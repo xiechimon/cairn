@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { join, resolve } from 'node:path';
+import { readOrbOwner } from './owner.mjs';
 
 export function runtimeDirectory({
   root = '/',
@@ -12,11 +13,7 @@ export function runtimeDirectory({
   io = fs,
   run = spawnSync,
 }) {
-  if (
-    !/^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name) ||
-    name === 'cairn-orb-base' ||
-    name === 'cairn-orb-computer'
-  )
+  if (!/^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name) || name === 'cairn-orb-base')
     throw new Error('Invalid machine name');
   if (![uid, gid].every((id) => Number.isInteger(id) && id > 0 && id < 65534))
     throw new Error('Invalid runtime owner');
@@ -162,8 +159,11 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   if (stop) args.shift();
   if (args.length !== 1)
     throw new Error('Usage: runtime-directory.mjs [--dry-run] [--stop] MACHINE');
+  const owner = readOrbOwner({
+    path: join(process.env.CAIRN_ORB_ROOT ?? '/', 'etc/cairn-orb/owner'),
+  });
   const ids = ['-u', '-g'].map((flag) => {
-    const result = spawnSync('/usr/bin/id', [flag, 'ian'], { encoding: 'utf8' });
+    const result = spawnSync('/usr/bin/id', [flag, owner], { encoding: 'utf8' });
     if (result.status !== 0) throw new Error('Cannot resolve runtime owner');
     return Number(result.stdout.trim());
   });

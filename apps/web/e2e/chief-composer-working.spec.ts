@@ -42,12 +42,14 @@ test('the narrow menu animates the same running context ring', async ({ page }) 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('reduced motion keeps the busy ring still', async ({ page }) => {
+test('reduced motion keeps the busy ring still and draws only its track', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/app?scenario=chief-draft');
   const meter = page.getByTestId('home-c').getByTestId('composer-context-meter');
   await expect(meter).toHaveAttribute('aria-busy', 'true');
   expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
+  await expect(meter.locator('circle')).toBeVisible();
+  await expect(meter.locator('path')).toBeHidden();
 });
 
 test('usage loading spins until the request settles, not forever on an empty reading', async ({ page }) => {

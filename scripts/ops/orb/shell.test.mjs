@@ -9,12 +9,11 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
-  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 
@@ -26,6 +25,9 @@ function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'cairn-orb-shell-'));
   const bin = join(root, 'bin');
   mkdirSync(bin);
+  const ownerFile = join(root, 'etc/cairn-orb/owner');
+  mkdirSync(dirname(ownerFile), { recursive: true });
+  writeFileSync(ownerFile, 'ian\n');
   const fake = join(bin, 'fake.mjs');
   writeFileSync(
     fake,
@@ -38,9 +40,15 @@ const args = process.argv.slice(2);
 const root = process.env.CAIRN_ORB_ROOT;
 appendFileSync(join(root, 'calls'), JSON.stringify([cmd, ...args]) + '\\n');
 if (process.env.FAIL_COMMAND === cmd) process.exit(1);
-if (cmd === 'node') console.log(args[0].endsWith('/runtime-directory.mjs') || args[0].endsWith('/computer-home.mjs') ? (process.env.HOME_CHANGES ?? '0') + ' changes' : JSON.stringify({ http: process.env.http_proxy, https: process.env.https_proxy }));
+if (cmd === 'node') console.log(args[0].endsWith('/runtime-directory.mjs') ? '0 changes' : JSON.stringify({ http: process.env.http_proxy, https: process.env.https_proxy }));
 if (cmd === 'sysctl') console.log(process.env.PROTECTED_HARDLINKS ?? '1');
-if (cmd === 'id') console.log(args[0] === '-un' ? (process.env.FAKE_USER || 'root') : args.includes('ian') ? (process.env.AGENT_UID || '1000') : '0');
+if (cmd === 'id') {
+  const named = args.find((arg) => !arg.startsWith('-'));
+  if (args[0] === '-un') console.log(process.env.FAKE_USER || 'root');
+  else if (!named) console.log('0');
+  else if (['ian', 'alice'].includes(named)) console.log(process.env.AGENT_UID || '1000');
+  else process.exit(1);
+}
 if (cmd === 'runuser' || cmd === 'bash') console.log(args.some((arg) => arg.includes('daemon-package.mjs')) ? (process.env.CAIRN_ORB_NODE_MAJOR || process.env.HOST_NODE_MAJOR || '26') : args.at(-1).includes('claude') ? (process.env.BAD_VERSION || '2.1.302 (Claude Code)') : 'codex-cli 0.163.0');
 if (cmd !== 'systemd-nspawn' && cmd !== 'pacstrap' && args.some((arg) => arg === '-M' || arg.startsWith('--machine'))) process.exit(91);
 if (cmd === 'machinectl' && args.some((arg) => ['bind', 'shell', 'login', 'copy-to', 'copy-from'].includes(arg))) process.exit(92);
@@ -75,7 +83,7 @@ if (cmd === 'pacstrap') {
   }
   if (process.env.MOUNTED_STAGE) writeFileSync(join(root, 'active-mount'), args[2] + '/dev');
 }
-if (cmd === 'findmnt' && args.includes('--target')) { console.log(args.at(-1).includes('cairn-computer') ? (process.env.HOME_MOUNT_OPTIONS ?? 'rw,nosuid,nodev') : (process.env.RUN_MOUNT_OPTIONS ?? 'rw,nosuid,nodev')); process.exit(0); }
+if (cmd === 'findmnt' && args.includes('--target')) { console.log(process.env.RUN_MOUNT_OPTIONS ?? 'rw,nosuid,nodev'); process.exit(0); }
 if (cmd === 'findmnt' && existsSync(join(root, 'active-mount'))) {
   const active = readFileSync(join(root, 'active-mount'), 'utf8');
   console.log(join(realpathSync(dirname(active)), basename(active)));
@@ -96,7 +104,7 @@ if (cmd === 'arch-chroot') {
   });
   if (!input.includes('major < 22') || !input.includes('passwd --lock root') || !input.includes('systemctl mask sshd')) process.exit(3);
 }
-if (cmd === 'machinectl') console.log('cairn-orb-base directory no\\ncairn-orb-computer directory no');
+if (cmd === 'machinectl') console.log('cairn-orb-base directory no');
 if (cmd === 'cp') cpSync(args.at(-2).slice(0, -2), args.at(-1), { recursive: true });
 if (cmd === 'systemd-nspawn' && args.includes('/usr/bin/node')) console.log(process.env.GUEST_NODE_MAJOR || '26');
 if (cmd === 'systemctl') {
@@ -155,13 +163,12 @@ if (cmd === 'ip') console.log('7: vz-cairn inet ' + (process.env.BRIDGE_IP || '1
     existsSync(join(root, 'calls'))
       ? readFileSync(join(root, 'calls'), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse)
       : [];
-  return { root, run, calls, env };
+  return { root, run, calls, env, ownerFile };
 }
 
 for (const file of [
   'install-host.sh',
   'build-image.sh',
-  'build-computer-image.sh',
   'prepare-machine.sh',
   'egress-relay.sh',
   'orb-host-check.sh',
@@ -252,87 +259,6 @@ test('invalid host pins and an unrelated existing image fail closed', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /preserve/);
     assert.ok(!f.calls().some(([cmd]) => cmd === 'pacstrap'));
-  } finally {
-    rmSync(f.root, { recursive: true, force: true });
-  }
-});
-
-test('a computer Orb gets its persistent home bind and the computer template never starts', () => {
-  const f = fixture();
-  try {
-    for (const [from, to] of [
-      ['cairn-orb.nspawn', 'etc/systemd/nspawn/cairn-orb.nspawn'],
-      [
-        'systemd-nspawn@cairn-orb-.service.d/limits.conf',
-        'etc/systemd/system/systemd-nspawn@cairn-orb-.service.d/limits.conf',
-      ],
-    ]) {
-      mkdirSync(join(f.root, to, '..'), { recursive: true });
-      writeFileSync(join(f.root, to), readFileSync(join(source, from)));
-    }
-    const name = 'cairn-orb-computer-abc';
-    const first = f.run('prepare-machine.sh', [name], { HOME_CHANGES: '1' });
-    assert.equal(first.status, 0, first.stderr);
-    assert.ok(
-      f
-        .calls()
-        .some(
-          (call) =>
-            call[0] === 'node' && call[1].endsWith('/computer-home.mjs') && call[2] === name,
-        ),
-    );
-    const binds = readFileSync(join(f.root, `run/systemd/nspawn/${name}.binds`), 'utf8');
-    assert.match(
-      binds,
-      new RegExp(`--bind=/var/lib/cairn-computer/${name}:/home/agent:idmap,norbind`),
-    );
-    assert.match(
-      binds,
-      new RegExp(`--bind=/run/cairn-orb/${name}/computer:/run/cairn-computer:idmap,norbind`),
-    );
-    assert.match(binds, /--bind=\/run\/cairn-orb\//);
-    assert.ok(existsSync(join(f.root, `run/cairn-orb/${name}/computer`)));
-    const dry = f.run('prepare-machine.sh', ['--dry-run', name]);
-    assert.equal(dry.status, 0, dry.stderr);
-    assert.ok(
-      f
-        .calls()
-        .some(
-          (call) =>
-            call[0] === 'node' &&
-            call.includes('--dry-run') &&
-            call[1].endsWith('/computer-home.mjs'),
-        ),
-    );
-    assert.notEqual(f.run('prepare-machine.sh', ['cairn-orb-computer']).status, 0);
-    assert.equal(f.run('prepare-machine.sh', ['cairn-orb-task-a']).status, 0);
-    assert.doesNotMatch(
-      readFileSync(join(f.root, 'run/systemd/nspawn/cairn-orb-task-a.binds'), 'utf8'),
-      /cairn-computer/,
-    );
-    assert.ok(
-      !f
-        .calls()
-        .some(
-          (call) => call[1]?.endsWith?.('/computer-home.mjs') && call.includes('cairn-orb-task-a'),
-        ),
-    );
-    assert.notEqual(f.run('prepare-machine.sh', ['--stop', 'cairn-orb-computer']).status, 0);
-    for (const options of ['rw,nodev', 'rw,nosuid', 'rw', '']) {
-      const before = f.calls().length;
-      const refused = f.run('prepare-machine.sh', ['cairn-orb-computer-def'], {
-        HOME_MOUNT_OPTIONS: options,
-      });
-      assert.notEqual(refused.status, 0, options);
-      assert.match(refused.stderr, /nosuid,nodev/);
-      const later = f.calls().slice(before);
-      assert.ok(
-        later.some(
-          (call) => call[0] === 'findmnt' && call.at(-1) === `${f.root}/var/lib/cairn-computer`,
-        ),
-      );
-      assert.ok(!later.some((call) => call[1]?.endsWith?.('/computer-home.mjs')));
-    }
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
@@ -614,7 +540,7 @@ test('a busy build lock prevents provisioning another image', () => {
 test('installer supplies the loopback proxy to provisioning commands', () => {
   const f = fixture();
   try {
-    const result = f.run('install-host.sh', ['--dry-run'], {
+    const result = f.run('install-host.sh', ['--dry-run', '--owner', 'ian'], {
       HTTP_PROXY: '',
       HTTPS_PROXY: '',
       http_proxy: '',
@@ -1063,237 +989,95 @@ test('btrfs mounted staging subvolume is preserved on failure', () => {
   }
 });
 
-function computerFixture() {
+test('build-image uses the owner from the owner file, not a fixed account', () => {
   const f = fixture();
-  const base = join(f.root, 'var/lib/machines/cairn-orb-base/etc');
-  mkdirSync(base, { recursive: true });
-  writeFileSync(
-    join(base, 'cairn-orb-image'),
-    'recipe=r\nclaude=2.1.302\ncodex=0.163.0\npnpm=10.0.0\nnode_major=26\nagent_uid=1000',
-  );
-  mkdirSync(join(f.root, 'etc/pacman.d'), { recursive: true });
-  writeFileSync(
-    join(f.root, 'etc/pacman.d/mirrorlist'),
-    'Server = https://mirror.example/$repo/os/$arch\n',
-  );
-  const image = join(f.root, 'var/lib/machines/cairn-orb-computer');
-  const stages = () =>
-    readdirSync(join(f.root, 'var/lib/machines')).filter((name) =>
-      name.startsWith('.cairn-orb-computer'),
-    );
-  return { ...f, image, stages };
-}
-
-test('computer image dry run plans the build without touching anything', () => {
-  const f = computerFixture();
   try {
-    const result = f.run('build-computer-image.sh', ['--dry-run']);
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(
-      result.stdout,
-      /pacman -Syu xorg-server-xvfb x11vnc fluxbox xdotool chromium imagemagick/,
-    );
-    assert.match(result.stdout, /1 planned changes/);
-    assert.equal(existsSync(f.image), false);
-    assert.ok(
-      !f.calls().some(([cmd]) => ['systemd-nspawn', 'mv', 'flock', 'btrfs', 'cp'].includes(cmd)),
-    );
+    writeFileSync(f.ownerFile, 'alice\n');
+    const dry = f.run('build-image.sh', ['--dry-run'], {
+      FAKE_USER: 'alice',
+      FAIL_COMMAND: 'runuser',
+    });
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.ok(f.calls().some((call) => call[0] === 'id' && call.at(-1) === 'alice'));
+    assert.ok(!f.calls().some((call) => call.includes('ian')));
+    const other = f.run('build-image.sh', ['--dry-run'], { FAKE_USER: 'bob' });
+    assert.equal(other.status, 0, other.stderr);
+    const runuser = f.calls().find(([cmd]) => cmd === 'runuser');
+    assert.deepEqual(runuser.slice(0, 3), ['runuser', '-u', 'alice']);
+    const refused = f.run('build-image.sh', ['--dry-run'], { AGENT_UID: '0' });
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /Cannot map alice to guest agent UID/);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
 });
 
-test('computer image dry run on a fresh host plans the build after the base instead of failing', () => {
-  const f = computerFixture();
+test('build-image fails closed when the owner file is missing, invalid or names no account', () => {
+  const f = fixture();
   try {
-    rmSync(join(f.root, 'var/lib/machines/cairn-orb-base'), { recursive: true });
-    const result = f.run('build-computer-image.sh', ['--dry-run']);
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /after cairn-orb-base is built/);
-    assert.match(result.stdout, /1 planned changes/);
-    assert.ok(
-      !f.calls().some(([cmd]) => ['systemd-nspawn', 'mv', 'flock', 'btrfs', 'cp'].includes(cmd)),
-    );
-    assert.notEqual(f.run('build-computer-image.sh').status, 0);
-  } finally {
-    rmSync(f.root, { recursive: true, force: true });
-  }
-});
-
-test('computer image builds from the base with the host mirrorlist read-only and converges', () => {
-  const f = computerFixture();
-  try {
-    const first = f.run('build-computer-image.sh');
-    assert.equal(first.status, 0, first.stderr);
-    assert.match(first.stdout, /1 changes/);
-    const nspawn = f.calls().filter(([cmd]) => cmd === 'systemd-nspawn');
-    assert.ok(nspawn.length > 0);
-    for (const call of nspawn) {
-      assert.ok(
-        call.includes(`--bind-ro=${f.root}/etc/pacman.d/mirrorlist:/etc/pacman.d/mirrorlist`),
-      );
-      assert.ok(call.includes('--register=no'));
-    }
-    assert.ok(
-      nspawn.some((call) =>
-        [
-          'pacman',
-          '-Syu',
-          'xorg-server-xvfb',
-          'x11vnc',
-          'fluxbox',
-          'xdotool',
-          'chromium',
-          'imagemagick',
-          'wqy-microhei',
-        ].every((word) => call.includes(word)),
-      ),
-    );
-    const policy = JSON.parse(
-      readFileSync(join(f.image, 'etc/chromium/policies/managed/cairn.json'), 'utf8'),
-    );
-    assert.equal(policy.PasswordManagerEnabled, false);
-    assert.equal(policy.SyncDisabled, true);
-    const unit = readFileSync(
-      join(f.image, 'etc/systemd/system/cairn-computer-desktop.service'),
-      'utf8',
-    );
-    assert.match(unit, /^User=agent$/m);
-    const agent = readFileSync(
-      join(f.image, 'etc/systemd/system/cairn-computer-agent.service'),
-      'utf8',
-    );
-    assert.match(agent, /^User=agent$/m);
-    assert.match(agent, /^After=.*\bnetwork-online\.target\b/m);
-    assert.match(agent, /^Wants=network-online\.target$/m);
-    assert.ok(
-      nspawn.some(
-        (call) => call.includes('enable') && call.includes('systemd-networkd-wait-online.service'),
-      ),
-    );
-    const waitOnline = readFileSync(
-      join(f.image, 'etc/systemd/system/systemd-networkd-wait-online.service.d/ipv4.conf'),
-      'utf8',
-    );
-    assert.match(waitOnline, /^ExecStart=$/m);
-    assert.match(
-      waitOnline,
-      /^ExecStart=\/usr\/lib\/systemd\/systemd-networkd-wait-online --ipv4 --operational-state=routable --timeout=60$/m,
-    );
-    assert.match(agent, /^Environment=DISPLAY=:1$/m);
-    assert.match(agent, /^Environment=AGENT_BROWSER_NO_VERSION_CHECK=1$/m);
-    assert.match(agent, /^Environment=AGENT_BROWSER_EXECUTABLE_PATH=\/usr\/bin\/chromium$/m);
-    assert.match(agent, /^Restart=always$/m);
-    assert.match(agent, /^ExecStartPre=.*-S \/run\/cairn\/computer\.sock/m);
-    assert.ok(
-      nspawn.some(
-        (call) =>
-          call.includes('npm') &&
-          call.includes('install') &&
-          call.some((arg) => /^agent-browser@/.test(arg)) &&
-          call.includes('--ignore-scripts') &&
-          !call.includes('runuser'),
-      ),
-    );
-    const install = nspawn.findIndex((call) => call.some((arg) => /^agent-browser@/.test(arg)));
-    const chmod = nspawn.findIndex(
-      (call) =>
-        !call.includes('runuser') &&
-        call.some((arg) => /chmod 755 .*agent-browser\/bin\/agent-browser-linux-/.test(arg)),
-    );
-    const runs = nspawn.findIndex(
-      (call) =>
-        call.includes('runuser') &&
-        call.includes('agent') &&
-        call.includes('agent-browser') &&
-        call.includes('--version'),
-    );
-    assert.ok(install >= 0 && chmod > install && runs > chmod, JSON.stringify(nspawn));
-    assert.match(
-      agent,
-      /^ExecStart=\/usr\/bin\/node \/opt\/cairn\/daemon\/cli\.mjs orb-computer --socket \/run\/cairn\/computer\.sock$/m,
-    );
-    const systemctl = f.calls().filter((call) => call.includes('systemctl'));
-    assert.ok(
-      systemctl.some(
-        (call) => call.includes('enable') && call.includes('cairn-computer-agent.service'),
-      ),
-    );
-    assert.ok(
-      systemctl.some(
-        (call) => call.includes('disable') && call.includes('cairn-orb-worker.service'),
-      ),
-    );
-    const desktop = readFileSync(join(f.image, 'usr/local/lib/cairn-computer/desktop.sh'), 'utf8');
-    assert.match(desktop, /-unixsock \/run\/cairn-computer\/view\.sock -viewonly/);
-    assert.doesNotMatch(unit, /RuntimeDirectory=cairn-computer/);
-    assert.match(unit, /ExecStartPre=.*-d \/run\/cairn-computer/);
-    assert.match(desktop, /-nolisten tcp/);
-    assert.doesNotMatch(desktop, /-rfbport [1-9]/);
-    assert.equal(existsSync(join(f.image, 'etc/cairn-orb-image')), false);
-    assert.match(readFileSync(join(f.image, 'etc/cairn-orb-computer-image'), 'utf8'), /^recipe=/);
-    const published = join(f.root, 'var/lib/cairn-orb/computer-image');
-    assert.equal(
-      readFileSync(published, 'utf8'),
-      readFileSync(join(f.image, 'etc/cairn-orb-computer-image'), 'utf8'),
-    );
-    assert.equal(statSync(published).mode & 0o777, 0o644);
-    assert.deepEqual(f.stages(), []);
-    rmSync(published);
-    const second = f.run('build-computer-image.sh');
-    assert.equal(second.status, 0, second.stderr);
-    assert.equal(second.stdout.trim(), '0 changes');
-    assert.equal(
-      readFileSync(published, 'utf8'),
-      readFileSync(join(f.image, 'etc/cairn-orb-computer-image'), 'utf8'),
-    );
-    writeFileSync(
-      join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image'),
-      'recipe=r2\nclaude=2.1.302\ncodex=0.163.0\npnpm=10.0.0\nnode_major=26\nagent_uid=1000',
-    );
-    const rebuilt = f.run('build-computer-image.sh');
-    assert.equal(rebuilt.status, 0, rebuilt.stderr);
-    assert.match(rebuilt.stdout, /rebuild cairn-orb-computer/);
-    assert.deepEqual(f.stages(), []);
-  } finally {
-    rmSync(f.root, { recursive: true, force: true });
-  }
-});
-
-test('computer image refuses a missing base, Node drift and an unrecognized image, and keeps the previous one on failure', () => {
-  const f = computerFixture();
-  try {
-    assert.equal(f.run('build-computer-image.sh').status, 0);
-    const marker = readFileSync(join(f.image, 'etc/cairn-orb-computer-image'), 'utf8');
-    writeFileSync(
-      join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image'),
-      'recipe=r3\nclaude=2.1.302\ncodex=0.163.0\npnpm=10.0.0\nnode_major=26\nagent_uid=1000',
-    );
-    const drift = f.run('build-computer-image.sh', [], { GUEST_NODE_MAJOR: '27' });
-    assert.notEqual(drift.status, 0);
-    assert.match(drift.stderr, /Guest Node major 27 differs/);
-    assert.equal(readFileSync(join(f.image, 'etc/cairn-orb-computer-image'), 'utf8'), marker);
-    assert.deepEqual(f.stages(), []);
-    const failed = f.run('build-computer-image.sh', [], { FAIL_COMMAND: 'systemd-nspawn' });
-    assert.notEqual(failed.status, 0);
-    assert.equal(readFileSync(join(f.image, 'etc/cairn-orb-computer-image'), 'utf8'), marker);
-    assert.deepEqual(f.stages(), []);
-    rmSync(join(f.image, 'etc/cairn-orb-computer-image'));
-    const unknown = f.run('build-computer-image.sh');
-    assert.notEqual(unknown.status, 0);
-    assert.match(unknown.stderr, /Unrecognized existing computer image/);
-    assert.ok(existsSync(f.image));
-    rmSync(join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image'));
-    const calls = f.calls().length;
-    const missing = f.run('build-computer-image.sh');
+    rmSync(f.ownerFile);
+    const missing = f.run('build-image.sh', ['--dry-run']);
     assert.notEqual(missing.status, 0);
-    assert.match(missing.stderr, /Build cairn-orb-base first/);
-    assert.ok(
-      !f
-        .calls()
-        .slice(calls)
-        .some(([cmd]) => cmd === 'systemd-nspawn'),
-    );
+    assert.match(missing.stderr, /Cannot read the orb owner file/);
+    for (const content of ['', 'Ian\n', 'a b\n', 'ian\nroot\n', '-ian\n', `${'a'.repeat(33)}\n`]) {
+      writeFileSync(f.ownerFile, content);
+      const result = f.run('build-image.sh', ['--dry-run']);
+      assert.notEqual(result.status, 0, JSON.stringify(content));
+      assert.match(result.stderr, /Invalid orb owner/);
+    }
+    writeFileSync(f.ownerFile, 'ghost\n');
+    const ghost = f.run('build-image.sh', ['--dry-run']);
+    assert.notEqual(ghost.status, 0);
+    assert.match(ghost.stderr, /Cannot map ghost to guest agent UID/);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('build-image takes --owner only in a dry run and only while the owner file is absent', () => {
+  const f = fixture();
+  try {
+    rmSync(f.ownerFile);
+    const planned = f.run('build-image.sh', ['--dry-run', '--owner', 'alice'], {
+      FAKE_USER: 'alice',
+    });
+    assert.equal(planned.status, 0, planned.stderr);
+    assert.notEqual(f.run('build-image.sh', ['--owner', 'alice']).status, 0);
+    assert.notEqual(f.run('build-image.sh', ['--dry-run', '--owner', 'Alice!']).status, 0);
+    writeFileSync(f.ownerFile, 'ian\n');
+    rmSync(join(f.root, 'calls'));
+    f.run('build-image.sh', ['--dry-run', '--owner', 'alice'], { FAKE_USER: 'ian' });
+    assert.ok(!f.calls().some((call) => call[0] === 'id' && call.at(-1) === 'alice'));
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('install-host.sh refuses a missing, root, invalid or nonexistent owner and accepts --owner or SUDO_USER', () => {
+  const f = fixture();
+  try {
+    const env = { HTTP_PROXY: '', HTTPS_PROXY: '', http_proxy: '', https_proxy: '' };
+    const refuse = (args, extra = {}) => {
+      const result = f.run('install-host.sh', args, { ...env, SUDO_USER: '', ...extra });
+      assert.notEqual(result.status, 0, JSON.stringify([args, extra]));
+      assert.match(result.stderr, /Cannot choose the orb owner/);
+    };
+    if (!existsSync('/etc/cairn-orb/owner')) {
+      refuse(['--dry-run']);
+      refuse(['--dry-run'], { SUDO_USER: 'root' });
+      refuse(['--dry-run'], { SUDO_USER: 'ghost' });
+      refuse(['--dry-run', '--owner']);
+    }
+    refuse(['--dry-run', '--owner', 'root']);
+    refuse(['--dry-run', '--owner', 'Alice']);
+    refuse(['--dry-run', '--owner', 'ghost']);
+    assert.equal(f.run('install-host.sh', ['--dry-run', '--owner', 'alice'], env).status, 0);
+    assert.equal(f.run('install-host.sh', ['--dry-run'], { ...env, SUDO_USER: 'alice' }).status, 0);
+    const flagWins = f.run('install-host.sh', ['--dry-run', '--owner', 'alice'], {
+      ...env,
+      SUDO_USER: 'root',
+    });
+    assert.equal(flagWins.status, 0, flagWins.stderr);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

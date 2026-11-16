@@ -146,7 +146,9 @@ export function ProviderModelChips({
               </Button>
             )}
             {options.length === 0 && !canAddTyped && (
-              <p className="m-0 px-2 py-2 text-meta text-content-tertiary">{t('没有匹配的模型')}</p>
+              <p className="m-0 px-2 py-2 text-meta text-content-tertiary">
+                {typed === '' ? t('输入模型 ID，按回车添加') : t('没有匹配的模型')}
+              </p>
             )}
           </div>
         </PopoverContent>

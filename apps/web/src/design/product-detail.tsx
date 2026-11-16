@@ -7,12 +7,7 @@ import { Button } from '../components/ui/button.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { Composer } from '../detail/composer.js';
 import { DocPane } from '../detail/docpane.js';
-import {
-  Segments,
-  TaskMentionAsLinkContext,
-  TodoGlanceContext,
-  TodoStatus,
-} from '../detail/segments.js';
+import { Segments, TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { SpecBlock } from '../detail/spec-block.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
@@ -407,7 +402,7 @@ export function ProductDetailSection() {
       <Specimen
         id="task-references"
         title="Task references"
-        note="Reference row above a Coordinator reply, per task state: a tinted tile and the title. In the sentence the task is its title as a plain link"
+        note="Reference row above a Coordinator reply, per task state: a tinted tile and the title. In the sentence the task is a chip with the same state"
         className="flex-col items-start"
       >
         {TASK_REF_PHASES.map((phase) => (
@@ -425,21 +420,19 @@ export function ProductDetailSection() {
                   }}
                 />
                 <p className="m-0 text-ui leading-[22px]">
-                  <TaskMentionAsLinkContext.Provider value>
-                    <Segments
-                      codeClassName="chat-code"
-                      segments={[
-                        { text: 'Added the repository, and the test task ' },
-                        {
-                          text: TASK_REF_TITLE,
-                          style: 'mention',
-                          mentionKind: 'todo',
-                          mentionId: `gallery-ref-${phase}`,
-                        },
-                        { text: ' is set up and reading it now.' },
-                      ]}
-                    />
-                  </TaskMentionAsLinkContext.Provider>
+                  <Segments
+                    codeClassName="chat-code"
+                    segments={[
+                      { text: 'Added the repository, and the test task ' },
+                      {
+                        text: TASK_REF_TITLE,
+                        style: 'mention',
+                        mentionKind: 'todo',
+                        mentionId: `gallery-ref-${phase}`,
+                      },
+                      { text: ' is set up and reading it now.' },
+                    ]}
+                  />
                 </p>
               </div>
             </TodoGlanceContext.Provider>

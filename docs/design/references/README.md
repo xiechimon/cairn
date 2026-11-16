@@ -97,6 +97,8 @@ Not captured: a PR state with CI and a merged badge (t3code needs a GitHub remot
 
 Amp does not use a wizard. The composer carries the state, and the screens below show the empty app, what is missing, and the way to fix it.
 
+Cairn departs from Amp here (owner 2026-11-15): Cairn ships as the desktop app, which starts the local Runner, so a newcomer's one missing piece is models. A team with no projects gets a two-step setup page (connect models, confirm the Coordinator and new-task models) before its first project; after that the composer chip below carries the state as in Amp.
+
 | File | State | What to compare |
 |---|---|---|
 | `amp-composer-orb-setup-banner.jpg` | new thread, nothing set up | Banner under the composer: what is missing, one primary action, `Docs`, `Dismiss` |

@@ -1,8 +1,9 @@
 import {
   type AgentTodoItem,
-  type ChiefDigestItem,
   type ChiefReportContent,
   type ClaudeLogin,
+  type ConfinementCause,
+  type ConfinementReport,
   type GithubRepoSummary,
   type MachineExecutor,
   type MachineHardware,
@@ -22,10 +23,12 @@ import {
   type SecretRecord,
   type SkillFact,
   type StepPromptOrigin,
+  type StepQueueBlocked,
   type TagRecord,
   type TaskRequest,
   type ThreadMessageContent,
   type ThreadReportContent,
+  type TodoDeliverables,
   type TodoOutputKind,
   type TodoOwner,
   type TodoSection,
@@ -53,7 +56,7 @@ export interface BuildRef {
   createdAt: number;
 }
 
-export type MadeKind = 'document' | 'design' | 'page' | 'code';
+export type MadeKind = 'document' | 'design' | 'page' | 'slides' | 'code';
 
 export interface TodoRecord {
   id: string;
@@ -92,6 +95,7 @@ export interface TodoRecord {
   output?: TodoOutputKind;
   section?: TodoSection | null;
   madeKind?: MadeKind;
+  deliverables?: TodoDeliverables;
   previewUrl?: string;
   visibility?: 'private' | 'team';
   routeOverride?: RouteOverride | null;
@@ -150,6 +154,13 @@ export interface OverlayUi {
   langDropdownOpen?: boolean;
   notificationBanner?: boolean;
   notificationPermission?: NotificationPermission;
+  mcpDialog?:
+    | { kind: 'catalog'; catalogId: string }
+    | { kind: 'custom' }
+    | { kind: 'manage'; connectorId: string }
+    | { kind: 'authorizing'; catalogId: string }
+    | { kind: 'confirm'; name: string; host: string }
+    | { kind: 'landing'; reason: string; name?: string };
 }
 
 export interface ScheduleRecord {
@@ -237,7 +248,6 @@ export interface FixtureSet {
   ui?: OverlayUi;
   usageNav?: boolean;
   schedules?: ScheduleRecord[];
-  scheduleForm?: 'hourly' | 'daily' | 'weekly' | 'once';
   project?: ProjectContent;
   team?: TeamContent;
   apiKeys?: ApiKeysContent;
@@ -292,6 +302,8 @@ export interface MachineRow {
     hardware?: MachineHardware;
     executor?: MachineExecutor;
     osPlatform?: MachineOsPlatform;
+    confinement?: ConfinementReport;
+    confinementCause?: ConfinementCause;
     computer?: true;
     ownComputer?: true;
     browser?: true;
@@ -312,6 +324,7 @@ export interface MachineRow {
 export interface ResourcesContent {
   skills: SkillRow[];
   mcpServers: McpRow[];
+  mcpConnectors?: import('@cairn/shared').McpConnectorRecord[];
   machines: MachineRow[];
   providerSources: ModelSource[];
   providers?: ProviderRecord[];
@@ -319,6 +332,7 @@ export interface ResourcesContent {
   secrets?: SecretRecord[];
   accounts?: AccountsContent;
   routingSettings?: import('@cairn/shared').TeamRoutingSettings;
+  topModels?: import('@cairn/shared').TopModel[] | null;
 }
 
 export interface DocSegment {
@@ -393,6 +407,8 @@ export type TranscriptItem =
       labelVars?: Record<string, string | number>;
       signalAt?: number;
       skills?: SkillFact[];
+      blocked?: true;
+      blockedKind?: StepQueueBlocked['kind'];
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }
@@ -401,6 +417,7 @@ export type TranscriptItem =
   | {
       kind: 'note';
       text: string;
+      vars?: Record<string, string>;
       id?: string;
     }
   | { kind: 'scheduled'; id?: string; stepId?: string }
@@ -553,6 +570,7 @@ export type ChiefStreamItem =
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string; createdAt?: number }
   | { kind: 'handoff'; todoId: string; id?: string }
+  | { kind: 'report-ack'; id: string; todoId: string; buildId: string }
   | {
       kind: 'takeover';
       id: string;
@@ -613,18 +631,12 @@ export type ChiefStreamItem =
       createdAt?: number;
       fallbackModel?: string;
       projectId?: string | null;
+      report?: { todoId: string; buildId: string };
     }
   | {
       kind: 'thinking';
       text: string;
       id?: string;
-    }
-  | {
-      kind: 'digest';
-      id: string;
-      reason: 'daily' | 'threshold';
-      madeAt: number;
-      items: ChiefDigestItem[];
     }
   | {
       kind: 'daily-report';
@@ -645,7 +657,8 @@ export type ChiefStreamItem =
       labelVars?: Record<string, string | number>;
       labelDetail?: { label: string; vars: Record<string, string | number> };
       signalAt?: number;
-      waiting?: boolean;
+      blocked?: true;
+      blockedKind?: StepQueueBlocked['kind'];
     };
 
 export interface ChiefToolRow {
@@ -663,6 +676,7 @@ export interface ChiefThreadRef {
 export type ChiefSettingsTab = 'routing' | 'charter' | 'memory' | 'watches';
 
 export interface ModelOption {
+  runtime: string;
   provider: string;
   machineId?: string;
   providerLabel: string;

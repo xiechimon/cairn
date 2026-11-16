@@ -1,13 +1,8 @@
 import { cn } from 'cn';
 import type { AccountStatus, VerifyFailure } from '../api/account-verification.js';
-import type {
-  AccountStep,
-  QuotaWindow,
-  StickyThread,
-  SubscriptionAccount,
-} from '../api/claude-accounts.js';
+import type { AccountStep, QuotaWindow, SubscriptionAccount } from '../api/claude-accounts.js';
 import { relativeTime } from '../board/rel-time.js';
-import { AccountStepRow, StickyThreadRow, useClock } from '../components/accounts/account-parts.js';
+import { AccountStepRow, useClock } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
 import { ListCard } from '../components/list-card.js';
 import {
@@ -184,7 +179,6 @@ export function SubscriptionDetail({
   view,
   verifying,
   steps,
-  sticky,
   actions,
 }: {
   account: SubscriptionAccount;
@@ -192,7 +186,6 @@ export function SubscriptionDetail({
   view: SubscriptionStatusView;
   verifying: boolean;
   steps: AccountStep[] | undefined;
-  sticky: StickyThread[];
   actions: SubscriptionActions;
 }) {
   const { t } = useI18n();
@@ -290,15 +283,6 @@ export function SubscriptionDetail({
               ) : (
                 steps.map((step) => <AccountStepRow key={step.stepId} step={step} now={now} />)
               )}
-            </ListCard>
-          </SettingsSection>
-        )}
-        {sticky.length > 0 && (
-          <SettingsSection title={t('固定账户的 thread')}>
-            <ListCard>
-              {sticky.map((thread) => (
-                <StickyThreadRow key={thread.threadId} thread={thread} now={now} />
-              ))}
             </ListCard>
           </SettingsSection>
         )}

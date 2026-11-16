@@ -42,8 +42,97 @@ export function turnSpanRecords(
   return records;
 }
 
+interface TurnIdentity {
+  threadId: string;
+  stepId: string;
+  provider: string;
+  model: string;
+}
+
+export interface SetupTiming {
+  begin(turn: TurnIdentity): void;
+  mark(threadId: string, name: string): void;
+  end(threadId: string): void;
+}
+
+interface SetupMark {
+  name: string;
+  at: number;
+  maxEventLoopDelayMs: number;
+}
+
+const LOOP_TICK_MS = 10;
+
+interface LoopWatch {
+  take(): number;
+  stop(): void;
+}
+
+function watchEventLoop(): LoopWatch {
+  let last = performance.now();
+  let worst = 0;
+  const timer = setInterval(() => {
+    const at = performance.now();
+    worst = Math.max(worst, at - last - LOOP_TICK_MS);
+    last = at;
+  }, LOOP_TICK_MS);
+  return {
+    take: () => {
+      const at = performance.now();
+      const delay = Math.max(worst, at - last - LOOP_TICK_MS, 0);
+      worst = 0;
+      last = at;
+      return Math.round(delay);
+    },
+    stop: () => clearInterval(timer),
+  };
+}
+
+export function createSetupTiming(now: () => number = Date.now): SetupTiming {
+  const open = new Map<string, { turn: TurnIdentity; marks: SetupMark[]; loop: LoopWatch }>();
+  const close = (threadId: string) => {
+    const setup = open.get(threadId);
+    if (setup === undefined) return undefined;
+    open.delete(threadId);
+    setup.loop.stop();
+    return setup;
+  };
+  return {
+    begin: (turn) => {
+      close(turn.threadId);
+      open.set(turn.threadId, {
+        turn,
+        marks: [{ name: 'start', at: now(), maxEventLoopDelayMs: 0 }],
+        loop: watchEventLoop(),
+      });
+    },
+    mark: (threadId, name) => {
+      const setup = open.get(threadId);
+      if (setup === undefined) return;
+      setup.marks.push({ name, at: now(), maxEventLoopDelayMs: setup.loop.take() });
+    },
+    end: (threadId) => {
+      const setup = close(threadId);
+      if (setup === undefined) return;
+      const { marks } = setup;
+      try {
+        emitCoordinatorTurnSpans(
+          setup.turn,
+          marks.slice(1).map((mark, i) => ({
+            kind: 'setup',
+            name: mark.name,
+            startAt: marks[i]?.at ?? mark.at,
+            endAt: mark.at,
+            maxEventLoopDelayMs: mark.maxEventLoopDelayMs,
+          })),
+        );
+      } catch {}
+    },
+  };
+}
+
 export function emitTurnSpans(
-  turn: { threadId: string; stepId: string; provider: string; model: string },
+  turn: TurnIdentity,
   entries: readonly EntryRecord[],
   now: () => number,
   redactText = false,

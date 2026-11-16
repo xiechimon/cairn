@@ -68,13 +68,33 @@ export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TF
   return [...new Set(purposes.filter((purpose) => purpose !== ''))].slice(0, NAMED_PURPOSES);
 }
 
-export function workOutcome(steps: readonly WorkStep[], t: TFunc): string[] {
-  const edited = new Set(
-    steps.flatMap((step) =>
-      step.kind === 'call' && step.action === 'edit' ? [step.target ?? ''] : [],
-    ),
+const FILE_NAME = /([\w.-]+\.[A-Za-z]\w*)/;
+
+function touchedFiles(steps: readonly WorkStep[], action: 'read' | 'edit'): string[] {
+  const paths = steps.flatMap((step) =>
+    step.kind === 'call' && step.action === action && !step.running && !step.error
+      ? [(step.target ?? '').replace(/ L\d.*$/, '').trim()]
+      : [],
   );
-  const test = steps.findLast(
+  return [...new Set(paths.filter((path) => path !== ''))];
+}
+
+function fileNames(paths: readonly string[], t: TFunc): string {
+  const [first = '', second = ''] = paths.map((path) => path.split('/').pop() ?? path);
+  if (paths.length === 1) return first;
+  return paths.length === 2
+    ? t('{first}、{second}', { first, second })
+    : t('{first}、{second} 等 {n} 个文件', {
+        first,
+        second,
+        n: paths.length,
+        more: paths.length - 2,
+      });
+}
+
+export function workResult(steps: readonly WorkStep[], t: TFunc): string | null {
+  const edited = touchedFiles(steps, 'edit');
+  const testIndex = steps.findLastIndex(
     (step) =>
       step.kind === 'call' &&
       step.action === 'run' &&
@@ -82,19 +102,19 @@ export function workOutcome(steps: readonly WorkStep[], t: TFunc): string[] {
       !step.unfinished &&
       TEST_COMMAND.test(step.command ?? ''),
   );
-  if (test?.kind === 'call')
-    return [
-      t(
-        edited.size > 0
-          ? test.error
-            ? '改完测试未通过'
-            : '改完测试通过'
-          : test.error
-            ? '测试未通过'
-            : '测试通过',
-      ),
-    ];
-  return edited.size > 0 ? [t('改了 {n} 个文件', { n: edited.size })] : [];
+  const lastEdit = steps.findLastIndex(
+    (step) => step.kind === 'call' && step.action === 'edit' && !step.running && !step.error,
+  );
+  const test = steps[testIndex];
+  const verdict = test?.kind === 'call' && testIndex > lastEdit ? test : undefined;
+  if (edited.length > 0) {
+    const files = fileNames(edited, t);
+    if (verdict === undefined) return t('改了 {files}', { files });
+    return t(verdict.error ? '改了 {files}，测试未通过' : '改了 {files}，测试通过', { files });
+  }
+  if (verdict !== undefined) return t(verdict.error ? '测试未通过' : '测试通过');
+  const read = touchedFiles(steps, 'read');
+  return read.length > 0 ? t('读了 {files}', { files: fileNames(read, t) }) : null;
 }
 
 function stepTarget(step: Extract<WorkStep, { kind: 'call' }>): string {
@@ -157,7 +177,11 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
             stepTarget(call)
           )
         }
-        mono={call !== null && call.description === undefined && call.command !== undefined}
+        mono={
+          call !== null &&
+          call.description === undefined &&
+          (call.command !== undefined || call.action === 'edit' || call.action === 'read')
+        }
         trailing={
           <>
             {call?.diff !== undefined && (
@@ -208,7 +232,10 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
               prompt={call.command !== undefined}
               command={call.command ?? call.target ?? call.label}
             />
-            <TraceOutput data-testid="tool-output">
+            <TraceOutput
+              data-testid="tool-output"
+              className={call.error && changeLines === null ? 'text-destructive' : undefined}
+            >
               {call.error && changeLines !== null && call.output !== null && (
                 <span className="block text-destructive" data-testid="edit-error">
                   {call.output}
@@ -274,23 +301,29 @@ export function WorkTrace({
   counts.edit = editPaths.size;
   const { text, failed } = traceSummary(t, counts, running);
   const purposes = workPurposes(item.steps, running, t);
-  const outcome = running || purposes.length === 0 ? [] : workOutcome(item.steps, t);
+  const result = running ? null : workResult(item.steps, t);
+  const detail = !running && purposes.length > 0 ? `${purposes.join(t('，'))} · ${text}` : text;
   return (
     <div className="my-2 min-w-0" data-testid="work-block">
       <div className="flex items-center gap-1">
         <TraceGroupSummary
           data-testid="work-summary"
-          summary={purposes.length > 0 ? purposes.join(t('，')) : text}
-          outcome={outcome.length > 0 ? `${t('，')}${outcome.join(t('，'))}` : null}
-          more={
-            !running &&
-            purposes.length > 0 &&
-            outcome.length === 0 &&
-            item.steps.length > purposes.length
-              ? t('· {n} 步', { n: item.steps.length })
-              : null
+          summary={
+            running && purposes.length > 0
+              ? purposes.join(t('，'))
+              : result === null
+                ? text
+                : result.split(FILE_NAME).map((part, index) =>
+                    index % 2 === 1 ? (
+                      <span key={`${index}-${part}`} className="font-mono text-code">
+                        {part}
+                      </span>
+                    ) : (
+                      part
+                    ),
+                  )
           }
-          summaryTitle={failed === null ? text : `${text} ${failed}`}
+          summaryTitle={failed === null ? detail : `${detail} ${failed}`}
           failed={failed}
           open={expanded}
           running={running}

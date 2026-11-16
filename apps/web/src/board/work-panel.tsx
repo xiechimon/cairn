@@ -15,6 +15,7 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { MadeCard, MadeCarousel, MadeSkeleton } from './made-carousel.js';
+import { MadeFiles, sizeLabel } from './made-files.js';
 import { groupMade, MADE_GROUP_LABEL, madeGroupOf, matchesMadeQuery } from './made-groups.js';
 import { MadeSearch } from './made-search.js';
 import { joinMeta, relativeTime } from './rel-time.js';
@@ -23,6 +24,7 @@ import { threadStatus } from './thread-copy.js';
 export type WorkPane = 'tasks' | 'made' | 'machines' | 'file';
 
 export const PANE_PARAM = 'pane';
+export const TASKS_TAB_PARAM = 'tab';
 
 export function paneOf(value: string | null): WorkPane | null {
   return value === 'tasks' || value === 'made' || value === 'machines' || value === 'file'
@@ -64,6 +66,7 @@ function MadeReport({
     () => ({ buildId: todo.latestBuildId, title: todo.title, phase: todo.phase }),
     [todo.latestBuildId, todo.title, todo.phase],
   );
+  const { t } = useI18n();
   const { report, settled } = useBuildReport(thread);
   useEffect(() => {
     if (settled && report === null) {
@@ -72,7 +75,17 @@ function MadeReport({
     }
   }, [settled, report, onClose, onOpenThread, todo.id]);
   if (report === null) return null;
-  return <ResearchReportDialog report={report} open onClose={onClose} />;
+  const kind =
+    todo.madeKind === 'slides' ? t('PPT') : todo.madeKind === 'page' ? t('网页') : undefined;
+  return (
+    <ResearchReportDialog
+      report={kind === undefined ? report : { ...report, label: kind }}
+      open
+      onClose={onClose}
+    >
+      <MadeFiles deliverables={todo.deliverables} />
+    </ResearchReportDialog>
+  );
 }
 
 const isMade = (todo: TodoRecord) =>
@@ -119,7 +132,7 @@ export function WorkPanel({
       matchesMadeQuery(todo.title, projectOf(todo), query, t(MADE_GROUP_LABEL[group]))
     );
   });
-  const groups = groupMade(made);
+  const groups = groupMade(made, now);
   const activeQuery: QueryLike | undefined =
     tab === 'archived' && connected ? archivedQ : todosQuery;
 
@@ -178,6 +191,12 @@ export function WorkPanel({
                 todo={todo}
                 meta={joinMeta([
                   todo.phase === 'needs_input' ? t('待你决定') : undefined,
+                  todo.madeKind === 'slides'
+                    ? sizeLabel(
+                        todo.deliverables?.items.find((item) => item.kind === 'slides')
+                          ?.sizeBytes ?? 0,
+                      )
+                    : undefined,
                   relativeTime(todo.phaseAt, now, t),
                   projectOf(todo),
                 ])}
@@ -215,7 +234,7 @@ export function WorkPanel({
               data-testid="made-search-toggle"
               aria-pressed={searching}
               onClick={toggleSearch}
-              className="text-content-secondary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+              className="text-content-secondary hover:text-foreground pointer-coarse:size-11 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
             />
           }
         >

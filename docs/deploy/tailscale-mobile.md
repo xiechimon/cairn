@@ -1,76 +1,71 @@
-# Mobile remote access deployment: Tailscale Serve HTTPS
+# Use Cairn on your devices over Tailscale
 
-Your phone is the remote control: the server lives on an always-on host, and you reach it over a private tailnet. This route does not expose the service to the public internet. HTTPS is required for iOS web push and the PWA "Add to Home Screen" flow.
+Keep one Cairn server on your computer and open it from your own phone or another computer. Tailscale carries the private connection; Cairn still requires device pairing. No Cloudflare account, public gateway or router port forwarding is needed. The server computer must stay awake and online.
 
-## Prerequisites
+## 1. Start Cairn on the server computer
 
-- An always-on host with Tailscale installed and signed in, visible in `tailscale status`.
-- MagicDNS enabled in the tailnet admin console under DNS. Serve certificates use the MagicDNS name.
-- The server and its private socket run as the owner. Tailscale Serve must run as that uid or root to reach the socket.
-
-## 1. Run the server
-
-The default TCP listener stays on `127.0.0.1:8787`. The first start generates a private access token at `<CAIRN_HOME>/token`; it survives restarts. Keep it as the fallback credential. `cairn token --rotate` replaces it; restart to apply the replacement. Do not put token values in shared logs or screenshots.
-
-For a host already running system tailscaled, start the server with:
+Install Node.js 22 or 24, then run:
 
 ```sh
-CAIRN_TSNET=socket npx @xiechimon/cairn
+npx @xiechimon/cairn
 ```
 
-For a service, set `CAIRN_TSNET=socket` in its environment and restart it. This opens `<CAIRN_HOME>/tsnet/tailnet.sock` with mode `0600` in a private directory, without spawning the tsnet sidecar. The default `CAIRN_HOME` is `$HOME/.cairn`.
+Open `http://127.0.0.1:8787/app` on that computer. Keep authentication enabled: do not set `CAIRN_AUTH=off`. Cairn stores its database and owner token under `~/.cairn` by default (`CAIRN_HOME` overrides it). Keep the owner token private.
 
-Tailscale Serve only makes the server reachable. It does not sign the browser in. `CAIRN_TAILSCALE_USERS` is ignored and does not grant access. Another device signs in with a one-time pairing code from Remote access. A browser on the server machine exchanges a loopback bootstrap for an HttpOnly session and does not paste the owner token.
-
-On Linux, LocalAPI is read through `/var/run/tailscale/tailscaled.sock`; on macOS, `/var/run/tailscaled.socket`. Failure to read status grants no implicit identity access. The macOS App Store variant and a real Mac-to-Unix-Serve browser path remain unverified.
-
-`CAIRN_TSNET=1` retains embedded tsnet supervision instead. The sidecar supplies its own owner metadata and rejects sharee and tagged sources. With neither setting, no tailnet listener is created. Token auth must remain enabled for either listener arrangement.
-
-## 2. Repoint Tailscale Serve after merge
-
-**Operator action, deferred until this change merges. Do not run it as part of implementation or verification.** The coordinator applies the repoint on the deployment host, using that service's actual `CAIRN_HOME`:
+A Linux browser on the server computer can sign in through the local bootstrap. If the local browser asks for a pairing code, create one in the server terminal:
 
 ```sh
-tailscale serve --bg "unix:${CAIRN_HOME:-$HOME/.cairn}/tsnet/tailnet.sock"
+curl -s -X POST \
+  -H "Authorization: Bearer $(npx @xiechimon/cairn-cli token | head -1)" \
+  http://127.0.0.1:8787/api/remote/pairing
+```
+
+Enter the returned `code` on Cairn's pairing page. With an explicit `CAIRN_TOKEN`, use that configured owner token instead of the file. Pairing codes expire and work only once; never share them publicly.
+
+## 2. Enable private HTTPS
+
+Install Tailscale on the server computer, sign in, and connect. In the Tailscale admin console, enable MagicDNS and HTTPS certificates under DNS. Then, on the server computer:
+
+```sh
+tailscale status
+tailscale serve --bg http://127.0.0.1:8787
 tailscale serve status
 ```
 
-Use `tailscale serve`, never `tailscale funnel`. Do not reset unrelated Serve configuration. Confirm the target in `tailscale serve status` is the private Unix socket, not `http://127.0.0.1:8787`.
+If Serve prints an enablement link, open it, enable Serve, and run the command again. Copy the HTTPS address printed by Serve, for example `https://<machine>.<tailnet>.ts.net`. The target should be the running Cairn server on loopback. Do not use Funnel: that publishes a service to the internet. Do not run `tailscale serve reset`, which removes unrelated Serve configuration.
 
-The old loopback target remains a supported token-only fallback:
+This is the simplest supported setup. Existing `CAIRN_TSNET=socket` private-socket and `CAIRN_TSNET=1` embedded-sidecar installations can remain as they are; neither is required for this guide. Do not restart or reconfigure an already working server just to follow this guide.
+
+## 3. Pair your phone or another browser
+
+1. Install Tailscale on the other device, sign in to the same tailnet, and connect. Tailnet access rules must allow access to the server's HTTPS port.
+2. On the server computer, open Cairn's Settings → Remote access and create a pairing code. The terminal command in step 1 is the fallback.
+3. On the other device, open the HTTPS address from Serve with `/app` appended. Enter the pairing code and name the device. The browser keeps an HttpOnly session cookie; a Tailscale login alone does not sign you in to Cairn.
+4. On iPhone, optionally use Safari's Add to Home Screen. iOS web push requires the installed web app, not an ordinary browser tab.
+
+Only pair your own devices. A paired device can approve a new Runner. **A lost paired device can approve machines until you revoke that device.** Use the owner session on the server computer → Settings → Remote access to revoke it. Also revoke any Runner it already approved: revoking a browser does not revoke previously enrolled machines. Pairing-code creation, device revocation and credential administration still require the owner token/session.
+
+## 4. Add another computer as a Runner
+
+Opening Cairn in a browser does not register that computer for agent work. On the computer that should run tasks, install Node.js 22 or 24 and Tailscale, connect to the same tailnet, then run:
 
 ```sh
-tailscale serve --bg http://127.0.0.1:8787
+npm install -g @xiechimon/cairn-cli@latest
+cairn start --server https://<machine>.<tailnet>.ts.net
 ```
 
-It never provides ambient owner login, even if identity headers are present.
+Replace the example address with the server's HTTPS address. Alternatively, open Cairn **at that HTTPS address**, choose Add Runner, and copy its commands. Do not copy a loopback address to another computer: `127.0.0.1` on that computer is not your Cairn server.
 
-## 3. Connect from the phone
+Open the printed approval URL in a paired browser, including your phone, and approve the intended Runner. Use the Tailscale HTTPS URL for approval too, not the server's loopback URL. Wait until the Runner appears online. Its credentials are saved for later `cairn start` calls. Approval under the server's own hostname still requires the owner session: it can replace the local Runner's credential. A headless Runner can instead use the API-key command shown under Add Runner; creating that key requires the owner session.
 
-1. Install Tailscale, sign in to the tailnet, and connect.
-2. Open `https://<machine>.<tailnet>.ts.net/app` from another untagged device owned by the server's Tailscale user.
-3. The phone sees the pairing page, not a signed-in Tailscale login. `/api/teams` is 401 until a pairing code is entered. Create that code on the server machine in Settings → Remote access, or with the owner token against `POST /api/remote/pairing`.
-4. Use "Add to Home Screen" for the standalone PWA and iOS web push.
+Connect your model as described in [getting started](../getting-started.md#use-your-claude-subscription-on-your-machines), select the online Runner, and send a small task. The model and tools use your own server/Runner and credentials, not a Cairn-hosted gateway.
 
-Tailscale only makes the server reachable. It does not sign the browser in. Pairing remains per-device and individually revocable. Paired-device tokens cannot manage pairing or approve machine enrollment.
+## If it does not connect
 
-## Authentication boundary
+- No page: confirm both devices are connected to Tailscale, the server is awake, and `tailscale serve status` still points at Cairn.
+- Hostname does not resolve: enable MagicDNS and check tailnet access rules. Use the HTTPS hostname from Serve, not a raw IP address.
+- Pairing refused: mint a fresh code in the owner session; codes are single-use. A revoked device must pair again.
+- Runner stays offline: check its `--server` address and Tailscale connection, finish approval, then run `cairn status` or `cairn logs -f` on that computer.
+- A VPN or TUN-mode proxy interferes: allow tailnet traffic (`100.64.0.0/10`) to go directly. iOS permits only one VPN-class tunnel at a time.
 
-The private accepting listener, not TCP peer address, establishes header trust. TCP loopback never reads Tailscale identity headers for admission, preserving #3073. Funnel identity is never admitted. The sidecar strips incoming `Tailscale-*` headers before adding WhoIs identity; system Serve must retain its own identity-header rewriting.
-
-Any process that can reach the private socket can claim an identity. Mode `0600`, the owning uid, and its private parent directory are security boundaries. Same-uid processes and root are trusted; other local accounts are not. Startup refuses a socket owned by another uid or with a mode other than `0600`; do not widen permissions to make a proxy connect.
-
-A browser signs in with a pairing code or, on the Linux server machine, a loopback bootstrap. That becomes an HttpOnly session cookie. Cookie writes need same-origin proof. Bearer requests, including the owner token and device tokens, are exempt from that check. Tailscale identity headers do not admit a browser.
-
-## Public-internet alternative
-
-For public access, use token or QR pairing authentication and terminate TLS in front of the server. Keep `CAIRN_TOKEN` configured on non-loopback binds. Tailscale Serve is the private route, not a substitute for public-entry authentication.
-
-## Known pitfalls
-
-- Local TUN-mode proxies can interfere with tailnet traffic. Add `100.64.0.0/10` to bypass or direct rules. On iOS, only one VPN-class tunnel can be active at a time.
-- If the MagicDNS name does not resolve, confirm MagicDNS is enabled in the tailnet admin console.
-- iOS web push reaches the installed PWA, not a regular browser tab.
-- `tailscale serve reset` clears all Serve and Funnel configuration; do not use it for this repoint.
-
-Design and verification limits: [seamless device authentication research](../research/seamless-device-auth-2026-11-08.md). The independent `CAIRN_AUTH=off` Host allowlist recommendation is outside this change.
+Tailscale identity headers never replace Cairn authentication. Cookie writes require same-origin proof. Background service setup and model/runtime requirements are in [getting started](../getting-started.md); other settings are in [configuration](../configuration.md).

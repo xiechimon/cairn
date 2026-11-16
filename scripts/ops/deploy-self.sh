@@ -23,6 +23,8 @@ Deploys one green main commit to this host's cairn checkout and user units, with
      is paused, or whose pnpm-workspace.yaml allows a new install script (exit 2)
   2. respects $CAIRN_DEPLOY_STATE/hold; daemon changes pause claims with a durable lease
      and drain within CAIRN_DEPLOY_STEP_WAIT_SECONDS (exit 75 on timeout), always resuming;
+     server-only changes pause claims the same way and wait up to
+     CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS for claimed steps, then restart the server anyway;
      every deploy also waits that long for open Coordinator computer calls other than
      request_takeover, which resumes across a restart
   3. rehearses the target's migrations on an online copy of the live DB in a scratch worktree
@@ -44,6 +46,7 @@ Environment (defaults in brackets):
   CAIRN_REQUIRED_CHECKS [check pack-smoke e2e-gate]  CAIRN_HEALTH_URL [http://127.0.0.1:8787]
   CAIRN_HEALTH_TRIES [60]  CAIRN_HEALTH_INTERVAL [2]  CAIRN_MACHINE_NAME [hostname -s]
   CAIRN_DEPLOY_KEEP_SNAPSHOTS [10]  CAIRN_DEPLOY_STEP_WAIT_SECONDS [1800]
+  CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS [600]
   CAIRN_DEPLOY_NOTIFY [$CAIRN_DEPLOY_STATE/notify.sh]
   CAIRN_DEPLOY_NOTIFY_TIMEOUT [5]
   CAIRN_GH_WRAPPER [~/.cairn/tools/app-token/as-bot.sh]
@@ -67,6 +70,7 @@ KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
 NOTIFY_HOOK="${CAIRN_DEPLOY_NOTIFY:-$STATE/notify.sh}"
 NOTIFY_TIMEOUT="${CAIRN_DEPLOY_NOTIFY_TIMEOUT:-5}"
 STEP_WAIT_SECONDS="${CAIRN_DEPLOY_STEP_WAIT_SECONDS:-1800}"
+SERVER_STEP_WAIT_SECONDS="${CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS:-600}"
 TOKEN_FILE="${CAIRN_DEPLOY_TOKEN_FILE:-$HOME/.cairn/token}"
 HOST_TOOLS_ROOT="${CAIRN_HOST_TOOLS_ROOT:-$HOME/.cairn/tools}"
 HOST_LANES_ROOT="${CAIRN_HOST_LANES_ROOT:-$HOME/lanes}"
@@ -321,7 +325,7 @@ classify_runtime() {
   while IFS= read -r path; do
     case "$path" in
       *package.json | pnpm-lock.yaml | pnpm-workspace.yaml) RUNTIME=daemon ;;
-      apps/server/* | apps/web/* | integration/test/* | docs/* | packages/shared/src/tables.ts | packages/shared/test/vocabulary.test.ts | packages/shared/test/__snapshots__/snapshot.test.ts.snap | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
+      apps/server/* | apps/web/* | apps/ios/* | integration/* | docs/* | .github/* | README.md | README.zh.md | AGENTS.md | CLAUDE.md | CONTEXT.md | packages/shared/src/tables.ts | packages/shared/test/vocabulary.test.ts | packages/shared/test/__snapshots__/snapshot.test.ts.snap | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
       *) RUNTIME=daemon ;;
     esac
   done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET")
@@ -339,13 +343,18 @@ PYLEASE
 }
 
 wait_for_steps() {
-  local deadline=$(( $(date +%s) + STEP_WAIT_SECONDS )) running
+  local wait_seconds="${1:-$STEP_WAIT_SECONDS}" on_deadline="${2:-starve}" deadline running
+  deadline=$(( $(date +%s) + wait_seconds ))
   while :; do
     [ "$(sqlite3 -readonly "$DB" "select count(*) from deploy_lease where id='server' and owner='$LEASE_OWNER' and status='draining' and expiresAt > $(($(date +%s) * 1000))")" = 1 ] || refuse "deployment lease lost during drain"
     running="$(sqlite3 -readonly "$DB" "select count(*) from step where status='claimed' and machineId is not null")" || refuse "cannot read running steps"
     [[ "$running" =~ ^[0-9]+$ ]] || refuse "invalid running step count"
     [ "$running" != 0 ] || return 0
-    [ "$(date +%s)" -lt "$deadline" ] || busy "starved: steps never idle ($running still running after ${STEP_WAIT_SECONDS}s drain)"
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      [ "$on_deadline" = restart ] || busy "starved: steps never idle ($running still running after ${wait_seconds}s drain)"
+      log "drain deadline passed after ${wait_seconds}s; restarting the server with $running claimed steps still running"
+      return 0
+    fi
     sleep 1
   done
 }
@@ -363,35 +372,128 @@ wait_for_computer_calls() {
 }
 
 drain_steps() {
-  [ "$RUNTIME" = daemon ] || return 0
+  if [ "$RUNTIME" = server ]; then
+    local probe
+    probe="$(lease_request)" || true
+    case "$probe" in
+      200) ;;
+      000 | '' | 404)
+        log "restarting the server without a drain: the deployment lease request answered ${probe:-nothing}"
+        return 0
+        ;;
+      *) refuse_lease_status "$probe" ;;
+    esac
+  fi
   [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
   printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
   local status
   status="$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" || true
   [ "$status" = 200 ] || refuse_lease_status "$status"
   assert_lease || refuse "cannot acquire deployment lease: the server returned another owner or an expired lease"
-  wait_for_steps
+  if [ "$RUNTIME" = daemon ]; then
+    wait_for_steps
+  else
+    wait_for_steps "$SERVER_STEP_WAIT_SECONDS" restart
+  fi
 }
 
-allow_builds_block() {
-  git -C "$CHECKOUT" show "$1:pnpm-workspace.yaml" 2>/dev/null |
-    awk '/^allowBuilds:/{inside=1; print; next} inside && /^[^[:space:]#]/{inside=0} inside{print}'
+WORKSPACE_BUILD_GUARD='
+import { createRequire } from "node:module";
+const { parseDocument } = createRequire(process.argv[1])("yaml");
+const reasons = [];
+const read = (text, label) => {
+  const document = parseDocument(text, { uniqueKeys: true });
+  const problems = [...document.errors, ...document.warnings];
+  if (problems.length > 0) {
+    reasons.push(`${label} pnpm-workspace.yaml does not parse cleanly: ${String(problems[0].message).split("\n")[0]}`);
+    return {};
+  }
+  return document.toJS() ?? {};
+};
+const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const hasMergeKey = (value) =>
+  Array.isArray(value)
+    ? value.some(hasMergeKey)
+    : plain(value) && Object.entries(value).some(([key, child]) => key === "<<" || hasMergeKey(child));
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const booleans = (map) => plain(map) && Object.values(map).every((value) => typeof value === "boolean");
+const previous = read(process.argv[2], "previous");
+const target = read(process.argv[3], "target");
+if (!plain(previous) || !plain(target)) {
+  reasons.push("pnpm-workspace.yaml is not a mapping");
+} else {
+  if (hasMergeKey(target)) reasons.push("target pnpm-workspace.yaml uses a merge key");
+  for (const key of new Set([...Object.keys(previous), ...Object.keys(target)])) {
+    if (key !== "allowBuilds" && /build|script|pnpmfile|hook|config.?dependenc/i.test(key) && !same(previous[key], target[key])) {
+      reasons.push(`${key} changed`);
+    }
+  }
+  const before = previous.allowBuilds ?? {};
+  const after = target.allowBuilds ?? {};
+  if (!booleans(before) || !booleans(after)) {
+    if (!same(before, after)) reasons.push("allowBuilds changed and is not a map of booleans");
+  } else {
+    for (const [name, allowed] of Object.entries(after)) {
+      if (allowed && before[name] !== true) reasons.push(`allowBuilds permits ${name}`);
+    }
+    for (const [name, allowed] of Object.entries(before)) {
+      if (!allowed && after[name] !== false) reasons.push(`allowBuilds stops denying ${name}`);
+    }
+  }
 }
+if (reasons.length > 0) {
+  console.log(reasons.join("; "));
+  process.exit(1);
+}
+'
 
-hook_lines() {
-  { git -C "$CHECKOUT" show "$1:$2" 2>/dev/null || true; } |
-    { grep -E '"(pre|post)?(install|prepare)"[[:space:]]*:' || true; } |
-    sed -E 's/^[[:space:]]*//; s/,[[:space:]]*$//'
+MANIFEST_HOOK_GUARD='
+import { execFileSync } from "node:child_process";
+const [checkout, previous, target, ...manifests] = process.argv.slice(1);
+const installHook = /install|prepare|prepublish|^pnpm:/i;
+const reasons = [];
+const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const read = (sha, path) => {
+  const listed = execFileSync("git", ["-C", checkout, "ls-tree", "-z", sha, "--", path], { encoding: "utf8" });
+  if (listed === "") return {};
+  if (!/^100(644|755) blob /.test(listed)) {
+    reasons.push(`${path} is not a regular file at ${sha.slice(0, 12)}`);
+    return {};
+  }
+  const text = execFileSync("git", ["-C", checkout, "show", `${sha}:${path}`], { encoding: "utf8" });
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    reasons.push(`${path} does not parse at ${sha.slice(0, 12)}: ${error.message}`);
+    return {};
+  }
+};
+for (const path of manifests) {
+  const before = read(previous, path);
+  const after = read(target, path);
+  if (!plain(before) || !plain(after)) {
+    reasons.push(`${path} is not a JSON object`);
+    continue;
+  }
+  if (!same(before.pnpm, after.pnpm)) reasons.push(`${path}: pnpm settings changed`);
+  const beforeScripts = before.scripts ?? {};
+  const afterScripts = after.scripts ?? {};
+  if (!plain(beforeScripts) || !plain(afterScripts)) {
+    if (!same(beforeScripts, afterScripts)) reasons.push(`${path}: scripts changed and is not an object`);
+    continue;
+  }
+  for (const [name, command] of Object.entries(afterScripts)) {
+    if (installHook.test(name) && (!Object.hasOwn(beforeScripts, name) || !same(beforeScripts[name], command))) {
+      reasons.push(`${path}: ${name}`);
+    }
+  }
 }
-
-install_hooks_changed() {
-  local manifest
-  while IFS= read -r manifest; do
-    [ "$(hook_lines "$PREVIOUS" "$manifest")" = "$(hook_lines "$TARGET" "$manifest")" ] ||
-      echo "$manifest"
-  done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- '*package.json')
-  git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- .pnpmfile.cjs .pnpmfile.mjs .npmrc '*/.npmrc'
+if (reasons.length > 0) {
+  console.log(reasons.join("; "));
+  process.exit(1);
 }
+'
 
 assert_deployable() {
   git -C "$CHECKOUT" fetch -q origin main
@@ -408,10 +510,30 @@ assert_deployable() {
     grep -qxF "$name"$'\t'success <<<"$checks" || refuse "required check $name is not green on $TARGET"
   done
 
-  [ "$(allow_builds_block "$PREVIOUS")" = "$(allow_builds_block "$TARGET")" ] ||
-    refuse "allowBuilds in pnpm-workspace.yaml changed; deploy by hand after reviewing install scripts"
-  local hooks
-  hooks="$(install_hooks_changed)"
+  local previous_workspace target_workspace build_changes
+  previous_workspace="$(git -C "$CHECKOUT" show "$PREVIOUS:pnpm-workspace.yaml")" ||
+    refuse "cannot read pnpm-workspace.yaml at $PREVIOUS"
+  target_workspace="$(git -C "$CHECKOUT" show "$TARGET:pnpm-workspace.yaml")" ||
+    refuse "cannot read pnpm-workspace.yaml at $TARGET"
+  build_changes="$(node --input-type=module -e "$WORKSPACE_BUILD_GUARD" "$CHECKOUT/package.json" \
+    "$previous_workspace" "$target_workspace" 2>&1)" ||
+    refuse "pnpm-workspace.yaml may permit new install scripts; deploy by hand after review: ${build_changes:-the build settings guard failed}"
+  local manifest_list hooks
+  local -a manifests=()
+  manifest_list="$(mktemp "$STATE/manifests.XXXXXX")"
+  git -C "$CHECKOUT" diff -z --name-only --no-renames "$PREVIOUS" "$TARGET" -- package.json ':(glob)**/package.json' >"$manifest_list" || {
+    rm -f "$manifest_list"
+    refuse "cannot list package.json changes between $PREVIOUS and $TARGET"
+  }
+  mapfile -d '' -t manifests <"$manifest_list"
+  rm -f "$manifest_list"
+  if [ "${#manifests[@]}" -gt 0 ]; then
+    hooks="$(node --input-type=module -e "$MANIFEST_HOOK_GUARD" "$CHECKOUT" "$PREVIOUS" "$TARGET" "${manifests[@]}" 2>&1)" ||
+      refuse "install hooks in package.json may be added or changed; deploy by hand after review: ${hooks:-the install hook guard failed}"
+  fi
+  hooks="$(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- .pnpmfile.cjs .pnpmfile.mjs .npmrc '*/.npmrc' \
+    package.yaml package.json5 ':(glob)**/package.yaml' ':(glob)**/package.json5' binding.gyp ':(glob)**/binding.gyp')" ||
+    refuse "cannot list pnpm config changes between $PREVIOUS and $TARGET"
   [ -z "$hooks" ] || refuse "install hooks or pnpm config changed; deploy by hand after review: $hooks"
 }
 
@@ -741,7 +863,8 @@ recover_interrupted() {
     log "restored the $PREVIOUS checkout; running services were not touched"
     return 0
   fi
-  if [ "$RUNTIME" = daemon ] && [ -s "$DB" ]; then
+  if [ -s "$DB" ] && { [ "$RUNTIME" = daemon ] || { [ "$(probe /app)" = 200 ] &&
+    [ "$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='deploy_lease'")" = 1 ]; }; }; then
     local lease_now
     [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
     [[ "$LEASE_OWNER" =~ ^[0-9a-f-]{36}$ ]] || refuse "invalid recovery lease owner"
@@ -752,7 +875,11 @@ recover_interrupted() {
       on conflict(id) do update set owner=excluded.owner, status=excluded.status, expiresAt=excluded.expiresAt
       where deploy_lease.owner=excluded.owner or deploy_lease.status='accepting' or deploy_lease.expiresAt <= $lease_now;
       commit;" || refuse "cannot recover deployment lease"
-    wait_for_steps
+    if [ "$RUNTIME" = daemon ]; then
+      wait_for_steps
+    else
+      wait_for_steps "$SERVER_STEP_WAIT_SECONDS" restart
+    fi
   fi
   if [ "$phase" = restoring ] || [ "$phase" = restored ]; then
     stop_or_give_up "$snapshot"
@@ -795,6 +922,7 @@ recover_interrupted() {
 }
 
 [[ "$STEP_WAIT_SECONDS" =~ ^[0-9]+$ ]] && [ "$STEP_WAIT_SECONDS" -le 1800 ] || refuse "drain deadline must be between 0 and 1800 seconds"
+[[ "$SERVER_STEP_WAIT_SECONDS" =~ ^[0-9]+$ ]] && [ "$SERVER_STEP_WAIT_SECONDS" -le 1800 ] || refuse "server drain deadline must be between 0 and 1800 seconds"
 recover_interrupted
 [ "$RECOVER_ONLY" = 0 ] || exit 0
 

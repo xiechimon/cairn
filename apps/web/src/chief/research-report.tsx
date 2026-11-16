@@ -1,6 +1,6 @@
 import { infoReportMessageSchema } from '@cairn/shared';
 import { cn } from 'cn';
-import { createContext, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, type ReactNode, useContext, useMemo, useRef, useState } from 'react';
 import { useConversationMessages } from '../api/hooks.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
 import { Button } from '../components/ui/button.js';
@@ -17,7 +17,8 @@ export interface ResearchReport {
   title: string;
   content: string;
   createdAt: number | undefined;
-  final: boolean;
+  final: boolean | null;
+  label?: string;
 }
 
 export const ReportThreadContext = createContext<{ title: string; final: boolean } | null>(null);
@@ -71,7 +72,8 @@ export function ResearchReportCard({
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const summary = reportSummaryOf(report.content);
-  const stage = report.final ? t('定稿') : t('初稿');
+  const stage = report.final === null ? null : report.final ? t('定稿') : t('初稿');
+  const stageAttr = report.final === null ? undefined : report.final ? 'final' : 'draft';
   const when =
     report.createdAt === undefined
       ? null
@@ -85,7 +87,7 @@ export function ResearchReportCard({
             delay={350}
             data-testid="research-report-card"
             data-variant="inline"
-            data-stage={report.final ? 'final' : 'draft'}
+            data-stage={stageAttr}
             onClick={() => setOpen(true)}
             className={cn(
               'flex max-w-full cursor-pointer items-center gap-1.5 bg-transparent p-0 text-left text-ui leading-5 text-foreground outline-none',
@@ -93,12 +95,8 @@ export function ResearchReportCard({
             )}
           >
             <FileText aria-hidden="true" className="size-4 flex-none text-content-secondary" />
-            <span className="flex-none">{t('调研报告已生成')}</span>
             <span className="min-w-0 truncate text-(--chat-link) underline decoration-(--chat-link)/40 underline-offset-3 hover:decoration-(--chat-link)">
               {report.title}
-            </span>
-            <span data-slot="research-report-stage" className="flex-none text-content-secondary">
-              {stage}
             </span>
           </PopoverTrigger>
         ) : (
@@ -111,19 +109,21 @@ export function ResearchReportCard({
             <Button
               variant="ghost"
               data-testid="research-report-card"
-              data-stage={report.final ? 'final' : 'draft'}
+              data-stage={stageAttr}
               onClick={() => setOpen(true)}
               className="h-10 max-w-full justify-start gap-2 border-0 px-3 text-ui font-normal text-foreground hover:bg-(--menu-hover) pointer-coarse:h-11 dark:hover:bg-(--menu-hover)"
             >
               <FileText aria-hidden="true" className="size-5 flex-none text-content-secondary" />
               <span className="flex-none">{t('调研报告已生成')}</span>
               <span className="min-w-0 truncate text-content-secondary">{report.title}</span>
-              <span
-                data-slot="research-report-stage"
-                className="flex-none rounded-sm bg-secondary px-1.5 text-meta text-content-secondary"
-              >
-                {stage}
-              </span>
+              {stage !== null && (
+                <span
+                  data-slot="research-report-stage"
+                  className="flex-none rounded-sm bg-secondary px-1.5 text-meta text-content-secondary"
+                >
+                  {stage}
+                </span>
+              )}
             </Button>
           </PopoverTrigger>
         )}
@@ -135,7 +135,7 @@ export function ResearchReportCard({
         >
           <div className="flex items-center gap-2 text-meta text-content-tertiary">
             <FileText aria-hidden="true" className="size-4 flex-none" />
-            <span>{stage}</span>
+            <span>{stage ?? report.label}</span>
             {when !== null && <span className="ml-auto tabular-nums">{when}</span>}
           </div>
           <p className="m-0 line-clamp-2 text-ui font-medium text-foreground">{report.title}</p>
@@ -153,10 +153,12 @@ export function ResearchReportDialog({
   report,
   open,
   onClose,
+  children,
 }: {
   report: ResearchReport;
   open: boolean;
   onClose: () => void;
+  children?: ReactNode;
 }) {
   const { t, locale } = useI18n();
   const contentRef = useRef<HTMLElement>(null);
@@ -183,9 +185,13 @@ export function ResearchReportDialog({
             className="m-0 flex items-center gap-1.5 text-meta text-content-tertiary"
           >
             <FileText aria-hidden="true" className="size-4 flex-none" />
-            <span>{t('调研报告')}</span>
-            <span aria-hidden="true">·</span>
-            <span>{report.final ? t('定稿') : t('初稿')}</span>
+            <span>{report.label ?? t('调研报告')}</span>
+            {report.final !== null && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{report.final ? t('定稿') : t('初稿')}</span>
+              </>
+            )}
             {when !== null && (
               <>
                 <span aria-hidden="true">·</span>
@@ -196,6 +202,7 @@ export function ResearchReportDialog({
           <DialogTitle className="mt-3 voice-title text-page text-foreground">
             {report.title}
           </DialogTitle>
+          {children}
         </header>
         <div
           data-testid="research-report-doc"

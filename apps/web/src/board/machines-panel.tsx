@@ -1,6 +1,6 @@
 import type { ComputerRecord } from '@cairn/shared';
 import { cn } from 'cn';
-import { Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
+import { Laptop, Plus, Server } from 'lucide-react';
 import { type ReactElement, type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useAuth } from '../api/auth.js';
@@ -70,8 +70,7 @@ function machineMeta(machine: MachineRow, now: number, t: TFunc): string {
     const seen = machine.lastSeenAt ?? 0;
     return seen > 0 ? joinMeta([t('离线'), relativeTime(seen, now, t)]) : t('离线');
   }
-  const running = machine.runningSteps ?? 0;
-  return running === 0 ? t('空闲') : t('{n} 个在跑', { n: running });
+  return machineStateLabel(machine, t);
 }
 
 export function MachineChip({
@@ -150,7 +149,7 @@ function SectionLabel({ className, children }: { className?: string; children: R
 const ROW_CLS =
   'h-auto w-full justify-start gap-5 rounded-none py-2 pr-4 pl-5 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
-const LINE_ROW_CLS = 'h-9 py-0';
+const LINE_ROW_CLS = 'h-9 py-0 pointer-coarse:h-11';
 
 function LineRow({
   icon,
@@ -228,13 +227,13 @@ function MachineCard({
                 }}
               />
             }
-            className="h-7 flex-none px-2 text-ui font-normal text-foreground"
+            className="h-7 flex-none px-2 text-ui font-normal text-foreground pointer-coarse:h-11"
           >
             {t('编辑')}
           </Button>
         )}
       </div>
-      {screenLive ? (
+      {screenLive && (
         <>
           <MachineScreenSurface
             teamId={teamId}
@@ -261,16 +260,6 @@ function MachineCard({
             />
           )}
         </>
-      ) : (
-        machine.online === true && (
-          <p
-            data-testid="machine-screen-hint"
-            className="m-0 flex items-center gap-2 py-2 pr-4 pl-5 text-meta text-content-tertiary"
-          >
-            <MonitorSmartphone aria-hidden="true" className="size-4 flex-none" />
-            {t('未开启桌面控制，开启后这里显示屏幕')}
-          </p>
-        )
       )}
     </div>
   );
@@ -336,7 +325,7 @@ export function MachinesPanel({
             ))}
           </ListCard>
         </QueryBoundary>
-        <div className="flex h-13 flex-none items-center justify-between pr-2 pl-4 text-meta text-content-tertiary">
+        <div className="flex h-11 flex-none items-center justify-between pr-2 pl-2.5 text-meta text-content-tertiary">
           <span>{t('{time} 检查过', { time: clockTime(checkedAt) })}</span>
           <Button
             variant="ghost"
@@ -346,7 +335,7 @@ export function MachinesPanel({
             aria-busy={checking}
             disabled={checking}
             onClick={recheck}
-            className="h-7 min-w-16 px-2 text-ui font-normal text-foreground disabled:opacity-100"
+            className="h-7 min-w-16 px-2 text-ui font-normal text-foreground pointer-coarse:h-11 disabled:opacity-100"
           >
             {checking ? (
               <Spinner
@@ -359,7 +348,7 @@ export function MachinesPanel({
             )}
           </Button>
         </div>
-        <div data-testid="machines-add" className="mt-7">
+        <div data-testid="machines-add" className="mt-1">
           <LineRow
             icon={<Plus aria-hidden="true" className="size-5.5" />}
             label={t('添加电脑')}

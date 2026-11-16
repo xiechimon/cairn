@@ -5,6 +5,7 @@ import {
   Archive,
   ChartColumn,
   ChevronLeft,
+  Clock,
   PanelLeft,
   Plus,
   Search,
@@ -25,7 +26,6 @@ import { Link, type NavigateFunction, type To, useLocation, useNavigate } from '
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import {
-  ProjectGlyph,
   SIDEBAR_ROW_ACTION,
   SidebarProjectGroupHeader,
   SidebarProjectRow,
@@ -40,11 +40,11 @@ import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
-import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { DeleteArchivedProjectsConfirm } from '../overlay/delete-archived-projects-confirm.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF } from '../settings/settings-href.js';
+import { DesktopUpdateButton } from './desktop-update.js';
 import { coordinatorSearch } from './open-composer.js';
 import { isArchivedProject } from './project-archive.js';
 import {
@@ -59,10 +59,10 @@ import {
   type ProjectStatus,
   sidebarProjects,
 } from './sidebar-projects.js';
+import { PANE_PARAM, TASKS_TAB_PARAM } from './work-panel.js';
 
 export type SidebarSelected =
   | 'board'
-  | 'schedules'
   | 'none'
   | '/app/resources/skills'
   | '/app/resources/mcp-servers'
@@ -148,18 +148,10 @@ const FOCUS =
 
 const SIDEBAR_FOOT_ROW = `flex h-8.5 flex-none items-center justify-start gap-3 rounded-(--cds-radius-md) pr-2 pl-1.5 text-ui text-sidebar-ink no-underline hover:bg-sidebar-hover hover:text-foreground pointer-coarse:h-11 ${FOCUS}`;
 
-const SEARCH_OPEN_DIM =
-  '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
-
 const SEARCH_OPEN_DIM_CURRENT =
   '[html[data-search-open]_&_[aria-current=page]]:bg-transparent [html[data-search-open]_&_[aria-current=page]]:text-content-secondary';
 
-const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--cds-radius-md) border-none bg-transparent p-0 text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover aria-expanded:bg-transparent ${FOCUS}`;
-
-const RAIL_ROW = `rail-row relative flex size-8 flex-none items-center justify-center rounded-(--cds-radius-md) text-sidebar-ink no-underline transition-[background-color,color] duration-150 ease-out hover:bg-sidebar-hover hover:text-foreground ${FOCUS_RING_INSET}`;
-const RAIL_ACTIVE = `bg-(--sidebar-active) text-foreground hover:bg-(--sidebar-active) hover:text-foreground ${SEARCH_OPEN_DIM}`;
-const RAIL_BTN =
-  'cursor-pointer border-none bg-transparent p-0 dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-sidebar-ink aria-expanded:hover:bg-sidebar-hover aria-expanded:hover:text-foreground';
+const ICON_BTN = `size-7 flex-none pointer-coarse:size-11 cursor-pointer rounded-(--cds-radius-md) border-none bg-transparent p-0 text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover aria-expanded:bg-transparent ${FOCUS}`;
 
 function SidebarTip({
   label,
@@ -227,28 +219,6 @@ function FooterIcon({
         {children}
       </Link>
     </SidebarTip>
-  );
-}
-
-function RailTip({
-  label,
-  hint,
-  icon,
-  children,
-}: {
-  label: string;
-  hint?: ReactNode;
-  icon: ReactNode;
-  children: ReactElement;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger render={children}>{icon}</TooltipTrigger>
-      <TooltipContent side="right" sideOffset={8}>
-        {label}
-        {hint}
-      </TooltipContent>
-    </Tooltip>
   );
 }
 
@@ -400,14 +370,14 @@ export function BoardSidebar({
   const { search, pathname } = useLocation();
   const baseParams = new URLSearchParams(search);
   const projectParam = pathname === '/app' ? baseParams.get('project') : null;
+  const schedulesActive =
+    pathname === '/app' &&
+    projectParam === null &&
+    baseParams.get(PANE_PARAM) === 'tasks' &&
+    baseParams.get(TASKS_TAB_PARAM) === 'scheduled';
   baseParams.delete('project');
   baseParams.delete('chat');
-  const projectHref = (id: string) => {
-    const next = new URLSearchParams(baseParams);
-    next.set('project', id);
-    next.set('chat', '1');
-    return { pathname: '/app', search: `?${next}` };
-  };
+  baseParams.delete(TASKS_TAB_PARAM);
   const plain = `?${baseParams}`;
   const newProjectTarget = { pathname: '/app/project/new', search: plain };
   const coordinatorTarget = { pathname: '/app', search: coordinatorSearch(search) };
@@ -420,10 +390,6 @@ export function BoardSidebar({
   const present = useMemo(() => allProjects.filter((row) => !isDeleted(row.id)), [allProjects]);
   const layout = useMemo(() => sidebarProjects(present, filter), [present, filter]);
   const activeLayout = useMemo(() => sidebarProjects(present), [present]);
-  const listed = useMemo(
-    () => [...activeLayout.ungrouped, ...activeLayout.groups.flatMap((group) => group.projects)],
-    [activeLayout],
-  );
   const groupNames = useMemo(() => activeLayout.groups.map((group) => group.name), [activeLayout]);
   const [confirmingAll, setConfirmingAll] = useState(false);
   const archivedPage = filter === 'archived';
@@ -479,98 +445,15 @@ export function BoardSidebar({
     });
   }, []);
   const navRef = useRef<HTMLElement | null>(null);
-  useScrollFade(navRef, { enabled: !collapsed });
-  const coordinatorActive = selected === 'board' && activeProject === null;
+  useScrollFade(navRef);
+  const coordinatorActive = selected === 'board' && activeProject === null && !schedulesActive;
+  const schedulesParams = new URLSearchParams(baseParams);
+  schedulesParams.set(PANE_PARAM, 'tasks');
+  schedulesParams.set(TASKS_TAB_PARAM, 'scheduled');
 
   const settingsTarget = { pathname: SETTINGS_HREF, search: plain };
   const activityTarget = { pathname: ACTIVITY_PATH, search: plain };
-
-  if (collapsed) {
-    const railLink = (
-      to: { pathname: string; search: string },
-      active: boolean,
-      label: string,
-    ) => ({
-      className: `${RAIL_ROW} ${active ? `rail-row--selected ${RAIL_ACTIVE}` : ''}`,
-      to,
-      'aria-current': active ? ('page' as const) : undefined,
-      'aria-label': label,
-    });
-    return (
-      <aside className="board-sidebar board-sidebar--collapsed relative z-(--z-docked) flex w-(--sidebar-rail-w) flex-none flex-col items-center bg-(--sidebar-surface) pb-2">
-        <div className="mx-2 flex h-12 flex-none items-center justify-center self-stretch border-b border-border">
-          <RailTip
-            label={t('展开侧边栏')}
-            icon={<PanelLeft className="size-5.5" strokeWidth={STROKE} />}
-          >
-            <Button
-              variant="ghost"
-              className={cn('rail-toggle', RAIL_ROW, RAIL_BTN, 'size-7 text-content-tertiary')}
-              aria-label={t('展开侧边栏')}
-              onClick={onToggle}
-            />
-          </RailTip>
-        </div>
-        <nav className="flex min-h-0 flex-1 flex-col items-center gap-0.5 overflow-y-auto pt-1">
-          <RailTip
-            label={t('搜索')}
-            hint={<Kbd>⌘K</Kbd>}
-            icon={<Search className={ICON} strokeWidth={STROKE} />}
-          >
-            <Button
-              variant="ghost"
-              className={`${RAIL_ROW} ${RAIL_BTN}`}
-              aria-label={t('搜索')}
-              onClick={onSearch}
-            />
-          </RailTip>
-          <span aria-hidden className="h-1 flex-none" />
-          <RailTip label={t('Coordinator')} icon={<BrandGlyph className={ICON} />}>
-            <Link {...railLink(coordinatorTarget, coordinatorActive, t('Coordinator'))} />
-          </RailTip>
-          {listed.map((row) => {
-            const href = projectHref(row.id);
-            const label = waiting.has(row.id)
-              ? t('{name}：有任务在等你', { name: row.name })
-              : row.name;
-            return (
-              <RailTip
-                key={row.id}
-                label={label}
-                icon={
-                  <>
-                    <ProjectGlyph icon={row.icon} />
-                    {waiting.has(row.id) && (
-                      <span
-                        data-slot="needs-you-dot"
-                        className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
-                      />
-                    )}
-                  </>
-                }
-              >
-                <Link {...railLink(href, activeProject === row.id, label)} />
-              </RailTip>
-            );
-          })}
-          <RailTip label={t('新建项目')} icon={<Plus className={ICON} strokeWidth={STROKE} />}>
-            <Link
-              {...railLink(newProjectTarget, false, t('新建项目'))}
-              data-slot="sidebar-new-project"
-            />
-          </RailTip>
-        </nav>
-        <div className="flex flex-none flex-col items-center gap-0.5 pt-2">
-          <RailTip label={t('活动')} icon={<Activity className={ICON} strokeWidth={STROKE} />}>
-            <Link {...railLink(activityTarget, false, t('活动'))} data-testid="sidebar-activity" />
-          </RailTip>
-          <RailTip label={t('设置')} icon={<Settings className={ICON} strokeWidth={STROKE} />}>
-            <Link {...railLink(settingsTarget, false, t('设置'))} data-testid="sidebar-settings" />
-          </RailTip>
-        </div>
-      </aside>
-    );
-  }
+  const toggleLabel = collapsed ? t('展开侧边栏') : t('收起侧边栏');
 
   const ungroupedSpaced = layout.ungrouped.length > 0 || projectsState !== undefined;
 
@@ -582,11 +465,15 @@ export function BoardSidebar({
         data-testid="team-row"
         className="sidebar-team-row mx-2 flex h-12 flex-none items-center border-b border-border pl-0.5 text-foreground"
       >
-        <SidebarTip label={t('收起侧边栏')} side="bottom">
+        <SidebarTip label={toggleLabel} side="bottom">
           <Button
             variant="ghost"
-            className={cn('sidebar-team-collapse', ICON_BTN, 'text-content-tertiary')}
-            aria-label={t('收起侧边栏')}
+            className={cn(
+              'sidebar-team-collapse',
+              ICON_BTN,
+              'text-content-tertiary pointer-coarse:-ml-2',
+            )}
+            aria-label={toggleLabel}
             onClick={onToggle}
           >
             <PanelLeft className="size-5.5" strokeWidth={STROKE} />
@@ -644,7 +531,7 @@ export function BoardSidebar({
                 <ProjectFilterMenu
                   filter={filter}
                   onFilter={chooseFilter}
-                  className="size-7 bg-transparent [&_svg:not([class*=size-])]:size-5"
+                  className="size-7 bg-transparent pointer-coarse:-mr-2 [&_svg:not([class*=size-])]:size-5"
                 />
               </div>
             </div>
@@ -662,7 +549,7 @@ export function BoardSidebar({
             {archivedCount === 0 && (
               <p
                 data-testid="sidebar-archived-empty"
-                className="m-0 flex-none py-1 pr-2 pl-3.5 text-meta text-content-secondary"
+                className="m-0 flex-none px-2 py-1 text-meta text-content-secondary"
               >
                 {t('没有已归档的项目')}
               </p>
@@ -726,6 +613,18 @@ export function BoardSidebar({
       </nav>
 
       <div data-testid="sidebar-pinned" className="flex flex-none flex-col gap-0.5 px-2 pb-2">
+        <Link
+          data-testid="sidebar-schedules"
+          aria-current={schedulesActive ? 'page' : undefined}
+          className={cn(
+            SIDEBAR_FOOT_ROW,
+            schedulesActive && 'bg-(--sidebar-active) text-foreground hover:bg-(--sidebar-active)',
+          )}
+          to={{ pathname: '/app', search: `?${schedulesParams}` }}
+        >
+          <Clock className={ICON} strokeWidth={STROKE} />
+          {t('定时')}
+        </Link>
         {archivedPage ? (
           <Button
             variant="ghost"
@@ -766,7 +665,9 @@ export function BoardSidebar({
         data-testid="sidebar-footer"
         className="flex h-14 flex-none items-center gap-1 border-t border-border pr-2 pl-1"
       >
-        <span className="flex-1" />
+        <div className="flex min-w-0 flex-1 items-center">
+          <DesktopUpdateButton iconClassName={ICON} idleClassName={ICON_BTN} />
+        </div>
         {usageNav && (
           <FooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
             <ChartColumn className={ICON} strokeWidth={STROKE} />

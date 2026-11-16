@@ -34,6 +34,18 @@ cairn start        # also: stop / restart / logs -f / status
 
 Both packages install a `cairn` bin: installing both globally on the same machine means whichever came last wins the name. The clean split is running the server where you browse and `cairn-cli` where agents build.
 
+## Use your Claude subscription on your machines
+
+Set the subscription up once on the server; every machine you enroll then runs Claude Code tasks with it, without a `claude` login on each machine. Cairn stores the token encrypted on your own server and hands it only to your own machines (and their orbs) for the official Claude Code to use.
+
+1. **Install the Claude Code CLI on every machine that runs tasks, and on the server host.** The daemon looks for `claude` on `PATH` (or `CAIRN_CLAUDE_BIN`) and logs `claude binary: not found` when it is missing. The server host needs it too: the Verify button runs `claude -p` there, and reports "unavailable" without it (`CLAUDE_BIN` overrides the path).
+2. **Enroll the machine** as in the section above. Wait until its log shows `claude binary: <path>`. If the machine's runtime list shows Claude Code as not installed, check that `claude` is on the daemon's `PATH`. A daemon older than the detection fix in #4795 also needs a `~/.claude/settings.json` that lists a model; without it an unpinned task never goes to that machine, so update the daemon or pin the task.
+3. **Create the token.** On any computer where you are signed in to your Claude subscription, run `claude setup-token` and copy the `sk-ant-oat01-…` value it prints.
+4. **Paste it in the Model services page.** Add a connection, pick Claude (tagged Subscription), give it a name, paste the token, optionally set the expiry date, and save. The token cannot be viewed afterwards. Then press Verify: a good token shows ok, a revoked one shows an authentication failure.
+5. **Start a task.** The default route sends a task to Claude Code (`claude-sonnet-5-5`). The plan step and the build run on a machine from step 2 and appear in the task conversation.
+
+Places a newcomer gets stuck: the server host missing `claude` in step 1; a machine that does not have `claude` on the daemon's `PATH`, whose Runner page then shows Claude Code as not detected; and a token that is not in the `sk-ant-oat01-` format, which is rejected as an invalid credential.
+
 ## Run the server in Docker
 
 Only the server (with the web UI) is containerized; agents run through a daemon on your own machines. The image binds `0.0.0.0` and keeps all state under `/data`:
@@ -55,6 +67,32 @@ pnpm start        # builds the web UI and starts the server hosting it on the sa
 ```
 
 The watch-mode dev stack, one process each: `pnpm dev:web`, `pnpm dev:server`, `pnpm dev:daemon` (`pnpm dev` runs all three together).
+
+## Keep the daemon running on Linux
+
+On Linux, tasks run in a sandbox that needs the daemon to be its own systemd user unit. `cairn start` and `cairn restart` run it as a transient user unit, `cairn-daemon-<id>.service`, and print its name. When `systemd-run --user` fails they print a warning and start a plain background process instead; that daemon shows Online but cannot start the sandbox.
+
+The sandbox also needs bubblewrap 0.10 or newer, which can overlay your home directory, and permission to create user namespaces. Ubuntu 25.04 and later, Debian 13 and Arch meet both after `sudo apt install bubblewrap` or `sudo pacman -S bubblewrap`. Ubuntu 24.04 ships bubblewrap 0.9 and Debian 12 ships 0.8, so a Runner there stays "Task sandbox not ready" and cannot take tasks. On Ubuntu 23.10 and later, AppArmor blocks user namespaces for programs without a profile; Ubuntu 25.04 and later ship a profile for `bwrap`. The Runner page shows why its sandbox is not ready.
+
+A transient unit ends when you log out or reboot. To keep the daemon running, enroll the machine as in [Run builds on your own machines](#run-builds-on-your-own-machines), stop it with `cairn stop` and create `~/.config/systemd/user/cairn-daemon.service`, using `command -v cairn` and `command -v node` for the two paths:
+
+```ini
+[Unit]
+Description=Cairn daemon
+
+[Service]
+Environment=PATH=/directory/of/node:/usr/local/bin:/usr/bin:/bin
+ExecStart=/path/to/cairn start --foreground
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+```sh
+systemctl --user daemon-reload
+systemctl --user enable --now cairn-daemon.service
+```
 
 ## Next steps
 

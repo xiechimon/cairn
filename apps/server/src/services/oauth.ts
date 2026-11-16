@@ -1,4 +1,9 @@
-import { GITHUB_CONNECTION_OAUTH, OAUTH_FAMILIES, type SecretBox } from '@cairn/shared';
+import {
+  GITHUB_CONNECTION_OAUTH,
+  OAUTH_FAMILIES,
+  type SecretBox,
+  type StartMcpConnectorOAuthBody,
+} from '@cairn/shared';
 import type { Db } from '../db/client.js';
 import {
   exchangeOAuthCode,
@@ -8,11 +13,18 @@ import {
 } from '../lib/github.js';
 import { newRecordId } from '../lib/ids.js';
 import { upsertGithubConnection } from './github-connection.js';
+import {
+  completeMcpConnectorOAuth,
+  type McpConnectorDeps,
+  McpOAuthError,
+  type McpOAuthPending,
+  prepareMcpConnectorOAuth,
+} from './mcp-servers.js';
 import { createProvider, openProviderKey, updateProvider } from './providers.js';
 
 export const OAUTH_STATE_TTL_MS = 30 * 60 * 1000;
 
-export type OAuthStateKind = 'provider' | 'github-connection';
+export type OAuthStateKind = 'provider' | 'github-connection' | 'mcp-connector';
 
 export type OAuthStateEntry =
   | {
@@ -27,6 +39,13 @@ export type OAuthStateEntry =
       teamId: string;
       origin: string;
       createdAt: number;
+    }
+  | {
+      kind: 'mcp-connector';
+      teamId: string;
+      origin: string;
+      createdAt: number;
+      pending: McpOAuthPending;
     };
 
 export interface OAuthClientConfig {
@@ -40,11 +59,17 @@ export interface OAuthDeps {
   states: Map<string, OAuthStateEntry>;
   fetch: FetchLike;
   client: OAuthClientConfig | null;
+  mcp: McpConnectorDeps;
 }
 
 export class OAuthFlowError extends Error {
   constructor(
-    readonly reason: 'unknown-family' | 'not-configured' | 'bad-state' | 'exchange-failed',
+    readonly reason:
+      | 'unknown-family'
+      | 'not-configured'
+      | 'bad-state'
+      | 'exchange-failed'
+      | 'conflict',
     message: string,
     readonly origin?: string,
     readonly kind?: OAuthStateKind,
@@ -130,6 +155,27 @@ export function startGithubConnectionAuthorize(
   );
 }
 
+export async function startMcpConnectorAuthorize(
+  deps: OAuthDeps,
+  input: { teamId: string; origin: string; body: StartMcpConnectorOAuthBody },
+): Promise<{ authorizationUrl: string }> {
+  sweep(deps.states);
+  const state = newRecordId(32);
+  const { authorizationUrl, pending } = await prepareMcpConnectorOAuth(deps.mcp, input.teamId, {
+    body: input.body,
+    origin: input.origin,
+    state,
+  });
+  deps.states.set(state, {
+    kind: 'mcp-connector',
+    teamId: input.teamId,
+    origin: input.origin,
+    createdAt: Date.now(),
+    pending,
+  });
+  return { authorizationUrl };
+}
+
 function consumeState(deps: OAuthDeps, state: string): OAuthStateEntry {
   const entry = deps.states.get(state);
   if (!entry) throw new OAuthFlowError('bad-state', `oauth state ${state} not found`);
@@ -173,13 +219,31 @@ async function exchangeToken(
 
 export type OAuthCallbackOutcome =
   | { kind: 'provider'; origin: string; presetId: string }
-  | { kind: 'github-connection'; origin: string };
+  | { kind: 'github-connection'; origin: string }
+  | { kind: 'mcp-connector'; origin: string; connectorId: string };
 
 export async function completeOAuthCallback(
   deps: OAuthDeps,
-  input: { code: string; state: string; createdBy: string },
+  input: { code: string; state: string; iss?: string; createdBy: string },
 ): Promise<OAuthCallbackOutcome> {
   const entry = consumeState(deps, input.state);
+  if (entry.kind === 'mcp-connector') {
+    try {
+      const connectorId = await completeMcpConnectorOAuth(deps.mcp, entry.teamId, entry.pending, {
+        code: input.code,
+        iss: input.iss,
+      });
+      return { kind: 'mcp-connector', origin: entry.origin, connectorId };
+    } catch (err) {
+      if (!(err instanceof McpOAuthError)) throw err;
+      throw new OAuthFlowError(
+        err.reason === 'conflict' ? 'conflict' : 'exchange-failed',
+        err.message,
+        entry.origin,
+        entry.kind,
+      );
+    }
+  }
   if (!deps.client) {
     throw new OAuthFlowError('exchange-failed', 'oauth client missing', entry.origin, entry.kind);
   }

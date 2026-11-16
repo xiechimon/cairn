@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { ComputerCall, ComputerFrame, MachineStreamEvent } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -569,5 +570,52 @@ describe('handoff state paths', () => {
     });
     sweepComputerHandoffs(s.db, now);
     expect(computerRow(s).handoffReason).toBe('login');
+  });
+});
+
+describe('the Runner relay route', () => {
+  test('the tool call id sent with a browser call keeps two identical calls apart, and a client that gives up releases the takeover hold', async () => {
+    const { s, calls } = boot();
+    const token = 'sidecar-token';
+    s.db
+      .update(machineTable)
+      .set({ tokenHash: createHash('sha256').update(token).digest('hex') })
+      .where(eq(machineTable.id, 'sidecar'))
+      .run();
+    const post = (
+      name: string,
+      params: Record<string, unknown>,
+      toolCallId?: string,
+      signal?: AbortSignal,
+    ) =>
+      s.app.request('/api/machine/tool/step-a', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ name, params, ...(toolCallId !== undefined ? { toolCallId } : {}) }),
+        ...(signal !== undefined ? { signal } : {}),
+      });
+
+    for (const [index, id] of ['call-1', 'call-2'].entries()) {
+      const response = post('browser_navigate', { url: 'https://example.test' }, id);
+      await vi.waitFor(() => expect(calls).toHaveLength(index + 1));
+      receiveComputerFrames(s.db, s.hub, 'omarchy', calls[index]!.callId, [done(1)]);
+      expect((await response).status).toBe(200);
+    }
+    expect(calls.map((call) => call.callId)).toHaveLength(2);
+    expect(new Set(calls.map((call) => call.callId)).size).toBe(2);
+
+    const abort = new AbortController();
+    const takeoverResponse = post(
+      'request_takeover',
+      { reason: 'captcha' },
+      'tk-route',
+      abort.signal,
+    );
+    await waitForPending(s);
+    abort.abort();
+    await Promise.resolve(takeoverResponse).catch(() => {});
+    await vi.waitFor(() => expect(takeoverRow(s)?.state).toBe('error'));
+    expect(computerRow(s)).toMatchObject({ handoffReason: null, handoffStepId: null });
+    expect(computerRow(s).executionStepId).toBeNull();
   });
 });

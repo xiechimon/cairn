@@ -27,22 +27,13 @@ test('an owner group folds to its count, flips aria and survives reload', async 
   await expect(projectRows(page)).toHaveCount(4);
 });
 
-test('the rail lists every project with no fold of its own', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app?scenario=sidebar-ref');
-
-  await expect(page.locator('.rail-row [data-slot="project-glyph"]')).toHaveCount(4);
-  await expect(page.locator('.rail-row[aria-label="技能"]')).toHaveCount(0);
-  await expect(page.locator('.rail-group')).toHaveCount(0);
-});
-
 test('resources live in settings, not the sidebar', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await expect(skills(page)).toHaveCount(0);
   await expect(page.locator('.sidebar-group', { hasText: '资源' })).toHaveCount(0);
   await page.getByTestId('sidebar-settings').click();
   const settings = page.getByRole('dialog', { name: '设置' });
-  for (const name of ['技能', 'MCP', '密钥', 'Runner', '模型服务', '规则与策略', 'API 密钥', '账号']) {
+  for (const name of ['技能', 'MCP', '密钥', '执行机', '模型服务', '模型选择', '模型路由', 'API 密钥', '账号']) {
     await expect(settings.getByRole('link', { name, exact: true })).toBeVisible();
   }
 });

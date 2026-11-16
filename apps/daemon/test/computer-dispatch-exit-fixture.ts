@@ -7,6 +7,7 @@ const firstAttempt = new Promise<void>((resolve) => {
   attempted = resolve;
 });
 const dispatcher = createComputerDispatcher({
+  cairnOrigins: [],
   client:
     process.argv[2] === 'fetch'
       ? new MachineClient({

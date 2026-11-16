@@ -1,3 +1,4 @@
+import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END, PROJECT_INSTRUCTIONS_MAX } from '@cairn/shared';
 import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import {
@@ -19,10 +20,28 @@ interface EditCharterDialogProps {
 export function EditCharterDialog({ open, onClose, charter, onSave }: EditCharterDialogProps) {
   const { t } = useI18n();
   const [text, setText] = useState(charter ?? '');
+  const [refused, setRefused] = useState(false);
   useEffect(() => {
-    if (open) setText(charter ?? '');
+    if (open) {
+      setText(charter ?? '');
+      setRefused(false);
+    }
   }, [open, charter]);
+  const marker = [BRIEF_MARKER_BEGIN, BRIEF_MARKER_END].find((line) => text.includes(line));
+  const problem =
+    marker != null
+      ? t('章程里不能有这一行：{marker}。这是 Cairn 自己用的分隔标记，删掉它再保存。', { marker })
+      : text.length > PROJECT_INSTRUCTIONS_MAX
+        ? t('章程最多 {max} 个字，现在有 {n} 个字。删短一些再保存。', {
+            max: PROJECT_INSTRUCTIONS_MAX.toLocaleString('en'),
+            n: text.length.toLocaleString('en'),
+          })
+        : null;
   const save = () => {
+    if (problem != null) {
+      setRefused(true);
+      return;
+    }
     if (onSave != null) onSave(text);
     else {
       blockDemoWrite();
@@ -48,11 +67,25 @@ export function EditCharterDialog({ open, onClose, charter, onSave }: EditCharte
     >
       <div className="flex flex-col gap-3">
         <Textarea
-          className="min-h-30 text-ui md:text-ui"
+          className="max-h-80 min-h-30 overflow-y-auto text-ui md:text-ui"
           value={text}
+          aria-invalid={refused && problem != null}
+          aria-describedby={refused && problem != null ? 'charter-problem' : undefined}
           onChange={(event) => setText(event.target.value)}
           placeholder={t('长期指令：模型路由规则（何种任务使用何种模型）、优先级、偏好…')}
         />
+        <div className="flex items-start justify-between gap-3">
+          {refused && problem != null ? (
+            <span id="charter-problem" role="alert" className="text-meta text-destructive">
+              {problem}
+            </span>
+          ) : (
+            <span />
+          )}
+          <span className="flex-none text-meta tabular-nums text-content-tertiary">
+            {`${text.length.toLocaleString('en')} / ${PROJECT_INSTRUCTIONS_MAX.toLocaleString('en')}`}
+          </span>
+        </div>
       </div>
     </DialogShell>
   );

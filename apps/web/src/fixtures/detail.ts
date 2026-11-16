@@ -169,7 +169,7 @@ function probeTools(expanded: boolean): TranscriptItem {
 }
 
 const PROBE_MERGE_ROUND: TranscriptItem[] = [
-  { kind: 'note', text: 'Xmon Dai 发起了合并' },
+  { kind: 'note', text: '{name} 发起了合并', vars: { name: 'Xmon Dai' } },
   {
     kind: 'robot',
     paragraphs: [
@@ -471,7 +471,7 @@ const failedCurrentTodo: TodoRecord = {
 const FAILED_CURRENT_RUNS: RunHistoryRow[] = [
   {
     label: '第 1 次运行',
-    meta: '6 小时前 · 72.1k tokens · Machine offline',
+    meta: '6 小时前 · 72.1k tokens · 执行机离线',
     status: 'failed-current',
   },
 ];
@@ -486,9 +486,9 @@ export function detailFailedCurrent(): FixtureSet {
 
 const LEGACY_RUN_HISTORY: RunHistoryRow[] = [
   { label: '第 4 次运行', meta: '6 小时前 · 66.1k tokens', status: 'current' },
-  { label: '第 3 次运行', meta: '3 天前 · Cancelled', status: 'failed' },
+  { label: '第 3 次运行', meta: '3 天前 · 已取消', status: 'failed' },
   { label: '第 2 次运行', meta: '3 天前', status: 'done' },
-  { label: '第 1 次运行', meta: '4 天前 · Machine offline', status: 'failed' },
+  { label: '第 1 次运行', meta: '4 天前 · 执行机离线', status: 'failed' },
 ];
 
 const LEGACY2_OVERLAY: BuildOverlayContent = {
@@ -574,7 +574,7 @@ export function overlayContent(todoId: string): BuildOverlayContent | null {
 const RUNS_12: RunHistoryRow[] = [
   {
     label: '第 1 次运行',
-    meta: '6 小时前 · 72.1k tokens · Machine offline',
+    meta: '6 小时前 · 72.1k tokens · 执行机离线',
     status: 'failed-current',
   },
 ];
@@ -583,7 +583,7 @@ const RUNS_15: RunHistoryRow[] = [
   { label: '第 2 次运行', meta: '刚刚', status: 'current' },
   {
     label: '第 1 次运行',
-    meta: '22 分钟前 · 435.5k tokens · Machine offline',
+    meta: '22 分钟前 · 435.5k tokens · 执行机离线',
     status: 'failed',
   },
 ];

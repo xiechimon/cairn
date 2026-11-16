@@ -585,21 +585,24 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
 test('full screen only watches; Take control and Return control drive the lease', async ({
   page,
 }) => {
+  const screenOpens: unknown[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/computers/comp-1/screen'))
+      screenOpens.push(request.postDataJSON());
+  });
   const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
   const panel = await open(page, feed, [
     { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
   ]);
-  const screenOpens: string[] = [];
-  page.on('request', (request) => {
-    if (request.method() === 'POST' && request.url().endsWith('/computers/comp-1/screen'))
-      screenOpens.push(request.url());
-  });
   const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
+  await expect.poll(() => screenOpens).toEqual([{ kind: 'view' }]);
   await expect(cardScreen).toHaveAttribute('data-status', 'placeholder');
-  const cardOpens = screenOpens.length;
+  const cardSurface = await cardScreen.evaluateHandle((element) => element);
   await panel.getByTestId('machine-screen-expand').click();
   const enlarged = page.getByTestId('machine-screen-enlarged');
   await expect(enlarged).toBeVisible();
+  await expect.poll(() => screenOpens).toEqual([{ kind: 'view' }, { kind: 'view' }]);
+  expect(await cardSurface.evaluate((element) => element.isConnected)).toBe(true);
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
   await expect(cardScreen).toHaveAttribute('data-interactive', 'false');
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
@@ -617,17 +620,28 @@ test('full screen only watches; Take control and Return control drive the lease'
   );
   await expect(dialog.getByText('你在操作，Coordinator 已暂停')).toBeVisible();
   expect(feed.controlCalls).toEqual(['POST']);
+  await expect.poll(() => screenOpens).toEqual([
+    { kind: 'view' },
+    { kind: 'view' },
+    { kind: 'control', leaseId: 'lease-1' },
+  ]);
   await dialog.getByRole('button', { name: '交还' }).click();
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
     'data-interactive',
     'false',
   );
   expect(feed.controlCalls).toEqual(['POST', 'DELETE']);
+  await expect.poll(() => screenOpens).toEqual([
+    { kind: 'view' },
+    { kind: 'view' },
+    { kind: 'control', leaseId: 'lease-1' },
+    { kind: 'view' },
+  ]);
   const openedWhileFull = screenOpens.length;
   await dialog.getByRole('button', { name: '退出全屏' }).click();
   await expect(enlarged).toHaveCount(0);
   await expect(cardScreen).toHaveAttribute('data-status', 'placeholder');
-  expect(openedWhileFull).toBeGreaterThan(cardOpens);
+  expect(await cardSurface.evaluate((element) => element.isConnected)).toBe(true);
   expect(screenOpens.length).toBe(openedWhileFull);
 });
 
@@ -651,7 +665,7 @@ test('opening the machine while a user lease exists elsewhere does not take cont
   await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
 });
 
-test('without a computer row the machine card shows the turn-on hint instead of a screen', async ({
+test('without a computer row the machine card shows no screen and no turn-on hint', async ({
   page,
 }) => {
   const panel = await open(
@@ -661,7 +675,8 @@ test('without a computer row the machine card shows the turn-on hint instead of 
   );
   const card = panel;
   await expect(card.getByTestId('machine-screen')).toHaveCount(0);
-  await expect(card.getByTestId('machine-screen-hint')).toBeVisible();
+  await expect(card.getByTestId('machine-list-row')).toContainText('omarchy');
+  await expect(card.getByText(/桌面控制/)).toHaveCount(0);
   await expect(card.getByRole('switch')).toHaveCount(0);
 });
 

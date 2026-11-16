@@ -12,15 +12,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { computerHome } from './computer-home.mjs';
 import { daemonNodeMajor } from './daemon-package.mjs';
-import { installHost } from './install-host.mjs';
+import { chooseOwner, installHost, renderPolkitRule } from './install-host.mjs';
+import { ORB_OWNER_FILE, readOrbOwner, validOwnerName } from './owner.mjs';
 import { runtimeDirectory } from './runtime-directory.mjs';
 import { missingUfwRules } from './ufw-rules.mjs';
 
-function policy() {
+const RULE_TEMPLATE = readFileSync(new URL('./50-cairn-orb.rules', import.meta.url), 'utf8');
+
+function policy(owner = 'ian') {
   let rule;
-  runInNewContext(readFileSync(new URL('./50-cairn-orb.rules', import.meta.url), 'utf8'), {
+  runInNewContext(renderPolkitRule(RULE_TEMPLATE, owner), {
     polkit: {
       Result: { YES: 'yes', NO: 'no', NOT_HANDLED: 'skip' },
       addRule: (fn) => {
@@ -95,6 +97,7 @@ function fixture() {
   const state = new Set();
   const calls = [];
   const logs = [];
+  const statOwner = { name: 'ian' };
   const run = (cmd, args) => {
     assert.notEqual(cmd, 'systemd-run');
     assert.ok(!args.some((arg) => arg === '-M' || arg.startsWith('--machine')));
@@ -122,7 +125,7 @@ function fixture() {
         status: state.has('directories') ? 0 : 1,
         stdout: state.has('directories')
           ? args.at(-1).endsWith('/dist') || args.at(-1).endsWith('/seed')
-            ? 'directory:ian:755'
+            ? `directory:${statOwner.name}:755`
             : 'directory:root:root:755'
           : '',
       };
@@ -144,7 +147,8 @@ function fixture() {
         stdout:
           '1 lo loopback carrier unmanaged\n2 vz-cairn bridge no-carrier configured\n3 eth0 ether routable unmanaged\n',
       };
-    if (cmd === 'id') return { status: 0, stdout: '1234\n' };
+    if (cmd === 'id')
+      return args[1] === 'ghost' ? { status: 1, stdout: '' } : { status: 0, stdout: '1234\n' };
     if (cmd === 'bash') {
       const stdout = state.has('image') ? '0 changes\n' : '1 changes\n';
       if (!args.includes('--dry-run')) state.add('image');
@@ -161,6 +165,8 @@ function fixture() {
     calls,
     logs,
     run,
+    owner: 'ian',
+    statOwner,
     nodeBinary: Buffer.from([0, 255, 254, 128]),
     log: (line) => logs.push(line),
   };
@@ -176,7 +182,7 @@ test('dry-run prints all privileged steps and leaves the fixture untouched', () 
     assert.ok(f.logs.some((line) => line.includes('build-image')));
     assert.ok(
       f.calls.every((line) =>
-        /stat -c|runuser .*is-|node --version|nft --version|nft list table inet cairn_orb|ip -Version|nmcli --version|networkctl .*list|pacman -Q|systemctl .*is-|systemctl is-|loginctl show-user|id -u|bash .*build-(computer-)?image.sh --dry-run/.test(
+        /stat -c|runuser .*is-|node --version|nft --version|nft list table inet cairn_orb|ip -Version|nmcli --version|networkctl .*list|pacman -Q|systemctl .*is-|systemctl is-|loginctl show-user|id -u|bash .*build-image.sh --dry-run/.test(
           line,
         ),
       ),
@@ -289,52 +295,6 @@ test('network configuration isolates physical links and allows proxy-only guest 
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
-});
-
-test('polkit protects the computer template and keeps computer homes to its own clones', () => {
-  const evaluate = policy();
-  const images = 'org.freedesktop.machine1.manage-images';
-  assert.equal(
-    evaluate(images, {
-      image: 'cairn-orb-computer',
-      verb: 'clone',
-      new_name: 'cairn-orb-computer-0123abcd',
-    }),
-    'yes',
-  );
-  for (const details of [
-    { image: 'cairn-orb-computer', verb: 'remove' },
-    { image: 'cairn-orb-computer', verb: 'rename', new_name: 'cairn-orb-computer-x' },
-    { image: 'cairn-orb-computer', verb: 'clone', new_name: 'cairn-orb-task-a' },
-    { image: 'cairn-orb-base', verb: 'clone', new_name: 'cairn-orb-computer-x' },
-    { image: 'cairn-orb-task-a', verb: 'clone', new_name: 'cairn-orb-computer-x' },
-    { image: 'cairn-orb-computer-x', verb: 'clone', new_name: 'cairn-orb-computer-y' },
-    { image: 'cairn-orb-task-a', verb: 'clone', new_name: 'cairn-orb-computer' },
-    { image: 'cairn-orb-base', verb: 'clone', new_name: 'cairn-orb-computer' },
-  ])
-    assert.equal(evaluate(images, details), 'no', JSON.stringify(details));
-  assert.equal(evaluate(images, { image: 'cairn-orb-computer-x', verb: 'remove' }), 'yes');
-  assert.equal(
-    evaluate('org.freedesktop.systemd1.manage-units', {
-      unit: 'systemd-nspawn@cairn-orb-computer.service',
-      verb: 'start',
-    }),
-    'no',
-  );
-  assert.equal(
-    evaluate('org.freedesktop.systemd1.manage-units', {
-      unit: 'systemd-nspawn@cairn-orb-computer-x.service',
-      verb: 'start',
-    }),
-    'yes',
-  );
-  assert.equal(
-    evaluate('org.freedesktop.machine1.manage-machines', {
-      machine: 'cairn-orb-computer',
-      verb: 'terminate',
-    }),
-    'no',
-  );
 });
 
 test('polkit cannot mutate, start or substitute the base image', () => {
@@ -567,23 +527,16 @@ test('installer counts and prints a rebuilt image then converges to zero changes
     assert.ok(f.logs.some((line) => line.includes('rebuild cairn-orb-base')));
     assert.equal(f.logs.at(-1), '1 changes');
     f.logs.length = 0;
-    installHost({
-      ...f,
-      run: (cmd, args) =>
-        cmd === 'bash' ? { status: 0, stdout: 'rebuild image\n1 changes\n' } : f.run(cmd, args),
-    });
-    assert.equal(f.logs.at(-1), '2 changes');
-    f.logs.length = 0;
     assert.throws(
       () =>
         installHost({
           ...f,
           run: (cmd, args) =>
-            cmd === 'bash' && args[0].endsWith('/build-computer-image.sh')
-              ? { status: 1, stdout: '', stderr: 'Build cairn-orb-base first' }
+            cmd === 'bash' && args[0].endsWith('/build-image.sh')
+              ? { status: 1, stdout: '', stderr: 'pacstrap failed' }
               : f.run(cmd, args),
         }),
-      /build-computer-image failed/,
+      /build-image failed/,
     );
     f.logs.length = 0;
     installHost(f);
@@ -685,26 +638,13 @@ test('installer provisions root-owned bind parents and owner content directories
   try {
     installHost(f);
     const config = readFileSync(join(f.root, 'etc/tmpfiles.d/cairn-orb.conf'), 'utf8');
-    for (const path of ['/run/cairn-orb', '/var/lib/cairn-orb', '/var/lib/cairn-computer'])
+    for (const path of ['/run/cairn-orb', '/var/lib/cairn-orb'])
       assert.ok(config.includes(`d ${path} 0755 root root -`));
     for (const path of ['/var/lib/cairn-orb/dist', '/var/lib/cairn-orb/seed'])
       assert.ok(config.includes(`d ${path} 0755 ian - -`));
     assert.equal(
       readFileSync(join(f.root, 'usr/local/lib/cairn-orb/runtime-directory.mjs'), 'utf8'),
       readFileSync(new URL('./runtime-directory.mjs', import.meta.url), 'utf8'),
-    );
-    const homeMount = readFileSync(
-      join(f.root, 'etc/systemd/system/var-lib-cairn\\x2dcomputer.mount'),
-      'utf8',
-    );
-    assert.match(homeMount, /^What=\/var\/lib\/cairn-computer$/m);
-    assert.match(homeMount, /^Where=\/var\/lib\/cairn-computer$/m);
-    assert.match(homeMount, /^Options=bind,nosuid,nodev$/m);
-    assert.ok(f.calls.includes('systemctl enable var-lib-cairn\\x2dcomputer.mount'));
-    assert.ok(f.calls.includes('systemctl start var-lib-cairn\\x2dcomputer.mount'));
-    assert.equal(
-      readFileSync(join(f.root, 'usr/local/lib/cairn-orb/computer-home.mjs'), 'utf8'),
-      readFileSync(new URL('./computer-home.mjs', import.meta.url), 'utf8'),
     );
     assert.ok(f.calls.some((call) => call.startsWith('systemd-tmpfiles --create')));
     assert.ok(!f.calls.some((call) => call.includes('--machine')));
@@ -1466,90 +1406,156 @@ test('changed foreign routing settings start inactive networkd without restartin
   assert.ok(!f.calls.includes('systemctl restart systemd-networkd.service'));
 });
 
-function fakeHomeFs(entries) {
-  const nodes = new Map(Object.entries(entries));
-  const calls = [];
-  const stat = (node) => ({
-    ...node,
-    isDirectory: () => node.type === 'dir',
-  });
-  return {
-    calls,
-    nodes,
-    lstatSync(path) {
-      const node = nodes.get(path);
-      if (!node) throw Object.assign(new Error(`ENOENT ${path}`), { code: 'ENOENT' });
-      return stat(node);
-    },
-    mkdirSync(path, { mode }) {
-      calls.push(['mkdir', path, mode]);
-      nodes.set(path, { type: 'dir', uid: 0, gid: 0, mode: mode & 0o755, dev: 1 });
-    },
-    openSync(path, flags) {
-      calls.push(['open', path, flags & fs.constants.O_NOFOLLOW ? 'nofollow' : 'follow']);
-      return path;
-    },
-    fchownSync(fd, uid, gid) {
-      calls.push(['fchown', fd, uid, gid]);
-      Object.assign(nodes.get(fd), { uid, gid });
-    },
-    fchmodSync(fd, mode) {
-      calls.push(['fchmod', fd, mode]);
-      nodes.get(fd).mode = mode;
-    },
-    closeSync() {},
-  };
-}
-
-const HOME_PARENT = '/r/var/lib/cairn-computer';
-const HOME = `${HOME_PARENT}/cairn-orb-computer-abc`;
-const rootParent = { type: 'dir', uid: 0, gid: 0, mode: 0o755, dev: 1 };
-
-test('a computer home is created once for ian, without following links, and reused after', () => {
-  const io = fakeHomeFs({ [HOME_PARENT]: rootParent });
-  const args = { root: '/r', name: 'cairn-orb-computer-abc', uid: 1000, gid: 1000, io };
-  assert.equal(computerHome({ ...args, dryRun: true }), 1);
-  assert.deepEqual(io.calls, []);
-  assert.equal(computerHome(args), 1);
-  assert.deepEqual(io.calls, [
-    ['mkdir', HOME, 0o700],
-    ['open', HOME, 'nofollow'],
-    ['fchown', HOME, 1000, 1000],
-    ['fchmod', HOME, 0o700],
-  ]);
-  assert.equal(computerHome(args), 0);
+test('the owner is chosen from --owner, else SUDO_USER, and root, empty or invalid names are refused', () => {
+  assert.equal(chooseOwner({ flag: 'alice', sudoUser: 'bob' }), 'alice');
+  assert.equal(chooseOwner({ sudoUser: 'bob' }), 'bob');
+  assert.equal(chooseOwner({ flag: 'alice', sudoUser: 'root' }), 'alice');
+  assert.equal(chooseOwner({ sudoUser: '', existing: 'carol' }), 'carol');
+  assert.equal(chooseOwner({ sudoUser: 'bob', existing: 'carol' }), 'carol');
+  assert.equal(chooseOwner({ sudoUser: 'root', existing: 'carol' }), 'carol');
+  assert.equal(chooseOwner({ flag: 'bob', existing: 'carol' }), 'bob');
+  for (const candidate of [
+    {},
+    { sudoUser: '' },
+    { sudoUser: 'root' },
+    { flag: 'root' },
+    { flag: 'Alice' },
+    { flag: 'a b' },
+    { flag: 'alice\nroot' },
+    { flag: '-alice' },
+    { flag: '../alice' },
+    { flag: 'a'.repeat(33) },
+  ])
+    assert.throws(
+      () => chooseOwner(candidate),
+      /Cannot choose the orb owner/,
+      JSON.stringify(candidate),
+    );
+  assert.ok(validOwnerName('a'.repeat(32)));
+  assert.ok(validOwnerName('_svc-1'));
 });
 
-test('a computer home refuses links, foreign owners, loose modes, bad parents and non-computer names', () => {
-  const ok = { type: 'dir', uid: 1000, gid: 1000, mode: 0o700, dev: 1 };
-  const args = { root: '/r', name: 'cairn-orb-computer-abc', uid: 1000, gid: 1000 };
-  for (const home of [
-    { ...ok, type: 'link' },
-    { ...ok, uid: 0 },
-    { ...ok, mode: 0o755 },
-    { ...ok, dev: 2 },
-  ])
-    assert.throws(
-      () => computerHome({ ...args, io: fakeHomeFs({ [HOME_PARENT]: rootParent, [HOME]: home }) }),
-      /Unrecognized computer home/,
+test('install-host refuses a missing, root, invalid or nonexistent owner before changing anything', () => {
+  for (const owner of [undefined, '', 'root', 'Ian', 'a;b', 'ghost']) {
+    const f = fixture();
+    try {
+      assert.throws(() => installHost({ ...f, owner }), /orb owner/i);
+      assert.deepEqual(readdirSync(f.root), []);
+      assert.ok(
+        !f.calls.some((call) => /^(pacman -S|systemctl (start|enable)|loginctl enable)/.test(call)),
+      );
+    } finally {
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  }
+});
+
+test('install-host writes the owner file and uses the owner for every account-bound step', () => {
+  const f = fixture();
+  try {
+    f.statOwner.name = 'alice';
+    installHost({ ...f, owner: 'alice' });
+    const ownerPath = join(f.root, ORB_OWNER_FILE);
+    assert.equal(readFileSync(ownerPath, 'utf8'), 'alice\n');
+    assert.equal(statSync(ownerPath).mode & 0o777, 0o644);
+    assert.equal(readOrbOwner({ path: ownerPath }), 'alice');
+    const config = readFileSync(join(f.root, 'etc/tmpfiles.d/cairn-orb.conf'), 'utf8');
+    assert.ok(config.includes('d /var/lib/cairn-orb/dist 0755 alice - -'));
+    assert.ok(config.includes('d /var/lib/cairn-orb/seed 0755 alice - -'));
+    assert.ok(f.calls.includes('loginctl enable-linger alice'));
+    assert.ok(f.calls.includes('id -u alice'));
+    assert.ok(
+      f.calls.some((call) =>
+        call.startsWith('runuser -u alice -- env XDG_RUNTIME_DIR=/run/user/1234'),
+      ),
     );
-  for (const parent of [
-    { ...rootParent, uid: 1000 },
-    { ...rootParent, mode: 0o777 },
-    { ...rootParent, type: 'link' },
-  ])
-    assert.throws(
-      () => computerHome({ ...args, io: fakeHomeFs({ [HOME_PARENT]: parent }) }),
-      /root-owned computer home parent/,
+    const accounts = f.calls.flatMap((call) =>
+      [...call.matchAll(/(?:\bid -[ug]|runuser -u|enable-linger|show-user)\s+(\S+)/g)].map(
+        (match) => match[1],
+      ),
     );
-  const io = fakeHomeFs({ [HOME_PARENT]: rootParent });
-  for (const name of [
-    'cairn-orb-computer',
-    'cairn-orb-base',
-    'cairn-orb-task-a',
-    'cairn-orb-computer-../x',
+    assert.ok(accounts.length > 0);
+    assert.deepEqual([...new Set(accounts)], ['alice']);
+    assert.ok(!config.includes('ian'));
+    f.logs.length = 0;
+    installHost({ ...f, owner: 'alice' });
+    assert.equal(f.logs.at(-1), '0 changes');
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('a dry run prints the owner file change and writes nothing', () => {
+  const f = fixture();
+  try {
+    installHost({ ...f, owner: 'alice', dryRun: true });
+    assert.ok(f.logs.includes(`plan: install ${ORB_OWNER_FILE} mode 644`));
+    assert.deepEqual(readdirSync(f.root), []);
+    assert.ok(f.calls.some((call) => /build-image\.sh --dry-run --owner alice$/.test(call)));
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('the installed polkit rule is the template with only the owner substituted', () => {
+  const f = fixture();
+  try {
+    f.statOwner.name = 'alice';
+    installHost({ ...f, owner: 'alice' });
+    const installed = readFileSync(join(f.root, 'etc/polkit-1/rules.d/50-cairn-orb.rules'), 'utf8');
+    assert.equal(installed, RULE_TEMPLATE.replace('@OWNER@', 'alice'));
+    assert.ok(installed.includes("subject.user !== 'alice'"));
+    assert.ok(!installed.includes('@OWNER@'));
+    assert.ok(!/\bian\b/.test(installed));
+    assert.equal(RULE_TEMPLATE.split("'@OWNER@'").length, 2);
+    const evaluate = policy('alice');
+    const clone = { image: 'cairn-orb-base', verb: 'clone', new_name: 'cairn-orb-task-a' };
+    assert.equal(evaluate('org.freedesktop.machine1.manage-images', clone, 'alice'), 'yes');
+    assert.equal(evaluate('org.freedesktop.machine1.manage-images', clone, 'ian'), 'skip');
+    assert.equal(evaluate('org.freedesktop.machine1.manage-images', clone, 'root'), 'skip');
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('renderPolkitRule refuses an owner that could change the rule', () => {
+  for (const owner of ["ian' || true || '", 'ian"', '', undefined, 'Ian'])
+    assert.throws(() => renderPolkitRule(RULE_TEMPLATE, owner), /Invalid orb owner/);
+});
+
+test('the owner file reader accepts one valid line and fails closed otherwise', () => {
+  const read = (content) =>
+    readOrbOwner({
+      path: '/x/owner',
+      io: {
+        readFileSync: () => {
+          if (content === null) throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+          return content;
+        },
+      },
+    });
+  assert.equal(read('ian\n'), 'ian');
+  assert.equal(read('alice'), 'alice');
+  assert.throws(() => read(null), /Cannot read the orb owner file \/x\/owner/);
+  for (const content of [
+    '',
+    '\n',
+    'Ian\n',
+    'ian\nroot\n',
+    'ian \n',
+    "ian'\n",
+    '../ian\n',
+    ' ian\n',
   ])
-    assert.throws(() => computerHome({ ...args, name, io }), /Invalid computer machine name/);
-  assert.throws(() => computerHome({ ...args, uid: 0, io }), /Invalid computer home owner/);
-  assert.deepEqual(io.calls, []);
+    assert.throws(() => read(content), /Invalid orb owner/, JSON.stringify(content));
+});
+
+test('root-run helpers read the owner only from the owner file', () => {
+  const source = readFileSync(new URL('./runtime-directory.mjs', import.meta.url), 'utf8');
+  assert.match(
+    source,
+    /readOrbOwner\(\{\s*path: join\(process\.env\.CAIRN_ORB_ROOT \?\? '\/', 'etc\/cairn-orb\/owner'\)/,
+  );
+  assert.ok(!/\bian\b/.test(source));
+  assert.ok(!/process\.env\.(SUDO_USER|USER|LOGNAME|CAIRN_ORB_OWNER)/.test(source));
 });

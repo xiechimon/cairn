@@ -34,7 +34,7 @@ export const DIALOG_TITLE_CLS =
 export const DIALOG_SUBTITLE_CLS = 'mt-0.5 text-meta text-content-tertiary';
 
 export const DIALOG_CLOSE_CLS =
-  'absolute top-4 right-4 text-content-tertiary hover:text-foreground';
+  'absolute top-4 right-4 text-content-tertiary hover:text-foreground pointer-coarse:top-2 pointer-coarse:right-2 pointer-coarse:size-11';
 
 export const DIALOG_BODY_CLS = 'min-h-0 overflow-y-auto px-4 pt-3 pb-4';
 
@@ -47,7 +47,7 @@ export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?:
   return (
     <div data-testid="dialog-foot" className={DIALOG_FOOT_CLS}>
       {hint != null && <div className={DIALOG_HINT_CLS}>{hint}</div>}
-      <div className="ml-auto flex items-center gap-2">{children}</div>
+      <div className="ml-auto flex flex-1 items-center justify-end gap-2">{children}</div>
     </div>
   );
 }
@@ -67,7 +67,7 @@ interface DialogShellProps {
   headerCenter?: ReactNode;
   headerAction?: ReactNode;
   open?: boolean;
-  onClose: () => void;
+  onClose: (details?: { reason?: string; event?: Event }) => void;
   children: ReactNode;
   footer?: ReactNode;
   hint?: ReactNode;
@@ -133,7 +133,7 @@ export function DialogShell({
   const { t } = useI18n();
   const { restore } = useReturnFocus(open);
 
-  const handleOpenChange = (next: boolean, details?: { reason?: string }) => {
+  const handleOpenChange = (next: boolean, details?: { reason?: string; event?: Event }) => {
     if (next) return;
     if (details?.reason === 'escape-key' && onEscapeWhileNested != null) {
       onEscapeWhileNested();
@@ -142,7 +142,7 @@ export function DialogShell({
     if (onEscapeWhileNested != null && details?.reason === 'outside-press') {
       return;
     }
-    onClose();
+    onClose(details);
   };
 
   if (viewportRoot || bare) {
@@ -157,10 +157,11 @@ export function DialogShell({
             data-slot="dialog-overlay"
             style={{ zIndex: backdropZ }}
             className={backdropClass}
-            onClick={onBackdropClick ?? onClose}
+            onClick={onBackdropClick ?? (() => onClose())}
           />
           <DialogPrimitive.Popup
             data-slot="dialog-content"
+            initialFocus={initialFocus}
             finalFocus={restore}
             className={
               viewportRoot

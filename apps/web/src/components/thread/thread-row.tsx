@@ -28,6 +28,7 @@ export interface ThreadRowProps {
   onSelectedChange?: (next: boolean) => void;
   onOpen?: () => void;
   menu?: ReactNode;
+  flush?: boolean;
 }
 
 export function ThreadRow({
@@ -42,6 +43,7 @@ export function ThreadRow({
   onSelectedChange,
   onOpen,
   menu,
+  flush = false,
 }: ThreadRowProps) {
   const { t } = useI18n();
   const quietTitle = tone === 'idle' || tone === 'resolved';
@@ -51,22 +53,25 @@ export function ThreadRow({
       data-tone={tone}
       data-selected={selected ? '' : undefined}
       className={cn(
-        'group/row relative flex items-start gap-2.5 rounded-(--radius-control) py-1.75 pr-2.5 pl-8.5 hover:bg-(--menu-hover)',
+        'group/row relative flex items-start gap-2.5 rounded-(--radius-control) py-1.75 pr-2.5 hover:bg-(--menu-hover)',
+        flush ? 'pl-2' : 'pl-8.5',
         selected && 'bg-(--menu-hover)',
       )}
     >
-      <span
-        className={cn(
-          'absolute top-2.25 left-2 hidden group-focus-within/row:flex group-hover/row:flex',
-          selected && 'flex',
-        )}
-      >
-        <Checkbox
-          checked={selected}
-          aria-label={t('选择 {title}', { title })}
-          onCheckedChange={(next) => onSelectedChange?.(next)}
-        />
-      </span>
+      {onSelectedChange != null && (
+        <span
+          className={cn(
+            'absolute top-2.25 left-2 hidden group-focus-within/row:flex group-hover/row:flex',
+            selected && 'flex',
+          )}
+        >
+          <Checkbox
+            checked={selected}
+            aria-label={t('选择 {title}', { title })}
+            onCheckedChange={(next) => onSelectedChange(next)}
+          />
+        </span>
+      )}
       <Button
         variant="ghost"
         onClick={onOpen}
@@ -96,7 +101,6 @@ export function ThreadRow({
       <span
         className={cn(
           'flex-none pt-px text-meta text-content-tertiary tabular-nums',
-          tone === 'working' && 'text-running-text',
           menu != null && 'group-focus-within/row:invisible group-hover/row:invisible',
         )}
       >

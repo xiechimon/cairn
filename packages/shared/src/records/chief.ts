@@ -4,6 +4,7 @@ import { replyQuoteText } from '../reply-quote.js';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { stepQueueBlockedSchema } from './machine-capabilities.js';
+import { workerBriefTextSchema } from './worker-brief-text.js';
 
 export const chiefIdFormat = (userId: string, teamId: string) => `chief-${userId}-${teamId}`;
 
@@ -170,7 +171,7 @@ export const patchChiefBodySchema = z
         agentId: recordId,
       })
       .nullish(),
-    charter: z.string().nullish(),
+    charter: workerBriefTextSchema.nullish(),
   })
   .refine((b) => b.agent !== undefined || b.charter !== undefined, {
     message: 'expected agent and/or charter',
@@ -248,7 +249,7 @@ export function chiefThreadTitle(firstMessage: string): string {
 }
 
 export const CHIEF_REBIND_CONFIRM_COPY =
-  '更换 Coordinator 的 agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。';
+  '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。';
 
 export const CHIEF_SETTINGS_TABS = ['Agent', '章程', '记忆', '关注与提醒'] as const;
 

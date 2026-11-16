@@ -22,6 +22,7 @@ import {
   useMachines,
   useNotifications,
   useProjects,
+  useSession,
   useWarmConversationMessages,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
@@ -50,7 +51,13 @@ import {
   globalCoordinatorThread,
 } from './coordinator-load.js';
 import { needsMachineName } from './needs-machine-name.js';
-import { chiefOutbox, type OutboxEntry, type UnsentSends, unlandedItems } from './outbox.js';
+import {
+  chiefOutbox,
+  keepSentKeys,
+  type OutboxEntry,
+  type UnsentSends,
+  unlandedItems,
+} from './outbox.js';
 import {
   questionActionThread,
   questionDraftKey,
@@ -106,6 +113,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const projectsQ = useProjects(teamId, live);
   const notificationsQ = useNotifications(teamId, live);
+  const userId = useSession(live).data?.id;
   const mutations = useApiMutations(teamId);
 
   const chief = fixture.chief;
@@ -208,7 +216,9 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   }, [newestPageOnly, activeThreadId, queryClient]);
   const streamHandlers = useMemo(
     () => ({
-      onMessage: (row: TranscriptRow) => {
+      onMessage: (row: TranscriptRow, clientMessageId?: string) => {
+        if (row.role === 'user' && clientMessageId !== undefined)
+          chiefOutbox.land(clientMessageId, row.id);
         const reason = chiefTurnErrorOfContent(row.content);
         if (reason === null) return;
         toast.error(t('Coordinator 本轮执行失败'), { description: reason });
@@ -259,16 +269,18 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     activity,
   ]);
   const outbox = useSyncExternalStore(chiefOutbox.subscribe, chiefOutbox.entries);
+  const globalThreadId = live ? (globalCoordinatorThread(liveThreads)?.id ?? null) : null;
   useEffect(() => {
     if (live) chiefOutbox.settle(activeThreadId, knownChiefIds);
   }, [live, outbox, activeThreadId, knownChiefIds]);
   const liveChiefWithUnsent = useMemo(() => {
     if (liveChief === null) return null;
-    const unlanded = unlandedItems(outbox, activeThreadId, knownChiefIds);
-    return unlanded.length === 0
-      ? liveChief
-      : { ...liveChief, stream: [...(liveChief.stream ?? []), ...unlanded] };
-  }, [liveChief, outbox, activeThreadId, knownChiefIds]);
+    const unlanded = unlandedItems(outbox, activeThreadId, knownChiefIds, globalThreadId);
+    return {
+      ...liveChief,
+      stream: [...keepSentKeys(liveChief.stream ?? [], chiefOutbox), ...unlanded],
+    };
+  }, [liveChief, outbox, activeThreadId, knownChiefIds, globalThreadId]);
   const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = chiefMessagesQ;
   const loadEarlier = useCallback(() => {
     void fetchNextPage();
@@ -407,12 +419,19 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           if (isCoordinatorNotReady(error))
             toastCoordinatorNotReady(
               t('Coordinator 还不能回答'),
-              t('点输入框下方的按钮，把模型来源、Runner 和 Coordinator 接上，再发一次。'),
+              t('点输入框下方的按钮，把模型来源、执行机和 Coordinator 接上，再发一次。'),
             );
           else toastError(t('发送失败，请重试。'), error);
           throw error;
         },
       );
+  const outboxScope = userId !== undefined && teamId !== undefined ? `${userId}/${teamId}` : null;
+  const deliverRef = useRef(deliver);
+  deliverRef.current = deliver;
+  useEffect(() => {
+    if (live && outboxScope !== null)
+      void chiefOutbox.resume(outboxScope, (entry) => deliverRef.current(entry));
+  }, [live, outboxScope]);
   const unsent = useMemo<UnsentSends | undefined>(
     () =>
       live
@@ -427,8 +446,8 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     ? (text: string, projectId: string | null) => {
         const sessionMachineId = routingRules?.find((rule) => rule.use === 'session')?.machineId;
         if (activeThread == null && needsMachineName(machines, sessionMachineId)) {
-          toast.warning(t('先选择 Runner'), {
-            description: t('多台 Runner 在线时，开工前要在规则里点名一台。'),
+          toast.warning(t('先选择执行机'), {
+            description: t('多台执行机在线时，开工前要在规则里点名一台。'),
             action: {
               label: t('去选择'),
               onClick: () => navigate(settingsHref('work-routing')),
@@ -436,7 +455,16 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           });
           return Promise.reject(new Error('Name a machine first'));
         }
-        chiefOutbox.enqueue({ threadId: activeThread?.id ?? null, projectId, text }, deliver);
+        chiefOutbox.enqueue(
+          {
+            scope: outboxScope,
+            threadId: activeThread?.id ?? null,
+            globalThreadId,
+            projectId,
+            text,
+          },
+          deliver,
+        );
         return Promise.resolve();
       }
     : DEMO_MODE

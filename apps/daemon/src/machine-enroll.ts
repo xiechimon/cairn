@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { enrollDisplayName } from '@cairn/shared';
 import { z } from 'zod';
 import type { MachineClient } from './machine-client.js';
 import { writePrivateFile } from './private-fs.js';
@@ -14,6 +15,7 @@ const pendingSchema = z.object({
   url: z.string().min(1),
   expiresAt: z.number(),
   serverUrl: z.string().optional(),
+  name: z.string().optional(),
 });
 
 export type PendingEnrollment = z.infer<typeof pendingSchema>;
@@ -68,7 +70,8 @@ export async function enrollThroughBrowser(
   if (
     pending !== null &&
     (pending.expiresAt <= io.now() ||
-      (pending.serverUrl !== undefined && pending.serverUrl !== serverUrl))
+      (pending.serverUrl !== undefined && pending.serverUrl !== serverUrl) ||
+      (pending.name !== undefined && pending.name !== name))
   ) {
     rmSync(path, { force: true });
     pending = null;
@@ -80,11 +83,16 @@ export async function enrollThroughBrowser(
       url: started.url,
       expiresAt: io.now() + ENROLL_TTL_MS,
       serverUrl,
+      name,
     };
     writePrivateFile(path, `${JSON.stringify(pending, null, 2)}\n`);
-    io.log(`Open ${pending.url} and approve this machine (expires in 10 minutes).`);
+    io.log(
+      `Open ${pending.url} and approve this machine${machineNameSuffix(name)} (expires in 10 minutes).`,
+    );
   } else {
-    io.log(`Waiting for approval of the pending enrollment: ${pending.url}`);
+    io.log(
+      `Waiting for approval of the pending enrollment: ${pending.url}${machineNameSuffix(name)}`,
+    );
   }
   for (;;) {
     if (io.stop?.aborted === true) throw new Error('enrollment stopped before approval');
@@ -123,12 +131,18 @@ export async function enrollThroughBrowser(
   }
 }
 
+export function machineNameSuffix(name: string): string {
+  const shown = enrollDisplayName(name);
+  return shown === undefined ? '' : ` (machine name: ${shown})`;
+}
+
 export async function pendingEnrollmentUrl(
   paths: StatePaths,
   serverUrl: string,
   waitMs: number,
   sleep: (ms: number) => Promise<void>,
   now: () => number,
+  name?: string,
 ): Promise<string | null> {
   const deadline = now() + waitMs;
   for (;;) {
@@ -136,7 +150,8 @@ export async function pendingEnrollmentUrl(
     if (
       pending !== null &&
       pending.expiresAt > now() &&
-      (pending.serverUrl === undefined || pending.serverUrl === serverUrl)
+      (pending.serverUrl === undefined || pending.serverUrl === serverUrl) &&
+      (pending.name === undefined || name === undefined || pending.name === name)
     )
       return pending.url;
     if (now() >= deadline) return null;

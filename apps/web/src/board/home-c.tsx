@@ -64,7 +64,7 @@ import {
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
 import { useNarrow } from './use-narrow.js';
-import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
+import { PANE_PARAM, paneOf, TASKS_TAB_PARAM, type WorkPane, WorkPanel } from './work-panel.js';
 
 const CHIEF_PARAM = 'chief';
 
@@ -208,6 +208,7 @@ export function HomeC({
     const params = withoutFileTarget(new URLSearchParams(searchParams));
     params.delete(THREAD_PARAM);
     params.delete(VIEW_PARAM);
+    params.delete(TASKS_TAB_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state });
@@ -495,7 +496,7 @@ export function HomeC({
       : surface.load;
   const composerPlaceholder =
     projectName != null
-      ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
+      ? t('在 {name} 里发消息', { name: projectName })
       : t('给 Coordinator 发消息');
   const archivedBar =
     archived === null ? null : (
@@ -604,12 +605,8 @@ export function HomeC({
                 showBindGate={!live}
                 todoGlances={todoGlances}
                 prefill={prefill}
-                placeholder={
-                  projectName != null
-                    ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-                    : t('给 Coordinator 发消息')
-                }
-                composerTools={setupStep !== null && <ComposerSetupHint next={setupStep} />}
+                placeholder={composerPlaceholder}
+                composerTools={setupStep !== null && <ComposerSetupHint step={setupStep} />}
                 composerRef={(node) => {
                   composerRef.current = node;
                 }}

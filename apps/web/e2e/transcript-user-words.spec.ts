@@ -218,6 +218,15 @@ test('3. review announcement row = note family (same shape as `发起了合并`)
   ).toBeVisible();
 });
 
+test('3b. in English the announcement row is one English sentence around the actor name', async ({ page }, testInfo) => {
+  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
+  await stubWorld(page);
+  const note = page.getByTestId('transcript-note').filter({ hasText: 'Xmon Dai' });
+  await note.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('announcement-en.png') });
+  await expect(note).toHaveText('Xmon Dai started an AI review');
+});
+
 test('4. real steer utterances go through markdown: fences become code blocks, literal ``` does not leak', async ({ page }) => {
   await stubWorld(page);
   const bubbles = page.getByTestId('user-bubble');

@@ -6,7 +6,7 @@ import { type Browser, chromium, type Page, expect as pexpect } from '@playwrigh
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { tag as tagTable } from '../../apps/server/src/db/schema.js';
-import { api, bootRealServer, type RealServer } from './helpers.js';
+import { api, bootRealServer, openPanelTask, projectTasksUrl, type RealServer } from './helpers.js';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
 const WEB_DIST = join(ROOT, 'apps/web/dist');
@@ -65,10 +65,10 @@ describe('spec 15 untitled tasks without category vocabulary (live UI → wire �
       title: '',
       spec: '394 占位标题探针\n\n现在的情况：第二行不进标题',
     });
-    await page.goto(`${server.url}/app/project/${projectId}/tasks`);
-    await pexpect(page.getByRole('link', { name: '394 占位标题探针' })).toBeVisible({
-      timeout: 30_000,
-    });
+    await page.goto(projectTasksUrl(server.url, projectId));
+    await openPanelTask(page, '394 占位标题探针');
+    await pexpect(page.getByTestId('side-chat')).toBeVisible({ timeout: 15_000 });
+    await pexpect(page.locator('.fresh-tags')).toHaveCount(0);
 
     const todos = (await api(server.url, 'GET', '/api/todos')).body as {
       id: string;
@@ -78,9 +78,5 @@ describe('spec 15 untitled tasks without category vocabulary (live UI → wire �
     const probe = todos.find((t) => t.title === '394 占位标题探针');
     expect(probe).toBeTruthy();
     expect(probe!.tagIds).toEqual([]);
-
-    await page.getByRole('link', { name: '394 占位标题探针' }).click();
-    await pexpect(page.getByTestId('side-chat')).toBeVisible({ timeout: 15_000 });
-    await pexpect(page.locator('.fresh-tags')).toHaveCount(0);
   }, 180_000);
 });

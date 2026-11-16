@@ -237,6 +237,7 @@ export async function runOrbStep(
             },
             machineId: claimed.step.machineId ?? undefined,
             upstream: deps.client,
+            ...(remoteSandbox ? { withholdMcpConnectors: true } : {}),
             ...(outboxDirectory && claimed.project?.repo?.kind === 'local'
               ? {
                   localDelivery: {

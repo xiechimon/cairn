@@ -81,6 +81,18 @@ export function checkSilentReverts({ cwd, base, baseHead, head, pulls, body }) {
   return failures;
 }
 
+const PULLS_PER_PAGE = 100;
+const MERGE_BASE_SLACK_MS = 24 * 60 * 60 * 1000;
+
+export function listMergedPulls({ fetchPage, since, exclude }) {
+  const pulls = [];
+  for (let page = 1; ; page++) {
+    const items = fetchPage(page);
+    pulls.push(...items.filter((item) => item.merged_at && item.number !== exclude));
+    if (items.length < PULLS_PER_PAGE || Date.parse(items.at(-1).updated_at) < since) return pulls;
+  }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   try {
     const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
@@ -91,29 +103,39 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     const base = execFileSync('git', ['merge-base', baseHead, head], { encoding: 'utf8' }).trim();
     const repo = process.env.GITHUB_REPOSITORY;
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '')) throw new Error('invalid GITHUB_REPOSITORY');
-    const pages = JSON.parse(
-      execFileSync(
-        'gh',
-        [
-          'api',
-          '--paginate',
-          '--slurp',
-          '-X',
-          'GET',
-          `repos/${repo}/pulls`,
-          '-f',
-          'state=closed',
-          '-f',
-          'sort=updated',
-          '-f',
-          'direction=desc',
-          '-f',
-          'per_page=100',
-        ],
-        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-      ),
-    );
-    const pulls = pages.flat().filter((item) => item.merged_at && item.number !== pull.number);
+    const since =
+      Number(execFileSync('git', ['show', '-s', '--format=%ct', base], { encoding: 'utf8' })) *
+        1000 -
+      MERGE_BASE_SLACK_MS;
+    const pulls = listMergedPulls({
+      since,
+      exclude: pull.number,
+      fetchPage: (page) =>
+        JSON.parse(
+          execFileSync(
+            'gh',
+            [
+              'api',
+              '-X',
+              'GET',
+              `repos/${repo}/pulls`,
+              '-f',
+              'state=closed',
+              '-f',
+              'sort=updated',
+              '-f',
+              'direction=desc',
+              '-f',
+              `per_page=${PULLS_PER_PAGE}`,
+              '-f',
+              `page=${page}`,
+              '--jq',
+              '[.[] | {number, merged_at, merge_commit_sha, updated_at}]',
+            ],
+            { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+          ),
+        ),
+    });
     const failures = checkSilentReverts({
       cwd: process.cwd(),
       base,

@@ -18,7 +18,6 @@ test('an unknown project id shows the not-found page, not the Coordinator home',
   await expect(notFound(page).getByRole('heading', { name: 'That project is not here' })).toBeVisible();
   await expect(page.getByTestId('project-not-found-id')).toHaveText('cairn-old');
   await expect(page.getByTestId('home-c')).toHaveCount(0);
-  await expect(page.getByTestId('project-home')).toHaveCount(0);
 });
 
 test('close names are suggested and a suggestion opens that project conversation', async ({
@@ -29,7 +28,6 @@ test('close names are suggested and a suggestion opens that project conversation
   await page.getByRole('link', { name: 'cairn', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`project=${KNOWN_ID}&chat=1$`));
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
-  await expect(page.getByTestId('project-home')).toHaveCount(0);
   await expect(notFound(page)).toHaveCount(0);
 });
 
@@ -65,7 +63,7 @@ test('while projects load there is no flash of not-found or of the Coordinator h
   await expect(notFound(page)).toHaveCount(0);
   await expect(page.getByTestId('home-c')).toHaveCount(0);
   release();
-  await expect(page.getByTestId('project-home')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(page.getByTestId('project-loading')).toHaveCount(0);
 });
 
@@ -83,7 +81,7 @@ test('a project list that fails to load shows an error with retry, not not-found
   await expect(error).toBeVisible();
   await expect(notFound(page)).toHaveCount(0);
   await error.getByRole('button', { name: 'Retry' }).click();
-  await expect(page.getByTestId('project-home')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
 });
 
 test('team failure retries the prerequisite before projects and project failure retries only projects', async ({
@@ -117,7 +115,7 @@ test('team failure retries the prerequisite before projects and project failure 
   expect(teamRequests).toBe(3);
   expect(requestedTeams).toEqual(['t1', 't1']);
   await error.getByRole('button', { name: 'Retry' }).click();
-  await expect(page.getByTestId('project-home')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toBeVisible();
   expect(projectRequests).toBe(3);
   expect(teamRequests).toBe(3);
   expect(requestedTeams).toEqual(['t1', 't1', 't1']);

@@ -9,6 +9,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
@@ -497,5 +498,222 @@ test('coordinator stores are pushed to the remote with the db', () => {
 test('--coordinator and --coordinator-out go together', () => {
   const f = fixture();
   const result = f.run(['--db', f.db, '--out', join(f.backups, 'db'), '--coordinator', f.server]);
+  assert.equal(result.status, 2);
+});
+
+test('the skills directory is archived read-only, rotated by --keep and pushed with the db', () => {
+  const f = fixture();
+  const skills = join(f.root, 'skills');
+  write(join(skills, 'deploy', 'SKILL.md'), 'deploy skill');
+  write(join(skills, '.migrating', 'half', 'SKILL.md'), 'half copied');
+  const before = files(skills);
+  const out = join(f.backups, 'skills');
+  write(join(out, 'skills-20200101T000000Z.tar.gz'), 'old');
+  const result = f.run([...f.full, '--skills', skills, '--skills-out', out, '--keep', '1']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /skills archived/);
+  const archives = readdirSync(out);
+  assert.equal(archives.length, 1);
+  const listing = spawnSync('tar', ['-tzf', join(out, archives[0])], { encoding: 'utf8' });
+  assert.equal(listing.status, 0, listing.stderr);
+  assert.match(listing.stdout, /deploy\/SKILL\.md/);
+  assert.doesNotMatch(listing.stdout, /\.migrating/);
+  assert.deepEqual(files(skills), before);
+  assert.deepEqual(readdirSync(join(f.receiver, 'skills')), archives);
+});
+
+test('--skills and --skills-out go together', () => {
+  const f = fixture();
+  const result = f.run(['--db', f.db, '--out', join(f.backups, 'db'), '--skills', f.server]);
+  assert.equal(result.status, 2);
+});
+
+function git(args, cwd) {
+  const run = spawnSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 't',
+      GIT_AUTHOR_EMAIL: 't@localhost',
+      GIT_COMMITTER_NAME: 't',
+      GIT_COMMITTER_EMAIL: 't@localhost',
+    },
+  });
+  assert.equal(run.status, 0, run.stderr);
+  return run.stdout;
+}
+
+function hostedRepos(root) {
+  const repos = join(root, 'server', 'repos');
+  const app = join(repos, 'team1', 'app.git');
+  git(['init', '--bare', '-q', app]);
+  git(['symbolic-ref', 'HEAD', 'refs/heads/trunk'], app);
+  const work = join(root, 'work');
+  git(['init', '-q', '-b', 'trunk', work]);
+  write(join(work, 'node.txt'), 'hello');
+  git(['add', 'node.txt'], work);
+  git(['commit', '-q', '-m', 'one'], work);
+  git(['branch', 'feature'], work);
+  write(join(work, 'node.txt'), 'hello again');
+  git(['commit', '-q', '-am', 'two'], work);
+  git(['tag', 'v1'], work);
+  git(['push', '-q', app, 'trunk', 'feature', 'v1'], work);
+  git(['init', '--bare', '-q', join(repos, 'team2', 'blank.git')]);
+  return { repos, app };
+}
+
+function refs(dir) {
+  return git(['for-each-ref', '--format=%(objectname) %(refname)'], dir);
+}
+
+test('hosted repos are bundled with their HEAD, rotated by --keep and restore to the same refs', () => {
+  const f = fixture();
+  const { repos, app } = hostedRepos(f.root);
+  const before = refs(app);
+  const out = join(f.backups, 'repos');
+  write(join(out, 'repos-20200101T000000Z', 'team1', 'old.bundle'), 'old');
+  const result = f.run([
+    '--db',
+    f.db,
+    '--out',
+    join(f.backups, 'db'),
+    '--repos',
+    repos,
+    '--repos-out',
+    out,
+    '--keep',
+    '1',
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /hosted repos bundled: 2/);
+  const runs = readdirSync(out);
+  assert.equal(runs.length, 1);
+  const run = join(out, runs[0]);
+  assert.deepEqual(files(run), [
+    'team1/app.bundle',
+    'team1/app.head',
+    'team2/blank.empty',
+    'team2/blank.head',
+  ]);
+  assert.equal(refs(app), before);
+
+  const restored = join(f.root, 'restored', 'team1', 'app.git');
+  git(['clone', '-q', '--mirror', join(run, 'team1', 'app.bundle'), restored]);
+  git(['remote', 'remove', 'origin'], restored);
+  git(
+    ['symbolic-ref', 'HEAD', readFileSync(join(run, 'team1', 'app.head'), 'utf8').trim()],
+    restored,
+  );
+  assert.equal(refs(restored), before);
+  assert.equal(git(['symbolic-ref', 'HEAD'], restored).trim(), 'refs/heads/trunk');
+  assert.equal(git(['show', 'trunk:node.txt'], restored), 'hello again');
+  assert.equal(
+    readFileSync(join(run, 'team2', 'blank.head'), 'utf8').trim(),
+    git(['symbolic-ref', 'HEAD'], join(repos, 'team2', 'blank.git')).trim(),
+  );
+});
+
+test('hosted repo bundles are pushed to the remote with the db', () => {
+  const f = fixture();
+  const { repos } = hostedRepos(f.root);
+  const result = f.run([...f.full, '--repos', repos, '--repos-out', join(f.backups, 'repos')]);
+  assert.equal(result.status, 0, result.stderr);
+  const runs = readdirSync(join(f.receiver, 'repos'));
+  assert.equal(runs.length, 1);
+  assert.deepEqual(files(join(f.receiver, 'repos', runs[0])), [
+    'team1/app.bundle',
+    'team1/app.head',
+    'team2/blank.empty',
+    'team2/blank.head',
+  ]);
+});
+
+function repoRun(f, repos) {
+  return f.run([
+    '--db',
+    f.db,
+    '--out',
+    join(f.backups, 'db'),
+    '--repos',
+    repos,
+    '--repos-out',
+    join(f.backups, 'repos'),
+  ]);
+}
+
+test('a missing hosted repos directory fails the run and keeps earlier snapshots', () => {
+  const f = fixture();
+  write(join(f.backups, 'repos', 'repos-20200101T000000Z', 'team1', 'app.bundle'), 'old');
+  const result = repoRun(f, join(f.server, 'repos'));
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /FAIL hosted repos not found/);
+  assert.deepEqual(readdirSync(join(f.backups, 'repos')), ['repos-20200101T000000Z']);
+});
+
+test('an empty hosted repos directory is an empty snapshot', () => {
+  const f = fixture();
+  mkdirSync(join(f.server, 'repos'), { recursive: true });
+  const result = repoRun(f, join(f.server, 'repos'));
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /hosted repos bundled: 0/);
+});
+
+test('a symlinked hosted repo fails the run instead of being followed', () => {
+  const f = fixture();
+  const { repos, app } = hostedRepos(f.root);
+  symlinkSync(app, join(repos, 'team2', 'outside.git'));
+  const result = repoRun(f, repos);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not a plain directory: team2\/outside/);
+});
+
+test('a hosted repo name with a newline fails the run instead of colliding', () => {
+  const f = fixture();
+  const { repos } = hostedRepos(f.root);
+  git(['init', '--bare', '-q', join(repos, 'team1', 'app\n.git')]);
+  const result = repoRun(f, repos);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unsafe hosted repo path/);
+});
+
+test('a hosted repo with a missing object fails the run', () => {
+  const f = fixture();
+  const { repos, app } = hostedRepos(f.root);
+  const blob = git(['rev-parse', 'trunk:node.txt'], app).trim();
+  git(['repack', '-a', '-d', '-q'], app);
+  const objects = join(app, 'objects');
+  const packs = readdirSync(join(objects, 'pack')).filter((name) => name.endsWith('.pack'));
+  for (const pack of packs) {
+    const kept = spawnSync(
+      'git',
+      ['-C', app, 'cat-file', '--batch-all-objects', '--batch-check=%(objectname)'],
+      {
+        encoding: 'utf8',
+      },
+    ).stdout;
+    assert.match(kept, new RegExp(blob));
+    rmSync(join(objects, 'pack', pack));
+    rmSync(join(objects, 'pack', pack.replace(/\.pack$/, '.idx')));
+  }
+  const result = repoRun(f, repos);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /FAIL bundle hosted repo team1\/app/);
+});
+
+test('a hosted repo whose refs cannot be listed fails the run instead of looking empty', () => {
+  const f = fixture();
+  const { repos } = hostedRepos(f.root);
+  const blank = join(repos, 'team2', 'blank.git');
+  writeFileSync(join(blank, 'packed-refs'), 'not a packed-refs line\n');
+  const result = repoRun(f, repos);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /FAIL (read HEAD|list refs) of hosted repo team2\/blank/);
+  assert.ok(!existsSync(join(f.backups, 'repos')));
+});
+
+test('--repos and --repos-out go together', () => {
+  const f = fixture();
+  const result = f.run(['--db', f.db, '--out', join(f.backups, 'db'), '--repos', f.server]);
   assert.equal(result.status, 2);
 });

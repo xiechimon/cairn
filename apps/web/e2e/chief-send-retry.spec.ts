@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { PROJECT } from './chief-home-mock';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -49,14 +50,21 @@ interface SendBody {
 async function mockCoordinator(
   page: Page,
   dropFirstResponse: boolean,
-  options: { readDelay?: number; postDelay?: number; rejectFirst?: boolean; firstThread?: boolean } = {},
+  options: {
+    readDelay?: number;
+    postDelay?: number;
+    rejectFirst?: boolean;
+    firstThread?: boolean;
+    holdFirst?: 'before-storing' | 'after-storing';
+  } = {},
 ) {
-  const { readDelay = 0, postDelay = 0, rejectFirst = false, firstThread = false } = options;
+  const { readDelay = 0, postDelay = 0, rejectFirst = false, firstThread = false, holdFirst } = options;
   const messages: Row[] = firstThread ? [] : [{ id: 'm1', role: 'user', content: 'Earlier note', createdAt: 10 }];
   const ledger = new Map<string, Row>();
   const posts: SendBody[] = [];
   let dropped = !dropFirstResponse;
-  await page.addInitScript(() => {
+  const context = page.context();
+  await context.addInitScript(() => {
     class FakeEventSource {
       readyState = 1;
       onopen: (() => void) | null = null;
@@ -73,7 +81,7 @@ async function mockCoordinator(
     }
     Object.defineProperty(window, 'EventSource', { configurable: true, value: FakeEventSource });
   });
-  await page.route('**/api/**', async (route) => {
+  await context.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     const json = (body: unknown, status = 200) =>
@@ -83,6 +91,8 @@ async function mockCoordinator(
       posts.push(body);
       if (postDelay > 0) await new Promise((resolve) => setTimeout(resolve, postDelay));
       if (rejectFirst && posts.length === 1) return json({ error: 'Submission refused' }, 503);
+      const held = holdFirst !== undefined && posts.length === 1;
+      if (held && holdFirst === 'before-storing') return new Promise<void>(() => {});
       const key = body.clientMessageId ?? `unkeyed-${posts.length}`;
       let row = ledger.get(key);
       if (row === undefined) {
@@ -90,6 +100,7 @@ async function mockCoordinator(
         messages.push(row);
         ledger.set(key, row);
       }
+      if (held) return new Promise<void>(() => {});
       if (!dropped) {
         dropped = true;
         return route.abort('connectionreset');
@@ -97,6 +108,7 @@ async function mockCoordinator(
       return json({ thread: THREAD, message: row }, 201);
     }
     if (path === '/api/teams') return json([TEAM]);
+    if (path === '/api/projects') return json([PROJECT]);
     if (path === '/api/user/me') return json(USER);
     if (path === '/api/teams/t1/notifications') return json({ unreadThreadIds: [] });
     if (path === '/api/teams/t1/chief/threads') {
@@ -296,4 +308,77 @@ test('a new send after a delivered one gets a fresh client message id even with 
   await expect.poll(() => posts.length).toBe(2);
   expect(posts[0]?.clientMessageId).not.toBe(posts[1]?.clientMessageId);
   expect(ledger.size).toBe(2);
+});
+
+async function crashAndReopen(page: Page): Promise<Page> {
+  const context = page.context();
+  const browser = context.browser();
+  if (browser === null) throw new Error('needs a launched browser');
+  const host = await browser.newBrowserCDPSession();
+  const { processInfo } = (await host.send('SystemInfo.getProcessInfo')) as {
+    processInfo: { type: string; id: number }[];
+  };
+  const crashed = new Promise((resolve) => page.once('crash', resolve));
+  for (const renderer of processInfo.filter((info) => info.type === 'renderer'))
+    process.kill(renderer.id, 'SIGKILL');
+  await crashed;
+  await host.detach();
+  await page.close();
+  const reopened = await context.newPage();
+  await reopened.goto('/app');
+  return reopened;
+}
+
+test('a message the server never received survives a renderer crash and is sent again under its id', async ({
+  page,
+}) => {
+  const { posts, ledger } = await mockCoordinator(page, false, { holdFirst: 'before-storing' });
+  await page.goto('/app');
+  await expect(bubbles(page)).toHaveCount(1);
+  await composer(page).fill('Do not lose me in a crash');
+  await composer(page).press('Enter');
+  await expect(sending(page)).toHaveText('Do not lose me in a crash');
+  await expect.poll(() => posts.length).toBe(1);
+  expect(ledger.size).toBe(0);
+  const reopened = await crashAndReopen(page);
+  await expect(bubbles(reopened).filter({ hasText: 'Do not lose me in a crash' })).toHaveCount(1);
+  await expect(sending(reopened)).toHaveCount(0);
+  expect(posts).toHaveLength(2);
+  expect(posts[1]?.clientMessageId).toBe(posts[0]?.clientMessageId);
+  expect(ledger.size).toBe(1);
+  await expect(composer(reopened)).toHaveValue('');
+});
+
+test('a message the server stored before the renderer crashed comes back once, not twice', async ({
+  page,
+}) => {
+  const { posts, ledger } = await mockCoordinator(page, false, { holdFirst: 'after-storing' });
+  await page.goto('/app');
+  await expect(bubbles(page)).toHaveCount(1);
+  await composer(page).fill('Stored before the crash');
+  await composer(page).press('Enter');
+  await expect(sending(page)).toHaveText('Stored before the crash');
+  await expect.poll(() => ledger.size).toBe(1);
+  const reopened = await crashAndReopen(page);
+  await expect.poll(() => posts.length).toBe(2);
+  expect(posts[1]?.clientMessageId).toBe(posts[0]?.clientMessageId);
+  await expect(sending(reopened)).toHaveCount(0);
+  await expect(bubbles(reopened)).toHaveText(['Earlier note', 'Stored before the crash']);
+  expect(ledger.size).toBe(1);
+});
+
+test('a reload while a message is sending keeps it and sends it again under its id', async ({ page }) => {
+  const { posts, ledger } = await mockCoordinator(page, false, { holdFirst: 'before-storing' });
+  await page.goto('/app');
+  await expect(bubbles(page)).toHaveCount(1);
+  await composer(page).fill('Reloaded while sending');
+  await composer(page).press('Enter');
+  await expect(sending(page)).toHaveText('Reloaded while sending');
+  await expect.poll(() => posts.length).toBe(1);
+  await page.reload();
+  await expect(bubbles(page).filter({ hasText: 'Reloaded while sending' })).toHaveCount(1);
+  await expect(sending(page)).toHaveCount(0);
+  expect(posts).toHaveLength(2);
+  expect(posts[1]?.clientMessageId).toBe(posts[0]?.clientMessageId);
+  expect(ledger.size).toBe(1);
 });

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { mockLive, TASK, THREAD } from './chief-home-mock';
+import { mockLive, TASK, taskEntry, THREAD } from './chief-home-mock';
 
 const HOME = '/app?scenario=home-c';
 
@@ -180,11 +180,21 @@ test('Up next, Scheduled and Done tabs list their own entries', async ({ page })
   );
 });
 
-test('a schedule row opens the schedule detail', async ({ page }) => {
+test('a schedule row opens a small editor next to it, not a dialog', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
   await panel(page).getByRole('tab', { name: '定时' }).click();
-  await panel(page).locator('[data-slot="schedule-row"]').first().click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  const row = panel(page).locator('[data-slot="schedule-row"]').first();
+  const title = (await row.locator('span.truncate').first().textContent()) ?? '';
+  await row.click();
+  const editor = page.getByTestId('schedule-popover');
+  await expect(editor).toBeVisible();
+  await expect(editor).toContainText(title);
+  await expect(editor.getByTestId('schedule-popover-runs')).toContainText('下次运行');
+  await expect(editor.getByRole('button', { name: '保存' })).toBeVisible();
+  await expect(page.locator('[data-slot="dialog-content"]')).toHaveCount(0);
+  await expect(editor).toHaveCSS('width', '320px');
+  await page.keyboard.press('Escape');
+  await expect(editor).toHaveCount(0);
 });
 
 test('a row opens its thread in the side chat', async ({ page }) => {
@@ -287,22 +297,21 @@ test('a scheduled row menu offers run, pause and delete; delete asks first', asy
   await expect(menu.getByRole('menuitem')).toHaveText([
     /立即运行/,
     /暂停定时/,
-    /查看详情/,
-    /管理定时/,
+    /编辑/,
     /删除/,
   ]);
   await menu.getByRole('menuitem', { name: /删除/ }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
 });
 
-test('the scheduled row menu opens the schedule detail', async ({ page }) => {
+test('Edit in the scheduled row menu opens the small editor', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
   await panel(page).getByRole('tab', { name: '定时' }).click();
   const row = panel(page).locator('[data-slot="schedule-row-frame"]').first();
   await row.hover();
   await row.getByTestId('schedule-row-menu-button').click();
-  await page.getByRole('menuitem', { name: /查看详情/ }).click();
-  await expect(page.getByTestId('schedule-detail-body')).toBeVisible();
+  await page.getByRole('menuitem', { name: /编辑/ }).click();
+  await expect(page.getByTestId('schedule-popover')).toBeVisible();
 });
 
 test('the task row menu groups open, move, mark done and rename above a divider, then archive and delete', async ({
@@ -438,26 +447,14 @@ test('the menu offers Mark done on open tasks only and follows the checkbox', as
   await expect(page.getByRole('alertdialog', { name: '停止并标记完成' })).toBeVisible();
 });
 
-test('Manage schedules sits in the schedule row menu and opens the schedules page', async ({
-  page,
-}) => {
-  await page.goto(`${HOME}&pane=tasks`);
-  await panel(page).getByRole('tab', { name: '定时' }).click();
-  const frame = panel(page).locator('[data-slot="schedule-row-frame"]').first();
-  await frame.hover();
-  await frame.getByTestId('schedule-row-menu-button').click();
-  await page.getByRole('menuitem', { name: /管理定时/ }).click();
-  await expect(page).toHaveURL(/\/app\/schedules/);
-});
-
-test('an empty scheduled tab says so and offers one grey pill to the schedules page', async ({
+test('an empty scheduled tab says so and offers one grey pill that opens the new schedule editor', async ({
   page,
 }) => {
   await page.goto('/app?scenario=home-c-empty&pane=tasks');
   await panel(page).getByRole('tab', { name: '定时' }).click();
   await expect(panel(page).getByTestId('tasks-schedules-empty')).toHaveText('还没有定时任务');
   await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(0);
-  const manage = panel(page).getByRole('link', { name: '管理定时' });
+  const manage = panel(page).getByRole('button', { name: '新建定时' });
   await expect(manage).toHaveCount(1);
   const pill = await manage.evaluate((el) => {
     const probe = document.createElement('span');
@@ -480,7 +477,7 @@ test('an empty scheduled tab says so and offers one grey pill to the schedules p
   expect(pill.below).toBe(12);
   expect(pill.left).toBe(0);
   await manage.click();
-  await expect(page).toHaveURL(/\/app\/schedules/);
+  await expect(page.getByTestId('schedule-popover')).toContainText('新建定时');
 });
 
 test('with no tasks anywhere the panel centres a first-run note whose button opens the add field, and the toggle has no badge', async ({
@@ -509,6 +506,44 @@ test('once tasks exist, an empty tab is one left-aligned quiet line under the ta
   await expect(panel(page).locator('[data-section="resolved"]')).toContainText('Unread dot on threads');
 });
 
+const queued = taskEntry({
+  id: 'todo-next',
+  seqNum: 12,
+  title: 'Draft the release notes',
+  phase: 'todo',
+  latestBuildId: null,
+  section: 'up_next',
+});
+
+async function mockSlowTasks(page: Page, tasks: unknown[]) {
+  await mockLive(page, { threads: [THREAD], messages: [], tasks }, (path, _route, json) =>
+    path === '/api/tasks'
+      ? new Promise<void>((resolve) => setTimeout(resolve, 800)).then(() => json({ entries: tasks }))
+      : undefined,
+  );
+}
+
+test('with nothing in progress the panel opens on Up next once the tasks load, and the picked tab stays', async ({
+  page,
+}) => {
+  await mockSlowTasks(page, [queued]);
+  await page.goto('/app?pane=tasks');
+  const next = panel(page).getByRole('tab', { name: '接下来' });
+  await expect(next).toHaveAttribute('aria-selected', 'true');
+  await expect(panel(page).locator('[data-section="up_next"]')).toContainText('Draft the release notes');
+  await panel(page).getByRole('tab', { name: '进行中' }).click();
+  await expect(panel(page).getByTestId('tasks-quiet')).toHaveText('现在没有进行中的任务');
+  await page.waitForTimeout(1000);
+  await expect(panel(page).getByRole('tab', { name: '进行中' })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('with a task in progress the panel still opens on In progress', async ({ page }) => {
+  await mockSlowTasks(page, [taskEntry({ section: 'working', title: TASK.title }), queued]);
+  await page.goto('/app?pane=tasks');
+  await expect(panel(page).locator('[data-section="working"]')).toContainText(TASK.title);
+  await expect(panel(page).getByRole('tab', { name: '进行中' })).toHaveAttribute('aria-selected', 'true');
+});
+
 test('the Made button swaps the panel to finished work', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
   await madeButton(page).click();
@@ -528,13 +563,14 @@ test('Made shows an empty state when nothing has finished', async ({ page }) => 
 
 const MADE = '/app?scenario=home-c-made&pane=made';
 
-test('Made groups finished work by kind with counts, as horizontal rows of preview cards', async ({
+test('Made groups the last seven days by kind and everything older under Earlier, as horizontal rows of preview cards', async ({
   page,
 }) => {
   await page.goto('/app?scenario=make-ref&pane=made');
   const groups = madePanel(page).getByTestId('made-group');
-  await expect(groups).toHaveCount(3);
-  await expect(groups.locator('h3')).toHaveText(['文档6', '设计3', '其他1']);
+  await expect(groups).toHaveCount(4);
+  await expect(groups.locator('h3')).toHaveText(['文档6', '设计3', '其他1', '更早1']);
+  await expect(groups.nth(3).getByTestId('made-card')).toContainText('0.8 版本发布落地页');
   await expect(groups.nth(0).getByTestId('made-card')).toHaveCount(6);
   const first = groups.nth(0).getByTestId('made-card').first();
   await expect(first).toContainText('发布会演讲稿');
@@ -632,6 +668,8 @@ test('Made search also matches the kind and keeps the matching group', async ({ 
   await madePanel(page).getByRole('button', { name: '搜索成果' }).click();
   await madePanel(page).getByTestId('made-search').fill('设计');
   await expect(madePanel(page).getByTestId('made-group').locator('h3')).toHaveText(['设计3']);
+  await madePanel(page).getByTestId('made-search').fill('网页');
+  await expect(madePanel(page).getByTestId('made-group').locator('h3')).toHaveText(['更早1']);
 });
 
 test('Made with many finished items scrolls the groups under fixed tabs', async ({ page }) => {
@@ -705,13 +743,47 @@ test('the composer has no in-progress pill above it', async ({ page }) => {
   await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
 });
 
-test('the sidebar has no Schedules row in any layout', async ({ page }) => {
+test('Schedules is a labelled row pinned above 新建项目, not a tree row or a footer icon', async ({ page }) => {
   await page.goto(HOME);
   const aside = page.locator('.board-sidebar');
-  await expect(aside.getByRole('button', { name: '定时' })).toHaveCount(0);
-  await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.reload();
-  await expect(page.getByRole('complementary').first().getByRole('link', { name: '定时' })).toHaveCount(0);
+  await expect(aside.locator('nav').getByRole('link', { name: '定时' })).toHaveCount(0);
+  await expect(page.getByTestId('sidebar-footer').getByRole('link', { name: '定时' })).toHaveCount(0);
+  const pinned = page.getByTestId('sidebar-pinned');
+  const schedules = pinned.getByRole('link', { name: '定时', exact: true });
+  await expect(schedules).toHaveText('定时');
+  const rowTop = await schedules.evaluate((el) => el.getBoundingClientRect().top);
+  const newTop = await pinned.locator('[data-slot="sidebar-new-project"]').evaluate((el) => el.getBoundingClientRect().top);
+  expect(rowTop).toBeLessThan(newTop);
+  await expect(schedules).not.toHaveAttribute('aria-current');
+  await schedules.click();
+  await expect(page).toHaveURL('/app?scenario=home-c&pane=tasks&tab=scheduled');
+  await expect(panel(page).getByRole('tab', { name: '定时' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByTestId('sidebar-reopen').click();
+  await expect(schedules).toHaveAttribute('aria-current', 'page');
+  await expect(
+    aside.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }),
+  ).not.toHaveAttribute('aria-current');
+});
+
+test('the old schedules URL opens the Tasks panel on 定时, and picking another tab drops the link and the sidebar highlight', async ({
+  page,
+}) => {
+  await page.goto('/app/schedules?scenario=home-c');
+  await expect(page).toHaveURL('/app?scenario=home-c&pane=tasks&tab=scheduled');
+  const scheduledTab = panel(page).getByRole('tab', { name: '定时' });
+  await expect(scheduledTab).toHaveAttribute('aria-selected', 'true');
+  await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(3);
+  await page.getByTestId('sidebar-reopen').click();
+  const row = page.getByTestId('sidebar-schedules');
+  await expect(row).toHaveAttribute('aria-current', 'page');
+
+  await panel(page).getByRole('tab', { name: '接下来' }).click();
+  await expect(panel(page).getByRole('tab', { name: '接下来' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL('/app?scenario=home-c&pane=tasks');
+  await expect(row).not.toHaveAttribute('aria-current');
+  await expect(
+    page.locator('.board-sidebar [data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }),
+  ).toHaveAttribute('aria-current', 'page');
 });
 
 test('at phone width the panel overlays without horizontal overflow', async ({ page }) => {
@@ -809,4 +881,101 @@ test('Made lists finished documents with the opening line of each report and lea
   await expect(madePanel(page).getByTestId('made-card-excerpt')).toHaveText(
     'Parquet halves the file size of CSV, see the benchmark.',
   );
+});
+
+test('the scheduled tab opens from the URL, creates and edits schedules in the small editor, and folds ended ones', async ({
+  page,
+}) => {
+  const free = taskEntry({ id: 'todo-2', title: 'Weekly dependency sweep', phase: 'todo', seqNum: 12, section: 'up_next' });
+  const embed = (title: string) => ({ seqNum: 9, title, phase: 'done', projectName: 'cairn', ownerId: 'u1' });
+  const base = {
+    teamId: 't1', projectId: 'proj-1', prompt: '', tz: 'Asia/Shanghai', cron: null, createdBy: 'u1',
+    lastRunAt: null, lastRunStatus: null, lastRunError: null, pausedReason: null,
+  };
+  const rows = [
+    { ...base, id: 's-daily', todoId: 'todo-1', kind: 'daily', at: Date.now(), enabled: true, nextRunAt: Date.now() + 3_600_000, todo: embed('Nightly release checks') },
+    { ...base, id: 's-ended', todoId: 'todo-3', kind: 'once', at: Date.now(), enabled: false, nextRunAt: null, pausedReason: 'Task archived', todo: embed('Stop retry storms') },
+  ];
+  const posted: Record<string, unknown>[] = [];
+  await mockLive(page, { threads: [THREAD], messages: [], tasks: [free] }, (path, route, json) => {
+    if (!path.startsWith('/api/schedules')) return undefined;
+    if (route.request().method() === 'GET') return json(rows);
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    posted.push(body);
+    return json({ ...rows[0], ...body, id: `s-${body.todoId}` });
+  });
+  await page.goto('/app?pane=tasks&tab=scheduled');
+  await expect(panel(page).getByRole('tab', { name: '定时' })).toHaveAttribute('aria-selected', 'true');
+  await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(1);
+  const ended = panel(page).getByTestId('schedules-ended');
+  const toggle = ended.getByRole('button', { name: /已结束/ });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toContainText('1');
+  await expect(panel(page).getByText('Stop retry storms')).toHaveCount(0);
+  await toggle.click();
+  await expect(ended.getByText('任务已归档，定时随之停用')).toBeVisible();
+  await expect(panel(page).getByText('Task archived')).toHaveCount(0);
+
+  await panel(page).getByTestId('schedule-new').click();
+  const editor = page.getByTestId('schedule-popover');
+  await expect(editor).toContainText('新建定时');
+  await expect(editor.getByRole('combobox', { name: '任务' })).toContainText('Weekly dependency sweep');
+  await editor.getByRole('button', { name: '保存' }).click();
+  await expect(editor).toHaveCount(0);
+  expect(posted[0]).toMatchObject({ todoId: 'todo-2', projectId: 'proj-1', kind: 'daily', enabled: true });
+
+  await panel(page).locator('[data-slot="schedule-row"]').first().click();
+  await expect(editor).toContainText('Nightly release checks');
+  await editor.getByRole('button', { name: '保存' }).click();
+  await expect(editor).toHaveCount(0);
+  expect(posted[1]).toMatchObject({ todoId: 'todo-1', kind: 'daily', tz: 'Asia/Shanghai', enabled: true });
+});
+
+test('the schedule editor keeps Save off while a custom cron has the wrong number of fields', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByRole('tab', { name: '定时' }).click();
+  await panel(page).locator('[data-slot="schedule-row"]').first().click();
+  const editor = page.getByTestId('schedule-popover');
+  const save = editor.getByRole('button', { name: '保存' });
+  await expect(save).toBeEnabled();
+  await editor.getByRole('radio', { name: '自定义' }).click();
+  const cron = editor.getByRole('textbox', { name: 'Cron 表达式' });
+  await cron.fill('0 9 * *');
+  await expect(editor.getByText('Cron 需要 5 段：分 时 日 月 周。')).toBeVisible();
+  await expect(save).toBeDisabled();
+  await cron.fill('0 9 * * 1');
+  await expect(save).toBeEnabled();
+});
+
+test('a schedule deleted while its editor is open says so and cannot be saved', async ({ page }) => {
+  const embed = { seqNum: 9, title: 'Nightly release checks', phase: 'done', projectName: 'cairn', ownerId: 'u1' };
+  const nightly = {
+    id: 's-daily', teamId: 't1', projectId: 'proj-1', todoId: 'todo-1', kind: 'daily', at: Date.now(),
+    cron: null, prompt: '', tz: 'Asia/Shanghai', enabled: true, nextRunAt: Date.now() + 3_600_000,
+    lastRunAt: null, lastRunStatus: null, lastRunError: null, pausedReason: null, createdBy: 'u1', todo: embed,
+  };
+  let rows: unknown[] = [nightly];
+  const posted: unknown[] = [];
+  await mockLive(page, { threads: [THREAD], messages: [] }, (path, route, json) => {
+    if (!path.startsWith('/api/schedules')) return undefined;
+    if (route.request().method() === 'GET') return json(rows);
+    posted.push(route.request().postDataJSON());
+    return json(nightly);
+  });
+  await page.goto('/app?pane=tasks&tab=scheduled');
+  await panel(page).locator('[data-slot="schedule-row"]').first().click();
+  const editor = page.getByTestId('schedule-popover');
+  await expect(editor).toContainText('Nightly release checks');
+  await expect(editor.getByRole('button', { name: '保存' })).toBeEnabled();
+  rows = [];
+  await page.waitForFunction(() => window.__es.some((entry) => entry.url.includes('/api/teams/t1/stream')));
+  await page.evaluate(() => {
+    window.__es.find((entry) => entry.url.includes('/api/teams/t1/stream'))?.emit({ type: 'todo', doc: { id: 'todo-1' } });
+  });
+  await expect(editor.getByRole('status')).toHaveText('这条定时已被删除');
+  await expect(editor.getByRole('button', { name: '保存' })).toHaveCount(0);
+  expect(posted).toHaveLength(0);
+  await editor.getByRole('button', { name: '关闭' }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(0);
 });

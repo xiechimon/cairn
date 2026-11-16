@@ -1,5 +1,5 @@
 import type { ClaimedStep } from '@cairn/shared';
-import { claimedStepSchema } from '@cairn/shared';
+import { claimedStepSchema, DEFAULT_CLAUDE_CODE_MODELS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -12,6 +12,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
+import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { profileForStep } from '../src/services/routing-rules.js';
 import { decideStepRoute, recordStepRoute, routedModelRunsOn } from '../src/services/step-route.js';
 import {
@@ -247,6 +248,7 @@ describe('the router agrees with what dispatch can execute', () => {
         label: 'team',
         tokenCipher: 'cipher',
         expiresAt: null,
+        enabledAt: nowMs(),
         createdAt: nowMs(),
       })
       .run();
@@ -370,6 +372,59 @@ describe('claim validation and recording follow the router rules', () => {
       routedModelRunsOn(w.s.db, row, { provider: 'claude-code', modelId: 'claude-sonnet-5-5' }),
     ).toBe(false);
   });
+
+  test('a machine whose own claude is not logged in runs routed Claude steps only when a subscription token is stored', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: false });
+    w.s.db
+      .update(machineTable)
+      .set({
+        claudeCodeReport: {
+          installed: true,
+          hostname: 'route-box',
+          models: [{ id: 'claude-sonnet-5-5', name: 'claude-sonnet-5-5' }],
+          auth: { state: 'not-logged-in', provider: 'firstParty' },
+        },
+      })
+      .where(eq(machineTable.id, w.machineId))
+      .run();
+    const row = () =>
+      w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!;
+    const sonnet = { provider: 'claude-code', modelId: 'claude-sonnet-5-5' };
+    expect(routedModelRunsOn(w.s.db, row(), sonnet)).toBe(false);
+    createClaudeSubscription({ db: w.s.db, box: w.s.secretBox }, w.s.team.id, {
+      label: 'mine',
+      token: `sk-ant-oat01-${'a1B2c3D4'.repeat(10)}`,
+    });
+    expect(routedModelRunsOn(w.s.db, row(), sonnet)).toBe(true);
+  });
+
+  test.each([
+    ['logged in', { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' }, true],
+    ['logged out', { state: 'not-logged-in', provider: 'firstParty' }, false],
+  ] as const)(
+    'a machine reporting the built-in Claude model list (no settings.json) is routable unpinned only when %s',
+    async (_label, auth, usable) => {
+      const w = await setupWorld();
+      equipMachine(w, { claude: true, codex: false });
+      w.s.db
+        .update(machineTable)
+        .set({
+          claudeCodeReport: {
+            installed: true,
+            hostname: 'route-box',
+            models: DEFAULT_CLAUDE_CODE_MODELS.map((model) => ({ ...model })),
+            auth,
+          },
+        })
+        .where(eq(machineTable.id, w.machineId))
+        .run();
+      const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!;
+      expect(
+        routedModelRunsOn(w.s.db, row, { provider: 'claude-code', modelId: 'claude-sonnet-5-5' }),
+      ).toBe(usable);
+    },
+  );
 
   test('a provider the router does not handle is recorded without a harness', async () => {
     const w = await setupWorld();

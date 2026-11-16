@@ -79,7 +79,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('e1 is a bare ring; e2 and e3 are their own pool plus one ring', async ({ page }) => {
-      await page.goto('/app/schedules?scenario=01');
+      await page.goto('/app?scenario=01');
       await page.waitForSelector('.board-sidebar');
       const e1 = await slot(page, 'e1');
       expect(e1).toBe(await ringIn(page, 'border'));
@@ -95,7 +95,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('cds pools keep their layered shadows; --top only in dark cds md/lg', async ({ page }) => {
-      await page.goto('/app/schedules?scenario=01');
+      await page.goto('/app?scenario=01');
       await page.waitForSelector('.board-sidebar');
       const top = await slot(page, 'top');
       for (const [name, want] of Object.entries(POOLS[theme])) {
@@ -112,7 +112,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('old slot names alias the ladder', async ({ page }) => {
-      await page.goto('/app/schedules?scenario=01');
+      await page.goto('/app?scenario=01');
       await page.waitForSelector('.board-sidebar');
       const pairs: Array<[string, string]> = [
         ['panel-shadow', 'e1'],

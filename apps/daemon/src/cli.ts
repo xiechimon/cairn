@@ -8,26 +8,31 @@ import {
   statSync,
 } from 'node:fs';
 import process from 'node:process';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { BRAND, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
-import { HostComputerProvider } from './computer/host.js';
-import { runOrbComputerAgent } from './computer/orb-agent.js';
 import {
   type DaemonConfig,
   type DaemonConfigInput,
   loadDaemonConfig,
   WorkspacesDirError,
 } from './config.js';
+import { realDoctorEnv, runDoctorCommand } from './doctor.js';
 import { createDaemonLogger } from './log.js';
-import { pendingEnrollmentUrl } from './machine-enroll.js';
+import { machineNameSuffix, pendingEnrollmentUrl } from './machine-enroll.js';
 import { runMachine } from './machine-loop.js';
-import { ORB_RELAY_TOKEN_ENV, orbReleaseFromEntry } from './orb/protocol.js';
+import { ORB_RELAY_TOKEN_ENV } from './orb/protocol.js';
 import { runOrbServicesEnsure } from './orb/services-runtime.js';
-import { orbAgentHome, runOrbWorker } from './orb/worker.js';
+import { runOrbWorker } from './orb/worker.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
-import { isAlive, runSupervisor, spawnSupervisor, stopSupervisor } from './supervisor.js';
+import {
+  isAlive,
+  runSupervisor,
+  type SupervisorStart,
+  spawnSupervisor,
+  stopSupervisor,
+} from './supervisor.js';
 import { runTokenCommand } from './token-command.js';
 import { DAEMON_VERSION } from './version.js';
 
@@ -59,6 +64,23 @@ function passthroughArgv(opts: StartOptions): string[] {
   if (opts.server) argv.push('--server', opts.server);
   if (opts.workspacesDir) argv.push('--workspaces-dir', opts.workspacesDir);
   return argv;
+}
+
+function reportStarted(started: SupervisorStart): void {
+  if (started.unit !== null) {
+    process.stdout.write(
+      `Started in background as systemd user unit ${started.unit} (pid ${started.pid})\n`,
+    );
+    return;
+  }
+  process.stdout.write(`Started in background (pid ${started.pid})\n`);
+  if (started.unitFailure !== null) {
+    process.stderr.write(
+      `warning: could not start the daemon as a systemd user unit (${started.unitFailure}).\n` +
+        'The Runner will show Online but cannot start its task sandbox, so it will not take tasks.\n' +
+        'Run it under systemd instead: https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#keep-the-daemon-running-on-linux\n',
+    );
+  }
 }
 
 export async function runForeground(opts: StartOptions): Promise<void> {
@@ -103,7 +125,7 @@ export function buildProgram(): Command {
 
   program
     .command('start')
-    .description('Start the daemon (detached + supervisor by default)')
+    .description('Start the daemon in the background (a systemd user unit on Linux)')
     .option('-f, --foreground', 'run attached (for pm2/systemd/containers)')
     .option('--api-key <k>', 'API key for non-interactive enroll (overrides existing enroll)')
     .option('--team <id>', 'team id for non-interactive enroll')
@@ -126,12 +148,13 @@ export function buildProgram(): Command {
         }
         throw err;
       }
-      const { pid } = spawnSupervisor({
-        home: config.home,
-        runnerArgv: passthroughArgv(opts),
-      });
-      process.stdout.write(`Started in background (pid ${pid})\n`);
-      await printEnrollmentUrl(config.home, config.serverUrl);
+      reportStarted(
+        spawnSupervisor({
+          home: config.home,
+          runnerArgv: passthroughArgv(opts),
+        }),
+      );
+      await printEnrollmentUrl(config.home, config.serverUrl, config.name);
     });
 
   program
@@ -159,15 +182,17 @@ export function buildProgram(): Command {
   program
     .command('restart')
     .description('Restart the background daemon')
+    .option('--server <url>', 'server URL (default: the one this machine enrolled with)')
     .action(async (_opts: StartOptions, cmd: Command) => {
-      const config = loadDaemonConfig({});
+      const config = loadDaemonConfig(configInput(cmd.opts<StartOptions>()));
       await stopSupervisor(config.home);
-      const { pid } = spawnSupervisor({
-        home: config.home,
-        runnerArgv: passthroughArgv(cmd.opts<StartOptions>()),
-      });
-      process.stdout.write(`Started in background (pid ${pid})\n`);
-      await printEnrollmentUrl(config.home, config.serverUrl);
+      reportStarted(
+        spawnSupervisor({
+          home: config.home,
+          runnerArgv: passthroughArgv(cmd.opts<StartOptions>()),
+        }),
+      );
+      await printEnrollmentUrl(config.home, config.serverUrl, config.name);
     });
 
   program
@@ -246,6 +271,18 @@ export function buildProgram(): Command {
     });
 
   program
+    .command('doctor')
+    .description('Check whether this machine can host the Coordinator computer')
+    .option('--json', 'print the result as JSON')
+    .action((opts: { json?: boolean }) => {
+      const code = runDoctorCommand(opts, {
+        env: realDoctorEnv(),
+        writeOut: (text) => process.stdout.write(text),
+      });
+      if (code !== 0) process.exitCode = code;
+    });
+
+  program
     .command('version')
     .description('Print the daemon version')
     .action(() => {
@@ -279,19 +316,6 @@ export function buildProgram(): Command {
       await runOrbWorker({ socketPath: opts.socket });
     });
 
-  program
-    .command('orb-computer', { hidden: true })
-    .requiredOption('--socket <path>', 'Computer agent socket')
-    .action(async (opts: { socket: string }) => {
-      if (process.env.CAIRN_ORB !== '1') throw new Error('Orb computer agent requires CAIRN_ORB=1');
-      const exit = await runOrbComputerAgent({
-        socketPath: opts.socket,
-        release: orbReleaseFromEntry(realpathSync(fileURLToPath(import.meta.url))),
-        provider: new HostComputerProvider({ home: orbAgentHome() }),
-      });
-      process.exitCode = exit === 'stale-release' ? 75 : 1;
-    });
-
   const orb = program.command('orb').description('Orb host helpers');
   orb
     .command('services')
@@ -322,13 +346,15 @@ function isMainModule(): boolean {
 
 if (isMainModule()) void main();
 
-async function printEnrollmentUrl(home: string, serverUrl: string): Promise<void> {
+async function printEnrollmentUrl(home: string, serverUrl: string, name: string): Promise<void> {
   const url = await pendingEnrollmentUrl(
     statePaths(home),
     serverUrl,
     2_000,
     (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     () => Date.now(),
+    name,
   );
-  if (url !== null) process.stdout.write(`Approve this machine in a browser: ${url}\n`);
+  if (url !== null)
+    process.stdout.write(`Approve this machine in a browser: ${url}${machineNameSuffix(name)}\n`);
 }

@@ -15,6 +15,8 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
       if (route.request().method() === 'POST') {
         const body = route.request().postDataJSON();
         expect(body.token).toBe(TOKEN);
+        const yearAhead = Date.now() + 365 * 24 * 60 * 60 * 1000;
+        expect(Math.abs(body.expiresAt - yearAhead)).toBeLessThan(60_000);
         const connection = { id: 'subscription-1', kind: 'claude-subscription', label: body.label, expiresAt: body.expiresAt, createdAt: Date.now() };
         connections.push(connection);
         return json(connection, 201);
@@ -32,13 +34,19 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
   await expect(page).toHaveURL(/\/app\/settings\/providers/);
 
   await page.getByTestId('resource-new').click();
-  await page.locator('[data-preset-id="claude-subscription"]').click();
-  const dialog = page.getByRole('dialog', { name: 'Add Claude subscription' });
+  const claudeRow = page.locator('[data-preset-id="claude-subscription"]');
+  await expect(claudeRow).toContainText('Claude Pro / Max');
+  await expect(claudeRow.locator('svg')).toHaveCount(1);
+  await claudeRow.click();
+  const dialog = page.getByRole('dialog', {
+    name: locale === 'zh' ? '添加 Claude 订阅' : 'Add Claude subscription',
+  });
   await expect(dialog).toContainText('claude setup-token');
+  await expect(dialog.locator('input[type="date"]')).toHaveCount(0);
   await dialog.getByTestId('subscription-label').fill('Personal Claude');
   await expect(dialog.getByTestId('subscription-token')).toHaveAttribute('type', 'password');
   await dialog.getByTestId('subscription-token').fill(TOKEN);
-  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await dialog.getByRole('button', { name: locale === 'zh' ? '保存' : 'Save', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   const row = page.locator('[data-instance-id="subscription:subscription-1"]');
   await expect(row).toContainText('Personal Claude');

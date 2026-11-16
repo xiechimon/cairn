@@ -41,7 +41,7 @@ import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import { NotFoundError } from './builds.js';
 import { ackChiefSteer, takeChiefSteer } from './chief-turns.js';
-import { recommendMachineConcurrency } from './dispatch-eligibility.js';
+import { availableRuntimes, recommendMachineConcurrency } from './dispatch-eligibility.js';
 import type { ConversationStreamHub } from './events.js';
 import { applyComputerPresence } from './machine-computer-presence.js';
 import {
@@ -183,7 +183,7 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     lastSeenAt: row.lastSeenAt,
     latestCliVersion: row.latestCliVersion,
     kind: row.kind,
-    enabledRuntimes: row.enabledRuntimes,
+    enabledRuntimes: availableRuntimes(row),
     maxConcurrent: row.maxConcurrent,
     maxConcurrentOverridden: row.maxConcurrentOverridden,
     recommendedConcurrent: recommendation.value,
@@ -429,11 +429,14 @@ export function enrollMachine(
 
 export function authorizeEnrollmentMachine(
   deps: MachineDeps,
-  input: { teamId: string; name: string; serverUrl: string },
+  input: { teamId: string; name: string; serverUrl: string; ownerApproved: boolean },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
   const token = newMachineToken();
   const isLocal = input.name === hostname();
+  if (isLocal && !input.ownerApproved) {
+    throw new HttpError(403, 'local machine requires owner approval');
+  }
   const existing = isLocal ? localMachineRow(db, input.teamId, input.name) : undefined;
   if (existing) {
     db.update(machine)
@@ -482,11 +485,12 @@ export function markPresence(
   deps: MachineDeps,
   machineId: string,
   body: MachinePresenceBody,
+  admitOnline = true,
 ): void {
   const { db, hub } = deps;
   const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!row) throw new NotFoundError(`machine ${machineId}`);
-  const becameOnline = !row.online;
+  const becameOnline = admitOnline && !row.online;
   const previousLogin = row.claudeCodeReport?.login;
   const reportedLogin = body.claudeCode?.login;
   const loginChanged =
@@ -498,7 +502,7 @@ export function markPresence(
     (row.capabilities?.confinement ? { ...row.capabilities, confinement: undefined } : undefined);
   db.update(machine)
     .set({
-      online: true,
+      ...(admitOnline ? { online: true } : {}),
       lastSeenAt: nowMs(),
       ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
@@ -508,6 +512,20 @@ export function markPresence(
     .run();
   const computerChanged = applyComputerPresence(db, machineId, row.teamId, body.computers, nowMs());
   if (becameOnline || loginChanged || computerChanged) {
+    const online = admitOnline || row.online;
+    hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online }));
+  }
+}
+
+export function markConnected(deps: Pick<MachineDeps, 'db' | 'hub'>, machineId: string): void {
+  const { db, hub } = deps;
+  const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (!row) return;
+  db.update(machine)
+    .set({ online: true, lastSeenAt: nowMs() })
+    .where(eq(machine.id, machineId))
+    .run();
+  if (!row.online) {
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online: true }));
   }
 }
@@ -523,7 +541,7 @@ export function markOffline(deps: Pick<MachineDeps, 'db' | 'hub'>, machineId: st
 export const MACHINE_STALE_OFFLINE_MS = 150_000;
 
 export function sweepStaleMachines(
-  deps: Pick<MachineDeps, 'db' | 'hub'>,
+  deps: Pick<MachineDeps, 'db' | 'hub'> & { machineHub?: MachineWakeHub | undefined },
   now: number = nowMs(),
 ): void {
   const { db } = deps;
@@ -539,6 +557,7 @@ export function sweepStaleMachines(
     )
     .all();
   for (const row of stale) {
+    deps.machineHub?.cancelGrace(row.id);
     markOffline(deps, row.id);
   }
 }

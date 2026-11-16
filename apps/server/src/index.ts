@@ -10,6 +10,7 @@ import {
   backupStatusPathOf,
   deployRecordPathOf,
   ensureAccessToken,
+  envStr,
   loadConfig,
   logTokenAuthStartup,
   reposDirOf,
@@ -22,6 +23,7 @@ import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { createAccessVerifier } from './lib/cloudflare-access.js';
+import { installEnvProxy } from './lib/env-proxy.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createServerLogger } from './lib/logger.js';
 import { loopbackOwnerFor } from './lib/loopback-owner.js';
@@ -42,6 +44,7 @@ import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
+import { newMcpOAuthState } from './services/mcp-servers.js';
 import { seedOwnerCheckpoints } from './services/owner.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
@@ -53,6 +56,8 @@ import {
   trajectoryOutcomeRunOf,
   trajectoryReflectCurateRunOf,
 } from './services/scheduler.js';
+import { sharedAgentSkillRoots } from './services/skills.js';
+import { prepareSkillsHome } from './services/skills-home.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
@@ -66,6 +71,15 @@ const logger = createServerLogger(logSecrets, {
     ? {}
     : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } } }),
 });
+
+const envProxy = installEnvProxy();
+if (envProxy.ignored)
+  logger.warn('a proxy environment variable is not an http(s) URL and is ignored');
+if (envProxy.proxy !== null)
+  logger.info(
+    { proxy: envProxy.proxy },
+    'outbound requests go through the proxy from the environment',
+  );
 
 const refusal = authStartupRefusal(loadedConfig);
 if (refusal !== null) {
@@ -95,6 +109,27 @@ const opened = (() => {
   }
 })();
 const { db, close } = opened;
+const skillsHome = await prepareSkillsHome({
+  db,
+  skillsDir: config.skillsDir,
+  pinned: envStr(ENV_VARS.skillsDir) !== null,
+  legacyDir: sharedAgentSkillRoots()[0],
+  skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
+}).catch((error: unknown) => {
+  logger.fatal(
+    { err: error, skillsDir: config.skillsDir },
+    'could not prepare the Cairn skills directory',
+  );
+  process.exit(1);
+});
+if (skillsHome.kind === 'shared') {
+  logger.warn(
+    { skillsDir: config.skillsDir },
+    'the skills directory overlaps one other agent tools share; Cairn reads it and refuses every write there',
+  );
+} else {
+  logger.info({ skillsDir: config.skillsDir, ...skillsHome }, 'skills directory ready');
+}
 const secretBox = createKeyfileSecretBox(config.keyfilePath);
 const vapidKeys = {
   ...loadOrCreateVapidKeys(config.vapidKeysPath, config.vapidSubject, config.webOrigin),
@@ -149,6 +184,7 @@ const app = createApp(
     enrollments: new Map(),
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),
+    mcpOAuthState: newMcpOAuthState(),
     oauthClient: config.githubOauth,
     githubAppTokenSocket: config.githubAppTokenSocket,
     githubAppIdentity: config.githubAppIdentity,

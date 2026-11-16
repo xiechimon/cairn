@@ -113,9 +113,15 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
+    "charter": {
+      "type": "string",
+    },
     "chief": {
       "additionalProperties": false,
       "properties": {
+        "history": {
+          "type": "string",
+        },
         "systemPrompt": {
           "type": "string",
         },
@@ -142,6 +148,53 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     },
     "conversationId": {
       "type": "string",
+    },
+    "deliverables": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        "limits": {
+          "additionalProperties": false,
+          "properties": {
+            "maxFiles": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "maxPageBytes": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "maxSlidesBytes": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "maxTotalBytes": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "maxFiles",
+            "maxTotalBytes",
+            "maxPageBytes",
+            "maxSlidesBytes",
+          ],
+          "type": "object",
+        },
+      },
+      "required": [
+        "generation",
+        "limits",
+      ],
+      "type": "object",
     },
     "instruction": {
       "type": [
@@ -634,6 +687,95 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 },
               ],
             },
+            "lane": {
+              "enum": [
+                "quick",
+              ],
+              "type": "string",
+            },
+            "projectBasis": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "channel",
+                      "type": "string",
+                    },
+                    "threadId": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "threadId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "composer",
+                      "type": "string",
+                    },
+                    "messageId": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "messageId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "owner-named",
+                      "type": "string",
+                    },
+                    "name": {
+                      "minLength": 2,
+                      "type": "string",
+                    },
+                    "segment": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "segment",
+                    "name",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "owner-answer",
+                      "type": "string",
+                    },
+                    "segment": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "segment",
+                  ],
+                  "type": "object",
+                },
+              ],
+            },
             "research": {
               "additionalProperties": false,
               "properties": {
@@ -1116,9 +1258,15 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               },
               "type": "array",
             },
+            "charter": {
+              "type": "string",
+            },
             "chief": {
               "additionalProperties": false,
               "properties": {
+                "history": {
+                  "type": "string",
+                },
                 "systemPrompt": {
                   "type": "string",
                 },
@@ -1145,6 +1293,53 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             },
             "conversationId": {
               "type": "string",
+            },
+            "deliverables": {
+              "additionalProperties": false,
+              "properties": {
+                "generation": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                "limits": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "maxFiles": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "maxPageBytes": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "maxSlidesBytes": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "maxTotalBytes": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "maxFiles",
+                    "maxTotalBytes",
+                    "maxPageBytes",
+                    "maxSlidesBytes",
+                  ],
+                  "type": "object",
+                },
+              },
+              "required": [
+                "generation",
+                "limits",
+              ],
+              "type": "object",
             },
             "instruction": {
               "type": [
@@ -1637,6 +1832,95 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                         },
                       ],
                     },
+                    "lane": {
+                      "enum": [
+                        "quick",
+                      ],
+                      "type": "string",
+                    },
+                    "projectBasis": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "channel",
+                              "type": "string",
+                            },
+                            "threadId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "threadId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "composer",
+                              "type": "string",
+                            },
+                            "messageId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "messageId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "owner-named",
+                              "type": "string",
+                            },
+                            "name": {
+                              "minLength": 2,
+                              "type": "string",
+                            },
+                            "segment": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "segment",
+                            "name",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "owner-answer",
+                              "type": "string",
+                            },
+                            "segment": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "segment",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
                     "research": {
                       "additionalProperties": false,
                       "properties": {
@@ -1960,6 +2244,51 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "commit": {
       "type": "string",
     },
+    "deliverables": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string",
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "sha256",
+        ],
+        "type": "object",
+      },
+      "maxItems": 5,
+      "type": "array",
+    },
+    "deliverablesSkipped": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "type": "string",
+          },
+          "reason": {
+            "maxLength": 64,
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "reason",
+        ],
+        "type": "object",
+      },
+      "maxItems": 20,
+      "type": "array",
+    },
     "errorMessage": {
       "type": "string",
     },
@@ -2031,6 +2360,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     },
     "gateHeadSha": {
       "type": "string",
+    },
+    "generation": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
     },
     "hasChanges": {
       "type": "boolean",
@@ -2756,6 +3090,18 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "maxItems": 250,
       "type": "array",
     },
+    "connectionId": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
   },
   "type": "object",
 }
@@ -2833,6 +3179,25 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "required": [
         "type",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "connectionId": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": {
+          "const": "hello",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "connectionId",
       ],
       "type": "object",
     },
@@ -3238,6 +3603,39 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
+    "mcpConnectors": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "headers": {
+            "additionalProperties": {
+              "type": "string",
+            },
+            "propertyNames": {
+              "type": "string",
+            },
+            "type": "object",
+          },
+          "slug": {
+            "type": "string",
+          },
+          "transport": {
+            "const": "http",
+            "type": "string",
+          },
+          "url": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "slug",
+          "transport",
+          "url",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "provider": {
       "anyOf": [
         {
@@ -3382,6 +3780,12 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "object",
     },
+    "withheldMcp": {
+      "items": {
+        "type": "string",
+      },
+      "type": "array",
+    },
     "withheldSecrets": {
       "items": {
         "type": "string",
@@ -3471,6 +3875,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "type": "string",
           },
           "type": "object",
+        },
+        "toolCallId": {
+          "pattern": "^[A-Za-z0-9_-]{1,200}$",
+          "type": "string",
         },
       },
       "required": [
@@ -3708,11 +4116,49 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "deliverables": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "page",
+              "slides",
+            ],
+            "type": "string",
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string",
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string",
+          },
+          "size": {
+            "maximum": 20971520,
+            "minimum": 0,
+            "type": "integer",
+          },
+        },
+        "required": [
+          "kind",
+          "name",
+          "size",
+          "sha256",
+        ],
+        "type": "object",
+      },
+      "maxItems": 5,
+      "type": "array",
+    },
     "files": {
       "items": {
         "additionalProperties": false,
         "properties": {
           "name": {
+            "maxLength": 120,
             "type": "string",
           },
           "size": {
@@ -3726,7 +4172,13 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         ],
         "type": "object",
       },
+      "maxItems": 8,
       "type": "array",
+    },
+    "generation": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
     },
   },
   "required": [
@@ -3741,6 +4193,48 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "deliverables": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "attachmentId": {
+            "type": "string",
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string",
+            },
+            "propertyNames": {
+              "type": "string",
+            },
+            "type": "object",
+          },
+          "method": {
+            "const": "PUT",
+            "type": "string",
+          },
+          "name": {
+            "type": "string",
+          },
+          "received": {
+            "type": "boolean",
+          },
+          "url": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "attachmentId",
+          "received",
+          "url",
+          "method",
+          "headers",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "uploads": {
       "items": {
         "additionalProperties": false,
@@ -4588,6 +5082,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
     {
       "additionalProperties": false,
       "properties": {
+        "clientMessageId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
         "conversationId": {
           "type": "string",
         },
@@ -4967,6 +5466,15 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                       "enum": [
                         "machine-offline",
                         "capability-missing",
+                        "sandbox-unavailable",
+                        "runtime-disabled",
+                        "model-unavailable",
+                        "local-path",
+                        "claude-rate-limited",
+                        "claude-logged-out",
+                        "account-switched",
+                        "coordinator-provider-missing",
+                        "coordinator-provider-no-key",
                       ],
                       "type": "string",
                     },
@@ -5749,9 +6257,14 @@ exports[`body/envelope schema snapshots > patchChiefBody > patchChiefBody.json 1
       ],
     },
     "charter": {
-      "type": [
-        "string",
-        "null",
+      "anyOf": [
+        {
+          "maxLength": 16000,
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
   },
@@ -6469,6 +6982,15 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
               "enum": [
                 "machine-offline",
                 "capability-missing",
+                "sandbox-unavailable",
+                "runtime-disabled",
+                "model-unavailable",
+                "local-path",
+                "claude-rate-limited",
+                "claude-logged-out",
+                "account-switched",
+                "coordinator-provider-missing",
+                "coordinator-provider-no-key",
               ],
               "type": "string",
             },
@@ -6857,6 +7379,68 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               },
               "type": "array",
             },
+            "deliverables": {
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "attachmentId": {
+                        "type": "string",
+                      },
+                      "kind": {
+                        "enum": [
+                          "page",
+                          "slides",
+                        ],
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "sizeBytes": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                    },
+                    "required": [
+                      "attachmentId",
+                      "kind",
+                      "name",
+                      "sizeBytes",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "skipped": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                      },
+                      "reason": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                      "reason",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "items",
+                "skipped",
+              ],
+              "type": "object",
+            },
             "githubLabelIds": {
               "items": {
                 "type": "string",
@@ -7015,6 +7599,95 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                         },
                         {
                           "type": "null",
+                        },
+                      ],
+                    },
+                    "lane": {
+                      "enum": [
+                        "quick",
+                      ],
+                      "type": "string",
+                    },
+                    "projectBasis": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "channel",
+                              "type": "string",
+                            },
+                            "threadId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "threadId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "composer",
+                              "type": "string",
+                            },
+                            "messageId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "messageId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "owner-named",
+                              "type": "string",
+                            },
+                            "name": {
+                              "minLength": 2,
+                              "type": "string",
+                            },
+                            "segment": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "segment",
+                            "name",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "owner-answer",
+                              "type": "string",
+                            },
+                            "segment": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "segment",
+                          ],
+                          "type": "object",
                         },
                       ],
                     },
@@ -8385,11 +9058,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > localStorage key 
       "valueShape": "grid | chart",
     },
     {
-      "key": "cairn.projectTasksLayout",
-      "source": "[推断] #178（project 任务页视图切换，与 teamMembersLayout 同形；原键未观测）",
-      "valueShape": "list | grid",
-    },
-    {
       "key": "cairn.cache.session-v1",
       "source": "r2 §1.5",
       "valueShape": "{token:"",cookieName:"",expiresAt,user{…}}——会话走 cookie，token 字段留空",
@@ -8825,6 +9493,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "mail_account",
   "mail_event",
   "mail_rule",
+  "mcp_connector",
+  "team_top_models",
 ]
 `;
 
@@ -8934,6 +9604,21 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/teams/{id}/routing-settings/seed",
   },
   {
+    "method": "GET",
+    "note": "team Top Models list or null",
+    "path": "/api/teams/{id}/top-models",
+  },
+  {
+    "method": "PUT",
+    "note": "replace the Top Models list",
+    "path": "/api/teams/{id}/top-models",
+  },
+  {
+    "method": "DELETE",
+    "note": "reset to the suggested list",
+    "path": "/api/teams/{id}/top-models",
+  },
+  {
     "method": "PATCH",
     "note": "D60 PR8: upsert a routing_rule by use",
     "path": "/api/teams/{id}/routing-rules/{use}",
@@ -8956,6 +9641,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "SSE，见 protocol/sse.ts",
     "path": "/api/teams/{id}/stream",
+  },
+  {
+    "method": "GET",
+    "note": "read-only scan of ~/.agents/skills and ~/.claude/skills for the import picker; skills already in the Cairn skills directory are left out",
+    "path": "/api/teams/{id}/skills/import-candidates",
   },
   {
     "method": "GET",
@@ -9962,6 +10652,15 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                   "enum": [
                     "machine-offline",
                     "capability-missing",
+                    "sandbox-unavailable",
+                    "runtime-disabled",
+                    "model-unavailable",
+                    "local-path",
+                    "claude-rate-limited",
+                    "claude-logged-out",
+                    "account-switched",
+                    "coordinator-provider-missing",
+                    "coordinator-provider-no-key",
                   ],
                   "type": "string",
                 },
@@ -10274,6 +10973,29 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 },
               ],
             },
+            "confinementCause": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "not-own-unit",
+                    "bwrap-missing",
+                    "home-overlay-failed",
+                  ],
+                  "type": "string",
+                },
+                "mountPoint": {
+                  "format": "starts_with",
+                  "maxLength": 4096,
+                  "pattern": "^\\/.*",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+              ],
+              "type": "object",
+            },
             "executor": {
               "enum": [
                 "orb",
@@ -10354,6 +11076,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "screenRecording",
               ],
               "type": "object",
+            },
+            "mcpConnectors": {
+              "const": true,
+              "type": "boolean",
             },
             "mcpServers": {
               "items": {
@@ -11459,13 +12185,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
         "null",
       ],
     },
-    "claudeUsage": {
-      "enum": [
-        "subscription-only",
-        "allow-paid",
-      ],
-      "type": "string",
-    },
     "coAuthorTrailer": {
       "default": true,
       "type": "boolean",
@@ -11662,6 +12381,68 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
       },
       "type": "array",
     },
+    "deliverables": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attachmentId": {
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "page",
+                  "slides",
+                ],
+                "type": "string",
+              },
+              "name": {
+                "type": "string",
+              },
+              "sizeBytes": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+            },
+            "required": [
+              "attachmentId",
+              "kind",
+              "name",
+              "sizeBytes",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "skipped": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+              },
+              "reason": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "name",
+              "reason",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "items",
+        "skipped",
+      ],
+      "type": "object",
+    },
     "githubLabelIds": {
       "items": {
         "type": "string",
@@ -11820,6 +12601,95 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
                 },
                 {
                   "type": "null",
+                },
+              ],
+            },
+            "lane": {
+              "enum": [
+                "quick",
+              ],
+              "type": "string",
+            },
+            "projectBasis": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "channel",
+                      "type": "string",
+                    },
+                    "threadId": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "threadId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "composer",
+                      "type": "string",
+                    },
+                    "messageId": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "messageId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "owner-named",
+                      "type": "string",
+                    },
+                    "name": {
+                      "minLength": 2,
+                      "type": "string",
+                    },
+                    "segment": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "segment",
+                    "name",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "owner-answer",
+                      "type": "string",
+                    },
+                    "segment": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "segment",
+                  ],
+                  "type": "object",
                 },
               ],
             },

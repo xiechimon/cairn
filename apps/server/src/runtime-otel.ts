@@ -370,6 +370,13 @@ export type CoordinatorTurnSpanRecord =
       isError: boolean;
       startAt: number;
       endAt: number;
+    }
+  | {
+      kind: 'setup';
+      name: string;
+      startAt: number;
+      endAt: number;
+      maxEventLoopDelayMs?: number;
     };
 
 function jsonText(value: unknown): string {
@@ -438,6 +445,21 @@ export function emitCoordinatorTurnSpans(
               error: mail ? 'mail turn error' : (otelErrorMessage(record.errorMessage) ?? 'error'),
             }
           : {}),
+      };
+    }
+    if (record.kind === 'setup') {
+      return {
+        parent,
+        name: `setup ${record.name}`,
+        kind: 'internal',
+        startMs: record.startAt,
+        endMs: Math.max(record.startAt, record.endAt),
+        attributes: {
+          ...(record.maxEventLoopDelayMs === undefined
+            ? {}
+            : { 'cairn.event_loop.max_delay_ms': record.maxEventLoopDelayMs }),
+          ...langfuseEnvironmentAttributes(environment),
+        },
       };
     }
     const argumentText = jsonText(record.arguments);

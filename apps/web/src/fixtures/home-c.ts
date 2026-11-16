@@ -9,7 +9,7 @@ import { scheduleOnce } from './schedules.js';
 
 export const HOME_C_CRED = 'home-c-cred';
 
-const SERVER_SECTION: Record<TodoRecord['phase'], Pick<TodoRecord, 'section' | 'owner'>> = {
+export const SERVER_SECTION: Record<TodoRecord['phase'], Pick<TodoRecord, 'section' | 'owner'>> = {
   todo: { section: 'up_next', owner: null },
   queued: { section: 'working', owner: null },
   planning: { section: 'working', owner: null },
@@ -490,11 +490,12 @@ export const makeRef: FixtureSet = {
         2520 + index,
         title,
         'design',
-        at('2026-09-17', 15, 0) - index * HOUR_MS,
+        at('2026-09-18', 15, 0) - index * HOUR_MS,
         index < 2 ? designPreview() : undefined,
       ),
     ),
     refMade('ref-other', 2530, '手帐模板', undefined, at('2026-09-20', 10, 0)),
+    refMade('ref-earlier-page', 2531, '0.8 版本发布落地页', 'page', at('2026-09-08', 11, 0)),
   ],
   now: at(MADE_DAY, 20, 30),
 };

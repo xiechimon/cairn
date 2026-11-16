@@ -182,7 +182,7 @@ export function brandFiles() {
   const favicon = faviconSvg();
   const files = [
     ['apps/web/public/logo.svg', favicon],
-    ['site/logo.svg', favicon],
+    ['site/public/logo.svg', favicon],
     [
       'apps/web/public/logo-mark.svg',
       svg(100, 100, placed(LARGE, GLYPHS.large.at, 'stroke="currentColor"')),

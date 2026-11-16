@@ -14,6 +14,13 @@ import {
   Trash2,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
+import {
+  KeyedMenuContent,
+  KeyedMenuItem,
+  KeyedMenuRadioItem,
+  KeyedMenuSubContent,
+  KeyedMenuSubTrigger,
+} from '../components/menu-keys.js';
 import { SIDEBAR_ROW_ACTION } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -23,14 +30,9 @@ import {
 } from '../components/ui/dialog-shell.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
@@ -147,7 +149,7 @@ function RowMenuTrigger({ label }: { label: string }) {
 
 function RowMenuContent({ children }: { children: ReactNode }) {
   return (
-    <DropdownMenuContent
+    <KeyedMenuContent
       side="bottom"
       align="start"
       alignOffset={-1}
@@ -155,7 +157,7 @@ function RowMenuContent({ children }: { children: ReactNode }) {
       className={SIDEBAR_MENU_CLS}
     >
       {children}
-    </DropdownMenuContent>
+    </KeyedMenuContent>
   );
 }
 
@@ -189,24 +191,25 @@ export function SidebarProjectMenu({
       <DropdownMenu>
         <RowMenuTrigger label={t('{name} 的菜单', { name })} />
         <RowMenuContent>
-          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onRename}>
+          <KeyedMenuItem shortcut="R" className={SIDEBAR_MENU_ITEM_CLS} onClick={onRename}>
             <Pencil />
             {t('重命名')}
-          </DropdownMenuItem>
-          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onSettings}>
+          </KeyedMenuItem>
+          <KeyedMenuItem shortcut="S" className={SIDEBAR_MENU_ITEM_CLS} onClick={onSettings}>
             <Settings2 />
             {t('项目设置')}
-          </DropdownMenuItem>
+          </KeyedMenuItem>
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger
+            <KeyedMenuSubTrigger
+              shortcut="M"
               className={`${SIDEBAR_MENU_ITEM_CLS} [&>svg:last-child]:text-content-tertiary`}
             >
               <FolderInput />
               {t('移到分组')}
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent alignOffset={-7} sideOffset={2} className={SIDEBAR_MENU_CLS}>
+            </KeyedMenuSubTrigger>
+            <KeyedMenuSubContent alignOffset={-7} sideOffset={2} className={SIDEBAR_MENU_CLS}>
               {groups.map((target) => (
-                <DropdownMenuItem
+                <KeyedMenuItem
                   key={target}
                   className={SIDEBAR_MENU_ITEM_CLS}
                   disabled={target === group}
@@ -214,37 +217,44 @@ export function SidebarProjectMenu({
                 >
                   <span className="min-w-0 flex-1 truncate">{target}</span>
                   {target === group && <Check className="text-content-tertiary" />}
-                </DropdownMenuItem>
+                </KeyedMenuItem>
               ))}
               {group !== null && (
-                <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={() => onMove(null)}>
+                <KeyedMenuItem
+                  shortcut="R"
+                  className={SIDEBAR_MENU_ITEM_CLS}
+                  onClick={() => onMove(null)}
+                >
                   <FolderOutput />
                   {t('移出分组')}
-                </DropdownMenuItem>
+                </KeyedMenuItem>
               )}
               {groups.length > 0 && <DropdownMenuSeparator />}
-              <DropdownMenuItem
+              <KeyedMenuItem
+                shortcut="N"
                 className={SIDEBAR_MENU_ITEM_CLS}
                 onClick={() => setDialog('group')}
               >
                 <FolderPlus />
                 {t('新建分组')}
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
+              </KeyedMenuItem>
+            </KeyedMenuSubContent>
           </DropdownMenuSub>
-          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onArchive}>
+          <KeyedMenuItem shortcut="A" className={SIDEBAR_MENU_ITEM_CLS} onClick={onArchive}>
             <Archive />
             {t('归档')}
-          </DropdownMenuItem>
+          </KeyedMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
+          <KeyedMenuItem
+            shortcut="D"
+            confirms
             variant="destructive"
             className={`${SIDEBAR_MENU_ITEM_CLS} ${DANGER_ITEM_CLS}`}
             onClick={() => setDialog('delete')}
           >
             <Trash2 />
             {t('删除')}
-          </DropdownMenuItem>
+          </KeyedMenuItem>
         </RowMenuContent>
       </DropdownMenu>
       <NameDialog
@@ -286,15 +296,15 @@ export function SidebarGroupMenu({
     <DropdownMenu>
       <RowMenuTrigger label={t('分组 {name} 的菜单', { name })} />
       <RowMenuContent>
-        <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onRename}>
+        <KeyedMenuItem shortcut="R" className={SIDEBAR_MENU_ITEM_CLS} onClick={onRename}>
           <Pencil />
           {t('重命名分组')}
-        </DropdownMenuItem>
+        </KeyedMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onUngroup}>
+        <KeyedMenuItem shortcut="U" className={SIDEBAR_MENU_ITEM_CLS} onClick={onUngroup}>
           <FolderMinus />
           {t('解散分组')}
-        </DropdownMenuItem>
+        </KeyedMenuItem>
       </RowMenuContent>
     </DropdownMenu>
   );
@@ -316,19 +326,21 @@ export function SidebarArchivedProjectMenu({
       <DropdownMenu>
         <RowMenuTrigger label={t('{name} 的菜单', { name })} />
         <RowMenuContent>
-          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onUnarchive}>
+          <KeyedMenuItem shortcut="U" className={SIDEBAR_MENU_ITEM_CLS} onClick={onUnarchive}>
             <RotateCcw />
             {t('取消归档')}
-          </DropdownMenuItem>
+          </KeyedMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
+          <KeyedMenuItem
+            shortcut="D"
+            confirms
             variant="destructive"
             className={`${SIDEBAR_MENU_ITEM_CLS} ${DANGER_ITEM_CLS}`}
             onClick={() => setDeleting(true)}
           >
             <Trash2 />
             {t('删除')}
-          </DropdownMenuItem>
+          </KeyedMenuItem>
         </RowMenuContent>
       </DropdownMenu>
       <DeleteProjectConfirm
@@ -349,6 +361,8 @@ export const PROJECT_FILTER_LABELS: Record<ProjectFilter, string> = {
   archived: '已归档',
   all: '全部',
 };
+
+const FILTER_KEYS: Record<ProjectFilter, string> = { active: 'I', archived: 'A', all: 'L' };
 
 export function ProjectFilterMenu({
   filter,
@@ -390,15 +404,16 @@ export function ProjectFilterMenu({
           {label}
         </TooltipContent>
       </Tooltip>
-      <DropdownMenuContent side="bottom" align="end" sideOffset={5} className={SIDEBAR_MENU_CLS}>
+      <KeyedMenuContent side="bottom" align="end" sideOffset={5} className={SIDEBAR_MENU_CLS}>
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger
+          <KeyedMenuSubTrigger
+            shortcut="S"
             className={`${SIDEBAR_MENU_ITEM_CLS} [&>svg:last-child]:text-content-tertiary`}
           >
             <span className="flex-1">{t('状态')}</span>
             <span className="text-content-tertiary">{t(PROJECT_FILTER_LABELS[filter])}</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent alignOffset={-7} sideOffset={2} className={SIDEBAR_MENU_CLS}>
+          </KeyedMenuSubTrigger>
+          <KeyedMenuSubContent alignOffset={-7} sideOffset={2} className={SIDEBAR_MENU_CLS}>
             <DropdownMenuRadioGroup
               value={filter}
               onValueChange={(next: unknown) => {
@@ -406,20 +421,21 @@ export function ProjectFilterMenu({
               }}
             >
               {PROJECT_FILTERS.map((option) => (
-                <DropdownMenuRadioItem
+                <KeyedMenuRadioItem
                   key={option}
                   value={option}
+                  shortcut={FILTER_KEYS[option]}
                   closeOnClick
                   data-testid={`sidebar-project-filter-${option}`}
                   className={`${SIDEBAR_MENU_ITEM_CLS} pr-8`}
                 >
                   {t(PROJECT_FILTER_LABELS[option])}
-                </DropdownMenuRadioItem>
+                </KeyedMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
+          </KeyedMenuSubContent>
         </DropdownMenuSub>
-      </DropdownMenuContent>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }

@@ -93,7 +93,7 @@ for (const theme of ['light', 'dark'] as const) {
     await toggle.focus();
     expect((await fresh(item, resting)).filter((entry) => entry.outline), 'keyboard focus on the toggle must be painted').toHaveLength(1);
 
-    for (const testid of ['machine-toggle', 'machine-accept-toggle', 'machine-menu']) {
+    for (const testid of ['machine-toggle', 'machine-menu']) {
       const target = item.getByTestId(testid);
       await target.hover();
       await page.mouse.down();

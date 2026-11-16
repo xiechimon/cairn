@@ -3,6 +3,8 @@
 > Ruling source = the 2026-09-28 grilling session (Q1–Q8 all pinned). This spec locks the terminal state of the skills / MCP two resource surfaces: the source flips from "DB registration" to "local file read-only", and the two DB tables plus the matching management surfaces are fully deleted. Parent issue = #365; construction tickets #367 (T1 skills local surface) / #368 (T2 MCP local surface) have no blocking edge and are parallelizable.
 >
 > Local source of truth: the skills directory defaults to `~/.agents/skills`; the MCP config defaults to the `mcpServers` section of `~/.claude.json`.
+>
+> Amended 2026-11-15: the skills directory defaults to `$CAIRN_HOME/skills`, so skills come in only through Import or New. `~/.agents/skills` and `~/.claude/skills`, which other agent tools share, are read-only to Cairn; an install that used `~/.agents/skills` copies its skills once on upgrade. The user stories below keep their original wording.
 
 ## Problem Statement
 

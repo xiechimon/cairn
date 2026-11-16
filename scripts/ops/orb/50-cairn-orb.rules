@@ -1,13 +1,10 @@
 polkit.addRule(function(action, subject) {
-    if (subject.user !== 'ian') return polkit.Result.NOT_HANDLED;
+    if (subject.user !== '@OWNER@') return polkit.Result.NOT_HANDLED;
     function orb(name) {
         return typeof name === 'string' && /^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name);
     }
     function template(name) {
-        return name === 'cairn-orb-base' || name === 'cairn-orb-computer';
-    }
-    function computer(name) {
-        return typeof name === 'string' && /^cairn-orb-computer-[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name);
+        return name === 'cairn-orb-base';
     }
     if (action.id === 'org.freedesktop.machine1.manage-images') {
         var image = action.lookup('image');
@@ -17,7 +14,6 @@ polkit.addRule(function(action, subject) {
         if (verb === 'clone') {
             var destination = action.lookup('new_name');
             if (!orb(destination) || template(destination)) return polkit.Result.NO;
-            if (computer(destination) !== (image === 'cairn-orb-computer')) return polkit.Result.NO;
             return polkit.Result.YES;
         }
         return verb === 'remove' && !template(image) ? polkit.Result.YES : polkit.Result.NO;

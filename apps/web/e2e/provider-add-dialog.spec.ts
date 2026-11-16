@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const PROVIDERS = '/app/resources/providers?scenario=01';
 
@@ -8,6 +8,13 @@ async function openPicker(page: Page) {
   const dialog = page.getByRole('dialog', { name: '添加模型服务' });
   await expect(dialog).toBeVisible();
   return dialog;
+}
+
+async function addTypedModel(page: Page, dialog: Locator, id: string) {
+  await dialog.getByRole('button', { name: '添加模型', exact: true }).click();
+  await page.getByLabel('搜索模型或输入 ID').fill(id);
+  await page.keyboard.press('Enter');
+  await expect(dialog.locator(`[data-model-chip="${id}"]`)).toBeVisible();
 }
 
 async function openCustomForm(page: Page) {
@@ -180,6 +187,7 @@ test('a templated base URL blocks the submit until its placeholders are replaced
   await expect(submit).toBeDisabled();
   await expect(dialog.getByText('把 Base URL 中的占位符换成你的账户值')).toBeVisible();
   await baseUrl.fill('https://api.cloudflare.com/client/v4/accounts/acc-1/ai/v1');
+  await addTypedModel(page, dialog, '@cf/meta/llama-3.1-8b-instruct');
   await expect(submit).toBeEnabled();
 });
 
@@ -199,7 +207,7 @@ test('family law: X, Escape and backdrop dismiss; panel clicks do not', async ({
   await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
 });
 
-test('providerId/label/baseUrl gate the submit; protocol select swaps', async ({ page }) => {
+test('providerId/label/baseUrl and one model gate the submit; protocol select swaps', async ({ page }) => {
   const dialog = await openCustomForm(page);
   const submit = dialog.getByRole('button', { name: '添加模型服务' });
   await expect(submit).toBeDisabled();
@@ -208,7 +216,15 @@ test('providerId/label/baseUrl gate the submit; protocol select swaps', async ({
   await dialog.locator('#dlg-provider-label').fill('R 355 网关');
   await expect(submit).toBeDisabled();
   await dialog.locator('#dlg-provider-baseurl').fill('https://relay-355.example.com/v1');
+  await expect(submit).toBeDisabled();
+  await expect(dialog.getByText('至少添加一个模型', { exact: false })).toBeVisible();
+  await dialog.getByRole('button', { name: '添加模型', exact: true }).click();
+  await expect(page.getByText('输入模型 ID，按回车添加')).toBeVisible();
+  await page.getByLabel('搜索模型或输入 ID').fill('relay-small');
+  await page.keyboard.press('Enter');
+  await expect(dialog.locator('[data-model-chip="relay-small"]')).toBeVisible();
   await expect(submit).toBeEnabled();
+  await expect(dialog.getByText('至少添加一个模型', { exact: false })).toHaveCount(0);
   // protocol select swaps the value
   const api = dialog.getByRole('combobox', { name: 'API 协议' });
   await api.click();
@@ -223,6 +239,7 @@ test('fixture submit closes the dialog (accept law) and reopens a clean picker',
   await dialog.locator('#dlg-provider-id').fill('relay-355');
   await dialog.locator('#dlg-provider-label').fill('R 355 网关');
   await dialog.locator('#dlg-provider-baseurl').fill('https://relay-355.example.com/v1');
+  await addTypedModel(page, dialog, 'relay-small');
   await dialog.getByRole('button', { name: '添加模型服务' }).click();
   await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
 

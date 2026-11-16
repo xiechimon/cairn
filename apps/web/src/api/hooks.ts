@@ -10,6 +10,7 @@ import type {
   ComputerCommandsResponse,
   ComputerRecord,
   ConversationMessagesResponse,
+  CreateMcpConnectorBody,
   CreateProjectBody,
   CreateProviderBody,
   CreateScheduleBody,
@@ -21,11 +22,10 @@ import type {
   FsPickResult,
   GithubConnectionStatus,
   GithubIssueEcho,
-  GithubIssueState,
-  GithubIssuesResponse,
   GithubReposResponse,
   ImportSkillBody,
   MachineRecord,
+  McpConnectorRecord,
   McpServerRecord,
   MemoryRecord,
   MergeReadiness,
@@ -38,6 +38,7 @@ import type {
   PatchAutonomyBody,
   PatchChiefBody,
   PatchMachineBody,
+  PatchMcpConnectorBody,
   PatchProjectBody,
   PatchProviderBody,
   PatchScheduleBody,
@@ -51,13 +52,14 @@ import type {
   ProviderTestResult,
   PrPanelRow,
   RemoteRoutesResponse,
-  RetroProposal,
   RouteOverride,
   ScheduleRecord,
   SearchResponse,
   SecretRecord,
   SetSecretBody,
+  SkillImportCandidatesResponse,
   SkillRecord,
+  StartMcpConnectorOAuthBody,
   StepJournalRow,
   TeamMember,
   TeamRecord,
@@ -415,10 +417,17 @@ export const useSchedules = (enabled: boolean) =>
     enabled,
   });
 
+export function registeredMachines(machines: MachineRecord[]): MachineRecord[] {
+  return machines.filter(
+    (machine) => machine.kind !== 'local' || machine.online || machine.lastSeenAt != null,
+  );
+}
+
 export const useMachines = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['machines', teamId],
     queryFn: () => api.get<MachineRecord[]>(`/api/teams/${teamId}/machines`),
+    select: registeredMachines,
     enabled: enabled && teamId !== undefined,
   });
 
@@ -523,22 +532,6 @@ export const useFsList = (dir: string | null, enabled: boolean) =>
     staleTime: 0,
   });
 
-export function useGithubIssues(
-  projectId: string | undefined,
-  state: GithubIssueState,
-  page: number,
-  enabled: boolean,
-) {
-  return useQuery({
-    queryKey: ['github-issues', projectId, state, page],
-    queryFn: () =>
-      api.get<GithubIssuesResponse>(
-        `/api/projects/${projectId}/github/issues?state=${state}&page=${page}`,
-      ),
-    enabled: enabled && projectId !== undefined,
-  });
-}
-
 export function useGithubIssueEcho(todoId: string | undefined, enabled: boolean) {
   return useQuery({
     queryKey: ['github-issue-echo', todoId],
@@ -617,11 +610,27 @@ export const useMcpServers = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
+export const useMcpConnectors = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['mcpConnectors', teamId],
+    queryFn: () => api.get<McpConnectorRecord[]>(`/api/teams/${teamId}/mcp-connectors`),
+    enabled: enabled && teamId !== undefined,
+  });
+
 export const useSkills = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['skills', teamId],
     queryFn: () => api.get<SkillRecord[]>(`/api/skills?teamId=${teamId}`),
     enabled: enabled && teamId !== undefined,
+  });
+
+export const useSkillImportCandidates = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['skillImportCandidates', teamId],
+    queryFn: () =>
+      api.get<SkillImportCandidatesResponse>(`/api/teams/${teamId}/skills/import-candidates`),
+    enabled: enabled && teamId !== undefined,
+    retry: false,
   });
 
 export const useSkillFile = (
@@ -727,13 +736,6 @@ export function useApiMutations(teamId: string | undefined) {
           title: '',
           spec: input.spec,
           ...(input.machineId != null ? { machineId: input.machineId } : {}),
-        }),
-      onSuccess: invalidateAll,
-    }),
-    importGithubIssue: useMutation({
-      mutationFn: (input: { projectId: string; number: number }) =>
-        api.post<TodoRecord>(`/api/projects/${input.projectId}/github/issues/import`, {
-          number: input.number,
         }),
       onSuccess: invalidateAll,
     }),
@@ -965,13 +967,14 @@ export function useApiMutations(teamId: string | undefined) {
             );
       },
       onSuccess: (result) => {
-        void qc.cancelQueries({ queryKey: ['chiefThreads', teamId] });
-        qc.setQueryData<ChiefThread[]>(['chiefThreads', teamId], (threads) => {
-          const current = threads ?? [];
-          return current.some((thread) => thread.id === result.thread.id)
-            ? current.map((thread) => (thread.id === result.thread.id ? result.thread : thread))
-            : [...current, result.thread];
-        });
+        const threadsKey = ['chiefThreads', teamId];
+        if (!qc.getQueryData<ChiefThread[]>(threadsKey)?.some((t) => t.id === result.thread.id)) {
+          void qc.cancelQueries({ queryKey: threadsKey });
+          qc.setQueryData<ChiefThread[]>(threadsKey, (threads) => [
+            ...(threads ?? []),
+            result.thread,
+          ]);
+        }
         cacheUserMessage(qc, result.thread.id, result.message);
         invalidateAll();
       },
@@ -1087,6 +1090,35 @@ export function useApiMutations(teamId: string | undefined) {
         api.patch<ProviderRecord>(`/api/teams/${teamId}/providers/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
+    createMcpConnector: useMutation({
+      mutationFn: (body: CreateMcpConnectorBody) =>
+        api.post<McpConnectorRecord>(`/api/teams/${teamId}/mcp-connectors`, body),
+      onSuccess: invalidateAll,
+    }),
+    patchMcpConnector: useMutation({
+      mutationFn: (input: { id: string; body: PatchMcpConnectorBody }) =>
+        api.patch<McpConnectorRecord>(
+          `/api/teams/${teamId}/mcp-connectors/${input.id}`,
+          input.body,
+        ),
+      onSuccess: invalidateAll,
+    }),
+    startMcpConnectorOAuth: useMutation({
+      mutationFn: (body: StartMcpConnectorOAuthBody) =>
+        api.post<{ authorizationUrl: string }>(
+          `/api/teams/${teamId}/mcp-connectors/oauth/start`,
+          body,
+        ),
+    }),
+    checkMcpConnector: useMutation({
+      mutationFn: (id: string) =>
+        api.post<McpConnectorRecord>(`/api/teams/${teamId}/mcp-connectors/${id}/check`, {}),
+      onSuccess: invalidateAll,
+    }),
+    deleteMcpConnector: useMutation({
+      mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/mcp-connectors/${id}`),
+      onSuccess: invalidateAll,
+    }),
     createSecret: useMutation({
       mutationFn: (body: SetSecretBody) =>
         api.post<SecretRecord>(`/api/teams/${teamId}/secrets`, body),
@@ -1122,14 +1154,6 @@ export function useApiMutations(teamId: string | undefined) {
     importSkill: useMutation({
       mutationFn: (body: ImportSkillBody) =>
         api.post<SkillRecord>(`/api/teams/${teamId}/skills/import`, body),
-      onSuccess: invalidateAll,
-    }),
-    decideRetroProposal: useMutation({
-      mutationFn: (input: { proposalId: string; decision: 'accept' | 'dismiss' }) =>
-        api.post<RetroProposal>(
-          `/api/teams/${teamId}/chief/retro-proposals/${input.proposalId}/${input.decision}`,
-          {},
-        ),
       onSuccess: invalidateAll,
     }),
     deleteMemory: useMutation({

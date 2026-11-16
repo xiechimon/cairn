@@ -65,7 +65,7 @@ test('message_todo reaches a running daemon and logs the delivered step', async 
     );
     const running = server.db.select().from(step).where(eq(step.buildId, buildId)).get()!;
     const issued = await api(server.url, 'POST', `/api/teams/${server.teamId}/api-keys`, {
-      name: 'message-todo',
+      name: 'MESSAGE_KEY',
       gitAccess: false,
       mcpAccess: true,
       toolGrants: { read: [], write: ['Message Todo'] },

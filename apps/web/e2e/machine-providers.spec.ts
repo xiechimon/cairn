@@ -3,7 +3,7 @@ import { mockLive } from './chief-home-mock';
 
 const NOW = Date.now();
 
-test('live: machine detail toggles a runtime through enabledRuntimes', async ({ page }) => {
+test('live: machine detail shows detection and login, with no runtime switch to write', async ({ page }) => {
   const patches: unknown[] = [];
   const machine = {
     id: 'm1',
@@ -47,9 +47,10 @@ test('live: machine detail toggles a runtime through enabledRuntimes', async ({ 
   const claudeCode = section.locator('[data-runtime="claude-code"]');
   const codex = section.locator('[data-runtime="codex"]');
   await expect(codex.getByTestId('provider-login-command')).toHaveText('codex login');
-  await expect(codex.getByTestId('provider-toggle')).toBeDisabled();
-  await claudeCode.getByTestId('provider-toggle').click();
-  await expect.poll(() => patches).toEqual([{ enabledRuntimes: ['pi'] }]);
+  await expect(claudeCode.getByTestId('provider-availability')).toHaveText('可用');
+  await expect(claudeCode).toContainText('已登录');
+  await expect(section.getByTestId('machine-runtimes').getByRole('switch')).toHaveCount(0);
+  expect(patches).toEqual([]);
 });
 
 test('fixture: machine detail lists providers with login command', async ({ page }) => {

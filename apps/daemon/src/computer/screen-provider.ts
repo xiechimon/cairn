@@ -1,15 +1,11 @@
 import { connect, type Socket } from 'node:net';
-import { join } from 'node:path';
 import { Duplex, PassThrough } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
-import type { ComputerScreenRequest } from '@cairn/shared';
-import { computerMachineName } from '../orb/computer.js';
 import { openUserControlPty } from './control-pty.js';
 import type { ComputerScreenConnection, ComputerScreenProvider } from './screen-channel.js';
 import { ReadOnlyViewGate } from './view-input.js';
 
 export const COMPUTER_SCREEN_SOCKET_WAIT_MS = 60_000;
-const DEFAULT_RUNTIME_ROOT = '/run/cairn-orb';
 
 export interface ReadOnlyView extends ComputerScreenConnection {
   accepted: Buffer[];
@@ -47,25 +43,11 @@ export function openReadOnlyView(): ReadOnlyView {
 }
 
 export interface ComputerScreenProviderOptions {
-  runtimeRoot?: string | (() => string);
-  ensureComputer?: (scopeKey: string) => Promise<string>;
+  holdComputer?: (scopeKey: string, kind: 'view' | 'control') => Promise<() => void>;
   socketPath?: (scopeKey: string, kind: 'view' | 'control') => string;
   socketWaitMs?: number;
   connect?: (path: string) => Socket;
   now?: () => number;
-}
-
-export function computerScreenSocketPath(
-  runtimeRoot: string,
-  scopeKey: string,
-  kind: Exclude<ComputerScreenRequest['kind'], 'terminal'>,
-): string {
-  return join(
-    runtimeRoot,
-    computerMachineName(scopeKey),
-    'computer',
-    kind === 'view' ? 'view.sock' : 'vnc.sock',
-  );
 }
 
 function waitForSocket(socket: Socket, signal: AbortSignal): Promise<void> {
@@ -152,24 +134,27 @@ export function createComputerScreenProvider(
       if (request.kind === 'control' && !request.controlLeaseId) {
         throw new Error('a live control lease is required');
       }
-      if (options.ensureComputer) await options.ensureComputer(request.scopeKey);
-      const runtimeRoot =
-        typeof options.runtimeRoot === 'function'
-          ? options.runtimeRoot()
-          : (options.runtimeRoot ?? DEFAULT_RUNTIME_ROOT);
-      return openUnixScreen(
-        options.socketPath
-          ? options.socketPath(request.scopeKey, request.kind)
-          : computerScreenSocketPath(runtimeRoot, request.scopeKey, request.kind),
-        request.signal,
-        {
-          socketWaitMs,
-          connect: connectSocket,
-          now,
-        },
-      );
+      if (!options.socketPath) throw new Error('This machine has no computer screen');
+      const release = options.holdComputer
+        ? await options.holdComputer(request.scopeKey, request.kind)
+        : () => {};
+      try {
+        const connection = await openUnixScreen(
+          options.socketPath(request.scopeKey, request.kind),
+          request.signal,
+          { socketWaitMs, connect: connectSocket, now },
+        );
+        return {
+          stream: connection.stream,
+          close: () => {
+            release();
+            return connection.close();
+          },
+        };
+      } catch (error) {
+        release();
+        throw error;
+      }
     },
   };
 }
-
-export const hostComputerScreen: ComputerScreenProvider = createComputerScreenProvider();

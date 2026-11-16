@@ -43,7 +43,7 @@ test('a waiting task in the Tasks panel opens the thread in the side chat', asyn
     .filter({ hasText: 'Connect a Claude subscription token' })
     .click();
   await expect(sideChat(page)).toContainText('Connect a Claude subscription token');
-  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你回答');
 });
 
 test('Escape closes the side chat', async ({ page }) => {

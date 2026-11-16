@@ -8,6 +8,7 @@ import { SegmentedTabs } from '../components/segmented.js';
 import { SETTINGS_HINT_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
+import { toastError } from '../components/ui/toaster.js';
 import type { ChiefContent, ChiefSettingsTab } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
@@ -16,7 +17,7 @@ import { EditCharterDialog } from './edit-charter-dialog.js';
 import { MemoryPanel } from './memory-panel.js';
 
 const TABS: { id: ChiefSettingsTab; label: string }[] = [
-  { id: 'routing', label: '模型与 Runner' },
+  { id: 'routing', label: '模型与执行机' },
   { id: 'charter', label: '章程' },
   { id: 'memory', label: '记忆' },
   { id: 'watches', label: '关注与提醒' },
@@ -42,7 +43,13 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
   const wakes = live ? (chiefQ.data?.wakes ?? []) : [];
   const saveCharter = live
     ? (value: string) =>
-        mutations.patchChief.mutate({ charter: value }, { onSuccess: () => setCharterOpen(false) })
+        mutations.patchChief.mutate(
+          { charter: value },
+          {
+            onSuccess: () => setCharterOpen(false),
+            onError: (error) => toastError(t('章程没有保存，你写的内容还在编辑框里。'), error),
+          },
+        )
     : undefined;
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -89,9 +96,9 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
                 onClick={() => navigate(COORDINATOR_ROUTING_HREF)}
               >
                 <span className="flex min-w-0 flex-col">
-                  <span className="text-ui text-foreground">{t('模型与 Runner')}</span>
+                  <span className="text-ui text-foreground">{t('模型与执行机')}</span>
                   <span className={SETTINGS_HINT_CLS}>
-                    {t('跟随 coordinator 路由规则，在路由设置里调整。')}
+                    {t('跟随 Coordinator 路由规则，在路由设置里调整。')}
                   </span>
                 </span>
                 <ChevronRight width={16} height={16} className="ml-auto text-content-tertiary" />

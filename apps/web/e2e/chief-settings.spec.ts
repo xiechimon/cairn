@@ -61,6 +61,37 @@ test('fixture charter save closes the dialog (accept law)', async ({ page }) => 
   await expect(dialog).toBeHidden();
 });
 
+test('a refused charter save says why in the dialog and keeps the text', async ({ page }) => {
+  const dialog = await openCharterDialog(page);
+  const box = dialog.getByRole('textbox');
+  const save = dialog.getByRole('button', { name: '保存章程' });
+  const long = '长'.repeat(16_001);
+  await box.fill(long);
+  await save.click();
+  await expect(dialog.getByRole('alert')).toHaveText(
+    '章程最多 16,000 个字，现在有 16,001 个字。删短一些再保存。',
+  );
+  await expect(dialog.getByRole('alert')).toBeInViewport();
+  await expect(save).toBeInViewport();
+  await expect(box).toHaveValue(long);
+  await expect(box).toHaveAttribute('aria-invalid', 'true');
+  await evidencePanelShot(page, 'charter-too-long.png', dialog);
+
+  const marked = '优先派给 r3-builder。\n<!-- END CAIRN-RUNTIME -->';
+  await box.fill(marked);
+  await save.click();
+  await expect(dialog.getByRole('alert')).toHaveText(
+    '章程里不能有这一行：<!-- END CAIRN-RUNTIME -->。这是 Cairn 自己用的分隔标记，删掉它再保存。',
+  );
+  await expect(box).toHaveValue(marked);
+  await evidencePanelShot(page, 'charter-runtime-marker.png', dialog);
+
+  await box.fill('优先派给 r3-builder。');
+  await expect(dialog.getByRole('alert')).toBeHidden();
+  await save.click();
+  await expect(dialog).toBeHidden();
+});
+
 test('watches empty-state card is centered and growth-proof (#772)', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('cairn.locale', 'en');
@@ -85,11 +116,11 @@ test('watches empty-state card is centered and growth-proof (#772)', async ({ pa
   }
 });
 
-test('模型与 Runner tab is one work-routing row: no Agent or dispatch leftovers (#903+#1260)', async ({
+test('模型与执行机 tab is one work-routing row: no Agent or dispatch leftovers (#903+#1260)', async ({
   page,
 }) => {
   await page.goto(AGENT_TAB);
-  await expect(page.getByRole('tab', { name: '模型与 Runner' })).toHaveAttribute(
+  await expect(page.getByRole('tab', { name: '模型与执行机' })).toHaveAttribute(
     'aria-selected',
     'true',
   );
@@ -99,9 +130,9 @@ test('模型与 Runner tab is one work-routing row: no Agent or dispatch leftove
 
   const row = page.getByTestId('chief-routing-row');
   await expect(row).toBeVisible();
-  await expect(row).toContainText('模型与 Runner');
-  await expect(row).toContainText('跟随 coordinator 路由规则');
+  await expect(row).toContainText('模型与执行机');
+  await expect(row).toContainText('跟随 Coordinator 路由规则');
   await expect(page.getByRole('button', { name: '未设置' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '压缩模型' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Runner', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '执行机', exact: true })).toHaveCount(0);
 });

@@ -150,8 +150,8 @@ test('no pending question means no chips and no pill', async ({ page }) => {
 
 test('the header carries no question pill on any page', async ({ page }) => {
   await mockLive(page, structuredClone(TWO));
-  await page.goto('/app/schedules');
-  await expect(page.getByTestId('page-topbar')).toBeVisible();
+  await page.goto('/app/settings/account');
+  await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible();
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
   await page.goto('/app?chief=settings');
   await expect(page.getByTestId('chief-settings-topbar')).toBeVisible();
@@ -222,12 +222,17 @@ test('the tab title counts pending questions and the Coordinator row opens the q
   page,
 }) => {
   await mockLive(page, structuredClone(TWO));
-  await page.goto('/app/schedules');
+  await page.goto('/app/activity');
+  await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page).toHaveTitle('(2) Cairn');
-  await expect(page.getByTestId('chief-question')).toHaveCount(0);
-  await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
+  await page.goto('/app?pane=tasks&tab=scheduled');
+  await expect(page).toHaveTitle('(2) Cairn');
+  await expect(page.getByRole('complementary', { name: '任务' })).toBeVisible();
+  await page.getByTestId('sidebar-reopen').click();
+  await page.mouse.move(700, 400);
   await page.getByRole('complementary').getByRole('button', { name: /Coordinator/ }).first().click();
   await expect(page).toHaveURL(/\/app(\?|$)/);
+  await expect(page).not.toHaveURL(/tab=scheduled/);
   await expect(page.getByTestId('chief-question').getByTestId('chief-question-chips')).toBeInViewport();
   await expect(shown(page)).toContainText('Which model?');
 });
@@ -689,7 +694,7 @@ test('Escape on the chips or the question bubble menu dismisses with a five-seco
   expect(cancelled).toEqual([]);
   await page.getByTestId('chief-question-text').hover();
   await page.getByTestId('chief-question-tools').getByTestId('chief-msg-more').click();
-  await expect(page.getByTestId('chief-question-dismiss')).toHaveText('取消提问');
+  await expect(page.getByTestId('chief-question-dismiss')).toHaveText(/^取消提问/);
   await page.getByTestId('chief-question-dismiss').click();
   await expect(card).toHaveCount(0);
   await expect.poll(() => cancelled.length, { timeout: 8000 }).toBe(1);
@@ -966,7 +971,7 @@ test('answer drafts per request and the thread draft stay separate through every
           buffer: Buffer.from('away'),
         });
         await expect(activeComposer.getByTestId('attachment-pending')).toBeVisible();
-        await goInApp('/app/schedules');
+        await goInApp('/app/machines/authorize');
         await expect(page.getByTestId('home-c')).toHaveCount(0);
         const before = uploadsDone;
         await expect(async () => {

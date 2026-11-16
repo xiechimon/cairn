@@ -71,15 +71,17 @@ test('no needs-you thread and no question means a plain tab title', async ({ pag
   await expect(page).toHaveTitle('Cairn');
 });
 
-test('a pending question counts as needs-you on the Tasks toggle and tab title, and the conversation says it is waiting', async ({
+test('a pending question counts as needs-you on the Tasks toggle and tab title, and the conversation shows no working row above it', async ({
   page,
 }) => {
   await openWithQuestion(page);
   await expect(page.getByTestId('tasks-badge')).toHaveText('1');
   await expect(page).toHaveTitle('(1) Cairn');
+  await expect(page.getByTestId('chief-question-option-0-0')).toBeVisible();
   const stream = page.getByTestId('chief-stream');
-  await expect(stream).toContainText('Waiting for your answer');
+  await expect(stream).not.toContainText('Waiting for your answer');
   await expect(stream).not.toContainText('Working on it');
+  await expect(stream.getByTestId('typing-dots')).toHaveCount(0);
 });
 
 test('a running turn with no question keeps its typing dots', async ({ page }) => {
@@ -89,7 +91,6 @@ test('a running turn with no question keeps its typing dots', async ({ page }) =
     todos: [],
   });
   await page.goto('/app');
-  await expect(page.getByTestId('chief-stream')).not.toContainText('Waiting for your answer');
   await expect(page.getByTestId('chief-stream').getByTestId('typing-dots')).toBeVisible();
 });
 

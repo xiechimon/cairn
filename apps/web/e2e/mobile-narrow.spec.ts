@@ -23,7 +23,7 @@ for (const width of [360, 390]) {
       ).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(drawer).toBeHidden();
-      await page.goto('/app/schedules');
+      await page.goto('/app?pane=tasks&tab=scheduled');
       await menu.click();
       await drawer.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
       await expect(page).toHaveURL(/\/app(\?|$)/);
@@ -92,15 +92,13 @@ for (const width of [360, 390]) {
         await page.goto(url);
         await page.locator('.settings-card, [data-testid="routing-settings-empty"], [data-testid="chief-settings-col"]').first().waitFor();
         const report = await page.evaluate(() => {
-          const rail = document.querySelector('.board-sidebar--collapsed')?.getBoundingClientRect();
-          const railRight = rail?.right ?? 0;
           const col = document.querySelector('[data-testid="page-col"], [data-testid="chief-settings-col"]');
           const problems: string[] = [];
           for (const el of col?.querySelectorAll('*') ?? []) {
             const box = el.getBoundingClientRect();
             if (box.width <= 1 && box.height <= 1) continue;
             if (getComputedStyle(el).visibility === 'hidden') continue;
-            if (box.left < railRight + 12 - 0.5 || box.right > innerWidth - 12 + 0.5) {
+            if (box.left < 12 - 0.5 || box.right > innerWidth - 12 + 0.5) {
               problems.push(`${el.className.toString().slice(0, 40)} ${Math.round(box.left)}-${Math.round(box.right)}`);
             }
             const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent?.trim());

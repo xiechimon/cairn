@@ -1,14 +1,14 @@
 {
   "frozenFrom": {
-    "sha": "4cd3aaed9fa3e8c0e9dc257b6fbbeddfb5f53915",
-    "date": "2026-11-14"
+    "sha": "7b61ccc46036b7467ee9a655c04880c92bc77ae1",
+    "date": "2026-11-16"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
-      "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer). Optional finalFocus forwards the Base UI focus target so memory deletion can return to a surviving row or its stable summary after the refreshed list settles (#3666).",
-      "hash": "2c8962d80ffebbf1a6d5938cf136c90f88d82d7ce269199ab2f50993ccdf9eab"
+      "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer). Optional finalFocus forwards the Base UI focus target so memory deletion can return to a surviving row or its stable summary after the refreshed list settles (#3666). The backdrop force-renders so a confirm nested in a route dialog (Project settings delete) keeps its own backdrop close.",
+      "hash": "f869abf6c3ac4223db4acc689d1ae5bb7b797a1ca795599e19a4915ad0ccaa62"
     },
     "alert-dialog.tsx": {
       "kind": "registry",
@@ -69,8 +69,8 @@
     },
     "dialog-shell.tsx": {
       "kind": "adapter",
-      "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces.",
-      "hash": "1ae4160c305fb19bb74001ca35301f8f683bc2b903e873b83eb0cfab817f1fdf"
+      "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog / overlay/route-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes, and bare forwards initialFocus. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces.",
+      "hash": "d298415599c67ce187b55ecf0825bd515067a66d605b364bbb84dca0bd02ee78"
     },
     "dialog.tsx": {
       "kind": "registry",
@@ -130,7 +130,7 @@
     "menu.ts": {
       "kind": "adapter",
       "reason": "Shared Paper menu classes (surface, item, indicator, separator) consumed by dropdown-menu.tsx and the hand-built menus outside components/ui, so every menu uses one padding token and the concentric --radius-menu-item.",
-      "hash": "46bf678e0254c78594a66f51b30670dd6f1e645b67f257a9b0b2c1d105379a79"
+      "hash": "47ba97af684cd377dafef5c38a032c8ed0c5ad77662eafee55b5dfffb602a006"
     },
     "message-scroller.tsx": {
       "kind": "registry",
@@ -148,8 +148,8 @@
       "kind": "registry",
       "upstreamItem": "popover",
       "status": "deviated",
-      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu face: popup consumes --radius-popover (10px) + --shadow-popover (light 1px ring + soft pool, dark inset highlight); text-sm -> text-ui (DESIGN.md type scale). Portal keepMounted exposed on PopoverContent so the Tasks panel PR hover cards are pre-rendered and open instantly (1 consumer, owner 2026-11-13).",
-      "hash": "0faffc4c5ed799be8c2eef1c2ef89d7957bc114f8de5feb64293712b71550fe8"
+      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu face: popup consumes --radius-popover (10px) + --shadow-popover (light 1px ring + soft pool, dark inset highlight); text-sm -> text-ui (DESIGN.md type scale). Portal keepMounted exposed on PopoverContent so the Tasks panel PR hover cards are pre-rendered and open instantly (1 consumer, owner 2026-11-13). Positioner anchor exposed on PopoverContent so the phone schedule editor covers the whole schedule list instead of its row (1 consumer, 2026-11-15).",
+      "hash": "5cb475ad76d7cfa53819af51ebeb560588d6d43117dc9404f7e73e13d7585e12"
     },
     "seeded-avatar.tsx": {
       "kind": "adapter",

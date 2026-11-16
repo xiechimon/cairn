@@ -3,8 +3,6 @@ import { ContainerOrbProvider } from '../src/orb/container-provider.js';
 import { HostOrbProvider, NspawnOrbProvider } from '../src/orb/provider.js';
 import type { OrbRuntime, OrbSpawnSpec } from '../src/orb/runtime.js';
 import {
-  COMPUTER_ENV,
-  createComputerOrbProvider,
   createOrbProvider,
   ORB_RUNTIME_ENV,
   podmanProviderOptions,
@@ -138,38 +136,6 @@ describe('createOrbProvider', () => {
   );
 });
 
-describe('createComputerOrbProvider', () => {
-  test('a host executor with the computer switch gets its own nspawn provider', () => {
-    expect(
-      createComputerOrbProvider({ [COMPUTER_ENV]: 'orb' }, new HostOrbProvider()),
-    ).toBeInstanceOf(NspawnOrbProvider);
-  });
-
-  test('an nspawn executor shares its provider with the computer', () => {
-    const executor = new NspawnOrbProvider();
-    expect(createComputerOrbProvider({ CAIRN_EXECUTOR: 'orb' }, executor)).toBe(executor);
-  });
-
-  test.each([{}, { [COMPUTER_ENV]: '' }])(
-    'a host executor without the switch has no computer (%j)',
-    (env) => {
-      expect(createComputerOrbProvider(env, new HostOrbProvider())).toBeUndefined();
-    },
-  );
-
-  test('the host desktop switch starts no computer Orb, even on an nspawn executor', () => {
-    expect(
-      createComputerOrbProvider({ [COMPUTER_ENV]: 'host' }, new NspawnOrbProvider()),
-    ).toBeUndefined();
-  });
-
-  test('an unknown computer value fails instead of silently running without one', () => {
-    expect(() =>
-      createComputerOrbProvider({ [COMPUTER_ENV]: 'podman' }, new HostOrbProvider()),
-    ).toThrow(`${COMPUTER_ENV} must be orb`);
-  });
-});
-
 describe('daemon startup', () => {
   test.each([
     ['docker', 'CAIRN_ORB_RUNTIME=docker is not implemented yet'],
@@ -200,20 +166,6 @@ describe('daemon startup', () => {
     expect(
       (api.presenceBodies[0] as { capabilities?: { executor?: string } }).capabilities?.executor,
     ).toBe('host');
-    await handle.stop();
-    await handle.done;
-  });
-  test('a host daemon with the computer switch reports a computer and keeps the host executor', async () => {
-    const { handle, api } = await boot({
-      capEnv: { [COMPUTER_ENV]: 'orb' },
-      capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
-    });
-    await waitFor(() => api.presenceBodies.length > 0);
-    const capabilities = (
-      api.presenceBodies[0] as { capabilities?: { executor?: string; computer?: boolean } }
-    ).capabilities;
-    expect(capabilities?.executor).toBe('host');
-    expect(capabilities?.computer).toBe(true);
     await handle.stop();
     await handle.done;
   });

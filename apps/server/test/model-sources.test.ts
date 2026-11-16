@@ -1,6 +1,7 @@
 import { hostname } from 'node:os';
 import { modelSourcesEnvelopeSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { builtinModelIds } from '../src/coordinator/runtime/provider.js';
 import { getModelSources } from '../src/services/providers.js';
 import { bootServer, issueApiKey, req, type TestServer } from './helpers.js';
 
@@ -63,15 +64,40 @@ describe('getModelSources (service layer, aggregated per machine)', () => {
     s.dispose();
   });
 
-  test('pi segment = custom providers models[] projection (id/name verbatim, flattened across providers)', async () => {
+  test('one pi segment per provider, carrying its id and label, so a picked model names its provider', async () => {
     const s = bootServer();
     await postProvider(s);
+    const second = await req(s.app, 'POST', `/api/teams/${s.team.id}/providers`, {
+      providerId: 'gw-two',
+      label: 'Second',
+      baseUrl: 'https://gw2.example.com/v1',
+      api: 'openai-completions',
+      models: [{ id: 'model-a', name: 'A again' }],
+    });
+    expect(second.status).toBe(201);
+    const deepseek = await req(s.app, 'POST', `/api/teams/${s.team.id}/providers`, {
+      providerId: 'deepseek',
+      label: 'DeepSeek',
+      baseUrl: 'https://api.deepseek.com/v1',
+      api: 'openai-completions',
+      apiKey: 'ds-key',
+      models: [],
+    });
+    expect(deepseek.status).toBe(201);
     const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
-    const pi = env.sources.find((src) => src.runtime === 'pi');
-    expect(pi?.models).toEqual([
+    expect(modelSourcesEnvelopeSchema.safeParse(env).success).toBe(true);
+    const pi = env.sources.filter((src) => src.runtime === 'pi');
+    expect(pi.map((src) => [src.provider, src.providerLabel])).toEqual([
+      ['gw-test', '测试网关'],
+      ['gw-two', 'Second'],
+      ['deepseek', 'DeepSeek'],
+    ]);
+    expect(pi[0]?.models).toEqual([
       { id: 'model-a', name: '模型甲', liveness: 'unknown' },
       { id: 'model-b', name: '模型乙', liveness: 'unknown' },
     ]);
+    expect(pi[1]?.models.map((m) => m.id)).toEqual(['model-a']);
+    expect(pi[2]?.models.map((m) => m.id)).toEqual([...builtinModelIds('deepseek')]);
     s.dispose();
   });
 

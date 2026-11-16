@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { MachineAskBody, MachineAskResponse } from '@cairn/shared';
 import {
   AGENT_TOOL_SKILL_CREATE,
@@ -35,10 +35,10 @@ import { projectOfTodo } from './git.js';
 import { resolveProjectGithubLabelIds } from './github-labels.js';
 import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
-import { refuseMailTurnTool } from './mail.js';
 import { stepScopeProjectId } from './picked-project.js';
+import { refuseRestrictedTurnTool } from './report-turn.js';
 import {
-  coordinatorProfile,
+  coordinatorMemoryOwner,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
   profileForStep,
@@ -58,7 +58,7 @@ export async function machineAsk(
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
 ): Promise<MachineAskResponse> {
   const row = ownedStep(deps, machineId, stepId);
-  refuseMailTurnTool(row.prompt, 'ask_user');
+  refuseRestrictedTurnTool(row.prompt, 'ask_user');
   if (row.kind === 'session') {
     return askWorkerQuestion(deps, row, body, opts);
   }
@@ -108,8 +108,9 @@ export async function executeRelayToolCall(
   signal?: AbortSignal,
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
-  refuseMailTurnTool(row.prompt, name);
+  refuseRestrictedTurnTool(row.prompt, name, params);
   if (isComputerBrowserTool(name) || name === 'request_takeover') {
+    assertChiefDigestTool(row.buildId, name);
     if (row.kind !== 'chief') {
       throw new HttpError(400, 'browser tools require a chief step');
     }
@@ -119,11 +120,7 @@ export async function executeRelayToolCall(
     if (row.status !== 'claimed') {
       throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
     }
-    const callId =
-      toolCallId ??
-      createHash('sha256')
-        .update(`${stepId}\0${name}\0${JSON.stringify(params)}`)
-        .digest('hex');
+    const callId = toolCallId ?? randomUUID();
     const result = await forwardComputerCall(
       deps,
       machineId,
@@ -190,7 +187,7 @@ export async function executeRelayToolCall(
         userId: threadRow.userId,
         chiefId: chiefRow.id,
         threadId,
-        chiefAgentId: coordinatorProfile(deps.db, threadRow.teamId)?.id ?? null,
+        chiefAgentId: coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
         conversationId: threadId,
         turnPrompt: row.prompt,
         turnMessageIds: row.ownerMessageIds ?? [],

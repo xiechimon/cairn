@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { routingRule, team, workPolicy } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { listClaudeCodeSources } from './providers.js';
 
 export const DEFAULT_SESSION_PROVIDER = 'claude-code';
@@ -83,29 +84,7 @@ function seedCoordinatorRule(db: Db, teamId: string): number {
 export function seedDefaultRouting(db: Db): DefaultRoutingReport {
   const report: DefaultRoutingReport = { sessionRules: 0, coordinatorRules: 0, policies: 0 };
   for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
-    const hasSessionRule =
-      db
-        .select({ id: routingRule.id })
-        .from(routingRule)
-        .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'session')))
-        .get() !== undefined;
-    if (!hasSessionRule) {
-      const now = nowMs();
-      report.sessionRules += db
-        .insert(routingRule)
-        .values({
-          id: newRecordId(),
-          teamId,
-          use: 'session',
-          provider: DEFAULT_SESSION_PROVIDER,
-          modelId: DEFAULT_SESSION_MODEL,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoNothing()
-        .run().changes;
-    }
-    report.coordinatorRules += seedCoordinatorRule(db, teamId);
+    if (!coordinatorRunsOnPi()) report.coordinatorRules += seedCoordinatorRule(db, teamId);
     if (!policyExists(db, teamId, 'session')) {
       report.policies += insertPolicy(db, teamId, 'session', [...AGENT_TOOL_DEFAULTS]);
     }

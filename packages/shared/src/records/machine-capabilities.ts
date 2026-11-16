@@ -38,6 +38,14 @@ export const confinementReportSchema = z.discriminatedUnion('state', [
 ]);
 export type ConfinementReport = z.infer<typeof confinementReportSchema>;
 
+export const confinementCauseSchema = z
+  .object({
+    kind: z.enum(['not-own-unit', 'bwrap-missing', 'home-overlay-failed']),
+    mountPoint: z.string().startsWith('/').max(4096).optional(),
+  })
+  .strict();
+export type ConfinementCause = z.infer<typeof confinementCauseSchema>;
+
 export function confinementDispatchReady(
   capabilities: MachineCapabilities | null | undefined,
 ): boolean {
@@ -99,8 +107,10 @@ export const machineCapabilitiesSchema = z.object({
   ownComputer: z.literal(true).optional(),
   browser: z.literal(true).optional(),
   secretGateway: z.literal(true).optional(),
+  mcpConnectors: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
   confinement: confinementReportSchema.optional(),
+  confinementCause: confinementCauseSchema.optional(),
   agentReach: agentReachReportSchema.optional(),
   hostPermissions: hostPermissionsSchema.optional(),
 });
@@ -118,6 +128,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   if (!base.success) return undefined;
   const osPlatform = machineOsPlatformSchema.safeParse(rec.osPlatform);
   const confinement = confinementReportSchema.safeParse(rec.confinement);
+  const confinementCause = confinementCauseSchema.safeParse(rec.confinementCause);
   const hardware = machineHardwareSchema.safeParse(rec.hardware);
   const executor = machineExecutorSchema.safeParse(rec.executor);
   const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
@@ -127,6 +138,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...base.data,
     ...(osPlatform.success ? { osPlatform: osPlatform.data } : {}),
     ...(confinement.success ? { confinement: confinement.data } : {}),
+    ...(confinementCause.success ? { confinementCause: confinementCause.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
     ...(agentReach.success ? { agentReach: agentReach.data } : {}),
     ...(hostPermissions.success ? { hostPermissions: hostPermissions.data } : {}),
@@ -136,6 +148,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(rec.ownComputer === true ? { ownComputer: true as const } : {}),
     ...(rec.browser === true ? { browser: true as const } : {}),
     ...(rec.secretGateway === true ? { secretGateway: true as const } : {}),
+    ...(rec.mcpConnectors === true ? { mcpConnectors: true as const } : {}),
   };
 }
 
@@ -162,7 +175,19 @@ export function capabilityMissingLabels(missing: {
 }
 
 export const stepQueueBlockedSchema = z.object({
-  kind: z.enum(['machine-offline', 'capability-missing']),
+  kind: z.enum([
+    'machine-offline',
+    'capability-missing',
+    'sandbox-unavailable',
+    'runtime-disabled',
+    'model-unavailable',
+    'local-path',
+    'claude-rate-limited',
+    'claude-logged-out',
+    'account-switched',
+    'coordinator-provider-missing',
+    'coordinator-provider-no-key',
+  ]),
   missing: z.array(z.string()),
   platform: runnerOsSchema.optional(),
 });

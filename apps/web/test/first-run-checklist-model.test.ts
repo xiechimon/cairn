@@ -1,44 +1,46 @@
 import { expect, test } from 'vitest';
 import {
   coordinatorCanAnswer,
-  modelSourceCount,
   firstRunComplete,
   firstRunSteps,
+  modelSides,
+  modelSourceCount,
+  modelsConfirmed,
   nextOpenStep,
+  projectCreationBlocked,
+  setupOpenStep,
+  setupShown,
 } from '../src/board/first-run-checklist-model.js';
 
-const done = { modelSources: 1, machinesOnline: 1, coordinatorCanAnswer: true };
+const both = { coordinator: true, tasks: true };
+const tasksOnly = { coordinator: false, tasks: true };
+const none = { coordinator: false, tasks: false };
 
-test('nothing is configured on a fresh install: all three steps are open', () => {
-  const steps = firstRunSteps({ modelSources: 0, machinesOnline: 0, coordinatorCanAnswer: false });
-  expect(steps?.map((s) => [s.id, s.done])).toEqual([
-    ['model-source', false],
-    ['machine', false],
-    ['coordinator', false],
+test('the models step needs a model on both sides, not just any model source', () => {
+  expect(firstRunSteps({ models: tasksOnly, machinesOnline: 1 })?.map((s) => [s.id, s.done])).toEqual([
+    ['models', false],
+    ['machine', true],
   ]);
-  expect(firstRunComplete(steps)).toBe(false);
+  expect(firstRunSteps({ models: both, machinesOnline: 1 })?.every((s) => s.done)).toBe(true);
 });
 
-test('each step reads its own fact', () => {
-  expect(firstRunSteps({ ...done, machinesOnline: 0 })?.map((s) => s.done)).toEqual([
-    true,
-    false,
-    true,
-  ]);
-  expect(firstRunSteps({ ...done, modelSources: 0 })?.map((s) => s.done)).toEqual([
-    false,
-    true,
-    true,
-  ]);
+test('the composer chip names models before an offline Runner', () => {
+  expect(nextOpenStep(firstRunSteps({ models: tasksOnly, machinesOnline: 0 }))).toBe('models');
+  expect(nextOpenStep(firstRunSteps({ models: both, machinesOnline: 0 }))).toBe('machine');
+  expect(nextOpenStep(firstRunSteps({ models: both, machinesOnline: 1 }))).toBeNull();
 });
 
-test('the checklist is complete, and so disappears, once every step is done', () => {
-  expect(firstRunComplete(firstRunSteps(done))).toBe(true);
+test('while any fact is still loading nothing is named', () => {
+  expect(firstRunSteps({ models: undefined, machinesOnline: 1 })).toBeNull();
+  expect(firstRunSteps({ models: both, machinesOnline: undefined })).toBeNull();
+  expect(firstRunComplete(firstRunSteps({ models: undefined, machinesOnline: 0 }))).toBe(true);
 });
 
-test('while any fact is still loading the checklist stays hidden instead of flashing', () => {
-  expect(firstRunSteps({ ...done, machinesOnline: undefined })).toBeNull();
-  expect(firstRunComplete(firstRunSteps({ ...done, modelSources: undefined }))).toBe(true);
+test('model sides come from whether the Coordinator can answer and whether any source exists', () => {
+  expect(modelSides(false, 1)).toEqual(tasksOnly);
+  expect(modelSides(true, 0)).toEqual({ coordinator: true, tasks: false });
+  expect(modelSides(undefined, 1)).toBeUndefined();
+  expect(modelSides(true, undefined)).toBeUndefined();
 });
 
 test('the Coordinator needs a routing facade with a model to answer', () => {
@@ -49,43 +51,46 @@ test('the Coordinator needs a routing facade with a model to answer', () => {
   expect(coordinatorCanAnswer({ ...base, agentActor: { modelId: 'm' } } as never)).toBe(true);
 });
 
-test('a team provider record is a model source', () => {
+test('provider records and available connections are model sources; unavailable ones are not', () => {
   expect(modelSourceCount([{ id: 'p1' }], [])).toBe(1);
-});
-
-test('a machine-local login reported as an available connection is a model source with no provider record', () => {
   expect(modelSourceCount([], [{ id: 'machine:m1', available: true }])).toBe(1);
-});
-
-test('an unavailable connection (expired login, offline machine) is not a model source', () => {
   expect(modelSourceCount([], [{ id: 'machine:m1', available: false }])).toBe(0);
-});
-
-test('a connection that does not report availability counts as usable', () => {
   expect(modelSourceCount([], [{ id: 'c1' }])).toBe(1);
-});
-
-test('nothing configured is zero sources, and still loading is unknown', () => {
-  expect(modelSourceCount([], [])).toBe(0);
   expect(modelSourceCount(undefined, [])).toBeUndefined();
-  expect(modelSourceCount([], undefined)).toBeUndefined();
 });
 
-test('the next open step follows the fixed order for every missing combination', () => {
-  const next = (modelSources: number, machinesOnline: number, canAnswer: boolean) =>
-    nextOpenStep(firstRunSteps({ modelSources, machinesOnline, coordinatorCanAnswer: canAnswer }));
-  expect(next(0, 0, false)).toBe('model-source');
-  expect(next(0, 1, true)).toBe('model-source');
-  expect(next(1, 0, false)).toBe('machine');
-  expect(next(1, 0, true)).toBe('machine');
-  expect(next(1, 1, false)).toBe('coordinator');
-  expect(next(1, 1, true)).toBeNull();
+test('models are confirmed only once both the coordinator and session rules are stored', () => {
+  const rule = (use: string) => ({ use }) as never;
+  expect(modelsConfirmed({ rules: [], policies: [] })).toBe(false);
+  expect(modelsConfirmed({ rules: [rule('coordinator')], policies: [] })).toBe(false);
+  expect(modelsConfirmed({ rules: [rule('session'), rule('review')], policies: [] })).toBe(false);
+  expect(modelsConfirmed({ rules: [rule('coordinator'), rule('session')], policies: [] })).toBe(true);
 });
 
-test('no step is named before the facts have loaded', () => {
-  expect(
-    nextOpenStep(
-      firstRunSteps({ modelSources: undefined, machinesOnline: 1, coordinatorCanAnswer: true }),
-    ),
-  ).toBeNull();
+test('the setup page opens the models step first, then confirm, then nothing', () => {
+  expect(setupOpenStep({ models: tasksOnly, confirmed: true })).toBe('models');
+  expect(setupOpenStep({ models: both, confirmed: false })).toBe('confirm');
+  expect(setupOpenStep({ models: both, confirmed: true })).toBeNull();
+});
+
+test('the setup page shows only for a team with no projects, and skipping hides it until asked again', () => {
+  const progress = { models: none, confirmed: false };
+  const base = { projects: 0, progress, skipped: false, requested: false };
+  expect(setupShown(base)).toBe(true);
+  expect(setupShown({ ...base, projects: 1 })).toBe(false);
+  expect(setupShown({ ...base, projects: 1, requested: true })).toBe(false);
+  expect(setupShown({ ...base, skipped: true })).toBe(false);
+  expect(setupShown({ ...base, skipped: true, requested: true })).toBe(true);
+  expect(setupShown({ ...base, projects: undefined })).toBeUndefined();
+  expect(setupShown({ ...base, progress: undefined })).toBeUndefined();
+});
+
+test('creating the first project is blocked until both steps are done; later projects never are', () => {
+  const open = { models: both, confirmed: false };
+  const done = { models: both, confirmed: true };
+  expect(projectCreationBlocked({ projects: 0, progress: open })).toBe(true);
+  expect(projectCreationBlocked({ projects: 0, progress: done })).toBe(false);
+  expect(projectCreationBlocked({ projects: 2, progress: open })).toBe(false);
+  expect(projectCreationBlocked({ projects: undefined, progress: open })).toBe(false);
+  expect(projectCreationBlocked({ projects: 0, progress: undefined })).toBe(false);
 });

@@ -3,7 +3,7 @@ import {
   apiKeyRecordSchema,
   BRAND,
   categoryFreeTaskInputSchema,
-  githubIssueStateSchema,
+  KEY_NAME_PATTERN,
   type MemoryRecord,
   phaseSchema,
   routeOverrideSchema,
@@ -37,11 +37,6 @@ export function requireProject(ctx: AppContext, id: string): typeof project.$inf
   return row;
 }
 
-export const githubIssuesQuerySchema = z.object({
-  state: githubIssueStateSchema,
-  page: z.coerce.number().int().min(1),
-});
-
 export const patchTodoBodySchema = categoryFreeTaskInputSchema.pipe(
   z.object({
     title: z.string().optional(),
@@ -62,7 +57,14 @@ export const patchSecretBodySchema = z.object({
   http: secretHttpPolicySchema.optional(),
 });
 
-export const createApiKeyBodySchema = apiKeyRecordSchema.extend({ name: z.string().nullish() });
+export const createApiKeyBodySchema = apiKeyRecordSchema.extend({
+  name: z
+    .string()
+    .regex(
+      KEY_NAME_PATTERN,
+      'name must look like MY_KEY: capital letters, digits and underscores, not starting with a digit',
+    ),
+});
 
 export function toMemoryRecord(row: typeof agentMemory.$inferSelect): MemoryRecord {
   return {

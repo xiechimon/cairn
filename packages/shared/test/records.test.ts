@@ -293,6 +293,8 @@ describe('mcp-server record (r3 §5.1 measured verbatim)', () => {
       url: 'https://mcp.example.com/mcp',
       hasCredential: false,
       credentialKeys: [],
+      source: 'local',
+      status: null,
       createdBy: 'usr_mon',
       id: 'mcp_01',
       createdAt: 1758260000000,

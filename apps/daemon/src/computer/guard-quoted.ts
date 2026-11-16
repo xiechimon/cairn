@@ -286,7 +286,12 @@ const SPLICE_SOLO_COMMANDS = ['kill', 'pkill', 'killall', 'xkill'];
 
 const SPLICE_SERVICE_COMMANDS = ['systemctl', 'service'];
 
-export const BROWSER_STATE_PATHS = ['.browser-profiles', '.agent-browser', '--user-data-dir'];
+export const BROWSER_STATE_PATHS = [
+  '.browser-profiles',
+  '.agent-browser',
+  '--user-data-dir',
+  'browser-profile',
+];
 
 const SPLICE_PATHS = [...BROWSER_STATE_PATHS, '/tmp/.x11-unix'];
 

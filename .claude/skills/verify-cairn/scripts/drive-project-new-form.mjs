@@ -104,7 +104,7 @@ const menu = () => page.getByRole('menu', { name: '仓库' });
 const openMenu = async () => {
 
   if (await menu().isVisible()) return;
-  const swap = page.locator('button[aria-label="选择仓库"]');
+  const swap = page.locator('button[aria-label="切换仓库来源"]');
   if (await swap.isVisible()) await swap.click();
   else await page.locator('#prj-new-repo').click();
   await menu().waitFor({ timeout: 5000 });

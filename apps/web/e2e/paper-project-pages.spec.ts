@@ -9,12 +9,19 @@ function setTheme(page: Page, theme: 'light' | 'dark') {
   return page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
 }
 
+async function openDialog(page: Page, url: string) {
+  await page.goto(url);
+  await page
+    .getByRole('dialog')
+    .evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test(`project settings: header, one card of equal rows, danger zone card (${theme})`, async ({
     page,
   }) => {
     await setTheme(page, theme);
-    await page.goto(SETTINGS);
+    await openDialog(page, SETTINGS);
 
     const header = page.locator('.settings-header');
     await expect(header.getByRole('heading', { name: 'r3-lifecycle' })).toBeVisible();
@@ -31,7 +38,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(card, 'P2').toHaveCSS('border-top-left-radius', radius);
 
     const rows = card.locator('> .settings-row');
-    await expect(rows).toHaveCount(4);
+    await expect(rows).toHaveCount(1);
     const faces = await rows.evaluateAll((els) =>
       els.map((el) => ({
         h: el.getBoundingClientRect().height,
@@ -42,15 +49,15 @@ for (const theme of ['light', 'dark'] as const) {
     expect(
       faces.map((f) => f.h),
       'P3',
-    ).toEqual([52, 52, 52, 52]);
+    ).toEqual([52]);
     expect(
       faces.map((f) => f.top),
       'P3',
-    ).toEqual(['0px', '0px', '0px', '0px']);
+    ).toEqual(['0px']);
     expect(
       faces.map((f) => f.bottom),
       'P3',
-    ).toEqual(['1px', '1px', '1px', '0px']);
+    ).toEqual(['0px']);
 
     const del = page.getByRole('button', { name: '删除', exact: true });
     await expect(card.getByRole('button', { name: '删除', exact: true }), 'P4').toHaveCount(0);
@@ -63,7 +70,9 @@ for (const theme of ['light', 'dark'] as const) {
     expect(delBox?.height, 'P4').toBe(32);
     await expect(del, 'P4').toHaveCSS('border-top-left-radius', '8px');
 
-    const branch = card.locator('span.prj-set-branch');
+    await page.getByRole('tab', { name: '仓库', exact: true }).click();
+    await expect(page.locator('.prj-set-danger'), 'P6').toHaveCount(0);
+    const branch = page.locator('.prj-set-card span.prj-set-branch');
     await expect(branch, 'P5').toHaveText('main');
     expect((await branch.boundingBox())?.height, 'P5').toBe(32);
     await expect(page.getByRole('button', { name: /main/ }), 'P5').toHaveCount(0);
@@ -74,7 +83,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await setTheme(page, theme);
-    await page.goto(NEW_PROJECT);
+    await openDialog(page, NEW_PROJECT);
 
     const avatar = page.locator('.prj-new-avatar');
     const avatarBox = await avatar.boundingBox();

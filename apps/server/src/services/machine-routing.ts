@@ -1,27 +1,22 @@
-import {
-  claudeLoginBlocksClaim,
-  claudeRateBlock,
-  isBuildStepKind,
-  type RunnerOs,
-  runnerOsOf,
-} from '@cairn/shared';
+import { claudeRateBlock, isBuildStepKind, type RunnerOs, runnerOsOf } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type build, type machine, step, team } from '../db/schema.js';
-import { claudeUsageGatePasses } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
+  claudeCodeLoginBlocked,
   type MachineIneligibility,
   machineEligibility,
   machineRunningCount,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
+import { connectorSlugs } from './mcp-servers.js';
 import type { RouteProfile } from './routing-rules.js';
 
 type MachineRow = typeof machine.$inferSelect;
 
 export interface WorkerStepFacts {
-  agentRow: Pick<RouteProfile, 'machineId' | 'requiredCapabilities'>;
+  agentRow: Pick<RouteProfile, 'machineId' | 'requiredCapabilities' | 'mcpServers'>;
   model: Pick<RouteProfile, 'provider' | 'modelId'>;
   localProject: boolean;
   localMerge: boolean;
@@ -35,7 +30,7 @@ export function workerIneligibility(
   now: number,
 ): MachineIneligibility | null {
   const claudeCode = stepRuntimeFor(facts.model.provider) === 'claude-code';
-  return machineEligibility({
+  const ineligible = machineEligibility({
     machine: machineRow,
     agent: facts.agentRow,
     model: facts.model,
@@ -44,12 +39,22 @@ export function workerIneligibility(
     claudeRateBlocked: claudeRateBlock(machineRow.claudeRateLimits ?? [], now) !== null,
     claudeLoginBlocked:
       claudeCode &&
-      !hasActiveClaudeSubscription({ db }, machineRow.teamId) &&
-      claudeLoginBlocksClaim(machineRow.claudeCodeReport?.login, now),
-    claudeUsageRefused:
-      !facts.localMerge && !claudeUsageGatePasses({ db }, machineRow, facts.model),
+      claudeCodeLoginBlocked(
+        machineRow.claudeCodeReport,
+        hasActiveClaudeSubscription({ db }, machineRow.teamId),
+        now,
+      ),
   });
+  if (ineligible !== null) return ineligible;
+  if (machineRow.capabilities?.mcpConnectors === true || facts.agentRow.mcpServers.length === 0)
+    return null;
+  const connectors = connectorSlugs(db, machineRow.teamId);
+  return facts.agentRow.mcpServers.some((slug) => connectors.has(slug.toLowerCase()))
+    ? { kind: 'capability', missing: [MCP_CONNECTOR_SUPPORT_LABEL] }
+    : null;
 }
+
+export const MCP_CONNECTOR_SUPPORT_LABEL = 'MCP connector support (update cairn on the Runner)';
 
 export function targetUnavailable(
   db: Db,
@@ -68,16 +73,26 @@ export function targetUnavailable(
 }
 
 export function priorSessionOf(
-  db: Db,
-  stepRow: Pick<typeof step.$inferSelect, 'buildId' | 'kind' | 'fallback' | 'freshSession'>,
+  db: Pick<Db, 'select'>,
+  stepRow: Pick<
+    typeof step.$inferSelect,
+    'buildId' | 'kind' | 'fallback' | 'freshSession' | 'byPerson'
+  >,
   buildRow: Pick<typeof build.$inferSelect, 'prevPhase' | 'withPlan' | 'planDocId'>,
+  enabledSubscriptionId: string | null,
 ): {
   priorSessionId: string | null;
   priorMachineId: string | null;
+  priorSubscriptionId: string | null;
   freshSession: boolean;
 } {
   const prior = db
-    .select({ sessionId: step.sessionId, machineId: step.machineId, fallback: step.fallback })
+    .select({
+      sessionId: step.sessionId,
+      machineId: step.machineId,
+      fallback: step.fallback,
+      subscriptionId: step.claudeSubscriptionId,
+    })
     .from(step)
     .where(
       and(
@@ -101,10 +116,17 @@ export function priorSessionOf(
       : null;
   const planHandoffMissing =
     stepRow.kind === 'build' && buildRow.withPlan && buildRow.planDocId === null;
+  const priorSubscriptionId = priorRow?.subscriptionId ?? null;
+  const startsNewRun =
+    (stepRow.byPerson || stepRow.kind === 'merge') &&
+    priorSubscriptionId !== null &&
+    priorSubscriptionId !== enabledSubscriptionId;
   return {
-    priorSessionId: priorRow?.sessionId ?? null,
-    priorMachineId: priorRow?.machineId ?? null,
+    priorSessionId: startsNewRun ? null : (priorRow?.sessionId ?? null),
+    priorMachineId: startsNewRun ? null : (priorRow?.machineId ?? null),
+    priorSubscriptionId,
     freshSession:
+      startsNewRun ||
       planHandoffMissing ||
       stepRow.kind === 'review' ||
       stepRow.kind === 'verify' ||

@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 const TASK = { ...BASE_TASK, title: 'Read the cairn repo', phase: 'building' };
 
-test('a reply that created a task gets one reference row with the state, and the mention is the title as a plain link', async ({
+test('a reply that created a task gets one reference row above its bubble, and the mention is a chip with the same state', async ({
   page,
 }) => {
   await mockLive(page, {
@@ -32,13 +32,18 @@ test('a reply that created a task gets one reference row with the state, and the
   await expect(ref).toContainText('Read the cairn repo');
   await expect(ref.locator('svg[data-glyph="progress"]')).toHaveCount(1);
   await expect(ref).not.toContainText('In progress');
-  await expect(ref).toHaveAccessibleName(/Read the cairn repo.*Running/);
+  await expect(ref).toHaveAccessibleName(/Read the cairn repo ?, Running/);
+  await expect(ref.locator('[data-slot="task-ref-route"]')).toHaveText('reports to this channel');
   const mention = stream.locator('a[data-slot="task-mention"]');
   await expect(mention).toHaveText('Read the cairn repo');
-  await expect(mention.locator('svg')).toHaveCount(0);
-  await expect(stream.locator('.mention-chip--todo')).toHaveCount(0);
-  await expect(stream.locator('svg[data-glyph="progress"]')).toHaveCount(1);
+  await expect(mention).toHaveClass(/mention-chip--todo/);
+  await expect(mention.locator('svg[data-glyph="progress"]')).toHaveCount(1);
   await expect(mention).toHaveAttribute('href', new RegExp(`thread=${TASK.id}`));
+  const rowBox = await ref.boundingBox();
+  const bubbleBox = await stream.getByTestId('chief-reply').boundingBox();
+  expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(bubbleBox!.y);
+  const elbow = await stream.locator('[data-slot="task-ref-elbow"]').boundingBox();
+  expect(elbow!.y + elbow!.height / 2).toBeGreaterThan(rowBox!.y + rowBox!.height / 2);
   await ref.click();
   await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
 });
@@ -100,7 +105,7 @@ test('no status word trails the title: the glyph and the accessible name carry t
 });
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`a task waiting for the owner shows the green eye on its reference row and link ink in the sentence (${theme})`, async ({
+  test(`a task waiting for the owner shows the green eye on its reference row and on its chip in the sentence (${theme})`, async ({
     page,
   }, testInfo) => {
     await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
@@ -123,7 +128,8 @@ for (const theme of ['light', 'dark'] as const) {
     const stream = page.getByTestId('chief-stream');
     const mention = stream.locator('a[data-slot="task-mention"]');
     const eye = stream.getByTestId('chief-task-ref').locator('[data-glyph="eye"]');
-    await expect(stream.locator('[data-glyph="eye"]')).toHaveCount(1);
+    await expect(stream.locator('[data-glyph="eye"]')).toHaveCount(2);
+    await expect(mention.locator('[data-glyph="eye"]')).toHaveCount(1);
     await expect(eye).toHaveAccessibleName('Review');
     const tokens = await page.evaluate(() => {
       const probe = document.createElement('span');
@@ -134,13 +140,14 @@ for (const theme of ['light', 'dark'] as const) {
       };
       const out = {
         link: read('color', 'var(--chat-link)'),
+        fill: read('backgroundColor', 'var(--popover)'),
         tint: read('backgroundColor', 'var(--task-wait-tint)'),
         ink: read('color', 'var(--task-wait-ink)'),
       };
       probe.remove();
       return out;
     });
-    await expect(mention).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(mention).toHaveCSS('background-color', tokens.fill);
     await expect(mention).toHaveCSS('color', tokens.link);
     await expect(eye).toHaveCSS('background-color', tokens.tint);
     await expect(eye).toHaveCSS('color', tokens.ink);
@@ -168,7 +175,7 @@ test('a reply that only mentions a task it did not create gets no reference row'
   await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
 });
 
-test('sibling tasks hang off one unbroken trunk: one stroke width, one x, an elbow into each tile centre', async ({
+test('sibling tasks rise from the bubble on one unbroken trunk: one stroke width, one x, an elbow into each tile centre', async ({
   page,
 }) => {
   const second = { ...TASK, id: 'todo-2', seqNum: 10, title: 'Rotate the relay token', phase: 'review' };
@@ -202,12 +209,14 @@ test('sibling tasks hang off one unbroken trunk: one stroke width, one x, an elb
       trunkGaps: trunk.slice(1).map((t, i) => t.top - trunk[i]!.bottom),
       trunkTop: trunk[0]!.top,
       trunkBottom: trunk.at(-1)!.bottom,
+      bubbleTop: bubble.top,
       rows: rows.map((row, i) => {
         const tile = box(row.querySelector('span.grid')!);
         const elbow = elbows[i]!;
         return {
           tileLeft: tile.left - bubble.left,
           tileMid: tile.top + tile.height / 2,
+          elbowTop: elbow.top,
           elbowBottom: elbow.bottom,
           elbowRight: elbow.right,
           tileTopGap: i === 0 ? tile.top : tile.top - box(rows[i - 1]!.querySelector('span.grid')!).bottom,
@@ -221,11 +230,11 @@ test('sibling tasks hang off one unbroken trunk: one stroke width, one x, an elb
   expect(g.trunkX).toEqual([18.75]);
   for (const gap of g.trunkGaps) expect(Math.abs(gap)).toBeLessThanOrEqual(0.01);
   const [a, b, c] = g.rows;
-  expect(g.trunkTop).toBeLessThanOrEqual(a!.tileMid);
-  expect(c!.tileMid - g.trunkBottom).toBeCloseTo(14, 1);
+  expect(Math.abs(g.trunkTop - a!.elbowBottom)).toBeLessThanOrEqual(0.01);
+  expect(g.bubbleTop - g.trunkBottom).toBeCloseTo(6, 1);
   for (const row of g.rows) {
     expect(row.tileLeft).toBe(32);
-    expect(Math.abs(row.elbowBottom - row.tileMid)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(row.elbowTop - row.tileMid)).toBeLessThanOrEqual(0.5);
   }
   expect(b!.tileTopGap).toBe(8);
   expect(c!.tileTopGap).toBe(8);

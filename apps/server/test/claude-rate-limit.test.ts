@@ -9,7 +9,6 @@ import {
   machine as machineTable,
   routingRule,
   step as stepTable,
-  team as teamTable,
 } from '../src/db/schema.js';
 import { bootServer, postProject, seedRoute, seedSessionRoute } from './helpers.js';
 
@@ -36,7 +35,7 @@ async function call(
 async function issueKey(s: ReturnType<typeof bootServer>, name: string): Promise<string> {
   const res = await call(s.app, 'POST', `/api/teams/${s.team.id}/api-keys`, {
     body: {
-      name,
+      name: name.toUpperCase().replaceAll('-', '_'),
       gitAccess: false,
       mcpAccess: false,
       machineAccess: true,
@@ -362,7 +361,7 @@ describe('claude rate limit (#1852)', () => {
     s.dispose();
   });
 
-  test('subscription-only does not let an OAuth or API-key spare take a rate-blocked owner step', async () => {
+  test('an OAuth or API-key spare does not take a rate-blocked owner step', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     try {
       const owner = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
@@ -386,9 +385,6 @@ describe('claude rate limit (#1852)', () => {
           .where(eq(machineTable.id, machineId))
           .run();
       }
-      expect(s.db.select().from(teamTable).where(eq(teamTable.id, s.team.id)).get()).toMatchObject({
-        claudeUsage: 'subscription-only',
-      });
       expect(s.db.select().from(claudeSubscription).all()).toEqual([]);
       useSessionRoute(s, owner.machineId, 'claude-code');
       const buildId = await startBuild(s);
@@ -415,15 +411,10 @@ describe('claude rate limit (#1852)', () => {
   });
 
   test.each(['oauth_token', 'api_key'] as const)(
-    'allow-paid does not let a %s spare take a rate-blocked owner step',
+    'a %s spare does not take a rate-blocked owner step',
     async (method) => {
       const s = bootServer({ claimHoldMs: 50 });
       try {
-        s.db
-          .update(teamTable)
-          .set({ claudeUsage: 'allow-paid' })
-          .where(eq(teamTable.id, s.team.id))
-          .run();
         const owner = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
         const oauth = await enroll(s, await issueKey(s, 'oauth-key'), 'oauth-spare');
         const paid = await enroll(s, await issueKey(s, 'paid-key'), 'paid-spare');
@@ -472,7 +463,7 @@ describe('claude rate limit (#1852)', () => {
     },
   );
 
-  test('subscription-only leaves non-Claude work on an API-key machine unaffected', async () => {
+  test('non-Claude work on an API-key machine is claimed despite a Claude rate block', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     try {
       const machine = await enroll(s, await issueKey(s, 'paid-key'), 'paid');

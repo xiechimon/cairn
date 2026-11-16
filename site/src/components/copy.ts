@@ -1,0 +1,270 @@
+export type Lang = 'zh' | 'en';
+
+const repo = 'https://github.com/xiechimon/cairn';
+
+export const links = {
+  repo,
+  discussions: `${repo}/discussions`,
+  issues: `${repo}/issues`,
+  security: `${repo}/blob/main/SECURITY.md`,
+  license: `${repo}/blob/main/LICENSE`,
+};
+
+export const copy = {
+  zh: {
+    htmlLang: 'zh-CN',
+    home: '/zh-cn/',
+    docs: '/zh-cn/docs/intro/',
+    install: '/zh-cn/docs/install/',
+    firstTask: '/zh-cn/docs/first-task/',
+    other: { href: '/', label: 'EN', name: 'English' },
+    title: 'Cairn：写代码的人的私人助理，跑在你自己的机器上',
+    description:
+      'Cairn 是写代码的人自托管的私人助理：在一个对话里说要做什么，agent 用你自己的机器和订阅先研究再动手，代码过合并闸才落地，撤不回的动作都等你点头。',
+    nav: { docs: '文档', github: 'GitHub', theme: '切换深浅色' },
+    eyebrow: ['自托管', '开源 Apache-2.0', '个人版'],
+    h1: ['写代码的人的私人助理，', '跑在你自己的机器上'],
+    lede: '在一个对话里说要做什么，你只拍板。agent 用你自己的机器和订阅，先读开源实现再动手；代码过合并闸才落地，撤不回的动作都等你点头。',
+    start: '开始上手',
+    copy: '复制',
+    copied: '已复制',
+    heroAlt:
+      'Cairn 桌面端：左边 Coordinator 对话里有两件事和它们开出的 thread，右边一个 thread 的报告停在等你决定；旁边是同一个对话在手机上',
+    caption: '真实界面，演示数据',
+    how: {
+      title: '一句话进去，一个决定出来',
+      lede: '你定要什么和架构，其余的交给 thread。',
+      steps: [
+        {
+          title: '说一句要什么',
+          body: '跟 Coordinator 说一件事，代码的也好，自己的事也好。它给每件事开一个 thread，在你自己的机器上跑。',
+          img: 'ios-home',
+          alt: '手机上的 Coordinator 对话：两个请求、它们开出的 thread，和一个带三个选项的问题',
+        },
+        {
+          title: '它先研究，再动手',
+          body: 'thread 先找两三个做得好的开源实现，读源码而不是 README，比较之后再改代码、跑测试。库、文件结构、命名和测试由它自己定。',
+          img: 'work',
+          alt: '一个 thread 在干活：读了三份实现，改了一个文件，跑了测试',
+        },
+        {
+          title: '你只定要你定的',
+          body: '每份报告最后两栏：“我已自行决定”，每条带理由；“需要你定的”，最多三条，每条带选项、证据和推荐。',
+          img: 'report',
+          alt: '一份 thread 报告，最后是“我已自行决定”和“需要你定的”',
+        },
+      ],
+    },
+    points: {
+      title: '为什么是 Cairn',
+      items: [
+        {
+          title: '用你自己的订阅',
+          body: 'Claude Code、Codex，或任何服务商的 API key（包括 Google 的 Gemini）。Cairn 不转售算力。',
+        },
+        {
+          title: '你的机器，你的数据',
+          body: '每台机器跑一个 Runner。thread 在自己的 git worktree 里干活，主机支持时放进一次性容器。代码和凭证都留在你手里。',
+        },
+        {
+          title: '只把要你的事交给你',
+          body: '首页置顶等你拍板的事；只有非你动手不可时才推送通知。',
+        },
+        {
+          title: '结果经得起查',
+          body: 'agent 合并之前，合并闸只认绑定在当前补丁上的审阅结论。撤不回的动作，等你点头。',
+        },
+        {
+          title: '电脑上开始，手机上拍板',
+          body: '同一个对话在手机上也能看、能回。通过 Tailscale 私有访问，不用把服务暴露到公网。',
+        },
+        {
+          title: '你自己的事',
+          tag: '规划中',
+          body: '邮件、日程、求职作为一个没有仓库的项目：agent 读、整理、起草；发送和提交等你。',
+        },
+      ],
+    },
+    fit: {
+      title: '适合谁',
+      yesTitle: '适合你，如果你',
+      yes: [
+        '写代码，或者跟代码一起工作，想让 agent 在后台干活、自己只拍板；',
+        '有一台能一直开着的机器：台式机、家里的服务器或 VPS，最好再有笔记本或手机跟进；',
+        '已经在付 Claude Code 或 Codex 的订阅，或者有 API key，想接着用而不是再买一份算力；',
+        '希望代码、邮件和凭证留在自己的机器上。',
+      ],
+      noTitle: '不适合你，如果你想要',
+      no: [
+        { text: '给团队共用的工具，有共享频道、角色和账单', alt: 'Amp Spaces', href: 'https://ampcode.com/docs/spaces' },
+        { text: '只是更好用的界面，自己驱动 Claude Code 或 Codex', alt: 'T3 Code', href: 'https://github.com/pingdotgg/t3code' },
+        { text: '住在聊天软件里的助理，比如 Telegram、WhatsApp', alt: 'OpenClaw', href: 'https://github.com/openclaw/openclaw' },
+        { text: '托管服务，什么都不用装、不用维护', alt: null, href: null },
+      ],
+      altPrefix: '可以看看',
+    },
+    selling: {
+      title: '“那你们卖什么？”',
+      body: '什么都不卖。全部代码 Apache-2.0，没有功能分级；只有评测任务集里一个私有、轮换的留出子集不公开。没有托管的控制面，也不转售算力：Cairn 跑在你的机器上，用你的订阅。',
+    },
+    install: {
+      title: '三步跑起来',
+      lede: '需要 Node.js 22 或 24。下面是最短路径，每一步的细节都在文档里。',
+      steps: [
+        {
+          title: '启动服务',
+          body: '下载并在本机启动，打开 127.0.0.1:8787/app。数据放在 ~/.cairn。',
+          code: 'npx @xiechimon/cairn',
+        },
+        {
+          title: '连接一台 Runner',
+          body: '在要干活的机器上装 CLI 并启动，按终端里给的链接在浏览器里批准这台机器。',
+          code: 'npm i -g @xiechimon/cairn-cli\ncairn start',
+        },
+        {
+          title: '接入模型，说第一件事',
+          body: '添加模型服务，或在 Runner 上登录 Claude Code。Coordinator 默认用你添加的服务商，想换再去 规则与策略 里选；然后就能在首页说第一件事了。',
+          code: null,
+        },
+      ],
+      more: '完整安装步骤',
+      first: '第一个任务怎么跑',
+    },
+    footer: {
+      tagline: 'Cairn 由 Cairn 自己开发：里面的 agent 领自己的票、开 PR。',
+      docs: '文档',
+      discussions: '讨论区',
+      issues: '问题反馈',
+      security: '安全',
+      license: 'Apache-2.0',
+    },
+  },
+  en: {
+    htmlLang: 'en',
+    home: '/',
+    docs: '/docs/intro/',
+    install: '/docs/install/',
+    firstTask: '/docs/first-task/',
+    other: { href: '/zh-cn/', label: '中文', name: '简体中文' },
+    title: 'Cairn: a personal assistant for people who write code, on your own machines',
+    description:
+      'Cairn is a self-hosted personal assistant for people who write code. Say what you want in one conversation; agents research and build on your own machines with your own subscriptions, code lands through a merge gate, and anything that cannot be undone waits for your yes.',
+    nav: { docs: 'Docs', github: 'GitHub', theme: 'Toggle theme' },
+    eyebrow: ['Self-hosted', 'Apache-2.0', 'For one person'],
+    h1: ['A personal assistant for people who write code, ', 'on your own machines'],
+    lede: 'Say what you want in one conversation and only make the calls. Agents read how open-source projects solved it before they build, on your machines and your subscriptions. Code lands through a merge gate, and nothing that cannot be undone happens without your yes.',
+    start: 'Get started',
+    copy: 'Copy',
+    copied: 'Copied',
+    heroAlt:
+      'Cairn on a desktop: the Coordinator conversation with two requests and the threads they started, a thread report waiting on a decision at the right, and the same conversation on a phone',
+    caption: 'Real UI, sample data',
+    how: {
+      title: 'One sentence in, one decision out',
+      lede: 'You decide what you want and the architecture. The thread does the rest.',
+      steps: [
+        {
+          title: 'Say what you want',
+          body: 'Tell the Coordinator one thing, about code or your own affairs. It opens a thread for each piece of work and runs it on your own machines.',
+          img: 'ios-home',
+          alt: 'The Coordinator conversation on a phone: two requests, the threads they started and a question with three options',
+        },
+        {
+          title: 'It researches, then builds',
+          body: 'A thread finds two or three strong open-source implementations, reads their source rather than their README, and compares them before it edits and runs the tests. Libraries, layout, naming and tests are its call.',
+          img: 'work',
+          alt: 'A thread at work: it read three implementations, edited one file and ran the tests',
+        },
+        {
+          title: 'You decide what is yours',
+          body: 'Every report ends with two lists: Decided myself, each choice with its reason, and Needs your decision, at most three items with options, evidence and a recommendation.',
+          img: 'report',
+          alt: 'A thread report ending with Decided myself and Needs your decision',
+        },
+      ],
+    },
+    points: {
+      title: 'Why Cairn',
+      items: [
+        {
+          title: 'Your own subscriptions',
+          body: "Claude Code, Codex, or an API key from any provider, Google's Gemini included. Cairn never resells compute.",
+        },
+        {
+          title: 'Your machines, your data',
+          body: 'Each machine runs a Runner. Threads work in their own git worktree, or in a throwaway container where the host supports it. Code and credentials stay with you.',
+        },
+        {
+          title: 'Only what needs you',
+          body: 'The home page pins the decisions waiting on you, and a push goes out only when you must act.',
+        },
+        {
+          title: 'Results you can trust',
+          body: 'Before an agent merges, the gate counts only review verdicts bound to the current patch. Anything that cannot be undone waits for your yes.',
+        },
+        {
+          title: 'Start at your desk, decide from your phone',
+          body: 'Follow and answer the same conversation on your phone, over private Tailscale access instead of a public address.',
+        },
+        {
+          title: 'Your own affairs',
+          tag: 'Planned',
+          body: 'Mail, calendar and job search as a project with no repository: agents read, sort and draft; sending and submitting wait for you.',
+        },
+      ],
+    },
+    fit: {
+      title: 'Who it is for',
+      yesTitle: 'It fits you if you',
+      yes: [
+        'write code, or work alongside code, and want agents to work in the background while you only make the calls;',
+        'have a machine that can stay on, such as a desktop, a home server or a VPS, and ideally a laptop or a phone to follow along from;',
+        'already pay for Claude Code or Codex, or have an API key, and want to keep using them rather than buy compute again;',
+        'want your code, mail and credentials to stay on your own machines.',
+      ],
+      noTitle: 'It is not the right fit if you want',
+      no: [
+        { text: 'a tool a team shares, with shared channels, roles and billing', alt: 'Amp Spaces', href: 'https://ampcode.com/docs/spaces' },
+        { text: 'only a better interface for driving Claude Code or Codex yourself', alt: 'T3 Code', href: 'https://github.com/pingdotgg/t3code' },
+        { text: 'an assistant that lives in your chat apps, such as Telegram or WhatsApp', alt: 'OpenClaw', href: 'https://github.com/openclaw/openclaw' },
+        { text: 'a hosted service with nothing to install or keep running', alt: null, href: null },
+      ],
+      altPrefix: 'Try',
+    },
+    selling: {
+      title: '“Wait, what are you selling?”',
+      body: 'Nothing. All code is Apache-2.0 with no feature gating; only a private, rotating holdout subset of the eval task set stays unpublished. There is no hosted control plane and no resold compute: Cairn runs on your machines with your subscriptions.',
+    },
+    install: {
+      title: 'Running in three steps',
+      lede: 'Needs Node.js 22 or 24. This is the shortest path; the docs cover every step in detail.',
+      steps: [
+        {
+          title: 'Start the server',
+          body: 'Downloads Cairn and serves it at 127.0.0.1:8787/app. Data lives in ~/.cairn.',
+          code: 'npx @xiechimon/cairn',
+        },
+        {
+          title: 'Connect a Runner',
+          body: 'On the machine that should do the work, install the CLI and start it, then approve the machine at the link it prints.',
+          code: 'npm i -g @xiechimon/cairn-cli\ncairn start',
+        },
+        {
+          title: 'Connect a model, say the first thing',
+          body: 'Add a provider, or sign in to Claude Code on the Runner. The Coordinator uses your provider by default (change it in Rules & policies), so just tell it on the home page what you want.',
+          code: null,
+        },
+      ],
+      more: 'Full install guide',
+      first: 'Run your first task',
+    },
+    footer: {
+      tagline: 'Cairn is built with Cairn: agents inside it take its own tickets and open the pull requests.',
+      docs: 'Docs',
+      discussions: 'Discussions',
+      issues: 'Issues',
+      security: 'Security',
+      license: 'Apache-2.0',
+    },
+  },
+} as const;

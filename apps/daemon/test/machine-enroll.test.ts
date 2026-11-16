@@ -61,7 +61,9 @@ test('browser enrollment writes machine.json with mode 0600 and points at the se
   expect(saved).toEqual(machine());
   expect(statSync(paths.machineJson).mode & 0o777).toBe(0o600);
   expect(existsSync(join(home, 'enroll.json'))).toBe(false);
-  expect(logs.join('\n')).toContain(AUTHORIZE);
+  expect(logs.join('\n')).toContain(
+    `${AUTHORIZE} and approve this machine (machine name: omarchy)`,
+  );
   releaseTestTempDir(home);
 });
 
@@ -148,6 +150,44 @@ test('a pending enrollment for another server is discarded and restarted', async
   );
   expect(starts).toEqual(['omarchy']);
   expect(polled).toBe('e1');
+  releaseTestTempDir(home);
+});
+
+test('a pending enrollment started under another machine name is discarded and restarted', async () => {
+  const { home, paths } = world();
+  mkdirSync(home, { recursive: true });
+  writeFileSync(
+    join(home, 'enroll.json'),
+    JSON.stringify({
+      enrollId: 'e-old',
+      url: AUTHORIZE,
+      expiresAt: 900_000,
+      serverUrl: SERVER,
+      name: 'old-name',
+    }),
+  );
+  let now = 0;
+  expect(
+    await pendingEnrollmentUrl(
+      paths,
+      SERVER,
+      500,
+      async () => {
+        now += 200;
+      },
+      () => now,
+      'omarchy',
+    ),
+  ).toBeNull();
+  const starts: string[] = [];
+  await enrollThroughBrowser(
+    clientOf(() => ({ status: 'authorized', machine: machine() as never }), starts),
+    paths,
+    SERVER,
+    'omarchy',
+    { now: () => 1_000, sleep: async () => {}, log: () => {} },
+  );
+  expect(starts).toEqual(['omarchy']);
   releaseTestTempDir(home);
 });
 

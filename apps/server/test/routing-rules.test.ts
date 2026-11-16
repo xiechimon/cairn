@@ -3,22 +3,34 @@ import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
+import { builtinModelIds } from '../src/coordinator/runtime/provider.js';
 import {
   machine as machineTable,
+  provider as providerTable,
   routingRule,
   team as teamTable,
   todo as todoTable,
   workPolicy,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
+import { chiefBinding } from '../src/services/chief.js';
+import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
+import { coordinatorRoute } from '../src/services/coordinator-route.js';
+import { createProvider } from '../src/services/providers.js';
 import {
+  anthropicCoordinatorChoice,
+  coordinatorMemoryOwner,
   coordinatorProfile,
+  listRoutingSettings,
+  memoryOwnerOf,
   profileForStep,
   routeForStep,
+  upsertRoutingRule,
   withOverride,
 } from '../src/services/routing-rules.js';
 import {
   bootServer,
+  insertMachine,
   issueApiKey,
   postProject,
   req,
@@ -471,6 +483,284 @@ describe('work_policy: tools, MCP, skills and secrets live on the policy', () =>
       tools: [],
       secrets: [],
       mcpServers: ['coord-mcp'],
+    });
+  });
+});
+
+describe('rules store provider ids, with a read-time default for Session', () => {
+  function bare(): TestServer {
+    const s = bootServer();
+    servers.push(s);
+    return s;
+  }
+
+  function addProvider(
+    s: TestServer,
+    providerId: string,
+    opts: { key?: boolean; models?: string[]; createdAt?: number } = {},
+  ): void {
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        body: {
+          providerId,
+          label: providerId,
+          baseUrl: 'http://127.0.0.1:8798/v1',
+          api: 'openai-completions',
+          ...(opts.key === false ? {} : { apiKey: `${providerId}-key` }),
+          models: (opts.models ?? []).map((id) => ({ id, name: id })),
+        },
+        createdBy: s.user.id,
+      },
+    );
+    if (opts.createdAt !== undefined) {
+      s.db
+        .update(providerTable)
+        .set({ createdAt: opts.createdAt })
+        .where(eq(providerTable.providerId, providerId))
+        .run();
+    }
+  }
+
+  function claudeRunner(s: TestServer, online = true): string {
+    const id = insertMachine(s, {
+      enabledRuntimes: ['pi', 'claude-code'],
+      claudeCodeReport: { installed: true, hostname: 'h', models: [] },
+    });
+    s.db.update(machineTable).set({ online }).where(eq(machineTable.id, id)).run();
+    return id;
+  }
+
+  function piOnlyRunner(s: TestServer, codex: 'ok' | 'absent' = 'absent'): string {
+    const id = insertMachine(s, { enabledRuntimes: ['pi'] });
+    const row = s.db.select().from(machineTable).where(eq(machineTable.id, id)).get()!;
+    s.db
+      .update(machineTable)
+      .set({
+        capabilities: {
+          ...row.capabilities!,
+          codexLogin: {
+            state: codex,
+            ...(codex === 'ok' ? { expiresAt: Date.now() + 3_600_000 } : {}),
+          },
+        },
+      })
+      .where(eq(machineTable.id, id))
+      .run();
+    return id;
+  }
+
+  const session = (s: TestServer) => routeForStep(s.db, { teamId: s.team.id }, 'build');
+
+  test('a rule saved as the runtime pi resolves to the runnable provider that stores the model', () => {
+    const s = bare();
+    addProvider(s, 'deepseek', { key: false, models: ['m1'], createdAt: 1 });
+    addProvider(s, 'local-llm', { key: false, models: ['m1'], createdAt: 2 });
+    addProvider(s, 'vani', { models: ['m1'], createdAt: 3 });
+    seedRoute(s, 'session', { provider: 'pi', modelId: 'm1' });
+    expect(session(s)).toMatchObject({ provider: 'local-llm', modelId: 'm1' });
+    seedRoute(s, 'session', { provider: 'pi', modelId: 'nobody-serves-this' });
+    expect(session(s)).toMatchObject({ provider: 'pi', modelId: 'nobody-serves-this' });
+  });
+
+  test('a team that owns a provider named pi keeps its pi rules on that provider', () => {
+    const s = bare();
+    addProvider(s, 'vani', { models: ['m1'] });
+    addProvider(s, 'pi', { models: ['m1'] });
+    seedRoute(s, 'session', { provider: 'pi', modelId: 'm1' });
+    expect(session(s)).toMatchObject({ provider: 'pi', modelId: 'm1' });
+  });
+
+  test('a pi rule for a built-in vendor model resolves for Runners but not for the in-server Coordinator', () => {
+    const s = bare();
+    const modelId = [...builtinModelIds('deepseek')][0]!;
+    addProvider(s, 'deepseek');
+    seedRoute(s, 'session', { provider: 'pi', modelId });
+    seedRoute(s, 'coordinator', { provider: 'pi', modelId });
+    expect(session(s)).toMatchObject({ provider: 'deepseek', modelId });
+    expect(coordinatorProfile(s.db, s.team.id)).toMatchObject({ provider: 'deepseek', modelId });
+    setCoordinatorServerContextEnabled(true);
+    expect(coordinatorRoute(s.db, s.team.id)).toBeNull();
+    setCoordinatorServerContextEnabled(false);
+  });
+
+  test('with no stored Session rule, a Runner with Claude Code gives the routed default even while offline', () => {
+    const s = bare();
+    claudeRunner(s, false);
+    addProvider(s, 'vani', { models: ['m1'] });
+    expect(session(s)).toMatchObject({
+      id: 'default-session',
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+    });
+  });
+
+  test('a Codex login counts only when it exists; an absent one falls through to the provider', () => {
+    const s = bare();
+    piOnlyRunner(s, 'absent');
+    addProvider(s, 'deepseek', { key: false, models: ['m0'], createdAt: 1 });
+    addProvider(s, 'vani', { models: ['m1', 'm2'], createdAt: 2 });
+    expect(session(s)).toMatchObject({ provider: 'vani', modelId: 'm1' });
+    piOnlyRunner(s, 'ok');
+    expect(session(s)).toMatchObject({ provider: 'claude-code' });
+  });
+
+  test('the provider default takes a Claude model on a provider, and nothing runnable means no rule', () => {
+    const s = bare();
+    piOnlyRunner(s);
+    expect(session(s)).toBeNull();
+    addProvider(s, 'claude-proxy', { key: false, models: ['claude-sonnet-5-5'] });
+    expect(session(s)).toMatchObject({ provider: 'claude-proxy', modelId: 'claude-sonnet-5-5' });
+  });
+
+  test('a stored stock seed falls back to the provider only when no Claude Code or Codex exists at all', () => {
+    const s = bare();
+    seedRoute(s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
+    addProvider(s, 'vani', { models: ['m1'] });
+    piOnlyRunner(s);
+    const todoRow = { teamId: s.team.id };
+    expect(profileForStep(s.db, todoRow, 'build')).toMatchObject({
+      provider: 'vani',
+      modelId: 'm1',
+    });
+    claudeRunner(s, false);
+    expect(profileForStep(s.db, todoRow, 'build')).toMatchObject({
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+    });
+  });
+
+  test('routing settings report the read-time Session default and why, until a Session rule is stored', async () => {
+    const s = bare();
+    const sessionDefault = () => listRoutingSettings(s.db, s.team.id).sessionDefault;
+    piOnlyRunner(s);
+    expect(sessionDefault()).toEqual({ reason: 'none', provider: null, modelId: null });
+    addProvider(s, 'vani', { models: ['m1'] });
+    expect(sessionDefault()).toEqual({ reason: 'provider', provider: 'vani', modelId: 'm1' });
+    piOnlyRunner(s, 'ok');
+    expect(sessionDefault()).toMatchObject({ reason: 'codex-login', provider: 'claude-code' });
+    claudeRunner(s, false);
+    expect(sessionDefault()).toMatchObject({ reason: 'claude-code', provider: 'claude-code' });
+    seedRoute(s, 'session', { provider: 'vani', modelId: 'm1' });
+    expect(sessionDefault()).toBeUndefined();
+    const res = await req(s.app, 'GET', `/api/teams/${s.team.id}/routing-settings`);
+    expect(((await res.json()) as { sessionDefault?: unknown }).sessionDefault).toBeUndefined();
+  });
+
+  test('with no stored Coordinator rule, the in-server Coordinator routes to the earliest provider it can run and stores nothing', () => {
+    const s = bare();
+    addProvider(s, 'deepseek', { key: false, models: ['m0'], createdAt: 1 });
+    addProvider(s, 'vani', { models: ['m1', 'm2'], createdAt: 2 });
+    setCoordinatorServerContextEnabled(true);
+    try {
+      expect(coordinatorRoute(s.db, s.team.id)).toMatchObject({ provider: 'vani', modelId: 'm1' });
+      expect(coordinatorProfile(s.db, s.team.id)).toMatchObject({ provider: 'vani' });
+      expect(coordinatorMemoryOwner(s.db, s.team.id)).toBeUndefined();
+      expect(listRoutingSettings(s.db, s.team.id, true).coordinatorDefault).toEqual({
+        reason: 'provider',
+        provider: 'vani',
+        modelId: 'm1',
+      });
+      expect(listRoutingSettings(s.db, s.team.id, true).rules).toEqual([]);
+    } finally {
+      setCoordinatorServerContextEnabled(false);
+    }
+    expect(coordinatorRoute(s.db, s.team.id)).toBeNull();
+    expect(listRoutingSettings(s.db, s.team.id).coordinatorDefault).toBeUndefined();
+  });
+
+  test('every Coordinator routing reader sees the default, while memory and identity wait for a stored rule', () => {
+    const s = bare();
+    addProvider(s, 'vani', { models: ['m1'] });
+    expect(chiefBinding(s.svc, s.team.id)).toEqual({ agentId: null, canOrchestrate: false });
+    setCoordinatorServerContextEnabled(true);
+    try {
+      expect(chiefBinding(s.svc, s.team.id)).toEqual({ agentId: null, canOrchestrate: true });
+      expect(coordinatorMemoryOwner(s.db, s.team.id)).toBeUndefined();
+      const ruleId = seedRoute(s, 'coordinator', { provider: 'vani', modelId: 'm1' });
+      expect(chiefBinding(s.svc, s.team.id)).toEqual({ agentId: ruleId, canOrchestrate: true });
+      expect(coordinatorMemoryOwner(s.db, s.team.id)).toBe(ruleId);
+    } finally {
+      setCoordinatorServerContextEnabled(false);
+    }
+  });
+
+  test('of two Anthropic keys the Coordinator default takes the one added first', () => {
+    const s = bare();
+    for (const providerId of ['anthropic-b', 'anthropic-a']) {
+      createProvider(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: s.team.id,
+          body: {
+            providerId,
+            label: providerId,
+            baseUrl: 'https://api.anthropic.com',
+            api: 'anthropic-messages',
+            apiKey: `${providerId}-key`,
+            models: [{ id: 'claude-haiku-5-5', name: 'Haiku' }],
+          },
+          createdBy: s.user.id,
+        },
+      );
+    }
+    s.db
+      .update(providerTable)
+      .set({ createdAt: 1 })
+      .where(eq(providerTable.providerId, 'anthropic-a'))
+      .run();
+    expect(anthropicCoordinatorChoice(s.db, s.team.id)?.provider).toBe('anthropic-a');
+  });
+
+  test('the Coordinator default prefers an Anthropic key, says when nothing can run it, and yields to a stored rule', () => {
+    const s = bare();
+    const coordinatorDefault = () => listRoutingSettings(s.db, s.team.id, true).coordinatorDefault;
+    expect(coordinatorDefault()).toEqual({ reason: 'none', provider: null, modelId: null });
+    addProvider(s, 'deepseek', { key: false, models: ['m0'] });
+    expect(coordinatorDefault()).toEqual({ reason: 'none', provider: null, modelId: null });
+    addProvider(s, 'vani', { models: ['m1'] });
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        body: {
+          providerId: 'anthropic',
+          label: 'Anthropic',
+          baseUrl: 'https://api.anthropic.com',
+          api: 'anthropic-messages',
+          apiKey: 'sk-ant-test',
+          models: [
+            { id: 'claude-sonnet-5-5', name: 'Sonnet' },
+            { id: 'claude-haiku-5-5', name: 'Haiku' },
+          ],
+        },
+        createdBy: s.user.id,
+      },
+    );
+    expect(coordinatorDefault()).toEqual({
+      reason: 'anthropic-key',
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+    });
+    seedRoute(s, 'coordinator', { provider: 'vani', modelId: 'm1' });
+    expect(coordinatorDefault()).toBeUndefined();
+  });
+
+  test('memory ownership stays on the stored rule, not the read-time default', () => {
+    const s = bare();
+    claudeRunner(s);
+    expect(memoryOwnerOf(s.db, s.team.id, 'verify')).toBe(`${s.team.id}:verify`);
+  });
+
+  test('naming a Runner on an empty Session rule creates it with the default provider and model', () => {
+    const s = bare();
+    const machineId = piOnlyRunner(s);
+    addProvider(s, 'vani', { models: ['m1'] });
+    expect(upsertRoutingRule(s.db, s.team.id, 'session', { machineId })).toMatchObject({
+      provider: 'vani',
+      modelId: 'm1',
+      machineId,
     });
   });
 });

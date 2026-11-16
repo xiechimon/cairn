@@ -1,7 +1,6 @@
 import {
   type ClaimedStep,
   contextTokensOf,
-  estimateTokens,
   isMailWakeText,
   type MachineDoneBody,
   type ModelUsage,
@@ -22,11 +21,7 @@ import {
 } from '@earendil-works/pi-durable';
 import { compactionWindow, type ModelRef } from './compaction.js';
 import { activeConversation, type Conversation } from './conversations.js';
-import {
-  reportCompactionFailure,
-  reportLiveCompactionFailure,
-  taskFailure,
-} from './failure-report.js';
+import { reportLiveCompactionFailure } from './failure-report.js';
 import type { InputReceipts } from './input-receipts.js';
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
@@ -34,7 +29,7 @@ import type { CoordinatorModels } from './models.js';
 import { suggestAfterTurn } from './suggest-replies.js';
 import type { ConversationGate, StepGate } from './tools.js';
 import { emitTurnSpans } from './turn-spans.js';
-import type { ColdSlimPlan, VolatileContext } from './volatile.js';
+import type { VolatileContext } from './volatile.js';
 
 const STOP_POLL_MS = 1_000;
 
@@ -53,9 +48,9 @@ export interface TurnDeps {
   conversationGate?: ConversationGate;
   volatile?: VolatileContext;
   volatileText?: string | null;
-  coldSlim?: ColdSlimPlan | null;
-  beforeDone?: () => void;
   onModel?: (ref: ModelRef) => void;
+  suggestionYield?: AbortSignal;
+  setupPhase?: (name: string) => void;
 }
 
 function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): ModelUsage {
@@ -78,35 +73,6 @@ function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): M
   return usage;
 }
 
-export const SWITCH_FOLD_INSTRUCTIONS =
-  'The Coordinator is switching models; keep everything the next model needs to continue.';
-
-async function foldBeforeModelSwitch(
-  deps: TurnDeps,
-  root: Conversation,
-  next: ModelRef,
-  scope: { threadId: string; stepId: string },
-): Promise<void> {
-  const current = (await root.agent(deps.context)).model;
-  if (current === undefined) return;
-  if (current.provider === next.provider && current.modelId === next.modelId) return;
-  const window = deps.models.models.getModel(next.provider, next.modelId)?.contextWindow;
-  if (window === undefined) return;
-  const view = await root.context(deps.context);
-  if (estimateTokens(JSON.stringify(view.messages)) < compactionWindow(window).backgroundAt) return;
-  try {
-    const task = await root.compact(SWITCH_FOLD_INSTRUCTIONS, deps.context);
-    const settled = await deps.harness.waitForTask(task, deps.context);
-    const { outcome } = settled.state;
-    if (outcome.status !== 'completed') {
-      const reason = outcome.error?.message ?? outcome.reason ?? outcome.status;
-      reportCompactionFailure(scope, 'model-switch-fold', taskFailure(reason));
-    }
-  } catch (error) {
-    reportCompactionFailure(scope, 'model-switch-fold', error);
-  }
-}
-
 export async function runCoordinatorTurn(
   deps: TurnDeps,
   claimed: ClaimedStep,
@@ -117,7 +83,6 @@ export async function runCoordinatorTurn(
   const stepId = claimed.step.id;
   let observation: OtelObservation | undefined;
   const done = async (body: MachineDoneBody) => {
-    if (body.status === 'success') deps.beforeDone?.();
     await deps.inputs?.barrier();
     await api.done(stepId, body, observation);
     await deps.inputs?.recover(harness);
@@ -134,6 +99,7 @@ export async function runCoordinatorTurn(
   const token = await api.token(stepId);
   if (token.provider !== null) deps.models.useStepProvider(token.provider);
   if (token.provider?.apiKey) await deps.models.setApiKey(provider, token.provider.apiKey);
+  deps.setupPhase?.('token');
 
   const heartbeat = setInterval(() => void api.heartbeat(stepId).catch(() => {}), deps.heartbeatMs);
   deps.gate?.set(stepId);
@@ -142,6 +108,11 @@ export async function runCoordinatorTurn(
   let steerPoll: ReturnType<typeof setInterval> | undefined;
   let rootKey: string | null = null;
   let watch: Awaited<ReturnType<Conversation['watch']>> | undefined;
+  const suggestionAbort = new AbortController();
+  const suggestionSignal =
+    deps.suggestionYield === undefined
+      ? suggestionAbort.signal
+      : AbortSignal.any([suggestionAbort.signal, deps.suggestionYield]);
   try {
     const mailTurn = isMailWakeText(claimed.instruction ?? '');
     const root = await activeConversation(harness, deps.conversationId, context);
@@ -160,9 +131,7 @@ export async function runCoordinatorTurn(
       .join('\n\n');
     deps.volatile?.set(rootKey, volatileText === '' ? null : volatileText);
     deps.volatile?.setStep(rootKey, stepId);
-    deps.volatile?.setColdSlim(rootKey, deps.coldSlim ?? null);
     let stopping: Promise<void> | null = null;
-    const suggestionAbort = new AbortController();
     let polling = false;
     stopPoll = setInterval(() => {
       if (polling || stopping !== null) return;
@@ -199,6 +168,7 @@ export async function runCoordinatorTurn(
         if (record !== undefined) admitted.add(input.id);
       }
     }
+    deps.setupPhase?.('conversation');
     const drainSteers = async () => {
       if (mailTurn) return;
       while (inFlight && stopping === null && api.steer !== undefined) {
@@ -241,12 +211,6 @@ export async function runCoordinatorTurn(
           });
       }, deps.stopPollMs ?? STOP_POLL_MS);
     }
-    await foldBeforeModelSwitch(
-      deps,
-      root,
-      { provider, modelId },
-      { threadId: claimed.chief.threadId, stepId },
-    );
     await root.configure(
       {
         model: { provider, modelId },
@@ -283,6 +247,7 @@ export async function runCoordinatorTurn(
       reportLiveCompactionFailure({ threadId, stepId }, call.value.docs['pi.live']);
       await mirror.onView(call.value);
     });
+    deps.setupPhase?.('configure');
     if (stopping !== null) {
       await stopping;
       return done({ status: 'stopped' });
@@ -293,6 +258,7 @@ export async function runCoordinatorTurn(
         input.kind === 'initial' &&
         input.conversationId === conversationKey,
     );
+    deps.setupPhase?.('input list');
     const prior =
       api.inputs === undefined
         ? undefined
@@ -304,12 +270,14 @@ export async function runCoordinatorTurn(
               ),
             context,
           );
+    deps.setupPhase?.('prior lookup');
     const initial = await api.inputs?.prepare(
       stepId,
       conversationKey,
       storedInstruction ?? '',
       prior?.entry === undefined ? undefined : String(prior.entry),
     );
+    deps.setupPhase?.('input prepare');
     const submission = await root.submit(
       {
         type: 'input',
@@ -318,6 +286,7 @@ export async function runCoordinatorTurn(
       },
       context,
     );
+    deps.setupPhase?.('submit');
     inFlight = true;
     let settled = await submission.wait(context);
     const firstEntry = settled.entry;
@@ -352,6 +321,33 @@ export async function runCoordinatorTurn(
       )
         settled = record;
     }
+    const answerEntry =
+      settled.status === 'done' && settled.type === 'input'
+        ? await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context)
+        : undefined;
+    const answer = answerEntry?.model?.[0];
+    const suggesting =
+      claimed.chief.trigger === 'user' &&
+      stopping === null &&
+      !suggestionSignal.aborted &&
+      answer?.role === 'assistant' &&
+      answer.stopReason === 'stop' &&
+      answer.content.some((block) => block.type === 'text' && block.text.trim() !== '')
+        ? (api.canSuggestReplies?.(stepId) ?? Promise.resolve(false))
+            .then((allowed) =>
+              allowed
+                ? suggestAfterTurn(
+                    deps.models.models,
+                    root,
+                    { provider, modelId },
+                    context,
+                    { threadId, stepId },
+                    suggestionSignal,
+                  )
+                : null,
+            )
+            .catch(() => null)
+        : Promise.resolve(null);
     await deps.inputs?.barrier();
     if (api.inputs === undefined && settled.entry !== undefined)
       await api.mapUserEntry?.(stepId, String(settled.entry));
@@ -411,33 +407,17 @@ export async function runCoordinatorTurn(
           : 'no answer';
       return done({ status: 'failed', errorMessage: `Coordinator turn ended: ${reason}` });
     }
-    const answerId = settled.answer;
-    const entry = await root.commit((tx) => tx.entry(AssistantEntry, answerId), context);
-    const answer = entry?.model?.[0];
     if (answer?.role !== 'assistant') {
       return done({ status: 'failed', errorMessage: 'Coordinator turn has no answer entry' });
     }
     const usage = turnUsage(answer, turnEntries);
-    const suggestion =
-      claimed.chief.trigger === 'user' &&
-      answer.stopReason === 'stop' &&
-      answer.content.some((block) => block.type === 'text' && block.text.trim() !== '') &&
-      (await api.canSuggestReplies?.(stepId).catch(() => false)) === true
-        ? await suggestAfterTurn(
-            deps.models.models,
-            root,
-            { provider, modelId },
-            context,
-            { threadId: claimed.chief.threadId, stepId },
-            suggestionAbort.signal,
-          ).catch(() => null)
-        : null;
+    const suggestion = await suggesting;
     if (suggestion !== null) {
       usage.input += suggestion.usage.input;
       usage.output += suggestion.usage.output;
       usage.cacheRead += suggestion.usage.cacheRead;
       usage.cacheWrite += suggestion.usage.cacheWrite;
-      if (suggestion.replies.length > 0 && !suggestionAbort.signal.aborted)
+      if (suggestion.replies.length > 0 && !suggestionSignal.aborted)
         await api.suggestReplies?.(stepId, suggestion.replies).catch(() => {});
     }
     if (stopping !== null) {
@@ -454,6 +434,7 @@ export async function runCoordinatorTurn(
     }
     return finished;
   } finally {
+    suggestionAbort.abort();
     void watch?.stop();
     clearInterval(stopPoll);
     clearInterval(steerPoll);
@@ -462,7 +443,6 @@ export async function runCoordinatorTurn(
       deps.conversationGate?.set(rootKey, null);
       deps.volatile?.set(rootKey, null);
       deps.volatile?.setStep(rootKey, null);
-      deps.volatile?.setColdSlim(rootKey, null);
     }
     clearInterval(heartbeat);
   }

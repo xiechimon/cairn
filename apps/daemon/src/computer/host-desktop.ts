@@ -6,21 +6,32 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
+  renameSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
-import { computerMachineName, PINNED_AGENT_BROWSER_VERSION } from '../orb/computer.js';
+import { z } from 'zod';
+import { AGENT_BROWSER_BINARY, browserSessionName } from './browser.js';
 import { executableOnPath } from './contained-spawn.js';
 import { HostComputerProvider } from './host.js';
 import type { ComputerInputFence, ComputerInputLease } from './input-fence.js';
 import type { ComputerPresenceSource } from './presence.js';
 import {
+  type ComputerProcessEvent,
   type ComputerProvider,
   ComputerRefusal,
   type ScopedComputerProviders,
 } from './provider.js';
+
+export const PINNED_AGENT_BROWSER_VERSION = '0.41.2';
+
+export function computerMachineName(scopeKey: string): string {
+  if (scopeKey === '') throw new Error('Computer scope key is empty');
+  return `cairn-orb-computer-${createHash('sha256').update(scopeKey).digest('hex').slice(0, 40)}`;
+}
 
 export const HOST_DESKTOP_PROGRAMS = [
   'systemd-run',
@@ -34,6 +45,10 @@ export const HOST_DESKTOP_PROGRAMS = [
 ] as const;
 export const HOST_DESKTOP_BROWSERS = ['chromium', 'google-chrome-stable'] as const;
 export const HOST_DESKTOP_READY_MS = 20_000;
+export const HOST_DESKTOP_IDLE_STOP_MS = 10 * 60_000;
+const BROWSER_COMMAND_TIMEOUT_MS = 30_000;
+const PROFILE_RELEASE_MS = 10_000;
+const BROWSER_PROFILE = join('.cairn', 'browser-profile');
 export const OMARCHY_WALLPAPER = '.local/state/omarchy/current/background';
 const UNIT_PREFIX = 'cairn-desktop-';
 
@@ -79,6 +94,50 @@ export interface CommandResult {
 
 export type CommandRunner = (argv: readonly string[]) => Promise<CommandResult>;
 
+const savedLogin = z.object({
+  cookies: z.array(
+    z.object({
+      name: z.string(),
+      value: z.string(),
+      domain: z.string(),
+      path: z.string(),
+      expires: z.number().optional(),
+      httpOnly: z.boolean().optional(),
+      secure: z.boolean().optional(),
+      sameSite: z.enum(['Strict', 'Lax', 'None']).optional(),
+    }),
+  ),
+});
+
+const sessionList = z.object({ data: z.object({ sessions: z.array(z.string()) }) });
+
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+async function browserCommand(
+  provider: HostComputerProvider,
+  args: readonly string[],
+): Promise<{ code: number | null; text: string }> {
+  const events = await provider.execute({
+    argv: [AGENT_BROWSER_BINARY, ...args],
+    timeoutMs: BROWSER_COMMAND_TIMEOUT_MS,
+    signal: new AbortController().signal,
+  });
+  let text = '';
+  let code: number | null = null;
+  for await (const event of events) {
+    if (event.kind === 'stdout') text += event.text;
+    else if (event.kind === 'exit') code = event.code;
+  }
+  return { code, text: text.trim() };
+}
+
 function runCommand(argv: readonly string[]): Promise<CommandResult> {
   return new Promise((resolve) => {
     execFile(argv[0] as string, argv.slice(1), { timeout: 15_000 }, (error, stdout) => {
@@ -95,6 +154,8 @@ export interface HostDesktopsOptions {
   run?: CommandRunner;
   inputFence?: ComputerInputFence;
   readyMs?: number;
+  idleStopMs?: number;
+  now?: () => number;
 }
 
 interface Desktop {
@@ -111,11 +172,19 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
   private readonly failed = new Set<string>();
   private readonly leases = new Map<string, ComputerInputLease>();
   private readonly listeners = new Set<() => void>();
+  private readonly lastUsed = new Map<string, number>();
+  private readonly busy = new Map<string, number>();
+  private readonly stopping = new Map<string, Promise<void>>();
+  private readonly takeovers = new Map<string, number>();
+  private readonly handoffs = new Map<string, Promise<void>>();
+  private readonly ownerBrowsers = new Set<string>();
+  private readonly now: () => number;
 
   constructor(private readonly options: HostDesktopsOptions) {
     this.hostRoot = options.root;
     this.env = options.env ?? process.env;
     this.run = options.run ?? runCommand;
+    this.now = options.now ?? Date.now;
   }
 
   private get path(): string | undefined {
@@ -164,6 +233,21 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     return join(this.options.root, this.id(scopeKey));
   }
 
+  private ownerUnit(scopeKey: string): string {
+    return `${UNIT_PREFIX}${this.id(scopeKey)}-browser.service`;
+  }
+
+  private homeEnv(home: string): string[] {
+    return [
+      `--setenv=PATH=${this.env.PATH ?? ''}`,
+      `--setenv=HOME=${home}`,
+      `--setenv=XDG_CONFIG_HOME=${join(home, '.config')}`,
+      `--setenv=XDG_DATA_HOME=${join(home, '.local', 'share')}`,
+      `--setenv=XDG_CACHE_HOME=${join(home, '.cache')}`,
+      `--setenv=XDG_STATE_HOME=${join(home, '.local', 'state')}`,
+    ];
+  }
+
   socketPath(scopeKey: string, kind: 'view' | 'control'): string {
     return join(this.directory(scopeKey), 'computer', kind === 'view' ? 'view.sock' : 'vnc.sock');
   }
@@ -188,23 +272,204 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     return (await this.desktop(scopeKey)).display;
   }
 
+  async hold(scopeKey: string, kind: 'view' | 'control' = 'view'): Promise<() => void> {
+    this.enter(scopeKey);
+    try {
+      await this.desktop(scopeKey);
+      if (kind === 'control') await this.takeOver(scopeKey);
+    } catch (error) {
+      this.leave(scopeKey);
+      throw error;
+    }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      if (kind === 'control') this.handBack(scopeKey);
+      this.leave(scopeKey);
+    };
+  }
+
+  private handoff(scopeKey: string, step: () => Promise<void>): Promise<void> {
+    const next = (this.handoffs.get(scopeKey) ?? Promise.resolve()).then(step);
+    this.handoffs.set(
+      scopeKey,
+      next.catch(() => {}),
+    );
+    return next;
+  }
+
+  private async takeOver(scopeKey: string): Promise<void> {
+    const count = this.takeovers.get(scopeKey) ?? 0;
+    this.takeovers.set(scopeKey, count + 1);
+    try {
+      await (count === 0
+        ? this.handoff(scopeKey, () => this.openOwnerBrowser(scopeKey))
+        : this.handoffs.get(scopeKey));
+    } catch (error) {
+      this.handBack(scopeKey);
+      throw error;
+    }
+  }
+
+  private handBack(scopeKey: string): void {
+    const count = (this.takeovers.get(scopeKey) ?? 1) - 1;
+    if (count > 0) this.takeovers.set(scopeKey, count);
+    else this.takeovers.delete(scopeKey);
+  }
+
+  private closeOwnerBrowser(scopeKey: string): Promise<void> {
+    if (!this.ownerBrowsers.has(scopeKey)) return this.handoffs.get(scopeKey) ?? Promise.resolve();
+    return this.handoff(scopeKey, async () => {
+      if (this.takeovers.has(scopeKey) || !this.ownerBrowsers.has(scopeKey)) return;
+      await this.run(['systemctl', '--user', 'stop', this.ownerUnit(scopeKey)]);
+      this.ownerBrowsers.delete(scopeKey);
+    });
+  }
+
+  private async openOwnerBrowser(scopeKey: string): Promise<void> {
+    const unit = this.ownerUnit(scopeKey);
+    if (
+      this.ownerBrowsers.has(scopeKey) &&
+      (await this.run(['systemctl', '--user', 'is-active', unit])).code === 0
+    )
+      return;
+    const desktop = await this.desktop(scopeKey);
+    const session = browserSessionName(scopeKey);
+    let url: string | undefined;
+    const listed = await browserCommand(desktop.provider, ['--json', 'session', 'list'])
+      .then(({ text }) => sessionList.safeParse(JSON.parse(text)))
+      .catch(() => undefined);
+    if (listed?.success && listed.data.data.sessions.includes(session)) {
+      const current = await browserCommand(desktop.provider, ['--session', session, 'get', 'url']);
+      const last = current.text.split('\n').at(-1)?.trim() ?? '';
+      if (/^https?:\/\//i.test(last)) url = last;
+      await browserCommand(desktop.provider, ['--session', session, 'close']);
+    }
+    const directory = this.directory(scopeKey);
+    const home = join(directory, 'home');
+    const profile = join(home, BROWSER_PROFILE);
+    await this.profileReleased(profile);
+    const browser = this.browserExecutable();
+    if (browser === undefined) throw new ComputerRefusal('This machine has no Chromium installed');
+    await this.run(['systemctl', '--user', 'stop', unit]);
+    await this.run(['systemctl', '--user', 'reset-failed', unit]);
+    const proxy =
+      this.env.https_proxy || this.env.HTTPS_PROXY || this.env.http_proxy || this.env.HTTP_PROXY;
+    const started = await this.run([
+      'systemd-run',
+      '--user',
+      '--collect',
+      `--unit=${unit}`,
+      `--property=BindsTo=${UNIT_PREFIX}${this.id(scopeKey)}.service`,
+      ...this.homeEnv(home),
+      `--setenv=DISPLAY=${desktop.display}`,
+      '--',
+      'env',
+      '-u',
+      'WAYLAND_DISPLAY',
+      '-u',
+      'WAYLAND_SOCKET',
+      browser,
+      `--user-data-dir=${profile}`,
+      '--ozone-platform=x11',
+      '--password-store=basic',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--hide-crash-restore-bubble',
+      ...(proxy ? [`--proxy-server=${proxy}`] : []),
+      url ?? '--restore-last-session',
+    ]);
+    if (started.code !== 0) throw new ComputerRefusal('The owner browser could not be started');
+    this.ownerBrowsers.add(scopeKey);
+  }
+
+  private async profileReleased(profile: string): Promise<void> {
+    const deadline = this.now() + PROFILE_RELEASE_MS;
+    for (;;) {
+      let owner: string;
+      try {
+        owner = readlinkSync(join(profile, 'SingletonLock'));
+      } catch {
+        return;
+      }
+      const pid = Number(owner.slice(owner.lastIndexOf('-') + 1));
+      if (!Number.isInteger(pid) || pid <= 0 || !processAlive(pid)) return;
+      if (this.now() >= deadline) throw new ComputerRefusal('The agent browser did not close');
+      await sleep(100);
+    }
+  }
+
+  private async importSavedLogin(scopeKey: string, home: string, provider: HostComputerProvider) {
+    const session = browserSessionName(scopeKey);
+    const saved = join(home, '.agent-browser', 'sessions', `${session}-${session}.json`);
+    if (!existsSync(saved)) return;
+    const parsed = savedLogin.safeParse(JSON.parse(readFileSync(saved, 'utf8')));
+    for (const cookie of parsed.success ? parsed.data.cookies : []) {
+      if (cookie.name === '') continue;
+      await browserCommand(provider, [
+        '--session',
+        session,
+        'cookies',
+        'set',
+        cookie.name,
+        cookie.value,
+        '--domain',
+        cookie.domain,
+        '--path',
+        cookie.path,
+        ...(cookie.httpOnly ? ['--http-only'] : []),
+        ...(cookie.secure ? ['--secure'] : []),
+        ...(cookie.sameSite ? ['--same-site', cookie.sameSite] : []),
+        ...(cookie.expires !== undefined && cookie.expires > 0
+          ? ['--expires', String(Math.floor(cookie.expires))]
+          : []),
+      ]);
+    }
+    await browserCommand(provider, ['--session', session, 'close']);
+    renameSync(saved, `${saved}.imported`);
+  }
+
+  private enter(scopeKey: string): void {
+    this.busy.set(scopeKey, (this.busy.get(scopeKey) ?? 0) + 1);
+    this.lastUsed.set(scopeKey, this.now());
+  }
+
+  private leave(scopeKey: string): void {
+    const count = (this.busy.get(scopeKey) ?? 1) - 1;
+    if (count > 0) this.busy.set(scopeKey, count);
+    else this.busy.delete(scopeKey);
+    this.lastUsed.set(scopeKey, this.now());
+  }
+
+  private async using<T>(scopeKey: string, run: () => Promise<T>): Promise<T> {
+    this.enter(scopeKey);
+    try {
+      return await run();
+    } finally {
+      this.leave(scopeKey);
+    }
+  }
+
   private desktop(scopeKey: string): Promise<Desktop> {
     const running = this.pending.get(scopeKey);
     if (running) return running;
     this.failed.delete(scopeKey);
-    const operation = this.start(scopeKey).then(
-      (desktop) => {
-        this.pending.delete(scopeKey);
-        this.notify();
-        return desktop;
-      },
-      (error: unknown) => {
-        this.pending.delete(scopeKey);
-        this.failed.add(scopeKey);
-        this.notify();
-        throw error;
-      },
-    );
+    const operation = (this.stopping.get(scopeKey) ?? Promise.resolve())
+      .then(() => this.start(scopeKey))
+      .then(
+        (desktop) => {
+          this.pending.delete(scopeKey);
+          this.notify();
+          return desktop;
+        },
+        (error: unknown) => {
+          this.pending.delete(scopeKey);
+          this.failed.add(scopeKey);
+          this.notify();
+          throw error;
+        },
+      );
     this.pending.set(scopeKey, operation);
     this.notify();
     return operation;
@@ -239,12 +504,7 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
         '--user',
         '--collect',
         `--unit=${unit}`,
-        `--setenv=PATH=${this.env.PATH ?? ''}`,
-        `--setenv=HOME=${home}`,
-        `--setenv=XDG_CONFIG_HOME=${join(home, '.config')}`,
-        `--setenv=XDG_DATA_HOME=${join(home, '.local', 'share')}`,
-        `--setenv=XDG_CACHE_HOME=${join(home, '.cache')}`,
-        `--setenv=XDG_STATE_HOME=${join(home, '.local', 'state')}`,
+        ...this.homeEnv(home),
         '--',
         'dbus-run-session',
         '--',
@@ -269,32 +529,64 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     }
     const current = this.desktops.get(scopeKey);
     if (current?.display === display) return current;
-    const { WAYLAND_DISPLAY: _wayland, SSH_AUTH_SOCK: _agent, ...inherited } = this.env;
-    const desktop = {
-      display,
-      provider: new HostComputerProvider({
-        home,
-        env: {
-          ...inherited,
-          HOME: home,
-          DISPLAY: display,
-          PATH: this.path,
-          AGENT_BROWSER_EXECUTABLE_PATH: this.browserExecutable(),
-          AGENT_BROWSER_NO_VERSION_CHECK: '1',
-        },
-      }),
-    };
+    const desktop = { display, provider: this.provider(home, display) };
+    if (!this.takeovers.has(scopeKey)) {
+      await this.run(['systemctl', '--user', 'stop', this.ownerUnit(scopeKey)]);
+      this.ownerBrowsers.delete(scopeKey);
+    }
+    await this.importSavedLogin(scopeKey, home, desktop.provider).catch(() => {});
     this.desktops.set(scopeKey, desktop);
     return desktop;
   }
 
+  private provider(home: string, display: string): HostComputerProvider {
+    const { WAYLAND_DISPLAY: _wayland, SSH_AUTH_SOCK: _agent, ...inherited } = this.env;
+    return new HostComputerProvider({
+      home,
+      env: {
+        ...inherited,
+        HOME: home,
+        DISPLAY: display,
+        PATH: this.path,
+        AGENT_BROWSER_EXECUTABLE_PATH: this.browserExecutable(),
+        AGENT_BROWSER_NO_VERSION_CHECK: '1',
+        AGENT_BROWSER_PROFILE: join(home, BROWSER_PROFILE),
+        AGENT_BROWSER_ARGS: '--hide-crash-restore-bubble',
+      },
+    });
+  }
+
   forScope(scopeKey: string): ComputerProvider {
     const provider = async () => (await this.desktop(scopeKey)).provider;
+    const leave = () => this.leave(scopeKey);
     return {
-      execute: async (request) => (await provider()).execute(request),
-      listFiles: async (path) => (await provider()).listFiles(path),
-      readFile: async (path) => (await provider()).readFile(path),
-      writeFile: async (path, content) => (await provider()).writeFile(path, content),
+      execute: async (request) => {
+        if (this.takeovers.has(scopeKey) && request.argv[0] === AGENT_BROWSER_BINARY)
+          throw new ComputerRefusal(
+            'The owner has taken over this browser; wait until they hand it back',
+          );
+        this.enter(scopeKey);
+        let events: AsyncIterable<ComputerProcessEvent>;
+        try {
+          if (request.argv[0] === AGENT_BROWSER_BINARY) await this.closeOwnerBrowser(scopeKey);
+          else await this.handoffs.get(scopeKey);
+          events = await (await provider()).execute(request);
+        } catch (error) {
+          leave();
+          throw error;
+        }
+        return (async function* () {
+          try {
+            yield* events;
+          } finally {
+            leave();
+          }
+        })();
+      },
+      listFiles: (path) => this.using(scopeKey, async () => (await provider()).listFiles(path)),
+      readFile: (path) => this.using(scopeKey, async () => (await provider()).readFile(path)),
+      writeFile: (path, content) =>
+        this.using(scopeKey, async () => (await provider()).writeFile(path, content)),
       killAll: async () => this.desktops.get(scopeKey)?.provider.killAll(),
     };
   }
@@ -303,9 +595,9 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     await Promise.all([...this.desktops.values()].map((desktop) => desktop.provider.killAll()));
   }
 
-  async presence(): Promise<ComputerPresence[]> {
+  private known(): { scopeKey: string; unit: string }[] {
     if (!existsSync(this.options.root)) return [];
-    const known = readdirSync(this.options.root).flatMap((name) => {
+    return readdirSync(this.options.root).flatMap((name) => {
       try {
         const scopeKey = readFileSync(join(this.options.root, name, 'scope'), 'utf8');
         return scopeKey === '' ? [] : [{ scopeKey, unit: `${UNIT_PREFIX}${name}.service` }];
@@ -313,6 +605,51 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
         return [];
       }
     });
+  }
+
+  async sweep(): Promise<void> {
+    const idleMs = this.options.idleStopMs ?? HOST_DESKTOP_IDLE_STOP_MS;
+    for (const { scopeKey, unit } of this.known()) {
+      const now = this.now();
+      if (!this.lastUsed.has(scopeKey)) this.lastUsed.set(scopeKey, now);
+      if (!this.idle(scopeKey, now, idleMs)) continue;
+      if ((await this.run(['systemctl', '--user', 'is-active', unit])).code !== 0) continue;
+      if (!this.idle(scopeKey, this.now(), idleMs)) continue;
+      const stop = this.stop(scopeKey, unit).finally(() => {
+        this.stopping.delete(scopeKey);
+        this.notify();
+      });
+      this.stopping.set(scopeKey, stop);
+      await stop;
+    }
+  }
+
+  private idle(scopeKey: string, now: number, idleMs: number): boolean {
+    return (
+      !this.busy.has(scopeKey) &&
+      !this.pending.has(scopeKey) &&
+      !this.stopping.has(scopeKey) &&
+      now - (this.lastUsed.get(scopeKey) ?? now) >= idleMs
+    );
+  }
+
+  private async stop(scopeKey: string, unit: string): Promise<void> {
+    const directory = this.directory(scopeKey);
+    const provider =
+      this.desktops.get(scopeKey)?.provider ??
+      this.provider(join(directory, 'home'), this.ready(directory) ?? '');
+    await browserCommand(provider, ['--session', browserSessionName(scopeKey), 'close']).catch(
+      () => {},
+    );
+    await provider.killAll();
+    this.ownerBrowsers.delete(scopeKey);
+    this.desktops.delete(scopeKey);
+    this.lastUsed.delete(scopeKey);
+    await this.run(['systemctl', '--user', 'stop', unit]);
+  }
+
+  async presence(): Promise<ComputerPresence[]> {
+    const known = this.known();
     known.splice(COMPUTER_PRESENCE_LIMIT);
     if (known.length === 0) return [];
     const states = (

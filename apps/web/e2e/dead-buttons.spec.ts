@@ -7,40 +7,40 @@ test('feedback route is gone — old URL redirects to the home', async ({ page }
   await expect(page.locator('[data-route="feedback"]')).toHaveCount(0);
 });
 
-test('schedules empty state drops the `查看文档` button; `新建定时` really opens and saves (#149, #1037)', async ({
+const EMPTY_SCHEDULES = '/app?scenario=11&pane=tasks&tab=scheduled';
+const SCHEDULES = '/app?scenario=home-c&pane=tasks&tab=scheduled';
+
+test('the empty schedules tab has no docs button; its `新建定时` really opens the editor (#149, #1037)', async ({
   page,
 }) => {
-  await page.goto('/app/schedules?scenario=11');
-  await expect(page.locator('.sched-empty')).toBeVisible();
-  await expect(page.locator('.sched-empty-docs')).toHaveCount(0);
-  const emptyNew = page.locator('.sched-empty').getByRole('button', { name: '新建定时' });
-  await expect(emptyNew).toBeVisible();
-
+  await page.goto(EMPTY_SCHEDULES);
+  await expect(page.getByTestId('tasks-schedules-empty')).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看文档' })).toHaveCount(0);
+  const emptyNew = page.getByTestId('schedule-new');
+  await expect(emptyNew).toHaveText('新建定时');
   await emptyNew.click();
-  const dialog = page.getByRole('dialog', { name: '新建定时' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: '保存' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.locator('.sched-card')).toHaveCount(1);
-  await expect(page.locator('.sched-empty')).toHaveCount(0);
+  const popover = page.getByTestId('schedule-popover');
+  await expect(popover).toContainText('新建定时');
+  await expect(popover).toContainText('这里还没有可以定时的任务');
+  await popover.getByRole('button', { name: '取消' }).click();
+  await expect(popover).toBeHidden();
 });
 
-test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respond, save lands a card (#1037)', async ({
+test('schedules fixture face: the new schedule editor frequency radios respond and Save closes it (#1037)', async ({
   page,
 }) => {
-  await page.goto('/app/schedules?scenario=11');
-  await expect(page.locator('.page-new-action')).toHaveCount(0);
-  await page.locator('.sched-empty').getByRole('button', { name: '新建定时' }).click();
-  const dialog = page.getByRole('dialog', { name: '新建定时' });
-  await expect(dialog).toBeVisible();
+  await page.goto(SCHEDULES);
+  await page.getByTestId('schedule-new').click();
+  const popover = page.getByTestId('schedule-popover');
+  await expect(popover).toBeVisible();
 
-  await dialog.getByRole('radio', { name: '每周' }).click();
-  await expect(dialog.getByRole('radio', { checked: true })).toHaveText('每周');
-  await dialog.getByRole('button', { name: '保存' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.locator('.sched-card')).toHaveCount(1);
-
-  await expect(page.locator('.sched-card')).toContainText('每周运行');
+  await popover.getByRole('radio', { name: '每周' }).click();
+  await expect(popover.getByRole('radio', { checked: true })).toHaveText('每周');
+  await expect(popover.getByLabel('从哪天开始每周重复')).toBeVisible();
+  const save = popover.getByRole('button', { name: '保存' });
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(popover).toBeHidden();
 });
 
 test('machines rows carry only live controls, no dead inline buttons (#222 shipped + #1108 narrowed)', async ({
@@ -48,7 +48,7 @@ test('machines rows carry only live controls, no dead inline buttons (#222 shipp
 }) => {
   await page.goto('/app/settings/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_');
 
-  await expect(page.getByTestId('machine-accept-toggle').first()).toBeVisible();
+  await expect(page.getByTestId('machine-menu').first()).toBeVisible();
 
   await expect(page.locator('[data-testid="machine-item"] > div:first-child button:not([data-testid])')).toHaveCount(0);
 });
@@ -64,17 +64,17 @@ test('composer toolbar drops the `语音输入` button, keeps attachment', async
   await expect(page.getByRole('menuitem', { name: '添加附件' })).toBeVisible();
 });
 
-test('api-keys empty state drops the `查看文档` button, keeps `新建密钥` (#307)', async ({ page }) => {
+test('api-keys empty state drops the `查看文档` button, keeps `新建 API 密钥` (#307)', async ({ page }) => {
   await stubLiveApiKeys(page);
   await page.goto('/app/api-keys');
 
   const keysEmpty = page.getByTestId('keys-empty');
   await expect(keysEmpty).toBeVisible();
   await expect(page.getByRole('link', { name: '查看文档' })).toHaveCount(0);
-  await expect(keysEmpty.getByRole('button', { name: '新建密钥' })).toBeVisible();
+  await expect(keysEmpty.getByRole('button', { name: '新建 API 密钥' })).toBeVisible();
 });
 
-test('api-keys non-empty state keeps `新建密钥` visible and opens the create dialog', async ({ page }) => {
+test('api-keys non-empty state keeps `新建 API 密钥` visible and opens the create dialog', async ({ page }) => {
   await page.route('**/api/**', (route, request) => {
     const path = new URL(request.url()).pathname;
     if (path.endsWith('/stream')) return route.abort();
@@ -106,10 +106,10 @@ test('api-keys non-empty state keeps `新建密钥` visible and opens the create
   await page.goto('/app/api-keys');
   await expect(page.getByText('Existing key', { exact: true })).toBeVisible();
   await expect(page.getByTestId('keys-empty')).toHaveCount(0);
-  const create = page.getByRole('button', { name: '新建密钥', exact: true });
+  const create = page.getByRole('button', { name: '新建 API 密钥', exact: true });
   await expect(create).toBeVisible();
   await create.click();
-  await expect(page.getByRole('dialog', { name: '新建密钥', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '新建 API 密钥', exact: true })).toBeVisible();
 });
 
 test('resources empty state drops the `查看文档` link (#307); skills empty-state main button = `新建技能` dialog (XMON-114)', async ({
@@ -130,23 +130,45 @@ test('resources empty state drops the `查看文档` link (#307); skills empty-s
   await expect(secretsEmpty.getByRole('button', { name: '添加密钥' })).toBeVisible();
 });
 
-test('mcp page is read-only: no create entry, no per-row more-menu ink, empty state points at ~/.claude.json (#368)', async ({
+test('mcp page: catalog cards connect, add-server opens a form, local rows stay read-only (#4870)', async ({
   page,
 }) => {
-
   await page.goto('/app/resources/mcp-servers?scenario=01');
-  await expect(page.getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
-  const empty = page.getByTestId('resource-empty');
-  await expect(empty).toBeVisible();
-  await expect(empty.getByRole('button')).toHaveCount(0);
-  await expect(empty.locator('p')).toContainText('~/.claude.json');
+  const catalog = page.getByTestId('mcp-catalog');
+  await expect(catalog.locator('[data-connector-card]')).toHaveCount(8);
+  await expect(page.getByTestId('resource-empty')).toHaveCount(0);
+  await catalog.getByRole('button', { name: '接入 Linear' }).click();
+  const signIn = page.getByRole('dialog', { name: '前往 mcp.linear.app 登录' });
+  await expect(signIn).toBeVisible();
+  await expect(signIn.getByTestId('mcp-signin-host')).toHaveText('mcp.linear.app');
+  await signIn.getByRole('button', { name: '改用令牌' }).click();
+  await expect(page.getByRole('dialog', { name: '连接 Linear' })).toBeVisible();
+  await page.getByRole('button', { name: '取消' }).click();
+  await catalog.getByRole('button', { name: '接入 GitHub' }).click();
+  await expect(page.getByRole('dialog', { name: '连接 GitHub' })).toContainText('Pull requests');
+  await page.getByRole('button', { name: '取消' }).click();
+  await page.getByTestId('mcp-add-server').click();
+  await expect(page.getByRole('dialog', { name: '添加 MCP 服务器' })).toBeVisible();
+
+  await page.goto('/app/resources/mcp-servers?scenario=mcp-manage-needs-auth');
+  const manage = page.getByRole('dialog', { name: 'Cloudflare' });
+  await expect(manage.getByTestId('dialog-foot').getByRole('button').last()).toHaveText('重新连接');
+  await manage.getByRole('button', { name: '删除' }).click();
+  const confirm = page.getByRole('alertdialog', { name: '删除连接' });
+  await expect(confirm).toBeVisible();
+  await expect(manage).toHaveCount(0);
+  await confirm.getByRole('button', { name: '取消' }).click();
+  await expect(manage).toBeVisible();
+
+  await page.goto('/app/resources/mcp-servers?scenario=mcp-oauth-denied');
+  const banner = page.getByTestId('mcp-oauth-error');
+  await expect(banner).toContainText('没能连上 Linear');
+  await expect(banner.getByRole('button', { name: '重试' })).toBeVisible();
 
   await page.goto('/app/resources/mcp-servers?scenario=07');
   await expect(page.locator('[data-testid="resource-row"][data-mcp]')).toHaveCount(1);
   await expect(page.locator('[data-testid="resource-row"] button')).toHaveCount(0);
-  await expect(page.getByRole('dialog')).toHaveCount(1);
   await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
 });
 
 test('project settings drops the avatar `更换` ink (#307, supersedes the #177 chrome verdict)', async ({
@@ -156,19 +178,21 @@ test('project settings drops the avatar `更换` ink (#307, supersedes the #177 
   await expect(page.locator('.prj-set-change')).toHaveCount(0);
 
   await expect(page.locator('.prj-set-avatar')).toBeVisible();
+  await page.getByRole('tab', { name: '仓库', exact: true }).click();
   await expect(page.locator('span.prj-set-branch')).toBeVisible();
 });
 
-test('sched card `更多` opens a menu and deletes the row through the confirm (#306)', async ({
+test('schedule row `更多` opens a menu and its delete asks through the confirm (#306)', async ({
   page,
 }) => {
-  await page.goto('/app/schedules?scenario=r3-93');
-  const card = page.locator('.sched-card');
-  await expect(card).toHaveCount(1);
-  const more = page.locator('.sched-card-more');
+  await page.goto('/app?scenario=r3-93&pane=tasks&tab=scheduled');
+  const frame = page.locator('[data-slot="schedule-row-frame"]');
+  await expect(frame).toHaveCount(1);
+  const more = frame.getByTestId('schedule-row-menu-button');
+  await frame.hover();
   await expect(more).toHaveAttribute('aria-expanded', 'false');
   await more.click();
-  const menu = page.locator('.sched-card-menu');
+  const menu = page.getByRole('menu');
   await expect(menu).toBeVisible();
   await expect(more).toHaveAttribute('aria-expanded', 'true');
 
@@ -177,7 +201,7 @@ test('sched card `更多` opens a menu and deletes the row through the confirm (
 
   await more.click();
   await expect(menu).toBeVisible();
-  await menu.locator('.sched-card-menu-row').click();
+  await menu.getByRole('menuitem', { name: /删除/ }).click();
 
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toBeVisible();
@@ -185,9 +209,6 @@ test('sched card `更多` opens a menu and deletes the row through the confirm (
   await expect(confirm).not.toContainText('#1');
   await confirm.getByRole('button', { name: '删除' }).click();
   await expect(confirm).toBeHidden();
-  await expect(page.locator('.sched-card')).toHaveCount(0);
-
-  await expect(page.locator('.sched-empty')).toBeVisible();
 });
 
 test('skills `排序` opens the single-select listbox, picking an option closes it (#306)', async ({
@@ -275,28 +296,6 @@ test('todo-phase `开始` fires orchestration directly — no start dialog (#640
   await expect(page.locator('.overlay-title')).toHaveCount(0);
 });
 
-test('project task rows and cards are real links that open the todo detail (#318, #2531)', async ({ page }) => {
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks');
-  const row = page.locator('.prj-task-row').first();
-  await expect(row).toBeVisible();
-
-  await expect(row.locator('a.prj-task-link')).toHaveCount(1);
-  await expect(row.locator('a.prj-task-link')).toHaveAttribute(
-    'href',
-    /^\/app\?scenario=prj-tasks&thread=[^&]+$/,
-  );
-  await row.click();
-  await expect(page).toHaveURL(/\/app\?scenario=prj-tasks&thread=/);
-
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks');
-  await page.locator('.prj-tasks-view-btn').nth(1).click();
-  const card = page.locator('.prj-task-card').first();
-  await expect(card).toBeVisible();
-  await expect(card.locator('a.prj-task-link')).toHaveCount(1);
-  await card.click();
-  await expect(page).toHaveURL(/\/app\?scenario=prj-tasks&thread=/);
-});
-
 test('detail transcript message tools carry no restore action (#884)', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
   await expect(page.locator('.chat-col path[d^="M3 12a9"]')).toHaveCount(0);
@@ -305,7 +304,7 @@ test('detail transcript message tools carry no restore action (#884)', async ({ 
   const tools = block.getByTestId('msg-tools');
   await expect(tools.getByRole('button')).toHaveCount(1);
   await tools.getByTestId('chief-msg-more').click();
-  await expect(page.getByRole('menuitem')).toHaveText(['复制']);
+  await expect(page.getByRole('menuitem')).toHaveText([/^复制/]);
 });
 
 test('fail row `查看原始错误` opens the raw-error dialog with the full text (#1258)', async ({
@@ -313,13 +312,13 @@ test('fail row `查看原始错误` opens the raw-error dialog with the full tex
 }) => {
   await page.goto('/app/todo/r8-12?scenario=54');
 
-  await expect(page.locator('.chat-para--fail')).toHaveText('运行该任务的 Runner 已离线');
+  await expect(page.locator('.chat-para--fail')).toHaveText('运行该任务的执行机已离线');
   await page.getByRole('button', { name: '查看原始错误' }).click();
   const dialog = page.getByRole('dialog', { name: '原始错误' });
   await expect(dialog).toBeVisible();
 
   await expect(dialog.locator('[data-testid="fail-raw-error"]')).toHaveText(
-    '运行该任务的 Runner 已离线',
+    '运行该任务的执行机已离线',
   );
 
   await dialog.getByRole('button', { name: '关闭' }).click();

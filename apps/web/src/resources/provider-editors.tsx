@@ -140,7 +140,13 @@ export interface ProviderEditActions {
   remove?: () => void;
 }
 
-function TestRow({ onTest }: { onTest: () => Promise<ProviderTestResult> }) {
+function TestRow({
+  onTest,
+  hasModels,
+}: {
+  onTest: () => Promise<ProviderTestResult>;
+  hasModels: boolean;
+}) {
   const { t } = useI18n();
   const [pending, setPending] = useState(false);
   const [outcome, setOutcome] = useState<ProviderTestResult | 'unavailable' | null>(null);
@@ -158,7 +164,11 @@ function TestRow({ onTest }: { onTest: () => Promise<ProviderTestResult> }) {
   return (
     <SettingsRow
       label={t('测试连接')}
-      hint={t('发一个最小请求，不会显示密钥')}
+      hint={
+        hasModels
+          ? t('发一个最小请求，不会显示密钥')
+          : t('先在下面的模型列表里添加一个模型，才能测试')
+      }
       className="flex-wrap gap-y-2 py-3"
     >
       <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
@@ -181,7 +191,12 @@ function TestRow({ onTest }: { onTest: () => Promise<ProviderTestResult> }) {
             )}
           </div>
         )}
-        <Button variant="outline" size="sm" disabled={pending} onClick={() => void run()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={pending || !hasModels}
+          onClick={() => void run()}
+        >
           {pending ? t('测试中…') : t('测试')}
         </Button>
       </div>
@@ -255,7 +270,11 @@ export function TeamProviderEditor({
         </SettingsRow>
         {!oauth && <KeyRow onReplace={(apiKey) => fire({ apiKey })} />}
         {!oauth && actions.test !== undefined && (
-          <TestRow key={JSON.stringify(record)} onTest={actions.test} />
+          <TestRow
+            key={JSON.stringify(record)}
+            onTest={actions.test}
+            hasModels={record.models.length > 0}
+          />
         )}
       </SettingsCard>
       <ProviderSection title={t('模型列表')} hint={t('这里的模型会出现在模型选择器里')}>
@@ -357,7 +376,7 @@ export function ClaudeCodeEditor({
             {bin?.path ?? t('未找到')}
           </code>
         </SettingsRow>
-        <SettingsRow label={t('配置')} hint={t('模型槽来自这台 Runner 的这个文件')}>
+        <SettingsRow label={t('配置')} hint={t('模型槽来自这台执行机的这个文件')}>
           <code className="text-meta text-content-secondary">~/.claude/settings.json</code>
         </SettingsRow>
       </SettingsCard>
@@ -365,9 +384,9 @@ export function ClaudeCodeEditor({
         {source === undefined || source.models.length === 0 ? (
           <p className={cn(SETTINGS_HINT_CLS, 'm-0 px-1')}>
             {source === undefined
-              ? t('这台 Runner 还没上报 Claude Code 信息。')
+              ? t('这台执行机还没上报 Claude Code 信息。')
               : t(
-                  '在该 Runner 上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。',
+                  '在该执行机上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。',
                 )}
           </p>
         ) : (
@@ -406,11 +425,11 @@ export function PiEditor({
       <SettingsCard>
         <SettingsRow
           label={t('服务商')}
-          hint={t('pi 步骤用所有 Runner 的服务商，不读这台 Runner 的配置')}
+          hint={t('pi 步骤用所有执行机的服务商，不读这台执行机的配置')}
           className="flex-wrap gap-y-2 py-2.5"
         >
           <Button variant="outline" size="sm" onClick={onShowTeam}>
-            {t('所有 Runner 的 {n} 个服务商', { n: providerCount })}
+            {t('所有执行机的 {n} 个服务商', { n: providerCount })}
           </Button>
         </SettingsRow>
       </SettingsCard>
@@ -428,7 +447,7 @@ export function GeminiEditor({ machineName }: { machineName: string }) {
         kind={t('{machine} 上的 CLI', { machine: machineName })}
       />
       <p className={cn(SETTINGS_HINT_CLS, 'm-0 px-1')}>
-        {t('Gemini CLI 还不上报版本和模型；打开后，这台 Runner 会接 Gemini 步骤。')}
+        {t('Gemini CLI 还不上报版本和模型；打开后，这台执行机就会接 Gemini 步骤。')}
       </p>
     </>
   );

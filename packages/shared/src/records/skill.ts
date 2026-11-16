@@ -4,8 +4,6 @@ import { recordId } from './common.js';
 
 export const SKILL_ENTRY_FILE = 'SKILL.md';
 
-export const SKILLS_DIR_DEFAULT = '~/.agents/skills';
-
 export const MAX_SKILL_FILE_BYTES = 512_000;
 
 export const MAX_SKILL_TOTAL_BYTES = 2_000_000;
@@ -48,6 +46,23 @@ export const importSkillBodySchema = z
     message: 'invalid body: exactly one of localPath or url is required',
   });
 export type ImportSkillBody = z.infer<typeof importSkillBodySchema>;
+
+export const skillImportCandidateSchema = z.object({
+  id: z.string(),
+  description: z.string().nullable(),
+  sourcePath: z.string(),
+  alreadyImported: z.boolean(),
+  problem: z.enum(['missing-name', 'invalid-name', 'missing-description']).nullable(),
+});
+export type SkillImportCandidate = z.infer<typeof skillImportCandidateSchema>;
+
+export const skillImportCandidatesResponseSchema = z.object({
+  candidates: z.array(skillImportCandidateSchema),
+  skippedSources: z.array(
+    z.object({ root: z.string(), reason: z.enum(['missing', 'unreadable']) }),
+  ),
+});
+export type SkillImportCandidatesResponse = z.infer<typeof skillImportCandidatesResponseSchema>;
 
 export const SKILL_DIR_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
@@ -96,5 +111,5 @@ export function buildSkillEntry(name: string, description: string, body: string)
 
 export const SKILL_PAGE_COPY = {
   empty: '尚无技能',
-  directoryHint: '把包含 SKILL.md 的技能目录放进 {dir}，或新建一个技能，即会出现在这里。',
+  hint: '用「导入」或「新建」添加技能。',
 } as const;

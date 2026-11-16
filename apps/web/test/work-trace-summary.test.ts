@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { workOutcome, workPurposes } from '../src/detail/work-trace.js';
+import { workPurposes, workResult } from '../src/detail/work-trace.js';
 import type { WorkStep } from '../src/fixtures/records.js';
-import type { TFunc } from '../src/i18n/translate.js';
+import { EN } from '../src/i18n/en.js';
+import { type TFunc, translate } from '../src/i18n/translate.js';
 
 const t: TFunc = (key: string) => (key === '核对 README' ? 'Check the README' : key);
 
@@ -95,35 +96,71 @@ describe('workPurposes from reasoning headings', () => {
   });
 });
 
-describe('workOutcome', () => {
+describe('workResult', () => {
   const edit = (id: string, target: string) => call({ id, action: 'edit', label: 'edit', target });
+  const read = (id: string, target: string) => call({ id, action: 'read', label: 'read', target });
+  const named: TFunc = (key, vars) =>
+    Object.entries(vars ?? {}).reduce((text, [name, value]) => text.replace(`{${name}}`, String(value)), key);
 
-  test('edits plus a finished test run read as one outcome, the last run deciding', () => {
+  test('edited files name the result, with the last finished test run, and outrank what was read', () => {
+    const steps = [
+      read('a', 'src/notes.md L1-20'),
+      edit('b', 'src/orders/export.ts'),
+      edit('c', 'src/orders/export.ts'),
+      call({ id: 'd', command: 'pnpm test', error: true }),
+      call({ id: 'e', command: 'pnpm test' }),
+    ];
+    expect(workResult(steps, named)).toBe('改了 export.ts，测试通过');
+  });
+
+  test('more than two files name the first two and count the rest', () => {
+    const steps = [edit('a', 'a/one.ts'), edit('b', 'b/two.ts'), edit('c', 'c/three.ts'), edit('d', 'd/four.ts')];
+    expect(workResult(steps, named)).toBe('改了 one.ts、two.ts 等 4 个文件');
+  });
+
+  test('English reads as one sentence', () => {
+    const en: TFunc = (key, vars) => translate('en', EN, key, vars);
+    const steps = [edit('a', 'src/rate-limit.ts'), edit('b', 'src/login.ts'), call({ id: 'c', command: 'pnpm test auth' })];
+    expect(workResult(steps, en)).toBe('Edited rate-limit.ts and login.ts, tests pass');
+    expect(workResult([...steps, edit('d', 'a.ts'), call({ id: 'e', command: 'pnpm test', error: true })], en)).toBe(
+      'Edited rate-limit.ts, login.ts and 1 more, tests fail',
+    );
+  });
+
+  test('a test run alone gives its verdict; reads alone name the files without line ranges', () => {
+    expect(workResult([read('a', 'README.md'), call({ id: 'b', command: 'go test ./...', error: true })], named)).toBe(
+      '测试未通过',
+    );
+    expect(workResult([read('a', 'src/main.ts L10–29'), read('b', 'src/main.ts L40–52')], named)).toBe(
+      '读了 main.ts',
+    );
+  });
+
+  test('a failed edit changed nothing, and a test run before the last edit did not test it', () => {
+    const failed = call({ id: 'x', action: 'edit', label: 'edit', target: 'src/other.ts', error: true });
+    expect(workResult([failed, edit('a', 'src/a.ts'), call({ id: 'b', command: 'pnpm test' })], named)).toBe(
+      '改了 a.ts，测试通过',
+    );
+    expect(workResult([call({ id: 'b', command: 'pnpm test' }), edit('a', 'src/a.ts')], named)).toBe('改了 a.ts');
+    expect(workResult([failed], named)).toBeNull();
+  });
+
+  test('a test run still running or never finished gives no verdict', () => {
     const steps = [
       edit('a', 'src/a.ts'),
-      call({ id: 'd', command: 'pnpm test', error: true }),
-      call({ id: 'e', command: 'pnpm exec vitest run orders', error: false }),
-    ];
-    expect(workOutcome(steps, t)).toEqual(['改完测试通过']);
-    expect(workOutcome([...steps, call({ id: 'f', command: 'cargo test', error: true })], t)).toEqual([
-      '改完测试未通过',
-    ]);
-  });
-
-  test('a test run alone, edits alone, and neither', () => {
-    expect(workOutcome([call({ id: 'a', command: 'go test ./...', error: true })], t)).toEqual(['测试未通过']);
-    expect(workOutcome([call({ id: 'a', command: 'pytest' })], t)).toEqual(['测试通过']);
-    expect(
-      workOutcome([edit('a', 'src/a.ts'), edit('b', 'src/a.ts'), edit('c', 'src/b.ts')], t),
-    ).toEqual(['改了 {n} 个文件']);
-    expect(workOutcome([call({ id: 'a', command: 'pnpm build' })], t)).toEqual([]);
-  });
-
-  test('a test run still running or never finished is not an outcome', () => {
-    const steps = [
       call({ id: 'b', command: 'pnpm test', unfinished: true }),
       call({ id: 'c', command: 'pnpm test', running: true }),
     ];
-    expect(workOutcome(steps, t)).toEqual([]);
+    expect(workResult(steps, named)).toBe('改了 a.ts');
+  });
+
+  test('a group with nothing to name keeps the counts', () => {
+    const steps: WorkStep[] = [
+      { kind: 'think', id: 't', text: 'plan', seconds: 2 },
+      call({ id: 'a', command: 'pnpm build' }),
+      call({ id: 'b', action: 'search', description: 'grep ready src' }),
+      call({ id: 'c', action: 'edit', label: 'edit', target: 'src/a.ts', running: true }),
+    ];
+    expect(workResult(steps, named)).toBeNull();
   });
 });

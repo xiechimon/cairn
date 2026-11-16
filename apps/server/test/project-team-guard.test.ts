@@ -155,7 +155,7 @@ describe('#1466 the chief tool surface: a cross-team project id = 404 (same shap
     expect(chiefWatchIds()).toEqual([]);
   });
 
-  test('T9 open_thread: an own-team todo pointing at another team project -> 404, no build created, the phase unchanged, no watch added', async () => {
+  test('T9 open_thread: an own-team todo pointing at another team project -> 404, no build created, the phase unchanged, only the creating channel watches its own todo', async () => {
     insertCrossTodo();
     const own = await createOwnTodo();
     const single = await chiefError('open_thread', { todoId: CROSS });
@@ -163,16 +163,16 @@ describe('#1466 the chief tool surface: a cross-team project id = 404 (same shap
     expect(single.message).toBe(`project ${PROJ_B}`);
     expect(todoState(CROSS)).toEqual({ phase: 'todo', builds: 0 });
     expect(todoState(own)).toEqual({ phase: 'queued', builds: 1 });
-    expect(chiefWatchIds()).toEqual([]);
+    expect(chiefWatchIds()).toEqual([own]);
   });
 
-  test('T10 a mixed watch_todos list containing an own-team todo pointing at another team project -> 404, nothing watched', async () => {
+  test('T10 a mixed watch_todos list containing an own-team todo pointing at another team project -> 404, the cross-team todo is not watched', async () => {
     insertCrossTodo();
     const own = await createOwnTodo();
     const err = await chiefError('watch_todos', { todoIds: [own, CROSS] });
     expect(err.status).toBe(404);
     expect(err.message).toBe(`project ${PROJ_B}`);
-    expect(chiefWatchIds()).toEqual([]);
+    expect(chiefWatchIds()).toEqual([own]);
   });
 
   test('T8 same-team paths unchanged: docs / create_todo / update_project / connect_repo / todos / watch_todos', async () => {

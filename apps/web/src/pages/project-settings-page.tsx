@@ -1,5 +1,6 @@
 import { isGithubRepoRef } from '@cairn/shared';
 import { cn } from 'cn';
+import { FolderSearch } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects } from '../api/hooks.js';
@@ -8,13 +9,14 @@ import { ProjectAvatar } from '../board/project-avatar.js';
 import { ProjectIconPicker } from '../board/project-icon-picker.js';
 import { ProjectsFailed, ProjectsLoading } from '../board/project-not-found.js';
 import { MemoryPanel } from '../chief/memory-panel.js';
+import { EmptyState } from '../components/empty-state.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
+import { ProfileHeader } from '../components/profile-card.js';
 import {
   SETTINGS_HINT_CLS,
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
   SettingsDangerZone,
-  SettingsHeader,
   SettingsRow,
 } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -27,12 +29,13 @@ import { isDeleted, markDeleted } from '../fixtures/deletions.js';
 import type { ProjectContent } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronDown, SquarePen } from '../icons/index.js';
+import { ChevronDown } from '../icons/index.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
+import { RouteDialog } from '../overlay/route-dialog.js';
 import { ProjectAutonomyCard } from './project-autonomy-card.js';
 import { ProjectBaseBranchSelect } from './project-base-branch-select.js';
 import { ProjectConcurrencySelect } from './project-concurrency-select.js';
-import { PageShell, TabGroup } from './shell.js';
+import { TabGroup } from './shell.js';
 
 const TABS = [
   { id: 'basic', label: '基本信息' },
@@ -40,8 +43,10 @@ const TABS = [
   { id: 'memory', label: '记忆' },
 ];
 
-const ROW_INPUT_CLS = `${FORM_CONTROL_CLS} w-72`;
-const ROW_ICON_CLS = 'text-content-tertiary';
+const ROW_INPUT_CLS = `${FORM_CONTROL_CLS} w-72 min-w-0 max-sm:flex-1`;
+
+const NARROW_ROWS_CLS =
+  'max-sm:[&_.settings-row]:flex-wrap max-sm:[&_.settings-row]:py-3 max-sm:[&_.settings-row>span]:w-full max-sm:[&_.settings-row>span]:max-w-full';
 export function ProjectSettingsPage() {
   const { t } = useI18n();
   const { id } = useParams();
@@ -54,7 +59,6 @@ export function ProjectSettingsPage() {
   });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [accelDraft, setAccelDraft] = useState<string | null>(null);
-  const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [descDraft, setDescDraft] = useState<string | null>(null);
   const [convRepo, setConvRepo] = useState('');
   const [convPathDraft, setConvPathDraft] = useState<string | null>(null);
@@ -77,7 +81,12 @@ export function ProjectSettingsPage() {
           ...(wireProject.color != null ? { color: wireProject.color } : {}),
         }
       : undefined
-    : fixture.project;
+    : id !== undefined && (fixture.projectNames === undefined || id in fixture.projectNames)
+      ? fixture.project
+      : undefined;
+  const missing = live
+    ? projectsQ.data !== undefined && wireProject === undefined
+    : project === undefined;
   const memoryProject = live ? wireProject : { id: id ?? '', name: project?.name ?? '' };
   const rowIds = live
     ? (projectsQ.data ?? []).map((p) => p.id)
@@ -92,16 +101,23 @@ export function ProjectSettingsPage() {
         : repoKind === 'local'
           ? t('本地文件夹')
           : undefined;
+  if (missing) {
+    return (
+      <RouteDialog title={t('项目设置')} size="page">
+        <EmptyState
+          testId="project-settings-missing"
+          icon={FolderSearch}
+          title={t('找不到这个项目')}
+          description={t('它可能已被删除、改名，或你不在它所属的团队。')}
+          className="py-16"
+        />
+      </RouteDialog>
+    );
+  }
   return (
-    <PageShell
-      route="project-settings"
-      fixture={fixture}
-      selected="none"
-      title={t('设置')}
-      back={{ pathname: `/app/project/${id ?? ''}`, search: searchParams.toString() }}
-    >
+    <RouteDialog title={t('项目设置')} size="page">
       <div className="flex flex-col gap-4">
-        <SettingsHeader
+        <ProfileHeader
           avatarClassName={cn('prj-set-avatar', project?.icon != null && 'rounded-xl')}
           avatar={
             <ProjectIconPicker
@@ -133,72 +149,39 @@ export function ProjectSettingsPage() {
               }
             />
           }
-          title={project?.name ?? ''}
+          name={project?.name ?? ''}
           sub={kindLabel}
+          onRename={(next) => {
+            if (id === undefined) return;
+            if (!live) {
+              blockDemoWrite();
+              return;
+            }
+            mutations.patchProject.mutate(
+              { id, body: { name: next } },
+              { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+            );
+          }}
         />
         <div className="flex">
           <TabGroup tabs={TABS} tab={tab} onTab={setTab} />
         </div>
-        {tab === 'memory' ? (
-          live && memoryProject === undefined ? (
-            projectsQ.isError ? (
-              <ProjectsFailed
-                retrying={projectsQ.isFetching}
-                onRetry={() => void projectsQ.refetch()}
-              />
-            ) : projectsQ.data === undefined ? (
-              <div className="flex min-h-28">
-                <ProjectsLoading />
-              </div>
-            ) : (
-              <p role="alert" className="text-ui text-content-secondary">
-                {t('找不到这个项目')}
-              </p>
-            )
+        {live && wireProject === undefined ? (
+          projectsQ.isError ? (
+            <ProjectsFailed
+              retrying={projectsQ.isFetching}
+              onRetry={() => void projectsQ.refetch()}
+            />
           ) : (
-            <MemoryPanel live={live} teamId={teamId} project={memoryProject ?? null} />
+            <div className="flex min-h-28">
+              <ProjectsLoading />
+            </div>
           )
-        ) : (
+        ) : tab === 'memory' ? (
+          <MemoryPanel live={live} teamId={teamId} project={memoryProject ?? null} />
+        ) : tab === 'repo' ? (
           <>
-            <SettingsCard className="prj-set-card">
-              <SettingsRow label={t('名称')}>
-                {live && wireProject !== undefined ? (
-                  <>
-                    <Input
-                      aria-label={t('名称')}
-                      className={ROW_INPUT_CLS}
-                      value={nameDraft ?? wireProject.name}
-                      onChange={(event) => setNameDraft(event.target.value)}
-                    />
-                    <Button
-                      className={DIALOG_PRIMARY_BUTTON}
-                      aria-label={t('保存名称')}
-                      disabled={
-                        mutations.patchProject.isPending ||
-                        (nameDraft ?? '').trim() === wireProject.name ||
-                        (nameDraft ?? '').trim() === ''
-                      }
-                      onClick={() => {
-                        if (id === undefined) return;
-                        mutations.patchProject.mutate(
-                          { id, body: { name: (nameDraft ?? '').trim() } },
-                          {
-                            onSuccess: () => setNameDraft(null),
-                            onError: (error) => toastError(t('保存失败，请重试。'), error),
-                          },
-                        );
-                      }}
-                    >
-                      {t('保存')}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    {project?.name ?? ''}
-                    <SquarePen width={16} height={16} className={ROW_ICON_CLS} />
-                  </>
-                )}
-              </SettingsRow>
+            <SettingsCard className={cn('prj-set-card', NARROW_ROWS_CLS)}>
               {live && wireProject?.repoKind === 'github' ? (
                 <SettingsRow label={t('仓库')}>
                   <Input
@@ -258,18 +241,10 @@ export function ProjectSettingsPage() {
                     className={`prj-set-branch inline-flex w-32 items-center justify-between border px-2.5 font-mono ${SETTINGS_SELECT_TRIGGER_CLS}`}
                   >
                     {project?.defaultBranch ?? 'main'}
-                    <ChevronDown width={16} height={16} className={ROW_ICON_CLS} />
+                    <ChevronDown width={16} height={16} className="text-content-tertiary" />
                   </span>
                 )}
               </SettingsRow>
-              {live && wireProject !== undefined && (
-                <SettingsRow
-                  label={t('并发与优先级')}
-                  hint={t('本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。')}
-                >
-                  <ProjectConcurrencySelect project={wireProject} />
-                </SettingsRow>
-              )}
               {live && wireProject?.repoKind === 'github' && (
                 <SettingsRow label={t('本机加速路径')}>
                   <Input
@@ -301,51 +276,6 @@ export function ProjectSettingsPage() {
                   </Button>
                 </SettingsRow>
               )}
-              <SettingsRow
-                label={t('描述')}
-                valueClassName={
-                  live || project?.description != null ? undefined : 'text-content-tertiary'
-                }
-              >
-                {live && wireProject !== undefined ? (
-                  <>
-                    <Input
-                      aria-label={t('描述')}
-                      className={ROW_INPUT_CLS}
-                      placeholder={t('尚无描述')}
-                      value={descDraft ?? wireProject.description ?? ''}
-                      onChange={(event) => setDescDraft(event.target.value)}
-                    />
-                    <Button
-                      className={DIALOG_PRIMARY_BUTTON}
-                      aria-label={t('保存描述')}
-                      disabled={
-                        mutations.patchProject.isPending ||
-                        (descDraft ?? wireProject.description ?? '') ===
-                          (wireProject.description ?? '')
-                      }
-                      onClick={() => {
-                        if (id === undefined) return;
-                        const next = (descDraft ?? '').trim();
-                        mutations.patchProject.mutate(
-                          { id, body: { description: next === '' ? null : next } },
-                          {
-                            onSuccess: () => setDescDraft(null),
-                            onError: (error) => toastError(t('描述保存失败，请重试。'), error),
-                          },
-                        );
-                      }}
-                    >
-                      {t('保存')}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    {project?.description ?? t('尚无描述')}
-                    <SquarePen width={16} height={16} className={ROW_ICON_CLS} />
-                  </>
-                )}
-              </SettingsRow>
             </SettingsCard>
             {live && wireProject?.repoKind === 'local' && (
               <SettingsCard>
@@ -425,6 +355,61 @@ export function ProjectSettingsPage() {
               wireProject?.repoKind === 'github' &&
               id !== undefined &&
               teamId !== undefined && <ProjectAutonomyCard projectId={id} teamId={teamId} />}
+          </>
+        ) : (
+          <>
+            <SettingsCard className={cn('prj-set-card', NARROW_ROWS_CLS)}>
+              <SettingsRow
+                label={t('描述')}
+                valueClassName={
+                  live || project?.description != null ? undefined : 'text-content-tertiary'
+                }
+              >
+                {live && wireProject !== undefined ? (
+                  <>
+                    <Input
+                      aria-label={t('描述')}
+                      className={ROW_INPUT_CLS}
+                      placeholder={t('尚无描述')}
+                      value={descDraft ?? wireProject.description ?? ''}
+                      onChange={(event) => setDescDraft(event.target.value)}
+                    />
+                    <Button
+                      className={DIALOG_PRIMARY_BUTTON}
+                      aria-label={t('保存描述')}
+                      disabled={
+                        mutations.patchProject.isPending ||
+                        (descDraft ?? wireProject.description ?? '') ===
+                          (wireProject.description ?? '')
+                      }
+                      onClick={() => {
+                        if (id === undefined) return;
+                        const next = (descDraft ?? '').trim();
+                        mutations.patchProject.mutate(
+                          { id, body: { description: next === '' ? null : next } },
+                          {
+                            onSuccess: () => setDescDraft(null),
+                            onError: (error) => toastError(t('描述保存失败，请重试。'), error),
+                          },
+                        );
+                      }}
+                    >
+                      {t('保存')}
+                    </Button>
+                  </>
+                ) : (
+                  (project?.description ?? t('尚无描述'))
+                )}
+              </SettingsRow>
+              {live && wireProject !== undefined && (
+                <SettingsRow
+                  label={t('并发与优先级')}
+                  hint={t('本项目同时运行的对话上限。你发的消息会插队，并可多用一个位置。')}
+                >
+                  <ProjectConcurrencySelect project={wireProject} />
+                </SettingsRow>
+              )}
+            </SettingsCard>
             <section className="flex flex-col gap-2">
               <h3 className="m-0 px-1 text-meta font-normal text-content-tertiary">
                 {t('危险操作')}
@@ -462,6 +447,6 @@ export function ProjectSettingsPage() {
           navigate('/app');
         }}
       />
-    </PageShell>
+    </RouteDialog>
   );
 }

@@ -384,6 +384,34 @@
   z-index: var(--z-modal-scrim);
 }
 
+html:has([data-slot="demo-banner"])
+  :is([data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"]) {
+  top: 2.25rem;
+}
+
+html:has([data-slot="demo-banner"]) .app-drawer {
+  top: 2.25rem;
+  height: calc(100% - 2.25rem);
+}
+
+@media (max-width: 640px) {
+  .route-page-dialog {
+    --settings-w: 100%;
+    --settings-h: 100%;
+    top: 0;
+    left: 0;
+    translate: none;
+    max-height: none;
+    border-radius: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  html:has([data-slot="demo-banner"]) .route-page-dialog {
+    top: 2.25rem;
+    --settings-h: calc(100% - 2.25rem);
+  }
+}
+
 @supports (corner-shape: superellipse(1.5)) {
   .board-notify-banner {
     corner-shape: superellipse(1.5);
@@ -675,8 +703,13 @@
   }
 }
 
-.board-shell:not(:has(> .board-sidebar)) > .board-sheet {
+.board-shell:not(:has(> .board-sidebar)) > .board-sheet,
+.page-shell:not(:has(> .board-sidebar)) > .page-main {
   border-left-width: 0;
+}
+
+.page-shell:not(:has(> .board-sidebar)) [data-testid="page-topbar"] {
+  padding-left: 52px;
 }
 
 @media (width < 48rem) {
@@ -704,7 +737,7 @@ html:not(.light)
 }
 
 :is([data-slot="message-scroller"], [data-trace-card], [data-slot="trace"], .chat-interactions)
-  :is(button, a, [role="button"]),
+  :is(button, a, [role="button"]):not(.mention-chip--todo),
 .chat-interaction {
   box-shadow: none;
   transition-duration: 0s;
@@ -720,4 +753,30 @@ body:has([data-testid="chief-body"]),
 #root:has([data-testid="chief-body"]),
 #root :has([data-testid="chief-body"]) {
   overscroll-behavior: none;
+}
+
+:root[data-shell="mac-desktop"] .sidebar-team-row {
+  padding-left: 70px;
+  -webkit-app-region: drag;
+}
+
+:root[data-shell="mac-desktop"] .sidebar-team-name {
+  visibility: hidden;
+}
+
+:root[data-shell="mac-desktop"] .sidebar-team-row :is(button, a) {
+  -webkit-app-region: no-drag;
+}
+
+:root[data-shell="mac-desktop"] .sidebar-peek-trigger {
+  left: 78px;
+}
+
+.desktop-drag-strip {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: var(--z-gate);
+  height: 8px;
+  pointer-events: none;
+  -webkit-app-region: drag;
 }

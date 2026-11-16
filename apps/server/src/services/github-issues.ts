@@ -1,7 +1,5 @@
 import {
   type GithubIssueEcho,
-  type GithubIssueState,
-  type GithubIssuesResponse,
   type GithubRepoRef,
   githubIssueSourceRef,
   neutralizeIssueAttachmentTokens,
@@ -14,15 +12,11 @@ import type { Db } from '../db/client.js';
 import { type project as projectTable, todo as todoTable } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { githubRepoIssue, githubRepoIssues, githubRepoLabels } from '../lib/github.js';
+import { githubRepoIssue, githubRepoLabels } from '../lib/github.js';
 import { githubRepoOfProject } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { teamUserToken } from './github-connection.js';
-import {
-  normalizeGithubLabelColor,
-  resolveProjectGithubLabelIds,
-  syncGithubLabels,
-} from './github-labels.js';
+import { resolveProjectGithubLabelIds, syncGithubLabels } from './github-labels.js';
 import { CORRECTION_PROMPT } from './merge-gate/correction.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { createTodo, type TodoDeps } from './todos.js';
@@ -72,37 +66,6 @@ function claimedSourceRefs(db: Db, teamId: string, refs: string[]): Set<string> 
   return new Set(
     rows.map((r) => r.sourceRef?.toLowerCase()).filter((v): v is string => v !== undefined),
   );
-}
-
-export async function listProjectGithubIssues(
-  deps: GithubIssueFaceDeps,
-  row: ProjectRow,
-  opts: { state: GithubIssueState; page: number },
-): Promise<GithubIssuesResponse> {
-  const { owner, repo } = requireGithubRepo(row);
-  const token = await requireToken(deps, row.teamId, { owner, repo });
-  const fetchImpl = deps.githubFetch ?? fetch;
-  const { issues, hasMore } = await githubRepoIssues(fetchImpl, token, owner, repo, opts);
-  const claimed = claimedSourceRefs(
-    deps.db,
-    row.teamId,
-    issues.map((issue) => githubIssueSourceRef(owner, repo, issue.number)),
-  );
-  return {
-    issues: issues
-      .filter(
-        (issue) => !claimed.has(githubIssueSourceRef(owner, repo, issue.number).toLowerCase()),
-      )
-      .map((issue) => ({
-        ...issue,
-        labels: issue.labels.map((label) => ({
-          name: label.name,
-          color: normalizeGithubLabelColor(label.color),
-        })),
-      })),
-    page: opts.page,
-    hasMore,
-  };
 }
 
 export type ImportGithubIssueDeps = GithubIssueFaceDeps & Omit<TodoDeps, 'box'>;

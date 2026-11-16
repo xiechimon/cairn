@@ -90,6 +90,7 @@ class FakeClient implements MachineApi {
   sessionUploads: string[] = [];
   git: GitCredentials | null = null;
   replacement: GitCredentials | null = null;
+  tokenExtras: Record<string, unknown> = {};
 
   async enroll(): Promise<never> {
     throw new Error('unused');
@@ -122,6 +123,7 @@ class FakeClient implements MachineApi {
         models: [{ id: 'stub-model', name: 'stub-model' }],
       },
       secrets: {},
+      ...this.tokenExtras,
       git:
         this.calls.filter((call) => call === 'token').length > 1
           ? (this.replacement ?? this.git)
@@ -269,6 +271,7 @@ async function setup(
     replacement?: GitCredentials;
     hookNotes?: WorkspaceHookNoteData[];
     now?: () => number;
+    tokenExtras?: Record<string, unknown>;
   },
 ) {
   probeMock.mockReset();
@@ -281,6 +284,7 @@ async function setup(
   const client = new FakeClient();
   client.git = opts.git ?? null;
   client.replacement = opts.replacement ?? null;
+  client.tokenExtras = opts.tokenExtras ?? {};
   const journal = new StepJournal(paths.outboxDir);
   mkdirSync(join(home, 'workspaces'), { recursive: true });
   await runStep(
@@ -436,6 +440,39 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(client.doneBodies[0]!.body.status).toBe('failed');
     expect(String(client.doneBodies[0]!.body.errorMessage)).toContain('bad object');
     expect(transcriptRows(client).some((r) => r.id === 'git-credential-s1')).toBe(false);
+  }, 20_000);
+
+  test('a local repo push that succeeds writes no git credential row', async () => {
+    const workspace = fakeWorkspace({});
+    const { client } = await setup(
+      claimedStep('build', { kind: 'local', cloneUrl: '/tmp/user-repo' }),
+      { git: null, workspace },
+    );
+    expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: null }]);
+    expect(client.doneBodies[0]!.body.status).toBe('success');
+    expect(transcriptRows(client).some((r) => r.id === 'git-credential-s1')).toBe(false);
+  }, 20_000);
+
+  test('a push that falls back to machine credentials keeps the credential row before the agent output', async () => {
+    const workspace = fakeWorkspace({
+      pushWithToken: () => {
+        throw new Error(MEA_AUTH_FAILURE);
+      },
+    });
+    let clock = 1_000;
+    const { client } = await setup(
+      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+      { git: GITHUB_TOKEN, workspace, now: () => (clock += 10) },
+    );
+    const rows = transcriptRows(client);
+    const credential = rows.find((r) => r.id === 'git-credential-s1');
+    const firstAssistant = rows.find((r) => r.role === 'assistant');
+    expect(systemRowOf(credential?.content)).toEqual({
+      kind: GIT_CREDENTIAL_ROW_KIND,
+      source: 'machine',
+    });
+    expect(firstAssistant).toBeDefined();
+    expect(credential!.createdAt).toBeLessThan(firstAssistant!.createdAt);
   }, 20_000);
 
   test('failure mode 6: prepare already fell back (provenance machine) → provenance line surfaces with prepare (visible even on rounds where push never fired)', async () => {
@@ -694,4 +731,44 @@ test.each(
     expect.soft(hooks[0]?.output === 'before [REDACTED] after').toBe(true);
     expect(hooks[0]?.omittedChars).toBe(17);
   }
+});
+
+test('a granted connector reaches the session and its credential never reaches the transcript', async () => {
+  const linear = {
+    slug: 'linear',
+    transport: 'http' as const,
+    url: 'https://mcp.linear.app/mcp',
+    headers: {
+      Authorization: 'Bearer lin-access-123',
+      'X-MCP-Readonly': 'true',
+      'X-Api-Version': '2',
+    },
+  };
+  let mounted: SessionOpts['mcpServers'];
+  const { client, lines } = await setup(
+    { ...claimedStep('build', { kind: 'local', cloneUrl: '/tmp/repo' }), mcpServers: ['linear'] },
+    {
+      workspace: fakeWorkspace({}),
+      tokenExtras: {
+        mcpConnectors: [
+          linear,
+          { slug: 'github', transport: 'http', url: 'https://api.githubcopilot.com/mcp/' },
+        ],
+      },
+      onSession: (opts) => {
+        mounted = opts.mcpServers;
+      },
+      echo: 'saw lin-access-123 and readonly true on api 2',
+    },
+  );
+  expect(mounted).toEqual([linear]);
+  const text = JSON.stringify(transcriptRows(client));
+  expect(text).not.toContain('lin-access-123');
+  expect(text).toContain('[REDACTED]');
+  expect(text).toContain('readonly true on api 2');
+  expect(client.doneBodies.map((d) => d.body.status)).toEqual(['success']);
+  expect(lines.join('\n')).not.toContain('lin-access-123');
+  expect(lines.filter((l) => l.startsWith('[mcp] loaded from'))).toEqual([
+    expect.stringMatching(/: \(none\); from connectors: linear$/),
+  ]);
 });

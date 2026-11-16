@@ -21,7 +21,7 @@ import { withoutDeleted } from '../fixtures/deletions.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { PageShell } from '../pages/shell.js';
+import { RouteDialog } from '../overlay/route-dialog.js';
 import {
   type ActivityGroup,
   type ActivityRow,
@@ -77,23 +77,32 @@ function ActivityThreadRow({
       tone={tone}
       age={relativeTime(row.todo.phaseAt, now, t)}
       onOpen={onOpen}
+      flush
       reason={
         <span className="inline-flex max-w-full items-center gap-1.5">
-          <ToneGlyph tone={tone} still />
+          <ToneGlyph
+            tone={tone}
+            still
+            className={
+              tone === 'failed' || tone === 'working' ? 'text-content-tertiary' : undefined
+            }
+          />
           {row.projectName !== undefined && (
             <>
               <ProjectAvatar name={row.projectName} {...projectMark(row.todo.projectId)} bare />
-              <span className="truncate">{row.projectName}</span>
+              <span className="max-w-28 flex-none truncate">{row.projectName}</span>
               <span aria-hidden>·</span>
             </>
           )}
-          <span className="truncate max-[640px]:hidden">{t(threadCopy(row.todo).reason)}</span>
-          <span aria-hidden className="max-[640px]:hidden">
-            ·
-          </span>
-          <span data-testid="activity-row-cost" className="flex-none font-mono text-code">
-            {row.cost === null ? '—' : formatUsd(row.cost)}
-          </span>
+          <span className="min-w-0 truncate">{t(threadCopy(row.todo).reason)}</span>
+          {row.cost !== null && (
+            <>
+              <span aria-hidden>·</span>
+              <span data-testid="activity-row-cost" className="flex-none font-mono text-code">
+                {formatUsd(row.cost)}
+              </span>
+            </>
+          )}
         </span>
       }
     />
@@ -182,26 +191,23 @@ export function ActivityPage() {
   const failed = activity.state === 'error';
 
   return (
-    <PageShell
-      route="activity"
-      fixture={fixture}
-      selected="none"
-      title={<span className="max-[640px]:pl-8">{t('活动')}</span>}
+    <RouteDialog
+      title={t('活动')}
+      size="page"
       bleed
       actions={
         !loading &&
         !failed && (
           <span data-testid="activity-summary" className="text-meta text-content-tertiary">
-            {t('{n} 条 · {cost}', {
-              n: rows.length,
-              cost: totalCost === null ? '—' : formatUsd(totalCost),
-            })}
+            {totalCost === null
+              ? t('{n} 条', { n: rows.length })
+              : t('{n} 条 · {cost}', { n: rows.length, cost: formatUsd(totalCost) })}
           </span>
         )
       }
     >
       <div className="flex flex-col gap-2 px-4 py-3">
-        <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-card px-2.5 py-1 text-content-tertiary dark:bg-input/30">
+        <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-card px-2.5 py-1 text-content-tertiary pointer-coarse:min-h-11 pointer-coarse:py-0 pointer-coarse:pr-0 dark:bg-input/30">
           <Search width={16} height={16} className="flex-none" />
           {chips.map((chip, index) => (
             <QueryChip
@@ -232,14 +238,14 @@ export function ActivityPage() {
                 setQuery(`${query} `);
               }
             }}
-            className="h-6 min-w-24 flex-1 rounded-none border-none bg-transparent p-0 text-ui text-foreground shadow-none ring-0 focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent md:text-ui"
+            className="h-6 min-w-24 flex-1 rounded-none pointer-coarse:h-11 border-none bg-transparent p-0 text-ui text-foreground shadow-none ring-0 focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent md:text-ui"
           />
           <Button
             variant="ghost"
             size="icon-xs"
             aria-label={t('语法')}
             aria-expanded={helpOpen}
-            className="text-content-tertiary"
+            className="text-content-tertiary pointer-coarse:size-11"
             onClick={() => setHelpOpen((value) => !value)}
           >
             <CircleHelp />
@@ -247,7 +253,7 @@ export function ActivityPage() {
         </div>
         <ChipProblems chips={chips} problems={problems} />
         {helpOpen && <SyntaxHelp className="shadow-none ring-1 ring-border" />}
-        <fieldset className="m-0 flex min-w-0 items-center gap-1.5 overflow-x-auto border-0 p-0">
+        <fieldset className="m-0 flex min-w-0 flex-wrap items-center gap-1.5 border-0 p-0">
           <legend className="sr-only">{t('快速筛选')}</legend>
           {QUICK_FILTERS.map((quick) => (
             <Button
@@ -257,7 +263,7 @@ export function ActivityPage() {
               data-testid="quick-filter"
               aria-pressed={hasToken(quick.token)}
               className={cn(
-                'flex-none rounded-full text-content-secondary',
+                'flex-none rounded-full text-content-secondary pointer-coarse:h-11',
                 hasToken(quick.token) && 'border-foreground/30 bg-secondary text-foreground',
               )}
               onClick={() => toggleQuick(quick.token)}
@@ -268,7 +274,7 @@ export function ActivityPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="flex-none text-content-secondary"
+            className="flex-none text-content-secondary pointer-coarse:h-11"
             onClick={() => {
               setHelpOpen(true);
               inputRef.current?.focus();
@@ -326,10 +332,9 @@ export function ActivityPage() {
                     data-testid="activity-group-total"
                     className="text-caption text-content-tertiary"
                   >
-                    {t('{n} 条 · {cost}', {
-                      n: group.count,
-                      cost: group.cost === null ? '—' : formatUsd(group.cost),
-                    })}
+                    {group.cost === null
+                      ? t('{n} 条', { n: group.count })
+                      : t('{n} 条 · {cost}', { n: group.count, cost: formatUsd(group.cost) })}
                   </span>
                 </div>
                 {group.rows.map((row) => (
@@ -360,6 +365,6 @@ export function ActivityPage() {
           </StoneTrail>
         )}
       </div>
-    </PageShell>
+    </RouteDialog>
   );
 }

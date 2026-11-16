@@ -162,11 +162,11 @@ function transcript12(stamp: string): TranscriptItem[] {
       footer: { seconds: 28 },
     },
     { kind: 'note', text: '18:18' },
-    { kind: 'note', text: 'Xmon Dai 发起了合并' },
+    { kind: 'note', text: '{name} 发起了合并', vars: { name: 'Xmon Dai' } },
     {
       kind: 'fail',
-      title: '运行该任务的 Runner 已离线',
-      body: '请将这台 Runner 重新上线。这一步不会改派到其他 Runner。',
+      title: '运行该任务的执行机已离线',
+      body: '请将这台执行机重新上线。这一步不会改派到其他执行机。',
     },
   ];
 }
@@ -413,7 +413,7 @@ const RUN1_TO_V2: TranscriptItem[] = [
     ],
   },
   { kind: 'plan', title: '方案 · v1', preview: R8_PLAN_PREVIEW, seconds: 31 },
-  { kind: 'note', text: 'Xmon Dai 发起了 AI 审核' },
+  { kind: 'note', text: '{name} 发起了 AI 审核', vars: { name: 'Xmon Dai' } },
   REVIEW_MESSAGE,
   ADJUST_V2_MESSAGE,
   { kind: 'plan', title: '方案 · v2', preview: R8_PLAN_PREVIEW, seconds: 29 },
@@ -480,11 +480,11 @@ const RUN1_FAILED: TranscriptItem[] = [
     ],
     footer: { seconds: 29 },
   },
-  { kind: 'note', text: 'Xmon Dai 发起了合并' },
+  { kind: 'note', text: '{name} 发起了合并', vars: { name: 'Xmon Dai' } },
   {
     kind: 'fail',
-    title: '运行该任务的 Runner 已离线',
-    body: '请将这台 Runner 重新上线。这一步不会改派到其他 Runner。',
+    title: '运行该任务的执行机已离线',
+    body: '请将这台执行机重新上线。这一步不会改派到其他执行机。',
   },
 ];
 
@@ -503,7 +503,7 @@ const REUSED_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'plan', title: '方案 · v1', preview: R8_PLAN_PREVIEW },
   { kind: 'run', machine: MACHINE_NAME },
   { kind: 'user', text: '确认' },
-  { kind: 'streaming', seconds: 1, label: '连接 Runner...' },
+  { kind: 'streaming', seconds: 1, label: '连接执行机...' },
 ];
 
 const REUSED_REVIEW_TRANSCRIPT: TranscriptItem[] = [

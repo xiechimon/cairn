@@ -2,7 +2,6 @@ import { expect, type Page, test } from '@playwright/test';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 const HOME = '/app?scenario=home-c';
-const SCHEDULES = '/app/schedules?scenario=home-c';
 
 const homeComposer = (page: Page) => page.getByTestId('home-c').getByTestId('chief-composer-input');
 
@@ -47,14 +46,6 @@ test('an open dialog keeps its keys', async ({ page }) => {
   await page.keyboard.type('ab');
   await expect(field).toHaveValue('ab');
   await expect(homeComposer(page)).toHaveValue('');
-});
-
-test('C no longer navigates: a page without a composer ignores typing', async ({ page }) => {
-  await page.goto(SCHEDULES);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  await page.locator('body').press('c');
-  await page.waitForTimeout(200);
-  await expect(page).toHaveURL(/\/app\/schedules/);
 });
 
 async function mockPendingQuestion(page: Page) {

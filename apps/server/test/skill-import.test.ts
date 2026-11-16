@@ -1,8 +1,11 @@
+import { createHash } from 'node:crypto';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   statSync,
@@ -14,10 +17,11 @@ import {
   type ClaimedStep,
   MAX_SKILL_FILE_BYTES,
   machineSkillsManifestResponseSchema,
+  skillImportCandidatesResponseSchema,
   skillRecordSchema,
 } from '@cairn/shared';
 import type { Hono } from 'hono';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { skillAudit } from '../src/db/schema.js';
@@ -241,6 +245,24 @@ describe('POST /api/teams/{id}/skills/import (localPath)', () => {
       });
       expect(viaLink.status).toBe(400);
       expect(await errorText(viaLink)).toContain('skills directory');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('LP4b: a source that contains the skills root -> 400, nothing written', async () => {
+    const parent = makeRoot();
+    const skillsDir = join(parent, 'home', 'skills');
+    mkdirSync(skillsDir, { recursive: true });
+    writeFileSync(join(parent, 'SKILL.md'), skillMd('parent', 'd'));
+    const s = bootServer({ skillsDir, skillSourcesPath: join(makeRoot(), 's.json') });
+    try {
+      const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+        localPath: parent,
+      });
+      expect(res.status).toBe(400);
+      expect(await errorText(res)).toContain('contains the cairn skills directory');
+      expect(readdirSync(skillsDir)).toEqual([]);
     } finally {
       s.dispose();
     }
@@ -1013,5 +1035,125 @@ describe('source registration failure (#1185)', () => {
       }),
     ).rejects.toThrow();
     expect(readSkillSource(path, 'phantom-skill')).toBeNull();
+  });
+});
+
+describe('GET /api/teams/{id}/skills/import-candidates', () => {
+  let home: string;
+  let previousHome: string | undefined;
+  beforeEach(() => {
+    previousHome = process.env.HOME;
+    home = makeRoot();
+    process.env.HOME = home;
+  });
+  afterEach(() => {
+    process.env.HOME = previousHome;
+  });
+
+  const agentsRoot = () => join(home, '.agents', 'skills');
+  const claudeRoot = () => join(home, '.claude', 'skills');
+  const cairnRoot = () => join(home, '.cairn', 'skills');
+
+  function put(root: string, dir: string, md: string) {
+    mkdirSync(join(root, dir), { recursive: true });
+    writeFileSync(join(root, dir, 'SKILL.md'), md);
+  }
+
+  function tree(root: string): string[] {
+    return readdirSync(root, { recursive: true })
+      .map(String)
+      .sort()
+      .map((rel) => {
+        const full = join(root, rel);
+        const st = lstatSync(full);
+        if (st.isSymbolicLink()) return `${rel} -> ${readlinkSync(full)} ${st.mtimeMs}`;
+        if (st.isDirectory()) return `${rel}/ ${st.mtimeMs}`;
+        return `${rel} ${createHash('sha256').update(readFileSync(full)).digest('hex')} ${st.mtimeMs}`;
+      });
+  }
+
+  async function candidates(s: ReturnType<typeof bootServer>) {
+    const res = await req(s.app, 'GET', `/api/teams/${s.team.id}/skills/import-candidates`);
+    expect(res.status).toBe(200);
+    return skillImportCandidatesResponseSchema.parse(await res.json());
+  }
+
+  test('C1: lists both shared roots, dedupes by real path, marks taken ids, flags unimportable skills and changes nothing on disk', async () => {
+    const agents = agentsRoot();
+    const claude = claudeRoot();
+    const cairn = cairnRoot();
+    put(agents, 'deploy', skillMd('deploy', '部署'));
+    put(agents, 'review', skillMd('review', '评审'));
+    put(agents, 'nodesc', '---\nname: nodesc\n---\n# nodesc\n');
+    put(agents, 'noname', '# no frontmatter\n');
+    put(agents, 'bad-name', skillMd('has space', '名字不能当目录'));
+    put(claude, 'review', skillMd('review', '另一份评审'));
+    symlinkSync(join(agents, 'deploy'), join(claude, 'deploy-link'));
+    put(cairn, 'review', skillMd('review', '已导入'));
+    put(cairn, 'mine', skillMd('mine', 'Cairn 自己的'));
+    symlinkSync(join(cairn, 'mine'), join(claude, 'into-cairn'));
+    const before = [tree(agents), tree(claude), tree(cairn)];
+    const s = bootServer({ skillsDir: cairn, skillSourcesPath: join(home, 's.json') });
+    try {
+      const body = await candidates(s);
+      expect(body.skippedSources).toEqual([]);
+      expect(
+        body.candidates.map((c) => [c.id, c.sourcePath, c.alreadyImported, c.problem]),
+      ).toEqual([
+        ['has space', join(agents, 'bad-name'), false, 'invalid-name'],
+        ['deploy', join(agents, 'deploy'), false, null],
+        ['nodesc', join(agents, 'nodesc'), false, 'missing-description'],
+        ['noname', join(agents, 'noname'), false, 'missing-name'],
+        ['review', join(agents, 'review'), true, null],
+        ['review', join(claude, 'review'), true, null],
+      ]);
+      expect([tree(agents), tree(claude), tree(cairn)]).toEqual(before);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('C2: a shared root that does not exist is reported as skipped, not as an error', async () => {
+    put(claudeRoot(), 'deploy', skillMd('deploy', '部署'));
+    const s = bootServer({ skillsDir: cairnRoot(), skillSourcesPath: join(home, 's.json') });
+    try {
+      const body = await candidates(s);
+      expect(body.skippedSources).toEqual([{ root: agentsRoot(), reason: 'missing' }]);
+      expect(body.candidates.map((c) => c.id)).toEqual(['deploy']);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('C3: importing a candidate copies it into the Cairn directory; refresh after the source changed updates the copy and leaves the source alone', async () => {
+    const agents = agentsRoot();
+    put(agents, 'deploy', skillMd('deploy', '部署'));
+    const s = bootServer({ skillsDir: cairnRoot(), skillSourcesPath: join(home, 's.json') });
+    try {
+      const [picked] = (await candidates(s)).candidates;
+      const before = tree(agents);
+      const imported = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+        localPath: picked!.sourcePath,
+      });
+      expect(imported.status).toBe(201);
+      expect(readFileSync(join(cairnRoot(), 'deploy', 'SKILL.md'), 'utf8')).toBe(
+        skillMd('deploy', '部署'),
+      );
+      expect(tree(agents)).toEqual(before);
+      expect((await candidates(s)).candidates).toMatchObject([
+        { id: 'deploy', alreadyImported: true },
+      ]);
+
+      writeFileSync(join(agents, 'deploy', 'SKILL.md'), skillMd('deploy', '部署（改过）'));
+      const changed = tree(agents);
+      const refreshed = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/deploy/refresh`);
+      expect(refreshed.status).toBe(200);
+      expect(readFileSync(join(cairnRoot(), 'deploy', 'SKILL.md'), 'utf8')).toBe(
+        skillMd('deploy', '部署（改过）'),
+      );
+      expect(tree(agents)).toEqual(changed);
+    } finally {
+      s.dispose();
+    }
   });
 });

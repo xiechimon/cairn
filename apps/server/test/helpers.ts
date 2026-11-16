@@ -37,6 +37,7 @@ import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js'
 import { teamAutonomyPaused } from '../src/services/github-autonomy-brake.js';
 import { productionHarnessEvalConfig } from '../src/services/harness-eval-production.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
+import { newMcpOAuthState } from '../src/services/mcp-servers.js';
 import type { VapidKeys } from '../src/services/push.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { rejectingGithubFetch } from './network-guard.js';
@@ -63,6 +64,7 @@ export function bootServer(
   opts: {
     db?: Db;
     pingIntervalMs?: number;
+    offlineGraceMs?: number;
     claimHoldMs?: number;
     reposDir?: string;
     attachmentsDir?: string;
@@ -84,6 +86,7 @@ export function bootServer(
     webOrigin?: string;
     pushEndpointHosts?: ReadonlySet<string>;
     mcpConfigPath?: string;
+    mcpFetch?: AppContext['mcpFetch'];
     backupStatusPath?: string;
     deployRecordPath?: string;
     remote?: Partial<NonNullable<AppContext['remote']>>;
@@ -92,7 +95,7 @@ export function bootServer(
   const db = opts.db ?? openMemoryDb();
   const { user, team } = seed(db);
   const hub = new TeamStreamHub();
-  const machineHub = new MachineWakeHub();
+  const machineHub = new MachineWakeHub(opts.offlineGraceMs);
   const convHub = new ConversationStreamHub();
   const secretBox = createEphemeralSecretBox();
   const generatedVapidKeys = webpush.generateVAPIDKeys();
@@ -123,6 +126,7 @@ export function bootServer(
   };
   const oauthStates: AppContext['oauthStates'] = new Map();
   const xaiDeviceStates: AppContext['xaiDeviceStates'] = new Map();
+  const mcpOAuthState = newMcpOAuthState();
   try {
     const appContext: AppContext = {
       remote: {
@@ -149,6 +153,7 @@ export function bootServer(
       enrollments: new Map(),
       oauthStates,
       xaiDeviceStates,
+      mcpOAuthState,
       oauthClient: opts.oauthClient ?? null,
       ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
       ...(opts.providerTestTimeoutMs === undefined
@@ -174,6 +179,7 @@ export function bootServer(
       loopbackOwner: opts.loopbackOwner ?? null,
       accessVerifier: opts.accessVerifier ?? null,
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
+      ...(opts.mcpFetch !== undefined ? { mcpFetch: opts.mcpFetch } : {}),
     };
     const app = createApp(appContext, opts.logger);
     const rawRequest = app.request.bind(app);
@@ -217,6 +223,7 @@ export function bootServer(
       skillSourcesPath,
       oauthStates,
       xaiDeviceStates,
+      mcpOAuthState,
       svc: {
         db,
         hub,
@@ -237,7 +244,7 @@ export function bootServer(
 
 export async function issueApiKey(s: ReturnType<typeof bootServer>): Promise<string> {
   const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/api-keys`, {
-    name: 'machine-bootstrap',
+    name: 'MACHINE_BOOTSTRAP',
     gitAccess: false,
     mcpAccess: false,
     machineAccess: true,
@@ -563,4 +570,79 @@ export function pauseTeamForTest(db: Db, teamId: string): void {
 
 export function teamPausedForTest(db: Db, teamId: string): boolean {
   return teamAutonomyPaused(db, teamId);
+}
+
+export async function enrollConnectorRunner(
+  s: TestServer,
+  name: string,
+  connectors: boolean,
+): Promise<{ machineId: string; token: string }> {
+  const apiKey = await issueApiKey(s);
+  const res = await s.app.request('/api/machine/enroll', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      teamId: s.team.id,
+      name,
+      cliVersion: '0.3.0',
+      capabilities: { mcpServers: [], skills: [], ...(connectors ? { mcpConnectors: true } : {}) },
+    }),
+  });
+  const body = (await res.json()) as { machineId: string; token: string };
+  s.db
+    .update(machineTable)
+    .set({ online: true, enabledRuntimes: ['pi'], latestCliVersion: '0.3.0' })
+    .where(eq(machineTable.id, body.machineId))
+    .run();
+  return body;
+}
+
+let connectorStepSeq = 7_400;
+
+export function queueConnectorStep(s: TestServer, projectId: string, machineId: string): string {
+  connectorStepSeq += 1;
+  const seq = connectorStepSeq;
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const todoId = `todo-mcpw-${suffix}`;
+  const buildId = `build-mcpw-${suffix}`;
+  const stepId = `step-mcpw-${suffix}`;
+  s.db
+    .insert(todoTable)
+    .values({
+      id: todoId,
+      teamId: s.team.id,
+      projectId,
+      seqNum: seq,
+      title: `connector task ${suffix}`,
+      spec: 'probe',
+      phase: 'queued',
+      phaseAt: seq,
+      routeOverride: { machineId },
+    })
+    .run();
+  s.db
+    .insert(buildTable)
+    .values({
+      id: buildId,
+      todoId,
+      withPlan: false,
+      planDocId: null,
+      triggerSource: 'user',
+      createdAt: seq,
+    })
+    .run();
+  s.db
+    .insert(stepTable)
+    .values({
+      id: stepId,
+      buildId,
+      kind: 'build',
+      machineId: null,
+      status: 'pending',
+      prompt: null,
+      freshSession: false,
+      createdAt: seq + 1,
+    })
+    .run();
+  return stepId;
 }

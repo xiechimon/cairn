@@ -1,6 +1,6 @@
-import { Clock } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { ChevronRight, Clock, Plus } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { useSchedules } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { QueryBoundary } from '../components/query-state.js';
@@ -9,8 +9,14 @@ import { withCreatedSchedules, withoutDeleted } from '../fixtures/deletions.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { scheduleSummary } from '../pages/schedule-summary.js';
-import { ScheduleDetailController } from '../schedules/schedule-detail-dialog.js';
+import {
+  scheduleCadence,
+  scheduleNext,
+  scheduleSummary,
+  scheduleUnnamedCron,
+} from '../pages/schedule-summary.js';
+import { scheduleEnded, schedulePauseReason } from '../schedules/schedule-model.js';
+import { type ScheduleCandidate, SchedulePopover } from '../schedules/schedule-popover.js';
 import { ScheduleRowMenu } from './tasks-schedule-menu.js';
 
 function byNextRun(a: ScheduleRecord, b: ScheduleRecord): number {
@@ -19,80 +25,191 @@ function byNextRun(a: ScheduleRecord, b: ScheduleRecord): number {
   return key(a) - key(b);
 }
 
-export function TasksScheduleList({ projectId, now }: { projectId: string | null; now: number }) {
+const ROW_ICON = 'flex size-7 flex-none items-center justify-center';
+
+export function TasksScheduleList({
+  projectId,
+  now,
+  candidates,
+}: {
+  projectId: string | null;
+  now: number;
+  candidates: readonly ScheduleCandidate[];
+}) {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const { live } = useLiveData();
   const query = useSchedules(live);
-  const [selected, setSelected] = useState<ScheduleRecord | null>(null);
+  const [editing, setEditing] = useState<ScheduleRecord | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [endedOpen, setEndedOpen] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
   const fixture = resolveScenario(searchParams);
-  const rows = withoutDeleted(
+  const listed = withoutDeleted(
     live
       ? (query.data ?? []).map((row) => ({ ...row, at: row.at ?? now }))
       : withCreatedSchedules(fixture.schedules ?? []),
-  )
-    .filter((row) => projectId === null || row.projectId === projectId)
-    .sort(byNextRun);
-  return (
-    <>
-      <QueryBoundary
-        query={live ? query : undefined}
-        isEmpty={rows.length === 0}
-        loadingLabel={t('正在加载定时')}
-        errorTitle={t('定时没能加载')}
-        empty={
-          <div className="flex flex-col items-start gap-3 px-2.5 py-2">
-            <p data-testid="tasks-schedules-empty" className="m-0 text-ui text-content-tertiary">
-              {t('还没有定时任务')}
-            </p>
-            <Button variant="secondary" size="sm" render={<Link to="/app/schedules" />}>
-              {t('管理定时')}
-            </Button>
-          </div>
-        }
+  ).filter((row) => projectId === null || row.projectId === projectId);
+  const scheduled = new Set(listed.map((row) => row.todoId));
+  const editingDeleted = editing !== null && !listed.some((row) => row.todoId === editing.todoId);
+  const rows = (editingDeleted ? [...listed, editing] : listed).sort(byNextRun);
+  const free = candidates.filter((candidate) => !scheduled.has(candidate.id));
+  const current = rows.filter((row) => !scheduleEnded(row));
+  const ended = rows.filter(scheduleEnded);
+  const newSchedule = (empty: boolean) => (
+    <SchedulePopover
+      schedule={null}
+      candidates={free}
+      anchor={empty ? undefined : listRef}
+      now={now}
+      open={creating}
+      onOpenChange={setCreating}
+      trigger={
+        empty ? (
+          <Button variant="secondary" size="sm" data-testid="schedule-new" />
+        ) : (
+          <Button
+            variant="ghost"
+            data-testid="schedule-new"
+            className="h-auto w-full justify-start gap-4 rounded-(--radius-tile) py-2 pl-2.5 text-left font-normal text-content-secondary"
+          />
+        )
+      }
+    >
+      {empty ? null : (
+        <span className={ROW_ICON}>
+          <Plus aria-hidden className="size-4 text-content-tertiary" strokeWidth={1.75} />
+        </span>
+      )}
+      {t('新建定时')}
+    </SchedulePopover>
+  );
+  const row = (schedule: ScheduleRecord) => {
+    const deletedHere = editingDeleted && editing.todoId === schedule.todoId;
+    const reason = schedule.enabled === false ? (schedule.pausedReason ?? null) : null;
+    const cron = scheduleUnnamedCron(schedule, t);
+    const cadence =
+      cron === null ? (
+        scheduleCadence(schedule, t)
+      ) : (
+        <>
+          {t('自定义')} <code className="font-mono">{cron}</code>
+        </>
+      );
+    const status = deletedHere ? (
+      t('已删除')
+    ) : reason !== null ? (
+      schedulePauseReason(reason, t)
+    ) : scheduleEnded(schedule) ? (
+      t(schedule.lastRunAt ? '已运行' : '停止前没有运行')
+    ) : schedule.enabled === false ? (
+      <>
+        {cadence} · {t('已暂停')}
+      </>
+    ) : cron === null ? (
+      scheduleSummary(schedule, now, t)
+    ) : (
+      <>
+        {cadence} · {scheduleNext(schedule, now, t)}
+      </>
+    );
+    return (
+      <div
+        key={schedule.id}
+        data-slot="schedule-row-frame"
+        className="group/task relative rounded-(--radius-tile) hover:bg-(--menu-hover) has-aria-expanded:bg-(--menu-hover)"
       >
+        <SchedulePopover
+          schedule={schedule}
+          deleted={deletedHere}
+          anchor={listRef}
+          now={now}
+          open={editing?.todoId === schedule.todoId}
+          onOpenChange={(open) => setEditing(open ? schedule : null)}
+          trigger={
+            <Button
+              variant="ghost"
+              data-slot="schedule-row"
+              className="h-auto w-full items-center justify-start gap-4 rounded-(--radius-tile) py-2 pr-11 pl-2.5 text-left font-normal whitespace-normal hover:bg-transparent pointer-coarse:pr-12 dark:hover:bg-transparent"
+            />
+          }
+        >
+          <span className={ROW_ICON}>
+            <Clock aria-hidden className="size-4 text-content-tertiary" strokeWidth={1.75} />
+          </span>
+          <span className="flex min-h-7 min-w-0 flex-1 flex-col justify-center">
+            <span className="truncate text-ui leading-5 text-foreground">
+              {schedule.todo.title}
+            </span>
+            <span
+              className="truncate text-meta leading-4.5 text-content-tertiary"
+              title={reason ?? undefined}
+            >
+              {status}
+            </span>
+          </span>
+        </SchedulePopover>
+        {!deletedHere && (
+          <div
+            data-slot="schedule-row-menu"
+            className="absolute top-1/2 right-2 -translate-y-1/2 opacity-0 group-focus-within/task:opacity-100 group-hover/task:opacity-100 has-aria-expanded:opacity-100 pointer-coarse:right-0 pointer-coarse:opacity-100"
+          >
+            <ScheduleRowMenu schedule={schedule} now={now} onEdit={() => setEditing(schedule)} />
+          </div>
+        )}
+      </div>
+    );
+  };
+  return (
+    <QueryBoundary
+      query={live ? query : undefined}
+      isEmpty={rows.length === 0}
+      loadingLabel={t('正在加载定时')}
+      errorTitle={t('定时没能加载')}
+      empty={
+        <div className="flex flex-col items-start gap-3 px-2.5 py-2">
+          <p data-testid="tasks-schedules-empty" className="m-0 text-ui text-content-tertiary">
+            {t('还没有定时任务')}
+          </p>
+          {newSchedule(true)}
+          <p className="m-0 text-meta text-content-tertiary">
+            {t('也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则。')}
+          </p>
+        </div>
+      }
+    >
+      <div ref={listRef} className="flex flex-col">
         <section
           data-testid="tasks-section"
           data-section="scheduled"
           className="flex flex-col gap-0.5"
         >
-          {rows.map((row) => (
-            <div
-              key={row.id}
-              data-slot="schedule-row-frame"
-              className="group/task relative rounded-(--radius-tile) hover:bg-(--menu-hover) has-aria-expanded:bg-(--menu-hover)"
-            >
-              <Button
-                variant="ghost"
-                data-slot="schedule-row"
-                onClick={() => setSelected(row)}
-                className="h-auto w-full items-start justify-start gap-4 rounded-(--radius-tile) py-2 pr-11 pl-2.5 text-left font-normal whitespace-normal hover:bg-transparent pointer-coarse:pr-12 dark:hover:bg-transparent"
-              >
-                <span className="flex size-7 flex-none items-center justify-center rounded-(--radius-control) bg-(--hover-1)">
-                  <Clock aria-hidden className="size-4 text-content-tertiary" strokeWidth={1.75} />
-                </span>
-                <span className="flex min-h-7 min-w-0 flex-1 flex-col justify-center">
-                  <span className="truncate text-ui leading-5 text-foreground">
-                    {row.todo.title}
-                  </span>
-                  <span className="truncate text-meta leading-4.5 text-content-tertiary">
-                    {row.enabled === false
-                      ? (row.pausedReason ?? t('已暂停'))
-                      : scheduleSummary(row, now, t)}
-                  </span>
-                </span>
-              </Button>
-              <div
-                data-slot="schedule-row-menu"
-                className="absolute top-3 right-2 opacity-0 group-focus-within/task:opacity-100 group-hover/task:opacity-100 has-aria-expanded:opacity-100 pointer-coarse:top-0 pointer-coarse:right-0 pointer-coarse:opacity-100"
-              >
-                <ScheduleRowMenu schedule={row} now={now} onOpenDetail={() => setSelected(row)} />
-              </div>
-            </div>
-          ))}
+          {current.map(row)}
+          {newSchedule(false)}
         </section>
-      </QueryBoundary>
-      <ScheduleDetailController schedule={selected} now={now} onClose={() => setSelected(null)} />
-    </>
+        {ended.length > 0 && (
+          <section data-testid="schedules-ended" className="mt-2 flex flex-col gap-0.5">
+            <Button
+              variant="ghost"
+              aria-expanded={endedOpen}
+              onClick={() => setEndedOpen((open) => !open)}
+              className="h-8 justify-start gap-4 rounded-(--radius-tile) px-2.5 text-ui font-normal text-foreground aria-expanded:bg-transparent pointer-coarse:h-11 dark:aria-expanded:bg-transparent"
+            >
+              <span className={ROW_ICON}>
+                <ChevronRight
+                  aria-hidden
+                  className={`size-4 text-content-tertiary transition-transform ${endedOpen ? 'rotate-90' : ''}`}
+                />
+              </span>
+              <span className="flex items-baseline gap-2">
+                {t('已结束')}
+                <span className="text-content-tertiary tabular-nums">{ended.length}</span>
+              </span>
+            </Button>
+            {endedOpen && ended.map(row)}
+          </section>
+        )}
+      </div>
+    </QueryBoundary>
   );
 }

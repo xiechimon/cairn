@@ -1,17 +1,31 @@
 import type { MadeKind, TodoRecord } from '../fixtures/records.js';
+import { dayIndex } from './rel-time.js';
 
-export type MadeGroupKey = Exclude<MadeKind, 'code'> | 'other';
+type MadeKindGroup = Exclude<MadeKind, 'code'> | 'other';
 
-const GROUP_ORDER: readonly MadeGroupKey[] = ['document', 'design', 'page', 'other'];
+export type MadeGroupKey = MadeKindGroup | 'earlier';
+
+const GROUP_ORDER: readonly MadeGroupKey[] = [
+  'document',
+  'design',
+  'page',
+  'slides',
+  'other',
+  'earlier',
+];
+
+export const MADE_EARLIER_DAYS = 7;
 
 export const MADE_GROUP_LABEL: Record<MadeGroupKey, string> = {
   document: '文档',
   design: '设计',
   page: '网页',
+  slides: 'PPT',
   other: '其他',
+  earlier: '更早',
 };
 
-export function madeGroupOf(todo: Pick<TodoRecord, 'madeKind' | 'output'>): MadeGroupKey | null {
+export function madeGroupOf(todo: Pick<TodoRecord, 'madeKind' | 'output'>): MadeKindGroup | null {
   const kind = todo.madeKind ?? (todo.output === 'info' ? 'document' : todo.output);
   if (kind === 'code') return null;
   return kind ?? 'other';
@@ -24,11 +38,14 @@ export interface MadeGroup<T> {
 
 export function groupMade<T extends Pick<TodoRecord, 'madeKind' | 'output' | 'phaseAt'>>(
   items: readonly T[],
+  now: number,
 ): MadeGroup<T>[] {
   const byKey = new Map<MadeGroupKey, T[]>();
   for (const item of [...items].sort((a, b) => b.phaseAt - a.phaseAt)) {
-    const key = madeGroupOf(item);
-    if (key !== null) byKey.set(key, [...(byKey.get(key) ?? []), item]);
+    const kind = madeGroupOf(item);
+    if (kind === null) continue;
+    const key = dayIndex(now) - dayIndex(item.phaseAt) >= MADE_EARLIER_DAYS ? 'earlier' : kind;
+    byKey.set(key, [...(byKey.get(key) ?? []), item]);
   }
   return GROUP_ORDER.flatMap((key) => {
     const group = byKey.get(key);

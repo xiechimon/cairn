@@ -72,6 +72,9 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/api/teams/{id}/routing-settings/seed',
     note: 'D60 PR8: seed missing session/review rules and policies from agents',
   },
+  { method: 'GET', path: '/api/teams/{id}/top-models', note: 'team Top Models list or null' },
+  { method: 'PUT', path: '/api/teams/{id}/top-models', note: 'replace the Top Models list' },
+  { method: 'DELETE', path: '/api/teams/{id}/top-models', note: 'reset to the suggested list' },
   {
     method: 'PATCH',
     path: '/api/teams/{id}/routing-rules/{use}',
@@ -85,6 +88,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams/{id}/notifications', note: '→ {unreadThreadIds}（02 §9.1）' },
   { method: 'GET', path: '/api/teams/{id}/progress' },
   { method: 'GET', path: '/api/teams/{id}/stream', note: 'SSE，见 protocol/sse.ts' },
+  {
+    method: 'GET',
+    path: '/api/teams/{id}/skills/import-candidates',
+    note: 'read-only scan of ~/.agents/skills and ~/.claude/skills for the import picker; skills already in the Cairn skills directory are left out',
+  },
   {
     method: 'GET',
     path: '/api/teams/{id}/skills/{sid}',

@@ -229,60 +229,6 @@ describe('earlier events reach the model in short form', () => {
     expect(out[0]?.role === 'user' && out[0].content).toBe(long);
   });
 
-  it('on a cold turn, projects summary plus recent exchanges and drops older turns', async () => {
-    const dir = makeTestTempDir('coord-cold-slim-');
-    dirs.push(dir);
-    const requests: string[] = [];
-    const faux = fauxProvider({
-      provider: 'stub',
-      models: [{ id: 'm', contextWindow: 200_000 }],
-      tokensPerSecond: 1e9,
-    });
-    faux.setResponses(
-      Array(20).fill((c: { messages: unknown[] }) => {
-        requests.push(JSON.stringify(c.messages));
-        return fauxAssistantMessage('ok');
-      }),
-    );
-    const models = createCoordinatorModels([faux.provider]);
-    const volatile = createVolatileContext();
-    const harness = await openCoordinatorHarness(join(dir, 's.sqlite'), models.models, ctx, {
-      extensions: [volatileContextExtension(volatile)],
-    });
-    const deps = {
-      harness,
-      models,
-      api: fakeMachineApi(),
-      context: ctx,
-      heartbeatMs: 1000,
-      now: () => 1,
-      conversationGate: createConversationGate(),
-      volatile,
-    };
-    for (let i = 0; i < 12; i++) {
-      await runCoordinatorTurn(deps, chiefStep(`warm-${i}`, `OLD-TURN-${i}`));
-    }
-    await runCoordinatorTurn(
-      {
-        ...deps,
-        coldSlim: { cold: true, summaryHint: 'billing pause summary' },
-      },
-      chiefStep('cold-1', 'resume with 收到'),
-    );
-    const cold = requests.at(-1) ?? '';
-    expect(cold).toContain('billing pause summary');
-    expect(cold).toContain('resume with 收到');
-    expect(cold).toContain('OLD-TURN-11');
-    expect(cold).not.toContain('"OLD-TURN-0"');
-    expect(cold).not.toContain('"OLD-TURN-4"');
-    const stored = (await (await harness.root(ctx)).entries({}, 50, undefined, ctx)).items
-      .filter((entry) => UserEntry.is(entry))
-      .map((entry) => JSON.stringify(entry.model))
-      .join('');
-    expect(stored).toContain('OLD-TURN-0');
-    await harness.close(ctx);
-  });
-
   it('shortens block-form events and never touches the stored entry', async () => {
     const dir = makeTestTempDir('coord-events-');
     dirs.push(dir);

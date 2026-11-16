@@ -8,16 +8,17 @@ const detail = (page: Page) => settings(page).getByTestId('machine-detail');
 
 test('the breadcrumb is the only page title: no second heading repeats it', async ({ page }) => {
   await page.goto(MACHINES);
-  await expect(settings(page).getByTestId('settings-head')).toHaveText('Runner');
-  await expect(settings(page).getByRole('heading', { name: 'Runner', exact: true })).toHaveCount(1);
+  await expect(settings(page).getByTestId('settings-head')).toHaveText('执行机');
+  await expect(settings(page).getByRole('heading', { name: '执行机', exact: true })).toHaveCount(1);
   await expect(settings(page).getByTestId('page-topbar')).toHaveCount(0);
-  await expect(settings(page).getByTestId('settings-head')).toContainText('Runner');
+  await expect(settings(page).getByTestId('settings-head')).toContainText('执行机');
 });
 
 test('other sections keep one heading for the page, the breadcrumb', async ({ page }) => {
   for (const [section, label] of [
     ['providers', '模型服务'],
-    ['routing', '用量与连接'],
+    ['routing', '模型路由'],
+    ['work-routing', '模型选择'],
     ['skills', '技能'],
   ] as const) {
     await page.goto(`/app/settings/${section}?scenario=providers-fleet`);
@@ -162,7 +163,7 @@ test('typing inside another settings field does not steal focus', async ({ page 
   await expect(name).toBeFocused();
 });
 
-test('machines are single-column rows: name, then status, runtime and capability links; switch and menu on the right', async ({
+test('machines are single-column rows: name, then status, runtime and capability links; menu on the right, no switch', async ({
   page,
 }) => {
   await page.goto(MACHINES);
@@ -177,7 +178,7 @@ test('machines are single-column rows: name, then status, runtime and capability
   await expect(host.locator('[data-orchestration="host"]')).toHaveText('Coordinator 主机');
   await expect(host.getByTestId('machine-item-status')).toHaveText('在线');
   await expect(host.getByTestId('machine-open-runtime')).toContainText('运行时');
-  await expect(host.getByTestId('machine-accept-toggle')).toBeVisible();
+  await expect(host.getByRole('switch')).toHaveCount(0);
   await expect(host.getByTestId('machine-menu')).toBeVisible();
   await expect(host.getByTestId('machine-os')).toHaveText('Linux');
   await expect(host.getByTestId('machine-os-unknown')).toHaveCount(0);
@@ -238,21 +239,8 @@ test('the runtime link opens the row and an offline row says when it was last on
   await expect(old).toHaveAttribute('data-expanded', 'true');
   const pane = detail(page);
   await expect(pane.getByTestId('machine-offline-hint')).toContainText('重新连接 old-laptop');
-  const accept = old.getByTestId('machine-accept-toggle');
-  const runtime = pane.getByTestId('provider-toggle').first();
-  for (const control of [accept, runtime]) {
-    await expect(control).toBeDisabled();
-    await expect(control).toHaveAttribute('aria-disabled', 'true');
-  }
-  const trackOf = (el: Locator) => el.evaluate((node) => getComputedStyle(node).backgroundColor);
-  const off = await trackOf(pane.getByTestId('provider-toggle').nth(1));
-  expect(await trackOf(accept)).toBe(off);
-  expect(await trackOf(runtime)).toBe(off);
-  const onlineAccept = items(page).filter({ hasText: 'omarchy' }).getByTestId('machine-accept-toggle');
-  await expect(onlineAccept).toBeEnabled();
-  await expect(onlineAccept).toBeChecked();
-  await expect(accept).toBeChecked();
-  expect(await trackOf(onlineAccept)).not.toBe(await trackOf(accept));
+  await expect(pane.getByTestId('machine-runtimes').getByRole('switch')).toHaveCount(0);
+  await expect(pane.getByTestId('provider-availability').first()).toBeVisible();
   await expect(pane.getByTestId('machine-recover')).toContainText('重新启动');
   await expect(pane.getByTestId('machine-recover').locator('code')).toContainText('start');
 });
@@ -282,7 +270,7 @@ test('at 375px the rows keep name, status and controls inside the panel and noth
     .getByTestId('machines-scroll')
     .evaluate((el) => el.scrollWidth - el.clientWidth);
   expect(inner).toBeLessThanOrEqual(0);
-  const toggle = await items(page).first().getByTestId('machine-accept-toggle').boundingBox();
+  const toggle = await items(page).first().getByTestId('machine-menu').boundingBox();
   const panel = await settings(page).getByTestId('settings-panel').boundingBox();
   expect((toggle?.x ?? 0) + (toggle?.width ?? 0) <= (panel?.x ?? 0) + (panel?.width ?? 0)).toBe(true);
 });

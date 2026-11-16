@@ -1,14 +1,11 @@
 import { useState } from 'react';
-import { ChiefDigestRow } from '../chief/chief-digest-row.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
 import { QuestionAnsweredLine, QuestionAsked } from '../chief/question-answered-line.js';
 import { QuestionChips } from '../chief/question-chips.js';
 import { answerLines } from '../chief/question-lifecycle.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
-import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import {
-  DIGEST_ITEMS,
   NOW,
   QUESTION_ANSWERED,
   QUESTION_CANCELLED,
@@ -24,7 +21,7 @@ export function ProductChiefSection() {
     <Section
       id="product-chief"
       title="Coordinator"
-      lede="The Coordinator's parts: questions it asks you, the conversation digest, the home summary line, its identity, and outage banners."
+      lede="The Coordinator's parts: questions it asks you, the home summary line, its identity, and outage banners."
     >
       <Specimen
         id="question-chips"
@@ -64,26 +61,6 @@ export function ProductChiefSection() {
             <QuestionAnsweredLine item={QUESTION_CANCELLED} />
           </div>
         </Labeled>
-      </Specimen>
-      <Specimen
-        id="digest"
-        title="Digest"
-        note="ChiefDigestRow: expand to see the grouped summary"
-        stage="canvas"
-        className="flex-col"
-      >
-        <MessageScrollerProvider>
-          <Labeled label="Daily digest">
-            <div className="w-160">
-              <ChiefDigestRow reason="daily" madeAt={NOW} items={DIGEST_ITEMS} />
-            </div>
-          </Labeled>
-          <Labeled label="Threshold digest">
-            <div className="w-160">
-              <ChiefDigestRow reason="threshold" madeAt={NOW} items={DIGEST_ITEMS.slice(0, 2)} />
-            </div>
-          </Labeled>
-        </MessageScrollerProvider>
       </Specimen>
       <Specimen id="identity" title="Identity" note="ChiefIdentity" stage="canvas">
         <Cell label="Identity, idle">

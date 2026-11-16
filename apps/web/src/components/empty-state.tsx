@@ -12,7 +12,7 @@ export interface EmptyStateProps {
   title: string;
   description?: string;
   action?: { label: string; onClick?: () => void; disabled?: boolean };
-  hint?: { icon?: EmptyStateIcon; text: string };
+  hint?: { icon?: EmptyStateIcon; text: ReactNode };
   className?: string;
   testId?: string;
 }
@@ -43,7 +43,7 @@ export function EmptyState({
         <EmptyContent className="gap-2">
           {action != null && (
             <Button
-              className={DIALOG_PRIMARY_BUTTON}
+              className={cn(DIALOG_PRIMARY_BUTTON, 'pointer-coarse:h-11')}
               disabled={action.disabled}
               onClick={action.onClick}
             >
@@ -51,7 +51,7 @@ export function EmptyState({
             </Button>
           )}
           {hint != null && (
-            <p className="m-0 max-w-sm text-center text-meta text-content-tertiary">
+            <p className="m-0 max-w-80 text-center text-meta text-balance text-content-tertiary">
               {HintIcon != null && (
                 <HintIcon
                   className="mr-1 inline-block size-3 align-text-bottom text-content-dim"
