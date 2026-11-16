@@ -73,6 +73,8 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/api-keys',
   'GET /api/remote/identity',
   'GET /api/remote/descriptor',
+  'GET /api/remote/tailscale',
+  'POST /api/remote/tailscale',
   'GET /api/remote/routes',
   'POST /api/auth/bootstrap',
   'POST /api/auth/access',

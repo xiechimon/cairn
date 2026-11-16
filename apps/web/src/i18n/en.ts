@@ -1226,9 +1226,9 @@ export const EN: Record<string, string> = {
   'Tailscale 已连接。点「开启」后，你 Tailscale 网络里的设备就能打开这台电脑上的 Cairn，打开时仍要登录 Cairn。':
     'Tailscale is connected. Choose Turn on so devices in your Tailscale network can open Cairn on this computer; they still have to sign in to Cairn.',
   '已开启，正在确认 {url} 能打开。第一次可能要等一分钟。':
-    'Turned on. Checking that {url} opens; the first time can take a minute.',
+    'Turned on. Checking that {url} can be opened; the first time can take a minute.',
   '{url} 现在打不开。确认 Tailscale 还连着，再点「重新检查」。':
-    '{url} does not open right now. Check that Tailscale is still connected, then choose Check again.',
+    'Cannot open {url} right now. Check that Tailscale is still connected, then choose Check again.',
   '已连通，另一台电脑用这个地址连回来：{url}':
     'Connected. The other computer reaches this one at {url}',
   '没能开启 Tailscale 访问，请重试。': 'Could not turn on Tailscale access. Try again.',
