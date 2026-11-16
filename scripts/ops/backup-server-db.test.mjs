@@ -9,6 +9,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
@@ -628,18 +629,87 @@ test('hosted repo bundles are pushed to the remote with the db', () => {
   ]);
 });
 
-test('a missing hosted repos directory is an empty collection', () => {
-  const f = fixture();
-  const result = f.run([
-    ...f.full,
+function repoRun(f, repos) {
+  return f.run([
+    '--db',
+    f.db,
+    '--out',
+    join(f.backups, 'db'),
     '--repos',
-    join(f.server, 'repos'),
+    repos,
     '--repos-out',
     join(f.backups, 'repos'),
   ]);
+}
+
+test('a missing hosted repos directory fails the run and keeps earlier snapshots', () => {
+  const f = fixture();
+  write(join(f.backups, 'repos', 'repos-20200101T000000Z', 'team1', 'app.bundle'), 'old');
+  const result = repoRun(f, join(f.server, 'repos'));
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /FAIL hosted repos not found/);
+  assert.deepEqual(readdirSync(join(f.backups, 'repos')), ['repos-20200101T000000Z']);
+});
+
+test('an empty hosted repos directory is an empty snapshot', () => {
+  const f = fixture();
+  mkdirSync(join(f.server, 'repos'), { recursive: true });
+  const result = repoRun(f, join(f.server, 'repos'));
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /no hosted repos yet/);
   assert.match(result.stdout, /hosted repos bundled: 0/);
+});
+
+test('a symlinked hosted repo fails the run instead of being followed', () => {
+  const f = fixture();
+  const { repos, app } = hostedRepos(f.root);
+  symlinkSync(app, join(repos, 'team2', 'outside.git'));
+  const result = repoRun(f, repos);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not a plain directory: team2\/outside/);
+});
+
+test('a hosted repo name with a newline fails the run instead of colliding', () => {
+  const f = fixture();
+  const { repos } = hostedRepos(f.root);
+  git(['init', '--bare', '-q', join(repos, 'team1', 'app\n.git')]);
+  const result = repoRun(f, repos);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unsafe hosted repo path/);
+});
+
+test('a hosted repo with a missing object fails the run', () => {
+  const f = fixture();
+  const { repos, app } = hostedRepos(f.root);
+  const blob = git(['rev-parse', 'trunk:node.txt'], app).trim();
+  git(['repack', '-a', '-d', '-q'], app);
+  const objects = join(app, 'objects');
+  const packs = readdirSync(join(objects, 'pack')).filter((name) => name.endsWith('.pack'));
+  for (const pack of packs) {
+    const kept = spawnSync(
+      'git',
+      ['-C', app, 'cat-file', '--batch-all-objects', '--batch-check=%(objectname)'],
+      {
+        encoding: 'utf8',
+      },
+    ).stdout;
+    assert.match(kept, new RegExp(blob));
+    rmSync(join(objects, 'pack', pack));
+    rmSync(join(objects, 'pack', pack.replace(/\.pack$/, '.idx')));
+  }
+  const result = repoRun(f, repos);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /FAIL bundle hosted repo team1\/app/);
+});
+
+test('a hosted repo whose refs cannot be listed fails the run instead of looking empty', () => {
+  const f = fixture();
+  const { repos } = hostedRepos(f.root);
+  const blank = join(repos, 'team2', 'blank.git');
+  writeFileSync(join(blank, 'packed-refs'), 'not a packed-refs line\n');
+  const result = repoRun(f, repos);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /FAIL (read HEAD|list refs) of hosted repo team2\/blank/);
+  assert.ok(!existsSync(join(f.backups, 'repos')));
 });
 
 test('--repos and --repos-out go together', () => {

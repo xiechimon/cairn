@@ -21,9 +21,11 @@ usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
                      newer than the DB copy is a reconcile case at the next boot, never a restore failure
   --skills           Cairn skills directory (<CAIRN_HOME>/skills); written as --skills-out/skills-<UTC timestamp>.tar.gz,
                      keeping the newest --keep; the source is only read
-  --repos            hosted git repositories (<server data dir>/repos, laid out as <team>/<name>.git); each is
-                     written as a verified git bundle --repos-out/repos-<UTC timestamp>/<team>/<name>.bundle with
-                     its HEAD branch in <name>.head, keeping the newest --keep runs; the sources are only read
+  --repos            existing hosted repositories directory (<server data dir>/repos, laid out as
+                     <team>/<name>.git); each bare repo is written as a git bundle
+                     --repos-out/repos-<UTC timestamp>/<team>/<name>.bundle, restored into scratch and checked
+                     with fsck and its refs before the run is kept, with its HEAD branch in <name>.head;
+                     keeps the newest --keep runs; symlinks and unsafe names fail the run; sources are only read
   --remote           existing rsync destination root (for example dmit-backup:); receives db/ and attachments/
                      and every other store given, with no remote shell, no deletes and no overwrites; the
                      receiver rotates its own copies
@@ -176,31 +178,43 @@ if [ -n "$SKILLS" ]; then
 fi
 
 if [ -n "$REPOS" ]; then
+  [ -d "$REPOS" ] || fail "hosted repos not found: $REPOS"
   run_dir="$REPOS_OUT/repos-$ts"
   [ ! -e "$run_dir" ] || fail "$run_dir already exists"
   mkdir -p "$tmp/repos" || fail "create a scratch dir for hosted repos"
   bundled=0
-  if [ -d "$REPOS" ]; then
-    for src in "$REPOS"/*/*.git; do
-      [ -d "$src" ] || continue
-      team="$(basename "$(dirname "$src")")"
-      repo="$(basename "$src" .git)"
-      copy="$tmp/repos/$team/$repo"
-      mkdir -p "$tmp/repos/$team" || fail "create $tmp/repos/$team"
-      git -C "$src" symbolic-ref -q HEAD > "$copy.head" || fail "read HEAD of hosted repo $team/$repo"
-      if [ -z "$(git -C "$src" for-each-ref --count=1 --format='%(refname)')" ]; then
-        : > "$copy.empty"
-      else
-        git -C "$src" bundle create "$copy.bundle" --all 2> "$tmp/bundle.err" ||
-          fail "bundle hosted repo $team/$repo: $(cat "$tmp/bundle.err")"
-        git -C "$src" bundle verify "$copy.bundle" > /dev/null 2> "$tmp/bundle.err" ||
-          fail "verify bundle of hosted repo $team/$repo: $(cat "$tmp/bundle.err")"
-      fi
-      bundled=$((bundled + 1))
-    done
-  else
-    echo "[$ts] no hosted repos yet: $REPOS"
-  fi
+  for src in "$REPOS"/*/*.git; do
+    [ -e "$src" ] || [ -L "$src" ] || continue
+    team_dir="${src%/*}"
+    team="${team_dir##*/}"
+    repo="${src##*/}"
+    repo="${repo%.git}"
+    [[ "$team" =~ ^[A-Za-z0-9_-]+$ && "$repo" =~ ^[A-Za-z0-9._-]+$ ]] || fail "unsafe hosted repo path: $src"
+    [ ! -L "$team_dir" ] && [ ! -L "$src" ] && [ -d "$src" ] || fail "hosted repo is not a plain directory: $team/$repo"
+    [ "$(git -C "$src" rev-parse --is-bare-repository 2>/dev/null)" = "true" ] || fail "not a bare repository: $team/$repo"
+    copy="$tmp/repos/$team/$repo"
+    mkdir -p "$tmp/repos/$team" || fail "create $tmp/repos/$team"
+    git -C "$src" symbolic-ref -q HEAD > "$copy.head" || fail "read HEAD of hosted repo $team/$repo"
+    source_refs="$(git -C "$src" for-each-ref --format='%(objectname) %(refname)')" ||
+      fail "list refs of hosted repo $team/$repo"
+    if [ -z "$source_refs" ]; then
+      : > "$copy.empty"
+    else
+      git -C "$src" bundle create "$copy.bundle" --all 2> "$tmp/bundle.err" ||
+        fail "bundle hosted repo $team/$repo: $(cat "$tmp/bundle.err")"
+      git clone -q --mirror "$copy.bundle" "$tmp/restore-check.git" 2> "$tmp/bundle.err" ||
+        fail "restore check of hosted repo $team/$repo: $(cat "$tmp/bundle.err")"
+      git -C "$tmp/restore-check.git" fsck --no-dangling --no-progress 2> "$tmp/bundle.err" > /dev/null ||
+        fail "fsck of restored hosted repo $team/$repo: $(cat "$tmp/bundle.err")"
+      restored_refs="$(git -C "$tmp/restore-check.git" for-each-ref --format='%(objectname) %(refname)' refs/heads refs/tags)" ||
+        fail "list refs of restored hosted repo $team/$repo"
+      expected_refs="$(git -C "$src" for-each-ref --format='%(objectname) %(refname)' refs/heads refs/tags)" ||
+        fail "list refs of hosted repo $team/$repo"
+      [ "$restored_refs" = "$expected_refs" ] || fail "restored refs differ for hosted repo $team/$repo"
+      rm -rf "$tmp/restore-check.git"
+    fi
+    bundled=$((bundled + 1))
+  done
   mkdir -p "$REPOS_OUT" || fail "create $REPOS_OUT"
   mv "$tmp/repos" "$run_dir" || fail "write $run_dir"
   (
