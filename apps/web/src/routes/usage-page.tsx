@@ -175,9 +175,10 @@ function Heatmap({
                     tabIndex={cell.date === selected ? 0 : -1}
                     className={cn(
                       cellSize,
-                      'rounded-(--cds-radius-xs) border-0 p-0 hover:outline-2 hover:outline-offset-1 hover:outline-content-tertiary focus-visible:ring-2 focus-visible:ring-ring',
+                      'rounded-(--cds-radius-xs) border-0 p-0 hover:outline-solid hover:outline-2 hover:outline-offset-1 hover:outline-content-tertiary focus-visible:ring-2 focus-visible:ring-ring',
                       LEVEL_BG[cell.level],
-                      cell.date === selected && 'outline-2 outline-offset-1 outline-foreground',
+                      cell.date === selected &&
+                        'outline-solid outline-2 outline-offset-1 outline-foreground',
                     )}
                     onPointerEnter={() => onHover(cell.date)}
                     onFocus={() => onHover(null)}
