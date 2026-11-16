@@ -160,7 +160,7 @@ const openMenu = async (page: Page, name: string) => {
 };
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`a disabled Save stays a dimmed primary button beside the grey Cancel pill (${theme})`, async ({
+  test(`a disabled Save is a pale pill with dim text beside the grey Cancel pill (${theme})`, async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme: theme });
@@ -193,15 +193,15 @@ for (const theme of ['light', 'dark'] as const) {
         saveOpacity: save!.opacity,
         secondary: token('--secondary'),
         foreground: token('--foreground'),
-        primary: token('--primary'),
-        primaryInk: token('--primary-foreground'),
+        paleSecondary: token('--secondary', '50%'),
+        dimInk: token('--text-dim'),
       };
     });
     expect(look.cancelFill).toBe(look.secondary);
     expect(look.cancelInk).toBe(look.foreground);
-    expect(look.saveFill).toBe(look.primary);
-    expect(look.saveInk).toBe(look.primaryInk);
-    expect(look.saveOpacity).toBe('0.4');
+    expect(look.saveFill).toBe(look.paleSecondary);
+    expect(look.saveInk).toBe(look.dimInk);
+    expect(look.saveOpacity).toBe('1');
     expect(look.saveFill).not.toBe(look.cancelFill);
     expect(look.saveInk).not.toBe(look.cancelInk);
   });
