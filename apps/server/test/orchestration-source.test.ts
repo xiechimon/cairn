@@ -197,7 +197,7 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        name: 'mcp-orch',
+        name: 'MCP_ORCH',
         gitAccess: false,
         mcpAccess: true,
         toolGrants: { read: ['Todos'], write: ['Create Todo'] },

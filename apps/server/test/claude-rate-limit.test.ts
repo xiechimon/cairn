@@ -35,7 +35,7 @@ async function call(
 async function issueKey(s: ReturnType<typeof bootServer>, name: string): Promise<string> {
   const res = await call(s.app, 'POST', `/api/teams/${s.team.id}/api-keys`, {
     body: {
-      name,
+      name: name.toUpperCase().replaceAll('-', '_'),
       gitAccess: false,
       mcpAccess: false,
       machineAccess: true,

@@ -849,7 +849,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(createApiKeyBodySchema, await jsonBody(c), 'body');
     const created = createApiKey(svc, {
       teamId,
-      name: body.name ?? null,
+      name: body.name,
       gitAccess: body.gitAccess,
       mcpAccess: body.mcpAccess,
       machineAccess: body.machineAccess,

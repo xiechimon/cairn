@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { BRAND } from '../brand.js';
 import { epochMs, recordId } from './common.js';
 
+export const KEY_NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
+
 export const apiKeyRecordSchema = z.object({
   name: z.string().nullable(),
   gitAccess: z.boolean(),
