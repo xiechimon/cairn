@@ -288,6 +288,8 @@ function SubThreadRow({ activity }: { activity: ThreadActivity }) {
   );
 }
 
+const MIRROR_LINK_CLS = 'flex-none text-(--chat-link) no-underline hover:underline';
+
 function ChannelMirrorRow({ mirror }: { mirror: ChannelMirror }) {
   const { t } = useI18n();
   const channel = useChannelOf()(mirror.fromThreadId);
@@ -307,14 +309,18 @@ function ChannelMirrorRow({ mirror }: { mirror: ChannelMirror }) {
             {mirror.title}
           </span>
           <span className="flex-none">{t(reportStatusWord(mirror))}</span>
-          {channel?.projectId != null && (
+          {channel?.projectId != null ? (
             <Link
               to={channelHref(channel.projectId)}
               aria-label={t('去{channel}', { channel: name })}
-              className="flex-none text-(--chat-link) no-underline hover:underline"
+              className={MIRROR_LINK_CLS}
             >
               {t('去看')}
             </Link>
+          ) : (
+            <ThreadLink todoId={mirror.todoId} className={MIRROR_LINK_CLS}>
+              {t('去看')}
+            </ThreadLink>
           )}
         </span>
       </Marker>

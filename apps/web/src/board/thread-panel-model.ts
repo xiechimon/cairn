@@ -118,7 +118,7 @@ const INFO_STEPS = ['调研', '交报告'] as const;
 
 export function threadProgress(
   todo: Pick<TodoRecord, 'phase' | 'output'>,
-  waitingOnChecks: boolean,
+  prOpen: boolean,
 ): ThreadProgress | null {
   const { phase } = todo;
   if (phase === 'failed' || phase === 'closed') return null;
@@ -135,7 +135,7 @@ export function threadProgress(
       ? 4
       : phase === 'review'
         ? 3
-        : phase === 'building' && waitingOnChecks
+        : phase === 'building' && prOpen
           ? 2
           : phase === 'building' || phase === 'needs_input'
             ? 1

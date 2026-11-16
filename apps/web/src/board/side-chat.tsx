@@ -622,11 +622,7 @@ function ReadyThread({
           originText={origin?.text ?? null}
         />
       </Head>
-      <ThreadFacts
-        todo={todo}
-        machineName={chat.machineName}
-        waitingOnChecks={chat.waitingOnChecks}
-      />
+      <ThreadFacts todo={todo} machineName={chat.machineName} prOpen={prRows.length > 0} />
       <ThreadPrPanel
         status={prs.status}
         rows={prRows}

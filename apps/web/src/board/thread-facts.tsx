@@ -22,17 +22,17 @@ const STEP_TEXT = {
 export function ThreadFacts({
   todo,
   machineName,
-  waitingOnChecks,
+  prOpen,
 }: {
   todo: TodoRecord;
   machineName: string | null;
-  waitingOnChecks: boolean;
+  prOpen: boolean;
 }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const project = useProjects(teamId, live).data?.find((p) => p.id === todo.projectId)?.name;
   const route = useReportRoute(todo.id, todo.phase);
-  const progress = threadProgress(todo, waitingOnChecks);
+  const progress = threadProgress(todo, prOpen);
   const facts = [
     ...(project !== undefined ? [['project', t('项目'), project]] : []),
     ...(machineName !== null ? [['machine', t('机器'), machineName]] : []),

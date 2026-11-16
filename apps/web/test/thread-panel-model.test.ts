@@ -10,8 +10,8 @@ describe('threadProgress', () => {
     ['needs_input', false, 1, 'wait'],
     ['review', false, 3, 'wait'],
     ['done', false, 4, 'idle'],
-  ] as const)('a code task in %s (checks pending %s) is at step %i, %s', (phase, checks, at, tone) => {
-    expect(threadProgress({ phase, output: 'code' }, checks)).toMatchObject({ at, tone });
+  ] as const)('a code task in %s (PR open %s) is at step %i, %s', (phase, prOpen, at, tone) => {
+    expect(threadProgress({ phase, output: 'code' }, prOpen)).toMatchObject({ at, tone });
   });
 
   test('a research task has two steps and waits on you once its report is in review', () => {
