@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { epochMs, recordId } from './common.js';
 import { isSecretHeaderName } from './secret.js';
 
-export type McpConnectorAuth = 'none' | 'token' | 'oauth';
+export type McpConnectorAuth = 'none' | 'token' | 'oauth' | 'github-app';
 
 export interface McpCatalogOption {
   id: string;
@@ -34,7 +34,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     description: '仓库、议题、拉取请求与工作流',
     url: 'https://api.githubcopilot.com/mcp/',
     docsUrl: 'https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md',
-    auth: ['token'],
+    auth: ['token', 'github-app'],
     tokenLabel: '个人访问令牌',
     tokenHelpUrl: 'https://github.com/settings/personal-access-tokens/new',
     tokenHelp: '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull\u00a0requests 读写权限。',
@@ -177,7 +177,7 @@ export const MCP_CONNECTOR_STATUSES = ['unchecked', 'connected', 'needs_auth', '
 export const mcpConnectorStatusSchema = z.enum(MCP_CONNECTOR_STATUSES);
 export type McpConnectorStatus = z.infer<typeof mcpConnectorStatusSchema>;
 
-export const MCP_CONNECTOR_AUTH_KINDS = ['none', 'static', 'oauth'] as const;
+export const MCP_CONNECTOR_AUTH_KINDS = ['none', 'static', 'oauth', 'github-app'] as const;
 export const mcpConnectorAuthKindSchema = z.enum(MCP_CONNECTOR_AUTH_KINDS);
 export type McpConnectorAuthKind = z.infer<typeof mcpConnectorAuthKindSchema>;
 
@@ -201,6 +201,7 @@ export const mcpConnectorRecordSchema = z.object({
   url: z.string(),
   headerNames: z.array(z.string()),
   authKind: mcpConnectorAuthKindSchema,
+  account: z.string().nullable(),
   status: mcpConnectorStatusSchema,
   statusReason: z.string().nullable(),
   toolCount: z.number().int().nullable(),
@@ -268,3 +269,34 @@ export const startMcpConnectorOAuthBodySchema = z.discriminatedUnion('kind', [
 export type StartMcpConnectorOAuthBody = z.infer<typeof startMcpConnectorOAuthBodySchema>;
 
 export const startMcpConnectorOAuthResponseSchema = z.object({ authorizationUrl: z.string() });
+
+export const githubConnectorAvailabilitySchema = z.object({
+  available: z.boolean(),
+  installUrl: z.string().nullable(),
+});
+export type GithubConnectorAvailability = z.infer<typeof githubConnectorAvailabilitySchema>;
+
+export const startGithubConnectorDeviceBodySchema = z.strictObject({
+  connectorId: recordId.optional(),
+});
+export type StartGithubConnectorDeviceBody = z.infer<typeof startGithubConnectorDeviceBodySchema>;
+
+export const githubConnectorDeviceStartSchema = z.object({
+  attemptId: z.string(),
+  userCode: z.string(),
+  verificationUri: z.string(),
+  intervalSeconds: z.number().int().positive(),
+  expiresInSeconds: z.number().int().positive(),
+});
+export type GithubConnectorDeviceStart = z.infer<typeof githubConnectorDeviceStartSchema>;
+
+export const githubConnectorDevicePollSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('pending'), intervalSeconds: z.number().int().positive() }),
+  z.object({ status: z.literal('complete'), connector: mcpConnectorRecordSchema }),
+  z.object({ status: z.literal('expired') }),
+  z.object({ status: z.literal('denied') }),
+  z.object({ status: z.literal('failed') }),
+]);
+export type GithubConnectorDevicePoll = z.infer<typeof githubConnectorDevicePollSchema>;
+
+export const githubConnectorInstallationsSchema = z.object({ installed: z.boolean() });

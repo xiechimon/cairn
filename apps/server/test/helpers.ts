@@ -87,6 +87,7 @@ export function bootServer(
     pushEndpointHosts?: ReadonlySet<string>;
     mcpConfigPath?: string;
     mcpFetch?: AppContext['mcpFetch'];
+    mcpGithubApp?: AppContext['mcpGithubApp'];
     backupStatusPath?: string;
     deployRecordPath?: string;
     remote?: Partial<NonNullable<AppContext['remote']>>;
@@ -182,6 +183,7 @@ export function bootServer(
       accessVerifier: opts.accessVerifier ?? null,
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
       ...(opts.mcpFetch !== undefined ? { mcpFetch: opts.mcpFetch } : {}),
+      ...(opts.mcpGithubApp !== undefined ? { mcpGithubApp: opts.mcpGithubApp } : {}),
     };
     const app = createApp(appContext, opts.logger);
     const rawRequest = app.request.bind(app);

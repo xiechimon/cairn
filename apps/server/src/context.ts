@@ -11,7 +11,7 @@ import type { CodexDeviceState } from './services/codex-device-login.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import type { PendingUpload } from './services/machine-uploads.js';
 import type { MachineWakeHub } from './services/machine-wake-hub.js';
-import type { McpOAuthState } from './services/mcp-servers.js';
+import type { GithubAppRegistration, McpOAuthState } from './services/mcp-servers.js';
 import type { OAuthClientConfig, OAuthStateEntry } from './services/oauth.js';
 import type { VapidKeys } from './services/push.js';
 import type { SkillImportFetch } from './services/skill-import.js';
@@ -76,5 +76,6 @@ export interface AppContext {
   mcpConfigPath: string;
   mcpFetch?: typeof fetch;
   mcpOAuthState: McpOAuthState;
+  mcpGithubApp?: GithubAppRegistration;
   logger?: Logger;
 }

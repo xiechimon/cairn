@@ -1505,7 +1505,10 @@ export const mcpConnector = sqliteTable(
       'mcp_connector_status',
       sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error')`,
     ),
-    check('mcp_connector_auth_kind', sql`${t.authKind} in ('none', 'static', 'oauth')`),
+    check(
+      'mcp_connector_auth_kind',
+      sql`${t.authKind} in ('none', 'static', 'oauth', 'github-app')`,
+    ),
   ],
 );
 
