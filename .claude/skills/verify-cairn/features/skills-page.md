@@ -26,7 +26,7 @@ Preconditions: `launch.mjs` stack up (the scratch skill directory is empty); rea
 - The API truth as the second pair of eyes:
   `curl -s <api>/api/skills?teamId=<teamId>` -> `[{id:"deployer",name:"deployer",description:"部署流程手册",teamId:<teamId>}]`.
 - Delete the directory -> it vanishes on refresh:
-  `rm -rf <skillsDir>/deploy` -> reload -> `[data-testid="resource-row"]` count 0, the empty-state `[data-testid="resource-empty"]` is visible with the copy `用「导入」或「新建」添加技能。`. On a live server the built-in `cairn-research` row stays, so the empty state needs the built-in install to be absent.
+  `rm -rf <skillsDir>/deploy` -> reload -> `[data-testid="resource-row"]` count 0, the empty-state `[data-testid="resource-empty"]` is visible with the copy `用「导入」或「新建」添加技能。`.
 - Write-surface / import-surface pins:
   On `/app/resources/skills` the `新建` entry count is 1 (role=button with the exact copy `新建` / `[data-testid="resource-new"]`; restored at XMON-114 — the old "no create button, count 0" wording is void); goto `/app/resources/skills/import` -> the URL lands at `/app`.
 - No-frontmatter fallback:

@@ -601,7 +601,7 @@ export function listImportCandidates(skillsDir: string): SkillImportCandidatesRe
       out.skippedSources.push({ root, reason: missing ? 'missing' : 'unreadable' });
       continue;
     }
-    for (const skill of scanSkillsRoot(root, false)) {
+    for (const skill of scanSkillsRoot(root)) {
       let real: string;
       try {
         real = realpathSync(skill.dir);

@@ -292,8 +292,6 @@ export interface MachineRow {
   enabledRuntimes?: string[];
   chiefHost?: boolean;
   isDefault?: boolean;
-  chiefRunning?: boolean;
-  chiefWaiting?: boolean;
   maxConcurrent?: number;
   runningSteps?: number;
   capabilities?: {

@@ -6,8 +6,8 @@ import {
   formatAccessTokenFile,
   parseAccessTokenFile,
 } from '@cairn/shared';
+import { runTokenCommand } from '@cairn/shared/token-command';
 import { afterEach, describe, expect, test } from 'vitest';
-import { runTokenCommand } from '../src/token-command.js';
 import { testTempDir } from './test-temp-dir.js';
 
 const homes: string[] = [];

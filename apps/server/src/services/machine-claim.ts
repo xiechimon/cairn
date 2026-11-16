@@ -56,6 +56,7 @@ import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.j
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
+import { quickLaneRefusal } from './coordinator-request.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
@@ -117,12 +118,7 @@ function workerSkillInjection(
   const granted =
     agentRow.skillsAllowlist === null
       ? [...scanned.keys()]
-      : [
-          ...new Set([
-            ...agentRow.skillsAllowlist,
-            ...[...scanned.values()].filter((s) => s.builtin).map((s) => s.id),
-          ]),
-        ];
+      : [...new Set(agentRow.skillsAllowlist)];
   const candidates = granted.map((id) => {
     const s = scanned.get(id);
     return s === undefined
@@ -476,6 +472,11 @@ async function tryClaim(
       failStepWithEvents(deps, cand.stepRow, `Ship refused: ${shipRefusal}`);
       continue;
     }
+    const laneRefusal = quickLaneRefusal(db, cand.todoRow);
+    if (laneRefusal !== null) {
+      failStepWithEvents(deps, cand.stepRow, laneRefusal);
+      continue;
+    }
     const localMerge = parseLocalMergeInstruction(cand.stepRow.prompt);
     if (localMerge !== null) {
       const project = projectOfTodo(db, cand.todoRow);
@@ -585,6 +586,8 @@ async function tryClaim(
           const fresh = priorSessionOf(tx, cand.stepRow, cand.buildRow, boundId);
           if (accountHeld(cand.stepRow, fresh, boundId)) return false;
         }
+        const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
+        if (latestTodo === undefined || quickLaneRefusal(db, latestTodo) !== null) return false;
         holdBlockedBuild(db, cand.stepRow.buildId);
         const res = tx
           .update(step)
