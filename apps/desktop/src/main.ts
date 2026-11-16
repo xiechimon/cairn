@@ -16,6 +16,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  powerSaveBlocker,
   session,
   shell,
   Tray,
@@ -23,7 +24,9 @@ import {
   utilityProcess,
 } from 'electron';
 import { appMenuTemplate } from './app-menu.js';
+import { createKeepAwake } from './keep-awake.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
+import { trayMenuTemplate } from './tray-menu.js';
 import { createUpdater, removeLeftoverUpdates } from './updater.js';
 
 const LOOPBACK = '127.0.0.1';
@@ -209,15 +212,21 @@ function showTray(origin: string): Tray {
   icon.setTemplateImage(true);
   const created = new Tray(icon);
   created.setToolTip('Cairn');
-  created.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: `Running at ${new URL(origin).host}`, enabled: false },
-      { type: 'separator' },
-      { label: 'Open Cairn', click: focusWindow },
-      { type: 'separator' },
-      { label: 'Quit Cairn', accelerator: 'CommandOrControl+Q', click: () => app.quit() },
-    ]),
-  );
+  const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
+  const showMenu = (): void =>
+    created.setContextMenu(
+      Menu.buildFromTemplate(
+        trayMenuTemplate(new URL(origin).host, keepAwake.isOn(), {
+          open: focusWindow,
+          setKeepAwake: (on) => {
+            keepAwake.set(on);
+            showMenu();
+          },
+          quit: () => app.quit(),
+        }),
+      ),
+    );
+  showMenu();
   return created;
 }
 

@@ -48,8 +48,8 @@ jobs:
           pnpm --filter @cairn/desktop stage-server
           pnpm --filter @cairn/desktop stage-runner
 
-      - name: Check the signature checker
-        run: node --test apps/desktop/scripts/check-signature.test.mjs
+      - name: Check the signature checker and the tray keep-awake
+        run: node --test apps/desktop/scripts/check-signature.test.mjs apps/desktop/scripts/keep-awake.test.mjs
 
       - name: Import a throwaway signing certificate
         run: |
