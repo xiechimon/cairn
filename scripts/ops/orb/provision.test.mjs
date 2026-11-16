@@ -764,7 +764,14 @@ function runtimeFixture(t) {
     fs.rmSync(directory, { recursive: true });
     return { status: 0 };
   };
-  const options = { root, name, uid: process.getuid(), gid: process.getgid(), io, run };
+  const options = {
+    root,
+    name,
+    uid: process.getuid() || 1000,
+    gid: process.getgid() || 1000,
+    io,
+    run,
+  };
   return { options, parent, state, directory, calls, run };
 }
 
@@ -999,7 +1006,19 @@ test('stop removes only an empty unmounted root-owned orphan without a record', 
     /Unrecognized/,
   );
   fs.rmSync(join(f.directory, 'planted'));
-  assert.throws(() => runtimeDirectory({ ...f.options, stop: true }), /Unrecognized/);
+  const ownedByRunner = (path) => {
+    const stat = f.options.io.lstatSync(path);
+    return path === f.directory ? Object.assign(stat, { uid: f.options.uid }) : stat;
+  };
+  assert.throws(
+    () =>
+      runtimeDirectory({
+        ...f.options,
+        stop: true,
+        io: { ...f.options.io, lstatSync: ownedByRunner },
+      }),
+    /Unrecognized/,
+  );
 });
 
 test('failed removal after unmount can retry without unmounting the host filesystem', (t) => {
