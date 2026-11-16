@@ -171,4 +171,24 @@ describe('a research report the Coordinator delivered shows once, inside its not
     expect(reports.get(bubble('n-told')!)).toEqual(['told']);
     expect(reports.has(bubble('n-reworked')!)).toBe(false);
   });
+
+  test('a report asked for in this conversation shows under its conclusion, not under the reply that dispatched it', () => {
+    const [dispatch, conclusion] = mapChiefStream([
+      {
+        id: 'a-asked',
+        role: 'assistant',
+        content: JSON.stringify([{ type: 'text', text: 'Dispatched [#1](todo:asked).' }]),
+        createdAt: 90,
+      },
+      notice('n-asked', 'asked', 'b-asked'),
+    ]);
+    const placed = placeReportCards(
+      [dispatch!, conclusion!].map((item, i) => ({ item, i })),
+      new Map([[dispatch!, ['asked']]]),
+      new Map([['asked', research('b-asked')]]),
+      new Set(),
+    );
+    expect(placed.get(conclusion!)).toEqual(['asked']);
+    expect(placed.has(dispatch!)).toBe(false);
+  });
 });

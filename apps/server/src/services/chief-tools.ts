@@ -78,6 +78,7 @@ import { executeMemoryDocumentTool } from './memory-documents.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
+import { ensureResearchProject } from './projects.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
 import {
@@ -630,19 +631,38 @@ export async function executeChiefTool(
 
     case 'create_todo': {
       const body = parseWith(coordinatorCreateTodoParamsSchema, params, 'params');
-      requireProjectRow(db, body.projectId, ctx.teamId);
       assertNamedMachineForNewTask(svc, ctx.teamId);
-      const record = createRequestTodo(svc, ctx, body, {
-        createdBy:
-          ctx.turnPrompt !== undefined && parseChiefTrigger(ctx.turnPrompt) === 'user'
-            ? ctx.userId
-            : ctx.chiefAgentId,
-        ownerId: ctx.userId,
+      const record = db.transaction(() => {
+        const projectRow =
+          body.projectId === undefined
+            ? ensureResearchProject(db, ctx.teamId)
+            : requireProjectRow(db, body.projectId, ctx.teamId);
+        const created = createRequestTodo(
+          svc,
+          ctx,
+          { ...body, projectId: projectRow.id },
+          {
+            createdBy:
+              ctx.turnPrompt !== undefined && parseChiefTrigger(ctx.turnPrompt) === 'user'
+                ? ctx.userId
+                : ctx.chiefAgentId,
+            ownerId: ctx.userId,
+          },
+        );
+        db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, created.id)).run();
+        if (body.platform !== undefined) {
+          setTodoPlatform(db, requireTeamTodo(db, created.id, ctx.teamId), body.platform);
+        }
+        if (body.projectId === undefined) {
+          addChiefWatch(deps, {
+            teamId: ctx.teamId,
+            todo: created,
+            projectName: projectRow.name,
+            threadId: ctx.threadId,
+          });
+        }
+        return created;
       });
-      db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
-      if (body.platform !== undefined) {
-        setTodoPlatform(db, requireTeamTodo(db, record.id, ctx.teamId), body.platform);
-      }
       const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
         origin: 'coordinator',
         actor: 'Coordinator',
