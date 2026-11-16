@@ -84,6 +84,7 @@ credentials.enc
 !.claude/skills/verify-step-claim/
 !.claude/skills/verify-merge-gate/
 !.claude/skills/retro-cairn/
+!.claude/skills/options-prototype-cairn/
 !.claude/hillclimb/
 !.claude/settings.json
 !.claude/hooks/
