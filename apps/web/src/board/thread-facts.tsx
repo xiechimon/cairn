@@ -69,7 +69,7 @@ export function ThreadFacts({
                 {index > 0 && <span aria-hidden="true" className="h-px w-3 bg-border" />}
                 <span className="flex items-center gap-1.5">
                   {state === 'done' ? (
-                    <Check aria-hidden="true" className="size-3 text-content-secondary" />
+                    <Check aria-hidden="true" className="size-4 text-content-secondary" />
                   ) : (
                     <span
                       aria-hidden="true"
