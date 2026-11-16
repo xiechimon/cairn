@@ -67,13 +67,13 @@ Checked against the code on 2026-11-16; the model's results were not re-run (no 
 - **A lost report leaving the step executing forever (old F4, no property covered it)**: no longer holds as written. The daemon now re-delivers stranded `awaiting-upload` journal entries on a timer (`replayStrandedUploads` in `machine-loop.ts`, at most 40 attempts per step, after which the journal is left). Liveness is still not checked.
 - `evidence/` holds pre-#1473 reproductions (`repro-server.test.ts.txt`, `repro-daemon.test.ts.txt`, `repro-output.txt`) and model runs (`run-full.txt`, `run-p3-break.txt`) as historical snapshots.
 
-Mismatches between the model and the code today, not re-checked for effect on the properties:
+Mismatches between the model and the code, assessed on 2026-11-16 by reading the code against the model; TLC was not re-run:
 
-- `abandonedEnding` and `releaseClaimedStep` (`build-abandoned-sweep.ts`) now also consider `deps.machineHub?.silentSinceDrop`, stop a step whose build is no longer the todo's latest build, and fail a step quarantined after `ABANDONED_CLAIM_QUARANTINE_LIMIT` (3) claims without progress instead of releasing it. None is in `SchedulerTick`.
-- `tick` now also runs `sweepAbandonedChiefSteps`, `sweepAbandonedShipSteps` (merge steps with a ship-gate instruction) and `sweepUnplaceableSteps`; the model has one sweep order and no chief or ship-gate steps.
-- `finishStep` now rejects a report whose `generation` differs from `claimedAt` before any write.
-- `heartbeatStep` answers 410 when the step row no longer exists (a reset deleted it) and `runStep` then delivers a stop to itself (`discard: false`); the model never deletes its step.
-- The push stream's `onAbort` in `routes-machine.ts` now calls `dropConnection` on `machine-wake-hub.ts`, which marks the machine offline only after a grace period. The model's immediate `MachineStreamAbort` offline is an over-approximation of timing.
+- `silentSinceDrop` and the `dropConnection` grace (`machine-wake-hub.ts`): after its stream drops the machine stays online for a grace period and counts as not live until it shows presence again. The model's `MachineStreamAbort` takes it offline at once and `MarkPresence` brings it back, which covers the same states earlier. No effect found.
+- `abandonedEnding` stopping a step whose build is no longer the todo's latest, and `releaseClaimedStep` failing a step after `ABANDONED_CLAIM_QUARANTINE_LIMIT` (3) claims without progress: both end the step as stopped or failed and neither can create a claim, so P3, P5 and P6 are unaffected. Observation, outside P4: `stopStepKeepPhase` marks the step stopped and deletes its `stop_pending` row but sends no stop signal, so the sweep itself does not interrupt an executor that is still running; how that executor learns of the stop was not checked.
+- `tick` also runs `sweepAbandonedChiefSteps`, `sweepAbandonedShipSteps` and `sweepUnplaceableSteps`: chief and ship-gate steps are outside the model, so no property covers them (a coverage gap, not a contradiction); `sweepUnplaceableSteps` ends pending steps and cannot create a claim.
+- `finishStep` rejects a report whose `generation` differs from `claimedAt` before any write (`machine-finish-step.ts`): it rejects more than the model does, which only strengthens P2.
+- `heartbeatStep` answers 410 when the step row no longer exists (`machines.ts`), after which `runStep` delivers a stop to itself: the model never deletes a step. The server side was checked; the executor side was not.
 
 If any property turns FAIL later, first apply "How to tell a real bug from a model mistake"; do not weaken the property or model to make it pass.
 
