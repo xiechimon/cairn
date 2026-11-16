@@ -14,7 +14,7 @@ const MANIFEST_BRAND = {
 
 const MANIFEST_SCREENSHOT_LABEL = 'Cairn task board — humans direct, agents execute';
 
-const MANIFEST_DARK_CANVAS = '#1f1f1f';
+const MANIFEST_DARK_CANVAS = '#1b1c1b';
 
 describe('PWA files', () => {
   it('manifest.webmanifest carries the Cairn brand, stone colors and shipped screenshots', () => {

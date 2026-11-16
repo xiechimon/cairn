@@ -80,10 +80,10 @@ for (const theme of ['light', 'dark'] as const) {
     expect(first.value.idleInk).toBe(first.value.selectedInk);
     expect(first.value.selectedBg).not.toBe(first.value.trackBg);
     if (theme === 'light') {
-      expect(first.value.trackBg).toBe('rgb(242, 242, 242)');
-      expect(first.value.selectedBg).toBe('rgb(255, 255, 255)');
-      expect(first.value.selectedInk).toBe('rgb(10, 10, 10)');
-      expect(first.value.idleInk).toBe('rgb(10, 10, 10)');
+      expect(first.value.trackBg).toBe('rgb(224, 223, 218)');
+      expect(first.value.selectedBg).toBe('rgb(248, 247, 243)');
+      expect(first.value.selectedInk).toBe('rgb(28, 29, 27)');
+      expect(first.value.idleInk).toBe('rgb(28, 29, 27)');
     }
     for (const { name, value } of faces.slice(1)) {
       const { trackHeight, optionHeight, ...rest } = value;
