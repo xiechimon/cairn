@@ -14,6 +14,7 @@ import {
   NotFoundError,
   restoreFailedReview,
 } from './builds.js';
+import { quickLaneRefusal } from './coordinator-request.js';
 import { projectOfTodo, repoDirFor } from './git.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { enqueueLocalMerge } from './local-merge.js';
@@ -34,6 +35,8 @@ export async function requestMerge(
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
   if (todoRow.output === 'info') throw new HttpError(409, INFO_CARD_MERGE_REFUSAL);
+  const laneRefusal = quickLaneRefusal(deps.db, todoRow);
+  if (laneRefusal !== null) throw new HttpError(409, laneRefusal);
   assertNoMergeStepInFlight(deps, buildId);
   const projectRow = projectOfTodo(deps.db, todoRow);
   const shipRoute = projectRow === undefined ? DEFAULT_SHIP_ROUTE : projectShipRouteOf(projectRow);
