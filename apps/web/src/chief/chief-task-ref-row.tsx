@@ -39,11 +39,11 @@ export function TaskRefRow({
             data-phase={taskRef.phase}
             data-testid="chief-task-ref"
             className={cn(
-              'relative flex h-7 w-fit cursor-pointer items-center gap-1.5 text-ui font-normal text-(--foreground) no-underline hover:underline',
+              'relative my-0.5 flex h-6 w-fit cursor-pointer text-ui font-normal text-popover-foreground no-underline hover:underline',
               nested
-                ? 'ml-14 max-w-[calc(100%-3.5rem)]'
+                ? 'ml-13.5 max-w-[calc(100%-3.375rem)]'
                 : elbow
-                  ? 'ml-8 max-w-[calc(100%-2rem)]'
+                  ? 'ml-7.5 max-w-[calc(100%-1.875rem)]'
                   : 'max-w-full',
             )}
           />
@@ -54,7 +54,7 @@ export function TaskRefRow({
             aria-hidden="true"
             data-slot="task-ref-elbow"
             viewBox="0 0 12 16"
-            className="pointer-events-none absolute top-3.25 -left-3.75 h-4 w-3 overflow-visible text-(--task-ref-line)"
+            className="pointer-events-none absolute top-2.75 -left-3.25 h-4 w-3 overflow-visible text-(--task-ref-line)"
           >
             <path
               d="M1 14.25V7A6 6 0 0 1 7 1H10.75"
@@ -65,16 +65,18 @@ export function TaskRefRow({
             />
           </svg>
         )}
-        <TodoStatusTile phase={taskRef.phase} />
-        <span className="min-w-0 truncate">{taskRef.title ?? t('任务')}</span>
-        {unread && (
-          <span
-            role="img"
-            aria-label={t('有新动态')}
-            data-slot="task-ref-unread"
-            className="size-1.5 flex-none rounded-full bg-(--card-button)"
-          />
-        )}
+        <span className="flex min-w-0 items-center gap-1.5 rounded-md bg-popover pr-2 pl-0.5 shadow-(--e1-lift)">
+          <TodoStatusTile phase={taskRef.phase} />
+          <span className="min-w-0 truncate">{taskRef.title ?? t('任务')}</span>
+          {unread && (
+            <span
+              role="img"
+              aria-label={t('有新动态')}
+              data-slot="task-ref-unread"
+              className="size-1.5 flex-none rounded-full bg-(--card-button)"
+            />
+          )}
+        </span>
         <span className="sr-only">{`${t('，')}${t(PHASE_UI[taskRef.phase].chip)}`}</span>
       </PopoverTrigger>
       <PopoverContent

@@ -49,26 +49,14 @@ const TASK_NUMBER_LABEL = /^#\d+$/;
 type StatusTone = 'working' | 'wait' | 'quiet' | 'fail';
 
 const TONE_CLASS: Record<StatusTone, { ink: string; tile: string; chip: string }> = {
-  working: {
-    ink: 'text-tint-working-ink',
-    tile: 'bg-tint-working',
-    chip: 'bg-tint-working-soft text-tint-working-ink',
-  },
+  working: { ink: 'text-tint-working-ink', tile: 'bg-tint-working', chip: 'text-tint-working-ink' },
   wait: {
     ink: 'text-(--task-wait-ink)',
     tile: 'bg-(--task-wait-tint)',
-    chip: 'bg-(--task-chip-fill) text-(--chat-link)',
+    chip: 'text-(--chat-link)',
   },
-  quiet: {
-    ink: 'text-tint-quiet-ink',
-    tile: 'bg-tint-quiet',
-    chip: 'bg-tint-quiet-soft text-tint-quiet-ink',
-  },
-  fail: {
-    ink: 'text-tint-fail-ink',
-    tile: 'bg-tint-fail',
-    chip: 'bg-tint-fail-soft text-tint-fail-ink',
-  },
+  quiet: { ink: 'text-tint-quiet-ink', tile: 'bg-tint-quiet', chip: 'text-tint-quiet-ink' },
+  fail: { ink: 'text-tint-fail-ink', tile: 'bg-tint-fail', chip: 'text-tint-fail-ink' },
 };
 
 const CONVERSATION_STATUS: Record<Phase, { glyph: GlyphKind; tone: StatusTone }> = {
@@ -85,10 +73,10 @@ const CONVERSATION_STATUS: Record<Phase, { glyph: GlyphKind; tone: StatusTone }>
 };
 
 const TASK_CHIP_CLS =
-  'mx-0.5 inline-flex cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-0 align-top font-sans text-ui leading-[inherit] font-normal no-underline';
+  'mx-1 inline-flex cursor-pointer items-center gap-1.5 rounded-sm bg-popover px-1.5 py-0 align-top font-sans text-ui leading-[inherit] font-normal text-popover-foreground no-underline shadow-(--e1-lift)';
 
-export function taskChipClass(phase: Phase): string {
-  return cn(TASK_CHIP_CLS, TONE_CLASS[CONVERSATION_STATUS[phase].tone].chip);
+export function taskChipClass(phase: Phase | undefined): string {
+  return cn(TASK_CHIP_CLS, phase !== undefined && TONE_CLASS[CONVERSATION_STATUS[phase].tone].chip);
 }
 
 export function taskStatusInk(phase: Phase): string {
@@ -144,7 +132,7 @@ function MentionChip({ seg }: { seg: DocSegment }) {
   if (seg.mentionKind === 'agent') return <span data-slot="agent-mention">{label}</span>;
   return href != null ? (
     <Link
-      className={cn(chipClass, phase != null ? taskChipClass(phase) : 'cursor-pointer')}
+      className={cn(chipClass, todoId != null ? taskChipClass(phase) : 'cursor-pointer')}
       to={href}
       data-phase={phase}
       data-slot={todoId != null ? 'task-mention' : undefined}

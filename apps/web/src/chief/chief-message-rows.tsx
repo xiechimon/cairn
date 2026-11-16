@@ -241,7 +241,7 @@ function TaskRefWithChildren({
     <>
       <GuidedRow
         rails={[]}
-        {...(elbow ? { branch: { x: TOP_X, end: first, to: 28, rise: true } } : {})}
+        {...(elbow ? { branch: { x: TOP_X, end: first, to: 30, rise: true } } : {})}
       >
         <TaskRefRow taskRef={taskRef} elbow={elbow} guide={false} />
       </GuidedRow>
@@ -254,7 +254,7 @@ function TaskRefWithChildren({
         const lastChild = index === children.length - 1;
         return (
           <Fragment key={child.todoId}>
-            <GuidedRow rails={rails} branch={{ x: NESTED_X, end: lastChild, to: 52 }}>
+            <GuidedRow rails={rails} branch={{ x: NESTED_X, end: lastChild, to: 54 }}>
               <TaskRefRow taskRef={child} nested guide={false} />
             </GuidedRow>
             {reportsBelow && (

@@ -139,7 +139,7 @@ for (const theme of ['light', 'dark'] as const) {
       };
       const out = {
         link: read('color', 'var(--chat-link)'),
-        fill: read('backgroundColor', 'var(--task-chip-fill)'),
+        fill: read('backgroundColor', 'var(--popover)'),
         tint: read('backgroundColor', 'var(--task-wait-tint)'),
         ink: read('color', 'var(--task-wait-ink)'),
       };
