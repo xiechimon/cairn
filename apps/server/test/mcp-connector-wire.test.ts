@@ -2,14 +2,12 @@ import { type ClaudeCodeReport, machineTokenResponseSchema } from '@cairn/shared
 import { eq } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test } from 'vitest';
 import {
-  build as buildTable,
   chiefMessage as chiefMessageTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   machine as machineTable,
   mcpConnector,
   step as stepTable,
-  todo as todoTable,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
@@ -17,15 +15,14 @@ import { claimStep, stepToken } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import {
   bootServer,
+  enrollConnectorRunner,
   insertMachine,
-  issueApiKey,
   postProject,
+  queueConnectorStep,
   seedRoute,
   seedSessionRoute,
   type TestServer,
 } from './helpers.js';
-
-let seq = 7_400;
 
 async function world(mcpServers: string[]) {
   const s = bootServer({ claimHoldMs: 100 });
@@ -33,31 +30,6 @@ async function world(mcpServers: string[]) {
   const projectId = await postProject(s.app, 'mcp-wire-proj');
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', mcpServers });
   return { s, projectId };
-}
-
-async function runner(
-  s: TestServer,
-  name: string,
-  connectors: boolean,
-): Promise<{ machineId: string; token: string }> {
-  const apiKey = await issueApiKey(s);
-  const res = await s.app.request('/api/machine/enroll', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      teamId: s.team.id,
-      name,
-      cliVersion: '0.3.0',
-      capabilities: { mcpServers: [], skills: [], ...(connectors ? { mcpConnectors: true } : {}) },
-    }),
-  });
-  const body = (await res.json()) as { machineId: string; token: string };
-  s.db
-    .update(machineTable)
-    .set({ online: true, enabledRuntimes: ['pi'], latestCliVersion: '0.3.0' })
-    .where(eq(machineTable.id, body.machineId))
-    .run();
-  return body;
 }
 
 function connector(
@@ -93,53 +65,6 @@ function connector(
     .run();
 }
 
-function pendingStep(s: TestServer, projectId: string, machineId: string): string {
-  seq += 1;
-  const suffix = Math.random().toString(36).slice(2, 8);
-  const todoId = `todo-mcpw-${suffix}`;
-  const buildId = `build-mcpw-${suffix}`;
-  const stepId = `step-mcpw-${suffix}`;
-  s.db
-    .insert(todoTable)
-    .values({
-      id: todoId,
-      teamId: s.team.id,
-      projectId,
-      seqNum: seq,
-      title: `connector task ${suffix}`,
-      spec: 'probe',
-      phase: 'queued',
-      phaseAt: seq,
-      routeOverride: { machineId },
-    })
-    .run();
-  s.db
-    .insert(buildTable)
-    .values({
-      id: buildId,
-      todoId,
-      withPlan: false,
-      planDocId: null,
-      triggerSource: 'user',
-      createdAt: seq,
-    })
-    .run();
-  s.db
-    .insert(stepTable)
-    .values({
-      id: stepId,
-      buildId,
-      kind: 'build',
-      machineId: null,
-      status: 'pending',
-      prompt: null,
-      freshSession: false,
-      createdAt: seq + 1,
-    })
-    .run();
-  return stepId;
-}
-
 function claim(s: TestServer, machineId: string) {
   return claimStep(
     {
@@ -168,8 +93,8 @@ describe('MCP connectors on the machine wire', () => {
   test('a step granted a connector is not claimed by a Runner without connector support and says why', async () => {
     const { s, projectId } = await world(['linear']);
     connector(s, 'linear');
-    const old = await runner(s, 'old-runner', false);
-    const stepId = pendingStep(s, projectId, old.machineId);
+    const old = await enrollConnectorRunner(s, 'old-runner', false);
+    const stepId = queueConnectorStep(s, projectId, old.machineId);
     expect(await claim(s, old.machineId)).toBeNull();
     const pending = s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
     const target = { id: stepId, createdAt: pending?.createdAt ?? 0, homeMachineId: old.machineId };
@@ -184,8 +109,8 @@ describe('MCP connectors on the machine wire', () => {
     connector(s, 'linear', { headers: { Authorization: 'Bearer lin-static-token' } });
     connector(s, 'notion', { status: 'needs_auth' });
     connector(s, 'github', { headers: { Authorization: 'Bearer not-granted' } });
-    const current = await runner(s, 'new-runner', true);
-    const stepId = pendingStep(s, projectId, current.machineId);
+    const current = await enrollConnectorRunner(s, 'new-runner', true);
+    const stepId = queueConnectorStep(s, projectId, current.machineId);
     const claimed = await claim(s, current.machineId);
     expect(claimed?.step.id).toBe(stepId);
     expect(claimed?.mcpServers).toEqual(['linear', 'files', 'notion']);
@@ -205,8 +130,8 @@ describe('MCP connectors on the machine wire', () => {
   test('a step whose grant names only local servers still runs on an older Runner', async () => {
     const { s, projectId } = await world(['files']);
     connector(s, 'linear', { headers: { Authorization: 'Bearer lin-static-token' } });
-    const old = await runner(s, 'old-runner', false);
-    const stepId = pendingStep(s, projectId, old.machineId);
+    const old = await enrollConnectorRunner(s, 'old-runner', false);
+    const stepId = queueConnectorStep(s, projectId, old.machineId);
     const claimed = await claim(s, old.machineId);
     expect(claimed?.step.id).toBe(stepId);
     expect(claimed?.mcpServers).toEqual(['files']);

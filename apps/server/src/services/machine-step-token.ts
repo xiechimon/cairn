@@ -101,23 +101,39 @@ export async function stepToken(
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     ...(owned.status === 'claimed' && todoRow && agentRow
-      ? await connectorFields(deps, machineId, todoRow.teamId, agentRow.mcpServers)
+      ? await connectorFields(deps, owned, todoRow.teamId, agentRow.mcpServers)
       : {}),
     git,
   };
 }
 
+type ClaimedStepRow = Pick<typeof step.$inferSelect, 'id' | 'machineId' | 'claimedAt'>;
+
+function stillClaimedBy(deps: MachineDeps, claimed: ClaimedStepRow): boolean {
+  const current = deps.db
+    .select({ status: step.status, machineId: step.machineId, claimedAt: step.claimedAt })
+    .from(step)
+    .where(eq(step.id, claimed.id))
+    .get();
+  return (
+    current?.status === 'claimed' &&
+    current.machineId === claimed.machineId &&
+    current.claimedAt === claimed.claimedAt
+  );
+}
+
 async function connectorFields(
   deps: MachineDeps,
-  machineId: string,
+  claimed: ClaimedStepRow,
   teamId: string,
   profileSlugs: readonly string[],
   locked = false,
 ): Promise<Pick<MachineTokenResponse, 'mcpConnectors' | 'withheldMcp'>> {
-  const machineRow = deps.db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (claimed.machineId === null) return {};
+  const machineRow = deps.db.select().from(machine).where(eq(machine.id, claimed.machineId)).get();
   if (!machineRow) return {};
   const { grant } = stepMcpGrant(deps.db, machineRow, profileSlugs, locked);
-  return stepConnectorEndpoints(
+  const fields = await stepConnectorEndpoints(
     {
       db: deps.db,
       box: deps.box,
@@ -129,6 +145,7 @@ async function connectorFields(
     teamId,
     grant ?? [],
   );
+  return stillClaimedBy(deps, claimed) ? fields : {};
 }
 
 function gatewayMayReceive(
@@ -240,10 +257,10 @@ async function chiefStepToken(
     ...(claimed && bundle.claudeSubscriptionToken !== undefined
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
-    ...(claimed && stepRow?.machineId && threadRow && agentRow
+    ...(claimed && stepRow && threadRow && agentRow
       ? await connectorFields(
           deps,
-          stepRow.machineId,
+          stepRow,
           threadRow.teamId,
           agentRow.mcpServers,
           chiefTurnLocked(stepRow),

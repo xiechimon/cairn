@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { mcpConnectorRecordSchema } from '@cairn/shared';
+import { machineTokenResponseSchema, mcpConnectorRecordSchema } from '@cairn/shared';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { eq } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { mcpConnector } from '../src/db/schema.js';
+import { mcpConnector, step as stepTable } from '../src/db/schema.js';
 import { isOwnerOnlyRoute } from '../src/lib/token-auth.js';
 import {
   checkMcpConnector,
@@ -17,7 +18,14 @@ import {
   stepConnectorEndpoints,
   updateMcpConnector,
 } from '../src/services/mcp-servers.js';
-import { bootServer, req } from './helpers.js';
+import {
+  bootServer,
+  enrollConnectorRunner,
+  postProject,
+  queueConnectorStep,
+  req,
+  seedSessionRoute,
+} from './helpers.js';
 
 interface Seen {
   url: string;
@@ -652,6 +660,52 @@ describe('MCP connector OAuth', () => {
     expect(t.row()?.tokenGeneration).toBe(2);
     expect(results.map((r) => r.status)).toEqual(['connected', 'connected']);
     expect(t.world.current()).toBe('at-2');
+  });
+
+  test('a step that stops being claimed while its token waits on a refresh gets no connector credentials', async () => {
+    let release = () => {};
+    const t = bootOAuth({
+      refreshGate: new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    });
+    const started = await t.start(linearStart);
+    await t.callback({ code: 'code-ok', state: started.state, iss: AS });
+    t.expire(Date.now() + 5 * 60_000);
+    seedSessionRoute(t.s, { provider: 'stub-gw', modelId: 'stub-model', mcpServers: ['linear'] });
+    const projectId = await postProject(t.s.app, 'refresh-race');
+    const runner = await enrollConnectorRunner(t.s, 'race-runner', true);
+    const [finished, kept] = [0, 1].map(() => {
+      const id = queueConnectorStep(t.s, projectId, runner.machineId);
+      t.s.db
+        .update(stepTable)
+        .set({ status: 'claimed', machineId: runner.machineId, claimedAt: Date.now() })
+        .where(eq(stepTable.id, id))
+        .run();
+      return id;
+    });
+    const token = async (id: string) =>
+      machineTokenResponseSchema.parse(
+        await (
+          await t.s.app.request(`/api/machine/token/${id}`, {
+            headers: { authorization: `Bearer ${runner.token}` },
+          })
+        ).json(),
+      );
+    const pending = [token(finished ?? ''), token(kept ?? '')];
+    await vi.waitFor(() =>
+      expect(t.world.tokenRequests.some((p) => p.get('grant_type') === 'refresh_token')).toBe(true),
+    );
+    t.s.db
+      .update(stepTable)
+      .set({ status: 'done' })
+      .where(eq(stepTable.id, finished ?? ''))
+      .run();
+    release();
+    const [gone, live] = await Promise.all(pending);
+    expect(gone?.mcpConnectors).toBeUndefined();
+    expect(JSON.stringify(gone)).not.toContain('at-2');
+    expect(live?.mcpConnectors?.[0]?.headers).toEqual({ Authorization: 'Bearer at-2' });
   });
 
   test('a refresh that finishes after a reconnect does not overwrite the new tokens', async () => {
