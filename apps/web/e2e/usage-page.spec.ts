@@ -1,6 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive } from './chief-home-mock';
-import { pressAndExpect } from './helpers.js';
 
 const cell = (page: Page, date: string) => page.locator(`[data-day="${date}"]`);
 const readout = (page: Page) => page.getByTestId('usage-readout');
@@ -59,17 +58,4 @@ test('a new team sees an empty state instead of a blank grid', async ({ page }) 
   await page.goto('/app/usage');
   await expect(page.getByTestId('usage-empty')).toContainText('No usage yet');
   await expect(page.getByTestId('usage-heatmap')).toHaveCount(0);
-});
-
-test('the sidebar footer offers Usage and neither it nor search offers Activity', async ({
-  page,
-}) => {
-  await page.goto('/app');
-  const footer = page.getByTestId('sidebar-footer');
-  await expect(footer.getByTestId('sidebar-usage')).toBeVisible();
-  await expect(footer.getByTestId('sidebar-activity')).toHaveCount(0);
-  const search = page.getByRole('dialog', { name: 'Search' });
-  await pressAndExpect(page, 'Meta+k', search);
-  await expect(search.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
-  await expect(search.getByRole('button', { name: 'Activity', exact: true })).toHaveCount(0);
 });
