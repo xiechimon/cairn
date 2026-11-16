@@ -81,6 +81,7 @@ import { executeMemoryDocumentTool } from './memory-documents.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
+import { listedProjects } from './personal-space.js';
 import { ensureResearchProject } from './projects.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
@@ -177,7 +178,7 @@ function requireProjectRow(db: Db, projectId: string, teamId: string) {
   const row = db
     .select()
     .from(project)
-    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+    .where(and(eq(project.id, projectId), listedProjects(teamId)))
     .get();
   if (!row) throw new HttpError(404, `project ${projectId}`);
   return row;
@@ -351,7 +352,7 @@ export async function executeChiefTool(
   }
   switch (name) {
     case 'projects': {
-      const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();
+      const rows = db.select().from(project).where(listedProjects(ctx.teamId)).all();
       return json(
         rows.map((p) => {
           const todoCount = db

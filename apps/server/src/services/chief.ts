@@ -101,6 +101,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemoryDocuments } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { ownershipOf, rescheduleOwnershipHandoff } from './owner.js';
+import { listedProjects } from './personal-space.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
 import { researchProjectId } from './projects.js';
 import {
@@ -565,7 +566,7 @@ function pickedProjectOf(
     db
       .select({ id: project.id, name: project.name })
       .from(project)
-      .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+      .where(and(eq(project.id, projectId), listedProjects(teamId)))
       .get() ?? null
   );
 }
@@ -1636,7 +1637,7 @@ export function buildChiefSystemPrompt(
   const chiefRow = ensureChief(deps, teamId);
   const coordinator = coordinatorProfile(deps.db, teamId);
   const memoryOwner = coordinatorMemoryOwner(deps.db, teamId);
-  const projects = deps.db.select().from(project).where(eq(project.teamId, teamId)).all();
+  const projects = deps.db.select().from(project).where(listedProjects(teamId)).all();
   const skills = scanLocalSkills(deps.skillsDir);
   const injected = memoryOwner
     ? injectMemoryDocuments(deps.db, {

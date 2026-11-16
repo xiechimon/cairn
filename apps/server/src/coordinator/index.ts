@@ -37,6 +37,7 @@ import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { serverTakesTurn } from '../services/machine-claim.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
 import { ownershipOf } from '../services/owner.js';
+import { listedProjects } from '../services/personal-space.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
 import {
   type CoordinatorProviders,
@@ -488,7 +489,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       projects: db
         .select()
         .from(project)
-        .where(eq(project.teamId, threadRow.teamId))
+        .where(listedProjects(threadRow.teamId))
         .all()
         .map((p) => ({
           id: p.id,

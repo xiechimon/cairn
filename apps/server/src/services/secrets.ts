@@ -19,6 +19,7 @@ import { sha256Hex } from '../lib/crypto.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { linkedMailSecretIds } from './mail.js';
+import { listedProjects } from './personal-space.js';
 
 export interface SecretDeps {
   db: Db;
@@ -165,7 +166,7 @@ export function createSecret(
     const owned = deps.db
       .select({ id: project.id })
       .from(project)
-      .where(and(eq(project.id, projectId), eq(project.teamId, input.teamId)))
+      .where(and(eq(project.id, projectId), listedProjects(input.teamId)))
       .get();
     if (!owned) throw notFound(`project ${projectId}`);
   }
