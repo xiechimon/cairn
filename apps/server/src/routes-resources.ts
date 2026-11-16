@@ -98,7 +98,11 @@ import {
   startMcpConnectorAuthorize,
   startOAuthAuthorize,
 } from './services/oauth.js';
-import { ProviderTestLimiter, testProviderConnection } from './services/provider-test.js';
+import {
+  listUpstreamModels,
+  ProviderTestLimiter,
+  testProviderConnection,
+} from './services/provider-test.js';
 import {
   createProvider,
   deleteProvider,
@@ -554,6 +558,12 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   });
 
   const providerTestLimiter = new ProviderTestLimiter();
+  const providerTestDeps = () => ({
+    ...keysvc,
+    fetch: ctx.providerTestFetch ?? globalThis.fetch,
+    tokenFetch: ctx.oauthFetch ?? globalThis.fetch,
+    ...(ctx.providerTestTimeoutMs === undefined ? {} : { timeoutMs: ctx.providerTestTimeoutMs }),
+  });
   app.post('/api/teams/:id/providers/:pid/test', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
@@ -565,20 +575,24 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     }
     const body = parseWith(testProviderBodySchema, (await jsonBody(c)) ?? {}, 'body');
     const id = c.req.param('pid');
-    providerTestLimiter.take(id);
     return c.json(
       await testProviderConnection(
-        {
-          ...keysvc,
-          fetch: ctx.providerTestFetch ?? globalThis.fetch,
-          tokenFetch: ctx.oauthFetch ?? globalThis.fetch,
-          ...(ctx.providerTestTimeoutMs === undefined
-            ? {}
-            : { timeoutMs: ctx.providerTestTimeoutMs }),
-        },
+        { ...providerTestDeps(), limiter: providerTestLimiter },
         { teamId, id, ...body },
       ),
     );
+  });
+
+  app.get('/api/teams/:id/providers/:pid/upstream-models', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    if (pairedDeviceIdOf(c) !== null || !isOwner(ctx.db, ctx.user.id)) {
+      throw new HttpError(
+        403,
+        redactSecrets('Only the owner can list upstream models.').value as string,
+      );
+    }
+    return c.json(await listUpstreamModels(providerTestDeps(), { teamId, id: c.req.param('pid') }));
   });
 
   app.delete('/api/teams/:id/providers/:pid', (c) => {

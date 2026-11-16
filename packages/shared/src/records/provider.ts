@@ -71,11 +71,39 @@ export const testProviderBodySchema = z.object({
   model: z.string().min(1).max(256).optional(),
 });
 
+export const providerFailureSchema = z.enum([
+  'auth',
+  'not-found',
+  'rate-limit',
+  'timeout',
+  'upstream',
+  'invalid',
+  'network',
+  'no-model',
+]);
+export type ProviderFailure = z.infer<typeof providerFailureSchema>;
+
 export const providerTestResultSchema = z.strictObject({
   status: z.enum(['ok', 'failed']),
   reason: z.string().nullable(),
+  failure: providerFailureSchema.nullable(),
+  httpStatus: z.number().int().nullable(),
+  latencyMs: z.number().int().nonnegative().nullable(),
 });
 export type ProviderTestResult = z.infer<typeof providerTestResultSchema>;
+
+export const upstreamModelsResultSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('ok'),
+    models: z.array(z.strictObject({ id: z.string(), name: z.string() })),
+  }),
+  z.strictObject({
+    status: z.literal('failed'),
+    failure: providerFailureSchema,
+    httpStatus: z.number().int().nullable(),
+  }),
+]);
+export type UpstreamModelsResult = z.infer<typeof upstreamModelsResultSchema>;
 
 export const PROVIDER_PRESET_IDS = [
   'github-copilot',

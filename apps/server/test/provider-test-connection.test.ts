@@ -74,7 +74,13 @@ async function result(s: TestServer, path: string, body: object = {}) {
   const text = await response.text();
   expect(text.includes(KEY)).toBe(false);
   expect(text.includes(OTHER_KEY)).toBe(false);
-  return JSON.parse(text) as { status: string; reason: string | null };
+  return JSON.parse(text) as {
+    status: string;
+    reason: string | null;
+    failure: string | null;
+    httpStatus: number | null;
+    latencyMs: number | null;
+  };
 }
 
 afterEach(() => {
@@ -175,10 +181,41 @@ describe('provider connection check', () => {
     expect(calls).toHaveLength(0);
   });
 
-  test('returns exactly status and reason, with no model count or upstream metadata', async () => {
+  test('returns status and latency, with no model count or upstream metadata', async () => {
     transport({ status: 200, body: completion(`model-${KEY}`) });
     const s = bootServer();
-    expect(await result(s, await addProvider(s))).toEqual({ status: 'ok', reason: null });
+    expect(await result(s, await addProvider(s))).toEqual({
+      status: 'ok',
+      reason: null,
+      failure: null,
+      httpStatus: null,
+      latencyMs: expect.any(Number),
+    });
+  });
+
+  test.each([
+    [401, 'auth'],
+    [404, 'not-found'],
+    [429, 'rate-limit'],
+    [502, 'upstream'],
+  ])('classifies an upstream %i as %s', async (status, failure) => {
+    transport({ status, body: { error: { message: 'fixture' } } });
+    const s = bootServer();
+    const data = await result(s, await addProvider(s));
+    expect(data).toMatchObject({ status: 'failed', failure, httpStatus: status, latencyMs: null });
+  });
+
+  test('tests the requested model, not the cheapest one', async () => {
+    const calls = transport({ status: 200, body: completion() });
+    const s = bootServer();
+    const path = await addProvider(s, {
+      models: [
+        { id: 'small', name: 'Small' },
+        { id: 'large', name: 'Large' },
+      ],
+    });
+    expect((await result(s, path, { model: 'large' })).status).toBe('ok');
+    expect(calls[0]?.body.model).toBe('large');
   });
 
   test('uses native x-api-key authentication for Anthropic', async () => {
@@ -236,10 +273,17 @@ describe('provider connection check', () => {
       transport({ status: 200, body: completion() });
       const s = bootServer();
       const path = await addProvider(s, { apiKey });
-      expect(await result(s, path)).toEqual({ status: 'ok', reason: null });
+      expect(await result(s, path)).toMatchObject({ status: 'ok', reason: null });
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 11_000);
       transport({ status: 401, body: { error: { message: `denied ${apiKey}` } } });
       const data = await result(s, path);
-      expect(Object.keys(data).sort()).toEqual(['reason', 'status']);
+      expect(Object.keys(data).sort()).toEqual([
+        'failure',
+        'httpStatus',
+        'latencyMs',
+        'reason',
+        'status',
+      ]);
       expect(data.status).toBe('failed');
       expect(data.reason).toEqual(expect.any(String));
     },
@@ -320,12 +364,109 @@ describe('provider connection check', () => {
     expect(calls).toHaveLength(0);
   });
 
-  test('limits each provider to five requests per minute', async () => {
+  test('tests each model at most once per ten seconds, other models stay free', async () => {
     const calls = transport({ status: 200, body: completion() });
     const s = bootServer();
-    const path = await addProvider(s);
-    for (let index = 0; index < 5; index++) await result(s, path);
+    const path = await addProvider(s, {
+      models: [
+        { id: 'a', name: 'A' },
+        { id: 'b', name: 'B' },
+        { id: 'c', name: 'C' },
+      ],
+    });
+    for (const model of ['a', 'b', 'c']) await result(s, path, { model });
+    expect((await req(s.app, 'POST', path, { model: 'a' })).status).toBe(429);
     expect((await req(s.app, 'POST', path, {})).status).toBe(429);
-    expect(calls).toHaveLength(5);
+    expect(calls).toHaveLength(3);
+  });
+});
+
+describe('upstream model list', () => {
+  const listPath = (path: string) => path.replace(/\/test$/, '/upstream-models');
+
+  test('lists OpenAI-compatible models with a Bearer key, sorted and deduplicated', async () => {
+    const urls: string[] = [];
+    const fetch = vi.fn<typeof globalThis.fetch>(async (url, init) => {
+      urls.push(String(url));
+      const auth = new Headers(init?.headers).get('authorization');
+      return new Response(
+        JSON.stringify({ data: [{ id: 'zeta' }, { id: 'alpha' }, { id: 'zeta' }, { id: '' }] }),
+        { status: auth === `Bearer ${KEY}` ? 200 : 401 },
+      );
+    });
+    vi.stubGlobal('fetch', fetch);
+    const s = bootServer();
+    const response = await req(s.app, 'GET', listPath(await addProvider(s)));
+    expect(await response.json()).toEqual({
+      status: 'ok',
+      models: [
+        { id: 'alpha', name: 'alpha' },
+        { id: 'zeta', name: 'zeta' },
+      ],
+    });
+    expect(urls).toEqual(['https://provider.example/v1/models']);
+  });
+
+  test('uses x-api-key and anthropic-version for Anthropic and keeps display names', async () => {
+    let headers = new Headers();
+    const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+      headers = new Headers(init?.headers);
+      return new Response(
+        JSON.stringify({ data: [{ id: 'claude-x', display_name: 'Claude X' }] }),
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal('fetch', fetch);
+    const s = bootServer();
+    const path = await addProvider(s, {
+      providerId: 'anthropic',
+      api: 'anthropic-messages',
+      baseUrl: 'https://api.anthropic.com',
+    });
+    const body = await (await req(s.app, 'GET', listPath(path))).json();
+    expect(body).toEqual({ status: 'ok', models: [{ id: 'claude-x', name: 'Claude X' }] });
+    expect(headers.get('x-api-key') === KEY).toBe(true);
+    expect(headers.get('anthropic-version')).toBe('2023-06-01');
+    expect(headers.has('authorization')).toBe(false);
+  });
+
+  test.each([
+    [
+      { status: 401, body: '{}' },
+      { failure: 'auth', httpStatus: 401 },
+    ],
+    [
+      { status: 404, body: '{}' },
+      { failure: 'not-found', httpStatus: 404 },
+    ],
+    [
+      { status: 200, body: '<html>' },
+      { failure: 'invalid', httpStatus: null },
+    ],
+    [
+      { status: 200, body: '{"object":"list"}' },
+      { failure: 'invalid', httpStatus: null },
+    ],
+  ])('reports a failed list without upstream text: %o', async (reply, expected) => {
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      async () => new Response(`${reply.body}${KEY}`.slice(0, reply.body.length), reply),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const s = bootServer();
+    const response = await req(s.app, 'GET', listPath(await addProvider(s)));
+    const text = await response.text();
+    expect(text.includes(KEY)).toBe(false);
+    expect(JSON.parse(text)).toEqual({ status: 'failed', ...expected });
+  });
+
+  test('refuses a non-owner before outbound traffic', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    vi.stubGlobal('fetch', fetch);
+    const s = bootServer();
+    const path = await addProvider(s);
+    s.db.run(sql`INSERT INTO user (id, displayName) VALUES ('earlier-user', 'Earlier')`);
+    s.db.run(sql`UPDATE user SET rowid = 100000 WHERE id != 'earlier-user'`);
+    expect((await req(s.app, 'GET', listPath(path))).status).toBe(403);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

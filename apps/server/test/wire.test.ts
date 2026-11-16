@@ -60,6 +60,7 @@ const INFERRED_ROUTES = [
   'POST /api/schedules/{id}/run',
   'DELETE /api/teams/{id}/providers/{pid}',
   'POST /api/teams/{id}/providers/{pid}/test',
+  'GET /api/teams/{id}/providers/{pid}/upstream-models',
   'GET /api/teams/{id}/mcp-connectors',
   'POST /api/teams/{id}/mcp-connectors',
   'PATCH /api/teams/{id}/mcp-connectors/{cid}',
