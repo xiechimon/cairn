@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { chiefMessage, message } from '../src/db/schema.js';
@@ -177,5 +179,35 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
       expect(crossTeam).toBe(404);
       expect(missing).toBe(404);
     });
+  });
+});
+
+describe('create_project', () => {
+  test('a hosted project gets a provisioned repository the Runner can clone', async () => {
+    const created = (await relay('create_project', {
+      name: 'Mac Otel Demo',
+      repoKind: 'hosted',
+    })) as { id: string };
+    const listed = await req(H.s.app, 'GET', '/api/projects');
+    const rows = (await listed.json()) as {
+      id: string;
+      repoName: string | null;
+      cloneUrl?: string;
+    }[];
+    const row = rows.find((entry) => entry.id === created.id);
+    expect(row).toBeDefined();
+    expect(row?.repoName).toBe('mac-otel-demo');
+    expect(row?.cloneUrl).toMatch(/\/git\/.+\/mac-otel-demo$/);
+    expect(existsSync(join(H.s.reposDir, H.teamId, 'mac-otel-demo.git', 'HEAD'))).toBe(true);
+  });
+
+  test('a plain project has no repository', async () => {
+    const created = (await relay('create_project', { name: 'Notes' })) as { id: string };
+    const listed = await req(H.s.app, 'GET', '/api/projects');
+    const rows = (await listed.json()) as { id: string; repoKind?: string; cloneUrl?: string }[];
+    const row = rows.find((entry) => entry.id === created.id);
+    expect(row).toBeDefined();
+    expect(row?.repoKind).toBeUndefined();
+    expect(row?.cloneUrl).toBeUndefined();
   });
 });

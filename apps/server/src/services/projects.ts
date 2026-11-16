@@ -1,5 +1,6 @@
 import {
   ACTIVE_STEP_STATUSES,
+  type CreateProjectBody,
   DEFAULT_AUTONOMY_SETTINGS,
   DEFAULT_SHIP_ROUTE,
   type PatchProjectBody,
@@ -34,7 +35,15 @@ import type { FetchLike } from '../lib/github.js';
 import { githubRepoReachable } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
-import { isGithubRepoRef, validateGithubLocalSlotPath } from './git.js';
+import {
+  isGithubRepoRef,
+  provisionHostedRepo,
+  type RepoCtx,
+  slugifyRepoName,
+  uniqueRepoName,
+  validateGithubLocalSlotPath,
+  validateLocalRepoPath,
+} from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { dispatchHostedCleanup, enqueueHostedCleanup } from './hosted-cleanup.js';
 import { retireTodoDeliverables } from './machine-deliverables.js';
@@ -163,6 +172,55 @@ function projectRunningWork(db: ProjectReader, projectId: string): string[] {
     order by kind, sortKey
   `);
   return rows.map((row) => row.line);
+}
+
+export async function createProject(
+  ctx: RepoCtx,
+  input: CreateProjectBody & { teamId: string },
+): Promise<ProjectRow> {
+  const kind = input.kind ?? input.repoKind;
+  let githubRepo: string | null = null;
+  if (kind === 'github') {
+    const ref =
+      typeof input.githubRepo === 'string'
+        ? input.githubRepo
+        : input.githubRepo
+          ? `${input.githubRepo.owner}/${input.githubRepo.repo}`
+          : undefined;
+    if (ref === undefined || !isGithubRepoRef(ref)) {
+      throw new HttpError(400, 'invalid body at githubRepo: expected "owner/repo"');
+    }
+    githubRepo = ref;
+  } else if (kind === 'local' && input.githubRepo !== undefined) {
+    throw new HttpError(400, 'invalid body at githubRepo: not allowed for kind "local"');
+  }
+  const localPath =
+    kind === 'local'
+      ? await validateLocalRepoPath(input.localPath)
+      : kind === 'github'
+        ? validateGithubLocalSlotPath(input.localPath)
+        : null;
+  let repoName: string | null = null;
+  if (kind === 'hosted') {
+    repoName = await uniqueRepoName(ctx, input.teamId, slugifyRepoName(input.name));
+    await provisionHostedRepo(ctx, input.teamId, repoName);
+  }
+  const id = newRecordId();
+  ctx.db
+    .insert(project)
+    .values({
+      id,
+      name: input.name,
+      teamId: input.teamId,
+      repoKind: kind ?? null,
+      repoName,
+      githubRepo,
+      localPath,
+    })
+    .run();
+  const row = ctx.db.select().from(project).where(eq(project.id, id)).get();
+  if (row === undefined) throw new HttpError(500, `project ${id} was not saved`);
+  return row;
 }
 
 export const RESEARCH_PROJECT_NAME = '调研';

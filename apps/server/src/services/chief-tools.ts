@@ -83,7 +83,7 @@ import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
 import { listedProjects } from './personal-space.js';
-import { ensureResearchProject } from './projects.js';
+import { createProject, ensureResearchProject } from './projects.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
 import {
@@ -758,24 +758,12 @@ export async function executeChiefTool(
       return json(result);
     }
     case 'create_project': {
-      const name = str(params, 'name');
-      const repoKind = optStr(params, 'repoKind');
-      const id = newRecordId();
-      db.insert(project)
-        .values({
-          id,
-          name,
-          teamId: ctx.teamId,
-          repoKind: repoKind === 'hosted' ? 'hosted' : null,
-          repoName: null,
-          githubRepo: null,
-        })
-        .run();
-      return json({
-        id,
-        name,
-        note: repoKind === 'hosted' ? 'hosted repo provisioning via REST face' : 'plain project',
+      const row = await createProject(deps, {
+        name: str(params, 'name'),
+        teamId: ctx.teamId,
+        ...(optStr(params, 'repoKind') === 'hosted' ? { kind: 'hosted' as const } : {}),
       });
+      return json({ id: row.id, name: row.name, repoKind: row.repoKind, repoName: row.repoName });
     }
     case 'update_project': {
       const projectId = str(params, 'projectId');

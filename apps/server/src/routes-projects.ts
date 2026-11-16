@@ -16,7 +16,7 @@ import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { build, project, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
-import { newRecordId, nowMs } from './lib/ids.js';
+import { nowMs } from './lib/ids.js';
 import {
   githubAppOf,
   githubIssueDepsOf,
@@ -32,21 +32,12 @@ import { patchAutonomy, readAutonomy } from './services/autonomy-gates.js';
 import { toBuildRecord } from './services/builds.js';
 import { listDir } from './services/fs-list.js';
 import { pickFolder } from './services/fs-pick.js';
-import {
-  isGithubRepoRef,
-  provisionHostedRepo,
-  readBranches,
-  readFiles,
-  slugifyRepoName,
-  toProjectRecord,
-  uniqueRepoName,
-  validateGithubLocalSlotPath,
-  validateLocalRepoPath,
-} from './services/git.js';
+import { readBranches, readFiles, toProjectRecord } from './services/git.js';
 import { importGithubIssue } from './services/github-issues.js';
 import { listNamedPrompts, putNamedPrompt, resetNamedPrompt } from './services/named-prompts.js';
 import { listedProjects } from './services/personal-space.js';
 import {
+  createProject,
   projectMergeConfigOf,
   projectShipRouteOf,
   updateProject,
@@ -145,47 +136,7 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(createProjectBodySchema, await jsonBody(c), 'body');
     const teamId = body.teamId ?? ctx.team.id;
     requireTeam(ctx, teamId);
-    const kind = body.kind ?? body.repoKind;
-    let githubRepo: string | null = null;
-    if (kind === 'github') {
-      const ref =
-        typeof body.githubRepo === 'string'
-          ? body.githubRepo
-          : body.githubRepo
-            ? `${body.githubRepo.owner}/${body.githubRepo.repo}`
-            : undefined;
-      if (ref === undefined || !isGithubRepoRef(ref)) {
-        throw new HttpError(400, 'invalid body at githubRepo: expected "owner/repo"');
-      }
-      githubRepo = ref;
-    } else if (kind === 'local' && body.githubRepo !== undefined) {
-      throw new HttpError(400, 'invalid body at githubRepo: not allowed for kind "local"');
-    }
-    const localPath =
-      kind === 'local'
-        ? await validateLocalRepoPath(body.localPath)
-        : kind === 'github'
-          ? validateGithubLocalSlotPath(body.localPath)
-          : null;
-    const id = newRecordId();
-    let repoName: string | null = null;
-    if (kind === 'hosted') {
-      repoName = await uniqueRepoName(ctx, teamId, slugifyRepoName(body.name));
-      await provisionHostedRepo(ctx, teamId, repoName);
-    }
-    ctx.db
-      .insert(project)
-      .values({
-        id,
-        name: body.name,
-        teamId,
-        repoKind: kind ?? null,
-        repoName,
-        githubRepo,
-        localPath,
-      })
-      .run();
-    const row = requireProject(ctx, id);
+    const row = await createProject(ctx, { ...body, teamId });
     return c.json(toProjectRecord(row, requestOrigin(c)), 201);
   });
 
