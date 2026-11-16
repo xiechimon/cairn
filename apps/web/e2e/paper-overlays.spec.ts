@@ -198,8 +198,11 @@ test('provider picker: grouped rows, search hides empty groups', async ({ page }
   expect((await row.boundingBox())?.height).toBe(40);
   await expect(dialog.getByRole('group', { name: '订阅登录' }).locator('[data-preset-id]')).toHaveCount(2);
   const codex = dialog.locator('[data-preset-id="openai-codex"]');
-  await expect(codex).toBeDisabled();
-  await expect(codex).toHaveCSS('color', await resolveColor(page, '#545454'));
+  await expect(codex).toBeEnabled();
+  await expect(codex).toHaveCSS(
+    'color',
+    await row.evaluate((element) => getComputedStyle(element).color),
+  );
   await evidenceShot(page, 'provider-picker.png');
 
   await dialog.getByLabel('搜索服务商...').fill('cloudflare');
