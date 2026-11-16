@@ -245,7 +245,9 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).toContain('先后顺序用 dependsOn 表达');
     expect(prompt).toContain('唯一的例外是用户要你直接操作电脑');
     expect(prompt).toContain('同一回合最多重试 3 次');
-    expect(prompt).toContain('用 request_takeover 请用户接管');
+    expect(prompt).toContain('browser_act 的 fill_secret（ref 和 secret 名称）代填密码');
+    expect(prompt).toContain('不要读取、索取或发送明文密码');
+    expect(prompt).toContain('验证码、滑块、短信码、二次验证和设备确认仍用 request_takeover');
     expect(prompt).toContain(
       '不要再重试，也不要设法绕过拦截：直接用 request_takeover 请用户自己操作',
     );
