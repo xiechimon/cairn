@@ -26,9 +26,7 @@ async function settle(locator: Locator) {
 
 async function openFromTopbar(page: Page, url: string, name: string) {
   await page.goto(url);
-  await page
-    .getByRole('button', { name: url.includes('/providers') ? '添加服务商' : '新建', exact: true })
-    .click();
+  await page.getByTestId('resource-new').click();
   const dialog = page.getByRole('dialog', { name });
   await expect(dialog).toBeVisible();
   await settle(dialog);
