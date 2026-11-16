@@ -2,6 +2,7 @@ import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 const SUBAGENT_TASK_TYPE = 'local_agent';
 const FINISHED_MAX = 10;
+const SETTLED_MEMORY = 50;
 const DESCRIPTION_MAX = 200;
 const SUMMARY_MAX = 2000;
 const OUTPUT_FILE_MAX = 500;
@@ -49,19 +50,14 @@ export class BackgroundSubagents {
     else if (m.subtype === 'task_notification') this.noteSettled(m);
   }
 
-  get running(): readonly string[] {
-    return [...this.live].map((id) => this.descriptions.get(id) ?? id);
-  }
-
-  get awaitingResults(): boolean {
-    return this.awaitingResult.size > 0;
+  get pending(): readonly string[] {
+    return [...this.live, ...this.awaitingResult].map((id) => this.descriptions.get(id) ?? id);
   }
 
   takeFinished(): { finished: FinishedSubagent[]; omitted: number } {
     const taken = { finished: this.finished, omitted: this.omitted };
     this.finished = [];
     this.omitted = 0;
-    this.awaitingResult.clear();
     return taken;
   }
 
@@ -92,6 +88,7 @@ export class BackgroundSubagents {
           clip(task.description ?? task.task_id, DESCRIPTION_MAX),
         );
       this.foreground.delete(task.task_id);
+      this.awaitingResult.delete(task.task_id);
       next.add(task.task_id);
     }
     for (const id of this.live) if (!next.has(id)) this.awaitingResult.add(id);
@@ -108,7 +105,7 @@ export class BackgroundSubagents {
     if (!this.live.has(id) && !this.awaitingResult.has(id)) return;
     this.live.delete(id);
     this.awaitingResult.delete(id);
-    this.settled.add(id);
+    this.remember(id);
     if (this.finished.length < FINISHED_MAX) {
       this.finished.push({
         description: this.descriptions.get(id) ?? id,
@@ -120,5 +117,12 @@ export class BackgroundSubagents {
       this.omitted += 1;
     }
     this.descriptions.delete(id);
+  }
+
+  private remember(id: string): void {
+    this.settled.add(id);
+    if (this.settled.size <= SETTLED_MEMORY) return;
+    const oldest = this.settled.values().next().value;
+    if (oldest !== undefined) this.settled.delete(oldest);
   }
 }

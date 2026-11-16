@@ -425,7 +425,6 @@ const TERMINAL_EVENT_TYPES: readonly string[] = ['done', 'error', 'message_stop'
 
 const BACKGROUND_SUBAGENT_CONTINUATIONS_MAX = 3;
 const BACKGROUND_SUBAGENT_WAIT_MS = 20 * 60_000;
-const BACKGROUND_RESULT_GRACE_MS = 5_000;
 const AWAIT_BACKGROUND_TOOL = 'await_background_subagents';
 
 function backgroundContinuationPrompt(results: {
@@ -472,7 +471,6 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private heldDone: StepEvent | null = null;
   private waitCallId: string | null = null;
   private waitTimer: NodeJS.Timeout | null = null;
-  private graceTimer: NodeJS.Timeout | null = null;
   private continuations = 0;
 
   constructor(
@@ -529,13 +527,8 @@ class ClaudeSessionHandle implements AgentSessionHandle {
             return;
           }
         }
-        if (this.heldDone !== null && this.background.running.length === 0) {
-          if (!this.background.awaitingResults) this.continueAfterBackground();
-          else if (this.graceTimer === null)
-            this.graceTimer = setTimeout(() => {
-              this.graceTimer = null;
-              if (this.heldDone !== null && !this.closed) this.continueAfterBackground();
-            }, BACKGROUND_RESULT_GRACE_MS);
+        if (this.heldDone !== null && this.background.pending.length === 0) {
+          this.continueAfterBackground();
         }
         this.flushSteers();
       }
@@ -556,7 +549,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }
 
   private holdForBackground(done: StepEvent): boolean {
-    const running = this.background.running;
+    const running = this.background.pending;
     if (running.length === 0 || this.stopping) return false;
     if (this.continuations >= BACKGROUND_SUBAGENT_CONTINUATIONS_MAX) return false;
     this.background.takeFinished();
@@ -568,7 +561,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     });
     this.waitTimer = setTimeout(() => {
       this.releaseHeldDone(
-        `Stopped waiting after ${BACKGROUND_SUBAGENT_WAIT_MS / 60_000} minutes; still running: ${this.background.running.join('; ')}`,
+        `Stopped waiting after ${BACKGROUND_SUBAGENT_WAIT_MS / 60_000} minutes; still running: ${this.background.pending.join('; ')}`,
       );
       this.stopping = true;
       this.finish();
@@ -599,8 +592,6 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private closeWait(result: string): void {
     if (this.waitTimer !== null) clearTimeout(this.waitTimer);
     this.waitTimer = null;
-    if (this.graceTimer !== null) clearTimeout(this.graceTimer);
-    this.graceTimer = null;
     const id = this.waitCallId;
     if (id === null) return;
     this.waitCallId = null;
@@ -615,8 +606,6 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     this.closed = true;
     if (this.waitTimer !== null) clearTimeout(this.waitTimer);
     this.waitTimer = null;
-    if (this.graceTimer !== null) clearTimeout(this.graceTimer);
-    this.graceTimer = null;
     for (const pending of this.pendingSteers.splice(0)) {
       pending.reject(new Error('claude-code session closed before steer delivery'));
     }

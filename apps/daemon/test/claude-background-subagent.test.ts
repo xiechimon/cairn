@@ -155,6 +155,34 @@ test('a turn that ends while a background subagent runs waits for it and continu
   expect(events.some((event) => event.type === 'steer' && event.text === prompts[1])).toBe(true);
 });
 
+test('a level that empties before the result arrives still waits for the notification', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const prompts = fakeCli(async (cli) => {
+    await cli.nextPrompt();
+    cli.emit(started('agent-1', 'local_agent', 'survey'));
+    cli.emit(live(['agent-1', 'local_agent']));
+    cli.emit(live());
+    cli.emit(assistant('Waiting.'));
+    cli.emit(result);
+    await new Promise((resolve) => setTimeout(resolve, 60_000));
+    cli.emit(live(['agent-1', 'local_agent']));
+    cli.emit(live());
+    await new Promise((resolve) => setTimeout(resolve, 60_000));
+    cli.emit(notified('agent-1', 'late result'));
+    await cli.nextPrompt();
+    cli.emit(assistant('Report written.'));
+    cli.emit(result);
+  });
+
+  const pending = run();
+  await vi.advanceTimersByTimeAsync(130_000);
+  const events = await pending;
+
+  expect(prompts).toHaveLength(2);
+  expect(prompts[1]).toContain('late result');
+  expect(events.filter((event) => event.type === 'done')).toHaveLength(1);
+});
+
 test('continuations stop at the cap and the session finishes with a subagent still running', async () => {
   const prompts = fakeCli(async (cli) => {
     for (let turn = 1; ; turn++) {
