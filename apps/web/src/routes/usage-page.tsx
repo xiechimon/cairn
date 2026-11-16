@@ -8,6 +8,7 @@ import { useLiveData } from '../api/provider.js';
 import { useDailyUsage } from '../api/usage-daily.js';
 import { useNarrow } from '../board/use-narrow.js';
 import { EmptyState } from '../components/empty-state.js';
+import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -158,9 +159,11 @@ function Heatmap({
                 cell.future ? (
                   <span key={cell.date} />
                 ) : (
-                  <button
+                  <Button
                     key={cell.date}
                     type="button"
+                    variant="link"
+                    size="icon"
                     data-day={cell.date}
                     data-level={cell.level}
                     aria-pressed={cell.date === selected}
@@ -172,7 +175,7 @@ function Heatmap({
                     tabIndex={cell.date === selected ? 0 : -1}
                     className={cn(
                       cellSize,
-                      'rounded-[3px] hover:outline-2 hover:outline-offset-1 hover:outline-content-tertiary focus-visible:ring-2 focus-visible:ring-ring',
+                      'rounded-(--cds-radius-xs) border-0 p-0 hover:outline-2 hover:outline-offset-1 hover:outline-content-tertiary focus-visible:ring-2 focus-visible:ring-ring',
                       LEVEL_BG[cell.level],
                       cell.date === selected && 'outline-2 outline-offset-1 outline-foreground',
                     )}
@@ -192,7 +195,7 @@ function Heatmap({
       >
         {t('少')}
         {LEVEL_BG.map((bg) => (
-          <i key={bg} className={cn('block size-2.5 rounded-[3px]', bg)} />
+          <i key={bg} className={cn('block size-2.5 rounded-(--cds-radius-xs)', bg)} />
         ))}
         {t('多')}
       </div>
@@ -213,7 +216,7 @@ function UsageBody({ days, today }: { days: readonly DailyUsageDay[]; today: str
       <div className="flex flex-col gap-0.5">
         <span
           data-testid="usage-recent-total"
-          className="text-[20px] leading-7 font-medium text-foreground tabular-nums"
+          className="text-brand leading-7 font-medium text-foreground tabular-nums"
         >
           {formatTokens(grid.recentTotal)} token
         </span>
