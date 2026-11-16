@@ -415,6 +415,80 @@ export function openProjectChannel(
   return { thread: chiefThreadView(deps, teamId, thread), created };
 }
 
+function retryableGreetingStep(
+  deps: ChiefDeps,
+  thread: ThreadRow,
+): { id: string; prompt: string } | undefined {
+  if (thread.projectId === null || thread.archivedAt !== null || thread.activeRun !== null)
+    return undefined;
+  const picked = deps.db.select().from(project).where(eq(project.id, thread.projectId)).get();
+  if (picked === undefined || picked.teamId !== thread.teamId || picked.archivedAt !== null)
+    return undefined;
+  const messages = deps.db
+    .select({ id: chiefMessage.id, role: chiefMessage.role })
+    .from(chiefMessage)
+    .where(eq(chiefMessage.threadId, thread.id))
+    .all();
+  if (
+    messages.some(
+      (row) =>
+        row.role === 'assistant' ||
+        (row.role === 'user' && !row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)),
+    )
+  )
+    return undefined;
+  const turns = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, thread.id), eq(step.kind, 'chief')))
+    .orderBy(asc(step.createdAt), sql`rowid`)
+    .all();
+  const original = turns[0];
+  const latest = turns.at(-1);
+  const prompt = original?.prompt;
+  if (
+    prompt == null ||
+    latest === undefined ||
+    !prompt.startsWith(PICKED_PROJECT_OPEN) ||
+    !prompt.split('\n')[1]?.startsWith(CHANNEL_GREETING_OPEN) ||
+    turns.some(
+      (turn) =>
+        turn.status !== 'failed' ||
+        turn.prompt !== prompt ||
+        (turn.ownerMessageIds?.length ?? 0) > 0,
+    )
+  )
+    return undefined;
+  return { id: latest.id, prompt };
+}
+
+export function retryProjectGreeting(
+  deps: ChiefDeps,
+  teamId: string,
+  threadId: string,
+  failedStepId: string,
+): ChiefThread {
+  return deps.db.transaction(
+    (db) => {
+      const scoped = { ...deps, db };
+      const thread = getChiefThread(scoped, threadId);
+      if (!thread || thread.teamId !== teamId || thread.userId !== deps.user.id)
+        throw new HttpError(404, `chief thread ${threadId}`);
+      const failed = retryableGreetingStep(scoped, thread);
+      if (failed === undefined || failed.id !== failedStepId)
+        throw new HttpError(409, 'the initial greeting is no longer retryable');
+      requireCoordinatorRule(scoped, teamId);
+      enqueueChiefStep(scoped, threadId, {
+        prompt: failed.prompt,
+        trigger: 'user',
+        ownerMessageIds: [],
+      });
+      return chiefThreadView(scoped, teamId, getChiefThread(scoped, threadId) ?? thread);
+    },
+    { behavior: 'immediate' },
+  );
+}
+
 function dropUnstartedGreeting(db: Db, threadId: string): void {
   db.delete(step)
     .where(
@@ -444,6 +518,8 @@ export function chiefThreadView(deps: ChiefDeps, teamId: string, r: ThreadRow): 
   return {
     ...record,
     lastTurnError: latest?.status === 'failed' ? turnErrorOf(deps.db, latest.id) : null,
+    retryGreetingStepId:
+      latest?.status === 'failed' ? (retryableGreetingStep(deps, r)?.id ?? null) : null,
     orchestration: orchestrationOf(deps.db, latestOrchestrationStep(deps.db, r.id)),
   };
 }

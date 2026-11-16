@@ -202,6 +202,7 @@ export interface ChiefConversationProps {
   onSettings?: () => void;
   onSend?: (text: string) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
+  onRetryGreeting?: () => void;
   onWithdraw?: (messageId: string) => Promise<void>;
   unsent?: UnsentSends | undefined;
   onSteer?: (messageId: string) => void;
@@ -229,6 +230,7 @@ export function ChiefConversation({
   onSettings,
   onSend,
   onRewind,
+  onRetryGreeting,
   onWithdraw,
   unsent,
   onSteer,
@@ -443,6 +445,7 @@ export function ChiefConversation({
     [allRows],
   );
   const latestUser = rows.findLast(({ item }) => item.kind === 'user');
+  const latestError = rows.findLast(({ item }) => item.kind === 'error');
   const latestUserKey =
     latestUser == null ? null : chiefStreamRowKey(latestUser.item, latestUser.i);
   latestUserKeyRef.current = latestUserKey;
@@ -545,7 +548,13 @@ export function ChiefConversation({
       onCopy={copyText}
       onRewindRequest={requestRewind}
       entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
-      onRetry={latestUser != null && i > latestUser.i ? retryLastUser : undefined}
+      onRetry={
+        latestUser != null && i > latestUser.i
+          ? retryLastUser
+          : latestUser == null && i === latestError?.i
+            ? onRetryGreeting
+            : undefined
+      }
       onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
       joinsPrev={run?.joinsPrev === true}
       joinsNext={run?.joinsNext === true}

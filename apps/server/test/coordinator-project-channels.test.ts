@@ -1,7 +1,7 @@
-import { threadReportContentSchema } from '@cairn/shared';
+import { TRANSCRIPT_PROMPT_ROW_ID_PREFIX, threadReportContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { chiefMessage, chiefThread, project, routingRule, step } from '../src/db/schema.js';
+import { chiefMessage, chiefThread, project, routingRule, step, team } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
 import { applyBuildStepAction, applyStepFailure } from '../src/services/builds.js';
@@ -69,6 +69,161 @@ describe('Coordinator project channels (docs/design/coordinator-project-channels
       [H.threadId, null],
       [channel.body.id, H.projectId],
     ]);
+  });
+
+  test('a failed initial greeting retries its saved prompt without inventing owner messages', async () => {
+    const channel = await openChannel();
+    const original = stepsOf(channel.body.id)[0]!;
+    H.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, original.id)).run();
+    H.s.db
+      .update(chiefThread)
+      .set({ activeRun: null })
+      .where(eq(chiefThread.id, channel.body.id))
+      .run();
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}${original.id}`,
+        threadId: channel.body.id,
+        role: 'user',
+        content: original.prompt,
+        createdAt: nowMs(),
+      })
+      .run();
+    const retry = () =>
+      req(
+        H.s.app,
+        'POST',
+        `/api/teams/${H.teamId}/chief/threads/${channel.body.id}/retry-greeting/${original.id}`,
+      );
+    const before = rowsOf(channel.body.id);
+    const listed = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/threads`);
+    expect(await listed.json()).toContainEqual(
+      expect.objectContaining({ id: channel.body.id, retryGreetingStepId: original.id }),
+    );
+    expect((await openChannel()).status).toBe(200);
+    expect(stepsOf(channel.body.id)).toHaveLength(1);
+    const response = await retry();
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      id: channel.body.id,
+      retryGreetingStepId: null,
+      activeRun: { phase: 'chief' },
+    });
+    const retried = stepsOf(channel.body.id).find((s) => s.id !== original.id)!;
+    expect(retried).toMatchObject({
+      prompt: original.prompt,
+      status: 'pending',
+      ownerMessageIds: [],
+      scopeProjectId: H.projectId,
+      fallback: null,
+    });
+    expect(rowsOf(channel.body.id)).toEqual(before);
+    expect((await retry()).status).toBe(409);
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, retried.id)).run();
+    expect((await retry()).status).toBe(409);
+    H.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, retried.id)).run();
+    H.s.db
+      .update(chiefThread)
+      .set({ activeRun: null })
+      .where(eq(chiefThread.id, channel.body.id))
+      .run();
+    expect((await retry()).status).toBe(409);
+    expect(
+      (
+        await req(
+          H.s.app,
+          'POST',
+          `/api/teams/${H.teamId}/chief/threads/${channel.body.id}/retry-greeting/${retried.id}`,
+        )
+      ).status,
+    ).toBe(201);
+    expect(stepsOf(channel.body.id)).toHaveLength(3);
+    expect(rowsOf(channel.body.id)).toEqual(before);
+  });
+
+  test.each([
+    'user',
+    'assistant',
+    'done',
+    'other-turn',
+    'archived-project',
+    'archived-thread',
+    'main-thread',
+  ] as const)('greeting recovery refuses %s without adding a step', async (state) => {
+    const channel = await openChannel();
+    const original = stepsOf(channel.body.id)[0]!;
+    H.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, original.id)).run();
+    H.s.db
+      .update(chiefThread)
+      .set({ activeRun: null })
+      .where(eq(chiefThread.id, channel.body.id))
+      .run();
+    if (state === 'user' || state === 'assistant')
+      H.s.db
+        .insert(chiefMessage)
+        .values({
+          id: newUuidv7(),
+          threadId: channel.body.id,
+          role: state,
+          content: 'Check the project',
+          createdAt: nowMs(),
+        })
+        .run();
+    if (state === 'done')
+      H.s.db.update(step).set({ status: 'done' }).where(eq(step.id, original.id)).run();
+    if (state === 'other-turn')
+      H.s.db
+        .update(step)
+        .set({ prompt: '[wake:settle] provenance=watch:task\nTask finished' })
+        .where(eq(step.id, original.id))
+        .run();
+    if (state === 'archived-project')
+      H.s.db.update(project).set({ archivedAt: nowMs() }).where(eq(project.id, H.projectId)).run();
+    if (state === 'archived-thread')
+      H.s.db
+        .update(chiefThread)
+        .set({ archivedAt: nowMs() })
+        .where(eq(chiefThread.id, channel.body.id))
+        .run();
+    const before = stepsOf(channel.body.id);
+    const response = await req(
+      H.s.app,
+      'POST',
+      `/api/teams/${H.teamId}/chief/threads/${state === 'main-thread' ? H.threadId : channel.body.id}/retry-greeting/${original.id}`,
+    );
+    expect(response.status).toBe(409);
+    expect(stepsOf(channel.body.id)).toEqual(before);
+    const listed = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/threads`);
+    const rows = (await listed.json()) as { id: string; retryGreetingStepId?: string | null }[];
+    expect(
+      rows.find((row) => row.id === (state === 'main-thread' ? H.threadId : channel.body.id))
+        ?.retryGreetingStepId ?? null,
+    ).toBeNull();
+  });
+
+  test('greeting recovery cannot create a missing channel or cross the team boundary', async () => {
+    const channel = await openChannel();
+    const original = stepsOf(channel.body.id)[0]!;
+    const otherTeam = newUuidv7();
+    H.s.db.insert(team).values({ id: otherTeam, name: 'Other team', createdAt: nowMs() }).run();
+    const before = stepsOf(channel.body.id);
+    for (const [teamId, threadId] of [
+      ['missing-team', channel.body.id],
+      [otherTeam, channel.body.id],
+      [H.teamId, 'missing-thread'],
+    ]) {
+      expect(
+        (
+          await req(
+            H.s.app,
+            'POST',
+            `/api/teams/${teamId}/chief/threads/${threadId}/retry-greeting/${original.id}`,
+          )
+        ).status,
+      ).toBe(404);
+    }
+    expect(stepsOf(channel.body.id)).toEqual(before);
   });
 
   test('the index allows one active thread per Coordinator and scope', async () => {

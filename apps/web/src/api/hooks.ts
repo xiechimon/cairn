@@ -1023,6 +1023,21 @@ export function useApiMutations(teamId: string | undefined) {
         });
       },
     }),
+    chiefRetryGreeting: useMutation({
+      mutationFn: (input: { threadId: string; stepId: string }) =>
+        api.post<ChiefThread>(
+          `/api/teams/${teamId}/chief/threads/${input.threadId}/retry-greeting/${input.stepId}`,
+          {},
+        ),
+      onSuccess: (thread) => {
+        void qc.cancelQueries({ queryKey: ['chiefThreads', teamId] });
+        qc.setQueryData<ChiefThread[]>(['chiefThreads', teamId], (threads) =>
+          threads?.map((row) => (row.id === thread.id ? thread : row)),
+        );
+        invalidateAll();
+      },
+      onError: invalidateAll,
+    }),
     chiefRewind: useMutation({
       mutationFn: (input: { threadId: string; messageId: string }) =>
         api.post<{ deletedCount: number; thread: ChiefThread }>(

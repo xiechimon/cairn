@@ -27,6 +27,7 @@ import {
   listChiefThreads,
   openProjectChannel,
   patchChief,
+  retryProjectGreeting,
   rewindChiefThread,
   sendChiefMessageFromComposer,
 } from './services/chief.js';
@@ -154,6 +155,15 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const { thread, created } = openProjectChannel(svc, teamId, c.req.param('projectId'));
     return c.json(thread, created ? 201 : 200);
+  });
+
+  app.post('/api/teams/:id/chief/threads/:tid/retry-greeting/:stepId', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(
+      retryProjectGreeting(svc, teamId, c.req.param('tid'), c.req.param('stepId')),
+      201,
+    );
   });
 
   app.post('/api/teams/:id/chief/threads/:tid/rewind', async (c) => {

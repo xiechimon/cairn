@@ -84,7 +84,7 @@
       "id": "coordinator-chat",
       "name": "Coordinator chat",
       "summary": "The one never-ending Coordinator conversation on the home page, where the user dispatches work and reads reports.",
-      "states": "Empty home with starters, streaming reply with a stop control, finished reply with an action row and, when the Coordinator offered them, quick-reply chips above the composer, and a connection-lost banner when the stream drops.",
+      "states": "Empty home with starters, streaming reply with a stop control, finished reply with an action row and, when the Coordinator offered them, quick-reply chips above the composer, and a connection-lost banner when the stream drops. A failed initial project greeting offers explicit retry with a reason, without inventing an owner message; pending, running, stale and ineligible retries are refused.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -108,6 +108,7 @@
           "/api/teams/:id/chief/threads",
           "/api/teams/:id/chief/channels/:projectId",
           "/api/teams/:id/chief/threads/:tid/messages/:mid",
+          "/api/teams/:id/chief/threads/:tid/retry-greeting/:stepId",
           "/api/teams/:id/chief/threads/:tid/rewind",
           "/api/teams/:id/chief/threads/:tid/stop",
           "/api/teams/:id/coordinator**"
@@ -136,11 +137,14 @@
       "backendDesign": [
         "docs/research/coordinator-in-server.md",
         "docs/spec/26-pi-session-runtime-and-trust-surface.md",
+        "docs/design/coordinator-project-channels.md",
         "docs/design/coordinator-quick-replies.md"
       ],
       "evidence": [
         "apps/web/e2e/chief-home-chat.spec.ts",
         "apps/web/e2e/chief-home-c.spec.ts",
+        "apps/web/e2e/chief-greeting-retry.spec.ts",
+        "apps/server/test/coordinator-project-channels.test.ts",
         "apps/server/test/coordinator-turns.test.ts",
         "apps/server/test/coordinator/turn.test.ts"
       ]

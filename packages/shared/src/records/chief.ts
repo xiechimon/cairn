@@ -142,6 +142,7 @@ export const chiefThreadSchema = z.object({
   toolResultHashes: z.record(z.string(), z.string()),
   activeRun: activeRunSchema,
   lastTurnError: z.string().nullable().optional(),
+  retryGreetingStepId: recordId.nullable().optional(),
   pending: z.array(chiefPendingMessageSchema).optional(),
   fallbackModel: z.string().nullable().optional(),
   orchestration: chiefOrchestrationSchema.nullable().optional(),

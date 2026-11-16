@@ -86,8 +86,9 @@ export function channelStream(
   stream: readonly ChiefStreamItem[],
   fallback: string,
   fresh: boolean,
+  recoverGreeting = false,
 ): ChiefStreamItem[] {
-  if (stream.some((item) => item.kind === 'user')) return [...stream];
+  if (recoverGreeting || stream.some((item) => item.kind === 'user')) return [...stream];
   const opening = stream.filter((item) => item.kind !== 'error');
   if (opening.length > 0) return opening;
   const failed = opening.length < stream.length;
@@ -271,8 +272,13 @@ export function HomeC({
     () =>
       archived !== null
         ? (chiefData.stream ?? [])
-        : channelStream(chiefData.stream ?? [], channelGreeting, surface.chiefFresh),
-    [chiefData.stream, archived, channelGreeting, surface.chiefFresh],
+        : channelStream(
+            chiefData.stream ?? [],
+            channelGreeting,
+            surface.chiefFresh,
+            surface.onRetryGreeting !== undefined,
+          ),
+    [chiefData.stream, archived, channelGreeting, surface.chiefFresh, surface.onRetryGreeting],
   );
   const [only, ...rest] = stream;
   const fallbackOnly =
@@ -595,6 +601,7 @@ export function HomeC({
                         : () => Promise.resolve()
                 }
                 onRewind={archived === null ? surface.onRewind : undefined}
+                onRetryGreeting={archived === null ? surface.onRetryGreeting : undefined}
                 onWithdraw={archived === null ? surface.onWithdraw : undefined}
                 unsent={archived === null ? surface.unsent : undefined}
                 onSteer={archived === null ? surface.onSteer : undefined}

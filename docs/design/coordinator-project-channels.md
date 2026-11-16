@@ -61,8 +61,16 @@ The first message is a model turn, following OpenClaw's session reset prompt (`s
 - When the project thread is created, the server enqueues one greeting turn on it. The prompt has team and project memory and the project's open tasks; the Coordinator greets the owner by display name in one to three sentences, names anything in the project that waits on the owner, and asks what they want to do. The reply is stored as an ordinary Coordinator message.
 - It runs once per thread, at creation, never on later opens.
 - The owner's request comes first: if the owner sends before the greeting turn starts, the greeting turn is dropped and the owner's message is answered instead.
-- While the turn runs, the channel shows the usual typing state. If the turn fails or no model is configured, the client shows a fixed bubble instead, worded like "Owner, what would you like to do in cairn?" through `t()`, and no error mark.
+- While the turn runs, the channel shows the usual typing state. With no configured model it shows a fixed bubble, worded like "Owner, what would you like to do in cairn?" through `t()`. A failed initial greeting that the server identifies as recoverable shows its error and an explicit retry instead (approved recovery revision 19, 2026-11-16).
 - The composer is focused from the start.
+
+### Explicit initial-greeting recovery
+
+Opening a channel still never retries it automatically. `chiefThreadView` advertises `retryGreetingStepId` only for an unarchived project channel with no active run, no real owner or assistant message, and only failed attempts of its original saved greeting prompt. Synthetic transcript prompt rows are not owner messages. Unrelated turns and successful or cancelled greetings do not qualify.
+
+`POST /api/teams/:id/chief/threads/:tid/retry-greeting/:stepId` checks the existing team and thread owner, then rechecks eligibility and the latest failed step inside an immediate SQLite transaction. It copies the saved prompt byte for byte into the normal queue with no owner-message IDs. It creates no conversation message, changes no model or permissions, and adds no automatic retry loop. Pending or running attempts and stale step IDs return 409; missing or foreign threads return 404. Missing model configuration uses the existing Coordinator readiness error.
+
+The web client keeps that failed greeting visible without a preceding owner message, gives only the latest error a retry action, and removes the action as soon as the returned thread becomes busy. Error explanations reuse the shared turn-error copy, including the macOS local-network settings path only when the error identifies that class of failure. A new owner message uses the existing send path and makes initial-greeting recovery ineligible. Successful replies are ordinary persisted Coordinator messages, so reload and reopen need no separate recovery state.
 
 ## Failure behavior
 
