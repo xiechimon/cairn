@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Cairn desktop app for macOS: runs the bundled Cairn server on Electron's Node and opens its web UI.",
+  "description": "Cairn desktop app for macOS: runs the bundled Cairn server and local Runner on Electron's Node and opens its web UI.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/xiechimon/cairn.git",
@@ -16,6 +16,7 @@
   },
   "scripts": {
     "stage-server": "node scripts/stage-server.mjs",
+    "stage-runner": "node scripts/stage-runner.mjs",
     "build": "node build.mjs",
     "start": "node build.mjs && electron .",
     "dist:mac": "node build.mjs && electron-builder --mac",

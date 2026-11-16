@@ -11,6 +11,8 @@ files:
 extraResources:
   - from: server
     to: server
+  - from: runner
+    to: runner
 afterPack: scripts/after-pack.cjs
 npmRebuild: false
 publish: null

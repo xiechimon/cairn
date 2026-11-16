@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
 
@@ -6,6 +7,16 @@ const LAUNCH_TIMEOUT_MS = 120_000;
 const GATE_SETTLE_MS = 5_000;
 const PAIRING_INPUT = '#cairn-pair-input';
 const UPDATE_BUTTON = '[data-testid="desktop-update"]';
+const RUNNER_ONLINE_TIMEOUT_MS = 90_000;
+const RUNNER_ENTRY = 'Resources/runner/dist/cli.mjs';
+
+function runnerProcesses() {
+  try {
+    return execFileSync('pgrep', ['-f', RUNNER_ENTRY], { encoding: 'utf8' }).trim();
+  } catch {
+    return '';
+  }
+}
 
 const [appPath, screenshotPath] = process.argv.slice(2);
 if (appPath === undefined || screenshotPath === undefined) {
@@ -48,6 +59,25 @@ try {
   );
   console.log(`update check: ${JSON.stringify(update)}`);
 
+  const runner = await window.evaluate(async (timeoutMs) => {
+    const teams = await (await fetch('/api/teams')).json();
+    const teamId = (teams.teams ?? teams)[0].id;
+    const deadline = Date.now() + timeoutMs;
+    let machines = [];
+    while (Date.now() < deadline) {
+      const body = await (await fetch(`/api/teams/${teamId}/machines`)).json();
+      machines = (body.machines ?? body).map(({ name, kind, online }) => ({ name, kind, online }));
+      if (machines.some((machine) => machine.kind === 'local' && machine.online)) break;
+      await new Promise((wake) => setTimeout(wake, 1_000));
+    }
+    return machines;
+  }, RUNNER_ONLINE_TIMEOUT_MS);
+  assert.ok(
+    runner.some((machine) => machine.kind === 'local' && machine.online),
+    `the local Runner did not come online: ${JSON.stringify(runner)}`,
+  );
+  console.log(`local Runner: ${JSON.stringify(runner)}`);
+
   await window.screenshot({ path: screenshotPath });
   const origin = new URL(window.url()).origin;
 
@@ -71,9 +101,10 @@ try {
     () => false,
   );
   assert.equal(reachable, false, 'the server outlived the app');
+  assert.equal(runnerProcesses(), '', 'the local Runner outlived the app');
 
   console.log(
-    `desktop smoke passed: ${origin} signed in, no pairing gate, close hides, quit stops the server`,
+    `desktop smoke passed: ${origin} signed in, no pairing gate, Runner online, close hides, quit stops the server and Runner`,
   );
 } finally {
   if (child.exitCode === null && child.signalCode === null) await app.close();
