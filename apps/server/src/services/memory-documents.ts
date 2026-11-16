@@ -16,6 +16,7 @@ import {
   searchMemoryEntries,
   validateMemoryText,
 } from './memory.js';
+import { listedProjects } from './personal-space.js';
 
 export { memoryDocumentVersion } from './memory.js';
 
@@ -36,7 +37,7 @@ function namespace(db: Db | Tx, owner: MemoryDocumentOwner, scope: string, write
     const row = db
       .select()
       .from(project)
-      .where(and(eq(project.id, projectId), eq(project.teamId, owner.teamId)))
+      .where(and(eq(project.id, projectId), listedProjects(owner.teamId)))
       .get();
     if (!row) throw new HttpError(404, `project ${projectId}`);
     if (write && row.archivedAt !== null)
@@ -132,7 +133,7 @@ function result(row: Row) {
     ...page(row),
     ...(bounded && bounded.omitted > 0
       ? {
-          reminder: `Keep MEMORY.md to short one-line entries. Move detail into memory files, merge or drop stale lines; use memories to read the full index. ${bounded.omitted} lines exceed the load bound.`,
+          reminder: `${bounded.omitted} MEMORY.md lines exceed the load bound. During a normal turn, use memories to page through the full index, update_memory to merge or remove stale entries and move detail into files, and delete_memory for obsolete files. Do not start a background turn for this.`,
         }
       : {}),
   };

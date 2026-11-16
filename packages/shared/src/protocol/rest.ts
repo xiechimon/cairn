@@ -72,6 +72,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/api/teams/{id}/routing-settings/seed',
     note: 'D60 PR8: seed missing session/review rules and policies from agents',
   },
+  {
+    method: 'GET',
+    path: '/api/teams/{id}/usage/daily',
+    note: 'tokens per local day, Coordinator and tasks apart (?days=1..371&tz=IANA)',
+  },
   { method: 'GET', path: '/api/teams/{id}/top-models', note: 'team Top Models list or null' },
   { method: 'PUT', path: '/api/teams/{id}/top-models', note: 'replace the Top Models list' },
   { method: 'DELETE', path: '/api/teams/{id}/top-models', note: 'reset to the suggested list' },
@@ -275,6 +280,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     method: 'POST',
     path: '/api/teams/{id}/providers/oauth/xai/device/poll',
     note: 'SuperGrok device-code poll; stores the refresh token, not the access token',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/providers/oauth/openai-codex/device',
+    note: 'ChatGPT Codex device-code start; device_auth_id stays on the server',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/providers/oauth/openai-codex/device/poll',
+    note: 'ChatGPT Codex device-code poll; stores the sealed OAuth secret as the openai-codex provider',
   },
   {
     method: 'GET',

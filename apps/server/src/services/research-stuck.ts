@@ -17,7 +17,6 @@ import { attachment, build, message, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
-import { checkedResearchReport } from './research-citations.js';
 import { type OpenedResearchThread, openResearchThread } from './research-thread.js';
 import { readStuckBuildState, stuckResearchReason } from './research-trigger.js';
 import { researchRoundOf, retryLessonsOf } from './retry-lessons.js';
@@ -115,11 +114,15 @@ export function openStuckResearch(deps: BuildDeps, buildId: string): StuckResear
   return { ...opened, round };
 }
 
-function currentAuditArrivedAt(deps: BuildDeps, checkerBuildId: string): number | null {
+function reportBefore(
+  deps: BuildDeps,
+  buildId: string,
+  deadline: number,
+): InfoReportMessage | null {
   const row = deps.db
     .select({ content: message.content })
     .from(message)
-    .where(eq(message.id, `info-report-${checkerBuildId}`))
+    .where(eq(message.id, `info-report-${buildId}`))
     .get();
   if (typeof row?.content !== 'string') return null;
   let parsed: unknown;
@@ -130,20 +133,13 @@ function currentAuditArrivedAt(deps: BuildDeps, checkerBuildId: string): number 
   }
   const report = infoReportMessageSchema.safeParse(parsed);
   if (!report.success) return null;
-  return (
-    deps.db
-      .select({ createdAt: attachment.createdAt })
-      .from(attachment)
-      .where(eq(attachment.id, report.data.attachmentId))
-      .get()?.createdAt ?? null
-  );
-}
-
-function checkedReportBefore(deps: BuildDeps, buildId: string, deadline: number) {
-  const checked = checkedResearchReport(deps.db, buildId);
-  if (checked === null) return null;
-  const arrivedAt = currentAuditArrivedAt(deps, checked.checkerBuildId);
-  return arrivedAt !== null && arrivedAt < deadline ? checked : null;
+  const arrivedAt = deps.db
+    .select({ createdAt: attachment.createdAt })
+    .from(attachment)
+    .innerJoin(build, eq(build.reportAttachmentId, attachment.id))
+    .where(and(eq(attachment.id, report.data.attachmentId), eq(build.id, buildId)))
+    .get()?.createdAt;
+  return arrivedAt !== undefined && arrivedAt < deadline ? report.data : null;
 }
 
 export function deliverStuckResearch(deps: BuildDeps, researchTodoId: string): boolean {
@@ -169,33 +165,15 @@ export function deliverStuckResearch(deps: BuildDeps, researchTodoId: string): b
       .get()
   )
     return false;
-  const row = deps.db
-    .select({ content: message.content })
-    .from(message)
-    .where(eq(message.id, `info-report-${researchTodo.latestBuildId}`))
-    .get();
-  if (row === undefined || typeof row.content !== 'string') return false;
-  let report: InfoReportMessage | undefined;
-  try {
-    const parsed = infoReportMessageSchema.safeParse(JSON.parse(row.content));
-    report = parsed.success ? parsed.data : undefined;
-  } catch {
-    report = undefined;
-  }
   const request = deps.db
     .select({ createdAt: message.createdAt })
     .from(message)
     .where(eq(message.id, `${RESEARCH_REQUESTED_KIND}-${stuckBuildId}-${round}`))
     .get();
-  const checked =
-    report === undefined || !request
-      ? null
-      : checkedReportBefore(
-          deps,
-          researchTodo.latestBuildId,
-          request.createdAt + RESEARCH_WAIT_MAX_MS,
-        );
-  if (report === undefined || !request || checked === null) return false;
+  const report = !request
+    ? null
+    : reportBefore(deps, researchTodo.latestBuildId, request.createdAt + RESEARCH_WAIT_MAX_MS);
+  if (report === null) return false;
   if (
     deps.db.select({ id: build.id }).from(build).where(eq(build.id, stuckBuildId)).get() ===
     undefined
@@ -207,7 +185,6 @@ export function deliverStuckResearch(deps: BuildDeps, researchTodoId: string): b
     attachmentId: report.attachmentId,
     todoId: researchTodoId,
     round,
-    acceptedAudit: checked.content,
   });
 }
 
@@ -237,18 +214,14 @@ export function stuckResearchWaitState(
   if (deps.db.select({ id: message.id }).from(message).where(eq(message.id, timeoutId)).get())
     return 'timed-out';
   const researchTodo = deps.db.select().from(todo).where(eq(todo.id, parsed.data.todoId)).get();
-  const checked =
+  const report =
     researchTodo?.latestBuildId &&
     researchTodo.archivedAt === null &&
     researchTodo.sourceKind === RESEARCH_STUCK_SOURCE_KIND &&
     researchTodo.sourceRef === stuckResearchSourceRef(buildId, round)
-      ? checkedReportBefore(
-          deps,
-          researchTodo.latestBuildId,
-          request.createdAt + RESEARCH_WAIT_MAX_MS,
-        )
+      ? reportBefore(deps, researchTodo.latestBuildId, request.createdAt + RESEARCH_WAIT_MAX_MS)
       : null;
-  if (checked !== null) {
+  if (report !== null) {
     deliverStuckResearch(deps, parsed.data.todoId);
     return 'ready';
   }

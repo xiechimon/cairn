@@ -143,6 +143,7 @@ export const project = sqliteTable('project', {
   autonomy: json<
     (AutonomySettings & Partial<ProjectMergeConfig> & { shipRoute?: ShipRoute }) | null
   >('autonomy'),
+  personalOwnerId: text('personalOwnerId').references(() => user.id),
 });
 
 export const todo = sqliteTable(
@@ -816,6 +817,8 @@ export const secret = sqliteTable(
     httpHeader: text('httpHeader'),
     httpTemplate: text('httpTemplate'),
     policyRevision: integer('policyRevision').notNull().default(1),
+    envSeal: text('envSeal'),
+    updatedAt: epochMs('updatedAt'),
   },
   (t) => [
     check(
@@ -1006,11 +1009,35 @@ export const chiefTurnUsage = sqliteTable(
     cacheWrite: integer('cacheWrite').notNull().default(0),
     ttftMs: integer('ttftMs'),
     contextTokens: integer('contextTokens'),
+    contextWindow: integer('contextWindow'),
+    compactAt: integer('compactAt'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.stepId, t.model] }),
     index('chief_turn_usage_thread_idx').on(t.threadId, t.createdAt),
+  ],
+);
+
+export const stepUsage = sqliteTable(
+  'step_usage',
+  {
+    stepId: text('stepId').notNull(),
+    model: text('model').notNull(),
+    teamId: text('teamId').notNull(),
+    buildId: text('buildId').notNull(),
+    kind: text('kind').$type<StepKind>().notNull(),
+    input: integer('input').notNull().default(0),
+    output: integer('output').notNull().default(0),
+    cacheRead: integer('cacheRead').notNull().default(0),
+    cacheWrite: integer('cacheWrite').notNull().default(0),
+    mirroredTokens: integer('mirroredTokens').notNull().default(0),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.stepId, t.model] }),
+    index('step_usage_team_created_idx').on(t.teamId, t.createdAt),
+    index('step_usage_build_model_idx').on(t.buildId, t.model),
   ],
 );
 

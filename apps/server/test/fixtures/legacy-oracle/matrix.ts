@@ -9,7 +9,7 @@ import {
   type RequiredCapabilities,
 } from '@cairn/shared';
 import Database from 'better-sqlite3';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../../../src/db/client.js';
 import * as schema from '../../../src/db/schema.js';
@@ -324,7 +324,6 @@ interface Comparable {
   machineId: string | null;
   tools: string[];
   secrets: string[];
-  mcpServers: string[];
   skillsAllowlist: string[] | null;
   defaultSkill: string | null;
   requiredCapabilities: unknown;
@@ -339,7 +338,6 @@ function pick(p: Comparable): Comparable {
     machineId: p.machineId,
     tools: p.tools,
     secrets: p.secrets,
-    mcpServers: p.mcpServers,
     skillsAllowlist: p.skillsAllowlist,
     defaultSkill: p.defaultSkill,
     requiredCapabilities: p.requiredCapabilities,
@@ -373,8 +371,8 @@ export const INTENTIONAL_DIFFERENCES = {
     'a review policy drops the reviewer-denied tools and withholds secrets, as the legacy seeded review policy did',
   reviewerExecutorInference:
     'an agent promoted to a review rule gets the Orb executor inferred from its machine, as every legacy seeded rule did',
-  citationRoute:
-    'citation checks run under a citation_check rule seeded from the assigned or independent checker; legacy ran them under the session route and blocked non-independent checks at runtime',
+  retiredCitationRoute:
+    'citation checking is retired; old task data remains, but migration does not seed a checker route',
   unassignedMachineFallback:
     'a rule with no machine takes the seed agent machine for every step; legacy applied that fallback only to a step with an assigned agent',
   customReviewerPermissions:
@@ -522,11 +520,6 @@ function compareCell(
       [roleModel.provider, roleModel.modelId, cell.thinking === 'high' ? 'high' : null],
     );
     same(
-      'coordinator mcp',
-      profile.mcpServers,
-      cell.mcp === 'some' ? ['codegraph', 'playwright'] : [],
-    );
-    same(
       'coordinator fallback',
       profile.fallbackModels,
       cell.fallback === 'some' ? [{ provider: 'claude-code', modelId: 'claude-sonnet-5-5' }] : null,
@@ -563,26 +556,24 @@ function compareCell(
     check(citation !== undefined, 'citation todo missing');
     if (citation === undefined) return;
     const after = profileForStep(db, citation, 'build');
-    check(after !== null, 'no citation profile');
+    check(after !== null, 'no session profile');
     if (after === null) return;
-    const independent = modelsAreIndependent(
-      SESSION_MODEL.modelId,
-      ROLE_MODELS[cell.model].modelId,
+    same(
+      'retired citation task retains the session fallback',
+      [after.provider, after.modelId],
+      [SESSION_MODEL.provider, SESSION_MODEL.modelId],
     );
-    const expectCheckerRule = independent && (cell.assigned === 'yes' || cell.kind === 'custom');
-    if (expectCheckerRule) {
-      same(
-        'citation model',
-        [after.provider, after.modelId],
-        [roleModel.provider, roleModel.modelId],
-      );
-    } else {
-      same(
-        'citation falls back to the session model',
-        [after.provider, after.modelId],
-        [SESSION_MODEL.provider, SESSION_MODEL.modelId],
-      );
-    }
+    same(
+      'no checker route is seeded',
+      db
+        .select()
+        .from(schema.routingRule)
+        .where(
+          and(eq(schema.routingRule.teamId, t), sql`${schema.routingRule.use} = 'citation_check'`),
+        )
+        .get(),
+      undefined,
+    );
     return;
   }
   const kind = STEP_OF[cell.role];
@@ -605,8 +596,8 @@ function compareCell(
     if (!personaRuns) {
       same(
         'permissions come from the selected reviewer',
-        [after.tools, after.mcpServers, after.skillsAllowlist, after.defaultSkill, after.secrets],
-        [[], [], null, null, []],
+        [after.tools, after.skillsAllowlist, after.defaultSkill, after.secrets],
+        [[], null, null, []],
       );
     }
     return;
@@ -643,7 +634,6 @@ function compareCell(
     check(INTENTIONAL_DIFFERENCES.customReviewerPermissions.length > 0, 'unreachable');
     expected = {
       ...expected,
-      mcpServers: cell.mcp === 'some' ? ['codegraph', 'playwright'] : [],
       skillsAllowlist: cell.skills === 'null' ? null : cell.skills === 'some' ? ['skill-a'] : [],
       defaultSkill: cell.defaultSkill === 'some' ? 'skill-a' : null,
     };

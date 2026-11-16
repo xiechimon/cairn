@@ -32,7 +32,11 @@ export function useThreadMentions(projectId: string | undefined): {
           label: s.name,
           subtitle: s.description ?? undefined,
         })),
-        machine: (machinesQ.data ?? []).map((m) => ({ id: m.id, label: m.name })),
+        machine: (machinesQ.data ?? []).map((m) => ({
+          id: m.id,
+          label: m.name,
+          capabilities: m.capabilities ?? undefined,
+        })),
       },
       files: (filesQ.data?.files ?? []).map((f) => ({ path: f.path, type: f.type })),
     };
@@ -60,7 +64,11 @@ export function useThreadMentions(projectId: string | undefined): {
         label: s.name,
         subtitle: s.description,
       })),
-      machine: (fixture.resources?.machines ?? []).map((m) => ({ id: m.name, label: m.name })),
+      machine: (fixture.resources?.machines ?? []).map((m) => ({
+        id: m.name,
+        label: m.name,
+        capabilities: m.capabilities ?? undefined,
+      })),
     },
     files: undefined,
   };

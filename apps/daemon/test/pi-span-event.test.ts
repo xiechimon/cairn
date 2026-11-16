@@ -47,7 +47,7 @@ function harness() {
 }
 
 describe('recordPiSpanEvent', () => {
-  test('maps message_end into a chat span and tool events into an execute_tool span', async () => {
+  test('maps tool events without duplicating generations recorded at the model boundary', async () => {
     const { sink, spans } = harness();
     const toolStart: AgentSessionEventLike = {
       type: 'message_update',
@@ -81,17 +81,11 @@ describe('recordPiSpanEvent', () => {
     await sink.flush();
     await flushDaemonOtel();
     const sent = spans();
-    expect(sent).toHaveLength(2);
+    expect(sent).toHaveLength(1);
     const tool = sent.find((s) => s.name.startsWith('execute_tool'))!;
     expect(tool.parentSpanId).toBe('68de601387c7a961');
     const toolAttrs = Object.fromEntries(tool.attributes.map((a) => [a.key, a.value]));
     expect(toolAttrs['gen_ai.tool.call.id']).toEqual({ stringValue: 'call-9' });
-    const chat = sent.find((s) => s.name.startsWith('chat'))!;
-    const chatAttrs = Object.fromEntries(chat.attributes.map((a) => [a.key, a.value]));
-    expect(chatAttrs['gen_ai.request.model']).toEqual({ stringValue: 'claude-sonnet' });
-    expect(chatAttrs['gen_ai.usage.input_tokens']).toEqual({ intValue: 7 });
-    expect(chatAttrs['gen_ai.usage.output_tokens']).toEqual({ intValue: 3 });
-    expect(chatAttrs['cairn.raw_stop_reason']).toEqual({ stringValue: 'end_turn' });
   });
 
   test('ignores events that carry no span data', async () => {

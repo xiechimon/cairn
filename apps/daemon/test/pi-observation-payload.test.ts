@@ -10,6 +10,8 @@ interface CapturedSpan {
   name: string;
   traceId: string;
   parentSpanId: string;
+  startTimeUnixNano: string;
+  endTimeUnixNano: string;
   attributes: { key: string; value: { stringValue?: string } }[];
 }
 
@@ -132,6 +134,7 @@ test('worker generations export the actual requests and responses, including too
     for (const [index, chat] of chats.entries()) {
       expect(chat.traceId).toBe(ctx.traceId);
       expect(chat.parentSpanId).toBe(ctx.stepSpanId);
+      expect(BigInt(chat.endTimeUnixNano)).toBeGreaterThan(BigInt(chat.startTimeUnixNano));
       const attrs = Object.fromEntries(chat.attributes.map((a) => [a.key, a.value.stringValue]));
       const input = JSON.parse(attrs[LANGFUSE_ATTR.input]!) as { role: string; content: unknown }[];
       expect(input.filter((message) => message.role !== 'assistant').map(messageText)).toEqual(

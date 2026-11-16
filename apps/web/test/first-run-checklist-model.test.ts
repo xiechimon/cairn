@@ -73,7 +73,7 @@ test('the setup page opens the models step first, then confirm, then nothing', (
   expect(setupOpenStep({ models: both, confirmed: true })).toBeNull();
 });
 
-test('the setup page shows only for a team with no projects, and skipping hides it until asked again', () => {
+test('the setup page shows only for a team with no projects until both steps are done, and skipping hides it until asked again', () => {
   const progress = { models: none, confirmed: false };
   const base = { projects: 0, progress, skipped: false, requested: false };
   expect(setupShown(base)).toBe(true);
@@ -83,6 +83,10 @@ test('the setup page shows only for a team with no projects, and skipping hides 
   expect(setupShown({ ...base, skipped: true, requested: true })).toBe(true);
   expect(setupShown({ ...base, projects: undefined })).toBeUndefined();
   expect(setupShown({ ...base, progress: undefined })).toBeUndefined();
+  const done = { models: both, confirmed: true };
+  expect(setupShown({ ...base, progress: { models: both, confirmed: false } })).toBe(true);
+  expect(setupShown({ ...base, progress: done })).toBe(false);
+  expect(setupShown({ ...base, progress: done, requested: true })).toBe(false);
 });
 
 test('creating the first project is blocked until both steps are done; later projects never are', () => {

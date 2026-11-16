@@ -9,11 +9,6 @@ import {
   MEMORY_VERSION_RETENTION_MS,
   purgeExpiredMemoryVersions,
 } from '../src/services/memory.js';
-import {
-  applyMemoryPass,
-  memoryPassDue,
-  memoryPassSection,
-} from '../src/services/memory-consolidation.js';
 
 const TEAM = 'team-1';
 const AGENT = 'agent-1';
@@ -153,48 +148,7 @@ describe('version retention', () => {
   });
 });
 
-describe('legacy weekly pass with MEMORY.md documents', () => {
-  test.each(['merge', 'expire'])('a queued %s cannot change a stale document', (operation) => {
-    const db = openMemoryDb();
-    const content = '- release：Squash only.\n- review：Attach proof.';
-    const document = insert(db, { title: MEMORY_INDEX_TITLE, content });
-    const fact = insert(db, { content: 'Squash only.' });
-    const raw =
-      operation === 'expire'
-        ? { expire: [document] }
-        : {
-            merge: [
-              { keep: document, drop: [fact], content: 'Squash only.' },
-              { keep: fact, drop: [document], content: 'Squash merges only.' },
-            ],
-          };
-    expect(applyMemoryPass(db, { teamId: TEAM, agentId: AGENT }, raw, 10_000)).toEqual({
-      applied: 0,
-      skipped: 1,
-    });
-    expect(valid(db)).toHaveLength(2);
-    expect(valid(db).find((row) => row.id === document)?.content).toBe(content);
-  });
-
-  test('document facts and scopes never count toward the legacy pass minimum', () => {
-    const db = openMemoryDb();
-    const document = insert(db, {
-      title: MEMORY_INDEX_TITLE,
-      content: '- a：one\n- b：two\n- c：three\n- d：four',
-    });
-    const due = () => memoryPassDue(db, 'chief', TEAM, AGENT, 10_000);
-    expect(due()).toBe(false);
-    for (const projectId of ['p1', 'p2', 'p3']) {
-      insert(db, { title: MEMORY_INDEX_TITLE, projectId });
-    }
-    expect(due()).toBe(false);
-    expect(memoryPassSection(db, 'chief', TEAM, AGENT)).not.toContain(document);
-    for (const title of ['a', 'b', 'c']) insert(db, { title });
-    expect(due()).toBe(false);
-    insert(db, { title: 'd' });
-    expect(due()).toBe(false);
-  });
-
+describe('memory use history', () => {
   test('folds preserve the most recent injection time through subsequent folds', () => {
     const db = openMemoryDb();
     insert(db, { lastInjectedAt: 4_000 });

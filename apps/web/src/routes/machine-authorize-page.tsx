@@ -8,8 +8,12 @@ import { Card } from '../components/ui/card.js';
 import { DIALOG_TITLE_CLS } from '../components/ui/dialog-shell.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
-import { isLoopbackOrigin } from '../lib/pairing-origin.js';
-import { CopyCommand, INSTALL_COMMAND, startCommand } from '../resources/create-machine-dialog.js';
+import {
+  CopyCommand,
+  INSTALL_COMMAND,
+  startCommand,
+  useRunnerServerAccess,
+} from '../resources/create-machine-dialog.js';
 import { MACHINES_HREF } from '../resources/machines-page.js';
 
 type Phase = 'idle' | 'pending' | 'authorizing' | 'authorized' | 'expired';
@@ -28,6 +32,7 @@ export function MachineAuthorizePage() {
   const [name, setName] = useState<string | null>(null);
   const [polled, setPolled] = useState(false);
   const [pollFailed, setPollFailed] = useState(false);
+  const { access } = useRunnerServerAccess(phase === 'idle');
   const stopped = useRef(false);
   useEffect(() => {
     stopped.current = false;
@@ -78,7 +83,7 @@ export function MachineAuthorizePage() {
     }
   };
 
-  const serverOrigin = window.location.origin;
+  const serverUrl = access?.state === 'ready' ? access.url : null;
   const backSearch = new URLSearchParams(search);
   backSearch.delete('enroll');
   const waiting = phase === 'pending' || phase === 'authorizing';
@@ -88,28 +93,20 @@ export function MachineAuthorizePage() {
       <div className="flex w-[400px] max-w-full flex-col items-center gap-4">
         <Card role="region" aria-label={t('授权执行机')} className="w-full gap-3 p-6">
           <h1 className={DIALOG_TITLE_CLS}>{t('授权执行机')}</h1>
-          {phase === 'idle' && (
-            <>
+          {phase === 'idle' &&
+            (serverUrl === null ? (
               <p className={DESC_CLASS}>
-                {t('在要接入的电脑上依次运行这两条命令。终端会给出授权链接，打开它就能确认。')}
+                {t('先在执行机页的「添加执行机」里用 Tailscale 连通这台电脑，命令会出现在这里。')}
               </p>
-              <CopyCommand command={INSTALL_COMMAND} />
-              <CopyCommand command={startCommand(serverOrigin)} />
-              {isLoopbackOrigin(serverOrigin) && (
-                <p className="m-0 text-meta text-content-tertiary">
-                  {t(
-                    '当前地址只适用于这台电脑。添加另一台电脑前，请用 Tailscale 地址打开 Cairn，再复制命令。',
-                  )}{' '}
-                  <Link
-                    className="whitespace-nowrap text-foreground underline underline-offset-2"
-                    to={{ pathname: '/app/settings/remote', search: backSearch.toString() }}
-                  >
-                    {t('远程访问')}
-                  </Link>
+            ) : (
+              <>
+                <p className={DESC_CLASS}>
+                  {t('在要接入的电脑上依次运行这两条命令。终端会给出授权链接，打开它就能确认。')}
                 </p>
-              )}
-            </>
-          )}
+                <CopyCommand command={INSTALL_COMMAND} />
+                <CopyCommand command={startCommand(serverUrl)} />
+              </>
+            ))}
           {waiting && (
             <>
               <p className={DESC_CLASS}>{t('有一台执行机请求加入你的团队。')}</p>

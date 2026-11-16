@@ -142,6 +142,7 @@ test('gallery menu: a letter on a checkbox row toggles it and a radio letter sel
   await page.goto('/design.html');
   await page.getByRole('button', { name: 'View options' }).click();
   const done = page.getByRole('menuitemcheckbox', { name: /Show done tasks/ });
+  await expectFocusWithin(page.getByRole('menu').filter({ has: done }));
   await expect(done).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('s');
   await expect(done).toHaveAttribute('aria-checked', 'false');

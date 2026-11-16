@@ -5,7 +5,7 @@ import {
   buildReworkNewBranchNote,
   buildReworkReuseNote,
   conversationBranch,
-  SESSION_BRIEF,
+  sessionBriefFor,
   withRetryLessons,
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
@@ -24,6 +24,7 @@ import {
   hasFailureRow,
   publishBuild,
 } from './builds.js';
+import { rewatchCreatingThread } from './chief.js';
 import { claimClientMessage, completeClientMessage } from './client-message.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { assertAutomaticRetryAllowed } from './retry-parking.js';
@@ -95,6 +96,7 @@ export async function restartFailedBuild(
       );
     todoRecord = current;
     if (origin === 'automatic') assertAutomaticRetryAllowed(deps, current.id);
+    rewatchCreatingThread(deps, current);
     if (reworkTarget !== null && prClosed === null) {
       const currentTarget = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
       if (currentTarget) assertParkedBuildIdle(deps, currentTarget);
@@ -220,7 +222,9 @@ export async function restartFailedBuild(
       newId,
       'session',
       todoRecord.teamId,
-      [SESSION_BRIEF, restartPrompt, priorLessons].filter((part) => part != null).join('\n\n'),
+      [sessionBriefFor(todoRecord.request), restartPrompt, priorLessons]
+        .filter((part) => part != null)
+        .join('\n\n'),
       false,
       origin === 'person',
     );

@@ -86,6 +86,7 @@ export interface RealServer {
 
 export async function bootRealServer(opts: {
   providerBaseUrl: string;
+  bare?: boolean;
   claimHoldMs?: number;
   agentDescription?: string;
   webDir?: string;
@@ -134,6 +135,7 @@ export async function bootRealServer(opts: {
       enrollments: new Map(),
       oauthStates: new Map(),
       xaiDeviceStates: new Map(),
+      codexDeviceStates: new Map(),
       mcpOAuthState: newMcpOAuthState(),
       oauthClient: null,
       reposDir,
@@ -201,6 +203,7 @@ export async function bootRealServer(opts: {
     const url = `http://127.0.0.1:${port}`;
 
     if (
+      opts.bare !== true &&
       db.select().from(providerTable).where(eq(providerTable.id, 'prov-it')).get() === undefined
     ) {
       db.insert(providerTable)
@@ -222,8 +225,9 @@ export async function bootRealServer(opts: {
         .run();
     }
     if (
+      opts.bare !== true &&
       db.select().from(routingRuleTable).where(eq(routingRuleTable.id, AGENT_ID)).get() ===
-      undefined
+        undefined
     ) {
       const now = Date.now();
       db.insert(routingRuleTable)

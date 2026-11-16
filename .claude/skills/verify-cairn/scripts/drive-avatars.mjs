@@ -148,7 +148,7 @@ try {
   const me = await getJson(`${SERVER}/api/user/me`);
   check(
     'api-user-me',
-    me?.displayName === 'Owner' && me?.avatarUrl === null,
+    typeof me?.displayName === 'string' && me.displayName.trim().length > 0 && me?.avatarUrl === null,
     `seed user displayName=${me?.displayName ?? '?'} avatarUrl=${JSON.stringify(me?.avatarUrl)}`,
   );
   const teams = await getJson(`${SERVER}/api/teams`);

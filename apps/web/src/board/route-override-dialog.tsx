@@ -11,7 +11,7 @@ import { useSearchParams } from 'react-router';
 import { useApiMutations, useMachines, useMcpServers } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
-import { MachineName, machineLabel } from '../components/machine-label.js';
+import { MachineName } from '../components/machine-label.js';
 import {
   SETTINGS_HINT_CLS,
   SETTINGS_ROW_CLS,
@@ -98,10 +98,10 @@ export function RouteOverrideDialog({
   }, [open, initial]);
 
   const machines = live
-    ? (machinesQ.data ?? []).map((machine) => ({ id: machine.id, name: machine.name }))
-    : (fixture.resources?.machines ?? [])
-        .filter((machine): machine is typeof machine & { id: string } => machine.id != null)
-        .map((machine) => ({ id: machine.id, name: machine.name }));
+    ? (machinesQ.data ?? [])
+    : (fixture.resources?.machines ?? []).filter(
+        (machine): machine is typeof machine & { id: string } => machine.id != null,
+      );
   const pickedMachine = machines.find((machine) => machine.id === machineId);
   const mcpOptions = live
     ? (mcpQ.data ?? [])
@@ -199,19 +199,25 @@ export function RouteOverrideDialog({
                 data-testid="route-override-machine"
               >
                 <SelectValue>
-                  {machineId === null
-                    ? t(machines.length > 1 && !sessionHasMachine ? '选择执行机' : '不固定')
-                    : pickedMachine === undefined
-                      ? machineId
-                      : machineLabel(pickedMachine, machines)}
+                  {machineId === null ? (
+                    t(machines.length > 1 && !sessionHasMachine ? '选择执行机' : '不固定')
+                  ) : pickedMachine === undefined ? (
+                    machineId
+                  ) : (
+                    <MachineName machine={pickedMachine} all={machines} compact />
+                  )}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="w-max min-w-0 max-w-(--available-width)">
                 {machines.length > 1 && !sessionHasMachine ? null : (
                   <SelectItem value={null}>{t('不固定')}</SelectItem>
                 )}
                 {machines.map((machine) => (
-                  <SelectItem key={machine.id} value={machine.id}>
+                  <SelectItem
+                    key={machine.id}
+                    value={machine.id}
+                    className="h-auto! min-h-8 py-1! [&>:first-child]:min-w-0 [&>:first-child]:shrink [&>:first-child]:whitespace-normal [&>:first-child]:[overflow-wrap:anywhere]"
+                  >
                     <MachineName machine={machine} all={machines} />
                   </SelectItem>
                 ))}

@@ -114,7 +114,15 @@ if ! wait_200 /api/user/me; then
   exit 1
 fi
 me_body=$(curl -s --noproxy '*' "http://127.0.0.1:$PORT/api/user/me")
-case "$me_body" in *'"displayName":"Owner"'*) echo "ok: /api/user/me 200 + seed effective";; *) echo "FAIL: me body unexpected: $me_body"; exit 1;; esac
+printf '%s' "$me_body" | node -e '
+const assert = require("node:assert/strict");
+let expected = "Owner";
+try { expected = require("node:os").userInfo().username.trim() || expected; } catch {}
+let body = "";
+process.stdin.on("data", (chunk) => body += chunk).on("end", () => {
+  assert.equal(JSON.parse(body).displayName, expected);
+  console.log("ok: /api/user/me 200 + OS owner name seeded");
+});'
 
 if ! wait_200 /app; then
   echo "FAIL: /app not 200 (web dist missing from the package or webDir misresolved) — server output tail:"

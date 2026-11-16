@@ -1,0 +1,15 @@
+# Machine OS identity and icons
+
+Scope: identify the actual operating system and Linux distribution for machine labels. This is an identity-presentation correction, not a screen redesign or a borrowed interaction.
+
+| Source | Observed behavior | Trade-off | Decision |
+| --- | --- | --- | --- |
+| [systemd os-release](https://www.freedesktop.org/software/systemd/man/latest/os-release.html) | Observed: `/etc/os-release` takes precedence; use `/usr/lib/os-release` only when the former is absent. `ID` is version-independent and contains lowercase letters, digits, dots, underscores and hyphens. `ID_LIKE` identifies related distributions, not the installed distribution. | A family match can mislabel a derivative as Arch or Debian. | Match exact `ID`; do not infer from hostname or `ID_LIKE`. |
+| [Node util.parseEnv](https://nodejs.org/docs/latest-v22.x/api/util.html#utilparseenvcontent) | Observed: the maintained built-in parser supports quoted assignments, last duplicate wins, and does not execute shell commands or expand variables. It exists within Cairn's Node >=22.19 requirement. | It is a dotenv parser, not a complete shell/os-release parser. | Use it only to extract the grammar-restricted `ID`, then validate the identifier; do not claim full os-release conformance. |
+| Installed dotenv 16.6.1 and shell-quote 1.12.0 | Observed: both are transitive dependencies; dotenv does not implement os-release shell escaping, and shell-quote supports expansion and shell operators. | Neither improves on the built-in parser for this restricted field. | No parser dependency or shell invocation. |
+| [Simple Icons 16.37.0](https://github.com/simple-icons/simple-icons/tree/16.37.0) | Observed: maintained brand paths, CC0-1.0 package, tree-shakeable named exports; covers Linux and many distributions absent from the installed Lobe icons. | Brand names and trademarks remain their owners'; package licensing is not a trademark grant. | Use named imports and monochrome paths for nominative identification, no endorsement or decorative branding. |
+| Installed @lobehub/icons 6.15.0 | Observed: exports Apple and Microsoft, but not Linux/Arch/Ubuntu/Debian/Fedora. Existing Cairn provider marks already use this package. | Microsoft is the corporate four-square mark, rather than the Windows perspective mark. | Reuse existing Apple/Microsoft marks for macOS/Windows; one shared machine-label component owns every choice. |
+
+Inferred fit: add only optional `capabilities.osDistribution`; existing enrollment/presence JSON carries it. Old daemons remain generic Linux. Unknown or malformed identifiers cannot select arbitrary assets or load external URLs. A known exact ID selects its own logo, while unknown derivatives retain Linux rather than a misleading family logo.
+
+Concrete areas: daemon capability probes; shared capability schema and lenient report parser; web machine label, its structured identity consumers and data projections. No server endpoint, database migration, dispatch requirement, permission or browser default changes.

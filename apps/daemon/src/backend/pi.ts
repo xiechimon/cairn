@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { delimiter, join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import type {
   AgentBackend,
   AgentBackendCapabilities,
@@ -19,6 +20,8 @@ import type {
 import {
   classifyStepFailure,
   ENV_VARS,
+  LANGFUSE_ATTR,
+  observationAttributes,
   THINKING_LEVELS,
   contextTokensOf as usageContextTokens,
 } from '@cairn/shared';
@@ -45,6 +48,7 @@ import {
   SessionManager,
   SettingsManager,
 } from '@earendil-works/pi-coding-agent';
+import { credentialRedactor } from '../credential-output.js';
 import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
 import { compactionCeilingFetch } from './compaction-ceiling.js';
 import { SessionNotResumableError } from './errors.js';
@@ -518,33 +522,6 @@ function noteFirstToken(state: MapState, event: AgentSessionEventLike): void {
 }
 
 export function recordPiSpanEvent(sink: PiStepSpanSink, event: AgentSessionEventLike): void {
-  if (event.type === 'message_end') {
-    const msg = event.message;
-    if (
-      msg != null &&
-      msg.role === 'assistant' &&
-      msg.provider !== undefined &&
-      msg.model !== undefined &&
-      msg.usage !== undefined
-    ) {
-      sink.chat(Date.now(), {
-        provider: msg.provider,
-        model: msg.model,
-        ...(msg.responseModel !== undefined ? { responseModel: msg.responseModel } : {}),
-        ...(msg.stopReason !== undefined ? { finishReason: msg.stopReason } : {}),
-        ...(msg.rawStopReason !== undefined ? { rawFinishReason: msg.rawStopReason } : {}),
-        usage: {
-          input: msg.usage.input,
-          output: msg.usage.output,
-          cacheRead: msg.usage.cacheRead,
-          cacheWrite: msg.usage.cacheWrite,
-        },
-        costUsd: msg.usage.cost?.total,
-        output: { role: msg.role, content: msg.content },
-      });
-    }
-    return;
-  }
   if (event.type === 'message_update') {
     const toolCall = event.assistantMessageEvent?.toolCall;
     if (event.assistantMessageEvent?.type === 'toolcall_end' && toolCall != null) {
@@ -790,6 +767,13 @@ class PiSessionHandle implements AgentSessionHandle {
   readonly events: AsyncIterable<StepEvent>;
   private readonly queue = new EventQueue();
   private readonly state: MapState;
+  private readonly seenUserMessages = new WeakSet<PiMessageLike>();
+  private readonly pendingSteers: {
+    text: string;
+    content: unknown;
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  }[] = [];
   private closed = false;
   private stopping = false;
 
@@ -806,6 +790,7 @@ class PiSessionHandle implements AgentSessionHandle {
     this.events = this.queue.iterable();
     session.subscribe((event) => {
       const raw = event as unknown as AgentSessionEventLike;
+      this.receiveSteer(raw);
       if (
         raw.type === 'message_end' &&
         raw.message?.role === 'assistant' &&
@@ -829,6 +814,7 @@ class PiSessionHandle implements AgentSessionHandle {
   private finish(): void {
     if (this.closed) return;
     this.closed = true;
+    this.rejectPendingSteers();
     this.queue.end();
     if (this.spans !== undefined) void this.spans.flush();
     void this.shutdownExtensions().finally(() => {
@@ -843,14 +829,59 @@ class PiSessionHandle implements AgentSessionHandle {
     } catch {}
   }
 
-  async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
-    if (images !== undefined && images.length > 0 && this.model !== null) {
-      ensureImageInput(this.model);
-      await this.session.steer(text, toPiImages(images));
-    } else {
-      await this.session.steer(text);
+  private receiveSteer(event: AgentSessionEventLike): void {
+    const message = event.message;
+    if (
+      (event.type !== 'message_start' && event.type !== 'message_end') ||
+      message?.role !== 'user' ||
+      this.seenUserMessages.has(message)
+    ) {
+      return;
     }
-    this.queue.push({ type: 'steer', text });
+    this.seenUserMessages.add(message);
+    if (this.closed || this.stopping) return;
+    const content =
+      typeof message.content === 'string'
+        ? [{ type: 'text', text: message.content }]
+        : message.content;
+    const index = this.pendingSteers.findIndex((pending) =>
+      isDeepStrictEqual(pending.content, content),
+    );
+    if (index === -1) return;
+    const [pending] = this.pendingSteers.splice(index, 1);
+    if (pending === undefined) return;
+    this.queue.push({ type: 'steer', text: pending.text });
+    pending.resolve();
+  }
+
+  private rejectPendingSteers(): void {
+    for (const pending of this.pendingSteers.splice(0)) {
+      pending.reject(new Error('Pi session closed before steer was consumed'));
+    }
+  }
+
+  async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
+    if (this.closed || this.stopping) throw new Error('Pi session is closed or stopping');
+    const piImages = images !== undefined && images.length > 0 ? toPiImages(images) : undefined;
+    if (piImages !== undefined && this.model !== null) {
+      ensureImageInput(this.model);
+    }
+    return new Promise<void>((resolve, reject) => {
+      const pending = {
+        text,
+        content: [{ type: 'text', text }, ...(piImages ?? [])],
+        resolve,
+        reject,
+      };
+      this.pendingSteers.push(pending);
+      const sent =
+        piImages !== undefined ? this.session.steer(text, piImages) : this.session.steer(text);
+      void sent.catch((error: unknown) => {
+        const index = this.pendingSteers.indexOf(pending);
+        if (index !== -1) this.pendingSteers.splice(index, 1);
+        reject(error);
+      });
+    });
   }
 
   emitBackendError(message: string): void {
@@ -860,8 +891,12 @@ class PiSessionHandle implements AgentSessionHandle {
 
   async stop(): Promise<void> {
     this.stopping = true;
-    await this.session.abort();
-    this.finish();
+    this.rejectPendingSteers();
+    try {
+      await this.session.abort();
+    } finally {
+      this.finish();
+    }
   }
 
   usage(): AgentTokenUsage {
@@ -964,23 +999,51 @@ export class PiBackend implements AgentBackend {
     const ceilingFetch = compactionCeilingFetch(diagnosedFetch, (line) => {
       this.opts.onCompactionLog?.(line);
     });
+    const redact = credentialRedactor(opts.provider.apiKey);
     const spans =
       opts.telemetry !== undefined
         ? new PiStepSpanSink(
             opts.telemetry,
             { provider: opts.provider.providerId, model: opts.modelId },
             this.opts.onOtelLog,
+            redact,
           )
         : undefined;
     const streamSimple = runtime.streamSimple.bind(runtime);
     runtime.streamSimple = (requestModel, context, options) => {
-      spans?.request(
-        context.messages.map((message) => ({
-          role: message.role,
-          content: message.role === 'system' ? getSystemMessageText(message) : message.content,
-        })),
-      );
-      return streamSimple(requestModel, context, { ...options, fetch: ceilingFetch });
+      const at = Date.now();
+      const summary = options?.cacheRetention === 'none';
+      const input =
+        spans === undefined || summary
+          ? undefined
+          : observationAttributes({
+              input: redact(
+                context.messages.map((message) => ({
+                  role: message.role,
+                  content:
+                    message.role === 'system' ? getSystemMessageText(message) : message.content,
+                })),
+              ),
+            })[LANGFUSE_ATTR.input];
+      const stream = streamSimple(requestModel, context, { ...options, fetch: ceilingFetch });
+      if (spans !== undefined && requestModel.api !== 'pi-virtual') {
+        void stream.result().then((message) => {
+          spans.chat(at, {
+            provider: message.provider,
+            model: message.model,
+            responseModel: message.responseModel,
+            finishReason: message.stopReason,
+            rawFinishReason: message.rawStopReason,
+            usage: message.usage,
+            costUsd: message.usage.cost?.total,
+            endAt: Date.now(),
+            input,
+            output: summary ? undefined : { role: message.role, content: message.content },
+          });
+          void spans.flush(false);
+        });
+      }
+      return stream;
     };
     const diagnose = (message: string): string =>
       enrichProviderError(message, providerResponses.current, {

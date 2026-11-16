@@ -46,7 +46,7 @@ for (const [route, scenario] of [
 // which a role locator cannot express (secondary carrier, #910).
 for (const [route, scenario] of [
   ['/app/resources/skills', '06'],
-  ['/app/resources/secrets', '08'],
+  ['/app/resources/secrets', 'secrets-list'],
   ['/app/resources/providers', '10'],
 ] as const) {
   test(`resources \`新建\` owns its hit area — ${route}`, async ({ page }) => {

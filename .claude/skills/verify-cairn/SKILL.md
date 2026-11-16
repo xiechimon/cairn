@@ -21,9 +21,9 @@ Apply this checklist before reporting verification or handing off a delivery. Fo
 
 - Fixture screenshots cannot establish real-app behavior. Keep focused fixture UI and visual regression tests; label them as fixture evidence. Verify claims about the real app on an isolated live stack without `?scenario=`, using the relevant API, database or runtime observations alongside screenshots.
 - Stub-only runs cannot establish real-provider behavior. Keep deterministic stub regressions, including real-daemon protocol and orchestration checks; name the stubbed boundary and limit the claim to the exercised layers. A real-provider claim requires a real-provider run with recorded provider mode and runtime evidence; if credentials or access are unavailable, report that claim as unverified.
-- Make supporting evidence readable to reviewers. Do not commit evidence to a branch that merges: `main` has no `docs/verify/`. Screenshots for a PR body go on the `pr-assets/<pr-number>` side branch (`.claude/skills/pr-cairn/SKILL.md`); link or describe other evidence in the PR. Preserve ordinary reference links as references; embed image links and check that they are reachable.
+- Make supporting evidence readable: do not commit it to the repository (`main` has no `docs/verify/`); keep it in the gitignored evidence directory and link or describe it where you report. Preserve ordinary reference links as references; embed image links and check that they are reachable.
 - Mechanism claims require compiled or runtime evidence of the claimed effect, such as compiled CSS, observed animation state, actual wire payloads, runtime logs or schema snapshots. Source, configuration and installed dependencies alone do not establish that the mechanism took effect. Record the artifact and the assertion it supports.
-- Separate automated checks from review. `scripts/pr-evidence-gate.py` (required by the merge gate via `pr-evidence-not-green`) rejects missing or empty What/Proof/Review/Risk sections (legacy Verified aliases Proof; Upstream is optional), non-embedded image links, unreachable image URLs, fixture URLs whose query carries `scenario` (#1982), a diff touching `apps/server/src/routes*.ts` without the evidence card (`### Requirement` and `### Requests`), and a diff changing more than docs without `Live:`, `Mocked:` and `Not covered:` lines. The screenshot-archive origin check (#1983) was removed in #2201: images may live on any reachable https host. Negative controls live in `scripts/pr-evidence-gate.test.py`. The gate still does not judge evidence sufficiency, live-app origin, or real-provider execution. Stub-only runs stay a reviewer check until evidence carries machine-readable provider provenance; do not claim the gate detects them from a screenshot or a passing HTTP request. `vp.mjs drive api-evidence-card card` generates the card's table, transcript and screenshots from a live stack.
+- Separate automated checks from review: no check judges evidence sufficiency, live-app origin or real-provider execution, so state them yourself and label stub-only runs as such.
 
 The implementer templates incorporate the same checklist in `docs/agent-dispatch-prompts.md#evidence-limits-checklist`. Apply it to every workflow below, including the stub LLM custom probes and fixture regressions.
 
@@ -32,7 +32,7 @@ The implementer templates incorporate the same checklist in `docs/agent-dispatch
 | Dimension | Fact |
 |---|---|
 | Surface | web UI (`apps/web`, vite) first; HTTP API (`apps/server`, Hono REST+SSE+SQLite). daemon optional, UI verification does not need it. |
-| Run | `pnpm dev:server` (default 8787, first boot auto-creates the DB + seeds a single user **Owner**) + `pnpm dev:web` (vite dev 5173, proxy `/api`, `/git` to the server). No auth: seeded = auto-logged-in, browser opens usable directly. Production form = root `pnpm start` (build web to server same-origin serving `apps/web/dist`). |
+| Run | `pnpm dev:server` (default 8787, first boot auto-creates the DB and seeds one owner using the server's OS username, falling back to **Owner**) + `pnpm dev:web` (vite dev 5173, proxy `/api`, `/git` to the server). No auth: seeded = auto-logged-in, browser opens usable directly. Production form = root `pnpm start` (build web to server same-origin serving `apps/web/dist`). |
 | Drive | Playwright (`@playwright/test` root devDep, chromium installed). live mode = URL **without** `?scenario=` (with it = the fixture face, e2e-only). |
 | Observe | screenshots (1440x732, same convention as e2e); HTTP JSON (`GET /api/auth/session`, `/api/todos`, `/api/teams`...); SQLite rows (`<CAIRN_HOME>/server/server.db`, better-sqlite3 read-only); server logs (`cairn-server online` line). |
 | Isolate | three axes: `VERIFY_PORT` (server, default 8791) / `VERIFY_WEB_PORT` (vite, default 5273) / `CAIRN_HOME` (scratch). vite dev does not write `dist/`, no collision with e2e's dist. |
@@ -84,7 +84,7 @@ node .claude/skills/verify-cairn/scripts/launch.mjs
 node .../scripts/doctor.mjs   # read-only, zero write operations
 ```
 
-Checks: pid group alive to `GET /api/auth/session` 200 and `displayName === "Owner"` to `GET /api/teams` 200 to `GET /api/projects` 200 to web `GET /app` 200. Any FAIL exit code 1. When the stack is not up, hint to run launch first.
+Checks: pid group alive to `GET /api/auth/session` 200 and a nonempty owner display name to `GET /api/teams` 200 to `GET /api/projects` 200 to web `GET /app` 200. Any FAIL exit code 1. When the stack is not up, hint to run launch first.
 
 ## Drive
 

@@ -19,7 +19,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
-| `secrets` | `设置` (Settings) › `安全` (Security) › `密钥` (Secrets) | [Secrets](#secrets) |
+| `secrets` | `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars) | [Secrets](#secrets) |
 | `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
 
@@ -27,7 +27,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 
 ### agent-computer
 
-**The agent's computer** (partial, centrality 1). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.
+**The agent's computer** (partial, centrality 1). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.
 
 States: No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.
 
@@ -35,14 +35,13 @@ Reach:
 
 1. `open /app`
 2. `click testid:machines-button`
-3. `click label:浏览器`
-4. `click testid:machine-screen-expand`
+3. `click testid:machine-screen-expand`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `chief-takeover`, `chief-takeover-failed`, `chief-takeover-give-back`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-take`, `chief-takeover-time-left`, `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-control-bar`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-card`, `machine-edit`, `machine-list-row`, `machine-screen`, `machine-screen-chrome`, `machine-screen-enlarged`, `machine-screen-exit`, `machine-screen-expand`, `machine-status-dot`, `machines-add`, `machines-button`, `machines-recheck`
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
-- Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
+- Frontend design: **gap**: the computer feed, screen view and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
 - Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/computer-host-desktop.test.ts`
 
@@ -109,9 +108,9 @@ Reach:
 
 ### daily-report
 
-**Daily report and retro** (shipped, centrality 1). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.
+**Daily report and retro** (shipped, centrality 1). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.
 
-States: A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro and intake suggestions and each one's state.
+States: A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro suggestions and each one's state. Historical intake suggestions are hidden and cannot create tasks.
 
 Reach:
 
@@ -186,7 +185,7 @@ Reach:
 
 ### memory
 
-**Memory** (shipped, centrality 1). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. A design plans direct in-place edits of MEMORY.md and memory files.
+**Memory** (shipped, centrality 1). Team and project memories the Coordinator reads, writes and injects into later turns and threads. Oversized indexes prompt normal-turn maintenance; no daily tidy pass runs. A design plans direct in-place edits of MEMORY.md and memory files.
 
 States: Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.
 
@@ -201,7 +200,7 @@ Reach:
 - Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](../../../docs/research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](../../../docs/research/memory-inplace-edit-2026-11-09.md)
 - Frontend design: [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
 - Backend design: [docs/design/memory-backend.md](../../../docs/design/memory-backend.md), [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
-- Evidence: `apps/web/e2e/chief-memory.spec.ts`, `apps/web/test/memory-list.test.ts`, `apps/server/test/memory-consolidation.test.ts`, `apps/server/test/project-memory.test.ts`, `integration/test/m4b-memory-e2e.test.ts`
+- Evidence: `apps/web/e2e/chief-memory.spec.ts`, `apps/web/test/memory-list.test.ts`, `apps/server/test/memory-callers-documents.test.ts`, `apps/server/test/project-memory.test.ts`, `integration/test/m4b-memory-e2e.test.ts`
 
 ### merge-gate
 
@@ -478,9 +477,9 @@ Reach:
 
 ### first-run
 
-**First run** (shipped, centrality 2). The setup page before the first project and the composer setup hint that help a new user configure models.
+**First run** (shipped, centrality 2). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
 
-States: A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint appears on the composer.
+States: A team with no projects lands on a full-screen two-step setup page (connect models for the Coordinator and tasks, confirm both models) with a language switch; it can be skipped, and once both steps are done it opens the Coordinator conversation. The first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.
 
 Reach:
 
@@ -490,7 +489,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `first-run-confirm`, `first-run-pick-*`, `first-run-setup`, `first-run-step-*`
+- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `first-run-add-provider`, `first-run-confirm`, `first-run-pick-*`, `first-run-setup`, `first-run-skip`, `first-run-step-*`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
 - Backend design: **gap**: no design for checklist state and the 10-minute path
@@ -508,7 +507,7 @@ Reach:
 
 - Web routes: `/app/machines/authorize`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: none
+- Test ids in its code: `tailscale-ready`
 - Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md)
 - Frontend design: **gap**: the add-machine dialog and authorize page have no design
 - Backend design: **gap**: no design for the browser enrollment handshake and its failure modes
@@ -516,14 +515,14 @@ Reach:
 
 ### machines
 
-**Machines** (shipped, centrality 2). The machines page and machine detail: online state, capabilities, revoke and evacuate.
+**Machines** (shipped, centrality 2). A compact machine list with names, default marker, system, online state and a menu for default, delete and evacuate.
 
-States: An empty state, online and offline machines with last seen, a machine detail with runtimes and capabilities.
+States: Empty, loading and error states; online and offline rows; default machine; long names; row menu and confirmation dialogs. No expandable details or capability controls.
 
 Reach:
 
 1. `settings machines`
-2. `click testid:machine-item`
+2. `click testid:machine-menu`
 
 - Web routes: `/app/resources/machines`, `/app/resources/machines/:id`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners)
@@ -831,9 +830,9 @@ Reach:
 
 ### mcp-servers
 
-**MCP servers** (shipped, centrality 3). The read-only list of MCP servers configured on each machine.
+**MCP servers** (shipped, centrality 3). Connect remote MCP servers from a catalog or by URL and see the local servers each machine configures; every task and review uses what is connected.
 
-States: An empty state or a read-only list of servers per machine.
+States: Catalog cards connected, needing sign-in, or failing; add-server dialog; manage dialog; local servers per machine, or empty.
 
 Reach:
 
@@ -955,9 +954,9 @@ Reach:
 
 ### secrets
 
-**Secrets** (shipped, centrality 3). Team and project secrets stored encrypted and delivered to threads that need them.
+**Secrets** (shipped, centrality 3). Team and project secrets and environment variables stored encrypted and delivered to threads that need them; env var values stay readable to the owner.
 
-States: An empty list, secrets by scope, and an add dialog with team or project scope.
+States: An empty list, env vars with values next to hidden secrets, a name filter, the add and edit dialog with the secret checkbox, bulk NAME=VALUE add, and the row menu with convert to secret.
 
 Reach:
 
@@ -966,9 +965,9 @@ Reach:
 3. `click testid:secret-scope`
 
 - Web routes: `/app/resources/secrets`
-- Settings: `设置` (Settings) › `安全` (Security) › `密钥` (Secrets)
-- Keyboard shortcuts in its code: none
-- Test ids in its code: `resource-empty`, `secret-scope`
+- Settings: `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars)
+- Keyboard shortcuts in its code: `D`, `E`, `S`
+- Test ids in its code: `resource-empty`, `secret-bulk`, `secret-convert-confirm`, `secret-kind`, `secret-menu`, `secret-menu-convert`, `secret-menu-delete`, `secret-menu-edit`, `secret-scope`, `secret-value`
 - Research: [docs/research/1775-gateway-prior-art.md](../../../docs/research/1775-gateway-prior-art.md)
 - Frontend design: **gap**: the secrets page and project secrets have no design
 - Backend design: [docs/research/1775-secret-gateway-design.md](../../../docs/research/1775-secret-gateway-design.md)
@@ -1009,7 +1008,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: `A`, `D`, `M`, `N`, `R`, `S`, `U`
-- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `team-row`
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices

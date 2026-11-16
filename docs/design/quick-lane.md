@@ -23,7 +23,7 @@ Saying "add a `node.txt` that says hello" in the cairn channel today costs a pro
    | Skipped | Kept |
    |---|---|
    | Asking for the project when a basis exists | One question in the main channel when no basis exists and several destinations fit |
-   | `github_overlap` and its numbered result in the reply (owner decision) | The `threads` check for an existing thread on the same request, the verbatim citation and the `409` on rebinding a message |
+   | The duplicate check; the Coordinator no longer runs one (owner decision), the thread checks GitHub and `close_as_duplicate` stops it on a match | The `threads` check for an existing thread on the same request, the verbatim citation and the `409` on rebinding a message |
    | The follow-up `update_todo` title call; the placeholder title cut from the owner's words is final | Work branch, PR, merge gate, CI, protected-path review, merge policy |
    | Tests first, when the owner's words fix the content and the change only adds, edits or removes data or copy | Tests first for any behavior change; a session that cannot tell uses `SESSION_BRIEF` |
 
@@ -43,7 +43,7 @@ type TaskRequest = {
 };
 ```
 
-Both are written once by the request service at creation and never change. Moving the task to another project (`update_todo projectId`) clears `lane` and `projectBasis` in the same transaction, so a moved task runs as an ordinary task.
+Both are written once by the request service at creation and never change. Moving the task to another project (`update_todo projectId` or the board) clears `lane` and `projectBasis` in the same write, and so does an owner edit of the task text, which replaces the cited segments; a moved or edited task runs as an ordinary task.
 
 ## Paths that read or write the lane
 
@@ -52,7 +52,7 @@ Both are written once by the request service at creation and never change. Movin
 | L1 | Coordinator `create_todo` with `lane: 'quick'` (`chief-tools.ts`, `coordinator-request.ts`) | step `ownerMessageIds`, cited segments, creating thread scope, project row | `request.lane`, `request.projectBasis`, final title | `400` and nothing written when the turn is not an owner turn, a cited message is outside `ownerMessageIds`, or the basis does not check out. In a project channel a task for another project needs `owner-named` or `owner-answer` |
 | L2 | Coordinator `update_todo projectId` | task state | clears `lane` and `projectBasis` | unchanged rules: only an unstarted task moves |
 | L3 | MCP `create_todo`, REST task creation, issue import | none | no lane fields | not quick; unchanged |
-| L4 | Claim (`machine-claim.ts`) | `lane`, `projectBasis`, cited segments, task project | step prompt: `QUICK_SESSION_BRIEF` instead of `SESSION_BRIEF` | a basis that no longer checks out (a cited message rewound, the project moved) dispatches nothing and puts the task in needs-you with the reason |
+| L4 | Claim (`machine-claim.ts`) | `lane`, `projectBasis`, cited segments, task project | none; the session step's prompt already carries `QUICK_SESSION_BRIEF` instead of `SESSION_BRIEF`, picked when the build starts or is retried (`build-start.ts`, `build-restart.ts`) | a basis that no longer checks out (a cited message rewound, the project moved) dispatches nothing and puts the task in needs-you with the reason |
 | L5 | Merge landing (`machine-merge-landing.ts`) and the merge gate | the same as L4 | none | same as L4. The gate's verdict does not read `lane`: the same patch gets the same verdict with and without it |
 | L6 | Retry (`build-restart.ts`) | creating thread's watch | keeps the creating thread's watch | fixes the #5136 P2: reports after a retry no longer go to the main channel |
 | L7 | Reports to the creating channel | PR events, build state | one line when a PR opens (`…开了 PR #n，在等检查` or `…在等你合并` under a human merge policy) and one when it merges | the main-channel mirror stays `needs-you` and `done` only (#5136) |

@@ -12,8 +12,6 @@ import { retryIsParked } from './retry-parking.js';
 import { getTodo } from './todos.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
-export const CITATION_CHECK_SOURCE_KIND = 'research-citation-check';
-export const CITATION_PARKED_MARK = 'Citation check parked';
 export const NEEDS_YOU_STALE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const GATE_REJECTION = [
@@ -43,7 +41,6 @@ export function failureNeedsHuman(errorMessage: string): boolean {
   if (retryIsParked(errorMessage)) return true;
   if (errorMessage.startsWith('PR Auto-fix needs you:')) return true;
   if (isProviderAuthFailure(errorMessage)) return true;
-  if (errorMessage.startsWith(CITATION_PARKED_MARK)) return true;
   if (GATE_REJECTION.some((mark) => errorMessage.includes(mark))) return true;
   const lower = errorMessage.toLowerCase();
   return MISSING_CREDENTIALS.some((mark) => lower.includes(mark.toLowerCase()));
@@ -118,7 +115,12 @@ export async function sweepFailedRetries(deps: BuildDeps): Promise<void> {
     .where(and(eq(todo.phase, 'failed'), isNull(todo.archivedAt)))
     .all();
   for (const row of rows) {
-    if (row.latestBuildId === null || row.sourceKind === CITATION_CHECK_SOURCE_KIND) continue;
+    if (
+      row.latestBuildId === null ||
+      row.sourceKind === 'research-intake' ||
+      row.sourceKind === 'research-citation-check'
+    )
+      continue;
     if (pendingWorkerQuestions(deps.db, row.latestBuildId).length > 0) continue;
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
     if (

@@ -27,11 +27,11 @@ test('fixture: subscriptions sit in the provider list and the routing page lists
   await expect(providerRows).toHaveCount(6);
   await expect(providerRows.filter({ hasText: '不可用' })).toHaveCount(2);
   const graph = page.getByTestId('routing-section');
-  await expect(graph.locator('[data-routing-source]')).toHaveCount(5);
+  await expect(graph.locator('[data-routing-source]')).toHaveCount(4);
   await expect(graph.locator('[data-routing-target]')).toHaveCount(6);
-  await expect(graph.locator('path[data-wire]')).toHaveCount(5);
-  await expect(graph.locator('path[data-wire][data-broken]')).toHaveCount(1);
-  await expect(graph.locator('[data-routing-source="citation_check"]')).toHaveAttribute('data-broken', '');
+  await expect(graph.locator('path[data-wire]')).toHaveCount(4);
+  await expect(graph.locator('path[data-wire][data-broken]')).toHaveCount(0);
+  await expect(graph.locator('[data-routing-source="citation_check"]')).toHaveCount(0);
   await expect(graph.locator('[data-routing-source="coordinator"]')).not.toHaveAttribute('data-broken', '');
 });
 

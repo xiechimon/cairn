@@ -96,7 +96,10 @@ export interface MachineProvider {
   observedAt: number;
 }
 
-export type MachineWithProviders = Pick<MachineRecord, 'id' | 'name' | 'online'> & {
+export type MachineWithProviders = Pick<
+  MachineRecord,
+  'id' | 'name' | 'online' | 'capabilities'
+> & {
   enabledRuntimes: readonly string[];
   providers?: MachineProvider[];
 };

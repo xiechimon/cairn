@@ -53,6 +53,42 @@ describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.st
     await handle.done;
   });
 
+  test('the model consumption acknowledgment settles before the daemon reports done', async () => {
+    const api = new FakeMachineApi();
+    api.steerResponse = 'Read this supplement';
+    let acknowledge: () => void = () => {};
+    let acknowledging = false;
+    const gate = new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    });
+    const originalAck = api.steerAck.bind(api);
+    api.steerAck = async (stepId, body) => {
+      acknowledging = true;
+      await gate;
+      await originalAck(stepId, body);
+    };
+    const { backend, release } = gatedBackend([]);
+    const { handle, lines } = await boot({ api, backend });
+    try {
+      await waitFor(() => api.parked !== null);
+      api.parked?.(CLAIMED);
+      await waitFor(() => lines.some((line) => line.includes('new session conv-1')));
+      api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+      await waitFor(() => acknowledging);
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect.soft(api.doneBodies).toHaveLength(0);
+      acknowledge();
+      await waitFor(() => api.doneBodies.length === 1);
+      expect(api.calls.indexOf('steer-ack:s1')).toBeLessThan(api.calls.indexOf('done:s1:success'));
+    } finally {
+      acknowledge();
+      release();
+      await handle.stop();
+      await handle.done;
+    }
+  });
+
   test('failure mode: the turn ends while steer attachments download → dropped after the download, never acked', async () => {
     const api = new FakeMachineApi();
     const png = Buffer.from('89504e470d0a1a0a', 'hex');

@@ -46,13 +46,13 @@ test('bannedModelFromLog stays quiet for the allowed deepseek-v4.1-flash route',
   assert.equal(bannedModelFromLog(log), null);
 });
 
-test('AGENTS.md Do-not-use models are covered by BANNED_MODEL_IDS', () => {
-  const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
+test('lane-workers.md Do-not-use models are covered by BANNED_MODEL_IDS', () => {
+  const agents = readFileSync(join(ROOT, 'docs/ops/lane-workers.md'), 'utf8');
   const banLine = agents
     .split('\n')
     .find((line) => line.startsWith('- **Do not use**:'))
     ?.slice('- **Do not use**:'.length);
-  assert.ok(banLine, 'AGENTS.md must keep a Do not use line');
+  assert.ok(banLine, 'lane-workers.md must keep a Do not use line');
   assert.match(banLine, /DeepSeek V4 Flash/i);
   assert.match(banLine, /MiniMax M3/i);
   assert.match(banLine, /gpt-6-astra/i);
@@ -68,8 +68,8 @@ test('AGENTS.md Do-not-use models are covered by BANNED_MODEL_IDS', () => {
   assert.equal(isBannedModelId('gpt-5.6-luna'), true);
 });
 
-test('AGENTS.md Model roles table pins the role models and names no banned id', () => {
-  const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
+test('lane-workers.md Model roles table pins the role models and names no banned id', () => {
+  const agents = readFileSync(join(ROOT, 'docs/ops/lane-workers.md'), 'utf8');
   const rows = parseModelRoles(agents);
   assert.deepEqual(rows.find((row) => row.role === 'Orchestration')?.modelIds, ['claude-opus-5-5']);
   assert.deepEqual(rows.find((row) => row.role === 'Implementation')?.modelIds, [

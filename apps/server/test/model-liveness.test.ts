@@ -7,11 +7,13 @@ import { bootServer, req } from './helpers.js';
 let server: Server;
 let origin = '';
 const paths: string[] = [];
+const authorizations: string[] = [];
 let providerCount = 0;
 
 beforeAll(async () => {
   server = createServer((request, response) => {
     paths.push(request.url ?? '');
+    authorizations.push(request.headers.authorization ?? '');
     if (request.url?.endsWith('/v1/models') || request.url?.endsWith('/v4/models')) {
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end(JSON.stringify({ data: [{ id: 'listed-model' }] }));
@@ -57,4 +59,31 @@ describe('refreshRelayCatalog probes the models list under the base URL', () => 
       s.dispose();
     }
   });
+});
+
+test('a subscription provider is probed with its access token, never the stored OAuth secret', async () => {
+  const s = bootServer();
+  try {
+    const providerId = 'probe-subscription';
+    const secret = JSON.stringify({
+      kind: 'xai-oauth',
+      refresh: 'refresh-fixture',
+      access: 'access-fixture',
+      expires: Date.now() + 3_600_000,
+    });
+    const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/providers`, {
+      providerId,
+      label: 'Subscription',
+      baseUrl: `${origin}/v1`,
+      api: 'openai-completions',
+      apiKey: secret,
+      models: [{ id: 'listed-model', name: 'Listed' }],
+    });
+    expect(res.status).toBe(201);
+    authorizations.length = 0;
+    await refreshRelayCatalog({ db: s.db, box: s.secretBox }, s.team.id, providerId);
+    expect(authorizations).toEqual(['Bearer access-fixture']);
+  } finally {
+    s.dispose();
+  }
 });

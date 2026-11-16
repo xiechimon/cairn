@@ -124,6 +124,36 @@ const QUOTA_BLOCK = {
 } as const;
 
 describe('quota hold (#1261)', () => {
+  test.each(['research-intake', 'research-citation-check'] as const)(
+    'retired %s stays dormant through quota recovery and cannot be claimed',
+    async (sourceKind) => {
+      const w = await setupWorld();
+      await startBuild(w);
+      const { stepId } = await claim(w);
+      await done(w, stepId, { status: 'failed', quotaBlock: QUOTA_BLOCK });
+      w.s.db.update(todoTable).set({ sourceKind }).where(eq(todoTable.id, w.todoId)).run();
+      const before = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+
+      expect(sweepQuotaWaitSteps(w.s.svc, before.quotaBlock!.probeAt + 1)).toBe(0);
+      expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()).toEqual(before);
+
+      w.s.db
+        .update(stepTable)
+        .set({ status: 'pending', machineId: null })
+        .where(eq(stepTable.id, stepId))
+        .run();
+      const response = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
+        cred: w.token,
+        body: {},
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ step: null });
+      expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()?.status).toBe(
+        'pending',
+      );
+    },
+  );
+
   test('W1+W2+W3: a quota done -> waiting_quota hold + notification + read-surface projection', async () => {
     const w = await setupWorld();
     const buildId = await startBuild(w);

@@ -7,8 +7,10 @@ import type {
 } from '@cairn/shared';
 import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
+import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
 import { build, chiefThread, machine, step, todo } from '../db/schema.js';
 import { githubAppTokenExpiry, isAppToken } from '../lib/github-token.js';
+import { materializeCodexAccessToken } from './codex-device-login.js';
 import type { StepCredentialBundle } from './credentials.js';
 import {
   issueStepGitCredential,
@@ -93,7 +95,7 @@ export async function stepToken(
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     ...(owned.status === 'claimed' && todoRow && agentRow
-      ? await connectorFields(deps, owned, todoRow.teamId, agentRow.mcpServers)
+      ? await connectorFields(deps, owned, todoRow.teamId)
       : {}),
     git,
   };
@@ -118,13 +120,12 @@ async function connectorFields(
   deps: MachineDeps,
   claimed: ClaimedStepRow,
   teamId: string,
-  profileSlugs: readonly string[],
   locked = false,
 ): Promise<Pick<MachineTokenResponse, 'mcpConnectors' | 'withheldMcp'>> {
   if (claimed.machineId === null) return {};
   const machineRow = deps.db.select().from(machine).where(eq(machine.id, claimed.machineId)).get();
-  if (!machineRow) return {};
-  const { grant } = stepMcpGrant(deps.db, machineRow, profileSlugs, locked);
+  if (machineRow?.capabilities?.mcpConnectors !== true) return {};
+  const grant = stepMcpGrant(deps.db, machineRow, locked);
   const fields = await stepConnectorEndpoints(
     {
       db: deps.db,
@@ -214,16 +215,16 @@ async function dispatchProvider(
   if (!bundleProvider || bundleProvider.apiKey === null || teamId === undefined) {
     return toProviderConfig(bundleProvider, agentProviderId);
   }
-  const apiKey = await materializeXaiAccessToken(
-    {
-      db: deps.db,
-      box: deps.box,
-      fetch: deps.oauthFetch ?? globalThis.fetch,
-      states: new Map(),
-    },
-    teamId,
-    bundleProvider.providerId,
-  );
+  const loginDeps = {
+    db: deps.db,
+    box: deps.box,
+    fetch: deps.oauthFetch ?? globalThis.fetch,
+    states: new Map(),
+  };
+  const apiKey =
+    bundleProvider.providerId === CODEX_PROVIDER_ID
+      ? await materializeCodexAccessToken(loginDeps, teamId)
+      : await materializeXaiAccessToken(loginDeps, teamId, bundleProvider.providerId);
   return toProviderConfig({ ...bundleProvider, apiKey }, agentProviderId);
 }
 
@@ -250,13 +251,7 @@ async function chiefStepToken(
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     ...(claimed && stepRow && threadRow && agentRow
-      ? await connectorFields(
-          deps,
-          stepRow,
-          threadRow.teamId,
-          agentRow.mcpServers,
-          chiefTurnLocked(stepRow),
-        )
+      ? await connectorFields(deps, stepRow, threadRow.teamId, chiefTurnLocked(stepRow))
       : {}),
     git: null,
     commitIdentity: softwareCommitIdentity(deps),

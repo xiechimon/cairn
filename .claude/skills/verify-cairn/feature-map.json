@@ -224,7 +224,7 @@
     {
       "id": "memory",
       "name": "Memory",
-      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. A design plans direct in-place edits of MEMORY.md and memory files.",
+      "summary": "Team and project memories the Coordinator reads, writes and injects into later turns and threads. Oversized indexes prompt normal-turn maintenance; no daily tidy pass runs. A design plans direct in-place edits of MEMORY.md and memory files.",
       "states": "Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.",
       "centrality": 1,
       "status": "shipped",
@@ -237,7 +237,7 @@
         ],
         "server": [
           "apps/server/src/services/memory.ts",
-          "apps/server/src/services/memory-consolidation.ts",
+          "apps/server/src/services/memory-documents.ts",
           "apps/server/src/routes-agents.ts"
         ]
       },
@@ -266,7 +266,7 @@
       "evidence": [
         "apps/web/e2e/chief-memory.spec.ts",
         "apps/web/test/memory-list.test.ts",
-        "apps/server/test/memory-consolidation.test.ts",
+        "apps/server/test/memory-callers-documents.test.ts",
         "apps/server/test/project-memory.test.ts",
         "integration/test/m4b-memory-e2e.test.ts"
       ]
@@ -413,8 +413,8 @@
     {
       "id": "daily-report",
       "name": "Daily report and retro",
-      "summary": "The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.",
-      "states": "A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro and intake suggestions and each one's state.",
+      "summary": "The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.",
+      "states": "A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro suggestions and each one's state. Historical intake suggestions are hidden and cannot create tasks.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -1005,7 +1005,7 @@
     {
       "id": "agent-computer",
       "name": "The agent's computer",
-      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.",
+      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.",
       "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.",
       "centrality": 1,
       "status": "partial",
@@ -1041,7 +1041,6 @@
       "reach": [
         "open /app",
         "click testid:machines-button",
-        "click label:浏览器",
         "click testid:machine-screen-expand"
       ],
       "research": [
@@ -1050,7 +1049,7 @@
         "docs/research/user-computer-model-2026-11-08.md"
       ],
       "frontendDesign": {
-        "gap": "the computer feed, screen view, browser toggle and control handover have no design"
+        "gap": "the computer feed, screen view and control handover have no design"
       },
       "backendDesign": {
         "gap": "no design for computer access grants, the browser preference, the guard and the screen channel"
@@ -1206,7 +1205,7 @@
         "server": [
           "apps/server/src/services/research-trigger.ts",
           "apps/server/src/services/research-before-plan.ts",
-          "apps/server/src/services/research-citations.ts"
+          "apps/server/src/services/research-stuck.ts"
         ],
         "daemon": [
           "apps/daemon/src/backend/web-search.ts"
@@ -1292,8 +1291,8 @@
     {
       "id": "machines",
       "name": "Machines",
-      "summary": "The machines page and machine detail: online state, capabilities, revoke and evacuate.",
-      "states": "An empty state, online and offline machines with last seen, a machine detail with runtimes and capabilities.",
+      "summary": "A compact machine list with names, default marker, system, online state and a menu for default, delete and evacuate.",
+      "states": "Empty, loading and error states; online and offline rows; default machine; long names; row menu and confirmation dialogs. No expandable details or capability controls.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1323,7 +1322,7 @@
       },
       "reach": [
         "settings machines",
-        "click testid:machine-item"
+        "click testid:machine-menu"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/machines-local-row.md"
@@ -1505,8 +1504,8 @@
     {
       "id": "first-run",
       "name": "First run",
-      "summary": "The setup page before the first project and the composer setup hint that help a new user configure models.",
-      "states": "A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint appears on the composer.",
+      "summary": "The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.",
+      "states": "A team with no projects lands on a full-screen two-step setup page (connect models for the Coordinator and tasks, confirm both models) with a language switch; it can be skipped, and once both steps are done it opens the Coordinator conversation. The first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1763,7 +1762,8 @@
           "/app/activity"
         ],
         "server": [
-          "/api/search"
+          "/api/search",
+          "/api/teams/:id/usage/daily"
         ]
       },
       "reach": [
@@ -2015,8 +2015,8 @@
     {
       "id": "mcp-servers",
       "name": "MCP servers",
-      "summary": "The read-only list of MCP servers configured on each machine.",
-      "states": "An empty state or a read-only list of servers per machine.",
+      "summary": "Connect remote MCP servers from a catalog or by URL and see the local servers each machine configures; every task and review uses what is connected.",
+      "states": "Catalog cards connected, needing sign-in, or failing; add-server dialog; manage dialog; local servers per machine, or empty.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2130,14 +2130,15 @@
     {
       "id": "secrets",
       "name": "Secrets",
-      "summary": "Team and project secrets stored encrypted and delivered to threads that need them.",
-      "states": "An empty list, secrets by scope, and an add dialog with team or project scope.",
+      "summary": "Team and project secrets and environment variables stored encrypted and delivered to threads that need them; env var values stay readable to the owner.",
+      "states": "An empty list, env vars with values next to hidden secrets, a name filter, the add and edit dialog with the secret checkbox, bulk NAME=VALUE add, and the row menu with convert to secret.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/resources/secrets-page.tsx",
-          "apps/web/src/resources/create-secret-dialog.tsx"
+          "apps/web/src/resources/secret-dialog.tsx",
+          "apps/web/src/resources/bulk-secret-dialog.tsx"
         ],
         "server": [
           "apps/server/src/services/secrets.ts"

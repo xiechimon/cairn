@@ -38,8 +38,8 @@ export const EN: Record<string, string> = {
   移除订阅: 'Remove subscription',
   '移除后，后续步骤不再使用这个订阅。':
     'After removal, later steps no longer use this subscription.',
-  '登录已失效，请重新生成令牌后再添加':
-    'The login is no longer valid. Generate a new token and add it again.',
+  '这个订阅的登录已失效。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
+    'This subscription is no longer signed in. Remove it, then run `claude setup-token` in a terminal and add the new token.',
   '验证超时，请重试': 'Verification timed out. Try again.',
   '服务器上找不到 claude 命令': 'The claude command was not found on the server.',
   '验证没有通过，请重试': 'Verification did not pass. Try again.',
@@ -47,7 +47,8 @@ export const EN: Record<string, string> = {
     'The connection dropped; the server may be restarting. Try again.',
   '验证太频繁，请 10 秒后重试': 'Verifying too often. Try again in 10 seconds.',
   验证失败: 'Verification failed',
-  '令牌已过期，请重新添加': 'The token has expired. Add it again.',
+  '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
+    'This subscription has expired. Remove it, then run `claude setup-token` in a terminal and add the new token.',
   使用: 'Usage',
   '24 小时步骤': 'Steps in 24 hours',
   Archive: 'Archive',
@@ -57,14 +58,14 @@ export const EN: Record<string, string> = {
   '添加 Claude 订阅': 'Add Claude subscription',
   '在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。':
     'Run `claude setup-token` on your machine, then paste the token below.',
-  'Claude Code 步骤会使用最近添加且未过期的订阅。Token 加密保存，保存后无法再查看。':
-    'Claude Code steps use the most recently added unexpired connection. Tokens are encrypted and cannot be viewed after saving.',
+  'Coordinator 和任务都会用这个订阅，不用再配 API key。Token 加密保存，保存后无法再查看。':
+    'The Coordinator and tasks both use this subscription, so you need no API key. The token is stored encrypted and cannot be viewed after saving.',
   '保存失败，请检查填写内容后重试。':
     'Could not save the connection. Check the fields and try again.',
-  '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。':
-    '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.',
-  '{name}：Claude 订阅的 token 将在 {days} 天后过期。运行 `claude setup-token`，再添加一个新的订阅。':
-    '{name}: Claude subscription token expires in {days## day|# days}. Run `claude setup-token` and add a new connection.',
+  '{name}：已过期，Coordinator 和任务都暂时用不了。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型服务」。':
+    '{name}: expired, so the Coordinator and tasks cannot run for now. Run `claude setup-token` in a terminal and add the new token under Settings → Model services.',
+  '{name}：将在 {days} 天后过期。到期前在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型服务」。':
+    '{name}: expires in {days## day|# days}. Before then, run `claude setup-token` in a terminal and add the new token under Settings → Model services.',
   Archived: 'Archived',
   Agent: 'Agent',
 
@@ -202,23 +203,6 @@ export const EN: Record<string, string> = {
   还没有连上电脑: 'No computer connected yet',
   '你在控制 · 还剩 {n} 分钟': 'You are in control · {n} min left',
   浏览器: 'Browser',
-  '让 Agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
-  辅助功能未授予: 'Accessibility not granted',
-  '在 系统设置 → 隐私与安全性 → 辅助功能 中允许 Cairn，否则 Agent 无法读取和操作桌面。':
-    'Allow Cairn under System Settings → Privacy & Security → Accessibility, or agents cannot read and drive the desktop.',
-  桌面辅助通道不可用: 'Desktop accessibility bus unavailable',
-  'AT-SPI 辅助总线不可用，Agent 将无法读取和操作桌面。请安装并启用 at-spi（如 orca）后重试。':
-    'The AT-SPI accessibility bus is unavailable, so agents cannot read and drive the desktop. Install and enable at-spi (for example orca) and retry.',
-  屏幕录制未授予: 'Screen recording not granted',
-  '在 系统设置 → 隐私与安全性 → 屏幕录制 中允许 Cairn，否则 Agent 无法截取屏幕。':
-    'Allow Cairn under System Settings → Privacy & Security → Screen Recording, or agents cannot capture the screen.',
-  屏幕截取不可用: 'Screen capture unavailable',
-  '当前环境无法截取屏幕，Agent 的屏幕读取将被拒绝。':
-    'This environment cannot capture the screen; agents will be refused screen reads.',
-  '这台执行机还不支持浏览器。': 'This Runner does not support the browser yet.',
-  '这台执行机已不再报告浏览器能力；可关闭已保存的偏好。':
-    'This Runner no longer reports browser capability; you can turn off the saved preference.',
-  '浏览器偏好已绑定到另一台执行机。': 'The browser preference is already bound to another Runner.',
   '没有其他电脑时，任务都在 Coordinator 这台电脑上跑。':
     'With no other computer, work runs on the Coordinator’s computer.',
   添加电脑: 'Add computer',
@@ -231,8 +215,6 @@ export const EN: Record<string, string> = {
   已暂停: 'Paused',
   全团队: 'Whole team',
   '仅 {name}': 'Only {name}',
-  '项目密钥只发给该项目的对话，同名时优先于团队密钥。':
-    'Project secrets go only to threads in that project and override a team secret with the same name.',
   并发与优先级: 'Concurrency and priority',
   '不限（跟随执行机上限）': 'No limit (Runner limits apply)',
   '串行，一次一个': 'Serial, one at a time',
@@ -257,27 +239,7 @@ export const EN: Record<string, string> = {
   'Coordinator 还缺模型': 'The Coordinator needs a model',
   '添加一个服务商，Coordinator 用不了 Claude Code 登录':
     'Add a provider; the Coordinator cannot use a Claude Code sign-in',
-  '还差第 1 步：接入模型': 'Step 1 is still open: connect models',
-  '还差第 2 步：确认模型': 'Step 2 is still open: confirm models',
-  启动中: 'Starting',
-  '本机执行机正在启动，启动后会检查这台电脑上的 Claude Code':
-    'The local Runner is starting; it checks Claude Code on this computer once it is up',
-  '本机执行机没有启动，查不到 Claude Code。退出 Cairn 再打开一次。':
-    'The local Runner did not start, so Claude Code cannot be checked. Quit Cairn and open it again.',
-  已在这台电脑上登录: 'Signed in on this computer',
-  '{role}：{model}': '{role}: {model}',
-  '没找到已登录的 Claude Code。在终端运行 `claude` 登录后，这里会自己更新。':
-    'No signed-in Claude Code found. Run `claude` in a terminal and sign in; this updates by itself.',
-  '{machine} 上没有检测到 Claude Code。装好后运行 `cairn restart`，这里会自己更新。':
-    'Claude Code is not detected on {machine}. Install it, then run `cairn restart`; this updates by itself.',
-  '还没有在线的执行机。在要跑任务的电脑上装好 CLI，运行 `cairn start` 并批准它。':
-    'No Runner is online yet. On the computer that should run tasks, install the CLI, run `cairn start` and approve it.',
-  '本机 Claude Code': 'Claude Code on this computer',
-  只给任务用: 'Tasks only',
-  '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
-  '任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。':
-    'Tasks can run now. The Coordinator cannot use a Claude Code sign-in and still needs a provider.',
   '因为你添加了 Anthropic API key': 'Because you added an Anthropic API key',
   '因为这是最早添加、Coordinator 能直接用的服务商':
     'Because it is the earliest added provider the Coordinator can use',
@@ -293,15 +255,21 @@ export const EN: Record<string, string> = {
     'Cairn picked these two from the models you connected. Nothing is saved until you confirm, and you can change them in Settings later.',
   还没有能用的模型: 'No usable model yet',
   换一个: 'Change',
-  确认这两个模型: 'Confirm both models',
-  先把模型配好: 'Set up your models first',
-  'Cairn 在这台电脑上跑 Agent，用你自己的模型。做完下面两步就能建第一个项目。':
-    'Cairn runs agents on this computer with your own models. Finish the two steps below to create your first project.',
-  模型配好了: 'Your models are set',
-  '现在可以建第一个项目了。模型以后可以在设置里改。':
-    'You can create your first project now. You can change the models in Settings later.',
   'Claude 订阅、API key 或本地模型': 'A Claude subscription, an API key or a local model',
+  '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
+  '订阅已保存。这台电脑还没找到 Claude Code，装好它之后会自动用上。':
+    'Subscription saved. Claude Code was not found on this computer; it will be used once you install it.',
+  '因为你登录了 Claude 订阅，Coordinator 直接用它':
+    'Because you signed in with a Claude subscription, the Coordinator uses it directly',
   '先跳过，去主页看看': 'skip for now and look around',
+  '欢迎使用 Cairn': 'Welcome to Cairn',
+  'Cairn 在这台电脑上跑 Agent，用你自己的模型。配好模型就能开始对话。':
+    'Cairn runs agents on this computer with your own models. Set them up and you can start chatting.',
+  接一个服务商就够: 'One provider is enough',
+  '选 Coordinator 和新任务用哪个模型': 'Pick the models for the Coordinator and new tasks',
+  '开始和 Coordinator 对话': 'Start chatting with the Coordinator',
+  两步做完就直接进入对话: 'Finish both steps and the conversation opens',
+  确认并开始对话: 'Confirm and start chatting',
   '建项目前要先把模型配好，还差第 1 步：接入模型。':
     'Set up your models before creating a project. Step 1 is still open: connect models.',
   '建项目前要先把模型配好，还差第 2 步：确认模型。':
@@ -314,7 +282,6 @@ export const EN: Record<string, string> = {
   接入模型: 'Connect models',
   'Coordinator 和任务都有模型': 'The Coordinator and tasks both have models',
   确认模型: 'Confirm models',
-  新建第一个项目: 'Create your first project',
   不急的话可以: 'No rush: ',
   '，下次打开 Cairn 时这页还在。': '; this page is here the next time you open Cairn.',
   去完成设置: 'Finish setup',
@@ -695,12 +662,55 @@ export const EN: Record<string, string> = {
   '没有匹配的技能。': 'No matching skills.',
   '导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。':
     'Importing copies the skill into Cairn’s own directory; the original is left unchanged.',
-  尚无密钥: 'No secrets yet',
-  '密钥只交给你授权的 Agent，保存后无法查看。':
-    'Secrets go only to the Agents you allow and cannot be viewed once saved.',
   添加密钥: 'Add secret',
-  '也可以让 Coordinator 添加，值不会进入对话。':
-    'The Coordinator can add them too; the value never enters the conversation.',
+  较早: 'earlier',
+  空值: 'Empty',
+  清除筛选: 'Clear filter',
+  '原值已隐藏。留空则保持原值，填写则替换。':
+    'The current value is hidden. Leave this empty to keep it, or type a new value to replace it.',
+  '保存后转为机密，值不再显示，也不能转回环境变量。':
+    'Saving converts it to a secret: the value is hidden and it cannot become an env var again.',
+  机密的值不能为空: 'A secret value cannot be empty',
+  '第 {lines} 行要写成 NAME=VALUE': 'Line {lines} must look like NAME=VALUE',
+  保存并转为机密: 'Save as secret',
+  添加密钥或环境变量: 'Add secret or env var',
+  '编辑 {name}': 'Edit {name}',
+  '项目里的条目只发给该项目的对话，同名时优先于团队条目。':
+    "Project entries go only to that project's conversations and override team entries with the same name.",
+  '加密保存在 Cairn 服务器上。': 'Encrypted at rest on the Cairn server.',
+  机密: 'Secret',
+  '机密不能转回环境变量。': 'A secret cannot become an env var again.',
+  '机密的值保存后隐藏，不能为空；环境变量的值在这里一直可见。':
+    'Secret values are hidden after saving and cannot be empty. Env var values stay visible here.',
+  '名称要符合环境变量格式（例如 MY_VAR）': 'Use a name like MY_VAR',
+  密钥与环境变量: 'Secrets & env vars',
+  批量添加: 'Bulk add',
+  '任务在执行机上运行时会拿到这些密钥和环境变量。项目里的同名条目优先于团队条目。也可以让 Coordinator 添加机密，值不会进入对话。':
+    'Tasks get these secrets and environment variables when they run on a machine. Project entries override team entries with the same name. The Coordinator can also add secrets without the value entering the conversation.',
+  还没有密钥或环境变量: 'No secrets or environment variables yet',
+  '执行机跑任务时会拿到它们。': 'Machines get them when they run tasks.',
+  按名称筛选: 'Filter by name',
+  最后更新: 'Last updated',
+  '没有名称包含「{q}」的条目': 'No entries whose name contains “{q}”',
+  转为机密: 'Convert to secret',
+  '没能添加，请重试。': 'Could not add it. Try again.',
+  '没能保存，请重试。': 'Could not save. Try again.',
+  '没能转为机密，请重试。': 'Could not convert it to a secret. Try again.',
+  '没能删除，请重试。': 'Could not delete it. Try again.',
+  '把 {name} 转为机密？': 'Convert {name} to a secret?',
+  '转为机密后，这里不再显示它的值，也不能再转回环境变量。已经看到过这个值的地方（浏览器、对话、其他系统）不会因此收回。':
+    'Once converted, its value is no longer shown here and it cannot become an env var again. Copies already seen elsewhere (a browser, a conversation, another system) are not recalled.',
+  '删除后，用到它的任务就拿不到这个值了':
+    'Once deleted, tasks that use it no longer get this value',
+  '删除 {name}': 'Delete {name}',
+  '{names} 没能添加（可能已有同名条目），其余已添加。':
+    '{names} could not be added (an entry with that name may already exist); the rest were added.',
+  批量添加密钥和环境变量: 'Bulk add secrets and env vars',
+  '粘贴 NAME=VALUE，每行一条。': 'One NAME=VALUE per line.',
+  '添加 {n} 条': 'Add {n}',
+  内容: 'Assignments',
+  都存为机密: 'Save all as secrets',
+  '机密的值不能为空：{names}': 'Secret values cannot be empty: {names}',
   个文件: 'file(s)',
   描述: 'Description',
 
@@ -973,16 +983,8 @@ export const EN: Record<string, string> = {
     'Queued: no {platform} Runner yet · needs {platform}',
   '排队中：等 {machine} 上线 · 需要 {platform}（前面 {ahead} 个）':
     'Queued: waiting for {machine} to come online · needs {platform} ({ahead} ahead)',
-  '这台执行机没上报任务沙箱状态，接不了任务。更新 CLI 后在这台机器上运行 `{command} restart`。':
-    'This Runner has not reported its task sandbox, so it cannot take tasks. Update the CLI, then run `{command} restart` on this machine.',
-  '正在检查任务沙箱，检查完才接任务。':
-    'Checking the task sandbox; this Runner takes tasks once the check passes.',
-  '这台机器的系统不支持任务沙箱，接不了任务。':
-    "This machine's system does not support the task sandbox, so it cannot take tasks.",
-  '任务沙箱没就绪，这台执行机接不了任务。Linux 上后台服务要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。':
-    'The task sandbox is not ready, so this Runner cannot take tasks. On Linux the daemon must run as its own systemd user unit with bubblewrap (`bwrap`) installed: update the CLI, then run `{command} restart` on this machine.',
-  '排队中：执行机的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）':
-    'Queued: the task sandbox on the Runner is not ready, so it cannot take tasks. The Runner page shows why and how to fix it ({ahead} ahead)',
+  '排队中：执行机的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
+    'Queued: the task sandbox on the Runner is not ready, so it cannot take tasks ({ahead} ahead)',
   '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
     'Queued: the Runner has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
   '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
@@ -991,18 +993,10 @@ export const EN: Record<string, string> = {
     'Queued: a local project only runs on the Runner that holds it, so this Runner cannot run it ({ahead} ahead)',
   '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
     'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
-    'Queued: Claude Code is not logged in on the Runner. Run claude on that machine to log in ({ahead} ahead)',
-  '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）':
-    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks. The Runner page shows why and how to fix it ({ahead} ahead)',
-  '任务沙箱没就绪：后台服务没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。':
-    'The task sandbox is not ready: the daemon is not running as its own systemd user unit. Run `{command} restart` on this machine, which starts one; if that does not help, check that `systemd-run --user` works.',
-  '任务沙箱没就绪：这台机器没装 bubblewrap（`bwrap`）。装好后（如 `sudo pacman -S bubblewrap` 或 `sudo apt install bubblewrap`），执行机每分钟会自己再检查一次。':
-    'The task sandbox is not ready: bubblewrap (`bwrap`) is not installed on this machine. Install it (for example `sudo pacman -S bubblewrap` or `sudo apt install bubblewrap`); the Runner checks again every minute.',
-  '任务沙箱没就绪：家目录里的 FUSE 挂载 `{mountPoint}` 挡住了沙箱，通常是某个 AppImage 程序在 TMPDIR 指向家目录时留下的。关掉那个程序，或让它的 TMPDIR 指向家目录以外，执行机每分钟会自己再检查一次。':
-    'The task sandbox is not ready: the FUSE mount `{mountPoint}` in your home folder blocks it, usually left by an AppImage app started with TMPDIR inside home. Close that app, or start it with TMPDIR outside home; the Runner checks again every minute.',
-  '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，执行机每分钟会自己再检查一次。':
-    'The task sandbox is not ready: it cannot overlay your home folder, usually because of a FUSE mount there (such as an AppImage app). Find it with `findmnt -l | grep fuse` and close that app; the Runner checks again every minute.',
+  '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在执行机上运行 claude 登录（前面 {ahead} 个）':
+    'Queued: Claude is not signed in. Add a Claude subscription (run claude setup-token in a terminal) or run claude on the Runner to sign in ({ahead} ahead)',
+  '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
+    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks ({ahead} ahead)',
   '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
     'Queued: {machine} has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
   '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
@@ -1011,8 +1005,8 @@ export const EN: Record<string, string> = {
     'Queued: a local project only runs on the Runner that holds it, so {machine} cannot run it ({ahead} ahead)',
   '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
     'Queued: Claude is rate limited on {machine}; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
-    'Queued: Claude Code is not logged in on {machine}. Run claude on that machine to log in ({ahead} ahead)',
+  '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在 {machine} 上运行 claude 登录（前面 {ahead} 个）':
+    'Queued: Claude is not signed in. Add a Claude subscription (run claude setup-token in a terminal) or run claude on {machine} to sign in ({ahead} ahead)',
   '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）':
     'Queued: the Claude account was switched and this step keeps the old account. Stop it, then continue, to start over on the new account ({ahead} ahead)',
   'Coordinator 规则用的服务商「{name}」还没添加':
@@ -1029,9 +1023,6 @@ export const EN: Record<string, string> = {
   '不限（默认执行机）': 'Any (default Runner)',
   '运行中不能改，换平台请新开任务':
     'Locked once the task has run. Start a new task to change the platform.',
-  // #1251 machines page capability annotation (daemon-reported inventory).
-  能力清单未上报: 'Capabilities not reported',
-  'MCP {n} · 本机技能 {m}': 'MCP {n} · local skills {m}',
   手动: 'Manual',
   推荐: 'Recommended',
   // #905 activity phases (live row labels) + the freshness disclosure line.
@@ -1155,13 +1146,7 @@ export const EN: Record<string, string> = {
   '只能用大写字母、数字和下划线，不能以数字开头。':
     'Capital letters, digits and _ only; no leading digit.',
   // wayfinder #173 add-secret dialog family (r2 §242 verbatim fields)
-  '名称（环境变量名）': 'Name (environment variable name)',
-  '描述（可选）': 'Description (optional)',
   值: 'Value',
-  该密钥的用途: 'What this secret is for',
-  粘贴密钥的值: 'Paste the secret value',
-  '值将加密存储，保存后无法再次查看。':
-    'The value is stored encrypted and cannot be viewed again after saving.',
   全部: 'All',
   进行中: 'In progress',
   标题: 'Title',
@@ -1230,14 +1215,40 @@ export const EN: Record<string, string> = {
   '手动输入 owner/repo': 'Enter owner/repo manually',
   // wayfinder #181 add-machine dialog family (r2 11b verbatim copy; the
   // command strings themselves stay untranslated — brand slots via BRAND)
-  '有条件时优先使用云主机：笔记本会休眠或断网，云主机常在线，构建更稳定。':
-    'Prefer a cloud host when you can: laptops sleep or drop off the network, while cloud hosts stay online and build more reliably.',
-  '当前地址只适用于这台电脑。添加另一台电脑前，请用 Tailscale 地址打开 Cairn，再复制命令。':
-    'This address only works on this computer. To add another computer, open Cairn at its Tailscale address before copying the command.',
-  '在待接入的执行机上执行以下命令。浏览器将打开登录页，授权团队 {team} 后执行机即可上线。此后它在后台常驻运行，无需保持终端开启。':
-    'Run the following commands on the Runner you want to connect. Your browser will open a sign-in page; once you authorize the team {team}, the Runner comes online. It then keeps running in the background — no need to keep the terminal open.',
-  '安装 CLI': 'Install the CLI',
-  在执行机上运行: 'Run on the Runner',
+  '让另一台电脑帮你跑任务。两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。':
+    'Let another computer run tasks for you. The two computers connect through Tailscale, and this computer has to stay on and online.',
+  '用 Tailscale 连通两台电脑': 'Connect the two computers with Tailscale',
+  '在另一台电脑上安装 CLI': 'Install the CLI on the other computer',
+  在另一台电脑上启动执行机: 'Start the Runner on the other computer',
+  '终端会打印一个批准链接。打开链接，确认把这台电脑加入团队 {team}，执行机就会上线。之后它在后台常驻运行，关掉终端也没关系。':
+    'The terminal prints an approval link. Open it and confirm adding that computer to the team {team}, and the Runner comes online. It then keeps running in the background, so you can close the terminal.',
+  '查不到 Tailscale 的状态。点「重新检查」再试。':
+    'Could not read the Tailscale status. Choose Check again to retry.',
+  '正在检查 Tailscale…': 'Checking Tailscale…',
+  '这台电脑还没装 Tailscale。下载安装并登录，另一台电脑也装上、登录同一个账号，装好后点「重新检查」。':
+    'Tailscale is not installed on this computer. Install it and sign in, install it on the other computer with the same account, then choose Check again.',
+  '下载 Tailscale →': 'Download Tailscale →',
+  'Tailscale 装好了，但还没登录或没连上。打开 Tailscale 登录并连接，再点「重新检查」。':
+    'Tailscale is installed but not signed in or not connected. Open Tailscale, sign in and connect, then choose Check again.',
+  'Tailscale 需要允许当前用户修改它的设置。在这台电脑的终端运行一次下面的命令，再点「重试」。':
+    'Tailscale has to let your user change its settings. Run this command once in a terminal on this computer, then choose Retry.',
+  '你的 Tailscale 网络还没开 HTTPS 证书。在 Tailscale 网页上开启后，回来点「重试」。':
+    'HTTPS certificates are off in your Tailscale network. Turn them on in Tailscale, then come back and choose Retry.',
+  '去 Tailscale 开启 →': 'Turn it on in Tailscale →',
+  '这台电脑的 Tailscale Serve 端口 `443`、`8443`、`10000` 都被别的服务占着。腾出一个再点「重试」。':
+    'Other services already use the Tailscale Serve ports `443`, `8443` and `10000` on this computer. Free one, then choose Retry.',
+  'Tailscale 已连接。点「开启」后，你 Tailscale 网络里的设备就能打开这台电脑上的 Cairn，打开时仍要登录 Cairn。':
+    'Tailscale is connected. Choose Turn on so devices in your Tailscale network can open Cairn on this computer; they still have to sign in to Cairn.',
+  '已开启，正在确认 {url} 能打开。第一次可能要等一分钟。':
+    'Turned on. Checking that {url} can be opened; the first time can take a minute.',
+  '{url} 现在打不开。确认 Tailscale 还连着，再点「重新检查」。':
+    'Cannot open {url} right now. Check that Tailscale is still connected, then choose Check again.',
+  '已连通，另一台电脑用这个地址连回来：{url}':
+    'Connected. The other computer reaches this one at {url}',
+  '没能开启 Tailscale 访问，请重试。': 'Could not turn on Tailscale access. Try again.',
+  '正在开启…': 'Turning on…',
+  '先在执行机页的「添加执行机」里用 Tailscale 连通这台电脑，命令会出现在这里。':
+    'First connect this computer with Tailscale under Add Runner on the Runners page; the commands then appear here.',
   '在云服务器上运行？改用 API key 注册':
     'Running on a cloud server? Register with an API key instead',
   '获取 API key →': 'Get an API key →',
@@ -1328,14 +1339,7 @@ export const EN: Record<string, string> = {
     'The latest server database backup run on {host} failed ({detail}); the last successful backup was less than an hour ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
   '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
     'The latest server database backup run on {host} failed ({detail}); the last successful backup was {hours## hour|# hours} ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
-  // #895 机器页三态读标注（spec 21 A8；orchestration 块 join 行集）+ chief
-  // 设置 Agent tab「机器」槽的描述（A6）。徽标/状态 = 机器与总管编排的
-  // 关系面，非机器自身状态。
-  'Coordinator 主机': 'Coordinator host',
-  'Coordinator 回合进行中': 'Coordinator turn in progress',
-  'Coordinator 等待执行机': 'Coordinator waiting for Runner',
   '暂无 MCP 服务器。': 'No MCP servers yet.',
-  团队密钥: 'Team secrets',
   // #1169 授权技能段（权限 tab）：不限制（null）与限制后全不勾（[] = 显式
   // 全拒）两态互转；逐技能勾选行只在限制态渲染。
   '该 Agent 执行任务时可读取的团队技能范围。开启「不限制」= 全量可读；关闭后仅勾选的技能可读，未勾选一律拒绝——「不限制」与全不勾是两种状态，可随时互转。':
@@ -1363,8 +1367,6 @@ export const EN: Record<string, string> = {
     'Let this Agent modify skills already in the team skill library.',
   '任务执行时，该 Agent 可在需要密钥的执行步中按需取用团队密钥，每次取用都会留下记录；密钥不预置进 shell 环境。所在执行机需要 cairn CLI 0.1.28 及以上。':
     'When running a task, this Agent can retrieve team secrets on demand in the execution steps that need them; every retrieval is recorded, and secrets are never preloaded into the shell environment. The Runner must have cairn CLI 0.1.28 or newer.',
-  '该 Agent 执行任务时可使用的团队 MCP 服务器，其工具以 mcp__<服务器>__<工具> 的形式出现。':
-    'Team MCP servers this Agent may use while running tasks; their tools appear as mcp__<server>__<tool>.',
   '说明该 Agent 的常驻职责，可多行。该说明会注入它执行的每个任务的系统提示词，也会提供给 Coordinator 用于分派。':
     'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':
@@ -1405,7 +1407,17 @@ export const EN: Record<string, string> = {
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
   这一轮没有完成: 'This turn did not finish',
-  'Coordinator 本轮执行失败': 'The Coordinator turn failed',
+  连不上模型服务: "Can't reach the model provider",
+  '可能是地址填错了、网络或代理不通，或者本地模型没有开。':
+    "The address may be wrong, the network or proxy may be blocking it, or the local model isn't running.",
+  '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。':
+    "The address may be wrong, the network or proxy may be blocking it, or the local model isn't running. If the model is on this Mac or your local network, also turn on Cairn in System Settings → Privacy & Security → Local Network.",
+  '模型服务不接受这个 API key': "The model provider didn't accept this API key",
+  'API key 填错了或已经失效。': 'The API key is wrong or has expired.',
+  '模型服务这次出错了。稍后重试；一直出错的话，检查模型服务设置。':
+    'The model provider returned an error this time. Try again later; if it keeps failing, check the provider settings.',
+  '重新填写 API key': 'Re-enter the API key',
+  打开模型服务设置: 'Open provider settings',
   '撤回失败，Coordinator 可能已经开始处理这条了。':
     'Could not withdraw: the Coordinator may already be working on it.',
   '插话失败，请重试。': 'Could not steer. Try again.',
@@ -1545,7 +1557,6 @@ export const EN: Record<string, string> = {
   '删除项目失败，请重试。': 'Could not delete the project. Try again.',
   '断开连接失败，请重试。': 'Could not disconnect. Try again.',
   '添加模型服务失败，请重试。': 'Could not add the provider. Try again.',
-  '添加密钥失败，请重试。': 'Could not add the secret. Try again.',
   '新建 API 密钥失败，请重试。': 'Could not create the API key. Try again.',
   待回答的提问: 'Pending questions',
   '提交回答失败，草稿还在，请再试一次。':
@@ -1591,7 +1602,6 @@ export const EN: Record<string, string> = {
   等你的事: 'Needs you',
   没有等你的事: 'Nothing is waiting on you',
   复盘: 'Retro',
-  外部动态: 'Outside developments',
   复盘建议: 'Retro suggestions',
   日报: 'Daily report',
   '昨天（{day}）的进展': 'Yesterday ({day})',
@@ -1606,11 +1616,9 @@ export const EN: Record<string, string> = {
     "The report couldn't be written. Yesterday's numbers: done {done} · merged {merged} · failed {failed}",
   '写日报时有 {n} 件等你，现在的情况看任务面板。':
     '{n## item was|# items were} waiting on you when the report was written; the Tasks panel shows the current state.',
-  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 2 条不用了」。':
-    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #2".',
+  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 1 条不用了」。':
+    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #1".',
   '来源：': 'Source: ',
-  '对应：{matches}': 'Matches: {matches}',
-  '建议动作：{action}': 'Suggested action: {action}',
   昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
   '这些来源太长，只读了后面的部分：{sources}。':
     'These sources were too long, so only their latest part was read: {sources}. ',
@@ -1645,11 +1653,7 @@ export const EN: Record<string, string> = {
   '{kind} 步骤': '{kind} step',
   '{time} 重置': 'resets {time}',
   '冷却至 {time}': 'Cooling until {time}',
-  已检测到: 'Detected',
-  '没有检测到，装好后重启执行机': 'Not detected. Install it, then restart the Runner',
   暂不支持: 'Not supported yet',
-  '这台执行机上检测到的执行器。检测到就能接任务，不用开关。':
-    'Runtimes detected on this Runner. Anything detected takes tasks; there is nothing to switch on.',
   可用: 'Available',
   在这台执行机上运行: 'Run on this Runner:',
   已登录: 'Signed in',
@@ -1701,8 +1705,8 @@ export const EN: Record<string, string> = {
   新任务用这个模型和思考强度开始: 'New tasks start with this model and thinking level',
   每日报告和对话摘要: 'Daily reports and conversation summaries',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
-  '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。其他后台用途（评审、引文检查等）用哪个模型，在模型路由的图里能看到。':
-    'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See which model other background uses (review, citation check and so on) use in the Model routing graph.',
+  '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。评审等其他用途的模型，在模型路由的图里能看到。':
+    'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See models for review and other uses in the Model routing graph.',
   '先给 Coordinator 选模型，它才能回答你的消息。':
     'Pick a model for the Coordinator so it can answer your messages.',
   '「{name}」验证通过': '{name} verified',
@@ -1803,7 +1807,6 @@ export const EN: Record<string, string> = {
     '{n#1 routing rule|# routing rules} failed validation and stayed put',
   '把固定在这台执行机上的路由规则一起迁到另一台执行机。':
     'Move the routing rules pinned to this Runner to another Runner.',
-  引文检查: 'Citation check',
   首选执行机: 'Preferred Runner',
   不固定: 'Any machine',
   '当前默认：Claude Code（因为有执行机装了 Claude Code）':
@@ -1843,6 +1846,10 @@ export const EN: Record<string, string> = {
     'A newer xAI credential is already stored. This sign-in did not replace it.',
   '验证码已过期，请重试。': 'The code expired. Try again.',
   'xAI 登录失败，请重试。': 'xAI sign-in failed. Try again.',
+  'OpenAI Codex 登录被拒绝。': 'OpenAI Codex sign-in was denied.',
+  '已有更新的 OpenAI Codex 凭证，这次登录没有覆盖它。':
+    'A newer OpenAI Codex credential is already stored. This sign-in did not replace it.',
+  'OpenAI Codex 登录失败，请重试。': 'OpenAI Codex sign-in failed. Try again.',
   找不到这个项目: 'That project is not here',
   '它可能已被删除、改名，或你不在它所属的团队。':
     'It may have been deleted, renamed, or you may not be on its team.',
@@ -1968,6 +1975,8 @@ export const EN: Record<string, string> = {
   'Cron 表达式': 'Cron expression',
   '服务器按{timezone}计算 Cron。': 'Cron is evaluated by the server in {timezone}.',
   'Cron 需要 5 段：分 时 日 月 周。': 'Use five cron fields: minute hour day month weekday.',
+  'Cron 表达式有误': 'Fix the cron expression',
+  先选择任务: 'Pick a task first',
   从哪天开始每周重复: 'Day to repeat each week',
   '整点运行可能会晚几分钟开始。': 'Runs on the hour may start a few minutes late.',
   提示词: 'Saved prompt',
@@ -1992,12 +2001,9 @@ export const EN: Record<string, string> = {
   已复制链接: 'Link copied',
   显示更多: 'Show more',
   'PR 状态加载失败，稍后会自动重试。': 'Could not load the PR status; retrying shortly.',
-  '这台执行机在 Coordinator 里的角色': "This Runner's role for the Coordinator",
   能力: 'Capabilities',
-  '这台执行机上报的 MCP 与技能清单': 'The MCP servers and skills this Runner reports',
   管理: 'Manage',
   登录已过期: 'Sign-in expired',
-  登录将过期: 'Sign-in expiring',
   已接入的执行机: 'Connected Runners',
   '已检查 {ago}': 'Checked {ago}',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
@@ -2068,14 +2074,7 @@ export const EN: Record<string, string> = {
   '撤销设备失败，请重试。': 'Could not revoke the device. Try again.',
   等你审阅: 'Ready for review',
   '选择 {title}': 'Select {title}',
-  '最后在线 {time}': 'Last seen {time}',
   系统未知: 'Unknown OS',
-  '更新 Cairn 后才能接有平台要求的任务': 'Update Cairn to take tasks that need a platform',
-  '任务沙箱没就绪，暂时接不了任务——展开看怎么修':
-    'Task sandbox not ready, so this Runner cannot take tasks. Expand to see how to fix it',
-  '重新连接 {name} 后才能修改它的设置。': 'Reconnect {name} to change its settings.',
-  '在这台执行机上确认它已联网、没有休眠，然后运行 `{command}` 重新启动。上线后这里会自动变回在线。':
-    'On this Runner, make sure it is online and awake, then run `{command}` to start it again. It turns online here by itself.',
   '额度空了，等额度恢复后自动续跑。': 'Out of quota. It resumes by itself when quota returns.',
   '被限流，等恢复后自动续跑。': 'Rate limited. It resumes by itself when the limit lifts.',
   查看: 'View',
@@ -2165,7 +2164,6 @@ export const EN: Record<string, string> = {
   在主对话中查看: 'View in the main chat',
   主对话里没有加载这条消息: 'That message is not loaded in the main chat.',
   有新动态: 'New activity',
-  'Agent 的权限': 'Agent access',
   仅自己可见: 'Only you can see this',
   文档: 'Documents',
   设计: 'Designs',
@@ -2320,6 +2318,8 @@ export const EN: Record<string, string> = {
   '删除 {model}': 'Remove {model}',
   常用模型: 'Top models',
   '你常用的模型，最多 {max} 个。': 'Your models, up to {max}.',
+  '还没有常用模型。先在「模型服务」里接入服务商，再回来添加。':
+    'No top models yet. Connect one under Providers first, then add models here.',
   '还没有常用模型。点「添加模型」从已连接的服务商里挑。':
     'No top models yet. Use Add model to pick from your connected providers.',
   '恢复成推荐的模型和顺序。': 'Go back to the suggested models and their order.',

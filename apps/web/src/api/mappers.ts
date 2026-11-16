@@ -58,6 +58,7 @@ import {
   type SystemRow,
   stripAnsiEscapes,
   stripSkillRouteSection,
+  stripTurnContext,
   systemRowOf,
   TAKEOVER_HANDED_BACK,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -105,8 +106,7 @@ import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable':
-    '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）',
+  'sandbox-unavailable': '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
   'runtime-disabled':
     '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
   'model-unavailable':
@@ -114,7 +114,7 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
   'local-path': '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了（前面 {ahead} 个）',
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
-    '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
+    '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在 {machine} 上运行 claude 登录（前面 {ahead} 个）',
   'account-switched':
     '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）',
   'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
@@ -122,14 +122,13 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
 };
 
 const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable':
-    '排队中：执行机的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）',
+  'sandbox-unavailable': '排队中：执行机的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
   'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
   'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
   'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）',
   'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
-    '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
+    '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在执行机上运行 claude 登录（前面 {ahead} 个）',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
@@ -1400,6 +1399,40 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
   return options;
 }
 
+const MODEL_UNREACHABLE_RE =
+  /Connection error|NECP|ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|fetch failed/i;
+
+const MODEL_KEY_REJECTED_RE =
+  /\b401\b|(invalid|incorrect).{0,20}api key|unauthorized|authentication_error/i;
+
+export interface TurnErrorCopy {
+  title: string;
+  hint: string;
+  fix: string;
+}
+
+export function turnErrorCopy(turnError: string, onMac: boolean): TurnErrorCopy {
+  if (MODEL_UNREACHABLE_RE.test(turnError))
+    return {
+      title: '连不上模型服务',
+      hint: onMac
+        ? '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。'
+        : '可能是地址填错了、网络或代理不通，或者本地模型没有开。',
+      fix: '打开模型服务设置',
+    };
+  if (MODEL_KEY_REJECTED_RE.test(turnError))
+    return {
+      title: '模型服务不接受这个 API key',
+      hint: 'API key 填错了或已经失效。',
+      fix: '重新填写 API key',
+    };
+  return {
+    title: '这一轮没有完成',
+    hint: '模型服务这次出错了。稍后重试；一直出错的话，检查模型服务设置。',
+    fix: '打开模型服务设置',
+  };
+}
+
 export function chiefTurnErrorOfContent(content: unknown): string | null {
   if (typeof content !== 'string') return null;
   let parsed: unknown;
@@ -1464,7 +1497,7 @@ export function askQuestionOfContent(content: unknown): {
 const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
 
 function chiefUserText(raw: string): string {
-  return stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, '')).trim();
+  return stripTurnContext(stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, ''))).trim();
 }
 
 function takeoverItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {

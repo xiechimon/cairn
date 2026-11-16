@@ -45,14 +45,11 @@ On 2026-10-25 the App pushed a test branch and opened PRs (#1670 under the old n
 Now going through `as-bot.sh` (the dispatching side):
 
 - Pushing.
-- Opening PRs (`gh pr create`).
-- Merge preparation follows the identity checks below; merge authorization uses the human login.
+- Opening PRs (`gh pr create`) when a PR is used at all; work normally ships straight to `main` (`AGENTS.md`, "Ship").
 
 Agent sessions on this host (Claude Code, Codex, pi) commit and push through `as-bot.sh` as well. The repository's pre-commit hook rejects a commit made in an agent session (`agentEnv` in `packages/shared/commit-identity.json`) unless both its author and committer are `cairnwright[bot]`, and the pre-push hook rejects an agent pushing any commit not authored by `cairnwright[bot]`.
 
 Claude Code cloud sessions are the exception (ian, 2026-11-10). The private key never leaves this host, so a cloud container cannot mint an App token. A cloud session commits with plain git as `Claude <noreply@anthropic.com>`, the identity its container is configured with, and pushes with the session's own repository credential. `cloudAgents` in `packages/shared/commit-identity.json` lists that identity: the pre-commit hook accepts an agent commit whose author and committer are both the App or both a cloud identity, the pre-push hook accepts commits a cloud identity authored, and `commit-author` accepts them on a branch of this repository when the committer is a cloud identity, the App, ian, GitHub or Mergify. A fork cannot carry the identity. Cloud sessions committed this way before the allowlist (11 commits on 2026-10-21).
-
-Measured on #3851 (2026-11-10): a PR a cloud session opens through the GitHub connector is opened by `xiechimon`, the account the connector is linked to, not by an App. Every PR merges by squash and the squash commit is authored by the PR opener, so a cloud-opened PR lands on `main` authored by ian, which the allowlist accepts. It also means such a PR is ian's own on GitHub: he cannot approve it. Not measured yet: the `commit-author` run on `main` after the first such merge.
 
 Other scripts that write to the remote should likewise prefix their commands with `as-bot.sh` when they need the App identity: `scripts/cleanup-merged-branches.sh` (`git push origin --delete`, `gh pr list`).
 
@@ -63,7 +60,7 @@ Not switched:
 - `~/.local/bin/ai-route` (symlinked to `~/.agents/automation/ai-route/ai-route.py`): only spawns `codex app-server`, pi, and grok child processes; no git commit, git push, or gh calls.
 - `GITHUB_TOKEN` in CI: belongs to none of these identities.
 
-Merging, approving, and label changes — operations that need a human identity — still use xiechimon's gh login and never go through the App token.
+Approving and label changes — operations that need a human identity — still use xiechimon's gh login and never go through the App token.
 
 ## Commit identity
 
@@ -75,10 +72,7 @@ Commits are not signed: no path creates commits through the GitHub API, so there
 
 `commit-author` (`.github/workflows/commit-author.yml`, `scripts/commit-identity.mjs ci`) is an allowlist over `BASE_SHA..HEAD` for PRs and `BEFORE_SHA..HEAD` for main pushes (`HEAD^!` when the previous SHA is missing or all zeros). A commit passes when it is authored by `cairnwright[bot]`, ian or a cloud session identity and committed by the App, ian, a cloud session identity, GitHub or Mergify, on a branch of this repository (`HEAD_REPO` equals the repository; a fork cannot carry either identity, because only the App and ian can push here); or when it is a Mergify queue merge. Anything else fails, including the retired regular user `Cairnwright`, synthetic identities and either identity claimed from a fork.
 
-Every PR merges by squash; the squash commit is authored by the PR opener, so App-opened PRs land on main as `cairnwright[bot]`.
-
-- Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (path class does not route to ian), and no unchecked tasks anywhere in the body. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
-- A protected-path or security-surface PR, including one that used to be owner-routed and one opened by `cairnwright[bot]`, uses that same queue. A security surface also needs `/security-review` findings fixed or recorded in Risk before merge, and required CI on the head. `pr-evidence` fails a security-surface head that lacks `Security review (<sha>): fixed` or `Security review (<sha>): recorded`.
+Commits land on `main` as pushed, so their author is the identity that made them. After pushing, check the `commit-author` result on that commit with the rest of CI.
 
 The regular GitHub user `cairnwright` is no longer used by anything; whether to keep or delete it is ian's decision.
 
@@ -88,17 +82,9 @@ The regular GitHub user `cairnwright` is no longer used by anything; whether to 
 - Never written to a file, never committed to the repo, never logged, never put into PR or issue text; this document contains no token value.
 - Neither the token nor the `.pem` is handed to an agent process: token swapping and pushing are done by the dispatching side through the command prefix.
 
-## Code Owners review
+## Code Owners
 
-`.github/CODEOWNERS` sets the owner of `integration/eval/**`, `.claude/hillclimb/**`, and the CODEOWNERS file itself to `@xiechimon`. Path class does not route those PRs to ian (ian, 2026-11-12). The eval ruler stays protected so no PR can edit what judges it (`AGENTS.md`, "Merge routes"). pr-gate runs the origin/main copy, so a PR cannot edit the gate that judges it.
-
-"Require review from Code Owners" is to be enabled only after the App can open PRs. Reason: if the PR author is xiechimon, ian cannot approve his own PR, and the owner in CODEOWNERS is also xiechimon — once enabled, PRs touching these paths would never obtain a valid code-owner review. For PRs opened by the App the author is `cairnwright[bot]`, which ian can approve. App-opened PRs were measured working on 2026-10-25.
-
-Conditions and how to enable:
-
-- Condition: #1669 merged into main, and ian personally confirms.
-- Setting: `required_approving_review_count=0` plus `require_code_owner_reviews=true`. This way only PRs touching CODEOWNERS paths need ian's approval; other PRs require no review.
-- Before changing it, save a snapshot of the current main branch protection so it can be rolled back.
+`.github/CODEOWNERS` names `@xiechimon` as owner of `integration/eval/**`, `.claude/hillclimb/**` and the CODEOWNERS file itself. Commits go straight to `main`, so it is not enforced as a review; the rule that no change may edit what judges it lives in `AGENTS.md`.
 
 ## Create traffic throttle
 

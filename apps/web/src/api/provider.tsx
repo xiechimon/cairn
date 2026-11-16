@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { Outlet, useLocation } from 'react-router';
+import { MachineIdentityContext } from '../components/machine-label.js';
 import { DemoBanner } from '../demo/demo-banner.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
 import { USER_NAME } from '../fixtures/fixtures.js';
-import { SCENARIO_PARAM, SCENARIOS_ENABLED } from '../fixtures/scenario.js';
+import { resolveScenario, SCENARIO_PARAM, SCENARIOS_ENABLED } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { useSession, useTeams } from './hooks.js';
+import { useMachines, useSession, useTeams } from './hooks.js';
 import { isFixtureMode } from './mode.js';
 import { useTeamStream } from './sse.js';
 
@@ -57,6 +58,7 @@ export function LiveDataBridge() {
   const teams = useTeams(live);
   const session = useSession(live);
   const teamId = teams.data?.[0]?.id;
+  const machines = useMachines(teamId, live);
   useTeamStream(teamId, live);
   const value = useMemo<LiveData>(
     () => ({
@@ -77,19 +79,27 @@ export function LiveDataBridge() {
     live || !SCENARIOS_ENABLED ? null : new URLSearchParams(search).get(SCENARIO_PARAM);
   return (
     <LiveDataContext.Provider value={value}>
-      {DEMO_MODE ? (
-        <div className="flex h-full flex-col">
-          <DemoBanner />
-          <div data-slot="demo-body" className="relative min-h-0 flex-1 contain-layout">
-            <Outlet />
+      <MachineIdentityContext.Provider
+        value={
+          live
+            ? (machines.data ?? [])
+            : (resolveScenario(new URLSearchParams(search)).resources?.machines ?? [])
+        }
+      >
+        {DEMO_MODE ? (
+          <div className="flex h-full flex-col">
+            <DemoBanner />
+            <div data-slot="demo-body" className="relative min-h-0 flex-1 contain-layout">
+              <Outlet />
+            </div>
           </div>
-        </div>
-      ) : (
-        <>
-          {scenarioId != null && <FixtureModeChip id={scenarioId} />}
-          <Outlet />
-        </>
-      )}
+        ) : (
+          <>
+            {scenarioId != null && <FixtureModeChip id={scenarioId} />}
+            <Outlet />
+          </>
+        )}
+      </MachineIdentityContext.Provider>
     </LiveDataContext.Provider>
   );
 }

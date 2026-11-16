@@ -7,14 +7,7 @@ import { modelRefSchema } from './model-source.js';
 import type { StepKind } from './step.js';
 import { workPolicyRecordSchema } from './work-policy.js';
 
-export const ROUTE_USES = [
-  'coordinator',
-  'session',
-  'review',
-  'digest',
-  'compaction',
-  'citation_check',
-] as const;
+export const ROUTE_USES = ['coordinator', 'session', 'review', 'digest', 'compaction'] as const;
 export type RouteUse = (typeof ROUTE_USES)[number];
 export const routeUseSchema = z.enum(ROUTE_USES);
 
@@ -66,7 +59,6 @@ export const patchRoutingRuleBodySchema = z
     fallbackModels: z.array(modelRefSchema).max(FALLBACK_MODELS_MAX).nullable().optional(),
     machineId: recordId.nullable().optional(),
     requiredCapabilities: requiredCapabilitiesSchema.nullable().optional(),
-    mcpServers: z.array(z.string()).nullable().optional(),
     expectedUpdatedAt: epochMs.optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: 'empty patch' });
@@ -81,7 +73,12 @@ export const sessionDefaultSchema = z.object({
 });
 export type SessionDefault = z.infer<typeof sessionDefaultSchema>;
 
-export const COORDINATOR_DEFAULT_REASONS = ['anthropic-key', 'provider', 'none'] as const;
+export const COORDINATOR_DEFAULT_REASONS = [
+  'anthropic-key',
+  'provider',
+  'claude-code',
+  'none',
+] as const;
 
 export const coordinatorDefaultSchema = z.object({
   reason: z.enum(COORDINATOR_DEFAULT_REASONS),

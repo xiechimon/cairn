@@ -41,6 +41,7 @@ const BOARD = [
 ];
 const SIDEBAR = [
   'activity-page',
+  'desktop-update',
   'search-syntax-palette',
   'menu-keys',
   'settings-',
@@ -246,6 +247,7 @@ export const FILE_RULES = new Map([
   ['apps/web/src/overlay/plan-dropdown.tsx', OVERLAYS],
   ['apps/web/src/overlay/search-panel.tsx', OVERLAYS],
   ['apps/web/src/board/sidebar.tsx', SIDEBAR],
+  ['apps/web/src/board/desktop-update.tsx', SIDEBAR],
   ['apps/web/src/routes/activity-page.tsx', ['activity-page', 'search-syntax-palette']],
   ['apps/web/src/board/app-sidebar.tsx', SIDEBAR],
   ['apps/web/src/routes/board-page.tsx', BOARD],
@@ -278,7 +280,7 @@ export const FILE_RULES = new Map([
     ['detail-composer-queue-stop', 'chief-home-busy'],
   ],
   ['apps/web/vitest.config.ts', []],
-  ['apps/web/DESIGN.md', ['texture-', 'a11y-axe', 'gallery-snapshots']],
+  ['apps/web/DESIGN.md', ['texture-', 'a11y-axe']],
   ['apps/web/COMPONENTS.md', []],
   ['apps/web/e2e/chief-home-mock.ts', ['chief-home-']],
   ['apps/web/e2e/demo-server.ts', ['demo-mode']],
@@ -453,14 +455,11 @@ export function selectSpecs({ paths, allSpecs, dependencies, workspace }) {
     const { specs, why } = classify(path, dependencyImpact, workspaceReach);
     const axe = specs !== null && path.startsWith('apps/web/src/');
     reasons.push(
-      `  ${path} → ${specs === null ? `FULL (${why})` : specs.length === 0 && !axe ? `none (${why})` : why}${axe ? ' + a11y-axe + gallery-snapshots' : ''}`,
+      `  ${path} → ${specs === null ? `FULL (${why})` : specs.length === 0 && !axe ? `none (${why})` : why}${axe ? ' + a11y-axe' : ''}`,
     );
     if (specs === null) full = true;
     for (const s of specs ?? []) picked.add(s);
-    if (axe) {
-      picked.add('a11y-axe');
-      picked.add('gallery-snapshots');
-    }
+    if (axe) picked.add('a11y-axe');
   }
   return { full, selection: full ? [...allSpecs].sort() : expand([...picked], allSpecs), reasons };
 }

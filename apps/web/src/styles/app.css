@@ -756,7 +756,7 @@ body:has([data-testid="chief-body"]),
 }
 
 :root[data-shell="mac-desktop"] .sidebar-team-row {
-  padding-left: 70px;
+  padding-left: 82px;
   -webkit-app-region: drag;
 }
 
@@ -764,12 +764,20 @@ body:has([data-testid="chief-body"]),
   visibility: hidden;
 }
 
+:root[data-shell="mac-desktop"] .sidebar-footer-brand {
+  display: flex;
+}
+
 :root[data-shell="mac-desktop"] .sidebar-team-row :is(button, a) {
   -webkit-app-region: no-drag;
 }
 
+:root[data-shell="mac-desktop"] .first-run-drag {
+  -webkit-app-region: drag;
+}
+
 :root[data-shell="mac-desktop"] .sidebar-peek-trigger {
-  left: 78px;
+  left: 90px;
 }
 
 .desktop-drag-strip {

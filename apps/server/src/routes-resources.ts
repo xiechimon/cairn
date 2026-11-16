@@ -14,6 +14,7 @@ import {
   patchMcpConnectorBodySchema,
   patchProviderBodySchema,
   patchScheduleBodySchema,
+  ROUTE_USES,
   redactSecrets,
   renameClaudeSubscriptionSchema,
   SKILL_ENTRY_FILE,
@@ -52,6 +53,7 @@ import {
   renameClaudeSubscription,
   verifySubscriptionConnection,
 } from './services/claude-subscriptions.js';
+import { pollCodexDeviceLogin, startCodexDeviceLogin } from './services/codex-device-login.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
 import {
@@ -96,6 +98,7 @@ import {
   getProvidersEnvelope,
   updateProvider,
 } from './services/providers.js';
+import { seedClaudeCodeRules } from './services/routing-rules.js';
 import { runScheduleNow } from './services/schedule-run.js';
 import {
   createSchedule,
@@ -104,7 +107,13 @@ import {
   setScheduleEnabled,
 } from './services/schedules.js';
 import { search } from './services/search.js';
-import { createSecret, deleteSecret, listSecrets, updateSecret } from './services/secrets.js';
+import {
+  createSecret,
+  deleteSecret,
+  listSecrets,
+  listSecretsWithEnvValues,
+  updateSecret,
+} from './services/secrets.js';
 import {
   importSkill,
   listImportCandidates,
@@ -295,7 +304,12 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       .where(and(eq(machine.id, body.targetMachineId), eq(machine.teamId, src.teamId)))
       .get();
     if (!dst) throw notFound(`machine ${body.targetMachineId}`);
-    const holders = ctx.db.select().from(routingRule).where(eq(routingRule.machineId, id)).all();
+    const holders = ctx.db
+      .select()
+      .from(routingRule)
+      .where(eq(routingRule.machineId, id))
+      .all()
+      .filter((rule) => ROUTE_USES.includes(rule.use));
     const moved: string[] = [];
     const rejected: { agentId: string; reason: string }[] = [];
     for (const rule of holders) {
@@ -444,7 +458,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     const body = parseWith(createClaudeSubscriptionSchema, await jsonBody(c), 'body');
-    return c.json(createClaudeSubscription(keysvc, teamId, body), 201);
+    const created = createClaudeSubscription(keysvc, teamId, body);
+    if (created.enabled) seedClaudeCodeRules(ctx.db, teamId);
+    return c.json(created, 201);
   });
 
   app.delete('/api/teams/:id/claude-subscriptions/:cid', (c) => {
@@ -542,6 +558,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         {
           ...keysvc,
           fetch: ctx.providerTestFetch ?? globalThis.fetch,
+          tokenFetch: ctx.oauthFetch ?? globalThis.fetch,
           ...(ctx.providerTestTimeoutMs === undefined
             ? {}
             : { timeoutMs: ctx.providerTestTimeoutMs }),
@@ -603,6 +620,33 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       throw new HttpError(400, 'state required');
     }
     return c.json(await pollXaiDeviceLogin(xaiDeviceDeps(), { teamId, state: body.state }));
+  });
+
+  const codexDeviceDeps = () => ({
+    db: ctx.db,
+    box: ctx.secretBox,
+    fetch: ctx.oauthFetch ?? globalThis.fetch,
+    states: ctx.codexDeviceStates,
+  });
+
+  app.post('/api/teams/:id/providers/oauth/openai-codex/device', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const started = await startCodexDeviceLogin(codexDeviceDeps(), {
+      teamId,
+      createdBy: ctx.user.id,
+    });
+    return c.json(started);
+  });
+
+  app.post('/api/teams/:id/providers/oauth/openai-codex/device/poll', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = (await jsonBody(c)) as { state?: unknown };
+    if (typeof body.state !== 'string' || body.state === '') {
+      throw new HttpError(400, 'state required');
+    }
+    return c.json(await pollCodexDeviceLogin(codexDeviceDeps(), { teamId, state: body.state }));
   });
 
   app.post('/api/teams/:id/providers/oauth/:preset/authorize', (c) => {
@@ -802,7 +846,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/secrets', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(listSecrets(keysvc, teamId));
+    const ownerCaller =
+      pairedDeviceIdOf(c) === null &&
+      (ctx.authToken === null || c.get('ownerIdentity') !== undefined);
+    c.header('Cache-Control', 'no-store');
+    return c.json(
+      ownerCaller ? listSecretsWithEnvValues(keysvc, teamId) : listSecrets(keysvc, teamId),
+    );
   });
 
   app.post('/api/teams/:id/secrets', async (c) => {
@@ -815,6 +865,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       description: body.description ?? null,
       value: body.value,
       projectId: body.projectId ?? null,
+      ...(body.kind !== undefined ? { kind: body.kind } : {}),
       ...(body.delivery !== undefined ? { delivery: body.delivery } : {}),
       ...(body.http !== undefined ? { http: body.http } : {}),
     });

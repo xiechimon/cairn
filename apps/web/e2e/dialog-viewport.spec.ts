@@ -22,7 +22,7 @@ async function expectBodyOverflows(dialog: Locator) {
 
 test('provider: 3 model chips overflow the body, submit pinned to the bottom and does not move on scroll', async ({ page }) => {
   await page.goto('/app/resources/providers?scenario=01');
-  await page.getByRole('button', { name: '添加服务商' }).click();
+  await page.getByTestId('resource-new').click();
   const dialog = page.getByRole('dialog', { name: '添加模型服务' });
   await expect(dialog).toBeVisible();
 
@@ -51,13 +51,13 @@ test('provider: 3 model chips overflow the body, submit pinned to the bottom and
 });
 
 test('secret: static-form face submit stays in the viewport', async ({ page }) => {
-  await page.goto('/app/resources/secrets?scenario=01');
+  await page.goto('/app/resources/secrets?scenario=secrets-list');
   await page.getByRole('button', { name: '新建', exact: true }).click();
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('dialog', { name: '添加密钥或环境变量' });
   await expect(dialog).toBeVisible();
   await expectShellCapped(dialog);
 
-  await expect(dialog.getByRole('button', { name: '添加密钥' })).toBeInViewport();
+  await expect(dialog.getByRole('button', { name: '添加', exact: true })).toBeInViewport();
 });
 
 test('machine: disclosure expanded (tallest content state) bottom link stays in the viewport', async ({ page }) => {
@@ -108,8 +108,9 @@ test('schedules `新建定时` editor (900×420): capped to the viewport, its bo
   if (box == null) return;
   expect(box.y).toBeGreaterThanOrEqual(0);
   expect(box.y + box.height).toBeLessThanOrEqual(420.5);
-  expect(await popover.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
-  await popover.evaluate((el) => {
+  const body = popover.locator('.overflow-y-auto').first();
+  expect(await body.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  await body.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
   await expect(popover.getByRole('button', { name: '保存' })).toBeInViewport();

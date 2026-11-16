@@ -1,5 +1,6 @@
 import {
   OAUTH_FAMILIES,
+  PROVIDER_CODEX_PRESET,
   PROVIDER_OAUTH_PRESET_IDS,
   PROVIDER_PRESET_IDS,
   PROVIDER_XAI_PRESET,
@@ -152,7 +153,10 @@ function connectionSummary(
   return [host, protocol, connection.authHeader ? 'Bearer' : t('原生鉴权')].join(' · ');
 }
 
-const WIRED_OAUTH_IDS: ReadonlySet<string> = new Set(OAUTH_FAMILIES.map((f) => f.presetId));
+const WIRED_OAUTH_IDS: ReadonlySet<string> = new Set([
+  ...OAUTH_FAMILIES.map((f) => f.presetId),
+  PROVIDER_CODEX_PRESET.id,
+]);
 
 const PRESET_ROWS = PROVIDER_PRESET_IDS.map((id) => {
   const oauth = (PROVIDER_OAUTH_PRESET_IDS as readonly string[]).includes(id);
@@ -186,6 +190,10 @@ interface CreateProviderDialogProps {
   xaiSignInPending?: boolean;
   xaiDevice?: { userCode: string; verificationUri: string } | null;
   xaiDeviceError?: string | null;
+  onCodexSignIn?: () => void;
+  codexSignInPending?: boolean;
+  codexDevice?: { userCode: string; verificationUri: string } | null;
+  codexDeviceError?: string | null;
 }
 
 export function CreateProviderDialog({
@@ -201,6 +209,10 @@ export function CreateProviderDialog({
   xaiSignInPending,
   xaiDevice,
   xaiDeviceError,
+  onCodexSignIn,
+  codexSignInPending,
+  codexDevice,
+  codexDeviceError,
 }: CreateProviderDialogProps) {
   const { t } = useI18n();
   const [view, setView] = useState<'picker' | 'form'>('picker');
@@ -315,6 +327,18 @@ export function CreateProviderDialog({
             />
           </InputGroup>
           {connectError != null && connectError !== '' && <FieldError>{connectError}</FieldError>}
+          {codexDevice != null && (
+            <FieldDescription data-testid="codex-device-login">
+              {t('在浏览器打开这个链接，输入验证码。')}{' '}
+              <a href={codexDevice.verificationUri} target="_blank" rel="noreferrer">
+                {codexDevice.verificationUri}
+              </a>{' '}
+              <span className="font-mono">{codexDevice.userCode}</span>
+            </FieldDescription>
+          )}
+          {codexDeviceError != null && codexDeviceError !== '' && (
+            <FieldError>{codexDeviceError}</FieldError>
+          )}
           <div className="flex flex-col">
             {PRESET_GROUPS.map((group) => {
               const groupRows = rows.filter((row) => row.group === group);
@@ -346,14 +370,16 @@ export function CreateProviderDialog({
                       variant="ghost"
                       data-preset-id={row.id}
                       className={PICKER_ROW_CLS}
-                      disabled={row.oauth && (!row.wired || connectPending === true)}
-                      onClick={() =>
-                        row.oauth
-                          ? onConnect != null
-                            ? onConnect(row.id)
-                            : onClose()
-                          : enterForm({ id: row.id, label: row.label })
+                      disabled={
+                        row.oauth &&
+                        (!row.wired || connectPending === true || codexSignInPending === true)
                       }
+                      onClick={() => {
+                        if (!row.oauth) enterForm({ id: row.id, label: row.label });
+                        else if (row.id === PROVIDER_CODEX_PRESET.id)
+                          onCodexSignIn != null ? onCodexSignIn() : onClose();
+                        else onConnect != null ? onConnect(row.id) : onClose();
+                      }}
                     >
                       <span aria-hidden className={PICKER_TILE_CLS}>
                         <ProviderPresetIcon id={row.id} />

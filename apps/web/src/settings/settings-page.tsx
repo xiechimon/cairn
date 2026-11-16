@@ -168,7 +168,12 @@ const GROUPS: Group[] = [
   {
     heading: '安全',
     sections: [
-      { id: 'secrets', label: '密钥', Icon: ShieldEllipsis, element: () => <SecretsPage /> },
+      {
+        id: 'secrets',
+        label: '密钥与环境变量',
+        Icon: ShieldEllipsis,
+        element: () => <SecretsPage />,
+      },
       {
         id: 'api-keys',
         label: 'API 密钥',

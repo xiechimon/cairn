@@ -1,4 +1,10 @@
-import { CODEX_MODEL, type RuleFix, type RuleIssue, type RuleIssueReason } from '@cairn/shared';
+import {
+  CODEX_MODEL,
+  ROUTE_USES,
+  type RuleFix,
+  type RuleIssue,
+  type RuleIssueReason,
+} from '@cairn/shared';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { usesHostCodexLogin } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
@@ -123,6 +129,7 @@ export function routingRuleIssues(db: Db, teamId: string): RuleIssue[] {
     .where(eq(routingRule.teamId, teamId))
     .orderBy(asc(routingRule.use))
     .all()
+    .filter((row) => ROUTE_USES.includes(row.use))
     .flatMap((row) => {
       const problem = ruleProblem(db, resolveRuleProvider(db, row), machines);
       return problem === null ? [] : [{ use: row.use, ...problem, suggested: ruleFix(db, row) }];

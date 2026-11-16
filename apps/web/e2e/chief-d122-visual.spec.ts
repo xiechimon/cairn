@@ -19,7 +19,14 @@ test('the jump-to-latest button is 36px', async ({ page }) => {
   await page.goto('/app');
   const home = page.getByTestId('home-c');
   await expect(home.getByTestId('chief-msg').last()).toBeVisible();
-  await home.getByTestId('chief-body').evaluate((node) => node.scrollTo({ top: 0 }));
+  const body = home.getByTestId('chief-body');
+  await expect
+    .poll(() => body.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight))
+    .toBeLessThanOrEqual(2);
+  await body.evaluate((node) => {
+    node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+    node.scrollTo({ top: 0 });
+  });
   const jump = home.getByTestId('jump-to-latest');
   await expect(jump).toHaveAttribute('data-active', 'true');
   const box = await jump.boundingBox();

@@ -103,7 +103,7 @@ Failure excerpt:
 \`\`\`
 $errs
 \`\`\`
-Find the cause (reproduce locally; heavy checks through \`flock /tmp/cairn-heavy.lock\`). If the failure comes from this branch, fix it test-first; if it is a flake or comes from main, say so with evidence. pr-evidence failures mean the PR body lacks required sections or \`- [x]\` acceptance items: report that instead of changing code. Rebase on origin/main (docs/lessons.md: keep all rows), keep a single \`Closes #$n\` line, commit on $b. Do not push. No new code comments; English only.
+Find the cause (reproduce locally; heavy checks through \`flock /tmp/cairn-heavy.lock\`). If the failure comes from this branch, fix it test-first; if it is a flake or comes from main, say so with evidence. Rebase on origin/main (docs/lessons.md: keep all rows), keep a single \`Closes #$n\` line, commit on $b. Do not push. No new code comments; English only.
 P
   setsid nohup bash -c "timeout 5400 ai-route run implement -C $d \"\$(cat /tmp/cifix-$n.txt)\"; rc=\$?; if [ \$rc != 0 ]; then echo x >> $f.fail; [ \$(wc -l < $f.fail) -lt 3 ] && rm -f $f; fi" >> ~/lanes/logs/cifix-$n.log 2>&1 < /dev/null 9>&- &
   log "PR #$pr ($fails) -> fix worker"

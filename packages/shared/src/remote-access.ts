@@ -39,6 +39,26 @@ export const remoteRoutesResponseSchema = z.object({
 });
 export type RemoteRoutesResponse = z.infer<typeof remoteRoutesResponseSchema>;
 
+export const tailscaleAccessStateSchema = z.enum([
+  'not-installed',
+  'not-connected',
+  'needs-operator',
+  'needs-https',
+  'occupied',
+  'off',
+  'verifying',
+  'unreachable',
+  'ready',
+]);
+export type TailscaleAccessState = z.infer<typeof tailscaleAccessStateSchema>;
+
+export const tailscaleAccessSchema = z.object({
+  state: tailscaleAccessStateSchema,
+  url: z.string().url().nullable(),
+  consentUrl: z.string().url().nullable(),
+});
+export type TailscaleAccess = z.infer<typeof tailscaleAccessSchema>;
+
 export const deviceNameSchema = z.string().trim().min(1).max(DEVICE_NAME_MAX_CHARS);
 
 export const pairingCodeResponseSchema = z.object({

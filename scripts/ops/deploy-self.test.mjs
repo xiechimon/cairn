@@ -155,12 +155,19 @@ exec env GH_TOKEN=fixture-scoped-app-token "$@"`,
     `echo "gh $*" >> "${fake}/gh.log"
 [ "\${GH_TOKEN-}" != fixture-scoped-app-token ] || echo authenticated >> "${fake}/gh-auth.log"
 case "$1 $2" in
+  "api repos/"*"/actions/workflows/ci.yml/runs?"*)
+    sha=$(echo "$2" | sed -E 's/.*head_sha=([0-9a-f]+).*/\\1/')
+    [[ "$2" == *'branch=main&event=push&'* ]] || exit 1
+    [ ! -f "${fake}/ci-api-fail" ] || exit 1
+    if [ -f "${fake}/ci-$sha" ]; then
+      cat "${fake}/ci-$sha"
+    else
+      printf '{"workflow_runs":[{"head_sha":"%s","head_branch":"main","event":"push","status":"completed","conclusion":"success"}]}' "$sha"
+    fi | jq -r "\${@: -1}" ;;
   "api repos/"*)
     sha=$(echo "$2" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\\1#')
     if [ -f "${fake}/checks-$sha" ]; then cat "${fake}/checks-$sha"; else printf 'check\\tsuccess\\npack-smoke\\tsuccess\\ne2e-gate\\tsuccess\\n'; fi ;;
-  "issue list")
-    if [[ "$*" == *autonomy-paused* ]]; then cat "${fake}/paused" 2>/dev/null || echo 0
-    else cat "${fake}/lag-issue" 2>/dev/null || true; fi ;;
+  "issue list") cat "${fake}/lag-issue" 2>/dev/null || true ;;
   "issue create") echo "https://github.com/x/y/issues/77" ;;
   "issue close") [ ! -f "${fake}/lag-close-fail" ] || exit 1 ;;
 esac`,
@@ -364,14 +371,56 @@ test('refuses a SHA whose required checks are not all green', () => {
   }
 });
 
-test('refuses while autonomy is paused', () => {
-  const f = fixture();
-  const target = pushTarget(f);
-  writeFileSync(join(f.fake, 'paused'), '1\n');
-  const result = f.run(DEPLOY, [target]);
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /autonomy-paused/);
-});
+for (const script of [DEPLOY, WATCH]) {
+  test(`${script.endsWith('deploy-self.sh') ? 'deployment' : 'watch'} requires the exact SHA main push CI run to succeed`, () => {
+    const f = fixture();
+    const target = pushTarget(f);
+    const success = {
+      head_sha: target,
+      head_branch: 'main',
+      event: 'push',
+      status: 'completed',
+      conclusion: 'success',
+    };
+    for (const run of [
+      null,
+      { status: 'queued', conclusion: null },
+      { status: 'in_progress', conclusion: null },
+      { conclusion: 'failure' },
+      { conclusion: 'cancelled' },
+      { event: 'pull_request' },
+      { head_branch: 'feature' },
+      { head_sha: f.previous },
+    ]) {
+      writeFileSync(
+        join(f.fake, `ci-${target}`),
+        JSON.stringify({ workflow_runs: run === null ? [] : [{ ...success, ...run }] }),
+      );
+      const result = f.run(script, script === DEPLOY ? [target] : [], {
+        CAIRN_DEPLOY_SCRIPT: DEPLOY,
+      });
+      assert.equal(result.status, script === DEPLOY ? 2 : 0, result.stderr);
+      if (script === DEPLOY) assert.match(result.stderr, /main push CI is not successful/);
+      assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.previous);
+      assert.equal(f.log('systemctl.log'), '');
+      assert.equal(f.log('pnpm.log'), '');
+    }
+    writeFileSync(join(f.fake, 'ci-api-fail'), '');
+    const failed = f.run(script, script === DEPLOY ? [target] : [], {
+      CAIRN_DEPLOY_SCRIPT: DEPLOY,
+    });
+    assert.equal(failed.status, script === DEPLOY ? 2 : 0, failed.stderr);
+    assert.equal(f.log('systemctl.log'), '');
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.previous);
+    unlinkSync(join(f.fake, 'ci-api-fail'));
+    writeFileSync(join(f.fake, `ci-${target}`), JSON.stringify({ workflow_runs: [success] }));
+    const green = f.run(script, script === DEPLOY ? [target] : [], {
+      CAIRN_DEPLOY_SCRIPT: DEPLOY,
+    });
+    assert.equal(green.status, 0, green.stderr);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+  });
+}
 
 test('refuses a target that changes install-script permissions or hooks', () => {
   for (const allowBuilds of [

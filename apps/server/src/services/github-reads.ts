@@ -18,7 +18,7 @@ import { githubRepoOfProject } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { teamUserToken } from './github-connection.js';
 import type { GithubIssueFaceDeps } from './github-issues.js';
-import { lookupGithubOverlaps } from './github-overlap.js';
+import { listedProjects } from './personal-space.js';
 
 export const GITHUB_READ_TIMEOUT_MS = 6_000;
 
@@ -58,7 +58,7 @@ async function openTarget(
   const row = deps.db
     .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
     .from(project)
-    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+    .where(and(eq(project.id, projectId), listedProjects(teamId)))
     .get();
   if (!row) throw new HttpError(404, `project ${projectId} not found`);
   if (row.repoKind !== 'github') {
@@ -199,15 +199,6 @@ export async function executeGithubReadTool(
           taskId: taskIds.get(refOf(issue.number)) ?? null,
         })),
       };
-    }
-    case 'github_overlap': {
-      const p = parseWith(githubReadToolParamsSchemas.github_overlap, params, 'params');
-      const t = await openTarget(deps, teamId, p.projectId);
-      return lookupGithubOverlaps(fetchImpl, t, p.terms, p.paths ?? [], {
-        timeoutMs,
-        cleanTitle: (title) => cleanGithubText(title, TITLE_MAX),
-        readFailure,
-      });
     }
     case 'pull_requests': {
       const p = parseWith(githubReadToolParamsSchemas.pull_requests, params, 'params');

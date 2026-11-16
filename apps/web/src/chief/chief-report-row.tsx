@@ -18,14 +18,6 @@ function todoLinks(refs: readonly ChiefReportTodoRef[]): string {
   return refs.map((ref) => `[${mdText(ref.title)}](todo:${ref.id})`).join('、');
 }
 
-function sourceHost(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-}
-
 function statusLabel(status: RetroProposalStatus, t: Translate): string {
   if (status === 'accepted') return t('已建成线程');
   if (status === 'dismissed') return t('已忽略');
@@ -39,30 +31,17 @@ function suggestionLines(entry: ChiefReportSuggestion, t: Translate): string[] {
     entry.item.status === 'accepted' && entry.item.todoId !== null
       ? `[${state}](todo:${entry.item.todoId})`
       : state;
-  if (entry.kind === 'retro') {
-    const p = entry.item;
-    const source =
-      p.source.todoId === null
-        ? t('协调者对话')
-        : `[${mdText(p.source.label)}](todo:${p.source.todoId})`;
-    return [
-      `${entry.n}. **${mdText(p.title)}** · ${made}`,
-      `${pad}${mdText(p.what)}`,
-      `${pad}- ${t('为什么没拦住：{why}', { why: mdText(p.why) })}`,
-      `${pad}- ${t('防护：{safeguard}', { safeguard: mdText(p.safeguard) })}`,
-      `${pad}- ${t('出处：')}${source}`,
-    ];
-  }
-  const item = entry.item;
+  const p = entry.item;
+  const source =
+    p.source.todoId === null
+      ? t('协调者对话')
+      : `[${mdText(p.source.label)}](todo:${p.source.todoId})`;
   return [
-    `${entry.n}. **${mdText(item.claim)}** · ${made}`,
-    `${pad}- ${t('来源：')}[${mdText(sourceHost(item.url))}](${item.url})`,
-    ...(item.matches === ''
-      ? []
-      : [`${pad}- ${t('对应：{matches}', { matches: mdText(item.matches) })}`]),
-    ...(item.action === ''
-      ? []
-      : [`${pad}- ${t('建议动作：{action}', { action: mdText(item.action) })}`]),
+    `${entry.n}. **${mdText(p.title)}** · ${made}`,
+    `${pad}${mdText(p.what)}`,
+    `${pad}- ${t('为什么没拦住：{why}', { why: mdText(p.why) })}`,
+    `${pad}- ${t('防护：{safeguard}', { safeguard: mdText(p.safeguard) })}`,
+    `${pad}- ${t('出处：')}${source}`,
   ];
 }
 
@@ -102,8 +81,6 @@ export function chiefReportSentence(report: ChiefReportContent, t: Translate): s
 export function chiefReportMarkdown(report: ChiefReportContent, t: Translate): string {
   const y = report.yesterday;
   const suggestions = report.status === 'posted' ? chiefReportSuggestions(report) : [];
-  const retro = suggestions.filter((entry) => entry.kind === 'retro');
-  const intake = suggestions.filter((entry) => entry.kind === 'intake');
   const out: string[] = [];
   out.push(
     report.status === 'retrying'
@@ -149,18 +126,14 @@ export function chiefReportMarkdown(report: ChiefReportContent, t: Translate): s
   );
   if (report.status === 'posted' && report.retroRan) {
     out.push('', `## ${t('复盘建议')}`, '');
-    if (retro.length === 0) out.push(t('昨天的对话里没找到值得改的地方'));
-    else for (const entry of retro) out.push(...suggestionLines(entry, t));
-  }
-  if (intake.length > 0) {
-    out.push('', `## ${t('外部动态')}`, '');
-    for (const entry of intake) out.push(...suggestionLines(entry, t));
+    if (suggestions.length === 0) out.push(t('昨天的对话里没找到值得改的地方'));
+    else for (const entry of suggestions) out.push(...suggestionLines(entry, t));
   }
   const notes: string[] = [];
   if (suggestions.length > 0)
     notes.push(
       t(
-        '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 2 条不用了」。',
+        '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 1 条不用了」。',
         {
           day: report.day,
         },

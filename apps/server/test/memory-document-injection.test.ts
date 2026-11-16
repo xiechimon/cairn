@@ -51,6 +51,9 @@ function check(text: string) {
   expect(text).not.toContain('first-200');
   expect(text).not.toContain('FILE-BODY');
   expect(text).toContain('后面还有 5 行没有加载');
+  expect(text).toContain('正常回合');
+  expect(text).toContain('update_memory');
+  expect(text).toContain('delete_memory');
 }
 function chiefContext() {
   const ownerMessageId = seedOwnerMessage(H.s.db, H.threadId, 'hello');

@@ -4,25 +4,25 @@ const PROVIDERS = '/app/resources/providers?scenario=01';
 
 async function openDialog(page: Page) {
   await page.goto(PROVIDERS);
-  await page.getByRole('button', { name: '添加服务商' }).click();
+  await page.getByTestId('resource-new').click();
   const dialog = page.getByRole('dialog', { name: '添加模型服务' });
   await expect(dialog).toBeVisible();
   return dialog;
 }
 
-test('OAuth badge rides only the wired family (GitHub Copilot); the unwired codex row has no badge, xai has no badge', async ({
+test('OAuth badge rides the wired rows (GitHub Copilot, OpenAI Codex device login); xai has no badge', async ({
   page,
 }) => {
   const dialog = await openDialog(page);
-  await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(1);
+  await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(2);
   await expect(
     dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).getByText('OAuth', { exact: true }),
   ).toHaveCount(1);
 
   const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
-  await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(0);
-  await expect(codex).toBeDisabled();
-  await expect(codex.getByText('暂未开通')).toHaveText('暂未开通');
+  await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(1);
+  await expect(codex).toBeEnabled();
+  await expect(dialog.getByText('暂未开通')).toHaveCount(0);
 
   await expect(dialog.locator('[data-preset-id]', { hasText: 'xAI' }).first()).not.toContainText(
     'SuperGrok',
@@ -30,21 +30,12 @@ test('OAuth badge rides only the wired family (GitHub Copilot); the unwired code
   await expect(dialog.getByText('SuperGrok')).toHaveCount(0);
 });
 
-test('unwired codex row click does nothing: no close, no form entry', async ({ page }) => {
-  const dialog = await openDialog(page);
-  const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
-  await codex.click({ force: true });
-  await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeVisible();
-  await expect(dialog.locator('#dlg-provider-id')).toHaveCount(0);
-  await expect(codex).toBeDisabled();
-});
-
 test('fixture face clicking a wired-badge row = accept law (closes); reopening still lists it', async ({ page }) => {
   const dialog = await openDialog(page);
   await dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).click();
   await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
   const again = await openDialog(page);
-  await expect(again.getByText('OAuth', { exact: true })).toHaveCount(1);
+  await expect(again.getByText('OAuth', { exact: true })).toHaveCount(2);
   await expect(again.getByRole('alert')).toHaveCount(0);
 });
 

@@ -116,7 +116,7 @@ The per-task orb differentiator and the execution targets : how a user sees and 
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [The agent's computer](#agent-computer) | 1 | Frontend design: the computer feed, screen view, browser toggle and control handover have no design<br>Backend design: no design for computer access grants, the browser preference, the guard and the screen channel |
+| [The agent's computer](#agent-computer) | 1 | Frontend design: the computer feed, screen view and control handover have no design<br>Backend design: no design for computer access grants, the browser preference, the guard and the screen channel |
 | [Per-task orb isolation](#orb-isolation) | 1 | Frontend design: nothing shows whether a thread ran in an orb or how to turn orbs on for a machine |
 | [Own-key cloud sandboxes](#own-key-sandboxes) | 2 | Research: no note comparing E2B and Daytona against the dispatch contract<br>Frontend design: no design for adding a sandbox provider and its key<br>Backend design: no design for the E2B and Daytona providers, key injection and teardown |
 
@@ -200,10 +200,10 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### agent-computer
 
-**The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.
+**The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.
 
 - Research: [docs/research/coordinator-computer.md](research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](research/user-computer-model-2026-11-08.md) (not on main)
-- Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
+- Frontend design: **gap**: the computer feed, screen view and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
 
 ### coordinator-chat
@@ -232,7 +232,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### daily-report
 
-**Daily report and retro** (shipped). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.
+**Daily report and retro** (shipped). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.
 
 - Research: [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: [apps/web/DESIGN-RULES.md](../apps/web/DESIGN-RULES.md)
@@ -264,7 +264,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### memory
 
-**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. A design plans direct in-place edits of MEMORY.md and memory files.
+**Memory** (shipped). Team and project memories the Coordinator reads, writes and injects into later turns and threads. Oversized indexes prompt normal-turn maintenance; no daily tidy pass runs. A design plans direct in-place edits of MEMORY.md and memory files.
 
 - Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](research/memory-inplace-edit-2026-11-09.md)
 - Frontend design: [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
@@ -384,7 +384,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### first-run
 
-**First run** (shipped). The setup page before the first project and the composer setup hint that help a new user configure models.
+**First run** (shipped). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
 
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](design/references/first-run)
@@ -400,7 +400,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### machines
 
-**Machines** (shipped). The machines page and machine detail: online state, capabilities, revoke and evacuate.
+**Machines** (shipped). A compact machine list with names, default marker, system, online state and a menu for default, delete and evacuate.
 
 - Research: [docs/research/machine-execution-plane.md](research/machine-execution-plane.md), [docs/research/t3code-devices-and-scope-2026-11-06.md](research/t3code-devices-and-scope-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/settings](design/references/settings), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)
@@ -528,7 +528,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### mcp-servers
 
-**MCP servers** (shipped). The read-only list of MCP servers configured on each machine.
+**MCP servers** (shipped). Connect remote MCP servers from a catalog or by URL and see the local servers each machine configures; every task and review uses what is connected.
 
 - Research: [docs/research/mcp-connectors-2026-11-15.md](research/mcp-connectors-2026-11-15.md)
 - Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md)
@@ -576,7 +576,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### secrets
 
-**Secrets** (shipped). Team and project secrets stored encrypted and delivered to threads that need them.
+**Secrets** (shipped). Team and project secrets and environment variables stored encrypted and delivered to threads that need them; env var values stay readable to the owner.
 
 - Research: [docs/research/1775-gateway-prior-art.md](research/1775-gateway-prior-art.md)
 - Frontend design: **gap**: the secrets page and project secrets have no design

@@ -7,6 +7,8 @@ import type {
   CapabilitiesResponse,
   ChiefGetResponse,
   ChiefThread,
+  CodexDevicePollResponse,
+  CodexDeviceStartResponse,
   ComputerCommandsResponse,
   ComputerRecord,
   ConversationMessagesResponse,
@@ -55,12 +57,14 @@ import type {
   RouteOverride,
   ScheduleRecord,
   SearchResponse,
+  SecretListEntry,
   SecretRecord,
   SetSecretBody,
   SkillImportCandidatesResponse,
   SkillRecord,
   StartMcpConnectorOAuthBody,
   StepJournalRow,
+  TailscaleAccess,
   TeamMember,
   TeamRecord,
   ThreadMessageResult,
@@ -545,7 +549,7 @@ export function useGithubIssueEcho(todoId: string | undefined, enabled: boolean)
 export const useSecrets = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['secrets', teamId],
-    queryFn: () => api.get<SecretRecord[]>(`/api/teams/${teamId}/secrets`),
+    queryFn: () => api.get<SecretListEntry[]>(`/api/teams/${teamId}/secrets`),
     enabled: enabled && teamId !== undefined,
   });
 
@@ -575,6 +579,27 @@ export const useRemoteDevices = (enabled: boolean) =>
     retry: false,
     refetchInterval: DEVICES_POLL_MS,
   });
+
+const TAILSCALE_READY_POLL_MS = 30_000;
+const TAILSCALE_SETUP_POLL_MS = 3_000;
+
+export const useTailscaleAccess = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['tailscaleAccess'],
+    queryFn: () => api.get<TailscaleAccess>('/api/remote/tailscale'),
+    enabled,
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.state === 'ready' ? TAILSCALE_READY_POLL_MS : TAILSCALE_SETUP_POLL_MS,
+  });
+
+export function useEnableTailscaleAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<TailscaleAccess>('/api/remote/tailscale', {}),
+    onSuccess: (access) => queryClient.setQueryData(['tailscaleAccess'], access),
+  });
+}
 
 export function useRemoteMutations() {
   const queryClient = useQueryClient();
@@ -1069,6 +1094,23 @@ export function useApiMutations(teamId: string | undefined) {
         if (result.status === 'complete') invalidateAll();
       },
     }),
+    startCodexDevice: useMutation({
+      mutationFn: () =>
+        api.post<CodexDeviceStartResponse>(
+          `/api/teams/${teamId}/providers/oauth/openai-codex/device`,
+          {},
+        ),
+    }),
+    pollCodexDevice: useMutation({
+      mutationFn: (state: string) =>
+        api.post<CodexDevicePollResponse>(
+          `/api/teams/${teamId}/providers/oauth/openai-codex/device/poll`,
+          { state },
+        ),
+      onSuccess: (result) => {
+        if (result.status === 'complete') invalidateAll();
+      },
+    }),
     startGithubOAuth: useMutation({
       mutationFn: () =>
         api.post<OAuthAuthorizeResponse>(`/api/teams/${teamId}/github/oauth/authorize`, {}),
@@ -1122,6 +1164,13 @@ export function useApiMutations(teamId: string | undefined) {
     createSecret: useMutation({
       mutationFn: (body: SetSecretBody) =>
         api.post<SecretRecord>(`/api/teams/${teamId}/secrets`, body),
+      onSuccess: invalidateAll,
+    }),
+    updateSecret: useMutation({
+      mutationFn: (input: {
+        id: string;
+        body: { name?: string; value?: string; kind?: 'secret' };
+      }) => api.patch<SecretRecord>(`/api/teams/${teamId}/secrets/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
     deleteSecret: useMutation({

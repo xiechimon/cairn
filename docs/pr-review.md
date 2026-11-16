@@ -4,16 +4,14 @@
 
 ## Five-step process (execute in order; skipping a step means reviewing blind)
 
+Independent review follows `AGENTS.md`, "Code Review Rules": another agent in a separate, read-only context, with no requirement to change models. The read-only boundary and current-head evidence still apply.
+
 1. **Claim the review**: say in chat which PR you are reviewing before you start, so two reviewers do not duplicate work.
 2. **Read everything**: the PR body, all comments, all commits, all changed files — not one missing before you start writing the review.
 3. **Read the linked issues**: the full text (including comments) of every issue referenced in the body / comments / commit messages / cross-links. Understand "what is being asked for" before judging "is what is given that thing".
 4. **Read the diff without switching branches**: use only `gh pr view` / `gh pr diff` / `gh api` / `git show <ref>:<path>` (after fetch); if you need a PR file's contents, write it to a one-off file and read that. **Never `gh pr checkout`, never `git switch`** — this repo runs many lanes in parallel for the long term, each building in its own worktree; the moment a reviewer checks out, the worktree jumps onto someone else's branch and smashes the construction site; reviewing is a read-only action and changes no working-tree state.
    - Code files touched by the diff are read **in full** (no truncation) before being compared against the diff; code paths the diff does not touch but that verifying the behavior requires (callers, the other end of an interface, shared surfaces) are read as well.
 5. **Check whether docs need to stay in sync**: when existing behavior changed or a new mechanism was added, check whether document surfaces like `docs/spec/` (layering responsibilities, acceptance criteria), `.claude/skills/verify-cairn/feature-map.json` (the feature registry: entry points, research and design links; a new route or page needs a row), `apps/web/COMPONENTS.md`, and `.claude/skills/verify-cairn/SKILL.md` should change with it. Record gaps under `Bad` or `Tests`; do not fix them for the author on the spot.
-
-## Exception: the `pr-gate` pre-merge workflow (spec 28 §7.5)
-
-`.claude/workflows/pr-gate.js` is a pre-merge gate, not a human-review scorecard, and differs from the above in four places: the sub-agent has read-only access to GitHub — it posts no comments — and its verdict is a JSON judgment carrying a headSha, relayed by the main session; the evidence dimension and its refuter run in their own separate worktrees and may `git -c core.hooksPath=/dev/null checkout --detach <headSha>` (AGENTS.md forbids bypassing hooks, and this is the one place that overrides it: a hook shipped in the reviewed tree must not run with the reviewer's credentials; what step 4 forbids is switching branches in a shared workspace; a separate worktree does not collide with other lanes); hooks are disabled for any checkout, fetch, or ref deletion, because the shared clone's `core.hooksPath` may be the relative path `.husky/_` written by husky, which resolves into the checked-out tree, and the PR-bundled hooks would then run with the session's credentials; when `head.repo.full_name` is not this repo (a fork), never check out, install dependencies, or run commands — read only with `git show` / `git diff` / `git ls-tree`; to read a PR, fetch it into a private ref (the path carries head, deleted after reading); read only PR comments whose `author_association` is OWNER / MEMBER / COLLABORATOR, filtering out the rest with `--jq` first (the repo is public, anyone can comment, and the evidence dimension has a shell). The remaining steps (read everything, read linked issues, doc sync) proceed as usual. When changing this file or the review criteria in `pr-gate.js`, change both together.
 
 ## Six-section scorecard (fixed output form)
 
@@ -60,10 +58,10 @@ Every PR merges by squash, whoever opened it. A squash commit is authored by the
 
 ## Mechanical checks are not the reviewer's job (do not be a CI parrot)
 
-lint / typecheck / spec:parse / vitest / e2e are covered by the CI `check` job and the `pack-smoke` / `e2e-gate` required checks; the "has answers" property of the What / Proof / Review / Risk sections (legacy Verified aliases Proof; Upstream is optional) is pinned by `pr-evidence-gate.py`; the absence of unchecked tasks anywhere in the body outside fenced code and HTML comments (no tasks are required) is pinned by `pr-tasks-gate.py` (the pr-tasks step of the pr-evidence job). The reviewer spends judgment where machines cannot see:
+lint / typecheck / spec:parse / vitest / e2e are covered by the CI `check`, `pack-smoke` and `e2e-gate` jobs. The reviewer spends judgment where machines cannot see:
 
 - **Semantic conflicts**: two parallel PRs each change the same thing and each runs green (git merges cleanly, typecheck exposes it late or not at all) — compare against open PRs in flight and check `gh pr diff --name-only` for file collisions.
 - **Seam discipline**: whether dependencies locked by `biome.json`'s `noRestrictedImports` are being reached around the thin bridge modules (`apps/daemon/src/backend/` is the GitOps / MCP / LLM provider seam).
 - **Snapshot surfaces**: when the wire schema in `packages/shared` changes, whether `snapshot.test.ts` was updated in sync (a changed JSON projection with no snapshot update = guaranteed CI red).
-- **Closing-tag discipline**: the `pr-evidence` check already requires `Closes #N` or `Part of #N` for a ticket title (GitHub closes the issue from the PR body on merge into main, whatever the merge method); judge whether the PR really finishes the ticket it closes, and whether a segment **mistakenly carries** the whole ticket's `Closes #N` instead of `Part of #N`.
-- **Review provenance and evidence quality**: check the Review section against the actual review and reasons for unfixed findings. No review is required before merge (`AGENTS.md`, "Merge routes"); when the Review section names a review, check that it ran on the current head SHA. Check that Proof demonstrates the requested behavior and that any checked tasks have evidence; a checked box alone is not proof.
+- **Closing-tag discipline**: judge whether a change that says `Closes #N` really finishes ticket N, and whether a segment **mistakenly carries** the whole ticket's `Closes #N` instead of `Part of #N`.
+- **Evidence quality**: check that the stated verification demonstrates the requested behavior; a checked box alone is not proof. No review is required before a change lands (`AGENTS.md`, "Ship").

@@ -16,6 +16,7 @@ import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
 import { decideRetroProposal, reportSuggestions } from './chief-report.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
+import { isPersonalSpace } from './personal-space.js';
 import { PhaseTransitionError } from './phase.js';
 import { answerTaskQuestion, messageThreadAsUser, startThreadBuild } from './thread-message.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
@@ -88,7 +89,9 @@ function openThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): str
     );
   }
   const projectRow = deps.db.select().from(project).where(eq(project.id, row.projectId)).get();
-  if (projectRow?.teamId !== ctx.teamId) throw new HttpError(404, `project ${row.projectId}`);
+  if (projectRow?.teamId !== ctx.teamId || isPersonalSpace(projectRow)) {
+    throw new HttpError(404, `project ${row.projectId}`);
+  }
   try {
     const buildId = startThreadBuild(deps, row, { origin: 'coordinator', actor: 'Coordinator' });
     return json({ todoId: row.id, seqNum: row.seqNum, buildId });
@@ -276,7 +279,7 @@ function decideReportSuggestion(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: 
     suggestions.map((entry) => ({
       n: entry.n,
       kind: entry.kind,
-      title: tidy(entry.kind === 'retro' ? entry.item.title : entry.item.claim, TITLE_MAX),
+      title: tidy(entry.item.title, TITLE_MAX),
       status: entry.item.status,
     }));
   const entry = suggestions.find((candidate) => candidate.n === n);

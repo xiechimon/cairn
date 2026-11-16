@@ -4,7 +4,7 @@ const PROVIDERS = '/app/resources/providers?scenario=01';
 
 async function openPicker(page: Page) {
   await page.goto(PROVIDERS);
-  await page.getByRole('button', { name: '添加服务商' }).click();
+  await page.getByTestId('resource-new').click();
   const dialog = page.getByRole('dialog', { name: '添加模型服务' });
   await expect(dialog).toBeVisible();
   return dialog;
@@ -56,19 +56,19 @@ test('search filters by display name and id, case-insensitive; empty query resto
   await expect(dialog.locator('[data-preset-id]')).toHaveCount(38);
 });
 
-test('OAuth badge rides wired family rows only (github-copilot); codex unwired carries a note, xai none', async ({
+test('OAuth badge rides the wired rows (github-copilot, codex device login); xai none', async ({
   page,
 }) => {
   const dialog = await openPicker(page);
-  await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(1);
+  await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(2);
   await expect(
     dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).getByText('OAuth', { exact: true }),
   ).toHaveCount(1);
 
   const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
-  await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(0);
-  await expect(codex).toBeDisabled();
-  await expect(codex.getByText('暂未开通')).toHaveText('暂未开通');
+  await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(1);
+  await expect(codex).toBeEnabled();
+  await expect(dialog.getByText('暂未开通')).toHaveCount(0);
   const xai = dialog.locator('[data-preset-id="xai"]');
   await expect(xai).toHaveCount(1);
   await expect(dialog.locator('[data-preset-id]', { hasText: 'xAI' })).toHaveCount(1);

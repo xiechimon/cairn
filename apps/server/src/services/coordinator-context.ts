@@ -1,4 +1,5 @@
-import { and, desc, eq, inArray, isNotNull, type SQL } from 'drizzle-orm';
+import { isBackendRuntimeId } from '@cairn/shared';
+import { and, desc, eq, gt, inArray, type SQL } from 'drizzle-orm';
 import {
   type ContextResume,
   contextResumeOf,
@@ -79,6 +80,8 @@ export type ContextBearingTurnUsage = {
   cacheRead: number;
   input: number;
   contextTokens: number;
+  contextWindow: number | null;
+  compactAt: number | null;
 };
 
 export type TurnUsageForColdResume = {
@@ -108,6 +111,8 @@ function lastContextBearingTurnUsageWhere(db: Db, scope: SQL): ContextBearingTur
   const last = db
     .select({
       contextTokens: chiefTurnUsage.contextTokens,
+      contextWindow: chiefTurnUsage.contextWindow,
+      compactAt: chiefTurnUsage.compactAt,
       model: chiefTurnUsage.model,
       createdAt: chiefTurnUsage.createdAt,
       cacheRead: chiefTurnUsage.cacheRead,
@@ -116,7 +121,7 @@ function lastContextBearingTurnUsageWhere(db: Db, scope: SQL): ContextBearingTur
       stepId: chiefTurnUsage.stepId,
     })
     .from(chiefTurnUsage)
-    .where(and(eq(chiefTurnUsage.stepId, stepId), isNotNull(chiefTurnUsage.contextTokens)))
+    .where(and(eq(chiefTurnUsage.stepId, stepId), gt(chiefTurnUsage.contextTokens, 0)))
     .orderBy(desc(chiefTurnUsage.createdAt))
     .get();
   if (last?.contextTokens == null) return null;
@@ -128,6 +133,8 @@ function lastContextBearingTurnUsageWhere(db: Db, scope: SQL): ContextBearingTur
     cacheRead: last.cacheRead,
     input: last.input,
     contextTokens: last.contextTokens,
+    contextWindow: last.contextWindow,
+    compactAt: last.compactAt,
   };
 }
 
@@ -180,7 +187,7 @@ export function lastTurnContext(
 ): {
   tokens: number;
   contextWindow: number;
-  compactAt: number;
+  compactAt?: number;
   resume: ContextResume;
   resumeExpiresAt?: number;
   resumeExpiresInMs?: number;
@@ -222,11 +229,16 @@ export function lastTurnContext(
     retentionMs,
     lastUsageCreatedAt: last.createdAt,
   });
-  const contextWindow = contextWindowOf(db, chiefRow.teamId, last.model);
+  const contextWindow = last.contextWindow ?? contextWindowOf(db, chiefRow.teamId, last.model);
+  const compactAt =
+    last.compactAt ??
+    (isBackendRuntimeId(last.model.slice(0, last.model.indexOf('/')))
+      ? undefined
+      : compactionWindow(contextWindow).backgroundAt);
   return {
     tokens: last.contextTokens,
     contextWindow,
-    compactAt: compactionWindow(contextWindow).backgroundAt,
+    ...(compactAt !== undefined ? { compactAt } : {}),
     resume,
     ...(resumeExpiresAt !== null
       ? {

@@ -69,6 +69,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { ownershipOf, reconcileOwners, sectionOf } from './owner.js';
+import { isPersonalSpace } from './personal-space.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
 import { profileForStep } from './routing-rules.js';
@@ -654,7 +655,7 @@ export function updateAutonomousTodo(
     const editor = opts.textWriter;
     if (row.request !== null && editor !== undefined && typeof editor === 'object') {
       sets.request = {
-        ...row.request,
+        ...withoutQuickLane(sets.request ?? row.request),
         segments: [
           {
             source: { kind: 'edit', userId: editor.ownerEdit, at: nowMs(), span: 'whole' },
@@ -758,16 +759,23 @@ export function updateAutonomousTodo(
   return record;
 }
 
+function withoutQuickLane(request: TaskRequest): TaskRequest {
+  const { lane: _lane, projectBasis: _basis, ...ordinary } = request;
+  return ordinary;
+}
+
 interface ProjectMove {
   sets: Pick<TodoRow, 'projectId' | 'orderIndex'> &
-    Partial<Pick<TodoRow, 'sourceKind' | 'sourceRef'>>;
+    Partial<Pick<TodoRow, 'sourceKind' | 'sourceRef' | 'request'>>;
   closeIssueRef: string | null;
   targetName: string;
 }
 
 function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): ProjectMove {
   const target = projectOfTodo(deps.db, { projectId, teamId: row.teamId });
-  if (target === undefined) throw new HttpError(404, `project ${projectId}`);
+  if (target === undefined || isPersonalSpace(target)) {
+    throw new HttpError(404, `project ${projectId}`);
+  }
   if (!canMoveTodoProject(row)) {
     throw new HttpError(
       409,
@@ -793,6 +801,7 @@ function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): Proje
   } else if (row.sourceKind === null && targetOpensIssues) {
     sets.sourceKind = 'github-issue-self';
   }
+  if (row.request !== null) sets.request = withoutQuickLane(row.request);
   return {
     sets,
     closeIssueRef: dropsIssue ? row.sourceRef : null,

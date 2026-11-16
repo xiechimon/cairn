@@ -40,6 +40,7 @@ import { useSendKey } from '../api/use-send-key.js';
 import { globalCoordinatorThread } from '../chief/coordinator-load.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
+import type { NamedMachine } from '../components/machine-label.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
@@ -78,7 +79,7 @@ export interface ThreadChat {
   locked: boolean;
   running: boolean;
   waitingOnChecks: boolean;
-  machineName: string | null;
+  machine: NamedMachine | null;
   platformWait: { machine: string | null; platform: RunnerOs } | null;
   stopped: boolean;
   sendError: string | null;
@@ -183,15 +184,16 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     stopRequested.current = false;
   }, [buildId]);
 
-  const machineName = useMemo(() => {
-    const claimed = machinesQ.data?.find((m) => steps.some((s) => s.machineId === m.id))?.name;
+  const machine = useMemo(() => {
+    const claimed = machinesQ.data?.find((m) => steps.some((s) => s.machineId === m.id));
     if (claimed != null) return claimed;
     const pinned =
       listed?.routeOverride?.machineId ??
       routingQ.data?.rules?.find((rule) => rule.use === 'session')?.machineId ??
       null;
-    return machinesQ.data?.find((m) => m.id === pinned)?.name ?? null;
+    return machinesQ.data?.find((m) => m.id === pinned) ?? null;
   }, [machinesQ.data, steps, listed?.routeOverride?.machineId, routingQ.data]);
+  const machineName = machine?.name ?? null;
   const platformWait = useMemo(() => {
     const queue = steps.find(
       (step) => step.status === 'pending' && step.queue?.blocked?.platform !== undefined,
@@ -410,7 +412,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       !running &&
       buildQ.data != null &&
       resolvedBuildPrNumber(buildQ.data) != null,
-    machineName,
+    machine,
     platformWait,
     stopped: buildQ.data?.errorMessage === STOP_MESSAGE,
     sendError: mutations.messageThread.isError

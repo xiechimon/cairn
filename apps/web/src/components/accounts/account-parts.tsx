@@ -12,6 +12,7 @@ import { relativeTime } from '../../board/rel-time.js';
 import { useI18n } from '../../i18n/provider.js';
 import { ClaudeMark, GrokMark, OpenAIMark, PiMark } from '../brand-marks.js';
 import { ListRow } from '../list-card.js';
+import { MachineName } from '../machine-label.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
 import { StatusChip, type StatusTone } from '../ui/status-chip.js';
@@ -148,7 +149,9 @@ export function MachineProvidersCard({
       className="flex flex-col gap-2"
     >
       <header className="flex items-center gap-3 px-1">
-        <h3 className="m-0 truncate text-ui font-semibold text-foreground">{machine.name}</h3>
+        <h3 className="m-0 truncate text-ui font-semibold text-foreground">
+          <MachineName machine={machine} />
+        </h3>
         {online}
       </header>
       <SettingsCard>
