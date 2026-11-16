@@ -1430,7 +1430,8 @@ export const EN: Record<string, string> = {
   '可能是模型服务里的地址填错了、模型服务没有开，或者这台电脑还没允许 Cairn 访问本地网络。处理好后点重试。':
     "The address in Providers may be wrong, the model service may not be running, or this computer hasn't allowed Cairn on the local network yet. Fix it, then retry.",
   检查模型服务: 'Check providers',
-  'Coordinator 本轮执行失败': 'The Coordinator turn failed',
+  '模型这次没有给出回复。点重试再发一次；一直这样的话，检查一下模型服务。':
+    "The model didn't reply this time. Retry to send it again; if it keeps happening, check Providers.",
   '撤回失败，Coordinator 可能已经开始处理这条了。':
     'Could not withdraw: the Coordinator may already be working on it.',
   '插话失败，请重试。': 'Could not steer. Try again.',

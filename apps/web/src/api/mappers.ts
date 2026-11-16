@@ -1404,12 +1404,21 @@ const LOCAL_NETWORK_BLOCKED_RE = /NECP|EHOSTUNREACH/;
 const MODEL_UNREACHABLE_RE =
   /Connection error|NECP|ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|fetch failed/i;
 
-export function modelUnreachableHint(turnError: string): string | null {
+export function turnErrorCopy(turnError: string): { title: string; hint: string } {
   if (LOCAL_NETWORK_BLOCKED_RE.test(turnError))
-    return '这台 Mac 还没允许 Cairn 访问本地网络。打开「系统设置 → 隐私与安全性 → 本地网络」，打开 Cairn，然后点重试。';
+    return {
+      title: '连不上模型服务',
+      hint: '这台 Mac 还没允许 Cairn 访问本地网络。打开「系统设置 → 隐私与安全性 → 本地网络」，打开 Cairn，然后点重试。',
+    };
   if (MODEL_UNREACHABLE_RE.test(turnError))
-    return '可能是模型服务里的地址填错了、模型服务没有开，或者这台电脑还没允许 Cairn 访问本地网络。处理好后点重试。';
-  return null;
+    return {
+      title: '连不上模型服务',
+      hint: '可能是模型服务里的地址填错了、模型服务没有开，或者这台电脑还没允许 Cairn 访问本地网络。处理好后点重试。',
+    };
+  return {
+    title: '这一轮没有完成',
+    hint: '模型这次没有给出回复。点重试再发一次；一直这样的话，检查一下模型服务。',
+  };
 }
 
 export function chiefTurnErrorOfContent(content: unknown): string | null {
