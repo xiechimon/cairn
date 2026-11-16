@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { build, message, plan as planTable, step, stopPending, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
+import { settleRetiredGateStep } from './build-gate-steps.js';
 import {
   persistGateVerdict,
   reportedVerdictHeads,
@@ -112,6 +113,7 @@ export function applyStepFailure(
   preservedCommits?: readonly string[],
 ): void {
   const { db } = deps;
+  if (settleRetiredGateStep(deps, stepRow, { errorMessage: rawErrorMessage })) return;
   if (settleParkedStep(deps, stepRow, { status: 'failed', errorMessage: rawErrorMessage })) return;
   db.delete(stopPending).where(eq(stopPending.stepId, stepRow.id)).run();
   if (

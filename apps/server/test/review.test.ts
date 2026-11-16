@@ -24,6 +24,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
+import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
 import type { TestServer } from './helpers.js';
 import {
   bootServer,
@@ -374,12 +375,12 @@ describe('the AI review initiation write surface (M7 #312)', () => {
 
     expect(w.todoRow().phase).toBe('confirm');
     const reviewStep = w.stepsOf(buildId).find((s) => s.kind === 'review');
-    expect(reviewStep?.status).toBe('done');
+    expect(reviewStep?.status).toBe('stopped');
     expect(messages.some((m) => m.content === MERGE_ANNOUNCEMENT)).toBe(false);
     expect(w.stepsOf(buildId).filter((s) => s.kind === 'plan')).toHaveLength(1);
   });
 
-  test('terminal loop (blocking): the review step done(success, with a blocking verdict) -> the REVIEW_VERDICT_KIND message + the phase moves to planning + a replan step queued', async () => {
+  test('a retired blocking review is recorded without replanning or changing the delivered plan', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
@@ -433,16 +434,11 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     );
     expect(parsedVerdict.findings.some((f) => f.severity === 'blocking')).toBe(true);
 
-    expect(w.todoRow().phase).toBe('planning');
+    expect(w.todoRow().phase).toBe('confirm');
     const planSteps = w.stepsOf(buildId).filter((s) => s.kind === 'plan');
-    expect(planSteps).toHaveLength(2);
-    const revisePrompt = planSteps[1]?.prompt ?? '';
-    expect(revisePrompt).toContain('审核结论');
-    expect(revisePrompt).toContain('Blocking findings');
-    expect(revisePrompt).toContain('未处理空输入');
-    expect(revisePrompt).toContain('src/parse.ts:42');
+    expect(planSteps).toHaveLength(1);
     const reviewStep = w.stepsOf(buildId).find((s) => s.kind === 'review');
-    expect(reviewStep?.status).toBe('done');
+    expect(reviewStep?.status).toBe('stopped');
 
     const reviseNote = messages.find(
       (m) =>
@@ -451,8 +447,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
         !m.content.startsWith('{') &&
         m.content.includes('AI 审核检测到'),
     );
-    expect(reviseNote?.content).toContain('1 处 blocking 风险');
-    expect(reviseNote?.content).toContain('已自动入队重规划步');
+    expect(reviseNote).toBeUndefined();
   });
 
   test('terminal loop (the daemon sent no findings): the verdict fallback message lands + no revision triggered', async () => {
@@ -466,25 +461,9 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     await w.done(reviewClaimed.stepId, { status: 'success' });
 
     const messages = w.messagesOf(buildId);
-    const verdictRow = messages.find(
-      (m) =>
-        m.role === 'system' &&
-        typeof m.content === 'string' &&
-        (() => {
-          try {
-            const parsed = JSON.parse(m.content) as { kind?: string };
-            return parsed.kind === REVIEW_VERDICT_KIND;
-          } catch {
-            return false;
-          }
-        })(),
-    );
-    expect(verdictRow).toBeDefined();
-    const parsedVerdict = reviewVerdictSchema.parse(
-      JSON.parse((verdictRow as { content: string }).content).verdict,
-    );
-    expect(parsedVerdict.conclusion).toBe('审核未返回结论');
-    expect(parsedVerdict.findings).toHaveLength(0);
+    expect(
+      messages.find((m) => m.id === `retired-gate-report-${reviewClaimed.stepId}`)?.content,
+    ).toContain('The delivered result is unchanged');
     expect(w.todoRow().phase).toBe('confirm');
     expect(w.stepsOf(buildId).filter((s) => s.kind === 'plan')).toHaveLength(1);
   });
@@ -503,27 +482,9 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     });
 
     const messages = w.messagesOf(buildId);
-    const verdictRow = messages.find(
-      (m) =>
-        m.role === 'system' &&
-        typeof m.content === 'string' &&
-        (() => {
-          try {
-            const parsed = JSON.parse(m.content) as { kind?: string };
-            return parsed.kind === REVIEW_VERDICT_KIND;
-          } catch {
-            return false;
-          }
-        })(),
-    );
-    expect(verdictRow).toBeDefined();
-    const row = JSON.parse((verdictRow as { content: string }).content) as {
-      verdict: { conclusion: string; findings: unknown[] };
-      extractionError?: string;
-    };
-    expect(row.verdict.conclusion).toBe('判定提取失败');
-    expect(row.verdict.findings).toHaveLength(0);
-    expect(row.extractionError).toBe('审核步输出中未找到 verdict JSON（agent 未按契约输出）');
+    expect(
+      messages.find((m) => m.id === `retired-gate-report-${reviewClaimed.stepId}`)?.content,
+    ).toContain('审核步输出中未找到 verdict JSON（agent 未按契约输出）');
     expect(w.todoRow().phase).toBe('confirm');
     expect(w.stepsOf(buildId).filter((s) => s.kind === 'plan')).toHaveLength(1);
   });
@@ -551,6 +512,203 @@ function reviewPromptOf(w: World, buildId: string): string {
   expect(step).toBeDefined();
   return step?.prompt ?? '';
 }
+
+describe('retired gate work cannot take delivery back from the user', () => {
+  test.each(['previous version', 'current version'] as const)(
+    'a user completion requested in the %s does not wait for a retired reviewer',
+    async (version) => {
+      const w = await setupWorld();
+      const buildId = await advanceToReviewGate(w);
+      await w.startReview(buildId);
+      const claimed = await w.claim();
+      if (version === 'previous version') {
+        w.s.db
+          .update(buildTable)
+          .set({ afterStopPhase: 'done' })
+          .where(eq(buildTable.id, buildId))
+          .run();
+        sweepAbandonedBuildSteps(w.s.svc);
+      } else {
+        const response = await call(w.s.app, 'POST', `/api/todos/${w.todoId}/stop-and-done`);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ state: 'done' });
+      }
+      expect(w.todoRow().phase).toBe('done');
+      const completed = w.todoRow();
+      await w.done(claimed.stepId, {
+        status: 'success',
+        findings: {
+          conclusion: 'BLOCK',
+          findings: [{ id: '1', severity: 'blocking', summary: 'late finding' }],
+        },
+      });
+      expect(w.todoRow()).toEqual(completed);
+      expect(w.buildRow(buildId).afterStopPhase).toBeNull();
+    },
+  );
+
+  test.each(['success', 'failed', 'stopped'] as const)(
+    'a late %s report preserves a review-phase delivery, including a blocking verdict',
+    async (status) => {
+      const w = await setupWorld();
+      const buildId = await advanceToReviewGate(w);
+      await w.startReview(buildId);
+      const claimed = await w.claim();
+      w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+      w.s.db
+        .update(buildTable)
+        .set({ prNumber: 23, prUrl: 'https://github.com/acme/app/pull/23' })
+        .where(eq(buildTable.id, buildId))
+        .run();
+      const task = w.todoRow();
+      const delivered = w.buildRow(buildId);
+      sweepAbandonedBuildSteps(w.s.svc);
+      expect(w.stepsOf(buildId).find((s) => s.id === claimed.stepId)?.archiveStop).toBe(
+        'requested',
+      );
+      const stopped = await call(w.s.app, 'GET', `/api/machine/stop?stepId=${claimed.stepId}`, {
+        cred: w.machineToken,
+      });
+      expect(stopped.status).toBe(200);
+      expect(await stopped.json()).toMatchObject({ discard: false });
+      const outcome = {
+        status,
+        ...(status === 'failed'
+          ? {
+              errorMessage: 'quota exhausted',
+              quotaBlock: { kind: 'capacity', providerId: 'stub-gw', reason: 'quota exhausted' },
+            }
+          : {}),
+        findings: {
+          conclusion: 'BLOCK',
+          findings: [{ id: '1', severity: 'blocking', summary: 'late finding' }],
+        },
+        prNumber: 7,
+        prUrl: 'https://github.com/acme/app/pull/7',
+        changesDiff:
+          'diff --git a/late.ts b/late.ts\n--- a/late.ts\n+++ b/late.ts\n@@ -1 +1 @@\n-old\n+late\n',
+      };
+      await w.done(claimed.stepId, outcome);
+      await w.done(claimed.stepId, outcome);
+      expect(w.todoRow()).toEqual(task);
+      expect(w.buildRow(buildId)).toEqual(delivered);
+      expect(
+        w.stepsOf(buildId).filter((s) => s.kind === 'plan' || s.kind === 'build'),
+      ).toHaveLength(2);
+      expect(w.stepsOf(buildId).find((s) => s.id === claimed.stepId)?.status).toBe('stopped');
+      expect(
+        w.messagesOf(buildId).filter((m) => m.id === `retired-gate-report-${claimed.stepId}`),
+      ).toHaveLength(1);
+    },
+  );
+
+  test.each(['pending', 'waiting_quota', 'claimed'] as const)(
+    'upgrade retires %s gate work and hands an already delivered build to the user once',
+    async (status) => {
+      const w = await setupWorld();
+      const buildId = await advanceToReviewGate(w);
+      const execution = w.stepsOf(buildId).find((s) => s.kind === 'build')!;
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: 'old-verify',
+          buildId,
+          kind: 'verify',
+          status,
+          machineId: execution.machineId,
+          claimedAt: Date.now(),
+          lastHeartbeatAt: Date.now(),
+          createdAt: Date.now(),
+        })
+        .run();
+      w.s.db
+        .update(todoTable)
+        .set({ phase: 'building', hasChanges: true })
+        .where(eq(todoTable.id, w.todoId))
+        .run();
+      sweepAbandonedBuildSteps(w.s.svc);
+      const delivered = w.todoRow();
+      expect(delivered).toMatchObject({ phase: 'review', hasChanges: true });
+      expect(w.buildRow(buildId).errorMessage).toBeNull();
+      const old = w.stepsOf(buildId).find((s) => s.id === 'old-verify');
+      expect(old).toMatchObject(
+        status === 'claimed'
+          ? { status: 'claimed', archiveStop: 'requested' }
+          : { status: 'stopped' },
+      );
+      sweepAbandonedBuildSteps(w.s.svc);
+      expect(w.todoRow()).toEqual(delivered);
+    },
+  );
+
+  test.each([
+    'live implementation',
+    'pending question',
+    'failed',
+    'done',
+    'closed',
+    'archived',
+    'superseded',
+  ] as const)('upgrade does not revive or prematurely deliver a task with %s', async (state) => {
+    const w = await setupWorld();
+    const buildId = await advanceToReviewGate(w);
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'old-verify',
+        buildId,
+        kind: 'verify',
+        status: 'pending',
+        createdAt: Date.now(),
+      })
+      .run();
+    if (state === 'live implementation') {
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: 'ongoing-session',
+          buildId,
+          kind: 'session',
+          status: 'pending',
+          createdAt: Date.now() + 1,
+        })
+        .run();
+    }
+    if (state === 'pending question') {
+      w.s.db
+        .insert(messageTable)
+        .values({
+          id: 'pending-question',
+          conversationId: buildId,
+          role: 'assistant',
+          content: {
+            kind: 'ask_user_question',
+            requestId: 'pending-question',
+            status: 'pending',
+            questions: [{ header: 'Filename', question: 'Which filename?', options: [] }],
+            answers: null,
+          },
+          createdAt: Date.now(),
+        })
+        .run();
+    }
+    w.s.db
+      .update(todoTable)
+      .set({
+        phase: state === 'failed' || state === 'done' || state === 'closed' ? state : 'building',
+        ...(state === 'archived' ? { archivedAt: Date.now() } : {}),
+        ...(state === 'superseded' ? { latestBuildId: 'newer-build' } : {}),
+      })
+      .where(eq(todoTable.id, w.todoId))
+      .run();
+    const before = w.todoRow();
+    sweepAbandonedBuildSteps(w.s.svc);
+    expect(w.todoRow()).toEqual(before);
+    expect(w.stepsOf(buildId).find((s) => s.id === 'old-verify')?.status).toBe('stopped');
+    if (state === 'live implementation')
+      expect(w.stepsOf(buildId).find((s) => s.id === 'ongoing-session')?.status).toBe('pending');
+  });
+});
 
 describe('review step material forks by gate (#511)', () => {
   beforeEach(async () => {

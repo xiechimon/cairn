@@ -31,6 +31,7 @@ import { conflict, HttpError } from '../lib/errors.js';
 import { githubBranchPulls } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
+import { settleRetiredGateStep } from './build-gate-steps.js';
 import { reportedVerdictHeads } from './build-gate-verdict.js';
 import {
   applyStepFailure,
@@ -217,7 +218,8 @@ export async function finishStep(
   await finishStepReport(deps, machineId, stepId, body);
   stopStepComputer(deps, stepId);
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
-  if (row && !isChiefConversation(row.buildId)) await drainTaskMessageQueue(deps, row.buildId);
+  if (row && row.kind !== 'review' && row.kind !== 'verify' && !isChiefConversation(row.buildId))
+    await drainTaskMessageQueue(deps, row.buildId);
 }
 
 async function finishStepReport(
@@ -239,6 +241,7 @@ async function finishStepReport(
         failUnpublishedDeliverables(db, stepId, found.claimedAt);
       }
       revokeStepGitCredential(deps, stepId);
+      if (found.machineId === machineId && settleRetiredGateStep(deps, found, body)) return;
       if (body.status === 'failed') {
         noteDeliveredPlanResidual(
           deps,
@@ -250,6 +253,12 @@ async function finishStepReport(
     }
   }
   const stepRow = ownedStep(deps, machineId, stepId);
+  if (settleRetiredGateStep(deps, stepRow, body)) {
+    recordStepUsage(deps, stepRow, body.usage ?? []);
+    revokeStepGitCredential(deps, stepId);
+    emitRuntimeStepSpan(db, stepId);
+    return;
+  }
   let changeFiles: DocumentDiffFile[] | undefined;
   if (body.changesDiff !== undefined && body.changesDiff.length <= CHANGES_DIFF_MAX_BYTES) {
     try {
