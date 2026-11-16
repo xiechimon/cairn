@@ -134,7 +134,7 @@ export function boundMemoryIndex(content: string): { content: string; omitted: n
   return {
     content:
       omitted > 0
-        ? `${loaded}\n（MEMORY.md 后面还有 ${omitted} 行没有加载；用 memories 读全文，并把细节移到记忆文件）`
+        ? `${loaded}\n（MEMORY.md 后面还有 ${omitted} 行没有加载；Coordinator 在正常回合里用 memories 分页读全文，用 update_memory 合并或移出细节、删掉过时条目；过时的记忆文件用 delete_memory 删除，不为此另开后台回合）`
         : loaded,
     omitted,
   };
@@ -576,7 +576,6 @@ export function updateMemoryEntry(
     content: string;
     threadId?: string;
     teamScoped?: boolean;
-    absorb?: { ids: readonly string[]; at: number };
   },
 ) {
   return db.transaction((tx) => {
@@ -595,8 +594,6 @@ export function updateMemoryEntry(
         )
         .get();
     if (!row) throw new HttpError(404, `memory ${input.memoryId}`);
-    if (indexed !== undefined && input.absorb !== undefined)
-      throw new HttpError(409, 'document facts cannot be consolidated by the legacy pass');
     if (row.invalidAt !== null)
       throw new HttpError(
         409,
@@ -605,28 +602,14 @@ export function updateMemoryEntry(
           : `memory ${row.id} was superseded by ${row.supersededBy}; update that one`,
       );
     validateMemoryText(row.title, input.content);
-    if (indexRow(row) && (row.content !== input.content || input.absorb !== undefined))
+    if (indexRow(row) && row.content !== input.content)
       throw new HttpError(400, 'memory index is managed; update a fact ID from memories');
-    const absorbed = input.absorb?.ids ?? [];
-    const absorb = (successorId: string) => {
-      if (input.absorb === undefined || absorbed.length === 0) return;
-      tx.update(agentMemory)
-        .set({ invalidAt: input.absorb.at, supersededBy: successorId })
-        .where(inArray(agentMemory.id, [...absorbed]))
-        .run();
-    };
-    if (row.content === input.content) {
-      absorb(row.id);
-      return row;
-    }
+    if (row.content === input.content) return row;
     const duplicate = memoriesInScope(
       tx,
       { ...row, teamScoped: input.teamScoped },
       row.projectId === null,
-    ).find(
-      (other) =>
-        other.id !== row.id && !absorbed.includes(other.id) && other.content === input.content,
-    );
+    ).find((other) => other.id !== row.id && other.content === input.content);
     if (duplicate) throw new HttpError(409, `memory ${duplicate.id} already has this content`);
     if (indexed !== undefined) {
       const updatedAt = Math.max(nowMs(), row.updatedAt + 1);
@@ -657,9 +640,7 @@ export function updateMemoryEntry(
           .run();
       return successor;
     }
-    const successor = replaceMemory(tx, row, input.content);
-    absorb(successor.id);
-    return successor;
+    return replaceMemory(tx, row, input.content);
   });
 }
 
