@@ -82,18 +82,8 @@ export function McpGrantRows({
   return (
     <div className="flex flex-col gap-2">
       <SettingsCard>
-        {row(
-          'session',
-          t('任务'),
-          t('做任务时可以调用 {name} 的工具', { name }),
-          t('让任务用 {name}', { name }),
-        )}
-        {row(
-          'review',
-          t('评审'),
-          t('评审改动时可以调用 {name} 的工具', { name }),
-          t('让评审用 {name}', { name }),
-        )}
+        {row('session', t('任务'), t('做任务时能调用它的工具'), t('让任务用 {name}', { name }))}
+        {row('review', t('评审'), t('评审改动时能调用它的工具'), t('让评审用 {name}', { name }))}
       </SettingsCard>
       <p className={SETTINGS_HINT_CLS}>{t('Coordinator 还不能用连接器，只有任务和评审能用。')}</p>
     </div>

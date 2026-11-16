@@ -2264,8 +2264,8 @@ export const EN: Record<string, string> = {
   任务可用: 'Tasks can use it',
   评审可用: 'Reviews can use it',
   任务和评审都还不能用: 'No task or review can use it yet',
-  '做任务时可以调用 {name} 的工具': 'Tasks can call tools from {name}',
-  '评审改动时可以调用 {name} 的工具': 'Reviews can call tools from {name}',
+  做任务时能调用它的工具: 'Tasks can call its tools',
+  评审改动时能调用它的工具: 'Reviews can call its tools',
   '让任务用 {name}': 'Let tasks use {name}',
   '让评审用 {name}': 'Let reviews use {name}',
   'Coordinator 还不能用连接器，只有任务和评审能用。':
