@@ -1,5 +1,7 @@
 # Cairn Development Rules
 
+Before any change under `apps/web/src`, read `apps/web/DESIGN-RULES.md` and invoke the `design-cairn` skill, before reading or editing the code.
+
 ## Safety
 
 - This repository is public: never commit secrets, credentials, internal addresses, personal information or quota details.
@@ -20,7 +22,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 
 ## Ship
 
-Work lands on `main` directly. There is no pull request, merge queue or PR-body format. Production safety lives in the deploy: `scripts/ops/deploy-watch.sh` deploys only main commits whose `check`, `pack-smoke` and `e2e-gate` runs are green, with a migration rehearsal, a backup and rollback.
+Work lands on `main` directly. There is no pull request, merge queue or PR-body format. Production safety lives in the deploy: `scripts/ops/deploy-watch.sh` deploys only main commits whose `check`, `pack-smoke` and `e2e-gate` runs are green, with a migration rehearsal, a backup and rollback. A Claude Code cloud session lands work the same way: it pushes `HEAD:main` and opens no pull request, whatever branch its session defaults name (ian, 2026-11-16).
 
 1. Work in your own worktree on a branch from the latest `origin/main`.
 2. Commit any uncommitted changes. Tidy noisy intermediate commits into a few clear ones while they are still unpushed.
@@ -48,7 +50,7 @@ Work lands on `main` directly. There is no pull request, merge queue or PR-body 
 
 Where to look:
 
-- UI work under `apps/web/src`: `apps/web/DESIGN-RULES.md`, then `.claude/skills/design-cairn/SKILL.md`.
+- UI work under `apps/web/src`: `apps/web/DESIGN-RULES.md`, then `.claude/skills/design-cairn/SKILL.md` (see the first line of this file).
 - Every user-facing feature has a row in `.claude/skills/verify-cairn/feature-map.json`; run `node scripts/generate-feature-map.mjs` after changing routes, test ids or shortcuts. Acceptance and evidence: `.claude/skills/verify-cairn/SKILL.md`.
 - Test scope: `docs/spec/19-test-layering-and-blast-radius.md`; use real e2e for complex features.
 - Model-side latency, failures and usage: Langfuse first, `docs/ops/langfuse.md#debugging-a-turn-or-task`.
