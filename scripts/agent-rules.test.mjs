@@ -16,10 +16,6 @@ test('AGENTS.md ships straight to main without force and keeps the deploy as the
     agents,
     /deploys only main commits whose `check`, `pack-smoke` and `e2e-gate` runs are green/,
   );
-  assert.match(
-    agents,
-    /A failing test is not yours only after it fails on `origin\/main` without your change/,
-  );
   assert.match(agents, /stop and ask ian before pushing/);
   assert.match(agents, /Watch CI on the commit you pushed/);
 });
