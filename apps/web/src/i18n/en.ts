@@ -2335,4 +2335,16 @@ export const EN: Record<string, string> = {
     'No top models yet. Use Add model to pick from your connected providers.',
   '恢复成推荐的模型和顺序。': 'Go back to the suggested models and their order.',
   恢复推荐: 'Reset to suggested',
+  检查更新: 'Check for updates',
+  '正在检查更新…': 'Checking for updates…',
+  '已是最新版本 {version}': 'Up to date ({version})',
+  '更新到 {version}': 'Update to {version}',
+  '正在更新 {percent}%': 'Updating {percent}%',
+  '正在重启…': 'Restarting…',
+  '更新失败：{message}': 'Update failed: {message}',
+  开发版不检查更新: 'Development builds do not check for updates',
+  '把 Cairn 移到「应用程序」后才能自动更新':
+    'Move Cairn to Applications to update it automatically',
+  'Cairn 所在的文件夹不可写，无法自动更新':
+    "Cairn's folder is read-only, so it cannot update itself",
 };

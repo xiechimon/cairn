@@ -44,6 +44,7 @@ import { DeleteArchivedProjectsConfirm } from '../overlay/delete-archived-projec
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF } from '../settings/settings-href.js';
+import { DesktopUpdateButton } from './desktop-update.js';
 import { coordinatorSearch } from './open-composer.js';
 import { isArchivedProject } from './project-archive.js';
 import {
@@ -660,7 +661,9 @@ export function BoardSidebar({
         data-testid="sidebar-footer"
         className="flex h-14 flex-none items-center gap-1 border-t border-border pr-2 pl-1"
       >
-        <span className="flex-1" />
+        <div className="flex min-w-0 flex-1 items-center">
+          <DesktopUpdateButton iconClassName={ICON} idleClassName={ICON_BTN} />
+        </div>
         {usageNav && (
           <FooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
             <ChartColumn className={ICON} strokeWidth={STROKE} />
