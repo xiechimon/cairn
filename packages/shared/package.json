@@ -12,6 +12,7 @@
     ".": "./src/index.ts",
     "./connect-relay": "./src/protocol/connect-relay.ts",
     "./temp-environment": "./src/node/temp-environment.ts",
+    "./token-command": "./src/node/token-command.ts",
     "./github-create-gate": "./src/github-create-gate.ts",
     "./merge-gate": "./src/records/merge-gate.ts",
     "./otel": "./src/otel.ts",

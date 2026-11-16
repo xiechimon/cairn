@@ -70,8 +70,6 @@
   "machine-add-dialog.spec.ts": 4351,
   "machine-authorize.spec.ts": 1697,
   "machine-detail.spec.ts": 3154,
-  "machines-chief-state.spec.ts": 2293,
-  "machines-claude-login.spec.ts": 1040,
   "machines-local.spec.ts": 2592,
   "menu-keys.spec.ts": 25131,
   "mobile-narrow.spec.ts": 16861,

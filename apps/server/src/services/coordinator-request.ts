@@ -8,6 +8,7 @@ import {
   orchestratedTodoIdOf,
   PLACEHOLDER_TITLE_FALLBACK,
   type ProjectBasis,
+  parseOrchestrationSourceRef,
   parseReplyQuote,
   quoteSegments,
   RequestQuoteError,
@@ -296,6 +297,47 @@ function requireUnboundMessages(db: Db, ctx: RequestCtx, segments: readonly Task
       );
     }
   }
+}
+
+export function quickLaneRefusal(
+  db: Db,
+  row: Pick<TodoRow, 'teamId' | 'projectId' | 'sourceKind' | 'sourceRef' | 'request'>,
+): string | null {
+  const request = row.request;
+  if (request === null || (request.lane === undefined && request.projectBasis === undefined)) {
+    return null;
+  }
+  const threadId =
+    row.sourceKind === 'orchestration' && row.sourceRef !== null
+      ? parseOrchestrationSourceRef(row.sourceRef)?.threadId
+      : undefined;
+  const ids = request.segments.flatMap((segment) => sourceIdOf(segment) ?? []);
+  if (
+    request.projectBasis === undefined ||
+    threadId === undefined ||
+    ids.length !== request.segments.length
+  ) {
+    return 'quick lane refused: the task has no checkable owner request';
+  }
+  const ctx: RequestCtx = { teamId: row.teamId, threadId, turnMessageIds: ids, turnPrompt: null };
+  try {
+    const cited = citedMessages(db, ctx, [...new Set(ids)]);
+    const changed = request.segments.some((segment) => {
+      const now = cited.find((c) => sourceIdOf(c.segment) === sourceIdOf(segment))?.segment.text;
+      return segment.source.span === 'whole'
+        ? now !== segment.text
+        : !now?.normalize('NFC').includes(segment.text.normalize('NFC'));
+    });
+    if (changed) return "quick lane refused: the owner's cited words changed";
+    const basis = quickLaneBasis(db, ctx, row.projectId, cited, request.segments);
+    if (JSON.stringify(basis) !== JSON.stringify(request.projectBasis)) {
+      return 'quick lane refused: the destination basis no longer matches';
+    }
+  } catch (error) {
+    if (error instanceof HttpError) return `quick lane refused: ${error.message}`;
+    throw error;
+  }
+  return null;
 }
 
 export function createRequestTodo(

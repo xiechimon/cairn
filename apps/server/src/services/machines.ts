@@ -726,7 +726,7 @@ function skillsSelection(
   return {
     isChief: false,
     unrestricted: false,
-    wanted: scanned.filter((s) => s.builtin || whitelist.has(s.id)),
+    wanted: scanned.filter((s) => whitelist.has(s.id)),
   };
 }
 

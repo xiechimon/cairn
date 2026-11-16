@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "145f6940-2639-4aca-9816-928646002b7f",
+  "id": "fe346979-02f1-40ea-8b5d-dd5c48fd5205",
   "prevId": "f6658e2d-7a9f-4aa5-a60d-6f449998ffcf",
   "tables": {
     "action_journal": {
@@ -5719,13 +5719,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "personalOwnerId": {
-          "name": "personalOwnerId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {},
@@ -5736,19 +5729,6 @@
           "tableTo": "team",
           "columnsFrom": [
             "teamId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "project_personalOwnerId_user_id_fk": {
-          "name": "project_personalOwnerId_user_id_fk",
-          "tableFrom": "project",
-          "tableTo": "user",
-          "columnsFrom": [
-            "personalOwnerId"
           ],
           "columnsTo": [
             "id"
@@ -6823,6 +6803,20 @@
           "notNull": true,
           "autoincrement": false,
           "default": 1
+        },
+        "envSeal": {
+          "name": "envSeal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},

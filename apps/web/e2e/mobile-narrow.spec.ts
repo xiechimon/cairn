@@ -90,7 +90,7 @@ for (const width of [360, 390]) {
       ];
       for (const url of pages) {
         await page.goto(url);
-        await page.locator('.settings-card, [data-testid="routing-settings-empty"], [data-testid="chief-settings-col"]').first().waitFor();
+        await page.locator('.settings-card, [data-testid="machine-item"], [data-testid="routing-settings-empty"], [data-testid="chief-settings-col"]').first().waitFor();
         const report = await page.evaluate(() => {
           const col = document.querySelector('[data-testid="page-col"], [data-testid="chief-settings-col"]');
           const problems: string[] = [];

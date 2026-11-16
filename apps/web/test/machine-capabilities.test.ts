@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  browserCapabilityInstalled,
   desktopControlInstalled,
   desktopControlOnline,
 } from '../src/board/machine-capabilities.js';
@@ -33,23 +32,6 @@ describe('machine computer capability badges', () => {
       ),
     ).toBe(true);
     expect(desktopControlInstalled(machine(), computer())).toBe(true);
-  });
-
-  it('browser is installed only when the machine reports browser capability', () => {
-    expect(browserCapabilityInstalled(machine(), null)).toBe(false);
-    expect(
-      browserCapabilityInstalled(
-        machine({ capabilities: { mcpServers: [], skills: [], computer: true } }),
-        null,
-      ),
-    ).toBe(false);
-    expect(
-      browserCapabilityInstalled(
-        machine({ capabilities: { mcpServers: [], skills: [], browser: true } }),
-        null,
-      ),
-    ).toBe(true);
-    expect(browserCapabilityInstalled(machine(), computer())).toBe(false);
   });
 
   it('desktop control is online only while the machine and computer can show a screen', () => {

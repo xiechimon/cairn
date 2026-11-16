@@ -817,6 +817,8 @@ export const secret = sqliteTable(
     httpHeader: text('httpHeader'),
     httpTemplate: text('httpTemplate'),
     policyRevision: integer('policyRevision').notNull().default(1),
+    envSeal: text('envSeal'),
+    updatedAt: epochMs('updatedAt'),
   },
   (t) => [
     check(
