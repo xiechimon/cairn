@@ -54,13 +54,14 @@ export interface TurnDeps {
 }
 
 function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): ModelUsage {
+  const contextTokens = contextTokensOf(answer.usage);
   const usage = {
     model: `${answer.provider}/${answer.model}`,
     input: 0,
     output: 0,
     cacheRead: 0,
     cacheWrite: 0,
-    contextTokens: contextTokensOf(answer.usage),
+    ...(contextTokens > 0 ? { contextTokens } : {}),
   };
   for (const entry of entries) {
     const message = entry.model?.[0];
