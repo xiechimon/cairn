@@ -92,6 +92,7 @@ function makeWorld(step: {
       title: 'sweep target',
       phase: 'building',
       phaseAt: base - step.createdAgo,
+      latestBuildId: buildId,
       seqNum: 1,
     })
     .run();

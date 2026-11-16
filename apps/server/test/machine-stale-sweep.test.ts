@@ -69,6 +69,7 @@ function makeWorld(opts: {
         title: 'stale target',
         phase: 'building',
         phaseAt: base - age,
+        latestBuildId: buildId,
         seqNum: 1,
       })
       .run();
