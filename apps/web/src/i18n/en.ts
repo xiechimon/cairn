@@ -48,7 +48,6 @@ export const EN: Record<string, string> = {
     'Run `claude setup-token` on your machine, then paste the token below.',
   'Claude Code 步骤会使用最近添加且未过期的订阅。Token 加密保存，保存后无法再查看。':
     'Claude Code steps use the most recently added unexpired connection. Tokens are encrypted and cannot be viewed after saving.',
-  '到期日（可选）': 'Expires on (optional)',
   '保存失败，请检查填写内容后重试。':
     'Could not save the connection. Check the fields and try again.',
   '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。':
