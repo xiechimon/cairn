@@ -1,4 +1,5 @@
 import {
+  dailyUsageQuerySchema,
   patchRoutingRuleBodySchema,
   patchTeamBodySchema,
   patchUserBodySchema,
@@ -52,6 +53,7 @@ import {
 } from './services/routing-rules.js';
 import { filterKnownSkillIds } from './services/skills.js';
 import { readTopModels, resetTopModels, writeTopModels } from './services/top-models.js';
+import { dailyUsage } from './services/usage-daily.js';
 
 const ACCESS_REFUSALS = {
   invalid: { status: 401, error: 'Unauthorized' },
@@ -157,6 +159,13 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       ...listRoutingSettings(ctx.db, id, coordinatorRunsOnPi()),
       ruleIssues: routingRuleIssues(ctx.db, id),
     });
+  });
+
+  app.get('/api/teams/:id/usage/daily', (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    const { days, tz } = parseWith(dailyUsageQuerySchema, c.req.query(), 'query');
+    return c.json(dailyUsage(ctx.db, id, { days, tz, now: Date.now() }));
   });
 
   app.get('/api/teams/:id/top-models', (c) => {
