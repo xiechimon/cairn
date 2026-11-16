@@ -1232,14 +1232,40 @@ export const EN: Record<string, string> = {
   '手动输入 owner/repo': 'Enter owner/repo manually',
   // wayfinder #181 add-machine dialog family (r2 11b verbatim copy; the
   // command strings themselves stay untranslated — brand slots via BRAND)
-  '有条件时优先使用云主机：笔记本会休眠或断网，云主机常在线，构建更稳定。':
-    'Prefer a cloud host when you can: laptops sleep or drop off the network, while cloud hosts stay online and build more reliably.',
-  '当前地址只适用于这台电脑。添加另一台电脑前，请用 Tailscale 地址打开 Cairn，再复制命令。':
-    'This address only works on this computer. To add another computer, open Cairn at its Tailscale address before copying the command.',
-  '在待接入的执行机上执行以下命令。浏览器将打开登录页，授权团队 {team} 后执行机即可上线。此后它在后台常驻运行，无需保持终端开启。':
-    'Run the following commands on the Runner you want to connect. Your browser will open a sign-in page; once you authorize the team {team}, the Runner comes online. It then keeps running in the background — no need to keep the terminal open.',
-  '安装 CLI': 'Install the CLI',
-  在执行机上运行: 'Run on the Runner',
+  '让另一台电脑帮你跑任务。两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。':
+    'Let another computer run tasks for you. The two computers connect through Tailscale, and this computer has to stay on and online.',
+  '用 Tailscale 连通两台电脑': 'Connect the two computers with Tailscale',
+  '在另一台电脑上安装 CLI': 'Install the CLI on the other computer',
+  在另一台电脑上启动执行机: 'Start the Runner on the other computer',
+  '终端会打印一个批准链接。打开链接，确认把这台电脑加入团队 {team}，执行机就会上线。之后它在后台常驻运行，关掉终端也没关系。':
+    'The terminal prints an approval link. Open it and confirm adding that computer to the team {team}, and the Runner comes online. It then keeps running in the background, so you can close the terminal.',
+  '查不到 Tailscale 的状态。点「重新检查」再试。':
+    'Could not read the Tailscale status. Choose Check again to retry.',
+  '正在检查 Tailscale…': 'Checking Tailscale…',
+  '这台电脑还没装 Tailscale。下载安装并登录，另一台电脑也装上、登录同一个账号，装好后点「重新检查」。':
+    'Tailscale is not installed on this computer. Install it and sign in, install it on the other computer with the same account, then choose Check again.',
+  '下载 Tailscale →': 'Download Tailscale →',
+  'Tailscale 装好了，但还没登录或没连上。打开 Tailscale 登录并连接，再点「重新检查」。':
+    'Tailscale is installed but not signed in or not connected. Open Tailscale, sign in and connect, then choose Check again.',
+  'Tailscale 需要允许当前用户修改它的设置。在这台电脑的终端运行一次下面的命令，再点「重试」。':
+    'Tailscale has to let your user change its settings. Run this command once in a terminal on this computer, then choose Retry.',
+  '你的 Tailscale 网络还没开 HTTPS 证书。在 Tailscale 网页上开启后，回来点「重试」。':
+    'HTTPS certificates are off in your Tailscale network. Turn them on in Tailscale, then come back and choose Retry.',
+  '去 Tailscale 开启 →': 'Turn it on in Tailscale →',
+  '这台电脑的 Tailscale Serve 端口 `443`、`8443`、`10000` 都被别的服务占着。腾出一个再点「重试」。':
+    'Other services already use the Tailscale Serve ports `443`, `8443` and `10000` on this computer. Free one, then choose Retry.',
+  'Tailscale 已连接。点「开启」后，你 Tailscale 网络里的设备就能打开这台电脑上的 Cairn，打开时仍要登录 Cairn。':
+    'Tailscale is connected. Choose Turn on so devices in your Tailscale network can open Cairn on this computer; they still have to sign in to Cairn.',
+  '已开启，正在确认 {url} 能打开。第一次可能要等一分钟。':
+    'Turned on. Checking that {url} can be opened; the first time can take a minute.',
+  '{url} 现在打不开。确认 Tailscale 还连着，再点「重新检查」。':
+    'Cannot open {url} right now. Check that Tailscale is still connected, then choose Check again.',
+  '已连通，另一台电脑用这个地址连回来：{url}':
+    'Connected. The other computer reaches this one at {url}',
+  '没能开启 Tailscale 访问，请重试。': 'Could not turn on Tailscale access. Try again.',
+  '正在开启…': 'Turning on…',
+  '先在执行机页的「添加执行机」里用 Tailscale 连通这台电脑，命令会出现在这里。':
+    'First connect this computer with Tailscale under Add Runner on the Runners page; the commands then appear here.',
   '在云服务器上运行？改用 API key 注册':
     'Running on a cloud server? Register with an API key instead',
   '获取 API key →': 'Get an API key →',

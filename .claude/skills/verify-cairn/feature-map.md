@@ -507,7 +507,7 @@ Reach:
 
 - Web routes: `/app/machines/authorize`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: none
+- Test ids in its code: `tailscale-ready`
 - Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md)
 - Frontend design: **gap**: the add-machine dialog and authorize page have no design
 - Backend design: **gap**: no design for the browser enrollment handshake and its failure modes
