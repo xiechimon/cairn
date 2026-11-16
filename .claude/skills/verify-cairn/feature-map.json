@@ -1448,8 +1448,8 @@
     {
       "id": "tailnet-login",
       "name": "Login and tailnet device auth",
-      "summary": "The token gate today; next, the owner's own tailnet devices are signed in without a token.",
-      "states": "Signed out shows the token gate; signed in opens the app; a tailnet device is meant to skip the gate.",
+      "summary": "The token gate, and the one-time owner sign-in link the server prints (or `cairn token --link` mints) where the browser has no loopback proof; next, the owner's own tailnet devices are signed in without a token.",
+      "states": "Signed out shows the token gate, with the `token --link` command on a loopback page; an owner link signs the browser in as the owner once and a used or expired link leaves the gate open; signed in opens the app; a tailnet device is meant to skip the gate.",
       "centrality": 2,
       "status": "partial",
       "code": {
@@ -1462,7 +1462,9 @@
       },
       "routes": {
         "server": [
-          "/api/auth/session"
+          "/api/auth/session",
+          "/api/auth/owner-link",
+          "/api/auth/owner-link/redeem"
         ]
       },
       "reach": [
@@ -1479,6 +1481,8 @@
       ],
       "evidence": [
         "apps/web/e2e/token-gate.spec.ts",
+        "apps/web/e2e/token-gate-owner-link.spec.ts",
+        "apps/server/test/owner-link.test.ts",
         "apps/server/test/token-auth.test.ts",
         "apps/server/test/tailnet-listener.test.ts"
       ],

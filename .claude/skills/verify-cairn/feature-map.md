@@ -617,9 +617,9 @@ Reach:
 
 ### tailnet-login
 
-**Login and tailnet device auth** (partial, centrality 2). The token gate today; next, the owner's own tailnet devices are signed in without a token.
+**Login and tailnet device auth** (partial, centrality 2). The token gate, and the one-time owner sign-in link the server prints (or `cairn token --link` mints) where the browser has no loopback proof; next, the owner's own tailnet devices are signed in without a token.
 
-States: Signed out shows the token gate; signed in opens the app; a tailnet device is meant to skip the gate.
+States: Signed out shows the token gate, with the `token --link` command on a loopback page; an owner link signs the browser in as the owner once and a used or expired link leaves the gate open; signed in opens the app; a tailnet device is meant to skip the gate.
 
 Reach:
 
@@ -631,7 +631,7 @@ Reach:
 - Research: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the sign-in gate and the signed-in-by-tailnet state have no design
 - Backend design: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
-- Evidence: `apps/web/e2e/token-gate.spec.ts`, `apps/server/test/token-auth.test.ts`, `apps/server/test/tailnet-listener.test.ts`
+- Evidence: `apps/web/e2e/token-gate.spec.ts`, `apps/web/e2e/token-gate-owner-link.spec.ts`, `apps/server/test/owner-link.test.ts`, `apps/server/test/token-auth.test.ts`, `apps/server/test/tailnet-listener.test.ts`
 
 ### account-and-team
 

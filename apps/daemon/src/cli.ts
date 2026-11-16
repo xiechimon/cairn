@@ -10,7 +10,7 @@ import {
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { BRAND, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
-import { runTokenCommand } from '@cairn/shared/token-command';
+import { runTokenCommand, runTokenLinkCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
 import {
@@ -262,11 +262,13 @@ export function buildProgram(): Command {
     .command('token')
     .description('Print the server access token and its location; --rotate writes a new one')
     .option('--rotate', 'write a new token to the token file ($CAIRN_HOME/token)')
-    .action((opts: { rotate?: boolean }) => {
-      const code = runTokenCommand(
-        { rotate: opts.rotate === true },
-        { env: process.env, writeOut: (text) => process.stdout.write(text) },
-      );
+    .option('--link', 'print a one-time link that signs a browser on this computer in as the owner')
+    .action(async (opts: { rotate?: boolean; link?: boolean }) => {
+      const io = { env: process.env, writeOut: (text: string) => process.stdout.write(text) };
+      const code =
+        opts.link === true
+          ? await runTokenLinkCommand(io)
+          : runTokenCommand({ rotate: opts.rotate === true }, io);
       if (code !== 0) process.exitCode = code;
     });
 

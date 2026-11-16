@@ -62,6 +62,22 @@ export function resolveBrowserSession(
   return { kind: row.kind, deviceId: row.deviceId };
 }
 
+export function hasOwnerBrowserSession(db: Db, now = nowMs()): boolean {
+  return (
+    db
+      .select({ id: browserSession.id })
+      .from(browserSession)
+      .where(
+        and(
+          eq(browserSession.kind, 'owner'),
+          isNull(browserSession.relayScope),
+          gt(browserSession.expiresAt, now),
+        ),
+      )
+      .get() !== undefined
+  );
+}
+
 export function resolveRelayBrowserSession(
   db: Db,
   binding: { tokenHash: string; installationId: string; teamId: string },

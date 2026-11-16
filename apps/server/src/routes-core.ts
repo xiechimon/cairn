@@ -1,4 +1,5 @@
 import {
+  ownerLinkRedeemBodySchema,
   patchRoutingRuleBodySchema,
   patchTeamBodySchema,
   patchUserBodySchema,
@@ -16,8 +17,8 @@ import type { AppContext } from './context.js';
 import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
 import { parseWith } from './lib/errors.js';
-import { loopbackOwnerOriginOf } from './lib/loopback-owner.js';
-import { isOpenRemotePath, pairedDeviceIdOf } from './lib/token-auth.js';
+import { loopbackOriginOf, loopbackOwnerOriginOf } from './lib/loopback-owner.js';
+import { isOpenRemotePath, matchesAuthToken, pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
 import {
@@ -43,7 +44,12 @@ import {
   markNotificationRead,
   markNotificationUnread,
 } from './services/notifications.js';
-import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
+import {
+  deviceStreams,
+  issueOwnerLink,
+  pairedDeviceExists,
+  redeemOwnerLink,
+} from './services/paired-devices.js';
 import { routingRuleIssues } from './services/routing-rule-issues.js';
 import {
   listRoutingSettings,
@@ -79,6 +85,35 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (existing?.kind === 'owner') return c.json({ ok: true });
     const session = issueBrowserSession(ctx.db, 'owner');
     setAuthCookie(c, session.token, requestIsSecure(c));
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/auth/owner-link', (c) => {
+    const provided = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '')?.[1];
+    if (
+      ctx.authToken === null ||
+      provided === undefined ||
+      !matchesAuthToken(ctx.authToken, provided)
+    ) {
+      return c.json({ error: 'only the owner token can create a sign-in link' }, 403);
+    }
+    c.header('cache-control', 'no-store');
+    return c.json(issueOwnerLink(ctx.db), 201);
+  });
+
+  app.post('/api/auth/owner-link/redeem', async (c) => {
+    c.header('cache-control', 'no-store');
+    if (ctx.authToken === null) return c.json({ error: 'Not found' }, 404);
+    if (c.req.header('sec-fetch-site') !== 'same-origin') {
+      return c.json({ error: 'same-origin proof required' }, 403);
+    }
+    if (loopbackOriginOf(c) === null) {
+      return c.json({ error: 'open the sign-in link on the computer that runs Cairn' }, 403);
+    }
+    const body = parseWith(ownerLinkRedeemBodySchema, await jsonBody(c), 'body');
+    const redeemed = redeemOwnerLink(ctx.db, body.code);
+    if (redeemed === null) return c.json({ error: 'this sign-in link was used or expired' }, 401);
+    setAuthCookie(c, redeemed.sessionToken, requestIsSecure(c), redeemed.expiresAt);
     return c.json({ ok: true });
   });
 

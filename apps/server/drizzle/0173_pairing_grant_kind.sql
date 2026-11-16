@@ -1,0 +1,1 @@
+ALTER TABLE `pairing_grant` ADD `kind` text DEFAULT 'device' NOT NULL;

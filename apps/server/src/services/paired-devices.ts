@@ -18,6 +18,9 @@ import { issueBrowserSession } from './browser-session.js';
 const LAST_SEEN_RESOLUTION_MS = 60_000;
 const CODE_BYTES = 24;
 const TOKEN_BYTES = 32;
+const DEVICE_GRANT = 'device';
+const OWNER_GRANT = 'owner';
+const OWNER_LINK_TTL_MS = 10 * 60_000;
 
 export interface IssuedPairingCode {
   code: string;
@@ -195,7 +198,13 @@ export function issuePairingGrant(
   const active = db
     .select()
     .from(pairingGrant)
-    .where(and(isNull(pairingGrant.revokedAt), isNull(pairingGrant.redeemedAt)))
+    .where(
+      and(
+        eq(pairingGrant.kind, DEVICE_GRANT),
+        isNull(pairingGrant.revokedAt),
+        isNull(pairingGrant.redeemedAt),
+      ),
+    )
     .all()
     .filter((row) => row.expiresAt > now);
   const overflow = active.length - PAIRING_CODE_CAP + 1;
@@ -225,6 +234,7 @@ export function listPairingGrants(db: Db, now = nowMs()): PairingGrantView[] {
     .from(pairingGrant)
     .where(
       and(
+        eq(pairingGrant.kind, DEVICE_GRANT),
         isNull(pairingGrant.relayScope),
         isNull(pairingGrant.revokedAt),
         isNull(pairingGrant.redeemedAt),
@@ -236,7 +246,11 @@ export function listPairingGrants(db: Db, now = nowMs()): PairingGrantView[] {
 }
 
 export function revokePairingGrant(db: Db, id: string, now = nowMs()): boolean {
-  const row = db.select().from(pairingGrant).where(eq(pairingGrant.id, id)).get();
+  const row = db
+    .select()
+    .from(pairingGrant)
+    .where(and(eq(pairingGrant.id, id), eq(pairingGrant.kind, DEVICE_GRANT)))
+    .get();
   if (row === undefined || row.revokedAt !== null || row.redeemedAt !== null) return false;
   db.update(pairingGrant).set({ revokedAt: now }).where(eq(pairingGrant.id, id)).run();
   return true;
@@ -283,6 +297,7 @@ export function redeemPairingGrant(
       .where(
         and(
           eq(pairingGrant.codeHash, hashCredential(code)),
+          eq(pairingGrant.kind, DEVICE_GRANT),
           scope === null ? isNull(pairingGrant.relayScope) : eq(pairingGrant.relayScope, scope),
           isNull(pairingGrant.revokedAt),
           isNull(pairingGrant.redeemedAt),
@@ -291,6 +306,47 @@ export function redeemPairingGrant(
       )
       .run().changes === 1
   );
+}
+
+export function issueOwnerLink(db: Db, now = nowMs()): IssuedPairingCode {
+  const code = randomBytes(TOKEN_BYTES).toString('base64url');
+  const expiresAt = now + OWNER_LINK_TTL_MS;
+  db.insert(pairingGrant)
+    .values({
+      id: newRecordId(),
+      codeHash: hashCredential(code),
+      kind: OWNER_GRANT,
+      expiresAt,
+      createdAt: now,
+    })
+    .run();
+  return { code, expiresAt };
+}
+
+export function redeemOwnerLink(
+  db: Db,
+  code: string,
+  now = nowMs(),
+): { sessionToken: string; expiresAt: number } | null {
+  return db.transaction((tx) => {
+    const consumed =
+      tx
+        .update(pairingGrant)
+        .set({ redeemedAt: now })
+        .where(
+          and(
+            eq(pairingGrant.codeHash, hashCredential(code)),
+            eq(pairingGrant.kind, OWNER_GRANT),
+            isNull(pairingGrant.revokedAt),
+            isNull(pairingGrant.redeemedAt),
+            gt(pairingGrant.expiresAt, now),
+          ),
+        )
+        .run().changes === 1;
+    if (!consumed) return null;
+    const session = issueBrowserSession(tx, 'owner', null, now);
+    return { sessionToken: session.token, expiresAt: session.expiresAt };
+  });
 }
 
 export function revokeRelayPairingGrants(db: Db, installationId: string, now = nowMs()): void {

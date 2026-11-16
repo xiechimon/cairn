@@ -95,3 +95,20 @@ export function parsePairFragment(hash: string): { code: string; environmentId: 
   if (code === null || code === '' || environmentId === null || environmentId === '') return null;
   return { code, environmentId };
 }
+
+export const OWNER_FRAGMENT_KEY = 'owner';
+
+export const ownerLinkRedeemBodySchema = z.object({ code: z.string().min(1).max(256) }).strict();
+
+export const ownerLinkResponseSchema = z.object({ code: z.string().min(1), expiresAt: epochMs });
+
+export function ownerSignInLink(origin: string, code: string): string {
+  return `${origin}/app#${new URLSearchParams({ [OWNER_FRAGMENT_KEY]: code }).toString()}`;
+}
+
+export function parseOwnerFragment(hash: string): string | null {
+  const code = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash).get(
+    OWNER_FRAGMENT_KEY,
+  );
+  return code === null || code === '' ? null : code;
+}

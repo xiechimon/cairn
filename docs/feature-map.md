@@ -440,7 +440,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### tailnet-login
 
-**Login and tailnet device auth** (partial). The token gate today; next, the owner's own tailnet devices are signed in without a token.
+**Login and tailnet device auth** (partial). The token gate, and the one-time owner sign-in link the server prints (or `cairn token --link` mints) where the browser has no loopback proof; next, the owner's own tailnet devices are signed in without a token.
 
 - Research: [docs/research/seamless-device-auth-2026-11-08.md](research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the sign-in gate and the signed-in-by-tailnet state have no design

@@ -861,6 +861,7 @@ export const pairingGrant = sqliteTable(
   {
     id: text('id').primaryKey(),
     codeHash: text('codeHash').notNull(),
+    kind: text('kind').notNull().default('device'),
     relayScope: text('relayScope'),
     expiresAt: epochMs('expiresAt').notNull(),
     createdAt: epochMs('createdAt').notNull(),

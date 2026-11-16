@@ -1,4 +1,3 @@
-import { parsePairFragment } from '@cairn/shared';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import {
   authSnapshot,
@@ -8,6 +7,7 @@ import {
   consumePairFragment,
   demandGate,
   exchangeAccessIdentity,
+  hasSignInFragment,
   isLoopbackPage,
   passGate,
 } from './auth.js';
@@ -51,7 +51,7 @@ function establishSession(): Promise<boolean> {
   if (establishing !== null) return establishing;
   establishing = (async () => {
     if (DEMO_MODE) return false;
-    if (parsePairFragment(window.location.hash) !== null) {
+    if (hasSignInFragment()) {
       let failed = false;
       await consumePairFragment(() => {
         failed = true;

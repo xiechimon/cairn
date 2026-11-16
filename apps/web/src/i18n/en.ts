@@ -1253,6 +1253,8 @@ export const EN: Record<string, string> = {
     'Enter a one-time pairing code. Create it in Remote access on the computer running the server. It works once, for 5 minutes.',
   配对码: 'Pairing code',
   '配对码无效，请重试。': 'Pairing code is invalid. Try again.',
+  '这台就是运行 Cairn 的电脑？在终端运行下面的命令，打开它打印的链接登录：':
+    'Is this the computer running Cairn? Run this in a terminal and open the link it prints:',
   未使用的配对码: 'Unused pairing codes',
   作废配对码: 'Revoke code',
   进入: 'Continue',

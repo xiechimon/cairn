@@ -1,4 +1,9 @@
-import { type PairResponse, parsePairFragment, type RemoteDescriptor } from '@cairn/shared';
+import {
+  type PairResponse,
+  parseOwnerFragment,
+  parsePairFragment,
+  type RemoteDescriptor,
+} from '@cairn/shared';
 import { useSyncExternalStore } from 'react';
 
 export const TOKEN_STORAGE_KEY = 'cairn.token';
@@ -133,6 +138,7 @@ export async function exchangeAccessIdentity(): Promise<boolean> {
 
 const DESCRIPTOR_PATH = '/api/remote/descriptor';
 const PAIR_PATH = '/api/remote/pair';
+const OWNER_LINK_REDEEM_PATH = '/api/auth/owner-link/redeem';
 const FALLBACK_DEVICE_NAME = 'Browser';
 
 function pairedDeviceName(): string {
@@ -140,12 +146,33 @@ function pairedDeviceName(): string {
   return platform !== undefined && platform !== '' ? platform : FALLBACK_DEVICE_NAME;
 }
 
+export function hasSignInFragment(): boolean {
+  const hash = window.location.hash;
+  return parseOwnerFragment(hash) !== null || parsePairFragment(hash) !== null;
+}
+
 export async function consumePairFragment(
   onFailure: (error: unknown) => void = () => {},
 ): Promise<void> {
+  const ownerCode = parseOwnerFragment(window.location.hash);
   const pair = parsePairFragment(window.location.hash);
-  if (pair === null) return;
+  if (ownerCode === null && pair === null) return;
   window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  if (ownerCode !== null) {
+    try {
+      const res = await fetch(OWNER_LINK_REDEEM_PATH, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code: ownerCode }),
+      });
+      if (!res.ok) throw new Error(`owner link ${res.status}`);
+      passGate();
+    } catch (error) {
+      onFailure(error);
+    }
+    return;
+  }
+  if (pair === null) return;
   try {
     const descriptor = await fetch(DESCRIPTOR_PATH);
     if (!descriptor.ok) throw new Error(`descriptor ${descriptor.status}`);

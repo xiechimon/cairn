@@ -159,17 +159,29 @@ function relayed(c: Context): boolean {
 
 const peerUidBySocket = new WeakMap<object, number | null>();
 
-export function loopbackOwnerOriginOf(c: Context, owner: LoopbackOwner): string | null {
+export function loopbackOriginOf(c: Context): string | null {
   const connection = connectionOf(c);
   if (connection === null) return null;
+  if (
+    loopbackOfNodeAddress(connection.remoteAddress) === null ||
+    loopbackOfNodeAddress(connection.localAddress) === null
+  )
+    return null;
   const host = c.req.header('host')?.toLowerCase();
   if (host === undefined || !loopbackHostsFor(connection.localPort).has(host)) return null;
   if (relayed(c)) return null;
+  return `http://${host}`;
+}
+
+export function loopbackOwnerOriginOf(c: Context, owner: LoopbackOwner): string | null {
+  const origin = loopbackOriginOf(c);
+  const connection = connectionOf(c);
+  if (origin === null || connection === null) return null;
   const socket = (c.env as HttpBindings).incoming.socket;
   let peerUid = peerUidBySocket.get(socket);
   if (peerUid === undefined) {
     peerUid = owner.peerUid(connection);
     peerUidBySocket.set(socket, peerUid);
   }
-  return peerUid === owner.uid ? `http://${host}` : null;
+  return peerUid === owner.uid ? origin : null;
 }

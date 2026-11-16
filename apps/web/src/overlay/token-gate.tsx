@@ -1,8 +1,10 @@
+import { PUBLISHED_PACKAGES } from '@cairn/shared';
 import { type FormEvent, useEffect, useState } from 'react';
 import {
   beginGateProbe,
   bootstrapLoopback,
   consumePairFragment,
+  isLoopbackPage,
   passGate,
   redeemPairingCode,
   rejectGate,
@@ -25,6 +27,9 @@ export function TokenGate() {
       await consumePairFragment(() => rejectGate());
       if (!DEMO_MODE && (await bootstrapLoopback())) passGate();
     })();
+    const consumePastedLink = () => void consumePairFragment(() => rejectGate());
+    window.addEventListener('hashchange', consumePastedLink);
+    return () => window.removeEventListener('hashchange', consumePastedLink);
   }, []);
 
   useEffect(() => {
@@ -91,6 +96,14 @@ export function TokenGate() {
           >
             {t('进入')}
           </Button>
+          {isLoopbackPage() && (
+            <p className="token-gate-owner-link text-xs leading-normal text-content-tertiary">
+              {t('这台就是运行 Cairn 的电脑？在终端运行下面的命令，打开它打印的链接登录：')}
+              <code className="mt-1 block select-all font-mono text-code text-content-secondary">
+                {`npx ${PUBLISHED_PACKAGES.server.name} token --link`}
+              </code>
+            </p>
+          )}
         </form>
       </Card>
     </div>
