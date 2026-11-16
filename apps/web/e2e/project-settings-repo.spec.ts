@@ -11,7 +11,7 @@ interface WireProject {
   id: string;
   name: string;
   teamId: string;
-  repoKind: string;
+  repoKind?: string;
   repoName?: string;
   githubRepo: string | null;
 }
@@ -103,4 +103,18 @@ test('settings: hosted project keeps the read-only repo row (github-only edit)',
   await expect(page.getByText('目标分支', { exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: FIELD })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '保存仓库' })).toHaveCount(0);
+});
+
+test('settings: a project without a repository has no Repository tab; ?tab=repo opens the basics', async ({
+  page,
+}) => {
+  await stubWorld(page, [{ id: PROJECT_ID, name: 'plain-probe', teamId: TEAM_ID, githubRepo: null }]);
+  await page.goto(`/app/project/${PROJECT_ID}/settings?tab=repo`);
+  await expect(page.getByRole('tab', { name: '基本信息', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.getByRole('tab', { name: '记忆', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '仓库', exact: true })).toHaveCount(0);
+  await expect(page.getByText('目标分支', { exact: true })).toHaveCount(0);
 });

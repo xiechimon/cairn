@@ -93,6 +93,11 @@ export function ProjectSettingsPage() {
     : Object.keys(fixture.projectNames ?? {});
   const tone = Math.max(0, rowIds.filter((pid) => !isDeleted(pid)).indexOf(id ?? ''));
   const repoKind = live ? wireProject?.repoKind : project?.hosted ? 'hosted' : project?.repoKind;
+  const tabs =
+    project !== undefined && repoKind === undefined
+      ? TABS.filter((entry) => entry.id !== 'repo')
+      : TABS;
+  const shownTab = tabs.some((entry) => entry.id === tab) ? tab : 'basic';
   const kindLabel =
     repoKind === 'hosted'
       ? t('Cairn 托管')
@@ -164,7 +169,7 @@ export function ProjectSettingsPage() {
           }}
         />
         <div className="flex">
-          <TabGroup tabs={TABS} tab={tab} onTab={setTab} />
+          <TabGroup tabs={tabs} tab={shownTab} onTab={setTab} />
         </div>
         {live && wireProject === undefined ? (
           projectsQ.isError ? (
@@ -177,9 +182,9 @@ export function ProjectSettingsPage() {
               <ProjectsLoading />
             </div>
           )
-        ) : tab === 'memory' ? (
+        ) : shownTab === 'memory' ? (
           <MemoryPanel live={live} teamId={teamId} project={memoryProject ?? null} />
-        ) : tab === 'repo' ? (
+        ) : shownTab === 'repo' ? (
           <>
             <SettingsCard className={cn('prj-set-card', NARROW_ROWS_CLS)}>
               {live && wireProject?.repoKind === 'github' ? (
