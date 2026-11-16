@@ -40,6 +40,7 @@ import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
 import { THREAD_PARAM, threadCopy, threadStatus, VIEW_PARAM } from './thread-copy.js';
+import { ThreadFacts } from './thread-facts.js';
 import { ThreadLead } from './thread-lead.js';
 import {
   type ThreadChatStream,
@@ -71,7 +72,6 @@ const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]
 
 function StatusLine({
   todo,
-  machineName,
   platformWait,
   now,
   waitingOnChecks,
@@ -79,7 +79,6 @@ function StatusLine({
   originText,
 }: {
   todo: TodoRecord;
-  machineName: string | null;
   platformWait: ThreadChat['platformWait'];
   now: number;
   waitingOnChecks: boolean;
@@ -102,7 +101,7 @@ function StatusLine({
         ? t('{n} 条更新', { n: updates.lines.length })
         : purpose !== ''
           ? purpose
-          : joinMeta([machineName, needText, relativeTime(todo.phaseAt, now, t)]);
+          : joinMeta([needText, relativeTime(todo.phaseAt, now, t)]);
   return (
     <p
       data-testid="side-chat-status"
@@ -616,7 +615,6 @@ function ReadyThread({
       >
         <StatusLine
           todo={todo}
-          machineName={chat.machineName}
           platformWait={chat.platformWait}
           now={now}
           waitingOnChecks={chat.waitingOnChecks}
@@ -624,6 +622,11 @@ function ReadyThread({
           originText={origin?.text ?? null}
         />
       </Head>
+      <ThreadFacts
+        todo={todo}
+        machineName={chat.machineName}
+        waitingOnChecks={chat.waitingOnChecks}
+      />
       <ThreadPrPanel
         status={prs.status}
         rows={prRows}

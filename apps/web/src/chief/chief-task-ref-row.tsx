@@ -10,6 +10,7 @@ import { TodoGlanceContext, TodoStatusTile } from '../detail/segments.js';
 import { useI18n } from '../i18n/provider.js';
 import { PHASE_UI } from '../phase.js';
 import type { TaskRef } from './chief-task-refs.js';
+import { useReportRoute } from './report-route.js';
 
 export function TaskRefRow({
   taskRef,
@@ -24,6 +25,7 @@ export function TaskRefRow({
 }) {
   const { t } = useI18n();
   const unread = useThreadUnread(taskRef.todoId);
+  const route = useReportRoute(taskRef.todoId, taskRef.phase);
   const card = useWarmHoverCard();
   return (
     <Popover {...card.root}>
@@ -39,7 +41,7 @@ export function TaskRefRow({
             data-phase={taskRef.phase}
             data-testid="chief-task-ref"
             className={cn(
-              'relative flex h-7 w-fit cursor-pointer items-center gap-1.5 text-ui font-normal text-(--foreground) no-underline hover:underline',
+              'group/ref relative flex h-7 w-fit cursor-pointer items-center gap-1.5 text-ui font-normal text-(--foreground) no-underline',
               nested
                 ? 'ml-14 max-w-[calc(100%-3.5rem)]'
                 : elbow
@@ -66,7 +68,9 @@ export function TaskRefRow({
           </svg>
         )}
         <TodoStatusTile phase={taskRef.phase} />
-        <span className="min-w-0 truncate">{taskRef.title ?? t('任务')}</span>
+        <span className="min-w-0 truncate group-hover/ref:underline">
+          {taskRef.title ?? t('任务')}
+        </span>
         {unread && (
           <span
             role="img"
@@ -76,6 +80,11 @@ export function TaskRefRow({
           />
         )}
         <span className="sr-only">{`${t('，')}${t(PHASE_UI[taskRef.phase].chip)}`}</span>
+        {route !== null && (
+          <span data-slot="task-ref-route" className="flex-none text-meta text-content-tertiary">
+            {t('结果回到{place}', { place: route })}
+          </span>
+        )}
       </PopoverTrigger>
       <PopoverContent
         side="top"

@@ -21,6 +21,17 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
+  这里: 'this channel',
+  主频道: 'the main channel',
+  '{channel} 频道': '{channel} channel',
+  '结果回到{place}': 'reports to {place}',
+  结果回到: 'Reports to',
+  去看: 'Open',
+  '去{channel}': 'Open {channel}',
+  进度: 'Progress',
+  改代码: 'Code',
+  调研: 'Research',
+  交报告: 'Report',
   有新版本: 'A new version is available',
   点此刷新: 'Refresh',
   订阅账户没能加载: 'Subscriptions could not be loaded',
