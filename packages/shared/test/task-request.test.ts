@@ -57,6 +57,7 @@ describe('Coordinator tools that write todo text take no task text', () => {
     expect(paramNames('create_todo')).toEqual(
       [
         'projectId',
+        'title',
         'messageIds',
         'sourceTodoId',
         'quotes',
@@ -111,13 +112,14 @@ describe('Coordinator tools that write todo text take no task text', () => {
     );
   });
 
-  it('the strict param schemas refuse task body text; update_todo may take a summary title', () => {
+  it('the strict param schemas refuse task body text; both tools may take a summary title', () => {
     expect(coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p', spec: 'x' }).success).toBe(
       false,
     );
     expect(
-      coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p', title: 'x' }).success,
-    ).toBe(false);
+      coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p', title: '新建 HELLO.md' })
+        .success,
+    ).toBe(true);
     expect(coordinatorUpdateTodoParamsSchema.safeParse({ todoId: 't', spec: 'x' }).success).toBe(
       false,
     );

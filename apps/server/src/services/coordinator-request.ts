@@ -371,12 +371,13 @@ export function createRequestTodo(
       : undefined;
   const keys = new Set(cited.map((c) => segmentKey(c.quoteSource)));
   const siblings = params.quotes === undefined ? [] : splitSiblings(db, ctx.teamId, keys);
+  const summaryTitle = params.title === undefined ? '' : derivePlaceholderTitle(params.title);
   const request: TaskRequest = {
     segments,
     siblings: siblings.map((row) => row.id),
     difficulty: params.difficulty ?? null,
-    titleSource: segments[0]?.author ?? 'owner',
-    titleSourceRef: segments[0]?.sourceRef ?? null,
+    titleSource: summaryTitle !== '' ? 'coordinator' : (segments[0]?.author ?? 'owner'),
+    titleSourceRef: summaryTitle !== '' ? null : (segments[0]?.sourceRef ?? null),
     ...(params.research !== undefined ? { research: params.research } : {}),
     ...(projectBasis !== undefined ? { lane: 'quick', projectBasis } : {}),
   };
@@ -384,11 +385,13 @@ export function createRequestTodo(
     teamId: ctx.teamId,
     projectId: params.projectId,
     title:
+      summaryTitle ||
       derivePlaceholderTitle(
         segments[0]?.context?.messages.find((message) => message.role === 'user')?.text ??
           segments[0]?.text ??
           '',
-      ) || PLACEHOLDER_TITLE_FALLBACK,
+      ) ||
+      PLACEHOLDER_TITLE_FALLBACK,
     spec: renderTaskText(request),
     createdBy: provenance.createdBy,
     ownerId: provenance.ownerId,

@@ -61,10 +61,25 @@ describe('create_todo copies the owner words verbatim', () => {
     expect(split.spec).toBe(created.spec);
   });
 
-  test('a spec or title argument is refused', async () => {
+  test('a spec argument is refused', async () => {
     await expect(
-      relay('create_todo', { projectId: H.projectId, title: 'x', spec: 'paraphrase' }),
+      relay('create_todo', { projectId: H.projectId, spec: 'paraphrase' }),
     ).rejects.toMatchObject({ status: 400 });
+  });
+
+  test('a summary title names the task while the spec keeps the owner words', async () => {
+    const words =
+      '帮我新建一个项目叫 mac-otel-demo（用 Cairn 自带的仓库），然后安排一个任务：在仓库根目录建 HELLO.md，内容是一行 hello from the Mac app，提交即可。';
+    const id = ownerMessage(words);
+    const created = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [id],
+      title: '新建 HELLO.md 并提交',
+    })) as Created;
+    expect(created.title).toBe('新建 HELLO.md 并提交');
+    expect(created.spec).toContain(words);
+    expect(row(created.id).request?.titleSource).toBe('coordinator');
+    expect(row(created.id).request?.segments[0]?.text).toBe(words);
   });
 
   test('the spec is the cited message byte for byte, attachments granted, prefix excluded', async () => {

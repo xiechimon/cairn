@@ -61,6 +61,7 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
    `todo.spec` holds `renderTaskText(request)`, and it is written only by the request service (`coordinator-request.ts`), at creation and on append. Readers that only display or search text (the board, search, the Coordinator `todos` summary, MCP `todos`, trajectory export) keep reading `spec`. Every reader that decides authority or builds a model prompt reads `request.segments`; the table under Entry points lists them.
 3. The title has its own author, `titleAuthor(todo)`:
    - `worker` when `request.titleSource` is `worker`. The title is printed with a `named by the worker` label and no fence.
+   - `coordinator` when `create_todo` or `update_todo` passed a summary `title` (owner, 2026-11-17: the title only names the task, so the Coordinator writes it at creation; the task text stays the owner's words). The title is printed with a `named by the Coordinator` label and no fence. Without a summary the title is the first segment's words cut at 50 characters.
    - `request.titleSource` is fixed to the first segment's author when the title is created; `titleSourceRef` snapshots that segment's issue ref. A spec edit preserves both fields. A title edit sets them to `owner` and `null`, independently of the spec segments.
    - `isIssueSourcedTask(todo)` for tasks without `request`.
 

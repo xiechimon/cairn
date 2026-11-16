@@ -166,13 +166,15 @@ describe('Coordinator task text contract', () => {
   it('keeps routing references out of verbatim task text', () => {
     const tool = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'create_todo');
     expect(tool?.description).toContain('copied character for character');
-    expect(tool?.description).toContain('You add routing only');
+    expect(tool?.description).toContain('You add the title and routing only');
   });
 
-  it('leaves title derivation to the server and bounds the update_todo summary title', () => {
-    const create = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'create_todo');
-    expect(create?.description).toContain('starts with a placeholder title cut from them');
-    expect(create?.parameters).not.toHaveProperty('properties.title');
+  it('takes a summary title on create_todo and bounds the update_todo summary title', () => {
+    const create = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'create_todo')?.parameters as {
+      properties: Record<string, { description: string }>;
+    };
+    expect(create.properties.title?.description).toContain('at most 50 characters');
+    expect(create.properties).not.toHaveProperty('spec');
     const update = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'update_todo')?.parameters as {
       properties: Record<string, { description: string }>;
     };
