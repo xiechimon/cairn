@@ -39,7 +39,6 @@ import {
 } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
-import { autonomousMergePolicy } from './autonomous-merge.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
@@ -93,7 +92,7 @@ import { connectorSlugs } from './mcp-servers.js';
 import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
-import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
+import { projectMergeConfigOf } from './projects.js';
 import {
   coordinatorMemoryOwner,
   coordinatorProfile,
@@ -457,15 +456,15 @@ async function tryClaim(
         project?.repoKind !== 'local' ||
         project.id !== localMerge.projectId ||
         config === null ||
-        (config.mergePolicy !== 'autonomous' && projectShipRouteOf(project) !== 'local-merge') ||
         JSON.stringify(config.localChecks) !== JSON.stringify(localMerge.localChecks) ||
-        cand.todoRow.phase !== 'review' ||
+        (project.baseBranch !== null && project.baseBranch !== localMerge.defaultBranch) ||
+        !['done', 'review', 'failed'].includes(cand.todoRow.phase) ||
         cand.todoRow.latestBuildId !== localMerge.buildId
       ) {
         failStepWithEvents(
           deps,
           cand.stepRow,
-          'Local merge authorization changed; a new judgment is required',
+          'Local merge authorization changed; request the merge again',
         );
         continue;
       }
@@ -533,18 +532,6 @@ async function tryClaim(
     if (!stillAuthorized()) return null;
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
     if (!stillAuthorized()) return null;
-    if (localMerge !== null) {
-      const currentProject = projectOfTodo(db, cand.todoRow);
-      if (!currentProject) continue;
-      const brake = autonomousMergePolicy(
-        db,
-        cand.todoRow.teamId,
-        projectMergeConfigOf(currentProject),
-        nowMs(),
-        cand.stepRow.buildId,
-      );
-      if (brake.autonomyPaused || brake.dailyCapReached) continue;
-    }
     const claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
     const deliverables = deliverableCapability(cand.stepRow.kind, cand.todoRow.output, claimedAt);
     let won = false;
@@ -560,6 +547,25 @@ async function tryClaim(
         }
         const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
         if (latestTodo === undefined || quickLaneRefusal(db, latestTodo) !== null) return false;
+        if (
+          cand.stepRow.kind === 'merge' &&
+          (latestTodo.latestBuildId !== cand.buildRow.id ||
+            latestTodo.archivedAt !== null ||
+            latestTodo.projectId !== cand.todoRow.projectId ||
+            !['done', 'review', 'failed'].includes(latestTodo.phase))
+        )
+          return false;
+        if (localMerge !== null) {
+          const target = projectOfTodo(db, latestTodo);
+          if (
+            target?.repoKind !== 'local' ||
+            target.id !== localMerge.projectId ||
+            JSON.stringify(projectMergeConfigOf(target).localChecks) !==
+              JSON.stringify(localMerge.localChecks) ||
+            (target.baseBranch !== null && target.baseBranch !== localMerge.defaultBranch)
+          )
+            return false;
+        }
         holdBlockedBuild(db, cand.stepRow.buildId);
         const res = tx
           .update(step)

@@ -126,14 +126,12 @@ export const localMergeCommandSchema = z.object({
   judgedBase: z.string().regex(/^[0-9a-f]{40}$/),
   judgedHead: z.string().regex(/^[0-9a-f]{40}$/),
   judgedPatchDigest: z.string().regex(/^pd2:[0-9a-f]{64}$/),
-  localChecks: z
-    .array(
-      z
-        .string()
-        .min(1)
-        .refine((command) => command.trim().length > 0),
-    )
-    .min(1),
+  localChecks: z.array(
+    z
+      .string()
+      .min(1)
+      .refine((command) => command.trim().length > 0),
+  ),
   message: z.string().min(1),
   identity: z.object({ name: z.string().min(1), email: z.string().min(1) }),
 });

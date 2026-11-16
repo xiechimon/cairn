@@ -329,7 +329,8 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     const buildClaimed = await w.claim();
     expect(buildClaimed.kind).toBe('build');
     await w.done(buildClaimed.stepId, { status: 'success' });
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
+    w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
     const res = await w.startReview(buildId);
     expect(res.status).toBe(202);
     expect(w.stepsOf(buildId).filter((s) => s.kind === 'review')).toHaveLength(1);
@@ -503,7 +504,8 @@ async function advanceToReviewGate(w: World): Promise<string> {
   const buildClaimed = await w.claim();
   expect(buildClaimed.kind).toBe('build');
   await w.done(buildClaimed.stepId, { status: 'success', sessionId: 'sess-build' });
-  expect(w.todoRow().phase).toBe('review');
+  expect(w.todoRow().phase).toBe('done');
+  w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
   return buildId;
 }
 
@@ -560,9 +562,10 @@ describe('retired gate work cannot take delivery back from the user', () => {
         .set({ prNumber: 23, prUrl: 'https://github.com/acme/app/pull/23' })
         .where(eq(buildTable.id, buildId))
         .run();
-      const task = w.todoRow();
       const delivered = w.buildRow(buildId);
       sweepAbandonedBuildSteps(w.s.svc);
+      const task = w.todoRow();
+      expect(task.phase).toBe('done');
       expect(w.stepsOf(buildId).find((s) => s.id === claimed.stepId)?.archiveStop).toBe(
         'requested',
       );
@@ -628,7 +631,7 @@ describe('retired gate work cannot take delivery back from the user', () => {
         .run();
       sweepAbandonedBuildSteps(w.s.svc);
       const delivered = w.todoRow();
-      expect(delivered).toMatchObject({ phase: 'review', hasChanges: true });
+      expect(delivered).toMatchObject({ phase: 'done', hasChanges: true });
       expect(w.buildRow(buildId).errorMessage).toBeNull();
       const old = w.stepsOf(buildId).find((s) => s.id === 'old-verify');
       expect(old).toMatchObject(

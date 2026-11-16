@@ -12,10 +12,9 @@ import { build, message, step, stopPending, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { persistGateVerdict, reportedVerdictHeads } from './build-gate-verdict.js';
 import { landReservedPhase, settleAfterStopPhase } from './build-stop.js';
-import type { BuildDeps, CompleteStepOutcome } from './builds.js';
+import { type BuildDeps, type CompleteStepOutcome, finishTodoDone } from './builds.js';
 import { publishStepRow } from './quota-wait.js';
 import { finishScheduledStep } from './schedules.js';
-import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
@@ -105,9 +104,11 @@ export function retireMergeGateSteps(deps: BuildDeps): void {
     .all();
   for (const { task, run } of stalled) {
     if (run.afterStopPhase === 'keep') continue;
-    if (run.afterStopPhase === null && task.phase !== 'building') continue;
+    if (task.output === 'info') continue;
+    if (task.phase === 'confirm' && run.afterStopPhase !== 'done') continue;
     const steps = deps.db.select().from(step).where(eq(step.buildId, run.id)).all();
-    if (!steps.some((s) => s.kind === 'review' || s.kind === 'verify')) continue;
+    if (task.phase !== 'review' && !steps.some((s) => s.kind === 'review' || s.kind === 'verify'))
+      continue;
     const execution = steps
       .filter((s) => s.kind === 'plan' || isBuildStepKind(s.kind))
       .sort((a, b) => b.createdAt - a.createdAt)[0];
@@ -121,6 +122,6 @@ export function retireMergeGateSteps(deps: BuildDeps): void {
       continue;
     }
     if (pendingWorkerQuestions(deps.db, run.id).length > 0) continue;
-    setTodoPhase(deps, task.id, 'review');
+    finishTodoDone(deps, task.id, run.id);
   }
 }

@@ -10,8 +10,6 @@ const CODE_CARD_ID = 'todo-code';
 
 const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
-const MERGE_LABEL = '将改动合并到默认分支';
-const INFO_NOTE = '信息卡的产出是报告附件，不进合并。';
 const REPORT_KEY = `${TEAM_ID}/att-report.md`;
 const REPORT_TEXT = [
   '## 登录页轨迹调研',
@@ -183,14 +181,12 @@ async function useTheme(page: Page, theme: 'light' | 'dark') {
   await page.emulateMedia({ reducedMotion: 'reduce' });
 }
 
-async function openCompleteDialogFromDetail(page: Page, cardId: string, theme: string) {
+async function completeFromDetail(page: Page, cardId: string, theme: string) {
   await page.goto(`/app/todo/${cardId}`);
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
   await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await page.getByRole('menuitem', { name: '完成' }).click();
-  const dialog = page.getByRole('dialog', { name: '完成任务' });
-  await expect(dialog).toBeVisible();
-  return dialog;
+  await expect(page.getByRole('dialog', { name: '完成任务' })).toHaveCount(0);
 }
 
 for (const theme of ['light', 'dark'] as const) {
@@ -237,7 +233,7 @@ for (const theme of ['light', 'dark'] as const) {
     }
   });
 
-  test(`info card completion dialog offers no merge and completes without one (${theme})`, async ({
+  test(`info card completes directly without a merge (${theme})`, async ({
     page,
   }) => {
     await useTheme(page, theme);
@@ -255,23 +251,19 @@ for (const theme of ['light', 'dark'] as const) {
       return route.fulfill({ json: { ...INFO_CARD, phase: body.phase ?? 'done' } });
     });
 
-    const dialog = await openCompleteDialogFromDetail(page, INFO_CARD_ID, theme);
-    await expect(dialog.getByText(MERGE_LABEL)).toHaveCount(0);
-    await expect(dialog.getByRole('checkbox')).toHaveCount(0);
-    await expect(dialog.getByText(INFO_NOTE)).toBeVisible();
-    await evidenceShot(page, `complete-dialog-info-${theme}.png`);
-
-    await dialog.getByRole('button', { name: '完成', exact: true }).click();
-    await expect(dialog).toHaveCount(0);
+    await completeFromDetail(page, INFO_CARD_ID, theme);
+    await expect.poll(() => donePhase).toBe('done');
     expect(merges).toBe(0);
-    expect(donePhase).toBe('done');
   });
 }
 
-test('code card completion dialog keeps its merge row', async ({ page }) => {
+test('a delivered code card has no completion or merge choice', async ({ page }) => {
   await useTheme(page, 'dark');
-  await stubSurface(page, CODE_CARD);
-  const dialog = await openCompleteDialogFromDetail(page, CODE_CARD_ID, 'dark');
-  await expect(dialog.getByText(MERGE_LABEL)).toBeVisible();
-  await expect(dialog.getByText(INFO_NOTE)).toHaveCount(0);
+  await stubSurface(page, { ...CODE_CARD, phase: 'done' });
+  await page.goto(`/app/todo/${CODE_CARD_ID}`);
+  await expect(page.getByTestId('side-chat-status')).toContainText('已完成');
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
+  await expect(page.getByRole('menuitem', { name: '完成', exact: true })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: /合并/ })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: '完成任务' })).toHaveCount(0);
 });

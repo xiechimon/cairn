@@ -20,7 +20,7 @@ import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import { resolveNamedPrompt } from './named-prompts.js';
 import { assertPhaseTransition } from './phase.js';
-import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
+import { projectShipRouteOf } from './projects.js';
 import { appendShipGateInstruction, CUSTOM_NEEDS_PR, hasGithubPr, judgeShip } from './ship-gate.js';
 import { insertGateAnnouncement } from './transcript.js';
 
@@ -35,6 +35,11 @@ export async function requestMerge(
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
   if (todoRow.output === 'info') throw new HttpError(409, INFO_CARD_MERGE_REFUSAL);
+  if (todoRow.latestBuildId !== buildId)
+    throw new HttpError(409, 'Only the current delivery can be merged');
+  if (!['done', 'review', 'failed'].includes(todoRow.phase))
+    throw new HttpError(409, 'Finish the task before requesting a merge');
+  assertDeliveredBuild(deps, row);
   const laneRefusal = quickLaneRefusal(deps.db, todoRow);
   if (laneRefusal !== null) throw new HttpError(409, laneRefusal);
   assertNoMergeStepInFlight(deps, buildId);
@@ -45,18 +50,14 @@ export async function requestMerge(
   }
   if (shipRoute === 'custom' && !hasGithubPr(deps, buildId))
     throw new HttpError(409, CUSTOM_NEEDS_PR);
-  const judged = shipRoute === 'merge-gate' ? null : await judgeShip(deps, buildId);
+  const judged = shipRoute === 'custom' ? await judgeShip(deps, buildId) : null;
   const pr = shipRoute === 'custom' ? null : githubPrOf(deps, todoRow, row.prNumber);
   if (pr !== null) {
     return mergeThroughGithub(deps, row, pr.prNumber, pr.repoRef, actor ?? deps.user.displayName);
   }
-  if (
-    projectRow?.repoKind === 'local' &&
-    shipRoute !== 'custom' &&
-    (shipRoute === 'local-merge' || projectMergeConfigOf(projectRow).mergePolicy === 'autonomous')
-  ) {
+  if (projectRow?.repoKind === 'local' && shipRoute !== 'custom') {
     if (todoRow.phase === 'failed') assertDeliveredBuild(deps, row);
-    else assertPhaseTransition(todoRow.phase, 'done');
+    else if (todoRow.phase !== 'done') assertPhaseTransition(todoRow.phase, 'done');
     assertMergeTools(deps, todoRow);
     const git = deps.gitOps ?? systemGitOps;
     const localPath = projectRow.localPath;
@@ -67,25 +68,9 @@ export async function requestMerge(
     if (listing === null || listing.defaultBranch === null) {
       throw new HttpError(409, '无法读取本地仓库默认分支，拒绝走未受控合并');
     }
-    const local = await enqueueLocalMerge(
-      deps,
-      buildId,
-      projectRow.baseBranch ?? listing.defaultBranch,
-      shipRoute === 'local-merge',
-      todoRow.phase === 'failed',
-    );
-    if (local.enqueued) {
-      insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
-      return { delegated: true };
-    }
-    const blocking = local.readiness?.blockers ?? [];
-    if (blocking.length > 0) {
-      throw new HttpError(
-        409,
-        `本地合并未通过关口判定，无法落地：${blocking.map((b) => b.label).join('；')}`,
-      );
-    }
-    throw new HttpError(409, '本地合并未通过关口判定，无法落地');
+    await enqueueLocalMerge(deps, buildId, projectRow.baseBranch ?? listing.defaultBranch);
+    insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
+    return { delegated: true };
   }
   restoreFailedReview(deps, row);
   if (todoRow.phase === 'failed') {
@@ -93,7 +78,7 @@ export async function requestMerge(
     if (!restored) throw new NotFoundError(`todo ${row.todoId}`);
     todoRow = restored;
   }
-  assertPhaseTransition(todoRow.phase, 'done');
+  if (todoRow.phase !== 'done') assertPhaseTransition(todoRow.phase, 'done');
   assertMergeTools(deps, todoRow);
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   let prompt: string | undefined;
@@ -113,8 +98,16 @@ export async function requestMerge(
       configuredBaseBranch: projectRow.baseBranch,
     });
   }
-  if (prompt !== undefined) assertNoMergeStepInFlight(deps, buildId);
-  enqueueStep(deps, buildId, 'merge', todoRow.teamId, prompt);
+  const current = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+  if (
+    current?.latestBuildId !== buildId ||
+    current.archivedAt !== null ||
+    !['done', 'review', 'failed'].includes(current.phase) ||
+    current.projectId !== todoRow.projectId
+  )
+    throw new HttpError(409, 'The delivery changed while preparing the merge');
+  assertNoMergeStepInFlight(deps, buildId);
+  enqueueStep(deps, buildId, 'merge', todoRow.teamId, prompt, false, true);
   return { delegated: true };
 }
 

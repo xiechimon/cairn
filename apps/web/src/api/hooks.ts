@@ -875,11 +875,6 @@ export function useApiMutations(teamId: string | undefined) {
       }) => api.post<{ delegated: true }>(`/api/builds/${input.buildId}/steps`, input.body),
       onSuccess: invalidateAll,
     }),
-    mergeBuild: useMutation({
-      mutationFn: (buildId: string) =>
-        api.post<{ delegated: true }>(`/api/builds/${buildId}/merge`, {}),
-      onSuccess: invalidateAll,
-    }),
     stopBuild: useMutation({
       mutationFn: (input: { buildId: string; discard: boolean }) =>
         api.post<{ delegated: boolean }>(`/api/builds/${input.buildId}/stop`, {

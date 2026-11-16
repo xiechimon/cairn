@@ -492,7 +492,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
       ),
       output: str(
-        'Optional deliverable kind: "code" (default, changes the repository through the build→review→merge pipeline) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
+        'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
       ),
       blockedBy: idArr(
         'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
@@ -563,7 +563,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'complete_todos',
     description:
-      'Mark todos done without a merge step. Accepted for a review you own: one a review wake handed you (a research report, or a branch with no PR to merge) - that is how you accept it. Rejected at every other confirm/review gate: passing a gate the user owns is a human action (merge, or confirm on the board) - park the card there and notify the user instead (#900).',
+      'Accept a delivered research report you own and mark its todo done, without merging. Successful code tasks finish themselves. This tool does not approve plans or authorize a merge.',
     parameters: obj({ todoIds: idArr('Todo ids to complete.') }, ['todoIds']),
   },
   {
@@ -705,7 +705,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'merge_builds',
     description:
-      '(Blocked — merge is human-only. #1256, ADR 0018.) Merge reviewed builds into the default branch — only through the web UI human exit; calling this tool from a machine (chief/MCP) is hard-rejected.',
+      'Merge the current delivered builds only when the user explicitly instructed you to merge them. Completed tasks stay completed. Never call this on a completion, CI or other event, never decide to merge yourself, and never ask whether to merge. Branches and PRs stay unchanged unless the user requests a merge.',
     parameters: obj({ buildIds: idArr('Build ids to merge.') }, ['buildIds']),
   },
   {
@@ -911,7 +911,7 @@ export const CHIEF_REPLY_TOOLS: readonly RemoteToolDef[] = [
 export const CHIEF_TOOLS_REMOVED_UNDER_D60 = {
   run_builds: 'open_thread (the thread plans and implements on its own; no agent or plan mode)',
   confirm_builds: 'message_thread (a thread runs plan to self-check without a confirm gate)',
-  run_review: 'the merge gate (independent review is no longer started by hand)',
+  run_review: 'message_thread (request review as ordinary work; no mandatory review step)',
   split_todo: 'create_todo for each part and open_thread on each',
   agents: 'routing rules (the team has no agents; models and machines come from routing rules)',
   create_agent: 'routing rules (agents are no longer configured here)',

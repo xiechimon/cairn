@@ -57,15 +57,21 @@ export function hasMessageRow(
   );
 }
 
-export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string): void {
+export function finishTodoDone(
+  deps: BuildDeps,
+  todoId: string,
+  buildId: string,
+  extra: { hasChanges?: boolean } = {},
+): void {
   const current = deps.db
     .select({ phase: todo.phase })
     .from(todo)
     .where(eq(todo.id, todoId))
     .get()?.phase;
+  if (current === 'done') return;
   if (current !== undefined) assertPhaseTransition(current, 'done');
   stopUnclaimedGateSteps(deps, buildId);
-  setTodoPhase(deps, todoId, 'done', {}, { landedMerge: true });
+  setTodoPhase(deps, todoId, 'done', extra, { landedMerge: true });
   insertMessageRow(deps, buildId, {
     id: newRecordId(),
     role: 'system',

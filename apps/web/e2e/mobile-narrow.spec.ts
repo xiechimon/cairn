@@ -110,23 +110,12 @@ for (const width of [360, 390]) {
       }
     });
 
-    test('M7 审批弹层：合并对话框在视口内可关', async ({ page }) => {
+    test('M7 completion leaves no merge dialog on a narrow screen', async ({ page }) => {
       await page.goto(DETAIL_REVIEW);
       await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
       await page.getByRole('menuitem', { name: '完成' }).click();
-      const dialog = page.getByRole('dialog', { name: '完成任务' });
-      await expect(dialog).toBeVisible();
-      const box = (await dialog.boundingBox()) as {
-        x: number;
-        width: number;
-        y: number;
-        height: number;
-      };
-      expect(box.x).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width).toBeLessThanOrEqual(width);
-      expect(box.y).toBeGreaterThanOrEqual(0);
-      await page.keyboard.press('Escape');
-      await expect(dialog).toBeHidden();
+      await expect(page.getByRole('dialog', { name: '完成任务' })).toHaveCount(0);
+      await expect(page.getByTestId('side-chat')).toBeVisible();
     });
   });
 }

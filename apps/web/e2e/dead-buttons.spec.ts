@@ -259,7 +259,7 @@ test('transcript work summary collapses and re-expands call rows', async ({ page
 
 const REVIEW_DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 
-test('more menu `完成` opens the accept dialog on the review surface (#318)', async ({ page }) => {
+test('more menu `完成` does not open an accept dialog', async ({ page }) => {
   await page.goto(REVIEW_DETAIL);
   await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
 
@@ -270,7 +270,7 @@ test('more menu `完成` opens the accept dialog on the review surface (#318)', 
   await complete.click();
 
   await expect(menu).toBeHidden();
-  await expect(page.getByRole('dialog', { name: '完成任务' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '完成任务' })).toHaveCount(0);
 });
 
 test('more menu `关闭` is phase-gated by the server funnel edges (#318)', async ({ page }) => {

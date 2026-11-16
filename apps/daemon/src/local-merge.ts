@@ -140,8 +140,6 @@ export async function landLocalMerge(
   ) {
     return { outcome: 'recheck', reason: 'default-head-moved' };
   }
-  if (command.localChecks.length === 0)
-    return { outcome: 'checks-failed', reason: 'No required local checks configured' };
   const temp = mkdtempSync(join(tmpdir(), 'cairn-local-merge-'));
   const candidate = join(temp, 'candidate');
   let added = false;

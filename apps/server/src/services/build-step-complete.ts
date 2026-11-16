@@ -304,7 +304,7 @@ export function completeStep(
     return;
   }
   if (isBuildStepKind(stepRow.kind)) {
-    setTodoPhase(deps, todoRow.id, 'review', {
+    finishTodoDone(deps, todoRow.id, buildRow.id, {
       hasChanges: outcome.hasChanges ?? true,
     });
     return;
@@ -315,7 +315,7 @@ export function completeStep(
     insertMessageRow(deps, buildRow.id, {
       id: newRecordId(),
       role: 'system',
-      content: `合并步跑完了；本任务以 PR #${pr.prNumber} 在 GitHub 上合并为准，cairn 对账读到它合并后收尾。它若还开着：在审核关口点「合并」由 cairn 经 GitHub 合并，或直接在 GitHub 上合并。`,
+      content: `合并步跑完了；本任务以 PR #${pr.prNumber} 在 GitHub 上的状态为准，cairn 对账读到它合并后记录结果。`,
       createdAt: nowMs(),
     });
     return;

@@ -1,13 +1,11 @@
 import { UNSTARTED_STEP_STATUSES } from '@cairn/shared';
-import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne, or } from 'drizzle-orm';
 import { build, machine, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { retireMergeGateSteps } from './build-gate-steps.js';
 import { applyStoppedStep, stopStepKeepPhase } from './build-stop.js';
 import { applyStepFailure, type BuildDeps } from './builds.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
-import { projectOfTodo } from './git.js';
-import { projectMergeConfigOf } from './projects.js';
 import { parseShipGateInstruction, settleAbandonedShip } from './ship-gate.js';
 
 export const BUILD_ABANDONED_STEP_MS = 120_000;
@@ -22,7 +20,11 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     .innerJoin(todo, eq(build.todoId, todo.id))
     .where(
       and(
-        or(isNotNull(todo.archivedAt), inArray(todo.phase, ['closed', 'done'])),
+        or(
+          isNotNull(todo.archivedAt),
+          eq(todo.phase, 'closed'),
+          and(eq(todo.phase, 'done'), ne(step.kind, 'merge')),
+        ),
         inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
       ),
     )
@@ -68,8 +70,9 @@ function abandonedEnding(
   if (live && progressed) return null;
   return row.archiveStop !== null ||
     todoRow.archivedAt !== null ||
+    todoRow.latestBuildId !== row.buildId ||
     todoRow.phase === 'closed' ||
-    todoRow.phase === 'done'
+    (todoRow.phase === 'done' && row.kind !== 'merge')
     ? 'stop'
     : 'release';
 }
@@ -128,10 +131,6 @@ function releaseClaimedStep(
   if (row.archiveStop !== null) {
     applyStoppedStep(deps, row.id);
     return;
-  }
-  if (row.kind === 'merge' && row.prompt?.includes('"local-merge"')) {
-    const projectRow = projectOfTodo(deps.db, todoRow);
-    if (projectRow && projectMergeConfigOf(projectRow).mergePolicy === 'autonomous') return;
   }
   const noProgress =
     row.lastHeartbeatAt === null || row.lastHeartbeatAt <= (row.claimedAt ?? row.createdAt);

@@ -22,9 +22,6 @@ export type TranscriptRow = z.infer<typeof transcriptRowSchema>;
 
 export const MERGE_ANNOUNCEMENT = '发起了合并';
 
-export const MERGE_HUMAN_ONLY_COPY =
-  '合并动作只由人触发，机器（chief / MCP）不得合并。请在任务详情页的审阅关口点击「完成」按钮手动合并。';
-
 export const REVIEW_ANNOUNCEMENT = '发起了 AI 审核';
 
 export const CONFIRM_ANNOUNCEMENT = '通过了确认';

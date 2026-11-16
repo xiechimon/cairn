@@ -66,7 +66,7 @@ test('a task waiting for review has no chip above the composer; finishing lives 
   ).toHaveCount(0);
   await panel(page).getByRole('button', { name: '更多操作…' }).click();
   await page.getByRole('menuitem', { name: '完成' }).click();
-  await expect(page.getByRole('dialog', { name: '完成任务' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '完成任务' })).toHaveCount(0);
 });
 
 test('a plan waiting for approval shows no plan card or plan update in the conversation', async ({

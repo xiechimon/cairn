@@ -1,309 +1,189 @@
-import { CONTINUE_PROMPTS, type MergeBlocker, type MergeReadiness } from '@cairn/shared';
+import { CONTINUE_PROMPTS, conversationBranch, DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
-import {
-  build as buildTable,
-  project as projectTable,
-  step as stepTable,
-  todo as todoTable,
-} from '../src/db/schema.js';
+import { afterEach, expect, test } from 'vitest';
+import { build, project, step, team, todo } from '../src/db/schema.js';
 import { requestMerge } from '../src/services/build-merge-request.js';
-import { type BuildDeps, startBuilds } from '../src/services/builds.js';
-import { resumeAutonomyPauses } from '../src/services/github-autonomy-brake.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { parseShipGateInstruction, reverifyShip } from '../src/services/ship-gate.js';
-import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, insertMachine, pauseTeamForTest, postProject, req } from './helpers.js';
-
-const s = bootServer();
-insertMachine(s);
-afterAll(() => s.dispose());
+import { mergeGithubFake } from './fakes/github.js';
+import { bootServer, pauseTeamForTest, req, seedSessionRoute } from './helpers.js';
 
 const HEAD = 'a'.repeat(40);
-const MOVED = 'c'.repeat(40);
-
-const BLOCKER: MergeBlocker = {
-  code: 'review-missing',
-  class: 'transient',
-  label: 'review missing',
-  detail: [],
-};
-
-function readiness(headSha: string, blockers: MergeReadiness['blockers'] = []): MergeReadiness {
-  return {
-    ready: blockers.length === 0,
-    headSha,
-    patchDigest: 'd'.repeat(64),
-    policy: 'autonomous',
-    blockers,
-  };
-}
-
-function depsWith(verdict: () => MergeReadiness): BuildDeps {
-  return { ...s.svc, mergeVerdict: async () => verdict() };
-}
-
-async function reviewBuild(route: 'custom' | 'local-merge', withPr = true): Promise<string> {
-  const projectId = await postProject(s.app);
-  if (route === 'local-merge') {
-    s.db
-      .update(projectTable)
-      .set({ repoKind: 'local' })
-      .where(eq(projectTable.id, projectId))
-      .run();
-  }
-  if (route === 'custom' && withPr) {
-    s.db
-      .update(projectTable)
-      .set({ repoKind: 'github', githubRepo: 'octo/demo' })
-      .where(eq(projectTable.id, projectId))
-      .run();
-  }
-  await req(s.app, 'PUT', `/api/projects/${projectId}/ship-route`, { shipRoute: route });
-  const created = (await (
-    await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: 'ship me', spec: '' })
-  ).json()) as { id: string };
-  startBuilds(s.svc, {
-    projectId,
-    todoIds: [created.id],
-  });
-  setTodoPhase(s.svc, created.id, 'planning');
-  setTodoPhase(s.svc, created.id, 'confirm');
-  s.db
-    .update(todoTable)
-    .set({ phase: 'review', hasChanges: true })
-    .where(eq(todoTable.id, created.id))
-    .run();
-  const buildId =
-    s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()?.latestBuildId ?? '';
-  if (withPr) {
-    s.db.update(buildTable).set({ prNumber: 7 }).where(eq(buildTable.id, buildId)).run();
-  }
-  return buildId;
-}
-
-function mergeSteps(buildId: string) {
-  return s.db
-    .select()
-    .from(stepTable)
-    .where(eq(stepTable.buildId, buildId))
-    .all()
-    .filter((r) => r.kind === 'merge');
-}
-
-function setPaused(paused: boolean): void {
-  if (paused) pauseTeamForTest(s.db, s.team.id);
-  else resumeAutonomyPauses(s.db, s.team.id);
-}
-
-describe('every ship route needs a mergeable gate verdict for the current head', () => {
-  test('custom route with a blocked verdict enqueues no merge step', async () => {
-    const buildId = await reviewBuild('custom');
-    await expect(
-      requestMerge(
-        depsWith(() => readiness(HEAD, [BLOCKER])),
-        buildId,
-      ),
-    ).rejects.toMatchObject({ status: 409 });
-    expect(mergeSteps(buildId)).toHaveLength(0);
-  });
-
-  test('custom route on a local or PR-less build is refused and enqueues no step', async () => {
-    const localBuild = await reviewBuild('custom', false);
-    await expect(
-      requestMerge(
-        depsWith(() => readiness(HEAD)),
-        localBuild,
-      ),
-    ).rejects.toMatchObject({
-      status: 409,
-      message: expect.stringContaining('GitHub pull request'),
-    });
-    expect(mergeSteps(localBuild)).toHaveLength(0);
-  });
-
-  test('custom route on a local project is refused and enqueues no step', async () => {
-    const buildId = await reviewBuild('custom');
-    const projectId = s.db
-      .select({ projectId: todoTable.projectId })
-      .from(todoTable)
-      .innerJoin(buildTable, eq(buildTable.todoId, todoTable.id))
-      .where(eq(buildTable.id, buildId))
-      .get()?.projectId;
-    s.db
-      .update(projectTable)
-      .set({ repoKind: 'local', githubRepo: null })
-      .where(eq(projectTable.id, projectId ?? ''))
-      .run();
-    await expect(
-      requestMerge(
-        depsWith(() => readiness(HEAD)),
-        buildId,
-      ),
-    ).rejects.toMatchObject({ status: 409 });
-    expect(mergeSteps(buildId)).toHaveLength(0);
-  });
-
-  test('custom route without any verdict source fails closed', async () => {
-    const buildId = await reviewBuild('custom');
-    await expect(requestMerge(s.svc, buildId)).rejects.toMatchObject({ status: 409 });
-    expect(mergeSteps(buildId)).toHaveLength(0);
-  });
-
-  test('an open autonomy brake blocks the custom route even for a mergeable verdict', async () => {
-    const buildId = await reviewBuild('custom');
-    setPaused(true);
-    try {
-      await expect(
-        requestMerge(
-          depsWith(() => readiness(HEAD)),
-          buildId,
-        ),
-      ).rejects.toMatchObject({
-        status: 409,
-        message: expect.stringContaining('autonomy-paused'),
-      });
-      expect(mergeSteps(buildId)).toHaveLength(0);
-    } finally {
-      setPaused(false);
-    }
-  });
-
-  test('an open autonomy brake blocks the local-merge route', async () => {
-    const buildId = await reviewBuild('local-merge');
-    setPaused(true);
-    try {
-      await expect(
-        requestMerge(
-          depsWith(() => readiness(HEAD)),
-          buildId,
-        ),
-      ).rejects.toMatchObject({
-        status: 409,
-        message: expect.stringContaining('autonomy-paused'),
-      });
-      expect(mergeSteps(buildId)).toHaveLength(0);
-    } finally {
-      setPaused(false);
-    }
-  });
-
-  test('local-merge route with a blocked verdict enqueues no merge step', async () => {
-    const buildId = await reviewBuild('local-merge');
-    await expect(
-      requestMerge(
-        depsWith(() => readiness(HEAD, [BLOCKER])),
-        buildId,
-      ),
-    ).rejects.toMatchObject({ status: 409 });
-    expect(mergeSteps(buildId)).toHaveLength(0);
-  });
-
-  test('a mergeable verdict enqueues the custom step with the Ship prompt bound to the judged head', async () => {
-    const buildId = await reviewBuild('custom');
-    await req(s.app, 'PUT', '/api/prompts/ship', { text: 'Squash and push to main.' });
-    try {
-      await requestMerge(
-        depsWith(() => readiness(HEAD)),
-        buildId,
-      );
-      const [merge] = mergeSteps(buildId);
-      expect(merge?.prompt?.startsWith('Squash and push to main.')).toBe(true);
-      expect(merge?.prompt).toContain(`--match-head-commit ${HEAD}`);
-      expect(parseShipGateInstruction(merge?.prompt ?? null)).toEqual({
-        buildId,
-        judgedHead: HEAD,
-      });
-    } finally {
-      await req(s.app, 'DELETE', '/api/prompts/ship');
-    }
-  });
-
-  test('without an edit the custom step carries the default Ship text', async () => {
-    const buildId = await reviewBuild('custom');
-    await requestMerge(
-      depsWith(() => readiness(HEAD)),
-      buildId,
-    );
-    expect(mergeSteps(buildId)[0]?.prompt?.startsWith(CONTINUE_PROMPTS.merge)).toBe(true);
-  });
+const disposals: (() => void)[] = [];
+afterEach(() => {
+  for (const dispose of disposals.splice(0)) dispose();
 });
 
-describe('the merge step re-checks the verdict for the head it lands', () => {
-  async function enqueued() {
-    const buildId = await reviewBuild('custom');
-    await requestMerge(
-      depsWith(() => readiness(HEAD)),
-      buildId,
-    );
-    const row = mergeSteps(buildId)[0];
-    if (row === undefined) throw new Error('merge step missing');
-    return row;
-  }
+function world() {
+  const fake = mergeGithubFake({ 7: { state: 'open', merged: false, headSha: HEAD } }, () =>
+    conversationBranch('build'),
+  );
+  fake.setGreenRequiredChecks(HEAD);
+  const s = bootServer({ githubFetch: fake.fetch });
+  disposals.push(() => s.dispose());
+  s.db
+    .insert(project)
+    .values({
+      id: 'project',
+      teamId: s.team.id,
+      name: 'Custom delivery',
+      repoKind: 'github',
+      githubRepo: 'octo/demo',
+      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, shipRoute: 'custom' },
+    })
+    .run();
+  s.db
+    .insert(todo)
+    .values({
+      id: 'todo',
+      teamId: s.team.id,
+      projectId: 'project',
+      title: 'Delivered change',
+      phase: 'done',
+      phaseAt: Date.now(),
+      seqNum: 1,
+      latestBuildId: 'build',
+      hasChanges: true,
+    })
+    .run();
+  s.db
+    .insert(build)
+    .values({
+      id: 'build',
+      todoId: 'todo',
+      withPlan: false,
+      triggerSource: 'user',
+      createdAt: Date.now(),
+      prNumber: 7,
+    })
+    .run();
+  s.db
+    .insert(step)
+    .values({
+      id: 'delivery',
+      buildId: 'build',
+      kind: 'session',
+      status: 'done',
+      checkpointCommit: HEAD,
+      createdAt: Date.now(),
+    })
+    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub' });
+  upsertGithubConnection(
+    { db: s.db, box: s.secretBox },
+    {
+      teamId: s.team.id,
+      login: 'octo',
+      accessToken: 'test-token',
+      scope: 'repo',
+    },
+  );
+  const deps = { ...s.svc, box: s.secretBox, githubFetch: fake.fetch };
+  const merges = () =>
+    s.db
+      .select()
+      .from(step)
+      .all()
+      .filter((row) => row.kind === 'merge');
+  return { s, fake, deps, merges };
+}
 
-  test('same head and a mergeable verdict passes, ignoring the step own work-in-flight blocker', async () => {
-    const row = await enqueued();
-    const inFlight: MergeBlocker = { ...BLOCKER, code: 'work-in-flight' };
-    expect(
-      await reverifyShip(
-        depsWith(() => readiness(HEAD, [inFlight])),
-        row,
-      ),
-    ).toBeNull();
+test('explicit custom merge pins the completed delivery without a verdict or autonomy permission', async () => {
+  const w = world();
+  pauseTeamForTest(w.s.db, w.s.team.id);
+  w.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
+  await req(w.s.app, 'PUT', '/api/prompts/ship', { text: 'Squash and push to main.' });
+  await requestMerge(w.deps, 'build');
+  const [merge] = w.merges();
+  expect(merge?.prompt?.startsWith('Squash and push to main.')).toBe(true);
+  expect(merge?.prompt).toContain(`--match-head-commit ${HEAD}`);
+  expect(parseShipGateInstruction(merge?.prompt ?? null)).toEqual({
+    buildId: 'build',
+    judgedHead: HEAD,
   });
+  expect(await reverifyShip(w.deps, merge!)).toBeNull();
+  expect(w.s.db.select().from(todo).get()?.phase).toBe('done');
+  expect(w.fake.puts()).toEqual([]);
+  await expect(requestMerge(w.deps, 'build')).rejects.toThrow('合并步');
+  expect(w.merges()).toHaveLength(1);
+});
 
-  test('a head that moved after the verdict is refused', async () => {
-    const row = await enqueued();
-    expect(
-      await reverifyShip(
-        depsWith(() => readiness(MOVED)),
-        row,
-      ),
-    ).toMatch(/head/);
-  });
+test('a fresh custom route uses the existing Ship prompt', async () => {
+  const w = world();
+  await requestMerge(w.deps, 'build');
+  expect(w.merges()[0]?.prompt?.startsWith(CONTINUE_PROMPTS.merge)).toBe(true);
+});
 
-  test('a verdict that became blocked is refused', async () => {
-    const row = await enqueued();
-    expect(
-      await reverifyShip(
-        depsWith(() => readiness(HEAD, [BLOCKER])),
-        row,
-      ),
-    ).toMatch(/review missing/);
-  });
+test.each([
+  'no-pr',
+  'local',
+  'foreign-branch',
+  'fork',
+  'head',
+  'base',
+  'closed',
+  'checks',
+] as const)('custom merge refuses %s before issuing a command', async (state) => {
+  const w = world();
+  if (state === 'no-pr') w.s.db.update(build).set({ prNumber: null }).run();
+  if (state === 'local') w.s.db.update(project).set({ repoKind: 'local', githubRepo: null }).run();
+  const pull = w.fake.pulls[7]!;
+  if (state === 'foreign-branch') pull.headRef = 'someone/else';
+  if (state === 'fork') pull.headRepoId = 999;
+  if (state === 'head') pull.headSha = 'e'.repeat(40);
+  if (state === 'base') pull.baseRef = 'release';
+  if (state === 'closed') pull.state = 'closed';
+  if (state === 'checks')
+    w.fake.checkAnswers['/check-runs'] = {
+      status: 200,
+      body: { total_count: 0, check_runs: [] },
+    };
+  await expect(requestMerge(w.deps, 'build')).rejects.toMatchObject({ status: 409 });
+  expect(w.merges()).toEqual([]);
+  expect(w.fake.puts()).toEqual([]);
+});
 
-  test('an autonomy brake opened after enqueue is refused', async () => {
-    const row = await enqueued();
-    setPaused(true);
-    try {
-      expect(
-        await reverifyShip(
-          depsWith(() => readiness(HEAD)),
-          row,
-        ),
-      ).toMatch(/autonomy-paused/);
-    } finally {
-      setPaused(false);
-    }
-  });
+test.each(['archive', 'supersede', 'close'] as const)(
+  'custom merge refuses a delivery changed by %s during its PR read',
+  async (change) => {
+    const w = world();
+    w.fake.onGet = () => {
+      w.s.db
+        .update(todo)
+        .set(
+          change === 'archive'
+            ? { archivedAt: 1 }
+            : change === 'supersede'
+              ? { latestBuildId: 'newer' }
+              : { phase: 'closed' },
+        )
+        .run();
+    };
+    await expect(requestMerge(w.deps, 'build')).rejects.toMatchObject({ status: 409 });
+    expect(w.merges()).toEqual([]);
+  },
+);
 
-  test('a build without a GitHub PR is refused at claim time', async () => {
-    const row = await enqueued();
-    s.db.update(buildTable).set({ prNumber: null }).where(eq(buildTable.id, row.buildId)).run();
-    expect(
-      await reverifyShip(
-        depsWith(() => readiness(HEAD)),
-        row,
-      ),
-    ).toMatch(/GitHub pull request/);
-  });
+test.each(['head', 'checks', 'archive', 'supersede', 'no-pr'] as const)(
+  'custom merge rechecks %s before the machine claims it',
+  async (change) => {
+    const w = world();
+    await requestMerge(w.deps, 'build');
+    if (change === 'head') w.fake.pulls[7]!.headSha = 'e'.repeat(40);
+    if (change === 'checks')
+      w.fake.checkAnswers['/check-runs'] = {
+        status: 200,
+        body: { total_count: 0, check_runs: [] },
+      };
+    if (change === 'archive') w.s.db.update(todo).set({ archivedAt: 1 }).run();
+    if (change === 'supersede') w.s.db.update(todo).set({ latestBuildId: 'newer' }).run();
+    if (change === 'no-pr') w.s.db.update(build).set({ prNumber: null }).run();
+    expect(await reverifyShip(w.deps, w.merges()[0]!)).not.toBeNull();
+  },
+);
 
-  test('steps without a ship instruction are not touched', async () => {
-    const row = await enqueued();
-    expect(
-      await reverifyShip(
-        depsWith(() => readiness(MOVED)),
-        { ...row, prompt: 'plain' },
-      ),
-    ).toBeNull();
-  });
+test('steps without a custom merge instruction are unchanged', async () => {
+  const w = world();
+  const row = w.s.db.select().from(step).where(eq(step.id, 'delivery')).get()!;
+  expect(await reverifyShip(w.deps, row)).toBeNull();
 });

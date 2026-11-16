@@ -133,7 +133,7 @@ export function autonomousMergePolicy(
   };
 }
 
-export function claimAutonomousMerge(db: Db, buildId: string): void {
+export function claimAutonomousMerge(db: Db, buildId: string, explicit = false): void {
   db.transaction(
     (tx) => {
       const context = tx
@@ -145,8 +145,10 @@ export function claimAutonomousMerge(db: Db, buildId: string): void {
         .get();
       if (!context) throw conflict('Merge context is missing');
       const config = projectMergeConfigOf(context.project);
-      if (config.mergePolicy !== 'autonomous') return;
-      const brake = autonomousMergePolicy(tx, context.todo.teamId, config);
+      if (!explicit && config.mergePolicy !== 'autonomous') return;
+      const brake = explicit
+        ? { autonomyPaused: false, dailyCapReached: false }
+        : autonomousMergePolicy(tx, context.todo.teamId, config);
       if (brake.autonomyPaused) throw conflict('autonomy-paused: autonomous merging is paused');
       const id = `autonomous-merge-${buildId}`;
       if (
