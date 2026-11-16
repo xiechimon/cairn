@@ -22,7 +22,7 @@ import {
   utilityProcess,
 } from 'electron';
 import { type LocalRunner, startLocalRunner } from './runner.js';
-import { createUpdater } from './updater.js';
+import { createUpdater, removeLeftoverUpdates } from './updater.js';
 
 const LOOPBACK = '127.0.0.1';
 const READY_TIMEOUT_MS = 60_000;
@@ -242,6 +242,7 @@ async function boot(): Promise<void> {
       },
       (error: unknown) => console.error('Cairn Runner did not start:', error),
     );
+    void removeLeftoverUpdates();
     serveUpdates(server.origin);
     openWindow(server.origin);
   } catch (error) {
