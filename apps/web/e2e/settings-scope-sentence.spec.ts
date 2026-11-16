@@ -77,10 +77,11 @@ test('machines with the same name get an id suffix in the rows, the scope menu a
   );
 });
 
-test('an offline machine says when it was last online', async ({ page }) => {
+test('an offline machine keeps only its current status in the compact row', async ({ page }) => {
   await page.goto(DUPLICATES);
   const row = settings(page).getByTestId('machine-item').filter({ hasText: 'old-laptop' });
-  await expect(row.getByTestId('machine-last-seen')).toHaveText('最后在线 12 分钟前');
+  await expect(row.getByTestId('machine-item-status')).toHaveText('离线');
+  await expect(row.getByTestId('machine-last-seen')).toHaveCount(0);
 });
 
 test('scope menu wraps long machine names without clipping or overlapping adjacent options inside a phone viewport', async ({

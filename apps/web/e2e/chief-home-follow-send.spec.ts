@@ -202,6 +202,32 @@ test('scrolling up stops following, and the jump button resumes it', async ({ pa
   await expect(jump).toHaveAttribute('data-active', 'true');
 });
 
+test('a scroll up that lands after the stream re-renders stays where the reader put it', async ({
+  page,
+}) => {
+  await sendAtBottom(page);
+  await emit(page, { type: 'text_delta', text: `${paragraph(0)}\n\n` });
+  await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+
+  await viewport(page).evaluate(
+    async (node, [u, text]) => {
+      const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+      node.dispatchEvent(new WheelEvent('wheel', { deltaY: -700, bubbles: true }));
+      window.__es.find((es) => es.url.includes(u))?.emit({ type: 'text_delta', text });
+      await frame();
+      await frame();
+      node.scrollTop -= 700;
+      node.dispatchEvent(new Event('scroll'));
+    },
+    [streamUrl, `${paragraph(1)}\n\n`] as const,
+  );
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThan(300);
+  const parked = await gapToBottom(page);
+  for (let n = 2; n < 5; n++) await emit(page, { type: 'text_delta', text: `${paragraph(n)}\n\n` });
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThan(parked);
+  await expect(home(page).getByTestId('jump-to-latest')).toHaveAttribute('data-active', 'true');
+});
+
 for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-light'] as const) {
   test(`jump to latest is instant with ${activation} through a long lazy history`, async ({
     page,

@@ -82,6 +82,10 @@ test('agents admin-merge only a PR ian named in chat', () => {
 test('the review rules use the heading Codex reads and keep findings advisory', () => {
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(agents, /^## Code Review Rules$/m);
+  assert.match(agents, /another agent reads the change in a separate, read-only context/);
+  assert.match(agents, /it may use the author's model/);
+  assert.match(agents, /not a local `claude` command for a Sonnet review/);
+  assert.match(agents, /This does not enable code review by default/);
   assert.doesNotMatch(agents, /^## Review guidelines$/m);
   assert.doesNotMatch(agents, /P2\/P3 findings do not block/);
   assert.match(agents, /Findings are advisory at every severity/);

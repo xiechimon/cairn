@@ -472,6 +472,17 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
   });
 
+  test('flag on: a stored context size of 0 counts as no data and leaves the meter empty', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-zero');
+    await finishStep(deps(), machineId, 'turn-zero', {
+      status: 'success',
+      usage: [usage('stub-gw/stub-model', 0, 0, { contextTokens: 0 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toBeNull();
+  });
+
   test('flag on: cold-resume still sees a context-less turn model for route mismatch', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-cc-cold');
