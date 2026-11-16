@@ -440,6 +440,7 @@ function SkipLine({ onSkip, className }: { onSkip: () => void; className?: strin
       {t('不急的话可以')}
       <Button
         variant="link"
+        data-testid="first-run-skip"
         className="inline-flex h-auto min-h-6 p-0 align-baseline text-meta font-normal text-foreground underline decoration-content-tertiary underline-offset-4 pointer-coarse:-my-3 pointer-coarse:py-3"
         onClick={() => {
           skipSetup();

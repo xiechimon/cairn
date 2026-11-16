@@ -142,7 +142,8 @@ test('the new-project dialog says which step is missing until setup is done', as
 
 test('skipping goes to the Coordinator home; a team with projects never sees the page', async ({ page }) => {
   await open(page, fresh());
-  await page.getByRole('button', { name: '先跳过，去主页看看' }).click();
+  await page.locator('[data-testid="first-run-skip"]:visible').click();
+  await expect(page.getByTestId('team-row')).toBeVisible();
   await expect(page.getByTestId('first-run-setup')).toHaveCount(0);
   await expect(page.getByTestId('home-c')).toBeVisible();
 
