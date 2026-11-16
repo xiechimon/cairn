@@ -7,6 +7,8 @@ import {
   isIssueSourcedTask,
   orchestratedTodoIdOf,
   PLACEHOLDER_TITLE_FALLBACK,
+  type ProjectBasis,
+  parseReplyQuote,
   quoteSegments,
   RequestQuoteError,
   renderTaskText,
@@ -19,9 +21,10 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chiefMessage, todo } from '../db/schema.js';
+import { chiefMessage, chiefThread, project, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
+import { parseChiefTrigger } from './chief.js';
 import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
 import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
@@ -32,6 +35,89 @@ export interface RequestCtx {
   teamId: string;
   threadId: string;
   turnMessageIds?: readonly string[];
+  turnPrompt?: string | null;
+}
+
+type ProjectRow = typeof project.$inferSelect;
+
+function sourceIdOf(segment: TaskSegment): string | null {
+  if (segment.source.kind === 'chat') return segment.source.messageId;
+  if (segment.source.kind === 'answer') return segment.source.requestId;
+  return null;
+}
+
+function namesOf(row: ProjectRow): string[] {
+  return [row.name, row.repoName, row.githubRepo?.split('/').at(-1)]
+    .map((name) => (name ?? '').normalize('NFC').trim().toLowerCase())
+    .filter((name) => name.length >= 2);
+}
+
+function ownerWordsOf(segment: TaskSegment): string {
+  return (parseReplyQuote(segment.text)?.body ?? segment.text).normalize('NFC').toLowerCase();
+}
+
+function quickLaneBasis(
+  db: Db,
+  ctx: RequestCtx,
+  projectId: string,
+  segments: readonly TaskSegment[],
+): ProjectBasis {
+  const target = db
+    .select()
+    .from(project)
+    .where(and(eq(project.id, projectId), eq(project.teamId, ctx.teamId)))
+    .get();
+  if (target === undefined) throw new HttpError(404, `project ${projectId}`);
+  const turn = new Set(ctx.turnMessageIds ?? []);
+  const ownerTurn =
+    parseChiefTrigger(ctx.turnPrompt ?? null) === 'user' &&
+    segments.every((segment) => {
+      const id = sourceIdOf(segment);
+      return segment.author === 'owner' && id !== null && turn.has(id);
+    });
+  if (!ownerTurn) {
+    throw new HttpError(
+      400,
+      "lane quick needs an owner turn: cite only the owner's messages of this turn",
+    );
+  }
+  const threadRow = db
+    .select({ projectId: chiefThread.projectId })
+    .from(chiefThread)
+    .where(eq(chiefThread.id, ctx.threadId))
+    .get();
+  if (threadRow?.projectId === target.id) return { kind: 'channel', threadId: ctx.threadId };
+  const chatIds = segments.flatMap((segment) =>
+    segment.source.kind === 'chat' ? [segment.source.messageId] : [],
+  );
+  const picked =
+    chatIds.length > 0
+      ? db
+          .select({ id: chiefMessage.id })
+          .from(chiefMessage)
+          .where(
+            and(
+              eq(chiefMessage.threadId, ctx.threadId),
+              inArray(chiefMessage.id, chatIds),
+              eq(chiefMessage.projectId, target.id),
+            ),
+          )
+          .get()
+      : undefined;
+  if (picked !== undefined) return { kind: 'composer', messageId: picked.id };
+  const names = namesOf(target);
+  for (const [index, segment] of segments.entries()) {
+    const words = ownerWordsOf(segment);
+    const name = names.find((candidate) => words.includes(candidate));
+    if (name === undefined) continue;
+    return segment.source.kind === 'answer'
+      ? { kind: 'owner-answer', segment: index }
+      : { kind: 'owner-named', segment: index, name };
+  }
+  throw new HttpError(
+    400,
+    `lane quick needs a checkable destination for project ${target.id}: create it in that project's channel, or have the owner name it or pick it; otherwise ask_user which project`,
+  );
 }
 
 const NO_OWNER_WORDS =
@@ -203,6 +289,9 @@ export function createRequestTodo(
   if (params.sourceTodoId === undefined && messageIds.length === 0) {
     throw new HttpError(400, NO_OWNER_WORDS);
   }
+  if (params.lane === 'quick' && params.sourceTodoId !== undefined) {
+    throw new HttpError(400, "lane quick cites the owner's messages, not sourceTodoId");
+  }
   const cited =
     params.sourceTodoId !== undefined
       ? citedTodo(db, ctx, params.sourceTodoId)
@@ -213,6 +302,8 @@ export function createRequestTodo(
     requireUnboundMessages(db, ctx, segments);
   }
   requireTeamTodos(db, ctx.teamId, params.dependsOn ?? []);
+  const projectBasis =
+    params.lane === 'quick' ? quickLaneBasis(db, ctx, params.projectId, segments) : undefined;
   const keys = new Set(cited.map((c) => segmentKey(c.quoteSource)));
   const siblings = params.quotes === undefined ? [] : splitSiblings(db, ctx.teamId, keys);
   const request: TaskRequest = {
@@ -222,6 +313,7 @@ export function createRequestTodo(
     titleSource: segments[0]?.author ?? 'owner',
     titleSourceRef: segments[0]?.sourceRef ?? null,
     ...(params.research !== undefined ? { research: params.research } : {}),
+    ...(projectBasis !== undefined ? { lane: 'quick', projectBasis } : {}),
   };
   const record = createAutonomousTodo(deps, {
     teamId: ctx.teamId,
@@ -316,16 +408,34 @@ export function updateRequestTodo(
       );
     }
   }
-  const routed = updateAutonomousTodo(
-    deps,
-    params.todoId,
-    {
-      ...(summaryTitle !== undefined ? { title: summaryTitle } : {}),
-      ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
-      ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
-    },
-    summaryTitle !== undefined ? { textWriter: 'coordinator-title' } : {},
-  );
+  const routed = db.transaction(() => {
+    const before = db
+      .select({ projectId: todo.projectId, request: todo.request })
+      .from(todo)
+      .where(and(eq(todo.id, params.todoId), eq(todo.teamId, ctx.teamId)))
+      .get();
+    const updated = updateAutonomousTodo(
+      deps,
+      params.todoId,
+      {
+        ...(summaryTitle !== undefined ? { title: summaryTitle } : {}),
+        ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
+        ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+      },
+      summaryTitle !== undefined ? { textWriter: 'coordinator-title' } : {},
+    );
+    const request = before?.request;
+    if (
+      updated !== null &&
+      updated.projectId !== before?.projectId &&
+      request != null &&
+      (request.lane !== undefined || request.projectBasis !== undefined)
+    ) {
+      const { lane: _lane, projectBasis: _basis, ...ordinary } = request;
+      db.update(todo).set({ request: ordinary }).where(eq(todo.id, params.todoId)).run();
+    }
+    return updated;
+  });
   if (added === null || routed === null) return routed;
   const row = appendableRow(db, ctx, params.todoId);
   const request: TaskRequest = { ...row.request, segments: [...row.request.segments, ...added] };
