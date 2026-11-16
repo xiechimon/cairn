@@ -640,6 +640,7 @@ export const EN: Record<string, string> = {
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
   '请立即复制 API 密钥，它仅显示一次。': 'Copy the API key now — it is shown only once.',
+  '没能复制，请手动选中 API 密钥复制。': 'Could not copy; select the API key and copy it by hand.',
 
   // —— resources routes (r7 06–10, r2 §6) ——
   新建: 'New',
