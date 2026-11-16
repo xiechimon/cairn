@@ -163,6 +163,11 @@ const convHub = new ConversationStreamHub();
 const machineHub = new MachineWakeHub();
 const reposDir = reposDirOf(config);
 mkdirSync(reposDir, { recursive: true });
+const workspacesDirOf = () =>
+  localWorkspaceRoot(
+    config.homeDir,
+    resolve(process.env[ENV_VARS.workspacesDir] ?? join(config.homeDir, 'workspaces')),
+  );
 const attachmentsDir = attachmentsDirOf(config);
 mkdirSync(attachmentsDir, { recursive: true });
 const githubFetch = refreshingGithubFetch(
@@ -198,6 +203,9 @@ const app = createApp(
     githubAppIdentity: config.githubAppIdentity,
     githubFetch,
     reposDir,
+    get workspacesDir() {
+      return workspacesDirOf();
+    },
     attachmentsDir,
     backupStatusPath: backupStatusPathOf(config),
     deployRecordPath: deployRecordPathOf(config),
@@ -276,10 +284,7 @@ const coordinator = config.coordinatorInServer
         vapidKeys,
         reposDir,
         get workspacesDir() {
-          return localWorkspaceRoot(
-            config.homeDir,
-            resolve(process.env[ENV_VARS.workspacesDir] ?? join(config.homeDir, 'workspaces')),
-          );
+          return workspacesDirOf();
         },
         attachmentsDir,
         skillsDir: config.skillsDir,
