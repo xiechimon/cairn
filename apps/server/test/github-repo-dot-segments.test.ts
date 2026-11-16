@@ -318,7 +318,7 @@ describe('#1466 read path: legacy rows treated as "not a valid GitHub repo", zer
   );
 
   test.each(STORED_BAD_REFS)(
-    'R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（%s）',
+    'R7 PR delivery completes without outbound CI polling or repair steps (%s)',
     async (bad) => {
       const rec = recorder();
       const s = boot(rec);
@@ -331,7 +331,7 @@ describe('#1466 read path: legacy rows treated as "not a valid GitHub repo", zer
       );
       await poller.sweep();
       expect(rec.calls).toEqual([]);
-      expect(phaseOf(s, todoId)).toBe('review');
+      expect(phaseOf(s, todoId)).toBe('done');
       expect(stepsOf(s, buildId)).toEqual([{ kind: 'build', status: 'done' }]);
     },
   );
@@ -375,7 +375,7 @@ describe('#1466 read path: legacy rows treated as "not a valid GitHub repo", zer
       const projectId = insertGithubProject(s, bad);
       const b1 = newUuidv7();
       const b2 = newUuidv7();
-      const todoId = insertTodo(s, projectId, { phase: 'review', latestBuildId: b2 });
+      const todoId = insertTodo(s, projectId, { phase: 'done', latestBuildId: b2 });
       const base = nowMs();
       for (const [id, prNumber, at] of [
         [b1, 888, base - 120_000],
@@ -394,6 +394,10 @@ describe('#1466 read path: legacy rows treated as "not a valid GitHub repo", zer
           })
           .run();
       }
+      s.db
+        .insert(stepTable)
+        .values({ id: `step-${b2}`, buildId: b2, kind: 'build', status: 'done', createdAt: base })
+        .run();
       const result = await requestMerge(
         { ...s.svc, reposDir: s.reposDir, box: s.secretBox, githubFetch: rec.impl },
         b2,
@@ -407,23 +411,23 @@ describe('#1466 read path: legacy rows treated as "not a valid GitHub repo", zer
 
 describe('#1466 builds.ts delivery gate: legacy invalid githubRepo treated as "no GitHub repo" (R9)', () => {
   test.each(STORED_BAD_REFS)(
-    'R9 completeStep execution step delivering a PR -> review with no further step queued (%s)',
+    'R9 completeStep execution step delivering a PR -> done with no further step queued (%s)',
     (bad) => {
       const s = boot(recorder());
       const projectId = insertGithubProject(s, bad);
       const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId);
       completeStep(s.svc, stepId, { hasChanges: true });
-      expect(phaseOf(s, todoId)).toBe('review');
+      expect(phaseOf(s, todoId)).toBe('done');
       expect(stepsOf(s, buildId)).toEqual([{ kind: 'build', status: 'done' }]);
     },
   );
 
-  test('R9 control: a legal githubRepo PR delivery reaches user review with no further step enqueued', () => {
+  test('R9 control: a legal githubRepo PR delivery completes with no further step enqueued', () => {
     const s = boot(recorder());
     const projectId = insertGithubProject(s, VALID_REPO);
     const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId);
     completeStep(s.svc, stepId, { hasChanges: true });
-    expect(phaseOf(s, todoId)).toBe('review');
+    expect(phaseOf(s, todoId)).toBe('done');
     expect(stepsOf(s, buildId)).toEqual([{ kind: 'build', status: 'done' }]);
   });
 });

@@ -246,7 +246,7 @@ async function world(
 }
 
 describe('in-product merge gate', () => {
-  test('a finished GitHub build delivers to user review without queuing a reviewer', () => {
+  test('a finished GitHub build completes without queuing a reviewer', () => {
     return world('build', false).then(({ s, buildId, stepId }) => {
       completeStep(s.svc, stepId, { hasChanges: true });
       const reviews = s.db
@@ -256,7 +256,7 @@ describe('in-product merge gate', () => {
         .all()
         .filter((row) => row.kind === 'review');
       expect(reviews).toHaveLength(0);
-      expect(s.db.select().from(todo).where(eq(todo.id, 'todo-1794')).get()?.phase).toBe('review');
+      expect(s.db.select().from(todo).where(eq(todo.id, 'todo-1794')).get()?.phase).toBe('done');
       completeStep(s.svc, stepId, { hasChanges: true });
       expect(
         s.db
