@@ -92,7 +92,7 @@ npm i -g @xiechimon/cairn-cli
 cairn start --server http://127.0.0.1:8787
 ```
 
-它会打印一个链接；在打开着 Cairn 的浏览器里打开它，批准这台机器。执行机在别的机器上时，换成你 server 的地址。Linux 执行机的任务沙箱还需要 bubblewrap，见[上手指南](./docs/getting-started.md#keep-the-daemon-running-on-linux)。
+它会打印一个链接；在打开着 Cairn 的浏览器里打开它，批准这台机器。执行机在别的机器上时，换成你 server 的地址。Linux 执行机的任务沙箱还需要 bubblewrap，见[上手指南](./docs/getting-started.md#keep-the-daemon-running-on-linux)。在 macOS 和 Windows 上用 npm 跑 server 时，浏览器暂时不能批准这台机器、也不能添加服务商，这些要用 owner token 来做，见[上手指南](./docs/getting-started.md#run-the-server)。
 
 然后接上模型：在跑守护进程的机器上登录 Claude Code 或 Codex CLI；或者在网页里添加服务商，用 `claude setup-token` 得到的 Claude 令牌、API key 或自定义端点。还不能用的：服务商列表里的 OpenAI Codex 登录（标着“暂未开通”）和 Gemini CLI。GitHub Copilot 登录要先配好你自己的 GitHub OAuth App（`CAIRN_GITHUB_OAUTH_CLIENT_ID`、`CAIRN_GITHUB_OAUTH_CLIENT_SECRET`）。想在手机上跟进，看[用 Tailscale 私网访问](./docs/deploy/tailscale-mobile.md)。Docker 和从源码构建见[上手指南](./docs/getting-started.md)。
 

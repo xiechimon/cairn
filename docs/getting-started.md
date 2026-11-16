@@ -26,6 +26,15 @@ curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" http://127.0
 
 Open the returned code in the browser pairing page. Another device uses the same one-time code from Remote access. `cairn token` prints the owner token for this machine only. To reach the server from another machine, put Tailscale Serve or another route in front of loopback; the route does not sign the browser in. `CAIRN_AUTH=off` disables auth and works only on a loopback bind.
 
+A browser signed in with a pairing code is a paired device, not the owner, so on macOS and Windows, and in any browser on another machine, it cannot yet add providers, secrets or API keys, manage pairing, or approve the server's own machine as a Runner ([#5201](https://github.com/xiechimon/cairn/issues/5201)). Do those with the owner token for now. For example, to approve the Runner that `cairn start --server` printed a link for, take the `enroll=` value from that link:
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" -H "Content-Type: application/json" \
+  -d '{"enrollId":"<enroll value>"}' http://127.0.0.1:8787/api/machine/enroll/confirm
+```
+
+Cairn for Mac signs in as the owner and needs none of this.
+
 ## Run builds on your own machines
 
 The UI is fully usable without a daemon; register a machine when you want agents to actually run builds on it. On each machine that executes builds:

@@ -92,7 +92,7 @@ npm i -g @xiechimon/cairn-cli
 cairn start --server http://127.0.0.1:8787
 ```
 
-It prints a link; open it in the browser where Cairn is open and approve the machine. Use your server's address instead when the Runner is on another machine. A Linux Runner also needs bubblewrap for its task sandbox; see [getting started](./docs/getting-started.md#keep-the-daemon-running-on-linux).
+It prints a link; open it in the browser where Cairn is open and approve the machine. Use your server's address instead when the Runner is on another machine. A Linux Runner also needs bubblewrap for its task sandbox; see [getting started](./docs/getting-started.md#keep-the-daemon-running-on-linux). On macOS and Windows, the npm server's browser cannot yet approve that machine or add providers; those need the owner token, as [getting started](./docs/getting-started.md#run-the-server) shows.
 
 Then connect a model: sign in to Claude Code or the Codex CLI on a machine that runs the daemon, or add a provider in the web UI with a Claude token from `claude setup-token`, an API key, or a custom endpoint. Not available yet: OpenAI Codex sign-in in the provider list (it is marked as such) and Gemini CLI. GitHub Copilot sign-in needs your own GitHub OAuth App (`CAIRN_GITHUB_OAUTH_CLIENT_ID`, `CAIRN_GITHUB_OAUTH_CLIENT_SECRET`). To follow along from your phone, see [private access over Tailscale](./docs/deploy/tailscale-mobile.md). Docker and building from source are in [getting started](./docs/getting-started.md).
 
