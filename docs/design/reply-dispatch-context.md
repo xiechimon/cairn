@@ -35,7 +35,7 @@ Creation stores the snapshot atomically with request text and attachment grants.
 
 ## UI brief and acceptance
 
-Surface: existing task conversation, opening brief. References: the private Claude quote/reload and Amp image/reload captures named in the research record; existing shots in `docs/design/references/coordinator-chat/`. Compose existing user message, assistant text, `ReplyQuoteBlock`, and `ChatMarkdown` image preview, using project tokens. Rules: P1/P3/P5, C5/C11, V1/V2/V10, A2. This restores an existing conversation's lost content; no route, setting, mode, or new top-level surface is introduced.
+Surface: existing task conversation, opening brief. References: the private Claude quote/reload and Amp image/reload captures named in the research record; existing shots in `docs/design/references/coordinator-chat/`. Compose existing user message, assistant text, `ReplyQuoteBlock`, and `ChatMarkdown` image preview, using project tokens. Rules: P1/P3/P5, C5/C11/C18, V1/V2/V10, A2. This restores an existing conversation's lost content; no route, setting, mode, or new top-level surface is introduced.
 
 Before UI implementation, create a draft from existing components. States: normal inherited context; legacy/plain brief; missing or cyclic source; missing image; no-vision runtime; long quote; pending question and running execution below the brief; reload; 390px; light/dark. Loading and offline retain the existing task-loading behavior and stored snapshot; they add no new control.
 
