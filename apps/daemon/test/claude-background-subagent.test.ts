@@ -206,6 +206,30 @@ test('continuations stop at the cap and the session finishes with a subagent sti
   expect(events.at(-1)?.type).toBe('done');
 });
 
+test.each([false, true])(
+  'a turn after the input closed is not held for its subagent (notification=%s)',
+  async (notify) => {
+    const prompts = fakeCli(async (cli) => {
+      await cli.nextPrompt();
+      cli.emit(assistant('First answer.'));
+      cli.emit(result);
+      await tick();
+      cli.emit(started('agent-1', 'local_agent', 'late survey'));
+      cli.emit(assistant('Waiting.'));
+      cli.emit(result);
+      await tick();
+      if (notify) cli.emit(notified('agent-1', 'late result'));
+      await tick();
+    });
+
+    const events = await run();
+
+    expect(prompts).toHaveLength(1);
+    expect(events.filter((event) => event.type === 'done')).toHaveLength(1);
+    expect(events.some((event) => event.type === 'steer')).toBe(false);
+  },
+);
+
 test('an error while waiting ends the session with that error and no held success', async () => {
   const prompts = fakeCli(async (cli) => {
     await cli.nextPrompt();

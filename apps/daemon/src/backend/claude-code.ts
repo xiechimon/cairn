@@ -567,7 +567,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
 
   private holdForBackground(done: StepEvent): boolean {
     const running = this.background.pending;
-    if (running.length === 0 || this.stopping) return false;
+    if (running.length === 0 || this.stopping || this.inputEnded) return false;
     if (this.continuations >= BACKGROUND_SUBAGENT_CONTINUATIONS_MAX) return false;
     this.background.takeFinished();
     this.heldDone = done;
