@@ -320,7 +320,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'todos',
     description:
-      'List todo summaries within 32 KiB: {todos:[{id,seqNum,title,phase,summary}],total,nextOffset}. Continue with offset=nextOffset until null. Pass todoId separately to fetch one full todo including spec and assignment.',
+      'List todo summaries within 32 KiB: {todos:[{id,seqNum,title,phase,summary}],total,nextOffset}. Continue with offset=nextOffset until null. Pass query to keep only todos whose title or spec contains every term (case-insensitive); use it before create_todo to see whether a task already does the same thing. Pass todoId separately to fetch one full todo including spec and assignment.',
     parameters: obj({
       todoId: str('Optional todo id: return this full todo instead of the summary list.'),
       offset: {
@@ -330,6 +330,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
       projectId: str('Optional project id filter.'),
       phase: str(
         'Optional phase filter (todo/queued/planning/confirm/building/review/done/failed/closed).',
+      ),
+      query: str(
+        'Optional search terms separated by spaces (at most 8 distinct terms, 200 characters); every term must appear in the title or spec, case-insensitive. Ignored when todoId is set.',
       ),
     }),
     replaySafe: true,
