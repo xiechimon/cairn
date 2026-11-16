@@ -14,6 +14,9 @@ concurrency:
   group: desktop-release
   cancel-in-progress: false
 
+env:
+  VERSION: 0.1.${{ github.run_number }}
+
 jobs:
   decide:
     runs-on: ubuntu-latest
@@ -46,17 +49,17 @@ jobs:
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
 
-  release:
+  package:
     needs: decide
     if: needs.decide.outputs.release == 'true'
     runs-on: macos-latest
     environment: desktop-release
-    permissions:
-      contents: write
     timeout-minutes: 60
+    strategy:
+      matrix:
+        arch: [arm64, x64]
     env:
-      GH_TOKEN: ${{ github.token }}
-      VERSION: 0.1.${{ github.run_number }}
+      ARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
@@ -91,27 +94,65 @@ jobs:
           apps/desktop/scripts/import-signing-identity.sh "$RUNNER_TEMP/signing.p12" \
             "$RUNNER_TEMP/signing.password" apps/desktop/signing/cairn-mac-self-signed.crt
 
-      - name: Package arm64 and x64
+      - name: Package the app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         working-directory: apps/desktop
         run: |
           node build.mjs
-          pnpm exec electron-builder --mac dmg zip --arm64 --x64 -c.extraMetadata.version="$VERSION"
+          pnpm exec electron-builder --mac dmg zip "--$ARCH" -c.extraMetadata.version="$VERSION"
 
-      - name: Check that the update zips hold apps signed by the release certificate
+      - name: Check that the update zip holds an app signed by the release certificate
         working-directory: apps/desktop
         run: |
-          for arch in arm64 x64; do
-            mkdir -p "$RUNNER_TEMP/unzipped-$arch"
-            ditto -x -k "release/Cairn-$VERSION-$arch.zip" "$RUNNER_TEMP/unzipped-$arch"
-          done
+          mkdir -p "$RUNNER_TEMP/unzipped"
+          ditto -x -k "release/Cairn-$VERSION-$ARCH.zip" "$RUNNER_TEMP/unzipped"
           node scripts/check-signature.mjs signing/cairn-mac-self-signed.crt \
-            "$RUNNER_TEMP/unzipped-arm64/Cairn.app" "$RUNNER_TEMP/unzipped-x64/Cairn.app"
+            "$RUNNER_TEMP/unzipped/Cairn.app"
 
       - name: Launch the arm64 app before publishing it
+        if: matrix.arch == 'arm64'
         working-directory: apps/desktop
         run: pnpm smoke
+
+      - name: Keep the packaged files for the publish job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-${{ matrix.arch }}
+          path: |
+            apps/desktop/release/Cairn-${{ env.VERSION }}-${{ matrix.arch }}.dmg
+            apps/desktop/release/Cairn-${{ env.VERSION }}-${{ matrix.arch }}.zip
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          keychain="$RUNNER_TEMP/cairn-signing.keychain-db"
+          if [ -e "$keychain" ]; then
+            security delete-keychain "$keychain"
+          fi
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: apps/desktop/release
 
       - name: Write the update manifest
         working-directory: apps/desktop
@@ -129,11 +170,3 @@ jobs:
             Cairn-"$VERSION"-arm64.dmg Cairn-"$VERSION"-x64.dmg \
             Cairn-"$VERSION"-arm64.zip Cairn-"$VERSION"-x64.zip \
             desktop-latest.json
-
-      - name: Remove the signing keychain
-        if: always()
-        run: |
-          keychain="$RUNNER_TEMP/cairn-signing.keychain-db"
-          if [ -e "$keychain" ]; then
-            security delete-keychain "$keychain"
-          fi

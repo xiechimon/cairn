@@ -67,7 +67,7 @@ test('publishing pins the built commit before creating a release even after main
   const workflow = parse(
     readFileSync(new URL('../.github/workflows/desktop-release.yml', import.meta.url), 'utf8'),
   );
-  const script = workflow.jobs.release.steps.find(
+  const script = workflow.jobs.publish.steps.find(
     (step) => step.name === 'Publish the release',
   ).run;
   const root = makeTestTempDir('desktop-publish-');
@@ -124,4 +124,19 @@ test('publishing pins the built commit before creating a release even after main
     git('ls-remote', 'origin', 'refs/tags/desktop-v0.1.3').split(/\s/)[0],
     git('rev-parse', 'HEAD'),
   );
+});
+
+test('both architectures are packaged in parallel and published only after both succeed', () => {
+  const workflow = parse(
+    readFileSync(new URL('../.github/workflows/desktop-release.yml', import.meta.url), 'utf8'),
+  );
+  const manifest = readFileSync(
+    new URL('../apps/desktop/scripts/release-manifest.mjs', import.meta.url),
+    'utf8',
+  );
+  assert.deepEqual(workflow.jobs.package.strategy.matrix.arch, ['arm64', 'x64']);
+  assert.match(manifest, /ARCHS = \['arm64', 'x64'\]/);
+  assert.equal(workflow.jobs.publish.needs, 'package');
+  assert.equal(workflow.jobs.publish.permissions.contents, 'write');
+  assert.equal(workflow.jobs.package.permissions, undefined);
 });
