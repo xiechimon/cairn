@@ -517,3 +517,5 @@ Leave 15 GiB before starting; at 80% disk, enable retention first, then check th
 | MinIO | `cgr.dev/chainguard/minio@sha256:73297936408b731668ca0e835ac9add1a35cb6026a125c2f0cd476d9ef48222c` (MinIO no longer publishes container images, and the official Langfuse compose also switched to the Chainguard build; the Chainguard free tier only has `latest`, so it is pinned by digest) |
 
 Upgrade: change this table and the same set of tags in `ops/langfuse/docker-compose.yml`, stop the stack, `docker compose pull`, `up -d`. Langfuse runs migrations by itself within the same major version; for a major version, read the official upgrade guide first.
+
+For a reply missing from the page, continue with browser Network/Console, the server journal and read-only DB records; a successful model trace does not prove browser delivery. Keep credentials in the approved local secret source, out of threads, logs and committed files.
