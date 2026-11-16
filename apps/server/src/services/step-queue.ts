@@ -12,6 +12,8 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, routingRule, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { accountHeld } from './claude-account-hold.js';
+import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { type CoordinatorRouteRefusal, coordinatorRouteVerdict } from './coordinator-route.js';
 import {
@@ -97,6 +99,8 @@ export function stepQueueProjector(db: Db, teamId: string) {
       fallback: step.fallback,
       buildId: step.buildId,
       freshSession: step.freshSession,
+      byPerson: step.byPerson,
+      claudeSubscriptionId: step.claudeSubscriptionId,
       holdUntil: step.holdUntil,
       buildRow: build,
       todoRow: todo,
@@ -164,6 +168,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
   }
 
   const catalog = mergedCatalogModels();
+  const enabledId = enabledSubscriptionId({ db }, teamId);
 
   interface WorkerRouting {
     verdict: RouteVerdict;
@@ -185,7 +190,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     };
     const unavailable = (id: string) =>
       targetUnavailable(db, machineRowOf(id), teamId, facts, catalog, now);
-    const prior = priorSessionOf(db, row, row.buildRow);
+    const prior = priorSessionOf(db, row, row.buildRow, enabledId);
     const need = agentRow.requiredCapabilities?.os;
     const sole = platformFallbackMachineId(db, teamMachines, defaultMachineId, need);
     const verdict = routeVerdict({
@@ -196,6 +201,12 @@ export function stepQueueProjector(db: Db, teamId: string) {
         sole,
       ),
     });
+    if (
+      stepRuntimeFor(facts.model.provider) === 'claude-code' &&
+      accountHeld(row, prior, enabledId)
+    ) {
+      return { verdict, blocked: { kind: 'account-switched', missing: [] } };
+    }
     if (verdict.claim) return { verdict, blocked: undefined };
     const named = verdict.waitingFor;
     const platform = need === undefined ? {} : { platform: need };
