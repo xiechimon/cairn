@@ -2217,6 +2217,42 @@ export const EN: Record<string, string> = {
     "Connected by browser sign-in. Deleting removes only the tokens stored here; revoke the grant in {name}'s settings.",
   '换一个{label}': 'Replace {label}',
   '已连接 · {n} 个工具': 'Connected · {n#1 tool|# tools}',
+  代码已过期: 'Code expired',
+  '重新开始拿一个新代码。': 'Start again for a new code.',
+  已取消授权: 'Authorization cancelled',
+  '你在 GitHub 上取消了授权，这次什么都没有保存。':
+    'You cancelled on GitHub, so nothing was saved.',
+  连接失败: 'Connection failed',
+  '授权期间这个连接有了变动，这次授权没有保存，重新开始一次。':
+    'This connection changed while you were authorizing, so nothing was saved. Start again.',
+  'GitHub 没有完成授权，稍后重新开始一次。':
+    'GitHub did not finish authorizing. Start again in a moment.',
+  '没能开始连接 GitHub': 'Could not start connecting GitHub',
+  '这台服务器还没有设置 GitHub 登录，改用令牌连接。':
+    'GitHub sign-in is not set up on this server. Connect with a token instead.',
+  'GitHub 连接的名字都被占用了，先删掉一个旧的连接。':
+    'Every GitHub connection name is taken. Delete an old connection first.',
+  '暂时连不上 GitHub，稍后再试。': 'Cannot reach GitHub right now. Try again in a moment.',
+  '重新连接 GitHub': 'Reconnect GitHub',
+  '连接 GitHub': 'Connect GitHub',
+  '在 GitHub 上授权 Cairn': 'Authorize Cairn on GitHub',
+  '正在向 GitHub 要一个授权代码…': 'Getting a code from GitHub…',
+  '打开 GitHub': 'Open GitHub',
+  '打开 GitHub，输入下面的代码，然后点授权。': 'Open GitHub, enter the code below, then authorize.',
+  授权后自动继续: 'Continues once you authorize',
+  重新开始: 'Start again',
+  '选择 Cairn 能用的仓库': 'Choose the repositories Cairn can use',
+  仍然完成: 'Finish anyway',
+  '在 GitHub 上选好 Agent 能读写的仓库，以后也能改。':
+    'On GitHub, pick the repositories agents can read and write. You can change this later.',
+  '还没有选择仓库；组织仓库可能要等组织管理员批准。':
+    'No repositories chosen yet; organization repositories may need an admin to approve.',
+  'GitHub 拒绝了访问。组织可能要求先做 SSO 授权，或等管理员批准 Cairn 应用。':
+    'GitHub refused access. The organization may require SSO authorization or admin approval of the Cairn app.',
+  '删除只移除 Cairn 里的连接。': 'Deleting removes only this connection in Cairn.',
+  'Cairn 发 PR 也靠这份授权，别去 GitHub 撤销。':
+    'Cairn also opens PRs with this grant, so do not revoke it on GitHub.',
+  '已连接 · @{login} · {n} 个工具': 'Connected · @{login} · {n#1 tool|# tools}',
   需要重新授权: 'Needs sign-in',
   连不上: 'Unreachable',
   还没检查: 'Not checked yet',
