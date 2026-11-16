@@ -43,6 +43,7 @@ import {
 } from '../components/ui/select.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { BUILTIN_RUNTIME_LABEL } from '../routes/agent-model-select.js';
 
 type Mark = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -130,7 +131,7 @@ function TopModelRow({
           variant="ghost"
           size="icon-xs"
           aria-label={t('拖动排序 {model}', { model: name })}
-          className="top-model-grip -mx-1 cursor-grab touch-none text-content-tertiary active:cursor-grabbing max-sm:absolute max-sm:top-1/2 max-sm:left-3 max-sm:mx-0 max-sm:-translate-y-1/2"
+          className="top-model-grip -mx-1 pointer-coarse:size-11 cursor-grab touch-none text-content-tertiary active:cursor-grabbing max-sm:absolute max-sm:top-1/2 max-sm:left-3 max-sm:mx-0 max-sm:-translate-y-1/2"
           {...attributes}
           {...listeners}
         >
@@ -196,7 +197,7 @@ function TopModelRow({
           variant="ghost"
           size="icon-sm"
           aria-label={t('删除 {model}', { model: name })}
-          className="top-model-remove flex-none text-content-tertiary"
+          className="top-model-remove flex-none text-content-tertiary pointer-coarse:size-11"
           onClick={onRemove}
         >
           <X aria-hidden />
@@ -265,7 +266,9 @@ export function TopModelsCard({
             {runtimes.map((runtime) => (
               <DropdownMenuGroup key={runtime}>
                 <DropdownMenuLabel>
-                  {MODEL_SOURCE_RUNTIME_LABELS[runtime as ModelSourceRuntime] ?? runtime}
+                  {runtime === 'pi'
+                    ? t(BUILTIN_RUNTIME_LABEL)
+                    : (MODEL_SOURCE_RUNTIME_LABELS[runtime as ModelSourceRuntime] ?? runtime)}
                 </DropdownMenuLabel>
                 {unique
                   .filter((o) => o.runtime === runtime)

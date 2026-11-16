@@ -195,7 +195,8 @@ export function ModelPicker({
       </SelectTrigger>
       <SelectContent
         className="routing-rule-model-menu w-max min-w-(--anchor-width) max-w-(--available-width)"
-        {...(trigger === undefined ? {} : { alignItemWithTrigger: false, align: 'end' as const })}
+        alignItemWithTrigger={false}
+        {...(trigger === undefined ? {} : { align: 'end' as const })}
       >
         {runtimes.map((runtime) => (
           <SelectGroup key={runtime}>
