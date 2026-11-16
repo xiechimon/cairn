@@ -113,7 +113,13 @@ test.runIf(live)(
     const handle = await liveLaunch(['/bin/sh', '-c', 'printf "%s\\n" "$CONFINE_SENTINEL"; cat']);
     const metadata = spawnSync(
       'systemctl',
-      ['--user', 'show', handle.unit, '-p', 'ExecStart,BindsTo,KillMode,ExitType,Delegate'],
+      [
+        '--user',
+        'show',
+        handle.unit,
+        '-p',
+        'ExecStart,BindsTo,KillMode,ExitType,Delegate,ProtectControlGroups',
+      ],
       {
         encoding: 'utf8',
       },
@@ -123,6 +129,7 @@ test.runIf(live)(
     expect(metadata.stdout).toContain('KillMode=control-group');
     expect(metadata.stdout).toContain('ExitType=cgroup');
     expect(metadata.stdout).toContain('Delegate=no');
+    expect(metadata.stdout).toContain('ProtectControlGroups=no');
     const group = taskGroup(handle.unit);
     const path = `/sys/fs/cgroup${group}/cgroup.events`;
     const fd = openSync(path, 'r');
@@ -147,6 +154,27 @@ test.runIf(live)(
     }
   },
 );
+
+test.runIf(live)('real systemd: every cgroup mount the task sees is read-only', async () => {
+  const handle = await liveLaunch([
+    '/bin/sh',
+    '-c',
+    'group=/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup); test -f "$group/cgroup.procs" && echo own-group-visible; mkdir "$group/child" 2>&1; echo +pids 2>&1 > "$group/cgroup.subtree_control"; while read -r id parent device root point options rest; do case "$rest" in *" - cgroup2 "* | *" - cgroup "*) echo "mount $point $options" ;; esac; done < /proc/self/mountinfo',
+  ]);
+  let output = '';
+  handle.process.stdout.on('data', (chunk) => {
+    output += chunk;
+  });
+  handle.process.stdout.resume();
+  handle.process.stdin.end();
+  await handle.completed;
+  const lines = output.trim().split('\n');
+  expect(lines[0]).toBe('own-group-visible');
+  expect(lines.filter((line) => line.endsWith('Read-only file system'))).toHaveLength(2);
+  const mounts = lines.filter((line) => line.startsWith('mount '));
+  expect(mounts.length).toBeGreaterThan(0);
+  for (const mount of mounts) expect(mount.split(' ')[2]?.split(',')).toContain('ro');
+});
 
 test.runIf(live)('real systemd: a process escaping into the unit blocks removal', async () => {
   const handle = await liveLaunch(['/bin/cat']);

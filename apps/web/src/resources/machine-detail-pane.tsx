@@ -59,6 +59,10 @@ export function sandboxNotice(capabilities: MachineRow['capabilities']): string 
           return '任务沙箱没就绪：后台服务没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。';
         case 'bwrap-missing':
           return '任务沙箱没就绪：这台机器没装 bubblewrap（`bwrap`）。装好后（如 `sudo pacman -S bubblewrap` 或 `sudo apt install bubblewrap`），执行机每分钟会自己再检查一次。';
+        case 'bwrap-too-old':
+          return '任务沙箱没就绪：这台机器的 bubblewrap（`bwrap`）太旧，没有沙箱要用的 overlay 选项，要 0.11 或更新（Ubuntu 24.04 和 Debian 12 自带的都更旧）。按 `https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#sandbox-on-ubuntu-2404-and-debian-12` 从源码装到 `/usr/local`，再确认 `command -v bwrap` 输出 `/usr/local/bin/bwrap`，执行机每分钟会自己再检查一次。';
+        case 'userns-denied':
+          return '任务沙箱没就绪：系统不让 `bwrap` 创建用户命名空间。Ubuntu 上要给执行机用的 `bwrap` 加一个 AppArmor 配置，其他发行版要打开非特权用户命名空间（Debian 内核是 `kernel.unprivileged_userns_clone=1`），命令见 `https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#sandbox-on-ubuntu-2404-and-debian-12`。改好后执行机每分钟会自己再检查一次。';
         case 'home-overlay-failed':
           return cause.mountPoint === undefined
             ? '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，执行机每分钟会自己再检查一次。'

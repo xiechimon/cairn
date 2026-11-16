@@ -10713,6 +10713,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                   "enum": [
                     "not-own-unit",
                     "bwrap-missing",
+                    "bwrap-too-old",
+                    "userns-denied",
                     "home-overlay-failed",
                   ],
                   "type": "string",
