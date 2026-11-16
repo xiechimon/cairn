@@ -3,6 +3,7 @@ import {
   accessSync,
   constants,
   copyFileSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   realpathSync,
@@ -15,7 +16,6 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { runWorkspaceHook } from '../src/workspace-hooks.js';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
-const husky = join(repo, 'node_modules/husky/bin.js');
 const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
 const roots: string[] = [];
 
@@ -95,12 +95,11 @@ function fixture(overrides: NodeJS.ProcessEnv = {}, stubs = ['corepack', 'pnpm',
     GIT_COMMITTER_EMAIL: 'setup@example.com',
     CAIRN_TEST_LOG: log,
     CAIRN_TEST_PIDS: pids,
-    CAIRN_TEST_HUSKY: husky,
     CAIRN_TEST_GIT: realGit,
     ...overrides,
   };
   execFileSync(realGit, ['clone', '--shared', '--quiet', '--sparse', repo, clone], { env });
-  execFileSync(realGit, ['sparse-checkout', 'set', '.agents', '.husky'], { cwd: clone, env });
+  execFileSync(realGit, ['sparse-checkout', 'set', '.agents'], { cwd: clone, env });
   mkdirSync(join(clone, '.agents'), { recursive: true });
   for (const name of ['setup', 'resume']) {
     copyFileSync(join(repo, '.agents', name), join(clone, '.agents', name));
@@ -116,7 +115,7 @@ function fixture(overrides: NodeJS.ProcessEnv = {}, stubs = ['corepack', 'pnpm',
       join(bin, name),
       String.raw`#!${process.execPath}
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, chmodSync } from 'node:fs';
+import { appendFileSync } from 'node:fs';
 appendFileSync(process.env.CAIRN_TEST_PIDS, process.pid + '\n');
 const command = ${JSON.stringify(name)};
 const args = process.argv.slice(2);
@@ -138,13 +137,6 @@ if (command === 'git') {
 }
 if (command === 'corepack') process.exit(Number(process.env.CAIRN_TEST_COREPACK_EXIT || 0));
 if (args[0] === 'install') process.exit(Number(process.env.CAIRN_TEST_INSTALL_EXIT || 0));
-if (args.join(' ') === 'exec husky') {
-  if (process.env.CAIRN_TEST_SKIP_HUSKY === '1') process.exit(0);
-  const result = spawnSync(process.execPath, [process.env.CAIRN_TEST_HUSKY], { stdio: 'inherit' });
-  if (result.status) process.exit(result.status);
-  if (process.env.CAIRN_TEST_HOOK_MODE === '644') chmodSync('.husky/_/pre-push', 0o644);
-  process.exit(0);
-}
 if (args.join(' ') === 'exec playwright install chromium') process.exit(Number(process.env.CAIRN_TEST_BROWSER_EXIT || 0));
 process.exit(1);
 `,
@@ -192,14 +184,14 @@ process.exit(1);
   };
 }
 
-test('setup is executable, installs real hooks twice in a fresh clone and leaves it clean', () => {
+test('setup is executable, installs dependencies twice without Git hooks and leaves a fresh clone clean', () => {
   accessSync(join(repo, '.agents/setup'), constants.X_OK);
   const f = fixture({ PLAYWRIGHT_BROWSERS_PATH: '/unused-cache' });
   for (let run = 0; run < 2; run += 1) {
     const result = f.run('setup');
     expect(result.error).toBeUndefined();
     expect(result.status, result.stderr).toBe(0);
-    accessSync(join(f.clone, '.husky/_/pre-push'), constants.X_OK);
+    expect(existsSync(join(f.clone, '.husky'))).toBe(false);
     expect(f.status()).toBe('');
   }
   const commands = f.commands();
@@ -207,7 +199,6 @@ test('setup is executable, installs real hooks twice in a fresh clone and leaves
     Array.from({ length: 2 }, () => [
       ['corepack', 'enable'],
       ['pnpm', 'install', '--frozen-lockfile'],
-      ['pnpm', 'exec', 'husky'],
       ['pnpm', 'exec', 'playwright', 'install', 'chromium'],
     ]).flat(),
   );
@@ -223,7 +214,6 @@ test('setup skips corepack when the Node runtime no longer ships it', () => {
   expect(result.status, result.stderr).toBe(0);
   expect(f.commands().map(({ command, args }) => [command, ...args])).toEqual([
     ['pnpm', 'install', '--frozen-lockfile'],
-    ['pnpm', 'exec', 'husky'],
     ['pnpm', 'exec', 'playwright', 'install', 'chromium'],
   ]);
 });
@@ -242,8 +232,6 @@ test('setup contains no backgrounding or server launch commands', () => {
 test.each([
   { CAIRN_TEST_COREPACK_EXIT: '2' },
   { CAIRN_TEST_INSTALL_EXIT: '3' },
-  { CAIRN_TEST_SKIP_HUSKY: '1' },
-  { CAIRN_TEST_HOOK_MODE: '644' },
   { CAIRN_TEST_BROWSER_EXIT: '4' },
 ])('setup fails rather than reporting incomplete setup as ready: %j', (env) => {
   const f = fixture(env);
