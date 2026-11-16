@@ -440,6 +440,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }[] = [];
   private closed = false;
   private stopping = false;
+  private inputEnded = false;
 
   constructor(
     q: Query,
@@ -465,6 +466,8 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }
 
   private async pump(): Promise<void> {
+    let finished: StepEvent | undefined;
+    let turnAfterFinish = false;
     try {
       for await (const msg of this.q) {
         const before = this.state.rateLimits.length;
@@ -480,6 +483,14 @@ class ClaudeSessionHandle implements AgentSessionHandle {
               this.spans?.toolStart(ev.call.id, Date.now(), ev.call.name, ev.call.arguments);
             }
           }
+          if (ev.type === 'done') {
+            finished = ev;
+            this.flushSteers();
+            this.inputEnded = true;
+            this.input.end();
+            continue;
+          }
+          if (finished !== undefined) turnAfterFinish = true;
           this.queue.push(ev);
           if (TERMINAL_EVENT_TYPES.includes(ev.type)) {
             return;
@@ -487,8 +498,13 @@ class ClaudeSessionHandle implements AgentSessionHandle {
         }
         this.flushSteers();
       }
+      if (finished !== undefined) this.queue.push(finished);
     } catch (err) {
       if (this.stopping) {
+        return;
+      }
+      if (finished !== undefined && !turnAfterFinish) {
+        this.queue.push(finished);
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
@@ -511,7 +527,8 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }
 
   async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
-    if (this.closed) throw new Error('claude-code session closed before steer delivery');
+    if (this.closed || this.inputEnded)
+      throw new Error('claude-code session closed before steer delivery');
     return new Promise<void>((resolve, reject) => {
       this.pendingSteers.push({ message: buildUserMessage(text, images), text, resolve, reject });
       this.flushSteers();
@@ -519,7 +536,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }
 
   private flushSteers(): void {
-    if (this.closed || this.state.runningTools.size > 0) return;
+    if (this.closed || this.inputEnded || this.state.runningTools.size > 0) return;
     for (const pending of this.pendingSteers.splice(0)) {
       this.input.push(pending.message);
       this.queue.push({ type: 'steer', text: pending.text });
