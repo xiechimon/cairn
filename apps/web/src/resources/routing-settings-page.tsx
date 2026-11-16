@@ -24,7 +24,7 @@ import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { useTopModels, useTopModelsMutations } from '../api/top-models.js';
 import { QueryBoundary } from '../components/query-state.js';
-import { SettingsCard, SettingsRow, SettingsSection } from '../components/settings-list.js';
+import { SettingsCard, SettingsRow } from '../components/settings-list.js';
 import {
   Select,
   SelectContent,
@@ -388,11 +388,6 @@ export function RoutingSettingsPage() {
         empty={null}
       >
         <div className="flex flex-col gap-8 pt-1 pb-16">
-          <p className="m-0 text-meta text-pretty break-keep text-content-tertiary">
-            {t(
-              '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。评审等其他用途的模型，在模型路由的图里能看到。',
-            )}
-          </p>
           <RuleIssueNotices
             issues={settings.ruleIssues ?? []}
             options={options}
@@ -417,6 +412,31 @@ export function RoutingSettingsPage() {
               enabledRuntimes={enabledRuntimes}
               onSave={save('session')}
             />
+            {agentUses.map((use) => (
+              <RuleRow
+                key={use}
+                use={use}
+                label={t(ROUTE_USE_LABELS[use])}
+                hint={
+                  use === 'coordinator' && ruleOf(use) === null ? (
+                    settings.coordinatorDefault !== undefined ? (
+                      <CoordinatorDefaultHint
+                        coordinatorDefault={settings.coordinatorDefault}
+                        options={options}
+                      />
+                    ) : (
+                      t('先给 Coordinator 选模型，它才能回答你的消息。')
+                    )
+                  ) : (
+                    t(USE_HINTS[use] ?? '')
+                  )
+                }
+                rule={ruleOf(use)}
+                options={options}
+                enabledRuntimes={enabledRuntimes}
+                onSave={save(use)}
+              />
+            ))}
           </SettingsCard>
           {(!live || topModelsQ.data !== undefined) && (
             <TopModelsCard
@@ -436,35 +456,6 @@ export function RoutingSettingsPage() {
               }}
             />
           )}
-          <SettingsSection testId="routing-agents" title={t('Coordinator 和其他 Agent')}>
-            <SettingsCard>
-              {agentUses.map((use) => (
-                <RuleRow
-                  key={use}
-                  use={use}
-                  label={t(ROUTE_USE_LABELS[use])}
-                  hint={
-                    use === 'coordinator' && ruleOf(use) === null ? (
-                      settings.coordinatorDefault !== undefined ? (
-                        <CoordinatorDefaultHint
-                          coordinatorDefault={settings.coordinatorDefault}
-                          options={options}
-                        />
-                      ) : (
-                        t('先给 Coordinator 选模型，它才能回答你的消息。')
-                      )
-                    ) : (
-                      t(USE_HINTS[use] ?? '')
-                    )
-                  }
-                  rule={ruleOf(use)}
-                  options={options}
-                  enabledRuntimes={enabledRuntimes}
-                  onSave={save(use)}
-                />
-              ))}
-            </SettingsCard>
-          </SettingsSection>
         </div>
       </QueryBoundary>
     </PageShell>

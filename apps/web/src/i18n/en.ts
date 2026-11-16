@@ -1654,8 +1654,6 @@ export const EN: Record<string, string> = {
   新任务用这个模型和思考强度开始: 'New tasks start with this model and thinking level',
   对话摘要: 'Conversation summaries',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
-  '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。评审等其他用途的模型，在模型路由的图里能看到。':
-    'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See models for review and other uses in the Model routing graph.',
   '先给 Coordinator 选模型，它才能回答你的消息。':
     'Pick a model for the Coordinator so it can answer your messages.',
   '「{name}」验证通过': '{name} verified',
