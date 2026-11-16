@@ -3,18 +3,8 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import * as dbClient from '../src/db/client.js';
-import {
-  build,
-  chiefReport,
-  machine,
-  message,
-  routingRule,
-  team,
-  todo,
-  tokenUsage,
-} from '../src/db/schema.js';
+import { build, machine, message, routingRule, team, todo, tokenUsage } from '../src/db/schema.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
-import { ingestIntake } from '../src/services/intake-items.js';
 import { createProvider } from '../src/services/providers.js';
 import {
   checkedResearchReport,
@@ -618,47 +608,6 @@ describe('research citation handoff', () => {
     const checker = openCitationCheck(s.svc, opened.buildId)!;
     land(s, checker.buildId, 'Everything looks fine.', 'gpt-6.1-sol');
     expect(checkedResearchReport(s.db, opened.buildId)).toBeNull();
-  });
-  test('intake waits for the audit and only lists supported claim and URL pairs', async () => {
-    const items = [
-      { url, claim },
-      { url, claim: 'This is free.' },
-    ];
-    const { s, opened } = await world(
-      true,
-      `Intake\n\n\`\`\`json\n${JSON.stringify(items)}\n\`\`\``,
-    );
-    s.db
-      .insert(chiefReport)
-      .values({
-        id: 'daily-1',
-        chiefId: 'chief-1',
-        teamId: s.team.id,
-        day: '2026-11-04',
-        threadId: 'main',
-        status: 'posted',
-        createdAt: 1,
-      })
-      .run();
-    const target = { id: 'daily-1', teamId: s.team.id, chiefId: 'chief-1' };
-    expect(ingestIntake(s.db, target, Date.now())).toBe(0);
-    const checker = openCitationCheck(s.svc, opened.buildId)!;
-    land(
-      s,
-      checker.buildId,
-      receipt([
-        supported,
-        {
-          ...supported,
-          claim: 'This is free.',
-          verdict: 'unsupported',
-          quote: '',
-          reason: 'No price claim.',
-        },
-      ]),
-      'gpt-6.1-sol',
-    );
-    expect(ingestIntake(s.db, target, Date.now())).toBe(1);
   });
 });
 

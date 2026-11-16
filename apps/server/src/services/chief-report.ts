@@ -3,7 +3,6 @@ import type {
   ChiefReportLedger,
   ChiefReportSuggestion,
   ChiefReportTodoRef,
-  IntakeItem,
   RetroProposal,
 } from '@cairn/shared';
 import {
@@ -18,7 +17,6 @@ import {
   isActiveStepStatus,
   MAIL_FENCE_OPEN,
   quoteIssueLines,
-  RESEARCH_INTAKE_ITEM_SOURCE_KIND,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
 import { and, asc, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
@@ -42,7 +40,6 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { askQuestionContentOf } from './chief-questions.js';
 import type { ConversationStreamHub } from './events.js';
-import { ingestIntake, pendingIntakeReports } from './intake-items.js';
 import { listNeedsYou } from './needs-you.js';
 import { listedProjects } from './personal-space.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
@@ -777,21 +774,6 @@ function proposalsOf(db: Db, reportId: string): RetroProposal[] {
     }));
 }
 
-function intakeOf(db: Db, reportId: string): IntakeItem[] {
-  return proposalRows(db, reportId)
-    .filter((row) => row.sourceKind === INTAKE_SOURCE_KIND)
-    .map((row) => ({
-      id: row.id,
-      url: row.sourceId,
-      claim: row.what,
-      matches: row.why,
-      action: row.safeguard,
-      projectId: row.projectId,
-      status: row.status,
-      todoId: row.todoId,
-    }));
-}
-
 type Effects = (() => void)[];
 
 function writeReportRow(
@@ -841,7 +823,6 @@ function pushReport(
           `失败 ${y.failedCount}`,
           `等你 ${content.needsYou.count}`,
           ...(content.retro.length > 0 ? [`改进建议 ${content.retro.length}`] : []),
-          ...((content.intake ?? []).length > 0 ? [`外部动态 ${content.intake?.length}`] : []),
         ].join(' · ')
       : '日报没写成，先看昨天的数字';
   effects.push(() =>
@@ -876,7 +857,6 @@ function reportContent(
     yesterday: computeLedger(deps.db, rec.teamId, inputs.coversStart, inputs.coversEnd),
     needsYou: needsYouFacts(deps.db, rec.teamId, rec.threadId, now),
     retro: proposalsOf(deps.db, rec.id),
-    intake: intakeOf(deps.db, rec.id),
     retroRan,
     truncated: inputs.truncated,
   };
@@ -884,10 +864,7 @@ function reportContent(
 
 function isEmptyReport(content: ChiefReportContent): boolean {
   return (
-    ledgerEmpty(content.yesterday) &&
-    content.needsYou.count === 0 &&
-    content.retro.length === 0 &&
-    (content.intake ?? []).length === 0
+    ledgerEmpty(content.yesterday) && content.needsYou.count === 0 && content.retro.length === 0
   );
 }
 
@@ -900,7 +877,6 @@ export function postReportWithoutRun(
   const settled = { ...rec, inputs };
   const effects: Effects = [];
   deps.db.transaction(() => {
-    ingestIntake(deps.db, settled, now);
     const content = reportContent(deps, settled, inputs, 'posted', false, now);
     const empty = isEmptyReport(content);
     if (!empty) {
@@ -914,37 +890,6 @@ export function postReportWithoutRun(
       .run();
   });
   for (const effect of effects) effect();
-}
-
-export function retryPendingIntakeReports(deps: ReportDeps, now: number): void {
-  for (const reportId of pendingIntakeReports(deps.db)) {
-    const rec = deps.db.select().from(chiefReport).where(eq(chiefReport.id, reportId)).get();
-    if (!rec?.inputs) continue;
-    const inputs = rec.inputs;
-    const effects: Effects = [];
-    deps.db.transaction(() => {
-      if (ingestIntake(deps.db, rec, now) === 0) return;
-      const existing = deps.db
-        .select()
-        .from(chiefMessage)
-        .where(eq(chiefMessage.id, reportRowId(rec)))
-        .get();
-      let previous: unknown;
-      try {
-        previous = JSON.parse(String(existing?.content));
-      } catch {
-        previous = null;
-      }
-      const parsed = chiefReportContentSchema.safeParse(previous);
-      const content = parsed.success
-        ? { ...parsed.data, intake: intakeOf(deps.db, rec.id) }
-        : reportContent(deps, rec, inputs, 'posted', rec.attempts > 0, now);
-      writeReportRow(deps, rec, content, effects);
-      pushReport(deps, rec, content, now, effects);
-      deps.db.update(chiefReport).set({ status: 'posted' }).where(eq(chiefReport.id, rec.id)).run();
-    });
-    for (const effect of effects) effect();
-  }
 }
 
 export function startReportRun(
@@ -1019,7 +964,6 @@ export function settleReportRun(
       })
       .run();
   }
-  ingestIntake(db, rec, now);
   const content = reportContent(deps, rec, inputs, 'posted', true, now);
   const alreadyPosted =
     db
@@ -1041,7 +985,6 @@ export function settleReportRun(
 export function reportSuggestions(db: Db, reportId: string): ChiefReportSuggestion[] {
   return chiefReportSuggestions({
     retro: proposalsOf(db, reportId),
-    intake: intakeOf(db, reportId),
   });
 }
 
@@ -1050,10 +993,10 @@ export function decideRetroProposal(
   teamId: string,
   proposalId: string,
   decision: 'accept' | 'dismiss',
-): RetroProposal | IntakeItem {
+): RetroProposal {
   const { db } = deps;
   const row = db.select().from(retroProposal).where(eq(retroProposal.id, proposalId)).get();
-  if (row === undefined || row.teamId !== teamId)
+  if (row === undefined || row.teamId !== teamId || !isRetroRow(row))
     throw new HttpError(404, `retro proposal ${proposalId}`);
   const rec = db.select().from(chiefReport).where(eq(chiefReport.id, row.reportId)).get();
   const chiefRow =
@@ -1075,26 +1018,15 @@ export function decideRetroProposal(
       .get();
     if (claimed === undefined) throw new HttpError(409, 'retro proposal is already decided');
     if (decision !== 'accept') return;
-    const spec =
-      row.sourceKind === INTAKE_SOURCE_KIND
-        ? [
-            row.what,
-            '',
-            `来源：${row.sourceId}`,
-            `对应：${row.why}`,
-            `建议动作：${row.safeguard}`,
-            '',
-            `来自 ${rec.day} 日报的外部动态。`,
-          ].join('\n')
-        : [
-            row.what,
-            '',
-            `为什么当时没拦住：${row.why}`,
-            '',
-            `防护：${row.safeguard}`,
-            '',
-            `出处：${row.sourceLabel}（${row.sourceKind} ${row.sourceId}），来自 ${rec.day} 的日报复盘。`,
-          ].join('\n');
+    const spec = [
+      row.what,
+      '',
+      `为什么当时没拦住：${row.why}`,
+      '',
+      `防护：${row.safeguard}`,
+      '',
+      `出处：${row.sourceLabel}（${row.sourceKind} ${row.sourceId}），来自 ${rec.day} 的日报复盘。`,
+    ].join('\n');
     const todoId = createTodo(deps, {
       teamId,
       projectId: row.projectId,
@@ -1102,9 +1034,6 @@ export function decideRetroProposal(
       spec,
       createdBy: deps.user.id,
       ownerId: deps.user.id,
-      ...(row.sourceKind === INTAKE_SOURCE_KIND
-        ? { sourceKind: RESEARCH_INTAKE_ITEM_SOURCE_KIND, sourceRef: row.sourceId }
-        : {}),
     }).id;
     db.update(retroProposal).set({ todoId }).where(eq(retroProposal.id, proposalId)).run();
   });
@@ -1118,21 +1047,14 @@ export function decideRetroProposal(
     try {
       parsed = JSON.parse(String(reportRow.content));
     } catch {}
-    const content = chiefReportContentSchema.safeParse(parsed);
+    const content = chiefReportContentSchema.loose().safeParse(parsed);
     if (content.success) {
       const effects: Effects = [];
-      writeReportRow(
-        deps,
-        rec,
-        { ...content.data, retro: proposalsOf(db, rec.id), intake: intakeOf(db, rec.id) },
-        effects,
-      );
+      writeReportRow(deps, rec, { ...content.data, retro: proposalsOf(db, rec.id) }, effects);
       for (const effect of effects) effect();
     }
   }
-  const updated = [...proposalsOf(db, rec.id), ...intakeOf(db, rec.id)].find(
-    (proposal) => proposal.id === proposalId,
-  );
+  const updated = proposalsOf(db, rec.id).find((proposal) => proposal.id === proposalId);
   if (updated === undefined) throw new HttpError(404, `retro proposal ${proposalId}`);
   return updated;
 }

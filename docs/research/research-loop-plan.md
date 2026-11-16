@@ -2,6 +2,8 @@
 
 Status: revised 2026-11-02 after the owner's decisions (plan decision D63, which builds on the thread model of D60). Code facts are checked against `origin/main` at `456edfe36`. This document stands alone; it does not depend on any earlier plan version.
 
+Daily dependency-release and external-development research was retired on 2026-11-16. Existing database records remain historical data; intake drafts cannot create tasks. The remaining plan concerns task-scoped research, not a recurring intake.
+
 Labels used throughout:
 - **[verified]**: read in the source (code on `origin/main`, a web page, a PR) during this session.
 - **[inferred]**: reasoned from verified facts; can be re-checked.
@@ -13,7 +15,6 @@ Labels used throughout:
 - **End state.**
   - A stuck build gets outside research before its last retry.
   - Work on a new mechanism starts with a research thread whose report the code thread reads.
-  - Once a day, the Coordinator digest lists at most 5 outside developments that match open work.
   - Findings that helped a merged retry are kept as sourced memory that expires after 90 days.
   - Every runtime that runs unlocked work can search the web, including pi.
 - **Thread model (D60).**
@@ -94,7 +95,6 @@ Patterns across the table [inferred]:
 | A | Prompt only: tell agents to search when stuck | (a) partly | Same discretion problem as every product above | Folded into the research thread's prompt |
 | B | Stuck to research: at CI-fix round 2 of 3 or a second rejection in a round, a research thread runs and its report feeds the retry | (a) | Injected web content reaches a build session running with bypass permissions | **Decided (D63)** |
 | C | Research before planning for new mechanisms, dependencies, performance problems and technology choices; the plan cites it | (a) upstream | Over-triggering; any URL satisfies a mechanical check | **Decided: soft for 14 days (D63)** |
-| D | Daily intake: dependency releases plus topic search, scored against open work | (b) | Noise | **Decided: Coordinator digest, at most 5 items, no X in v1 (D63)** |
 | E | Research findings become sourced, expiring memory | (c) | Stale facts | **Decided: only after a merged retry that used the report, 90-day expiry (D63)** |
 | F | Give the locked Coordinator a search tool | (a), (b) | Breaks the Coordinator's lock-down and D60's "does not plan" | Rejected |
 | G | A server-side search service in `apps/server` | All | Breaks the backend seam rule | Rejected |
@@ -143,7 +143,7 @@ Two tiers for cairn [inferred]:
 | Tier | Used for | Harness | Default model role (mirrors the repository's model table) |
 |---|---|---|---|
 | 1: single agent | Stuck-retry research; prior-art research for one task | One research thread, one session, with parallel tool calls (several searches per turn) and a 3-to-15-call budget in its prompt | Implementation role (`claude-sonnet-5-5`, or `gpt-6.1-sol` on pi); the Coordinator picks this tier by default |
-| 2: multi-agent | Daily intake; large questions (technology choice, new subsystem) | A lead research thread fans out 3 to 5 sub-searches in parallel, then merges | Lead: orchestration role (`claude-opus-5-5`); sub-searches: implementation role; dedupe and extraction: mechanical role (`claude-haiku-5-5`) |
+| 2: multi-agent | Large questions (technology choice, new subsystem) | A lead research thread fans out 3 to 5 sub-searches in parallel, then merges | Lead: orchestration role (`claude-opus-5-5`); sub-searches: implementation role; dedupe and extraction: mechanical role (`claude-haiku-5-5`) |
 
 Rules for both tiers:
 - **Search mode.** Live search, because stuck builds and intake need fresh facts. The provider tool has no cached mode, so injection risk is handled by three controls instead:
@@ -199,21 +199,6 @@ Acceptance:
 - A plan without a source gets the non-blocking finding.
 - The Coordinator and research prompt changes pass the paired-trial adoption judge (`docs/spec/29-evaluation-and-data-loop.md`).
 
-### Phase 4: daily intake (decided)
-
-Behavior:
-1. A Coordinator schedule (cron `0 8 * * *`, server time) opens one tier-2 research thread per day.
-2. Sources:
-   - GitHub releases of cairn's direct dependencies through the existing GitHub connection (free, deterministic);
-   - a topic search with topics from open issue titles and the plan's current phase.
-   - No X timeline in v1. X is added only after S4 passes and ian places the cookie himself.
-3. Output: at most 5 items, each with a source URL, a one-line claim, the matching open issue or plan item, and a proposed action. Items go into the Coordinator digest. Accepting an item opens a thread; nothing becomes a GitHub issue automatically.
-4. Dedupe against the previous 7 reports; spike S4 picks the mechanism.
-
-Acceptance:
-- An integration test with fixture release feeds asserts at most 5 items, every item with a URL, and no repeated URL across two days.
-- Over 14 days, at least 1 item in 5 is accepted or explicitly rejected [guessed target]; below that, intake is narrowed.
-
 ### Phase 1b: search tool for pi (Option 2, in parallel with Phase 1)
 
 Behavior:
@@ -237,7 +222,6 @@ Acceptance:
 | P1 citation check | Medium | A check step on the research thread before handoff, run by the other vendor | No | The checker cannot fetch a page (the claim is marked unverified rather than dropped silently); double the tokens per report |
 | P2 sourced memory | High [inferred]: `memory_candidate.content` is free text; `agent_memory.invalidAt` exists | `apps/server/src/trajectory-curate.ts`, `apps/server/src/services/memory.ts` | No; a new column would touch `**/drizzle/**`, which is protected, so source and date stay in `content` | An expired fact still injected (test `stillValid`); reflect-curate is env-gated off, so Phase 2 stays inert until it is enabled |
 | P3 research-first routing | Medium; the blocker edge outside `split_todo` is [D60 work] | Coordinator prompt; D60 thread API | No; adoption judge | Over-triggering on small tasks; the Coordinator skips it (count flagged threads without a research thread) |
-| P4 intake | Medium [inferred]: schedules, info deliverables and the digest exist | `apps/server/src/services/schedules.ts`, `chief-digest.ts`; no outside access in the server | No in v1 (no X credential) | Noise; GitHub rate limit; repeats across days |
 
 Seam check [inferred]:
 - Every outward call happens inside a daemon session: Claude Code's built-in tools, or the pi tool in `apps/daemon/src/backend/web-search.ts`.
@@ -249,8 +233,8 @@ Layers follow `docs/spec/19-test-layering-and-blast-radius.md`:
 
 | Layer | What | Run |
 |---|---|---|
-| unit (vitest light) | Trigger predicate truth table; `research-report` rendering inside the fence and clipped; search provider mapping and missing key; tool absent on locked steps; memory candidate with `invalidAt`; intake scoring and dedupe | `pnpm exec vitest run --changed`; CI required |
-| integration (real server plus daemon, fake backend) | CI red twice, stuck event, research thread, report, fenced in the third fix prompt; 20-minute cap; pi info step calling `web_search` against a fixture provider; intake with fixture releases | CI required; run the touched file locally |
+| unit (vitest light) | Trigger predicate truth table; `research-report` rendering inside the fence and clipped; search provider mapping and missing key; tool absent on locked steps; memory candidate with `invalidAt` | `pnpm exec vitest run --changed`; CI required |
+| integration (real server plus daemon, fake backend) | CI red twice, stuck event, research thread, report, fenced in the third fix prompt; 20-minute cap; pi info step calling `web_search` against a fixture provider | CI required; run the touched file locally |
 | eval (adoption judge) | Research prompt, Coordinator routing prompt | `docs/spec/29-evaluation-and-data-loop.md` |
 | live acceptance (`verify-cairn`) | One real stuck build on omarchy whose research thread shows search tool calls and whose retry prompt shows the report; one pi research thread | Once per phase, evidence in the PR |
 | web e2e | Only if the conversation gains a rendering for research messages | `pnpm --filter @cairn/web e2e:affected` |
@@ -285,12 +269,10 @@ Claude usage is not budgeted here. Metered provider calls and Codex usage are.
 |---|---|---|---|
 | P1 stuck research | 2 to 5 threads per day, about 15 searches each | 30 to 75 | Only threads on pi pay; Claude Code native search has no per-search meter on subscription auth [inferred] |
 | P3 research before planning | 1 to 3 per day, about 15 searches | 15 to 45 | Same |
-| P4 intake | 1 tier-2 thread per day, about 30 searches plus about 40 GitHub reads | 30 | Same; GitHub API free |
-| Total if every research thread ran on pi | | 75 to 150 (2,250 to 4,500 per month) | Exa at $4 per 1,000: $9 to $18 per month gross, about $0 to $8 after the $10 credit; plus page contents at $1 per 1,000. Brave at $5 per 1,000: $11 to $23, minus $5 credit. Tavily at $0.008: $18 to $36, minus 1,000 free credits |
 | Citation check | One check per report, about the report's size again | 0 searches (fetches only) | Fetch cost only on pi |
 | Codex | Research threads routed to pi with `gpt-6.1-sol` consume Codex usage at about 150k to 400k tokens per tier-1 thread [guessed] | | Decision 4 sets how much research goes to Codex |
 
-Tier 2 costs about 15 times the tokens of a chat (Anthropic [verified]), so it is limited to intake and large questions by design.
+Tier 2 costs about 15 times the tokens of a chat (Anthropic [verified]), so it is reserved for large questions.
 
 ## 12. Decisions
 
@@ -301,7 +283,6 @@ Decided (D63, ian, 2026-11-02):
 - **Plan check:** prior-art citation in plans is a soft check for 14 days, then decided from data.
 - **Who decides:** research is its own thread, opened by the Coordinator as routing with a strong or cheap model by complexity, under D60.
 - **X:** no X timeline in v1; added only after S4 and ian placing the cookie himself.
-- **Intake:** Coordinator digest, at most 5 items, accepting opens work, no automatic issues.
 - **Memory:** only after a merged retry that used the report, with source and date, 90-day expiry.
 - **Order:** spikes S1 to S6 first, then phases.
 
