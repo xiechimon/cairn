@@ -136,8 +136,7 @@ async function openMemory(page: Page, options: MockOptions = {}) {
 
 async function openProjectMemory(page: Page, options: MockOptions = {}) {
   const control = await mockMemory(page, options);
-  await page.goto('/app/project/p-notes/settings');
-  await page.getByRole('tab', { name: '记忆' }).click();
+  await page.goto('/app/project/p-notes/settings?tab=memory');
   return control;
 }
 
