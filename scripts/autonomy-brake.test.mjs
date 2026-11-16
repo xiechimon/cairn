@@ -280,6 +280,32 @@ for (const paused of [true, false])
     assert.match(f.calls(), /POST/);
     assert.match(f.calls(), new RegExp(`"state":"${paused ? 'failure' : 'success'}"`));
   });
+test('sweep reruns the newest run that ran, not a skipped run a closed PR left on the same head', (t) => {
+  const f = fixture(t, {
+    issues: [],
+    pulls: [{ number: 7, head: { sha: 'a'.repeat(40) }, auto_merge: null, labels: [] }],
+    runs: [
+      {
+        id: 89,
+        status: 'completed',
+        conclusion: 'success',
+        head_sha: 'a'.repeat(40),
+        pull_requests: [{ number: 7 }],
+      },
+      {
+        id: 90,
+        status: 'completed',
+        conclusion: 'skipped',
+        head_sha: 'a'.repeat(40),
+        pull_requests: [{ number: 7 }],
+      },
+    ],
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(f.calls(), /actions\/runs\/89\/rerun/);
+  assert.doesNotMatch(f.calls(), /actions\/runs\/90\/rerun/);
+});
 test('a new paused head fails the PR check and publishes a failure status', (t) => {
   const f = fixture(t, {
     issues: [{ number: 5 }],

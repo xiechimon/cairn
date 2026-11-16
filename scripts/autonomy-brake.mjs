@@ -217,7 +217,8 @@ function sweep(paused) {
         .filter(
           (run) =>
             run.head_sha === pr.head.sha &&
-            run.pull_requests.some((pull) => pull.number === pr.number),
+            run.pull_requests.some((pull) => pull.number === pr.number) &&
+            run.conclusion !== 'skipped',
         )
         .sort((a, b) => b.id - a.id)[0];
       if (latest?.status === 'completed') {
