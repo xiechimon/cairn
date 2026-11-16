@@ -152,6 +152,17 @@ describe('the ship action uses the stored route and prompt', () => {
   test('merge-gate route ignores the edited Ship prompt', async () => {
     const projectId = await postProject(s.app);
     const { buildId } = await reviewTodo(projectId);
+    s.db
+      .insert(stepTable)
+      .values({
+        id: `delivered-${buildId}`,
+        buildId,
+        kind: 'build',
+        status: 'done',
+        checkpointCommit: 'ab'.repeat(20),
+        createdAt: Date.now(),
+      })
+      .run();
     await req(s.app, 'PUT', '/api/prompts/ship', { text: 'should not be used' });
     const res = await req(s.app, 'POST', `/api/builds/${buildId}/merge`);
     expect(res.status).toBe(202);
