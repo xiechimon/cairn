@@ -715,8 +715,8 @@ export const EN: Record<string, string> = {
   '把 {name} 转为机密？': 'Convert {name} to a secret?',
   '转为机密后，这里不再显示它的值，也不能再转回环境变量。已经看到过这个值的地方（浏览器、对话、其他系统）不会因此收回。':
     'Once converted, its value is no longer shown here and it cannot become an env var again. Copies already seen elsewhere (a browser, a conversation, another system) are not recalled.',
-  '删除后，用到它的任务就拿不到这个值了。':
-    'Once deleted, tasks that use it no longer get this value.',
+  '删除后，用到它的任务就拿不到这个值了':
+    'Once deleted, tasks that use it no longer get this value',
   '删除 {name}': 'Delete {name}',
   '{names} 没能添加（可能已有同名条目），其余已添加。':
     '{names} could not be added (an entry with that name may already exist); the rest were added.',

@@ -366,7 +366,7 @@ export function SecretsPage() {
       </AlertDialogShell>
       <DeleteConfirm
         open={deleting !== null}
-        title={t('删除后，用到它的任务就拿不到这个值了。')}
+        title={t('删除后，用到它的任务就拿不到这个值了')}
         summary={deleting?.name ?? ''}
         ariaLabel={t('删除 {name}', { name: deleting?.name ?? '' })}
         onClose={() => setDeleting(null)}
