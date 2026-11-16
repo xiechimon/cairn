@@ -51,13 +51,13 @@ test('provider: 3 model chips overflow the body, submit pinned to the bottom and
 });
 
 test('secret: static-form face submit stays in the viewport', async ({ page }) => {
-  await page.goto('/app/resources/secrets?scenario=01');
+  await page.goto('/app/resources/secrets?scenario=secrets-list');
   await page.getByRole('button', { name: '新建', exact: true }).click();
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('dialog', { name: '添加密钥或环境变量' });
   await expect(dialog).toBeVisible();
   await expectShellCapped(dialog);
 
-  await expect(dialog.getByRole('button', { name: '添加密钥' })).toBeInViewport();
+  await expect(dialog.getByRole('button', { name: '添加', exact: true })).toBeInViewport();
 });
 
 test('machine: disclosure expanded (tallest content state) bottom link stays in the viewport', async ({ page }) => {

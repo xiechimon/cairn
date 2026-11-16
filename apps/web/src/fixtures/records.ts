@@ -20,7 +20,7 @@ import {
   type QuotaWait,
   type RouteOverride,
   type RunnerOfflineContent,
-  type SecretRecord,
+  type SecretListEntry,
   type SkillFact,
   type StepPromptOrigin,
   type StepQueueBlocked,
@@ -327,7 +327,7 @@ export interface ResourcesContent {
   providerSources: ModelSource[];
   providers?: ProviderRecord[];
   memories?: MemoryRecord[];
-  secrets?: SecretRecord[];
+  secrets?: SecretListEntry[];
   accounts?: AccountsContent;
   routingSettings?: import('@cairn/shared').TeamRoutingSettings;
   topModels?: import('@cairn/shared').TopModel[] | null;

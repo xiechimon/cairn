@@ -55,6 +55,7 @@ import type {
   RouteOverride,
   ScheduleRecord,
   SearchResponse,
+  SecretListEntry,
   SecretRecord,
   SetSecretBody,
   SkillImportCandidatesResponse,
@@ -545,7 +546,7 @@ export function useGithubIssueEcho(todoId: string | undefined, enabled: boolean)
 export const useSecrets = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['secrets', teamId],
-    queryFn: () => api.get<SecretRecord[]>(`/api/teams/${teamId}/secrets`),
+    queryFn: () => api.get<SecretListEntry[]>(`/api/teams/${teamId}/secrets`),
     enabled: enabled && teamId !== undefined,
   });
 
@@ -1122,6 +1123,13 @@ export function useApiMutations(teamId: string | undefined) {
     createSecret: useMutation({
       mutationFn: (body: SetSecretBody) =>
         api.post<SecretRecord>(`/api/teams/${teamId}/secrets`, body),
+      onSuccess: invalidateAll,
+    }),
+    updateSecret: useMutation({
+      mutationFn: (input: {
+        id: string;
+        body: { name?: string; value?: string; kind?: 'secret' };
+      }) => api.patch<SecretRecord>(`/api/teams/${teamId}/secrets/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
     deleteSecret: useMutation({

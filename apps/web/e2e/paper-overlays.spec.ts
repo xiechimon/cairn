@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence.js';
 
-const SECRETS = '/app/resources/secrets?scenario=01';
+const SECRETS = '/app/resources/secrets?scenario=secrets-list';
 const SKILLS = '/app/resources/skills?scenario=01';
 const PROVIDERS = '/app/resources/providers?scenario=01';
 const MACHINES = '/app/resources/machines?scenario=06';
@@ -54,7 +54,7 @@ for (const theme of ['light', 'dark'] as const) {
     })();
     if (theme === 'light') expect(want).toBe('rgba(0, 0, 0, 0.4)');
 
-    await openFromTopbar(page, SECRETS, '添加密钥');
+    await openFromTopbar(page, SECRETS, '添加密钥或环境变量');
     const overlay = page.locator('[data-slot="dialog-overlay"]');
     await settle(overlay);
     await expect(overlay).toHaveCSS('background-color', want);
@@ -73,7 +73,7 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const width = async (dialog: Locator) => (await dialog.boundingBox())?.width;
 
-  const secret = await openFromTopbar(page, SECRETS, '添加密钥');
+  const secret = await openFromTopbar(page, SECRETS, '添加密钥或环境变量');
   expect(await width(secret)).toBe(400);
   await evidenceShot(page, 'secret-dialog-s.png');
 
@@ -94,10 +94,10 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
 
 test('dialog face: sheet surface, 12px corners, 15px sans title, 28px close', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
-  const dialog = await openFromTopbar(page, SECRETS, '添加密钥');
+  const dialog = await openFromTopbar(page, SECRETS, '添加密钥或环境变量');
   await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#ffffff'));
   await expect(dialog).toHaveCSS('border-top-left-radius', '12px');
-  const title = dialog.getByTestId('dialog-head').getByText('添加密钥');
+  const title = dialog.getByTestId('dialog-head').getByText('添加密钥或环境变量');
   await expect(title).toHaveCSS('font-size', '15px');
   const close = dialog.getByRole('button', { name: '关闭' });
   const box = await close.boundingBox();

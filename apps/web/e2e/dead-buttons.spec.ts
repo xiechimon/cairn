@@ -127,7 +127,7 @@ test('resources empty state drops the `查看文档` link (#307); skills empty-s
   const secretsEmpty = page.getByTestId('resource-empty');
   await expect(secretsEmpty).toBeVisible();
   await expect(page.getByRole('link', { name: '查看文档' })).toHaveCount(0);
-  await expect(secretsEmpty.getByRole('button', { name: '添加密钥' })).toBeVisible();
+  await expect(secretsEmpty.getByRole('button', { name: '添加', exact: true })).toBeVisible();
 });
 
 test('mcp page: catalog cards connect, add-server opens a form, local rows stay read-only (#4870)', async ({

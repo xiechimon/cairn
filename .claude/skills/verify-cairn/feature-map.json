@@ -2135,14 +2135,15 @@
     {
       "id": "secrets",
       "name": "Secrets",
-      "summary": "Team and project secrets stored encrypted and delivered to threads that need them.",
-      "states": "An empty list, secrets by scope, and an add dialog with team or project scope.",
+      "summary": "Team and project secrets and environment variables stored encrypted and delivered to threads that need them; env var values stay readable to the owner.",
+      "states": "An empty list, env vars with values next to hidden secrets, a name filter, the add and edit dialog with the secret checkbox, bulk NAME=VALUE add, and the row menu with convert to secret.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/resources/secrets-page.tsx",
-          "apps/web/src/resources/create-secret-dialog.tsx"
+          "apps/web/src/resources/secret-dialog.tsx",
+          "apps/web/src/resources/bulk-secret-dialog.tsx"
         ],
         "server": [
           "apps/server/src/services/secrets.ts"

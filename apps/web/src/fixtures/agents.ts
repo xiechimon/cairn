@@ -1,4 +1,4 @@
-import type { SecretRecord } from '@cairn/shared';
+import type { SecretListEntry } from '@cairn/shared';
 import { legacyDone, legacyReview, R3_BUILDER, TEAM_ID } from './core.js';
 import type { ChiefContent, FixtureSet, ResourcesContent } from './records.js';
 import { RESOURCES } from './resources.js';
@@ -9,13 +9,48 @@ const SECRETS_BASE: ResourcesContent = {
   memories: [],
 };
 
-const SECRET_ROWS: SecretRecord[] = [
+const SECRET_NOW = Date.now();
+const MINUTE_MS = 60_000;
+
+const SECRET_ROWS: SecretListEntry[] = [
   {
     id: 'secret-stripe',
     teamId: TEAM_ID,
     projectId: null,
     name: 'STRIPE_API_KEY',
     description: null,
+    kind: 'secret',
+    updatedAt: SECRET_NOW - 3 * 24 * 60 * MINUTE_MS,
+  },
+  {
+    id: 'secret-node-env',
+    teamId: TEAM_ID,
+    projectId: null,
+    name: 'NODE_ENV',
+    description: null,
+    kind: 'env',
+    value: 'development',
+    updatedAt: SECRET_NOW - 12 * MINUTE_MS,
+  },
+  {
+    id: 'secret-api-base',
+    teamId: TEAM_ID,
+    projectId: null,
+    name: 'PUBLIC_API_BASE_URL',
+    description: null,
+    kind: 'env',
+    value: 'https://api.staging.example.com/v2/internal/gateway?region=ap-southeast-1',
+    updatedAt: SECRET_NOW - 5 * 60 * MINUTE_MS,
+  },
+  {
+    id: 'secret-debug',
+    teamId: TEAM_ID,
+    projectId: null,
+    name: 'DEBUG',
+    description: null,
+    kind: 'env',
+    value: '',
+    updatedAt: SECRET_NOW - 26 * 60 * MINUTE_MS,
   },
   { id: 'secret-npm', teamId: TEAM_ID, projectId: null, name: 'NPM_TOKEN', description: null },
 ];

@@ -149,9 +149,9 @@ for (const theme of ['light', 'dark'] as const) {
       expect(composer).toContain('0px 0px 0px 1px inset');
 
       // e3: the dialog rings once
-      await page.goto('/app/resources/secrets?scenario=01');
+      await page.goto('/app/resources/secrets?scenario=secrets-list');
       await page.getByRole('button', { name: '新建', exact: true }).click();
-      const dialog = page.getByRole('dialog', { name: '添加密钥' });
+      const dialog = page.getByRole('dialog', { name: '添加密钥或环境变量' });
       await expect(dialog).toBeVisible();
       const dialogShadow = await dialog.evaluate((el) => getComputedStyle(el).boxShadow);
       expect(rings(dialogShadow)).toBe(1);

@@ -576,7 +576,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### secrets
 
-**Secrets** (shipped). Team and project secrets stored encrypted and delivered to threads that need them.
+**Secrets** (shipped). Team and project secrets and environment variables stored encrypted and delivered to threads that need them; env var values stay readable to the owner.
 
 - Research: [docs/research/1775-gateway-prior-art.md](research/1775-gateway-prior-art.md)
 - Frontend design: **gap**: the secrets page and project secrets have no design
