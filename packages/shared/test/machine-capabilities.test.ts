@@ -182,6 +182,30 @@ describe('record additive contract (old server / old daemon parse both ways)', (
     ).toEqual({ kind: 'home-overlay-failed', mountPoint: '/home/u/.cache/.mount_x' });
   });
 
+  it('a record carrying a sandbox cause this reader does not know still parses, keeping the confinement report', () => {
+    const confinement = {
+      state: 'unavailable',
+      reason: 'startup-failed',
+      invocation: '7d4f6a2e-8b1c-4e3a-9f5d-2c6b8a1e4f70',
+      generation: 3,
+      revision: 2,
+    } as const;
+    const capabilities = { mcpServers: [], skills: [], osPlatform: 'linux', confinement } as const;
+    for (const kind of ['bwrap-too-old', 'userns-denied'])
+      expect(
+        machineRecordSchema.parse({
+          ...machineBase,
+          capabilities: { ...capabilities, confinementCause: { kind } },
+        }).capabilities?.confinementCause,
+      ).toEqual({ kind });
+    const parsed = machineRecordSchema.parse({
+      ...machineBase,
+      capabilities: { ...capabilities, confinementCause: { kind: 'cgroup-too-old' } },
+    }).capabilities;
+    expect(parsed?.confinement).toEqual(confinement);
+    expect(parsed?.confinementCause).toBeUndefined();
+  });
+
   it('machineRecordSchema: running threads are optional, so an older server record still parses', () => {
     const running = [{ threadId: 'todo-1', title: 'Thread', projectId: 'project-1', startedAt: 1 }];
     expect(machineRecordSchema.parse({ ...machineBase, running }).running).toEqual(running);

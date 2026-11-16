@@ -1,4 +1,4 @@
-import type { ClaimedStep } from '@cairn/shared';
+import type { ClaimedStep, TaskRequest } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -170,6 +170,37 @@ test('a merge step enqueued while requestMerge awaits the hosted branch listing 
     expect(merges.filter((row) => row.kind === 'merge')).toHaveLength(1);
   } finally {
     spy.mockRestore();
+    w.s.dispose();
+  }
+});
+
+test('landing refuses a quick task whose destination no longer checks out (quick-lane.md L5)', async () => {
+  const w = await mergeWorld();
+  try {
+    const request: TaskRequest = {
+      segments: [
+        {
+          source: { kind: 'chat', threadId: 'chief-gone', messageId: 'm-gone', span: 'whole' },
+          author: 'owner',
+          sourceRef: null,
+          text: 'add a node.txt that says hello',
+        },
+      ],
+      siblings: [],
+      difficulty: null,
+      titleSource: 'owner',
+      titleSourceRef: null,
+      lane: 'quick',
+      projectBasis: { kind: 'channel', threadId: 'chief-gone' },
+    };
+    w.s.db
+      .update(todo)
+      .set({ sourceKind: 'orchestration', sourceRef: 'chief:gone', request })
+      .where(eq(todo.id, 'task'))
+      .run();
+    expect(await applyMergeLanding(w.deps, w.merge, w.commit)).toContain('quick lane');
+    expect(await systemGitOps.resolveCommit(w.dir, 'refs/heads/dev')).toBe(w.main);
+  } finally {
     w.s.dispose();
   }
 });

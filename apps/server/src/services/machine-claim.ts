@@ -21,6 +21,7 @@ import {
   type StepKind,
   selectSkillsForTask,
   WORKER_ASK_USER_TOOL,
+  WORKER_CLOSE_AS_DUPLICATE_TOOL,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
   WORKER_THREAD_REPORT_TOOL,
@@ -55,6 +56,7 @@ import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.j
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
+import { quickLaneRefusal } from './coordinator-request.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
@@ -475,6 +477,11 @@ async function tryClaim(
       failStepWithEvents(deps, cand.stepRow, `Ship refused: ${shipRefusal}`);
       continue;
     }
+    const laneRefusal = quickLaneRefusal(db, cand.todoRow);
+    if (laneRefusal !== null) {
+      failStepWithEvents(deps, cand.stepRow, laneRefusal);
+      continue;
+    }
     const localMerge = parseLocalMergeInstruction(cand.stepRow.prompt);
     if (localMerge !== null) {
       const project = projectOfTodo(db, cand.todoRow);
@@ -584,6 +591,8 @@ async function tryClaim(
           const fresh = priorSessionOf(tx, cand.stepRow, cand.buildRow, boundId);
           if (accountHeld(cand.stepRow, fresh, boundId)) return false;
         }
+        const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
+        if (latestTodo === undefined || quickLaneRefusal(db, latestTodo) !== null) return false;
         holdBlockedBuild(db, cand.stepRow.buildId);
         const res = tx
           .update(step)
@@ -780,9 +789,13 @@ export function workerRemoteTools(
       (kind === 'plan' || isBuildStepKind(kind) || !isThreadScheduleTool(tool.name)) &&
       (namesTask || tool.name !== 'set_task_meta'),
   );
-  return kind === 'session'
-    ? [...base, WORKER_ASK_USER_TOOL, WORKER_THREAD_REPORT_TOOL]
-    : [...base];
+  if (kind !== 'session') return [...base];
+  return [
+    ...base,
+    WORKER_ASK_USER_TOOL,
+    WORKER_THREAD_REPORT_TOOL,
+    ...(isGithubProject ? [WORKER_CLOSE_AS_DUPLICATE_TOOL] : []),
+  ];
 }
 
 export async function claimStep(

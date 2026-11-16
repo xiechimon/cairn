@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { redactSecrets } from '@cairn/shared';
 import { otlpTraceIdOfTurn } from '@cairn/shared/otel';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { coordinatorTurnSnapshot, type step, todo } from '../db/schema.js';
+import { chiefThread, coordinatorTurnSnapshot, type step, todo } from '../db/schema.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -197,6 +197,15 @@ export function captureToolResult(stepId: string, tool: CaptureTool, result: unk
   capture.views.push({ ...open, result });
 }
 
+function toolViewForSecretScan(view: z.infer<typeof toolView>, chiefId: string | undefined) {
+  if (view.tool !== 'create_todo' || typeof view.result !== 'string' || chiefId === undefined)
+    return view;
+  const result = z.record(z.string(), z.unknown()).parse(JSON.parse(view.result));
+  if (JSON.stringify(result) !== view.result) throw new Error('noncanonical tool result');
+  const { sourceBuildId, ...rest } = result;
+  return { ...view, result: sourceBuildId === chiefId ? rest : result };
+}
+
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value !== null && typeof value === 'object') {
@@ -235,12 +244,16 @@ export function sealCoordinatorTurnSnapshot(
   try {
     if (capture.overLimit) throw new Error('capture view or record limit crossed');
     const parsed = snapshotPayload.parse({ claim: capture.claim, toolViews: capture.views });
-    const viewsRedacted = redactSecrets(parsed.toolViews);
-    const redacted = {
-      value: { claim: parsed.claim, toolViews: viewsRedacted.value },
-      count: viewsRedacted.count,
-    };
-    const payloadText = JSON.stringify(redacted.value);
+    const thread = db
+      .select({ chiefId: chiefThread.chiefId })
+      .from(chiefThread)
+      .where(and(eq(chiefThread.id, stepRow.buildId), eq(chiefThread.teamId, teamId)))
+      .get();
+    const viewsRedacted = redactSecrets(
+      parsed.toolViews.map((view) => toolViewForSecretScan(view, thread?.chiefId)),
+    );
+    if (viewsRedacted.count !== 0) throw new Error('tool views contain credentials');
+    const payloadText = JSON.stringify(parsed);
     if (Buffer.byteLength(payloadText, 'utf8') > COORDINATOR_SNAPSHOT_PAYLOAD_MAX_BYTES)
       throw new Error('payload limit exceeded');
     db.insert(coordinatorTurnSnapshot)
@@ -248,7 +261,7 @@ export function sealCoordinatorTurnSnapshot(
         ...base,
         status: 'sealed',
         reason: null,
-        redactionCount: redacted.count,
+        redactionCount: viewsRedacted.count,
         payloadBytes: Buffer.byteLength(payloadText, 'utf8'),
         digest: createHash('sha256')
           .update(canonical(JSON.parse(payloadText)))

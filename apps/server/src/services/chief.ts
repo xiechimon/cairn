@@ -1075,7 +1075,33 @@ export function addChiefWatch(
     reason?: string;
   },
 ): void {
-  const chiefRow = ensureChief(deps, input.teamId);
+  appendChiefWatch(deps, ensureChief(deps, input.teamId), input);
+}
+
+export function rewatchCreatingThread(deps: ChiefDeps, record: TodoRecord): void {
+  if (record.sourceKind !== 'orchestration' || record.sourceRef === null) return;
+  const threadId = parseOrchestrationSourceRef(record.sourceRef)?.threadId;
+  const threadRow = threadId === undefined ? undefined : getChiefThread(deps, threadId);
+  if (threadId === undefined || threadRow === undefined || threadRow.archivedAt !== null) return;
+  const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
+  const projectRow = deps.db
+    .select({ name: project.name })
+    .from(project)
+    .where(eq(project.id, record.projectId))
+    .get();
+  if (chiefRow === undefined || projectRow === undefined) return;
+  appendChiefWatch(deps, chiefRow, {
+    todo: record,
+    projectName: projectRow.name,
+    threadId,
+  });
+}
+
+function appendChiefWatch(
+  deps: ChiefDeps,
+  chiefRow: ChiefRow,
+  input: { todo: TodoRecord; projectName: string; threadId: string; reason?: string },
+): void {
   if (chiefRow.watches.some((w) => w.todoId === input.todo.id)) return;
   const threadRow = getChiefThread(deps, input.threadId);
   const watch: ChiefWatch = {
@@ -1657,8 +1683,7 @@ export function buildChiefSystemPrompt(
     '',
     '### 路由',
     '- 原话：你不写任务正文。服务端从引用的用户消息（默认本回合消息）或 sourceTodoId 指定的来源任务逐字拷贝正文。create_todo 后立刻用 update_todo 的 title 写成不超过 50 字的摘要标题；不复述、不总结、不扩写、不翻译正文，也不替用户加要求或步骤。什么时候问用户见下面的「决策边界」。',
-    '- 先找已有的：create_todo 前用 threads 看同一件事是不是已经在做；在做就用 message_thread 把新的话转给那条 thread，不再建任务。只是提问、没要求改动时只回答，不建任务。',
-    '- 查重：在 GitHub 项目里 create_todo 前，用 github_overlap 传 projectId、请求的关键词（包括同一件事的其他说法），知道要改的路径时也传上。按意图比较，不只比字面；同一件事就续在已有条目上，不另建。带编号的查重结果（包括「没有重复」）写在给用户的回复里。只有 github_overlap 报错时才不建，并说明哪一项查询失败。',
+    '- 先找已有的：create_todo 前用 todos 的 query 按关键词（同一件事的几种说法各试一次）搜标题和正文，再用 threads 看同一件事是不是已经在做（已关闭的任务不算在做）；在做就用 message_thread 把新的话转给那条 thread，不再建任务。只是提问、没要求改动时只回答，不建任务。',
     '- 拆分：按可独立验收的成果拆，不按执行步骤拆；同类小事合成一张卡。每张卡调用一次 create_todo，quotes 填这张卡覆盖的用户原句，逐字照抄；结果的 uncovered 是尚未覆盖的原文。兄弟任务的编号和彼此关系写在给用户的回复里，spec 不添加路由说明；先后顺序用 dependsOn 表达。',
     '- 派活：create_todo 自动启动 thread，不需要 open_thread。用 priority 和 difficulty 路由，并行数由项目并发限制决定。thread 需要用户、做完或失败时会在对话里写一行「任务 #n …」，你不用等待、轮询或睡眠。',
     '- 跟进：threads 列出你开的 thread 和各自一行汇报，needs_you 列出谁在等人。',

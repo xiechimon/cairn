@@ -1,0 +1,34 @@
+# Browser passwords by reference
+
+Recommendation: use an owner-saved, exact-origin browser credential, resolved outside the model. Do not remove the password guard without a replacement credential boundary. A placeholder alone does not prevent the model from reading the password back through the shared browser or shell.
+
+Evidence labels: observed means read first-hand on 2026-11-16; inferred means derived from those observations. Sources are vendor security material, OWASP, and the installed browser tool's documentation. Earlier comparison: [login handoff research](browser-login-handoff-2026-11-13.md).
+
+## The reported case is an intentional guard, with an existing exposure
+
+- Observed: `apps/daemon/src/computer/browser.ts` refuses `fill` and `type` into password inputs or `current-password`, `new-password`, and `one-time-code` autocomplete fields. Commit `1ad1b0cee` introduced this as the second segment of the login handoff so the model could enter a username but not a secret. `apps/daemon/test/computer-browser.test.ts` covers these cases.
+- Observed: [the existing design](../design/computer-login-handoff.md) records the owner's November 14 decision to add origin-bound saved-login fills without per-fill confirmation as M2b, retaining takeover for human verification. The November 15 change shares a persistent Chromium profile between agent and takeover browsers.
+- Observed: approved read-only Langfuse access and product database queries correlate the refusal with a browser fill call and the exact takeover reason in the supplied image. The submitted action already contained a plaintext password. Equality-only checks found that value in the preceding user message, mirrored user message, assistant tool-call message, `computer_call.params`, and Langfuse browser-action input. It matches the local Langfuse bootstrap password; whether the account password has since changed was not tested. No secret value or private operational identifier is reproduced here.
+- Inferred: removing only the input guard would preserve that exposure. New credentials must enter through settings, not chat. Exposed credentials need owner rotation; deleting production history is a separate authorized incident-response action.
+
+## Primary-source comparison
+
+| Source | Mechanism and security boundary | Trade-off |
+| --- | --- | --- |
+| [1Password security explanation](https://1password.com/blog/closing-the-credential-risk-gap-for-browser-use-ai-agents) | Observed: an encrypted channel connects the approving device to the browser extension. A person approves; the extension fills without exposing credentials to the LLM. | Strong separation and another account/integration; per-login approval differs from the owner's saved-login decision. |
+| [Browserbase Agentic Autofill](https://docs.browserbase.com/integrations/1password/agentic-autofill.md) | Observed: the extension fills and submits without returning values to the integrating application. Setup requires Business OAuth registration, a separate personal 1Password account and production HTTPS callback. | More setup than reusing Cairn's encrypted store; precedent for keeping fill outside the model loop. |
+| [Browser Use secrets](https://docs.browser-use.com/open-source/secrets.md) | Observed: the model sees names and calls `type_secret`. Checks use the receiving frame's browser-reported URL. Common encodings are scrubbed. The docs explicitly say this is not a sandbox: model-written code and browser JS can retrieve values; screenshots are not redacted. | Reference injection is not a guarantee against a prompt-injected agent. |
+| [Browser Use 1Password](https://docs.browser-use.com/cloud/guides/1password) | Observed: service-account integration supplies values to the agent; personal autofill uses approval and can keep the agent away during fill. Domain bindings leave the value readable through browser/CDP after typing. | Different security models, not interchangeable implementations of “the model never sees it.” |
+| agent-browser 0.41.2, installed `skill-data/core/references/authentication.md` | Observed: `auth login --no-navigate` checks scheme, host and effective port before each fill; credential-provider plugins resolve just in time without generated argv or normal output containing the password. The vault persists credentials beside its key. Local debugging gives any local process full browser control. | Prefer maintained login over custom form-filling, but neither vault nor CDP isolates it from Cairn's same-user shell. [Pinned reference](https://github.com/vercel-labs/agent-browser/blob/v0.41.2/skill-data/core/references/authentication.md). |
+| [OWASP Secrets Management](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html) | Observed: centralize secrets, apply least privilege, minimize plaintext lifetime, audit access rather than values, and never log secrets. Environment variables and co-located keys expose secrets to more processes. | Requires a threat model and lifecycle coverage, not just substitution. |
+| Cairn before this change | Observed: encrypted server secrets support `plaintext` and `http`. Browser fills do not resolve references. `machine-computer.ts` applies pattern-based redaction without known passwords. `ComputerExecuteRequest` has no stdin; host execution ignores it. | Reuse the store, but expanding inside params or argv creates leaks. |
+
+All external reads used agent-reach Exa search or its documented Jina Reader route. A Jina response for the extensionless Browser Use page returned bundled site HTML; the explicit `.md` page provided the actual documentation. No referenced product was operated with a real credential.
+
+## Fit and implementation boundary
+
+Inferred: reuse Cairn's store with browser-only delivery and owner-set exact origin. Add a typed password-reference action, not generic interpolation in shell, URLs or text. Preserve literal-password and one-time-code refusal. Resolve only in the trusted fill path, outside persisted params, and use stdin rather than argv or environment variables.
+
+Inferred: shared CDP, shell, file and screenshot access cannot guarantee that a hostile agent never retrieves a password. Encoding-aware redaction is defense in depth, not isolation. The design must separate those capabilities or obtain approval for an ordinary-flow guarantee before code. The older session-profile risk acceptance does not automatically approve a new password exposure.
+
+Concrete areas: shared secret records and computer protocol; server secret CRUD, grants and machine-computer dispatch/output; daemon computer execution stdin and browser handling; existing secrets settings dialog; handoff classification; migration, protocol compatibility, and security regression tests. See [the one-page design](../design/browser-secret-fill.md).
