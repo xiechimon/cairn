@@ -151,7 +151,7 @@ const SIDEBAR_FOOT_ROW = `flex h-8.5 flex-none items-center justify-start gap-3 
 const SEARCH_OPEN_DIM_CURRENT =
   '[html[data-search-open]_&_[aria-current=page]]:bg-transparent [html[data-search-open]_&_[aria-current=page]]:text-content-secondary';
 
-const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--cds-radius-md) border-none bg-transparent p-0 text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover aria-expanded:bg-transparent ${FOCUS}`;
+const ICON_BTN = `size-7 flex-none pointer-coarse:size-11 cursor-pointer rounded-(--cds-radius-md) border-none bg-transparent p-0 text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover aria-expanded:bg-transparent ${FOCUS}`;
 
 function SidebarTip({
   label,
@@ -468,7 +468,11 @@ export function BoardSidebar({
         <SidebarTip label={toggleLabel} side="bottom">
           <Button
             variant="ghost"
-            className={cn('sidebar-team-collapse', ICON_BTN, 'text-content-tertiary')}
+            className={cn(
+              'sidebar-team-collapse',
+              ICON_BTN,
+              'text-content-tertiary pointer-coarse:-ml-2',
+            )}
             aria-label={toggleLabel}
             onClick={onToggle}
           >
@@ -527,7 +531,7 @@ export function BoardSidebar({
                 <ProjectFilterMenu
                   filter={filter}
                   onFilter={chooseFilter}
-                  className="size-7 bg-transparent [&_svg:not([class*=size-])]:size-5"
+                  className="size-7 bg-transparent pointer-coarse:-mr-2 [&_svg:not([class*=size-])]:size-5"
                 />
               </div>
             </div>
@@ -545,7 +549,7 @@ export function BoardSidebar({
             {archivedCount === 0 && (
               <p
                 data-testid="sidebar-archived-empty"
-                className="m-0 flex-none py-1 pr-2 pl-3.5 text-meta text-content-secondary"
+                className="m-0 flex-none px-2 py-1 text-meta text-content-secondary"
               >
                 {t('没有已归档的项目')}
               </p>
