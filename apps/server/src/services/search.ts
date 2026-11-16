@@ -10,6 +10,7 @@ import { and, asc, eq, inArray, not, or, type SQL, sql } from 'drizzle-orm';
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Db } from '../db/client.js';
 import { build, project, todo, tokenUsage, user } from '../db/schema.js';
+import { listedProjects } from './personal-space.js';
 
 export interface SearchDeps {
   db: Db;
@@ -52,7 +53,7 @@ function resolveFilter(
       const ids = deps.db
         .select({ id: project.id, name: project.name })
         .from(project)
-        .where(eq(project.teamId, teamId))
+        .where(listedProjects(teamId))
         .all()
         .filter((row) => row.name.toLowerCase() === cond.name.toLowerCase())
         .map((row) => row.id);
@@ -215,7 +216,7 @@ export function search(
   const projects = deps.db
     .select({ id: project.id, name: project.name })
     .from(project)
-    .where(and(eq(project.teamId, input.teamId), containsLike(project.name, pattern)))
+    .where(and(listedProjects(input.teamId), containsLike(project.name, pattern)))
     .orderBy(asc(project.name))
     .all();
 

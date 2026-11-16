@@ -29,6 +29,7 @@ import {
   THREAD_TOOL_DESCRIPTIONS,
   THREAD_TOOL_SCHEMAS,
 } from './mcp-threads.js';
+import { listedProjects } from './personal-space.js';
 import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
@@ -88,7 +89,7 @@ function requireProjectRow(db: Db, projectId: string, teamId: string) {
   const row = db
     .select()
     .from(project)
-    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+    .where(and(eq(project.id, projectId), listedProjects(teamId)))
     .get();
   if (!row) throw new HttpError(404, `project ${projectId}`);
   return row;
@@ -175,7 +176,7 @@ export async function executeMcpTool(
       return json(records);
     }
     case 'projects': {
-      const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();
+      const rows = db.select().from(project).where(listedProjects(ctx.teamId)).all();
       return json(
         rows.map((p) => {
           const todoCount = db

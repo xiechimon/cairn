@@ -58,6 +58,7 @@ import {
 } from './services/scheduler.js';
 import { sharedAgentSkillRoots } from './services/skills.js';
 import { prepareSkillsHome } from './services/skills-home.js';
+import { fillSystemAvatar } from './services/system-avatar.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
@@ -138,6 +139,7 @@ const vapidKeys = {
   apns: loadApnsConfig(config.apns),
 };
 const seeded = seed(db);
+await fillSystemAvatar(seeded.user);
 seedLocalMachine(db, seeded.team.id);
 setCoordinatorServerContextEnabled(config.coordinatorServerContext || config.coordinatorInServer);
 setCoordinatorInServer(config.coordinatorInServer);
@@ -157,6 +159,11 @@ const convHub = new ConversationStreamHub();
 const machineHub = new MachineWakeHub();
 const reposDir = reposDirOf(config);
 mkdirSync(reposDir, { recursive: true });
+const workspacesDirOf = () =>
+  localWorkspaceRoot(
+    config.homeDir,
+    resolve(process.env[ENV_VARS.workspacesDir] ?? join(config.homeDir, 'workspaces')),
+  );
 const attachmentsDir = attachmentsDirOf(config);
 mkdirSync(attachmentsDir, { recursive: true });
 const githubFetch = refreshingGithubFetch(
@@ -192,6 +199,9 @@ const app = createApp(
     githubAppIdentity: config.githubAppIdentity,
     githubFetch,
     reposDir,
+    get workspacesDir() {
+      return workspacesDirOf();
+    },
     attachmentsDir,
     backupStatusPath: backupStatusPathOf(config),
     deployRecordPath: deployRecordPathOf(config),
@@ -270,10 +280,7 @@ const coordinator = config.coordinatorInServer
         vapidKeys,
         reposDir,
         get workspacesDir() {
-          return localWorkspaceRoot(
-            config.homeDir,
-            resolve(process.env[ENV_VARS.workspacesDir] ?? join(config.homeDir, 'workspaces')),
-          );
+          return workspacesDirOf();
         },
         attachmentsDir,
         skillsDir: config.skillsDir,

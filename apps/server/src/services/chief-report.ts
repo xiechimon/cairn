@@ -44,6 +44,7 @@ import { askQuestionContentOf } from './chief-questions.js';
 import type { ConversationStreamHub } from './events.js';
 import { ingestIntake, pendingIntakeReports } from './intake-items.js';
 import { listNeedsYou } from './needs-you.js';
+import { listedProjects } from './personal-space.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { wallClockParts } from './schedules.js';
 import { createTodo, type TodoDeps } from './todos.js';
@@ -630,7 +631,7 @@ export function buildReportRun(db: Db, input: ReportRunInput): ReportRun {
   const projectRows = db
     .select({ id: project.id, name: project.name })
     .from(project)
-    .where(and(eq(project.teamId, teamId), sql`${project.archivedAt} is null`))
+    .where(and(listedProjects(teamId), sql`${project.archivedAt} is null`))
     .all()
     .sort((a, b) => Number(sourceProjects.has(b.id)) - Number(sourceProjects.has(a.id)))
     .slice(0, PROJECT_LIST_MAX);

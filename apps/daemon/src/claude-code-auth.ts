@@ -146,9 +146,9 @@ export function claudeCodeAuthFailureMessage(machineName: string, cliMessage?: s
 export function claudeCodeTeamSubscriptionAuthFailureMessage(cliMessage: string): string {
   return [
     `${CLAUDE_CODE_AUTH_FAILURE_MARKER} `,
-    'claude-code 步骤无法执行：cairn 中保存的团队 Claude 订阅 token 被拒绝。',
-    '补法：运行 `claude setup-token` 获取新 token，',
-    '在 cairn 的「设置 → 订阅」中替换该团队 Claude 订阅的 token，然后点击「验证」。',
+    '你的 Claude 订阅登录已失效（token 被拒绝或已撤销），Coordinator 和任务暂时用不了。',
+    '补法：在 cairn 的「设置 → 模型服务」里移除这个失效的订阅，',
+    '再在终端运行 `claude setup-token` 拿一个新 token 添加回来。',
     `CLI 原因：${cliMessage}`,
   ].join('');
 }

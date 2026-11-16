@@ -45,6 +45,7 @@ import {
 } from './services/git.js';
 import { importGithubIssue } from './services/github-issues.js';
 import { listNamedPrompts, putNamedPrompt, resetNamedPrompt } from './services/named-prompts.js';
+import { listedProjects } from './services/personal-space.js';
 import {
   projectMergeConfigOf,
   projectShipRouteOf,
@@ -67,7 +68,7 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/projects', (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
     const origin = requestOrigin(c);
-    const rows = ctx.db.select().from(project).where(eq(project.teamId, teamId)).all();
+    const rows = ctx.db.select().from(project).where(listedProjects(teamId)).all();
     return c.json(rows.map((r) => toProjectRecord(r, origin)));
   });
 

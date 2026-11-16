@@ -85,6 +85,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 
 ## Code Review Rules
 
+- For repository development, independent review means another agent reads the change in a separate, read-only context; it may use the author's model. Use the available agent tools, not a local `claude` command for a Sonnet review. This does not enable code review by default or change the product's reviewer requirements.
 - Review only what the PR changes. Report a defect on a line the PR did not add or modify only when the PR's change makes it reachable or worse; otherwise leave it for the nightly scan, which files old-code problems as issues.
 - On a later review of the same PR, read only the commits pushed since the last review and do not repeat a finding that is already raised or resolved.
 - Name the bug class of each finding and list every instance of it in the diff in one comment, so one push fixes the class instead of one line per round. When a later commit adds another instance of a class already raised on this PR, add it to that class's thread instead of opening a new one.
