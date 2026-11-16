@@ -9,12 +9,14 @@ import {
   machineEnrollStartResponseSchema,
 } from '@cairn/shared';
 import { type OtelEnv, withOtelEnv } from './otel-config.js';
+import { createRestartBudget } from './restart-budget.js';
 
 const PRIVATE_DIR_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
 const STOP_TIMEOUT_MS = 10_000;
 const RESTART_DELAY_MS = 5_000;
 const MAX_RESTARTS = 5;
+const STABLE_RUN_MS = 60_000;
 
 export interface RunnerOptions {
   root: string;
@@ -26,6 +28,7 @@ export interface RunnerOptions {
 }
 
 export interface LocalRunner {
+  ensureRunning: () => void;
   stop: () => Promise<void>;
 }
 
@@ -84,8 +87,11 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
 export async function startLocalRunner(options: RunnerOptions): Promise<LocalRunner> {
   writeMachineJson(options.home, await enrollLocalMachine(options.origin, options.ownerToken));
   let child: ChildProcess | null = null;
-  let restarts = 0;
+  let pending: NodeJS.Timeout | null = null;
+  const budget = createRestartBudget(MAX_RESTARTS, STABLE_RUN_MS);
   const launch = (): void => {
+    pending = null;
+    budget.started();
     const started = spawn(
       process.execPath,
       [join(options.root, 'dist', 'cli.mjs'), 'start', '--foreground', '--server', options.origin],
@@ -94,17 +100,26 @@ export async function startLocalRunner(options: RunnerOptions): Promise<LocalRun
     child = started;
     started.once('exit', (code, signal) => {
       child = null;
-      if (options.isQuitting() || restarts >= MAX_RESTARTS) return;
-      restarts += 1;
-      console.error(
-        `Cairn Runner exited (code ${code}, signal ${signal}); restart ${restarts} of ${MAX_RESTARTS}`,
-      );
-      setTimeout(launch, RESTART_DELAY_MS);
+      if (options.isQuitting()) return;
+      if (!budget.exited()) {
+        console.error(`Cairn Runner exited (code ${code}, signal ${signal}); not restarting`);
+        return;
+      }
+      console.error(`Cairn Runner exited (code ${code}, signal ${signal}); restarting`);
+      pending = setTimeout(launch, RESTART_DELAY_MS);
     });
   };
   launch();
   return {
+    ensureRunning: () => {
+      if (child !== null || options.isQuitting()) return;
+      if (pending !== null) clearTimeout(pending);
+      budget.reset();
+      launch();
+    },
     stop: () => {
+      if (pending !== null) clearTimeout(pending);
+      pending = null;
       const running = child;
       if (running === null) return Promise.resolve();
       return new Promise((done) => {

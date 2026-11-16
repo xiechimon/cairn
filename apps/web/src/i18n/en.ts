@@ -277,6 +277,8 @@ export const EN: Record<string, string> = {
   '在要干活的电脑上运行 `{command}`': 'Run `{command}` on the computer that should do the work',
   '{name} 离线': '{name} is offline',
   '在 {name} 上运行 `{command}` 让它重新上线': 'Run `{command}` on {name} to bring it back',
+  'Cairn 会在这台电脑唤醒后自动重连': 'Cairn reconnects this computer by itself once it wakes',
+  '正在重新连接…': 'Reconnecting…',
   '{n} 台执行机都离线': '{n#1 Runner is|# Runners are} offline',
   '在其中一台上运行 `{command}` 让它重新上线': 'Run `{command}` on one of them to bring it back',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',

@@ -1,5 +1,5 @@
 import { PUBLISHED_PACKAGES } from '@cairn/shared';
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { useChief, useMachines, useProviders } from '../api/hooks.js';
 import { useModelRouting } from '../api/model-routing.js';
@@ -66,28 +66,49 @@ function withCode(text: string): ReactNode {
   });
 }
 
-function runnerStep(
-  machines: readonly { name: string; online?: boolean }[] | undefined,
+interface LocalRunnerBridge {
+  reconnect: () => Promise<void>;
+}
+
+function localRunnerBridge(): LocalRunnerBridge | null {
+  const desktop = (window as Window & { cairnDesktop?: { localRunner?: LocalRunnerBridge } })
+    .cairnDesktop;
+  return desktop?.localRunner ?? null;
+}
+
+export function runnerStep(
+  machines: readonly { name: string; online?: boolean; kind?: 'local' | 'remote' }[] | undefined,
   command: string,
+  appRunsLocal: boolean,
   t: TFunc,
-): { label: string; hint: ReactNode } {
+): { label: string; hint: ReactNode; reconnect: boolean } {
   const offline = (machines ?? []).filter((machine) => machine.online === false);
   const [only] = offline;
   if (only === undefined) {
     return {
       label: t('连接一台执行机'),
       hint: withCode(t('在要干活的电脑上运行 `{command}`', { command })),
+      reconnect: false,
+    };
+  }
+  if (offline.length === 1 && only.kind === 'local' && appRunsLocal) {
+    return {
+      label: t('{name} 离线', { name: only.name }),
+      hint: t('Cairn 会在这台电脑唤醒后自动重连'),
+      reconnect: true,
     };
   }
   if (offline.length === 1) {
     return {
       label: t('{name} 离线', { name: only.name }),
       hint: withCode(t('在 {name} 上运行 `{command}` 让它重新上线', { name: only.name, command })),
+      reconnect: false,
     };
   }
   return {
     label: t('{n} 台执行机都离线', { n: offline.length }),
     hint: withCode(t('在其中一台上运行 `{command}` 让它重新上线', { command })),
+    reconnect: false,
   };
 }
 
@@ -95,7 +116,14 @@ export function ComposerSetupHint({ step: { next, models } }: { step: ComposerSe
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const machinesQ = useMachines(teamId, live);
-  const runner = runnerStep(machinesQ.data, `${PUBLISHED_PACKAGES.cli.command} start`, t);
+  const [bridge] = useState(localRunnerBridge);
+  const [reconnecting, setReconnecting] = useState(false);
+  const { reconnect, ...runner } = runnerStep(
+    machinesQ.data,
+    `${PUBLISHED_PACKAGES.cli.command} start`,
+    bridge !== null,
+    t,
+  );
   const copy: Record<FirstRunStepId, { icon: ReactNode; label: string; hint: ReactNode }> = {
     models: {
       icon: <Key width={16} height={16} />,
@@ -134,6 +162,21 @@ export function ComposerSetupHint({ step: { next, models } }: { step: ComposerSe
       >
         {hint}
       </span>
+      {next === 'machine' && reconnect && bridge !== null && (
+        <Button
+          variant="ghost"
+          size="xs"
+          data-testid="composer-setup-reconnect"
+          className="ml-1 flex-none text-(--text-secondary)"
+          disabled={reconnecting}
+          onClick={() => {
+            setReconnecting(true);
+            void bridge.reconnect().finally(() => setReconnecting(false));
+          }}
+        >
+          {t(reconnecting ? '正在重新连接…' : '重新连接')}
+        </Button>
+      )}
     </>
   );
 }

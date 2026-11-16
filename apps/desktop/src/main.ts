@@ -16,6 +16,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  powerMonitor,
   powerSaveBlocker,
   session,
   shell,
@@ -48,6 +49,7 @@ interface RunningServer {
 let server: RunningServer | null = null;
 let tray: Tray | null = null;
 let runner: LocalRunner | null = null;
+let runnerStarting: Promise<void> | null = null;
 let quitting = false;
 
 function cairnHome(): string {
@@ -334,18 +336,35 @@ async function boot(): Promise<void> {
     const ownerToken = readOwnerToken();
     signOwnPagesIn(server.origin, ownerToken);
     tray = showTray(server.origin);
-    void startLocalRunner({
-      root: bundledRoot('runner'),
-      home: join(app.getPath('userData'), 'runner'),
-      origin: server.origin,
-      ownerToken,
-      otelEnv,
-      isQuitting: () => quitting,
-    }).then(
-      (started) => {
-        runner = started;
-      },
-      (error: unknown) => console.error('Cairn Runner did not start:', error),
+    const origin = server.origin;
+    const bringRunnerUp = (): Promise<void> => {
+      if (runner !== null) {
+        runner.ensureRunning();
+        return Promise.resolve();
+      }
+      runnerStarting ??= startLocalRunner({
+        root: bundledRoot('runner'),
+        home: join(app.getPath('userData'), 'runner'),
+        origin,
+        ownerToken,
+        otelEnv,
+        isQuitting: () => quitting,
+      })
+        .then(
+          (started) => {
+            runner = started;
+          },
+          (error: unknown) => console.error('Cairn Runner did not start:', error),
+        )
+        .finally(() => {
+          runnerStarting = null;
+        });
+      return runnerStarting;
+    };
+    void bringRunnerUp();
+    powerMonitor.on('resume', () => void bringRunnerUp());
+    ipcMain.handle('local-runner:reconnect', (event) =>
+      event.senderFrame?.origin === origin ? bringRunnerUp() : undefined,
     );
     void removeLeftoverUpdates();
     serveUpdates(server.origin);

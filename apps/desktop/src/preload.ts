@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     read: (providerIds: string[]): Promise<LocalProviderImport[]> =>
       ipcRenderer.invoke('local-providers:read', providerIds),
   },
+  localRunner: {
+    reconnect: (): Promise<void> => ipcRenderer.invoke('local-runner:reconnect'),
+  },
   update: {
     state: (): Promise<DesktopUpdateState> => ipcRenderer.invoke('desktop-update:state'),
     check: (): Promise<void> => ipcRenderer.invoke('desktop-update:check'),

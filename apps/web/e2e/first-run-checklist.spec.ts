@@ -4,7 +4,7 @@ import { mockLive, PROJECT } from './chief-home-mock';
 interface World {
   providers: unknown[];
   connections?: unknown[];
-  machines: { id: string; name: string; online: boolean }[];
+  machines: { id: string; name: string; online: boolean; kind?: 'local' | 'remote'; lastSeenAt?: number }[];
   bound: boolean;
   teamPaths: string[];
 }
@@ -113,6 +113,44 @@ test('a machine coming back online clears the chip', async ({ page }) => {
     for (const es of window.__es) es.emit({ type: 'machine_presence', machineId: 'm1', online: true });
   });
   await expect(chip(page)).toHaveCount(0);
+});
+
+test('in the desktop app its own offline machine reconnects instead of asking for cairn start', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const calls: string[] = [];
+    Object.assign(window, {
+      __reconnects: calls,
+      cairnDesktop: { localRunner: { reconnect: async () => void calls.push('reconnect') } },
+    });
+  });
+  await open(page, {
+    ...fresh(),
+    providers: [{ id: 'p1', name: 'gw' }],
+    bound: true,
+    machines: [{ id: 'm1', name: 'xmonsMac', online: false, kind: 'local', lastSeenAt: 1 }],
+  });
+  await expect(chip(page)).toHaveText('xmonsMac 离线');
+  await expect(hint(page)).toHaveText('Cairn 会在这台电脑唤醒后自动重连');
+  await expect(hint(page).locator('code')).toHaveCount(0);
+  await page.getByTestId('composer-setup-reconnect').click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __reconnects: string[] }).__reconnects))
+    .toEqual(['reconnect']);
+});
+
+test('outside the desktop app an offline local machine still shows the start command', async ({
+  page,
+}) => {
+  await open(page, {
+    ...fresh(),
+    providers: [{ id: 'p1', name: 'gw' }],
+    bound: true,
+    machines: [{ id: 'm1', name: 'xmonsMac', online: false, kind: 'local', lastSeenAt: 1 }],
+  });
+  await expect(hint(page)).toHaveText(/^在 xmonsMac 上运行 .+ start 让它重新上线$/);
+  await expect(page.getByTestId('composer-setup-reconnect')).toHaveCount(0);
 });
 
 test('with several runners all offline the chip counts them instead of asking to connect one', async ({
