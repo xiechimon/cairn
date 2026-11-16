@@ -7,16 +7,14 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, dueEvent, gateState, message, project, step, todo } from '../db/schema.js';
+import { build, dueEvent, message, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { BLOCKED_BY_HOLD, deadEndBlocker } from './blockers.js';
 import { planAwaitsAutoConfirm } from './builds.js';
 import { type ChiefDeps, enqueueOwnershipWake } from './chief.js';
 import { settleChiefActiveRun } from './chief-turns.js';
-import { projectRepoRef } from './git.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
 import { notifyOwnership } from './notifications.js';
-import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { publishStepRow } from './quota-wait.js';
 import { endSnoozeOn } from './snooze.js';
@@ -72,42 +70,9 @@ function phaseWork(row: TodoRow): string {
   return `${row.latestBuildId ?? ''}:${row.phaseAt}`;
 }
 
-function reviewOwnership(db: Db, row: TodoRow): Ownership | null {
-  const projectRow = db.select().from(project).where(eq(project.id, row.projectId)).get();
-  const policy =
-    projectRow === undefined ? 'autonomous' : projectMergeConfigOf(projectRow).mergePolicy;
+function reviewOwnership(row: TodoRow): Ownership {
   const workKey = `review:${phaseWork(row)}`;
-  const coordinatorReview: Ownership = { owner: 'coordinator', reason: 'review', workKey };
-  if (row.output === 'info') return coordinatorReview;
-  const buildRow =
-    row.latestBuildId === null
-      ? undefined
-      : db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
-  const prGate =
-    buildRow?.prNumber != null &&
-    projectRow?.repoKind === 'github' &&
-    projectRow.githubRepo !== null;
-  const gate =
-    buildRow === undefined
-      ? undefined
-      : db.select().from(gateState).where(eq(gateState.buildId, buildRow.id)).get();
-  if (prGate && (gate === undefined || gate.evaluatedAt < row.phaseAt)) return null;
-  const blockers = gate?.blockers ?? [];
-  if (gate !== undefined && !gate.ready && blockers.some((b) => b.class === 'transient')) {
-    return null;
-  }
-  if (policy === 'human' || blockers.some((b) => b.class === 'human')) {
-    return { owner: 'owner', reason: 'review', workKey };
-  }
-  if (prGate) return null;
-  const repo = projectRepoRef(projectRow, '');
-  const personLands =
-    repo !== null &&
-    repo.kind !== 'github' &&
-    row.hasChanges &&
-    projectRow !== undefined &&
-    projectShipRouteOf(projectRow) !== 'custom';
-  return personLands ? { owner: 'owner', reason: 'review', workKey } : coordinatorReview;
+  return { owner: row.output === 'info' ? 'coordinator' : 'owner', reason: 'review', workKey };
 }
 
 function failedOwnership(db: Db, row: TodoRow): Ownership | null {
@@ -177,7 +142,7 @@ function workOwnership(db: Db, row: TodoRow): Ownership | null {
     if (row.latestBuildId !== null && planAwaitsAutoConfirm({ db }, row.latestBuildId)) return null;
     return { owner: 'owner', reason: 'confirm', workKey: `confirm:${phaseWork(row)}` };
   }
-  if (row.phase === 'review') return reviewOwnership(db, row);
+  if (row.phase === 'review') return reviewOwnership(row);
   if (row.phase === 'failed') return failedOwnership(db, row);
   return null;
 }
