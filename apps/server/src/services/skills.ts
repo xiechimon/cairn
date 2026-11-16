@@ -29,7 +29,6 @@ import { skillAudit } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
-import { builtinSkillsRoot } from './builtin-skills.js';
 
 export interface LocalSkill {
   id: string;
@@ -37,18 +36,13 @@ export interface LocalSkill {
   description: string | null;
   dirName: string;
   dir: string;
-  builtin: boolean;
 }
 
 export function scanLocalSkills(skillsDir: string): LocalSkill[] {
-  const builtinRoot = builtinSkillsRoot();
-  const builtins = builtinRoot === null ? [] : scanSkillsRoot(builtinRoot, true);
-  const taken = new Set(builtins.map((s) => s.id));
-  const team = scanSkillsRoot(skillsDir, false).filter((s) => !taken.has(s.id));
-  return [...builtins, ...team].sort((a, b) => a.id.localeCompare(b.id));
+  return scanSkillsRoot(skillsDir).sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export function scanSkillsRoot(skillsDir: string, builtin: boolean): LocalSkill[] {
+export function scanSkillsRoot(skillsDir: string): LocalSkill[] {
   let entryNames: string[];
   try {
     entryNames = readdirSync(skillsDir, { withFileTypes: true }).map((e) => e.name);
@@ -86,7 +80,7 @@ export function scanSkillsRoot(skillsDir: string, builtin: boolean): LocalSkill[
     const id = fm.name ?? dirName;
     if (seenId.has(id)) continue;
     seenId.add(id);
-    out.push({ id, name: id, description: fm.description ?? null, dirName, dir, builtin });
+    out.push({ id, name: id, description: fm.description ?? null, dirName, dir });
   }
   return out;
 }
@@ -433,9 +427,6 @@ export function updateLocalSkill(
 ): SkillRecord {
   const resolved = resolveLocalSkill(opts.skillsDir, skillId);
   if (!resolved) throw new NotFoundError(`skill ${skillId}`);
-  if (resolved.skill.builtin) {
-    throw new HttpError(409, `skill ${skillId} ships with Cairn and cannot be edited`);
-  }
   if (lstatSync(resolved.dir).isSymbolicLink()) {
     throw new HttpError(
       409,

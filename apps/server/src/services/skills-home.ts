@@ -87,7 +87,7 @@ export async function prepareSkillsHome(opts: SkillsHomeOpts): Promise<SkillsHom
   const taken = new Set(scanLocalSkills(opts.skillsDir).map((s) => s.id));
   const copied: string[] = [];
   const skipped: { id: string; reason: string }[] = [];
-  for (const skill of scanSkillsRoot(opts.legacyDir, false)) {
+  for (const skill of scanSkillsRoot(opts.legacyDir)) {
     const dest = join(opts.skillsDir, skill.dirName);
     if (taken.has(skill.id) || existsSync(dest)) {
       skipped.push({ id: skill.id, reason: 'already in the Cairn skills directory' });

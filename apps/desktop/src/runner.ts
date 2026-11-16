@@ -67,6 +67,9 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
     ELECTRON_RUN_AS_NODE: '1',
     [ENV_VARS.home]: options.home,
     [ENV_VARS.server]: options.origin,
+    [ENV_VARS.skillsDir]: join(options.home, 'skills'),
+    [ENV_VARS.mcpConfig]: join(options.home, 'mcp.json'),
+    CLAUDE_CONFIG_DIR: join(options.home, 'claude'),
   };
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
