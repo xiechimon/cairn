@@ -2,54 +2,72 @@ name: desktop-release
 
 on:
   schedule:
-    - cron: '17 18 * * *'
+    - cron: '17 */3 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: desktop-release
   cancel-in-progress: false
 
 jobs:
+  decide:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release: ${{ steps.changed.outputs.release }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Release only when the app's sources moved since the last release
+        id: changed
+        run: |
+          last=$(git tag --list 'desktop-v*' --sort=-v:refname | head -n 1)
+          if [ "$GITHUB_EVENT_NAME" != "schedule" ] || [ -z "$last" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$last" "$GITHUB_SHA" -- \
+            apps/web apps/server apps/daemon apps/desktop packages/shared \
+            package.json pnpm-lock.yaml pnpm-workspace.yaml \
+            ':(exclude)apps/*/test/*' ':(exclude)packages/*/test/*' ':(exclude)apps/web/e2e/*' \
+            ':(exclude)*.md')
+          if [ -z "$changed" ]; then
+            echo "nothing the app ships changed since $last"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$changed" | head -n 20
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
     runs-on: macos-latest
+    permissions:
+      contents: write
     timeout-minutes: 60
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: 0.1.${{ github.run_number }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          fetch-depth: 0
-
-      - name: Skip a nightly run when main has not moved since the last release
-        id: changed
-        run: |
-          last=$(git tag --list 'desktop-v*' --sort=-v:refname | head -n 1)
-          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ -n "$last" ] && [ "$(git rev-list -n 1 "$last")" = "$GITHUB_SHA" ]; then
-            echo "main is still at $last; nothing to release"
-            echo "release=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "release=true" >> "$GITHUB_OUTPUT"
-          fi
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
-        if: steps.changed.outputs.release == 'true'
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
-        if: steps.changed.outputs.release == 'true'
         with:
           node-version: 24
           cache: pnpm
 
       - name: Install dependencies
-        if: steps.changed.outputs.release == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Build the web UI, the server and the Runner
-        if: steps.changed.outputs.release == 'true'
         run: |
           pnpm --filter @cairn/web build
           pnpm --filter @xiechimon/cairn build
@@ -59,7 +77,6 @@ jobs:
           pnpm --filter @cairn/desktop stage-runner
 
       - name: Package arm64 and x64
-        if: steps.changed.outputs.release == 'true'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         working-directory: apps/desktop
@@ -68,17 +85,14 @@ jobs:
           pnpm exec electron-builder --mac dmg zip --arm64 --x64 -c.extraMetadata.version="$VERSION"
 
       - name: Launch the arm64 app before publishing it
-        if: steps.changed.outputs.release == 'true'
         working-directory: apps/desktop
         run: pnpm smoke
 
       - name: Write the update manifest
-        if: steps.changed.outputs.release == 'true'
         working-directory: apps/desktop
         run: node scripts/release-manifest.mjs "$VERSION" release
 
       - name: Publish the release
-        if: steps.changed.outputs.release == 'true'
         working-directory: apps/desktop/release
         run: |
           gh release create "desktop-v$VERSION" \
