@@ -80,7 +80,7 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
     }
   });
 
-  test('entering review -> build_review; same todo second event = same-key upsert (single row, readAt reset)', async () => {
+  test('code completion -> todo_done; same todo second event = same-key upsert (single row, readAt reset)', async () => {
     const s = await withRunningTodo();
     const stream = await openStream(s.app, s.team.id);
     try {
@@ -99,7 +99,7 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
 
       const frame = await notificationFrames(stream)(3000);
       const ev = notificationEventSchema.parse(frame);
-      expect(ev.notification.type).toBe('build_review');
+      expect(ev.notification.type).toBe('todo_done');
       expect(ev.notification.id).toBe(`${s.user.id}:${s.todoDoc.id}`);
       expect(ev.notification.entityRef).toEqual({
         title: '写周报',
@@ -114,14 +114,14 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
         .where(eq(notification.entityId, s.todoDoc.id))
         .all();
       expect(rows).toHaveLength(1);
-      expect(rows[0]?.type).toBe('build_review');
+      expect(rows[0]?.type).toBe('todo_done');
       expect(rows[0]?.readAt).toBeNull();
     } finally {
       stream.close();
     }
   });
 
-  test('scheduled round stops at review = build_review (no independent "scheduled round ended" type, r5 section 7.2)', async () => {
+  test('a scheduled code round completes with todo_done, without requiring a merge', async () => {
     const s = await withRunningTodo({ withPlan: false, triggerSource: 'schedule' });
     const stream = await openStream(s.app, s.team.id);
     try {
@@ -133,7 +133,7 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
 
       const frame = await notificationFrames(stream)(3000);
       const ev = notificationEventSchema.parse(frame);
-      expect(ev.notification.type).toBe('build_review');
+      expect(ev.notification.type).toBe('todo_done');
     } finally {
       stream.close();
     }
@@ -149,10 +149,6 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
           id: string;
         }[];
       completeStep(s.svc, (await stepsOf())[0]?.id ?? '');
-      await notificationFrames(stream)(3000);
-      await req(s.app, 'POST', `/api/builds/${s.buildId}/merge`);
-      const steps = await stepsOf();
-      completeStep(s.svc, steps[steps.length - 1]?.id ?? '');
 
       const doneFrame = notificationEventSchema.parse(await notificationFrames(stream)(3000));
       expect(doneFrame.notification).toMatchObject({ type: 'todo_done', readAt: null });
