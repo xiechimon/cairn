@@ -129,6 +129,7 @@ export {
   resourcesMcpConfirmHost,
   resourcesMcpConnectGithub,
   resourcesMcpConnectors,
+  resourcesMcpGrant,
   resourcesMcpManageNeedsAuth,
   resourcesMcpOAuthDenied,
   resourcesSkillsList,

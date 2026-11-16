@@ -831,9 +831,9 @@ Reach:
 
 ### mcp-servers
 
-**MCP servers** (shipped, centrality 3). The read-only list of MCP servers configured on each machine.
+**MCP servers** (shipped, centrality 3). Connect remote MCP servers from a catalog or by URL, choose whether tasks and reviews may use each one, and see local servers each machine configures.
 
-States: An empty state or a read-only list of servers per machine.
+States: Connected, needs sign-in and unreachable connectors with their grant; catalog cards; the grant sheet after connecting; the add-server dialog; local config entries; an empty local list.
 
 Reach:
 
@@ -843,12 +843,12 @@ Reach:
 - Web routes: `/app/resources/mcp-servers`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `MCP`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `mcp-add-server`, `mcp-catalog`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
+- Test ids in its code: `mcp-add-server`, `mcp-catalog`, `mcp-connected`, `mcp-grant-*`, `mcp-grant-summary`, `mcp-local`, `mcp-oauth-error`, `mcp-signin-host`
 - Verify recipes: [.claude/skills/verify-cairn/features/mcp-servers.md](features/mcp-servers.md)
 - Research: [docs/research/mcp-connectors-2026-11-15.md](../../../docs/research/mcp-connectors-2026-11-15.md)
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md)
 - Backend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md)
-- Evidence: `apps/server/test/mcp-servers.test.ts`, `apps/daemon/test/mcp-config.test.ts`
+- Evidence: `apps/server/test/mcp-servers.test.ts`, `apps/daemon/test/mcp-config.test.ts`, `apps/web/e2e/mcp-grants.spec.ts`
 
 ### projects
 

@@ -1,4 +1,10 @@
-import type { McpConnectorRecord, ModelSource, ProviderRecord } from '@cairn/shared';
+import type {
+  McpConnectorRecord,
+  ModelSource,
+  PolicyUse,
+  ProviderRecord,
+  WorkPolicyRecord,
+} from '@cairn/shared';
 import {
   legacyDone,
   legacyReview,
@@ -552,14 +558,60 @@ const MCP_CONNECTORS: McpConnectorRecord[] = [
   }),
 ];
 
+const mcpPolicy = (use: PolicyUse, mcpServers: string[]): WorkPolicyRecord => ({
+  id: `policy-${use}`,
+  teamId: TEAM_ID,
+  use,
+  tools: [],
+  mcpServers,
+  skillsAllowlist: null,
+  defaultSkill: null,
+  secrets: [],
+  seededFromAgentId: null,
+  createdAt: r7(9, 0),
+  updatedAt: r7(13, 10),
+});
+
+const MCP_ROUTING = {
+  rules: [],
+  policies: [mcpPolicy('session', ['github', 'context7']), mcpPolicy('review', ['github'])],
+};
+
+const MCP_RESOURCES: ResourcesContent = {
+  ...RESOURCES,
+  mcpConnectors: MCP_CONNECTORS,
+  routingSettings: MCP_ROUTING,
+};
+
 export const resourcesMcpConnectors: FixtureSet = {
   ...resourcesDefault,
-  resources: { ...RESOURCES, mcpConnectors: MCP_CONNECTORS },
+  resources: MCP_RESOURCES,
+};
+
+export const resourcesMcpGrant: FixtureSet = {
+  ...resourcesMcpConnectors,
+  resources: {
+    ...MCP_RESOURCES,
+    mcpConnectors: [
+      ...MCP_CONNECTORS,
+      connector('mcp-linear', {
+        slug: 'linear',
+        label: 'Linear',
+        catalogId: 'linear',
+        url: 'https://mcp.linear.app/mcp',
+        headerNames: [],
+        authKind: 'oauth',
+        status: 'connected',
+        toolCount: 23,
+      }),
+    ],
+  },
+  ui: { mcpDialog: { kind: 'grant', connectorId: 'mcp-linear' } },
 };
 
 export const resourcesMcpConnectGithub: FixtureSet = {
   ...resourcesDefault,
-  resources: { ...RESOURCES, mcpConnectors: MCP_CONNECTORS.slice(1) },
+  resources: { ...MCP_RESOURCES, mcpConnectors: MCP_CONNECTORS.slice(1) },
   ui: { mcpDialog: { kind: 'catalog', catalogId: 'github' } },
 };
 

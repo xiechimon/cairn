@@ -25,11 +25,13 @@ import {
   ConnectorStatus,
   McpConnectorDialog,
   type McpDialogTarget,
+  McpGrantSheet,
   type McpOAuthRequest,
   type McpSignIn,
   McpSignInDialog,
 } from './mcp-connector-dialog.js';
 import { McpConnectorIcon } from './mcp-connector-icon.js';
+import { grantSummary, useMcpGrants } from './mcp-grants.js';
 import {
   ResourceList,
   ResourceRow,
@@ -48,7 +50,8 @@ type FixtureDialog =
   | { kind: 'manage'; connectorId: string }
   | { kind: 'authorizing'; catalogId: string }
   | { kind: 'confirm'; name: string; host: string }
-  | { kind: 'landing'; reason: string; name?: string };
+  | { kind: 'landing'; reason: string; name?: string }
+  | { kind: 'grant'; connectorId: string };
 
 interface SignInAttempt {
   name: string;
@@ -139,7 +142,13 @@ export function McpServersPage() {
       )
     : (fixture.resources?.mcpServers ?? []);
   const connectors = live ? (connectorsQ.data ?? []) : (fixture.resources?.mcpConnectors ?? []);
+  const grants = useMcpGrants(teamId, live, fixture.resources?.routingSettings?.policies);
   const fixtureDialog = fixture.ui?.mcpDialog;
+  const [granting, setGranting] = useState<McpConnectorRecord | string | null>(
+    fixtureDialog?.kind === 'grant' ? fixtureDialog.connectorId : null,
+  );
+  const grantTarget =
+    typeof granting === 'string' ? connectors.find((c) => c.id === granting) : granting;
   const [dialog, setDialog] = useState<McpDialogTarget | null>(() =>
     initialTarget(fixtureDialog, connectors),
   );
@@ -170,6 +179,8 @@ export function McpServersPage() {
     else {
       setNotice(null);
       forgetAttempt();
+      const connectorId = searchParams.get('connector');
+      if (oauth === 'connected' && connectorId !== null) setGranting(connectorId);
     }
     const next = new URLSearchParams(searchParams);
     next.delete('oauth');
@@ -227,11 +238,10 @@ export function McpServersPage() {
     if (entry.auth.includes('oauth')) return startSignIn(catalogAttempt(entry));
     if (entry.auth.includes('none')) {
       if (live)
-        mutations.createMcpConnector.mutate({
-          kind: 'catalog',
-          catalogId: entry.id,
-          slug: entry.id,
-        });
+        mutations.createMcpConnector.mutate(
+          { kind: 'catalog', catalogId: entry.id, slug: entry.id },
+          { onSuccess: (record) => setGranting(record) },
+        );
       return;
     }
     setDialog({ kind: 'catalog', entry });
@@ -303,7 +313,17 @@ export function McpServersPage() {
                         description={
                           entry !== undefined ? t(entry.description) : hostOf(record.url)
                         }
-                        status={<ConnectorStatus record={record} />}
+                        status={
+                          <span className="flex flex-wrap items-center gap-x-1.5">
+                            <ConnectorStatus record={record} />
+                            <span
+                              data-testid="mcp-grant-summary"
+                              className="text-meta text-content-tertiary"
+                            >
+                              · {grantSummary(t, grants.uses(record.slug))}
+                            </span>
+                          </span>
+                        }
                         action={
                           <Button
                             variant="outline"
@@ -382,9 +402,22 @@ export function McpServersPage() {
         target={dialog}
         live={live}
         teamId={teamId}
+        grants={grants}
         onClose={() => setDialog(null)}
+        onConnected={(record) => {
+          setDialog(null);
+          setGranting(record);
+        }}
         onSignIn={requestSignIn}
       />
+      {grantTarget !== undefined && grantTarget !== null && (
+        <McpGrantSheet
+          key={grantTarget.id}
+          connector={grantTarget}
+          grants={grants}
+          onClose={() => setGranting(null)}
+        />
+      )}
       {signIn !== null && (
         <McpSignInDialog
           signIn={signIn}

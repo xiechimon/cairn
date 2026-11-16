@@ -2021,13 +2021,15 @@
     {
       "id": "mcp-servers",
       "name": "MCP servers",
-      "summary": "The read-only list of MCP servers configured on each machine.",
-      "states": "An empty state or a read-only list of servers per machine.",
+      "summary": "Connect remote MCP servers from a catalog or by URL, choose whether tasks and reviews may use each one, and see local servers each machine configures.",
+      "states": "Connected, needs sign-in and unreachable connectors with their grant; catalog cards; the grant sheet after connecting; the add-server dialog; local config entries; an empty local list.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/resources/mcp-servers-page.tsx"
+          "apps/web/src/resources/mcp-servers-page.tsx",
+          "apps/web/src/resources/mcp-connector-dialog.tsx",
+          "apps/web/src/resources/mcp-grants.tsx"
         ],
         "server": [
           "apps/server/src/services/mcp-servers.ts"
@@ -2066,7 +2068,8 @@
       ],
       "evidence": [
         "apps/server/test/mcp-servers.test.ts",
-        "apps/daemon/test/mcp-config.test.ts"
+        "apps/daemon/test/mcp-config.test.ts",
+        "apps/web/e2e/mcp-grants.spec.ts"
       ]
     },
     {

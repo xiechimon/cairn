@@ -528,7 +528,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### mcp-servers
 
-**MCP servers** (shipped). The read-only list of MCP servers configured on each machine.
+**MCP servers** (shipped). Connect remote MCP servers from a catalog or by URL, choose whether tasks and reviews may use each one, and see local servers each machine configures.
 
 - Research: [docs/research/mcp-connectors-2026-11-15.md](research/mcp-connectors-2026-11-15.md)
 - Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md)

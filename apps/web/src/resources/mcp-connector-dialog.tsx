@@ -17,9 +17,11 @@ import {
 } from '../components/ui/dialog-shell.js';
 import { Field } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
+import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { Plus, X } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { type GrantDraft, McpGrantRows, type McpGrants } from './mcp-grants.js';
 
 const PALE_DISABLED = 'disabled:bg-secondary/50 disabled:text-content-dim disabled:opacity-100';
 
@@ -93,7 +95,9 @@ interface McpConnectorDialogProps {
   target: McpDialogTarget | null;
   live: boolean;
   teamId: string | undefined;
+  grants: McpGrants;
   onClose: () => void;
+  onConnected: (record: McpConnectorRecord) => void;
   onSignIn: (request: McpOAuthRequest) => void;
 }
 
@@ -101,7 +105,9 @@ export function McpConnectorDialog({
   target,
   live,
   teamId,
+  grants,
   onClose,
+  onConnected,
   onSignIn,
 }: McpConnectorDialogProps) {
   if (target === null) return null;
@@ -114,6 +120,7 @@ export function McpConnectorDialog({
         live={live}
         teamId={teamId}
         onClose={onClose}
+        onConnected={onConnected}
       />
     );
   if (target.kind === 'custom')
@@ -123,6 +130,7 @@ export function McpConnectorDialog({
         live={live}
         teamId={teamId}
         onClose={onClose}
+        onConnected={onConnected}
         onSignIn={onSignIn}
       />
     );
@@ -132,6 +140,7 @@ export function McpConnectorDialog({
       connector={target.connector}
       live={live}
       teamId={teamId}
+      grants={grants}
       onClose={onClose}
       onSignIn={onSignIn}
     />
@@ -159,10 +168,12 @@ function DialogFoot({
   danger,
   secondary,
   primaryRef,
+  cancelLabel,
 }: {
   primary: FootAction;
   primaryRef?: Ref<HTMLButtonElement>;
   onCancel: () => void;
+  cancelLabel?: string;
   danger?: FootAction;
   secondary?: FootAction;
 }) {
@@ -191,7 +202,7 @@ function DialogFoot({
       )}
       <span className="flex-1" />
       <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onCancel}>
-        {t('取消')}
+        {cancelLabel ?? t('取消')}
       </Button>
       <Button
         ref={primaryRef}
@@ -262,11 +273,13 @@ function CatalogConnectDialog({
   live,
   teamId,
   onClose,
+  onConnected,
 }: {
   entry: McpCatalogEntry;
   live: boolean;
   teamId: string | undefined;
   onClose: () => void;
+  onConnected: (record: McpConnectorRecord) => void;
 }) {
   const { t } = useI18n();
   const mutations = useApiMutations(teamId);
@@ -286,7 +299,7 @@ function CatalogConnectDialog({
     mutations.createMcpConnector.mutate(body, {
       onSuccess: (record) => {
         const message = connectorProblem(t, record);
-        if (message === null) onClose();
+        if (message === null) onConnected(record);
         else setProblem(message);
       },
       onError: (error) => setProblem(submitError(t, error)),
@@ -326,11 +339,13 @@ function CustomServerDialog({
   live,
   teamId,
   onClose,
+  onConnected,
   onSignIn,
 }: {
   live: boolean;
   teamId: string | undefined;
   onClose: () => void;
+  onConnected: (record: McpConnectorRecord) => void;
   onSignIn: (request: McpOAuthRequest) => void;
 }) {
   const { t } = useI18n();
@@ -362,7 +377,7 @@ function CustomServerDialog({
       {
         onSuccess: (record) => {
           const message = connectorProblem(t, record);
-          if (message === null) onClose();
+          if (message === null) onConnected(record);
           else setProblem(message);
         },
         onError: (error) => setProblem(submitError(t, error)),
@@ -490,12 +505,14 @@ function ManageConnectorDialog({
   connector,
   live,
   teamId,
+  grants,
   onClose,
   onSignIn,
 }: {
   connector: McpConnectorRecord;
   live: boolean;
   teamId: string | undefined;
+  grants: McpGrants;
   onClose: () => void;
   onSignIn: (request: McpOAuthRequest) => void;
 }) {
@@ -506,7 +523,22 @@ function ManageConnectorDialog({
   const [current, setCurrent] = useState(connector);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [grant, setGrant] = useState<GrantDraft | null>(null);
+  const [grantSaving, setGrantSaving] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
+  const shownGrant = grant ?? grants.uses(current.slug);
+  const changeGrant = (next: GrantDraft) => {
+    const before = shownGrant;
+    setGrant(next);
+    setGrantSaving(true);
+    grants
+      .save(current.slug, next)
+      .catch((error: unknown) => {
+        setGrant(before);
+        toastError(t('保存失败，请重试。'), error);
+      })
+      .finally(() => setGrantSaving(false));
+  };
   const oauth = current.authKind === 'oauth';
   const needsAuth = oauth && current.status === 'needs_auth';
   const pending =
@@ -578,6 +610,15 @@ function ManageConnectorDialog({
         <Field>
           <span className="text-ui font-medium text-foreground">{t('地址')}</span>
           <p className={VALUE_BOX_CLS}>{current.url}</p>
+        </Field>
+        <Field>
+          <span className="text-ui font-medium text-foreground">{t('谁可以用')}</span>
+          <McpGrantRows
+            name={current.label}
+            value={shownGrant}
+            disabled={!grants.ready || grantSaving}
+            onChange={changeGrant}
+          />
         </Field>
         {oauth && (
           <p className="m-0 text-meta text-content-tertiary">
@@ -681,6 +722,61 @@ export function McpSignInDialog({
         <p className="m-0 text-meta text-content-tertiary">
           {t('先确认这个网址属于 {name}，不认识就取消。', { name: signIn.name })}
         </p>
+      </FormStack>
+    </DialogShell>
+  );
+}
+
+export function McpGrantSheet({
+  connector,
+  grants,
+  onClose,
+}: {
+  connector: McpConnectorRecord;
+  grants: McpGrants;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState<GrantDraft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const current = grants.uses(connector.slug);
+  const shown = draft ?? { ...current, session: true };
+  const save = () => {
+    setSaving(true);
+    setProblem(null);
+    grants
+      .save(connector.slug, shown)
+      .then(onClose)
+      .catch(() => setProblem(t('没能保存，稍后重试。')))
+      .finally(() => setSaving(false));
+  };
+  return (
+    <DialogShell
+      title={t('让哪些工作用 {name}', { name: connector.label })}
+      subtitle={<ConnectorStatus record={connector} />}
+      size="s"
+      onClose={onClose}
+      footer={
+        <DialogFoot
+          primary={{
+            label: saving ? t('正在保存…') : t('保存'),
+            onClick: save,
+            disabled: saving || !grants.ready,
+          }}
+          onCancel={onClose}
+          cancelLabel={t('稍后再说')}
+        />
+      }
+    >
+      <FormStack className={DIALOG_FORM_CLS}>
+        <McpGrantRows
+          name={connector.label}
+          value={shown}
+          disabled={saving || !grants.ready}
+          onChange={setDraft}
+        />
+        <DialogError message={problem} />
       </FormStack>
     </DialogShell>
   );

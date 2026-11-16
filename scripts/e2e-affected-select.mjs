@@ -212,6 +212,7 @@ const RESOURCES = [
   'skill-import',
   'task-panel',
   'first-pr-report',
+  'mcp-',
 ];
 export const SHARED_SURFACE_ONLY = [
   'cds-motion',
