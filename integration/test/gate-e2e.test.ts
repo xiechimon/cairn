@@ -121,14 +121,6 @@ afterAll(async () => {
 
 describe('#929 command gate tool_call seam E2E: both directions + MCP coverage', () => {
   test('reject and allow each land where they should: irreversible bash form denied (reason into transcript), MCP call passes the same gate, legal bash change lands', async () => {
-    const authed = await api(
-      server.url,
-      'PATCH',
-      `/api/teams/${server.teamId}/work-policies/session`,
-      { mcpServers: ['demo'] },
-    );
-    expect(authed.status).toBe(200);
-
     world = await seedWorld(
       server.url,
       server.teamId,

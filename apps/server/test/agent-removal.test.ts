@@ -447,7 +447,6 @@ describe('removing the agent table from a seeded legacy install', () => {
       provider: 'openai-codex',
       modelId: 'gpt-6-luna',
     });
-    expect(claimed?.mcpServers).toEqual(['codegraph', 'playwright']);
     expect(claimed?.remoteTools?.map((tool) => tool.name)).toContain('open_thread');
     expect(claimed?.remoteTools?.map((tool) => tool.name)).not.toContain('run_builds');
     opened.close();

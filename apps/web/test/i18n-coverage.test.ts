@@ -62,7 +62,6 @@ const COMPUTED_KEYS = new Set<string>([
   ...AGENT_TOOL_SWITCHES,
   ...Object.values(AGENT_TOOL_COPY),
   AGENT_PERMISSION_COPY.secrets,
-  AGENT_PERMISSION_COPY.mcpServers,
   AGENT_PERMISSION_COPY.responsibility,
   AGENT_PERMISSION_COPY.defaultSkill,
   AGENT_PERMISSION_COPY.skillsAllowlist,

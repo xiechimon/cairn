@@ -2020,8 +2020,8 @@
     {
       "id": "mcp-servers",
       "name": "MCP servers",
-      "summary": "The read-only list of MCP servers configured on each machine.",
-      "states": "An empty state or a read-only list of servers per machine.",
+      "summary": "Connect remote MCP servers from a catalog or by URL and see the local servers each machine configures; every task and review uses what is connected.",
+      "states": "Catalog cards connected, needing sign-in, or failing; add-server dialog; manage dialog; local servers per machine, or empty.",
       "centrality": 3,
       "status": "shipped",
       "code": {

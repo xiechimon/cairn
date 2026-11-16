@@ -12,7 +12,6 @@ import {
 import { newRecordId } from '../src/lib/ids.js';
 import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { claimStep, stepToken } from '../src/services/machines.js';
-import { stepQueueProjector } from '../src/services/step-queue.js';
 import {
   bootServer,
   enrollConnectorRunner,
@@ -24,11 +23,11 @@ import {
   type TestServer,
 } from './helpers.js';
 
-async function world(mcpServers: string[]) {
+async function world() {
   const s = bootServer({ claimHoldMs: 100 });
   onTestFinished(() => s.dispose());
   const projectId = await postProject(s.app, 'mcp-wire-proj');
-  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', mcpServers });
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
   return { s, projectId };
 }
 
@@ -90,30 +89,28 @@ async function tokenOf(s: TestServer, machineToken: string, stepId: string) {
 }
 
 describe('MCP connectors on the machine wire', () => {
-  test('a step granted a connector is not claimed by a Runner without connector support and says why', async () => {
-    const { s, projectId } = await world(['linear']);
-    connector(s, 'linear');
-    const old = await enrollConnectorRunner(s, 'old-runner', false);
+  test('a Runner without connector support runs the step with its own local servers only, even one named like a connector', async () => {
+    const { s, projectId } = await world();
+    connector(s, 'linear', { headers: { Authorization: 'Bearer lin-static-token' } });
+    const old = await enrollConnectorRunner(s, 'old-runner', false, ['files', 'Linear']);
     const stepId = queueConnectorStep(s, projectId, old.machineId);
-    expect(await claim(s, old.machineId)).toBeNull();
-    const pending = s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
-    const target = { id: stepId, createdAt: pending?.createdAt ?? 0, homeMachineId: old.machineId };
-    expect(stepQueueProjector(s.db, s.team.id).project(target)?.blocked).toEqual({
-      kind: 'capability-missing',
-      missing: ['MCP connector support (update cairn on the Runner)'],
-    });
+    const claimed = await claim(s, old.machineId);
+    expect(claimed?.step.id).toBe(stepId);
+    expect(claimed?.mcpServers).toEqual(['files', 'linear']);
+    const token = await tokenOf(s, old.token, stepId);
+    expect(token.mcpConnectors).toBeUndefined();
+    expect(token.withheldMcp).toBeUndefined();
   });
 
-  test('a Runner with connector support claims the step and gets only granted, deliverable connectors', async () => {
-    const { s, projectId } = await world(['linear', 'files', 'notion']);
+  test('a Runner with connector support gets every connector and its local servers without any grant', async () => {
+    const { s, projectId } = await world();
     connector(s, 'linear', { headers: { Authorization: 'Bearer lin-static-token' } });
     connector(s, 'notion', { status: 'needs_auth' });
-    connector(s, 'github', { headers: { Authorization: 'Bearer not-granted' } });
-    const current = await enrollConnectorRunner(s, 'new-runner', true);
+    const current = await enrollConnectorRunner(s, 'new-runner', true, ['files', 'Linear']);
     const stepId = queueConnectorStep(s, projectId, current.machineId);
     const claimed = await claim(s, current.machineId);
     expect(claimed?.step.id).toBe(stepId);
-    expect(claimed?.mcpServers).toEqual(['linear', 'files', 'notion']);
+    expect(claimed?.mcpServers).toEqual(['files', 'linear', 'notion']);
     const token = await tokenOf(s, current.token, stepId);
     expect(token.mcpConnectors).toEqual([
       {
@@ -124,20 +121,6 @@ describe('MCP connectors on the machine wire', () => {
       },
     ]);
     expect(token.withheldMcp).toEqual(['notion']);
-    expect(JSON.stringify(token)).not.toContain('not-granted');
-  });
-
-  test('a step whose grant names only local servers still runs on an older Runner', async () => {
-    const { s, projectId } = await world(['files']);
-    connector(s, 'linear', { headers: { Authorization: 'Bearer lin-static-token' } });
-    const old = await enrollConnectorRunner(s, 'old-runner', false);
-    const stepId = queueConnectorStep(s, projectId, old.machineId);
-    const claimed = await claim(s, old.machineId);
-    expect(claimed?.step.id).toBe(stepId);
-    expect(claimed?.mcpServers).toEqual(['files']);
-    const token = await tokenOf(s, old.token, stepId);
-    expect(token.mcpConnectors).toBeUndefined();
-    expect(token.withheldMcp).toBeUndefined();
   });
 });
 
@@ -172,7 +155,6 @@ function coordinatorWorld(connectors: boolean) {
     modelId: 'sonnet',
     thinkingLevel: 'off',
     machineId,
-    mcpServers: ['linear', 'files'],
   });
   connector(s, 'linear', { headers: { Authorization: 'Bearer lin-static-token' } });
   s.db
@@ -211,28 +193,19 @@ describe('MCP connectors for the Coordinator on a Runner', () => {
   test('a Runner with connector support gets the connector on the claim and in the token', async () => {
     const { machineId, deps, s } = coordinatorWorld(true);
     const claimed = await claimStep(deps, machineId, s.team.id, 10, 'http://localhost');
-    expect(claimed?.mcpServers).toEqual(['linear', 'files']);
+    expect(claimed?.mcpServers).toEqual(['files', 'linear']);
     const token = await stepToken(deps, machineId, 's1');
     expect(token.mcpConnectors?.map((c) => c.slug)).toEqual(['linear']);
   });
 
-  test('an older Runner still runs the turn without the connector and the thread says so', async () => {
+  test('an older Runner runs the turn with its local servers and no connector or notice', async () => {
     const { machineId, deps, s } = coordinatorWorld(false);
     const claimed = await claimStep(deps, machineId, s.team.id, 10, 'http://localhost');
     expect(claimed?.step.id).toBe('s1');
     expect(claimed?.mcpServers).toEqual(['files']);
     expect((await stepToken(deps, machineId, 's1')).mcpConnectors).toBeUndefined();
-    const notes = s.db
-      .select()
-      .from(chiefMessageTable)
-      .where(eq(chiefMessageTable.threadId, THREAD))
-      .all()
-      .map((row) => JSON.parse(String(row.content)) as { kind: string; message: string });
-    expect(notes).toEqual([
-      expect.objectContaining({
-        kind: 'chief_notice',
-        message: 'MCP connectors linear are unavailable this turn: the Runner needs a newer cairn.',
-      }),
-    ]);
+    expect(
+      s.db.select().from(chiefMessageTable).where(eq(chiefMessageTable.threadId, THREAD)).all(),
+    ).toEqual([]);
   });
 });

@@ -392,13 +392,12 @@ describe('D71 thread override set at dispatch', () => {
   });
 });
 
-describe('work_policy: tools, MCP, skills and secrets live on the policy', () => {
+describe('work_policy: tools, skills and secrets live on the policy', () => {
   test('the policy values are the step permissions', async () => {
     const w = await setupWorld();
     sessionRule(w.s);
     seedPolicy(w.s, 'session', {
       tools: ['policy-tool'],
-      mcpServers: ['policy-mcp'],
       skillsAllowlist: ['policy-skill'],
       defaultSkill: 'policy-skill',
       secrets: ['POLICY_SECRET'],
@@ -406,7 +405,6 @@ describe('work_policy: tools, MCP, skills and secrets live on the policy', () =>
     const todoRow = await buildTodo(w);
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
       tools: ['policy-tool'],
-      mcpServers: ['policy-mcp'],
       skillsAllowlist: ['policy-skill'],
       defaultSkill: 'policy-skill',
       secrets: ['POLICY_SECRET'],
@@ -418,13 +416,12 @@ describe('work_policy: tools, MCP, skills and secrets live on the policy', () =>
     const ruleId = sessionRule(w.s);
     w.s.db
       .update(routingRule)
-      .set({ tools: ['rule-tool'], mcpServers: ['rule-mcp'], secrets: ['RULE_SECRET'] })
+      .set({ tools: ['rule-tool'], secrets: ['RULE_SECRET'] })
       .where(eq(routingRule.id, ruleId))
       .run();
     const todoRow = await buildTodo(w);
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
       tools: [],
-      mcpServers: [],
       secrets: [],
     });
   });
@@ -456,7 +453,6 @@ describe('work_policy: tools, MCP, skills and secrets live on the policy', () =>
     const todoRow = await buildTodo(w);
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
       tools: [],
-      mcpServers: [],
       secrets: [],
       skillsAllowlist: [],
     });
@@ -477,12 +473,11 @@ describe('work_policy: tools, MCP, skills and secrets live on the policy', () =>
 
   test('the coordinator profile takes no session policy permissions', async () => {
     const w = await setupWorld();
-    seedRoute(w.s, 'coordinator', { provider: 'p', modelId: 'm', mcpServers: ['coord-mcp'] });
+    seedRoute(w.s, 'coordinator', { provider: 'p', modelId: 'm' });
     seedPolicy(w.s, 'session', { tools: ['session-tool'], secrets: ['SESSION_SECRET'] });
     expect(coordinatorProfile(w.s.db, w.s.team.id)).toMatchObject({
       tools: [],
       secrets: [],
-      mcpServers: ['coord-mcp'],
     });
   });
 });
