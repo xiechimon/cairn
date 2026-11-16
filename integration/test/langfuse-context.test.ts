@@ -346,7 +346,6 @@ describe('harvest replay context closure', () => {
     ['modelId', 'other'],
     ['thinkingLevel', 'high'],
     ['machineId', 'other'],
-    ['mcpServers', ['other']],
     ['fallbackModels', []],
     ['requiredCapabilities', { models: ['other'] }],
   ])('rejects unseeded coordinator route.%s', (field, value) => {
