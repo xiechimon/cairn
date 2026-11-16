@@ -764,6 +764,10 @@ body:has([data-testid="chief-body"]),
   visibility: hidden;
 }
 
+:root[data-shell="mac-desktop"] .sidebar-footer-brand {
+  display: flex;
+}
+
 :root[data-shell="mac-desktop"] .sidebar-team-row :is(button, a) {
   -webkit-app-region: no-drag;
 }
