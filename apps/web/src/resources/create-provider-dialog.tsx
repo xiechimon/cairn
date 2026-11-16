@@ -32,7 +32,7 @@ import { ProviderPresetIcon } from './provider-preset-icon.js';
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
 const PICKER_ROW_CLS =
-  'h-10 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-card dark:hover:bg-card disabled:text-content-tertiary disabled:opacity-100';
+  'h-10 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) disabled:text-content-tertiary disabled:opacity-100';
 
 const PICKER_TILE_CLS =
   'flex size-5.5 flex-none items-center justify-center rounded-(--radius-control) bg-card text-caption font-semibold text-content-secondary ring-1 ring-border';
@@ -154,16 +154,14 @@ function connectionSummary(
 
 const WIRED_OAUTH_IDS: ReadonlySet<string> = new Set(OAUTH_FAMILIES.map((f) => f.presetId));
 
-const PRESET_ROWS = PROVIDER_PRESET_IDS.map((id) => {
-  const oauth = (PROVIDER_OAUTH_PRESET_IDS as readonly string[]).includes(id);
-  return {
-    id,
-    label: PRESET_LABELS[id],
-    group: PRESET_GROUP[id],
-    oauth,
-    wired: oauth && WIRED_OAUTH_IDS.has(id),
-  };
-}).sort((a, b) => a.label.localeCompare(b.label, 'en'));
+const PRESET_ROWS = PROVIDER_PRESET_IDS.map((id) => ({
+  id,
+  label: PRESET_LABELS[id],
+  group: PRESET_GROUP[id],
+  oauth: (PROVIDER_OAUTH_PRESET_IDS as readonly string[]).includes(id),
+}))
+  .filter((row) => !row.oauth || WIRED_OAUTH_IDS.has(row.id))
+  .sort((a, b) => a.label.localeCompare(b.label, 'en'));
 
 interface CreateProviderDialogProps {
   open?: boolean;
@@ -179,6 +177,7 @@ interface CreateProviderDialogProps {
     apiKey?: string;
   }) => void;
   onConnect?: (presetId: string) => void;
+  oauthSignIn: boolean;
   connectPending?: boolean;
   connectError?: string | null;
   onPickClaudeSubscription?: () => void;
@@ -194,6 +193,7 @@ export function CreateProviderDialog({
   pending,
   onCreate,
   onConnect,
+  oauthSignIn,
   connectPending,
   connectError,
   onPickClaudeSubscription,
@@ -239,13 +239,12 @@ export function CreateProviderDialog({
     setModelIds([]);
   }, [open]);
 
-  const rows =
-    query.trim() === ''
-      ? PRESET_ROWS
-      : PRESET_ROWS.filter((row) => {
-          const q = query.trim().toLowerCase();
-          return row.label.toLowerCase().includes(q) || row.id.includes(q);
-        });
+  const q = query.trim().toLowerCase();
+  const rows = PRESET_ROWS.filter(
+    (row) =>
+      (oauthSignIn || !row.oauth) &&
+      (q === '' || row.label.toLowerCase().includes(q) || row.id.includes(q)),
+  );
 
   const enterForm = (entry: { id: string; label: string } | null) => {
     const defaults = entry === null ? undefined : PROVIDER_PRESET_DEFAULTS[entry.id];
@@ -337,7 +336,6 @@ export function CreateProviderDialog({
                         <Claude size={14} />
                       </span>
                       <span className="min-w-0 truncate">Claude Pro / Max</span>
-                      <span className={PICKER_TAG_CLS}>{t('订阅')}</span>
                     </Button>
                   )}
                   {groupRows.map((row) => (
@@ -346,7 +344,7 @@ export function CreateProviderDialog({
                       variant="ghost"
                       data-preset-id={row.id}
                       className={PICKER_ROW_CLS}
-                      disabled={row.oauth && (!row.wired || connectPending === true)}
+                      disabled={row.oauth && connectPending === true}
                       onClick={() =>
                         row.oauth
                           ? onConnect != null
@@ -359,10 +357,7 @@ export function CreateProviderDialog({
                         <ProviderPresetIcon id={row.id} />
                       </span>
                       <span className="min-w-0 truncate">{row.label}</span>
-                      {row.wired && <span className={PICKER_TAG_CLS}>OAuth</span>}
-                      {row.oauth && !row.wired && (
-                        <span className={PICKER_TAG_CLS}>{t('暂未开通')}</span>
-                      )}
+                      {row.oauth && <span className={PICKER_TAG_CLS}>OAuth</span>}
                     </Button>
                   ))}
                 </fieldset>

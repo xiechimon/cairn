@@ -10,7 +10,7 @@ async function openDialog(page: Page) {
   return dialog;
 }
 
-test('OAuth badge rides only the wired family (GitHub Copilot); the unwired codex row has no badge, xai has no badge', async ({
+test('OAuth badge rides only the wired family (GitHub Copilot); the unwired codex login is not offered, xai has no badge', async ({
   page,
 }) => {
   const dialog = await openDialog(page);
@@ -18,25 +18,12 @@ test('OAuth badge rides only the wired family (GitHub Copilot); the unwired code
   await expect(
     dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).getByText('OAuth', { exact: true }),
   ).toHaveCount(1);
-
-  const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
-  await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(0);
-  await expect(codex).toBeDisabled();
-  await expect(codex.getByText('暂未开通')).toHaveText('暂未开通');
+  await expect(dialog.locator('[data-preset-id="openai-codex"]')).toHaveCount(0);
 
   await expect(dialog.locator('[data-preset-id]', { hasText: 'xAI' }).first()).not.toContainText(
     'SuperGrok',
   );
   await expect(dialog.getByText('SuperGrok')).toHaveCount(0);
-});
-
-test('unwired codex row click does nothing: no close, no form entry', async ({ page }) => {
-  const dialog = await openDialog(page);
-  const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
-  await codex.click({ force: true });
-  await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeVisible();
-  await expect(dialog.locator('#dlg-provider-id')).toHaveCount(0);
-  await expect(codex).toBeDisabled();
 });
 
 test('fixture face clicking a wired-badge row = accept law (closes); reopening still lists it', async ({ page }) => {

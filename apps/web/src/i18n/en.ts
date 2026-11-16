@@ -1203,8 +1203,6 @@ export const EN: Record<string, string> = {
   // 同为英文字面)
   '搜索服务商...': 'Search providers...',
   自定义端点: 'Custom endpoint',
-  // #385 族表未接线的 OAuth preset 行注记(如 openai-codex)
-  暂未开通: 'Not yet available',
   // Paper grouped provider picker: group headings
   订阅登录: 'Subscription sign-in',
   模型厂商: 'Model vendors',

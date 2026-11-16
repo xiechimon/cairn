@@ -315,7 +315,12 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.get('/api/capabilities', (c) => {
-    return c.json(capabilitiesResponseSchema.parse({ thinkingLevels: THINKING_LEVELS }));
+    return c.json(
+      capabilitiesResponseSchema.parse({
+        thinkingLevels: THINKING_LEVELS,
+        githubOAuth: ctx.oauthClient !== null,
+      }),
+    );
   });
 
   app.get('/api/teams/:id/models', (c) => {

@@ -24,13 +24,13 @@ async function openCustomForm(page: Page) {
   return dialog;
 }
 
-test('topbar `新建` opens the picker: 38 preset rows, search, `自定义端点` entry, no dead submit', async ({
+test('topbar `新建` opens the picker: 37 preset rows, search, `自定义端点` entry, no dead submit', async ({
   page,
 }) => {
   const dialog = await openPicker(page);
   await expect(dialog).toHaveAccessibleName('添加模型服务');
   await expect(dialog.getByLabel('搜索服务商...')).toBeVisible();
-  await expect(dialog.locator('[data-preset-id]')).toHaveCount(38);
+  await expect(dialog.locator('[data-preset-id]')).toHaveCount(37);
   await expect(dialog.getByRole('button', { name: '自定义端点' })).toHaveText('自定义端点');
 
   await expect(dialog.locator('[data-preset-id]').first()).toContainText('GitHub Copilot');
@@ -38,7 +38,7 @@ test('topbar `新建` opens the picker: 38 preset rows, search, `自定义端点
   await expect(dialog.getByRole('button', { name: '添加模型服务' })).toHaveCount(0);
 });
 
-test('search filters by display name and id, case-insensitive; empty query restores 38', async ({
+test('search filters by display name and id, case-insensitive; empty query restores 37', async ({
   page,
 }) => {
   const dialog = await openPicker(page);
@@ -53,10 +53,10 @@ test('search filters by display name and id, case-insensitive; empty query resto
   await search.fill('no-such-provider');
   await expect(dialog.locator('[data-preset-id]')).toHaveCount(0);
   await search.fill('');
-  await expect(dialog.locator('[data-preset-id]')).toHaveCount(38);
+  await expect(dialog.locator('[data-preset-id]')).toHaveCount(37);
 });
 
-test('OAuth badge rides wired family rows only (github-copilot); codex unwired carries a note, xai none', async ({
+test('OAuth badge rides wired family rows only (github-copilot); the unwired codex login is not offered, xai none', async ({
   page,
 }) => {
   const dialog = await openPicker(page);
@@ -65,10 +65,7 @@ test('OAuth badge rides wired family rows only (github-copilot); codex unwired c
     dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).getByText('OAuth', { exact: true }),
   ).toHaveCount(1);
 
-  const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
-  await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(0);
-  await expect(codex).toBeDisabled();
-  await expect(codex.getByText('暂未开通')).toHaveText('暂未开通');
+  await expect(dialog.locator('[data-preset-id="openai-codex"]')).toHaveCount(0);
   const xai = dialog.locator('[data-preset-id="xai"]');
   await expect(xai).toHaveCount(1);
   await expect(dialog.locator('[data-preset-id]', { hasText: 'xAI' })).toHaveCount(1);
@@ -97,7 +94,7 @@ test('`自定义端点` opens the existing form (fields and defaults unchanged);
   await expect(dialog.getByRole('button', { name: '添加模型服务' })).toBeDisabled();
 
   await dialog.getByRole('button', { name: '返回' }).click();
-  await expect(dialog.locator('[data-preset-id]')).toHaveCount(38);
+  await expect(dialog.locator('[data-preset-id]')).toHaveCount(37);
   await expect(dialog.locator('#dlg-provider-id')).toHaveCount(0);
 });
 
@@ -244,7 +241,7 @@ test('fixture submit closes the dialog (accept law) and reopens a clean picker',
   await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
 
   const again = await openPicker(page);
-  await expect(again.locator('[data-preset-id]')).toHaveCount(38);
+  await expect(again.locator('[data-preset-id]')).toHaveCount(37);
   await expect(again.getByLabel('搜索服务商...')).toHaveValue('');
   await again.getByRole('button', { name: '自定义端点' }).click();
   await expect(again.locator('#dlg-provider-id')).toHaveValue('');
