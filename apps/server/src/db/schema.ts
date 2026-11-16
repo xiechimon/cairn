@@ -1018,6 +1018,28 @@ export const chiefTurnUsage = sqliteTable(
   ],
 );
 
+export const stepUsage = sqliteTable(
+  'step_usage',
+  {
+    stepId: text('stepId').notNull(),
+    model: text('model').notNull(),
+    teamId: text('teamId').notNull(),
+    buildId: text('buildId').notNull(),
+    kind: text('kind').$type<StepKind>().notNull(),
+    input: integer('input').notNull().default(0),
+    output: integer('output').notNull().default(0),
+    cacheRead: integer('cacheRead').notNull().default(0),
+    cacheWrite: integer('cacheWrite').notNull().default(0),
+    mirroredTokens: integer('mirroredTokens').notNull().default(0),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.stepId, t.model] }),
+    index('step_usage_team_created_idx').on(t.teamId, t.createdAt),
+    index('step_usage_build_model_idx').on(t.buildId, t.model),
+  ],
+);
+
 export const coordinatorConversation = sqliteTable('coordinator_conversation', {
   storeId: text('storeId'),
   threadId: text('threadId').primaryKey(),
