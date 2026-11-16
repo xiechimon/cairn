@@ -91,6 +91,23 @@
   }
 }
 
+@layer components {
+  [data-slot="button"]:is([data-variant="default"], [data-variant="secondary"]) {
+    position: relative;
+    isolation: isolate;
+  }
+  [data-slot="button"]:is([data-variant="default"], [data-variant="secondary"])::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--background);
+    filter: url(#cairn-ink-specks);
+    pointer-events: none;
+  }
+}
+
 @layer utilities {
   :where(
     button,

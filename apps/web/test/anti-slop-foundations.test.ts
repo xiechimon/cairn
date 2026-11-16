@@ -60,6 +60,18 @@ describe('V16 no texture or gradient surfaces', () => {
     ]);
   });
 
+  test('ink specks fill only the filled buttons, under a crisp label', () => {
+    const index = readFileSync(join(ROOT, 'index.html'), 'utf8');
+    const design = readFileSync(join(ROOT, 'design.html'), 'utf8');
+    expect(index).toContain('id="cairn-ink-specks"');
+    expect(design).toContain('id="cairn-ink-specks"');
+    const uses = [...appCss.matchAll(/([^{}]+)\{[^{}]*url\(#cairn-ink-specks\)/g)].map((m) => m[1]?.trim());
+    expect(uses).toEqual([
+      '[data-slot="button"]:is([data-variant="default"], [data-variant="secondary"])::before',
+    ]);
+    expect(offenders(/cairn-ink-specks/)).toEqual(['styles/app.css']);
+  });
+
   test('the user bubble is one flat token fill', () => {
     const bubble =
       sourceFiles.find(({ path }) => path === 'components/chat/user-message-bubble.tsx')?.text ?? '';
