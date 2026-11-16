@@ -35,46 +35,61 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
   const trimmed = name.trim();
   const badName = trimmed !== '' && !KEY_NAME_PATTERN.test(trimmed);
   const ready = trimmed !== '' && !badName;
+  const close = () => {
+    setName('');
+    onClose();
+  };
   const submit = () => {
     if (!ready) return;
     onCreate({ name: trimmed, ...API_KEY_ACCESS });
-    onClose();
+    close();
   };
 
   return (
     <DialogShell
       title={t('新建密钥')}
       open={open}
-      onClose={onClose}
+      onClose={close}
       size="s"
       footer={
         <FormActions
           className="pt-0"
           primary={{ label: t('创建'), onClick: submit, disabled: !ready }}
-          secondary={{ label: t('取消'), onClick: onClose }}
+          secondary={{ label: t('取消'), onClick: close }}
         />
       }
     >
       <FormStack className="max-w-none">
-        <FormField label={t('名称')} htmlFor="apikey-name-input">
+        <FormField
+          label={t('名称')}
+          htmlFor="apikey-name-input"
+          help={
+            <span
+              id="apikey-name-rule"
+              role={badName ? 'alert' : undefined}
+              className={badName ? 'text-destructive' : undefined}
+            >
+              {t('只能用大写字母、数字和下划线，不能以数字开头。')}
+            </span>
+          }
+        >
           <Input
             id="apikey-name-input"
             className={`${FORM_CONTROL_CLS} font-mono`}
             value={name}
             aria-invalid={badName}
-            aria-describedby={badName ? 'apikey-name-error' : undefined}
+            aria-describedby="apikey-name-rule"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') submit();
+              if (event.key === 'Enter' && !event.nativeEvent.isComposing) submit();
             }}
             placeholder="MY_KEY"
           />
         </FormField>
-        {badName && (
-          <p id="apikey-name-error" role="alert" className="m-0 text-meta text-destructive">
-            {t('名称只能用大写字母、数字和下划线，不能以数字开头，如 MY_KEY。')}
-          </p>
-        )}
       </FormStack>
     </DialogShell>
   );

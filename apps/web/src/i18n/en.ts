@@ -1153,8 +1153,8 @@ export const EN: Record<string, string> = {
   // #170 create-agent dialog family
   创建: 'Create',
   // W4 #287 API key 新建表单弹窗（r3 §6 权限位 [推断]）
-  '名称只能用大写字母、数字和下划线，不能以数字开头，如 MY_KEY。':
-    'Use capital letters, digits and underscores, not starting with a digit, like MY_KEY.',
+  '只能用大写字母、数字和下划线，不能以数字开头。':
+    'Capital letters, digits and _ only; no leading digit.',
   // wayfinder #173 add-secret dialog family (r2 §242 verbatim fields)
   '名称（环境变量名）': 'Name (environment variable name)',
   '描述（可选）': 'Description (optional)',

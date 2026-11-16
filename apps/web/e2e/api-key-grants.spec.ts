@@ -29,9 +29,7 @@ test('a new key needs a MY_KEY name, gets every permission, and shows its plaint
   await expect(create).toBeDisabled();
   for (const bad of ['laptop', '1KEY', 'MY-KEY']) {
     await name.fill(bad);
-    await expect(dialog.getByRole('alert')).toHaveText(
-      '名称只能用大写字母、数字和下划线，不能以数字开头，如 MY_KEY。',
-    );
+    await expect(dialog.getByRole('alert')).toHaveText('只能用大写字母、数字和下划线，不能以数字开头。');
     await expect(create).toBeDisabled();
   }
   await name.fill('  CI_RUNNER_2  ');
