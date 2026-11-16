@@ -1960,6 +1960,8 @@ export const EN: Record<string, string> = {
   'Cron 表达式': 'Cron expression',
   '服务器按{timezone}计算 Cron。': 'Cron is evaluated by the server in {timezone}.',
   'Cron 需要 5 段：分 时 日 月 周。': 'Use five cron fields: minute hour day month weekday.',
+  'Cron 表达式有误': 'Fix the cron expression',
+  先选择任务: 'Pick a task first',
   从哪天开始每周重复: 'Day to repeat each week',
   '整点运行可能会晚几分钟开始。': 'Runs on the hour may start a few minutes late.',
   提示词: 'Saved prompt',
