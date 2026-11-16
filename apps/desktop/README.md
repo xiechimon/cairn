@@ -24,7 +24,7 @@ The `electron` package's install script is disabled in `pnpm-workspace.yaml`, so
 
 ## Releases
 
-`desktop-release` publishes `desktop-v0.1.<run number>` to GitHub Releases with arm64 and x64 DMG and zip files named `Cairn-<version>-<arch>.<ext>`. It runs nightly at 18:17 UTC when `main` has moved since the last `desktop-v*` tag, and on demand from the Actions tab (`workflow_dispatch`). The version is stamped into the packaged `package.json` with `-c.extraMetadata.version`, so `app.getVersion()` reports it; the arm64 build passes `pnpm smoke` before anything is published.
+`desktop-release` publishes `desktop-v0.1.<run number>` to GitHub Releases with arm64 and x64 DMG and zip files named `Cairn-<version>-<arch>.<ext>`. It runs every 3 hours (minute 17) and on demand from the Actions tab (`workflow_dispatch`). A scheduled run first checks on Linux whether anything the app ships changed since the last `desktop-v*` tag (`apps/web`, `apps/server`, `apps/daemon`, `apps/desktop`, `packages/shared` and the root package and lockfile files) and starts the macOS build only if so; an on-demand run always builds. The version is stamped into the packaged `package.json` with `-c.extraMetadata.version`, so `app.getVersion()` reports it; the arm64 build passes `pnpm smoke` before anything is published.
 
 ## Updates
 
