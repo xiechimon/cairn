@@ -1,9 +1,4 @@
-import {
-  type BoundGitCredentials,
-  type CommitIdentity,
-  type PushPublication,
-  withCoAuthor,
-} from '@cairn/shared';
+import type { BoundGitCredentials, CommitIdentity, PushPublication } from '@cairn/shared';
 import { gitCredentialEnv, machineGitEnv, runGitOk } from './git.js';
 
 const PUBLISHED = ['--remotes', '--glob=refs/cairn/published-tags/*'];
@@ -15,7 +10,6 @@ async function rewriteUnpublished(
   branch: string,
   head: string,
   identity: CommitIdentity | null,
-  coAuthor: CommitIdentity | null,
 ): Promise<void> {
   const unpublished = (
     await git(['rev-list', '--reverse', '--topo-order', head, '--not', ...PUBLISHED])
@@ -44,8 +38,7 @@ async function rewriteUnpublished(
       !committerDate
     )
       throw new Error('Invalid commit metadata');
-    const original = body.join('\0').trimEnd();
-    const message = withCoAuthor(original, coAuthor);
+    const message = body.join('\0').trimEnd();
     const rewrittenParents = parents
       .split(' ')
       .filter(Boolean)
@@ -53,7 +46,6 @@ async function rewriteUnpublished(
     const authorIdentity = identity ?? { name: author, email };
     const committerIdentity = identity ?? { name: committer, email: committerEmail };
     if (
-      message === original &&
       rewrittenParents.join(' ') === parents &&
       authorIdentity.name === author &&
       authorIdentity.email === email &&
@@ -108,11 +100,5 @@ export async function attributeStepCommits(
     undefined,
     input.credential ? gitCredentialEnv(input.credential) : machineGitEnv(),
   );
-  await rewriteUnpublished(
-    git,
-    input.branch,
-    await git(['rev-parse', 'HEAD']),
-    input.identity,
-    input.coAuthor,
-  );
+  await rewriteUnpublished(git, input.branch, await git(['rev-parse', 'HEAD']), input.identity);
 }

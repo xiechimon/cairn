@@ -477,9 +477,9 @@ Reach:
 
 ### first-run
 
-**First run** (shipped, centrality 2). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped, centrality 2). The setup page before the first project and the composer setup hint that help a new user configure models.
 
-States: A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.
+States: A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint appears on the composer.
 
 Reach:
 
@@ -492,8 +492,8 @@ Reach:
 - Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `first-run-add-provider`, `first-run-confirm`, `first-run-pick-*`, `first-run-setup`, `first-run-step-*`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
-- Backend design: **gap**: no design for checklist state, first-PR detection and the 10-minute path
-- Evidence: `apps/web/e2e/first-run-setup.spec.ts`, `apps/web/e2e/first-run-checklist.spec.ts`, `apps/web/e2e/first-pr-report.spec.ts`, `apps/server/test/first-pr-report.test.ts`
+- Backend design: **gap**: no design for checklist state and the 10-minute path
+- Evidence: `apps/web/e2e/first-run-setup.spec.ts`, `apps/web/e2e/first-run-checklist.spec.ts`
 
 ### machine-enrollment
 
@@ -634,9 +634,9 @@ Reach:
 
 ### account-and-team
 
-**Account and team** (shipped, centrality 3). The user's account, the team record and the PR attribution settings.
+**Account and team** (shipped, centrality 3). The user's account, language and device notification preferences.
 
-States: Account details and language, and the PR attribution settings.
+States: Account details, language selection and device push enabled or disabled.
 
 Reach:
 
@@ -649,8 +649,8 @@ Reach:
 - Verify recipes: [.claude/skills/verify-cairn/features/avatars.md](features/avatars.md)
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
-- Backend design: **gap**: no design for the single-user account, the team record and attribution settings
-- Evidence: `apps/web/e2e/account-controls.spec.ts`, `apps/web/e2e/team-attribution-settings.spec.ts`, `apps/server/test/user-patch.test.ts`
+- Backend design: **gap**: no design for the single-user account and team record
+- Evidence: `apps/web/e2e/account-controls.spec.ts`, `apps/web/e2e/account-release-removal.spec.ts`, `apps/web/e2e/push-device-switch.spec.ts`, `apps/server/test/user-patch.test.ts`
 
 ### api-keys
 

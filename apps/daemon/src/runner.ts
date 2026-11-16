@@ -645,7 +645,6 @@ async function runClaimedStep(
     stepStartMs,
     reviewCheckout: checkout,
     readonlyWorkspace,
-    coAuthor: tokenRes.coAuthor ?? null,
     appIdentity,
     identity: stepIdentity,
     runGit: withStepGit,

@@ -31,7 +31,6 @@ import {
 import { coordinatorRunsOnPi } from './services/coordinator-context.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection } from './services/events.js';
-import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
 import {
   openAutonomyPauses,
   pauseTeamGithubRepos,
@@ -132,16 +131,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/teams', (c) => {
     const row = ctx.db.select().from(team).where(eq(team.id, ctx.team.id)).get();
-    return c.json(
-      row === undefined
-        ? []
-        : [
-            {
-              ...toTeamRecord(row, openAutonomyPauses(ctx.db, row.id)),
-              firstPrReportPrompt: readFirstPrReportPrompt(ctx.db, row.id),
-            },
-          ],
-    );
+    return c.json(row === undefined ? [] : [toTeamRecord(row, openAutonomyPauses(ctx.db, row.id))]);
   });
 
   app.get('/api/teams/:id/model-routing', (c) => {
@@ -205,20 +195,6 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     const body = parseWith(patchTeamBodySchema, await jsonBody(c), 'body');
-    if (body.coAuthorTrailer !== undefined) {
-      ctx.db
-        .update(team)
-        .set({ coAuthorTrailer: body.coAuthorTrailer })
-        .where(eq(team.id, id))
-        .run();
-    }
-    if (body.requestInstructorReview !== undefined) {
-      ctx.db
-        .update(team)
-        .set({ requestInstructorReview: body.requestInstructorReview })
-        .where(eq(team.id, id))
-        .run();
-    }
     if (body.autonomyPaused === false) resumeAutonomyPauses(ctx.db, id);
     if (body.autonomyPaused === true) {
       await pauseTeamGithubRepos(
@@ -239,12 +215,10 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
         .where(eq(team.id, id))
         .run();
     }
-    const prompt = setFirstPrReportPrompt(ctx.db, id, body.firstPrReportPrompt ?? {});
     const row = ctx.db.select().from(team).where(eq(team.id, id)).get();
     return c.json({
       ...ctx.team,
       ...(row === undefined ? {} : toTeamRecord(row, openAutonomyPauses(ctx.db, id))),
-      firstPrReportPrompt: prompt,
     });
   });
 

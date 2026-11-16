@@ -1,5 +1,5 @@
 import type { GithubRepoRef } from '@cairn/shared';
-import { conversationBranch, MERGE_ANNOUNCEMENT, withCoAuthor } from '@cairn/shared';
+import { conversationBranch, MERGE_ANNOUNCEMENT } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { type build, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -32,11 +32,9 @@ import { projectOfTodo } from './git.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
 import { teamUserToken } from './github-connection.js';
 import { githubText } from './github-text.js';
-import { humanWorkIdentity } from './github-work-attribution.js';
 import { assertMergeRequiredChecks } from './merge-required-checks.js';
 import { assertPhaseTransition } from './phase.js';
 import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
-import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import { setTodoPhase } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
@@ -222,12 +220,7 @@ export async function mergeThroughGithub(
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
       commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
-      commitMessage: withCoAuthor(
-        PLAIN_MERGE_BODY,
-        readTeamAttributionSettings(deps.db, before.todoRow.teamId).coAuthorTrailer
-          ? humanWorkIdentity(deps.db, before.todoRow, row.triggerSource)
-          : null,
-      ),
+      commitMessage: PLAIN_MERGE_BODY,
     });
     if (result.kind === 'merged' || result.kind === 'refused' || result.kind === 'rate-limited')
       settleAutonomousMerge(deps.db, row.id, result.kind === 'merged' ? 'merged' : 'refused');

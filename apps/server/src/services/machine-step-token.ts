@@ -17,7 +17,6 @@ import {
 } from './credentials.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
-import { humanWorkIdentity } from './github-work-attribution.js';
 import { chiefTurnLocked, stepMcpGrant } from './machine-claim.js';
 import {
   isChiefConversation,
@@ -32,7 +31,6 @@ import {
   stepConnectorEndpoints,
 } from './mcp-servers.js';
 import { coordinatorProfile } from './routing-rules.js';
-import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import { materializeXaiAccessToken } from './xai-device-login.js';
 
 export async function stepToken(
@@ -84,12 +82,6 @@ export async function stepToken(
   );
   return {
     commitIdentity: softwareCommitIdentity(deps),
-    coAuthor:
-      todoRow &&
-      stepRow?.scheduleId == null &&
-      readTeamAttributionSettings(deps.db, todoRow.teamId).coAuthorTrailer
-        ? humanWorkIdentity(deps.db, todoRow, buildRow?.triggerSource)
-        : null,
     provider,
     secrets: bundle.secrets,
     ...httpSecretFields(
@@ -268,6 +260,5 @@ async function chiefStepToken(
       : {}),
     git: null,
     commitIdentity: softwareCommitIdentity(deps),
-    coAuthor: null,
   };
 }

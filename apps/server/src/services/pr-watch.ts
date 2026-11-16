@@ -13,7 +13,6 @@ import type { BuildDeps } from './builds.js';
 import { CI_CLOSED_CONFIRM_MS } from './ci-loop.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
-import { reconcileWorkAttribution } from './github-work-attribution.js';
 import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
 import { createPrWakes, settlePrWakeNotices } from './pr-wakes.js';
 import { type CheckTally, checkTallyOf, FINISHED_PR_STATES, mergeStateOf } from './thread-pr.js';
@@ -285,13 +284,6 @@ export function createPrWatch(
     if (state === null) return;
     const finished = FINISHED_PR_STATES.includes(state);
     const head = pull.headSha ?? '';
-    if (!finished) {
-      try {
-        await reconcileWorkAttribution(deps, fetchImpl, token, target, head, now);
-      } catch {
-        run.logger?.info({ buildId: target.buildId }, 'PR attribution deferred');
-      }
-    }
     const task = deps.db.select().from(todo).where(eq(todo.id, target.threadId)).get();
     if (pull.state === 'open' && task !== undefined) {
       try {

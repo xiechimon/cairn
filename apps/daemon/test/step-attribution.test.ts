@@ -63,7 +63,7 @@ async function workspace() {
 }
 
 test.each([null, userToken])(
-  'unpublished commits become the App with the trailer, whatever credential pushes them: %j',
+  'unpublished commits become the App without adding trailers, whatever credential pushes them: %j',
   async (credential) => {
     const w = await workspace();
     await w.commit('one');
@@ -74,15 +74,15 @@ test.each([null, userToken])(
         branch: w.branch,
         base: w.base,
         identity: bot,
-        coAuthor: human,
         credential,
       });
     const log = await w.log();
     expect(log).toHaveLength(2);
     for (const entry of log) {
       expect(entry.startsWith(`${bot.name} <${bot.email}>|${bot.name} <${bot.email}>|`)).toBe(true);
-      expect(entry.match(/Co-authored-by:/g)?.length).toBe(1);
     }
+    expect(log[0]).toContain(trailer);
+    expect(log[1]).not.toContain('Co-authored-by:');
     expect(await w.git(['rev-parse', 'HEAD~2'])).toBe(w.published);
     expect(await w.git(['log', '-1', '--format=%an', w.published])).toBe('Session');
   },
@@ -96,7 +96,6 @@ test('without an App identity a user token never turns step commits into that us
     branch: w.branch,
     base: w.base,
     identity: null,
-    coAuthor: null,
     credential: userToken,
   });
   expect(await w.git(['rev-parse', 'HEAD'])).toBe(before);

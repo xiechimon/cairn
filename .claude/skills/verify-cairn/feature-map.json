@@ -1504,20 +1504,16 @@
     {
       "id": "first-run",
       "name": "First run",
-      "summary": "The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.",
-      "states": "A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.",
+      "summary": "The setup page before the first project and the composer setup hint that help a new user configure models.",
+      "states": "A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint appears on the composer.",
       "centrality": 2,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/first-run-checklist-model.ts",
           "apps/web/src/board/first-run-setup.tsx",
-          "apps/web/src/board/first-pr-card.tsx",
           "apps/web/src/board/home-banners.ts",
           "apps/web/src/board/composer-setup-hint.tsx"
-        ],
-        "server": [
-          "apps/server/src/services/first-pr-report.ts"
         ]
       },
       "reach": [
@@ -1532,13 +1528,11 @@
         "docs/design/references/first-run"
       ],
       "backendDesign": {
-        "gap": "no design for checklist state, first-PR detection and the 10-minute path"
+        "gap": "no design for checklist state and the 10-minute path"
       },
       "evidence": [
         "apps/web/e2e/first-run-setup.spec.ts",
-        "apps/web/e2e/first-run-checklist.spec.ts",
-        "apps/web/e2e/first-pr-report.spec.ts",
-        "apps/server/test/first-pr-report.test.ts"
+        "apps/web/e2e/first-run-checklist.spec.ts"
       ],
       "batch": "B6"
     },
@@ -2228,8 +2222,8 @@
     {
       "id": "account-and-team",
       "name": "Account and team",
-      "summary": "The user's account, the team record and the PR attribution settings.",
-      "states": "Account details and language, and the PR attribution settings.",
+      "summary": "The user's account, language and device notification preferences.",
+      "states": "Account details, language selection and device push enabled or disabled.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2237,8 +2231,7 @@
           "apps/web/src/routes/account-page.tsx"
         ],
         "server": [
-          "apps/server/src/routes-core.ts",
-          "apps/server/src/services/team-attribution-settings.ts"
+          "apps/server/src/routes-core.ts"
         ]
       },
       "routes": {
@@ -2266,11 +2259,12 @@
         "docs/design/references/settings"
       ],
       "backendDesign": {
-        "gap": "no design for the single-user account, the team record and attribution settings"
+        "gap": "no design for the single-user account and team record"
       },
       "evidence": [
         "apps/web/e2e/account-controls.spec.ts",
-        "apps/web/e2e/team-attribution-settings.spec.ts",
+        "apps/web/e2e/account-release-removal.spec.ts",
+        "apps/web/e2e/push-device-switch.spec.ts",
         "apps/server/test/user-patch.test.ts"
       ],
       "batch": "B10"

@@ -10,7 +10,6 @@ import {
   localCommitIdentity,
   localCommitViolation,
   pushViolation,
-  withCoAuthor,
 } from '../src/commit-identity.js';
 
 const policy = JSON.parse(
@@ -55,30 +54,6 @@ describe('the App identity', () => {
 
   test('without an App, cairn commits as a local identity', () => {
     expect(localCommitIdentity('Cairn')).toEqual({ name: 'Cairn', email: 'cairn@localhost' });
-  });
-});
-
-describe('the co-author trailer', () => {
-  test('is appended once, case-insensitively', () => {
-    const once = withCoAuthor('fix: x', ownerNoreply);
-    expect(once).toBe(
-      'fix: x\n\nCo-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>',
-    );
-    expect(withCoAuthor(once.toUpperCase(), ownerNoreply)).toBe(once.toUpperCase());
-  });
-
-  test('joins an existing trailer block instead of starting a new paragraph', () => {
-    expect(withCoAuthor('fix: x\n\ncloses #1\nCairn-Thread: t', ownerNoreply)).toBe(
-      'fix: x\n\ncloses #1\nCairn-Thread: t\nCo-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>',
-    );
-  });
-
-  test('is absent when nobody instructed the work', () => {
-    expect(withCoAuthor('fix: x', null)).toBe('fix: x');
-  });
-
-  test('refuses an identity that could inject a header', () => {
-    expect(() => withCoAuthor('fix', { name: 'a\nb', email: 'x@y' })).toThrow();
   });
 });
 

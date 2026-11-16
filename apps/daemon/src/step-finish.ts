@@ -1,9 +1,4 @@
-import type {
-  AgentSessionHandle,
-  CommitIdentity,
-  GitIdentity,
-  ProviderConfig,
-} from '@cairn/shared';
+import type { AgentSessionHandle, CommitIdentity, ProviderConfig } from '@cairn/shared';
 import type { AskChannel } from './ask-channel.js';
 import { deliverStepOutcome, type StepDeliveryInput } from './step-deliver.js';
 import type { StepGitRunner } from './step-git-tools.js';
@@ -33,7 +28,6 @@ export interface StepFinishInput
   stepStartMs: number;
   reviewCheckout: boolean;
   readonlyWorkspace: boolean;
-  coAuthor: GitIdentity | null;
   appIdentity: CommitIdentity | null;
   identity: CommitIdentity;
   runGit: StepGitRunner;
@@ -91,7 +85,6 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     ws,
     claimed: input.claimed,
     stepId,
-    coAuthor: input.coAuthor,
     appIdentity: input.appIdentity,
     identity: input.identity,
     mergeCredential: input.creds.git,

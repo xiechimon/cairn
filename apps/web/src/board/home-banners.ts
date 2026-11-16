@@ -1,4 +1,4 @@
-export type HomeBannerKind = 'backup' | 'login' | 'quota' | 'notify' | 'first-pr';
+export type HomeBannerKind = 'backup' | 'login' | 'quota' | 'notify';
 
 export const HOME_BANNER_LIMIT = 2;
 
@@ -7,7 +7,6 @@ const RANK: Record<HomeBannerKind, number> = {
   login: 0,
   quota: 1,
   notify: 1,
-  'first-pr': 2,
 };
 
 export function pickHomeBanners<T extends { kind: HomeBannerKind }>(candidates: T[]): T[] {

@@ -17,7 +17,6 @@ import { AppSidebar } from '../board/app-sidebar.js';
 import type { ArchivedProjectState } from '../board/archived-project-bar.js';
 import { BackupBanner } from '../board/backup-banner.js';
 import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
-import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
 import { setupShown } from '../board/first-run-checklist-model.js';
 import {
   FirstRunSetup,
@@ -68,11 +67,6 @@ export function BoardPage() {
   const backupQ = useBackupNotice(live);
   const mutations = useApiMutations(teamId);
   const teamsQ = useTeams(live);
-  const team = live ? teamsQ.data?.[0] : undefined;
-  const firstPrCard =
-    team?.firstPrReportPrompt === undefined
-      ? null
-      : firstPrCardInfo(team.firstPrReportPrompt, team.createdAt);
 
   const homeProjectId = searchParams.get('project');
   const threadId = searchParams.get(THREAD_PARAM);
@@ -175,22 +169,6 @@ export function BoardPage() {
           {
             kind: 'notify' as const,
             node: <NotificationBanner key="notify" onEnable={notifyBanner.enable} />,
-          },
-        ]
-      : []),
-    ...(firstPrCard != null
-      ? [
-          {
-            kind: 'first-pr' as const,
-            node: (
-              <FirstPrCard
-                key="first-pr"
-                info={firstPrCard}
-                onDismiss={() =>
-                  mutations.patchTeam.mutate({ firstPrReportPrompt: { dismissed: true } })
-                }
-              />
-            ),
           },
         ]
       : []),
