@@ -50,10 +50,39 @@ const sessionId =
     ? (argAfter('--resume') ?? argAfter('--session-id') ?? '00000000-0000-4000-8000-000000000001')
     : '00000000-0000-4000-8000-000000000001';
 let handled = false;
+let answerContextUsage = () => {};
+const contextUsageAnswered = new Promise((resolve) => {
+  answerContextUsage = resolve;
+});
 
-createInterface({ input: process.stdin }).on('line', (line) => {
+createInterface({ input: process.stdin }).on('line', async (line) => {
   if (line.trim() === '') return;
   const message = JSON.parse(line);
+  if (message.type === 'control_request' && message.request?.subtype === 'get_context_usage') {
+    emit({
+      type: 'control_response',
+      response: {
+        subtype: 'success',
+        request_id: message.request_id,
+        response: {
+          model: 'claude-sonnet-5-5',
+          totalTokens: 0,
+          maxTokens: 200000,
+          rawMaxTokens: 200000,
+          percentage: 0,
+          autoCompactThreshold: 167000,
+          isAutoCompactEnabled: true,
+          categories: [],
+          gridRows: [],
+          memoryFiles: [],
+          mcpTools: [],
+          agents: [],
+        },
+      },
+    });
+    answerContextUsage();
+    return;
+  }
   if (message.type === 'control_request') {
     emit({
       type: 'control_response',
@@ -108,6 +137,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     tools: [],
     model: 'claude-sonnet-5-5',
   });
+  await Promise.race([contextUsageAnswered, new Promise((resolve) => setTimeout(resolve, 2000))]);
   emit({
     type: 'assistant',
     session_id: sessionId,
