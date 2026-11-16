@@ -132,6 +132,7 @@ function releaseClaimedStep(
     applyStoppedStep(deps, row.id);
     return;
   }
+  if (row.kind === 'merge' && row.prompt?.includes('"local-merge"')) return;
   const noProgress =
     row.lastHeartbeatAt === null || row.lastHeartbeatAt <= (row.claimedAt ?? row.createdAt);
   const claims = noProgress ? row.claimCount + 1 : row.claimCount;

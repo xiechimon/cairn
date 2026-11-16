@@ -38,6 +38,8 @@ An explicitly requested merge does not reopen a completed task. Claim, finish, s
 
 Startup migration uses the existing data-migration mechanism and is repeatable. It preserves work branch commits, PR links, reports, attachments, user configuration unrelated to the gate and task history. Stopping claimed work is a runtime reconciliation, not a SQL-only rewrite that lets late completions mutate tasks. A migration failure leaves the transaction unchanged and reports the failure; no remote writes occur during migration.
 
+Abandoned local merge recovery retains a current claimed command and its pending admission when the landing is unknown, irrespective of the legacy project merge policy. A timeout is not evidence that the write failed. Repeated sweeps must not release or quarantine that command for another execution; daemon recovery can still report the original claim's result. Closed, archived, stop-requested and superseded tasks take the existing stop path before this retention rule, while retaining the unknown admission. Ordinary abandoned implementation steps keep their existing retry behavior. Regression coverage exercises both legacy policies, repeated sweeps and each cancellation path; the existing step-claim model does not model local merge commands or their landing state.
+
 ## User-visible changes and UI brief
 
 Surface: thread and review, Tasks panel, completion dialog, public introduction and first-task guide. Goal: finish the task without a merge decision prompt; do not imply a missing model review is unfinished work. Rules: P1-P5, C1, C5, C10, C14, C15, V1, V5, V10, T1, T2, A1-A4, R1.

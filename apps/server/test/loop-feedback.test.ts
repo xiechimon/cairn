@@ -539,9 +539,14 @@ describe('correction loop', () => {
     expect(s.db.select().from(message).all()).toEqual(rows);
   });
 
-  test('the API merge gate rejects an unguarded correction before any GitHub merge request', async () => {
+  test('an explicit correction merge requires repository checks but not retired guard proof', async () => {
     const { s, deps, task } = await world();
-    s.db.update(todo).set({ correctionRequired: true }).where(eq(todo.id, task.id)).run();
+    s.db
+      .update(todo)
+      .set({ correctionRequired: true, phase: 'done' })
+      .where(eq(todo.id, task.id))
+      .run();
+    const checkpoint = '1a2b3c4d'.repeat(5);
     const gh = mergeGithubFake({ 42: { state: 'open', merged: false } }, () =>
       conversationBranch('build-feedback'),
     );
@@ -552,15 +557,20 @@ describe('correction loop', () => {
         buildId: 'build-feedback',
         kind: 'build',
         status: 'done',
-        checkpointCommit: '1a2b3c4d'.repeat(5),
+        checkpointCommit: checkpoint,
         createdAt: 1,
       })
       .run();
     await expect(
       requestMerge({ ...deps, githubFetch: gh.fetch }, 'build-feedback'),
-    ).rejects.toThrow(/Correction.*test or gate/);
+    ).rejects.toThrow('Required checks are not green');
     expect(gh.puts()).toHaveLength(0);
-    expect(s.db.select().from(todo).where(eq(todo.id, task.id)).get()?.phase).toBe('review');
+    gh.setGreenRequiredChecks(checkpoint);
+    await expect(
+      requestMerge({ ...deps, githubFetch: gh.fetch }, 'build-feedback'),
+    ).resolves.toEqual({ delegated: true });
+    expect(gh.puts()).toHaveLength(1);
+    expect(s.db.select().from(todo).where(eq(todo.id, task.id)).get()?.phase).toBe('done');
   });
 
   test('the API correction merge completes after GitHub merges even if guard proof disappears during settlement', async () => {
