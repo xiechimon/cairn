@@ -250,11 +250,8 @@ test('Weekdays and custom cron send the actual discriminated API body', async ({
   const expression = editor(page).getByRole('textbox', { name: 'Cron expression' });
   await expression.fill('* *');
   await expect(expression).toHaveAttribute('aria-invalid', 'true');
-  await expect(editor(page).getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-  await expect(editor(page).getByText('Fix the cron expression', { exact: true })).toBeVisible();
   await expression.fill('*/20 8-17 * * MON-FRI');
   await expect(expression).toHaveAttribute('aria-invalid', 'false');
-  await expect(editor(page).getByText('Fix the cron expression', { exact: true })).toHaveCount(0);
   await scheduleShot(page, 'schedule-editor-custom-cron.png');
   await editor(page).getByRole('button', { name: 'Save', exact: true }).click();
   await expect(editor(page)).toBeHidden();
@@ -402,23 +399,4 @@ test('ended one-time schedules fold into a collapsed 已结束 group with plain 
   await expect(commit).toHaveAttribute('title', /^git commit failed/);
   await expect(page.locator('[data-slot="schedule-row"]').first()).toContainText('Nightly release checks');
   await expect(page.getByText(/Task archived/)).toHaveCount(0);
-});
-
-test.describe('on a touch phone', () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-
-  test('the six frequency options stay inside their track above the next field and the title keeps its line', async ({ page }) => {
-    await setup(page);
-    await open(page);
-    await editor(page).getByRole('radio', { name: 'Custom', exact: true }).click();
-    const title = await editor(page).getByRole('heading', { name: 'Nightly release checks' }).boundingBox();
-    expect(title?.height ?? 0).toBeGreaterThanOrEqual(16);
-    const track = await editor(page).getByRole('radiogroup').boundingBox();
-    const custom = await editor(page).getByRole('radio', { name: 'Custom', exact: true }).boundingBox();
-    const label = await editor(page).getByText('Cron expression', { exact: true }).boundingBox();
-    expect(track && custom && label).toBeTruthy();
-    if (!track || !custom || !label) return;
-    expect(custom.y + custom.height).toBeLessThanOrEqual(track.y + track.height + 0.5);
-    expect(track.y + track.height).toBeLessThanOrEqual(label.y);
-  });
 });

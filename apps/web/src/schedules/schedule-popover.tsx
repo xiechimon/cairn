@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode, RefObject } from 'react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -19,7 +19,6 @@ import {
 } from '../components/ui/select.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
-import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { scheduleWhen } from '../pages/schedule-summary.js';
 import { ScheduleFields } from './schedule-fields.js';
@@ -85,7 +84,7 @@ export function SchedulePopover({
               },
               collisionAvoidance: { side: 'shift' as const, align: 'shift' as const },
               className:
-                'h-(--available-height) w-(--anchor-width) min-w-80 gap-3 overflow-hidden p-3 pb-0',
+                'h-(--available-height) w-(--anchor-width) min-w-80 gap-3 overflow-y-auto p-3 pb-0',
             }
           : {
               side: 'left' as const,
@@ -93,7 +92,7 @@ export function SchedulePopover({
               sideOffset: 16,
               collisionPadding: { top: 60, right: 8, left: 8, bottom: 104 },
               collisionAvoidance: { side: 'flip' as const, align: 'shift' as const },
-              className: 'max-h-(--available-height) w-80 gap-3 overflow-hidden p-3 pb-0',
+              className: 'max-h-(--available-height) w-80 gap-3 overflow-y-auto p-3 pb-0',
             })}
       >
         {open && (
@@ -187,100 +186,76 @@ function ScheduleEditor({
               ? null
               : t(RUN_STATUS[record.lastRunStatus] ?? record.lastRunStatus),
           ]);
-  const blocker =
-    busy || deleted
-      ? null
-      : target === undefined
-        ? t('先选择任务')
-        : draft.trigger === 'custom' && !cronHasFiveFields(draft.cron)
-          ? t('Cron 表达式有误')
-          : null;
   const problem = record?.pausedReason ?? record?.lastRunError ?? null;
-  const bodyRef = useRef<HTMLDivElement>(null);
-  useScrollFade(bodyRef);
-  useEffect(() => {
-    const body = bodyRef.current;
-    if (!body) return;
-    const reveal = (event: FocusEvent) => {
-      if (event.target instanceof Element) event.target.scrollIntoView({ block: 'nearest' });
-    };
-    body.addEventListener('focusin', reveal);
-    return () => body.removeEventListener('focusin', reveal);
-  }, []);
   return (
     <>
-      <PopoverTitle className="shrink-0 truncate text-ui font-medium">
+      <PopoverTitle className="truncate text-ui font-medium">
         {schedule === null ? t('新建定时') : schedule.todo.title}
       </PopoverTitle>
-      <div
-        ref={bodyRef}
-        className={`${scrollFadeClassName()} -m-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto scroll-py-5 p-1 [--scroll-fade-size:16px]`}
-      >
-        {deleted && (
-          <p role="status" className="m-0 text-meta text-destructive">
-            {t('这条定时已被删除')}
+      {deleted && (
+        <p role="status" className="m-0 text-meta text-destructive">
+          {t('这条定时已被删除')}
+        </p>
+      )}
+      {schedule === null ? (
+        candidates.length === 0 ? (
+          <p className="m-0 text-meta text-content-secondary">
+            {t('这里还没有可以定时的任务。先建一个任务，或者直接让 Coordinator 帮你建定时。')}
           </p>
-        )}
-        {schedule === null ? (
-          candidates.length === 0 ? (
-            <p className="m-0 text-meta text-content-secondary">
-              {t('这里还没有可以定时的任务。先建一个任务，或者直接让 Coordinator 帮你建定时。')}
-            </p>
-          ) : (
-            <FormField label={t('任务')} htmlFor={taskId}>
-              <Select
-                value={todoId}
-                onValueChange={(value) => {
-                  if (value !== null) setTodoId(value);
-                }}
-                disabled={busy}
-              >
-                <SelectTrigger
-                  id={taskId}
-                  aria-label={t('任务')}
-                  className="w-full min-w-0 pointer-coarse:h-11"
-                >
-                  <SelectValue>
-                    <span className="truncate">{target?.title ?? t('选择任务')}</span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent aria-label={t('任务')}>
-                  {candidates.map((candidate) => (
-                    <SelectItem key={candidate.id} value={candidate.id}>
-                      {candidate.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormField>
-          )
         ) : (
-          <dl data-testid="schedule-popover-runs" className="m-0 grid grid-cols-2 gap-2 text-meta">
-            <div>
-              <dt className="text-content-tertiary">{t('下次运行')}</dt>
-              <dd className="m-0 text-foreground">{nextRun}</dd>
-            </div>
-            <div>
-              <dt className="text-content-tertiary">{t('上次运行')}</dt>
-              <dd className="m-0 text-foreground">{lastRun}</dd>
-            </div>
-            {problem !== null && (
-              <dd className="col-span-2 m-0 break-words text-content-secondary" title={problem}>
-                {schedulePauseReason(problem, t)}
-              </dd>
-            )}
-          </dl>
-        )}
-        {(schedule !== null || candidates.length > 0) && (
-          <ScheduleFields value={draft} onChange={setDraft} tz={tz} disabled={busy || deleted} />
-        )}
-        {error !== null && (
-          <p role="alert" className="m-0 break-words text-meta text-destructive">
-            {error}
-          </p>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-2 pb-3">
+          <FormField label={t('任务')} htmlFor={taskId}>
+            <Select
+              value={todoId}
+              onValueChange={(value) => {
+                if (value !== null) setTodoId(value);
+              }}
+              disabled={busy}
+            >
+              <SelectTrigger
+                id={taskId}
+                aria-label={t('任务')}
+                className="w-full min-w-0 pointer-coarse:h-11"
+              >
+                <SelectValue>
+                  <span className="truncate">{target?.title ?? t('选择任务')}</span>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent aria-label={t('任务')}>
+                {candidates.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+        )
+      ) : (
+        <dl data-testid="schedule-popover-runs" className="m-0 grid grid-cols-2 gap-2 text-meta">
+          <div>
+            <dt className="text-content-tertiary">{t('下次运行')}</dt>
+            <dd className="m-0 text-foreground">{nextRun}</dd>
+          </div>
+          <div>
+            <dt className="text-content-tertiary">{t('上次运行')}</dt>
+            <dd className="m-0 text-foreground">{lastRun}</dd>
+          </div>
+          {problem !== null && (
+            <dd className="col-span-2 m-0 break-words text-content-secondary" title={problem}>
+              {schedulePauseReason(problem, t)}
+            </dd>
+          )}
+        </dl>
+      )}
+      {(schedule !== null || candidates.length > 0) && (
+        <ScheduleFields value={draft} onChange={setDraft} tz={tz} disabled={busy || deleted} />
+      )}
+      {error !== null && (
+        <p role="alert" className="m-0 break-words text-meta text-destructive">
+          {error}
+        </p>
+      )}
+      <div className="sticky bottom-px mt-auto mb-px flex items-center gap-2 bg-popover pt-1 pb-3">
         {schedule !== null && (
           <Button
             variant="ghost"
@@ -291,15 +266,10 @@ function ScheduleEditor({
             {t('打开任务')}
           </Button>
         )}
-        {blocker !== null && (
-          <span className="ml-auto min-w-0 truncate text-meta text-content-tertiary">
-            {blocker}
-          </span>
-        )}
         <Button
           variant="secondary"
           size="sm"
-          className={`${blocker === null ? 'ml-auto' : ''} ${DIALOG_TEXT_BUTTON} pointer-coarse:h-11 dark:bg-(--menu-hover) dark:hover:bg-(--sidebar-press)`}
+          className={`ml-auto ${DIALOG_TEXT_BUTTON} font-normal pointer-coarse:h-11 dark:bg-(--menu-hover) dark:hover:bg-(--sidebar-press)`}
           onClick={onDone}
         >
           {deleted ? t('关闭') : t('取消')}
@@ -307,7 +277,7 @@ function ScheduleEditor({
         {!deleted && (
           <Button
             size="sm"
-            className="text-ui pointer-coarse:h-11 dark:disabled:bg-(--menu-hover)/50"
+            className="text-ui disabled:bg-secondary/50 disabled:text-content-dim disabled:opacity-100 pointer-coarse:h-11 dark:disabled:bg-(--menu-hover)/50"
             disabled={!savable}
             onClick={() => void save()}
           >

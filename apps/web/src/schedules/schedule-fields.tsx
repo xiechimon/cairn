@@ -75,7 +75,7 @@ export function ScheduleFields({
           options={(['once', 'hourly', 'daily', 'weekdays', 'weekly', 'custom'] as const).map(
             (trigger) => ({ value: trigger, label: t(TRIGGER_LABELS[trigger]), disabled }),
           )}
-          className="grid h-auto w-full grid-cols-3 pointer-coarse:h-auto dark:[--seg-active:color-mix(in_oklch,var(--popover),white_10%)] [&_button]:w-full [&_button]:px-2 pointer-coarse:[&_button]:h-11"
+          className="grid h-auto w-full grid-cols-3 dark:[--seg-active:color-mix(in_oklch,var(--popover),white_10%)] [&_button]:w-full [&_button]:px-2 pointer-coarse:[&_button]:h-11"
         />
       </div>
       {value.trigger === 'custom' ? (
@@ -187,7 +187,7 @@ export function ScheduleFields({
           value={value.prompt}
           disabled={disabled}
           onChange={(event) => onChange({ ...value, prompt: event.target.value })}
-          className="max-h-40 min-h-20 text-ui md:text-ui pointer-coarse:min-h-14"
+          className="max-h-40 min-h-20 text-ui md:text-ui"
         />
       </FormField>
     </div>
