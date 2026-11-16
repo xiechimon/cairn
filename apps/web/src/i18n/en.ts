@@ -258,9 +258,12 @@ export const EN: Record<string, string> = {
   '{role}：{model}': '{role}: {model}',
   '没找到已登录的 Claude Code。在终端运行 `claude` 登录后，这里会自己更新。':
     'No signed-in Claude Code found. Run `claude` in a terminal and sign in; this updates by itself.',
+  '{machine} 上没有检测到 Claude Code。装好后运行 `cairn restart`，这里会自己更新。':
+    'Claude Code is not detected on {machine}. Install it, then run `cairn restart`; this updates by itself.',
+  '还没有在线的执行机。在要跑任务的电脑上装好 CLI，运行 `cairn start` 并批准它。':
+    'No Runner is online yet. On the computer that should run tasks, install the CLI, run `cairn start` and approve it.',
   '本机 Claude Code': 'Claude Code on this computer',
   只给任务用: 'Tasks only',
-  '让任务用这台电脑上的 Claude Code': 'Let tasks use Claude Code on this computer',
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
   '任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。':
