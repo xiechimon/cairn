@@ -7,7 +7,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { plan as planTable, step as stepTable } from '../src/db/schema.js';
+import { plan as planTable, step as stepTable, todo as todoTable } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import {
@@ -62,7 +62,15 @@ async function worldInReview(): Promise<{
   completeStep(s.svc, (await stepsOf())[0]!.id);
   await req(s.app, 'POST', `/api/builds/${b.id}/steps`, { action: 'confirm' });
   const steps = await stepsOf();
-  completeStep(s.svc, steps[steps.length - 1]!.id);
+  const executionId = steps[steps.length - 1]!.id;
+  s.db
+    .update(stepTable)
+    .set({ checkpointCommit: 'ab'.repeat(20) })
+    .where(eq(stepTable.id, executionId))
+    .run();
+  completeStep(s.svc, executionId);
+  expect(await phaseOf()).toBe('done');
+  s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, todoDoc.id)).run();
   return { s, todoId: todoDoc.id, buildId: b.id, stepsOf, phaseOf, messagesOf };
 }
 
@@ -73,7 +81,7 @@ const REJECT_BODY = {
   clientMessageId: '3f9a0c2e-0000-4000-8000-000000000701',
 } as const;
 
-describe('#701 human rejection at the review gate (the revision action surface reuses the review->planning edge)', () => {
+describe('#701 legacy review-state revision compatibility', () => {
   test('FM1: rejecting from a resting review (steer surface 409, no session) still works -- 202 -> planning + a replan step queued (review template prompt) + a feedback row on the timeline', async () => {
     const w = await worldInReview();
     try {

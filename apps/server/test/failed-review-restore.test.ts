@@ -253,6 +253,8 @@ async function driveToDeadlock(
     ...(commit !== null ? { commit } : {}),
   });
   dropQueuedVerify(w.s, buildId);
+  expect(w.todoRow().phase).toBe('done');
+  w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
   expect(w.todoRow().phase).toBe('review');
   const reviewRes = await w.startReview(buildId);
   expect(reviewRes.status).toBe(202);
@@ -270,7 +272,7 @@ async function driveToDeadlock(
   return buildId;
 }
 
-describe('#702 failed->review restore (B-C17 deadlock shape)', () => {
+describe('#702 legacy failed-review restore (B-C17 deadlock shape)', () => {
   describe('failure mode 1 positive: exit open (build delivered)', () => {
     let w: World;
     beforeEach(async () => {
