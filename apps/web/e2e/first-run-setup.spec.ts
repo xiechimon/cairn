@@ -152,7 +152,11 @@ test('the welcome side draws the ink spiral as far as the open step', async ({ p
   const spiral = page.getByTestId('first-run-setup').locator('[data-slot="ink-spiral"]');
   await expect(spiral).toBeVisible();
   await expect(spiral).toHaveAttribute('data-drawn', '0.33');
-  await page.setViewportSize({ width: 1440, height: 700 });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const rail = await page.getByTestId('first-run-setup').locator('ol').first().boundingBox();
+  const drawn = await spiral.boundingBox();
+  expect((rail?.y ?? 0) + (rail?.height ?? 0)).toBeLessThanOrEqual(drawn?.y ?? 0);
+  await page.setViewportSize({ width: 1440, height: 680 });
   await expect(spiral).toBeHidden();
 });
 

@@ -536,12 +536,6 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
         <LanguageSwitch />
       </div>
       <aside className="relative flex flex-none flex-col px-5 pt-[calc(env(safe-area-inset-top)+3rem)] lg:max-w-150 lg:basis-2/5 lg:overflow-hidden lg:border-r lg:border-border lg:bg-(--surface-1) lg:px-18 lg:pt-12 lg:pb-10">
-        <InkSpiral
-          hangs={NO_HANGS}
-          drawn={open === 'models' ? 1 / 3 : 2 / 3}
-          size={180}
-          className="absolute right-12 bottom-24 max-lg:hidden [@media(max-height:760px)]:hidden"
-        />
         <div className="relative flex h-8 items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <BrandGlyph className="size-5" />
@@ -560,6 +554,12 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
           </p>
           <Rail open={open} />
           <Segments open={open} />
+          <InkSpiral
+            hangs={NO_HANGS}
+            drawn={open === 'models' ? 1 / 3 : 2 / 3}
+            size={150}
+            className="mt-6 self-end max-lg:hidden [@media(max-height:700px)]:hidden"
+          />
         </div>
         <SkipLine onSkip={onSkip} className="relative max-lg:hidden" />
       </aside>
