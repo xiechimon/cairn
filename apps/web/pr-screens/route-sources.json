@@ -46,9 +46,6 @@
     "apps/web/src/resources/machines-page.tsx",
     "apps/web/src/resources/create-machine-dialog.tsx"
   ],
-  "machine-detail": [
-    "apps/web/src/resources/machine-detail-page.tsx"
-  ],
   "skills": [
     "apps/web/src/resources/skills-page.tsx",
     "apps/web/src/resources/skill-dialog.tsx",

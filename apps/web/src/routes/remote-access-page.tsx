@@ -10,6 +10,7 @@ import {
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
+import { withCodeSpans } from '../components/notice-banner.js';
 import { QrCode } from '../components/qr-code.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
@@ -25,7 +26,6 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { type PairingCandidate, pairingCandidates } from '../lib/pairing-origin.js';
 import { PageShell } from '../pages/shell.js';
-import { TextWithCode } from '../resources/machine-detail-pane.js';
 import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
 
 export const REMOTE_ACCESS_ROUTE = 'remote-access';
@@ -169,7 +169,7 @@ export function RemoteAccessPage() {
           hint={
             awaitingTailnetLogin && tailnet?.authUrl
               ? undefined
-              : { text: <TextWithCode text={t('打开方法：设置 `CAIRN_TSNET=1` 后重启 Cairn。')} /> }
+              : { text: withCodeSpans(t('打开方法：设置 `CAIRN_TSNET=1` 后重启 Cairn。')) }
           }
         />
       ) : (
