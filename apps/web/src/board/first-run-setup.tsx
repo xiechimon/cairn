@@ -200,8 +200,8 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
   const ccStatus =
     online === undefined ? (
       setup.machines.length === 0 ? (
-        <span className="inline-flex items-center gap-2">
-          <Spinner className="size-3.5" aria-label={t('启动中')} />
+        <span className="flex items-start gap-2">
+          <Spinner className="mt-0.5 size-3.5 flex-none" aria-label={t('启动中')} />
           {t('本机执行机正在启动，启动后会检查这台电脑上的 Claude Code')}
         </span>
       ) : (
