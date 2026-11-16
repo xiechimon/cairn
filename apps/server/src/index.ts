@@ -59,6 +59,7 @@ import {
 import { sharedAgentSkillRoots } from './services/skills.js';
 import { prepareSkillsHome } from './services/skills-home.js';
 import { fillSystemAvatar } from './services/system-avatar.js';
+import { createTailscaleServe } from './services/tailscale-serve.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
@@ -171,13 +172,20 @@ const githubFetch = refreshingGithubFetch(
   globalThis.fetch,
 );
 let tsnetRemote: TsnetRemote | null = null;
+const environmentId = loadOrCreateEnvironmentId(environmentIdPathOf(config.dataDir));
+const tailscale = createTailscaleServe({
+  environmentId,
+  listenPort: config.port,
+  recordPath: join(config.dataDir, 'tailscale-serve.json'),
+});
 const app = createApp(
   {
     remote: {
-      environmentId: loadOrCreateEnvironmentId(environmentIdPathOf(config.dataDir)),
+      environmentId,
       listenHost: config.host,
       listenPort: config.port,
       tailnetStatus: () => tsnetRemote?.status() ?? null,
+      tailscale,
     },
     db,
     hub,
@@ -298,6 +306,12 @@ const coordinator = config.coordinatorInServer
 if (coordinator !== null) setCoordinatorWake((threadId) => coordinator.wake(threadId));
 scheduler.start();
 
+if (config.authToken === null) {
+  await tailscale.withdraw().catch((error: unknown) => {
+    logger.warn({ err: error }, 'tailscale serve mapping could not be withdrawn with auth off');
+  });
+}
+
 const server = serve(
   {
     fetch: app.fetch,
@@ -318,6 +332,12 @@ computerScreens.recover();
 sweepComputerHandoffs(db, Date.now());
 computerScreens.attach(server);
 
+if (config.authToken !== null) {
+  void tailscale.reapply().catch((error: unknown) => {
+    logger.warn({ err: error }, 'tailscale serve could not be pointed at this server');
+  });
+}
+
 const tsnetStarting = startTsnetRemote({
   settings: config.tsnet,
   homeDir: config.homeDir,
@@ -330,11 +350,16 @@ const tsnetStarting = startTsnetRemote({
 });
 
 const COORDINATOR_CLOSE_MS = 5_000;
+const TAILSCALE_WITHDRAW_MS = 3_000;
 let shuttingDown = false;
 async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   scheduler.stop();
+  await Promise.race([
+    tailscale.withdraw().catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, TAILSCALE_WITHDRAW_MS)),
+  ]);
   await Promise.race([
     coordinator?.close(),
     new Promise((resolve) => setTimeout(resolve, COORDINATOR_CLOSE_MS)),

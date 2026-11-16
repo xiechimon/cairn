@@ -62,6 +62,23 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     );
   });
 
+  app.get('/api/remote/tailscale', async (c) => {
+    c.header('cache-control', 'no-store');
+    if (remote.tailscale === undefined) throw new HttpError(404, 'tailscale access unavailable');
+    return c.json(await remote.tailscale.status());
+  });
+
+  app.post('/api/remote/tailscale', async (c) => {
+    requireOwner(c);
+    c.header('cache-control', 'no-store');
+    if (remote.tailscale === undefined) throw new HttpError(404, 'tailscale access unavailable');
+    try {
+      return c.json(await remote.tailscale.enable());
+    } catch (error) {
+      throw new HttpError(502, error instanceof Error ? error.message : String(error));
+    }
+  });
+
   app.get('/api/remote/pairing', (c) => {
     requireOwner(c);
     c.header('cache-control', 'no-store');

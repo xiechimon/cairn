@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import {
@@ -51,16 +51,29 @@ function bundledRoot(name: string): string {
   return app.isPackaged ? join(process.resourcesPath, name) : join(app.getAppPath(), name);
 }
 
-function freeLoopbackPort(): Promise<number> {
+function freeLoopbackPort(wanted: number): Promise<number> {
   return new Promise((resolvePort, reject) => {
     const probe = createServer();
     probe.once('error', reject);
-    probe.listen(0, LOOPBACK, () => {
+    probe.listen(wanted, LOOPBACK, () => {
       const address = probe.address();
       const port = typeof address === 'object' && address !== null ? address.port : 0;
       probe.close(() => resolvePort(port));
     });
   });
+}
+
+async function serverPort(): Promise<number> {
+  const path = join(app.getPath('userData'), 'server-port');
+  let saved = 0;
+  try {
+    saved = Number.parseInt(readFileSync(path, 'utf8'), 10);
+  } catch {}
+  const port = await freeLoopbackPort(Number.isInteger(saved) && saved > 0 ? saved : 0).catch(() =>
+    freeLoopbackPort(0),
+  );
+  writeFileSync(path, `${port}\n`);
+  return port;
 }
 
 function startServer(port: number): RunningServer {
@@ -234,7 +247,7 @@ function serveUpdates(origin: string): void {
 
 async function boot(): Promise<void> {
   try {
-    server = startServer(await freeLoopbackPort());
+    server = startServer(await serverPort());
     await waitUntilServing(server);
     const ownerToken = readOwnerToken();
     signOwnPagesIn(server.origin, ownerToken);
