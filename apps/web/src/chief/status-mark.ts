@@ -75,7 +75,6 @@ const LOOK_TOOLS = new Set([
   'docs',
   'issues',
   'pull_requests',
-  'github_overlap',
   'workflow_runs',
   'conversation',
   'memories',

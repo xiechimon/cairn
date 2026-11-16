@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { constants, createWriteStream } from 'node:fs';
-import { access, mkdtemp, rename, rm } from 'node:fs/promises';
+import { access, mkdtemp, readdir, rename, rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import {
@@ -18,6 +18,8 @@ const run = promisify(execFile);
 const REQUEST_HEADERS = { 'User-Agent': 'Cairn-Desktop' };
 const NO_MANIFEST = 404;
 const APP_BUNDLE_NAME = 'Cairn.app';
+const STAGING_PREFIX = '.cairn-update-';
+const QUIT_FALLBACK_MS = 30_000;
 
 export interface Updater {
   state(): DesktopUpdateState;
@@ -37,6 +39,18 @@ async function updateBlocker(bundle: string): Promise<DesktopUpdateBlocker | nul
   return access(dirname(bundle), constants.W_OK).then(
     () => null,
     () => 'read-only' as const,
+  );
+}
+
+export async function removeLeftoverUpdates(): Promise<void> {
+  const bundle = runningBundle();
+  if (!app.isPackaged || !bundle.endsWith('.app')) return;
+  const folder = dirname(bundle);
+  const entries = await readdir(folder).catch(() => []);
+  await Promise.all(
+    entries
+      .filter((name) => name.startsWith(STAGING_PREFIX))
+      .map((name) => rm(join(folder, name), { recursive: true, force: true }).catch(() => {})),
   );
 }
 
@@ -98,7 +112,8 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
   const busy = (): boolean =>
     current.status === 'checking' ||
     current.status === 'downloading' ||
-    current.status === 'installing';
+    current.status === 'installing' ||
+    current.status === 'restarting';
 
   async function check(): Promise<void> {
     if (busy()) return;
@@ -134,7 +149,7 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
     const update = pending;
     if (update === null || busy()) return;
     const bundle = runningBundle();
-    const staging = await mkdtemp(join(dirname(bundle), '.cairn-update-'));
+    const staging = await mkdtemp(join(dirname(bundle), STAGING_PREFIX));
     try {
       set({ status: 'downloading', version: update.version, percent: 0 });
       const zip = join(staging, `Cairn-${update.version}.zip`);
@@ -143,8 +158,9 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
       );
       set({ status: 'installing', version: update.version });
       await swapBundle(bundle, staging, zip);
-      await rm(staging, { recursive: true, force: true });
+      set({ status: 'restarting', version: update.version });
       app.relaunch();
+      setTimeout(() => app.exit(0), QUIT_FALLBACK_MS).unref();
       app.quit();
     } catch (error) {
       await rm(staging, { recursive: true, force: true });

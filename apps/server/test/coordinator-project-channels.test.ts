@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, project, routingRule, step } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
+import { applyBuildStepAction, applyStepFailure } from '../src/services/builds.js';
 import {
   addChiefWatch,
   composeChiefSystemPrompt,
@@ -199,6 +200,30 @@ describe('Coordinator project channels (docs/design/coordinator-project-channels
       [created.id, 'needs-you', channel.body.id],
       [created.id, 'done', channel.body.id],
     ]);
+  });
+
+  test('a retried channel task still reports to its channel (quick-lane.md L6)', async () => {
+    const channel = await openChannel();
+    const created = (await relay(
+      'create_todo',
+      ownerTodoParams(H.s.db, channel.body.id, H.projectId, 'Export the board as CSV'),
+      { threadId: channel.body.id, conversationId: channel.body.id },
+    )) as { id: string; buildId: string };
+    const pending = stepsOf(created.buildId).find((row) => row.status === 'pending')!;
+    applyStepFailure(deps(), pending, 'runner crashed');
+    expect(getTodo(deps(), created.id)!.phase).toBe('failed');
+    await applyBuildStepAction(deps(), created.buildId, {
+      action: 'restart',
+      feedback: '',
+      clientMessageId: 'retry-1',
+    });
+    const before = rowsOf(H.threadId).length;
+    postThreadReport(deps(), getTodo(deps(), created.id)!, 'review');
+    const reports = rowsOf(channel.body.id)
+      .filter((r) => r.role === 'system' && String(r.content).includes('"thread-report"'))
+      .map((r) => threadReportContentSchema.parse(JSON.parse(String(r.content))).phase);
+    expect(reports.at(-1)).toBe('review');
+    expect(rowsOf(H.threadId)).toHaveLength(before);
   });
 
   test('a report for a main-channel task is not mirrored', async () => {

@@ -263,7 +263,7 @@ describe('apiKey surface (r3 section 6 observed display rules + 02 section 8 has
     return `/api/teams/${s.team.id}/api-keys`;
   }
   const body = {
-    name: '笔记本',
+    name: 'LAPTOP',
     gitAccess: true,
     mcpAccess: true,
     machineAccess: true,
@@ -287,7 +287,7 @@ describe('apiKey surface (r3 section 6 observed display rules + 02 section 8 has
     expect(API_KEY_PATTERN.test(created.plaintext)).toBe(true);
     expect(created.masked).toBe(maskApiKey(created.plaintext));
     expect(created.masked).toMatch(/^cairn_[0-9a-f]{8}…$/);
-    expect(created.name).toBe('笔记本');
+    expect(created.name).toBe('LAPTOP');
     expect(created.gitAccess).toBe(true);
     expect(created.mcpAccess).toBe(true);
     expect(created.toolGrants).toEqual({ read: ['Todos', 'Projects'], write: ['Create Todo'] });
@@ -318,17 +318,16 @@ describe('apiKey surface (r3 section 6 observed display rules + 02 section 8 has
     await expectErrorShape(await req(s.app, 'GET', '/api/teams/nope/api-keys'), 404);
   });
 
-  test('POST optional name defaults to null; bad body 400', async () => {
+  test('POST needs a name shaped like MY_KEY; anything else is 400 and creates nothing', async () => {
     const s = bootServer();
-    const res = await req(s.app, 'POST', teamPath(s), {
-      gitAccess: false,
-      mcpAccess: false,
-      toolGrants: { read: [], write: [] },
-    });
-    expect(res.status).toBe(201);
-    expect(((await res.json()) as { name: string | null }).name).toBeNull();
+    const access = { gitAccess: false, mcpAccess: false, toolGrants: { read: [], write: [] } };
+    for (const name of [undefined, null, '', 'laptop', 'My_Key', '1KEY', 'MY-KEY', 'MY KEY'])
+      await expectErrorShape(await req(s.app, 'POST', teamPath(s), { ...access, name }), 400);
+    expect(s.db.select().from(apiKeyTable).all()).toHaveLength(0);
+    for (const name of ['MY_KEY2', '_X'])
+      expect((await req(s.app, 'POST', teamPath(s), { ...access, name })).status).toBe(201);
     await expectErrorShape(
-      await req(s.app, 'POST', teamPath(s), { gitAccess: 'yes', toolGrants: {} }),
+      await req(s.app, 'POST', teamPath(s), { name: 'K', gitAccess: 'yes', toolGrants: {} }),
       400,
     );
   });

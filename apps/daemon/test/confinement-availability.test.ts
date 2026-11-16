@@ -167,9 +167,31 @@ test('the cause comes from the failure itself, and a FUSE mount alone names noth
       home: () => '/home/ian',
     }),
   ).toEqual({ kind: 'home-overlay-failed' });
+  for (const [stderr, kind] of [
+    ['bwrap: Unknown option --overlay-src\n', 'bwrap-too-old'],
+    ['bwrap: Unknown option --tmp-overlay\n', 'bwrap-too-old'],
+    ['bwrap: setting up uid map: Permission denied\n', 'userns-denied'],
+    [
+      'bwrap: No permissions to creating new namespace, likely because the kernel does not allow non-privileged user namespaces.\n',
+      'userns-denied',
+    ],
+    [
+      "bwrap: No permissions to create a new namespace, likely because the kernel does not allow non-privileged user namespaces. On e.g. debian this can be enabled with 'sysctl kernel.unprivileged_userns_clone=1'.\n",
+      'userns-denied',
+    ],
+  ] as const)
+    expect(confinementCauseOf(new ConfinementExitedError(stderr), inspect(T3_MOUNT))).toEqual({
+      kind,
+    });
   expect(
     confinementCauseOf(
-      new ConfinementExitedError('bwrap: setting up uid map: Permission denied\n'),
+      new ConfinementExitedError('bwrap: Creating new namespace failed: Invalid argument\n'),
+      inspect(T3_MOUNT),
+    ),
+  ).toBeUndefined();
+  expect(
+    confinementCauseOf(
+      new ConfinementExitedError('bwrap: Unknown option --share-net\n'),
       inspect(T3_MOUNT),
     ),
   ).toBeUndefined();
@@ -212,32 +234,37 @@ test('only a daemon that can never be its own unit stops rechecking', async () =
   expect(unit.recoverable).toBe(true);
 });
 
-test('a Runner without bubblewrap reports why, rechecks on its own and starts claiming once fixed', async () => {
-  const launch = vi
-    .fn<typeof launchConfined>()
-    .mockRejectedValueOnce(
-      new ConfinementExitedError('Failed to find executable bwrap: No such file or directory\n'),
-    )
-    .mockImplementation(successfulLaunch);
-  const { api, handle } = await boot({
-    confinementPlatform: 'linux',
-    confinementPreflight: launch,
-    confinementRecheckMs: 20,
-  });
-  expect(api.presenceBodies.at(-1)).toMatchObject({
-    capabilities: {
-      confinement: { state: 'unavailable', reason: 'startup-failed' },
-      confinementCause: { kind: 'bwrap-missing' },
-    },
-  });
-  expect(api.claimCalls).toBe(0);
-  await vi.waitFor(() => expect(api.claimCalls).toBeGreaterThan(0), { timeout: 5000 });
-  expect(launch).toHaveBeenCalledTimes(2);
-  expect(
-    (api.presenceBodies.at(-1) as { capabilities?: object } | undefined)?.capabilities,
-  ).not.toHaveProperty('confinementCause');
-  await handle.stop();
-});
+test.each([
+  ['Failed to find executable bwrap: No such file or directory\n', 'bwrap-missing'],
+  ['bwrap: Unknown option --overlay-src\n', 'bwrap-too-old'],
+  ['bwrap: setting up uid map: Permission denied\n', 'userns-denied'],
+])(
+  'a Runner whose sandbox fails with %j reports %s, rechecks on its own and starts claiming once fixed',
+  async (stderr, kind) => {
+    const launch = vi
+      .fn<typeof launchConfined>()
+      .mockRejectedValueOnce(new ConfinementExitedError(stderr))
+      .mockImplementation(successfulLaunch);
+    const { api, handle } = await boot({
+      confinementPlatform: 'linux',
+      confinementPreflight: launch,
+      confinementRecheckMs: 20,
+    });
+    expect(api.presenceBodies.at(-1)).toMatchObject({
+      capabilities: {
+        confinement: { state: 'unavailable', reason: 'startup-failed' },
+        confinementCause: { kind },
+      },
+    });
+    expect(api.claimCalls).toBe(0);
+    await vi.waitFor(() => expect(api.claimCalls).toBeGreaterThan(0), { timeout: 5000 });
+    expect(launch).toHaveBeenCalledTimes(2);
+    expect(
+      (api.presenceBodies.at(-1) as { capabilities?: object } | undefined)?.capabilities,
+    ).not.toHaveProperty('confinementCause');
+    await handle.stop();
+  },
+);
 
 test('a ready Runner invalidated by a stale-report 409 is rechecked by the timer', async () => {
   const api = new FakeMachineApi();

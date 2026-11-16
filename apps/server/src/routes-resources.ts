@@ -153,7 +153,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/mcp-servers', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(listMcpServers({ mcpConfigPath: ctx.mcpConfigPath }, teamId));
+    return c.json(listMcpServers({ mcpConfigPath: ctx.mcpConfigPath, db: ctx.db }, teamId));
   });
 
   app.get('/api/documents/:id/diff', (c) => {
@@ -862,7 +862,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(createApiKeyBodySchema, await jsonBody(c), 'body');
     const created = createApiKey(svc, {
       teamId,
-      name: body.name ?? null,
+      name: body.name,
       gitAccess: body.gitAccess,
       mcpAccess: body.mcpAccess,
       machineAccess: body.machineAccess,

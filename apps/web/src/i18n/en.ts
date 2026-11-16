@@ -21,6 +21,17 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
+  这里: 'this channel',
+  主频道: 'the main channel',
+  '{channel} 频道': '{channel} channel',
+  '结果回到{place}': 'reports to {place}',
+  结果回到: 'Reports to',
+  去看: 'Open',
+  '去{channel}': 'Open {channel}',
+  进度: 'Progress',
+  改代码: 'Code',
+  调研: 'Research',
+  交报告: 'Report',
   有新版本: 'A new version is available',
   点此刷新: 'Refresh',
   订阅账户没能加载: 'Subscriptions could not be loaded',
@@ -48,7 +59,6 @@ export const EN: Record<string, string> = {
     'Run `claude setup-token` on your machine, then paste the token below.',
   'Claude Code 步骤会使用最近添加且未过期的订阅。Token 加密保存，保存后无法再查看。':
     'Claude Code steps use the most recently added unexpired connection. Tokens are encrypted and cannot be viewed after saving.',
-  '到期日（可选）': 'Expires on (optional)',
   '保存失败，请检查填写内容后重试。':
     'Could not save the connection. Check the fields and try again.',
   '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。':
@@ -249,22 +259,9 @@ export const EN: Record<string, string> = {
     'Add a provider; the Coordinator cannot use a Claude Code sign-in',
   '还差第 1 步：接入模型': 'Step 1 is still open: connect models',
   '还差第 2 步：确认模型': 'Step 2 is still open: confirm models',
-  启动中: 'Starting',
-  '本机执行机正在启动，启动后会检查这台电脑上的 Claude Code':
-    'The local Runner is starting; it checks Claude Code on this computer once it is up',
-  '本机执行机没有启动，查不到 Claude Code。退出 Cairn 再打开一次。':
-    'The local Runner did not start, so Claude Code cannot be checked. Quit Cairn and open it again.',
-  已在这台电脑上登录: 'Signed in on this computer',
   '{role}：{model}': '{role}: {model}',
-  '没找到已登录的 Claude Code。在终端运行 `claude` 登录后，这里会自己更新。':
-    'No signed-in Claude Code found. Run `claude` in a terminal and sign in; this updates by itself.',
-  '本机 Claude Code': 'Claude Code on this computer',
-  只给任务用: 'Tasks only',
-  '让任务用这台电脑上的 Claude Code': 'Let tasks use Claude Code on this computer',
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
-  '任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。':
-    'Tasks can run now. The Coordinator cannot use a Claude Code sign-in and still needs a provider.',
   '因为你添加了 Anthropic API key': 'Because you added an Anthropic API key',
   '因为这是最早添加、Coordinator 能直接用的服务商':
     'Because it is the earliest added provider the Coordinator can use',
@@ -626,7 +623,7 @@ export const EN: Record<string, string> = {
   '尚无 API 密钥': 'No API keys yet',
   'API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。':
     'API keys connect Runners from the command line and let MCP clients reach your workbench.',
-  新建密钥: 'New key',
+  '新建 API 密钥': 'New API key',
   复制: 'Copy',
   展开: 'Expand',
   '回复：{quote}': 'Replying to: {quote}',
@@ -636,7 +633,8 @@ export const EN: Record<string, string> = {
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
-  '请立即复制密钥，它仅显示一次。': 'Copy the key now — it is shown only once.',
+  '请立即复制 API 密钥，它仅显示一次。': 'Copy the API key now — it is shown only once.',
+  '没能复制，请手动选中 API 密钥复制。': 'Could not copy; select the API key and copy it by hand.',
 
   // —— resources routes (r7 06–10, r2 §6) ——
   新建: 'New',
@@ -1002,6 +1000,10 @@ export const EN: Record<string, string> = {
     'The task sandbox is not ready: the daemon is not running as its own systemd user unit. Run `{command} restart` on this machine, which starts one; if that does not help, check that `systemd-run --user` works.',
   '任务沙箱没就绪：这台机器没装 bubblewrap（`bwrap`）。装好后（如 `sudo pacman -S bubblewrap` 或 `sudo apt install bubblewrap`），执行机每分钟会自己再检查一次。':
     'The task sandbox is not ready: bubblewrap (`bwrap`) is not installed on this machine. Install it (for example `sudo pacman -S bubblewrap` or `sudo apt install bubblewrap`); the Runner checks again every minute.',
+  '任务沙箱没就绪：这台机器的 bubblewrap（`bwrap`）太旧，没有沙箱要用的 overlay 选项，要 0.11 或更新（Ubuntu 24.04 和 Debian 12 自带的都更旧）。按 `https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#sandbox-on-ubuntu-2404-and-debian-12` 从源码装到 `/usr/local`，再确认 `command -v bwrap` 输出 `/usr/local/bin/bwrap`，执行机每分钟会自己再检查一次。':
+    "The task sandbox is not ready: this machine's bubblewrap (`bwrap`) is too old for the overlay options the sandbox uses, which need 0.11 or newer (Ubuntu 24.04 and Debian 12 ship older). Build it from source into `/usr/local` as in `https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#sandbox-on-ubuntu-2404-and-debian-12`, then check that `command -v bwrap` prints `/usr/local/bin/bwrap`; the Runner checks again every minute.",
+  '任务沙箱没就绪：系统不让 `bwrap` 创建用户命名空间。Ubuntu 上要给执行机用的 `bwrap` 加一个 AppArmor 配置，其他发行版要打开非特权用户命名空间（Debian 内核是 `kernel.unprivileged_userns_clone=1`），命令见 `https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#sandbox-on-ubuntu-2404-and-debian-12`。改好后执行机每分钟会自己再检查一次。':
+    'The task sandbox is not ready: the system does not let `bwrap` create user namespaces. On Ubuntu, add an AppArmor profile for the `bwrap` the Runner uses; on other distributions, allow unprivileged user namespaces (`kernel.unprivileged_userns_clone=1` on Debian kernels). Commands are in `https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#sandbox-on-ubuntu-2404-and-debian-12`. Once fixed, the Runner checks again every minute.',
   '任务沙箱没就绪：家目录里的 FUSE 挂载 `{mountPoint}` 挡住了沙箱，通常是某个 AppImage 程序在 TMPDIR 指向家目录时留下的。关掉那个程序，或让它的 TMPDIR 指向家目录以外，执行机每分钟会自己再检查一次。':
     'The task sandbox is not ready: the FUSE mount `{mountPoint}` in your home folder blocks it, usually left by an AppImage app started with TMPDIR inside home. Close that app, or start it with TMPDIR outside home; the Runner checks again every minute.',
   '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，执行机每分钟会自己再检查一次。':
@@ -1155,18 +1157,8 @@ export const EN: Record<string, string> = {
   // #170 create-agent dialog family
   创建: 'Create',
   // W4 #287 API key 新建表单弹窗（r3 §6 权限位 [推断]）
-  '名称（可选）': 'Name (optional)',
-  '如：笔记本、CI 机器': 'e.g. laptop, CI runner',
-  'Git 读写（托管仓库 push/pull）': 'Git read/write (hosted repo push/pull)',
-  'MCP 访问（MCP 客户端接入）': 'MCP access (MCP client connections)',
-  '注册执行机（命令行接入）': 'Runner enrollment (CLI executor registration)',
-  工具权限位: 'Tool grants',
-  // #636 起 zh「全选」归筛选面板的全选行（en 'Select all'）；本面快捷键换
-  // 「授予全部」避开同形碰撞——zh 源串即 key，两个语义域必须分叉。
-  授予全部: 'Grant all',
-  清空: 'Clear all',
-  读: 'Read',
-  写: 'Write',
+  '只能用大写字母、数字和下划线，不能以数字开头。':
+    'Capital letters, digits and _ only; no leading digit.',
   // wayfinder #173 add-secret dialog family (r2 §242 verbatim fields)
   '名称（环境变量名）': 'Name (environment variable name)',
   '描述（可选）': 'Description (optional)',
@@ -1529,13 +1521,12 @@ export const EN: Record<string, string> = {
   已归档项目: 'Archived projects',
   筛选项目: 'Filter projects',
   '筛选项目：{value}': 'Filter projects: {value}',
-  '已归档的项目和它们的对话会一直保留，直到你删除。':
-    'Archived projects and their conversations are kept until you delete them.',
+  '已归档的项目和它们的对话会一直保留，直到你删除。': 'Kept until you delete them.',
   '这个项目已归档。取消归档后才能发消息。':
     'This project is archived. Unarchive it to send messages.',
   '这个项目已归档。取消归档后才能修改。': 'This project is archived. Unarchive it to make changes.',
   没有已归档的项目: 'No archived projects',
-  已归档的项目: 'Archived projects',
+  已归档的项目: 'Archived',
   全部删除: 'Delete all',
   没有可删除的已归档项目: 'No archived projects to delete',
   '删除 {n} 个已归档的项目？': 'Delete {n#1 archived project|# archived projects}?',
@@ -2345,6 +2336,7 @@ export const EN: Record<string, string> = {
   '已是最新版本 {version}': 'Up to date ({version})',
   '更新到 {version}': 'Update to {version}',
   '正在更新 {percent}%': 'Updating {percent}%',
+  '正在安装…': 'Installing…',
   '正在重启…': 'Restarting…',
   '更新失败：{message}': 'Update failed: {message}',
   开发版不检查更新: 'Development builds do not check for updates',

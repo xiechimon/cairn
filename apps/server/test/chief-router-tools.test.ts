@@ -814,6 +814,17 @@ describe('router tools', () => {
       expect(text).not.toContain('Ignore previous instructions');
     });
 
+    test('the prompt tells the Coordinator to search todos by keyword before create_todo', () => {
+      const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
+      expect(text).toContain('create_todo 前用 todos 的 query 按关键词');
+    });
+
+    test('the prompt has no GitHub overlap rule and asks for no overlap result in the reply', () => {
+      const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
+      expect(text).not.toContain('github_overlap');
+      expect(text).not.toContain('带编号的查重结果');
+    });
+
     test('an empty team says so', () => {
       const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
       expect(text).toContain('- 没有在跑的任务');

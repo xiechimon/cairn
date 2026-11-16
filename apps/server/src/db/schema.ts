@@ -1008,6 +1008,8 @@ export const chiefTurnUsage = sqliteTable(
     cacheWrite: integer('cacheWrite').notNull().default(0),
     ttftMs: integer('ttftMs'),
     contextTokens: integer('contextTokens'),
+    contextWindow: integer('contextWindow'),
+    compactAt: integer('compactAt'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [

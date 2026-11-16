@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "45194d37-1136-4aa9-b319-567525697357",
+  "id": "f6658e2d-7a9f-4aa5-a60d-6f449998ffcf",
   "prevId": "ccfaa3b7-9ab1-4eb6-a760-564f0185290a",
   "tables": {
     "action_journal": {
@@ -2115,6 +2115,20 @@
         },
         "contextTokens": {
           "name": "contextTokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "contextWindow": {
+          "name": "contextWindow",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "compactAt": {
+          "name": "compactAt",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -6789,20 +6803,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": 1
-        },
-        "envSeal": {
-          "name": "envSeal",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {},

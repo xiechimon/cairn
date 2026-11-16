@@ -64,17 +64,17 @@ test('composer toolbar drops the `语音输入` button, keeps attachment', async
   await expect(page.getByRole('menuitem', { name: '添加附件' })).toBeVisible();
 });
 
-test('api-keys empty state drops the `查看文档` button, keeps `新建密钥` (#307)', async ({ page }) => {
+test('api-keys empty state drops the `查看文档` button, keeps `新建 API 密钥` (#307)', async ({ page }) => {
   await stubLiveApiKeys(page);
   await page.goto('/app/api-keys');
 
   const keysEmpty = page.getByTestId('keys-empty');
   await expect(keysEmpty).toBeVisible();
   await expect(page.getByRole('link', { name: '查看文档' })).toHaveCount(0);
-  await expect(keysEmpty.getByRole('button', { name: '新建密钥' })).toBeVisible();
+  await expect(keysEmpty.getByRole('button', { name: '新建 API 密钥' })).toBeVisible();
 });
 
-test('api-keys non-empty state keeps `新建密钥` visible and opens the create dialog', async ({ page }) => {
+test('api-keys non-empty state keeps `新建 API 密钥` visible and opens the create dialog', async ({ page }) => {
   await page.route('**/api/**', (route, request) => {
     const path = new URL(request.url()).pathname;
     if (path.endsWith('/stream')) return route.abort();
@@ -106,10 +106,10 @@ test('api-keys non-empty state keeps `新建密钥` visible and opens the create
   await page.goto('/app/api-keys');
   await expect(page.getByText('Existing key', { exact: true })).toBeVisible();
   await expect(page.getByTestId('keys-empty')).toHaveCount(0);
-  const create = page.getByRole('button', { name: '新建密钥', exact: true });
+  const create = page.getByRole('button', { name: '新建 API 密钥', exact: true });
   await expect(create).toBeVisible();
   await create.click();
-  await expect(page.getByRole('dialog', { name: '新建密钥', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '新建 API 密钥', exact: true })).toBeVisible();
 });
 
 test('resources empty state drops the `查看文档` link (#307); skills empty-state main button = `新建技能` dialog (XMON-114)', async ({

@@ -272,6 +272,8 @@ const DOCS_FILE_METADATA_RESERVE_BYTES = 2048;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
 export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
+const SEARCH_QUERY_MAX_CHARS = 200;
+const SEARCH_QUERY_MAX_TERMS = 8;
 export const CHIEF_TASK_LIST_SUMMARY_MAX_CHARS = 240;
 
 function requireTeamBuild(db: Db, buildId: string, teamId: string) {
@@ -373,8 +375,29 @@ export async function executeChiefTool(
       }
       const projectId = optStr(params, 'projectId');
       const phase = optStr(params, 'phase');
+      const query = optStr(params, 'query');
+      if (query !== undefined && query.length > SEARCH_QUERY_MAX_CHARS) {
+        throw new HttpError(
+          400,
+          `invalid params.query: at most ${SEARCH_QUERY_MAX_CHARS} characters`,
+        );
+      }
+      const terms =
+        query === undefined ? [] : [...new Set(query.toLowerCase().split(/\s+/).filter(Boolean))];
+      if (query !== undefined && (terms.length === 0 || terms.length > SEARCH_QUERY_MAX_TERMS)) {
+        throw new HttpError(
+          400,
+          `invalid params.query: expected 1 to ${SEARCH_QUERY_MAX_TERMS} distinct search terms`,
+        );
+      }
       let records = listTodos(svc, { teamId: ctx.teamId, ...(projectId ? { projectId } : {}) });
       if (phase) records = records.filter((t) => t.phase === phase);
+      if (terms.length > 0) {
+        records = records.filter((t) => {
+          const text = `${t.title}\n${t.spec}`.toLowerCase();
+          return terms.every((term) => text.includes(term));
+        });
+      }
       const todos: { id: string; seqNum: number; title: string; phase: string; summary: string }[] =
         [];
       const response = { todos, total: records.length, nextOffset: null as number | null };
@@ -439,17 +462,18 @@ export async function executeChiefTool(
       return json(listSecrets(keysvc, ctx.teamId));
     }
     case 'mcp_servers': {
-      const rows = listMcpServers(
-        { mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath() },
-        ctx.teamId,
-      );
       return json(
-        rows.map((m) => ({
+        listMcpServers(
+          { mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath(), db },
+          ctx.teamId,
+        ).map((m) => ({
           id: m.id,
           label: m.label,
           slug: m.slug,
           transport: m.transport,
           url: m.url,
+          source: m.source,
+          ...(m.status !== null ? { status: m.status } : {}),
         })),
       );
     }
@@ -580,7 +604,6 @@ export async function executeChiefTool(
     }
     case 'issues':
     case 'pull_requests':
-    case 'github_overlap':
     case 'workflow_runs':
       return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {

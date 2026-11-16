@@ -190,7 +190,7 @@ beforeAll(async () => {
   projectId = (project.body as { id: string }).id;
   const enroll = async (name: string) => {
     const key = await api(server.url, 'POST', `/api/teams/${server.teamId}/api-keys`, {
-      name: `${name}-key`,
+      name: `${name.toUpperCase().replaceAll('-', '_')}_KEY`,
       gitAccess: false,
       mcpAccess: false,
       machineAccess: true,

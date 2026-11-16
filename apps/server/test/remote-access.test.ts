@@ -984,7 +984,7 @@ describe('F-R3 a request that outlives its device cannot create state', () => {
 
 describe('F-C1 credentials and grants are owner-only', () => {
   const CREDENTIAL_ROUTES: readonly (readonly [string, string, unknown])[] = [
-    ['POST', '/api/teams/{team}/api-keys', { name: 'k', machineAccess: true }],
+    ['POST', '/api/teams/{team}/api-keys', { name: 'K', machineAccess: true }],
     ['DELETE', '/api/teams/{team}/api-keys/any', undefined],
     ['POST', '/api/teams/{team}/secrets', { name: 'S', value: 'v' }],
     ['PATCH', '/api/teams/{team}/secrets/any', { value: 'v' }],
@@ -1030,7 +1030,7 @@ describe('F-C1 credentials and grants are owner-only', () => {
     const paired = await pairDevice(s);
     const res = await call(s, 'POST', `/api/teams/${s.team.id}/api-keys`, {
       headers: { authorization: `Bearer ${paired.token}` },
-      body: { name: 'enroller', machineAccess: true },
+      body: { name: 'ENROLLER', machineAccess: true },
     });
     expect(res.status).toBe(403);
   });

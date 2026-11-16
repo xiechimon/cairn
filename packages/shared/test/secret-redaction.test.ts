@@ -33,6 +33,18 @@ test('preserves ordinary text and has no regex state between calls', () => {
   expect(redactSecrets(token)).toEqual(redactSecrets(token));
 });
 
+test.each([
+  [`chief-${'x'.repeat(19)}sk-${'A'.repeat(21)}`, `chief-${'x'.repeat(19)}[REDACTED]`],
+  [`chief-${'x'.repeat(19)}SK-${'A'.repeat(21)}`, `chief-${'x'.repeat(19)}[REDACTED]`],
+  [`chief-sk-${'A'.repeat(18)}-${'B'.repeat(21)}`, 'chief-[REDACTED]'],
+])('redacts forged chief-shaped credentials even in sourceBuildId: %s', (forged, redacted) => {
+  expect(forged).toMatch(/^chief-[A-Za-z0-9][A-Za-z0-9_-]{20}-[A-Za-z0-9][A-Za-z0-9_-]{20}$/);
+  expect(redactSecrets({ sourceBuildId: forged, nested: [{ [forged]: forged }] })).toEqual({
+    value: { sourceBuildId: redacted, nested: [{ [redacted]: redacted }] },
+    count: 3,
+  });
+});
+
 test('rejects redacted key collisions instead of losing data', () => {
   expect(() =>
     redactSecrets({ [`ghp_${'a'.repeat(36)}`]: 1, [`ghp_${'b'.repeat(36)}`]: 2 }),

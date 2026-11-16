@@ -3,12 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, test } from 'vitest';
 import { ChatMarkdown } from '../src/detail/chat-markdown.js';
-import {
-  Segments,
-  TaskMentionAsLinkContext,
-  type TodoGlance,
-  TodoGlanceContext,
-} from '../src/detail/segments.js';
+import { Segments, type TodoGlance, TodoGlanceContext } from '../src/detail/segments.js';
 import type { DocSegment } from '../src/fixtures/records.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
@@ -97,21 +92,7 @@ describe('a Markdown task link names the task by its title (C15)', () => {
     }
   });
 
-  test('in a Coordinator reply the mention is the title as a plain link: the reference row above carries the state', () => {
-    const markup = page(
-      createElement(TaskMentionAsLinkContext.Provider, {
-        value: true,
-        children: createElement(ChatMarkdown, { text: 'Started [#7](todo:t7) just now.' }),
-      }),
-      KNOWN,
-    );
-    expect(plain(markup)).toContain('Started Export the report as CSV just now.');
-    expect(markup).toMatch(/<a [^>]*data-slot="task-mention"[^>]*href="\/app\?thread=t7"/);
-    expect(markup).not.toContain('mention-chip');
-    expect(markup).not.toContain('<svg');
-  });
-
-  test('outside a Coordinator reply the mention stays a chip with its state glyph', () => {
+  test('the mention is a chip with its state glyph', () => {
     const markup = page(
       createElement(ChatMarkdown, { text: 'Started [#7](todo:t7) just now.' }),
       KNOWN,

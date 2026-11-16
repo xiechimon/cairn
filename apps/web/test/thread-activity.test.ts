@@ -97,6 +97,27 @@ describe('groupThreadEvents', () => {
   });
 });
 
+describe('a report mirrored from a project channel', () => {
+  test('stands as its own line each time and never takes the thread\'s row', () => {
+    const first = { ...report('other', 'needs-you'), fromThreadId: 'chief-cairn' };
+    const own = report('other');
+    const done = { ...report('other'), fromThreadId: 'chief-cairn' };
+    const rows = [first, own, done].map((item, i) => ({ item, i }));
+    const kept = subThreadRowIds(
+      rows.map((row) => row.item),
+      glances,
+    );
+    expect([...kept]).toEqual([own.id]);
+    expect(
+      groupThreadEvents(rows, kept).map(({ item }) => [item.kind, 'id' in item ? item.id : null]),
+    ).toEqual([
+      ['channel-mirror', first.id],
+      ['thread-activity', own.id],
+      ['channel-mirror', done.id],
+    ]);
+  });
+});
+
 describe('todoGlanceOf', () => {
   test('only research opened before planning names a parent', () => {
     expect(glances.get('research')?.parentId).toBe('code');
