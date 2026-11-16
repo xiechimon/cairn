@@ -28,9 +28,9 @@ for (const [name, url] of [
 }
 
 for (const [name, url, rows] of [
-  ['skills', '/app/resources/skills?scenario=06', 1],
-  ['mcp', '/app/resources/mcp-servers?scenario=07', 1],
-  ['secrets', '/app/resources/secrets?scenario=secrets-list', 2],
+  ['skills', '/app/resources/skills?scenario=06', [52]],
+  ['mcp', '/app/resources/mcp-servers?scenario=07', [52]],
+  ['secrets', '/app/resources/secrets?scenario=secrets-list', [40, 52, 52, 52, 52, 52]],
 ] as const) {
   test(`${name} list: one settings card of 52px rows, 14px corner`, async ({ page }) => {
     await light(page, url);
@@ -40,7 +40,7 @@ for (const [name, url, rows] of [
     const heights = await cards.evaluate((el) =>
       [...el.children].map((row) => row.getBoundingClientRect().height),
     );
-    expect(heights).toEqual(Array.from({ length: rows }, () => 52));
+    expect(heights).toEqual(rows);
   });
 }
 
@@ -55,7 +55,7 @@ test('machines: `添加执行机` is the plus beside the list heading, no dashed
 });
 
 for (const [name, url, open, submit] of [
-  ['secret', '/app/resources/secrets?scenario=01', '新建', '添加密钥'],
+  ['secret', '/app/resources/secrets?scenario=secrets-list', '新建', '添加'],
   ['skill', '/app/resources/skills?scenario=06', '新建', '新建技能'],
   ['skill import', '/app/resources/skills?scenario=06', '导入', '导入'],
 ] as const) {

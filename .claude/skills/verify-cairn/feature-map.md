@@ -19,7 +19,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
-| `secrets` | `设置` (Settings) › `安全` (Security) › `密钥` (Secrets) | [Secrets](#secrets) |
+| `secrets` | `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars) | [Secrets](#secrets) |
 | `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
 
@@ -954,9 +954,9 @@ Reach:
 
 ### secrets
 
-**Secrets** (shipped, centrality 3). Team and project secrets stored encrypted and delivered to threads that need them.
+**Secrets** (shipped, centrality 3). Team and project secrets and environment variables stored encrypted and delivered to threads that need them; env var values stay readable to the owner.
 
-States: An empty list, secrets by scope, and an add dialog with team or project scope.
+States: An empty list, env vars with values next to hidden secrets, a name filter, the add and edit dialog with the secret checkbox, bulk NAME=VALUE add, and the row menu with convert to secret.
 
 Reach:
 
@@ -965,9 +965,9 @@ Reach:
 3. `click testid:secret-scope`
 
 - Web routes: `/app/resources/secrets`
-- Settings: `设置` (Settings) › `安全` (Security) › `密钥` (Secrets)
-- Keyboard shortcuts in its code: none
-- Test ids in its code: `resource-empty`, `secret-scope`
+- Settings: `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars)
+- Keyboard shortcuts in its code: `D`, `E`, `S`
+- Test ids in its code: `resource-empty`, `secret-bulk`, `secret-convert-confirm`, `secret-kind`, `secret-menu`, `secret-menu-convert`, `secret-menu-delete`, `secret-menu-edit`, `secret-scope`, `secret-value`
 - Research: [docs/research/1775-gateway-prior-art.md](../../../docs/research/1775-gateway-prior-art.md)
 - Frontend design: **gap**: the secrets page and project secrets have no design
 - Backend design: [docs/research/1775-secret-gateway-design.md](../../../docs/research/1775-secret-gateway-design.md)

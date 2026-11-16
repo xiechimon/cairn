@@ -214,8 +214,6 @@ export const EN: Record<string, string> = {
   已暂停: 'Paused',
   全团队: 'Whole team',
   '仅 {name}': 'Only {name}',
-  '项目密钥只发给该项目的对话，同名时优先于团队密钥。':
-    'Project secrets go only to threads in that project and override a team secret with the same name.',
   并发与优先级: 'Concurrency and priority',
   '不限（跟随执行机上限）': 'No limit (Runner limits apply)',
   '串行，一次一个': 'Serial, one at a time',
@@ -679,12 +677,55 @@ export const EN: Record<string, string> = {
   '没有匹配的技能。': 'No matching skills.',
   '导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。':
     'Importing copies the skill into Cairn’s own directory; the original is left unchanged.',
-  尚无密钥: 'No secrets yet',
-  '密钥只交给你授权的 Agent，保存后无法查看。':
-    'Secrets go only to the Agents you allow and cannot be viewed once saved.',
   添加密钥: 'Add secret',
-  '也可以让 Coordinator 添加，值不会进入对话。':
-    'The Coordinator can add them too; the value never enters the conversation.',
+  较早: 'earlier',
+  空值: 'Empty',
+  清除筛选: 'Clear filter',
+  '原值已隐藏。留空则保持原值，填写则替换。':
+    'The current value is hidden. Leave this empty to keep it, or type a new value to replace it.',
+  '保存后转为机密，值不再显示，也不能转回环境变量。':
+    'Saving converts it to a secret: the value is hidden and it cannot become an env var again.',
+  机密的值不能为空: 'A secret value cannot be empty',
+  '第 {lines} 行要写成 NAME=VALUE': 'Line {lines} must look like NAME=VALUE',
+  保存并转为机密: 'Save as secret',
+  添加密钥或环境变量: 'Add secret or env var',
+  '编辑 {name}': 'Edit {name}',
+  '项目里的条目只发给该项目的对话，同名时优先于团队条目。':
+    "Project entries go only to that project's conversations and override team entries with the same name.",
+  '加密保存在 Cairn 服务器上。': 'Encrypted at rest on the Cairn server.',
+  机密: 'Secret',
+  '机密不能转回环境变量。': 'A secret cannot become an env var again.',
+  '机密的值保存后隐藏，不能为空；环境变量的值在这里一直可见。':
+    'Secret values are hidden after saving and cannot be empty. Env var values stay visible here.',
+  '名称要符合环境变量格式（例如 MY_VAR）': 'Use a name like MY_VAR',
+  密钥与环境变量: 'Secrets & env vars',
+  批量添加: 'Bulk add',
+  '任务在执行机上运行时会拿到这些密钥和环境变量。项目里的同名条目优先于团队条目。也可以让 Coordinator 添加机密，值不会进入对话。':
+    'Tasks get these secrets and environment variables when they run on a machine. Project entries override team entries with the same name. The Coordinator can also add secrets without the value entering the conversation.',
+  还没有密钥或环境变量: 'No secrets or environment variables yet',
+  '执行机跑任务时会拿到它们。': 'Machines get them when they run tasks.',
+  按名称筛选: 'Filter by name',
+  最后更新: 'Last updated',
+  '没有名称包含「{q}」的条目': 'No entries whose name contains “{q}”',
+  转为机密: 'Convert to secret',
+  '没能添加，请重试。': 'Could not add it. Try again.',
+  '没能保存，请重试。': 'Could not save. Try again.',
+  '没能转为机密，请重试。': 'Could not convert it to a secret. Try again.',
+  '没能删除，请重试。': 'Could not delete it. Try again.',
+  '把 {name} 转为机密？': 'Convert {name} to a secret?',
+  '转为机密后，这里不再显示它的值，也不能再转回环境变量。已经看到过这个值的地方（浏览器、对话、其他系统）不会因此收回。':
+    'Once converted, its value is no longer shown here and it cannot become an env var again. Copies already seen elsewhere (a browser, a conversation, another system) are not recalled.',
+  '删除后，用到它的任务就拿不到这个值了。':
+    'Once deleted, tasks that use it no longer get this value.',
+  '删除 {name}': 'Delete {name}',
+  '{names} 没能添加（可能已有同名条目），其余已添加。':
+    '{names} could not be added (an entry with that name may already exist); the rest were added.',
+  批量添加密钥和环境变量: 'Bulk add secrets and env vars',
+  '粘贴 NAME=VALUE，每行一条。': 'One NAME=VALUE per line.',
+  '添加 {n} 条': 'Add {n}',
+  内容: 'Assignments',
+  都存为机密: 'Save all as secrets',
+  '机密的值不能为空：{names}': 'Secret values cannot be empty: {names}',
   个文件: 'file(s)',
   描述: 'Description',
 
@@ -1120,13 +1161,7 @@ export const EN: Record<string, string> = {
   '只能用大写字母、数字和下划线，不能以数字开头。':
     'Capital letters, digits and _ only; no leading digit.',
   // wayfinder #173 add-secret dialog family (r2 §242 verbatim fields)
-  '名称（环境变量名）': 'Name (environment variable name)',
-  '描述（可选）': 'Description (optional)',
   值: 'Value',
-  该密钥的用途: 'What this secret is for',
-  粘贴密钥的值: 'Paste the secret value',
-  '值将加密存储，保存后无法再次查看。':
-    'The value is stored encrypted and cannot be viewed again after saving.',
   全部: 'All',
   进行中: 'In progress',
   标题: 'Title',
@@ -1294,7 +1329,6 @@ export const EN: Record<string, string> = {
   '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
     'The latest server database backup run on {host} failed ({detail}); the last successful backup was {hours## hour|# hours} ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
   '暂无 MCP 服务器。': 'No MCP servers yet.',
-  团队密钥: 'Team secrets',
   // #1169 授权技能段（权限 tab）：不限制（null）与限制后全不勾（[] = 显式
   // 全拒）两态互转；逐技能勾选行只在限制态渲染。
   '该 Agent 执行任务时可读取的团队技能范围。开启「不限制」= 全量可读；关闭后仅勾选的技能可读，未勾选一律拒绝——「不限制」与全不勾是两种状态，可随时互转。':
@@ -1504,7 +1538,6 @@ export const EN: Record<string, string> = {
   '删除项目失败，请重试。': 'Could not delete the project. Try again.',
   '断开连接失败，请重试。': 'Could not disconnect. Try again.',
   '添加模型服务失败，请重试。': 'Could not add the provider. Try again.',
-  '添加密钥失败，请重试。': 'Could not add the secret. Try again.',
   '新建 API 密钥失败，请重试。': 'Could not create the API key. Try again.',
   待回答的提问: 'Pending questions',
   '提交回答失败，草稿还在，请再试一次。':
