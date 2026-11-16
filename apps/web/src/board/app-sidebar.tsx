@@ -286,7 +286,6 @@ export function AppSidebar({
   const sidebarProps = {
     waiting,
     onSearch: onSearch ?? (() => search.setOpen(true)),
-    usageNav: fixture.usageNav === true,
     selected,
     projects,
     statuses,

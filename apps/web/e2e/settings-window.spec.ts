@@ -6,13 +6,13 @@ const settings = (page: Page) => page.getByRole('dialog', { name: '设置' });
 const navItem = (page: Page, id: string) =>
   settings(page).locator(`[data-settings-section="${id}"]`);
 
-test('sidebar footer: settings and activity icons, no user chip and no computers link; the header chip carries the offline machine', async ({
+test('sidebar footer: settings and usage icons, no user chip and no computers link; the header chip carries the offline machine', async ({
   page,
 }) => {
   await page.goto(`/app?${FLEET}`);
   const footer = page.getByTestId('sidebar-footer');
   await expect(footer.getByTestId('sidebar-settings')).toBeVisible();
-  await expect(footer.getByTestId('sidebar-activity')).toBeVisible();
+  await expect(footer.getByTestId('sidebar-usage')).toBeVisible();
   await expect(page.getByTestId('sidebar-user-menu')).toHaveCount(0);
   await expect(page.locator('[data-slot="sidebar-user"]')).toHaveCount(0);
   await expect(footer.getByTestId('sidebar-attention')).toHaveCount(0);

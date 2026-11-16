@@ -632,6 +632,25 @@ Reach:
 - Backend design: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Evidence: `apps/web/e2e/token-gate.spec.ts`, `apps/server/test/token-auth.test.ts`, `apps/server/test/tailnet-listener.test.ts`
 
+### token-usage
+
+**Token usage** (shipped, centrality 2). The Usage dialog from the sidebar footer: tokens per local day as an ink heatmap, Coordinator and tasks apart.
+
+States: Loading, failed with retry, empty for a new team, and the heatmap with a 30-day total and a readout for the hovered or selected day; light and dark, desktop dialog and phone.
+
+Reach:
+
+1. `open /app`
+2. `click testid:sidebar-usage`
+
+- Web routes: `/app/usage`
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `usage-empty`, `usage-error`, `usage-heatmap`, `usage-readout`, `usage-recent-total`
+- Research: **gap**: no note beyond GitHub's contribution calendar, which the owner named
+- Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar)
+- Backend design: [docs/design/step-usage-daily.md](../../../docs/design/step-usage-daily.md)
+- Evidence: `apps/web/e2e/usage-page.spec.ts`, `apps/web/test/usage-model.test.ts`, `apps/server/test/step-usage-daily.test.ts`
+
 ### account-and-team
 
 **Account and team** (shipped, centrality 3). The user's account, the team record and the PR attribution settings.
@@ -1008,7 +1027,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: `A`, `D`, `M`, `N`, `R`, `S`, `U`
-- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `team-row`
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices

@@ -2356,4 +2356,11 @@ export const EN: Record<string, string> = {
     'Move Cairn to Applications to update it automatically',
   'Cairn 所在的文件夹不可写，无法自动更新':
     "Cairn's folder is read-only, so it cannot update itself",
+  没有用量: 'No usage',
+  '近 30 天，含缓存读取': 'Last 30 days, cache reads included',
+  还没有用量: 'No usage yet',
+  '和 Coordinator 说第一句话后，这里会按天显示用了多少 token。':
+    'After your first message to the Coordinator, this shows how many tokens each day used.',
+  少: 'Less',
+  多: 'More',
 };

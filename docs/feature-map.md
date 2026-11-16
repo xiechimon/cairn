@@ -15,12 +15,12 @@
 
 | Item | Count |
 |---|---|
-| Features | 55 |
-| status shipped | 44 |
+| Features | 56 |
+| status shipped | 45 |
 | status partial | 8 |
 | status planned | 3 |
 | research, frontend design and backend design all present or not applicable | 25 |
-| Research gaps | 12 |
+| Research gaps | 13 |
 | Frontend design gaps | 18 |
 | Backend design gaps | 19 |
 | notes cited but not on main | 21 |
@@ -60,6 +60,7 @@
 | [Model providers and subscriptions](#providers) | 2 | shipped | yes | yes | yes |  |
 | [Remote access over the tailnet](#remote-access) | 2 | partial | yes | gap | yes | B5 |
 | [Login and tailnet device auth](#tailnet-login) | 2 | partial | yes (not on main) | gap | yes (not on main) | B5 |
+| [Token usage](#token-usage) | 2 | shipped | gap | yes | yes | B7 |
 | [Account and team](#account-and-team) | 3 | shipped | yes | yes | gap | B10 |
 | [API keys](#api-keys) | 3 | shipped | gap | gap | gap | B10 |
 | [App shell and settings window](#app-shell) | 3 | shipped | yes (not on main) | yes | n/a |  |
@@ -146,6 +147,7 @@ Scheduled tasks, the search syntax with the activity view, and the sidebar with 
 
 | Feature | Centrality | Missing |
 |---|---|---|
+| [Token usage](#token-usage) | 2 | Research: no note beyond GitHub's contribution calendar, which the owner named |
 | [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model<br>Frontend design: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md<br>Backend design: no design for due events, missed runs and continue-thread schedules |
 | [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
 | [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
@@ -445,6 +447,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: [docs/research/seamless-device-auth-2026-11-08.md](research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the sign-in gate and the signed-in-by-tailnet state have no design
 - Backend design: [docs/research/seamless-device-auth-2026-11-08.md](research/seamless-device-auth-2026-11-08.md) (not on main)
+
+### token-usage
+
+**Token usage** (shipped). The Usage dialog from the sidebar footer: tokens per local day as an ink heatmap, Coordinator and tasks apart.
+
+- Research: **gap**: no note beyond GitHub's contribution calendar, which the owner named
+- Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar)
+- Backend design: [docs/design/step-usage-daily.md](design/step-usage-daily.md)
 
 ### account-and-team
 

@@ -38,7 +38,7 @@ const calls = (page: Page) =>
 test.describe('desktop shell', () => {
   test.use({ userAgent: `Mozilla/5.0 ${DESKTOP_SHELL_USER_AGENT}` });
 
-  test('the footer shows the brand at the left and the update button before activity and settings', async ({
+  test('the footer shows the brand at the left and the update button before usage and settings', async ({
     page,
   }) => {
     await fakeBridge(page);
@@ -52,8 +52,8 @@ test.describe('desktop shell', () => {
     const x = async (id: string) => (await footer.getByTestId(id).boundingBox())?.x ?? -1;
     const brandX = (await brand.boundingBox())?.x ?? -1;
     expect(brandX).toBeLessThan(await x('desktop-update'));
-    expect(await x('desktop-update')).toBeLessThan(await x('sidebar-activity'));
-    expect(await x('sidebar-activity')).toBeLessThan(await x('sidebar-settings'));
+    expect(await x('desktop-update')).toBeLessThan(await x('sidebar-usage'));
+    expect(await x('sidebar-usage')).toBeLessThan(await x('sidebar-settings'));
   });
 
   test('the icon fills with the download and a click installs only when an update is available', async ({

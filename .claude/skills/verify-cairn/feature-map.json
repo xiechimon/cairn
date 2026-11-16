@@ -1768,8 +1768,7 @@
           "/app/activity"
         ],
         "server": [
-          "/api/search",
-          "/api/teams/:id/usage/daily"
+          "/api/search"
         ]
       },
       "reach": [
@@ -1795,6 +1794,52 @@
         "apps/web/e2e/activity-page.spec.ts",
         "apps/web/e2e/search-syntax-palette.spec.ts",
         "apps/server/test/search-syntax.test.ts"
+      ],
+      "batch": "B7"
+    },
+    {
+      "id": "token-usage",
+      "name": "Token usage",
+      "summary": "The Usage dialog from the sidebar footer: tokens per local day as an ink heatmap, Coordinator and tasks apart.",
+      "states": "Loading, failed with retry, empty for a new team, and the heatmap with a 30-day total and a readout for the hovered or selected day; light and dark, desktop dialog and phone.",
+      "centrality": 2,
+      "status": "shipped",
+      "code": {
+        "web": [
+          "apps/web/src/routes/usage-page.tsx",
+          "apps/web/src/usage",
+          "apps/web/src/api/usage-daily.ts"
+        ],
+        "server": [
+          "apps/server/src/services/usage-daily.ts"
+        ]
+      },
+      "routes": {
+        "web": [
+          "/app/usage"
+        ],
+        "server": [
+          "/api/teams/:id/usage/daily"
+        ]
+      },
+      "reach": [
+        "open /app",
+        "click testid:sidebar-usage"
+      ],
+      "verify": [],
+      "research": {
+        "gap": "no note beyond GitHub's contribution calendar, which the owner named"
+      },
+      "frontendDesign": [
+        "docs/design/references/thread-list-sidebar"
+      ],
+      "backendDesign": [
+        "docs/design/step-usage-daily.md"
+      ],
+      "evidence": [
+        "apps/web/e2e/usage-page.spec.ts",
+        "apps/web/test/usage-model.test.ts",
+        "apps/server/test/step-usage-daily.test.ts"
       ],
       "batch": "B7"
     },
