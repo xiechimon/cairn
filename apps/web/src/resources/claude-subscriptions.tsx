@@ -6,6 +6,8 @@ import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 
+const SETUP_TOKEN_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
+
 export function AddClaudeSubscriptionDialog({
   onClose,
   onCreate,
@@ -20,8 +22,6 @@ export function AddClaudeSubscriptionDialog({
   const { t } = useI18n();
   const [label, setLabel] = useState(t('Claude 订阅'));
   const [token, setToken] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const expiresAt = expiry === '' ? null : new Date(expiry).getTime();
   return (
     <DialogShell
       title={t('添加 Claude 订阅')}
@@ -33,12 +33,13 @@ export function AddClaudeSubscriptionDialog({
           className="pt-0"
           primary={{
             label: t('保存'),
-            disabled:
-              pending ||
-              !label.trim() ||
-              !token.trim() ||
-              (expiresAt !== null && !Number.isFinite(expiresAt)),
-            onClick: () => onCreate({ label: label.trim(), token: token.trim(), expiresAt }),
+            disabled: pending || !label.trim() || !token.trim(),
+            onClick: () =>
+              onCreate({
+                label: label.trim(),
+                token: token.trim(),
+                expiresAt: Date.now() + SETUP_TOKEN_LIFETIME_MS,
+              }),
           }}
           secondary={{ label: t('取消'), onClick: onClose }}
         />
@@ -69,15 +70,6 @@ export function AddClaudeSubscriptionDialog({
             autoComplete="off"
             value={token}
             onChange={(event) => setToken(event.target.value)}
-          />
-        </FormField>
-        <FormField label={t('到期日（可选）')} htmlFor="subscription-expiry">
-          <Input
-            className={FORM_CONTROL_CLS}
-            id="subscription-expiry"
-            type="date"
-            value={expiry}
-            onChange={(event) => setExpiry(event.target.value)}
           />
         </FormField>
         {error && <p role="alert">{t('保存失败，请检查填写内容后重试。')}</p>}
