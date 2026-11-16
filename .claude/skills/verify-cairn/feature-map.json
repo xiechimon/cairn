@@ -2029,7 +2029,8 @@
           "apps/web/src/resources/mcp-servers-page.tsx"
         ],
         "server": [
-          "apps/server/src/services/mcp-servers.ts"
+          "apps/server/src/services/mcp-servers.ts",
+          "apps/server/src/services/mcp-github-connector.ts"
         ]
       },
       "routes": {
@@ -2042,7 +2043,11 @@
           "/api/teams/:id/mcp-connectors",
           "/api/teams/:id/mcp-connectors/:cid",
           "/api/teams/:id/mcp-connectors/:cid/check",
-          "/api/teams/:id/mcp-connectors/oauth/start"
+          "/api/teams/:id/mcp-connectors/oauth/start",
+          "/api/teams/:id/mcp-connectors/github",
+          "/api/teams/:id/mcp-connectors/github/device",
+          "/api/teams/:id/mcp-connectors/github/device/:attempt",
+          "/api/teams/:id/mcp-connectors/:cid/github/installations"
         ]
       },
       "reach": [
