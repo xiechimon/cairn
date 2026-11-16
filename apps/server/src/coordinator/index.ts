@@ -28,6 +28,7 @@ import { blockedNow } from '../services/blockers.js';
 import { parseChiefTrigger } from '../services/chief.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
+import { materializeCodexAccessToken } from '../services/codex-device-login.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
 import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
@@ -38,6 +39,7 @@ import { serverTakesTurn } from '../services/machine-claim.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
 import { ownershipOf } from '../services/owner.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
+import { CODEX_PROVIDER_ID } from './codex-login.js';
 import {
   type CoordinatorProviders,
   coordinatorApiKey,
@@ -322,7 +324,14 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   const binding = (teamId: string, route: CoordinatorProviders['router']): ProviderBinding => ({
     config: route.config,
     modelId: route.modelId,
-    resolveKey: () => coordinatorApiKey({ db, box: machine.box }, teamId, route.provider),
+    resolveKey: async () => {
+      const key = coordinatorApiKey({ db, box: machine.box }, teamId, route.provider);
+      if (key === null || route.provider !== CODEX_PROVIDER_ID || !key.startsWith('{')) return key;
+      return materializeCodexAccessToken(
+        { db, box: machine.box, fetch: globalThis.fetch, states: new Map() },
+        teamId,
+      );
+    },
   });
 
   setFailureSink({

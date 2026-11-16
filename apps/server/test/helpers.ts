@@ -126,6 +126,7 @@ export function bootServer(
   };
   const oauthStates: AppContext['oauthStates'] = new Map();
   const xaiDeviceStates: AppContext['xaiDeviceStates'] = new Map();
+  const codexDeviceStates: AppContext['codexDeviceStates'] = new Map();
   const mcpOAuthState = newMcpOAuthState();
   try {
     const appContext: AppContext = {
@@ -153,6 +154,7 @@ export function bootServer(
       enrollments: new Map(),
       oauthStates,
       xaiDeviceStates,
+      codexDeviceStates,
       mcpOAuthState,
       oauthClient: opts.oauthClient ?? null,
       ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
@@ -223,6 +225,7 @@ export function bootServer(
       skillSourcesPath,
       oauthStates,
       xaiDeviceStates,
+      codexDeviceStates,
       mcpOAuthState,
       svc: {
         db,

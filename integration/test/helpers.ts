@@ -134,6 +134,7 @@ export async function bootRealServer(opts: {
       enrollments: new Map(),
       oauthStates: new Map(),
       xaiDeviceStates: new Map(),
+      codexDeviceStates: new Map(),
       mcpOAuthState: newMcpOAuthState(),
       oauthClient: null,
       reposDir,

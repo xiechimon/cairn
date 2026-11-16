@@ -7,6 +7,8 @@ import type {
   CapabilitiesResponse,
   ChiefGetResponse,
   ChiefThread,
+  CodexDevicePollResponse,
+  CodexDeviceStartResponse,
   ComputerCommandsResponse,
   ComputerRecord,
   ConversationMessagesResponse,
@@ -1065,6 +1067,23 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<XaiDevicePollResponse>(`/api/teams/${teamId}/providers/oauth/xai/device/poll`, {
           state,
         }),
+      onSuccess: (result) => {
+        if (result.status === 'complete') invalidateAll();
+      },
+    }),
+    startCodexDevice: useMutation({
+      mutationFn: () =>
+        api.post<CodexDeviceStartResponse>(
+          `/api/teams/${teamId}/providers/oauth/openai-codex/device`,
+          {},
+        ),
+    }),
+    pollCodexDevice: useMutation({
+      mutationFn: (state: string) =>
+        api.post<CodexDevicePollResponse>(
+          `/api/teams/${teamId}/providers/oauth/openai-codex/device/poll`,
+          { state },
+        ),
       onSuccess: (result) => {
         if (result.status === 'complete') invalidateAll();
       },
