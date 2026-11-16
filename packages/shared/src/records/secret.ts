@@ -41,6 +41,29 @@ export function normalizeSecretOrigin(input: string): string | null {
   return folded === url.origin || folded === `${url.origin}:443` ? url.origin : null;
 }
 
+export function isBrowserLoopbackOrigin(origin: string): boolean {
+  return ['127.0.0.1', '[::1]', 'localhost'].includes(new URL(origin).hostname);
+}
+
+export function normalizeBrowserSecretOrigin(input: string): string | null {
+  if (input.includes('*') || !URL.canParse(input)) return null;
+  const url = new URL(input);
+  if (url.username !== '' || url.password !== '' || url.hostname === '') return null;
+  const folded = input.toLowerCase();
+  const defaultPort = url.protocol === 'https:' ? '443' : '80';
+  if (folded !== url.origin && folded !== `${url.origin}:${defaultPort}`) return null;
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  if (isBrowserLoopbackOrigin(url.origin)) return url.origin;
+  if (url.protocol !== 'https:' || IPV4_LITERAL.test(url.hostname)) return null;
+  if (
+    url.hostname.startsWith('[') ||
+    url.hostname.endsWith('.localhost') ||
+    url.hostname.endsWith('.')
+  )
+    return null;
+  return url.origin;
+}
+
 export function isSecretHeaderName(name: string): boolean {
   const folded = name.toLowerCase();
   return (

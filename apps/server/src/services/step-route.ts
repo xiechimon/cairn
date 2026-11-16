@@ -2,7 +2,6 @@ import {
   type CapabilityCandidate,
   CODEX_MODEL,
   classifyDifficulty,
-  claudeLoginBlocksClaim,
   claudeRateBlock,
   QUOTA_REJECT_PERCENT,
   type RequiredCapabilities,
@@ -16,6 +15,7 @@ import { machine, step, stepRoute, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
+  codexProviderKeyed,
   homeMachineRejectReason,
   machineRuntimeAvailable,
   missingCapabilityItems,
@@ -96,17 +96,17 @@ export function capabilityCandidates(
 ): CapabilityCandidate[] {
   const now = nowMs();
   const catalog = mergedCatalogModels();
+  const subscribed = hasActiveClaudeSubscription({ db }, teamId);
+  const codexProvider = codexProviderKeyed(db, teamId);
   const candidates: CapabilityCandidate[] = [];
   for (const row of db.select().from(machine).where(eq(machine.teamId, teamId)).all()) {
     if (!machineSatisfies(row, constraints)) continue;
-    const report = row.claudeCodeReport;
     const claudeInstalled = machineRuntimeAvailable(row, 'claude-code');
     const claudeUsable =
       claudeInstalled &&
+      subscribed &&
       row.online &&
-      claudeRateBlock(row.claudeRateLimits ?? [], now) === null &&
-      (hasActiveClaudeSubscription({ db }, teamId) ||
-        (report?.auth?.state !== 'not-logged-in' && !claudeLoginBlocksClaim(report?.login, now)));
+      claudeRateBlock(row.claudeRateLimits ?? [], now) === null;
     for (const modelId of CLAUDE_MODELS) {
       candidates.push({
         harness: 'claude-code',
@@ -120,18 +120,13 @@ export function capabilityCandidates(
         weeklyUsedPercent: weeklyUsedPercent(row),
       });
     }
-    const codexLogin = row.capabilities?.codexLogin;
-    if (codexLogin === undefined) continue;
+    if (!codexProvider) continue;
     candidates.push({
       harness: 'pi',
       provider: CODEX_MODEL.provider,
       modelId: CODEX_MODEL.modelId,
       machineId: row.id,
-      available:
-        row.online &&
-        codexLogin.state === 'ok' &&
-        codexLogin.expiresAt !== undefined &&
-        codexLogin.expiresAt > now,
+      available: row.online,
       weeklyUsedPercent: null,
     });
   }

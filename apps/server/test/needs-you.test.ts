@@ -6,7 +6,7 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  claudeCodeAuthFailureMessage,
+  claudeCodeSubscriptionMissingMessage,
   claudeCodeTeamSubscriptionAuthFailureMessage,
 } from '../../daemon/src/claude-code-auth.js';
 import {
@@ -618,7 +618,7 @@ describe('needs you (#1800)', () => {
     },
   );
 
-  test('a transient failure is retried once and stays out of needs you when the retry succeeds', async () => {
+  test('a transient failure is retried once and hands successful delivery to the user', async () => {
     const w = openWorld();
     const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
     if (step === undefined) throw new Error('missing step');
@@ -641,7 +641,7 @@ describe('needs you (#1800)', () => {
     setTodoPhase(w.deps, w.todoId, 'building');
     completeStep(w.deps, retried.id, { hasChanges: true });
 
-    expect(phaseOf(w)).toBe('review');
+    expect(phaseOf(w)).toBe('done');
     expect(groups(w).current).toEqual([]);
     expect(groups(w).stale).toEqual([]);
   });
@@ -692,7 +692,7 @@ describe('needs you (#1800)', () => {
   });
 
   test.each([
-    ['machine login', claudeCodeAuthFailureMessage('daemon-test')],
+    ['subscription missing', claudeCodeSubscriptionMissingMessage()],
     ['team subscription', claudeCodeTeamSubscriptionAuthFailureMessage('credential rejected')],
     ['raw CLI', 'Failed to authenticate: OAuth token revoked'],
     ['ordinary failure', 'build failed: test assertion failed'],
@@ -715,7 +715,7 @@ describe('needs you (#1800)', () => {
     expect(getTodo(w.deps, w.todoId)?.owner).toBe(needsHuman ? 'coordinator' : null);
   });
 
-  test('plan confirmations and human reviews enter needs you; an autonomous review does not', () => {
+  test('plan confirmations and delivered work enter needs you regardless of the old policy', () => {
     const confirm = openWorld('confirm');
     const humanReview = openWorld('review');
     humanReview.s.db
@@ -727,7 +727,7 @@ describe('needs you (#1800)', () => {
 
     expect(groups(confirm).current.map((entry) => entry.reason)).toEqual(['confirm']);
     expect(groups(humanReview).current.map((entry) => entry.reason)).toEqual(['review']);
-    expect(groups(autonomousReview).current).toEqual([]);
+    expect(groups(autonomousReview).current.map((entry) => entry.reason)).toEqual(['review']);
     expect(groups(autonomousReview).stale).toEqual([]);
   });
 

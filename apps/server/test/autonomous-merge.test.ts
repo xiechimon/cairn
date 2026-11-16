@@ -364,25 +364,53 @@ test('team settings reject negative and fractional caps without changing the sto
   expect(s.db.select().from(team).get()?.maxAutonomousMergesPerDay).toBe(1);
 });
 
-test('abandoned autonomous local commands retain their reservation without being reissued', () => {
-  const { s } = fixture();
-  claimAutonomousMerge(s.db, 'a');
-  s.db
-    .insert(step)
-    .values({
-      id: 'abandoned',
-      buildId: 'a',
-      kind: 'merge',
-      status: 'claimed',
-      prompt: '{"kind":"local-merge"}',
-      createdAt: Date.now() - 200_000,
-      claimedAt: Date.now() - 200_000,
-    })
-    .run();
-  sweepAbandonedBuildSteps(s.svc, Date.now());
-  expect(s.db.select().from(step).get()?.status).toBe('claimed');
-  expect(() => claimAutonomousMerge(s.db, 'b')).toThrow('daily-cap');
-});
+test.each([
+  ['autonomous', 'current', 'claimed'],
+  ['human', 'current', 'claimed'],
+  ['human', 'closed', 'stopped'],
+  ['human', 'archived', 'stopped'],
+  ['human', 'superseded', 'stopped'],
+  ['human', 'stop-requested', 'stopped'],
+] as const)(
+  'abandoned %s local command on a %s task is %s without being reissued',
+  (policy, state, status) => {
+    const { s } = fixture();
+    s.db
+      .update(project)
+      .set({ repoKind: 'local', autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: policy } })
+      .run();
+    s.db
+      .update(todo)
+      .set({
+        phase: state === 'closed' ? 'closed' : 'done',
+        latestBuildId: state === 'superseded' ? 'b' : 'a',
+        archivedAt: state === 'archived' ? Date.now() : null,
+      })
+      .where(eq(todo.id, 'a'))
+      .run();
+    claimAutonomousMerge(s.db, 'a', true);
+    s.db
+      .insert(step)
+      .values({
+        id: 'abandoned',
+        buildId: 'a',
+        kind: 'merge',
+        status: 'claimed',
+        prompt: '{"kind":"local-merge"}',
+        createdAt: Date.now() - 200_000,
+        claimedAt: Date.now() - 200_000,
+        archiveStop: state === 'stop-requested' ? 'requested' : null,
+      })
+      .run();
+    sweepAbandonedBuildSteps(s.svc, Date.now());
+    sweepAbandonedBuildSteps(s.svc, Date.now() + 600_000);
+    expect(s.db.select().from(step).get()).toMatchObject({ status, claimCount: 0 });
+    expect(s.db.select().from(todo).where(eq(todo.id, 'a')).get()?.phase).toBe(
+      state === 'closed' ? 'closed' : 'done',
+    );
+    expect(() => claimAutonomousMerge(s.db, 'a', true)).toThrow('already admitted');
+  },
+);
 
 test('a previous-day admission suppresses a delayed legacy success row on the next day', () => {
   const { s, config } = fixture();

@@ -35,7 +35,11 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
 
   await page.getByTestId('resource-new').click();
   const claudeRow = page.locator('[data-preset-id="claude-subscription"]');
-  await expect(claudeRow).toContainText('Claude Pro / Max');
+  await expect(claudeRow).toContainText(locale === 'zh' ? 'Claude 订阅' : 'Claude subscription');
+  const search = page.getByLabel(locale === 'zh' ? '搜索服务商...' : 'Search providers...');
+  await search.fill(locale === 'zh' ? '订阅' : 'subscription');
+  await expect(claudeRow).toBeVisible();
+  await search.fill('');
   await expect(claudeRow.locator('svg')).toHaveCount(1);
   await claudeRow.click();
   const dialog = page.getByRole('dialog', {

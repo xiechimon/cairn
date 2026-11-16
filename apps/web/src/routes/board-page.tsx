@@ -72,9 +72,15 @@ export function BoardPage() {
   const threadId = searchParams.get(THREAD_PARAM);
   const closeThread = useCloseThread();
   const liveProject = live ? (projectsQ.data ?? []).find((p) => p.id === homeProjectId) : undefined;
-  const fixtureProject = live
-    ? undefined
-    : fixtureProjects(fixture, archiveEdits).find((p) => p.id === homeProjectId);
+  const fixtureList = useMemo(
+    () => (live ? [] : fixtureProjects(fixture, archiveEdits)),
+    [live, fixture, archiveEdits],
+  );
+  const fixtureProject = fixtureList.find((p) => p.id === homeProjectId);
+  const fixtureActive = useMemo(
+    () => fixtureList.filter((project) => project.archivedAt === null),
+    [fixtureList],
+  );
   const homeProjectName =
     homeProjectId === null ? null : ((live ? liveProject?.name : fixtureProject?.name) ?? null);
   const homeArchived =
@@ -148,7 +154,7 @@ export function BoardPage() {
 
   const quotaInfos = quotaBannerInfo(todos);
   const backupWarning = backupQ.data ?? null;
-  const loginWarnings = useClaudeLoginWarnings(machines, now);
+  const loginWarnings = useClaudeLoginWarnings(now);
   const bannerCandidates: { kind: HomeBannerKind; node: ReactNode }[] = [
     ...(backupWarning != null
       ? [{ kind: 'backup' as const, node: <BackupBanner key="backup" notice={backupWarning} /> }]
@@ -269,6 +275,7 @@ export function BoardPage() {
               tasks={tasks}
               tasksQuery={live ? tasksQ : undefined}
               archived={archivedState}
+              fixtureProjects={live ? undefined : fixtureActive}
             />
           )}
         </div>

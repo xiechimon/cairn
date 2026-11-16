@@ -177,4 +177,61 @@ describe('enroll confirm owner auth (#2053)', () => {
     const confirmed = await reqWith(s, 'POST', '/api/machine/enroll/confirm', {}, { enrollId });
     expect(confirmed.status).toBe(200);
   });
+
+  test('the owner approves with the code the terminal shows; a stranger or a wrong code cannot', async () => {
+    const s = bootServer({ authToken: OWNER_TOKEN });
+    const start = await reqWith(s, 'POST', '/api/machine/enroll/start', {}, { name: 'studio-mac' });
+    const { enrollId, code } = (await start.json()) as { enrollId: string; code: string };
+    expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    const decoy = await reqWith(s, 'POST', '/api/machine/enroll/start', {}, { name: 'studio-mac' });
+    const decoyId = ((await decoy.json()) as { enrollId: string }).enrollId;
+
+    expect((await reqWith(s, 'POST', '/api/machine/enroll/confirm', {}, { code })).status).toBe(
+      401,
+    );
+    const wrong = await reqWith(
+      s,
+      'POST',
+      '/api/machine/enroll/confirm',
+      { authorization: `Bearer ${OWNER_TOKEN}` },
+      { code: 'ZZZZ-ZZZZ' },
+    );
+    expect(wrong.status).toBe(404);
+
+    const typed = code.toLowerCase().replace('-', ' ');
+    const confirmed = await reqWith(
+      s,
+      'POST',
+      '/api/machine/enroll/confirm',
+      { authorization: `Bearer ${OWNER_TOKEN}` },
+      { code: typed },
+    );
+    expect(confirmed.status).toBe(200);
+    const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
+    expect(((await poll.json()) as { status: string }).status).toBe('authorized');
+    const decoyPoll = await reqWith(
+      s,
+      'POST',
+      '/api/machine/enroll/poll',
+      {},
+      { enrollId: decoyId },
+    );
+    expect(await decoyPoll.json()).toEqual({ status: 'pending', name: 'studio-mac' });
+
+    const again = await reqWith(
+      s,
+      'POST',
+      '/api/machine/enroll/confirm',
+      { authorization: `Bearer ${OWNER_TOKEN}` },
+      { code },
+    );
+    expect(again.status).toBe(409);
+    expect(
+      (
+        await reqWith(s, 'GET', `/api/teams/${s.team.id}/machine-enrollments`, {
+          authorization: `Bearer ${OWNER_TOKEN}`,
+        })
+      ).status,
+    ).toBe(404);
+  });
 });

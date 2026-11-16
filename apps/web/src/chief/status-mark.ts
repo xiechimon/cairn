@@ -62,7 +62,6 @@ const TASK_TOOLS = new Set([
   'message_thread',
   'schedule_todo',
   'schedule_create',
-  'decide_report_suggestion',
 ]);
 const TASK_TOOL = /dispatch|todowrite|create_task|^task$/i;
 const LOOK_TOOLS = new Set([

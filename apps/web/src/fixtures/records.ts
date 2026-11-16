@@ -4,6 +4,7 @@ import {
   type ClaudeLogin,
   type ConfinementCause,
   type ConfinementReport,
+  type DailyUsageDay,
   type GithubRepoSummary,
   type MachineExecutor,
   type MachineHardware,
@@ -160,8 +161,17 @@ export interface OverlayUi {
     | { kind: 'manage'; connectorId: string }
     | { kind: 'authorizing'; catalogId: string }
     | { kind: 'confirm'; name: string; host: string }
-    | { kind: 'landing'; reason: string; name?: string };
+    | { kind: 'landing'; reason: string; name?: string }
+    | { kind: 'github-device'; step: GithubDeviceFixtureStep };
 }
+
+export type GithubDeviceFixtureStep =
+  | 'code'
+  | 'denied'
+  | 'expired'
+  | 'repos'
+  | 'repos-missing'
+  | 'reconnect';
 
 export interface ScheduleRecord {
   id: string;
@@ -246,7 +256,7 @@ export interface FixtureSet {
   unreadThreadIds?: string[];
   chiefBusy?: boolean;
   ui?: OverlayUi;
-  usageNav?: boolean;
+  dailyUsage?: DailyUsageDay[];
   schedules?: ScheduleRecord[];
   project?: ProjectContent;
   team?: TeamContent;
@@ -323,6 +333,7 @@ export interface ResourcesContent {
   skills: SkillRow[];
   mcpServers: McpRow[];
   mcpConnectors?: import('@cairn/shared').McpConnectorRecord[];
+  githubConnector?: import('@cairn/shared').GithubConnectorAvailability;
   machines: MachineRow[];
   providerSources: ModelSource[];
   providers?: ProviderRecord[];

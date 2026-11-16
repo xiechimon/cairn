@@ -476,14 +476,11 @@ function addReviewCard(w: World, prNumber: number): void {
 }
 
 describe('#1403 PR reconcile for review-phase builds', () => {
-  test('authenticated sweeps keep merge-gate reads on the injected transport', async () => {
+  test('authenticated sweeps reconcile PR state without evaluating the retired gate', async () => {
     const w = makeWorld({ connected: true });
     const mock = new PullsMock({ [w.prNumber]: { state: 'open', merged: false } });
     await pollerFor(w, mock).sweep();
-    expect(mock.gateFetch).toHaveBeenCalledWith(
-      `https://api.github.com/repos/octo/demo/pulls/${w.prNumber}`,
-      expect.anything(),
-    );
+    expect(mock.gateFetch).not.toHaveBeenCalled();
     expect(mock.requests.filter((url) => url.endsWith(`/pulls/${w.prNumber}`))).toHaveLength(1);
     expect(w.todoRow().phase).toBe('review');
   });
@@ -1069,7 +1066,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
   });
 
   test('㉖ requestMerge: the reconcile finishes the card during the PR probe → no merge step', async () => {
-    const w = makeWorld({ olderClosedPr: 150 });
+    const w = makeWorld({ connected: true, checkpoint: 'a'.repeat(40) });
     const probe = (input: string | URL) => {
       w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, w.todoId)).run();
       const url = String(input);
@@ -1077,9 +1074,10 @@ describe('#1403 PR reconcile for review-phase builds', () => {
         res(200, '"p"', { number: Number(url.split('/').at(-1)), state: 'open', merged: false }),
       );
     };
-    await expect(requestMerge({ ...w.s.svc, githubFetch: probe }, w.buildId)).rejects.toThrow(
-      'illegal phase transition: done -> done',
-    );
+    await expect(
+      requestMerge({ ...w.s.svc, box: w.s.secretBox, githubFetch: probe }, w.buildId),
+    ).rejects.toThrow('读取 PR 期间任务相位已变为 done，没有发起合并');
+    expect(w.todoRow().phase).toBe('done');
     expect(w.stepRows().filter((r) => r.kind === 'merge')).toEqual([]);
   });
 
@@ -1695,14 +1693,15 @@ describe('#1403 PR reconcile for review-phase builds', () => {
   });
 
   test.each(['closed', 'done'] as const)(
-    '[59] the done funnel on a card a person moved to %s throws before it stops anything',
+    '[59] the done funnel on a card a person moved to %s leaves steps and messages alone',
     (phase) => {
       const w = makeWorld({ inflight: 'pending', inflightKind: 'verify' });
       w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
       updateTodo(w.s.svc, w.todoId, { phase }, { manualPhase: true });
-      expect(() => finishTodoDone(w.s.svc, w.todoId, w.buildId)).toThrow(
-        `illegal phase transition: ${phase} -> done`,
-      );
+      const finish = () => finishTodoDone(w.s.svc, w.todoId, w.buildId);
+      if (phase === 'closed') expect(finish).toThrow('illegal phase transition: closed -> done');
+      else expect(finish).not.toThrow();
+      expect(w.todoRow().phase).toBe(phase);
       expect(w.stepRows().find((r) => r.kind === 'verify')?.status).toBe('pending');
       expect(w.systemRows()).toEqual([]);
     },

@@ -184,7 +184,7 @@ describe('spec 14 skill routing behavior acceptance E2E (#919)', () => {
     expect(started.status).toBe(201);
     build1Id = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    await waitFor(() => server.todoPhase(world1.todoId) === 'review', 150_000);
+    await waitFor(() => server.todoPhase(world1.todoId) === 'done', 150_000);
 
     const first = stub.requests[0]!;
     const flat = JSON.stringify(first.messages);
@@ -263,7 +263,7 @@ describe('spec 14 skill routing behavior acceptance E2E (#919)', () => {
     expect(started.status).toBe(201);
     const build2Id = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    await waitFor(() => server.todoPhase(world2.todoId) === 'review', 150_000);
+    await waitFor(() => server.todoPhase(world2.todoId) === 'done', 150_000);
 
     expect(
       logLines().some(

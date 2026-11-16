@@ -21,6 +21,7 @@ afterEach(() => {
 
 test('TH-13: steer posted at 1 s waits for a 5 s claude-code tool result without cancelling the tool', async () => {
   const api = new FakeMachineApi();
+  api.claudeSubscriptionToken = 'steer-order-subscription-token';
   const steerText = 'Use the tool result to finish the task.';
   api.steerResponse = steerText;
   const order: string[] = [];

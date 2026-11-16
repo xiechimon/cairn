@@ -339,15 +339,14 @@ export function TeamProviderEditor({
 export function claudeCodeStatus(
   source: ModelSource | undefined,
   online: boolean,
+  subscribed: boolean,
 ): { status: string; tone: 'ok' | 'warn' | 'off' } {
   if (source === undefined) return { status: '还没上报', tone: 'off' };
   if (!online) return { status: '离线 · 显示最后一次上报', tone: 'warn' };
   if (source.bin === null) return { status: '未安装', tone: 'warn' };
-  if (source.auth?.state === 'not-logged-in') return { status: '未登录', tone: 'warn' };
+  if (!subscribed) return { status: '已安装，添加 Claude 订阅后才能用', tone: 'warn' };
   if (source.models.length === 0) return { status: '已安装，未配置模型槽', tone: 'warn' };
-  if (source.auth?.state === 'logged-in') return { status: '已登录', tone: 'ok' };
-  if (source.auth?.state === 'unknown') return { status: '已安装，登录状态未知', tone: 'warn' };
-  return { status: '已安装', tone: 'ok' };
+  return { status: '已安装，用团队的 Claude 订阅', tone: 'ok' };
 }
 
 export function ClaudeCodeEditor({

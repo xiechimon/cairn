@@ -1292,6 +1292,10 @@ export const githubConnection = sqliteTable('github_connection', {
   accessTokenCipher: text('accessTokenCipher').notNull(),
   refreshTokenCipher: text('refreshTokenCipher'),
   accessTokenExpiresAt: epochMs('accessTokenExpiresAt'),
+  refreshTokenExpiresAt: epochMs('refreshTokenExpiresAt'),
+  appClientId: text('appClientId'),
+  connectionGeneration: text('connectionGeneration'),
+  refreshLeaseUntil: epochMs('refreshLeaseUntil'),
   disconnectedReason: text('disconnectedReason'),
   scope: text('scope').notNull(),
   createdAt: epochMs('createdAt').notNull(),
@@ -1505,7 +1509,10 @@ export const mcpConnector = sqliteTable(
       'mcp_connector_status',
       sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error')`,
     ),
-    check('mcp_connector_auth_kind', sql`${t.authKind} in ('none', 'static', 'oauth')`),
+    check(
+      'mcp_connector_auth_kind',
+      sql`${t.authKind} in ('none', 'static', 'oauth', 'github-app')`,
+    ),
   ],
 );
 

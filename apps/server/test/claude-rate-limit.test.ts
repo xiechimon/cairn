@@ -4,13 +4,14 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
+import { machine as machineTable, routingRule, step as stepTable } from '../src/db/schema.js';
 import {
-  claudeSubscription,
-  machine as machineTable,
-  routingRule,
-  step as stepTable,
-} from '../src/db/schema.js';
-import { bootServer, postProject, seedRoute, seedSessionRoute } from './helpers.js';
+  bootServer,
+  insertClaudeSubscription,
+  postProject,
+  seedRoute,
+  seedSessionRoute,
+} from './helpers.js';
 
 const HOUR = 60 * 60 * 1000;
 
@@ -127,6 +128,7 @@ async function report(
 describe('claude rate limit (#1852)', () => {
   test('records the latest window per machine and subscription', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     const a = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
     const b = await enroll(s, await issueKey(s, 'other-key'), 'other');
     const seconds = 1_800_000_000;
@@ -168,6 +170,7 @@ describe('claude rate limit (#1852)', () => {
 
   test('a rejected machine is skipped until resetsAt, then claims again', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
     useSessionRoute(s, machine.machineId, 'claude-code');
     const buildId = await startBuild(s);
@@ -211,6 +214,7 @@ describe('claude rate limit (#1852)', () => {
 
   test('allowed and allowed_warning do not block a claim', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
     useSessionRoute(s, machine.machineId, 'claude-code');
     const warningBuild = await startBuild(s);
@@ -241,6 +245,7 @@ describe('claude rate limit (#1852)', () => {
 
   test('a local merge already parked by the rate limiter resumes after an allowed report', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     const machine = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
     useSessionRoute(s, machine.machineId, 'claude-code');
     const buildId = await startBuild(s);
@@ -285,6 +290,7 @@ describe('claude rate limit (#1852)', () => {
 
   test('a later allowed report clears the same window and a different window stays rejected', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
     useSessionRoute(s, machine.machineId, 'claude-code');
     const buildId = await startBuild(s);
@@ -310,6 +316,7 @@ describe('claude rate limit (#1852)', () => {
 
   test('a continuing session on A is not parked for a rate-blocked rule machine B', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     const session = await enroll(s, await issueKey(s, 'session-key'), 'session-host');
     const rule = await enroll(s, await issueKey(s, 'rule-key'), 'rule-host');
     useSessionRoute(s, rule.machineId, 'claude-code');
@@ -343,6 +350,7 @@ describe('claude rate limit (#1852)', () => {
 
   test('another online machine does not take a rate-blocked owner step', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     const owner = await enroll(s, await issueKey(s, 'owner-key'), 'omarchy');
     const other = await enroll(s, await issueKey(s, 'spare-key'), 'spare');
     useSessionRoute(s, owner.machineId, 'claude-code');
@@ -363,6 +371,7 @@ describe('claude rate limit (#1852)', () => {
 
   test('an OAuth or API-key spare does not take a rate-blocked owner step', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     try {
       const owner = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
       const oauth = await enroll(s, await issueKey(s, 'oauth-key'), 'oauth-spare');
@@ -385,7 +394,6 @@ describe('claude rate limit (#1852)', () => {
           .where(eq(machineTable.id, machineId))
           .run();
       }
-      expect(s.db.select().from(claudeSubscription).all()).toEqual([]);
       useSessionRoute(s, owner.machineId, 'claude-code');
       const buildId = await startBuild(s);
       expect(
@@ -414,6 +422,7 @@ describe('claude rate limit (#1852)', () => {
     'a %s spare does not take a rate-blocked owner step',
     async (method) => {
       const s = bootServer({ claimHoldMs: 50 });
+      insertClaudeSubscription(s);
       try {
         const owner = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
         const oauth = await enroll(s, await issueKey(s, 'oauth-key'), 'oauth-spare');
@@ -436,7 +445,6 @@ describe('claude rate limit (#1852)', () => {
             .where(eq(machineTable.id, machineId))
             .run();
         }
-        expect(s.db.select().from(claudeSubscription).all()).toEqual([]);
         useSessionRoute(s, owner.machineId, 'claude-code');
         const buildId = await startBuild(s);
         expect(
@@ -465,6 +473,7 @@ describe('claude rate limit (#1852)', () => {
 
   test('non-Claude work on an API-key machine is claimed despite a Claude rate block', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     try {
       const machine = await enroll(s, await issueKey(s, 'paid-key'), 'paid');
       s.db
@@ -497,6 +506,7 @@ describe('claude rate limit (#1852)', () => {
 
   test('the only rejected machine parks the step and a failed done does not fail it', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
     useSessionRoute(s, machine.machineId, 'claude-code');
     const buildId = await startBuild(s);
@@ -522,6 +532,7 @@ describe('claude rate limit (#1852)', () => {
 
   test('a quota block for claude-code parks even when the rate-limit row was not stored', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
     useSessionRoute(s, machine.machineId, 'claude-code');
     const buildId = await startBuild(s);
@@ -546,8 +557,9 @@ describe('claude rate limit (#1852)', () => {
     s.dispose();
   });
 
-  test('a pi step on the rejected machine still claims and a pi failure stays a failure', async () => {
+  test('a late failure from a legacy pi reviewer stops it without changing the Claude quota wait', async () => {
     const s = bootServer({ claimHoldMs: 50 });
+    insertClaudeSubscription(s);
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
     useSessionRoute(s, machine.machineId, 'claude-code');
     seedRoute(s, 'review', {
@@ -578,7 +590,8 @@ describe('claude rate limit (#1852)', () => {
       body: { status: 'failed', errorMessage: 'disk full' },
     });
     expect(done.status).toBe(200);
-    expect(stepOfBuild(s, piBuild).status).toBe('failed');
+    expect(stepOfBuild(s, piBuild).status).toBe('stopped');
+    expect(stepOfBuild(s, claudeBuild).status).toBe('waiting_quota');
     s.dispose();
   });
 });

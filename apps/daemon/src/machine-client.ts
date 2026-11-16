@@ -230,11 +230,11 @@ export class MachineClient implements MachineApi {
   async enrollStart(body: { teamId?: string; name?: string }): Promise<{
     enrollId: string;
     url: string;
+    code?: string;
   }> {
     return this.request('POST', '/api/machine/enroll/start', {
       body,
-      parse: (raw) =>
-        machineEnrollStartResponseSchema.parse(raw) as { enrollId: string; url: string },
+      parse: (raw) => machineEnrollStartResponseSchema.parse(raw),
     });
   }
 

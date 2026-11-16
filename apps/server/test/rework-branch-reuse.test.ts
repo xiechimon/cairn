@@ -445,7 +445,7 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
     expect(fresh[0]!.freshSession).toBe(true);
   });
 
-  test('failure mode 9: a revision rejection on a reuse round -> still no build/conv switch (the two paths converge)', async () => {
+  test('failure mode 9: a legacy review revision on a reuse round keeps the build and conversation', async () => {
     const w = makeWorld();
     await restart(w, '先改方案');
     const planId = newRecordId();
@@ -461,7 +461,8 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
     await applyBuildStepAction(w.deps, w.buildId, { action: 'confirm' });
     const buildStep = stepsOf(w, w.buildId).find((st) => st.kind === 'build')!;
     completeStep(w.deps, buildStep.id, { hasChanges: true });
-    expect(todoRowOf(w).phase).toBe('review');
+    expect(todoRowOf(w).phase).toBe('done');
+    w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
 
     await applyBuildStepAction(w.deps, w.buildId, {
       action: 'revision',

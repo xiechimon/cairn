@@ -111,7 +111,7 @@ test('L9: the sidebar keeps the measured reference geometry', async ({ page }) =
       group: box(document.querySelector('aside [data-testid="project-group-header"]')),
       footer: box(document.querySelector('[data-testid="sidebar-footer"]')),
       settings: box(document.querySelector('[data-testid="sidebar-settings"]')),
-      activity: box(document.querySelector('[data-testid="sidebar-activity"]')),
+      usage: box(document.querySelector('[data-testid="sidebar-usage"]')),
       label: aside?.textContent?.includes('项目') && !aside.textContent.includes('新建项目'),
     };
   });
@@ -126,7 +126,7 @@ test('L9: the sidebar keeps the measured reference geometry', async ({ page }) =
   ]);
   expect(m.group).toEqual([8, 176, 204, 26]);
   expect(m.footer[3]).toBe(56);
-  expect(m.activity[0] + m.activity[2] / 2).toBe(168);
+  expect(m.usage[0] + m.usage[2] / 2).toBe(168);
   expect(m.settings[0] + m.settings[2] / 2).toBe(198);
   await expect(page.getByRole('complementary').getByText('项目', { exact: true })).toHaveCount(0);
 });

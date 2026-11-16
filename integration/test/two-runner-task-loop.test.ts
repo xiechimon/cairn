@@ -124,7 +124,7 @@ test('two real runners keep named tasks, workspaces and results isolated across 
     other: Awaited<ReturnType<typeof boot>>,
     marker: string,
   ) {
-    await waitFor(() => server.todoPhase(task.todoId) === 'review', 90_000);
+    await waitFor(() => server.todoPhase(task.todoId) === 'done', 90_000);
     const steps = server.db.select().from(step).where(eq(step.buildId, task.buildId)).all();
     expect(steps).toHaveLength(1);
     expect(steps[0]).toMatchObject({ status: 'done', machineId: owner.handle.machineId });

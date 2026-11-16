@@ -33,6 +33,7 @@ import { sha256Hex } from '../src/lib/crypto.js';
 import { newRecordId, newUuidv7 } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { enqueueStep } from '../src/services/builds.js';
+import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { teamAutonomyPaused } from '../src/services/github-autonomy-brake.js';
 import { productionHarnessEvalConfig } from '../src/services/harness-eval-production.js';
@@ -87,6 +88,7 @@ export function bootServer(
     pushEndpointHosts?: ReadonlySet<string>;
     mcpConfigPath?: string;
     mcpFetch?: AppContext['mcpFetch'];
+    mcpGithubApp?: AppContext['mcpGithubApp'];
     backupStatusPath?: string;
     deployRecordPath?: string;
     remote?: Partial<NonNullable<AppContext['remote']>>;
@@ -182,6 +184,7 @@ export function bootServer(
       accessVerifier: opts.accessVerifier ?? null,
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
       ...(opts.mcpFetch !== undefined ? { mcpFetch: opts.mcpFetch } : {}),
+      ...(opts.mcpGithubApp !== undefined ? { mcpGithubApp: opts.mcpGithubApp } : {}),
     };
     const app = createApp(appContext, opts.logger);
     const rawRequest = app.request.bind(app);
@@ -396,6 +399,17 @@ export const subscriptionClaudeReport = {
   models: [],
   auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
 } satisfies import('@cairn/shared').ClaudeCodeReport;
+
+export function insertClaudeSubscription(
+  s: Pick<TestServer, 'db' | 'secretBox' | 'team'>,
+  opts: { label?: string; expiresAt?: number | null } = {},
+): string {
+  return createClaudeSubscription({ db: s.db, box: s.secretBox }, s.team.id, {
+    label: opts.label ?? 'Team subscription',
+    token: `test-subscription-token-${randomUUID()}`,
+    ...(opts.expiresAt !== undefined ? { expiresAt: opts.expiresAt } : {}),
+  }).id;
+}
 
 export function insertMachine(
   s: TestServer,

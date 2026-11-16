@@ -4,7 +4,7 @@ import { settleTransitions } from './helpers.js';
 const SKILLS = '/app/resources/skills?scenario=01';
 const LISTED_SKILLS = '/app/resources/skills?scenario=06';
 const ACCOUNT = '/app/account?scenario=13';
-const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
+const PROVIDERS = '/app/resources/providers?scenario=01';
 
 const BADGES = '/design.html';
 const SCHEDULES = '/app?scenario=home-c&pane=tasks&tab=scheduled';
@@ -163,10 +163,11 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
   });
 
   test('checkbox, switch, and badge use the global outline', async ({ page }) => {
-    await themed(page, 'dark', ACCEPT);
-    await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
-    await page.getByRole('menuitem', { name: '完成' }).click();
-    const checkbox = page.getByRole('dialog', { name: '完成任务' }).locator('[data-slot="checkbox"]');
+    await themed(page, 'dark', PROVIDERS);
+    await page.getByTestId('resource-new').click();
+    const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+    await dialog.getByRole('button', { name: '自定义端点' }).click();
+    const checkbox = dialog.locator('[data-slot="checkbox"]');
     await expect(checkbox).toBeVisible();
     await focusKeyboard(checkbox);
     const checked = await readFocus(checkbox);

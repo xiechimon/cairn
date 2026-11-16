@@ -20,19 +20,26 @@ test('scope menu: all machines first, one option per machine, offline and Orb ma
   await expect(scopeSelect(page)).toContainText('所有执行机');
   await expect(scopeSelect(page).locator('svg.lucide-server')).toBeVisible();
   await scopeSelect(page).click();
-  await expect(page.getByRole('option')).toHaveText([
+  const names = [
     '所有执行机',
     'xmonsMac-3574.local',
     'build-box',
     'build-box-orb',
     'old-laptop · 离线',
     'new-box',
-  ]);
+  ];
+  const options = page.getByRole('option');
+  await expect(options).toHaveCount(names.length);
+  for (const [index, name] of names.entries()) {
+    await expect(options.nth(index)).toHaveAccessibleName(name);
+  }
   await expect(page.getByRole('option').first().locator('svg.lucide-server')).toBeVisible();
-  const machineOptions = page.getByRole('option').filter({ has: page.locator('svg.lucide-monitor') });
+  const machineOptions = page
+    .getByRole('option')
+    .filter({ has: page.locator('[data-slot="machine-os-icon"]') });
   await expect(machineOptions).toHaveCount(5);
   for (const option of await machineOptions.all()) {
-    await expect(option.locator('svg.lucide-monitor')).toBeVisible();
+    await expect(option.locator('[data-slot="machine-os-icon"]')).toBeVisible();
     expect(await option.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   }
   await page.keyboard.press('Escape');
@@ -86,17 +93,17 @@ test('unknown scope and item fall back to the team tab and its first row', async
   );
 });
 
-test('machine tab: Claude Code reports version, sign-in state and slots, with no runtime switch', async ({
+test('machine tab: Claude Code reports version and slots, runs on the team subscription, with no runtime switch', async ({
   page,
 }) => {
   await page.goto(FLEET);
   await pickScope(page, 'build-box-orb');
   await expect(page).toHaveURL(/scope=fleet-box-orb/);
-  await expect(scopeSelect(page).locator('svg.lucide-monitor')).toBeVisible();
+  await expect(scopeSelect(page).locator('[data-slot="machine-os-icon"]')).toBeVisible();
   const cc = instance(page, 'claude-code');
   await expect(cc).toContainText('v2.1.316');
-  await expect(cc).toContainText('未登录');
-  await expect(cc).toHaveAttribute('data-tone', 'warn');
+  await expect(cc).toContainText('用团队的 Claude 订阅');
+  await expect(cc).not.toContainText('未登录');
   await expect(page.getByTestId('provider-list').getByRole('switch')).toHaveCount(0);
   await expect(editor(page)).toContainText('/home/u/.local/bin/claude');
   const slots = editor(page).getByTestId('provider-model');
@@ -237,8 +244,8 @@ const REMOTE = 'Kd8fG2hJ4mN9pQ1rStUvWx3';
 const LOCAL = 'TlZ2sSD4EJCxjNJqVhdo_';
 
 for (const [scenario, scope, status] of [
-  ['10', REMOTE, '已登录'],
-  ['10-cc-loggedout', REMOTE, '未登录'],
+  ['10', REMOTE, '用团队的 Claude 订阅'],
+  ['10-cc-loggedout', REMOTE, '用团队的 Claude 订阅'],
   ['10-cc-bin-gone', REMOTE, '未安装'],
   ['10-cc-missing', LOCAL, '未安装'],
   ['10-cc-noconfig', LOCAL, '已安装，未配置模型槽'],

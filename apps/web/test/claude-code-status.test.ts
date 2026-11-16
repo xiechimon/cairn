@@ -16,31 +16,28 @@ function source(fields: Partial<ModelSource>): ModelSource {
 }
 
 describe('claudeCodeStatus', () => {
-  test('only an explicit logged-in report reads as signed in', () => {
-    expect(claudeCodeStatus(source({ auth: { state: 'logged-in' } }), true)).toEqual({
-      status: '已登录',
-      tone: 'ok',
-    });
+  test('an installed Claude Code with a team subscription is ready whatever the local login says', () => {
+    for (const state of ['logged-in', 'not-logged-in', 'unknown'] as const) {
+      expect(claudeCodeStatus(source({ auth: { state } }), true, true)).toEqual({
+        status: '已安装，用团队的 Claude 订阅',
+        tone: 'ok',
+      });
+    }
   });
 
-  test('an unknown auth probe is not reported as signed in', () => {
-    expect(claudeCodeStatus(source({ auth: { state: 'unknown' } }), true)).toEqual({
-      status: '已安装，登录状态未知',
+  test('without a usable team subscription it asks for one, even when the Runner is signed in', () => {
+    expect(claudeCodeStatus(source({ auth: { state: 'logged-in' } }), true, false)).toEqual({
+      status: '已安装，添加 Claude 订阅后才能用',
       tone: 'warn',
     });
   });
 
-  test('a report without auth (older daemon) reads as installed only', () => {
-    expect(claudeCodeStatus(source({}), true)).toEqual({ status: '已安装', tone: 'ok' });
-  });
-
-  test('not signed in, missing binary, missing slots, offline and no report', () => {
-    expect(claudeCodeStatus(source({ auth: { state: 'not-logged-in' } }), true).status).toBe(
-      '未登录',
+  test('missing binary, missing slots, offline and no report', () => {
+    expect(claudeCodeStatus(source({ bin: null }), true, true).status).toBe('未安装');
+    expect(claudeCodeStatus(source({ models: [] }), true, true).status).toBe(
+      '已安装，未配置模型槽',
     );
-    expect(claudeCodeStatus(source({ bin: null }), true).status).toBe('未安装');
-    expect(claudeCodeStatus(source({ models: [] }), true).status).toBe('已安装，未配置模型槽');
-    expect(claudeCodeStatus(source({ auth: { state: 'logged-in' } }), false).tone).toBe('warn');
-    expect(claudeCodeStatus(undefined, true)).toEqual({ status: '还没上报', tone: 'off' });
+    expect(claudeCodeStatus(source({}), false, true).tone).toBe('warn');
+    expect(claudeCodeStatus(undefined, true, true)).toEqual({ status: '还没上报', tone: 'off' });
   });
 });

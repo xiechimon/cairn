@@ -51,6 +51,8 @@ newest_green_after() {
   for sha in $(git -C "$CHECKOUT" rev-list --first-parent --max-count="$SCAN_DEPTH" "$deployed..origin/main"); do
     if [ -e "$STATE/failed/$sha" ]; then
       log "skip $sha: already failed ($(head -n1 "$STATE/failed/$sha"))" >&2
+    elif ! git -C "$CHECKOUT" merge-base --is-ancestor "$deployed" "$sha"; then
+      log "skip $sha: it does not contain the deployed $deployed" >&2
     elif green "$sha"; then
       echo "$sha"
       return 0

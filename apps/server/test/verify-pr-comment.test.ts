@@ -5,7 +5,7 @@ import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { build, gateVerdict, message, project, step, todo } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
-import { flushVerdictDigests } from '../src/services/build-gate-verdict.js';
+import { flushVerdictDigests, persistGateVerdict } from '../src/services/build-gate-verdict.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import type { GateGithubPort, GateRaw } from '../src/services/merge-gate/github-port.js';
 import { evaluateMergeGate } from '../src/services/merge-gate-run.js';
@@ -167,7 +167,7 @@ async function world(mode: 'attachments' | 'repository' | null = 'attachments') 
         buildId: 'comment-build',
         kind: 'verify',
         machineId: machine.machineId,
-        status: 'claimed',
+        status: 'done',
         prompt: buildVerifyStepPrompt({
           ticketRef: '3513',
           taskText: 'Verify comment',
@@ -179,23 +179,35 @@ async function world(mode: 'attachments' | 'repository' | null = 'attachments') 
         createdAt: 1,
       })
       .run();
-    const report = {
-      status: 'success',
-      ...(reported === null ? {} : { gateHeadSha: reported }),
-      verifyVerdict: {
-        passed,
-        conclusion: conclusion ?? `Checked API and retry (${id})`,
-        evidence: [{ path: 'attachment:private-token', note: 'private proof' }],
-      },
+    const verdict = {
+      passed,
+      conclusion: conclusion ?? `Checked API and retry (${id})`,
+      evidence: [{ path: 'attachment:private-token', note: 'private proof' }],
     };
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const done = await s.app.request(`/api/machine/done/${id}`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${machine.token}`, 'content-type': 'application/json' },
-        body: JSON.stringify(report),
-      });
-      expect(done.status).toBe(200);
-    }
+    const row = s.db.select().from(step).where(eq(step.id, id)).get()!;
+    persistGateVerdict(deps, row, {
+      stepFailed: false,
+      extracted: true,
+      blocked: !passed,
+      report: {
+        reportedHeadSha: reported,
+        driftedHeads: reported !== null && reported !== head ? [reported] : [],
+      },
+    });
+    s.db
+      .insert(message)
+      .values({
+        id: `legacy-verdict-${id}`,
+        conversationId: 'comment-build',
+        role: 'system',
+        content: {
+          kind: 'verify_verdict',
+          ...(mode === 'attachments' ? { stepId: id } : {}),
+          verdict,
+        },
+        createdAt: Date.now(),
+      })
+      .run();
     await flushVerdictDigests();
   }
   const poll = () => evaluateMergeGate(deps, 'comment-build', { port });

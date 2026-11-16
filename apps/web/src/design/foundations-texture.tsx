@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { EmptyState } from '../components/empty-state.js';
+import { InkSpiral, type SpiralHang } from '../components/ink-spiral.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import {
   DriftEdge,
@@ -12,6 +13,18 @@ import type { TextureFilter } from '../components/texture/texture-core.js';
 import { Switch } from '../components/ui/switch.js';
 import { MessageSquare } from '../icons/index.js';
 import { Labeled, Section, Specimen } from './specimen.js';
+
+const SPIRAL_HANGS: SpiralHang[] = [
+  { key: 'cairn', label: 'cairn', onSelect: () => {} },
+  { key: 'site', label: 'site', waiting: 'Waiting on you', onSelect: () => {} },
+  { key: 'notes', label: 'notes', onSelect: () => {} },
+];
+const SPIRAL_TAIL: SpiralHang = {
+  key: 'new',
+  label: 'New project',
+  muted: true,
+  onSelect: () => {},
+};
 
 const FILTERS: { value: TextureFilter; label: string }[] = [
   { value: 'ascii', label: 'ASCII' },
@@ -81,6 +94,16 @@ export function TextureSection() {
             description="Ask the Coordinator for something and it starts one."
             action={{ label: 'Ask the Coordinator' }}
           />
+        </div>
+      </Specimen>
+      <Specimen
+        id="ink-spiral"
+        title="Ink spiral"
+        note="The empty Coordinator home and the first-run welcome: the icon's one-stroke spiral in grained ink, with each project hung on a leader and a waiting one underlined"
+        code={`<InkSpiral hangs={projects} tail={newProject} size={300} />`}
+      >
+        <div className="flex w-full justify-center py-10">
+          <InkSpiral hangs={SPIRAL_HANGS} tail={SPIRAL_TAIL} size={300} />
         </div>
       </Specimen>
       <Specimen

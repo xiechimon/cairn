@@ -1,8 +1,10 @@
 name: desktop-release
 
 on:
+  push:
+    branches: [main]
   schedule:
-    - cron: '17 */3 * * *'
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -27,7 +29,7 @@ jobs:
         id: changed
         run: |
           last=$(git tag --list 'desktop-v*' --sort=-v:refname | head -n 1)
-          if [ "$GITHUB_EVENT_NAME" != "schedule" ] || [ -z "$last" ]; then
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ -z "$last" ]; then
             echo "release=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -118,8 +120,9 @@ jobs:
       - name: Publish the release
         working-directory: apps/desktop/release
         run: |
+          git push origin "$GITHUB_SHA:refs/tags/desktop-v$VERSION"
           gh release create "desktop-v$VERSION" \
-            --target "$GITHUB_SHA" \
+            --verify-tag \
             --latest \
             --title "Cairn for Mac $VERSION" \
             --notes "Built from $GITHUB_SHA. Signed with Cairn's own certificate, not an Apple one: the first launch needs right-click, Open." \

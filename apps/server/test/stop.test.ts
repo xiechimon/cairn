@@ -290,22 +290,26 @@ describe('the stop server write surface (M7 #308)', () => {
     expect(w.s.db.select().from(stopPendingTable).all()).toHaveLength(0);
   });
 
-  test('failure mode 6c: stopping the merge step -> review unchanged', async () => {
+  test('failure mode 6c: stopping an explicit merge preserves completed delivery', async () => {
     const buildId = await w.startBuild();
     const planStep = await w.claim();
     await w.uploadPlan(planStep.step.id, withVerification('# plan v1'));
     await w.done(planStep.step.id, { status: 'success' });
     await w.confirm(buildId);
     const buildStep = await w.claim();
-    await w.done(buildStep.step.id, { status: 'success', hasChanges: true });
-    expect(w.todoRow().phase).toBe('review');
+    await w.done(buildStep.step.id, {
+      status: 'success',
+      hasChanges: true,
+      commit: 'ab'.repeat(20),
+    });
+    expect(w.todoRow().phase).toBe('done');
     const merge = await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
     expect(merge.status).toBe(202);
     const mergeStep = await w.claim();
     expect(mergeStep.step.kind).toBe('merge');
     await w.stop(buildId, false);
     await w.done(mergeStep.step.id, { status: 'stopped' });
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
     expect(w.buildRow(buildId).errorMessage).toBe('已取消');
   });
 

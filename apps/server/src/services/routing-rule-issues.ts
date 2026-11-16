@@ -1,23 +1,16 @@
-import {
-  CODEX_MODEL,
-  ROUTE_USES,
-  type RuleFix,
-  type RuleIssue,
-  type RuleIssueReason,
-} from '@cairn/shared';
+import { ROUTE_USES, type RuleFix, type RuleIssue, type RuleIssueReason } from '@cairn/shared';
 import { and, asc, eq, sql } from 'drizzle-orm';
-import { usesHostCodexLogin } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { machine, provider, routingRule } from '../db/schema.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { type CoordinatorRouteRefusal, coordinatorRouteVerdict } from './coordinator-route.js';
 import {
+  codexProviderKeyed,
   machineRuntimeAvailable,
   runtimeGatePasses,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import {
-  CODEX_LOGIN_PRESENT,
   defaultCoordinatorChoice,
   defaultSessionChoice,
   keylessEndpoint,
@@ -36,26 +29,14 @@ const COORDINATOR_REFUSAL_REASON: Record<CoordinatorRouteRefusal, RuleIssueReaso
   'rule-provider-has-no-key': 'provider-no-key',
 };
 
-function providerProblem(
-  db: Pick<Db, 'select'>,
-  rule: RoutingRuleRow,
-  machines: readonly MachineRow[],
-): RuleProblem | null {
+function providerProblem(db: Pick<Db, 'select'>, rule: RoutingRuleRow): RuleProblem | null {
   const row = db
-    .select({ baseUrl: provider.baseUrl, keyed: sql<number>`${provider.apiKeyCipher} is not null` })
+    .select({ keyed: sql<number>`${provider.apiKeyCipher} is not null` })
     .from(provider)
     .where(and(eq(provider.teamId, rule.teamId), eq(provider.providerId, rule.provider)))
     .get();
-  if (row === undefined) {
-    const runnerCodexLogin =
-      rule.provider === CODEX_MODEL.provider &&
-      machines.some((m) => CODEX_LOGIN_PRESENT.has(m.capabilities?.codexLogin?.state ?? 'absent'));
-    return runnerCodexLogin ? null : { reason: 'provider-missing', provider: rule.provider };
-  }
-  const runnable =
-    row.keyed === 1 ||
-    keylessEndpoint(rule.provider) ||
-    usesHostCodexLogin(rule.provider, row.baseUrl);
+  if (row === undefined) return { reason: 'provider-missing', provider: rule.provider };
+  const runnable = row.keyed === 1 || keylessEndpoint(rule.provider);
   if (!runnable) return { reason: 'provider-no-key', provider: rule.provider };
   return null;
 }
@@ -64,12 +45,9 @@ function capabilityRouted(rule: RoutingRuleRow): boolean {
   return rule.use === 'session' && ROUTED_PROVIDERS.includes(rule.provider);
 }
 
-function runsRule(m: MachineRow, rule: RoutingRuleRow): boolean {
+function runsRule(m: MachineRow, rule: RoutingRuleRow, codexProvider: boolean): boolean {
   if (!capabilityRouted(rule)) return runtimeGatePasses(m, rule.provider);
-  return (
-    machineRuntimeAvailable(m, 'claude-code') ||
-    CODEX_LOGIN_PRESENT.has(m.capabilities?.codexLogin?.state ?? 'absent')
-  );
+  return machineRuntimeAvailable(m, 'claude-code') || codexProvider;
 }
 
 function ruleProblem(
@@ -86,12 +64,15 @@ function ruleProblem(
     return { reason: COORDINATOR_REFUSAL_REASON[verdict.refusal], provider: rule.provider };
   }
   const runtime = stepRuntimeFor(rule.provider);
-  if (machines.length > 0 && !machines.some((m) => runsRule(m, rule))) {
+  const codexProvider = capabilityRouted(rule) && codexProviderKeyed(db, rule.teamId);
+  if (machines.length > 0 && !machines.some((m) => runsRule(m, rule, codexProvider))) {
     return { reason: 'runtime-disabled', runtime };
   }
   if (rule.machineId !== null || rule.requiredCapabilities !== null) {
     const constraints = { machineId: rule.machineId, required: rule.requiredCapabilities };
-    const usable = machines.some((m) => machineSatisfies(m, constraints) && runsRule(m, rule));
+    const usable = machines.some(
+      (m) => machineSatisfies(m, constraints) && runsRule(m, rule, codexProvider),
+    );
     if (!usable) {
       return {
         reason: 'machine-unusable',
@@ -99,7 +80,7 @@ function ruleProblem(
       };
     }
   }
-  return runtime === 'pi' && !capabilityRouted(rule) ? providerProblem(db, rule, machines) : null;
+  return runtime === 'pi' && !capabilityRouted(rule) ? providerProblem(db, rule) : null;
 }
 
 function ruleFix(db: Pick<Db, 'select'>, rule: RoutingRuleRow): RuleFix | null {

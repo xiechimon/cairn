@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { TaskRefRow } from '../chief/chief-task-ref-row.js';
 import { ComposerAttachmentTile } from '../components/composer-attachment-tile.js';
 import { Button } from '../components/ui/button.js';
-import { AcceptDialog } from '../detail/accept-dialog.js';
 import { Composer } from '../detail/composer.js';
 import { DocPane } from '../detail/docpane.js';
 import { Segments, TodoGlanceContext, TodoStatus } from '../detail/segments.js';
@@ -192,9 +191,6 @@ function DialogsSpecimen() {
     setOpen(null);
   };
   const triggers = [
-    ['accept', 'Accept'],
-    ['accept-locked', 'Accept, merge locked'],
-    ['accept-info', 'Accept, no code changes'],
     ['stop', 'Stop'],
     ['stop-queued', 'Stop, queued'],
   ] as const;
@@ -210,25 +206,6 @@ function DialogsSpecimen() {
           {label}
         </Button>
       ))}
-      <AcceptDialog
-        open={open === 'accept'}
-        onClose={close}
-        onConfirm={(merge) => done(merge ? 'accept and merge' : 'accept')}
-        substantiveChanges
-      />
-      <AcceptDialog
-        open={open === 'accept-locked'}
-        onClose={close}
-        onConfirm={() => done('accept')}
-        mergeLocked
-        rejectReason="The PR still has a failing check."
-      />
-      <AcceptDialog
-        open={open === 'accept-info'}
-        onClose={close}
-        onConfirm={() => done('accept')}
-        infoOutput
-      />
       <StopConfirmDialog
         open={open === 'stop'}
         onClose={close}

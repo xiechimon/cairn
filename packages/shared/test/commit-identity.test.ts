@@ -114,8 +114,9 @@ describe('the local hooks', () => {
     expect(isAgentEnvironment(policy, { CLAUDECODE: '' })).toBe(false);
   });
 
-  test('source 3: an agent committing with the global xiechimon config is rejected', () => {
-    expect(localCommitViolation(policy, owner, owner, agent)).toMatch(/as-bot\.sh git commit/);
+  test('an authorized agent commits with either registered owner email', () => {
+    expect(localCommitViolation(policy, owner, owner, agent)).toBeNull();
+    expect(localCommitViolation(policy, ownerNoreply, ownerNoreply, agent)).toBeNull();
   });
 
   test('an agent committing as the App is accepted', () => {
@@ -128,20 +129,21 @@ describe('the local hooks', () => {
   });
 
   test('an agent mixing the cloud identity with another one is rejected', () => {
-    expect(localCommitViolation(policy, cloud, owner, agent)).toMatch(/as-bot\.sh git commit/);
-    expect(localCommitViolation(policy, owner, cloud, agent)).toMatch(/as-bot\.sh git commit/);
-    expect(localCommitViolation(policy, cloud, bot, agent)).toMatch(/as-bot\.sh git commit/);
+    expect(localCommitViolation(policy, cloud, owner, agent)).toMatch(/author and committer/);
+    expect(localCommitViolation(policy, owner, cloud, agent)).toMatch(/author and committer/);
+    expect(localCommitViolation(policy, cloud, bot, agent)).toMatch(/author and committer/);
+    expect(localCommitViolation(policy, owner, bot, agent)).toMatch(/author and committer/);
   });
 
   test('ian committing by hand is accepted', () => {
     expect(localCommitViolation(policy, owner, owner, human)).toBeNull();
   });
 
-  test('the identity of a cairn server without an App is rejected with the server setting that fixes it', () => {
+  test('a local-only Cairn identity cannot be published without an attributed user connection', () => {
     const local = localCommitIdentity('Session');
     for (const env of [human, agent])
       expect(localCommitViolation(policy, local, local, env)).toMatch(
-        /cairn server without a GitHub App identity: set CAIRN_GITHUB_APP_SLUG and CAIRN_GITHUB_APP_BOT_ID/,
+        /configure the product's GitHub user connection/,
       );
   });
 
@@ -150,13 +152,15 @@ describe('the local hooks', () => {
     expect(localCommitViolation(policy, identity, identity, agent)).toMatch(/./);
   });
 
-  test('an agent pushes only App-authored commits; ian pushes his own too', () => {
-    expect(pushViolation(policy, [facts(bot, bot)], agent)).toBeNull();
-    expect(pushViolation(policy, [facts(bot, web)], agent)).toBeNull();
-    expect(pushViolation(policy, [facts(cloud, cloud)], agent)).toBeNull();
-    expect(pushViolation(policy, [facts(cloud, cloud)], human)).toBeNull();
-    expect(pushViolation(policy, [facts(owner, owner)], agent)).toMatch(/as-bot\.sh git commit/);
-    expect(pushViolation(policy, [facts(owner, owner)], human)).toBeNull();
-    expect(pushViolation(policy, [facts(synthetic, synthetic)], human)).toMatch(/./);
+  test('pushes accept owner, cloud and old App commits but reject unattributed commits', () => {
+    expect(pushViolation(policy, [facts(bot, bot)])).toBeNull();
+    expect(pushViolation(policy, [facts(bot, web)])).toBeNull();
+    expect(pushViolation(policy, [facts(cloud, cloud)])).toBeNull();
+    expect(pushViolation(policy, [facts(owner, owner)])).toBeNull();
+    expect(pushViolation(policy, [facts(ownerNoreply, ownerNoreply)])).toBeNull();
+    expect(pushViolation(policy, [facts(synthetic, synthetic)])).toMatch(/./);
+    expect(
+      pushViolation(policy, [facts({ ...owner, email: 'stranger@example.com' }, owner)]),
+    ).toMatch(/./);
   });
 });

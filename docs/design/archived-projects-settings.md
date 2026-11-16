@@ -1,5 +1,7 @@
 # Archived projects in Settings
 
+Superseded 2026-11-16: the Settings `项目` section was removed. Archived projects are listed, opened and unarchived from the sidebar's `已归档` page and the archived-project bar above the composer.
+
 Issue [#3610](https://github.com/xiechimon/cairn/issues/3610). Research: [archived-projects-entry-2026-11-09](../research/archived-projects-entry-2026-11-09.md). References: [references/archived-projects](references/archived-projects) (Claude.ai `A01`, `A02`; Linear `L02`) and the settings references in [references/settings](references/settings).
 
 ## Surface

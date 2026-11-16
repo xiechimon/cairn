@@ -198,7 +198,7 @@ describe('spec 14 skills execution-plane injection E2E', () => {
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
     const activities = collectConvActivities(buildId);
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'review', 150_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'done', 150_000);
 
     try {
       await waitFor(() => {

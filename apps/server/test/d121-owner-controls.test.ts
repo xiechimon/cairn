@@ -166,6 +166,16 @@ test.each([null, 'github'] as const)(
       .set({ repoKind, githubRepo: repoKind === 'github' ? 'example/demo' : null })
       .run();
     w.db.update(todo).set({ phase: 'review', hasChanges: true }).where(eq(todo.id, 'todo')).run();
+    w.db
+      .insert(step)
+      .values({
+        id: 'delivered-build',
+        buildId: 'build',
+        kind: 'build',
+        status: 'done',
+        createdAt: READY_AT,
+      })
+      .run();
     const permission = await req(w.app, 'GET', '/api/builds/build/merge-permission');
     expect(permission.status).toBe(200);
     expect(await permission.json()).toEqual({
@@ -179,7 +189,9 @@ test.each([null, 'github'] as const)(
     const finish = await req(w.app, 'PATCH', '/api/todos/todo', { phase: 'done' });
     expect(finish.status).toBe(200);
     expect(w.phase()).toBe('done');
-    expect(w.db.select().from(step).all()).toEqual([]);
+    expect(w.db.select().from(step).all()).toMatchObject([
+      { id: 'delivered-build', kind: 'build', status: 'done' },
+    ]);
     expect(w.db.select().from(build).get()?.prNumber).toBe(42);
     w.restart();
     expect(w.phase()).toBe('done');

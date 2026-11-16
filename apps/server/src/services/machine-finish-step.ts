@@ -31,6 +31,7 @@ import { conflict, HttpError } from '../lib/errors.js';
 import { githubBranchPulls } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
+import { settleRetiredGateStep } from './build-gate-steps.js';
 import { reportedVerdictHeads } from './build-gate-verdict.js';
 import {
   applyStepFailure,
@@ -76,6 +77,7 @@ import {
 } from './machine-deps.js';
 import {
   applyMergeLanding,
+  applySpaceLanding,
   MERGE_LANDING_SKIPPED,
   MERGE_NOT_LANDED_NOTE,
   mergeCardLeftReview,
@@ -217,7 +219,8 @@ export async function finishStep(
   await finishStepReport(deps, machineId, stepId, body);
   stopStepComputer(deps, stepId);
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
-  if (row && !isChiefConversation(row.buildId)) await drainTaskMessageQueue(deps, row.buildId);
+  if (row && row.kind !== 'review' && row.kind !== 'verify' && !isChiefConversation(row.buildId))
+    await drainTaskMessageQueue(deps, row.buildId);
 }
 
 async function finishStepReport(
@@ -239,6 +242,7 @@ async function finishStepReport(
         failUnpublishedDeliverables(db, stepId, found.claimedAt);
       }
       revokeStepGitCredential(deps, stepId);
+      if (found.machineId === machineId && settleRetiredGateStep(deps, found, body)) return;
       if (body.status === 'failed') {
         noteDeliveredPlanResidual(
           deps,
@@ -250,6 +254,12 @@ async function finishStepReport(
     }
   }
   const stepRow = ownedStep(deps, machineId, stepId);
+  if (settleRetiredGateStep(deps, stepRow, body)) {
+    recordStepUsage(deps, stepRow, body.usage ?? []);
+    revokeStepGitCredential(deps, stepId);
+    emitRuntimeStepSpan(db, stepId);
+    return;
+  }
   let changeFiles: DocumentDiffFile[] | undefined;
   if (body.changesDiff !== undefined && body.changesDiff.length <= CHANGES_DIFF_MAX_BYTES) {
     try {
@@ -322,6 +332,12 @@ async function finishStepReport(
     if (landing === MERGE_LANDING_SKIPPED) landingSkipped = true;
     else landingError = landing;
   }
+  let spaceNote: string | null = null;
+  if (isBuildStepKind(stepRow.kind) && body.status === 'success') {
+    const space = await applySpaceLanding(deps, stepRow, body.commit ?? null);
+    if (space !== null && 'error' in space) landingError = space.error;
+    else if (space !== null) spaceNote = space.note;
+  }
   const report: StepReport = {
     machineId,
     stepId,
@@ -331,6 +347,7 @@ async function finishStepReport(
     priorMerged,
     landingSkipped,
     landingError,
+    spaceNote,
   };
   const grantGeneration = stepRow.claimedAt;
   if (
@@ -355,6 +372,7 @@ interface StepReport {
   priorMerged: { prNumber: number; prUrl: string | null } | null;
   landingSkipped: boolean;
   landingError: string | null;
+  spaceNote: string | null;
 }
 
 function applyStepReport(deps: MachineDeps, report: StepReport): void {
@@ -368,6 +386,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     priorMerged,
     landingSkipped,
     landingError,
+    spaceNote,
   } = report;
   {
     const current = db.select().from(step).where(eq(step.id, stepId)).get();
@@ -389,6 +408,15 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       conversationId: stepRow.buildId,
       role: 'system',
       content: MERGE_NOT_LANDED_NOTE,
+      createdAt: nowMs(),
+    });
+  }
+  if (spaceNote !== null) {
+    upsertMessage(deps, {
+      id: `space-landed-${stepId}`,
+      conversationId: stepRow.buildId,
+      role: 'system',
+      content: spaceNote,
       createdAt: nowMs(),
     });
   }

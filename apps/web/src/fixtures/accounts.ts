@@ -276,7 +276,6 @@ export const PROVIDER_MACHINES: MachineWithProviders[] = [
 ];
 
 const CLAUDE_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
-const REMOTE_CLAUDE = `machine:${MACHINE_REMOTE_ID}`;
 
 export const ACCOUNT_ROUTING: ModelRouting = {
   connections: [
@@ -315,28 +314,13 @@ export const ACCOUNT_ROUTING: ModelRouting = {
       models: ['gpt-4o'],
       available: false,
     },
-    {
-      id: REMOTE_CLAUDE,
-      vendor: 'anthropic',
-      kind: 'subscription',
-      models: CLAUDE_MODELS,
-      available: true,
-    },
   ],
-  quota: [
-    {
-      connectionId: REMOTE_CLAUDE,
-      windows: [
-        { window: '5h', usedPercent: 31, resetsAt: NOW + 3 * HOUR, reportedAt: NOW - MINUTE },
-        { window: 'week', usedPercent: 54, resetsAt: NOW + 4 * DAY, reportedAt: NOW - MINUTE },
-      ],
-    },
-  ],
+  quota: [],
   edges: [
     { use: 'coordinator', modelId: 'claude-opus-5-5', effort: 'high', connectionId: ACCOUNT_OK_ID },
     { use: 'implementation', modelId: 'gpt-6.1-sol', effort: 'high', connectionId: 'codex-main' },
     { use: 'review', modelId: 'claude-sonnet-5-5', effort: 'high', connectionId: ACCOUNT_OK_ID },
-    { use: 'mechanical', modelId: 'claude-haiku-5-5', effort: 'low', connectionId: REMOTE_CLAUDE },
+    { use: 'mechanical', modelId: 'claude-haiku-5-5', effort: 'low', connectionId: ACCOUNT_OK_ID },
     { use: 'eval', modelId: 'claude-sonnet-5-5', effort: 'high', connectionId: ACCOUNT_COOLING_ID },
     {
       use: 'nightly-scan',

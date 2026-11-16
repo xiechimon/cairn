@@ -1,5 +1,4 @@
 import {
-  type ClaudeCodeReport,
   ROUTING_USES,
   type RoutingConnection,
   type RoutingQuota,
@@ -7,9 +6,8 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { claudeSubscription, machine, provider } from '../db/schema.js';
+import { claudeSubscription, provider } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { machineRuntimeAvailable } from './dispatch-eligibility.js';
 
 const CLAUDE_ROUTING_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
 
@@ -55,54 +53,6 @@ export function getModelRouting(db: Db, teamId: string) {
       });
     }
   }
-  for (const row of db.select().from(machine).where(eq(machine.teamId, teamId)).all()) {
-    const codexLogin = row.capabilities?.codexLogin;
-    if (codexLogin !== undefined) {
-      connections.push({
-        id: `machine:${row.id}:codex`,
-        vendor: 'openai',
-        kind: 'subscription',
-        models: ['gpt-6.1-sol'],
-        available:
-          row.online &&
-          codexLogin.state === 'ok' &&
-          codexLogin.expiresAt !== undefined &&
-          codexLogin.expiresAt > now,
-      });
-    }
-    const report = row.claudeCodeReport;
-    if (!report?.installed && (row.claudeRateLimits?.length ?? 0) === 0) continue;
-    const id = `machine:${row.id}`;
-    const paid = !machineUsesClaudeSubscription(report);
-    connections.push({
-      id,
-      vendor: 'anthropic',
-      kind: paid ? 'api-key' : 'subscription',
-      models: CLAUDE_ROUTING_MODELS,
-      available:
-        machineRuntimeAvailable(row, 'claude-code') &&
-        row.online &&
-        report?.auth?.state !== 'not-logged-in' &&
-        report?.login?.state !== 'expired',
-    });
-    const windows: RoutingQuota['windows'][number][] = [];
-    for (const window of row.claudeRateLimits ?? []) {
-      const period =
-        window.subscription === 'five_hour' || window.subscription === '5h'
-          ? '5h'
-          : window.subscription === 'seven_day' || window.subscription === 'week'
-            ? 'week'
-            : null;
-      if (period === null) continue;
-      windows.push({
-        window: period,
-        usedPercent: window.utilization === null ? null : window.utilization * 100,
-        resetsAt: window.resetsAt,
-        reportedAt: window.reportedAt,
-      });
-    }
-    if (windows.length > 0) quota.push({ connectionId: id, windows });
-  }
   return {
     ...resolveRouting(
       ROUTING_USES.map((use) => ({ use })),
@@ -112,15 +62,4 @@ export function getModelRouting(db: Db, teamId: string) {
     connections,
     quota,
   };
-}
-
-export function machineUsesClaudeSubscription(
-  report: ClaudeCodeReport | null | undefined,
-): boolean {
-  const auth = report?.auth;
-  return (
-    auth?.state === 'logged-in' &&
-    auth.provider === 'firstParty' &&
-    (auth.method === 'claude.ai' || auth.method === 'oauth_token')
-  );
 }

@@ -9,10 +9,12 @@ import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { mcpConnector, step as stepTable } from '../src/db/schema.js';
 import { isOwnerOnlyRoute } from '../src/lib/token-auth.js';
+import { pollGithubConnectorDevice } from '../src/services/mcp-github-connector.js';
 import {
   checkMcpConnector,
   createMcpConnector,
   createPublicOAuthFetch,
+  type GithubAppRegistration,
   type McpConnectorDeps,
   refreshMcpConnectorToken,
   stepConnectorEndpoints,
@@ -61,11 +63,19 @@ function fakeMcp(
   return { fetch: mcpFetch, seen };
 }
 
-function boot(fetch: typeof globalThis.fetch, claudeJson?: unknown) {
+function boot(
+  fetch: typeof globalThis.fetch,
+  claudeJson?: unknown,
+  githubApp?: GithubAppRegistration,
+) {
   const dir = makeTestTempDir('cairn-mcp-conn-');
   const mcpConfigPath = join(dir, 'claude.json');
   if (claudeJson !== undefined) writeFileSync(mcpConfigPath, JSON.stringify(claudeJson));
-  const s = bootServer({ mcpFetch: fetch, mcpConfigPath });
+  const s = bootServer({
+    mcpFetch: fetch,
+    mcpConfigPath,
+    ...(githubApp !== undefined ? { mcpGithubApp: githubApp } : {}),
+  });
   onTestFinished(() => s.dispose());
   const base = `/api/teams/${s.team.id}/mcp-connectors`;
   const deps: McpConnectorDeps = {
@@ -75,6 +85,7 @@ function boot(fetch: typeof globalThis.fetch, claudeJson?: unknown) {
     fetch,
     oauthFetch: fetch,
     oauthState: s.mcpOAuthState,
+    ...(githubApp !== undefined ? { githubApp } : {}),
   };
   return { s, base, deps };
 }
@@ -833,5 +844,397 @@ describe('MCP connector OAuth', () => {
       (err: unknown) => err,
     );
     expect(String((failure as Error & { cause?: unknown }).cause)).toContain('non-public address');
+  });
+});
+
+const GH_MCP = 'https://api.githubcopilot.com/mcp/';
+const GH_APP = { clientId: 'Iv23-test-client', slug: 'cairn-test' } as const;
+
+interface GithubWorldOptions {
+  polls?: string[];
+  refresh?: 'ok' | 'bad' | 'down';
+  refreshGate?: Promise<void>;
+  mcpStatus?: number;
+}
+
+function githubWorld(opts: GithubWorldOptions = {}) {
+  const tokenRequests: URLSearchParams[] = [];
+  const installationAuth: string[] = [];
+  const polls = [...(opts.polls ?? ['complete'])];
+  let generation = 0;
+  let accessToken = 'none';
+  let installations = 0;
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    });
+  const issue = () => {
+    generation += 1;
+    accessToken = `ghu_ACCESS-${generation}`;
+    return json({
+      access_token: accessToken,
+      refresh_token: `ghr_REFRESH-${generation}`,
+      expires_in: 28_800,
+      refresh_token_expires_in: 15_897_600,
+      token_type: 'bearer',
+      scope: '',
+    });
+  };
+  const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    if (url.href === 'https://github.com/login/device/code')
+      return json({
+        device_code: 'DEVICE-SECRET-1',
+        user_code: 'ABCD-1234',
+        verification_uri: 'https://github.com/login/device',
+        expires_in: 900,
+        interval: 5,
+      });
+    if (url.href === 'https://github.com/login/oauth/access_token') {
+      const params = new URLSearchParams(await request.text());
+      tokenRequests.push(params);
+      if (params.get('grant_type') === 'refresh_token') {
+        await opts.refreshGate;
+        if (opts.refresh === 'bad') return json({ error: 'bad_refresh_token' });
+        if (opts.refresh === 'down') return new Response('', { status: 503 });
+        return issue();
+      }
+      const next = polls.shift() ?? 'authorization_pending';
+      if (next === 'complete') return issue();
+      if (next === 'slow_down') return json({ error: 'slow_down', interval: 10 });
+      return json({ error: next });
+    }
+    if (url.href === GH_MCP) {
+      if (opts.mcpStatus !== undefined) return new Response('', { status: opts.mcpStatus });
+      return fakeMcp({ token: accessToken }).fetch(request);
+    }
+    if (request.headers.get('authorization') !== `Bearer ${accessToken}`)
+      return new Response('', { status: 401 });
+    if (url.pathname === '/user') return json({ login: 'octo', id: 42, name: null });
+    if (url.pathname === '/user/installations') {
+      installationAuth.push(request.headers.get('authorization') ?? '');
+      return json({ total_count: installations, installations: [] });
+    }
+    return new Response('not found', { status: 404 });
+  }) as typeof globalThis.fetch;
+  return {
+    fetch,
+    tokenRequests,
+    installationAuth,
+    current: () => accessToken,
+    install: () => {
+      installations = 1;
+    },
+  };
+}
+
+function bootGithub(opts: GithubWorldOptions = {}, app: GithubAppRegistration = GH_APP) {
+  const world = githubWorld(opts);
+  const booted = boot(world.fetch, undefined, app);
+  const device = `${booted.base}/github/device`;
+  const texts: string[] = [];
+  const call = async (method: string, path: string, body?: unknown) => {
+    const res = await req(booted.s.app, method, path, body);
+    const text = await res.text();
+    texts.push(text);
+    return { status: res.status, body: text === '' ? null : JSON.parse(text) };
+  };
+  const start = (body: unknown = {}) => call('POST', device, body);
+  const poll = (attemptId: string, due = true) => {
+    const attempt = booted.s.mcpOAuthState.githubDevice.get(attemptId);
+    if (attempt && due) attempt.nextPollAt = 0;
+    return call('POST', `${device}/${attemptId}`);
+  };
+  const connect = async (body: unknown = {}) => {
+    const started = await start(body);
+    return poll(started.body.attemptId);
+  };
+  const rows = () => booted.s.db.select().from(mcpConnector).all();
+  const githubRow = () => rows().find((r) => r.authKind === 'github-app');
+  const sealed = () =>
+    JSON.parse(booted.s.secretBox.open(githubRow()?.oauthCipher ?? '')) as Record<string, unknown>;
+  const reseal = (patch: Record<string, unknown>) =>
+    booted.s.db
+      .update(mcpConnector)
+      .set({ oauthCipher: booted.s.secretBox.seal(JSON.stringify({ ...sealed(), ...patch })) })
+      .where(eq(mcpConnector.id, githubRow()?.id ?? ''))
+      .run();
+  const refreshes = () =>
+    world.tokenRequests.filter((p) => p.get('grant_type') === 'refresh_token');
+  return {
+    ...booted,
+    world,
+    texts,
+    call,
+    start,
+    poll,
+    connect,
+    rows,
+    githubRow,
+    sealed,
+    reseal,
+    refreshes,
+  };
+}
+
+describe('GitHub connector device sign-in', () => {
+  test('without a registered App the card stays on tokens and device sign-in is refused', async () => {
+    const t = bootGithub({}, null);
+    expect((await t.call('GET', `${t.base}/github`)).body).toEqual({
+      available: false,
+      installUrl: null,
+    });
+    expect((await t.start()).status).toBe(400);
+    expect(t.world.tokenRequests).toHaveLength(0);
+  });
+
+  test('sign-in connects a new connector, honors the interval and never returns secrets', async () => {
+    const t = bootGithub({ polls: ['authorization_pending', 'slow_down', 'complete'] });
+    expect((await t.call('GET', `${t.base}/github`)).body).toEqual({
+      available: true,
+      installUrl: 'https://github.com/apps/cairn-test/installations/new',
+    });
+    const started = await t.start();
+    expect(started.body).toMatchObject({
+      userCode: 'ABCD-1234',
+      verificationUri: 'https://github.com/login/device',
+      intervalSeconds: 5,
+      expiresInSeconds: 900,
+    });
+    const id = started.body.attemptId as string;
+    expect((await t.poll(id)).body).toEqual({ status: 'pending', intervalSeconds: 5 });
+    expect((await t.poll(id, false)).body).toEqual({ status: 'pending', intervalSeconds: 5 });
+    expect(t.world.tokenRequests).toHaveLength(1);
+    expect((await t.poll(id)).body).toEqual({ status: 'pending', intervalSeconds: 10 });
+    const done = await t.poll(id);
+    expect(done.body).toMatchObject({
+      status: 'complete',
+      connector: {
+        slug: 'github',
+        catalogId: 'github',
+        url: GH_MCP,
+        authKind: 'github-app',
+        account: 'octo',
+        status: 'connected',
+        toolCount: 2,
+      },
+    });
+    expect((await t.poll(id)).status).toBe(404);
+    const grant = t.world.tokenRequests[0];
+    expect(grant?.get('client_id')).toBe(GH_APP.clientId);
+    expect(grant?.has('client_secret')).toBe(false);
+    expect((await t.call('GET', t.base)).body[0]).toMatchObject({ account: 'octo' });
+    expect(t.githubRow()?.oauthCipher).not.toContain('ghu_');
+    expect(t.sealed()).toMatchObject({ login: 'octo', userId: 42, refreshToken: 'ghr_REFRESH-1' });
+    for (const text of t.texts) {
+      for (const secret of ['ghu_', 'ghr_', 'DEVICE-SECRET']) expect(text).not.toContain(secret);
+    }
+  });
+
+  test('denied, expired and failed polls end the attempt; cancelled or foreign attempts are 404', async () => {
+    for (const [answer, status] of [
+      ['access_denied', 'denied'],
+      ['expired_token', 'expired'],
+      ['device_flow_disabled', 'failed'],
+    ] as const) {
+      const t = bootGithub({ polls: [answer] });
+      const started = await t.start();
+      expect((await t.poll(started.body.attemptId)).body).toEqual({ status });
+      expect((await t.poll(started.body.attemptId)).status).toBe(404);
+      expect(t.rows()).toHaveLength(0);
+    }
+    const t = bootGithub();
+    const lapsed = await t.start();
+    const attempt = t.s.mcpOAuthState.githubDevice.get(lapsed.body.attemptId);
+    if (attempt) attempt.expiresAt = 1;
+    expect((await t.poll(lapsed.body.attemptId)).body).toEqual({ status: 'expired' });
+    const cancelled = await t.start();
+    const path = `${t.base}/github/device/${cancelled.body.attemptId}`;
+    expect((await t.call('DELETE', path)).status).toBe(204);
+    expect((await t.poll(cancelled.body.attemptId)).status).toBe(404);
+    const foreign = await t.start();
+    for (const who of [
+      { teamId: 'other-team', userId: t.s.user.id },
+      { teamId: t.s.team.id, userId: 'someone-else' },
+    ])
+      await expect(
+        pollGithubConnectorDevice(t.deps, { ...who, attemptId: foreign.body.attemptId }),
+      ).rejects.toMatchObject({ status: 404 });
+    expect(t.world.tokenRequests).toHaveLength(0);
+    expect(t.rows()).toHaveLength(0);
+  });
+
+  test('a new sign-in takes the next free slug, leaves a token connector editable and refuses a slug taken meanwhile', async () => {
+    const t = bootGithub({ polls: ['complete', 'complete'] });
+    const pat = await t.call('POST', t.base, {
+      kind: 'catalog',
+      catalogId: 'github',
+      slug: 'github',
+      token: 'ghp_PAT-SECRET-1',
+    });
+    expect((await t.connect()).body.connector).toMatchObject({ slug: 'github-2' });
+    const edited = await t.call('PATCH', `${t.base}/${pat.body.id}`, {
+      token: 'ghp_PAT-SECRET-2',
+      options: { readonly: 'true' },
+    });
+    expect(edited.status).toBe(200);
+    expect(edited.body).toMatchObject({ authKind: 'static', headerNames: expect.any(Array) });
+    const started = await t.start();
+    await t.call('POST', t.base, {
+      kind: 'custom',
+      slug: 'github-3',
+      label: 'Other',
+      url: 'https://mcp.other.test/mcp',
+    });
+    const raced = await t.poll(started.body.attemptId);
+    expect(raced.status).toBe(409);
+    expect(t.rows().map((r) => [r.slug, r.authKind])).toEqual(
+      expect.arrayContaining([
+        ['github', 'static'],
+        ['github-2', 'github-app'],
+        ['github-3', 'none'],
+      ]),
+    );
+    expect(t.rows()).toHaveLength(3);
+  });
+
+  test('reconnect replaces the pair on the same row; a stale or wrong-kind reconnect is refused', async () => {
+    const t = bootGithub({ polls: ['complete', 'complete', 'complete'] });
+    const first = (await t.connect()).body.connector;
+    const again = await t.connect({ connectorId: first.id });
+    expect(again.body.connector).toMatchObject({ id: first.id, status: 'connected' });
+    expect(t.githubRow()).toMatchObject({ authRevision: 2, tokenGeneration: 2 });
+    expect(t.sealed()).toMatchObject({ accessToken: 'ghu_ACCESS-2' });
+    const stale = await t.start({ connectorId: first.id });
+    t.s.db.update(mcpConnector).set({ authRevision: 7 }).run();
+    expect((await t.poll(stale.body.attemptId)).status).toBe(409);
+    expect(t.sealed()).toMatchObject({ accessToken: 'ghu_ACCESS-2' });
+    const custom = await t.call('POST', t.base, {
+      kind: 'custom',
+      slug: 'acme',
+      label: 'Acme',
+      url: 'https://mcp.acme.test/mcp',
+    });
+    expect((await t.start({ connectorId: custom.body.id })).status).toBe(400);
+  });
+
+  test('a token close to expiry is refreshed once through the device core, without a client secret', async () => {
+    let release = () => {};
+    const t = bootGithub({
+      refreshGate: new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    });
+    await t.connect();
+    t.reseal({ expiresAt: Date.now() + 5 * 60_000 });
+    const pending = [
+      stepConnectorEndpoints(t.deps, t.s.team.id, ['github']),
+      stepConnectorEndpoints(t.deps, t.s.team.id, ['github']),
+    ];
+    release();
+    const both = await Promise.all(pending);
+    expect(both.map((r) => r.mcpConnectors?.[0]?.headers)).toEqual([
+      { Authorization: 'Bearer ghu_ACCESS-2' },
+      { Authorization: 'Bearer ghu_ACCESS-2' },
+    ]);
+    expect(t.refreshes()).toHaveLength(1);
+    expect(Object.fromEntries(t.refreshes()[0] ?? [])).toEqual({
+      client_id: GH_APP.clientId,
+      grant_type: 'refresh_token',
+      refresh_token: 'ghr_REFRESH-1',
+    });
+    expect(t.githubRow()).toMatchObject({ tokenGeneration: 2, status: 'connected' });
+    expect(t.sealed()).toMatchObject({ refreshToken: 'ghr_REFRESH-2', login: 'octo' });
+  });
+
+  test('a rejected or lapsed refresh asks for reconnect; a GitHub outage is an error', async () => {
+    const bad = bootGithub({ refresh: 'bad' });
+    await bad.connect();
+    bad.reseal({ expiresAt: 1 });
+    expect(
+      await checkMcpConnector(bad.deps, bad.s.team.id, bad.githubRow()?.id ?? ''),
+    ).toMatchObject({ status: 'needs_auth', statusReason: 'refresh_rejected' });
+    expect(await stepConnectorEndpoints(bad.deps, bad.s.team.id, ['github'])).toEqual({
+      withheldMcp: ['github'],
+    });
+
+    const lapsed = bootGithub();
+    await lapsed.connect();
+    lapsed.reseal({ expiresAt: 1, refreshExpiresAt: 1 });
+    expect(
+      await checkMcpConnector(lapsed.deps, lapsed.s.team.id, lapsed.githubRow()?.id ?? ''),
+    ).toMatchObject({ status: 'needs_auth', statusReason: 'expired' });
+    expect(lapsed.refreshes()).toHaveLength(0);
+
+    const down = bootGithub({ refresh: 'down' });
+    await down.connect();
+    down.reseal({ expiresAt: 1 });
+    expect(
+      await checkMcpConnector(down.deps, down.s.team.id, down.githubRow()?.id ?? ''),
+    ).toMatchObject({ status: 'error', statusReason: 'refresh_failed' });
+  });
+
+  test('a refresh that lands after delete or reconnect writes nothing', async () => {
+    let release = () => {};
+    const t = bootGithub({
+      polls: ['complete', 'complete'],
+      refreshGate: new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    });
+    const id = (await t.connect()).body.connector.id as string;
+    const refresh = refreshMcpConnectorToken(t.deps, t.s.team.id, id);
+    await t.connect({ connectorId: id });
+    const cipher = t.githubRow()?.oauthCipher;
+    release();
+    await refresh;
+    expect(t.githubRow()).toMatchObject({ oauthCipher: cipher, authRevision: 2 });
+
+    let releaseAgain = () => {};
+    const gone = bootGithub({
+      refreshGate: new Promise<void>((resolve) => {
+        releaseAgain = resolve;
+      }),
+    });
+    const goneId = (await gone.connect()).body.connector.id as string;
+    const late = refreshMcpConnectorToken(gone.deps, gone.s.team.id, goneId);
+    expect((await gone.call('DELETE', `${gone.base}/${goneId}`)).status).toBe(204);
+    releaseAgain();
+    await late;
+    expect(gone.rows()).toHaveLength(0);
+  });
+
+  test('a 403 from GitHub MCP is an error, and edits refuse credentials but keep the label', async () => {
+    const t = bootGithub({ mcpStatus: 403 });
+    expect((await t.connect()).body.connector).toMatchObject({
+      status: 'error',
+      statusReason: 'forbidden',
+    });
+    const id = t.githubRow()?.id ?? '';
+    for (const patch of [{ token: 'ghp_x1234567' }, { options: { readonly: 'true' } }])
+      expect((await t.call('PATCH', `${t.base}/${id}`, patch)).status).toBe(400);
+    const renamed = await t.call('PATCH', `${t.base}/${id}`, { label: 'Work GitHub' });
+    expect(renamed.body).toMatchObject({ label: 'Work GitHub', authKind: 'github-app' });
+  });
+
+  test('done re-reads the installations with the connector token', async () => {
+    const t = bootGithub();
+    const id = (await t.connect()).body.connector.id as string;
+    const path = `${t.base}/${id}/github/installations`;
+    expect((await t.call('POST', path)).body).toEqual({ installed: false });
+    t.world.install();
+    expect((await t.call('POST', path)).body).toEqual({ installed: true });
+    expect(t.world.installationAuth).toEqual(['Bearer ghu_ACCESS-1', 'Bearer ghu_ACCESS-1']);
+  });
+
+  test('device routes are owner-only and the availability read is not', () => {
+    const path = '/api/teams/t1/mcp-connectors';
+    expect(isOwnerOnlyRoute('POST', `${path}/github/device`)).toBe(true);
+    expect(isOwnerOnlyRoute('POST', `${path}/github/device/a1`)).toBe(true);
+    expect(isOwnerOnlyRoute('DELETE', `${path}/github/device/a1`)).toBe(true);
+    expect(isOwnerOnlyRoute('POST', `${path}/c1/github/installations`)).toBe(true);
+    expect(isOwnerOnlyRoute('GET', `${path}/github`)).toBe(false);
   });
 });

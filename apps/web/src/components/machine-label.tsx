@@ -89,9 +89,7 @@ export function MachineIcon({
   return (
     <span
       data-slot="machine-os-icon"
-      role="img"
-      aria-label={identity?.label}
-      aria-hidden={identity === null ? true : undefined}
+      aria-hidden
       title={identity?.label}
       className={cn('inline-flex size-5 flex-none items-center justify-center', className)}
     >

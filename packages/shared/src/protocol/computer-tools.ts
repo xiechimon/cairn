@@ -25,17 +25,23 @@ export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'browser_act',
     description:
-      'Act on the current page using refs from browser_snapshot. Each action rechecks its ref against a fresh snapshot before running. Supported kinds: click, fill, type, press, hover, select, check, uncheck, scrollintoview.',
+      'Act on the current page using fresh snapshot refs. For passwords use fill_secret with the saved secret name and current website origin. First use asks the owner to approve that website in chat; wait for approval, then take a fresh snapshot and retry. Never send a plaintext password or one-time code. CAPTCHA and second factors use request_takeover.',
     parameters: obj(
       {
         actions: arr(
           obj(
             {
               kind: str(
-                'One of click, fill, type, press, hover, select, check, uncheck, scrollintoview.',
+                'One of click, fill, fill_secret, type, press, hover, select, check, uncheck, scrollintoview.',
               ),
               ref: str('Interactive ref from browser_snapshot, for example @e1.'),
               text: str('Text for fill, type, press or select.'),
+              secret: str(
+                'Saved workspace secret name for fill_secret; never its value. Use only kind, ref, secret and origin.',
+              ),
+              origin: str(
+                'Exact current website origin for fill_secret, including scheme and port but no path; for example https://example.com.',
+              ),
               paths: arr({ type: 'string' }, 'File paths for upload actions when supported.'),
             },
             ['kind'],

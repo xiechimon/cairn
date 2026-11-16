@@ -1,4 +1,5 @@
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
@@ -14,7 +15,7 @@ import {
   seedWorld,
   waitFor,
 } from './helpers.js';
-import { type StubLlm, startStubLlm } from './stub-llm.js';
+import { type StubLlm, type StubResponse, startStubLlm } from './stub-llm.js';
 
 let stub: StubLlm;
 let server: RealServer;
@@ -27,7 +28,7 @@ function logLines(): string[] {
 }
 
 beforeAll(async () => {
-  stub = await startStubLlm([
+  const responses: StubResponse[] = [
     {
       toolCall: {
         name: 'bash',
@@ -38,7 +39,20 @@ beforeAll(async () => {
       delayMs: 8_000,
     },
     { content: '收到，补上。' },
-  ]);
+  ];
+  let continued = false;
+  stub = await startStubLlm((request, index) => {
+    if (!continued && JSON.stringify(request.messages).includes('晚到的一条')) {
+      continued = true;
+      return {
+        toolCall: {
+          name: 'bash',
+          arguments: { command: "printf 'continued probe\\n' >> README.md" },
+        },
+      };
+    }
+    return responses[Math.min(index, responses.length - 1)]!;
+  });
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
   home = makeTestTempDir('cairn-w3-steer-home-');
   const config = loadDaemonConfig(
@@ -76,7 +90,7 @@ afterAll(async () => {
 });
 
 describe('W3 steer E2E: message while building → pending → signal → pull-confirm → session.steer', () => {
-  test('full-chain delivery + rendering + undisturbed step finish + gate reject', async () => {
+  test('full-chain delivery + rendering + undisturbed step finish + completed-thread continuation', async () => {
     const world = await seedWorld(server.url, server.teamId, {
       title: 'steer 探针',
       spec: '写一行 steer 探针。',
@@ -102,12 +116,22 @@ describe('W3 steer E2E: message while building → pending → signal → pull-c
       true,
     );
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
 
     const late = await api(server.url, 'POST', `/api/conversations/${buildId}/messages`, {
       content: '晚到的一条',
     });
-    expect(late.status).toBe(409);
-    expect(Object.keys(late.body as object)).toEqual(['error']);
+    expect(late.status).toBe(201);
+    expect(late.body).toMatchObject({ conversationId: buildId, delivered: 'new-turn' });
+    await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
+    expect(JSON.stringify(stub.requests.at(-1)?.messages)).toContain('晚到的一条');
+    expect(readFileSync(join(paths.workspacesDir, buildId, 'README.md'), 'utf8')).toContain(
+      'continued probe',
+    );
+    const continued = await api(server.url, 'GET', `/api/conversations/${buildId}/messages`);
+    const continuedBody = continued.body as { messages: { role: string; content: unknown }[] };
+    expect(
+      continuedBody.messages.some((m) => m.role === 'user' && m.content === '晚到的一条'),
+    ).toBe(true);
   }, 240_000);
 });

@@ -102,11 +102,11 @@ export function ComposerSetupHint({ step: { next, models } }: { step: ComposerSe
       ...(models.tasks
         ? {
             label: t('Coordinator 还缺模型'),
-            hint: t('添加一个服务商，Coordinator 用不了 Claude Code 登录'),
+            hint: t('添加一个 Coordinator 能用的服务商，或 Claude 订阅加装好 Claude Code 的执行机'),
           }
         : {
             label: t('接入模型来源'),
-            hint: t('添加模型服务商，或在执行机上登录 Claude Code'),
+            hint: t('添加模型服务商，或添加 Claude 订阅'),
           }),
     },
     machine: {

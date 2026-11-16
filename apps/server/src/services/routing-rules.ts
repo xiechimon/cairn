@@ -23,7 +23,6 @@ import {
   withPlatform,
 } from '@cairn/shared';
 import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
-import { codexLoginAvailable, usesHostCodexLogin } from '../coordinator/codex-login.js';
 import { builtinModelIds, isBuiltinProvider } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
 import {
@@ -38,10 +37,9 @@ import {
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
-import { machineRuntimeAvailable } from './dispatch-eligibility.js';
+import { claudeCodeUsable, machineRuntimeAvailable } from './dispatch-eligibility.js';
 import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
 import { decideStepRoute } from './step-route.js';
 
@@ -91,7 +89,6 @@ const DEFAULT_COORDINATOR_RULE_ID = 'default-coordinator';
 const COORDINATOR_MODEL_PREFERENCE = [/haiku/i, /sonnet/i];
 const CLAUDE_CODE_COORDINATOR_MODEL = 'claude-sonnet-5-5';
 const ANTHROPIC_API_HOST = 'api.anthropic.com';
-export const CODEX_LOGIN_PRESENT = new Set(['ok', 'expired']);
 
 export function keylessEndpoint(providerId: string): boolean {
   const presets: readonly string[] = PROVIDER_PRESET_IDS;
@@ -107,7 +104,6 @@ function servingProviders(
   return db
     .select({
       providerId: provider.providerId,
-      baseUrl: provider.baseUrl,
       models: provider.models,
       keyed: sql<number>`${provider.apiKeyCipher} is not null`,
     })
@@ -121,10 +117,7 @@ function servingProviders(
       const builtin =
         !storedOnly && modelId !== null && builtinModelIds(row.providerId).has(modelId);
       if (!stored && !builtin) return [];
-      const runnable =
-        row.keyed === 1 ||
-        keylessEndpoint(row.providerId) ||
-        usesHostCodexLogin(row.providerId, row.baseUrl);
+      const runnable = row.keyed === 1 || keylessEndpoint(row.providerId);
       return [
         { providerId: row.providerId, runnable, rank: (stored ? 0 : 2) + (runnable ? 0 : 1) },
       ];
@@ -168,27 +161,6 @@ function ruleRow(db: Pick<Db, 'select'>, teamId: string, use: RouteUse): Routing
   return row === null ? null : resolveRuleProvider(db, row);
 }
 
-function sessionHarness(
-  db: Pick<Db, 'select'>,
-  teamId: string,
-): 'claude-code' | 'codex-login' | null {
-  const rows = db
-    .select({
-      claudeCodeReport: machine.claudeCodeReport,
-      capabilities: machine.capabilities,
-    })
-    .from(machine)
-    .where(eq(machine.teamId, teamId))
-    .all();
-  if (rows.some((row) => machineRuntimeAvailable(row, 'claude-code'))) {
-    return 'claude-code';
-  }
-  const codex = rows.some((row) =>
-    CODEX_LOGIN_PRESENT.has(row.capabilities?.codexLogin?.state ?? 'absent'),
-  );
-  return codex ? 'codex-login' : null;
-}
-
 function providerSessionChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
@@ -211,9 +183,12 @@ export function defaultSessionChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
 ): (SessionDefault & { provider: string; modelId: string }) | null {
-  const harness = sessionHarness(db, teamId);
-  if (harness !== null) {
-    return { reason: harness, provider: DEFAULT_SESSION_PROVIDER, modelId: DEFAULT_SESSION_MODEL };
+  if (claudeCodeUsable(db, teamId)) {
+    return {
+      reason: 'claude-code',
+      provider: DEFAULT_SESSION_PROVIDER,
+      modelId: DEFAULT_SESSION_MODEL,
+    };
   }
   const choice = providerSessionChoice(db, teamId);
   return choice === null ? null : { reason: 'provider', ...choice };
@@ -253,23 +228,6 @@ export function anthropicCoordinatorChoice(
   return modelId === undefined ? null : { provider: source.providerId, modelId };
 }
 
-function claudeCodeCoordinatorChoice(
-  db: Pick<Db, 'select'>,
-  teamId: string,
-): { provider: string; modelId: string } | null {
-  const machines = db
-    .select({ claudeCodeReport: machine.claudeCodeReport, capabilities: machine.capabilities })
-    .from(machine)
-    .where(eq(machine.teamId, teamId))
-    .all();
-  const installed = machines.filter((row) => machineRuntimeAvailable(row, 'claude-code'));
-  if (installed.length === 0) return null;
-  const signedIn =
-    hasActiveClaudeSubscription({ db }, teamId) ||
-    installed.some((row) => row.claudeCodeReport?.auth?.state === 'logged-in');
-  return signedIn ? { provider: 'claude-code', modelId: CLAUDE_CODE_COORDINATOR_MODEL } : null;
-}
-
 export function defaultCoordinatorChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
@@ -279,7 +237,6 @@ export function defaultCoordinatorChoice(
   const rows = db
     .select({
       providerId: provider.providerId,
-      baseUrl: provider.baseUrl,
       models: provider.models,
       keyed: sql<number>`${provider.apiKeyCipher} is not null`,
     })
@@ -288,18 +245,15 @@ export function defaultCoordinatorChoice(
     .orderBy(asc(provider.createdAt), asc(provider.id))
     .all();
   for (const row of rows) {
-    const runnable =
-      row.keyed === 1 ||
-      keylessEndpoint(row.providerId) ||
-      (usesHostCodexLogin(row.providerId, row.baseUrl) && codexLoginAvailable());
-    if (!runnable) continue;
+    if (row.keyed !== 1 && !keylessEndpoint(row.providerId)) continue;
     const model = row.models.find((m) => m.id !== '');
     if (model !== undefined) {
       return { reason: 'provider', provider: row.providerId, modelId: model.id };
     }
   }
-  const claudeCode = claudeCodeCoordinatorChoice(db, teamId);
-  return claudeCode === null ? null : { reason: 'claude-code', ...claudeCode };
+  return claudeCodeUsable(db, teamId)
+    ? { reason: 'claude-code', provider: 'claude-code', modelId: CLAUDE_CODE_COORDINATOR_MODEL }
+    : null;
 }
 
 export function defaultCoordinatorRule(
@@ -512,7 +466,7 @@ export function profileForStep(
     const stockSeed =
       base.provider === DEFAULT_SESSION_PROVIDER && base.modelId === DEFAULT_SESSION_MODEL;
     const choice =
-      stockSeed && sessionHarness(db, todoRow.teamId) === null
+      stockSeed && !claudeCodeUsable(db, todoRow.teamId)
         ? providerSessionChoice(db, todoRow.teamId)
         : null;
     return choice === null ? base : { ...base, ...choice };

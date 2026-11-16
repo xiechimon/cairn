@@ -9,6 +9,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
 
   test('failure mode 1: claude-code step → executed by the claude backend, zero pi sessions + exactly one lazy line', async () => {
     const api = new FakeMachineApi();
+    api.claudeSubscriptionToken = 'backends-subscription-token';
     const { backend: pi, created: piCreated } = fakeBackend([{ type: 'done', usage: [] }]);
     const { backend: claude, created: claudeCreated } = fakeBackend([{ type: 'done', usage: [] }]);
     const { handle, lines } = await boot({ api, backend: pi, claudeCodeBackend: claude });
@@ -41,7 +42,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     await handle.done;
   });
 
-  test('failure mode 4: runtime step + no local claude credentials → fails before the step, wording names the local machine (#867 T6)', async () => {
+  test('failure mode 4: runtime step without a subscription token fails before the step, even with a local login', async () => {
     const api = new FakeMachineApi();
     const { backend: pi, created: piCreated } = fakeBackend([]);
     const { backend: claude, created: claudeCreated } = fakeBackend([]);
@@ -49,15 +50,19 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
       api,
       backend: pi,
       claudeCodeBackend: claude,
-      claudeCodeAuthProbe: async () => ({ state: 'not-logged-in', provider: 'firstParty' }),
+      claudeCodeAuthProbe: async () => ({
+        state: 'logged-in',
+        method: 'claude.ai',
+        provider: 'firstParty',
+      }),
     });
     await waitFor(() => api.parked !== null);
     api.parked?.(claudeClaimed());
     await waitFor(() => api.doneBodies.length === 1);
     expect(api.doneBodies[0]?.body.status).toBe('failed');
     const msg = api.doneBodies[0]?.body.errorMessage ?? '';
-    expect(msg).toContain('test-mbp');
-    expect(msg).toContain('ANTHROPIC_API_KEY');
+    expect(msg).toContain('claude setup-token');
+    expect(msg).toContain('设置 → 模型服务');
     expect(claudeCreated).toHaveLength(0);
     expect(piCreated).toHaveLength(0);
     expect(lines.some((l) => l === 'Loading claude-code runtime…')).toBe(false);
@@ -67,6 +72,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
 
   test('failure mode 3: mixed step flow (claude step + pi step) → each to its own backend, still exactly one lazy line', async () => {
     const api = new FakeMachineApi();
+    api.claudeSubscriptionToken = 'backends-subscription-token';
     const { backend: pi, created: piCreated } = fakeBackend([{ type: 'done', usage: [] }]);
     const { backend: claude, created: claudeCreated } = fakeBackend([{ type: 'done', usage: [] }]);
     const { handle, lines } = await boot({ api, backend: pi, claudeCodeBackend: claude });

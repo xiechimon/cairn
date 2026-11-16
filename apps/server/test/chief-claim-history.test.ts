@@ -18,7 +18,13 @@ import {
   setCoordinatorServerContextEnabled,
 } from '../src/services/coordinator-context.js';
 import { claimStep } from '../src/services/machines.js';
-import { bootServer, insertMachine, seedRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertClaudeSubscription,
+  insertMachine,
+  seedRoute,
+  type TestServer,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -31,6 +37,7 @@ function world(provider = 'claude-code') {
   setCoordinatorInServer(true);
   setCoordinatorServerContextEnabled(true);
   const s = bootServer({ githubFetch: async () => new Response('[]') });
+  insertClaudeSubscription(s);
   disposables.push(() => s.dispose());
   const report = {
     installed: true,

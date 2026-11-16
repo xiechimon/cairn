@@ -12,6 +12,10 @@ import {
 } from '@cairn/shared';
 import { type ReactNode, useEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
+import {
+  hasUsableClaudeSubscription,
+  useClaudeSubscriptions,
+} from '../api/claude-subscriptions.js';
 import { ApiError } from '../api/client.js';
 import { useMachines, useModelSources } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
@@ -49,7 +53,7 @@ const STORED_ONLY_USES: readonly RouteUse[] = ['digest', 'compaction'];
 
 const USE_HINTS: Partial<Record<RouteUse, string>> = {
   coordinator: '你对话的协调者，派活和汇报',
-  digest: '每日报告和对话摘要',
+  digest: '对话摘要',
   compaction: '上下文快满时压缩对话',
 };
 
@@ -73,18 +77,16 @@ function SessionDefaultHint({
   );
   const text =
     sessionDefault.reason === 'claude-code'
-      ? t('当前默认：Claude Code（因为有执行机装了 Claude Code）')
-      : sessionDefault.reason === 'codex-login'
-        ? t('当前默认：Codex（因为有执行机登录了 Codex）')
-        : sessionDefault.reason === 'provider'
-          ? t(
-              '当前默认：{model} · {provider}（因为还没有执行机装 Claude Code，用最早添加的服务商）',
-              {
-                model: row?.modelName ?? sessionDefault.modelId ?? '',
-                provider: row?.providerLabel ?? sessionDefault.provider ?? '',
-              },
-            )
-          : t('当前没有可用的默认：添加服务商，或在执行机上装 Claude Code');
+      ? t('当前默认：Claude Code（因为团队有 Claude 订阅，执行机也装了 Claude Code）')
+      : sessionDefault.reason === 'provider'
+        ? t(
+            '当前默认：{model} · {provider}（因为还没有 Claude 订阅或装了 Claude Code 的执行机，用最早添加的服务商）',
+            {
+              model: row?.modelName ?? sessionDefault.modelId ?? '',
+              provider: row?.providerLabel ?? sessionDefault.provider ?? '',
+            },
+          )
+        : t('当前没有可用的默认：添加服务商，或添加 Claude 订阅并在执行机上装 Claude Code');
   return <span data-testid="routing-session-default">{text}</span>;
 }
 
@@ -195,7 +197,8 @@ export function ModelPicker({
       </SelectTrigger>
       <SelectContent
         className="routing-rule-model-menu w-max min-w-(--anchor-width) max-w-(--available-width)"
-        {...(trigger === undefined ? {} : { alignItemWithTrigger: false, align: 'end' as const })}
+        alignItemWithTrigger={false}
+        {...(trigger === undefined ? {} : { align: 'end' as const })}
       >
         {runtimes.map((runtime) => (
           <SelectGroup key={runtime}>
@@ -318,6 +321,7 @@ export function RoutingSettingsPage() {
   const modelSourcesQ = useModelSources(teamId, live);
   const mutations = useRoutingSettingsMutations(teamId);
   const topModelsQ = useTopModels(teamId, live);
+  const subscriptionsQ = useClaudeSubscriptions(teamId, live);
   const topModelMutations = useTopModelsMutations(teamId);
   const settings = live
     ? (settingsQ.data ?? EMPTY_SETTINGS)
@@ -329,7 +333,12 @@ export function RoutingSettingsPage() {
     live ? (modelSourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
   const storedTopModels = live ? topModelsQ.data?.models : fixture.resources?.topModels;
-  const topModels = storedTopModels ?? suggestedTopModels(options);
+  const topModels =
+    storedTopModels ??
+    suggestedTopModels(
+      options,
+      !live || hasUsableClaudeSubscription(subscriptionsQ.data, Date.now()),
+    );
   const { hash } = useLocation();
   const loaded = !live || settingsQ.data !== undefined;
   useEffect(() => {

@@ -59,27 +59,17 @@ export function isWaiting(section: TaskSection): boolean {
   return WAITING.has(section);
 }
 
-function prWhat(pr: PrPanelRow): Phrase {
-  const { passed, failed, running, total } = pr.checks;
-  if (failed > 0) return { key: 'PR #{n} 有 {f} 项检查没过', params: { n: pr.number, f: failed } };
-  if (running > 0 || total === 0) return { key: 'PR #{n} 检查还在跑', params: { n: pr.number } };
-  return { key: 'PR #{n} 检查 {p}/{t} 通过', params: { n: pr.number, p: passed, t: total } };
-}
-
-function openPr(pr: PrPanelRow | undefined): PrPanelRow | undefined {
-  return pr !== undefined && (pr.state === 'open' || pr.state === 'draft') ? pr : undefined;
-}
-
 export function taskRowCopy(entry: TaskEntry, pr?: PrPanelRow): TaskRowCopy {
   const { todo, section } = entry;
   const base = { waiting: isWaiting(section), running: false };
   switch (section) {
-    case 'ready_for_review': {
-      const live = openPr(pr);
-      if (live !== undefined)
-        return { ...base, word: '待审阅', what: prWhat(live), where: '到 PR 卡合并' };
-      return { ...base, word: '待审阅', what: { key: '改动写好了' }, where: '到任务里看改动' };
-    }
+    case 'ready_for_review':
+      return {
+        ...base,
+        word: '待审阅',
+        what: { key: threadCopy(todo).reason },
+        where: null,
+      };
     case 'needs_input':
       if (todo.phase === 'confirm')
         return { ...base, word: '待回答', what: { key: '计划写好了' }, where: '到任务里批准计划' };

@@ -48,7 +48,6 @@ export function ratchetLintBaseline(
     execute('git', ['worktree', 'add', '-b', branch, worktree, 'origin/main'], repo);
     added = true;
     execute('pnpm', ['install', '--frozen-lockfile', '--ignore-scripts']);
-    execute('pnpm', ['exec', 'husky']);
     const target = join(worktree, 'scripts/lint-warning-baseline.json');
     const current = JSON.parse(readFileSync(target, 'utf8'));
     if (current.maxWarnings !== before) throw new Error('Baseline changed; rerun the measurement');

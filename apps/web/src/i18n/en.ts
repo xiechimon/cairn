@@ -233,21 +233,19 @@ export const EN: Record<string, string> = {
     'Research reports and other documents show up here once they finish.',
   新建项目: 'New project',
   接入模型来源: 'Connect a model source',
-  '添加模型服务商，或在执行机上登录 Claude Code':
-    'Add a provider, or sign in to Claude Code on a Runner',
+  '添加模型服务商，或添加 Claude 订阅': 'Add a provider, or add a Claude subscription',
   连接一台执行机: 'Connect a Runner',
   'Coordinator 还缺模型': 'The Coordinator needs a model',
-  '添加一个服务商，Coordinator 用不了 Claude Code 登录':
-    'Add a provider; the Coordinator cannot use a Claude Code sign-in',
+  '添加一个 Coordinator 能用的服务商，或 Claude 订阅加装好 Claude Code 的执行机':
+    'Add a provider the Coordinator can use, or a Claude subscription and a Runner with Claude Code',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
   '因为你添加了 Anthropic API key': 'Because you added an Anthropic API key',
   '因为这是最早添加、Coordinator 能直接用的服务商':
     'Because it is the earliest added provider the Coordinator can use',
-  '因为这台电脑登录了 Claude Code，任务直接用订阅额度':
-    'Because this computer is signed in to Claude Code, tasks use your subscription',
-  '因为这台电脑登录了 Codex': 'Because this computer is signed in to Codex',
-  '因为还没有 Claude Code，用最早添加的服务商':
-    'Because there is no Claude Code yet, the earliest added provider is used',
+  '因为你添加了 Claude 订阅，任务直接用订阅额度':
+    'Because you added a Claude subscription, tasks use it',
+  '因为还没有 Claude 订阅，用最早添加的服务商':
+    'Because there is no Claude subscription yet, the earliest added provider is used',
   已保存: 'Saved',
   '和你对话、拆任务、派活': 'Talks with you, breaks work down and hands it out',
   '写代码和做调研的 Agent 默认用它': 'The default for agents that write code and do research',
@@ -257,10 +255,10 @@ export const EN: Record<string, string> = {
   换一个: 'Change',
   'Claude 订阅、API key 或本地模型': 'A Claude subscription, an API key or a local model',
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
-  '订阅已保存。这台电脑还没找到 Claude Code，装好它之后会自动用上。':
-    'Subscription saved. Claude Code was not found on this computer; it will be used once you install it.',
-  '因为你登录了 Claude 订阅，Coordinator 直接用它':
-    'Because you signed in with a Claude subscription, the Coordinator uses it directly',
+  '订阅已保存，这台电脑装好 Claude\u00a0Code 后会自动用上。现在先添加一个服务商，Coordinator 就能开始工作。':
+    'Subscription saved. It will be used once Claude Code is installed on this computer. Add a provider now so the Coordinator can start.',
+  '因为你添加了 Claude 订阅，Coordinator 直接用它':
+    'Because you added a Claude subscription, the Coordinator uses it directly',
   '先跳过，去主页看看': 'skip for now and look around',
   '欢迎使用 Cairn': 'Welcome to Cairn',
   'Cairn 在这台电脑上跑 Agent，用你自己的模型。配好模型就能开始对话。':
@@ -825,6 +823,7 @@ export const EN: Record<string, string> = {
   基本信息: 'Basic info',
   标签: 'Tags',
   'Cairn 托管': 'Cairn hosted',
+  '没有仓库，可让 Coordinator 连接': 'No repository yet; the Coordinator can connect one',
   目标分支: 'Target branch',
   '{branch}（默认）': '{branch} (default)',
   默认分支: 'Default branch',
@@ -993,8 +992,8 @@ export const EN: Record<string, string> = {
     'Queued: a local project only runs on the Runner that holds it, so this Runner cannot run it ({ahead} ahead)',
   '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
     'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在执行机上运行 claude 登录（前面 {ahead} 个）':
-    'Queued: Claude is not signed in. Add a Claude subscription (run claude setup-token in a terminal) or run claude on the Runner to sign in ({ahead} ahead)',
+  '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型服务（前面 {ahead} 个）':
+    'Queued: the team has no usable Claude subscription. Run claude setup-token in a terminal and add the token under Model services ({ahead} ahead)',
   '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
     'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks ({ahead} ahead)',
   '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
@@ -1005,8 +1004,6 @@ export const EN: Record<string, string> = {
     'Queued: a local project only runs on the Runner that holds it, so {machine} cannot run it ({ahead} ahead)',
   '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
     'Queued: Claude is rate limited on {machine}; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在 {machine} 上运行 claude 登录（前面 {ahead} 个）':
-    'Queued: Claude is not signed in. Add a Claude subscription (run claude setup-token in a terminal) or run claude on {machine} to sign in ({ahead} ahead)',
   '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）':
     'Queued: the Claude account was switched and this step keeps the old account. Stop it, then continue, to start over on the new account ({ahead} ahead)',
   'Coordinator 规则用的服务商「{name}」还没添加':
@@ -1065,32 +1062,10 @@ export const EN: Record<string, string> = {
   复制链接: 'Copy link',
   暂停: 'Snooze',
   撤销: 'Undo',
-  完成任务: 'Complete task',
   负责人: 'Owner',
   'Coordinator 用的模型额度已用完': "The Coordinator's model is out of quota",
   'Coordinator 用的模型暂时过载': "The Coordinator's model is overloaded",
-  将改动合并到默认分支: 'Merge the changes into the default branch',
-  // #1313：已上报且文件集为空时完成弹层不提供合并勾选。
-  '本轮没有文件改动，完成不会合并分支。':
-    'This round has no file changes. Completing will not merge the branch.',
-  '信息卡的产出是报告附件，不进合并。':
-    'An info card delivers a report attachment and is never merged.',
-  // XMON-89 合并被拒的可见化：前置缺项行（{tools} = 1~2 个开关名的顿号串；
-  // 开关名本身是 shared AGENT_TOOL_SWITCHES 的 zh 值域词，locate 后仍按 zh
-  // 出现——与权限 tab 的开关行一致，不另开一份 en 词表）＋ 5xx/网络失败的
-  // 固定兜底句（4xx 的 server 原文不翻译：它逐字点名拒因，翻一遍反而对不
-  // 上）。#1236：完成弹层的勾选分流反馈四串（合并委派回执 / 不合并完成回
-  // 执 / 目标缺位报错 / 不合并腿兜底句）＋ failed 卡勾选锁定行。
-  '合并请求未送出，请重试。': 'The merge request was not sent. Try again.',
   '完成请求未送出，请重试。': 'The completion request was not sent. Try again.',
-  '任务数据未就绪，完成请求未送出。请刷新页面后重试。':
-    'Todo data is not ready, so the request was not sent. Refresh the page and try again.',
-  '已发起合并，合并完成后任务进入已完成。':
-    'Merge started. The todo moves to done once the merge completes.',
-  '任务已完成，改动保留在会话分支。':
-    'Todo completed. The changes stay on the conversation branch.',
-  '失败任务只能经合并完成，不能跳过合并。':
-    'A failed todo can only be completed through the merge; merging cannot be skipped.',
   输入: 'Input',
   输出: 'Output',
   花费: 'Cost',
@@ -1183,8 +1158,6 @@ export const EN: Record<string, string> = {
   // 同为英文字面)
   '搜索服务商...': 'Search providers...',
   自定义端点: 'Custom endpoint',
-  // #385 族表未接线的 OAuth preset 行注记(如 openai-codex)
-  暂未开通: 'Not yet available',
   // Paper grouped provider picker: group headings
   订阅登录: 'Subscription sign-in',
   模型厂商: 'Model vendors',
@@ -1220,8 +1193,16 @@ export const EN: Record<string, string> = {
   '用 Tailscale 连通两台电脑': 'Connect the two computers with Tailscale',
   '在另一台电脑上安装 CLI': 'Install the CLI on the other computer',
   在另一台电脑上启动执行机: 'Start the Runner on the other computer',
-  '终端会打印一个批准链接。打开链接，确认把这台电脑加入团队 {team}，执行机就会上线。之后它在后台常驻运行，关掉终端也没关系。':
-    'The terminal prints an approval link. Open it and confirm adding that computer to the team {team}, and the Runner comes online. It then keeps running in the background, so you can close the terminal.',
+  '之后它在后台常驻运行，关掉终端也没关系。':
+    'It then keeps running in the background, so you can close the terminal.',
+  在这里批准: 'Approve it here',
+  批准: 'Approve',
+  批准码: 'Approval code',
+  '终端会显示一个批准码。把它填在下面，确认把那台电脑加入团队 {team}。':
+    'The terminal shows an approval code. Enter it below to add that computer to the team {team}.',
+  '批准码不对或已过期。看一下终端里的码，再试一次。':
+    'That code is wrong or expired. Check the code in the terminal and try again.',
+  '已批准，执行机马上上线': 'Approved. The Runner comes online in a moment',
   '查不到 Tailscale 的状态。点「重新检查」再试。':
     'Could not read the Tailscale status. Choose Check again to retry.',
   '正在检查 Tailscale…': 'Checking Tailscale…',
@@ -1317,14 +1298,6 @@ export const EN: Record<string, string> = {
   // #1251 机器匹配段（权限 tab 第五组：执行要求写面 + 「哪些机器可跑它」读面）。
   '要求安装 {name}': 'Require {name} installed',
   离线: 'Offline',
-  '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该执行机上运行 `claude auth login` 重新登录。':
-    'Claude Code login on {name} expires in {days## day|# days}. On that Runner run `claude auth login`.',
-  '{name} 上的 Claude Code 登录将在 1 天后过期。在该执行机上运行 `claude auth login` 重新登录。':
-    'Claude Code login on {name} expires in 1 day. On that Runner run `claude auth login`.',
-  '{name} 上的 Claude Code 登录将在不到 1 天内过期。在该执行机上运行 `claude auth login` 重新登录。':
-    'Claude Code login on {name} expires in less than a day. On that Runner run `claude auth login`.',
-  '{name} 上的 Claude Code 登录已过期。在该执行机上运行 `claude auth login` 重新登录。':
-    'Claude Code login on {name} has expired. On that Runner run `claude auth login`.',
   服务器数据库备份: 'Server database backup',
   数据库备份已停止: 'Database backup stopped',
   数据库备份失败: 'Database backup failed',
@@ -1524,8 +1497,6 @@ export const EN: Record<string, string> = {
   '失败了。可以重试，或在下面回复说明怎么改。':
     'It failed. Retry, or reply below with what to change.',
   取消归档: 'Unarchive',
-  归档于: 'Archived',
-  已归档项目: 'Archived projects',
   筛选项目: 'Filter projects',
   '筛选项目：{value}': 'Filter projects: {value}',
   '已归档的项目和它们的对话会一直保留，直到你删除。': 'Kept until you delete them.',
@@ -1541,10 +1512,7 @@ export const EN: Record<string, string> = {
     'Their conversations, tasks and any work still running are deleted with them. This cannot be undone.',
   '{n} 个项目没能删除，已留在列表里。':
     '{n#1 project|# projects} could not be deleted and stay in the list.',
-  '在侧栏项目菜单里归档的项目会出现在这里。':
-    'Projects you archive from the sidebar project menu appear here.',
   '取消归档失败，请重试。': 'Could not unarchive the project. Try again.',
-  '取消归档中…': 'Unarchiving…',
   '批准失败，请重试。': 'Could not approve. Try again.',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
@@ -1589,11 +1557,6 @@ export const EN: Record<string, string> = {
   已建成线程: 'Made into a thread',
   已忽略: 'Dismissed',
   '{n} 件等你': '{n## item|# items} waiting on you',
-  今天的日报: "Today's report",
-  '日报没写成，过一会儿再试一次；先看昨天的数字。':
-    "The report couldn't be written; it will try once more shortly. Here are yesterday's numbers.",
-  '日报两次都没写成；下面是昨天的原始数字。':
-    "The report failed twice; here are yesterday's raw numbers.",
   '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}':
     'Done {done} · merged {merged} · failed {failed} · reruns {retries} · quota waits {quota} · reviews passed {pass} / blocked {block}',
   '失败：': 'Failed: ',
@@ -1603,21 +1566,17 @@ export const EN: Record<string, string> = {
   没有等你的事: 'Nothing is waiting on you',
   复盘: 'Retro',
   复盘建议: 'Retro suggestions',
-  日报: 'Daily report',
+  历史日报: 'Historical daily report',
+  '未处理（只读）': 'Unprocessed (read-only)',
+  '历史记录，仅供查看；日报已停用，不再生成或处理建议。':
+    'Historical record, for reference only. Daily reports are retired; reports and suggestion decisions are no longer generated or processed.',
   '昨天（{day}）的进展': 'Yesterday ({day})',
-  '今天的日报写好了：昨天没有新进展': "Today's report is ready: nothing new yesterday",
-  '{day} 的日报写好了：{covers} 没有新进展': 'The {day} report is ready: nothing new on {covers}',
-  '{day} 的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
-    'The {day} report is ready: done {done} · merged {merged} · failed {failed}',
-  '今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
-    "Today's report is ready: done {done} · merged {merged} · failed {failed}",
-  '，有 {k} 条建议等你决定': ', {k## suggestion needs|# suggestions need} your decision',
-  '日报没写成，先看昨天的数字：完成 {done} · 合并 {merged} · 失败 {failed}':
-    "The report couldn't be written. Yesterday's numbers: done {done} · merged {merged} · failed {failed}",
+  '{day} 的历史日报：完成 {done} · 合并 {merged} · 失败 {failed}':
+    'Historical report for {day}: done {done} · merged {merged} · failed {failed}',
+  '{day} 的历史日报未完成：完成 {done} · 合并 {merged} · 失败 {failed}':
+    'Unfinished historical report for {day}: done {done} · merged {merged} · failed {failed}',
   '写日报时有 {n} 件等你，现在的情况看任务面板。':
     '{n## item was|# items were} waiting on you when the report was written; the Tasks panel shows the current state.',
-  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 1 条不用了」。':
-    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #1".',
   '来源：': 'Source: ',
   昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
   '这些来源太长，只读了后面的部分：{sources}。':
@@ -1703,7 +1662,7 @@ export const EN: Record<string, string> = {
   新任务默认用: 'New tasks start on',
   '你对话的协调者，派活和汇报': 'The coordinator you talk to; it hands out work and reports back',
   新任务用这个模型和思考强度开始: 'New tasks start with this model and thinking level',
-  每日报告和对话摘要: 'Daily reports and conversation summaries',
+  对话摘要: 'Conversation summaries',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
   '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。评审等其他用途的模型，在模型路由的图里能看到。':
     'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See models for review and other uses in the Model routing graph.',
@@ -1771,7 +1730,8 @@ export const EN: Record<string, string> = {
     'Add an API key, subscription or custom endpoint and its models show up here.',
   还没上报: 'Not reported yet',
   模型列表: 'Models',
-  '已安装，登录状态未知': 'Installed, sign-in unknown',
+  '已安装，添加 Claude 订阅后才能用': 'Installed; add a Claude subscription to use it',
+  '已安装，用团队的 Claude 订阅': "Installed, runs on the team's Claude subscription",
   '{online}/{total} 台电脑在线': '{online} of {total#1 computer|# computers} online',
   '{online} 台在线 · {offline} 台离线（{names}）': '{online} online · {offline} offline ({names})',
   设置分区: 'Settings sections',
@@ -1809,14 +1769,12 @@ export const EN: Record<string, string> = {
     'Move the routing rules pinned to this Runner to another Runner.',
   首选执行机: 'Preferred Runner',
   不固定: 'Any machine',
-  '当前默认：Claude Code（因为有执行机装了 Claude Code）':
-    'Current default: Claude Code (a Runner has Claude Code installed)',
-  '当前默认：Codex（因为有执行机登录了 Codex）':
-    'Current default: Codex (a Runner is signed in to Codex)',
-  '当前默认：{model} · {provider}（因为还没有执行机装 Claude Code，用最早添加的服务商）':
-    'Current default: {model} · {provider} (no Runner has Claude Code, so the first provider you added is used)',
-  '当前没有可用的默认：添加服务商，或在执行机上装 Claude Code':
-    'No default yet: add a provider, or install Claude Code on a Runner',
+  '当前默认：Claude Code（因为团队有 Claude 订阅，执行机也装了 Claude Code）':
+    'Current default: Claude Code (the team has a Claude subscription and a Runner has Claude Code installed)',
+  '当前默认：{model} · {provider}（因为还没有 Claude 订阅或装了 Claude Code 的执行机，用最早添加的服务商）':
+    'Current default: {model} · {provider} (there is no Claude subscription or no Runner with Claude Code, so the first provider you added is used)',
+  '当前没有可用的默认：添加服务商，或添加 Claude 订阅并在执行机上装 Claude Code':
+    'No default yet: add a provider, or add a Claude subscription and install Claude Code on a Runner',
   '当前默认：{model} · {provider}（因为团队有 Anthropic API key）':
     'Current default: {model} · {provider} (the team has an Anthropic API key)',
   '当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）':
@@ -2081,22 +2039,14 @@ export const EN: Record<string, string> = {
   '{count} 处 Claude 登录已过期': '{count} Claude logins have expired',
   '{count} 处 Claude 登录即将过期': '{count} Claude logins are about to expire',
   '{expired} 处已过期，{expiring} 处即将过期': '{expired} expired, {expiring} about to expire',
-  '到期前重新登录，任务才不会中断。':
-    'Sign in again before they expire so tasks are not interrupted.',
-  '重新登录前，这些执行机和订阅不会接新任务。':
-    'Until you sign in again, these Runners and subscriptions take no new tasks.',
-  查看执行机: 'View Runners',
-  查看订阅: 'View subscriptions',
+  '到期前换上新的 token，任务才不会中断。':
+    'Add a new token before they expire so tasks are not interrupted.',
+  '换上新的 token 之前，这些订阅不会接新任务。':
+    'Until you add a new token, these subscriptions take no new tasks.',
   待你审阅: 'Ready for review',
   待你回答: 'Needs input',
   已解决: 'Resolved',
-  'PR #{n} 有 {f} 项检查没过': 'PR #{n} has {f} failing checks',
-  'PR #{n} 检查还在跑': 'Checks are still running on PR #{n}',
-  'PR #{n} 检查 {p}/{t} 通过': 'PR #{n}: all checks passed ({p}/{t})',
   'PR #{n} 已合并': 'PR #{n} merged',
-  改动写好了: 'The changes are ready',
-  '到 PR 卡合并': 'Merge on the PR card',
-  到任务里看改动: 'Review the changes in the task',
   计划写好了: 'The plan is written',
   到任务里批准计划: 'Approve the plan in the task',
   在问你一个问题: 'Asked you a question',
@@ -2239,6 +2189,42 @@ export const EN: Record<string, string> = {
     "Connected by browser sign-in. Deleting removes only the tokens stored here; revoke the grant in {name}'s settings.",
   '换一个{label}': 'Replace {label}',
   '已连接 · {n} 个工具': 'Connected · {n#1 tool|# tools}',
+  代码已过期: 'Code expired',
+  '重新开始拿一个新代码。': 'Start again for a new code.',
+  已取消授权: 'Authorization cancelled',
+  '你在 GitHub 上取消了授权，这次什么都没有保存。':
+    'You cancelled on GitHub, so nothing was saved.',
+  连接失败: 'Connection failed',
+  '授权期间这个连接有了变动，这次授权没有保存，重新开始一次。':
+    'This connection changed while you were authorizing, so nothing was saved. Start again.',
+  'GitHub 没有完成授权，稍后重新开始一次。':
+    'GitHub did not finish authorizing. Start again in a moment.',
+  '没能开始连接 GitHub': 'Could not start connecting GitHub',
+  '这台服务器还没有设置 GitHub 登录，改用令牌连接。':
+    'GitHub sign-in is not set up on this server. Connect with a token instead.',
+  'GitHub 连接的名字都被占用了，先删掉一个旧的连接。':
+    'Every GitHub connection name is taken. Delete an old connection first.',
+  '暂时连不上 GitHub，稍后再试。': 'Cannot reach GitHub right now. Try again in a moment.',
+  '重新连接 GitHub': 'Reconnect GitHub',
+  '连接 GitHub': 'Connect GitHub',
+  '在 GitHub 上授权 Cairn': 'Authorize Cairn on GitHub',
+  '正在向 GitHub 要一个授权代码…': 'Getting a code from GitHub…',
+  '打开 GitHub': 'Open GitHub',
+  '打开 GitHub，输入下面的代码，然后点授权。': 'Open GitHub, enter the code below, then authorize.',
+  授权后自动继续: 'Continues once you authorize',
+  重新开始: 'Start again',
+  '选择 Cairn 能用的仓库': 'Choose the repositories Cairn can use',
+  仍然完成: 'Finish anyway',
+  '在 GitHub 上选好 Agent 能读写的仓库，以后也能改。':
+    'On GitHub, pick the repositories agents can read and write. You can change this later.',
+  '还没有选择仓库；组织仓库可能要等组织管理员批准。':
+    'No repositories chosen yet; organization repositories may need an admin to approve.',
+  'GitHub 拒绝了访问。组织可能要求先做 SSO 授权，或等管理员批准 Cairn 应用。':
+    'GitHub refused access. The organization may require SSO authorization or admin approval of the Cairn app.',
+  '删除只移除 Cairn 里的连接。': 'Deleting removes only this connection in Cairn.',
+  'Cairn 发 PR 也靠这份授权，别去 GitHub 撤销。':
+    'Cairn also opens PRs with this grant, so do not revoke it on GitHub.',
+  '已连接 · @{login} · {n} 个工具': 'Connected · @{login} · {n#1 tool|# tools}',
   需要重新授权: 'Needs sign-in',
   连不上: 'Unreachable',
   还没检查: 'Not checked yet',
@@ -2337,4 +2323,11 @@ export const EN: Record<string, string> = {
     'Move Cairn to Applications to update it automatically',
   'Cairn 所在的文件夹不可写，无法自动更新':
     "Cairn's folder is read-only, so it cannot update itself",
+  没有用量: 'No usage',
+  '近 30 天，含缓存读取': 'Last 30 days, cache reads included',
+  还没有用量: 'No usage yet',
+  '和 Coordinator 说第一句话后，这里会按天显示用了多少 token。':
+    'After your first message to the Coordinator, this shows how many tokens each day used.',
+  少: 'Less',
+  多: 'More',
 };

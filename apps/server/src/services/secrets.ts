@@ -18,6 +18,7 @@ import { project, secret } from '../db/schema.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { browserPasswordIds } from './browser-passwords.js';
 import { linkedMailSecretIds } from './mail.js';
 import { listedProjects } from './personal-space.js';
 
@@ -212,6 +213,14 @@ export function updateSecret(
     assertNameFree(deps, teamId, row.projectId, patch.name, id);
   }
   const delivery = patch.delivery ?? row.delivery;
+  if (
+    browserPasswordIds(deps.db, teamId).has(id) &&
+    (delivery !== 'plaintext' || isDaemonReadSecretName(patch.name ?? row.name))
+  )
+    throw new HttpError(
+      400,
+      'a saved browser password must stay a secret, not a service credential',
+    );
   const policy = policyColumns(
     delivery,
     delivery === 'http' ? (patch.http ?? httpPolicyOf(row)) : patch.http,
@@ -294,6 +303,7 @@ export function openSecretGrants(
 ): SecretGrants {
   if (ids.length === 0) return { values: {}, http: [] };
   const linked = linkedMailSecretIds(deps.db, teamId);
+  const browser = browserPasswordIds(deps.db, teamId);
   const granted = deps.db
     .select()
     .from(secret)
@@ -303,7 +313,8 @@ export function openSecretGrants(
       (row) =>
         (row.projectId === null || row.projectId === projectId) &&
         !isMailSecretName(row.name) &&
-        !linked.has(row.id),
+        !linked.has(row.id) &&
+        !browser.has(row.id),
     );
   const names = [...new Set(granted.map((row) => row.name))];
   const projectRows =
@@ -320,7 +331,7 @@ export function openSecretGrants(
             ),
           )
           .all()
-          .filter((row) => !linked.has(row.id));
+          .filter((row) => !linked.has(row.id) && !browser.has(row.id));
   const values: Record<string, string> = {};
   const http = new Map<string, HttpSecretRow>();
   for (const row of [
@@ -342,7 +353,14 @@ export function openSecretGrants(
         });
       continue;
     }
-    if (row.valueCipher === null || isMailSecretName(row.name) || linked.has(row.id)) continue;
+    if (
+      row.delivery !== 'plaintext' ||
+      row.valueCipher === null ||
+      isMailSecretName(row.name) ||
+      linked.has(row.id) ||
+      browser.has(row.id)
+    )
+      continue;
     http.delete(row.name);
     values[row.name] = deps.box.open(row.valueCipher);
   }

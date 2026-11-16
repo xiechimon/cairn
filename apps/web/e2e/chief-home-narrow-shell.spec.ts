@@ -188,16 +188,16 @@ for (const viewport of [
       await expect(drawer).toBeHidden();
     });
 
-    test('settings, language and activity stay reachable from the drawer footer', async ({
+    test('settings, language and usage stay reachable from the drawer footer', async ({
       page,
     }) => {
       await page.goto(HOME);
       await page.getByTestId('narrow-menu').click();
       const drawer = page.getByRole('dialog', { name: '侧边栏' });
-      await expect(drawer.getByTestId('sidebar-activity')).toBeVisible();
+      await expect(drawer.getByTestId('sidebar-usage')).toBeVisible();
       await expect(drawer.getByTestId('sidebar-settings')).toBeVisible();
-      await drawer.getByTestId('sidebar-activity').click();
-      await expect(page).toHaveURL(/\/app\/activity/);
+      await drawer.getByTestId('sidebar-usage').click();
+      await expect(page).toHaveURL(/\/app\/usage/);
       await page.goto(HOME);
       await page.getByTestId('narrow-menu').click();
       await page.getByRole('dialog', { name: '侧边栏' }).getByTestId('sidebar-settings').click();

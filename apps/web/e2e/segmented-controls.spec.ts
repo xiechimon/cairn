@@ -4,8 +4,8 @@ import { settleTransitions } from './helpers.js';
 const SETTINGS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c';
 const NEW_SCHEDULE = '/app?scenario=home-c&pane=tasks&tab=scheduled';
 
-const CARD_DARK = 'rgb(48, 48, 48)';
-const CARD_LIGHT = 'rgb(255, 255, 255)';
+const CARD_DARK = 'rgb(44, 45, 44)';
+const CARD_LIGHT = 'rgb(248, 247, 243)';
 const CLEAR = 'rgba(0, 0, 0, 0)';
 
 const bg = (loc: Locator) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);

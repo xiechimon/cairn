@@ -21,6 +21,7 @@ import {
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { BROWSER_PASSWORD_ACTION, validateBrowserPasswordApproval } from './browser-passwords.js';
 import { type ChiefDeps, enqueueChiefStep } from './chief.js';
 import {
   ACTION_PROPOSAL_CARD_MARKER,
@@ -30,6 +31,7 @@ import {
 } from './chief-questions.js';
 import type { TeamStreamHub } from './events.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
+import { isOwner } from './instance-owner.js';
 import { deleteProject, type ProjectTx } from './projects.js';
 import { deleteTodo } from './todos.js';
 
@@ -372,6 +374,11 @@ function runTodoDelete(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: n
 }
 
 function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: number) {
+  if (row.actionId === BROWSER_PASSWORD_ACTION) {
+    validateBrowserPasswordApproval(tx, row.teamId, JSON.parse(row.inputJson));
+    journal(tx, row, 'run', now);
+    return;
+  }
   if (row.actionId === 'todo.delete') {
     runTodoDelete(deps, tx, row, now);
     return;
@@ -406,6 +413,9 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
         .get();
       if (row?.status !== 'pending') {
         throw new HttpError(409, `proposal ${input.proposalId} is not pending`);
+      }
+      if (row.actionId === BROWSER_PASSWORD_ACTION && !isOwner(deps.db, input.decidedBy)) {
+        throw new HttpError(403, 'only the owner can authorize a browser password website');
       }
       const digest = storedCardDigest(row);
       if (digest !== null && input.viaCard !== true) {

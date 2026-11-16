@@ -17,7 +17,6 @@ import {
   isChiefConversationId,
   isMailSecretName,
   isWaitingPhase,
-  MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
   SECRET_NAME_PATTERN,
   SECRET_NAME_RULE,
@@ -44,10 +43,12 @@ import { proposalCardId } from './action-proposals.js';
 import { executeAction } from './action-registry.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
+import { browserPasswordIds } from './browser-passwords.js';
 import {
   applyBuildStepAction,
   assertNamedMachineForNewTask,
   cancelBuild,
+  requestMerge,
   stopActiveStepsAfterExit,
 } from './builds.js';
 import {
@@ -833,17 +834,18 @@ export async function executeChiefTool(
       const existing = listSecrets(keysvc, ctx.teamId).find(
         (s) => s.name === name && s.projectId === projectId,
       );
+      const browser = browserPasswordIds(db, ctx.teamId);
       if (
         listSecrets(keysvc, ctx.teamId).some(
           (s) =>
             s.name === name &&
-            s.delivery === 'http' &&
+            (s.delivery === 'http' || browser.has(s.id)) &&
             (s.projectId === null || projectId === null || s.projectId === projectId),
         )
       )
         throw new HttpError(
           400,
-          `secret ${name} uses http delivery and can only be changed in settings`,
+          `secret ${name} uses protected delivery and can only be changed in settings`,
         );
       const value = str(params, 'value');
       const description = optStr(params, 'description') ?? null;
@@ -872,6 +874,9 @@ export async function executeChiefTool(
       const names = strArr(params, 'names');
       const projectId = optStr(params, 'projectId') ?? null;
       const all = listSecrets(keysvc, ctx.teamId);
+      const browser = browserPasswordIds(db, ctx.teamId);
+      if (all.some((s) => browser.has(s.id) && (names.includes(s.name) || names.includes(s.id))))
+        throw new HttpError(400, 'browser passwords can only be deleted in settings');
       const deleted: string[] = [];
       for (const n of names) {
         const hit =
@@ -954,7 +959,12 @@ export async function executeChiefTool(
     }
     case 'merge_builds': {
       const buildIds = strArr(params, 'buildIds');
-      return json({ rejected: true, buildIds, reason: MERGE_HUMAN_ONLY_COPY });
+      if (parseChiefTrigger(ctx.turnPrompt ?? null) !== 'user')
+        throw new HttpError(403, 'A user instruction is required to merge; events cannot merge');
+      for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
+      for (const buildId of buildIds)
+        await requestMerge(buildDeps(deps), buildId, deps.user.displayName);
+      return json({ merged: buildIds });
     }
 
     case 'ask_user': {
@@ -1156,8 +1166,7 @@ export function transitionTodos(
       !coordinatorAcceptsReview(ownershipOf(deps.db, owned))
     ) {
       skipped.push(id);
-      reasons[id] =
-        '待确认/审核关口的 done 落地必须由人过闸（发起合并，或用户在看板确认）。把卡停在当前关口，用 notify_user 唤醒用户处理。';
+      reasons[id] = '计划批准和报告验收保留用户的决定；不要把等待用户的任务直接标为完成。';
       continue;
     }
     try {

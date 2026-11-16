@@ -406,6 +406,14 @@ test.each(['success', 'stopped', 'manual', 'local'] as const)(
     expect(newBuildId).not.toBe('build');
     expect(w.s.convHub.subscriberCount(newBuildId)).toBe(0);
     expect(frames.filter((frame) => (frame as { type: string }).type === 'message')).toEqual([
+      ...(kind === 'success' || kind === 'local'
+        ? [
+            {
+              type: 'message',
+              message: expect.objectContaining({ role: 'system', content: '🎉 任务已完成' }),
+            },
+          ]
+        : []),
       {
         type: 'message',
         conversationId: newBuildId,

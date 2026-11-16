@@ -3,15 +3,10 @@ import { threadProgress } from '../src/board/thread-panel-model.js';
 
 describe('threadProgress', () => {
   test.each([
-    ['queued', false, 0, 'run'],
-    ['confirm', false, 0, 'wait'],
-    ['building', false, 1, 'run'],
-    ['building', true, 2, 'run'],
-    ['needs_input', false, 1, 'wait'],
-    ['review', false, 3, 'wait'],
-    ['done', false, 4, 'idle'],
-  ] as const)('a code task in %s (PR open %s) is at step %i, %s', (phase, prOpen, at, tone) => {
-    expect(threadProgress({ phase, output: 'code' }, prOpen)).toMatchObject({ at, tone });
+    'queued', 'confirm', 'building', 'needs_input', 'review', 'done',
+  ] as const)('a code task in %s does not imply mandatory review or merging', (phase) => {
+    expect(threadProgress({ phase, output: 'code' }, false)).toBeNull();
+    expect(threadProgress({ phase, output: 'code' }, true)).toBeNull();
   });
 
   test('a research task has two steps and waits on you once its report is in review', () => {

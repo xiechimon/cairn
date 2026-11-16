@@ -5,22 +5,15 @@ import {
   type DeliveredImage,
   type ProviderConfig,
 } from '@cairn/shared';
-import {
-  type ClaudeCodeAuthProbe,
-  claudeCodeAuthFailureMessage,
-  probeClaudeCodeAuth,
-} from './claude-code-auth.js';
+import { claudeCodeSubscriptionMissingMessage } from './claude-code-auth.js';
 import { type AttachmentDownloader, resolveDeliveredPrompt } from './step-attachments.js';
 
-export async function agentStepRefusal(input: {
+export function agentStepRefusal(input: {
   stepKind: string;
   agentTools: readonly string[] | undefined;
   runtimeId: string | null;
   hasSubscriptionToken: boolean;
-  authProbe: (() => Promise<ClaudeCodeAuthProbe>) | undefined;
-  machineName: () => string;
-  log: (message: string) => void;
-}): Promise<string | null> {
+}): string | null {
   const agentTools = input.agentTools;
   if (input.stepKind === 'merge' && agentTools !== undefined) {
     const missing = [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((t) => !agentTools.includes(t));
@@ -29,11 +22,7 @@ export async function agentStepRefusal(input: {
     }
   }
   if (input.runtimeId === 'claude-code' && !input.hasSubscriptionToken) {
-    const auth = await (input.authProbe ?? probeClaudeCodeAuth)();
-    if (auth.state === 'not-logged-in') return claudeCodeAuthFailureMessage(input.machineName());
-    if (auth.state === 'unknown') {
-      input.log(`claude-code auth probe inconclusive: ${auth.reason} (continuing)`);
-    }
+    return claudeCodeSubscriptionMissingMessage();
   }
   return null;
 }

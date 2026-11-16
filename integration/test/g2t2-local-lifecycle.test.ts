@@ -11,8 +11,6 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import {
   build as buildTable,
-  gateState as gateStateTable,
-  gateVerdict as gateVerdictTable,
   step as stepTable,
   todo as todoTable,
 } from '../../apps/server/src/db/schema.js';
@@ -20,8 +18,6 @@ import { seed } from '../../apps/server/src/db/seed.js';
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
 import { requestMerge } from '../../apps/server/src/services/build-merge-request.js';
 import { TeamStreamHub } from '../../apps/server/src/services/events.js';
-import { enqueueLocalMerge } from '../../apps/server/src/services/local-merge.js';
-import { localGateFacts } from '../../apps/server/src/services/local-merge-facts.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
@@ -96,7 +92,6 @@ function lifecycleTurns(probeLine: string) {
     { content: '方案已就绪：Context / Changes / Edge cases / Verification 四段完整。' },
     { toolCall: { name: 'bash', arguments: { command: `printf "${probeLine}\\n" >> README.md` } } },
     { content: '修改已完成并验证通过。' },
-    { content: '合并已确认：分支改动已并入默认分支。' },
   ];
 }
 
@@ -147,7 +142,7 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
   let todoId: string;
   let buildId: string;
 
-  test('failure modes 1-3: plan/build → conv branch pushed back to the user repo → merge → conv branch update lands delivery, user main checkout unchanged (#1211)', async () => {
+  test('delivery leaves main untouched; an explicit merge updates main after the task is done', async () => {
     userRepo = await seedUserRepo();
     const headSeed = await headOf(userRepo);
     const reflogSeed = await reflogMain(userRepo);
@@ -180,7 +175,7 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
       action: 'confirm',
     });
     expect(confirmed.status).toBe(202);
-    await waitFor(() => server.todoPhase(todoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(todoId) === 'done', 120_000);
 
     const branch = `cairn/conv-${buildId}`;
     const branchSha = await systemGitOps.resolveCommit(userRepo, `refs/heads/${branch}`);
@@ -195,21 +190,30 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
     const mergeRes = await api(server.url, 'POST', `/api/builds/${buildId}/merge`, {});
     expect(mergeRes.status, JSON.stringify(mergeRes.body)).toBe(202);
     expect(mergeRes.body).toEqual({ delegated: true });
-    await waitFor(() => server.todoPhase(todoId) === 'done', 120_000);
+    await waitFor(
+      () =>
+        server.db
+          .select()
+          .from(stepTable)
+          .where(eq(stepTable.buildId, buildId))
+          .all()
+          .some((row) => row.kind === 'merge' && row.status === 'done'),
+      120_000,
+    );
 
     const steps = server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
     const mergeStep = steps.find((s) => s.kind === 'merge')!;
     expect(mergeStep.status).toBe('done');
-    const landed = await systemGitOps.resolveCommit(userRepo, `refs/heads/${branch}`);
+    const landed = await systemGitOps.resolveCommit(userRepo, 'refs/heads/main');
     expect(landed).toBe(mergeStep.checkpointCommit);
-    expect(await headOf(userRepo)).toBe(headSeed);
-    expect(await reflogMain(userRepo)).toBe(reflogSeed);
-    expect(readFileSync(join(userRepo, 'README.md'), 'utf8')).not.toContain('g2t2 probe line');
+    expect(await headOf(userRepo)).toBe(landed);
+    expect(await reflogMain(userRepo)).not.toBe(reflogSeed);
+    expect(readFileSync(join(userRepo, 'README.md'), 'utf8')).toContain('g2t2 probe line');
     const status = await runGit(['status', '--porcelain'], { cwd: userRepo });
     expect(status.stdout.trim()).toBe('');
   }, 200_000);
 
-  test('failure mode 4: dirty workspace → merge step still done (#1211: delivery does not read the user workspace); user HEAD/dirty files unchanged', async () => {
+  test('a completed delivery cannot overwrite a dirty workspace when explicitly merged', async () => {
     const dirtyRepo = await seedUserRepo();
     const world = await seedWorld(
       server.url,
@@ -226,14 +230,23 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
 
     await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 120_000);
     await api(server.url, 'POST', `/api/builds/${dirtyBuildId}/steps`, { action: 'confirm' });
-    await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
 
     writeFileSync(join(dirtyRepo, 'README.md'), '# user repo\nUSER UNCOMMITTED WORK\n');
     const headBefore = await headOf(dirtyRepo);
 
     const mergeRes = await api(server.url, 'POST', `/api/builds/${dirtyBuildId}/merge`, {});
     expect(mergeRes.status, JSON.stringify(mergeRes.body)).toBe(202);
-    await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
+    await waitFor(
+      () =>
+        server.db
+          .select()
+          .from(stepTable)
+          .where(eq(stepTable.buildId, dirtyBuildId))
+          .all()
+          .some((row) => row.kind === 'merge' && row.status === 'done'),
+      120_000,
+    );
 
     const buildRow = server.db
       .select()
@@ -258,7 +271,7 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
 });
 
 for (const checkout of ['default', 'other', 'dirty', 'configured-base'] as const) {
-  test(`autonomous local landing through claim and report with a ${checkout} checkout`, async () => {
+  test(`explicit local landing through claim and report with a ${checkout} checkout`, async () => {
     const repo = await seedUserRepo();
     const git = async (args: string[]) => {
       const result = await runGit(args, { cwd: repo, env: commitEnv(IDENTITY) });
@@ -276,16 +289,14 @@ for (const checkout of ['default', 'other', 'dirty', 'configured-base'] as const
       server.url,
       server.teamId,
       {
-        title: 'Land autonomous local candidate',
-        spec: 'Seeded ready verdict for local executor acceptance.',
+        title: 'Land completed local delivery',
+        spec: 'Merge the delivered commit only when explicitly requested.',
       },
       { repoKind: 'local', localPath: repo, mergePolicy: 'autonomous' },
     );
-    if (checkout === 'configured-base') {
-      expect(
-        (await api(server.url, 'PATCH', `/api/projects/${world.projectId}`, { baseBranch })).status,
-      ).toBe(200);
-    }
+    expect(
+      (await api(server.url, 'PATCH', `/api/projects/${world.projectId}`, { baseBranch })).status,
+    ).toBe(200);
     const checks = ['test -f apps/web/src/local.ts'];
     expect(
       (
@@ -317,7 +328,7 @@ for (const checkout of ['default', 'other', 'dirty', 'configured-base'] as const
     server.db
       .update(todoTable)
       .set({
-        phase: 'review',
+        phase: 'done',
         latestBuildId: buildId,
         sourceRef: 'github:xiechimon/cairn#1625',
       })
@@ -349,50 +360,7 @@ for (const checkout of ['default', 'other', 'dirty', 'configured-base'] as const
       ])
       .run();
     const deps = { db: server.db, hub: new TeamStreamHub(), user: seed(server.db).user };
-    const judgedDigest =
-      (await localGateFacts(deps, buildId, baseBranch))?.readiness.patchDigest ?? '';
-    expect(judgedDigest).toMatch(/^pd2:/);
-    server.db
-      .insert(gateVerdictTable)
-      .values(
-        (
-          [
-            { kind: 'verify' as const, perspective: null },
-            { kind: 'review' as const, perspective: 'correctness' },
-            { kind: 'decision' as const, perspective: null },
-          ] as const
-        ).map((v, index) => ({
-          stepId: randomUUID(),
-          buildId,
-          kind: v.kind,
-          perspective: v.perspective,
-          outcome: 'pass' as const,
-          patchDigest: judgedDigest,
-          headSha: head,
-          expectedHeadSha: head,
-          createdAt: Date.now() + index,
-        })),
-      )
-      .run();
-    server.db
-      .insert(gateStateTable)
-      .values({
-        buildId,
-        ready: true,
-        headSha: head,
-        patchDigest: judgedDigest,
-        policy: 'autonomous',
-        blockers: [],
-        evaluatedAt: Date.now(),
-      })
-      .run();
-    if (checkout === 'configured-base') {
-      expect(await requestMerge(deps, buildId)).toEqual({ delegated: true });
-    } else {
-      const queued = await enqueueLocalMerge(deps, buildId, baseBranch);
-      expect(queued.readiness?.blockers).toEqual([]);
-      expect(queued.enqueued).toBe(true);
-    }
+    expect(await requestMerge(deps, buildId)).toEqual({ delegated: true });
     await waitFor(
       () =>
         server.db
@@ -406,7 +374,7 @@ for (const checkout of ['default', 'other', 'dirty', 'configured-base'] as const
     const defaultHead = await git(['rev-parse', baseBranch]);
     if (checkout === 'dirty') {
       expect(defaultHead).toBe(base);
-      expect(server.todoPhase(world.todoId)).toBe('review');
+      expect(server.todoPhase(world.todoId)).toBe('done');
       expect(readFileSync(join(repo, 'README.md'), 'utf8')).toBe('uncommitted user work\n');
     } else {
       expect(server.todoPhase(world.todoId)).toBe('done');

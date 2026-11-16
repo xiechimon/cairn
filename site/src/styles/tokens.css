@@ -10,26 +10,26 @@
   --radius-card: 12px;
   --radius-panel: 18px;
 
-  --canvas: #fafafa;
-  --sheet: #ffffff;
-  --card: #f7f7f7;
-  --secondary: #f2f2f2;
+  --canvas: #e7e6e1;
+  --sheet: #ecebe6;
+  --card: #e5e4df;
+  --secondary: #e0dfda;
   --hover: rgb(0 0 0 / 0.05);
   --line: rgb(0 0 0 / 0.1);
   --line-strong: rgb(0 0 0 / 0.16);
-  --ink: #0a0a0a;
-  --ink-2: #3a3a3a;
-  --ink-3: #545454;
-  --ink-4: #6e6e6e;
+  --ink: #1c1d1b;
+  --ink-2: #343633;
+  --ink-3: #4b4d4a;
+  --ink-4: #5d5f5c;
   --accent: #9a6500;
   --accent-soft: #f7ecd2;
   --accent-ink: #6e4900;
   --running: #5f8f4f;
-  --danger: #a33a2a;
+  --danger: #9c3627;
   --danger-soft: #f5ddd6;
-  --primary: #0a0a0a;
-  --on-primary: #ffffff;
-  --popover: #ffffff;
+  --primary: #1c1d1b;
+  --on-primary: #ecebe6;
+  --popover: #f8f7f3;
   --shadow-float: 0 2px 6px rgb(0 0 0 / 0.08), 0 8px 20px rgb(0 0 0 / 0.1);
   --shadow-shot: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 40px rgb(0 0 0 / 0.08);
 
@@ -55,26 +55,26 @@
 }
 
 :root[data-theme="dark"] {
-  --canvas: #1f1f1f;
-  --sheet: #191919;
-  --card: #202020;
-  --secondary: #262626;
+  --canvas: #1b1c1b;
+  --sheet: #151615;
+  --card: #1c1d1c;
+  --secondary: #222322;
   --hover: rgb(255 255 255 / 0.075);
   --line: rgb(255 255 255 / 0.1);
   --line-strong: rgb(255 255 255 / 0.16);
-  --ink: #f7f7f7;
-  --ink-2: #c4c4c4;
-  --ink-3: #a3a3a3;
-  --ink-4: #8a8a8a;
+  --ink: #ecebe6;
+  --ink-2: #bbbab7;
+  --ink-3: #9c9b98;
+  --ink-4: #8c8b88;
   --accent: #ebb550;
   --accent-soft: #33290f;
   --accent-ink: #f2cf86;
   --running: #82b46f;
   --danger: #f09a88;
   --danger-soft: #4a2a24;
-  --primary: #f7f7f7;
-  --on-primary: #191919;
-  --popover: #303030;
+  --primary: #ecebe6;
+  --on-primary: #151615;
+  --popover: #2c2d2c;
   --shadow-float: 0 2px 6px rgb(0 0 0 / 0.2), 0 8px 24px rgb(0 0 0 / 0.32);
   --shadow-shot: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 48px rgb(0 0 0 / 0.4);
 }

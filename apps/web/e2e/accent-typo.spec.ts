@@ -205,8 +205,8 @@ for (const theme of ['light', 'dark'] as const) {
     const destructive = await resolveToken(page, '--destructive');
     const card = await resolveToken(page, '--card');
 
-    expect(destructive).toBe(theme === 'dark' ? 'rgb(240, 154, 136)' : 'rgb(163, 58, 42)');
-    expect(card).toBe(theme === 'dark' ? 'rgb(32, 32, 32)' : 'rgb(247, 247, 247)');
+    expect(destructive).toBe(theme === 'dark' ? 'rgb(240, 154, 136)' : 'rgb(156, 54, 39)');
+    expect(card).toBe(theme === 'dark' ? 'rgb(28, 29, 28)' : 'rgb(229, 228, 223)');
     expect(await contrastOf(page, destructive, card)).toBeGreaterThanOrEqual(4.5);
   });
 

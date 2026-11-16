@@ -1,9 +1,8 @@
-import {
-  type ChiefReportContent,
-  type ChiefReportSuggestion,
-  type ChiefReportTodoRef,
-  chiefReportSuggestions,
-  type RetroProposalStatus,
+import type {
+  ChiefReportContent,
+  ChiefReportTodoRef,
+  RetroProposal,
+  RetroProposalStatus,
 } from '@cairn/shared';
 import { useI18n } from '../i18n/provider.js';
 import { ResearchReportCard } from './research-report.js';
@@ -21,23 +20,22 @@ function todoLinks(refs: readonly ChiefReportTodoRef[]): string {
 function statusLabel(status: RetroProposalStatus, t: Translate): string {
   if (status === 'accepted') return t('已建成线程');
   if (status === 'dismissed') return t('已忽略');
-  return t('待你决定');
+  return t('未处理（只读）');
 }
 
-function suggestionLines(entry: ChiefReportSuggestion, t: Translate): string[] {
-  const pad = ' '.repeat(String(entry.n).length + 2);
-  const state = statusLabel(entry.item.status, t);
-  const made =
-    entry.item.status === 'accepted' && entry.item.todoId !== null
-      ? `[${state}](todo:${entry.item.todoId})`
-      : state;
-  const p = entry.item;
+function suggestionLines(p: RetroProposal, n: number, t: Translate): string[] {
+  const pad = ' '.repeat(String(n).length + 2);
+  const state = statusLabel(p.status, t);
+  const title =
+    p.status === 'accepted' && p.todoId !== null
+      ? `[${mdText(p.title)}](todo:${p.todoId})`
+      : mdText(p.title);
   const source =
     p.source.todoId === null
       ? t('协调者对话')
       : `[${mdText(p.source.label)}](todo:${p.source.todoId})`;
   return [
-    `${entry.n}. **${mdText(p.title)}** · ${made}`,
+    `${n}. **${title}** · ${state}`,
     `${pad}${mdText(p.what)}`,
     `${pad}- ${t('为什么没拦住：{why}', { why: mdText(p.why) })}`,
     `${pad}- ${t('防护：{safeguard}', { safeguard: mdText(p.safeguard) })}`,
@@ -45,49 +43,27 @@ function suggestionLines(entry: ChiefReportSuggestion, t: Translate): string[] {
   ];
 }
 
-function isQuiet(report: ChiefReportContent): boolean {
-  const y = report.yesterday;
-  return (
-    y.finishedCount + y.mergedCount + y.failedCount + y.retries + y.quotaWaits === 0 &&
-    y.verdicts.pass + y.verdicts.block === 0
-  );
-}
-
-function undecidedCount(suggestions: readonly ChiefReportSuggestion[]): number {
-  return suggestions.filter((entry) => entry.item.status === 'draft').length;
-}
-
 export function chiefReportSentence(report: ChiefReportContent, t: Translate): string {
   const y = report.yesterday;
-  const counts = { done: y.finishedCount, merged: y.mergedCount, failed: y.failedCount };
+  const counts = {
+    day: report.day,
+    done: y.finishedCount,
+    merged: y.mergedCount,
+    failed: y.failedCount,
+  };
   if (report.status !== 'posted')
-    return t('日报没写成，先看昨天的数字：完成 {done} · 合并 {merged} · 失败 {failed}', counts);
-  const k = undecidedCount(chiefReportSuggestions(report));
-  const today = report.day === new Intl.DateTimeFormat('en-CA').format(Date.now());
-  const quiet = isQuiet(report) && k === 0;
-  const head = today
-    ? quiet
-      ? t('今天的日报写好了：昨天没有新进展')
-      : t('今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}', counts)
-    : quiet
-      ? t('{day} 的日报写好了：{covers} 没有新进展', { day: report.day, covers: report.covers })
-      : t('{day} 的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}', {
-          day: report.day,
-          ...counts,
-        });
-  return k === 0 ? head : `${head}${t('，有 {k} 条建议等你决定', { k })}`;
+    return t('{day} 的历史日报未完成：完成 {done} · 合并 {merged} · 失败 {failed}', counts);
+  return t('{day} 的历史日报：完成 {done} · 合并 {merged} · 失败 {failed}', counts);
 }
 
 export function chiefReportMarkdown(report: ChiefReportContent, t: Translate): string {
   const y = report.yesterday;
-  const suggestions = report.status === 'posted' ? chiefReportSuggestions(report) : [];
+  const suggestions = report.status === 'posted' ? report.retro : [];
   const out: string[] = [];
   out.push(
-    report.status === 'retrying'
-      ? t('日报没写成，过一会儿再试一次；先看昨天的数字。')
-      : report.status === 'failed'
-        ? t('日报两次都没写成；下面是昨天的原始数字。')
-        : chiefReportSentence(report, t),
+    chiefReportSentence(report, t),
+    '',
+    t('历史记录，仅供查看；日报已停用，不再生成或处理建议。'),
   );
   out.push('', `## ${t('昨天（{day}）的进展', { day: report.covers })}`, '');
   out.push(
@@ -127,18 +103,12 @@ export function chiefReportMarkdown(report: ChiefReportContent, t: Translate): s
   if (report.status === 'posted' && report.retroRan) {
     out.push('', `## ${t('复盘建议')}`, '');
     if (suggestions.length === 0) out.push(t('昨天的对话里没找到值得改的地方'));
-    else for (const entry of suggestions) out.push(...suggestionLines(entry, t));
+    else
+      suggestions.forEach((entry, index) => {
+        out.push(...suggestionLines(entry, index + 1, t));
+      });
   }
   const notes: string[] = [];
-  if (suggestions.length > 0)
-    notes.push(
-      t(
-        '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 1 条不用了」。',
-        {
-          day: report.day,
-        },
-      ),
-    );
   if (report.truncated.length > 0)
     notes.push(
       t('这些来源太长，只读了后面的部分：{sources}。', {
@@ -164,7 +134,7 @@ export function ChiefReportMessage({ report }: { report: ChiefReportContent }) {
           content: chiefReportMarkdown(report, t),
           createdAt: report.madeAt,
           final: null,
-          label: t('日报'),
+          label: t('历史日报'),
         }}
       />
     </>

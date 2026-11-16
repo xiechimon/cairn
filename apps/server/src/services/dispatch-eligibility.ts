@@ -1,7 +1,6 @@
 import {
   type ClaudeCodeReport,
   capabilityMissingLabels,
-  claudeLoginBlocksClaim,
   confinementDispatchReady,
   isBackendRuntimeId,
   MACHINE_RUNTIMES,
@@ -14,9 +13,11 @@ import {
   runnerOsOf,
   type StepKind,
 } from '@cairn/shared';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, isNotNull, ne } from 'drizzle-orm';
+import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
-import { build, step, todo } from '../db/schema.js';
+import { build, machine, provider, step, todo } from '../db/schema.js';
+import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
@@ -52,13 +53,30 @@ export function runtimeGatePasses(
   return machineRuntimeAvailable(machineRow, stepRuntimeFor(agentProvider));
 }
 
-export function claudeCodeLoginBlocked(
-  report: Pick<ClaudeCodeReport, 'auth' | 'login'> | null | undefined,
-  hasSubscription: boolean,
-  now: number,
-): boolean {
-  if (hasSubscription) return false;
-  return report?.auth?.state === 'not-logged-in' || claudeLoginBlocksClaim(report?.login, now);
+export function claudeCodeUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
+  if (!hasActiveClaudeSubscription({ db }, teamId)) return false;
+  return db
+    .select({ claudeCodeReport: machine.claudeCodeReport, capabilities: machine.capabilities })
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .all()
+    .some((row) => machineRuntimeAvailable(row, 'claude-code'));
+}
+
+export function codexProviderKeyed(db: Pick<Db, 'select'>, teamId: string): boolean {
+  return (
+    db
+      .select({ id: provider.id })
+      .from(provider)
+      .where(
+        and(
+          eq(provider.teamId, teamId),
+          eq(provider.providerId, CODEX_PROVIDER_ID),
+          isNotNull(provider.apiKeyCipher),
+        ),
+      )
+      .get() !== undefined
+  );
 }
 
 function runtimeMissingReason(name: string, runtime: 'pi' | 'claude-code' | 'gemini'): string {
@@ -113,7 +131,7 @@ export function unassignedStepReason(kind: StepKind): string {
   if (kind === 'review') {
     return 'review step has no review routing rule: add a `review` routing rule in routing settings, then rerun the task.';
   }
-  return `${kind} step has nothing to run it: add a model provider, or a Runner with Claude Code, in settings, then rerun the task.`;
+  return `${kind} step has nothing to run it: add a model provider, or a Claude subscription and a Runner with Claude Code, in settings, then rerun the task.`;
 }
 
 export function machineRunningCount(db: Db, machineId: string): number {
@@ -186,7 +204,7 @@ export interface EligibilityInput {
   catalog: ReadonlyArray<{ id: string; liveness?: 'alive' | 'dead' | 'unknown' }>;
   localProject: boolean;
   claudeRateBlocked: boolean;
-  claudeLoginBlocked: boolean;
+  claudeSubscriptionMissing: boolean;
 }
 
 export type MachineIneligibility =
@@ -213,7 +231,7 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
     return { kind: 'local-path' };
   }
   if (runtime === 'claude-code' && input.claudeRateBlocked) return { kind: 'claude-blocked' };
-  if (runtime === 'claude-code' && input.claudeLoginBlocked) return { kind: 'claude-login' };
+  if (runtime === 'claude-code' && input.claudeSubscriptionMissing) return { kind: 'claude-login' };
   if (!confinementDispatchReady(machineRow.capabilities)) return { kind: 'confinement' };
   return null;
 }

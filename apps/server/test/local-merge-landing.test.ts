@@ -1,15 +1,12 @@
-import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
+import { DEFAULT_AUTONOMY_SETTINGS, parseLocalMergeInstruction } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   autonomousMergeAdmission,
   build,
-  gateState,
-  gateVerdict,
   machine,
   message,
-  notification,
   project,
   step,
   stopPending,
@@ -19,54 +16,19 @@ import {
 import { systemGitOps } from '../src/lib/git.js';
 import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
 import { requestMerge } from '../src/services/build-merge-request.js';
-import { applyLocalMergeReport, enqueueLocalMerge } from '../src/services/local-merge.js';
-import { localGateFacts } from '../src/services/local-merge-facts.js';
+import { applyLocalMergeReport } from '../src/services/local-merge.js';
 import { claimStep } from '../src/services/machine-claim.js';
-import { bootServer, pauseTeamForTest, req, seedSessionRoute } from './helpers.js';
+import { bootServer, pauseTeamForTest, seedSessionRoute } from './helpers.js';
 
 const disposals: (() => void)[] = [];
 afterEach(() => {
   for (const dispose of disposals.splice(0)) dispose();
 });
-const LOCAL_TOOLS = ['合并分支', '推送分支'];
 const base = 'b'.repeat(40);
 const head = 'a'.repeat(40);
+const tools = ['合并分支', '推送分支'];
 
-const fakeGitOps = {
-  ...systemGitOps,
-  listBranches: async () => ({ defaultBranch: 'main', branches: [] }),
-  localCompareFiles: async () => [
-    {
-      status: 'modified' as const,
-      filename: 'apps/web/src/local.ts',
-      previousFilename: null,
-      sha: 'd'.repeat(40),
-      additions: 1,
-      deletions: 0,
-      patchSha: 'd'.repeat(64),
-    },
-  ],
-};
-
-interface Fixture {
-  s: ReturnType<typeof bootServer>;
-  digest: string;
-  deps: {
-    db: ReturnType<typeof bootServer>['db'];
-    hub: ReturnType<typeof bootServer>['svc']['hub'];
-    machineHub: ReturnType<typeof bootServer>['svc']['machineHub'];
-    user: ReturnType<typeof bootServer>['svc']['user'];
-    box: ReturnType<typeof bootServer>['secretBox'];
-    reposDir: string;
-    attachmentsDir: string;
-    skillsDir: string;
-  };
-}
-
-async function fixture(
-  policy: 'human' | 'shadow' | 'autonomous' = 'autonomous',
-  seed: { steps?: boolean; verdicts?: boolean; state?: boolean } = {},
-): Promise<Fixture> {
+function fixture(policy: 'human' | 'shadow' | 'autonomous' = 'human', localChecks = ['true']) {
   const s = bootServer();
   disposals.push(() => s.dispose());
   s.db
@@ -77,23 +39,22 @@ async function fixture(
       name: 'Local',
       repoKind: 'local',
       localPath: '/repo',
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: policy, localChecks: ['true'] },
+      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: policy, localChecks },
     })
     .run();
-  seedSessionRoute(s, { provider: 'anthropic', modelId: 'claude-x', tools: LOCAL_TOOLS });
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub', tools });
   s.db
     .insert(todo)
     .values({
       id: 'todo',
       teamId: s.team.id,
       projectId: 'project',
-      title: 'Deliver local change',
-      spec: '',
-      phase: 'review',
+      title: 'Delivered local change',
+      phase: 'done',
       phaseAt: Date.now(),
       seqNum: 1,
       latestBuildId: 'build',
-      sourceRef: 'github:xiechimon/cairn#1625',
+      hasChanges: true,
     })
     .run();
   s.db
@@ -106,485 +67,139 @@ async function fixture(
       createdAt: Date.now(),
     })
     .run();
-  if (seed.steps !== false) {
-    for (const [id, kind, commit] of [
-      ['plan', 'plan', base],
-      ['build', 'build', head],
-    ] as const)
-      s.db
-        .insert(step)
-        .values({
-          id,
-          buildId: 'build',
-          kind,
-          machineId: null,
-          status: 'done',
-          prompt: null,
-          createdAt: Date.now() + (kind === 'plan' ? 0 : 1),
-          checkpointCommit: commit,
-        })
-        .run();
-  }
+  s.db
+    .insert(step)
+    .values({
+      id: 'delivery',
+      buildId: 'build',
+      kind: 'session',
+      status: 'done',
+      createdAt: Date.now(),
+      checkpointCommit: head,
+    })
+    .run();
   const deps = {
     ...s.svc,
     box: s.secretBox,
     reposDir: s.reposDir,
     attachmentsDir: s.attachmentsDir,
-    gitOps: fakeGitOps,
+    gitOps: {
+      ...systemGitOps,
+      listBranches: async () => ({ defaultBranch: 'main', branches: [] }),
+      resolveCommit: async () => base,
+      localCompareFiles: async () => [
+        {
+          status: 'modified' as const,
+          filename: 'src/local.ts',
+          previousFilename: null,
+          sha: 'd'.repeat(40),
+          additions: 1,
+          deletions: 0,
+          patchSha: 'd'.repeat(64),
+        },
+      ],
+    },
   };
-  const digest = (await localGateFacts(deps, 'build', 'main'))?.readiness.patchDigest ?? '';
-  if (seed.verdicts !== false)
+  const merge = () =>
     s.db
-      .insert(gateVerdict)
-      .values(
-        (
-          [
-            { kind: 'verify' as const, perspective: null },
-            { kind: 'review' as const, perspective: 'correctness' },
-            { kind: 'decision' as const, perspective: null },
-          ] as const
-        ).map((v, k) => ({
-          stepId: `verdict-${v.kind}`,
-          buildId: 'build',
-          kind: v.kind,
-          perspective: v.perspective,
-          outcome: 'pass' as const,
-          patchDigest: digest,
-          headSha: head,
-          expectedHeadSha: head,
-          createdAt: Date.now() + k,
-        })),
-      )
-      .run();
-  if (seed.state !== false)
-    s.db
-      .insert(gateState)
-      .values({
-        buildId: 'build',
-        ready: true,
-        headSha: head,
-        patchDigest: digest,
-        policy,
-        blockers: [],
-        evaluatedAt: Date.now(),
-      })
-      .run();
-  return { s, deps, digest };
+      .select()
+      .from(step)
+      .all()
+      .find((row) => row.kind === 'merge')!;
+  return { s, deps, merge };
 }
 
-test('a ready local autonomous judgment enqueues exactly one bound merge', async () => {
-  const f = await fixture();
-  expect((await enqueueLocalMerge(f.deps, 'build', 'main')).enqueued).toBe(true);
-  const rows = f.s.db
-    .select()
-    .from(step)
-    .all()
-    .filter((r) => r.kind === 'merge');
-  expect(rows).toHaveLength(1);
-  expect(JSON.parse(rows[0]?.prompt ?? '{}')).toMatchObject({
-    kind: 'local-merge',
-    command: {
-      judgedBase: base,
-      judgedHead: head,
-      judgedPatchDigest: f.digest,
-      localChecks: ['true'],
+test.each(['human', 'shadow', 'autonomous'] as const)(
+  'explicit local merge ignores retired %s policy, verdicts, pause and cap; pins the delivery',
+  async (policy) => {
+    const f = fixture(policy);
+    pauseTeamForTest(f.s.db, f.s.team.id);
+    f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
+    expect(await requestMerge(f.deps, 'build')).toEqual({ delegated: true });
+    const command = parseLocalMergeInstruction(f.merge().prompt);
+    expect(command).toMatchObject({
       projectId: 'project',
       buildId: 'build',
       defaultBranch: 'main',
-    },
-  });
-});
-
-test('the local merge commits as the App bot user', async () => {
-  const f = await fixture();
-  const bot = {
-    name: 'cairnwright[bot]',
-    email: '347615582+cairnwright[bot]@users.noreply.github.com',
-  };
-  expect(
-    (await enqueueLocalMerge({ ...f.deps, githubAppIdentity: bot }, 'build', 'main')).enqueued,
-  ).toBe(true);
-  const [row] = f.s.db
-    .select()
-    .from(step)
-    .all()
-    .filter((r) => r.kind === 'merge');
-  const { command } = JSON.parse(row?.prompt ?? '{}');
-  expect(command.identity).toEqual(bot);
-  expect(JSON.stringify(command)).not.toMatch(/cairn@localhost/);
-});
-
-test('without a GitHub App the local merge keeps the local cairn identity', async () => {
-  const f = await fixture();
-  expect((await enqueueLocalMerge(f.deps, 'build', 'main')).enqueued).toBe(true);
-  const [row] = f.s.db
-    .select()
-    .from(step)
-    .all()
-    .filter((r) => r.kind === 'merge');
-  const { command } = JSON.parse(row?.prompt ?? '{}');
-  expect(command.identity).toEqual({ name: f.deps.user.displayName, email: 'cairn@localhost' });
-});
-
-for (const policy of ['human', 'shadow'] as const) {
-  test(`${policy} never enqueues autonomous landing`, async () => {
-    const f = await fixture(policy);
-    expect((await enqueueLocalMerge(f.deps, 'build', 'main')).enqueued).toBe(false);
-    expect(
-      f.s.db
-        .select()
-        .from(step)
-        .all()
-        .filter((r) => r.kind === 'merge'),
-    ).toHaveLength(0);
-  });
-}
-
-test('a build without stored verdicts cannot enqueue landing', async () => {
-  const f = await fixture('autonomous', { verdicts: false });
-  expect((await enqueueLocalMerge(f.deps, 'build', 'main')).enqueued).toBe(false);
-  expect(
-    f.s.db
-      .select()
-      .from(step)
-      .all()
-      .filter((r) => r.kind === 'merge'),
-  ).toHaveLength(0);
-});
-
-test('a gate state that was computed at another head does not lend its judgment', async () => {
-  const f = await fixture();
-  f.s.db
-    .update(gateState)
-    .set({ headSha: 'c'.repeat(40) })
-    .where(eq(gateState.buildId, 'build'))
-    .run();
-  expect((await enqueueLocalMerge(f.deps, 'build', 'main')).enqueued).toBe(false);
-});
-
-test('a hosted project is not handed to the local executor', async () => {
-  const f = await fixture();
-  f.s.db.update(project).set({ repoKind: 'hosted' }).where(eq(project.id, 'project')).run();
-  await expect(enqueueLocalMerge(f.deps, 'build', 'main')).rejects.toThrow();
-});
-
-for (const outcome of ['merged', 'held', 'recheck', 'checks-failed'] as const) {
-  test(`${outcome} records the outcome and only confirmed landing finishes the card`, async () => {
-    const f = await fixture();
-    await enqueueLocalMerge(f.deps, 'build', 'main');
-    const row = f.s.db
-      .select()
-      .from(step)
-      .all()
-      .find((r) => r.kind === 'merge');
-    if (row === undefined) throw new Error('no merge step');
-    f.s.db
-      .update(step)
-      .set({ status: 'claimed', machineId: 'machine' })
-      .where(eq(step.id, row.id))
-      .run();
-    const command = JSON.parse(row.prompt ?? '{}').command;
-    const result =
-      outcome === 'merged'
-        ? { outcome, commit: 'f'.repeat(40) }
-        : { outcome, reason: 'worktree-dirty' };
-    expect(
-      applyLocalMergeReport(
-        f.deps,
-        { ...row, status: 'claimed', machineId: 'machine' },
-        { command, result },
-      ),
-    ).toBe(true);
-    expect(f.s.db.select().from(todo).get()?.phase).toBe(outcome === 'merged' ? 'done' : 'review');
-    expect(
-      f.s.db
-        .select()
-        .from(step)
-        .all()
-        .find((r) => r.kind === 'merge')?.status,
-    ).toBe('done');
-    const notices = f.s.db.select().from(notification).all();
-    expect(notices).toHaveLength(1);
-    if (outcome === 'merged') expect(notices[0]?.type).toBe('todo_done');
-    else expect(notices[0]?.snippet).toContain('worktree-dirty');
-  });
-}
-
-test('requestMerge is what turns a ready local judgment into a landing command, not a test', async () => {
-  const f = await fixture();
-  await requestMerge(f.deps, 'build');
-  const merges = f.s.db
-    .select()
-    .from(step)
-    .all()
-    .filter((r) => r.kind === 'merge');
-  expect(merges).toHaveLength(1);
-  expect(JSON.parse(merges[0]?.prompt ?? '{}')).toMatchObject({
-    kind: 'local-merge',
-    command: { judgedBase: base, judgedHead: head, localChecks: ['true'] },
-  });
-});
-
-for (const policy of ['human', 'shadow'] as const) {
-  test(`a ${policy} project keeps its untouched branch-only merge when a person asks for it`, async () => {
-    const f = await fixture(policy);
-    await expect(requestMerge(f.deps, 'build')).resolves.toEqual({ delegated: true });
-    const merges = f.s.db
-      .select()
-      .from(step)
-      .all()
-      .filter((r) => r.kind === 'merge');
-    expect(merges).toHaveLength(1);
-    expect(merges[0]?.prompt).toBeNull();
-  });
-}
-
-test('an autonomous request that the gate still blocks is refused instead of landing', async () => {
-  const f = await fixture('autonomous', { verdicts: false });
-  await expect(requestMerge(f.deps, 'build')).rejects.toThrow(/无法落地/);
-  expect(
-    f.s.db
-      .select()
-      .from(step)
-      .all()
-      .filter((r) => r.kind === 'merge'),
-  ).toHaveLength(0);
-});
-
-test('an autonomous request whose default branch cannot be discovered fails closed instead of the legacy merge', async () => {
-  const f = await fixture('autonomous');
-  const unreadable = {
-    ...f.deps,
-    gitOps: { ...fakeGitOps, listBranches: async () => ({ defaultBranch: null, branches: [] }) },
-  };
-  await expect(requestMerge(unreadable, 'build')).rejects.toThrow();
-  const merges = f.s.db
-    .select()
-    .from(step)
-    .all()
-    .filter((r) => r.kind === 'merge');
-  expect(merges).toHaveLength(0);
-});
-
-test('an autonomous request whose repository read fails fails closed instead of the legacy merge', async () => {
-  const f = await fixture('autonomous');
-  const failing = {
-    ...f.deps,
-    gitOps: {
-      ...fakeGitOps,
-      listBranches: async () => {
-        throw new Error('no repo');
-      },
-    },
-  };
-  await expect(requestMerge(failing, 'build')).rejects.toThrow();
-  const merges = f.s.db
-    .select()
-    .from(step)
-    .all()
-    .filter((r) => r.kind === 'merge');
-  expect(merges).toHaveLength(0);
-});
-
-test('a local project without a stored path fails closed instead of the legacy merge', async () => {
-  const f = await fixture('autonomous');
-  f.s.db.update(project).set({ localPath: null }).where(eq(project.id, 'project')).run();
-  await expect(requestMerge(f.deps, 'build')).rejects.toThrow();
-  const merges = f.s.db
-    .select()
-    .from(step)
-    .all()
-    .filter((r) => r.kind === 'merge');
-  expect(merges).toHaveLength(0);
-});
-
-test('#1405 paused local readiness blocks enqueue without task mutation', async () => {
-  const f = await fixture();
-  pauseTeamForTest(f.s.db, f.s.team.id);
-  const before = f.s.db.select().from(todo).all();
-  const facts = await localGateFacts(f.deps, 'build', 'main');
-  expect(facts?.readiness.blockers.map((b) => b.code)).toContain('autonomy-paused');
-  await expect(enqueueLocalMerge(f.deps, 'build', 'main')).rejects.toMatchObject({ status: 409 });
-  expect(f.s.db.select().from(todo).all()).toEqual(before);
-  expect(
-    f.s.db
-      .select()
-      .from(step)
-      .all()
-      .filter((r) => r.kind === 'merge'),
-  ).toHaveLength(0);
-});
-
-test('#1405 zero cap blocks local readiness and issuance', async () => {
-  const f = await fixture();
-  f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
-  f.s.db
-    .update(project)
-    .set({
-      autonomy: {
-        ...DEFAULT_AUTONOMY_SETTINGS,
-        mergePolicy: 'autonomous',
-        localChecks: ['true'],
-      },
-    })
-    .run();
-  expect(
-    (await localGateFacts(f.deps, 'build', 'main'))?.readiness.blockers.map((b) => b.code),
-  ).toContain('daily-cap');
-  await expect(enqueueLocalMerge(f.deps, 'build', 'main')).rejects.toMatchObject({ status: 409 });
-});
-
-test('#1405 pause after local evaluation starts prevents issuance and announcements', async () => {
-  const f = await fixture();
-  const deps = {
-    ...f.deps,
-    gitOps: {
-      ...fakeGitOps,
-      localCompareFiles: async () => {
-        pauseTeamForTest(f.s.db, f.s.team.id);
-        return fakeGitOps.localCompareFiles();
-      },
-    },
-  };
-  await expect(requestMerge(deps, 'build')).rejects.toMatchObject({ status: 409 });
-  expect(
-    f.s.db
-      .select()
-      .from(step)
-      .all()
-      .filter((r) => r.kind === 'merge'),
-  ).toHaveLength(0);
-});
-
-test.each(['pause', 'cap'] as const)(
-  '#1405 local worker claim rechecks %s after enqueue without task mutation',
-  async (brake) => {
-    const f = await fixture();
-    f.s.db
-      .insert(machine)
-      .values(
-        readyMachine({
-          id: 'worker',
-          teamId: f.s.team.id,
-          name: 'Worker',
-          online: true,
-          enabledRuntimes: ['pi'],
-        }),
-      )
-      .run();
-    seedSessionRoute(f.s, {
-      provider: 'stub-gw',
-      modelId: 'stub',
-      machineId: 'worker',
-      tools: LOCAL_TOOLS,
+      judgedBase: base,
+      judgedHead: head,
+      localChecks: ['true'],
+      identity: { name: f.s.user.displayName, email: 'cairn@localhost' },
     });
-    await enqueueLocalMerge(f.deps, 'build', 'main');
-    if (brake === 'pause') pauseTeamForTest(f.s.db, f.s.team.id);
-    else f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
-    if (brake === 'cap')
+    expect(command?.judgedPatchDigest).toMatch(/^pd2:[a-f0-9]{64}$/);
+    expect(f.s.db.select().from(todo).get()?.phase).toBe('done');
+    await expect(requestMerge(f.deps, 'build')).rejects.toThrow('合并步');
+    expect(
       f.s.db
-        .update(project)
-        .set({
-          autonomy: {
-            ...DEFAULT_AUTONOMY_SETTINGS,
-            mergePolicy: 'autonomous',
-            localChecks: ['true'],
-          },
-        })
-        .run();
-    const before = f.s.db.select().from(step).all();
-    const beforeTodo = f.s.db.select().from(todo).all();
-    const beforeMessages = f.s.db.select().from(message).all();
-    await expect(
-      claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://localhost'),
-    ).resolves.toBeNull();
-    expect(f.s.db.select().from(step).all()).toEqual(before);
-    expect(f.s.db.select().from(todo).all()).toEqual(beforeTodo);
-    expect(f.s.db.select().from(message).all()).toEqual(beforeMessages);
+        .select()
+        .from(step)
+        .all()
+        .filter((row) => row.kind === 'merge'),
+    ).toHaveLength(1);
   },
 );
 
-test('#1405 a paused failed local card is not restored before rejecting the merge', async () => {
-  const f = await fixture();
-  f.s.db.update(todo).set({ phase: 'failed' }).run();
-  pauseTeamForTest(f.s.db, f.s.team.id);
-  const before = f.s.db.select().from(todo).all();
-  await expect(requestMerge(f.deps, 'build')).rejects.toMatchObject({ status: 409 });
-  expect(f.s.db.select().from(todo).all()).toEqual(before);
+test('a fresh local project needs no mandatory check list or second model', async () => {
+  const f = fixture('human', []);
+  const bot = { name: 'cairn-bot', email: 'bot@example.invalid' };
+  await requestMerge({ ...f.deps, githubAppIdentity: bot }, 'build');
+  expect(parseLocalMergeInstruction(f.merge().prompt)).toMatchObject({
+    localChecks: [],
+    identity: bot,
+  });
 });
 
-for (const brake of ['pause', 'cap'] as const) {
-  test(`a local candidate blocked by ${brake} leaves the next worker candidate claimable`, async () => {
-    const f = await fixture();
-    f.s.db
-      .insert(machine)
-      .values(
-        readyMachine({
-          id: 'worker',
-          teamId: f.s.team.id,
-          name: 'Worker',
-          online: true,
-          enabledRuntimes: ['pi'],
-        }),
-      )
-      .run();
-    seedSessionRoute(f.s, {
-      provider: 'stub-gw',
-      modelId: 'stub',
-      machineId: 'worker',
-      tools: LOCAL_TOOLS,
-    });
-    await enqueueLocalMerge(f.deps, 'build', 'main');
-    if (brake === 'pause') pauseTeamForTest(f.s.db, f.s.team.id);
-    else
-      await f.s.app.request(`/api/teams/${f.s.team.id}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ maxAutonomousMergesPerDay: 0 }),
-      });
-    f.s.db
-      .insert(todo)
-      .values({
-        id: 'next',
-        teamId: f.s.team.id,
-        projectId: 'project',
-        title: 'Next',
-        phase: 'queued',
-        phaseAt: 0,
-        seqNum: 2,
-        latestBuildId: 'next',
-      })
-      .run();
-    f.s.db
-      .insert(build)
-      .values({
-        id: 'next',
-        todoId: 'next',
-        withPlan: false,
-        triggerSource: 'user',
-        createdAt: Date.now(),
-      })
-      .run();
-    f.s.db
-      .insert(step)
-      .values({ id: 'next-step', buildId: 'next', kind: 'build', createdAt: Date.now() + 1000 })
-      .run();
-    expect((await claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://localhost'))?.step.id).toBe(
-      'next-step',
-    );
-    expect(
-      f.s.db
-        .select()
-        .from(step)
-        .all()
-        .find((r) => r.kind === 'merge')?.status,
-    ).toBe('pending');
-  });
-}
+test.each([
+  'archived',
+  'closed',
+  'superseded',
+  'undelivered',
+  'missing-path',
+  'missing-base',
+] as const)('local merge refuses %s without issuing a command', async (state) => {
+  const f = fixture();
+  if (state === 'archived') f.s.db.update(todo).set({ archivedAt: 1 }).run();
+  if (state === 'closed') f.s.db.update(todo).set({ phase: 'closed' }).run();
+  if (state === 'superseded') f.s.db.update(todo).set({ latestBuildId: 'newer' }).run();
+  if (state === 'undelivered') f.s.db.update(step).set({ status: 'failed' }).run();
+  if (state === 'missing-path') f.s.db.update(project).set({ localPath: null }).run();
+  const deps =
+    state === 'missing-base'
+      ? { ...f.deps, gitOps: { ...f.deps.gitOps, resolveCommit: async () => null } }
+      : f.deps;
+  await expect(requestMerge(deps, 'build')).rejects.toThrow();
+  expect(f.merge()).toBeUndefined();
+});
 
-test('changed local authorization releases the reservation before skipping the command', async () => {
-  const f = await fixture();
-  await enqueueLocalMerge(f.deps, 'build', 'main');
+test.each(['delivery', 'archive', 'base', 'path', 'checks'] as const)(
+  'changed %s during repository reads cannot issue a merge',
+  async (changed) => {
+    const f = fixture();
+    const deps = {
+      ...f.deps,
+      gitOps: {
+        ...f.deps.gitOps,
+        localCompareFiles: async () => {
+          if (changed === 'delivery') f.s.db.update(todo).set({ latestBuildId: 'newer' }).run();
+          if (changed === 'archive') f.s.db.update(todo).set({ archivedAt: 1 }).run();
+          if (changed === 'base') f.s.db.update(project).set({ baseBranch: 'other' }).run();
+          if (changed === 'path') f.s.db.update(project).set({ localPath: '/other' }).run();
+          if (changed === 'checks')
+            f.s.db
+              .update(project)
+              .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, localChecks: ['false'] } })
+              .run();
+          return f.deps.gitOps.localCompareFiles();
+        },
+      },
+    };
+    await expect(requestMerge(deps, 'build')).rejects.toThrow('changed while preparing');
+    expect(f.merge()).toBeUndefined();
+  },
+);
+
+test('completed delivery merge remains claimable despite old autonomy controls', async () => {
+  const f = fixture('autonomous');
   f.s.db
     .insert(machine)
     .values(
@@ -597,145 +212,127 @@ test('changed local authorization releases the reservation before skipping the c
       }),
     )
     .run();
-  f.s.db.update(project).set({ repoKind: 'hosted' }).run();
-  await claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://localhost');
-  expect(
-    f.s.db
-      .select()
-      .from(message)
-      .all()
-      .some((row) => row.id === 'autonomous-merge-build'),
-  ).toBe(false);
+  seedSessionRoute(f.s, { provider: 'stub-gw', modelId: 'stub', machineId: 'worker', tools });
+  await requestMerge(f.deps, 'build');
+  pauseTeamForTest(f.s.db, f.s.team.id);
+  f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
+  expect((await claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://localhost'))?.step.id).toBe(
+    f.merge().id,
+  );
+  expect(f.s.db.select().from(todo).get()?.phase).toBe('done');
 });
 
-for (const policy of ['autonomous', 'human'] as const) {
-  test(`${policy} abandoned local command preserves its policy path`, async () => {
-    const f = await fixture(policy);
-    await enqueueLocalMerge(f.deps, 'build', 'main', true);
-    const row = f.s.db
-      .select()
-      .from(step)
-      .all()
-      .find((r) => r.kind === 'merge');
-    if (!row) throw new Error('missing merge');
+test.each(['base', 'checks', 'project', 'delivery'] as const)(
+  'changed %s authorization is refused at claim and releases its reservation',
+  async (changed) => {
+    const f = fixture();
+    await requestMerge(f.deps, 'build');
+    f.s.db
+      .insert(machine)
+      .values(
+        readyMachine({
+          id: 'worker',
+          teamId: f.s.team.id,
+          name: 'Worker',
+          online: true,
+          enabledRuntimes: ['pi'],
+        }),
+      )
+      .run();
+    if (changed === 'base') f.s.db.update(project).set({ baseBranch: 'other' }).run();
+    if (changed === 'checks')
+      f.s.db
+        .update(project)
+        .set({
+          autonomy: {
+            ...DEFAULT_AUTONOMY_SETTINGS,
+            localChecks: ['false'],
+          },
+        })
+        .run();
+    if (changed === 'project') f.s.db.update(project).set({ repoKind: 'hosted' }).run();
+    if (changed === 'delivery') f.s.db.update(todo).set({ latestBuildId: 'newer' }).run();
+    expect(await claimStep(f.deps, 'worker', f.s.team.id, 0, 'http://localhost')).toBeNull();
+    expect(f.merge().status).toBe('failed');
+    expect(f.s.db.select().from(autonomousMergeAdmission).all()).toEqual([]);
+  },
+);
+
+test.each(['merged', 'held', 'recheck', 'checks-failed'] as const)(
+  'local %s report records the outcome and clears stop state without reopening the task',
+  async (outcome) => {
+    const f = fixture();
+    await requestMerge(f.deps, 'build');
+    const row = f.merge();
+    const command = parseLocalMergeInstruction(row.prompt)!;
     f.s.db
       .update(step)
-      .set({ status: 'claimed', claimedAt: Date.now() - 200_000 })
+      .set({ status: 'claimed', archiveStop: 'requested' })
       .where(eq(step.id, row.id))
       .run();
-    sweepAbandonedBuildSteps(f.deps);
-    expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()?.status).toBe(
-      policy === 'human' ? 'pending' : 'claimed',
+    f.s.db
+      .insert(stopPending)
+      .values({
+        conversationId: 'build',
+        stepId: row.id,
+        discard: false,
+        createdAt: Date.now(),
+      })
+      .run();
+    const result =
+      outcome === 'merged'
+        ? { outcome, commit: 'f'.repeat(40) }
+        : { outcome, reason: 'worktree-dirty' };
+    applyLocalMergeReport(f.deps, { ...row, status: 'claimed' }, { command, result });
+    expect(f.merge()).toMatchObject({ status: 'done', archiveStop: null });
+    expect(f.s.db.select().from(stopPending).all()).toEqual([]);
+    expect(f.s.db.select().from(todo).get()?.phase).toBe('done');
+    expect(
+      f.s.db
+        .select()
+        .from(message)
+        .all()
+        .some((m) => m.id === `local-merge-${row.id}`),
+    ).toBe(true);
+    expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state ?? null).toBe(
+      outcome === 'merged' ? 'merged' : null,
     );
-    if (policy === 'autonomous') {
-      expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('pending');
-      f.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, row.id)).run();
-      applyLocalMergeReport(
-        f.deps,
-        { ...row, status: 'failed' },
-        {
-          command: JSON.parse(row.prompt ?? '{}').command,
-          result: { outcome: 'merged', commit: 'f'.repeat(40) },
-        },
-      );
-      expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('merged');
-    }
-  });
-}
+  },
+);
 
-test('a late landing for a failed local command restores a refused admission exactly once', async () => {
-  const f = await fixture();
-  await enqueueLocalMerge(f.deps, 'build', 'main');
-  const row = f.s.db
-    .select()
-    .from(step)
-    .all()
-    .find((r) => r.kind === 'merge');
-  if (!row) throw new Error('missing merge');
+test('abandoned completed-task merge retries the same pinned command; superseded work stops', async () => {
+  const f = fixture('autonomous');
+  await requestMerge(f.deps, 'build');
+  const row = f.merge();
+  f.s.db
+    .update(step)
+    .set({ status: 'claimed', claimedAt: Date.now() - 200_000 })
+    .where(eq(step.id, row.id))
+    .run();
+  sweepAbandonedBuildSteps(f.deps);
+  expect(f.merge()).toMatchObject({ status: 'pending', prompt: row.prompt });
+  f.s.db.update(todo).set({ latestBuildId: 'newer' }).run();
+  f.s.db
+    .update(step)
+    .set({ status: 'claimed', claimedAt: Date.now() - 200_000 })
+    .where(eq(step.id, row.id))
+    .run();
+  sweepAbandonedBuildSteps(f.deps);
+  expect(f.merge().status).toBe('stopped');
+});
+
+test('a late actual landing is recorded once without reviving the failed command', async () => {
+  const f = fixture('autonomous');
+  await requestMerge(f.deps, 'build');
+  const row = f.merge();
   f.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, row.id)).run();
-  f.s.db.delete(autonomousMergeAdmission).run();
-  f.s.db.delete(message).where(eq(message.id, 'autonomous-merge-build')).run();
   const report = {
-    command: JSON.parse(row.prompt ?? '{}').command,
+    command: parseLocalMergeInstruction(row.prompt)!,
     result: { outcome: 'merged' as const, commit: 'f'.repeat(40) },
   };
   applyLocalMergeReport(f.deps, { ...row, status: 'failed' }, report);
   applyLocalMergeReport(f.deps, { ...row, status: 'failed' }, report);
   expect(f.s.db.select().from(autonomousMergeAdmission).all()).toHaveLength(1);
   expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('merged');
-  expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()?.status).toBe('failed');
+  expect(f.merge().status).toBe('failed');
 });
-
-for (const outcome of ['merged', 'held', 'recheck', 'checks-failed'] as const) {
-  test(`local merge ${outcome} explicitly clears its pending stop and archive marker`, async () => {
-    const f = await fixture();
-    await enqueueLocalMerge(f.deps, 'build', 'main');
-    const row = f.s.db
-      .select()
-      .from(step)
-      .all()
-      .find((r) => r.kind === 'merge')!;
-    f.s.db
-      .update(step)
-      .set({ status: 'claimed', machineId: 'machine', archiveStop: 'requested' })
-      .where(eq(step.id, row.id))
-      .run();
-    f.s.db
-      .insert(stopPending)
-      .values({ conversationId: 'build', stepId: row.id, discard: false, createdAt: Date.now() })
-      .run();
-    const command = JSON.parse(row.prompt ?? '{}').command;
-    applyLocalMergeReport(
-      f.deps,
-      { ...row, status: 'claimed', machineId: 'machine', archiveStop: 'requested' },
-      {
-        command,
-        result:
-          outcome === 'merged'
-            ? { outcome, commit: 'f'.repeat(40) }
-            : { outcome, reason: 'worktree-dirty' },
-      },
-    );
-    expect(f.s.db.select().from(step).where(eq(step.id, row.id)).get()).toMatchObject({
-      status: 'done',
-      archiveStop: null,
-    });
-    expect(f.s.db.select().from(stopPending).all()).toEqual([]);
-    expect(f.s.db.select().from(todo).get()?.phase).toBe(outcome === 'merged' ? 'done' : 'review');
-  });
-}
-
-test.each([null, 'requested'] as const)(
-  'a confirmed local landing finishes an archived task and unarchive keeps done (stop marker: %s)',
-  async (archiveStop) => {
-    const f = await fixture();
-    await enqueueLocalMerge(f.deps, 'build', 'main');
-    const row = f.s.db
-      .select()
-      .from(step)
-      .all()
-      .find((r) => r.kind === 'merge')!;
-    f.s.db
-      .update(step)
-      .set({ status: 'claimed', machineId: 'machine', archiveStop })
-      .where(eq(step.id, row.id))
-      .run();
-    f.s.db.update(todo).set({ archivedAt: 123 }).where(eq(todo.id, 'todo')).run();
-    applyLocalMergeReport(
-      f.deps,
-      { ...row, status: 'claimed', machineId: 'machine', archiveStop },
-      {
-        command: JSON.parse(row.prompt ?? '{}').command,
-        result: { outcome: 'merged', commit: 'f'.repeat(40) },
-      },
-    );
-    expect(f.s.db.select().from(todo).where(eq(todo.id, 'todo')).get()).toMatchObject({
-      phase: 'done',
-      archivedAt: 123,
-    });
-    expect(f.s.db.select().from(autonomousMergeAdmission).get()?.state).toBe('merged');
-    const response = await req(f.s.app, 'POST', '/api/todos/todo/unarchive');
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ phase: 'done', archivedAt: null });
-  },
-);

@@ -6,6 +6,7 @@ const SRC = new URL('../src/', import.meta.url).pathname;
 const ICON_DIR = new URL('../src/icons/', import.meta.url);
 const HEAVY_GLYPHS = new Set(['PlusSmall.tsx']);
 const ICON_SIZES = new Set(['4', '5', '5.5']);
+const ILLUSTRATIONS = new Set(['components/ink-spiral.tsx']);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -29,7 +30,9 @@ describe('icon stroke', () => {
 
   test('V14: no component passes a numeric strokeWidth other than 1.75', () => {
     const offenders = sources.flatMap(({ path, text }) =>
-      [...text.matchAll(/strokeWidth=\{(?!1\.75\}|STROKE\})[^}]*\}/g)].map((m) => `${path}: ${m[0]}`),
+      ILLUSTRATIONS.has(path)
+        ? []
+        : [...text.matchAll(/strokeWidth=\{(?!1\.75\}|STROKE\})[^}]*\}/g)].map((m) => `${path}: ${m[0]}`),
     );
     expect(offenders).toEqual([]);
   });

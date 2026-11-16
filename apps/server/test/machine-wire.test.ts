@@ -377,7 +377,7 @@ describe('claim/wake timing (r3 section 1.5 measured: ~75s long poll cadence + w
 });
 
 describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main timeline machine side)', () => {
-  test('claim->heartbeat->tool->token->upload-urls->transcript->done->confirm->continue->review->merge->done full chain field by field', async () => {
+  test('claim->heartbeat->tool->token->upload-urls->transcript->confirm->continue->done->explicit merge full chain field by field', async () => {
     const w = await setupWorld({ claimHoldMs: 200 });
     const cred = { cred: w.token };
     const { buildId } = await w.startBuild(true);
@@ -532,9 +532,15 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
 
     await call(w.s.app, 'POST', `/api/machine/done/${step2.step.id}`, {
       ...cred,
-      body: { status: 'success', sessionId: 'pi-session-1', hasChanges: true },
+      body: {
+        status: 'success',
+        sessionId: 'pi-session-1',
+        hasChanges: true,
+        commit: 'a'.repeat(40),
+      },
     });
-    expect(todoNow().phase).toBe('review');
+    expect(todoNow().phase).toBe('done');
+    expect((await w.claim()).body.step).toBeNull();
 
     const mergeRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
     expect(mergeRes.status).toBe(202);

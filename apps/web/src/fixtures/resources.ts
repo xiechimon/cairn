@@ -430,6 +430,7 @@ const connector = (
 ): McpConnectorRecord => ({
   id,
   teamId: TEAM_ID,
+  account: null,
   statusReason: null,
   toolCount: null,
   checkedAt: r7(13, 10),
@@ -517,4 +518,57 @@ export const resourcesMcpConfirmHost: FixtureSet = {
 export const resourcesMcpOAuthDenied: FixtureSet = {
   ...resourcesMcpConnectors,
   ui: { mcpDialog: { kind: 'landing', reason: 'denied', name: 'Linear' } },
+};
+
+const GITHUB_APP_CONNECTOR = connector('mcp-github-app', {
+  slug: 'github',
+  label: 'GitHub',
+  catalogId: 'github',
+  url: 'https://api.githubcopilot.com/mcp/',
+  headerNames: [],
+  authKind: 'github-app',
+  account: 'lin-wei',
+  status: 'connected',
+  toolCount: 41,
+});
+
+const GITHUB_APP_READY = {
+  available: true,
+  installUrl: 'https://github.com/apps/cairn-app/installations/new',
+};
+
+const githubDevice = (
+  step: import('./records.js').GithubDeviceFixtureStep,
+  connected: boolean,
+): FixtureSet => ({
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    githubConnector: GITHUB_APP_READY,
+    mcpConnectors: connected
+      ? [GITHUB_APP_CONNECTOR, ...MCP_CONNECTORS.slice(1)]
+      : MCP_CONNECTORS.slice(1),
+  },
+  ui: { mcpDialog: { kind: 'github-device', step } },
+});
+
+export const resourcesMcpGithubDeviceCode = githubDevice('code', false);
+export const resourcesMcpGithubDeviceDenied = githubDevice('denied', false);
+export const resourcesMcpGithubDeviceExpired = githubDevice('expired', false);
+export const resourcesMcpGithubDeviceRepos = githubDevice('repos', true);
+export const resourcesMcpGithubDeviceReposMissing = githubDevice('repos-missing', true);
+export const resourcesMcpGithubDeviceReconnect = githubDevice('reconnect', true);
+
+export const resourcesMcpGithubConnected: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    githubConnector: GITHUB_APP_READY,
+    mcpConnectors: [GITHUB_APP_CONNECTOR, ...MCP_CONNECTORS.slice(1)],
+  },
+};
+
+export const resourcesMcpGithubManage: FixtureSet = {
+  ...resourcesMcpGithubConnected,
+  ui: { mcpDialog: { kind: 'manage', connectorId: 'mcp-github-app' } },
 };

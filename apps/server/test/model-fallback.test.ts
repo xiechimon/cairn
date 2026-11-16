@@ -253,7 +253,7 @@ describe('model fallback chain (#1493)', () => {
   });
 
   test.each(['review', 'merge'] as const)(
-    'X3：%s 步禁止降级——额度用完只等不换（负对照）',
+    'a %s quota report never switches models: retired reviews stop and explicit merges wait',
     async (kind) => {
       const w = await setupWorld();
       await startBuild(w);
@@ -273,11 +273,13 @@ describe('model fallback chain (#1493)', () => {
         })
         .where(eq(stepTable.id, pending.id))
         .run();
+      if (kind === 'merge')
+        w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, w.todoId)).run();
       const c = await claim(w);
       expect(c.stepId).toBe(pending.id);
       await done(w, c.stepId, quotaDone('relay-a'));
       const row = stepRow(w, c.stepId);
-      expect(row.status).toBe('waiting_quota');
+      expect(row.status).toBe(kind === 'review' ? 'stopped' : 'waiting_quota');
       expect(row.fallback).toBeNull();
       const notif = w.s.db
         .select()
@@ -403,7 +405,7 @@ describe('model fallback chain (#1493)', () => {
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
     expect(buildRow.errorMessage).toBeNull();
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
-    expect(todoRow.phase).toBe('review');
+    expect(todoRow.phase).toBe('done');
   });
 
   test('a rate-limited first model continues on the fallback model and succeeds', async () => {

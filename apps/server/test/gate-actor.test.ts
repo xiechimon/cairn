@@ -100,6 +100,17 @@ describe('#902 gate-passing action records the actor (announcement row)', () => 
   test('failure mode 2: REST merge -> merge announcement row carries the actor (existing row family filled in)', async () => {
     const s = await withReviewTodo();
     try {
+      s.db
+        .insert(stepTable)
+        .values({
+          id: `delivered-${s.buildId}`,
+          buildId: s.buildId,
+          kind: 'build',
+          status: 'done',
+          checkpointCommit: 'ab'.repeat(20),
+          createdAt: Date.now(),
+        })
+        .run();
       const res = await req(s.app, 'POST', `/api/builds/${s.buildId}/merge`);
       expect(res.status).toBe(202);
       const row = rowsOf(s, s.buildId).find((m) => m.content === MERGE_ANNOUNCEMENT);

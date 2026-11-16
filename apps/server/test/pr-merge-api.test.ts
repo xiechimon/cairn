@@ -208,11 +208,6 @@ async function refusal(p: Promise<unknown>): Promise<HttpError> {
   throw new Error('expected requestMerge to refuse');
 }
 
-const MERGE_GATE_READS_201 = [
-  'GET /repos/octo/demo/issues?state=open&labels=autonomy-paused&per_page=100&page=1',
-  'GET /repos/octo/demo/pulls/201',
-];
-
 function sweptRequests(w: World, before: number): string[] {
   return w.fake.requests.slice(before).map((r) => {
     const url = new URL(r.url);
@@ -437,7 +432,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(result).toEqual({ delegated: true });
     expect(w.fake.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
       'GET https://api.github.com/repos/octo/demo/pulls/201',
-      'GET https://api.github.com/repos/octo/demo/issues?state=open&labels=autonomy-paused&per_page=100&page=1',
       'GET https://api.github.com/repos/octo/demo/branches/main',
       'GET https://api.github.com/repos/octo/demo/rules/branches/main?per_page=100&page=1',
       `GET https://api.github.com/repos/octo/demo/commits/${CP}/check-runs?filter=latest&per_page=100&page=1`,
@@ -665,8 +659,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
   });
 
   test.each([
-    ['a claimed verify step', 'verify', 'claimed', '验证步'],
-    ['a claimed review step', 'review', 'claimed', '审核步'],
     ['a pending build step', 'build', 'pending', '执行步'],
     ['a merge step queued before the upgrade', 'merge', 'pending', '合并步'],
   ] as const)(
@@ -685,8 +677,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
         .run();
       const err = await refusal(requestMerge(w.deps, w.buildId));
       expect(err.status).toBe(409);
-      expect(err.message).toContain(label);
-      expect(err.message.includes('推送')).toBe(kind !== 'review' && kind !== 'merge');
+      expect(err.message).toContain(kind === 'build' ? '执行步未完成交付' : label);
       expect(w.fake.requests).toEqual([]);
       expect(w.systemRows()).toEqual([]);
       expect(w.userRows()).toEqual([]);
@@ -702,7 +693,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
         .values({
           id: `step-late-${w.buildId}`,
           buildId: w.buildId,
-          kind: 'verify',
+          kind: 'session',
           status: 'claimed',
           createdAt: Date.now(),
         })
@@ -715,9 +706,9 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
   });
 
   test.each([
-    ['no GitHub connection', { connected: false }, '连接 GitHub 后再点合并'],
-    ['the PR head moved', { pull: { headSha: 'abcdef01'.repeat(5) } }, '再点一次合并'],
-    ['no checkpoint', { checkpoint: null }, '再点一次合并'],
+    ['no GitHub connection', { connected: false }, '连接 GitHub 后重新请求合并'],
+    ['the PR head moved', { pull: { headSha: 'abcdef01'.repeat(5) } }, '最后推送的提交'],
+    ['no checkpoint', { checkpoint: null }, '有效的提交 SHA'],
   ] as const)(
     '[2b-D32] failed card, %s → the refusal says how this card gets finished (the reconcile reads only review cards)',
     async (_name, o, next) => {
@@ -823,8 +814,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.status).toBe(409);
     expect(err.message).toContain('已在 GitHub 合并');
-    expect(err.message).toContain('核对不上');
-    expect(err.message).toContain('不勾合并');
+    expect(err.message).toContain('没有再发起合并');
     expect(w.fake.puts()).toEqual([]);
     expectUntouched(w);
     await w.sweep();
@@ -1168,7 +1158,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       swept = sweptRequests(w, before);
     };
     await requestMerge(w.deps, w.buildId);
-    expect(swept).toEqual(MERGE_GATE_READS_201);
+    expect(swept).toEqual([]);
     expect(w.systemRows()).toEqual([MERGED_ROW, DONE_ROW]);
     expect(w.phase()).toBe('done');
   });
@@ -1183,10 +1173,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       swept = sweptRequests(w, before);
     };
     await requestMerge(w.deps, w.buildId);
-    expect(swept).toEqual(MERGE_GATE_READS_201);
-    expect(w.fake.gets()).toHaveLength(
-      1 + MERGE_GATE_READS_201.filter((r) => r.includes('/pulls/')).length,
-    );
+    expect(swept).toEqual([]);
+    expect(w.fake.gets()).toHaveLength(1);
   });
 
   test('[2b-D17a] the card is closed while the PR read is in flight → refused at the re-read; no PUT', async () => {
@@ -1240,7 +1228,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const w = makeWorld({ phase: 'failed', buildStepStatus: 'failed' });
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.status).toBe(409);
-    expect(err.message).toContain('审核关口恢复仅对本轮已交付的 build 开放');
+    expect(err.message).toContain('合并仅对本轮已交付的 build 开放');
     expect(w.fake.requests).toEqual([]);
     expectUntouched(w, 'failed');
   });
@@ -1253,12 +1241,12 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expectUntouched(w, 'building');
   });
 
-  test('[2b-D21b] a done card → illegal phase transition; no request', async () => {
+  test('an explicit merge of a done card preserves done and pins its delivered SHA', async () => {
     const w = makeWorld({ phase: 'done' });
-    await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow(
-      'illegal phase transition: done -> done',
-    );
-    expect(w.fake.requests).toEqual([]);
+    await requestMerge(w.deps, w.buildId);
+    expect(JSON.parse(w.fake.puts()[0]?.body ?? 'null')).toMatchObject({ sha: CP });
+    expect(w.phase()).toBe('done');
+    expect(w.systemRows()).toEqual([MERGED_ROW]);
   });
 
   test('[2b-D22] githubRepo with a ".." segment → the merge step as before; no request', async () => {
@@ -1270,20 +1258,11 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(w.fake.requests).toEqual([]);
   });
 
-  test('[2b-D23] local repository under human → the merge step as before; its done finishes the card', async () => {
+  test('a local repository under human without a stored path refuses an unpinned merge', async () => {
     const w = makeWorld({ repoKind: 'local', prNumber: null, mergePolicy: 'human' });
-    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    await expect(requestMerge(w.deps, w.buildId)).rejects.toMatchObject({ status: 409 });
     expect(w.fake.requests).toEqual([]);
-    const mergeStep = w.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.buildId, w.buildId))
-      .all()
-      .find((r) => r.kind === 'merge');
-    expect(mergeStep).toBeDefined();
-    completeStep(w.deps, mergeStep?.id as string);
-    expect(w.phase()).toBe('done');
-    expect(w.systemRows()).toEqual([DONE_ROW]);
+    expectUntouched(w);
   });
 
   test('[2b-D23b] local repository under autonomous without a stored path → refused, no ungated merge', async () => {
@@ -1432,7 +1411,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     async (phase) => {
       const w = makeWorld({ phase });
       await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow(
-        `illegal phase transition: ${phase} -> done`,
+        'Finish the task before requesting a merge',
       );
       expect(w.fake.requests).toEqual([]);
       expect(w.userRows()).toEqual([]);
@@ -1505,20 +1484,19 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
   });
 });
 
-describe('#1405 autonomy brakes at the GitHub write boundary', () => {
-  test('a pause introduced during the PR read returns HTTP 409 without a PUT or task writes', async () => {
+describe('explicit user merges do not require autonomy permission', () => {
+  test('a retired autonomy pause introduced during the PR read does not block the user', async () => {
     const w = makeWorld();
     w.fake.onGet = () => {
       pauseTeamForTest(w.s.db, w.s.team.id);
     };
     const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: expect.stringContaining('autonomy-paused') });
-    expect(w.fake.puts()).toHaveLength(0);
-    expectUntouched(w);
+    expect(response.status).toBe(202);
+    expect(w.fake.puts()).toHaveLength(1);
+    expect(w.phase()).toBe('done');
   });
 
-  test('ten durable same-day Cairn merges block the default cap', async () => {
+  test('past merges do not impose a daily cap on the user', async () => {
     const w = makeWorld();
     for (let n = 0; n < 10; n++) {
       w.s.db
@@ -1533,12 +1511,10 @@ describe('#1405 autonomy brakes at the GitHub write boundary', () => {
         .run();
     }
     const before = w.systemRows();
-    const err = await refusal(requestMerge(w.deps, w.buildId));
-    expect(err.status).toBe(409);
-    expect(err.message).toContain('daily-cap');
-    expect(w.fake.puts()).toHaveLength(0);
-    expect(w.systemRows()).toEqual(before);
-    expect(w.phase()).toBe('review');
+    await requestMerge(w.deps, w.buildId);
+    expect(w.fake.puts()).toHaveLength(1);
+    expect(w.systemRows()).toEqual([...before, MERGED_ROW, DONE_ROW]);
+    expect(w.phase()).toBe('done');
   });
 
   test('human policy remains available while paused and at a zero autonomous cap', async () => {
@@ -1568,7 +1544,7 @@ describe('#1405 autonomy brakes at the GitHub write boundary', () => {
     expect(w.phase()).toBe('review');
   });
 
-  test('different builds racing for the final team slot issue exactly one PUT', async () => {
+  test('explicit merges of different deliveries are independent of the retired daily cap', async () => {
     const w = makeWorld();
     w.s.db.update(teamTable).set({ maxAutonomousMergesPerDay: 1 }).run();
     w.s.db
@@ -1617,10 +1593,8 @@ describe('#1405 autonomy brakes at the GitHub write boundary', () => {
       requestMerge(w.deps, w.buildId),
       requestMerge(w.deps, 'racer-build'),
     ]);
-    expect(outcomes.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
-    expect(w.fake.puts()).toHaveLength(1);
-    const rejected = outcomes.find((r) => r.status === 'rejected');
-    expect(rejected?.status === 'rejected' ? rejected.reason.status : null).toBe(409);
+    expect(outcomes.filter((r) => r.status === 'fulfilled')).toHaveLength(2);
+    expect(w.fake.puts()).toHaveLength(2);
   });
 
   test('yesterday merges do not consume the current UTC day', async () => {
@@ -1701,7 +1675,7 @@ test('#1405 reconcile keeps the reservation while a merge response is still in f
   expect(reservedDuringPut).toBe(true);
 });
 
-test('#1405 nine landed merges and an open poll during the tenth PUT cannot admit an eleventh', async () => {
+test('an in-flight explicit merge does not block a different delivery behind the retired cap', async () => {
   const w = makeWorld();
   const original = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
   if (!original) throw new Error('missing todo');
@@ -1777,18 +1751,18 @@ test('#1405 nine landed merges and an open poll during the tenth PUT cannot admi
   try {
     await w.sweep();
     const outcome = await Promise.allSettled([requestMerge(w.deps, 'racer-build')]);
-    expect(outcome[0]).toMatchObject({ status: 'rejected', reason: { status: 409 } });
-    expect(w.fake.puts()).toHaveLength(1);
+    expect(outcome[0]).toMatchObject({ status: 'fulfilled' });
+    expect(w.fake.puts()).toHaveLength(2);
   } finally {
     releasePut();
     await merging;
   }
   expect(w.phase()).toBe('done');
-  expect(w.fake.puts()).toHaveLength(1);
+  expect(w.fake.puts()).toHaveLength(2);
 });
 
 test.each(['open', 'network', 'malformed'] as const)(
-  '#1405 GitHub marker %s blocks a merge with a false team flag and no PUT',
+  'retired GitHub autonomy marker %s is not a prerequisite for an explicit merge',
   async (mode) => {
     const w = makeWorld();
     w.fake.markerAnswer =
@@ -1798,34 +1772,54 @@ test.each(['open', 'network', 'malformed'] as const)(
           ? 'network'
           : { status: 200, body: {} };
     expect(teamPausedForTest(w.s.db, w.s.team.id)).toBe(false);
-    const err = await refusal(requestMerge(w.deps, w.buildId));
-    expect(err.message).toContain('autonomy-paused');
-    expect(w.fake.puts()).toHaveLength(0);
+    await requestMerge(w.deps, w.buildId);
+    expect(w.fake.puts()).toHaveLength(1);
     expect(teamPausedForTest(w.s.db, w.s.team.id)).toBe(false);
-    expectUntouched(w);
+    expect(w.phase()).toBe('done');
   },
 );
 
-test('a closed GitHub marker resumes the merge that an open marker refused', async () => {
+test('a retired GitHub marker is never read when merging explicitly', async () => {
   const w = makeWorld();
   w.fake.markerAnswer = { status: 200, body: [{ number: 7 }] };
-  await refusal(requestMerge(w.deps, w.buildId));
-  w.fake.markerAnswer = { status: 200, body: [] };
+  let read = false;
+  w.fake.onMarker = () => {
+    read = true;
+  };
   expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+  expect(read).toBe(false);
   expect(w.fake.puts()).toHaveLength(1);
   expect(w.phase()).toBe('done');
 });
 
-test('#1405 a card closed during the uncached marker read cannot merge', async () => {
-  const w = makeWorld();
-  w.fake.onMarker = () => {
-    w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, w.todoId)).run();
+test('a completed card archived during the PR read cannot merge', async () => {
+  const w = makeWorld({ phase: 'done' });
+  w.fake.onGet = () => {
+    w.s.db.update(todoTable).set({ archivedAt: 1 }).where(eq(todoTable.id, w.todoId)).run();
   };
-  await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow(
-    'illegal phase transition: closed -> done',
-  );
+  await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow('Unarchive to continue');
   expect(w.fake.puts()).toHaveLength(0);
 });
+
+test.each(['repository', 'base', 'checkpoint'] as const)(
+  'a completed delivery cannot merge when its %s changes during GitHub reads',
+  async (changed) => {
+    const w = makeWorld({ phase: 'done' });
+    w.fake.onGet = () => {
+      if (changed === 'repository')
+        w.s.db.update(projectTable).set({ githubRepo: 'octo/other' }).run();
+      if (changed === 'base') w.s.db.update(projectTable).set({ baseBranch: 'main' }).run();
+      if (changed === 'checkpoint')
+        w.s.db
+          .update(stepTable)
+          .set({ checkpointCommit: 'a'.repeat(40) })
+          .run();
+    };
+    await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow();
+    expect(w.fake.puts()).toHaveLength(0);
+    expect(w.phase()).toBe('done');
+  },
+);
 
 test('human merge click keeps UserToken when App is available', async () => {
   const w = makeWorld();

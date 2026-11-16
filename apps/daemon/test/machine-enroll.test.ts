@@ -67,6 +67,38 @@ test('browser enrollment writes machine.json with mode 0600 and points at the se
   releaseTestTempDir(home);
 });
 
+test('the approval code from the server is printed, again when a later start resumes', async () => {
+  const { home, paths } = world();
+  const client = {
+    enrollStart: async () => ({ enrollId: 'e1', url: AUTHORIZE, code: 'K7F3-Q9XM' }),
+    enrollPoll: async (): Promise<Poll> => ({ status: 'pending' }),
+  };
+  const first: string[] = [];
+  const stop = new AbortController();
+  await expect(
+    enrollThroughBrowser(client, paths, SERVER, 'omarchy', {
+      now: () => 1_000,
+      sleep: async () => stop.abort(),
+      log: (line) => first.push(line),
+      stop: stop.signal,
+    }),
+  ).rejects.toThrow(/stopped before approval/);
+  expect(first.join('\n')).toContain('approval code K7F3-Q9XM');
+  const resumed: string[] = [];
+  const again = new AbortController();
+  again.abort();
+  await expect(
+    enrollThroughBrowser(client, paths, SERVER, 'omarchy', {
+      now: () => 2_000,
+      sleep: async () => {},
+      log: (line) => resumed.push(line),
+      stop: again.signal,
+    }),
+  ).rejects.toThrow(/stopped before approval/);
+  expect(resumed.join('\n')).toContain('approval code K7F3-Q9XM');
+  releaseTestTempDir(home);
+});
+
 test('a client without the enrollment methods reports a named error', async () => {
   const { home, paths } = world();
   await expect(

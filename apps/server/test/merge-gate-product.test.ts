@@ -1,6 +1,6 @@
 import {
+  buildReviewStepPrompt,
   DEFAULT_AUTONOMY_SETTINGS,
-  parseReviewPromptMeta,
   parseVerifyPromptMeta,
   REVIEW_VERDICT_KIND,
 } from '@cairn/shared';
@@ -149,7 +149,10 @@ function scriptedPort(
   };
 }
 
-async function world(stepKind: 'build' | 'session' = 'build'): Promise<{
+async function world(
+  stepKind: 'build' | 'session' = 'build',
+  legacyReview = true,
+): Promise<{
   s: TestServer;
   buildId: string;
   stepId: string;
@@ -165,7 +168,8 @@ async function world(stepKind: 'build' | 'session' = 'build'): Promise<{
     .run();
   const reviewerId = 'route-reviewer';
   seedSessionRoute(s, { modelId: 'claude-opus-4-8' });
-  seedRoute(s, 'review', { id: reviewerId, provider: 'openai-codex', modelId: 'gpt-5.4' });
+  if (legacyReview)
+    seedRoute(s, 'review', { id: reviewerId, provider: 'openai-codex', modelId: 'gpt-5.4' });
   seedRoute(s, 'coordinator', { modelId: 'claude-chief' });
   s.db
     .insert(chief)
@@ -218,12 +222,32 @@ async function world(stepKind: 'build' | 'session' = 'build'): Promise<{
       createdAt: 1,
     })
     .run();
+  if (legacyReview) {
+    s.db
+      .insert(step)
+      .values({
+        id: 'legacy-review-1794',
+        buildId,
+        kind: 'review',
+        status: 'pending',
+        createdAt: 2,
+        prompt: buildReviewStepPrompt({
+          agentId: reviewerId,
+          gate: 'review',
+          expectedHeadSha: HEAD,
+          planText: '',
+          changes: [],
+          checkout: true,
+        }),
+      })
+      .run();
+  }
   return { s, buildId, stepId, reviewerId };
 }
 
 describe('in-product merge gate', () => {
-  test('a finished GitHub build enqueues one review step for the default Reviewer and stays in building', () => {
-    return world().then(({ s, buildId, stepId, reviewerId }) => {
+  test('a finished GitHub build completes without queuing a reviewer', () => {
+    return world('build', false).then(({ s, buildId, stepId }) => {
       completeStep(s.svc, stepId, { hasChanges: true });
       const reviews = s.db
         .select()
@@ -231,12 +255,8 @@ describe('in-product merge gate', () => {
         .where(eq(step.buildId, buildId))
         .all()
         .filter((row) => row.kind === 'review');
-      expect(reviews).toHaveLength(1);
-      expect(parseReviewPromptMeta(reviews[0]?.prompt ?? null)?.agentId).toBe(reviewerId);
-      expect(reviews[0]?.prompt ?? '').toContain(HEAD);
-      expect(s.db.select().from(todo).where(eq(todo.id, 'todo-1794')).get()?.phase).toBe(
-        'building',
-      );
+      expect(reviews).toHaveLength(0);
+      expect(s.db.select().from(todo).where(eq(todo.id, 'todo-1794')).get()?.phase).toBe('done');
       completeStep(s.svc, stepId, { hasChanges: true });
       expect(
         s.db
@@ -245,7 +265,7 @@ describe('in-product merge gate', () => {
           .where(eq(step.buildId, buildId))
           .all()
           .filter((row) => row.kind === 'review'),
-      ).toHaveLength(1);
+      ).toHaveLength(0);
     });
   });
 
@@ -1069,10 +1089,11 @@ async function reviewPushWorld(policy: 'human' | 'autonomous') {
       ],
     })
     .run();
+  s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, 'todo-1794')).run();
   return w;
 }
 
-test('review push follows fresh gate evaluation once per persisted review entry', async () => {
+test('delivery notifies the user once per entry without waiting for a gate evaluation', async () => {
   const { s, buildId } = await reviewPushWorld('human');
   let clock = Date.now();
   vi.spyOn(Date, 'now').mockImplementation(() => clock++);
@@ -1080,7 +1101,7 @@ test('review push follows fresh gate evaluation once per persisted review entry'
     .spyOn(webpush, 'sendNotification')
     .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
   setTodoPhase(s.svc, 'todo-1794', 'review');
-  expect(send).not.toHaveBeenCalled();
+  expect(send).toHaveBeenCalledTimes(1);
   const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
   expect(readiness?.blockers.map((blocker) => blocker.code)).toEqual(['policy-human']);
   expect(send).toHaveBeenCalledTimes(1);
@@ -1095,13 +1116,13 @@ test('review push follows fresh gate evaluation once per persisted review entry'
   setTodoPhase(s.svc, 'todo-1794', 'building');
   send.mockClear();
   setTodoPhase(s.svc, 'todo-1794', 'review');
-  expect(send).not.toHaveBeenCalled();
+  expect(send).toHaveBeenCalledTimes(1);
   await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
   await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
   expect(send).toHaveBeenCalledTimes(1);
 });
 
-test('fresh machine blockers suppress review push until the gate becomes human-only', async () => {
+test('pending checks do not delay the delivery notification', async () => {
   const { s, buildId } = await reviewPushWorld('human');
   const send = vi
     .spyOn(webpush, 'sendNotification')
@@ -1111,12 +1132,12 @@ test('fresh machine blockers suppress review push until the gate becomes human-o
     port: scriptedPort([], { checksPending: true }),
   });
   expect(pending?.blockers.map((blocker) => blocker.code)).toContain('required-check-pending');
-  expect(send).not.toHaveBeenCalled();
+  expect(send).toHaveBeenCalledTimes(1);
   await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
   expect(send).toHaveBeenCalledTimes(1);
 });
 
-test('an autonomous review pushes once when a human blocker first appears during later evaluation', async () => {
+test('old autonomous policy notifies on delivery, not on later gate blockers', async () => {
   const { s, buildId } = await reviewPushWorld('autonomous');
   const send = vi
     .spyOn(webpush, 'sendNotification')
@@ -1124,7 +1145,7 @@ test('an autonomous review pushes once when a human blocker first appears during
   setTodoPhase(s.svc, 'todo-1794', 'review');
   const ready = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
   expect(ready?.ready).toBe(true);
-  expect(send).not.toHaveBeenCalled();
+  expect(send).toHaveBeenCalledTimes(1);
   const blocked = await evaluateMergeGate(s.svc, buildId, {
     port: scriptedPort([], { forked: true }),
   });
@@ -1134,7 +1155,7 @@ test('an autonomous review pushes once when a human blocker first appears during
   expect(send).toHaveBeenCalledTimes(1);
 });
 
-test('a human blocker waits for pending machine checks before the review push', async () => {
+test('mixed historical blockers do not delay delivery notification', async () => {
   const { s, buildId } = await reviewPushWorld('autonomous');
   const send = vi
     .spyOn(webpush, 'sendNotification')
@@ -1145,7 +1166,7 @@ test('a human blocker waits for pending machine checks before the review push', 
   });
   expect(mixed?.blockers.some((blocker) => blocker.class === 'human')).toBe(true);
   expect(mixed?.blockers.some((blocker) => blocker.class === 'transient')).toBe(true);
-  expect(send).not.toHaveBeenCalled();
+  expect(send).toHaveBeenCalledTimes(1);
   await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([], { forked: true }) });
   expect(send).toHaveBeenCalledTimes(1);
 });
@@ -1190,6 +1211,7 @@ test.each(['before evaluation', 'during evaluation'] as const)(
       .spyOn(webpush, 'sendNotification')
       .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
     setTodoPhase(s.svc, 'todo-1794', 'review');
+    send.mockClear();
     const archive = async () => {
       const response = await s.app.request('/api/todos/todo-1794/archive', { method: 'POST' });
       expect(response.status).toBe(200);

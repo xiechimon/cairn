@@ -20,14 +20,13 @@
     "docs/research/coordinator-computer.md": "branch origin/docs/coordinator-computer",
     "docs/research/project-coordinators.md": "branch origin/docs/project-coordinators",
     "docs/research/agent-machine-routing.md": "branch origin/claude/elegant-jones-a3e2a9",
-    "docs/research/pi-durable-spike.md": "branch origin/docs/pi-durable-spike",
-    "docs/research/review-gate-alternatives.md": "branch origin/docs/review-gate-alternatives"
+    "docs/research/pi-durable-spike.md": "branch origin/docs/pi-durable-spike"
   },
   "batches": [
     {
       "id": "B2",
-      "title": "What reaches ian: needs-you, questions, daily report, push",
-      "scope": "The attention surfaces of the phase 1 graduation criteria: the needs-you tray, question cards and their lifecycle, the 08:00 report and retro proposals, and phone push. Research Ikaga, Duet, Codex CLI and t3code first; design the tray and card states and the delivery and dedupe rules."
+      "title": "What reaches the user: needs-you, questions, push",
+      "scope": "The attention surfaces of the phase 1 graduation criteria: the needs-you tray, question cards and their lifecycle, and phone push. Research Ikaga, Duet, Codex CLI and t3code first; design the tray and card states and the delivery and dedupe rules."
     },
     {
       "id": "B3",
@@ -85,7 +84,7 @@
       "id": "coordinator-chat",
       "name": "Coordinator chat",
       "summary": "The one never-ending Coordinator conversation on the home page, where the user dispatches work and reads reports.",
-      "states": "Empty home with starters, streaming reply with a stop control, finished reply with an action row and, when the Coordinator offered them, quick-reply chips above the composer, and a connection-lost banner when the stream drops.",
+      "states": "Empty home with starters, streaming reply with a stop control, finished reply with an action row and, when the Coordinator offered them, quick-reply chips above the composer, and a connection-lost banner when the stream drops. A failed initial project greeting offers explicit retry with a reason, without inventing an owner message; pending, running, stale and ineligible retries are refused.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -109,6 +108,7 @@
           "/api/teams/:id/chief/threads",
           "/api/teams/:id/chief/channels/:projectId",
           "/api/teams/:id/chief/threads/:tid/messages/:mid",
+          "/api/teams/:id/chief/threads/:tid/retry-greeting/:stepId",
           "/api/teams/:id/chief/threads/:tid/rewind",
           "/api/teams/:id/chief/threads/:tid/stop",
           "/api/teams/:id/coordinator**"
@@ -137,11 +137,14 @@
       "backendDesign": [
         "docs/research/coordinator-in-server.md",
         "docs/spec/26-pi-session-runtime-and-trust-surface.md",
+        "docs/design/coordinator-project-channels.md",
         "docs/design/coordinator-quick-replies.md"
       ],
       "evidence": [
         "apps/web/e2e/chief-home-chat.spec.ts",
         "apps/web/e2e/chief-home-c.spec.ts",
+        "apps/web/e2e/chief-greeting-retry.spec.ts",
+        "apps/server/test/coordinator-project-channels.test.ts",
         "apps/server/test/coordinator-turns.test.ts",
         "apps/server/test/coordinator/turn.test.ts"
       ]
@@ -412,9 +415,9 @@
     },
     {
       "id": "daily-report",
-      "name": "Daily report and retro",
-      "summary": "The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.",
-      "states": "A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro suggestions and each one's state. Historical intake suggestions are hidden and cannot create tasks.",
+      "name": "Read-only report history",
+      "summary": "Existing report messages remain readable; daily generation, retries, push and suggestion decisions are retired.",
+      "states": "Historical posted and unfinished reports, read-only draft suggestions and links to already-created tasks. No new report for new users. Historical intake suggestions remain hidden.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -423,14 +426,7 @@
           "apps/web/src/chief/research-report.tsx"
         ],
         "server": [
-          "apps/server/src/services/chief-report.ts",
-          "apps/server/src/services/chief-digest.ts",
-          "apps/server/src/services/chief-router-tools.ts"
-        ]
-      },
-      "routes": {
-        "server": [
-          "/api/teams/:id/chief/retro-proposals/:pid/:decision"
+          "apps/server/drizzle/0177_retire_daily_reports.sql"
         ]
       },
       "reach": [
@@ -444,13 +440,11 @@
         "apps/web/DESIGN-RULES.md"
       ],
       "backendDesign": {
-        "gap": "no design for report content, timing, quiet rules and retro proposal storage"
+        "gap": "Retired: historical tables and records are retained; only active report-linked steps are stopped."
       },
       "evidence": [
         "apps/web/e2e/chief-daily-report.spec.ts",
-        "apps/server/test/chief-report.test.ts",
-        "apps/server/test/chief-digest.test.ts",
-        "apps/server/test/chief-router-tools.test.ts"
+        "apps/server/test/daily-report-retirement.test.ts"
       ],
       "batch": "B2"
     },
@@ -771,15 +765,15 @@
     },
     {
       "id": "merge-gate",
-      "name": "Evidence-bound merge gate",
-      "summary": "A differentiator: a merge lands only on the patch a verdict judged, with protected paths, required checks, review and the brake enforced by the server; per-project merge policy and ship route.",
-      "states": "The gate shows why a merge is allowed or blocked; merge permission missing, merge in progress, merged.",
+      "name": "Completed delivery and explicit merge",
+      "summary": "Successful code tasks finish with their branch or PR retained. Only an explicit conversational user request initiates a merge, without a mandatory agent review or merge-choice UI.",
+      "states": "Delivered code is completed without a merge dialog. Explicit merge requests can succeed or be refused for permissions, a changed delivery or target, duplicate operations, or a dirty workspace.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/detail/merge-gate.ts",
-          "apps/web/src/detail/accept-dialog.tsx"
+          "apps/web/src/board/thread-actions.tsx",
+          "apps/web/src/board/thread-panel-model.ts"
         ],
         "server": [
           "apps/server/src/services/merge-gate",
@@ -803,31 +797,23 @@
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
-        "click testid:thread-pr-panel",
-        "click testid:accept-dialog-pr"
-      ],
-      "verify": [
-        ".claude/skills/verify-cairn/features/review-700.md"
+        "click testid:thread-pr-panel"
       ],
       "research": [
-        "docs/research/2513-tla-statecharts.md",
-        "docs/research/892-gate-usage-measurement.md",
-        "docs/research/mergify-merge-queue-spike.md",
-        "docs/research/review-gate-alternatives.md"
+        "docs/research/remove-product-merge-gate-2026-11-16.md"
       ],
-      "frontendDesign": {
-        "gap": "the gate verdict, merge button and merge-permission states in the thread have no design"
-      },
+      "frontendDesign": [
+        "docs/design/remove-product-merge-gate.md"
+      ],
       "backendDesign": [
-        "docs/research/2513-tla-statecharts.md",
-        "docs/spec/23-rework-to-original-branch-and-pr-convergence.md"
+        "docs/design/remove-product-merge-gate.md"
       ],
       "evidence": [
-        "apps/server/test/merge-gate-readiness.test.ts",
-        "apps/server/test/merge-gate-verdict-binding.test.ts",
-        "integration/test/gate-e2e.test.ts"
-      ],
-      "batch": "B3"
+        "apps/server/test/pr-merge-api.test.ts",
+        "apps/server/test/local-merge-landing.test.ts",
+        "apps/web/e2e/info-card-report.spec.ts",
+        "integration/test/g2t2-local-lifecycle.test.ts"
+      ]
     },
     {
       "id": "plans-and-review",
@@ -1576,7 +1562,7 @@
     {
       "id": "projects",
       "name": "Projects",
-      "summary": "Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.",
+      "summary": "Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.",
       "states": "A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted.",
       "centrality": 3,
       "status": "shipped",
@@ -1584,8 +1570,7 @@
         "web": [
           "apps/web/src/pages/project-new-page.tsx",
           "apps/web/src/pages/project-redirect.tsx",
-          "apps/web/src/pages/project-settings-page.tsx",
-          "apps/web/src/settings/archived-projects-section.tsx"
+          "apps/web/src/pages/project-settings-page.tsx"
         ],
         "server": [
           "apps/server/src/routes-projects.ts",
@@ -1597,8 +1582,7 @@
           "/app/project/new",
           "/app/project/:id",
           "/app/project/:id/tasks",
-          "/app/project/:id/settings",
-          "settings:projects"
+          "/app/project/:id/settings"
         ],
         "server": [
           "/api/projects",
@@ -1616,8 +1600,7 @@
         "open /app/project/new",
         "click testid:github-picker",
         "open /app/project/<id of a project listed by the projects API>/settings",
-        "click testid:project-instructions-input",
-        "settings projects"
+        "click testid:project-instructions-input"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/project-new-form.md",
@@ -1640,8 +1623,7 @@
       "evidence": [
         "apps/web/e2e/project-new-repo.spec.ts",
         "apps/web/e2e/project-settings-autonomy.spec.ts",
-        "apps/server/test/project-delete.test.ts",
-        "apps/web/e2e/settings-archived-projects.spec.ts"
+        "apps/server/test/project-delete.test.ts"
       ]
     },
     {
@@ -1762,8 +1744,7 @@
           "/app/activity"
         ],
         "server": [
-          "/api/search",
-          "/api/teams/:id/usage/daily"
+          "/api/search"
         ]
       },
       "reach": [
@@ -1789,6 +1770,52 @@
         "apps/web/e2e/activity-page.spec.ts",
         "apps/web/e2e/search-syntax-palette.spec.ts",
         "apps/server/test/search-syntax.test.ts"
+      ],
+      "batch": "B7"
+    },
+    {
+      "id": "token-usage",
+      "name": "Token usage",
+      "summary": "The Usage dialog from the sidebar footer: tokens per local day as an ink heatmap, Coordinator and tasks apart.",
+      "states": "Loading, failed with retry, empty for a new team, and the heatmap with a 30-day total and a readout for the hovered or selected day; light and dark, desktop dialog and phone.",
+      "centrality": 2,
+      "status": "shipped",
+      "code": {
+        "web": [
+          "apps/web/src/routes/usage-page.tsx",
+          "apps/web/src/usage",
+          "apps/web/src/api/usage-daily.ts"
+        ],
+        "server": [
+          "apps/server/src/services/usage-daily.ts"
+        ]
+      },
+      "routes": {
+        "web": [
+          "/app/usage"
+        ],
+        "server": [
+          "/api/teams/:id/usage/daily"
+        ]
+      },
+      "reach": [
+        "open /app",
+        "click testid:sidebar-usage"
+      ],
+      "verify": [],
+      "research": {
+        "gap": "no note beyond GitHub's contribution calendar, which the owner named"
+      },
+      "frontendDesign": [
+        "docs/design/references/thread-list-sidebar"
+      ],
+      "backendDesign": [
+        "docs/design/step-usage-daily.md"
+      ],
+      "evidence": [
+        "apps/web/e2e/usage-page.spec.ts",
+        "apps/web/test/usage-model.test.ts",
+        "apps/server/test/step-usage-daily.test.ts"
       ],
       "batch": "B7"
     },
@@ -2024,7 +2051,8 @@
           "apps/web/src/resources/mcp-servers-page.tsx"
         ],
         "server": [
-          "apps/server/src/services/mcp-servers.ts"
+          "apps/server/src/services/mcp-servers.ts",
+          "apps/server/src/services/mcp-github-connector.ts"
         ]
       },
       "routes": {
@@ -2037,7 +2065,11 @@
           "/api/teams/:id/mcp-connectors",
           "/api/teams/:id/mcp-connectors/:cid",
           "/api/teams/:id/mcp-connectors/:cid/check",
-          "/api/teams/:id/mcp-connectors/oauth/start"
+          "/api/teams/:id/mcp-connectors/oauth/start",
+          "/api/teams/:id/mcp-connectors/github",
+          "/api/teams/:id/mcp-connectors/github/device",
+          "/api/teams/:id/mcp-connectors/github/device/:attempt",
+          "/api/teams/:id/mcp-connectors/:cid/github/installations"
         ]
       },
       "reach": [
@@ -2130,8 +2162,8 @@
     {
       "id": "secrets",
       "name": "Secrets",
-      "summary": "Team and project secrets and environment variables stored encrypted and delivered to threads that need them; env var values stay readable to the owner.",
-      "states": "An empty list, env vars with values next to hidden secrets, a name filter, the add and edit dialog with the secret checkbox, bulk NAME=VALUE add, and the row menu with convert to secret.",
+      "summary": "Encrypted secrets and readable environment variables; first-use browser passwords ask for website approval in chat.",
+      "states": "Original add/edit form with name, value and secret checkbox; browser website approval pending, refused or approved; subsequent same-site fills; reapproval after password, website or machine changes.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2156,23 +2188,27 @@
       "reach": [
         "settings secrets",
         "click testid:resource-new",
-        "click testid:secret-scope"
+        "click label:机密"
       ],
       "research": [
-        "docs/research/1775-gateway-prior-art.md"
+        "docs/research/1775-gateway-prior-art.md",
+        "docs/research/browser-secret-fill-2026-11-16.md"
       ],
-      "frontendDesign": {
-        "gap": "the secrets page and project secrets have no design"
-      },
+      "frontendDesign": [
+        "docs/design/browser-secret-fill.md"
+      ],
       "backendDesign": [
-        "docs/research/1775-secret-gateway-design.md"
+        "docs/research/1775-secret-gateway-design.md",
+        "docs/design/browser-secret-fill.md"
       ],
       "evidence": [
         "apps/web/e2e/secret-add-dialog.spec.ts",
         "apps/web/e2e/project-secrets.spec.ts",
-        "apps/server/test/project-secrets.test.ts"
-      ],
-      "batch": "B10"
+        "apps/server/test/project-secrets.test.ts",
+        "apps/server/test/secret-delivery-policy.test.ts",
+        "apps/server/test/computer-login-handoff.test.ts",
+        "apps/daemon/test/browser-secret-fill.test.ts"
+      ]
     },
     {
       "id": "api-keys",

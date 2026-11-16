@@ -171,7 +171,7 @@ describe('#1626 info-class fast lane: info card report handed to the downstream 
     expect(codeStart.status).toBe(201);
     const codeBuildId = (codeStart.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    await waitFor(() => server.todoPhase(codeTodoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(codeTodoId) === 'done', 120_000);
 
     const firstCodeRequest = stub.requests[requestsBefore]!;
     const brief = userTexts(firstCodeRequest.messages).join('\n');

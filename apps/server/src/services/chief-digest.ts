@@ -17,48 +17,18 @@ import {
   shortEvent,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  gt,
-  gte,
-  inArray,
-  isNull,
-  like,
-  lt,
-  ne,
-  not,
-  or,
-  sql,
-} from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, like, lt, ne, not, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { chief, chiefMessage, chiefThread, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { chiefToolDefHashes, extractText } from './chief.js';
-import {
-  buildReportRun,
-  type CoordinatorLine,
-  chiefReportState,
-  localDay,
-  postReportWithoutRun,
-  type ReportState,
-  reportHourReached,
-  reportOfStep,
-  settleReportRun,
-  startReportRun,
-  THREAD_FENCE_OPEN,
-} from './chief-report.js';
 import { coordinatorServerContextEnabled } from './coordinator-context.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { rememberMemoryFile } from './memory-documents.js';
-import type { VapidKeys } from './push.js';
 import { coordinatorMemoryOwner, coordinatorProfile } from './routing-rules.js';
-import { serverTimezone } from './schedules.js';
 
 export const CHIEF_DIGEST_THRESHOLD_CHARS = 40_000;
 export const CHIEF_DIGEST_RETRY_MS = 15 * 60_000;
@@ -70,7 +40,7 @@ const CHIEF_DIGEST_TEXT_MAX = 400;
 const DIGEST_META_RE = /\nDigest thread=(\S+) until=(\d+) last=(\S+) reason=(daily|threshold)$/;
 
 export const CHIEF_DIGEST_SYSTEM_PROMPT = [
-  '你是 Coordinator 的整理助手：只读地把 Coordinator 和用户的对话整理成摘要，每天早上还复盘昨天的对话和线程记录，提出改进建议。',
+  '你是 Coordinator 的整理助手：只读地把 Coordinator 和用户的对话整理成摘要。',
   '你只能用只读工具核实任务的当前状态，不建任务、不改任何东西、不给用户发消息。',
   '用与对话相同的语言写，白话短句。',
 ].join('\n');
@@ -96,10 +66,16 @@ export interface DigestDeps {
   db: Db;
   machineHub?: MachineWakeHub;
   convHub?: ConversationStreamHub;
-  vapidKeys?: VapidKeys | null;
 }
 
 type ThreadRow = typeof chiefThread.$inferSelect;
+
+interface CoordinatorLine {
+  id: string;
+  at: number;
+  text: string;
+  projectId: string | null;
+}
 
 const DIGEST_PROMPT_HEAD = [
   '请把下面这段 Coordinator 和用户的对话整理成摘要。只输出一个 ```json 代码块，格式：',
@@ -155,16 +131,10 @@ type Boundary = { at: number; rowid: number | null };
 
 interface FoldCandidate {
   since: Boundary | null;
-  reason: 'daily' | 'threshold';
+  reason: 'threshold';
 }
 
-function foldCandidate(
-  db: Db,
-  thread: ThreadRow,
-  tz: string,
-  now: number,
-  allowDaily: boolean,
-): FoldCandidate | null {
+function foldCandidate(db: Db, thread: ThreadRow, now: number): FoldCandidate | null {
   const lastDigest = db
     .select({ createdAt: chiefMessage.createdAt, content: chiefMessage.content })
     .from(chiefMessage)
@@ -208,15 +178,12 @@ function foldCandidate(
     .where(uncoveredFilter(thread.id, since, now))
     .get();
   if (stats?.first == null) return null;
-  const daily =
-    allowDaily && reportHourReached(now, tz) && localDay(stats.first, tz) < localDay(now, tz);
   const threshold =
-    !daily &&
     !coordinatorServerContextEnabled() &&
     (stats.chars ?? 0) >= CHIEF_DIGEST_THRESHOLD_CHARS &&
     !threadBusy(db, thread);
-  if (!daily && !threshold) return null;
-  return { since, reason: daily ? 'daily' : 'threshold' };
+  if (!threshold) return null;
+  return { since, reason: 'threshold' };
 }
 
 type ChiefMessageRow = typeof chiefMessage.$inferSelect;
@@ -347,81 +314,6 @@ function queueFold(
   return true;
 }
 
-function queueReport(
-  deps: DigestDeps,
-  chiefRow: typeof chief.$inferSelect,
-  coordinator: ThreadRow,
-  state: Extract<ReportState, { kind: 'due' }>,
-  tz: string,
-  now: number,
-): void {
-  const { db } = deps;
-  const candidate =
-    coordinator.updatedAt >= now - CHIEF_DIGEST_LOOKBACK_MS
-      ? foldCandidate(db, coordinator, tz, now, true)
-      : null;
-  const inWindow = and(
-    gte(chiefMessage.createdAt, state.start),
-    lt(chiefMessage.createdAt, state.end),
-  );
-  const uncovered =
-    candidate === null
-      ? undefined
-      : candidate.since === null
-        ? sql`1 = 1`
-        : afterBoundary(candidate.since.at, candidate.since.rowid);
-  const rows = db
-    .select({ row: chiefMessage, rowid: sql<number>`rowid` })
-    .from(chiefMessage)
-    .where(
-      and(
-        eq(chiefMessage.threadId, coordinator.id),
-        lt(chiefMessage.createdAt, now),
-        notDigestRow,
-        ne(chiefMessage.role, 'system'),
-        uncovered === undefined ? inWindow : or(inWindow, uncovered),
-      ),
-    )
-    .orderBy(asc(chiefMessage.createdAt), asc(sql`rowid`))
-    .all();
-  const since = candidate?.since ?? null;
-  const uncoveredIds = new Set(
-    candidate === null
-      ? []
-      : rows
-          .filter(
-            ({ row, rowid }) =>
-              since === null ||
-              row.createdAt > since.at ||
-              (row.createdAt === since.at && since.rowid !== null && rowid > since.rowid),
-          )
-          .map(({ row }) => row.id),
-  );
-  const lines = chiefTranscriptLines(rows.map(({ row }) => row));
-  const foldIndex = lines.findIndex((line) => uncoveredIds.has(line.id));
-  const foldFrom = foldIndex === -1 ? null : foldIndex;
-  const run = buildReportRun(db, {
-    teamId: chiefRow.teamId,
-    coordinator: lines,
-    foldFrom,
-    covers: state.covers,
-    start: state.start,
-    end: state.end,
-    maxChars: CHIEF_DIGEST_INPUT_MAX_CHARS,
-  });
-  if (run.body === null) {
-    postReportWithoutRun(deps, state.rec, run.inputs, now);
-    return;
-  }
-  const last = lines.at(-1);
-  const meta =
-    candidate !== null && foldFrom !== null && last !== undefined
-      ? digestMeta(coordinator.id, last, candidate.reason)
-      : '';
-  const stepId = queueDigestStep(deps, chiefRow, `${run.body}${meta}`, now);
-  startReportRun(db, state.rec, run.inputs, stepId);
-}
-
 export function planChiefDigests(deps: DigestDeps, now: number): void {
   const { db } = deps;
   for (const chiefRow of db.select().from(chief).all()) {
@@ -456,32 +348,6 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
       .limit(1)
       .get();
     if (userTurnWaiting !== undefined) continue;
-    let tz = chiefRow.tz ?? serverTimezone();
-    try {
-      localDay(0, tz);
-    } catch {
-      tz = serverTimezone();
-    }
-    const coordinator = db
-      .select()
-      .from(chiefThread)
-      .where(
-        and(
-          eq(chiefThread.chiefId, chiefRow.id),
-          ne(chiefThread.id, digestThreadId),
-          isNull(chiefThread.archivedAt),
-        ),
-      )
-      .get();
-    const report: ReportState =
-      coordinator === undefined
-        ? { kind: 'none' }
-        : chiefReportState(deps, chiefRow, coordinator.id, tz, now, CHIEF_DIGEST_RETRY_MS);
-    if (report.kind === 'running') continue;
-    if (report.kind === 'due' && coordinator !== undefined) {
-      queueReport(deps, chiefRow, coordinator, report, tz, now);
-      continue;
-    }
     const threads = db
       .select()
       .from(chiefThread)
@@ -495,7 +361,7 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
       .orderBy(desc(chiefThread.updatedAt))
       .all();
     for (const thread of threads) {
-      const candidate = foldCandidate(db, thread, tz, now, report.kind === 'none');
+      const candidate = foldCandidate(db, thread, now);
       if (candidate !== null && queueFold(deps, chiefRow, thread, candidate, now)) break;
     }
   }
@@ -558,7 +424,6 @@ export function finishChiefDigest(
     .find((t): t is string => t !== null && t.trim() !== '');
   const parsed = outcome.status === 'success' && text ? parseDigestJson(text) : null;
   const items = digestItemsOf(parsed);
-  const report = reportOfStep(db, stepRow.id);
   const thread = meta?.[1]
     ? db.select().from(chiefThread).where(eq(chiefThread.id, meta[1])).get()
     : undefined;
@@ -580,27 +445,16 @@ export function finishChiefDigest(
     chiefDigestThreadId(chiefRow.id) === stepRow.buildId &&
     meta?.[2] !== undefined &&
     lastCovered !== undefined;
-  const retro =
-    parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as { retro?: unknown }).retro
-      : undefined;
-  const retroFound = Array.isArray(retro) ? retro : null;
-  const succeeded = meta === null ? report !== undefined && retroFound !== null : ok;
-  const effects: (() => void)[] = [];
-  db.transaction(() => {
-    db.update(step)
-      .set({ status: succeeded ? 'done' : 'failed', finishedAt: now })
-      .where(eq(step.id, stepRow.id))
-      .run();
-    if (report !== undefined) settleReportRun(deps, report, retroFound, now, effects);
-  });
-  for (const effect of effects) effect();
+  db.update(step)
+    .set({ status: ok ? 'done' : 'failed', finishedAt: now })
+    .where(eq(step.id, stepRow.id))
+    .run();
   if (!ok) return;
   const until = Number(meta[2]);
   const rememberAs =
     prompt.includes(ISSUE_FENCE_OPEN) ||
     prompt.includes(MAIL_FENCE_OPEN) ||
-    prompt.includes(THREAD_FENCE_OPEN)
+    prompt.includes('【线程记录')
       ? null
       : (coordinatorMemoryOwner(db, chiefRow.teamId) ?? null);
   const content: ChiefDigestContent = {

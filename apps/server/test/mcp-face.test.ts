@@ -1,8 +1,8 @@
-import { MCP_TOOL_REGISTRY, MERGE_HUMAN_ONLY_COPY } from '@cairn/shared';
+import { MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { step, todo as todoTable } from '../src/db/schema.js';
+import { build as buildTable, step, todo as todoTable } from '../src/db/schema.js';
 import { PLATFORM_LOCKED_MESSAGE } from '../src/services/routing-rules.js';
 import { bootServer, postProject, startLegacyBuild, type TestServer } from './helpers.js';
 
@@ -231,22 +231,23 @@ describe('/api/mcp tool execution = key owner identity (02 section 7.2)', () => 
     s.dispose();
   });
 
-  test('merge_builds machine entry hard-refused (#1256): same-team legal build also refused, text names the human exit', async () => {
+  test('merge_builds requires its write grant and merges a completed current delivery without reopening it', async () => {
     const s = bootServer();
     const key = await issueMcpKey(s, { read: [], write: ['Merge Builds'] });
-    const projectId = await postProject(s.app);
-    const { build: buildTable, todo: todoT } = await import('../src/db/schema.js');
+    const deniedKey = await issueMcpKey(s, { read: ['Todos'], write: [] });
+    const projectId = await postProject(s.app, 'mcp-hosted', { repoKind: 'hosted' });
     const now = Date.now();
     s.db
-      .insert(todoT)
+      .insert(todoTable)
       .values({
         id: 'todo-merge-mcp',
         teamId: s.team.id,
         projectId,
         title: 'tm',
-        phase: 'review',
+        phase: 'done',
         phaseAt: now,
         seqNum: 1,
+        latestBuildId: 'build-merge-mcp',
       })
       .run();
     s.db
@@ -259,18 +260,42 @@ describe('/api/mcp tool execution = key owner identity (02 section 7.2)', () => 
         createdAt: now,
       })
       .run();
+    s.db
+      .insert(step)
+      .values({
+        id: 'delivered-mcp',
+        buildId: 'build-merge-mcp',
+        kind: 'session',
+        status: 'done',
+        checkpointCommit: 'a'.repeat(40),
+        createdAt: now,
+      })
+      .run();
+    const denied = (
+      await rpc(s.app, deniedKey, 'tools/call', {
+        name: 'merge_builds',
+        arguments: { buildIds: ['build-merge-mcp'] },
+      })
+    ).body as JsonRpcResponse;
+    expect(denied.error !== undefined || denied.result?.isError === true).toBe(true);
     const res = (
       await rpc(s.app, key, 'tools/call', {
         name: 'merge_builds',
         arguments: { buildIds: ['build-merge-mcp'] },
       })
     ).body as JsonRpcResponse;
-    expect(res.result?.isError).toBe(true);
-    expect(res.result?.content?.[0]?.text ?? '').toContain(MERGE_HUMAN_ONLY_COPY);
-    const { step: stepTable } = await import('../src/db/schema.js');
+    expect(res.result?.isError ?? false).toBe(false);
     expect(
-      s.db.select().from(stepTable).where(eq(stepTable.buildId, 'build-merge-mcp')).all(),
-    ).toHaveLength(0);
+      s.db.select().from(todoTable).where(eq(todoTable.id, 'todo-merge-mcp')).get()?.phase,
+    ).toBe('done');
+    expect(
+      s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, 'build-merge-mcp'))
+        .all()
+        .filter((row) => row.kind === 'merge'),
+    ).toHaveLength(1);
     s.dispose();
   });
 

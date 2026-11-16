@@ -119,7 +119,6 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
           machineId: row.id,
           models: report.models,
           ...(report.bin !== undefined ? { bin: report.bin } : {}),
-          ...(report.auth !== undefined ? { auth: report.auth } : {}),
         },
       ];
     });

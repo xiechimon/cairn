@@ -1,9 +1,8 @@
 import { BRAND, type ProjectColor, type ProjectIcon } from '@cairn/shared';
 import { cn } from 'cn';
 import {
-  Activity,
   Archive,
-  ChartColumn,
+  ChartNoAxesColumn,
   ChevronLeft,
   Clock,
   PanelLeft,
@@ -41,8 +40,8 @@ import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteArchivedProjectsConfirm } from '../overlay/delete-archived-projects-confirm.js';
+import { USAGE_PATH } from '../routes/usage-page.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
-import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF } from '../settings/settings-href.js';
 import { DesktopUpdateButton } from './desktop-update.js';
 import { coordinatorSearch } from './open-composer.js';
@@ -97,7 +96,6 @@ interface BoardSidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
   onSearch?: () => void;
-  usageNav?: boolean;
   selected?: SidebarSelected;
   projects?: SidebarProject[];
   waiting?: ReadonlySet<string>;
@@ -356,7 +354,6 @@ export function BoardSidebar({
   collapsed = false,
   onToggle,
   onSearch,
-  usageNav = false,
   selected = 'board',
   projects,
   waiting = NOTHING_WAITING,
@@ -452,7 +449,7 @@ export function BoardSidebar({
   schedulesParams.set(TASKS_TAB_PARAM, 'scheduled');
 
   const settingsTarget = { pathname: SETTINGS_HREF, search: plain };
-  const activityTarget = { pathname: ACTIVITY_PATH, search: plain };
+  const usageTarget = { pathname: USAGE_PATH, search: plain };
   const toggleLabel = collapsed ? t('展开侧边栏') : t('收起侧边栏');
 
   const ungroupedSpaced = layout.ungrouped.length > 0 || projectsState !== undefined;
@@ -674,15 +671,10 @@ export function BoardSidebar({
             <span className="truncate voice-title text-brand">{BRAND.manifestName}</span>
           </span>
         </div>
-        {usageNav && (
-          <FooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
-            <ChartColumn className={ICON} strokeWidth={STROKE} />
-          </FooterIcon>
-        )}
         <div className="flex flex-none items-center gap-0.5">
           <DesktopUpdateButton iconClassName={ICON} idleClassName={ICON_BTN} />
-          <FooterIcon label={t('活动')} testId="sidebar-activity" to={activityTarget}>
-            <Activity className={ICON} strokeWidth={STROKE} />
+          <FooterIcon label={t('用量')} testId="sidebar-usage" to={usageTarget}>
+            <ChartNoAxesColumn className={ICON} strokeWidth={STROKE} />
           </FooterIcon>
           <FooterIcon label={t('设置')} testId="sidebar-settings" to={settingsTarget}>
             <Settings className={ICON} strokeWidth={STROKE} />

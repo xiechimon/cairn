@@ -198,13 +198,13 @@ describe('ownerOf (#3512)', () => {
     { name: 'confirm', phase: 'confirm', owner: 'owner' },
     { name: 'confirm, human policy', phase: 'confirm', policy: 'human', owner: 'owner' },
     { name: 'archived confirm', phase: 'confirm', archived: true, owner: null },
-    { name: 'code review, autonomous, no repository', phase: 'review', owner: 'coordinator' },
+    { name: 'code review, autonomous, no repository', phase: 'review', owner: 'owner' },
     {
       name: 'code review, autonomous, GitHub project without a PR',
       phase: 'review',
       repo: 'github',
       hasChanges: true,
-      owner: 'coordinator',
+      owner: 'owner',
     },
     {
       name: 'code review, human, GitHub project without a PR',
@@ -234,13 +234,13 @@ describe('ownerOf (#3512)', () => {
       repo: 'local',
       hasChanges: true,
       shipRoute: 'custom',
-      owner: 'coordinator',
+      owner: 'owner',
     },
     {
       name: 'code review, autonomous, local repository without changes',
       phase: 'review',
       repo: 'local',
-      owner: 'coordinator',
+      owner: 'owner',
     },
     { name: 'code review, human', phase: 'review', policy: 'human', owner: 'owner' },
     {
@@ -255,7 +255,7 @@ describe('ownerOf (#3512)', () => {
       phase: 'review',
       policy: 'human',
       prNumber: 7,
-      owner: null,
+      owner: 'owner',
     },
     {
       name: 'code review, human, checks still running',
@@ -263,7 +263,7 @@ describe('ownerOf (#3512)', () => {
       policy: 'human',
       prNumber: 7,
       gate: 'transient',
-      owner: null,
+      owner: 'owner',
     },
     {
       name: 'code review, human, evaluated',
@@ -279,7 +279,7 @@ describe('ownerOf (#3512)', () => {
       policy: 'human',
       prNumber: 7,
       gate: 'stale',
-      owner: null,
+      owner: 'owner',
     },
     {
       name: 'info review, human',
@@ -870,27 +870,16 @@ describe('the Coordinator can act on what it owns (#3512)', () => {
   test.each([
     { output: 'info' as const, owner: 'coordinator', done: true },
     { output: 'code' as const, owner: 'owner', done: false },
-  ])('a human-policy $output review owned by $owner: complete_todos done=$done', (c) => {
-    const w = openWorld({ phase: 'review', policy: 'human', output: c.output });
+  ])('a default-policy $output review owned by $owner: complete_todos done=$done', (c) => {
+    const w = openWorld({ phase: 'review', output: c.output });
     expect(ownerNow(w)).toBe(c.owner);
     const out = transitionTodos(w.deps, w.s.team.id, [w.todoId], 'done', coordinator);
     expect(out.transitioned.includes(w.todoId)).toBe(c.done);
     expect(getTodo(w.deps, w.todoId)?.phase).toBe(c.done ? 'done' : 'review');
   });
 
-  test.each([
-    { name: 'an autonomous research report', output: 'info' as const },
-    {
-      name: 'an autonomous GitHub review without a PR',
-      output: 'code' as const,
-      repo: 'github' as const,
-    },
-  ])('$name wakes the Coordinator once, and complete_todos accepts it', (c) => {
-    const w = openWorld({
-      phase: 'building',
-      output: c.output,
-      ...(c.repo ? { repo: c.repo } : {}),
-    });
+  test('an autonomous research report wakes the Coordinator once, and complete_todos accepts it', () => {
+    const w = openWorld({ phase: 'building', output: 'info' });
     setTodoPhase(w.deps, w.todoId, 'review');
     reconcileOwners(w.deps);
     reconcileOwners(w.deps, [w.todoId]);

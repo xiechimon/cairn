@@ -19,6 +19,12 @@ test('topbar `新建` opens the add dialog with name, value and the `机密` che
   await expect(dialog.getByLabel('值', { exact: true })).toBeVisible();
   await expect(dialog.getByText('加密保存在 Cairn 服务器上。')).toBeVisible();
   await expect(dialog.getByRole('checkbox', { name: /机密/ })).not.toBeChecked();
+  await dialog.getByTestId('secret-kind').click();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(1);
+  await expect(dialog.getByLabel('登录网站', { exact: true })).toHaveCount(0);
+  await dialog.getByLabel('名称', { exact: true }).fill('LOGIN_PASSWORD');
+  await dialog.getByLabel('值', { exact: true }).fill('synthetic-password');
+  await expect(dialog.getByRole('button', { name: '添加', exact: true })).toBeEnabled();
 });
 
 test('family law: X, Escape and backdrop dismiss; panel clicks do not', async ({ page }) => {

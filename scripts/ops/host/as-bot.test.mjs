@@ -19,7 +19,10 @@ const sourceDir = resolve('scripts/ops/host/tools/app-token');
 const recorderStub = `#!${process.execPath}
 const fs = require('node:fs');
 const argv = process.argv.slice(2);
-const entry = JSON.stringify({ argv, token: process.env.GH_TOKEN ?? null }) + '\\n';
+const entry = JSON.stringify({ argv, token: process.env.GH_TOKEN ?? null,
+  githubToken: process.env.GITHUB_TOKEN ?? null,
+  author: process.env.GIT_AUTHOR_NAME, email: process.env.GIT_AUTHOR_EMAIL,
+  authHeader: process.env.GIT_CONFIG_VALUE_0 }) + '\\n';
 fs.appendFileSync(process.env.CALLS, entry);
 `;
 
@@ -58,6 +61,13 @@ function setup(t) {
     PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
     CALLS: calls,
     TOKEN_MINTS: mints,
+    GH_TOKEN: 'stub-inherited-installation-token',
+    GITHUB_TOKEN: 'stub-inherited-installation-token',
+    GIT_AUTHOR_NAME: 'cairnwright[bot]',
+    GIT_AUTHOR_EMAIL: 'stub-bot@example.com',
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
+    GIT_CONFIG_VALUE_0: 'AUTHORIZATION: stub-inherited-installation-token',
   };
   return {
     run(...argv) {
@@ -130,18 +140,18 @@ for (const argv of allowed) {
     const result = setup(t).run(...argv);
     assert.equal(result.status, 0, result.stderr);
     const pushed = argv[0] === 'git' && argv.includes('push');
-    const expected =
-      argv[0] === 'git' && argv[1] === 'commit'
-        ? [
-            'commit',
-            '--trailer',
-            'Co-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>',
-            ...argv.slice(2),
-          ]
-        : argv.slice(1);
+    const expected = argv.slice(1);
     assert.deepEqual(pushed ? result.calls.slice(-1) : result.calls, [
-      { argv: expected, token: 'stub-installation-token' },
+      {
+        argv: expected,
+        token: null,
+        githubToken: null,
+        author: 'xiechimon',
+        email: '157263579+xiechimon@users.noreply.github.com',
+        authHeader: '',
+      },
     ]);
+    assert.equal(result.minted, false);
   });
 }
 

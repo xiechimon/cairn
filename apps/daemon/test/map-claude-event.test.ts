@@ -427,13 +427,12 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
     );
   });
 
-  test('failure mode 11: auth-class failure wording names the machine + remedy (state.machineName)', () => {
-    const state = createClaudeMapState({ machineName: 'daemon-mea' });
-    const { events } = feed([ASSISTANT_AUTH_ERROR, RESULT_AUTH_ERROR], state);
+  test('failure mode 11: auth-class failure wording names the team subscription remedy', () => {
+    const { events } = feed([ASSISTANT_AUTH_ERROR, RESULT_AUTH_ERROR]);
     const err = events.find((e) => e.type === 'error') as { error: { message: string } };
-    expect(err.error.message).toContain('daemon-mea');
-    expect(err.error.message).toContain('ANTHROPIC_API_KEY');
-    expect(err.error.message).toContain('/login');
+    expect(err.error.message).toContain('claude setup-token');
+    expect(err.error.message).toContain('设置 → 模型服务');
+    expect(err.error.message).not.toContain('ANTHROPIC_API_KEY');
   });
 
   test("failure mode 8: system init's session_id scraped into state (A7 resume channel)", () => {

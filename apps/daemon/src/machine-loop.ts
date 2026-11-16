@@ -256,7 +256,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       executor: orbProvider.kind,
       mcpConnectors: true,
       ...(orbComputer ? { computer: true as const } : {}),
-      ...(hostDesktops?.offersBrowser() ? { browser: true as const } : {}),
+      ...(hostDesktops?.offersBrowser()
+        ? { browser: true as const, browserSecretFill: true as const }
+        : {}),
       ...(hostComputer ? { ownComputer: true as const } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(hostPermissions !== undefined ? { hostPermissions } : {}),
@@ -315,7 +317,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       claudeBackend = createClaudeCodeBackend({
         skills: { skillsDir: config.skillsDir, cwd: config.home },
         onSkillsLog: (msg) => logger.skills(msg),
-        machineName: config.name,
         ...(claudeBin !== null ? { executablePath: claudeBin.path } : {}),
         teamSkillsCacheDir: paths.teamSkillsCacheDir,
         ...(claudeBin !== null ? { executableVersion: claudeBin.version } : {}),
@@ -882,7 +883,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       stepTranscripts,
       stops,
       machineName: config.name,
-      claudeCodeAuthProbe: probeAuthAndRemember,
       ...(daemonOtel !== null ? { otel: daemonOtel } : {}),
       ...(opts.heartbeatIntervalMs !== undefined
         ? { heartbeatIntervalMs: opts.heartbeatIntervalMs }

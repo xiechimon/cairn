@@ -11,7 +11,12 @@ import {
   seedDefaultRouting,
 } from '../src/services/routing-migration.js';
 import { listRoutingSettings } from '../src/services/routing-rules.js';
-import { bootServer, insertMachine, subscriptionClaudeReport } from './helpers.js';
+import {
+  bootServer,
+  insertClaudeSubscription,
+  insertMachine,
+  subscriptionClaudeReport,
+} from './helpers.js';
 
 function coordinatorRules(s: ReturnType<typeof bootServer>) {
   return listRoutingSettings(s.db, s.team.id).rules.filter((rule) => rule.use === 'coordinator');
@@ -29,9 +34,19 @@ describe('seedDefaultRouting coordinator rule', () => {
     expect(coordinatorRules(s)).toEqual([]);
   });
 
-  test('a logged-in Claude Code machine seeds the coordinator rule on the default model', () => {
+  test('a Runner signed in to Claude Code without a stored subscription seeds nothing', () => {
     const s = bootServer();
     insertMachine(s, { claudeCodeReport: subscriptionClaudeReport });
+    expect(seedDefaultRouting(s.db)).toMatchObject({ coordinatorRules: 0 });
+    expect(coordinatorRules(s)).toEqual([]);
+  });
+
+  test('a stored subscription and a Runner with Claude Code seed the coordinator rule on the default model', () => {
+    const s = bootServer();
+    insertClaudeSubscription(s);
+    insertMachine(s, {
+      claudeCodeReport: { ...subscriptionClaudeReport, auth: { state: 'not-logged-in' } },
+    });
     expect(seedDefaultRouting(s.db)).toMatchObject({ coordinatorRules: 1 });
     expect(coordinatorRules(s)).toMatchObject([
       {
@@ -45,6 +60,7 @@ describe('seedDefaultRouting coordinator rule', () => {
 
   test('the first reported model is used when the default is not offered', () => {
     const s = bootServer();
+    insertClaudeSubscription(s);
     insertMachine(s, {
       claudeCodeReport: {
         ...subscriptionClaudeReport,
@@ -57,6 +73,7 @@ describe('seedDefaultRouting coordinator rule', () => {
 
   test('seeding is idempotent and never overrides an existing coordinator rule', () => {
     const s = bootServer();
+    insertClaudeSubscription(s);
     insertMachine(s, { claudeCodeReport: subscriptionClaudeReport });
     s.db
       .insert(routingRule)
@@ -85,6 +102,7 @@ describe('seedDefaultRouting coordinator rule', () => {
     ['server-context Coordinator', setCoordinatorServerContextEnabled],
   ] as const)('the %s gets no Claude Code coordinator rule at startup', (_, enable) => {
     const s = bootServer();
+    insertClaudeSubscription(s);
     insertMachine(s, { claudeCodeReport: subscriptionClaudeReport });
     enable(true);
     try {

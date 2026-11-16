@@ -120,13 +120,16 @@ describe('storage-free GitHub device transport', () => {
   );
 
   test.each([
-    ['bad_refresh_token', 401, 'GitHub authorization expired; reconnect GitHub'],
-    ['expired_token', 401, 'GitHub authorization expired; reconnect GitHub'],
-    ['temporarily_unavailable', 502, 'GitHub token refresh is temporarily unavailable'],
+    ['bad_refresh_token', 400, 401, 'GitHub authorization expired; reconnect GitHub'],
+    ['expired_token', 400, 401, 'GitHub authorization expired; reconnect GitHub'],
+    ['incorrect_client_credentials', 200, 401, 'GitHub authorization expired; reconnect GitHub'],
+    ['incorrect_client_credentials', 400, 401, 'GitHub authorization expired; reconnect GitHub'],
+    ['temporarily_unavailable', 200, 502, 'GitHub token refresh is temporarily unavailable'],
+    ['temporarily_unavailable', 400, 502, 'GitHub token refresh is temporarily unavailable'],
   ] as const)(
-    'classifies refresh %s without exposing the upstream description',
-    async (error, status, message) => {
-      const w = world(400);
+    'classifies refresh %s at HTTP %i without exposing the upstream description',
+    async (error, httpStatus, status, message) => {
+      const w = world(httpStatus);
       w.replies.push({ error, error_description: 'private-provider-details' });
       await expect(
         refreshGithubDeviceToken(w.deps, 'shared-client', 'old-refresh'),

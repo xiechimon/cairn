@@ -1,23 +1,16 @@
-import {
-  type MergeBlockerCode,
-  type MergeReadiness,
-  projectMergeConfigSchema,
-} from '@cairn/shared';
+import { conversationBranch } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { build, type step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { systemGitOps } from '../lib/git.js';
-import { githubPull } from '../lib/github.js';
+import { githubPull, hasPullFields, isFullSha, isOwnPull } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
-import { autonomousMergePolicy } from './autonomous-merge.js';
-import type { BuildDeps } from './builds.js';
+import { type BuildDeps, lastPushedCheckpoint } from './builds.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { pauseTeamAutonomy } from './github-autonomy-brake.js';
-import { localGateFacts } from './local-merge-facts.js';
 import { upsertMessage } from './machine-deps.js';
-import { evaluateMergeGate } from './merge-gate-run.js';
+import { assertMergeRequiredChecks } from './merge-required-checks.js';
 import { sendMustReachAlert } from './push-alerts.js';
 
 const INSTRUCTION_PREFIX = 'Ship gate verdict: ';
@@ -29,17 +22,11 @@ export type ShipGateInstruction = z.infer<typeof instructionSchema>;
 export const CUSTOM_NEEDS_PR =
   'the custom ship route needs a GitHub pull request so the landing can be verified; local projects use local-merge';
 
-const USER_APPROVAL_BLOCKERS: readonly MergeBlockerCode[] = ['policy-human'];
-const OWN_STEP_BLOCKERS: readonly MergeBlockerCode[] = [
-  ...USER_APPROVAL_BLOCKERS,
-  'work-in-flight',
-];
-
 export function appendShipGateInstruction(
   prompt: string,
   instruction: ShipGateInstruction,
 ): string {
-  const pin = `Merge only the judged commit ${instruction.judgedHead}. Push nothing to the pull request first. With gh, pass --match-head-commit ${instruction.judgedHead} to gh pr merge, or send sha=${instruction.judgedHead} to the merge API. If the head differs, stop and report instead of merging.`;
+  const pin = `The user explicitly requested this merge. Merge only the delivered commit ${instruction.judgedHead}. Push nothing to the pull request first. With gh, pass --match-head-commit ${instruction.judgedHead} to gh pr merge, or send sha=${instruction.judgedHead} to the merge API. If the head differs, stop and report instead of merging.`;
   return `${prompt}\n${pin}\n${INSTRUCTION_PREFIX}${JSON.stringify(instruction)}`;
 }
 
@@ -63,55 +50,58 @@ export function hasGithubPr(deps: BuildDeps, buildId: string): boolean {
   );
 }
 
-async function readinessOf(deps: BuildDeps, buildId: string): Promise<MergeReadiness | null> {
-  if (deps.mergeVerdict !== undefined) return deps.mergeVerdict(buildId);
-  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-  const todoRow = buildRow && deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  if (!todoRow) return null;
-  const projectRow = projectOfTodo(deps.db, todoRow);
-  if (projectRow === undefined) return null;
-  if (githubRepoOfProject(projectRow) !== null) return evaluateMergeGate(deps, buildId);
-  if (projectRow.repoKind !== 'local' || projectRow.localPath === null) return null;
-  const defaultBranch =
-    projectRow.baseBranch ??
-    (await (deps.gitOps ?? systemGitOps).listBranches(projectRow.localPath).catch(() => null))
-      ?.defaultBranch ??
-    null;
-  if (defaultBranch === null) return null;
-  return (await localGateFacts(deps, buildId, defaultBranch))?.readiness ?? null;
-}
-
 async function refusalOf(
   deps: BuildDeps,
   buildId: string,
-  ignored: readonly MergeBlockerCode[],
 ): Promise<{ reason: string } | { headSha: string }> {
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   const todoRow = buildRow && deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  if (!todoRow) return { reason: 'build or task missing' };
-  const brake = autonomousMergePolicy(
-    deps.db,
-    todoRow.teamId,
-    projectMergeConfigSchema.parse({}),
-    nowMs(),
-    buildId,
-  );
-  if (brake.autonomyPaused) return { reason: 'autonomy-paused: merging is paused for this team' };
-  if (brake.dailyCapReached) return { reason: 'daily-cap: the daily merge cap is reached' };
-  const readiness = await readinessOf(deps, buildId);
-  if (readiness === null) {
-    return { reason: 'the merge gate has no verdict for this build (no PR or local gate facts)' };
-  }
-  const blocking = readiness.blockers.filter((b) => !ignored.includes(b.code));
-  if (blocking.length > 0) {
-    return { reason: `merge gate blocks this ship: ${blocking.map((b) => b.label).join('; ')}` };
-  }
-  if (readiness.headSha === null) return { reason: 'the merge gate has no head to judge' };
-  return { headSha: readiness.headSha };
+  if (!buildRow || !todoRow) return { reason: 'build or task missing' };
+  if (
+    todoRow.latestBuildId !== buildId ||
+    todoRow.archivedAt !== null ||
+    !['done', 'review', 'failed'].includes(todoRow.phase)
+  )
+    return { reason: 'the current delivery is no longer eligible for merging' };
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  const repo = githubRepoOfProject(projectRow);
+  if (repo === null || buildRow.prNumber === null) return { reason: CUSTOM_NEEDS_PR };
+  const token = await githubReadToken(deps, todoRow.teamId, repo);
+  if (token === null) return { reason: 'Connect GitHub before requesting a merge' };
+  const fetchImpl = deps.githubFetch ?? fetch;
+  const page = await githubPull(fetchImpl, token, repo.owner, repo.repo, buildRow.prNumber);
+  const pull = page?.pull;
+  const head = lastPushedCheckpoint(deps, buildId, { mergeSteps: false });
+  if (!pull || !hasPullFields(pull) || !isOwnPull(pull, conversationBranch(buildId)))
+    return { reason: 'Cannot read the pull request belonging to this delivery' };
+  if (head === null || !isFullSha(head) || pull.headSha !== head)
+    return { reason: 'The pull request head differs from the delivered commit' };
+  if (pull.state !== 'open' || pull.merged)
+    return { reason: 'The pull request is already closed or merged' };
+  if (pull.baseRef !== (projectRow?.baseBranch ?? pull.defaultBranch))
+    return { reason: 'The pull request target differs from the project base' };
+  await assertMergeRequiredChecks(fetchImpl, token, repo, pull.baseRef, head);
+  const current = deps.db.select().from(todo).where(eq(todo.id, todoRow.id)).get();
+  if (
+    current?.latestBuildId !== buildId ||
+    current.archivedAt !== null ||
+    !['done', 'review', 'failed'].includes(current.phase) ||
+    current.projectId !== todoRow.projectId
+  )
+    return { reason: 'The delivery changed while checking the merge target' };
+  const currentProject = projectOfTodo(deps.db, current);
+  if (
+    currentProject?.repoKind !== projectRow?.repoKind ||
+    currentProject?.githubRepo !== projectRow?.githubRepo ||
+    currentProject?.baseBranch !== projectRow?.baseBranch ||
+    lastPushedCheckpoint(deps, buildId, { mergeSteps: false }) !== head
+  )
+    return { reason: 'The delivery or merge target changed while checking the merge target' };
+  return { headSha: head };
 }
 
 export async function judgeShip(deps: BuildDeps, buildId: string): Promise<{ headSha: string }> {
-  const outcome = await refusalOf(deps, buildId, USER_APPROVAL_BLOCKERS);
+  const outcome = await refusalOf(deps, buildId);
   if ('reason' in outcome) throw new HttpError(409, outcome.reason);
   return outcome;
 }
@@ -124,9 +114,9 @@ export async function reverifyShip(
   if (instruction === null) return null;
   if (instruction.buildId !== stepRow.buildId) return 'ship gate verdict belongs to another build';
   if (!hasGithubPr(deps, stepRow.buildId)) return CUSTOM_NEEDS_PR;
-  const outcome = await refusalOf(deps, stepRow.buildId, OWN_STEP_BLOCKERS).catch(
-    (err: unknown) => ({ reason: `merge gate could not be evaluated: ${String(err)}` }),
-  );
+  const outcome = await refusalOf(deps, stepRow.buildId).catch((err: unknown) => ({
+    reason: `Cannot verify the merge target: ${String(err)}`,
+  }));
   if ('reason' in outcome) return outcome.reason;
   return outcome.headSha === instruction.judgedHead
     ? null

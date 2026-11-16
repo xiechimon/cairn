@@ -3,23 +3,23 @@ name: Cairn
 direction: Cairn (stone trail) · dense · project-first
 reference: prototype A, the acceptance reference of the B-UI batch
 colors:
-  # Light (.light): claude.ai neutral layers (docs/design/claude-ai-spec.md, sections 5 and 6); dark values live in colors-dark, rules in the "Colors" and "Dark" sections
-  canvas: '#fafafa'        # app background, one step off the page
-  sheet: '#ffffff'         # main surface (--background)
-  card: '#f7f7f7'          # cards: black 3% over the page
-  popover: '#ffffff'       # menus and raised surfaces
+  # Light (.light): claude.ai's three neutral layers, tinted with the app icon's colours (owner 2026-11-16); dark values live in colors-dark, rules in the "Colors" and "Dark" sections
+  canvas: '#e7e6e1'        # app background, one step off the page
+  sheet: '#ecebe6'         # main surface (--background)
+  card: '#e5e4df'          # cards: black 3% over the page
+  popover: '#f8f7f3'       # menus and raised surfaces
   hover: 'rgb(0 0 0 / 0.06)'  # row hover (--sidebar-hover)
   line: 'rgb(0 0 0 / 0.1)'          # hairline ring and dividers (--border)
   rule: 'rgb(0 0 0 / 0.1)'
   divider: 'rgb(0 0 0 / 0.1)'
-  ink: '#0a0a0a'           # headings and body text (reference measured near-black, 2026-11-11)
-  ink-2: '#3a3a3a'         # supporting lines, nav and button labels, sidebar icons (--text-secondary, --sidebar-ink)
-  ink-3: '#545454'         # true metadata: times, counts, captions, placeholders; the reference's meta grey samples #52-#58
-  ink-4: '#6e6e6e'         # decorative icons only, never text; the reference's placeholder grey samples #72-#74
-  icon: '#3a3a3a'          # icons with a text label
+  ink: '#1c1d1b'           # headings and body text (reference measured near-black, 2026-11-11)
+  ink-2: '#343633'         # supporting lines, nav and button labels, sidebar icons (--text-secondary, --sidebar-ink)
+  ink-3: '#4b4d4a'         # true metadata: times, counts, captions, placeholders; the reference's meta grey samples #52-#58
+  ink-4: '#5d5f5c'         # decorative icons only, never text; the reference's placeholder grey samples #72-#74
+  icon: '#343633'          # icons with a text label
   accent: '#9a6500'        # ochre (--card-button): waiting on you, action links
-  primary: '#0a0a0a'       # primary button: the ink
-  on-primary: '#ffffff'
+  primary: '#1c1d1b'       # primary button: the ink
+  on-primary: '#ecebe6'
   on-accent: '#ffffff'     # text on the ochre accent
   count-badge: '#376dd6'   # count badges and the Tasks toggle dot (reference blue; white digit 4.9:1)
   count-badge-ink: '#ffffff'
@@ -29,12 +29,12 @@ colors:
   running: '#5f8f4f'       # working: running icon, online dot
   running-text: '#3f6c35'  # working text
   running-bar: '#55833f'
-  running-track: '#ebebeb'
+  running-track: '#d9d9d4'
   pebble-waiting: '#d49a1c'   # palette: waiting on you
   pebble-review: '#5379a0'    # ready for review
   pebble-working: '#5f8f4f'   # working
-  pebble-idle: '#6e6e6e'      # idle or snoozed
-  pebble-resolved: '#c7c7c7'  # merged or resolved
+  pebble-idle: '#5d5f5c'      # idle or snoozed
+  pebble-resolved: '#b8b7b3'  # merged or resolved
   danger-line: '#d98c7d'      # error ring and danger-zone outline
   tint-working: '#d2e4ff'
   tint-working-soft: '#e6eefb'
@@ -42,30 +42,30 @@ colors:
   tint-wait: '#f3e6c8'
   tint-wait-soft: '#f8efdc'
   tint-wait-ink: '#6e4900'
-  tint-quiet: '#ececec'
-  tint-quiet-soft: '#f2f2f2'
-  tint-quiet-ink: '#3a3a3a'
+  tint-quiet: '#dad9d5'
+  tint-quiet-soft: '#e0dfda'
+  tint-quiet-ink: '#343633'
   tint-fail: '#f5ddd6'
   tint-fail-soft: '#f9e8e3'
-  tint-fail-ink: '#a33a2a'
+  tint-fail-ink: '#9c3627'
 colors-dark:
   # Dark (:root default): page, sidebar one step lighter, raised surfaces lighter again
-  canvas: '#1f1f1f'
-  sheet: '#191919'
-  card: '#202020'
-  popover: '#303030'       # menus and raised surfaces
+  canvas: '#1b1c1b'
+  sheet: '#151615'
+  card: '#1c1d1c'
+  popover: '#2c2d2c'       # menus and raised surfaces
   hover: 'rgb(255 255 255 / 0.075)'
   line: 'rgb(255 255 255 / 0.1)'
   rule: 'rgb(255 255 255 / 0.1)'
   divider: 'rgb(255 255 255 / 0.1)'
-  ink: '#f7f7f7'
-  ink-2: '#c4c4c4'
-  ink-3: '#a3a3a3'
-  ink-4: '#8a8a8a'         # decorative icons only, never text
-  icon: '#c4c4c4'
+  ink: '#ecebe6'
+  ink-2: '#bbbab7'
+  ink-3: '#9c9b98'
+  ink-4: '#8c8b88'         # decorative icons only, never text
+  icon: '#bbbab7'
   accent: '#ebb550'        # ochre brightened; text on it is dark ochre, not white
-  primary: '#f7f7f7'       # primary button is the ink in dark
-  on-primary: '#191919'
+  primary: '#ecebe6'       # primary button is the ink in dark
+  on-primary: '#151615'
   on-accent: '#1a1404'
   count-badge: '#376dd6'   # same blue in dark, as the reference
   count-badge-ink: '#ffffff'
@@ -75,12 +75,12 @@ colors-dark:
   running: '#82b46f'
   running-text: '#9cc78b'
   running-bar: '#6fa35c'
-  running-track: '#2a2a2a'
+  running-track: '#262726'
   pebble-waiting: '#e0a838'
   pebble-review: '#7fa3cc'
   pebble-working: '#82b46f'
-  pebble-idle: '#8a8a8a'
-  pebble-resolved: '#474747'
+  pebble-idle: '#8c8b88'
+  pebble-resolved: '#434443'
   danger-line: '#8c4a3e'
   tint-working: '#223a5e'
   tint-working-soft: '#1d2d49'
@@ -88,9 +88,9 @@ colors-dark:
   tint-wait: '#3d3014'
   tint-wait-soft: '#2e2510'
   tint-wait-ink: '#f2cf86'
-  tint-quiet: '#2e2e2e'
-  tint-quiet-soft: '#262626'
-  tint-quiet-ink: '#c4c4c4'
+  tint-quiet: '#2a2b2a'
+  tint-quiet-soft: '#222322'
+  tint-quiet-ink: '#bbbab7'
   tint-fail: '#4a2a24'
   tint-fail-soft: '#3a2420'
   tint-fail-ink: '#f09a88'
@@ -155,18 +155,18 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 ## Colors
 
-- **Three neutral layers** (claude.ai, `docs/design/claude-ai-spec.md` section 5): `sheet` is the page and the sidebar (`#191919` dark, `#ffffff` light; `--sidebar-surface`), `canvas` the app background one step off it (`#1f1f1f`, `#fafafa`), `popover` the raised layer for menus and the composer (`#303030`, `#ffffff`). `card` is a 3% tint over the page. Every hover, selection and hairline is an alpha of white (dark) or black (light) over these layers: hover 7.5% / 6%, selected 15% / 12%, `line` 10%.
+- **Three neutral layers** (claude.ai, `docs/design/claude-ai-spec.md` section 5): `sheet` is the page and the sidebar (`#151615` dark, `#ecebe6` light; `--sidebar-surface`), `canvas` the app background one step off it (`#1b1c1b`, `#e7e6e1`), `popover` the raised layer for menus and the composer (`#2c2d2c`, `#f8f7f3`). The layers take the app icon's colours (owner 2026-11-16): the dark plate's faintly green near-black and the light plate's warm off-white, with the spiral's green-grey as the light ink. `card` is a 3% tint over the page. Every hover, selection and hairline is an alpha of white (dark) or black (light) over these layers: hover 7.5% / 6%, selected 15% / 12%, `line` 10%.
 - **One theme file**: every token lives in `src/styles/shadcn.css` (the file `components.json` points the shadcn CLI at). Its first `:root` block holds theme-independent tokens (motion, z-index, type, radii, sizes, formulas over color slots) followed by the dark colors; `.light` overrides the colors only. A palette change touches one file.
 - **Borders are always 1 CSS pixel**: the main panel, task cards, the active nav item, and the new-task button stay 1px on high-density screens too (they do not follow `--hairline` down to 0.5px); borders must be visible.
 - **Three-tier shadow ladder** (claude.ai values, spec section 5): `--e1` is a 1px `line` ring with no drop shadow (claude.ai cards carry none); `--e2` menus and floating surfaces (`0 2px 6px` 20% + `0 8px 24px` 32% black in dark, an inset `--elevated-ring` of white 4%); `--e3` dialogs (`0 1px 2px` 6% + `0 2px 8px` 24% and a `--dialog-ring` of white 5%). Light uses the same shapes at lower alpha with black rings (`0 2px 6px` 8% + `0 8px 20px` 10% and a 10% ring, measured on the Claude Duet row menu). The composer has its own `--shadow-composer` (`0 4px 20px` 7.5% and an 8% inset ring) and the jump button `--shadow-jump`. Shadows never change on hover (V21). Old slot names like `--panel-shadow` / `--shadow-popover` / `--dialog-shadow` are aliases.
-- **Four ink steps, each clearly apart** (contrast pass, owner 2026-11-12: "text contrast is too low, things do not separate"). `ink` is everything the user reads as content: message text, titles, row labels, menu items, form labels and values, list items. `ink-2` is for supporting lines (descriptions, hints, a settled row's title), idle tab and ghost-button labels and sidebar icons. `ink-3` is only for true metadata: times, counts, captions, placeholders. `ink-4` is for decorative icons, never text. Light on white: `#0a0a0a` 19.8:1, `#3a3a3a` 11.4, `#545454` 7.6, `#6e6e6e` 5.1; dark on `#191919`: `#f7f7f7` 16.4, `#c4c4c4` 10.1, `#a3a3a3` 7.0, `#8a8a8a` 5.1, so every step is about 1.4 to 1.7 times the next and every text level passes AA on every surface, the dark `popover` included (`ink-3` 5.2:1). The values come from sampling the reference recording with a script that averages the strongest 8% of glyph pixels in a text box (the same script returns the exact token on cairn's own render): its content text samples `#06`-`#0d`, its supporting and meta text one grey at `#50`-`#58` (dark `#93`-`#98`), its placeholders `#72`-`#74` (dark `#7f`). Cairn keeps two grey levels where the reference has one, with the lighter one no paler than the reference's. The earlier values (`#4f4f4f` and `#5c5c5c`, dark `#a6a6a6` and `#999999`) sat 13 levels apart and read as one grey; `ink-4` was `#878787` (3.5:1) and one caption used it as text.
+- **Four ink steps, each clearly apart** (contrast pass, owner 2026-11-12: "text contrast is too low, things do not separate"). `ink` is everything the user reads as content: message text, titles, row labels, menu items, form labels and values, list items. `ink-2` is for supporting lines (descriptions, hints, a settled row's title), idle tab and ghost-button labels and sidebar icons. `ink-3` is only for true metadata: times, counts, captions, placeholders. `ink-4` is for decorative icons, never text. Light on `#ecebe6`: `#1c1d1b` 14.2:1, `#343633` 10.2, `#4b4d4a` 7.2, `#5d5f5c` 5.4; dark on `#151615`: `#ecebe6` 15.2, `#bbbab7` 9.4, `#9c9b98` 6.5, `#8c8b88` 5.3, so every step is about 1.4 times the next and every text level keeps the contrast it had on the neutral layers before the icon tint (owner 2026-11-16) on every surface, the dark `popover` included. The values come from sampling the reference recording with a script that averages the strongest 8% of glyph pixels in a text box (the same script returns the exact token on cairn's own render): its content text samples `#06`-`#0d`, its supporting and meta text one grey at `#50`-`#58` (dark `#93`-`#98`), its placeholders `#72`-`#74` (dark `#7f`). Cairn keeps two grey levels where the reference has one, with the lighter one no paler than the reference's. The earlier values (`#4f4f4f` and `#5c5c5c`, dark `#a6a6a6` and `#999999`) sat 13 levels apart and read as one grey; `ink-4` was `#878787` (3.5:1) and one caption used it as text.
 - **Contrast (measured, WCAG 2.x)**: light on the page, `ink` 19.8, `ink-2` 11.37, `ink-3` 7.57, `ink-4` 5.1, `accent` 4.96, `running-text` 6.16, `destructive` 6.57; `ink-3` on `secondary` `#f2f2f2` 6.76. Dark on the page, `ink` 16.41, `ink-2` 10.08, `ink-3` 6.97, `ink-4` 5.09, `accent` 9.43; on `popover` `ink-2` 7.57 and `ink-3` 5.23. White text on the light `accent` is 4.96; `on-primary` on `primary` is 19.8 light and 16.41 dark. `ink-4` is decorative only.
 - **Focus ring**: `--focus-ring` is the ochre accent (`#9a6500` light, 4.96 on the page; `#ebb550` dark, 9.43), where claude.ai uses its blue (spec section 3). Buttons, checkboxes, switches and badges draw it as a `--focus-width` (2.4px) outline at offset 0, hugging the control's radius; rows and segmented options draw it inset. Text fields (`Input`, `Textarea`, `SelectTrigger`, the `InputGroup` shell, the settings search) instead turn their own 1px border `--focus-ring` and draw nothing outside it: one thin ochre line, no halo (owner 2026-11-13). An invalid field (`aria-invalid`) shows one `destructive` 1px border at rest and when focused; it never stacks the focus ring on the red border.
 - **Brand marks**: the spiral disc (the Coordinator's face) uses `--fab-surface` `#2f5a2a` with the `--fab-mark` `#f4f6f1` spiral in both themes, a stone green that sets the Coordinator's face apart from the neutral brand plate.
 - **Palette roles** (anti-slop batch 1, 2026-11-06): ochre is the one accent and means "waiting on you" (`--waiting-ink` for text and icons, `--badge-attention` for dots); green is a 6px dot for running or online and nothing else; rust (`--destructive`, `--danger-soft`) is failure and destructive actions only. Status chips are one neutral fill (`bg-secondary`) with the status in the text and icon colour; there are no slate and no per-project hues. The one exception is the task reference in the Coordinator conversation (owner decision 2026-11-11, matching the reference app): the glyph tile of its reference row and its chip take a status tint from the `tint-*` tokens (`tint-working` calm blue, `tint-wait` ochre, `tint-quiet` neutral, `tint-fail` rust; each has a tile fill, a softer chip fill `-soft` and an ink `-ink`, all text pairs 4.5 or more). Lists, the sidebar and the tasks panel keep one neutral fill.
 - **Accent discipline**: `accent` is used only for: needs-your-attention states and counts, action links on cards, icons of the active nav item, and count-badge backgrounds. It is never decorative and never a large-area background.
 - **Status is never color alone**: every status is a triple of "icon + color + text" (failed ⊗ failed / awaiting confirmation ☰ awaiting confirmation / awaiting review ⑂ awaiting review); color-blind users can tell them apart by icon and text.
-- **The primary button is `primary`**: the shadcn Button default tier, the ink itself: `#0a0a0a` with white text in light, `#f7f7f7` with `#191919` text in dark (claude.ai). Ochre is never the primary-button background, so "do this" and "waiting on you" never look alike; the enabled send button and a switch that is on are the accent roles (V5).
+- **The primary button is `primary`**: the shadcn Button default tier, the ink itself: `#1c1d1b` with `#ecebe6` text in light, `#ecebe6` with `#151615` text in dark. Ochre is never the primary-button background, so "do this" and "waiting on you" never look alike; the enabled send button and a switch that is on are the accent roles (V5).
 - Colors live only in `src/styles/shadcn.css`; components write token names, never hex values (`scripts/ui-drift-gate.mjs` G2 already pins this).
 
 ## Typography
@@ -423,7 +423,7 @@ Rules:
 
 Dark is the `:root` default (`.light` is the light theme). Values live in the `colors-dark` frontmatter and in the `:root` block of `src/styles/shadcn.css`; the gallery's Doc check (`/design.html`) compares the two in both themes.
 
-- **The same layers, alphas reversed**: in dark the page and the sidebar are `#191919`, the app canvas one step lighter (`#1f1f1f`), raised surfaces `#303030`; every hover, selection and hairline is an alpha of white. The neutrals carry no hue (claude.ai), so the ochre accent, the green dot and rust stand alone.
+- **The same layers, alphas reversed**: in dark the page and the sidebar are `#151615`, the app canvas one step lighter (`#1b1c1b`), raised surfaces `#2c2d2c`; every hover, selection and hairline is an alpha of white. The neutrals carry only the app icon's faint tint (owner 2026-11-16, replacing claude.ai's hueless greys), too little to compete, so the ochre accent, the green dot and rust still stand alone.
 - **Hairline rings stay drawn**: `line` #353b36 is 1.32 on the card and 1.45 on the sheet.
 - **The ink ladder inverts**: `ink` #e6e8e2, `ink-2` #b4bab3, `ink-3` #959c96, `icon` #959c96; `ink-4` #5d655f is decorative only.
 - **Contrast (measured, WCAG 2.x)**: on the card, `ink` 12.30, `ink-2` 7.68, `ink-3` 5.41, `icon` 5.41, `accent` 8.14, `running-text` 7.92, `destructive` 7.00; `ink-3` on canvas 6.43 and on a hovered menu row 4.53.
@@ -443,7 +443,7 @@ Read `DESIGN-RULES.md` (next to this file) first: it holds the short checkable r
 ```text
 Cairn UI rules (source: apps/web/DESIGN.md):
 - Look: direction A, Cairn. Stone paper, dense, calm. Light (.light): canvas #e6e7e1 → sheet #f6f6f2 → card #fdfdfb, ink #1d231f. Hairline rings, almost no shadow. Elevation is three tokens with the ring baked in: --e1 card/row, --e2 menu/popover, --e3 dialog/floating window. Never add a second ring or a raw shadow.
-- Dark (:root default): neutral layers from claude.ai: sheet (page and sidebar) #191919 → canvas #1f1f1f → popover #303030; hover, selection and hairlines are white alphas. Ink #f7f7f7 / #a6a6a6 / #999999. Accent #ebb550 with dark ochre text on it; it is also the focus ring. Running #82b46f. All tokens live in src/styles/shadcn.css.
+- Dark (:root default): neutral layers from claude.ai in the app icon's colours: sheet (page and sidebar) #151615 → canvas #1b1c1b → popover #2c2d2c; hover, selection and hairlines are white alphas. Ink #ecebe6 / #bbbab7 / #9c9b98 / #8c8b88. Accent #ebb550 with dark ochre text on it; it is also the focus ring. Running #82b46f. All tokens live in src/styles/shadcn.css.
 - Three meaningful hues: ochre (--card-button: light #9a6500, dark #ebb550) = waiting on you: action links, count badges, plus the focus ring and a switch that is on; green (running) = a working or online dot; rust = failure. Everything else is neutral ink.
 - Type: three families only. Source Serif 4 through `voice-title` (wordmark, page titles, 500), `voice-greeting` (`Greeting` heading, 360 light, 320 dark) and `voice-response` (task spec text, 400); agent replies are sans; Instrument Sans for everything else, including section and column headings, pane and dialog titles (font-heading font-title); JetBrains Mono for code, times, ids. Chinese falls back to PingFang SC under both the serif and the sans. Sizes only 26/20/17/15/14/13/12 through text-greeting / text-page / text-heading / text-card-title / text-ui / text-meta and text-code / text-caption; body weight 450, row titles 600, display titles 650.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
@@ -469,7 +469,7 @@ The board top bar has no bottom rule. Its primary action is a centered new-task 
 **Coordinator channels** (design `docs/design/coordinator-project-channels.md`, owner 2026-11-13). The main channel (`/app`) and each project channel (`/app?project=<id>&chat=1`) are separate Coordinator conversations, each with its own thread, session and turn queue; switching channels switches the thread, never filters one transcript. A channel shows only its own messages; the Coordinator reads another channel with the read-only `channel_messages` tool. Task reports return to the channel that created the task (`create_todo` makes that channel watch it), and a project-channel task that needs the owner or is done also leaves one line in the main channel, carrying the channel it came from.
 
 - **First open of a project channel** creates its thread and one greeting turn: the usual typing state, then a Coordinator bubble of one to three sentences that names the owner, mentions anything in the project waiting on them and asks what to do, with two or three reply chips for that project, from `suggest_replies` during the greeting or from the request that follows it. It runs once per thread. If the owner sends first, the greeting is dropped.
-- **Fixed greeting**: when there is nothing to show, the conversation opens with a Coordinator bubble instead of a heading: `{时段}好，{name}。你想让我做什么？` in the main channel, `{name}，你想在 {project} 里做什么？` in a project channel, each with three reply chips `做个计划` / `接一个仓库` / `接着最近的活`. A project channel shows it only when its greeting turn never ran or failed (no error row, no red mark), never while the turn's reply is still arriving. No serif heading, date line or counts sit above any conversation; the waiting count is the `任务` badge.
+- **Fixed greeting**: when there is nothing to show, the conversation opens with a Coordinator bubble instead of a heading: `{时段}好，{name}。你想让我做什么？` in the main channel, `{name}，你想在 {project} 里做什么？` in a project channel, each with three reply chips `做个计划` / `接一个仓库` / `接着最近的活`. A project channel shows it only when its greeting turn never ran or failed without recovery eligibility, never while the turn's reply is still arriving. A retryable failed initial greeting instead keeps its error visible; only the latest failure offers explicit retry, with the shared plain-language reason and model settings link. Retrying copies the saved greeting prompt without inventing an owner message. No serif heading, date line or counts sit above any conversation; the waiting count is the `任务` badge.
 - **Archived project channel**: the transcript as it was, no greeting bubble and no chips.
 
 On phones up to 640px, the sidebar folds into a drawer opened by a 44px menu button at the top left (top bars reserve 52px for it; the task detail page keeps its back chevron instead). Board columns become one vertical list, empty columns and the old empty start ghost are hidden, and horizontal board scrolling is disabled. The new-task bar is fixed above the safe-area inset at the bottom of the viewport. The needs-you strip remains before the board list.

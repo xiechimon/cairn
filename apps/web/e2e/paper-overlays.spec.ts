@@ -95,7 +95,7 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
 test('dialog face: sheet surface, 12px corners, 15px sans title, 28px close', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, SECRETS, '添加密钥或环境变量');
-  await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#ffffff'));
+  await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#ecebe6'));
   await expect(dialog).toHaveCSS('border-top-left-radius', '12px');
   const title = dialog.getByTestId('dialog-head').getByText('添加密钥或环境变量');
   await expect(title).toHaveCSS('font-size', '15px');
@@ -166,7 +166,7 @@ test('Paper menu: 32px rows, 14px text, 18px icons, 14px panel corners, 4px padd
   await settle(menu);
   await expect(menu).toHaveCSS('border-top-left-radius', '14px');
   await expect(menu).toHaveCSS('padding-top', '4px');
-  await expect(menu).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(menu).toHaveCSS('background-color', 'rgb(248, 247, 243)');
 
   const rows = menu.getByRole('menuitem');
   const count = await rows.count();

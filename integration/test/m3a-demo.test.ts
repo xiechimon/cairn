@@ -134,7 +134,7 @@ describe('M3a demo: server dispatches step → daemon executes for real → tran
       action: 'confirm',
     });
     expect(confirmed.status).toBe(202);
-    await waitFor(() => server.todoPhase(todoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(todoId) === 'done', 120_000);
 
     expect(logLines().some((l) => l.includes(`continue session ${buildId}`))).toBe(true);
     const second = stub.requests[2]!;

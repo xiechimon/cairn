@@ -46,12 +46,14 @@ import {
   withoutFileTarget,
 } from './file-pane.js';
 import { FilePreviewPanel } from './file-preview-panel.js';
+import { HomeSpiral, type SpiralProject } from './home-spiral.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { NarrowTopControls, useNarrowChrome } from './narrow-chrome.js';
 import { composeRequest } from './open-composer.js';
 import { PhoneTabs } from './phone-tabs.js';
 import { splitProjectsByArchive } from './project-archive.js';
+import { waitingProjectIds } from './sidebar-projects.js';
 import { TasksPanel } from './tasks-panel.js';
 import {
   needsYouBadge,
@@ -86,8 +88,9 @@ export function channelStream(
   stream: readonly ChiefStreamItem[],
   fallback: string,
   fresh: boolean,
+  recoverGreeting = false,
 ): ChiefStreamItem[] {
-  if (stream.some((item) => item.kind === 'user')) return [...stream];
+  if (recoverGreeting || stream.some((item) => item.kind === 'user')) return [...stream];
   const opening = stream.filter((item) => item.kind !== 'error');
   if (opening.length > 0) return opening;
   const failed = opening.length < stream.length;
@@ -108,6 +111,7 @@ interface HomeCProps {
   tasks: TasksView;
   tasksQuery?: QueryLike;
   archived?: ArchivedProjectState | null;
+  fixtureProjects?: readonly SpiralProject[];
 }
 
 export function conversationBoundaryKey(input: {
@@ -177,6 +181,7 @@ export function HomeC({
   tasks,
   tasksQuery,
   archived = null,
+  fixtureProjects,
 }: HomeCProps) {
   const { t } = useI18n();
   const { user, live, teamId, teamsQuery } = useLiveData();
@@ -271,8 +276,13 @@ export function HomeC({
     () =>
       archived !== null
         ? (chiefData.stream ?? [])
-        : channelStream(chiefData.stream ?? [], channelGreeting, surface.chiefFresh),
-    [chiefData.stream, archived, channelGreeting, surface.chiefFresh],
+        : channelStream(
+            chiefData.stream ?? [],
+            channelGreeting,
+            surface.chiefFresh,
+            surface.onRetryGreeting !== undefined,
+          ),
+    [chiefData.stream, archived, channelGreeting, surface.chiefFresh, surface.onRetryGreeting],
   );
   const [only, ...rest] = stream;
   const fallbackOnly =
@@ -310,6 +320,7 @@ export function HomeC({
     [todos],
   );
   const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);
+  const waitingIds = useMemo(() => waitingProjectIds(tasks), [tasks]);
   const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
   const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
@@ -568,6 +579,9 @@ export function HomeC({
         >
           {paneButtons}
           {!narrow && <ChiefStatusMark chief={{ ...chiefData, stream }} />}
+          {!narrow && fallbackOnly && projectId === null && archived === null && (
+            <HomeSpiral projects={fixtureProjects ?? activeProjects} waiting={waitingIds} />
+          )}
           {banner != null && (
             <div
               data-home-banner=""
@@ -595,6 +609,7 @@ export function HomeC({
                         : () => Promise.resolve()
                 }
                 onRewind={archived === null ? surface.onRewind : undefined}
+                onRetryGreeting={archived === null ? surface.onRetryGreeting : undefined}
                 onWithdraw={archived === null ? surface.onWithdraw : undefined}
                 unsent={archived === null ? surface.unsent : undefined}
                 onSteer={archived === null ? surface.onSteer : undefined}

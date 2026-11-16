@@ -2,7 +2,10 @@ import type { TeamRoutingSettings } from '@cairn/shared';
 import { ChevronRight, Plus } from 'lucide-react';
 import { Link, Navigate, useSearchParams } from 'react-router';
 import { toClaudeAccount } from '../api/claude-accounts.js';
-import { useClaudeSubscriptions } from '../api/claude-subscriptions.js';
+import {
+  hasUsableClaudeSubscription,
+  useClaudeSubscriptions,
+} from '../api/claude-subscriptions.js';
 import { useModelSources, useProviders } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import {
@@ -114,7 +117,8 @@ function RoutingContent() {
     live ? (sourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
   const topModels =
-    (live ? topModelsQ.data?.models : fixture.resources?.topModels) ?? suggestedTopModels(options);
+    (live ? topModelsQ.data?.models : fixture.resources?.topModels) ??
+    suggestedTopModels(options, !live || hasUsableClaudeSubscription(subscriptionsQ.data, now));
   const groups = ruleGraphGroups(settings, targets, options, t, topModels);
 
   return (

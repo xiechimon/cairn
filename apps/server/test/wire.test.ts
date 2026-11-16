@@ -14,9 +14,10 @@ import {
   userRecordSchema,
   WEB_REST_ENDPOINTS,
 } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
-import { plan as planTable } from '../src/db/schema.js';
+import { plan as planTable, step as stepTable } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, insertMachine, postProject, req, startLegacyBuild } from './helpers.js';
@@ -65,6 +66,11 @@ const INFERRED_ROUTES = [
   'DELETE /api/teams/{id}/mcp-connectors/{cid}',
   'POST /api/teams/{id}/mcp-connectors/{cid}/check',
   'POST /api/teams/{id}/mcp-connectors/oauth/start',
+  'GET /api/teams/{id}/mcp-connectors/github',
+  'POST /api/teams/{id}/mcp-connectors/github/device',
+  'POST /api/teams/{id}/mcp-connectors/github/device/{attempt}',
+  'DELETE /api/teams/{id}/mcp-connectors/github/device/{attempt}',
+  'POST /api/teams/{id}/mcp-connectors/{cid}/github/installations',
   'GET /api/teams/{id}/secrets',
   'POST /api/teams/{id}/secrets',
   'PATCH /api/teams/{id}/secrets/{sid}',
@@ -88,6 +94,7 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/chief/threads',
   'POST /api/conversations/{id}/messages',
   'POST /api/teams/{id}/chief/threads/{tid}/rewind',
+  'POST /api/teams/{id}/chief/threads/{tid}/retry-greeting/{stepId}',
   'POST /api/teams/{id}/chief/threads/{tid}/questions/{requestId}/answer',
   'POST /api/teams/{id}/chief/threads/{tid}/questions/{requestId}/cancel',
   'POST /api/teams/{id}/chief/retro-proposals/{pid}/{decision}',
@@ -546,7 +553,7 @@ describe('the build surface + the nine-value phase transitions (the server-side 
     expect(projectBuilds).toHaveLength(1);
   });
 
-  test('the full main timeline: queued->planning->confirm->(the reject v2 loop)->building->review->merge 202->done', async () => {
+  test('the full main timeline: plan revision->building->done; explicit merge remains separate from delivery', async () => {
     const s = await withTodo();
     const legacyBuildId = startLegacyBuild(s, s.todoDoc.id, { withPlan: true });
     const b = buildRecordSchema.parse(
@@ -595,8 +602,17 @@ describe('the build surface + the nine-value phase transitions (the server-side 
     const confirm = await req(s.app, 'POST', `/api/builds/${b.id}/steps`, { action: 'confirm' });
     expect(confirm.status).toBe(202);
     expect(await phaseOf()).toBe('building');
-    completeStep(s.svc, last(await stepsOf()).id);
-    expect(await phaseOf()).toBe('review');
+    const execution = last(await stepsOf());
+    s.db
+      .update(stepTable)
+      .set({ checkpointCommit: 'ab'.repeat(20) })
+      .where(eq(stepTable.id, execution.id))
+      .run();
+    completeStep(s.svc, execution.id);
+    expect(await phaseOf()).toBe('done');
+    expect(
+      (await stepsOf()).some((step) => ['review', 'verify', 'merge'].includes(step.kind)),
+    ).toBe(false);
     const merge = await req(s.app, 'POST', `/api/builds/${b.id}/merge`);
     expect(merge.status).toBe(202);
     expect(mergeAcceptedResponseSchema.safeParse(await merge.json()).success).toBe(true);

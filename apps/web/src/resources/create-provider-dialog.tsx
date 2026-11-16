@@ -33,12 +33,10 @@ import { ProviderPresetIcon } from './provider-preset-icon.js';
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
 const PICKER_ROW_CLS =
-  'h-10 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-card dark:hover:bg-card disabled:text-content-tertiary disabled:opacity-100';
+  'h-10 pointer-coarse:h-11 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) disabled:text-content-tertiary disabled:opacity-100';
 
 const PICKER_TILE_CLS =
   'flex size-5.5 flex-none items-center justify-center rounded-(--radius-control) bg-card text-caption font-semibold text-content-secondary ring-1 ring-border';
-
-const PICKER_TAG_CLS = 'ml-auto text-caption font-normal text-content-tertiary';
 
 const PICKER_GROUP_CLS = 'm-0 flex min-w-0 flex-col border-0 p-0';
 
@@ -158,19 +156,19 @@ const WIRED_OAUTH_IDS: ReadonlySet<string> = new Set([
   PROVIDER_CODEX_PRESET.id,
 ]);
 
-const PRESET_ROWS = PROVIDER_PRESET_IDS.map((id) => {
-  const oauth = (PROVIDER_OAUTH_PRESET_IDS as readonly string[]).includes(id);
-  return {
-    id,
-    label: PRESET_LABELS[id],
-    group: PRESET_GROUP[id],
-    oauth,
-    wired: oauth && WIRED_OAUTH_IDS.has(id),
-  };
-}).sort((a, b) => a.label.localeCompare(b.label, 'en'));
+const PRESET_ROWS = PROVIDER_PRESET_IDS.map((id) => ({
+  id,
+  label: PRESET_LABELS[id],
+  group: PRESET_GROUP[id],
+  oauth: (PROVIDER_OAUTH_PRESET_IDS as readonly string[]).includes(id),
+}))
+  .filter((row) => !row.oauth || WIRED_OAUTH_IDS.has(row.id))
+  .sort((a, b) => a.label.localeCompare(b.label, 'en'));
 
 interface CreateProviderDialogProps {
   open?: boolean;
+  inline?: boolean;
+  testId?: string;
   onClose: () => void;
   pending?: boolean;
   onCreate?: (body: {
@@ -183,6 +181,7 @@ interface CreateProviderDialogProps {
     apiKey?: string;
   }) => void;
   onConnect?: (presetId: string) => void;
+  oauthSignIn: boolean;
   connectPending?: boolean;
   connectError?: string | null;
   onPickClaudeSubscription?: () => void;
@@ -198,10 +197,13 @@ interface CreateProviderDialogProps {
 
 export function CreateProviderDialog({
   open,
+  inline = false,
+  testId,
   onClose,
   pending,
   onCreate,
   onConnect,
+  oauthSignIn,
   connectPending,
   connectError,
   onPickClaudeSubscription,
@@ -251,13 +253,12 @@ export function CreateProviderDialog({
     setModelIds([]);
   }, [open]);
 
-  const rows =
-    query.trim() === ''
-      ? PRESET_ROWS
-      : PRESET_ROWS.filter((row) => {
-          const q = query.trim().toLowerCase();
-          return row.label.toLowerCase().includes(q) || row.id.includes(q);
-        });
+  const q = query.trim().toLowerCase();
+  const rows = PRESET_ROWS.filter(
+    (row) =>
+      (oauthSignIn || row.id === PROVIDER_CODEX_PRESET.id || !row.oauth) &&
+      (q === '' || row.label.toLowerCase().includes(q) || row.id.includes(q)),
+  );
 
   const enterForm = (entry: { id: string; label: string } | null) => {
     const defaults = entry === null ? undefined : PROVIDER_PRESET_DEFAULTS[entry.id];
@@ -292,260 +293,256 @@ export function CreateProviderDialog({
     }
   };
 
-  return (
-    <DialogShell
-      title={t('添加模型服务')}
-      open={open}
-      onClose={onClose}
-      size="l"
-      footer={
-        view === 'form' ? (
-          <FormActions
-            className="pt-0"
-            primary={{
-              label: t('添加模型服务'),
-              onClick: submit,
-              disabled: !ready || pending === true,
-            }}
-            secondary={{ label: t('取消'), onClick: onClose }}
+  const footer =
+    view === 'form' ? (
+      <FormActions
+        className="pt-0"
+        primary={{
+          label: t('添加模型服务'),
+          onClick: submit,
+          disabled: !ready || pending === true,
+        }}
+        secondary={{ label: t('取消'), onClick: inline ? () => setView('picker') : onClose }}
+      />
+    ) : undefined;
+  const body =
+    view === 'picker' ? (
+      <div className="flex flex-col gap-3">
+        <InputGroup className="h-8.5 rounded-md border-border bg-card shadow-xs dark:bg-input/30">
+          <InputGroupAddon>
+            <Search />
+          </InputGroupAddon>
+          <InputGroupInput
+            aria-label={t('搜索服务商...')}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('搜索服务商...')}
+            className="text-ui md:text-ui"
           />
-        ) : undefined
-      }
-    >
-      {view === 'picker' ? (
-        <div className="flex flex-col gap-3">
-          <InputGroup className="h-8.5 rounded-md border-border bg-card shadow-xs dark:bg-input/30">
-            <InputGroupAddon>
-              <Search />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t('搜索服务商...')}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t('搜索服务商...')}
-              className="text-ui md:text-ui"
-            />
-          </InputGroup>
-          {connectError != null && connectError !== '' && <FieldError>{connectError}</FieldError>}
-          {codexDevice != null && (
-            <FieldDescription data-testid="codex-device-login">
-              {t('在浏览器打开这个链接，输入验证码。')}{' '}
-              <a href={codexDevice.verificationUri} target="_blank" rel="noreferrer">
-                {codexDevice.verificationUri}
-              </a>{' '}
-              <span className="font-mono">{codexDevice.userCode}</span>
-            </FieldDescription>
-          )}
-          {codexDeviceError != null && codexDeviceError !== '' && (
-            <FieldError>{codexDeviceError}</FieldError>
-          )}
-          <div className="flex flex-col">
-            {PRESET_GROUPS.map((group) => {
-              const groupRows = rows.filter((row) => row.group === group);
-              const claudeRow =
-                group === '订阅登录' &&
-                onPickClaudeSubscription !== undefined &&
-                matchesQuery('claude', query);
-              if (groupRows.length === 0 && !claudeRow) return null;
-              return (
-                <fieldset key={group} className={PICKER_GROUP_CLS}>
-                  <legend className={PICKER_GROUP_HEAD_CLS}>{t(group)}</legend>
-                  {claudeRow && (
-                    <Button
-                      variant="ghost"
-                      data-preset-id="claude-subscription"
-                      className={PICKER_ROW_CLS}
-                      onClick={onPickClaudeSubscription}
-                    >
-                      <span aria-hidden className={PICKER_TILE_CLS}>
-                        <Claude size={14} />
-                      </span>
-                      <span className="min-w-0 truncate">Claude Pro / Max</span>
-                      <span className={PICKER_TAG_CLS}>{t('订阅')}</span>
-                    </Button>
-                  )}
-                  {groupRows.map((row) => (
-                    <Button
-                      key={row.id}
-                      variant="ghost"
-                      data-preset-id={row.id}
-                      className={PICKER_ROW_CLS}
-                      disabled={
-                        row.oauth &&
-                        (!row.wired || connectPending === true || codexSignInPending === true)
-                      }
-                      onClick={() => {
-                        if (!row.oauth) enterForm({ id: row.id, label: row.label });
-                        else if (row.id === PROVIDER_CODEX_PRESET.id)
-                          onCodexSignIn != null ? onCodexSignIn() : onClose();
-                        else onConnect != null ? onConnect(row.id) : onClose();
-                      }}
-                    >
-                      <span aria-hidden className={PICKER_TILE_CLS}>
-                        <ProviderPresetIcon id={row.id} />
-                      </span>
-                      <span className="min-w-0 truncate">{row.label}</span>
-                      {row.wired && <span className={PICKER_TAG_CLS}>OAuth</span>}
-                      {row.oauth && !row.wired && (
-                        <span className={PICKER_TAG_CLS}>{t('暂未开通')}</span>
-                      )}
-                    </Button>
-                  ))}
-                </fieldset>
-              );
-            })}
-            <fieldset className={PICKER_GROUP_CLS}>
-              <legend className={PICKER_GROUP_HEAD_CLS}>{t('其他')}</legend>
-              <Button variant="ghost" className={PICKER_ROW_CLS} onClick={() => enterForm(null)}>
-                <span aria-hidden className={PICKER_TILE_CLS}>
-                  <PlusSmall />
-                </span>
-                {t('自定义端点')}
-              </Button>
-            </fieldset>
-          </div>
+        </InputGroup>
+        {connectError != null && connectError !== '' && <FieldError>{connectError}</FieldError>}
+        {codexDevice != null && (
+          <FieldDescription data-testid="codex-device-login">
+            {t('在浏览器打开这个链接，输入验证码。')}{' '}
+            <a href={codexDevice.verificationUri} target="_blank" rel="noreferrer">
+              {codexDevice.verificationUri}
+            </a>{' '}
+            <span className="font-mono">{codexDevice.userCode}</span>
+          </FieldDescription>
+        )}
+        {codexDeviceError != null && codexDeviceError !== '' && (
+          <FieldError>{codexDeviceError}</FieldError>
+        )}
+        <div className="flex flex-col">
+          {PRESET_GROUPS.map((group) => {
+            const groupRows = rows.filter((row) => row.group === group);
+            const claudeRow =
+              group === '订阅登录' &&
+              onPickClaudeSubscription !== undefined &&
+              matchesQuery(t('Claude 订阅').toLowerCase(), query);
+            if (groupRows.length === 0 && !claudeRow) return null;
+            return (
+              <fieldset key={group} className={PICKER_GROUP_CLS}>
+                <legend className={PICKER_GROUP_HEAD_CLS}>{t(group)}</legend>
+                {claudeRow && (
+                  <Button
+                    variant="ghost"
+                    data-preset-id="claude-subscription"
+                    className={PICKER_ROW_CLS}
+                    onClick={onPickClaudeSubscription}
+                  >
+                    <span aria-hidden className={PICKER_TILE_CLS}>
+                      <Claude size={14} />
+                    </span>
+                    <span className="min-w-0 truncate">{t('Claude 订阅')}</span>
+                  </Button>
+                )}
+                {groupRows.map((row) => (
+                  <Button
+                    key={row.id}
+                    variant="ghost"
+                    data-preset-id={row.id}
+                    className={PICKER_ROW_CLS}
+                    disabled={row.oauth && (connectPending === true || codexSignInPending === true)}
+                    onClick={() => {
+                      if (!row.oauth) enterForm({ id: row.id, label: row.label });
+                      else if (row.id === PROVIDER_CODEX_PRESET.id)
+                        onCodexSignIn != null ? onCodexSignIn() : onClose();
+                      else onConnect != null ? onConnect(row.id) : onClose();
+                    }}
+                  >
+                    <span aria-hidden className={PICKER_TILE_CLS}>
+                      <ProviderPresetIcon id={row.id} />
+                    </span>
+                    <span className="min-w-0 truncate">{row.label}</span>
+                  </Button>
+                ))}
+              </fieldset>
+            );
+          })}
+          <fieldset className={PICKER_GROUP_CLS}>
+            <legend className={PICKER_GROUP_HEAD_CLS}>{t('其他')}</legend>
+            <Button variant="ghost" className={PICKER_ROW_CLS} onClick={() => enterForm(null)}>
+              <span aria-hidden className={PICKER_TILE_CLS}>
+                <PlusSmall />
+              </span>
+              {t('自定义端点')}
+            </Button>
+          </fieldset>
         </div>
-      ) : (
-        <FormStack className="max-w-none">
-          <Button
-            variant="ghost"
-            className="self-start px-0 text-content-secondary"
-            onClick={() => setView('picker')}
-          >
-            <ChevronLeft />
-            {t('返回')}
-          </Button>
-          {preset?.id === PROVIDER_XAI_PRESET.id && (
-            <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={xaiSignInPending === true || onXaiSignIn == null}
-                onClick={onXaiSignIn}
-              >
-                {PROVIDER_XAI_PRESET.oauthLabel}
-              </Button>
-              {xaiDevice != null && (
-                <FieldDescription>
-                  {t('在浏览器打开这个链接，输入验证码。')}{' '}
-                  <a href={xaiDevice.verificationUri} target="_blank" rel="noreferrer">
-                    {xaiDevice.verificationUri}
-                  </a>{' '}
-                  <span className="font-mono">{xaiDevice.userCode}</span>
-                </FieldDescription>
-              )}
-              {xaiDeviceError != null && xaiDeviceError !== '' && (
-                <FieldError>{xaiDeviceError}</FieldError>
-              )}
-            </div>
-          )}
-          <FormField label={t('名称')} htmlFor="dlg-provider-label">
+      </div>
+    ) : (
+      <FormStack className="max-w-none">
+        <Button
+          variant="ghost"
+          className="self-start px-0 text-content-secondary"
+          onClick={() => setView('picker')}
+        >
+          <ChevronLeft />
+          {t('返回')}
+        </Button>
+        {preset?.id === PROVIDER_XAI_PRESET.id && (
+          <div className="flex flex-col gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={xaiSignInPending === true || onXaiSignIn == null}
+              onClick={onXaiSignIn}
+            >
+              {PROVIDER_XAI_PRESET.oauthLabel}
+            </Button>
+            {xaiDevice != null && (
+              <FieldDescription>
+                {t('在浏览器打开这个链接，输入验证码。')}{' '}
+                <a href={xaiDevice.verificationUri} target="_blank" rel="noreferrer">
+                  {xaiDevice.verificationUri}
+                </a>{' '}
+                <span className="font-mono">{xaiDevice.userCode}</span>
+              </FieldDescription>
+            )}
+            {xaiDeviceError != null && xaiDeviceError !== '' && (
+              <FieldError>{xaiDeviceError}</FieldError>
+            )}
+          </div>
+        )}
+        <FormField label={t('名称')} htmlFor="dlg-provider-label">
+          <Input
+            id="dlg-provider-label"
+            className={FORM_CONTROL_CLS}
+            value={label}
+            onChange={(event) => setLabel(event.target.value)}
+          />
+        </FormField>
+        <FormField
+          label={t('API 密钥')}
+          htmlFor="dlg-provider-apikey"
+          help={t('密钥将加密存储，保存后无法再次查看。')}
+        >
+          <Input
+            id="dlg-provider-apikey"
+            className={FORM_CONTROL_CLS}
+            type="password"
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder={t('无密钥网关可留空')}
+          />
+        </FormField>
+        <ProviderConnectionDisclosure
+          open={connectionOpen}
+          onOpenChange={setConnectionOpen}
+          summary={connectionSummary({ baseUrl, api, authHeader }, t)}
+        >
+          <FormField label={t('服务商 ID')} htmlFor="dlg-provider-id">
             <Input
-              id="dlg-provider-label"
+              id="dlg-provider-id"
               className={FORM_CONTROL_CLS}
-              value={label}
-              onChange={(event) => setLabel(event.target.value)}
+              value={providerId}
+              onChange={(event) => setProviderId(event.target.value)}
+              placeholder={t('例如 my-relay')}
             />
           </FormField>
           <FormField
-            label={t('API 密钥')}
-            htmlFor="dlg-provider-apikey"
-            help={t('密钥将加密存储，保存后无法再次查看。')}
+            label="Base URL"
+            htmlFor="dlg-provider-baseurl"
+            help={baseUrlHasPlaceholder ? t('把 Base URL 中的占位符换成你的账户值') : undefined}
           >
             <Input
-              id="dlg-provider-apikey"
+              id="dlg-provider-baseurl"
               className={FORM_CONTROL_CLS}
-              type="password"
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-              placeholder={t('无密钥网关可留空')}
+              value={baseUrl}
+              onChange={(event) => setBaseUrl(event.target.value)}
+              placeholder="https://api.example.com/v1"
             />
           </FormField>
-          <ProviderConnectionDisclosure
-            open={connectionOpen}
-            onOpenChange={setConnectionOpen}
-            summary={connectionSummary({ baseUrl, api, authHeader }, t)}
-          >
-            <FormField label={t('服务商 ID')} htmlFor="dlg-provider-id">
-              <Input
-                id="dlg-provider-id"
-                className={FORM_CONTROL_CLS}
-                value={providerId}
-                onChange={(event) => setProviderId(event.target.value)}
-                placeholder={t('例如 my-relay')}
-              />
-            </FormField>
-            <FormField
-              label="Base URL"
-              htmlFor="dlg-provider-baseurl"
-              help={baseUrlHasPlaceholder ? t('把 Base URL 中的占位符换成你的账户值') : undefined}
+          <FormField label={t('API 协议')} htmlFor="dlg-provider-api">
+            <Select
+              value={api}
+              onValueChange={(next) => {
+                if (next !== null) setApi(next as ProviderApi);
+              }}
             >
-              <Input
-                id="dlg-provider-baseurl"
-                className={FORM_CONTROL_CLS}
-                value={baseUrl}
-                onChange={(event) => setBaseUrl(event.target.value)}
-                placeholder="https://api.example.com/v1"
+              <SelectTrigger id="dlg-provider-api" className={FORM_CONTROL_CLS}>
+                <SelectValue>
+                  {API_OPTIONS.find((option) => option.value === api)?.label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent aria-label={t('API 协议')}>
+                {API_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+          <div>
+            {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
+            <label className="inline-flex w-fit cursor-pointer items-center gap-2">
+              <Checkbox
+                id="dlg-provider-authheader"
+                checked={authHeader}
+                onCheckedChange={setAuthHeader}
+                aria-label={t('以 Authorization: Bearer 请求头发送 API 密钥')}
               />
-            </FormField>
-            <FormField label={t('API 协议')} htmlFor="dlg-provider-api">
-              <Select
-                value={api}
-                onValueChange={(next) => {
-                  if (next !== null) setApi(next as ProviderApi);
-                }}
-              >
-                <SelectTrigger id="dlg-provider-api" className={FORM_CONTROL_CLS}>
-                  <SelectValue>
-                    {API_OPTIONS.find((option) => option.value === api)?.label}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent aria-label={t('API 协议')}>
-                  {API_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormField>
-            <div>
-              {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-              <label className="inline-flex w-fit cursor-pointer items-center gap-2">
-                <Checkbox
-                  id="dlg-provider-authheader"
-                  checked={authHeader}
-                  onCheckedChange={setAuthHeader}
-                  aria-label={t('以 Authorization: Bearer 请求头发送 API 密钥')}
-                />
-                <span className="text-ui text-foreground">
-                  {t('以 Authorization: Bearer 请求头发送 API 密钥')}
-                </span>
-              </label>
-            </div>
-          </ProviderConnectionDisclosure>
-          <Field>
-            <FieldTitle className={FIELD_TITLE_CLS}>{t('模型（至少一个）')}</FieldTitle>
-            <ProviderModelChips
-              catalog={catalog}
-              selected={modelIds}
-              onSelectedChange={setModelIds}
-            />
-            {modelIds.length === 0 && (
-              <FieldDescription className="text-meta text-content-tertiary">
-                {t('至少添加一个模型：点「添加模型」，输入端点支持的模型 ID，比如 gpt-4o-mini。')}
-              </FieldDescription>
-            )}
-            {modelIds.length > 0 && catalog.length > modelIds.length && (
-              <FieldDescription className="text-meta text-content-tertiary">
-                {t('目录里还有 {n} 个模型，点「添加模型」搜索。', {
-                  n: catalog.filter((model) => !modelIds.includes(model.id)).length,
-                })}
-              </FieldDescription>
-            )}
-          </Field>
-        </FormStack>
-      )}
+              <span className="text-ui text-foreground">
+                {t('以 Authorization: Bearer 请求头发送 API 密钥')}
+              </span>
+            </label>
+          </div>
+        </ProviderConnectionDisclosure>
+        <Field>
+          <FieldTitle className={FIELD_TITLE_CLS}>{t('模型（至少一个）')}</FieldTitle>
+          <ProviderModelChips
+            catalog={catalog}
+            selected={modelIds}
+            onSelectedChange={setModelIds}
+          />
+          {modelIds.length === 0 && (
+            <FieldDescription className="text-meta text-content-tertiary">
+              {t('至少添加一个模型：点「添加模型」，输入端点支持的模型 ID，比如 gpt-4o-mini。')}
+            </FieldDescription>
+          )}
+          {modelIds.length > 0 && catalog.length > modelIds.length && (
+            <FieldDescription className="text-meta text-content-tertiary">
+              {t('目录里还有 {n} 个模型，点「添加模型」搜索。', {
+                n: catalog.filter((model) => !modelIds.includes(model.id)).length,
+              })}
+            </FieldDescription>
+          )}
+        </Field>
+      </FormStack>
+    );
+  if (inline) {
+    return (
+      <section data-testid={testId} aria-label={t('添加模型服务')} className="flex flex-col gap-4">
+        {body}
+        {footer}
+      </section>
+    );
+  }
+  return (
+    <DialogShell title={t('添加模型服务')} open={open} onClose={onClose} size="l" footer={footer}>
+      {body}
     </DialogShell>
   );
 }

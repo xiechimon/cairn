@@ -352,7 +352,7 @@ describe('#1026/#1027 the plan upload receiving end: input validation + step-and
     }
   });
 
-  test('a review step PUT plan.md -> rejected 400: no version stored, planDocId unchanged (the #1027 rejection leg)', async () => {
+  test('a claimed legacy review step PUT plan.md is rejected without changing the stored plan', async () => {
     const w = await setupWorld();
     try {
       const buildId = w.startBuild(true);
@@ -362,13 +362,21 @@ describe('#1026/#1027 the plan upload receiving end: input validation + step-and
       await confirm(w, buildId);
       const buildStep = await w.claim();
       await w.done(buildStep.step.id, { status: 'success', sessionId: 'pi-1', hasChanges: true });
-      const revRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-        body: { action: 'review' },
-      });
-      expect(revRes.status).toBe(202);
-      const reviewStep = await w.claim();
-      expect(reviewStep.step.kind).toBe('review');
-      const res = await w.tryUploadPlan(reviewStep.step.id, '# 伪方案');
+      expect(w.todoRow().phase).toBe('done');
+      const reviewId = `legacy-review-${buildId}`;
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: reviewId,
+          buildId,
+          kind: 'review',
+          status: 'claimed',
+          machineId: w.s.db.select().from(machineTable).get()!.id,
+          claimedAt: Date.now(),
+          createdAt: Date.now(),
+        })
+        .run();
+      const res = await w.tryUploadPlan(reviewId, '# 伪方案');
       expect(res.status).toBe(400);
       expect(Object.keys((await res.json()) as object)).toEqual(['error']);
       expect(w.plansOf(buildId)).toHaveLength(1);

@@ -25,7 +25,6 @@ async function open(page: Page, world: World, path = '/app') {
         return json({
           edges: [],
           connections: [
-            { id: 'machine:m1', vendor: 'anthropic', kind: 'subscription', models: [], available: true },
             ...(world.subscription
               ? [{ id: 's1', vendor: 'anthropic', kind: 'subscription', models: [], available: true }]
               : []),
@@ -91,7 +90,7 @@ test('a team with no projects lands on the setup page, and confirming saves both
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
   await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('最早添加');
-  await expect(page.getByTestId('first-run-pick-session')).toContainText('Claude Code');
+  await expect(page.getByTestId('first-run-pick-session')).toContainText('Claude 订阅');
   await page.getByTestId('first-run-confirm').click();
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-opus-5-5' });
@@ -113,17 +112,48 @@ test('the change control opens the model picker, and confirming saves the model 
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-sonnet-5-5' });
 });
 
-test('without a provider, step 1 offers only Add provider, which opens the picker in place', async ({ page }) => {
+test('without a provider, step 1 lists the providers on the page, and Claude Pro / Max opens its sign-in', async ({ page }) => {
   await open(page, { ...fresh(), bound: false });
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
   await expect(page.getByTestId('first-run-setup')).not.toContainText('本机 Claude Code');
   await expect(page.getByTestId('first-run-setup').getByRole('switch')).toHaveCount(0);
-  await page.getByTestId('first-run-add-provider').click();
-  const picker = page.getByRole('dialog', { name: '添加模型服务' });
-  await expect(picker).toBeVisible();
+  const picker = page.getByTestId('first-run-add-provider');
+  await expect(picker.getByRole('textbox', { name: '搜索服务商...' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(/\/app(\?|$)/);
   await picker.locator('[data-preset-id="claude-subscription"]').click();
   await expect(page.getByRole('dialog', { name: '添加 Claude 订阅' })).toBeVisible();
+});
+
+test('the provider list starts below the language switch', async ({ page }) => {
+  await open(page, { ...fresh(), bound: false });
+  const search = page.getByTestId('first-run-add-provider').getByRole('textbox', { name: '搜索服务商...' });
+  const language = page.locator('[data-testid="first-run-locale-en"]:visible');
+  const searchBox = await search.boundingBox();
+  const languageBox = await language.boundingBox();
+  expect(searchBox).not.toBeNull();
+  expect(languageBox).not.toBeNull();
+  expect((languageBox?.y ?? 0) + (languageBox?.height ?? 0)).toBeLessThanOrEqual(searchBox?.y ?? 0);
+});
+
+test('a vendor opens its form in place, and Cancel goes back to the list', async ({ page }) => {
+  await open(page, { ...fresh(), bound: false });
+  const picker = page.getByTestId('first-run-add-provider');
+  await picker.locator('[data-preset-id="anthropic"]').click();
+  await expect(picker.getByLabel('API 密钥')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await picker.getByRole('button', { name: '取消' }).click();
+  await expect(picker.locator('[data-preset-id="anthropic"]')).toBeVisible();
+});
+
+test('the welcome side draws the ink spiral as far as the open step', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, { ...fresh(), bound: false });
+  const spiral = page.getByTestId('first-run-setup').locator('[data-slot="ink-spiral"]');
+  await expect(spiral).toBeVisible();
+  await expect(spiral).toHaveAttribute('data-drawn', '0.33');
+  await page.setViewportSize({ width: 1440, height: 700 });
+  await expect(spiral).toBeHidden();
 });
 
 test('the language switch on the setup page changes the page language', async ({ page }) => {
@@ -158,7 +188,7 @@ test('a saved Claude subscription with Claude Code found is the Coordinator pick
   await open(page, world);
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('Claude Sonnet 5.5');
-  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('因为你登录了 Claude 订阅');
+  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('因为你添加了 Claude 订阅');
   await page.getByTestId('first-run-confirm').click();
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
   expect(world.patches[0]?.body).toEqual({ provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
@@ -167,5 +197,5 @@ test('a saved Claude subscription with Claude Code found is the Coordinator pick
 test('a saved subscription without Claude Code on this computer says what is missing', async ({ page }) => {
   await open(page, { ...fresh(), bound: false, subscription: true });
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
-  await expect(page.getByTestId('first-run-setup')).toContainText('订阅已保存。这台电脑还没找到 Claude Code');
+  await expect(page.getByTestId('first-run-setup')).toContainText('现在先添加一个服务商，Coordinator 就能开始工作');
 });

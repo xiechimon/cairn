@@ -183,7 +183,7 @@ describe('a parked question is its own phase and wakes the Coordinator', () => {
     expect(out.delivered).toBe('new-turn');
   });
 
-  test('a build asks the zero-change question once: a second zero-change step after the answer goes to review', async () => {
+  test('a build asks the zero-change question once: a second zero-change step after the answer completes the task', async () => {
     const { todoId, buildId, stepRow } = startSession();
     endStep(stepRow.id, { hasChanges: false });
     await relay('answer_question', {
@@ -204,7 +204,7 @@ describe('a parked question is its own phase and wakes the Coordinator', () => {
       via: 'session-start',
     });
     endStep(resumed.id, { hasChanges: false });
-    expect(phaseOf(todoId)).toBe('review');
+    expect(phaseOf(todoId)).toBe('done');
     const asked = H.s.db
       .select()
       .from(message)
@@ -216,7 +216,7 @@ describe('a parked question is its own phase and wakes the Coordinator', () => {
 });
 
 describe('a step that delivered nothing asks once (task stall class 2)', () => {
-  test('a GitHub task whose step committed but opened no PR asks, quoting the report line, instead of going to review', async () => {
+  test('a GitHub task whose step committed but opened no PR asks, quoting the report line, instead of completing', async () => {
     const { todoId, buildId, stepRow } = startSession(githubProject());
     H.s.db
       .update(build)
@@ -238,14 +238,14 @@ describe('a step that delivered nothing asks once (task stall class 2)', () => {
     expect(phaseOf(todoId)).not.toBe('needs_input');
   });
 
-  test('a task in a project without GitHub that committed goes to review as before', () => {
+  test('a task in a project without GitHub that committed completes', () => {
     const { todoId, buildId, stepRow } = startSession();
     endStep(stepRow.id, { hasChanges: true });
     expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
-    expect(phaseOf(todoId)).toBe('review');
+    expect(phaseOf(todoId)).toBe('done');
   });
 
-  test('a GitHub task that ends without a PR again after the answer goes to review, asked once', async () => {
+  test('a GitHub task that ends without a PR again after the answer completes, asked once', async () => {
     const { todoId, buildId, stepRow } = startSession(githubProject());
     endStep(stepRow.id, { hasChanges: true });
     await relay('answer_question', {
@@ -266,12 +266,12 @@ describe('a step that delivered nothing asks once (task stall class 2)', () => {
       via: 'session-start',
     });
     endStep(resumed.id, { hasChanges: true });
-    expect(phaseOf(todoId)).toBe('review');
+    expect(phaseOf(todoId)).toBe('done');
   });
 });
 
 describe('a build answered under the old zero-change id is not asked again', () => {
-  test('a continuation that ends without commits after an answered no-change question goes to review', () => {
+  test('a continuation that ends without commits after an answered no-change question completes', () => {
     const { todoId, buildId, stepRow } = startSession();
     H.s.db
       .insert(message)
@@ -292,7 +292,7 @@ describe('a build answered under the old zero-change id is not asked again', () 
       .run();
     endStep(stepRow.id, { hasChanges: false });
     expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
-    expect(phaseOf(todoId)).toBe('review');
+    expect(phaseOf(todoId)).toBe('done');
   });
 });
 

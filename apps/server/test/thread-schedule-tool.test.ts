@@ -368,24 +368,31 @@ describe('worker schedule security', () => {
     ['review', 'in 15 minutes'],
     ['confirm', '*/15 * * * *'],
     ['review', '*/15 * * * *'],
-  ] as const)('%s gate survives a due worker %s schedule', async (phase, cadence) => {
-    const s = await world();
-    await s.run('schedule_create', { cadence, prompt: 'Follow up' });
-    const due = s.stored().nextRunAt!;
-    s.db.update(step).set({ status: 'done' }).where(eq(step.id, s.claimed.step.id)).run();
-    s.db.update(todo).set({ phase, phaseAt: due }).where(eq(todo.id, s.todoId)).run();
-    const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
-    await scheduler.tick(due);
-    expect(s.db.select().from(build).where(eq(build.todoId, s.todoId)).all()).toHaveLength(1);
-    expect(
-      s.db.select().from(build).where(eq(build.id, s.claimed.step.buildId)).get()?.errorMessage,
-    ).toBeNull();
-    expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.phase).toBe(phase);
-    expect(s.stored().nextRunAt).toBeGreaterThanOrEqual(due + 900_000);
-    expect(s.stored().lastRunAt).toBeNull();
-    await scheduler.tick(due + 900_000);
-    expect(s.db.select().from(build).where(eq(build.todoId, s.todoId)).all()).toHaveLength(1);
-  });
+  ] as const)(
+    '%s plan/report acceptance survives a due worker %s schedule',
+    async (phase, cadence) => {
+      const s = await world();
+      await s.run('schedule_create', { cadence, prompt: 'Follow up' });
+      const due = s.stored().nextRunAt!;
+      s.db.update(step).set({ status: 'done' }).where(eq(step.id, s.claimed.step.id)).run();
+      s.db
+        .update(todo)
+        .set({ phase, phaseAt: due, output: phase === 'review' ? 'info' : 'code' })
+        .where(eq(todo.id, s.todoId))
+        .run();
+      const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
+      await scheduler.tick(due);
+      expect(s.db.select().from(build).where(eq(build.todoId, s.todoId)).all()).toHaveLength(1);
+      expect(
+        s.db.select().from(build).where(eq(build.id, s.claimed.step.buildId)).get()?.errorMessage,
+      ).toBeNull();
+      expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.phase).toBe(phase);
+      expect(s.stored().nextRunAt).toBeGreaterThanOrEqual(due + 900_000);
+      expect(s.stored().lastRunAt).toBeNull();
+      await scheduler.tick(due + 900_000);
+      expect(s.db.select().from(build).where(eq(build.todoId, s.todoId)).all()).toHaveLength(1);
+    },
+  );
 
   test.each(['in 1 seconds', 'in 899 seconds', 'in 14 minutes', '*/5 * * * *', '0,5 * * * *'])(
     'rejects a worker cadence below 15 minutes: %s',

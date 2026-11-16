@@ -4,7 +4,6 @@ import {
   categoryFreeTaskInputSchema,
   githubReadToolParamsSchemas,
   MCP_TOOL_REGISTRY,
-  MERGE_HUMAN_ONLY_COPY,
   RUNNER_OS,
   runnerOsSchema,
   type UserRecord,
@@ -18,7 +17,7 @@ import { build, chiefThread, machine, project, schedule, todo } from '../db/sche
 import { HttpError, parseWith } from '../lib/errors.js';
 import { verifyApiKey } from './api-keys.js';
 import { readAttachmentMeta } from './attachments.js';
-import { cancelBuild, messageTodo } from './builds.js';
+import { cancelBuild, messageTodo, requestMerge } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
 import { confirmBuild, transitionTodos } from './chief-tools.js';
 import { readConversationPage } from './conversation-page.js';
@@ -151,6 +150,7 @@ export async function executeMcpTool(
     githubAppTokenSocket: deps.githubAppTokenSocket,
     githubAppIdentity: deps.githubAppIdentity,
     oauthClient: deps.oauthClient,
+    reposDir: deps.reposDir,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
   const mcpActor: TransitionActor = {
@@ -282,7 +282,8 @@ export async function executeMcpTool(
     case 'merge_builds': {
       const buildIds = strArrOf(args, 'buildIds');
       for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
-      throw new HttpError(403, MERGE_HUMAN_ONLY_COPY);
+      for (const buildId of buildIds) await requestMerge(svc, buildId, ctx.user.displayName);
+      return json({ merged: buildIds });
     }
     case 'cancel_builds': {
       const buildIds = strArrOf(args, 'buildIds');

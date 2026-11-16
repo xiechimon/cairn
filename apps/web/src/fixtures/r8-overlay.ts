@@ -246,7 +246,6 @@ const R8_CONFIRM_TRANSCRIPT: TranscriptItem[] = [
 export const boardR8Overlay: FixtureSet = {
   todos: [dyn15('planning'), dyn12Failed, legacyReview, ...R8_LEFTOVERS, legacyDone],
   now: r8(23, 44),
-  usageNav: true,
 };
 
 export const detailR8Fresh: FixtureSet = {
@@ -259,7 +258,6 @@ export const detailR8Fresh: FixtureSet = {
     legacyDone,
   ],
   now: r8(23, 43),
-  usageNav: true,
 };
 
 const probe17Fresh: TodoRecord = {
@@ -287,7 +285,6 @@ const probe17Fresh: TodoRecord = {
 export const detailR8DeleteFresh: FixtureSet = {
   todos: [probe17Fresh, dyn15('done'), dyn12Failed, legacyReview, ...R8_LEFTOVERS, legacyDone],
   now: at('2026-09-23', 0, 35),
-  usageNav: true,
 };
 
 export function detailR8Confirm(): FixtureSet {
@@ -301,7 +298,6 @@ export function detailR8Confirm(): FixtureSet {
       legacyDone,
     ],
     now: r8(23, 44),
-    usageNav: true,
     detail: { transcript: R8_CONFIRM_TRANSCRIPT, doc: R8_PLAN_DOC },
   };
 }

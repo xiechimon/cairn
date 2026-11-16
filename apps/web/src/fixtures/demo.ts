@@ -548,7 +548,6 @@ function demoFixtureOf(): FixtureSet {
       'demo-order-migration': MIGRATION_DETAIL,
       'demo-coupon-page': COUPON_DETAIL,
     },
-    usageNav: true,
     projectNames: { [PROJECT_ID_DEMO]: PROJECT },
     project: {
       name: PROJECT,

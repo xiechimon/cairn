@@ -41,6 +41,7 @@ const BOARD = [
 ];
 const SIDEBAR = [
   'activity-page',
+  'usage-page',
   'desktop-update',
   'search-syntax-palette',
   'menu-keys',
@@ -249,6 +250,7 @@ export const FILE_RULES = new Map([
   ['apps/web/src/board/sidebar.tsx', SIDEBAR],
   ['apps/web/src/board/desktop-update.tsx', SIDEBAR],
   ['apps/web/src/routes/activity-page.tsx', ['activity-page', 'search-syntax-palette']],
+  ['apps/web/src/routes/usage-page.tsx', ['usage-page']],
   ['apps/web/src/board/app-sidebar.tsx', SIDEBAR],
   ['apps/web/src/routes/board-page.tsx', BOARD],
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
@@ -290,6 +292,7 @@ export const FILE_RULES = new Map([
 ]);
 
 export const DIR_RULES = [
+  { prefix: 'apps/web/src/usage/', specs: ['usage-page'] },
   { prefix: 'apps/web/src/search/', specs: ['activity-page', 'search-'] },
   { prefix: 'apps/web/src/board/', specs: BOARD },
   {

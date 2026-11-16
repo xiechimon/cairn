@@ -92,6 +92,7 @@ function makeWorld(step: {
       title: 'sweep target',
       phase: 'building',
       phaseAt: base - step.createdAgo,
+      latestBuildId: buildId,
       seqNum: 1,
     })
     .run();
@@ -715,7 +716,7 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('review step judged the same (provider read from the review routing rule): gate blocked also suspends', () => {
+  test('retired review steps stop instead of waiting for a compatible runtime', () => {
     const w = makeWorld({
       status: 'pending',
       kind: 'review',
@@ -730,7 +731,7 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
-    expect(stepRowOf(w).status).toBe('pending');
+    expect(stepRowOf(w).status).toBe('stopped');
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
@@ -749,8 +750,8 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
   });
 });
 
-describe('#1284 verify step sweep (sweepAbandonedBuildSteps adds the verify kind)', () => {
-  test('claimed verify step heartbeat expired + machine offline: released back to pending (machine slot cleared, phase unchanged, no failure trace) + conversation-stream step event', async () => {
+describe('retired verify step recovery', () => {
+  test('an abandoned verify step stops and publishes its final state without failing the task', () => {
     const w = makeWorld({
       status: 'claimed',
       kind: 'verify',
@@ -758,20 +759,18 @@ describe('#1284 verify step sweep (sweepAbandonedBuildSteps adds the verify kind
       heartbeatAgo: 300_000,
     });
     const { events } = tapConvStream(w.s, w.buildId);
-    const woken = w.s.svc.machineHub.waitWake(w.teamId, 50);
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
     const row = stepRowOf(w);
-    expect(row.status).toBe('pending');
-    expect(row.machineId).toBeNull();
+    expect(row.status).toBe('stopped');
+    expect(row.machineId).toBe(w.machineId);
     expect(todoRowOf(w).phase).toBe('building');
     expect(buildRowOf(w).errorMessage).toBeNull();
-    expect(stepEventOf(events, w.stepId).status).toBe('pending');
-    await expect(woken).resolves.toBe(true);
+    expect(stepEventOf(events, w.stepId).status).toBe('stopped');
   });
 
-  test('B-C7 same shape: claimed verify step zero heartbeat progress past threshold + machine online: also released', () => {
+  test('an unstarted claimed verify step stops even if the machine is online', () => {
     const w = makeWorld({
       status: 'claimed',
       kind: 'verify',
@@ -781,8 +780,8 @@ describe('#1284 verify step sweep (sweepAbandonedBuildSteps adds the verify kind
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
-    expect(stepRowOf(w).status).toBe('pending');
-    expect(stepRowOf(w).machineId).toBeNull();
+    expect(stepRowOf(w).status).toBe('stopped');
+    expect(stepRowOf(w).machineId).toBe(w.machineId);
     expect(todoRowOf(w).phase).toBe('building');
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
@@ -830,7 +829,7 @@ describe('#1284 verify step sweep (sweepAbandonedBuildSteps adds the verify kind
     expect(stepRowOf(w).status).toBe('failed');
   });
 
-  test('counterexample: pending verify step past age + team zero online: suspended waiting for a machine, untouched (#1257)', () => {
+  test('a pending verify step stops without waiting for a machine', () => {
     const w = makeWorld({
       status: 'pending',
       kind: 'verify',
@@ -839,7 +838,7 @@ describe('#1284 verify step sweep (sweepAbandonedBuildSteps adds the verify kind
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
-    expect(stepRowOf(w).status).toBe('pending');
+    expect(stepRowOf(w).status).toBe('stopped');
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 });

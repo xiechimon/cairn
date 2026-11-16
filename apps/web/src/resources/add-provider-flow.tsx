@@ -2,7 +2,7 @@ import type { ClaudeSubscription } from '@cairn/shared';
 import { type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useCreateClaudeSubscription } from '../api/claude-subscriptions.js';
-import { useApiMutations } from '../api/hooks.js';
+import { useApiMutations, useCapabilities } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
@@ -95,6 +95,8 @@ export function AddProviderFlow({
   connectError,
   onConnectError,
   onSubscriptionCreated,
+  inline = false,
+  testId,
 }: {
   teamId: string | undefined;
   live: boolean;
@@ -103,16 +105,20 @@ export function AddProviderFlow({
   connectError: string | null;
   onConnectError: (message: string | null) => void;
   onSubscriptionCreated?: (created: ClaudeSubscription) => void;
+  inline?: boolean;
+  testId?: string;
 }) {
   const { t } = useI18n();
   const mutations = useApiMutations(teamId);
   const client = useQueryClient();
   const createSubscription = useCreateClaudeSubscription(teamId);
+  const capabilities = useCapabilities(live);
   const [CreateProviderDialog, setCreateProviderDialog] = useState<
     typeof CreateProviderDialogModule | null
   >(null);
+  const pickerOpen = inline || view === 'picker';
   const xai = useDeviceLogin({
-    active: view === 'picker',
+    active: pickerOpen,
     poll: mutations.pollXaiDevice,
     onComplete: () => onViewChange('closed'),
     messages: {
@@ -123,7 +129,7 @@ export function AddProviderFlow({
     },
   });
   const codex = useDeviceLogin({
-    active: view === 'picker',
+    active: pickerOpen,
     poll: mutations.pollCodexDevice,
     onComplete: () => onViewChange('closed'),
     messages: {
@@ -133,7 +139,6 @@ export function AddProviderFlow({
       failed: t('OpenAI Codex 登录失败，请重试。'),
     },
   });
-  const pickerOpen = view === 'picker';
 
   useEffect(() => {
     let mounted = true;
@@ -150,6 +155,8 @@ export function AddProviderFlow({
       {CreateProviderDialog !== null ? (
         <CreateProviderDialog
           open={pickerOpen}
+          inline={inline}
+          testId={testId}
           onClose={() => {
             onViewChange('closed');
             onConnectError(null);
@@ -185,6 +192,7 @@ export function AddProviderFlow({
                 }
               : undefined
           }
+          oauthSignIn={live ? capabilities.data?.githubOAuth === true : true}
           connectPending={mutations.startProviderOAuth.isPending}
           connectError={connectError}
           onPickClaudeSubscription={

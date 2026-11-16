@@ -22,9 +22,6 @@ export type TranscriptRow = z.infer<typeof transcriptRowSchema>;
 
 export const MERGE_ANNOUNCEMENT = '发起了合并';
 
-export const MERGE_HUMAN_ONLY_COPY =
-  '合并动作只由人触发，机器（chief / MCP）不得合并。请在任务详情页的审阅关口点击「完成」按钮手动合并。';
-
 export const REVIEW_ANNOUNCEMENT = '发起了 AI 审核';
 
 export const CONFIRM_ANNOUNCEMENT = '通过了确认';
@@ -116,8 +113,6 @@ export type ChiefDigestContent = z.infer<typeof chiefDigestContentSchema>;
 
 export const CHIEF_REPORT_KIND = 'chief_daily_report';
 export const CHIEF_REPORT_ROW_ID_PREFIX = 'chief-report-';
-export const CHIEF_REPORT_REF_MAX = 8;
-export const CHIEF_REPORT_RETRO_MAX = 5;
 export const INTAKE_SOURCE_KIND = 'intake';
 
 const chiefReportTodoRefSchema = z.object({
@@ -187,14 +182,6 @@ export const chiefReportContentSchema = z.object({
   truncated: z.array(z.string()),
 });
 export type ChiefReportContent = z.infer<typeof chiefReportContentSchema>;
-
-export type ChiefReportSuggestion = { n: number; kind: 'retro'; item: RetroProposal };
-
-export function chiefReportSuggestions(
-  report: Pick<ChiefReportContent, 'retro'>,
-): ChiefReportSuggestion[] {
-  return report.retro.map((item, i) => ({ n: i + 1, kind: 'retro', item }));
-}
 
 export const CHIEF_TURN_STOPPED_KIND = 'chief_turn_stopped';
 export const chiefTurnStoppedContentSchema = z.object({

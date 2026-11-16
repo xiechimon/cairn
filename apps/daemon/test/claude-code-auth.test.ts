@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { CLAUDE_CODE_AUTH_FAILURE_MARKER, isProviderAuthFailure } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
-  claudeCodeAuthFailureMessage,
+  claudeCodeSubscriptionMissingMessage,
   claudeCodeTeamSubscriptionAuthFailureMessage,
   parseClaudeCodeAuthStatus,
   probeClaudeCodeAuth,
@@ -107,23 +107,14 @@ describe('probeClaudeCodeAuth', () => {
   });
 });
 
-describe('claudeCodeAuthFailureMessage', () => {
-  test('keeps the CLI reason for machine login failures', () => {
-    const msg = claudeCodeAuthFailureMessage('daemon-mea', 'OAuth token revoked');
-    expect(msg).toContain('claude auth status');
-    expect(msg).toContain('OAuth token revoked');
-  });
-
-  test('failure mode 7: names the machine + credential kind + remedy', () => {
-    const msg = claudeCodeAuthFailureMessage('daemon-mea');
+describe('claudeCodeSubscriptionMissingMessage', () => {
+  test('is an auth failure that asks for a stored subscription, not a Runner login', () => {
+    const msg = claudeCodeSubscriptionMissingMessage();
     expect(msg).toContain(CLAUDE_CODE_AUTH_FAILURE_MARKER);
     expect(isProviderAuthFailure(msg)).toBe(true);
-    expect(msg).toContain('daemon-mea');
-    expect(msg).toContain('claude-code');
-    expect(msg).toContain('ANTHROPIC_API_KEY');
-    expect(msg).toContain('ANTHROPIC_AUTH_TOKEN');
-    expect(msg).toContain('/login');
-    expect(msg).toContain('不跨机');
+    expect(msg).toContain('claude setup-token');
+    expect(msg).toContain('设置 → 模型服务');
+    expect(msg).not.toContain('/login');
   });
 });
 

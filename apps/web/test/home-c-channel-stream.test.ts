@@ -40,6 +40,11 @@ describe('a project channel conversation', () => {
     expect(shown).toEqual([{ kind: 'robot', markdown: FALLBACK, seconds: '' }]);
   });
 
+  it('a recoverable failed greeting stays visible instead of becoming a canned reply', () => {
+    const stream = [{ kind: 'error' as const, text: 'Connection error: EHOSTUNREACH' }];
+    expect(channelStream(stream, FALLBACK, false, true)).toEqual(stream);
+  });
+
   it('a channel with no greeting turn at all shows the fixed greeting', () => {
     expect(channelStream([], FALLBACK, true)).toEqual([
       { kind: 'robot', markdown: FALLBACK, seconds: '' },

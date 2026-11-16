@@ -58,7 +58,7 @@ async function todoOf(s: TestServer, todoId: string): Promise<TodoRecord> {
   return todoRecordSchema.parse(await (await req(s.app, 'GET', `/api/todos/${todoId}`)).json());
 }
 
-async function runToReview(s: TestServer, projectId: string, todoId: string): Promise<string> {
+async function runToDone(s: TestServer, projectId: string, todoId: string): Promise<string> {
   const started = (await (
     await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       todoIds: [todoId],
@@ -68,13 +68,6 @@ async function runToReview(s: TestServer, projectId: string, todoId: string): Pr
   setTodoPhase(s.svc, todoId, 'building');
   completeStep(s.svc, listSteps(s.svc, buildId)[0]?.id as string);
   return buildId;
-}
-
-async function runToDone(s: TestServer, projectId: string, todoId: string): Promise<void> {
-  const buildId = await runToReview(s, projectId, todoId);
-  await req(s.app, 'POST', `/api/builds/${buildId}/merge`);
-  const steps = listSteps(s.svc, buildId);
-  completeStep(s.svc, steps[steps.length - 1]?.id as string);
 }
 
 describe('schedule CRUD (record = the r3 §8.3 measured shape)', () => {
@@ -338,9 +331,11 @@ describe('scheduled thread continuation', () => {
     expect((await todoOf(s, s.todoDoc.id)).buildHistory).toHaveLength(1);
   });
 
-  test('an owner schedule continues a review thread without cancelling its build', async () => {
+  test('an owner schedule continues a legacy review thread without cancelling its build', async () => {
     const s = await withTodo();
-    const oldBuildId = await runToReview(s, s.projectId, s.todoDoc.id);
+    const oldBuildId = await runToDone(s, s.projectId, s.todoDoc.id);
+    expect((await todoOf(s, s.todoDoc.id)).phase).toBe('done');
+    s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, s.todoDoc.id)).run();
     expect((await todoOf(s, s.todoDoc.id)).phase).toBe('review');
     await req(s.app, 'POST', '/api/schedules', {
       todoId: s.todoDoc.id,
