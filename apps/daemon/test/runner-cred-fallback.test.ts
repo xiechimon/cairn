@@ -738,7 +738,11 @@ test('a granted connector reaches the session and its credential never reaches t
     slug: 'linear',
     transport: 'http' as const,
     url: 'https://mcp.linear.app/mcp',
-    headers: { Authorization: 'Bearer lin-access-123', 'X-MCP-Readonly': 'true' },
+    headers: {
+      Authorization: 'Bearer lin-access-123',
+      'X-MCP-Readonly': 'true',
+      'X-Api-Version': '2',
+    },
   };
   let mounted: SessionOpts['mcpServers'];
   const { client, lines } = await setup(
@@ -754,14 +758,15 @@ test('a granted connector reaches the session and its credential never reaches t
       onSession: (opts) => {
         mounted = opts.mcpServers;
       },
-      echo: 'saw lin-access-123 and readonly true',
+      echo: 'saw lin-access-123 and readonly true on api 2',
     },
   );
   expect(mounted).toEqual([linear]);
   const text = JSON.stringify(transcriptRows(client));
   expect(text).not.toContain('lin-access-123');
   expect(text).toContain('[REDACTED]');
-  expect(text).toContain('readonly true');
+  expect(text).toContain('readonly true on api 2');
+  expect(client.doneBodies.map((d) => d.body.status)).toEqual(['success']);
   expect(lines.join('\n')).not.toContain('lin-access-123');
   expect(lines.filter((l) => l.startsWith('[mcp] loaded from'))).toEqual([
     expect.stringMatching(/: \(none\); from connectors: linear$/),

@@ -134,15 +134,20 @@ const OPTION_HEADER_NAMES = new Set(
   ),
 );
 
+const MIN_REDACTED_LENGTH = 8;
+
 export function mcpConnectorSecretValues(headers: Record<string, string> | undefined): string[] {
-  const values: string[] = [];
+  const values = new Set<string>();
   for (const [name, value] of Object.entries(headers ?? {})) {
-    if (OPTION_HEADER_NAMES.has(name.toLowerCase()) || value === '') continue;
-    values.push(value);
+    if (OPTION_HEADER_NAMES.has(name.toLowerCase())) continue;
     const credential = /^\S+\s+(\S+)$/.exec(value)?.[1];
-    if (credential !== undefined) values.push(credential);
+    for (const secret of [value, credential]) {
+      if (secret === undefined || secret.length < MIN_REDACTED_LENGTH) continue;
+      values.add(secret);
+      values.add(JSON.stringify(secret).slice(1, -1));
+    }
   }
-  return values;
+  return [...values];
 }
 
 export const MCP_RESERVED_SLUGS: readonly string[] = ['cairn'];
