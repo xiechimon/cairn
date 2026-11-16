@@ -37,7 +37,6 @@ import {
   proposalIdOfCard,
   publishQuestion,
 } from './services/chief-questions.js';
-import { decideRetroProposal } from './services/chief-report.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { readCoordinatorPage } from './services/coordinator.js';
 import { isJobOwnerCaller, jobSubmitAnswerActor } from './services/job-applications.js';
@@ -242,14 +241,6 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     }
     cancelQuestion(svc, { threadId, requestId, reason: '用户取消了本次提问' });
     return c.json({ ok: true as const });
-  });
-
-  app.post('/api/teams/:id/chief/retro-proposals/:pid/:decision', (c) => {
-    const teamId = c.req.param('id');
-    requireTeam(ctx, teamId);
-    const decision = c.req.param('decision');
-    if (decision !== 'accept' && decision !== 'dismiss') throw notFound(`decision ${decision}`);
-    return c.json(decideRetroProposal(svc, teamId, c.req.param('pid'), decision));
   });
 
   app.post('/api/conversations/:id/messages', async (c) => {

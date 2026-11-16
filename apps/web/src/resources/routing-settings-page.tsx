@@ -49,7 +49,7 @@ const STORED_ONLY_USES: readonly RouteUse[] = ['digest', 'compaction'];
 
 const USE_HINTS: Partial<Record<RouteUse, string>> = {
   coordinator: '你对话的协调者，派活和汇报',
-  digest: '每日报告和对话摘要',
+  digest: '对话摘要',
   compaction: '上下文快满时压缩对话',
 };
 

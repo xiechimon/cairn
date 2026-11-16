@@ -42,7 +42,7 @@ This design follows Claude Projects: separate conversation and context per proje
 | `create_todo` from a channel | Watch on the calling thread | Unchanged, so a task's reports return to the channel that created it |
 | Thread reports and wakes (`insertThreadReport`, `notifyWatchers`) | To the watching thread | Unchanged; plus one mirror line in the main channel when a project-channel task reaches needs-you or done |
 | Questions to the owner (`chief-questions.ts`) | On the asking thread | Unchanged; the Tasks panel already lists them across threads |
-| Daily report, digest, mail and job-application rows | Main thread | Unchanged (team-level) |
+| Historical reports, digest, mail and job-application rows | Existing thread | Historical reports stay read-only; mail and job-application rows remain team-level |
 | Rewind, withdraw, stop, steer | Per thread | Unchanged; they act on the channel's own thread |
 | `GET /conversations/:id/messages` | Main thread, filtered on the client | Each channel loads its own thread; `streamForProject` is deleted |
 | Web channel switch | Same thread, new filter | Switches the active thread; outbox, drafts and unread already key on thread id |

@@ -68,4 +68,4 @@ Run existing compaction/history tests before adding behavior. A compiled runtime
 - `apps/server/src/services/coordinator-context.ts`: measured usage and display window.
 - `apps/server/src/coordinator/memory-flush.ts`: durable facts through validated memory service.
 
-The old `planChiefSummaries` scheduler and steady-state rolling digest were already removed by #3362. Do not restore them. Preserve the daily user report: it is not a context checkpoint. No daemon/provider access is moved outside its existing seam.
+The old `planChiefSummaries` scheduler and steady-state rolling digest were already removed by #3362. Daily user reports and daily conversation digests are also retired. Context-pressure compaction and pre-compaction memory flush remain; neither schedules daily work. No daemon/provider access is moved outside its existing seam.

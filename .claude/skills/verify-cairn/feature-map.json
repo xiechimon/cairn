@@ -25,8 +25,8 @@
   "batches": [
     {
       "id": "B2",
-      "title": "What reaches ian: needs-you, questions, daily report, push",
-      "scope": "The attention surfaces of the phase 1 graduation criteria: the needs-you tray, question cards and their lifecycle, the 08:00 report and retro proposals, and phone push. Research Ikaga, Duet, Codex CLI and t3code first; design the tray and card states and the delivery and dedupe rules."
+      "title": "What reaches the user: needs-you, questions, push",
+      "scope": "The attention surfaces of the phase 1 graduation criteria: the needs-you tray, question cards and their lifecycle, and phone push. Research Ikaga, Duet, Codex CLI and t3code first; design the tray and card states and the delivery and dedupe rules."
     },
     {
       "id": "B3",
@@ -411,9 +411,9 @@
     },
     {
       "id": "daily-report",
-      "name": "Daily report and retro",
-      "summary": "The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.",
-      "states": "A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro suggestions and each one's state. Historical intake suggestions are hidden and cannot create tasks.",
+      "name": "Read-only report history",
+      "summary": "Existing report messages remain readable; daily generation, retries, push and suggestion decisions are retired.",
+      "states": "Historical posted and unfinished reports, read-only draft suggestions and links to already-created tasks. No new report for new users. Historical intake suggestions remain hidden.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -422,14 +422,7 @@
           "apps/web/src/chief/research-report.tsx"
         ],
         "server": [
-          "apps/server/src/services/chief-report.ts",
-          "apps/server/src/services/chief-digest.ts",
-          "apps/server/src/services/chief-router-tools.ts"
-        ]
-      },
-      "routes": {
-        "server": [
-          "/api/teams/:id/chief/retro-proposals/:pid/:decision"
+          "apps/server/drizzle/0173_retire_daily_reports.sql"
         ]
       },
       "reach": [
@@ -443,13 +436,11 @@
         "apps/web/DESIGN-RULES.md"
       ],
       "backendDesign": {
-        "gap": "no design for report content, timing, quiet rules and retro proposal storage"
+        "gap": "Retired: historical tables and records are retained; only active report-linked steps are stopped."
       },
       "evidence": [
         "apps/web/e2e/chief-daily-report.spec.ts",
-        "apps/server/test/chief-report.test.ts",
-        "apps/server/test/chief-digest.test.ts",
-        "apps/server/test/chief-router-tools.test.ts"
+        "apps/server/test/daily-report-retirement.test.ts"
       ],
       "batch": "B2"
     },
