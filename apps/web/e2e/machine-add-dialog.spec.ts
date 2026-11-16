@@ -50,7 +50,7 @@ test('the approval code from the terminal approves the computer inside the dialo
   await expect(approve).toBeDisabled();
   await code.fill('k7f3-q9xm');
   await approve.click();
-  await expect.poll(() => confirmed).toEqual({ code: 'k7f3-q9xm' });
+  await expect.poll(() => confirmed).toEqual({ code: 'K7F3-Q9XM' });
   await expect(code).toHaveValue('');
 });
 

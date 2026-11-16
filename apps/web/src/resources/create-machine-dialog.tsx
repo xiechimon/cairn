@@ -246,9 +246,9 @@ function ApproveByCode({ teamId }: { teamId: string | undefined }) {
         placeholder="XXXX-XXXX"
         autoComplete="off"
         spellCheck={false}
-        className="font-mono uppercase"
+        className="font-mono"
         value={code}
-        onChange={(event) => setCode(event.target.value)}
+        onChange={(event) => setCode(event.target.value.toUpperCase())}
       />
       <Button type="submit" size="sm" className="shrink-0" disabled={!ready || approve.isPending}>
         {t('批准')}
