@@ -428,7 +428,7 @@
   --switch-on: var(--card-button);
   --tag-tint: 12%;
   --avatar-tint: 15%;
-  --avatar-ink: 80%;
+  --avatar-ink: 70%;
   --code-pill-bg: #e0dfda;
   --bubble-fill: #f3ead6;
   --bubble-highlight: #e6ddc9;
@@ -439,7 +439,7 @@
   --task-wait-ink: #2f6b2a;
   --reply-bubble-highlight: #d4d3cf;
   --code-pill-ring: #d5d4cf;
-  --tag-ink: 35%;
+  --tag-ink: 32%;
   --switch-off: #c1c1bd;
   --switch-thumb: #ffffff;
   --running-track: #d9d9d4;

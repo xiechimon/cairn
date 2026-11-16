@@ -53,7 +53,11 @@ describe('V16 no texture or gradient surfaces', () => {
 
   test('ink grain lives only on the brand spiral illustration', () => {
     expect(offenders(/feTurbulence/)).toEqual(['components/ink-spiral.tsx']);
-    expect(offenders(/<InkSpiral\b/).sort()).toEqual(['board/first-run-setup.tsx', 'board/home-spiral.tsx']);
+    expect(offenders(/<InkSpiral\b/).sort()).toEqual([
+      'board/first-run-setup.tsx',
+      'board/home-spiral.tsx',
+      'design/foundations-texture.tsx',
+    ]);
   });
 
   test('the user bubble is one flat token fill', () => {
