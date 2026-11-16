@@ -6642,7 +6642,15 @@ exports[`body/envelope schema snapshots > setSecretBody > setSecretBody.json 1`]
       ],
       "type": "object",
     },
+    "kind": {
+      "enum": [
+        "secret",
+        "env",
+      ],
+      "type": "string",
+    },
     "name": {
+      "pattern": "^[A-Z_][A-Z0-9_]*$",
       "type": "string",
     },
     "projectId": {
@@ -12036,6 +12044,13 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
     "id": {
       "type": "string",
     },
+    "kind": {
+      "enum": [
+        "secret",
+        "env",
+      ],
+      "type": "string",
+    },
     "name": {
       "type": "string",
     },
@@ -12052,6 +12067,18 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
     },
     "teamId": {
       "type": "string",
+    },
+    "updatedAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
     },
   },
   "required": [
