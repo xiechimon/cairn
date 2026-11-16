@@ -1,13 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import {
   ACCESS_TOKEN_FILE_NAME,
-  ENV_VARS,
   formatAccessTokenFile,
   parseAccessTokenFile,
-} from '@cairn/shared';
-import { loadDaemonConfig } from './config.js';
+} from '../access-token-file.js';
+import { BRAND, ENV_VARS } from '../brand.js';
 
 export interface TokenCommandIo {
   env: NodeJS.ProcessEnv;
@@ -15,7 +15,7 @@ export interface TokenCommandIo {
 }
 
 export function runTokenCommand(opts: { rotate: boolean }, io: TokenCommandIo): number {
-  const home = loadDaemonConfig({}, io.env).home;
+  const home = resolve(io.env[ENV_VARS.home] ?? join(homedir(), BRAND.homeDirName));
   const filePath = join(home, ACCESS_TOKEN_FILE_NAME);
   const rawEnvToken = io.env[ENV_VARS.token];
   const envToken = rawEnvToken !== undefined && rawEnvToken !== '' ? rawEnvToken : null;

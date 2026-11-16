@@ -30,6 +30,7 @@ import { loopbackOwnerFor } from './lib/loopback-owner.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { shutdownRuntimeOtel } from './runtime-otel.js';
+import { runServerCommand } from './server-command.js';
 import { loadApnsConfig } from './services/apns.js';
 import { installBuiltinSkills } from './services/builtin-skills.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
@@ -62,6 +63,13 @@ import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
 import { startupMessage } from './startup-log.js';
+
+const commandExit = runServerCommand(process.argv.slice(2), {
+  env: process.env,
+  writeOut: (text) => process.stdout.write(text),
+  writeErr: (text) => process.stderr.write(text),
+});
+if (commandExit !== null) process.exit(commandExit);
 
 const loadedConfig = loadConfig();
 const logSecrets = [loadedConfig.authToken ?? ''];
