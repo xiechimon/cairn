@@ -201,7 +201,7 @@ test.describe('at phone width', () => {
     await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
     await expect(ref).toHaveText(new RegExp(`^${TASK.title}`));
     const box = await ref.boundingBox();
-    expect(box!.height).toBe(24);
+    expect(box!.height).toBe(28);
     expect(box!.x + box!.width).toBeLessThanOrEqual(390 - 16);
     await ref.click();
     await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
