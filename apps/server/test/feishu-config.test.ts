@@ -1,6 +1,6 @@
 import { DB_TABLES, INTERNAL_ONLY_TABLES, WEB_REST_ENDPOINTS } from '@cairn/shared';
 import { afterEach, expect, test } from 'vitest';
-import { openSecretValues } from '../src/services/secrets.js';
+import { createSecret, openSecretValues } from '../src/services/secrets.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
@@ -46,9 +46,11 @@ test('user-owned secrets with former bot names remain ordinary usable secrets', 
   servers.push(server);
   const path = `/api/teams/${server.team.id}/secrets`;
   for (const name of ['feishu.bot.app-id', 'feishu.bot.app-secret', 'FEISHU.BOT.app-secret']) {
-    const created = await req(server.app, 'POST', path, { name, value: 'user-owned-value' });
-    expect(created.status).toBe(201);
-    const { id } = (await created.json()) as { id: string };
+    expect((await req(server.app, 'POST', path, { name, value: 'v' })).status).toBe(400);
+    const { id } = createSecret(
+      { db: server.db, box: server.secretBox },
+      { teamId: server.team.id, name, value: 'user-owned-value' },
+    );
     expect(
       openSecretValues({ db: server.db, box: server.secretBox }, server.team.id, [id], null),
     ).toEqual({
