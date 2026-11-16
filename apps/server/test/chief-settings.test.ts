@@ -236,8 +236,10 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     );
     expect(prompt).toContain('优先文档 Agent');
     expect(prompt).toContain('### 项目');
-    expect(prompt).toContain('自动合并（autonomous）');
-    expect(prompt).not.toContain('合并（merge）动作只由人触发');
+    expect(prompt).toContain('代码任务成功后就完成，分支和 PR 保留');
+    expect(prompt).toContain('只有用户在对话里明确要求合并时才用 merge_builds 合并当前交付');
+    expect(prompt).toContain('不主动问要不要合并，不自己决定合并');
+    expect(prompt).not.toContain('自动合并（autonomous）');
     expect(prompt).toContain('你不写任务正文');
     expect(prompt).toContain('摘要标题');
     expect(prompt).toContain('quotes 填这张卡覆盖的用户原句');
@@ -337,7 +339,8 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).toContain('plan、写测试、实现、自检都由 thread 自己完成');
     expect(prompt).toContain('不写方案、不选模型');
     expect(prompt).toContain('message_thread');
-    expect(prompt).toContain('自动合并（autonomous）');
+    expect(prompt).toContain('不因任务完成、CI 通过或其他事件合并');
+    expect(prompt).not.toContain('自动合并（autonomous）');
     expect(prompt).not.toContain('withPlan:false');
     expect(prompt).not.toContain('dispatchReason');
     expect(prompt).not.toContain('派发模式（团队设置');

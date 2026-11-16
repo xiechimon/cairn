@@ -55,6 +55,8 @@ import { machine, mcpConnector } from '../db/schema.js';
 import { envProxyOf } from '../lib/env-proxy.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { githubAppRegistration } from './github-app-registration.js';
+import { refreshGithubDeviceToken } from './github-device-core.js';
 
 export interface McpServerDeps {
   mcpConfigPath: string;
@@ -130,13 +132,13 @@ export function listMcpServers(
       source: 'local' as const,
       status: null,
     })),
-    ...listMcpConnectors(deps, teamId).map((c) => ({
+    ...connectorRows(deps.db, teamId).map((c) => ({
       teamId,
       id: c.id,
       label: c.label,
       slug: c.slug,
       transport: 'http' as const,
-      url: c.url,
+      url: publicUrl(c.url),
       hasCredential: c.authKind !== 'none',
       credentialKeys: c.headerNames,
       createdBy: '',
@@ -151,14 +153,32 @@ export function listMcpServers(
 const CHECK_TIMEOUT_MS = 10_000;
 const MAX_TOOL_PAGES = 10;
 
+export type GithubConnectorTarget =
+  | { kind: 'new'; slug: string }
+  | { kind: 'reconnect'; connectorId: string; authRevision: number };
+
+export interface GithubConnectorAttempt {
+  teamId: string;
+  userId: string;
+  deviceCode: string;
+  target: GithubConnectorTarget;
+  intervalSeconds: number;
+  expiresAt: number;
+  nextPollAt: number;
+  polling: boolean;
+}
+
 export interface McpOAuthState {
   registrations: Map<string, OAuthClientInformationFull>;
   refreshes: Map<string, Promise<void>>;
+  githubDevice: Map<string, GithubConnectorAttempt>;
 }
 
 export function newMcpOAuthState(): McpOAuthState {
-  return { registrations: new Map(), refreshes: new Map() };
+  return { registrations: new Map(), refreshes: new Map(), githubDevice: new Map() };
 }
+
+export type GithubAppRegistration = Readonly<{ clientId: string; slug: string }> | null;
 
 export interface McpConnectorDeps {
   db: Db;
@@ -167,22 +187,44 @@ export interface McpConnectorDeps {
   fetch: typeof fetch;
   oauthFetch: typeof fetch;
   oauthState: McpOAuthState;
+  githubApp?: GithubAppRegistration;
   checkTimeoutMs?: number;
+}
+
+export function githubAppOfDeps(deps: Pick<McpConnectorDeps, 'githubApp'>): GithubAppRegistration {
+  return deps.githubApp === undefined ? githubAppRegistration : deps.githubApp;
 }
 
 type ConnectorRow = typeof mcpConnector.$inferSelect;
 
-function toConnectorRecord(row: ConnectorRow): McpConnectorRecord {
-  const url = new URL(row.url);
+function publicUrl(raw: string): string {
+  const url = new URL(raw);
+  return `${url.origin}${url.pathname}`;
+}
+
+function connectorRows(db: Db, teamId: string): ConnectorRow[] {
+  return db
+    .select()
+    .from(mcpConnector)
+    .where(eq(mcpConnector.teamId, teamId))
+    .orderBy(asc(mcpConnector.slug))
+    .all();
+}
+
+export function toConnectorRecord(
+  deps: Pick<McpConnectorDeps, 'box'>,
+  row: ConnectorRow,
+): McpConnectorRecord {
   return {
     id: row.id,
     teamId: row.teamId,
     slug: row.slug,
     label: row.label,
     catalogId: row.catalogId,
-    url: `${url.origin}${url.pathname}`,
+    url: publicUrl(row.url),
     headerNames: row.headerNames,
     authKind: row.authKind,
+    account: row.authKind === 'github-app' ? (openGithubApp(deps, row)?.login ?? null) : null,
     status: row.status,
     statusReason: row.statusReason,
     toolCount: row.toolCount,
@@ -192,7 +234,11 @@ function toConnectorRecord(row: ConnectorRow): McpConnectorRecord {
   };
 }
 
-function connectorRow(deps: McpConnectorDeps, teamId: string, id: string): ConnectorRow {
+export function connectorRow(
+  deps: Pick<McpConnectorDeps, 'db'>,
+  teamId: string,
+  id: string,
+): ConnectorRow {
   const row = deps.db
     .select()
     .from(mcpConnector)
@@ -278,7 +324,7 @@ function staticAuthKind(headers: Record<string, string>): McpConnectorAuthKind {
   return Object.keys(headers).length === 0 ? 'none' : 'static';
 }
 
-function assertSlugFree(deps: McpConnectorDeps, teamId: string, slug: string): void {
+export function assertSlugFree(deps: McpConnectorDeps, teamId: string, slug: string): void {
   if (localSlugs(deps, teamId).has(slug))
     throw conflict(`${slug} is already a local MCP server; choose another name`);
   const taken = deps.db
@@ -289,7 +335,7 @@ function assertSlugFree(deps: McpConnectorDeps, teamId: string, slug: string): v
   if (taken) throw conflict(`connector ${slug} already exists`);
 }
 
-const UNCHECKED = {
+export const UNCHECKED = {
   status: 'unchecked',
   statusReason: null,
   toolCount: null,
@@ -297,16 +343,10 @@ const UNCHECKED = {
 } as const;
 
 export function listMcpConnectors(
-  deps: Pick<McpConnectorDeps, 'db'>,
+  deps: Pick<McpConnectorDeps, 'db' | 'box'>,
   teamId: string,
 ): McpConnectorRecord[] {
-  return deps.db
-    .select()
-    .from(mcpConnector)
-    .where(eq(mcpConnector.teamId, teamId))
-    .orderBy(asc(mcpConnector.slug))
-    .all()
-    .map(toConnectorRecord);
+  return connectorRows(deps.db, teamId).map((row) => toConnectorRecord(deps, row));
 }
 
 export function createMcpConnector(
@@ -344,7 +384,7 @@ export function createMcpConnector(
       updatedAt: now,
     })
     .run();
-  return toConnectorRecord(connectorRow(deps, teamId, id));
+  return toConnectorRecord(deps, connectorRow(deps, teamId, id));
 }
 
 export function updateMcpConnector(
@@ -355,6 +395,14 @@ export function updateMcpConnector(
 ): { record: McpConnectorRecord; targetChanged: boolean } {
   const row = connectorRow(deps, teamId, id);
   const oauth = row.authKind === 'oauth';
+  if (
+    row.authKind === 'github-app' &&
+    (patch.token !== undefined ||
+      patch.headers !== undefined ||
+      patch.options !== undefined ||
+      patch.url !== undefined)
+  )
+    throw new HttpError(400, 'this connector signs in with GitHub; reconnect it instead');
   let target: ConnectorTarget | null = null;
   let dropTokens = false;
   const entry = row.catalogId === null ? undefined : mcpCatalogEntry(row.catalogId);
@@ -416,7 +464,7 @@ export function updateMcpConnector(
     .where(eq(mcpConnector.id, row.id))
     .run();
   return {
-    record: toConnectorRecord(connectorRow(deps, teamId, id)),
+    record: toConnectorRecord(deps, connectorRow(deps, teamId, id)),
     targetChanged: target !== null,
   };
 }
@@ -501,6 +549,56 @@ function openOAuth(deps: McpConnectorDeps, row: ConnectorRow): OAuthSecrets | nu
     : (JSON.parse(deps.box.open(row.oauthCipher)) as OAuthSecrets);
 }
 
+interface GithubAppSecrets {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  refreshExpiresAt: number;
+  login: string;
+  userId: number;
+}
+
+export function openGithubApp(
+  deps: Pick<McpConnectorDeps, 'box'>,
+  row: ConnectorRow,
+): GithubAppSecrets | null {
+  return row.authKind !== 'github-app' || row.oauthCipher === null
+    ? null
+    : (JSON.parse(deps.box.open(row.oauthCipher)) as GithubAppSecrets);
+}
+
+export function sealGithubApp(
+  deps: Pick<McpConnectorDeps, 'box'>,
+  grant: {
+    accessToken: string;
+    refreshToken: string;
+    expiresInSeconds: number;
+    refreshTokenExpiresInSeconds: number;
+  },
+  identity: { login: string; id: number },
+): string {
+  const now = nowMs();
+  const secrets: GithubAppSecrets = {
+    accessToken: grant.accessToken,
+    refreshToken: grant.refreshToken,
+    expiresAt: now + grant.expiresInSeconds * 1000,
+    refreshExpiresAt: now + grant.refreshTokenExpiresInSeconds * 1000,
+    login: identity.login,
+    userId: identity.id,
+  };
+  return deps.box.seal(JSON.stringify(secrets));
+}
+
+function bearerOf(
+  deps: McpConnectorDeps,
+  row: ConnectorRow,
+): { accessToken: string; expiresAt: number | null } | null {
+  if (row.authKind === 'github-app') return openGithubApp(deps, row);
+  return openOAuth(deps, row);
+}
+
+const signsIn = (row: ConnectorRow) => row.authKind === 'oauth' || row.authKind === 'github-app';
+
 function sealOAuth(
   deps: McpConnectorDeps,
   client: OAuthClientInformationFull,
@@ -523,22 +621,24 @@ export async function checkMcpConnector(
 ): Promise<McpConnectorRecord> {
   let row = connectorRow(deps, teamId, id);
   let result: ProbeResult;
-  if (row.authKind === 'oauth') {
-    const before = openOAuth(deps, row);
+  if (signsIn(row)) {
+    const before = bearerOf(deps, row);
     if (before?.expiresAt != null && before.expiresAt <= nowMs()) {
       await refreshMcpConnectorToken(deps, teamId, id);
       row = connectorRow(deps, teamId, id);
     }
-    const secrets = openOAuth(deps, row);
+    const secrets = bearerOf(deps, row);
     if (secrets === null) {
       result = { status: 'needs_auth', statusReason: 'reconnect', toolCount: null };
     } else if (secrets.expiresAt !== null && secrets.expiresAt <= nowMs()) {
-      return toConnectorRecord(row);
+      return toConnectorRecord(deps, row);
     } else {
       result = await probeMcpServer(deps, row.url, {
         ...openHeaders(deps, row),
         Authorization: `Bearer ${secrets.accessToken}`,
       });
+      if (row.authKind === 'github-app' && result.statusReason === 'forbidden')
+        result = { ...result, status: 'error' };
     }
   } else {
     result = await probeMcpServer(deps, row.url, openHeaders(deps, row));
@@ -555,7 +655,7 @@ export async function checkMcpConnector(
       ),
     )
     .run();
-  return toConnectorRecord(connectorRow(deps, teamId, id));
+  return toConnectorRecord(deps, connectorRow(deps, teamId, id));
 }
 
 const OAUTH_TIMEOUT_MS = 10_000;
@@ -602,7 +702,7 @@ export function createPublicOAuthFetch(env: NodeJS.ProcessEnv): typeof fetch {
 
 export const publicOAuthFetch = createPublicOAuthFetch(process.env);
 
-function guardedOAuthFetch(deps: McpConnectorDeps): typeof fetch {
+export function guardedOAuthFetch(deps: McpConnectorDeps): typeof fetch {
   return (input, init) => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.protocol !== 'https:')
@@ -998,13 +1098,13 @@ async function deliverableConnector(
 ): Promise<McpConnectorEndpoint | null> {
   if (row.status === 'needs_auth') return null;
   const headers = openHeaders(deps, row);
-  if (row.authKind !== 'oauth') return { slug: row.slug, transport: 'http', url: row.url, headers };
-  const before = openOAuth(deps, row);
+  if (!signsIn(row)) return { slug: row.slug, transport: 'http', url: row.url, headers };
+  const before = bearerOf(deps, row);
   if (before?.expiresAt != null && before.expiresAt - nowMs() < TOKEN_PATH_REFRESH_LEAD_MS) {
     await boundedRefresh(deps, teamId, row.id);
   }
   const current = connectorRow(deps, teamId, row.id);
-  const secrets = openOAuth(deps, current);
+  const secrets = bearerOf(deps, current);
   if (current.status === 'needs_auth' || secrets === null) return null;
   if (secrets.expiresAt !== null && secrets.expiresAt <= nowMs()) return null;
   return {
@@ -1055,6 +1155,7 @@ export function refreshMcpConnectorToken(
 
 async function runRefresh(deps: McpConnectorDeps, teamId: string, id: string): Promise<void> {
   const row = connectorRow(deps, teamId, id);
+  if (row.authKind === 'github-app') return refreshGithubApp(deps, row);
   const secrets = openOAuth(deps, row);
   const meta = row.oauthMeta;
   if (row.authKind !== 'oauth' || secrets === null || meta === null) return;
@@ -1105,6 +1206,53 @@ async function runRefresh(deps: McpConnectorDeps, teamId: string, id: string): P
     .update(mcpConnector)
     .set({
       oauthCipher: sealOAuth(deps, secrets.client, tokens, secrets.refreshToken),
+      tokenGeneration: row.tokenGeneration + 1,
+      ...(row.statusReason === 'refresh_failed' ? { status: 'connected', statusReason: null } : {}),
+    })
+    .where(unchanged)
+    .run();
+}
+
+async function refreshGithubApp(deps: McpConnectorDeps, row: ConnectorRow): Promise<void> {
+  const secrets = openGithubApp(deps, row);
+  if (secrets === null) return;
+  const unchanged = and(
+    eq(mcpConnector.id, row.id),
+    eq(mcpConnector.authRevision, row.authRevision),
+    eq(mcpConnector.tokenGeneration, row.tokenGeneration),
+  );
+  const app = githubAppOfDeps(deps);
+  if (app === null || secrets.refreshExpiresAt <= nowMs()) {
+    deps.db
+      .update(mcpConnector)
+      .set({ status: 'needs_auth', statusReason: 'expired', toolCount: null })
+      .where(unchanged)
+      .run();
+    return;
+  }
+  let grant: Awaited<ReturnType<typeof refreshGithubDeviceToken>>;
+  try {
+    grant = await refreshGithubDeviceToken(
+      { fetch: guardedOAuthFetch(deps) },
+      app.clientId,
+      secrets.refreshToken,
+    );
+  } catch (err) {
+    deps.db
+      .update(mcpConnector)
+      .set(
+        err instanceof HttpError && err.status === 401
+          ? { status: 'needs_auth', statusReason: 'refresh_rejected', toolCount: null }
+          : { status: 'error', statusReason: 'refresh_failed', toolCount: null },
+      )
+      .where(unchanged)
+      .run();
+    return;
+  }
+  deps.db
+    .update(mcpConnector)
+    .set({
+      oauthCipher: sealGithubApp(deps, grant, { login: secrets.login, id: secrets.userId }),
       tokenGeneration: row.tokenGeneration + 1,
       ...(row.statusReason === 'refresh_failed' ? { status: 'connected', statusReason: null } : {}),
     })

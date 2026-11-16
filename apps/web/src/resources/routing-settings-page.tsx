@@ -49,7 +49,7 @@ const STORED_ONLY_USES: readonly RouteUse[] = ['digest', 'compaction'];
 
 const USE_HINTS: Partial<Record<RouteUse, string>> = {
   coordinator: '你对话的协调者，派活和汇报',
-  digest: '每日报告和对话摘要',
+  digest: '对话摘要',
   compaction: '上下文快满时压缩对话',
 };
 
@@ -195,7 +195,8 @@ export function ModelPicker({
       </SelectTrigger>
       <SelectContent
         className="routing-rule-model-menu w-max min-w-(--anchor-width) max-w-(--available-width)"
-        {...(trigger === undefined ? {} : { alignItemWithTrigger: false, align: 'end' as const })}
+        alignItemWithTrigger={false}
+        {...(trigger === undefined ? {} : { align: 'end' as const })}
       >
         {runtimes.map((runtime) => (
           <SelectGroup key={runtime}>

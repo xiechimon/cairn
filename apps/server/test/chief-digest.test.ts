@@ -93,7 +93,7 @@ const VALID_OUTPUT = [
   '```',
 ].join('\n');
 
-async function setup(cliVersion = CHIEF_DIGEST_MIN_CLI_VERSION): Promise<World> {
+async function setup(cliVersion = CHIEF_DIGEST_MIN_CLI_VERSION, longChat = true): Promise<World> {
   const s = bootServer({ claimHoldMs: 200 });
   disposables.push(() => s.dispose());
   const teamId = s.team.id;
@@ -132,7 +132,7 @@ async function setup(cliVersion = CHIEF_DIGEST_MIN_CLI_VERSION): Promise<World> 
       id: 'asst-1',
       threadId: thread.id,
       role: 'assistant',
-      content: '已建任务 #9，正在跑。',
+      content: `已建任务 #9，正在跑。${longChat ? '长'.repeat(CHIEF_DIGEST_THRESHOLD_CHARS) : ''}`,
       createdAt: YESTERDAY_EVENING + 1000,
     })
     .run();
@@ -206,13 +206,15 @@ function bulk(w: World, at: number, chars: number) {
 }
 
 describe('chief long-chat digests (#1939)', () => {
-  test('waits for 08:00 local time before the daily digest', async () => {
-    const w = await setup();
-    w.plan(TODAY_0730);
-    expect(w.digestSteps()).toHaveLength(0);
+  test('short conversations are not summarized on a daily timer', async () => {
+    const w = await setup(CHIEF_DIGEST_MIN_CLI_VERSION, false);
+    for (const at of [TODAY_0730, TODAY_0830, TODAY_0830 + 86_400_000]) {
+      w.plan(at);
+      expect(w.digestSteps()).toHaveLength(0);
+    }
   });
 
-  test('the daily digest runs on a hidden thread with read-only tools and the transcript', async () => {
+  test('a context-pressure digest runs on a hidden thread with read-only tools and the transcript', async () => {
     const w = await setup();
     w.plan(TODAY_0830);
     const steps = w.digestSteps();
@@ -268,7 +270,7 @@ describe('chief long-chat digests (#1939)', () => {
       items: { group: string; reason: string; memory?: { id: string; agentId: string } }[];
     };
     expect(content.kind).toBe(CHIEF_DIGEST_KIND);
-    expect(content.reason).toBe('daily');
+    expect(content.reason).toBe('threshold');
     expect(content.items.map((i) => i.group)).toEqual(['decided', 'done', 'open', 'remembered']);
     const memoryId = content.items[3]?.memory?.id;
     expect(memoryId).toBeTruthy();
@@ -683,7 +685,7 @@ describe('chief long-chat digests (#1939)', () => {
         id: 'skewed',
         threadId: w.threadId,
         role: 'user',
-        content: '时钟偏慢的执行端写进来的消息',
+        content: `时钟偏慢的执行端写进来的消息${'长'.repeat(CHIEF_DIGEST_THRESHOLD_CHARS)}`,
         createdAt: YESTERDAY_EVENING + 1000,
       })
       .run();

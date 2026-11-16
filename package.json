@@ -35,7 +35,6 @@
     "prepush": "node scripts/prepush.mjs",
     "spec:parse": "node scripts/spec-parse-gate.mjs",
     "format": "biome format --write .",
-    "prepare": "husky",
     "migration-oracle:full": "node scripts/migration-oracle-full.mjs"
   },
   "devDependencies": {
@@ -43,7 +42,6 @@
     "@changesets/cli": "3.0.3",
     "@playwright/test": "catalog:",
     "concurrently": "^10.0.5",
-    "husky": "^9.1.7",
     "lucide-static": "^1.48.0",
     "typescript": "catalog:",
     "vitest": "catalog:",

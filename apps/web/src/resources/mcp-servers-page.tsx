@@ -8,7 +8,12 @@ import {
 import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
-import { useApiMutations, useMcpConnectors, useMcpServers } from '../api/hooks.js';
+import {
+  useApiMutations,
+  useGithubConnector,
+  useMcpConnectors,
+  useMcpServers,
+} from '../api/hooks.js';
 import { mapMcpServers } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
@@ -17,6 +22,7 @@ import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { SettingsFlat, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
+import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { Ban, Plus } from '../icons/index.js';
@@ -30,6 +36,7 @@ import {
   McpSignInDialog,
 } from './mcp-connector-dialog.js';
 import { McpConnectorIcon } from './mcp-connector-icon.js';
+import { GithubDeviceDialog } from './mcp-github-device-dialog.js';
 import {
   ResourceList,
   ResourceRow,
@@ -48,7 +55,13 @@ type FixtureDialog =
   | { kind: 'manage'; connectorId: string }
   | { kind: 'authorizing'; catalogId: string }
   | { kind: 'confirm'; name: string; host: string }
-  | { kind: 'landing'; reason: string; name?: string };
+  | { kind: 'landing'; reason: string; name?: string }
+  | { kind: 'github-device'; step: GithubDeviceFixtureStep };
+
+interface DeviceTarget {
+  connectorId?: string;
+  run: number;
+}
 
 interface SignInAttempt {
   name: string;
@@ -139,7 +152,21 @@ export function McpServersPage() {
       )
     : (fixture.resources?.mcpServers ?? []);
   const connectors = live ? (connectorsQ.data ?? []) : (fixture.resources?.mcpConnectors ?? []);
+  const githubQ = useGithubConnector(teamId, live);
+  const githubApp = live ? githubQ.data : fixture.resources?.githubConnector;
   const fixtureDialog = fixture.ui?.mcpDialog;
+  const fixtureDevice = fixtureDialog?.kind === 'github-device' ? fixtureDialog.step : undefined;
+  const fixtureGithub = connectors.find((c) => c.authKind === 'github-app');
+  const [device, setDevice] = useState<DeviceTarget | null>(() =>
+    fixtureDevice === undefined
+      ? null
+      : {
+          run: 0,
+          ...(fixtureDevice === 'reconnect' && fixtureGithub !== undefined
+            ? { connectorId: fixtureGithub.id }
+            : {}),
+        },
+  );
   const [dialog, setDialog] = useState<McpDialogTarget | null>(() =>
     initialTarget(fixtureDialog, connectors),
   );
@@ -215,6 +242,8 @@ export function McpServersPage() {
 
   const requestSignIn = (request: McpOAuthRequest) => {
     setDialog(null);
+    if (request.kind === 'reconnect' && request.connector.authKind === 'github-app')
+      return setDevice({ connectorId: request.connector.id, run: 0 });
     if (request.kind === 'custom') return startSignIn({ name: request.label, body: request });
     startSignIn({
       name: request.connector.label,
@@ -224,6 +253,10 @@ export function McpServersPage() {
   };
 
   const connect = (entry: McpCatalogEntry) => {
+    if (entry.auth.includes('github-app') && githubApp?.available === true) {
+      setNotice(null);
+      return setDevice({ run: 0 });
+    }
     if (entry.auth.includes('oauth')) return startSignIn(catalogAttempt(entry));
     if (entry.auth.includes('none')) {
       if (live)
@@ -385,6 +418,19 @@ export function McpServersPage() {
         onClose={() => setDialog(null)}
         onSignIn={requestSignIn}
       />
+      {device !== null && (
+        <GithubDeviceDialog
+          key={device.run}
+          live={live}
+          teamId={teamId}
+          {...(device.connectorId !== undefined ? { connectorId: device.connectorId } : {})}
+          installUrl={githubApp?.installUrl ?? null}
+          {...(device.run === 0 && fixtureDevice !== undefined ? { fixture: fixtureDevice } : {})}
+          {...(fixtureGithub !== undefined ? { fixtureConnector: fixtureGithub } : {})}
+          onClose={() => setDevice(null)}
+          onRestart={() => setDevice({ ...device, run: device.run + 1 })}
+        />
+      )}
       {signIn !== null && (
         <McpSignInDialog
           signIn={signIn}

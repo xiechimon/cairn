@@ -48,7 +48,7 @@ Reach:
 
 **Coordinator chat** (shipped, centrality 1). The one never-ending Coordinator conversation on the home page, where the user dispatches work and reads reports.
 
-States: Empty home with starters, streaming reply with a stop control, finished reply with an action row and, when the Coordinator offered them, quick-reply chips above the composer, and a connection-lost banner when the stream drops.
+States: Empty home with starters, streaming reply with a stop control, finished reply with an action row and, when the Coordinator offered them, quick-reply chips above the composer, and a connection-lost banner when the stream drops. A failed initial project greeting offers explicit retry with a reason, without inventing an owner message; pending, running, stale and ineligible retries are refused.
 
 Reach:
 
@@ -62,8 +62,8 @@ Reach:
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
-- Backend design: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](../../../docs/spec/26-pi-session-runtime-and-trust-surface.md), [docs/design/coordinator-quick-replies.md](../../../docs/design/coordinator-quick-replies.md)
-- Evidence: `apps/web/e2e/chief-home-chat.spec.ts`, `apps/web/e2e/chief-home-c.spec.ts`, `apps/server/test/coordinator-turns.test.ts`, `apps/server/test/coordinator/turn.test.ts`
+- Backend design: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](../../../docs/spec/26-pi-session-runtime-and-trust-surface.md), [docs/design/coordinator-project-channels.md](../../../docs/design/coordinator-project-channels.md), [docs/design/coordinator-quick-replies.md](../../../docs/design/coordinator-quick-replies.md)
+- Evidence: `apps/web/e2e/chief-home-chat.spec.ts`, `apps/web/e2e/chief-home-c.spec.ts`, `apps/web/e2e/chief-greeting-retry.spec.ts`, `apps/server/test/coordinator-project-channels.test.ts`, `apps/server/test/coordinator-turns.test.ts`, `apps/server/test/coordinator/turn.test.ts`
 
 ### coordinator-context
 

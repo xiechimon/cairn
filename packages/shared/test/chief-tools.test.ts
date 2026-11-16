@@ -185,7 +185,7 @@ describe('Coordinator task text contract', () => {
 });
 
 describe('D60 router tools', () => {
-  it('are seven tools outside the 48-item base vocabulary, so the base count stays 48', () => {
+  it('are six tools outside the 48-item base vocabulary, so the base count stays 48', () => {
     expect(CHIEF_ROUTER_TOOL_NAMES).toEqual([
       'open_thread',
       'message_thread',
@@ -193,7 +193,6 @@ describe('D60 router tools', () => {
       'answer_question',
       'threads',
       'needs_you',
-      'decide_report_suggestion',
     ]);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
     expect(CHIEF_TOOL_COUNT).toBe(48);

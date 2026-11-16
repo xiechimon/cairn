@@ -21,11 +21,12 @@ import { useI18n } from '../i18n/provider.js';
 import { Plus, X } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 
-const PALE_DISABLED = 'disabled:bg-secondary/50 disabled:text-content-dim disabled:opacity-100';
+export const PALE_DISABLED =
+  'disabled:bg-secondary/50 disabled:text-content-dim disabled:opacity-100';
 
 const FIELD_CLS = cn(FORM_CONTROL_CLS, 'placeholder:text-content-tertiary');
 
-const DIALOG_FORM_CLS = 'max-w-none text-balance [word-break:keep-all]';
+export const DIALOG_FORM_CLS = 'max-w-none text-balance [word-break:keep-all]';
 
 const VALUE_BOX_CLS =
   'm-0 rounded-(--radius-control) bg-muted px-3 py-2 font-mono text-ui text-foreground break-all';
@@ -55,7 +56,9 @@ export function connectorProblem(t: Translate, record: McpConnectorRecord): stri
     case 'unauthorized':
       return t('{name} 拒绝了这个令牌。检查令牌是否填对、有没有过期，然后换一个新的。', { name });
     case 'forbidden':
-      return t('令牌有效，但权限不够。给令牌加上需要的权限后重新检查。');
+      return record.authKind === 'github-app'
+        ? t('GitHub 拒绝了访问。组织可能要求先做 SSO 授权，或等管理员批准 Cairn 应用。')
+        : t('令牌有效，但权限不够。给令牌加上需要的权限后重新检查。');
     case 'timeout':
       return t('{name} 10 秒内没有响应。稍后重新检查。', { name });
     case 'unreachable':
@@ -507,7 +510,8 @@ function ManageConnectorDialog({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
-  const oauth = current.authKind === 'oauth';
+  const github = current.authKind === 'github-app';
+  const oauth = current.authKind === 'oauth' || github;
   const needsAuth = oauth && current.status === 'needs_auth';
   const pending =
     mutations.patchMcpConnector.isPending ||
@@ -579,7 +583,13 @@ function ManageConnectorDialog({
           <span className="text-ui font-medium text-foreground">{t('地址')}</span>
           <p className={VALUE_BOX_CLS}>{current.url}</p>
         </Field>
-        {oauth && (
+        {github && (
+          <p data-testid="mcp-github-delete-note" className="m-0 text-meta text-content-tertiary">
+            <span className="block">{t('删除只移除 Cairn 里的连接。')}</span>
+            <span className="block">{t('Cairn 发 PR 也靠这份授权，别去 GitHub 撤销。')}</span>
+          </p>
+        )}
+        {oauth && !github && (
           <p className="m-0 text-meta text-content-tertiary">
             {t(
               '用浏览器登录连接。删除只移除本机保存的令牌，{name} 那边的授权要在它的设置里撤销。',
@@ -616,9 +626,11 @@ export function ConnectorStatus({ record }: { record: McpConnectorRecord }) {
     return (
       <span className="inline-flex items-center gap-1.5 text-meta text-content-secondary">
         <span aria-hidden className="size-1.5 flex-none rounded-full bg-running" />
-        {record.toolCount !== null
-          ? t('已连接 · {n} 个工具', { n: record.toolCount })
-          : t('已连接')}
+        {record.account !== null && record.toolCount !== null
+          ? t('已连接 · @{login} · {n} 个工具', { login: record.account, n: record.toolCount })
+          : record.toolCount !== null
+            ? t('已连接 · {n} 个工具', { n: record.toolCount })
+            : t('已连接')}
       </span>
     );
   if (record.status === 'needs_auth')

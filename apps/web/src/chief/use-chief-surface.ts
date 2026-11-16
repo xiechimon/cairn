@@ -79,6 +79,7 @@ export interface ChiefSurface {
   chiefFresh: boolean;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
+  onRetryGreeting?: () => void;
   onAnswerQuestion?: (input: {
     requestId: string;
     answers: AskUserAnswer[];
@@ -320,6 +321,17 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     activeThread === null ||
     (activeThread.activeRun == null && activeThread.lastTurnAt == null);
 
+  const retryGreetingStepId = activeThread?.retryGreetingStepId;
+  const onRetryGreeting =
+    live && activeThread !== null && retryGreetingStepId != null
+      ? () => {
+          if (mutations.chiefRetryGreeting.isPending) return;
+          mutations.chiefRetryGreeting.mutate(
+            { threadId: activeThread.id, stepId: retryGreetingStepId },
+            { onError: (e) => toastError(t('恢复失败，请重试。'), e) },
+          );
+        }
+      : undefined;
   const onRewind = live
     ? (messageId: string) => {
         if (activeThread === null) return;
@@ -508,6 +520,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     chiefFresh,
     onSend,
     onRewind,
+    onRetryGreeting,
     onAnswerQuestion,
     onCancelQuestion,
     onWithdraw,

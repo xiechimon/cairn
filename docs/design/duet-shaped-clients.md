@@ -341,7 +341,7 @@ Owner decision on 2026-11-12: the web app is settled first, and iOS follows it. 
 | A checkbox to mark a task complete | cairn resolves a task from evidence (merge, close); a tick could close work no gate judged. The circle stays as a status glyph in the same place | Inferred |
 | The Make tab of finished artifacts and templates | Nothing in cairn maps to it (2.7): finished work is in its task thread, schedules are a link under Resolved | Inferred |
 | Duet's brand assets (logo, typeface, orange accent, illustrations) | Owner decision: Duet's layout and interaction, cairn's own tokens and marks | Read (owner decision) |
-| A morning brief built into the client | The brief is a Coordinator feature on its own track (#1784, `docs/research/duet-proactive-coordinator.md`); it arrives as a Coordinator message and a push, with no client screen | Read |
+| A morning brief built into the client | Daily reports and their push are retired; only read-only historical messages remain | Owner decision, 2026-11-16 |
 | Proactive checks of outside accounts every few hours | Not part of this client work; quota cost is the reason Duet limits it | Read (launch article) |
 | A Tasks `+` button that creates a task directly | The `+` opens the Chat composer instead, so tasks still enter through the Coordinator and the verbatim request stays in one path | Inferred |
 

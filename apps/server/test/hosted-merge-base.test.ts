@@ -1,5 +1,5 @@
 import type { ClaimedStep, TaskRequest } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, step, todo } from '../src/db/schema.js';
@@ -34,7 +34,7 @@ async function mergeWorld() {
       projectId: project.id,
       title: 'Merge',
       seqNum: 1,
-      phase: 'review',
+      phase: 'done',
       phaseAt: Date.now(),
       latestBuildId: 'build',
     })
@@ -64,8 +64,24 @@ async function mergeWorld() {
   );
   if (result.code !== 0) throw new Error(result.stderr);
   const commit = result.stdout.toString('utf8').trim();
+  s.db
+    .insert(step)
+    .values({
+      id: 'delivery',
+      buildId: 'build',
+      teamId: s.team.id,
+      kind: 'session',
+      status: 'done',
+      checkpointCommit: commit,
+      createdAt: Date.now(),
+    })
+    .run();
   await requestMerge({ ...s.svc, reposDir: s.reposDir }, 'build');
-  const merge = s.db.select().from(step).where(eq(step.buildId, 'build')).get();
+  const merge = s.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, 'build'), eq(step.kind, 'merge')))
+    .get();
   if (merge === undefined) throw new Error('merge step missing');
   const deps = {
     ...s.svc,

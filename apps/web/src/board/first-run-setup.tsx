@@ -1,4 +1,10 @@
-import type { CoordinatorDefault, RoutingRuleRecord, SessionDefault } from '@cairn/shared';
+import {
+  type CoordinatorDefault,
+  MODEL_SOURCE_RUNTIME_LABELS,
+  type ModelSourceRuntime,
+  type RoutingRuleRecord,
+  type SessionDefault,
+} from '@cairn/shared';
 import { cn } from 'cn';
 import { Check, KeyRound, MessageSquare, Plus } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -165,7 +171,9 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
   const status = hasProvider
     ? t('已添加，Coordinator 能用')
     : subscriptionSaved && !setup.claudeCodeFound
-      ? t('订阅已保存。这台电脑还没找到 Claude Code，装好它之后会自动用上。')
+      ? t(
+          '订阅已保存，这台电脑装好 Claude\u00a0Code 后会自动用上。现在先添加一个服务商，Coordinator 就能开始工作。',
+        )
       : t('Claude 订阅、API key 或本地模型');
   return (
     <>
@@ -260,8 +268,11 @@ function picksOf(setup: Setup, t: TFunc): (Pick | null)[] {
 }
 
 function modelLabel(pick: Pick, options: readonly ModelOption[]): [string, string] {
-  const row = options.find((o) => o.provider === pick.provider && o.modelId === pick.modelId);
-  return [row?.modelName ?? pick.modelId, row?.providerLabel ?? pick.provider];
+  const row =
+    options.find((o) => o.provider === pick.provider && o.modelId === pick.modelId) ??
+    options.find((o) => o.modelId === pick.modelId);
+  const runtimeLabel = MODEL_SOURCE_RUNTIME_LABELS[pick.provider as ModelSourceRuntime];
+  return [row?.modelName ?? pick.modelId, runtimeLabel ?? row?.providerLabel ?? pick.provider];
 }
 
 function ConfirmBody({ setup }: { setup: Setup }) {
@@ -362,7 +373,7 @@ function ConfirmBody({ setup }: { setup: Setup }) {
                     trigger={{
                       label: t('换一个'),
                       className:
-                        'h-6 gap-1 rounded-sm border-0 bg-transparent p-0 text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current data-[size=default]:h-6 dark:bg-transparent dark:hover:bg-transparent pointer-coarse:h-11 pointer-coarse:data-[size=default]:h-11',
+                        'h-6 gap-1 rounded-sm border-0 bg-transparent p-0 text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current data-[size=default]:h-6 dark:bg-transparent dark:hover:bg-transparent pointer-coarse:-my-2.5 pointer-coarse:h-11 pointer-coarse:data-[size=default]:h-11',
                     }}
                   />
                 </span>
@@ -423,7 +434,8 @@ function LanguageSwitch() {
       label={t('语言')}
       value={locale}
       onChange={setLocale}
-      optionHandle="dark:data-active:bg-(--sidebar-active)"
+      className="pointer-coarse:h-8"
+      optionHandle="dark:data-active:bg-(--sidebar-active) pointer-coarse:h-7 pointer-coarse:before:absolute pointer-coarse:before:inset-x-0 pointer-coarse:before:-inset-y-2 pointer-coarse:before:content-['']"
       options={LOCALES.map((code) => ({
         value: code,
         label: LOCALE_NAMES[code],
@@ -532,7 +544,7 @@ function Segments({ open }: { open: SetupStepId }) {
                 ? 'bg-content-tertiary'
                 : state === 'now'
                   ? 'bg-(--card-button)'
-                  : 'bg-border',
+                  : 'bg-content-dim',
             )}
           >
             <span className="sr-only">{id === 'models' ? t('接入模型') : t('确认模型')}</span>
@@ -581,11 +593,11 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
         </div>
         <SkipLine onSkip={onSkip} className="relative max-lg:hidden" />
       </aside>
-      <div className="flex flex-1 flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] lg:items-center lg:justify-center lg:overflow-y-auto lg:p-16">
+      <div className="flex flex-1 flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] lg:items-center lg:justify-center lg:overflow-y-auto lg:px-16 lg:pt-20 lg:pb-15">
         <section
           key={open}
           aria-label={open === 'models' ? t('接入模型') : t('确认模型')}
-          className="w-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 lg:min-h-96 lg:max-w-130"
+          className="w-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 lg:max-w-130"
         >
           <h2 className="m-0 voice-response text-page">
             {open === 'models' ? t('接入模型') : t('确认模型')}

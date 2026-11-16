@@ -141,15 +141,12 @@ test('old intake drafts cannot create tasks and their stored data is left unchan
     'POST',
     `/api/teams/${s.team.id}/chief/retro-proposals/ordinary-retro/accept`,
   );
-  expect(accepted.status).toBe(200);
+  expect(accepted.status).toBe(404);
   const stored = s.db
     .select()
     .from(chiefMessage)
     .where(eq(chiefMessage.id, 'chief-report-old-report'))
     .get();
-  expect(JSON.parse(String(stored?.content))).toMatchObject({
-    ...historical,
-    retro: [expect.objectContaining({ id: 'ordinary-retro', status: 'accepted' })],
-  });
-  expect(s.db.select().from(todo).all()).toHaveLength(1);
+  expect(JSON.parse(String(stored?.content))).toEqual(historical);
+  expect(s.db.select().from(todo).all()).toEqual([]);
 });

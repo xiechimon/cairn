@@ -8,12 +8,11 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, isNotNull, isNull, ne, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, chiefReport, project, todo } from '../db/schema.js';
+import { build, project, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
 import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
-import { decideRetroProposal, reportSuggestions } from './chief-report.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { isPersonalSpace } from './personal-space.js';
@@ -246,65 +245,6 @@ function needsYou(deps: ChiefToolDeps, ctx: ChiefToolCtx): string {
   return json({ items });
 }
 
-function decideReportSuggestion(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
-  if ((ctx.turnMessageIds ?? []).length === 0) {
-    throw new HttpError(
-      400,
-      'decide_report_suggestion rejected: only a message the user wrote can decide a report suggestion, and this turn has none',
-    );
-  }
-  const n = params.n;
-  if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1) {
-    throw new HttpError(400, 'invalid params.n: expected a positive integer');
-  }
-  const decision = params.decision;
-  if (decision !== 'accept' && decision !== 'dismiss') {
-    throw new HttpError(400, 'invalid params.decision: expected accept or dismiss');
-  }
-  const day = optStr(params, 'day');
-  const rec = deps.db
-    .select()
-    .from(chiefReport)
-    .where(
-      and(
-        eq(chiefReport.chiefId, ctx.chiefId),
-        day !== undefined ? eq(chiefReport.day, day) : undefined,
-      ),
-    )
-    .orderBy(desc(chiefReport.day))
-    .get();
-  if (rec === undefined) throw new HttpError(404, `no daily report${day ? ` for ${day}` : ''}`);
-  const suggestions = reportSuggestions(deps.db, rec.id);
-  const listed = () =>
-    suggestions.map((entry) => ({
-      n: entry.n,
-      kind: entry.kind,
-      title: tidy(entry.item.title, TITLE_MAX),
-      status: entry.item.status,
-    }));
-  const entry = suggestions.find((candidate) => candidate.n === n);
-  if (entry === undefined) {
-    throw new HttpError(
-      404,
-      `the ${rec.day} report has no suggestion ${n}: ${JSON.stringify(listed())}`,
-    );
-  }
-  try {
-    const updated = decideRetroProposal(deps, ctx.teamId, entry.item.id, decision);
-    return json({ day: rec.day, n, status: updated.status, todoId: updated.todoId });
-  } catch (error) {
-    if (!(error instanceof HttpError) || error.status !== 409) throw error;
-    const current = reportSuggestions(deps.db, rec.id).find((c) => c.n === n)?.item;
-    return json({
-      day: rec.day,
-      n,
-      status: current?.status ?? null,
-      todoId: current?.todoId ?? null,
-      alreadyDecided: true,
-    });
-  }
-}
-
 export async function executeRouterTool(
   deps: ChiefToolDeps,
   ctx: ChiefToolCtx,
@@ -324,8 +264,6 @@ export async function executeRouterTool(
       return threads(deps.db, ctx, params);
     case 'needs_you':
       return needsYou(deps, ctx);
-    case 'decide_report_suggestion':
-      return decideReportSuggestion(deps, ctx, params);
     default:
       throw new HttpError(400, `unknown router tool: ${name}`);
   }

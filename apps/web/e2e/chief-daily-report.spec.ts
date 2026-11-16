@@ -67,10 +67,10 @@ const reportRow = (overrides: Record<string, unknown> = {}): Row => ({
 const ZONE = 'Asia/Shanghai';
 const TODAY = new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(Date.now());
 
-test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
+test.describe('read-only historical daily reports', () => {
   test.use({ viewport: { width: 1280, height: 1500 }, timezoneId: ZONE });
 
-  test('the chat shows one sentence and a document card; the document holds the numbered suggestions', async ({
+  test('the historical document preserves facts and task links without offering decisions', async ({
     page,
   }) => {
     const decisions: string[] = [];
@@ -81,7 +81,7 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     await page.goto('/app');
     const row = page.getByTestId('home-c').getByTestId('chief-report');
     await expect(row.getByTestId('chief-report-sentence')).toHaveText(
-      '2026-10-27 的日报写好了：完成 1 · 合并 1 · 失败 1，有 2 条建议等你决定',
+      '2026-10-27 的历史日报：完成 1 · 合并 1 · 失败 1',
     );
     await expect(row.getByRole('button')).toHaveCount(1);
     const card = row.getByTestId('research-report-card');
@@ -91,7 +91,7 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     await evidencePanelShot(page, 'daily-report.png', row);
     await card.click();
     const doc = page.getByTestId('research-report-doc');
-    await expect(page.getByTestId('research-report-meta')).toHaveText(/^日报/);
+    await expect(page.getByTestId('research-report-meta')).toHaveText(/^历史日报/);
     await expect(page.getByTestId('research-report-meta')).not.toContainText('定稿');
     await expect(doc).toContainText('昨天（2026-10-26）的进展');
     await expect(doc).toContainText(
@@ -104,14 +104,16 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     await expect(doc).toContainText('写日报时有 2 件等你，现在的情况看任务面板。');
     const items = doc.getByTestId('md-list-ordered').locator(':scope > li');
     await expect(items).toHaveCount(2);
-    await expect(items.first()).toContainText('看板计数加回归测试 · 待你决定');
+    await expect(items.first()).toContainText('看板计数加回归测试 · 未处理（只读）');
     await expect(items.first()).toContainText('防护：加一个 e2e 断言计数与服务端一致');
     await expect(items.first().getByRole('link', { name: '#9 修复看板拖拽后计数不刷新' })).toHaveAttribute(
       'href',
       '/app?thread=todo-1',
     );
-    await expect(items.nth(1)).toContainText('协调者先查状态再答 · 待你决定');
-    await expect(doc).toContainText('比如「2026-10-27 日报第 1 条建线程」');
+    await expect(items.nth(1)).toContainText('协调者先查状态再答 · 未处理（只读）');
+    await expect(doc).toContainText('历史记录，仅供查看；日报已停用，不再生成或处理建议。');
+    await expect(doc).not.toContainText('第 1 条建线程');
+    await expect(doc).not.toContainText('待你决定');
     await expect(doc).toContainText('这些来源太长，只读了后面的部分：#12 大线程。');
     await expect(doc.getByRole('button', { name: '建成线程' })).toHaveCount(0);
     await evidencePanelShot(page, 'daily-report-document.png', page.getByRole('dialog'));
@@ -119,7 +121,7 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
   });
 
   test('old outside developments stay hidden while retro suggestions keep their numbering', async ({ page }) => {
-    const retro = [proposal('rp-1', '复盘 1')];
+    const retro = [{ ...proposal('rp-1', '复盘 1'), status: 'accepted', todoId: 'todo-1' }];
     await mockLive(page, {
       threads: [THREAD],
       messages: [
@@ -138,14 +140,15 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     });
     await page.goto('/app');
     const row = page.getByTestId('home-c').getByTestId('chief-report');
-    await expect(row.getByTestId('chief-report-sentence')).toContainText('有 1 条建议等你决定');
+    await expect(row.getByTestId('chief-report-sentence')).not.toContainText('等你决定');
     await row.getByTestId('research-report-card').click();
     const doc = page.getByTestId('research-report-doc');
     const lists = doc.getByTestId('md-list-ordered');
     await expect(lists).toHaveCount(1);
     await expect(lists.locator(':scope > li')).toHaveCount(1);
-    await expect(doc).toContainText('第 1 条不用了');
-    await expect(doc).not.toContainText('第 2 条不用了');
+    await expect(doc).not.toContainText('第 1 条不用了');
+    await expect(doc.getByRole('link', { name: '复盘 1' })).toHaveAttribute('href', '/app?thread=todo-1');
+    await expect(doc).toContainText('已建成线程');
     await expect(doc).not.toContainText('外部动态');
     await expect(doc.getByRole('link', { name: 'example.com' })).toHaveCount(0);
     await evidencePanelShot(page, 'daily-report-retired-intake.png', page.getByRole('dialog'));
@@ -161,16 +164,17 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     await page.goto('/app');
     const row = page.getByTestId('home-c').getByTestId('chief-report');
     await expect(row.getByTestId('chief-report-sentence')).toHaveText(
-      '日报没写成，先看昨天的数字：完成 1 · 合并 1 · 失败 1',
+      '2026-10-27 的历史日报未完成：完成 1 · 合并 1 · 失败 1',
     );
     await row.getByTestId('research-report-card').click();
     const doc = page.getByTestId('research-report-doc');
-    await expect(doc).toContainText('日报没写成，过一会儿再试一次；先看昨天的数字。');
+    await expect(doc).toContainText('历史记录，仅供查看；日报已停用，不再生成或处理建议。');
+    await expect(doc).not.toContainText('再试');
     await expect(doc).toContainText('完成 1');
     await expect(doc).not.toContainText('复盘建议');
   });
 
-  test('a quiet day says today only for today’s report, and names the day of an older one', async ({
+  test('even a record dated today is shown as historical, not a new daily promise', async ({
     page,
   }) => {
     const quiet = {
@@ -196,12 +200,12 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
       ],
     });
     await page.goto('/app');
-    await expect(sentence).toHaveText('今天的日报写好了：昨天没有新进展');
+    await expect(sentence).toHaveText(`${TODAY} 的历史日报：完成 0 · 合并 0 · 失败 0`);
     await mockLive(page, {
       threads: [THREAD],
       messages: [...HISTORY, reportRow({ yesterday: quiet, retro: [], truncated: [] })],
     });
     await page.goto('/app');
-    await expect(sentence).toHaveText('2026-10-27 的日报写好了：2026-10-26 没有新进展');
+    await expect(sentence).toHaveText('2026-10-27 的历史日报：完成 0 · 合并 0 · 失败 0');
   });
 });

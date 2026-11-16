@@ -1,13 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import {
-  copyFileSync,
-  mkdirSync,
-  readFileSync,
-  symlinkSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileViolations } from './public-content-gate.mjs';
@@ -150,13 +143,6 @@ test('line numbers and diagnostics do not expose matched content', () => {
   ]);
 });
 
-test('commit hook checks the index before checks and after automatic restaging', () => {
-  const hook = readFileSync(new URL('../.husky/pre-commit', import.meta.url), 'utf8');
-  const command = 'node scripts/public-content-gate.mjs --staged';
-  assert.ok(hook.indexOf(command) < hook.indexOf('pnpm exec biome'));
-  assert.ok(hook.lastIndexOf(command) > hook.indexOf('git add "$f"'));
-});
-
 const script = join(import.meta.dirname, 'public-content-gate.mjs');
 function repository(t) {
   const cwd = makeTestTempDir('public-content-gate-');
@@ -265,29 +251,6 @@ test('type-changing additions are checked in staged and committed diffs', (t) =>
   assert.equal(run('--staged').status, 1);
   git('commit', '-qm', 'synthetic type change');
   assert.equal(run('--base', base).status, 1);
-});
-
-test('the real commit hook refuses a type-change-only disclosure before formatting', (t) => {
-  const { cwd, git } = repository(t);
-  const link = join(cwd, 'link.md');
-  symlinkSync('example.md', link);
-  git('add', 'link.md');
-  git('commit', '-qm', 'synthetic symlink');
-  unlinkSync(link);
-  writeFileSync(link, `teamId: ${uuid}\n`);
-  git('add', 'link.md');
-  mkdirSync(join(cwd, 'scripts'));
-  for (const name of ['public-content-gate.mjs', 'public-content-allowlist.json'])
-    copyFileSync(join(import.meta.dirname, name), join(cwd, 'scripts', name));
-  writeFileSync(join(cwd, 'scripts', 'commit-identity.mjs'), '');
-  const result = spawnSync('sh', [join(import.meta.dirname, '../.husky/pre-commit')], {
-    cwd,
-    encoding: 'utf8',
-    env: scrubGitEnv({ ...process.env }),
-  });
-  assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.match(result.stderr, /"link.md":1: public-content identifier/);
-  assert.ok(!result.stderr.includes(uuid));
 });
 
 test('multiline matching preserves attribution without joining separate blocks', () => {

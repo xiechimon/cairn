@@ -23,6 +23,9 @@ import type {
   FsListResult,
   FsPickResult,
   GithubConnectionStatus,
+  GithubConnectorAvailability,
+  GithubConnectorDevicePoll,
+  GithubConnectorDeviceStart,
   GithubIssueEcho,
   GithubReposResponse,
   ImportSkillBody,
@@ -642,6 +645,14 @@ export const useMcpConnectors = (teamId: string | undefined, enabled: boolean) =
     enabled: enabled && teamId !== undefined,
   });
 
+export const useGithubConnector = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['githubConnector', teamId],
+    queryFn: () =>
+      api.get<GithubConnectorAvailability>(`/api/teams/${teamId}/mcp-connectors/github`),
+    enabled: enabled && teamId !== undefined,
+  });
+
 export const useSkills = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['skills', teamId],
@@ -1012,6 +1023,21 @@ export function useApiMutations(teamId: string | undefined) {
         });
       },
     }),
+    chiefRetryGreeting: useMutation({
+      mutationFn: (input: { threadId: string; stepId: string }) =>
+        api.post<ChiefThread>(
+          `/api/teams/${teamId}/chief/threads/${input.threadId}/retry-greeting/${input.stepId}`,
+          {},
+        ),
+      onSuccess: (thread) => {
+        void qc.cancelQueries({ queryKey: ['chiefThreads', teamId] });
+        qc.setQueryData<ChiefThread[]>(['chiefThreads', teamId], (threads) =>
+          threads?.map((row) => (row.id === thread.id ? thread : row)),
+        );
+        invalidateAll();
+      },
+      onError: invalidateAll,
+    }),
     chiefRewind: useMutation({
       mutationFn: (input: { threadId: string; messageId: string }) =>
         api.post<{ deletedCount: number; thread: ChiefThread }>(
@@ -1145,6 +1171,34 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<{ authorizationUrl: string }>(
           `/api/teams/${teamId}/mcp-connectors/oauth/start`,
           body,
+        ),
+    }),
+    startGithubDevice: useMutation({
+      mutationFn: (connectorId: string | undefined) =>
+        api.post<GithubConnectorDeviceStart>(
+          `/api/teams/${teamId}/mcp-connectors/github/device`,
+          connectorId === undefined ? {} : { connectorId },
+        ),
+    }),
+    pollGithubDevice: useMutation({
+      mutationFn: (attemptId: string) =>
+        api.post<GithubConnectorDevicePoll>(
+          `/api/teams/${teamId}/mcp-connectors/github/device/${attemptId}`,
+          {},
+        ),
+      onSuccess: (result) => {
+        if (result.status === 'complete') invalidateAll();
+      },
+    }),
+    cancelGithubDevice: useMutation({
+      mutationFn: (attemptId: string) =>
+        api.del<void>(`/api/teams/${teamId}/mcp-connectors/github/device/${attemptId}`),
+    }),
+    githubInstallations: useMutation({
+      mutationFn: (connectorId: string) =>
+        api.post<{ installed: boolean }>(
+          `/api/teams/${teamId}/mcp-connectors/${connectorId}/github/installations`,
+          {},
         ),
     }),
     checkMcpConnector: useMutation({

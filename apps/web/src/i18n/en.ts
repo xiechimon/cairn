@@ -257,8 +257,8 @@ export const EN: Record<string, string> = {
   换一个: 'Change',
   'Claude 订阅、API key 或本地模型': 'A Claude subscription, an API key or a local model',
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
-  '订阅已保存。这台电脑还没找到 Claude Code，装好它之后会自动用上。':
-    'Subscription saved. Claude Code was not found on this computer; it will be used once you install it.',
+  '订阅已保存，这台电脑装好 Claude\u00a0Code 后会自动用上。现在先添加一个服务商，Coordinator 就能开始工作。':
+    'Subscription saved. It will be used once Claude Code is installed on this computer. Add a provider now so the Coordinator can start.',
   '因为你登录了 Claude 订阅，Coordinator 直接用它':
     'Because you signed in with a Claude subscription, the Coordinator uses it directly',
   '先跳过，去主页看看': 'skip for now and look around',
@@ -1580,11 +1580,6 @@ export const EN: Record<string, string> = {
   已建成线程: 'Made into a thread',
   已忽略: 'Dismissed',
   '{n} 件等你': '{n## item|# items} waiting on you',
-  今天的日报: "Today's report",
-  '日报没写成，过一会儿再试一次；先看昨天的数字。':
-    "The report couldn't be written; it will try once more shortly. Here are yesterday's numbers.",
-  '日报两次都没写成；下面是昨天的原始数字。':
-    "The report failed twice; here are yesterday's raw numbers.",
   '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}':
     'Done {done} · merged {merged} · failed {failed} · reruns {retries} · quota waits {quota} · reviews passed {pass} / blocked {block}',
   '失败：': 'Failed: ',
@@ -1594,21 +1589,17 @@ export const EN: Record<string, string> = {
   没有等你的事: 'Nothing is waiting on you',
   复盘: 'Retro',
   复盘建议: 'Retro suggestions',
-  日报: 'Daily report',
+  历史日报: 'Historical daily report',
+  '未处理（只读）': 'Unprocessed (read-only)',
+  '历史记录，仅供查看；日报已停用，不再生成或处理建议。':
+    'Historical record, for reference only. Daily reports are retired; reports and suggestion decisions are no longer generated or processed.',
   '昨天（{day}）的进展': 'Yesterday ({day})',
-  '今天的日报写好了：昨天没有新进展': "Today's report is ready: nothing new yesterday",
-  '{day} 的日报写好了：{covers} 没有新进展': 'The {day} report is ready: nothing new on {covers}',
-  '{day} 的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
-    'The {day} report is ready: done {done} · merged {merged} · failed {failed}',
-  '今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
-    "Today's report is ready: done {done} · merged {merged} · failed {failed}",
-  '，有 {k} 条建议等你决定': ', {k## suggestion needs|# suggestions need} your decision',
-  '日报没写成，先看昨天的数字：完成 {done} · 合并 {merged} · 失败 {failed}':
-    "The report couldn't be written. Yesterday's numbers: done {done} · merged {merged} · failed {failed}",
+  '{day} 的历史日报：完成 {done} · 合并 {merged} · 失败 {failed}':
+    'Historical report for {day}: done {done} · merged {merged} · failed {failed}',
+  '{day} 的历史日报未完成：完成 {done} · 合并 {merged} · 失败 {failed}':
+    'Unfinished historical report for {day}: done {done} · merged {merged} · failed {failed}',
   '写日报时有 {n} 件等你，现在的情况看任务面板。':
     '{n## item was|# items were} waiting on you when the report was written; the Tasks panel shows the current state.',
-  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 1 条不用了」。':
-    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #1".',
   '来源：': 'Source: ',
   昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
   '这些来源太长，只读了后面的部分：{sources}。':
@@ -1694,7 +1685,7 @@ export const EN: Record<string, string> = {
   新任务默认用: 'New tasks start on',
   '你对话的协调者，派活和汇报': 'The coordinator you talk to; it hands out work and reports back',
   新任务用这个模型和思考强度开始: 'New tasks start with this model and thinking level',
-  每日报告和对话摘要: 'Daily reports and conversation summaries',
+  对话摘要: 'Conversation summaries',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
   '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。评审等其他用途的模型，在模型路由的图里能看到。':
     'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See models for review and other uses in the Model routing graph.',
@@ -2237,6 +2228,42 @@ export const EN: Record<string, string> = {
     "Connected by browser sign-in. Deleting removes only the tokens stored here; revoke the grant in {name}'s settings.",
   '换一个{label}': 'Replace {label}',
   '已连接 · {n} 个工具': 'Connected · {n#1 tool|# tools}',
+  代码已过期: 'Code expired',
+  '重新开始拿一个新代码。': 'Start again for a new code.',
+  已取消授权: 'Authorization cancelled',
+  '你在 GitHub 上取消了授权，这次什么都没有保存。':
+    'You cancelled on GitHub, so nothing was saved.',
+  连接失败: 'Connection failed',
+  '授权期间这个连接有了变动，这次授权没有保存，重新开始一次。':
+    'This connection changed while you were authorizing, so nothing was saved. Start again.',
+  'GitHub 没有完成授权，稍后重新开始一次。':
+    'GitHub did not finish authorizing. Start again in a moment.',
+  '没能开始连接 GitHub': 'Could not start connecting GitHub',
+  '这台服务器还没有设置 GitHub 登录，改用令牌连接。':
+    'GitHub sign-in is not set up on this server. Connect with a token instead.',
+  'GitHub 连接的名字都被占用了，先删掉一个旧的连接。':
+    'Every GitHub connection name is taken. Delete an old connection first.',
+  '暂时连不上 GitHub，稍后再试。': 'Cannot reach GitHub right now. Try again in a moment.',
+  '重新连接 GitHub': 'Reconnect GitHub',
+  '连接 GitHub': 'Connect GitHub',
+  '在 GitHub 上授权 Cairn': 'Authorize Cairn on GitHub',
+  '正在向 GitHub 要一个授权代码…': 'Getting a code from GitHub…',
+  '打开 GitHub': 'Open GitHub',
+  '打开 GitHub，输入下面的代码，然后点授权。': 'Open GitHub, enter the code below, then authorize.',
+  授权后自动继续: 'Continues once you authorize',
+  重新开始: 'Start again',
+  '选择 Cairn 能用的仓库': 'Choose the repositories Cairn can use',
+  仍然完成: 'Finish anyway',
+  '在 GitHub 上选好 Agent 能读写的仓库，以后也能改。':
+    'On GitHub, pick the repositories agents can read and write. You can change this later.',
+  '还没有选择仓库；组织仓库可能要等组织管理员批准。':
+    'No repositories chosen yet; organization repositories may need an admin to approve.',
+  'GitHub 拒绝了访问。组织可能要求先做 SSO 授权，或等管理员批准 Cairn 应用。':
+    'GitHub refused access. The organization may require SSO authorization or admin approval of the Cairn app.',
+  '删除只移除 Cairn 里的连接。': 'Deleting removes only this connection in Cairn.',
+  'Cairn 发 PR 也靠这份授权，别去 GitHub 撤销。':
+    'Cairn also opens PRs with this grant, so do not revoke it on GitHub.',
+  '已连接 · @{login} · {n} 个工具': 'Connected · @{login} · {n#1 tool|# tools}',
   需要重新授权: 'Needs sign-in',
   连不上: 'Unreachable',
   还没检查: 'Not checked yet',

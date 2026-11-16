@@ -25,8 +25,8 @@
   "batches": [
     {
       "id": "B2",
-      "title": "What reaches ian: needs-you, questions, daily report, push",
-      "scope": "The attention surfaces of the phase 1 graduation criteria: the needs-you tray, question cards and their lifecycle, the 08:00 report and retro proposals, and phone push. Research Ikaga, Duet, Codex CLI and t3code first; design the tray and card states and the delivery and dedupe rules."
+      "title": "What reaches the user: needs-you, questions, push",
+      "scope": "The attention surfaces of the phase 1 graduation criteria: the needs-you tray, question cards and their lifecycle, and phone push. Research Ikaga, Duet, Codex CLI and t3code first; design the tray and card states and the delivery and dedupe rules."
     },
     {
       "id": "B3",
@@ -84,7 +84,7 @@
       "id": "coordinator-chat",
       "name": "Coordinator chat",
       "summary": "The one never-ending Coordinator conversation on the home page, where the user dispatches work and reads reports.",
-      "states": "Empty home with starters, streaming reply with a stop control, finished reply with an action row and, when the Coordinator offered them, quick-reply chips above the composer, and a connection-lost banner when the stream drops.",
+      "states": "Empty home with starters, streaming reply with a stop control, finished reply with an action row and, when the Coordinator offered them, quick-reply chips above the composer, and a connection-lost banner when the stream drops. A failed initial project greeting offers explicit retry with a reason, without inventing an owner message; pending, running, stale and ineligible retries are refused.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -108,6 +108,7 @@
           "/api/teams/:id/chief/threads",
           "/api/teams/:id/chief/channels/:projectId",
           "/api/teams/:id/chief/threads/:tid/messages/:mid",
+          "/api/teams/:id/chief/threads/:tid/retry-greeting/:stepId",
           "/api/teams/:id/chief/threads/:tid/rewind",
           "/api/teams/:id/chief/threads/:tid/stop",
           "/api/teams/:id/coordinator**"
@@ -136,11 +137,14 @@
       "backendDesign": [
         "docs/research/coordinator-in-server.md",
         "docs/spec/26-pi-session-runtime-and-trust-surface.md",
+        "docs/design/coordinator-project-channels.md",
         "docs/design/coordinator-quick-replies.md"
       ],
       "evidence": [
         "apps/web/e2e/chief-home-chat.spec.ts",
         "apps/web/e2e/chief-home-c.spec.ts",
+        "apps/web/e2e/chief-greeting-retry.spec.ts",
+        "apps/server/test/coordinator-project-channels.test.ts",
         "apps/server/test/coordinator-turns.test.ts",
         "apps/server/test/coordinator/turn.test.ts"
       ]
@@ -411,9 +415,9 @@
     },
     {
       "id": "daily-report",
-      "name": "Daily report and retro",
-      "summary": "The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.",
-      "states": "A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro suggestions and each one's state. Historical intake suggestions are hidden and cannot create tasks.",
+      "name": "Read-only report history",
+      "summary": "Existing report messages remain readable; daily generation, retries, push and suggestion decisions are retired.",
+      "states": "Historical posted and unfinished reports, read-only draft suggestions and links to already-created tasks. No new report for new users. Historical intake suggestions remain hidden.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -422,14 +426,7 @@
           "apps/web/src/chief/research-report.tsx"
         ],
         "server": [
-          "apps/server/src/services/chief-report.ts",
-          "apps/server/src/services/chief-digest.ts",
-          "apps/server/src/services/chief-router-tools.ts"
-        ]
-      },
-      "routes": {
-        "server": [
-          "/api/teams/:id/chief/retro-proposals/:pid/:decision"
+          "apps/server/drizzle/0173_retire_daily_reports.sql"
         ]
       },
       "reach": [
@@ -443,13 +440,11 @@
         "apps/web/DESIGN-RULES.md"
       ],
       "backendDesign": {
-        "gap": "no design for report content, timing, quiet rules and retro proposal storage"
+        "gap": "Retired: historical tables and records are retained; only active report-linked steps are stopped."
       },
       "evidence": [
         "apps/web/e2e/chief-daily-report.spec.ts",
-        "apps/server/test/chief-report.test.ts",
-        "apps/server/test/chief-digest.test.ts",
-        "apps/server/test/chief-router-tools.test.ts"
+        "apps/server/test/daily-report-retirement.test.ts"
       ],
       "batch": "B2"
     },
@@ -2062,7 +2057,8 @@
           "apps/web/src/resources/mcp-servers-page.tsx"
         ],
         "server": [
-          "apps/server/src/services/mcp-servers.ts"
+          "apps/server/src/services/mcp-servers.ts",
+          "apps/server/src/services/mcp-github-connector.ts"
         ]
       },
       "routes": {
@@ -2075,7 +2071,11 @@
           "/api/teams/:id/mcp-connectors",
           "/api/teams/:id/mcp-connectors/:cid",
           "/api/teams/:id/mcp-connectors/:cid/check",
-          "/api/teams/:id/mcp-connectors/oauth/start"
+          "/api/teams/:id/mcp-connectors/oauth/start",
+          "/api/teams/:id/mcp-connectors/github",
+          "/api/teams/:id/mcp-connectors/github/device",
+          "/api/teams/:id/mcp-connectors/github/device/:attempt",
+          "/api/teams/:id/mcp-connectors/:cid/github/installations"
         ]
       },
       "reach": [

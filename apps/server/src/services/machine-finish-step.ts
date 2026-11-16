@@ -77,6 +77,7 @@ import {
 } from './machine-deps.js';
 import {
   applyMergeLanding,
+  applySpaceLanding,
   MERGE_LANDING_SKIPPED,
   MERGE_NOT_LANDED_NOTE,
   mergeCardLeftReview,
@@ -331,6 +332,12 @@ async function finishStepReport(
     if (landing === MERGE_LANDING_SKIPPED) landingSkipped = true;
     else landingError = landing;
   }
+  let spaceNote: string | null = null;
+  if (isBuildStepKind(stepRow.kind) && body.status === 'success') {
+    const space = await applySpaceLanding(deps, stepRow, body.commit ?? null);
+    if (space !== null && 'error' in space) landingError = space.error;
+    else if (space !== null) spaceNote = space.note;
+  }
   const report: StepReport = {
     machineId,
     stepId,
@@ -340,6 +347,7 @@ async function finishStepReport(
     priorMerged,
     landingSkipped,
     landingError,
+    spaceNote,
   };
   const grantGeneration = stepRow.claimedAt;
   if (
@@ -364,6 +372,7 @@ interface StepReport {
   priorMerged: { prNumber: number; prUrl: string | null } | null;
   landingSkipped: boolean;
   landingError: string | null;
+  spaceNote: string | null;
 }
 
 function applyStepReport(deps: MachineDeps, report: StepReport): void {
@@ -377,6 +386,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     priorMerged,
     landingSkipped,
     landingError,
+    spaceNote,
   } = report;
   {
     const current = db.select().from(step).where(eq(step.id, stepId)).get();
@@ -398,6 +408,15 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       conversationId: stepRow.buildId,
       role: 'system',
       content: MERGE_NOT_LANDED_NOTE,
+      createdAt: nowMs(),
+    });
+  }
+  if (spaceNote !== null) {
+    upsertMessage(deps, {
+      id: `space-landed-${stepId}`,
+      conversationId: stepRow.buildId,
+      role: 'system',
+      content: spaceNote,
       createdAt: nowMs(),
     });
   }

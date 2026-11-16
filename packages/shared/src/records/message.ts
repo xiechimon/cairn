@@ -113,8 +113,6 @@ export type ChiefDigestContent = z.infer<typeof chiefDigestContentSchema>;
 
 export const CHIEF_REPORT_KIND = 'chief_daily_report';
 export const CHIEF_REPORT_ROW_ID_PREFIX = 'chief-report-';
-export const CHIEF_REPORT_REF_MAX = 8;
-export const CHIEF_REPORT_RETRO_MAX = 5;
 export const INTAKE_SOURCE_KIND = 'intake';
 
 const chiefReportTodoRefSchema = z.object({
@@ -184,14 +182,6 @@ export const chiefReportContentSchema = z.object({
   truncated: z.array(z.string()),
 });
 export type ChiefReportContent = z.infer<typeof chiefReportContentSchema>;
-
-export type ChiefReportSuggestion = { n: number; kind: 'retro'; item: RetroProposal };
-
-export function chiefReportSuggestions(
-  report: Pick<ChiefReportContent, 'retro'>,
-): ChiefReportSuggestion[] {
-  return report.retro.map((item, i) => ({ n: i + 1, kind: 'retro', item }));
-}
 
 export const CHIEF_TURN_STOPPED_KIND = 'chief_turn_stopped';
 export const chiefTurnStoppedContentSchema = z.object({
