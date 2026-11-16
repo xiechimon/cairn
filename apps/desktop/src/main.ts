@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   ACCESS_TOKEN_FILE_NAME,
   DESKTOP_SHELL_USER_AGENT,
+  type DesktopUpdateState,
   ENV_VARS,
   parseAccessTokenFile,
 } from '@cairn/shared';
@@ -21,6 +22,7 @@ import {
   type UtilityProcess,
   utilityProcess,
 } from 'electron';
+import { appMenuTemplate } from './app-menu.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
 import { createUpdater, removeLeftoverUpdates } from './updater.js';
 
@@ -220,7 +222,17 @@ function showTray(origin: string): Tray {
 }
 
 function serveUpdates(origin: string): void {
+  const showMenu = (state: DesktopUpdateState): void =>
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate(
+        appMenuTemplate(state, {
+          check: () => void checkFromMenu(),
+          install: () => void installFromMenu(),
+        }),
+      ),
+    );
   const updater = createUpdater((state) => {
+    showMenu(state);
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send('desktop-update:state', state);
     }
@@ -230,6 +242,48 @@ function serveUpdates(origin: string): void {
     lastCheckedAt = Date.now();
     return updater.check();
   };
+  const installFromMenu = async (): Promise<void> => {
+    const state = updater.state();
+    if (state.status !== 'available') return;
+    const { response } = await dialog.showMessageBox({
+      type: 'question',
+      message: `Cairn ${state.version} is available`,
+      detail: `You have ${app.getVersion()}. Cairn downloads the update and restarts to install it.`,
+      buttons: ['Install and Restart', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response === 0) await updater.install();
+  };
+  const checkFromMenu = async (): Promise<void> => {
+    await check();
+    const state = updater.state();
+    if (state.status === 'available') await installFromMenu();
+    else if (state.status === 'current')
+      await dialog.showMessageBox({
+        type: 'info',
+        message: 'Cairn is up to date',
+        detail: `You have the latest version, ${state.version}.`,
+      });
+    else if (state.status === 'unsupported')
+      await dialog.showMessageBox({
+        type: 'info',
+        message: 'Cairn cannot update itself here',
+        detail:
+          state.blocker === 'not-in-applications'
+            ? 'Move Cairn to the Applications folder, then check again.'
+            : state.blocker === 'read-only'
+              ? 'Cairn is running from a read-only location. Copy it to the Applications folder, then check again.'
+              : 'This is a development build.',
+      });
+    else if (state.status === 'error')
+      await dialog.showMessageBox({
+        type: 'warning',
+        message: 'Cairn could not check for updates',
+        detail: state.message,
+      });
+  };
+  showMenu(updater.state());
   const fromOwnPage = (event: IpcMainInvokeEvent): boolean => event.senderFrame?.origin === origin;
   ipcMain.handle('desktop-update:state', (event) => (fromOwnPage(event) ? updater.state() : null));
   ipcMain.handle('desktop-update:check', (event) => (fromOwnPage(event) ? check() : undefined));
