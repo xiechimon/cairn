@@ -49,7 +49,7 @@ What Claude Code does (`Verified`, research §0a):
 
 Ours mirrors that, model-facing only:
 - **Prompt.** The system prompt and the `update_memory` description tell the model to keep each `MEMORY.md` to short one-line entries, move detail into files, and merge or drop stale lines.
-- **Load bound.** The injection path silently truncates each `MEMORY.md` at the same bound Claude Code uses (200 lines or 25 KB). It appends a note to the model: `（MEMORY.md 后面还有 N 行没有加载；用 memories 读全文，并把细节移到记忆文件）`. This bound is a server constant. It is never shown to the owner and never rejects a write.
+- **Load bound.** The injection path truncates each `MEMORY.md` at 200 lines or 25 KB and adds a model-facing note. During a normal turn, the Coordinator reads omitted content with paged `memories` calls and uses the existing memory tools to merge or remove stale entries and move details into files. This creates no background turn or additional model call. The bound is never shown to the owner and never rejects a write.
 - **Write reminder.** A write that leaves the index past the bound succeeds. Its tool result carries the same reminder, so the model tidies the index on its own.
 
 **Files.** There is no count limit. A full read of a very large file is paged, so the result stays under the 32 KB Coordinator tool-output cap (`COORDINATOR_TOOL_OUTPUT_MAX_BYTES`); `memories` takes an optional `offset`. Nothing caps the size of a file.
@@ -95,7 +95,6 @@ Ours mirrors that, model-facing only:
 | `memories` tool | List and search rows | List, read, search and versions (§2). |
 | Memory-edit side thread | none | Four tools only; per-call atomic writes and receipts, explicit partial success and clarification transitions (§3). |
 | Pre-compaction flush (`memory-flush.ts`) | Saves or updates rows | Ensures the scope index, reads its revision, then appends through `update_memory`; new files use `save_memory`. Conflicts trigger a fresh read before recomputing the append, never blind replay. When the index is long, it writes detail into a file instead, following the prompt. A failure is reported and compaction proceeds. |
-| Weekly consolidation (`memory-consolidation.ts`) | Merges and expires rows by `lastInjectedAt` | Replaced by a tidy pass: when a `MEMORY.md` passes the load bound, the digest asks the Coordinator to move detail into files and drop stale lines. Each tidy mutation uses fresh base revisions; stale work is recomputed, and committed file moves remain recorded if a later call fails. The owner sees nothing. Row merge and expiry are deleted. |
 | Settings `GET …/memories` | Valid team rows | `MEMORY.md` per scope, plus files with name, first line, `updatedAt` and current revision. |
 | Settings Delete | Hard delete of a row | Hard delete of a file and its versions (explicit erasure), with confirmation and required `baseVersion` from that confirmation view. Check before erasure; 400 if missing, 409 if stale, no erasure. Purge after the 90-day retention period compares the observed invalidation revision and cutoff inside its transaction, never purging a restored live version. |
 | Settings Promote | In-place `projectId` change | Deleted; `update_memory` `moveTo`. |
