@@ -21,6 +21,17 @@
 
     const ink = theme === 'light' ? '#e0dfda' : '#222322';
     const page = theme === 'light' ? '#e7e6e1' : '#1b1c1b';
+    if (localStorage.getItem('cairn.firstRunOpen') === '1') {
+      const sheet = theme === 'light' ? '#ecebe6' : '#151615';
+      const line = theme === 'light' ? 'rgb(0 0 0 / 0.1)' : 'rgb(255 255 255 / 0.1)';
+      boot.style.cssText = `position:fixed;inset:0;display:flex;background:${sheet};z-index:0`;
+      if (window.innerWidth >= 1024) {
+        const aside = document.createElement('div');
+        aside.style.cssText = `flex:0 0 40%;max-width:600px;background:${page};border-right:1px solid ${line}`;
+        boot.appendChild(aside);
+      }
+      return;
+    }
     boot.style.cssText = `position:fixed;inset:0;display:grid;grid-template-columns:288px 1fr;background:${page};z-index:0`;
 
     const rail = document.createElement('div');

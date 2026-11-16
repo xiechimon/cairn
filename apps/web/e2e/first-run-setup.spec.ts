@@ -146,6 +146,25 @@ test('a vendor opens its form in place, and Cancel goes back to the list', async
   await expect(picker.locator('[data-preset-id="anthropic"]')).toBeVisible();
 });
 
+test('reloading the setup page never flashes the Coordinator home', async ({ page }) => {
+  await open(page, { ...fresh(), bound: false });
+  await expect(page.getByTestId('first-run-add-provider')).toBeVisible();
+  await page.route('**/api/teams/t1/routing-settings', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.fallback();
+  });
+  await page.addInitScript(() => {
+    const seen = { home: false };
+    Object.assign(window, { __seen: seen });
+    new MutationObserver(() => {
+      if (document.querySelector('[data-route="board"], [data-testid="home-c"]')) seen.home = true;
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.reload();
+  await expect(page.getByTestId('first-run-add-provider')).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __seen: { home: boolean } }).__seen.home)).toBe(false);
+});
+
 test('the welcome side draws the ink spiral as far as the open step', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await open(page, { ...fresh(), bound: false });

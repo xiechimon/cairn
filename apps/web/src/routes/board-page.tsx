@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
   useApiMutations,
@@ -19,7 +19,10 @@ import { BackupBanner } from '../board/backup-banner.js';
 import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
 import { setupShown } from '../board/first-run-checklist-model.js';
 import {
+  FirstRunFrame,
   FirstRunSetup,
+  firstRunRemembered,
+  rememberFirstRun,
   SETUP_PARAM,
   setupSkipped,
   useFirstRunSetup,
@@ -186,22 +189,26 @@ export function BoardPage() {
     );
   const setup = useFirstRunSetup();
   const [skipped, setSkipped] = useState(setupSkipped);
-  const showSetup =
-    live &&
-    homeProjectId === null &&
-    threadId === null &&
-    setupShown({
-      projects: setup.projects,
-      progress: setup.progress,
-      skipped,
-      requested: searchParams.get(SETUP_PARAM) === '1',
-    }) === true;
+  const setupHome = live && homeProjectId === null && threadId === null;
+  const setupDecision = setupShown({
+    projects: setup.projects,
+    progress: setup.progress,
+    skipped,
+    requested: searchParams.get(SETUP_PARAM) === '1',
+  });
+  const showSetup = setupHome && setupDecision === true;
+  useEffect(() => {
+    if (setupHome && setupDecision !== undefined) rememberFirstRun(setupDecision);
+  }, [setupHome, setupDecision]);
   const homeShown =
     !showSetup &&
     chiefView !== 'settings' &&
     projectLookup !== 'loading' &&
     projectLookup !== 'failed' &&
     !(projectLookup === 'unknown' && homeProjectId !== null);
+  if (setupHome && setupDecision === undefined && firstRunRemembered()) {
+    return <FirstRunFrame />;
+  }
   if (showSetup) {
     return (
       <FirstRunSetup

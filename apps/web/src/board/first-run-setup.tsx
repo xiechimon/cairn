@@ -26,7 +26,7 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { AddProviderFlow, type AddProviderView } from '../resources/add-provider-flow.js';
 import { ModelPicker } from '../resources/routing-settings-page.js';
-import { safeSessionStorage } from '../safe-storage.js';
+import { safeLocalStorage, safeSessionStorage } from '../safe-storage.js';
 import {
   coordinatorCanAnswer,
   modelSides,
@@ -43,6 +43,31 @@ const SKIP_KEY = 'cairn.firstRunSetupSkipped';
 
 export function setupSkipped(): boolean {
   return safeSessionStorage()?.getItem(SKIP_KEY) === '1';
+}
+
+export const FIRST_RUN_OPEN_KEY = 'cairn.firstRunOpen';
+
+export function firstRunRemembered(): boolean {
+  return safeLocalStorage()?.getItem(FIRST_RUN_OPEN_KEY) === '1';
+}
+
+export function rememberFirstRun(open: boolean): void {
+  try {
+    if (open) safeLocalStorage()?.setItem(FIRST_RUN_OPEN_KEY, '1');
+    else safeLocalStorage()?.removeItem(FIRST_RUN_OPEN_KEY);
+  } catch {}
+}
+
+export function FirstRunFrame() {
+  return (
+    <main
+      data-testid="first-run-frame"
+      aria-busy="true"
+      className="flex h-full min-h-0 w-full min-w-0 bg-background"
+    >
+      <div className="max-lg:hidden lg:max-w-150 lg:basis-2/5 lg:border-r lg:border-border lg:bg-(--surface-1)" />
+    </main>
+  );
 }
 
 function skipSetup(): void {
