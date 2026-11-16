@@ -12,6 +12,7 @@ interface World {
   local?: { providerId: string; state: string }[];
   existing?: string[];
   created?: { providerId: string; apiKey?: string }[];
+  deleted?: string[];
 }
 
 const MACHINE = { id: 'm1', name: 'mac', online: true, enabledRuntimes: ['pi', 'claude-code'] };
@@ -54,6 +55,12 @@ async function open(page: Page, world: World, path = '/app') {
         world.created = [...(world.created ?? []), body];
         world.bound = true;
         return json({ id: `p-${body.providerId}`, ...body }, 201);
+      }
+      const removed = /^\/api\/teams\/t1\/providers\/([\w-]+)$/.exec(p);
+      if (removed?.[1] !== undefined && route.request().method() === 'DELETE') {
+        world.deleted = [...(world.deleted ?? []), removed[1]];
+        world.bound = (world.created ?? []).some((c) => !world.deleted?.includes(`p-${c.providerId}`));
+        return route.fulfill({ status: 204 });
       }
       if (p === '/api/teams/t1/providers') {
         return json({
@@ -250,6 +257,16 @@ test('skipping goes to the Coordinator home; a team with projects never sees the
   await expect(other.getByTestId('first-run-setup')).toHaveCount(0);
 });
 
+test('after skipping, the home offers a way back to the setup page until it is done', async ({ page }) => {
+  await open(page, fresh());
+  await page.locator('[data-testid="first-run-skip"]:visible').click();
+  const banner = page.getByTestId('first-run-resume');
+  await expect(banner).toContainText('模型还没确认');
+  await banner.getByRole('button', { name: '继续设置' }).click();
+  await expect(page.getByTestId('first-run-setup')).toBeVisible();
+  await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
+});
+
 test('a saved Claude subscription with Claude Code found is the Coordinator pick', async ({ page }) => {
   const world: World = { ...fresh(), bound: false, subscription: true, claudeCodeFound: true };
   await open(page, world);
@@ -285,6 +302,25 @@ test('on the Mac app, Import all adds every ready provider found in Pi and opens
     ['gateway', 'test-key-gateway'],
   ]);
   await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
+});
+
+test('Undo right after Import all removes what it added and goes back to step 1', async ({ page }) => {
+  const world: World = {
+    ...fresh(),
+    bound: false,
+    local: [
+      { providerId: 'relay', state: 'ready' },
+      { providerId: 'gateway', state: 'ready' },
+    ],
+  };
+  await open(page, world);
+  await page.getByTestId('local-provider-import').getByRole('button', { name: '全部导入' }).click();
+  await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
+  const toast = page.locator('[data-sonner-toast]', { hasText: '已导入 2 个服务商' });
+  await toast.getByRole('button', { name: '撤销' }).click();
+  await expect.poll(() => world.deleted).toEqual(['p-relay', 'p-gateway']);
+  await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
+  await expect(page.getByTestId('local-provider-import')).toContainText('在这台 Mac 上找到 2 个服务商');
 });
 
 test('Choose lists what was found; sign-in and already-added providers cannot be picked', async ({ page }) => {

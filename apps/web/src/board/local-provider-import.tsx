@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { Spinner } from '../components/ui/spinner.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 
@@ -65,7 +65,7 @@ export function LocalProviderImportCard({
 }) {
   const { t } = useI18n();
   const rows = useLocalProviders(teamId, live);
-  const { createProvider } = useApiMutations(teamId);
+  const { createProvider, deleteProvider } = useApiMutations(teamId);
   const [choosing, setChoosing] = useState(false);
   const [unchecked, setUnchecked] = useState<ReadonlySet<string>>(new Set());
   const [importing, setImporting] = useState(false);
@@ -81,10 +81,11 @@ export function LocalProviderImportCard({
       const imports = await bridge.read(chosen.map((row) => row.providerId));
       const missing = chosen.length - imports.length;
       if (missing > 0) toastError(t('有 {n} 个服务商已不在这台 Mac 上', { n: missing }), null);
+      const added: string[] = [];
       for (const row of imports) {
         if (row.api === null) continue;
         try {
-          await createProvider.mutateAsync({
+          const created = await createProvider.mutateAsync({
             providerId: row.providerId,
             label: row.label,
             baseUrl: row.baseUrl,
@@ -93,14 +94,32 @@ export function LocalProviderImportCard({
             models: row.models,
             apiKey: row.apiKey,
           });
+          added.push(created.id);
         } catch (error) {
           toastError(t('导入 {name} 失败', { name: row.label }), error);
         }
+      }
+      if (added.length > 0) {
+        toastSuccess(t('已导入 {n} 个服务商', { n: added.length }), {
+          label: t('撤销'),
+          onClick: () => void undoImport(added),
+        });
       }
     } catch (error) {
       toastError(t('读取本机配置失败'), error);
     } finally {
       setImporting(false);
+    }
+  };
+
+  const undoImport = async (ids: readonly string[]) => {
+    for (const id of ids) {
+      try {
+        await deleteProvider.mutateAsync(id);
+      } catch (error) {
+        toastError(t('撤销导入失败，可以在设置的服务商里删除。'), error);
+        return;
+      }
     }
   };
 

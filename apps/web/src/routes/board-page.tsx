@@ -24,6 +24,8 @@ import {
   firstRunRemembered,
   rememberFirstRun,
   SETUP_PARAM,
+  SetupResumeBanner,
+  setupResumeStep,
   setupSkipped,
   useFirstRunSetup,
 } from '../board/first-run-setup.js';
@@ -158,7 +160,28 @@ export function BoardPage() {
   const quotaInfos = quotaBannerInfo(todos);
   const backupWarning = backupQ.data ?? null;
   const loginWarnings = useClaudeLoginWarnings(now);
+  const setup = useFirstRunSetup();
+  const [skipped, setSkipped] = useState(setupSkipped);
+  const resumeStep = live ? setupResumeStep(setup) : null;
   const bannerCandidates: { kind: HomeBannerKind; node: ReactNode }[] = [
+    ...(resumeStep !== null
+      ? [
+          {
+            kind: 'setup' as const,
+            node: (
+              <SetupResumeBanner
+                key="setup"
+                step={resumeStep}
+                onResume={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.set(SETUP_PARAM, '1');
+                  setSearchParams(params);
+                }}
+              />
+            ),
+          },
+        ]
+      : []),
     ...(backupWarning != null
       ? [{ kind: 'backup' as const, node: <BackupBanner key="backup" notice={backupWarning} /> }]
       : []),
@@ -187,8 +210,6 @@ export function BoardPage() {
     picked.length === 0 ? undefined : (
       <div className="flex flex-col gap-2">{picked.map((entry) => entry.node)}</div>
     );
-  const setup = useFirstRunSetup();
-  const [skipped, setSkipped] = useState(setupSkipped);
   const setupHome = live && homeProjectId === null && threadId === null;
   const setupDecision = setupShown({
     projects: setup.projects,

@@ -9,6 +9,7 @@ import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { InkSpiral, type SpiralHang } from '../components/ink-spiral.js';
+import { NoticeBanner } from '../components/notice-banner.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -515,5 +516,30 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
         <SkipLine onSkip={onSkip} className="mt-auto pt-10 lg:hidden" />
       </div>
     </main>
+  );
+}
+
+export function setupResumeStep(setup: Setup): SetupStepId | null {
+  if (setup.projects !== 0 || setup.progress === undefined) return null;
+  return setupOpenStep(setup.progress);
+}
+
+export function SetupResumeBanner({ step, onResume }: { step: SetupStepId; onResume: () => void }) {
+  const { t } = useI18n();
+  const title = step === 'models' ? t('还没接入模型') : t('模型还没确认');
+  return (
+    <NoticeBanner
+      data-testid="first-run-resume"
+      aria-label={title}
+      tone="waiting"
+      icon={KeyRound}
+      title={title}
+      body={t('设置做完，Coordinator 才能开始对话。')}
+      actions={
+        <Button size="sm" className="px-3" onClick={onResume}>
+          {t('继续设置')}
+        </Button>
+      }
+    />
   );
 }

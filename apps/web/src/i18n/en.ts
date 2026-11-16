@@ -253,6 +253,14 @@ export const EN: Record<string, string> = {
   已添加: 'Already added',
   '有 {n} 个服务商已不在这台 Mac 上': '{n} {n#provider is|providers are} no longer on this Mac',
   '导入 {name} 失败': 'Could not import {name}',
+  '已导入 {n} 个服务商': 'Imported {n} {n#provider|providers}',
+  还没接入模型: 'No models connected yet',
+  模型还没确认: 'Models not confirmed yet',
+  '设置做完，Coordinator 才能开始对话。':
+    'Finish setup so the Coordinator can start talking with you.',
+  继续设置: 'Continue setup',
+  '撤销导入失败，可以在设置的服务商里删除。':
+    'Could not undo the import. Remove the providers in Settings, under Providers.',
   读取本机配置失败: 'Could not read the config on this Mac',
   '导入中…': 'Importing…',
   '导入 {n} 个': 'Import {n}',

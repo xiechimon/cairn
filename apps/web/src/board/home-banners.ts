@@ -1,8 +1,9 @@
-export type HomeBannerKind = 'backup' | 'login' | 'quota' | 'notify';
+export type HomeBannerKind = 'setup' | 'backup' | 'login' | 'quota' | 'notify';
 
 export const HOME_BANNER_LIMIT = 2;
 
 const RANK: Record<HomeBannerKind, number> = {
+  setup: 0,
   backup: 0,
   login: 0,
   quota: 1,
