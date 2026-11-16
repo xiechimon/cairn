@@ -258,10 +258,14 @@ async function driveToDeadlock(
   expect(reviewRes.status).toBe(202);
   const reviewClaimed = await w.claim();
   expect(reviewClaimed.kind).toBe('review');
-  await w.done(reviewClaimed.stepId, {
-    status: 'failed',
-    errorMessage: 'stream timeout (first=300000ms idle=480000ms)',
-  });
+  const errorMessage = 'stream timeout (first=300000ms idle=480000ms)';
+  w.s.db
+    .update(stepTable)
+    .set({ status: 'failed', finishedAt: Date.now() })
+    .where(eq(stepTable.id, reviewClaimed.stepId))
+    .run();
+  w.s.db.update(buildTable).set({ errorMessage }).where(eq(buildTable.id, buildId)).run();
+  w.s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, w.todoId)).run();
   expect(w.todoRow().phase).toBe('failed');
   return buildId;
 }

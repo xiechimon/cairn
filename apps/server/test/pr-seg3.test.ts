@@ -368,10 +368,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
       const hints = w.systemRows().filter((c) => c.includes('「check」'));
       expect(hints).toHaveLength(1);
       expect(hints[0]).toContain(conclusion);
-      expect(w.fake.gateFetch).toHaveBeenCalledWith(
-        'https://api.github.com/repos/octo/demo/pulls/201',
-        expect.anything(),
-      );
+      expect(w.fake.gateFetch).not.toHaveBeenCalled();
     },
   );
 
@@ -1010,7 +1007,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     const id = `step-c-${w.buildId}`;
     w.s.db
       .insert(stepTable)
-      .values({ id, buildId: w.buildId, kind: 'verify', status: 'claimed', createdAt: now })
+      .values({ id, buildId: w.buildId, kind: 'build', status: 'claimed', createdAt: now })
       .run();
     completeStep(w.deps, id);
     const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, id)).get();

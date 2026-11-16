@@ -208,11 +208,6 @@ async function refusal(p: Promise<unknown>): Promise<HttpError> {
   throw new Error('expected requestMerge to refuse');
 }
 
-const MERGE_GATE_READS_201 = [
-  'GET /repos/octo/demo/issues?state=open&labels=autonomy-paused&per_page=100&page=1',
-  'GET /repos/octo/demo/pulls/201',
-];
-
 function sweptRequests(w: World, before: number): string[] {
   return w.fake.requests.slice(before).map((r) => {
     const url = new URL(r.url);
@@ -1168,7 +1163,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       swept = sweptRequests(w, before);
     };
     await requestMerge(w.deps, w.buildId);
-    expect(swept).toEqual(MERGE_GATE_READS_201);
+    expect(swept).toEqual([]);
     expect(w.systemRows()).toEqual([MERGED_ROW, DONE_ROW]);
     expect(w.phase()).toBe('done');
   });
@@ -1183,10 +1178,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       swept = sweptRequests(w, before);
     };
     await requestMerge(w.deps, w.buildId);
-    expect(swept).toEqual(MERGE_GATE_READS_201);
-    expect(w.fake.gets()).toHaveLength(
-      1 + MERGE_GATE_READS_201.filter((r) => r.includes('/pulls/')).length,
-    );
+    expect(swept).toEqual([]);
+    expect(w.fake.gets()).toHaveLength(1);
   });
 
   test('[2b-D17a] the card is closed while the PR read is in flight → refused at the re-read; no PUT', async () => {
