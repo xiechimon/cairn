@@ -1266,20 +1266,25 @@ export const EN: Record<string, string> = {
   进入: 'Continue',
   // W4 #285 浏览器授权页（02 §5.2 路径一；/app/machines/authorize）
   授权执行机: 'Authorize Runner',
-  '生成授权链接，在执行机上完成注册发起。':
-    'Generate an authorization link and start enrollment on the executor Runner.',
-  生成授权链接: 'Generate authorization link',
-  '一台执行机请求加入你的团队。确认后它将以自己的凭据连接。':
-    'An executor Runner is requesting to join your team. Once authorized it connects with its own credentials.',
+  '在要接入的电脑上依次运行这两条命令。终端会给出授权链接，打开它就能确认。':
+    'Run these two commands, in order, on the computer you are adding. The terminal prints an authorization link; open it to confirm.',
+  '连不上服务器，正在重试。请检查网络。': 'Cannot reach the server; retrying. Check the network.',
+  '有一台执行机请求加入你的团队。': 'A Runner is asking to join your team.',
+  '正在连接执行机…': 'Connecting to the Runner…',
+  '← 返回执行机': '← Back to Runners',
+  '授权没成功，请再试一次。还不行就在执行机上重新运行 `cairn start`。':
+    'Authorization failed. Try again; if it still fails, run `cairn start` on the Runner again.',
   确认授权: 'Authorize',
   '正在授权…': 'Authorizing…',
-  '授权完成，执行机已注册。': 'Authorized — the Runner is registered.',
-  '授权完成，{name} 已注册为执行机。': 'Authorized — {name} is registered as a Runner.',
+  '授权完成，执行机已注册。终端那边会自己连上，这一页可以关掉。':
+    'Authorized — the Runner is registered. The terminal connects by itself; you can close this page.',
+  '授权完成，{name} 已注册为执行机。终端那边会自己连上，这一页可以关掉。':
+    'Authorized — {name} is registered as a Runner. The terminal connects by itself; you can close this page.',
   机器名: 'Machine name',
-  '这个名字由发起方自报。只有你刚在这台机器上运行了 `cairn start`，且终端里显示的名字与这里一致，才确认授权。':
-    'The requester reports this name itself. Confirm only if you just ran `cairn start` on this machine and its terminal shows the same name.',
-  '授权链接已失效，请在执行机上重新发起。':
-    'This authorization link has expired — restart enrollment on the executor Runner.',
+  '名字是那台电脑自己报的。和终端里显示的一样才确认。':
+    'That computer reports this name itself. Confirm only if its terminal shows the same name.',
+  '授权链接过期了。在执行机上重新运行 `cairn start` 拿新链接。':
+    'This authorization link has expired. Run `cairn start` on the Runner again for a new one.',
   '浏览器授权注册 →': 'Browser authorization →',
   // W2 #318 桩群校准：新建任务未保存闸（r9 §3.4）。#310 附件：dirty 位由
   // spec 非空承载（附件 token 注入后归 spec）,标签 add 仍为桩（本票不动）。
