@@ -104,7 +104,7 @@ for (const [name, paths, expected] of [
   ['sidecar sources', ['apps/tsnet-sidecar/main.go', 'apps/tsnet-sidecar/go.sum'], true],
   ['the workflow that builds it', ['.github/workflows/ci.yml'], true],
   ['server code that starts it', ['apps/server/src/services/tsnet-remote.ts'], false],
-  ['other workflows and documents', ['.github/workflows/release.yml', 'README.md'], false],
+  ['other workflows and documents', ['.github/workflows/site-deploy.yml', 'README.md'], false],
   ['empty changes', [], false],
 ]) {
   test(`hasSidecar classifies ${name}`, () => {

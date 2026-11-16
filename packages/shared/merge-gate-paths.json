@@ -95,7 +95,6 @@
       "scripts/ops/restore-drill.sh"
     ],
     "releaseAndControlPlane": [
-      ".github/workflows/release.yml",
       "**/package.json",
       "scripts/ops/**"
     ]
