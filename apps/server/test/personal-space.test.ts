@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import type { ProjectRecord } from '@cairn/shared';
@@ -6,7 +6,7 @@ import { serve } from '@hono/node-server';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { project, step } from '../src/db/schema.js';
+import { project, step, user } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { issueStepGitCredential } from '../src/services/credentials.js';
@@ -70,6 +70,34 @@ async function git(args: string[], cwd: string) {
   return runGit(args, { cwd, env: GIT_ENV, timeoutMs: 60_000 });
 }
 
+function chiefTool(name: string, params: Record<string, unknown>): Promise<string> {
+  return executeChiefTool(
+    {
+      db: s.db,
+      hub: s.hub,
+      box: s.secretBox,
+      user: s.user,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+      skillsDir: s.skillsDir,
+    },
+    {
+      teamId: s.team.id,
+      userId: s.user.id,
+      chiefId: 'chief-probe',
+      threadId: 'thread-probe',
+      chiefAgentId: null,
+      conversationId: 'thread-probe',
+    },
+    name,
+    params,
+  );
+}
+
+function statusOf(error: unknown): number {
+  return (error as { status?: number }).status ?? -1;
+}
+
 function claimedStepKey(projectId: string): string {
   const machineId = insertMachine(s);
   const stepId = queueConnectorStep(s, projectId, machineId);
@@ -102,27 +130,7 @@ describe('personal space row and repository (docs/design/personal-space.md S1)',
     const space = await ensurePersonalSpace(repoCtx(), s.team.id, s.user.id);
     const listed = (await (await req(s.app, 'GET', '/api/projects')).json()) as ProjectRecord[];
     expect(listed.map((p) => p.id)).not.toContain(space.id);
-    const tool = await executeChiefTool(
-      {
-        db: s.db,
-        hub: s.hub,
-        box: s.secretBox,
-        user: s.user,
-        reposDir: s.reposDir,
-        attachmentsDir: s.attachmentsDir,
-        skillsDir: s.skillsDir,
-      },
-      {
-        teamId: s.team.id,
-        userId: s.user.id,
-        chiefId: 'chief-probe',
-        threadId: 'thread-probe',
-        chiefAgentId: null,
-        conversationId: 'thread-probe',
-      },
-      'projects',
-      {},
-    );
+    const tool = await chiefTool('projects', {});
     expect(tool).not.toContain(space.id);
     for (const q of [PERSONAL_SPACE_NAME, `project:${PERSONAL_SPACE_NAME}`]) {
       const found = await req(s.app, 'GET', `/api/search?q=${encodeURIComponent(q)}`);
@@ -141,6 +149,35 @@ describe('personal space row and repository (docs/design/personal-space.md S1)',
     ).toBe(404);
     const row = s.db.select().from(project).where(eq(project.id, space.id)).get()!;
     expect(row.archivedAt).toBeNull();
+  });
+
+  test('Coordinator tools that take a project id treat a space as missing', async () => {
+    const space = await ensurePersonalSpace(repoCtx(), s.team.id, s.user.id);
+    for (const [name, params] of [
+      ['docs', { projectId: space.id }],
+      ['update_project', { projectId: space.id, name: 'mine' }],
+      ['connect_repo', { projectId: space.id, githubRepo: 'o/r' }],
+    ] as const) {
+      expect(statusOf(await chiefTool(name, params).catch((e: unknown) => e))).toBe(404);
+    }
+    const row = s.db.select().from(project).where(eq(project.id, space.id)).get()!;
+    expect(row).toMatchObject({ name: PERSONAL_SPACE_NAME, githubRepo: null });
+  });
+
+  test('a leftover repository directory is never reused for a new space', async () => {
+    const other = 'leftover-user';
+    const dir = repoDirFor(s.reposDir, s.team.id, `space-${other}`);
+    const unknown = await ensurePersonalSpace(repoCtx(), s.team.id, 'no-such-user').catch(
+      (e: unknown) => e,
+    );
+    expect(unknown).toBeInstanceOf(Error);
+    expect(existsSync(repoDirFor(s.reposDir, s.team.id, 'space-no-such-user'))).toBe(false);
+    s.db.insert(user).values({ id: other, displayName: 'Leftover' }).run();
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'marker'), 'x');
+    const space = await ensurePersonalSpace(repoCtx(), s.team.id, other).catch((e: unknown) => e);
+    expect(space).toMatchObject({ repoName: `space-${other}-2` });
+    expect(existsSync(join(dir, 'marker'))).toBe(true);
   });
 });
 
@@ -176,5 +213,9 @@ describe('space git access (P4)', () => {
     expect(toMain.code).not.toBe(0);
     expect(toMain.stderr.toString()).toContain('hidden ref');
     expect((await git(['push', 'origin', 'HEAD:refs/heads/task-1'], clone)).code).toBe(0);
+    const main = (await git(['rev-parse', 'origin/main'], clone)).stdout.toString().trim();
+    const replace = await git(['push', 'origin', `HEAD:refs/replace/${main}`], clone);
+    expect(replace.code).not.toBe(0);
+    expect(replace.stderr.toString()).toContain('hidden ref');
   });
 });

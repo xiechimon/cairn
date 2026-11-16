@@ -567,7 +567,7 @@ function pickedProjectOf(
     db
       .select({ id: project.id, name: project.name })
       .from(project)
-      .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+      .where(and(eq(project.id, projectId), listedProjects(teamId)))
       .get() ?? null
   );
 }

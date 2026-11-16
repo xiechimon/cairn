@@ -203,13 +203,15 @@ export const systemGitOps: GitOps = {
     if (r.code !== 0) throw new Error(`git update-ref failed: ${r.stderr}`);
   },
 
-  async denyPushTo(dir, branch) {
-    if (!/^[\w./-]+$/.test(branch)) throw new Error(`unsafe branch: ${branch}`);
-    const r = await runGit(['config', 'receive.hideRefs', `refs/heads/${branch}`], {
-      cwd: dir,
-      timeoutMs: META_TIMEOUT_MS,
-    });
-    if (r.code !== 0) throw new Error(`git config receive.hideRefs failed: ${r.stderr}`);
+  async denyPushes(dir, refPrefixes) {
+    for (const prefix of refPrefixes) {
+      if (!/^refs\/[\w./-]+$/.test(prefix)) throw new Error(`unsafe ref prefix: ${prefix}`);
+      const r = await runGit(['config', '--add', 'receive.hideRefs', prefix], {
+        cwd: dir,
+        timeoutMs: META_TIMEOUT_MS,
+      });
+      if (r.code !== 0) throw new Error(`git config receive.hideRefs failed: ${r.stderr}`);
+    }
   },
 
   async resolveCommit(dir, ref) {

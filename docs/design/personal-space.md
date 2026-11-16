@@ -74,6 +74,6 @@ One per row P1 to P11, including: a user A channel creating into B's space retur
 
 1. S1: `personalOwnerId` migration, first-use creation, list filters, P4.
 2. S2: `direct` landing, P3, P6, history (security surface: `machine-merge-landing.ts`).
-3. S3: Coordinator routing rules, P5, P9, and no project instructions in a space task's prompt.
+3. S3: Coordinator routing rules, P5, P9, and no project instructions in a space task's prompt. Before S3 lets any path create a space task, task and build reads (search, `todos`, `threads`, MCP `todos` and `search_threads`, `/api/todos`, `/api/builds/:id/*`) must hide space tasks from everyone but the owner; S1 refuses every creation path, so nothing reaches them yet.
 4. S4: Results panel grouping, search and archive (P7, P8), preview history and restore.
 5. E: the newcomer walk-through and its e2e.

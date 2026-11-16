@@ -26,6 +26,7 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
 import { parseChiefTrigger } from './chief.js';
 import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
+import { listedProjects } from './personal-space.js';
 import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
 
@@ -84,7 +85,7 @@ function quickLaneBasis(
   const target = db
     .select()
     .from(project)
-    .where(and(eq(project.id, projectId), eq(project.teamId, ctx.teamId)))
+    .where(and(eq(project.id, projectId), listedProjects(ctx.teamId)))
     .get();
   if (target === undefined) throw new HttpError(404, `project ${projectId}`);
   const turn = new Set(ctx.turnMessageIds ?? []);

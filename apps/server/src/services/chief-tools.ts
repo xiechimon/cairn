@@ -175,7 +175,7 @@ function requireProjectRow(db: Db, projectId: string, teamId: string) {
   const row = db
     .select()
     .from(project)
-    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+    .where(and(eq(project.id, projectId), listedProjects(teamId)))
     .get();
   if (!row) throw new HttpError(404, `project ${projectId}`);
   return row;

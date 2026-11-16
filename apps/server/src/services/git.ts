@@ -66,8 +66,10 @@ export async function uniqueRepoName(ctx: RepoCtx, teamId: string, base: string)
     .all()) {
     existing.add(row.repoName);
   }
+  const taken = (name: string) =>
+    existing.has(name) || existsSync(repoDirFor(ctx.reposDir, teamId, name));
   let candidate = base;
-  for (let i = 2; existing.has(candidate); i++) {
+  for (let i = 2; taken(candidate); i++) {
     candidate = `${base}-${i}`;
   }
   return candidate;
@@ -84,6 +86,14 @@ export async function provisionHostedRepo(
 ): Promise<string> {
   const dir = repoDirFor(ctx.reposDir, teamId, repoName);
   mkdirSync(join(ctx.reposDir, teamId), { recursive: true });
+  try {
+    mkdirSync(dir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw new HttpError(409, `repository ${repoName} already exists; try again`, 'repo-exists');
+    }
+    throw error;
+  }
   await systemGitOps.initBareRepo(dir);
   await systemGitOps.seedInitialCommit(dir, `init ${repoName}`);
   return dir;

@@ -4,7 +4,13 @@ import { apiKey, build, project, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { DEFAULT_HEAD_BRANCH, systemGitOps } from '../lib/git.js';
 import { stepIdOfGitKey } from './credentials.js';
-import { provisionHostedRepo, type RepoCtx, slugifyRepoName, uniqueRepoName } from './git.js';
+import {
+  provisionHostedRepo,
+  type RepoCtx,
+  removeHostedRepoDir,
+  slugifyRepoName,
+  uniqueRepoName,
+} from './git.js';
 
 type ProjectRow = typeof project.$inferSelect;
 
@@ -21,6 +27,8 @@ export function isPersonalSpace(row: Pick<ProjectRow, 'personalOwnerId'>): boole
 export function listedProjects(teamId: string) {
   return and(eq(project.teamId, teamId), isNull(project.personalOwnerId));
 }
+
+const SPACE_PUSH_DENIED_REFS = [`refs/heads/${DEFAULT_HEAD_BRANCH}`, 'refs/replace'];
 
 const creating = new Map<string, Promise<ProjectRow>>();
 
@@ -47,20 +55,25 @@ async function createPersonalSpace(
   if (existing !== undefined) return checkedSpace(existing, teamId, userId);
   const repoName = await uniqueRepoName(ctx, teamId, `space-${slugifyRepoName(userId)}`);
   const dir = await provisionHostedRepo(ctx, teamId, repoName);
-  await systemGitOps.denyPushTo(dir, DEFAULT_HEAD_BRANCH);
-  ctx.db
-    .insert(project)
-    .values({
-      id,
-      name: PERSONAL_SPACE_NAME,
-      teamId,
-      repoKind: 'hosted',
-      repoName,
-      personalOwnerId: userId,
-    })
-    .onConflictDoNothing({ target: project.id })
-    .run();
-  const row = ctx.db.select().from(project).where(eq(project.id, id)).get();
+  let row: ProjectRow | undefined;
+  try {
+    await systemGitOps.denyPushes(dir, SPACE_PUSH_DENIED_REFS);
+    ctx.db
+      .insert(project)
+      .values({
+        id,
+        name: PERSONAL_SPACE_NAME,
+        teamId,
+        repoKind: 'hosted',
+        repoName,
+        personalOwnerId: userId,
+      })
+      .onConflictDoNothing({ target: project.id })
+      .run();
+    row = ctx.db.select().from(project).where(eq(project.id, id)).get();
+  } finally {
+    if (row?.repoName !== repoName) removeHostedRepoDir(ctx.reposDir, teamId, repoName);
+  }
   if (row === undefined) throw new Error(`personal space ${id} missing after insert`);
   return checkedSpace(row, teamId, userId);
 }
