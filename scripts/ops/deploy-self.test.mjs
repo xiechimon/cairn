@@ -1009,6 +1009,29 @@ test('watch deploys the newest green main commit and skips a SHA that already fa
   assert.match(skipped.stderr, /already failed/);
 });
 
+test('watch never deploys a green first-parent commit that does not contain the deployed one', () => {
+  const f = fixture();
+  const deployed = pushTarget(f, 'deployed');
+  git(f.work, 'checkout', '-q', '-b', 'side', f.previous);
+  const side = commit(f.work, 'side');
+  git(f.work, 'merge', '-q', '--no-edit', '-X', 'theirs', 'main');
+  const merge = git(f.work, 'rev-parse', 'HEAD');
+  git(f.work, 'checkout', '-q', 'main');
+  git(f.work, 'merge', '-q', '--ff-only', 'side');
+  git(f.work, 'push', '-q', 'origin', 'main');
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', '--detach', deployed);
+  writeFileSync(
+    join(f.fake, `checks-${merge}`),
+    'check\tfailure\npack-smoke\tsuccess\ne2e-gate\tsuccess\n',
+  );
+  const result = f.run(WATCH, [], { CAIRN_DEPLOY_SCRIPT: DEPLOY });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), deployed);
+  assert.match(result.stderr, new RegExp(`skip ${side}: it does not contain the deployed`));
+  assert.equal(f.log('systemctl.log'), '');
+});
+
 test('watch skips a newest main commit whose ci run was cancelled and deploys the newest green one', () => {
   const f = fixture();
   const green = pushTarget(f, 'green');
