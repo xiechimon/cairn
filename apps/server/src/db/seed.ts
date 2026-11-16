@@ -1,3 +1,4 @@
+import { userInfo } from 'node:os';
 import type { AutonomyPauseEntry, TeamRecord, UserRecord } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -9,17 +10,32 @@ export interface SeedResult {
   team: TeamRecord;
 }
 
+function defaultOwnerName(): string {
+  try {
+    return userInfo().username.trim() || 'Owner';
+  } catch {
+    return 'Owner';
+  }
+}
+
 export function seed(db: Db): SeedResult {
   const existingTeam = db.select().from(team).all()[0];
   const existingUser = db.select().from(user).all()[0];
   if (existingTeam && existingUser) {
+    if (existingUser.displayName === 'Owner') {
+      existingUser.displayName = defaultOwnerName();
+      db.update(user)
+        .set({ displayName: existingUser.displayName })
+        .where(eq(user.id, existingUser.id))
+        .run();
+    }
     return { user: toUserRecord(existingUser), team: toTeamRecord(existingTeam) };
   }
 
   const userId = newRecordId();
   const teamId = newRecordId();
   const createdAt = nowMs();
-  const displayName = 'Owner';
+  const displayName = defaultOwnerName();
   db.insert(user).values({ id: userId, displayName, avatarUrl: null }).run();
   db.insert(team)
     .values({
