@@ -7,8 +7,10 @@ import type {
 } from '@cairn/shared';
 import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
+import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
 import { build, chiefThread, machine, step, todo } from '../db/schema.js';
 import { githubAppTokenExpiry, isAppToken } from '../lib/github-token.js';
+import { materializeCodexAccessToken } from './codex-device-login.js';
 import type { StepCredentialBundle } from './credentials.js';
 import {
   issueStepGitCredential,
@@ -221,16 +223,16 @@ async function dispatchProvider(
   if (!bundleProvider || bundleProvider.apiKey === null || teamId === undefined) {
     return toProviderConfig(bundleProvider, agentProviderId);
   }
-  const apiKey = await materializeXaiAccessToken(
-    {
-      db: deps.db,
-      box: deps.box,
-      fetch: deps.oauthFetch ?? globalThis.fetch,
-      states: new Map(),
-    },
-    teamId,
-    bundleProvider.providerId,
-  );
+  const loginDeps = {
+    db: deps.db,
+    box: deps.box,
+    fetch: deps.oauthFetch ?? globalThis.fetch,
+    states: new Map(),
+  };
+  const apiKey =
+    bundleProvider.providerId === CODEX_PROVIDER_ID
+      ? await materializeCodexAccessToken(loginDeps, teamId)
+      : await materializeXaiAccessToken(loginDeps, teamId, bundleProvider.providerId);
   return toProviderConfig({ ...bundleProvider, apiKey }, agentProviderId);
 }
 

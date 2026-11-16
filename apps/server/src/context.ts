@@ -7,6 +7,7 @@ import type { FetchLike } from './lib/github.js';
 import type { LoopbackOwner } from './lib/loopback-owner.js';
 import type { KeySecretBox } from './lib/secret-box.js';
 import type { SidecarStatus } from './lib/tsnet-sidecar.js';
+import type { CodexDeviceState } from './services/codex-device-login.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import type { PendingUpload } from './services/machine-uploads.js';
 import type { MachineWakeHub } from './services/machine-wake-hub.js';
@@ -62,6 +63,7 @@ export interface AppContext {
   githubFetch?: FetchLike;
   oauthStates: Map<string, OAuthStateEntry>;
   xaiDeviceStates: Map<string, XaiDeviceState>;
+  codexDeviceStates: Map<string, CodexDeviceState>;
   oauthFetch?: FetchLike;
   providerTestFetch?: typeof fetch;
   providerTestTimeoutMs?: number;

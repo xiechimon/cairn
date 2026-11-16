@@ -59,7 +59,7 @@ export interface ServerRuntimeConfig {
 export interface ProviderBinding {
   config: ProviderConfig;
   modelId: string;
-  resolveKey(): string | null;
+  resolveKey(): string | null | Promise<string | null>;
 }
 
 export interface ServerTurn {

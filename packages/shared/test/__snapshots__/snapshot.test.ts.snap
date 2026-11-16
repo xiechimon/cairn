@@ -10001,6 +10001,16 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/teams/{id}/providers/oauth/xai/device/poll",
   },
   {
+    "method": "POST",
+    "note": "ChatGPT Codex device-code start; device_auth_id stays on the server",
+    "path": "/api/teams/{id}/providers/oauth/openai-codex/device",
+  },
+  {
+    "method": "POST",
+    "note": "ChatGPT Codex device-code poll; stores the sealed OAuth secret as the openai-codex provider",
+    "path": "/api/teams/{id}/providers/oauth/openai-codex/device/poll",
+  },
+  {
     "method": "GET",
     "note": "#231 [设计]：收码 → token 密封落 provider 行（02 §8）→ 302 回 providers 页",
     "path": "/api/oauth/callback",
