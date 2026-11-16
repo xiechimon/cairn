@@ -104,3 +104,65 @@ test('GitHub attribution migration adds nullable identity fields without changin
     sqlite.close();
   }
 });
+
+test('device-grant migration preserves historical credentials and nullable provenance across restart', () => {
+  const journal = readJournal();
+  const cut = journal.entries.findIndex((item) =>
+    item.tag.endsWith('_github_connection_device_grant'),
+  );
+  expect(cut).toBeGreaterThan(0);
+  const prior = makeTestTempDir('cairn-migrations-pre-device-grant-');
+  temps.push(prior);
+  mkdirSync(join(prior, 'meta'));
+  for (const item of journal.entries.slice(0, cut)) {
+    cpSync(join(MIGRATIONS_FOLDER, `${item.tag}.sql`), join(prior, `${item.tag}.sql`));
+  }
+  writeFileSync(
+    join(prior, 'meta', '_journal.json'),
+    JSON.stringify({
+      ...journal,
+      entries: journal.entries.slice(0, cut),
+    }),
+  );
+  const path = join(prior, 'connection.sqlite');
+  let sqlite = new Database(path);
+  try {
+    migrate(drizzle(sqlite), { migrationsFolder: prior });
+    sqlite.prepare("INSERT INTO team (id,name,createdAt) VALUES ('t','team',1)").run();
+    sqlite
+      .prepare(`INSERT INTO github_connection
+      (teamId,login,accessTokenCipher,refreshTokenCipher,accessTokenExpiresAt,scope,createdAt,githubUserId)
+      VALUES ('t','legacy','sealed-access','sealed-refresh',1234,'repo',1,42)`)
+      .run();
+    const before = sqlite.prepare('SELECT * FROM github_connection').get();
+    migrate(drizzle(sqlite), { migrationsFolder: MIGRATIONS_FOLDER });
+    sqlite.close();
+    sqlite = new Database(path);
+    migrate(drizzle(sqlite), { migrationsFolder: MIGRATIONS_FOLDER });
+    expect(sqlite.prepare('SELECT * FROM github_connection').get()).toEqual({
+      ...(before as Record<string, unknown>),
+      refreshTokenExpiresAt: null,
+      appClientId: null,
+      connectionGeneration: null,
+      refreshLeaseUntil: null,
+    });
+    const info = sqlite.prepare('PRAGMA table_info(github_connection)').all() as {
+      name: string;
+      notnull: number;
+      dflt_value: unknown;
+    }[];
+    for (const name of [
+      'refreshTokenExpiresAt',
+      'appClientId',
+      'connectionGeneration',
+      'refreshLeaseUntil',
+    ]) {
+      expect(info.find((column) => column.name === name)).toMatchObject({
+        notnull: 0,
+        dflt_value: null,
+      });
+    }
+  } finally {
+    sqlite.close();
+  }
+});
