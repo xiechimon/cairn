@@ -42,6 +42,7 @@ test('TH-13: steer posted at 1 s waits for a 5 s claude-code tool result without
           order.push('steer_delivered');
           expect(message.value.message.content).toBe(steerText);
         }
+        return message;
       });
       toolStartedAt = Date.now();
       order.push('tool_started');
@@ -53,6 +54,7 @@ test('TH-13: steer posted at 1 s waits for a 5 s claude-code tool result without
       const tool = delay(5_000, undefined, { signal: options?.abortController?.signal });
       yield {
         type: 'assistant',
+        user_message_uuid: 'initial-user',
         message: {
           role: 'assistant',
           content: [
@@ -83,8 +85,13 @@ test('TH-13: steer posted at 1 s waits for a 5 s claude-code tool result without
         },
         parent_tool_use_id: null,
       };
-      await steered;
-      yield { type: 'result', subtype: 'success', is_error: false } as SDKMessage;
+      const delivered = await steered;
+      yield {
+        type: 'result',
+        subtype: 'success',
+        is_error: false,
+        user_message_uuids: [delivered.value?.uuid],
+      } as SDKMessage;
     })();
     return Object.assign(messages, { interrupt }) as unknown as Query;
   });
@@ -114,6 +121,7 @@ test('TH-13: steer posted at 1 s waits for a 5 s claude-code tool result without
 function toolStart(ids: string[]): SDKMessage {
   return {
     type: 'assistant',
+    user_message_uuid: 'initial-user',
     message: {
       role: 'assistant',
       content: ids.map((id) => ({ type: 'tool_use', id, name: 'Bash', input: {} })),
@@ -142,7 +150,14 @@ async function controlledSession(messages: AsyncGenerator<SDKMessage, void>) {
     void (async () => {
       for await (const message of prompt) received.push(message);
     })();
-    return Object.assign(messages, { interrupt }) as unknown as Query;
+    const stream = (async function* () {
+      yield* messages;
+      yield {
+        ...RESULT,
+        user_message_uuids: received.slice(1).map((message) => message.uuid),
+      } as SDKMessage;
+    })();
+    return Object.assign(stream, { interrupt }) as unknown as Query;
   });
   const handle = await createClaudeCodeBackend({}).createSession({
     provider: { kind: 'http', providerId: 'fake-claude' },
@@ -191,6 +206,8 @@ test('parallel tools hold queued steers in order, including images, until every 
     expect(received).toHaveLength(1);
     expect(events.some((event) => event.type === 'steer')).toBe(false);
     lastTool.resolve();
+    await waitFor(() => received.length === 3);
+    end.resolve();
     await Promise.all([firstSteer, lastSteer]);
     await waitFor(() => events.filter((event) => event.type === 'steer').length === 2);
     expect(received.slice(1).map((message) => message.message.content)).toEqual([
@@ -263,19 +280,20 @@ test.each([false, true])(
       expect(received).toHaveLength(1);
       expect(events.some((event) => event.type === 'steer')).toBe(false);
       emptyTool.resolve();
-      await waitFor(() => events.some((event) => event.type === 'steer'));
-      expect(await steering).toBe('delivered');
-      expect(events.slice(-2).map((event) => event.type)).toEqual(['toolcall_end', 'steer']);
-      expect(events.at(-2)).toMatchObject({
+      await waitFor(() => received.length === 2);
+      expect(events.at(-1)).toMatchObject({
         type: 'toolcall_end',
         call: { id: 'empty', result: undefined, isError },
       });
-      await handle.steer('Later instruction');
+      const later = handle.steer('Later instruction');
       await waitFor(() => received.length === 3);
       expect(received.slice(1).map((message) => message.message.content)).toEqual([
         'Queued instruction',
         'Later instruction',
       ]);
+      end.resolve();
+      expect(await steering).toBe('delivered');
+      await later;
       expect(interrupt).not.toHaveBeenCalled();
     } finally {
       otherTool.resolve();
@@ -332,9 +350,11 @@ test('steer is delivered immediately when no tool is running', async () => {
     await waitFor(() =>
       events.some((event) => event.type === 'toolcall_end' && event.call.result !== undefined),
     );
-    await handle.steer('Next instruction');
+    const delivery = handle.steer('Next instruction');
     await waitFor(() => received.length === 2);
     expect(received[1]?.message.content).toBe('Next instruction');
+    end.resolve();
+    await delivery;
     await waitFor(() => events.some((event) => event.type === 'steer'));
   } finally {
     end.resolve();
@@ -346,6 +366,7 @@ test('steer is delivered immediately when no tool is running', async () => {
 function finalText(text: string): SDKMessage {
   return {
     type: 'assistant',
+    user_message_uuid: 'initial-user',
     message: { role: 'assistant', content: [{ type: 'text', text }] },
   } as SDKMessage;
 }
@@ -383,6 +404,130 @@ const replies = (events: StepEvent[]) =>
       : [],
   );
 
+test('an enqueued late steer is not consumed by a result for the preceding answer', async () => {
+  const finish = defer();
+  const backlog = defer();
+  const preceding = defer();
+  let submitted = false;
+  const { handle, events, collected } = await cliSession(async function* (input) {
+    const initial = await input.next();
+    yield finalText('1 + 3 = 4');
+    await finish.promise;
+    yield { ...RESULT, user_message_uuids: [initial.value?.uuid] } as SDKMessage;
+    preceding.resolve();
+    await backlog.promise;
+    const late = await input.next();
+    if (!late.done) {
+      submitted = true;
+      yield finalText('2 + 4 = 6');
+      yield { ...RESULT, user_message_uuids: [late.value.uuid] } as SDKMessage;
+    }
+  });
+  await waitFor(() => replies(events).length === 1);
+  let acknowledged = false;
+  const delivery = handle.steer('No, 2 + 4').then(
+    () => {
+      acknowledged = true;
+      return 'consumed';
+    },
+    () => 'unread',
+  );
+  await delay(0);
+  finish.resolve();
+  await preceding.promise;
+  await delay(0);
+  expect(acknowledged).toBe(false);
+  backlog.resolve();
+  await collected;
+  expect(await delivery).toBe('consumed');
+  expect(submitted).toBe(true);
+  expect(replies(events)).toEqual(['1 + 3 = 4', '2 + 4 = 6']);
+});
+
+test.each([false, true])(
+  'a transmitted UUID stays unread when the Query ends without its receipt (crash=%s)',
+  async (crash) => {
+    const finish = defer();
+    const transmitted = defer();
+    const { handle, events, collected } = await cliSession(async function* (input) {
+      const initial = await input.next();
+      yield finalText('1 + 3 = 4');
+      const late = await input.next();
+      expect(late.value?.message.content).toBe('No, 2 + 4');
+      transmitted.resolve();
+      await finish.promise;
+      if (crash) throw new Error('CLI exited before reading the supplement');
+      yield { ...RESULT, user_message_uuids: [initial.value?.uuid] } as SDKMessage;
+    });
+    await waitFor(() => replies(events).length === 1);
+    const delivery = handle.steer('No, 2 + 4').then(
+      () => 'consumed',
+      () => 'unread',
+    );
+    await transmitted.promise;
+    finish.resolve();
+    await collected;
+    expect(await delivery).toBe('unread');
+    expect(events.some((event) => event.type === 'steer')).toBe(false);
+  },
+);
+
+test.each([false, true])(
+  'only a matching consumed UUID in the SDK result acknowledges a steer (error=%s)',
+  async (error) => {
+    const finish = defer();
+    const consumed = defer();
+    const { handle, events, collected } = await cliSession(async function* (input) {
+      await input.next();
+      yield toolStart(['first']);
+      yield toolResult('first');
+      const steer = await input.next();
+      yield steer.value as SDKMessage;
+      consumed.resolve();
+      await finish.promise;
+      yield finalText('6');
+      yield { ...RESULT, is_error: error, user_message_uuids: [steer.value?.uuid] } as SDKMessage;
+    });
+    await waitFor(() => events.some((event) => event.type === 'toolcall_end'));
+    let acknowledged = false;
+    const delivery = handle.steer('Calculate 2 + 4').then(() => {
+      acknowledged = true;
+    });
+    await consumed.promise;
+    await delay(0);
+    expect.soft(acknowledged).toBe(false);
+    finish.resolve();
+    await collected;
+    await delivery;
+    expect(replies(events)).toEqual(['6']);
+    expect(events.filter((event) => event.type === 'steer')).toEqual([
+      { type: 'steer', text: 'Calculate 2 + 4' },
+    ]);
+  },
+);
+
+test('an older SDK without a consumed UUID receipt leaves the steer unread', async () => {
+  const finish = defer();
+  const { handle, events, collected } = await cliSession(async function* (input) {
+    await input.next();
+    const frame = finalText('First answer') as unknown as Record<string, unknown>;
+    delete frame.user_message_uuid;
+    yield frame as SDKMessage;
+    await finish.promise;
+    yield RESULT;
+    expect((await input.next()).done).toBe(true);
+  });
+  await waitFor(() => replies(events).length === 1);
+  const delivery = handle.steer('Keep this supplement').then(
+    () => 'consumed',
+    () => 'unread',
+  );
+  finish.resolve();
+  await collected;
+  expect(await delivery).toBe('unread');
+  expect(events.some((event) => event.type === 'steer')).toBe(false);
+});
+
 test('a steer that lands after the final reply but before the result gets its own turn', async () => {
   const steered = defer();
   const { handle, events, collected } = await cliSession(async function* (input) {
@@ -392,13 +537,14 @@ test('a steer that lands after the final reply but before the result gets its ow
     yield RESULT;
     for (let next = await input.next(); !next.done; next = await input.next()) {
       yield finalText(`Opening ${String(next.value.message.content)}`);
-      yield RESULT;
+      yield { ...RESULT, user_message_uuids: [next.value.uuid] } as SDKMessage;
     }
   });
   await waitFor(() => replies(events).length === 1);
-  await handle.steer('zhipin.com');
+  const delivery = handle.steer('zhipin.com');
   steered.resolve();
   await collected;
+  await delivery;
   expect(replies(events)).toEqual(['Browser is open on example.com.', 'Opening zhipin.com']);
   expect(events.map((event) => event.type).filter((type) => type === 'done')).toEqual(['done']);
   expect(events.at(-1)?.type).toBe('done');

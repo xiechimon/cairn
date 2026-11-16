@@ -499,6 +499,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   });
   await backfillRepositoryCaches(config.workspacesDir, (message) => logger.workspace(message));
   const sessionHandles = new Map<string, AgentSessionHandle>();
+  const steerAcks = new Map<string, Set<Promise<void>>>();
   const stepImageSupport = new Map<string, boolean | null>();
   const stepSteeringSupport = new Map<string, boolean>();
   const stepTranscripts = new Map<string, TranscriptBuffer>();
@@ -722,13 +723,25 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         logger.step(`steer dropped (no live session) step=${stepId}`);
         return;
       }
-      await live.steer(deliveryText, images);
-      await client.steerAck?.(
-        stepId,
-        answers.length > 0
-          ? { answerIds: answers.map((answer) => answer.requestId), via: 'steer' }
-          : undefined,
-      );
+      const delivery = live
+        .steer(deliveryText, images)
+        .then(() =>
+          client.steerAck?.(
+            stepId,
+            answers.length > 0
+              ? { answerIds: answers.map((answer) => answer.requestId), via: 'steer' }
+              : undefined,
+          ),
+        );
+      const pending = steerAcks.get(stepId) ?? new Set<Promise<void>>();
+      steerAcks.set(stepId, pending);
+      pending.add(delivery);
+      try {
+        await delivery;
+      } finally {
+        pending.delete(delivery);
+        if (pending.size === 0) steerAcks.delete(stepId);
+      }
       logger.step(`steer delivered step=${stepId}`);
     } catch (err) {
       logger.step(`steer delivery failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -846,6 +859,19 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
       sessionHandles,
+      settleSteers: async (stepId: string) => {
+        const pending = steerAcks.get(stepId);
+        if (pending === undefined) return;
+        let settled = false;
+        await Promise.race([
+          Promise.allSettled([...pending]).then(() => {
+            settled = true;
+          }),
+          waitTimeout(5_000, undefined, { ref: false }),
+        ]);
+        if (!settled)
+          logger.step(`steer acknowledgment timed out step=${stepId}; unread input remains queued`);
+      },
       stepImageSupport,
       stepSteeringSupport,
       stepTranscripts,

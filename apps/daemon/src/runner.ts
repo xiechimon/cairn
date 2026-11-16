@@ -60,6 +60,7 @@ export interface RunStepDeps {
   mcpConfigPath: string;
   workspace?: WorktreeOps;
   sessionHandles?: Map<string, AgentSessionHandle>;
+  settleSteers?: (stepId: string) => Promise<void>;
   stepImageSupport?: Map<string, boolean | null>;
   stepSteeringSupport?: Map<string, boolean>;
   stepTranscripts?: Map<string, TranscriptBuffer>;
@@ -601,6 +602,8 @@ async function runClaimedStep(
     networkRetryDelays,
   });
   provider = passes.provider;
+  deps.sessionHandles?.delete(stepId);
+  await deps.settleSteers?.(stepId);
   if (passes.openError !== null) {
     clearCredentials(creds);
     await failStep(deps, heartbeat, stepId, passes.openError);
