@@ -48,6 +48,7 @@ export interface AppContext {
     {
       teamId: string;
       name?: string;
+      code: string;
       createdAt: number;
       machine?: { machineId: string; token: string; teamId: string; serverUrl: string };
     }

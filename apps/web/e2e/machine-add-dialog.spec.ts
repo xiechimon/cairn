@@ -19,9 +19,9 @@ test('the start command carries the checked Tailscale address, not the page orig
   await expect(dialog.getByTestId('tailscale-ready')).toHaveText(
     `已连通，另一台电脑用这个地址连回来：${TAILSCALE_URL}`,
   );
-  await expect(
-    dialog.getByText("确认把这台电脑加入团队 Xmon Dai's team", { exact: false }),
-  ).toBeVisible();
+  await expect(dialog.getByTestId('enrollment-code-hint')).toHaveText(
+    "终端会显示一个批准码。把它填在下面，确认把那台电脑加入团队 Xmon Dai's team。",
+  );
   const commands = dialog.locator('code');
   await expect(commands).toHaveCount(2);
   await expect(commands.nth(0)).toHaveText('npm install -g @xiechimon/cairn-cli@latest');
@@ -33,6 +33,25 @@ test('the start command carries the checked Tailscale address, not the page orig
     dialog.getByRole('button', { name: '在云服务器上运行？改用 API key 注册' }),
   ).toBeVisible();
   await expect(dialog.getByRole('link', { name: '获取 API key →' })).toHaveCount(0);
+});
+
+test('the approval code from the terminal approves the computer inside the dialog', async ({
+  page,
+}) => {
+  let confirmed: unknown = null;
+  await page.route('**/api/machine/enroll/confirm', async (route) => {
+    confirmed = route.request().postDataJSON();
+    await route.fulfill({ status: 200, json: { machine: {} } });
+  });
+  const dialog = await openDialog(page);
+  const approve = dialog.getByRole('button', { name: '批准', exact: true });
+  const code = dialog.getByRole('textbox', { name: '批准码' });
+  await code.fill('k7f3');
+  await expect(approve).toBeDisabled();
+  await code.fill('k7f3-q9xm');
+  await approve.click();
+  await expect.poll(() => confirmed).toEqual({ code: 'k7f3-q9xm' });
+  await expect(code).toHaveValue('');
 });
 
 test('family law: X, Escape and backdrop dismiss; panel clicks do not', async ({ page }) => {

@@ -1,11 +1,16 @@
 import { PUBLISHED_PACKAGES, type TailscaleAccess } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
-import { useEnableTailscaleAccess, useTailscaleAccess } from '../api/hooks.js';
+import {
+  useApproveMachineEnrollment,
+  useEnableTailscaleAccess,
+  useTailscaleAccess,
+} from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { withCodeSpans } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
+import { Input } from '../components/ui/input.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -215,6 +220,43 @@ function TailscaleStatus({
   }
 }
 
+function ApproveByCode({ teamId }: { teamId: string | undefined }) {
+  const { t } = useI18n();
+  const [code, setCode] = useState('');
+  const approve = useApproveMachineEnrollment(teamId);
+  const ready = code.replace(/[\s-]/g, '').length === 8;
+  return (
+    <form
+      className="flex items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!ready) return;
+        approve.mutate(code, {
+          onSuccess: () => {
+            setCode('');
+            toastSuccess(t('已批准，执行机马上上线'));
+          },
+          onError: (error) =>
+            toastError(t('批准码不对或已过期。看一下终端里的码，再试一次。'), error),
+        });
+      }}
+    >
+      <Input
+        aria-label={t('批准码')}
+        placeholder="XXXX-XXXX"
+        autoComplete="off"
+        spellCheck={false}
+        className="font-mono uppercase"
+        value={code}
+        onChange={(event) => setCode(event.target.value)}
+      />
+      <Button type="submit" size="sm" className="shrink-0" disabled={!ready || approve.isPending}>
+        {t('批准')}
+      </Button>
+    </form>
+  );
+}
+
 interface CreateMachineDialogProps {
   open?: boolean;
   onClose: () => void;
@@ -309,11 +351,20 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
                   <span className={STEP_TITLE_CLS}>{t('在另一台电脑上启动执行机')}</span>
                   <CopyCommand command={startCmd} />
                   <p className="m-0 text-meta text-content-tertiary">
-                    {t(
-                      '终端会打印一个批准链接。打开链接，确认把这台电脑加入团队 {team}，执行机就会上线。之后它在后台常驻运行，关掉终端也没关系。',
-                      { team: teamName },
-                    )}
+                    {t('之后它在后台常驻运行，关掉终端也没关系。')}
                   </p>
+                </div>
+              </li>
+              <li className={STEP_CLS}>
+                <span className={STEP_NUM_CLS}>4</span>
+                <div className={STEP_BODY_CLS}>
+                  <span className={STEP_TITLE_CLS}>{t('在这里批准')}</span>
+                  <p className={STEP_NOTE_CLS} data-testid="enrollment-code-hint">
+                    {t('终端会显示一个批准码。把它填在下面，确认把那台电脑加入团队 {team}。', {
+                      team: teamName,
+                    })}
+                  </p>
+                  <ApproveByCode teamId={teamId} />
                 </div>
               </li>
             </>

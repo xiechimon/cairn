@@ -1212,8 +1212,16 @@ export const EN: Record<string, string> = {
   '用 Tailscale 连通两台电脑': 'Connect the two computers with Tailscale',
   '在另一台电脑上安装 CLI': 'Install the CLI on the other computer',
   在另一台电脑上启动执行机: 'Start the Runner on the other computer',
-  '终端会打印一个批准链接。打开链接，确认把这台电脑加入团队 {team}，执行机就会上线。之后它在后台常驻运行，关掉终端也没关系。':
-    'The terminal prints an approval link. Open it and confirm adding that computer to the team {team}, and the Runner comes online. It then keeps running in the background, so you can close the terminal.',
+  '之后它在后台常驻运行，关掉终端也没关系。':
+    'It then keeps running in the background, so you can close the terminal.',
+  在这里批准: 'Approve it here',
+  批准: 'Approve',
+  批准码: 'Approval code',
+  '终端会显示一个批准码。把它填在下面，确认把那台电脑加入团队 {team}。':
+    'The terminal shows an approval code. Enter it below to add that computer to the team {team}.',
+  '批准码不对或已过期。看一下终端里的码，再试一次。':
+    'That code is wrong or expired. Check the code in the terminal and try again.',
+  '已批准，执行机马上上线': 'Approved. The Runner comes online in a moment',
   '查不到 Tailscale 的状态。点「重新检查」再试。':
     'Could not read the Tailscale status. Choose Check again to retry.',
   '正在检查 Tailscale…': 'Checking Tailscale…',
