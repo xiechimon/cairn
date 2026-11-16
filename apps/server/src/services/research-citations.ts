@@ -34,14 +34,17 @@ const RETRYABLE_CHECKER_PHASES = ['done', 'failed'] as const;
 const claimSchema = z
   .object({
     url: z.url({ protocol: /^https?$/ }),
-    claim: z.string().min(1).max(4000),
+    claim: z.string().max(4000),
     verdict: z.enum(['supported', 'unsupported', 'unavailable']),
     reason: z.string().min(1).max(4000),
     quote: z.string().max(4000),
     fetchedAt: z.iso.date(),
     quality: z.enum(['primary', 'secondary', 'unknown']),
   })
-  .refine((row) => row.verdict !== 'supported' || row.quote.trim().length > 0);
+  .refine(
+    (row) =>
+      row.verdict !== 'supported' || (row.claim.trim().length > 0 && row.quote.trim().length > 0),
+  );
 const auditSchema = z.object({ claims: z.array(claimSchema).min(1).max(100) });
 
 type CitationClaim = z.infer<typeof claimSchema>;
