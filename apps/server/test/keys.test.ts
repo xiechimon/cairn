@@ -203,10 +203,12 @@ describe('secret surface (team secrets, r2 section 6.3 + 02 section 8 write-only
       'description',
       'http',
       'id',
+      'kind',
       'name',
       'policyRevision',
       'projectId',
       'teamId',
+      'updatedAt',
     ]);
     await expectErrorShape(await req(s.app, 'POST', teamPath(s), body), 409);
   });

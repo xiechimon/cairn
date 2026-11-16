@@ -6,6 +6,8 @@ import {
   type MemoryRecord,
   phaseSchema,
   routeOverrideSchema,
+  SECRET_NAME_PATTERN,
+  SECRET_NAME_RULE,
   secretDeliverySchema,
   secretHttpPolicySchema,
 } from '@cairn/shared';
@@ -49,7 +51,8 @@ export const patchTodoBodySchema = categoryFreeTaskInputSchema.pipe(
 );
 
 export const patchSecretBodySchema = z.object({
-  name: z.string().optional(),
+  name: z.string().regex(SECRET_NAME_PATTERN, SECRET_NAME_RULE).optional(),
+  kind: z.literal('secret').optional(),
   description: z.string().nullish(),
   value: z.string().optional(),
   delivery: secretDeliverySchema.optional(),

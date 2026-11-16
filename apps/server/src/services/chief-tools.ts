@@ -15,9 +15,12 @@ import {
   fenceReportText,
   IN_PROGRESS_PHASES,
   isChiefConversationId,
+  isMailSecretName,
   isWaitingPhase,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
+  SECRET_NAME_PATTERN,
+  SECRET_NAME_RULE,
   SUGGEST_REPLIES_TOOL_NAME,
   snoozeTodoBodySchema,
   updateSkillToolParamsSchema,
@@ -801,6 +804,7 @@ export async function executeChiefTool(
     case 'set_secret': {
       const keysvc = { db, box: deps.box };
       const name = str(params, 'name');
+      if (isMailSecretName(name)) throw new HttpError(400, SECRET_NAME_RULE);
       const projectId = optStr(params, 'projectId') ?? null;
       const existing = listSecrets(keysvc, ctx.teamId).find(
         (s) => s.name === name && s.projectId === projectId,
@@ -820,8 +824,16 @@ export async function executeChiefTool(
       const value = str(params, 'value');
       const description = optStr(params, 'description') ?? null;
       if (existing) {
-        return json(updateSecret(keysvc, ctx.teamId, existing.id, { name, value, description }));
+        return json(
+          updateSecret(keysvc, ctx.teamId, existing.id, {
+            name,
+            value,
+            description,
+            kind: 'secret',
+          }),
+        );
       }
+      if (!SECRET_NAME_PATTERN.test(name)) throw new HttpError(400, SECRET_NAME_RULE);
       const record = createSecret(keysvc, {
         teamId: ctx.teamId,
         name,

@@ -102,4 +102,30 @@ describe('the Coordinator secret tools respect secret scope (D74 P5)', () => {
     };
     expect(created.delivery).toBe('plaintext');
   });
+
+  test('set_secret turns an env into a secret and never echoes a value; list_secrets carries none', async () => {
+    const env = createSecret(deps(), {
+      teamId: H.teamId,
+      name: 'PUBLIC_URL',
+      value: 'stored-sentinel-91c2',
+      kind: 'env',
+    });
+    expect(JSON.stringify(await relay('secrets', {}))).not.toContain('stored-sentinel-91c2');
+    const result = await relay('set_secret', { name: 'PUBLIC_URL', value: 'tool-sentinel-4d7e' });
+    expect(result).toMatchObject({ id: env.id, kind: 'secret' });
+    expect(JSON.stringify(result)).not.toContain('tool-sentinel-4d7e');
+    expect(openedValue(env.id, null)).toBe('tool-sentinel-4d7e');
+    const created = await relay('set_secret', { name: 'NEW_ONE', value: 'tool-sentinel-4d7e' });
+    expect(created).toMatchObject({ kind: 'secret' });
+    expect(JSON.stringify(created)).not.toContain('tool-sentinel-4d7e');
+  });
+
+  test('set_secret refuses names that do not look like MY_KEY, mail. names included', async () => {
+    createSecret(deps(), { teamId: H.teamId, name: 'mail.gmail.refresh', value: 'v' });
+    for (const name of ['lower', 'mail.gmail.refresh', 'MAIL.NEW']) {
+      await expect(relay('set_secret', { name, value: 'v' })).rejects.toMatchObject({
+        status: 400,
+      });
+    }
+  });
 });

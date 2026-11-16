@@ -1,4 +1,11 @@
-import type { SecretBox, SecretDelivery, SecretHttpPolicy, SecretRecord } from '@cairn/shared';
+import type {
+  SecretBox,
+  SecretDelivery,
+  SecretHttpPolicy,
+  SecretKind,
+  SecretListEntry,
+  SecretRecord,
+} from '@cairn/shared';
 import {
   isDaemonReadSecretName,
   isHttpSecretValue,
@@ -8,8 +15,9 @@ import {
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project, secret } from '../db/schema.js';
+import { sha256Hex } from '../lib/crypto.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
-import { newRecordId } from '../lib/ids.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
 import { linkedMailSecretIds } from './mail.js';
 
 export interface SecretDeps {
@@ -19,7 +27,16 @@ export interface SecretDeps {
 
 type SecretRow = typeof secret.$inferSelect;
 
-export function toSecretRecord(row: SecretRow): SecretRecord {
+function isEnvRow(row: SecretRow, linked: ReadonlySet<string>): boolean {
+  return (
+    row.valueCipher !== null &&
+    row.delivery === 'plaintext' &&
+    row.envSeal === sha256Hex(row.valueCipher) &&
+    !linked.has(row.id)
+  );
+}
+
+function toSecretRecord(row: SecretRow, linked: ReadonlySet<string>): SecretRecord {
   return {
     id: row.id,
     teamId: row.teamId,
@@ -29,7 +46,20 @@ export function toSecretRecord(row: SecretRow): SecretRecord {
     delivery: row.delivery,
     http: httpPolicyOf(row),
     policyRevision: row.policyRevision,
+    kind: isEnvRow(row, linked) ? 'env' : 'secret',
+    updatedAt: row.updatedAt,
   };
+}
+
+function sealValue(deps: SecretDeps, value: string, kind: SecretKind) {
+  const valueCipher = deps.box.seal(value);
+  return { valueCipher, envSeal: kind === 'env' ? sha256Hex(valueCipher) : null };
+}
+
+function assertStorable(kind: SecretKind, delivery: SecretDelivery, value: string | null): void {
+  if (kind === 'env' && delivery === 'http')
+    throw new HttpError(400, 'an environment variable cannot use http delivery');
+  if (kind === 'secret' && value === '') throw new HttpError(400, 'a secret value cannot be empty');
 }
 
 function httpPolicyOf(row: SecretRow): SecretHttpPolicy | null {
@@ -90,14 +120,27 @@ function assertNameFree(
   if (dup) throw conflict(`secret ${name} already exists`);
 }
 
-export function listSecrets(deps: SecretDeps, teamId: string): SecretRecord[] {
+function teamRows(deps: SecretDeps, teamId: string): SecretRow[] {
   return deps.db
     .select()
     .from(secret)
     .where(eq(secret.teamId, teamId))
     .orderBy(asc(secret.name))
-    .all()
-    .map(toSecretRecord);
+    .all();
+}
+
+export function listSecrets(deps: SecretDeps, teamId: string): SecretRecord[] {
+  const linked = linkedMailSecretIds(deps.db, teamId);
+  return teamRows(deps, teamId).map((row) => toSecretRecord(row, linked));
+}
+
+export function listSecretsWithEnvValues(deps: SecretDeps, teamId: string): SecretListEntry[] {
+  const linked = linkedMailSecretIds(deps.db, teamId);
+  return teamRows(deps, teamId).map((row) => {
+    const record = toSecretRecord(row, linked);
+    if (record.kind !== 'env' || row.valueCipher === null) return record;
+    return { ...record, value: deps.box.open(row.valueCipher) };
+  });
 }
 
 export function createSecret(
@@ -110,9 +153,12 @@ export function createSecret(
     projectId?: string | null;
     delivery?: SecretDelivery;
     http?: SecretHttpPolicy;
+    kind?: SecretKind;
   },
 ): SecretRecord {
+  const kind = input.kind ?? 'secret';
   const policy = policyColumns(input.delivery ?? 'plaintext', input.http);
+  assertStorable(kind, policy.delivery, input.value);
   if (policy.delivery === 'http') assertHttpDeliverable(input.name, input.value);
   const projectId = input.projectId ?? null;
   if (projectId !== null) {
@@ -133,13 +179,14 @@ export function createSecret(
       projectId,
       name: input.name,
       description: input.description ?? null,
-      valueCipher: deps.box.seal(input.value),
+      ...sealValue(deps, input.value, kind),
       ...policy,
+      updatedAt: nowMs(),
     })
     .run();
   const row = getRow(deps, input.teamId, id);
   if (!row) throw new Error('secret missing after insert');
-  return toSecretRecord(row);
+  return toSecretRecord(row, linkedMailSecretIds(deps.db, input.teamId));
 }
 
 export function updateSecret(
@@ -152,10 +199,14 @@ export function updateSecret(
     value?: string;
     delivery?: SecretDelivery;
     http?: SecretHttpPolicy;
+    kind?: 'secret';
   },
 ): SecretRecord {
   const row = getRow(deps, teamId, id);
   if (!row) throw notFound(`secret ${id}`);
+  const linked = linkedMailSecretIds(deps.db, teamId);
+  const wasEnv = isEnvRow(row, linked);
+  const kind: SecretKind = wasEnv && patch.kind === undefined ? 'env' : 'secret';
   if (patch.name !== undefined && patch.name !== row.name) {
     assertNameFree(deps, teamId, row.projectId, patch.name, id);
   }
@@ -174,8 +225,14 @@ export function updateSecret(
       400,
       'changing the target of an http secret, or making it plaintext, needs a new value',
     );
+  const converting = wasEnv && kind === 'secret';
+  assertStorable(
+    kind,
+    policy.delivery,
+    patch.value ?? (converting && row.valueCipher !== null ? deps.box.open(row.valueCipher) : null),
+  );
   if (policy.delivery === 'http') {
-    if (linkedMailSecretIds(deps.db, teamId).has(row.id))
+    if (linked.has(row.id))
       throw new HttpError(400, 'a secret linked to a mail account cannot use http delivery');
     const value = patch.value ?? (row.valueCipher === null ? '' : deps.box.open(row.valueCipher));
     assertHttpDeliverable(patch.name ?? row.name, value);
@@ -185,8 +242,13 @@ export function updateSecret(
     .set({
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(patch.description !== undefined ? { description: patch.description } : {}),
-      ...(patch.value !== undefined ? { valueCipher: deps.box.seal(patch.value) } : {}),
+      ...(patch.value !== undefined
+        ? sealValue(deps, patch.value, kind)
+        : kind === 'secret'
+          ? { envSeal: null }
+          : {}),
       ...policy,
+      updatedAt: nowMs(),
       ...(policyChanged || patch.value !== undefined
         ? { policyRevision: row.policyRevision + 1 }
         : {}),
@@ -195,7 +257,7 @@ export function updateSecret(
     .run();
   const updated = getRow(deps, teamId, id);
   if (!updated) throw new Error('secret missing after update');
-  return toSecretRecord(updated);
+  return toSecretRecord(updated, linked);
 }
 
 export function deleteSecret(deps: SecretDeps, teamId: string, id: string): boolean {
@@ -260,7 +322,8 @@ export function openSecretGrants(
               inArray(secret.name, names),
             ),
           )
-          .all();
+          .all()
+          .filter((row) => !linked.has(row.id));
   const values: Record<string, string> = {};
   const http = new Map<string, HttpSecretRow>();
   for (const row of [

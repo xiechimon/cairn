@@ -1170,6 +1170,13 @@
       "when": 1794760486981,
       "tag": "0171_drop_team_claude_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 172,
+      "version": "6",
+      "when": 1794795892627,
+      "tag": "0172_secret_env_seal",
+      "breakpoints": true
     }
   ]
 }
