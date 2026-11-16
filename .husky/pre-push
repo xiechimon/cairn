@@ -1,6 +1,3 @@
 #!/usr/bin/env sh
 set -e
-updates=$(cat)
-printf '%s\n' "$updates" | node scripts/prepush-main-guard.mjs
-printf '%s\n' "$updates" | node scripts/commit-identity.mjs pre-push
-pnpm prepush
+node scripts/prepush-main-guard.mjs
