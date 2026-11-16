@@ -95,7 +95,7 @@ afterAll(async () => {
 });
 
 describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main sequence)', () => {
-  test('create → session: worktree contract lands + real bash change → commit/push → review + hasChanges (git ground truth)', async () => {
+  test('create → session: real bash change → commit/push → done with changes, without merging', async () => {
     world = await seedWorld(
       server.url,
       server.teamId,
@@ -104,6 +104,7 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
     );
     bareDir = join(server.reposDir, server.teamId, 'm3b-lifecycle.git');
     expect(existsSync(bareDir)).toBe(true);
+    const originalMain = await systemGitOps.resolveCommit(bareDir, 'refs/heads/main');
 
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
@@ -112,7 +113,7 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
     try {
-      await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
+      await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
     } catch (err) {
       const b = server.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get();
       const s = server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
@@ -124,6 +125,8 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
     const branch = `cairn/conv-${buildId}`;
     const branchSha = await systemGitOps.resolveCommit(bareDir, `refs/heads/${branch}`);
     expect(branchSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(branchSha).not.toBe(originalMain);
+    expect(await systemGitOps.resolveCommit(bareDir, 'refs/heads/main')).toBe(originalMain);
     expect(existsSync(join(paths.workspacesDir, buildId))).toBe(true);
     expect(existsSync(join(paths.workspacesDir, world.projectId, 'repo', '.git'))).toBe(true);
 
@@ -173,12 +176,22 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
     expect(gitConfig).not.toContain('cairn_');
   }, 150_000);
 
-  test('review → merge 202 delegated → merge step → main fast-forward → done (02 §4.2/A6 + r3 §3.6)', async () => {
+  test('explicit merge of a completed delivery → merge step → main fast-forward, task stays done', async () => {
     const mergeRes = await api(server.url, 'POST', `/api/builds/${buildId}/merge`, {});
     expect(mergeRes.status).toBe(202);
     expect(mergeRes.body).toEqual({ delegated: true });
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
+    await waitFor(
+      () =>
+        server.db
+          .select()
+          .from(stepTable)
+          .where(eq(stepTable.buildId, buildId))
+          .all()
+          .some((row) => row.kind === 'merge' && row.status === 'done'),
+      120_000,
+    );
+    expect(server.todoPhase(world.todoId)).toBe('done');
 
     const mainFile = await readFile(server, world.projectId, 'README.md', 'main');
     expect(mainFile.content).toContain('m3b probe line');
@@ -242,7 +255,7 @@ describe('M3b demo: single-machine full lifecycle todo→done (02 §4.2 main seq
     expect(rerun.status).toBe(201);
     const rerunBuildId = (rerun.body as { builds: { id: string }[] }).builds[0]!.id;
     expect(rerunBuildId).not.toBe(failedBuildId);
-    await waitFor(() => server.todoPhase(world2.todoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(world2.todoId) === 'done', 120_000);
     expect(existsSync(join(paths.workspacesDir, rerunBuildId))).toBe(true);
     const bareDir2 = join(server.reposDir, server.teamId, 'm3b-failure.git');
     const branch2 = await systemGitOps.resolveCommit(

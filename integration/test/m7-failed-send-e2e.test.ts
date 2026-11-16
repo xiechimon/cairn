@@ -105,7 +105,7 @@ afterAll(async () => {
   if (home) rmSync(home, { recursive: true, force: true });
 });
 
-describe('M7 failed-phase send E2E: failed send → restart → feedback joins the new round session → runs to review', () => {
+describe('M7 failed-phase send E2E: failed send → restart → feedback joins the new round session → done', () => {
   test('full-chain persistence + new round actually runs + phase gate rejects', async () => {
     const world = await seedWorld(server.url, server.teamId, {
       title: 'restart 探针',
@@ -157,7 +157,7 @@ describe('M7 failed-phase send E2E: failed send → restart → feedback joins t
     expect(firstStep.kind).toBe('session');
     expect(firstStep.prompt).toContain('把测试也补上');
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
 
     const taskPrompt = buildTaskPromptText('restart 探针', '这个任务的第一轮会失败。');
     const llmSawFeedback = stub.requests.some((r) =>

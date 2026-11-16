@@ -139,7 +139,7 @@ describe('MCP client face E2E: local config registration + every local server on
     expect(started.status).toBe(201);
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'review', 150_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'done', 150_000);
 
     expect(external.calls).toEqual([{ name: 'echo', args: { text: 'm4b-bridge' } }]);
 

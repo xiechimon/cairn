@@ -145,7 +145,7 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
       sourceBuildId: build1,
     });
 
-    await waitFor(() => server.todoPhase(world1.todoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(world1.todoId) === 'done', 120_000);
     expect(listFiles(server.db, { teamId: server.teamId, agentId: AGENT_ID })).toHaveLength(1);
   }, 150_000);
 
@@ -160,11 +160,11 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     });
     expect(started.status).toBe(201);
 
-    await waitFor(() => server.todoPhase(world2.todoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(world2.todoId) === 'done', 120_000);
 
     expect(listFiles(server.db, { teamId: server.teamId, agentId: AGENT_ID })).toHaveLength(1);
     const todo2 = server.db.select().from(todoTable).where(eq(todoTable.id, world2.todoId)).get();
-    expect(todo2?.phase).toBe('review');
+    expect(todo2?.phase).toBe('done');
 
     const task2Requests = stub.requests.filter((r) => JSON.stringify(r).includes('无记忆指令任务'));
     expect(task2Requests.length).toBeGreaterThan(0);
