@@ -90,7 +90,7 @@ export function ProjectsSection() {
     <Section
       id="projects-lists"
       title="Project card, list rows and phone tab bar"
-      lede="The Projects page card, the shared list row used by Library, activity and settings lists, and the phone tab bar with an inbox badge."
+      lede="The Projects page card, the shared list row used by Library and settings lists, and the phone tab bar with an inbox badge."
     >
       <Specimen
         id="project-cards"

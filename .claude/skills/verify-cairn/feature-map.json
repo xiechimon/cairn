@@ -50,8 +50,8 @@
     },
     {
       "id": "B7",
-      "title": "Recurring and finding work: schedules, search and activity, sidebar",
-      "scope": "Scheduled tasks, the search syntax with the activity view, and the sidebar with unread marks. Research Amp, Claude Code scheduled tasks and t3code, and design the due-event model, the search index and the unread state."
+      "title": "Recurring and finding work: schedules, search, sidebar",
+      "scope": "Scheduled tasks, the search syntax, and the sidebar with unread marks. Research Amp, Claude Code scheduled tasks and t3code, and design the due-event model, the search index and the unread state."
     },
     {
       "id": "B8",
@@ -1517,7 +1517,7 @@
       "id": "mobile-web",
       "name": "Mobile web and PWA",
       "summary": "The web app installed on a phone: narrow layouts, the service worker and the home-screen app.",
-      "states": "At phone width the Coordinator home has no header bar: a round menu button, the bare status mark and one round Tasks button with its count badge float at the top, a floating pill tab bar switches chat, Tasks and results with a round computers button beside it, every side panel is a full-screen tab between them, the composer is one row, settings and activity live in the drawer footer, touch message tools appear on a tap, and the sidebar drawer pushes the conversation back as a dimmed card; settings collapse to a list; the app can be installed to the home screen.",
+      "states": "At phone width the Coordinator home has no header bar: a round menu button, the bare status mark and one round Tasks button with its count badge float at the top, a floating pill tab bar switches chat, Tasks and results with a round computers button beside it, every side panel is a full-screen tab between them, the composer is one row, settings and usage live in the drawer footer, touch message tools appear on a tap, and the sidebar drawer pushes the conversation back as a dimmed card; settings collapse to a list; the app can be installed to the home screen.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1714,41 +1714,36 @@
       "batch": "B7"
     },
     {
-      "id": "search-and-activity",
-      "name": "Search and activity",
-      "summary": "The search palette with its query syntax and the activity page over all threads.",
-      "states": "The search palette with syntax help and query chips, and the activity list grouped by day with filters, totals and load more.",
+      "id": "search",
+      "name": "Search",
+      "summary": "The search palette with its query syntax.",
+      "states": "The search palette with syntax help, query chips, filter problems and a failed-search retry.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/search",
-          "apps/web/src/overlay/search-panel.tsx",
-          "apps/web/src/routes/activity-page.tsx"
+          "apps/web/src/overlay/search-panel.tsx"
         ],
         "server": [
           "apps/server/src/services/search.ts"
         ]
       },
       "routes": {
-        "web": [
-          "/app/activity"
-        ],
+        "web": [],
         "server": [
           "/api/search"
         ]
       },
       "reach": [
         "open /app",
-        "press Mod+K",
-        "open /app/activity",
-        "click testid:quick-filter"
+        "press Mod+K"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/search.md"
       ],
       "research": {
-        "gap": "no note on Amp's search syntax and activity filters"
+        "gap": "no note on Amp's search syntax and filters"
       },
       "frontendDesign": [
         "docs/design/references/thread-list-sidebar",
@@ -1758,7 +1753,6 @@
         "gap": "no design for the search syntax, index and ranking"
       },
       "evidence": [
-        "apps/web/e2e/activity-page.spec.ts",
         "apps/web/e2e/search-syntax-palette.spec.ts",
         "apps/server/test/search-syntax.test.ts"
       ],

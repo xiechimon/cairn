@@ -215,7 +215,7 @@ test('the tab title carries the Tasks count on every page and the sidebar carrie
   await expect(page.getByTestId('tasks-badge')).toHaveText('3');
   await expect(page).toHaveTitle('(3) Cairn');
   await expect(page.getByRole('complementary').getByTestId('attention-badge')).toHaveCount(0);
-  await page.goto('/app/activity?scenario=home-c');
+  await page.goto('/app/usage?scenario=home-c');
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page).toHaveTitle('(3) Cairn');
 });

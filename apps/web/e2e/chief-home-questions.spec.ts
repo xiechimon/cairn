@@ -222,7 +222,7 @@ test('the tab title counts pending questions and the Coordinator row opens the q
   page,
 }) => {
   await mockLive(page, structuredClone(TWO));
-  await page.goto('/app/activity');
+  await page.goto('/app/usage');
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page).toHaveTitle('(2) Cairn');
   await page.goto('/app?pane=tasks&tab=scheduled');

@@ -621,11 +621,7 @@ export function SearchSyntaxSection() {
             <ChipProblems chips={GALLERY_CHIPS} problems={[null, null, 'bad_cost']} />
           </div>
         </Specimen>
-        <Specimen
-          id="syntax-help"
-          title="Syntax help"
-          note="Opened from the palette footer or the Activity field"
-        >
+        <Specimen id="syntax-help" title="Syntax help" note="Opened from the palette footer">
           <SyntaxHelp className="w-full" />
         </Specimen>
       </div>

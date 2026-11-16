@@ -1,5 +1,5 @@
 import { parseSearchQuery, type SearchResponse } from '@cairn/shared';
-import { Activity, CircleHelp, TriangleAlert } from 'lucide-react';
+import { CircleHelp, TriangleAlert } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
@@ -13,14 +13,12 @@ import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
-import { withoutDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Clock, Kanban, Search, Settings, X } from '../icons/index.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
-import { ACTIVITY_PATH, activityHref } from '../search/activity-href.js';
-import { activityTodosForHits, searchTodosLocally } from '../search/activity-model.js';
+import { searchTodosLocally } from '../search/local-search.js';
 import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
 import {
   chipProblem,
@@ -35,7 +33,6 @@ import { SETTINGS_HREF } from '../settings/settings-href.js';
 const NAV_ROWS = [
   { label: 'Coordinator', Icon: Kanban, href: '/app' },
   { label: '定时', Icon: Clock, href: '/app/schedules' },
-  { label: '活动', Icon: Activity, href: ACTIVITY_PATH },
   { label: '设置', Icon: Settings, href: SETTINGS_HREF },
 ];
 
@@ -243,15 +240,6 @@ export function SearchPanel({
     navigate({ pathname, search });
     onClose();
   };
-  const openActivity = () => {
-    navigate(activityHref(query, search));
-    onClose();
-  };
-  const viewAllCount = activityTodosForHits(
-    todos,
-    live ? fixture.todos : withoutDeleted(fixture.todos),
-  ).length;
-  const showViewAll = q !== '' && viewAllCount > 0;
   const [helpOpen, setHelpOpen] = useState(false);
   useEffect(() => {
     if (!open) setHelpOpen(false);
@@ -271,7 +259,6 @@ export function SearchPanel({
       : [
           ...todos.map((todo) => () => goThread(todo.id)),
           ...projects.map((project) => () => go(`/app/project/${project.id}`)),
-          ...(showViewAll ? [openActivity] : []),
         ]),
   ];
   const base = commands.length;
@@ -365,9 +352,6 @@ export function SearchPanel({
                 if (completed === null) return;
                 event.preventDefault();
                 onQuery(joinQuery(chips, completed));
-              } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                openActivity();
               } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 if (actions.length === 0) return;
                 event.preventDefault();
@@ -513,27 +497,6 @@ export function SearchPanel({
                         </Button>
                       );
                     })}
-                  </>
-                )}
-                {showViewAll && (
-                  <>
-                    <div className={GROUP_LABEL}>{t('没找到想要的？')}</div>
-                    <Button
-                      variant="ghost"
-                      data-row-kind="activity"
-                      data-row-index={base + todos.length + projects.length}
-                      data-selected={
-                        cursor === base + todos.length + projects.length ? '' : undefined
-                      }
-                      className={`${ROW_BASE} ${rowLitClasses(cursor === base + todos.length + projects.length, kbd)}`}
-                      onClick={openActivity}
-                    >
-                      <Activity width={18} height={18} />
-                      {t('在活动里查看全部 {n} 条', { n: viewAllCount })}
-                      <span className={ROW_END}>
-                        <ShortcutHint keys={['mod', 'enter']} />
-                      </span>
-                    </Button>
                   </>
                 )}
               </>

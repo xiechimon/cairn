@@ -535,7 +535,7 @@ Reach:
 
 **Mobile web and PWA** (shipped, centrality 2). The web app installed on a phone: narrow layouts, the service worker and the home-screen app.
 
-States: At phone width the Coordinator home has no header bar: a round menu button, the bare status mark and one round Tasks button with its count badge float at the top, a floating pill tab bar switches chat, Tasks and results with a round computers button beside it, every side panel is a full-screen tab between them, the composer is one row, settings and activity live in the drawer footer, touch message tools appear on a tap, and the sidebar drawer pushes the conversation back as a dimmed card; settings collapse to a list; the app can be installed to the home screen.
+States: At phone width the Coordinator home has no header bar: a round menu button, the bare status mark and one round Tasks button with its count badge float at the top, a floating pill tab bar switches chat, Tasks and results with a round computers button beside it, every side panel is a full-screen tab between them, the composer is one row, settings and usage live in the drawer footer, touch message tools appear on a tap, and the sidebar drawer pushes the conversation back as a dimmed card; settings collapse to a list; the app can be installed to the home screen.
 
 Reach:
 
@@ -944,27 +944,25 @@ Reach:
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 - Evidence: `apps/web/e2e/schedules-live.spec.ts`, `apps/server/test/schedules.test.ts`, `apps/server/test/due-events.test.ts`
 
-### search-and-activity
+### search
 
-**Search and activity** (shipped, centrality 3). The search palette with its query syntax and the activity page over all threads.
+**Search** (shipped, centrality 3). The search palette with its query syntax.
 
-States: The search palette with syntax help and query chips, and the activity list grouped by day with filters, totals and load more.
+States: The search palette with syntax help, query chips, filter problems and a failed-search retry.
 
 Reach:
 
 1. `open /app`
 2. `press Mod+K`
-3. `open /app/activity`
-4. `click testid:quick-filter`
 
-- Web routes: `/app/activity`
+- Web routes: none
 - Keyboard shortcuts in its code: `Mod+K`
-- Test ids in its code: `activity-empty`, `activity-error`, `activity-group`, `activity-group-total`, `activity-list`, `activity-load-more`, `activity-row-cost`, `activity-showing`, `activity-summary`, `chip-problems`, `query-chip`, `quick-filter`, `search-context`, `search-error`, `syntax-help`
+- Test ids in its code: `chip-problems`, `query-chip`, `search-context`, `search-error`, `syntax-help`
 - Verify recipes: [.claude/skills/verify-cairn/features/search.md](features/search.md)
-- Research: **gap**: no note on Amp's search syntax and activity filters
+- Research: **gap**: no note on Amp's search syntax and filters
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
 - Backend design: **gap**: no design for the search syntax, index and ranking
-- Evidence: `apps/web/e2e/activity-page.spec.ts`, `apps/web/e2e/search-syntax-palette.spec.ts`, `apps/server/test/search-syntax.test.ts`
+- Evidence: `apps/web/e2e/search-syntax-palette.spec.ts`, `apps/server/test/search-syntax.test.ts`
 
 ### secrets
 

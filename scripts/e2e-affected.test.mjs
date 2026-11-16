@@ -511,11 +511,9 @@ for (const path of ['apps/web/src/routes/account-page.tsx', 'apps/web/e2e/live-s
   });
 }
 
-test('Activity and palette source edits keep their navigation regressions in the affected set', () => {
+test('Palette source edits keep their navigation regressions in the affected set', () => {
   for (const path of [
-    'apps/web/src/routes/activity-page.tsx',
-    'apps/web/src/search/activity-model.ts',
-    'apps/web/src/search/activity-href.ts',
+    'apps/web/src/search/local-search.ts',
     'apps/web/src/search/query-chip.tsx',
     'apps/web/src/search/search-query.ts',
     'apps/web/src/overlay/search-panel.tsx',
@@ -528,7 +526,6 @@ test('Activity and palette source edits keep their navigation regressions in the
       workspace: () => workspacePackages(LOCKFILE),
     });
     assert.equal(result.full, false, path);
-    assert.ok(result.selection.includes('activity-page.spec.ts'), path);
     assert.ok(result.selection.includes('search-syntax-palette.spec.ts'), path);
   }
 });

@@ -134,49 +134,7 @@ test('the Syntax button opens the filter list and closes it again', async ({ pag
   await expect(help).toHaveCount(0);
 });
 
-test('View all N in Activity carries the query, by click and by Cmd+Enter', async ({ page }) => {
-  await openPalette(page);
-  await field(page).fill('is:failed ');
-  const viewAll = panel(page).locator('[data-row-kind="activity"]');
-  await expect(viewAll).toContainText('View all 3 in Activity');
-  await viewAll.click();
-  await expect(page).toHaveURL(/\/app\/activity\?.*q=is%3Afailed/);
-  await expect(page.locator('[data-testid="query-chip"]')).toHaveText(['is:failed']);
-
-  await openPalette(page);
-  await field(page).fill('project:cairn ');
-  await field(page).press('Meta+Enter');
-  await expect(page).toHaveURL(/\/app\/activity\?.*q=project%3Acairn/);
-  await expect(page.getByTestId('activity-group').first()).toBeVisible();
-});
-
-test('View all advertises only the live hits Activity can display and retains archived search hits', async ({
-  page,
-}) => {
-  const active = { ...TASK, title: 'Active match', phase: 'done', phaseAt: Date.now() };
-  const archivedHit = { id: 'archived-match', seqNum: 10, title: 'Archived match', phase: 'done', phaseAt: Date.now(), projectName: 'cairn' };
-  await mockLive(page, { threads: [], messages: [], todos: [active] }, (path, _route, json) => {
-    if (path !== '/api/search') return undefined;
-    return json({
-      todos: [{ ...active, projectName: 'cairn' }, archivedHit],
-      projects: [],
-      agents: [],
-    });
-  });
-  await openPalette(page, '/app');
-  await field(page).fill('match');
-  await expect(todoRows(page)).toHaveCount(2);
-  await expect(todoRows(page).filter({ hasText: 'Archived match' })).toBeVisible();
-  const viewAll = panel(page).locator('[data-row-kind="activity"]');
-  await expect(viewAll).toContainText('View all 1 in Activity');
-  await viewAll.click();
-  await expect(page).toHaveURL(/\/app\/activity\?.*q=match/);
-  await expect(page.locator('[data-slot="thread-row"]')).toHaveCount(1);
-  await expect(page.locator('[data-slot="thread-row"]')).toContainText('Active match');
-  await expect(page.getByTestId('activity-summary')).toContainText('1 thread');
-});
-
-test('an archived-only live search remains openable without advertising an empty Activity list', async ({
+test('an archived-only live search remains openable', async ({
   page,
 }) => {
   await mockLive(page, { threads: [], messages: [], todos: [TASK] }, (path, _route, json) => {
@@ -191,13 +149,12 @@ test('an archived-only live search remains openable without advertising an empty
   await field(page).fill('match');
   await expect(todoRows(page)).toHaveCount(1);
   await expect(todoRows(page)).toContainText('Archived match');
-  await expect(panel(page).locator('[data-row-kind="activity"]')).toHaveCount(0);
 });
 
 test('the empty palette lists only places that land somewhere distinct', async ({ page }) => {
   await openPalette(page);
   const rows = panel(page).locator('[data-row-kind="nav"]');
-  await expect(rows).toHaveText(['Coordinator', 'Schedules', 'Activity', 'Settings']);
+  await expect(rows).toHaveText(['Coordinator', 'Schedules', 'Settings']);
   await rows.filter({ hasText: 'Settings' }).click();
   await expect(page).toHaveURL(/\/app\/settings/);
   await expect(page).not.toHaveURL(/\/app\/(team|account|api-keys)/);

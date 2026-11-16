@@ -42,7 +42,7 @@ function activityTodo(
 const CAIRN = PROJECT_ID;
 const RELAY = HOME_C_CRED;
 
-export const activityTodos: TodoRecord[] = [
+const activityTodos: TodoRecord[] = [
   activityTodo(
     'act-fold',
     431,
@@ -112,19 +112,4 @@ export const activityFixture: FixtureSet = {
   ...homeC,
   todos: activityTodos,
   now: day(ACTIVITY_DAY, 20, 30),
-};
-
-export const activityManyFixture: FixtureSet = {
-  ...activityFixture,
-  todos: Array.from({ length: 30 }, (_, i) =>
-    activityTodo(
-      `act-many-${i}`,
-      500 + i,
-      `Thread ${i + 1}`,
-      'done',
-      CAIRN,
-      day(ACTIVITY_DAY, 20, 0) - i * 60_000,
-      0.5,
-    ),
-  ),
 };

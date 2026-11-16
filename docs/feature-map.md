@@ -76,7 +76,7 @@
 | [Quota wait](#quota-wait) | 3 | shipped | yes | gap | gap | B9 |
 | [Research before retry and plan](#research-loop) | 3 | shipped | yes | n/a | yes |  |
 | [Scheduled tasks](#schedules) | 3 | shipped | gap | gap | gap | B7 |
-| [Search and activity](#search-and-activity) | 3 | shipped | gap | yes | gap | B7 |
+| [Search](#search) | 3 | shipped | gap | yes | gap | B7 |
 | [Secrets](#secrets) | 3 | shipped | yes | yes | yes |  |
 | [Server backup and deploy status](#server-status) | 3 | shipped | yes | gap | yes | B11 |
 | [Sidebar](#sidebar) | 3 | shipped | yes | yes | gap | B7 |
@@ -140,15 +140,15 @@ The phase 2 graduation path: a stranger installs the desktop app and gets a merg
 | [First run](#first-run) | 2 | Backend design: no design for checklist state and the 10-minute path |
 | [Mobile web and PWA](#mobile-web) | 2 | Research: no note on how Amp, t3code and Claude handle mobile web and PWA install |
 
-### B7 · Recurring and finding work: schedules, search and activity, sidebar
+### B7 · Recurring and finding work: schedules, search, sidebar
 
-Scheduled tasks, the search syntax with the activity view, and the sidebar with unread marks. Research Amp, Claude Code scheduled tasks and t3code, and design the due-event model, the search index and the unread state.
+Scheduled tasks, the search syntax, and the sidebar with unread marks. Research Amp, Claude Code scheduled tasks and t3code, and design the due-event model, the search index and the unread state.
 
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Token usage](#token-usage) | 2 | Research: no note beyond GitHub's contribution calendar, which the owner named |
 | [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model<br>Frontend design: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md<br>Backend design: no design for due events, missed runs and continue-thread schedules |
-| [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
+| [Search](#search) | 3 | Research: no note on Amp's search syntax and filters<br>Backend design: no design for the search syntax, index and ranking |
 | [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
 
 ### B8 · Composer and attachments
@@ -574,11 +574,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Frontend design: **gap**: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 
-### search-and-activity
+### search
 
-**Search and activity** (shipped). The search palette with its query syntax and the activity page over all threads.
+**Search** (shipped). The search palette with its query syntax.
 
-- Research: **gap**: no note on Amp's search syntax and activity filters
+- Research: **gap**: no note on Amp's search syntax and filters
 - Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: **gap**: no design for the search syntax, index and ranking
 

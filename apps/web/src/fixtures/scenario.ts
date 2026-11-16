@@ -1,6 +1,6 @@
 import type { TeamRoutingSettings } from '@cairn/shared';
 import { accountsDefault, accountsEmpty } from './accounts.js';
-import { activityFixture, activityManyFixture } from './activity.js';
+import { activityFixture } from './activity.js';
 import { chiefBubbleRuns } from './chief-bubble-runs.js';
 import { chiefDraft, sidebarRef } from './chief-draft.js';
 import { CHIEF_FILES_SCENARIOS } from './chief-files.js';
@@ -242,8 +242,6 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'sidebar-groups': sidebarGroups,
       'home-c': homeC,
       activity: activityFixture,
-      'activity-many': activityManyFixture,
-      'activity-empty': { ...homeC, todos: [] },
       'home-c-empty': homeCEmpty,
       'home-c-quiet': homeCQuiet,
       'home-c-unread': { ...homeC, unreadThreadIds: ['home-c-working-c'] },

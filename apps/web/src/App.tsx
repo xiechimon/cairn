@@ -27,12 +27,10 @@ import { MCP_HREF } from './resources/mcp-servers-page.js';
 import { ROUTING_SETTINGS_HREF } from './resources/routing-settings-page.js';
 import { SECRETS_HREF } from './resources/secrets-page.js';
 import { SKILLS_HREF } from './resources/skills-page.js';
-import { ActivityPage } from './routes/activity-page.js';
 import { BoardPage } from './routes/board-page.js';
 import { MachineAuthorizePage } from './routes/machine-authorize-page.js';
 import { TodoRedirect } from './routes/todo-redirect.js';
 import { USAGE_PATH, UsagePage } from './routes/usage-page.js';
-import { ACTIVITY_PATH } from './search/activity-href.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
 import { LegacyModelRoutingRedirect, SettingsRedirect } from './settings/settings-redirect.js';
 
@@ -49,7 +47,6 @@ function withBoundary(routes: RouteObject[]): RouteObject[] {
 }
 
 const DIALOG_ROUTES = withBoundary([
-  { path: ACTIVITY_PATH, element: <ActivityPage /> },
   { path: USAGE_PATH, element: <UsagePage /> },
   { path: '/app/project/new', element: <ProjectNewPage /> },
   { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
