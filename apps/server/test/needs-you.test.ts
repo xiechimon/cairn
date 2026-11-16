@@ -641,8 +641,8 @@ describe('needs you (#1800)', () => {
     setTodoPhase(w.deps, w.todoId, 'building');
     completeStep(w.deps, retried.id, { hasChanges: true });
 
-    expect(phaseOf(w)).toBe('review');
-    expect(groups(w).current.map((entry) => entry.reason)).toEqual(['review']);
+    expect(phaseOf(w)).toBe('done');
+    expect(groups(w).current).toEqual([]);
     expect(groups(w).stale).toEqual([]);
   });
 

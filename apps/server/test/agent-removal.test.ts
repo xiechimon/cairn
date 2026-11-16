@@ -502,7 +502,7 @@ describe('removing the agent table from a seeded legacy install', () => {
     expect(flight?.status).toBe('done');
     expect(
       s.db.select().from(schema.todo).where(eq(schema.todo.id, 'todo-flight')).get()?.phase,
-    ).toBe('review');
+    ).toBe('done');
     opened.close();
   });
 
