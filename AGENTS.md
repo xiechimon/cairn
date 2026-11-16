@@ -32,7 +32,6 @@ Work lands on `main` directly. There is no pull request, merge queue or PR-body 
 6. If the push is rejected because `origin/main` is ahead, fetch, rebase and push again. Do not repeat step 4 after a later fetch, rebase or rejected push unless conflict resolution or other local edits changed files after it passed.
 7. A conflict that changes behavior: resolve it, then stop and ask ian before pushing.
 8. Watch CI on the commit you pushed. If it goes red, fixing it is your next task; if you cannot fix it quickly, revert your commit. While main is red, do not push on top of the broken area.
-9. A failing test is not yours only after it fails on `origin/main` without your change.
 
 ## How to work
 
