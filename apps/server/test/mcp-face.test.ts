@@ -27,7 +27,7 @@ async function issueMcpKey(
   const res = await s.app.request(`/api/teams/${s.team.id}/api-keys`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'mcp-e2e', gitAccess: false, mcpAccess, toolGrants: grants }),
+    body: JSON.stringify({ name: 'MCP_E2E', gitAccess: false, mcpAccess, toolGrants: grants }),
   });
   expect(res.status).toBe(201);
   const body = (await res.json()) as { plaintext: string };

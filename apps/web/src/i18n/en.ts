@@ -629,7 +629,7 @@ export const EN: Record<string, string> = {
   '尚无 API 密钥': 'No API keys yet',
   'API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。':
     'API keys connect Runners from the command line and let MCP clients reach your workbench.',
-  新建密钥: 'New key',
+  '新建 API 密钥': 'New API key',
   复制: 'Copy',
   展开: 'Expand',
   '回复：{quote}': 'Replying to: {quote}',
@@ -639,7 +639,7 @@ export const EN: Record<string, string> = {
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
-  '请立即复制密钥，它仅显示一次。': 'Copy the key now — it is shown only once.',
+  '请立即复制 API 密钥，它仅显示一次。': 'Copy the API key now — it is shown only once.',
 
   // —— resources routes (r7 06–10, r2 §6) ——
   新建: 'New',
@@ -1158,18 +1158,8 @@ export const EN: Record<string, string> = {
   // #170 create-agent dialog family
   创建: 'Create',
   // W4 #287 API key 新建表单弹窗（r3 §6 权限位 [推断]）
-  '名称（可选）': 'Name (optional)',
-  '如：笔记本、CI 机器': 'e.g. laptop, CI runner',
-  'Git 读写（托管仓库 push/pull）': 'Git read/write (hosted repo push/pull)',
-  'MCP 访问（MCP 客户端接入）': 'MCP access (MCP client connections)',
-  '注册执行机（命令行接入）': 'Runner enrollment (CLI executor registration)',
-  工具权限位: 'Tool grants',
-  // #636 起 zh「全选」归筛选面板的全选行（en 'Select all'）；本面快捷键换
-  // 「授予全部」避开同形碰撞——zh 源串即 key，两个语义域必须分叉。
-  授予全部: 'Grant all',
-  清空: 'Clear all',
-  读: 'Read',
-  写: 'Write',
+  '只能用大写字母、数字和下划线，不能以数字开头。':
+    'Capital letters, digits and _ only; no leading digit.',
   // wayfinder #173 add-secret dialog family (r2 §242 verbatim fields)
   '名称（环境变量名）': 'Name (environment variable name)',
   '描述（可选）': 'Description (optional)',

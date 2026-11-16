@@ -204,7 +204,7 @@ beforeAll(async () => {
   });
   expect(policy.status).toBe(200);
   const key = await api(server.url, 'POST', `/api/teams/${server.teamId}/api-keys`, {
-    name: 'done-dialog-m1-key',
+    name: 'DONE_DIALOG_M1_KEY',
     gitAccess: false,
     mcpAccess: false,
     machineAccess: true,
