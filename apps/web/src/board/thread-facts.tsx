@@ -1,9 +1,5 @@
 import { cn } from 'cn';
 import { Check } from 'lucide-react';
-import { useProjects } from '../api/hooks.js';
-import { useLiveData } from '../api/provider.js';
-import { useReportRoute } from '../chief/report-route.js';
-import { MachineName, type NamedMachine } from '../components/machine-label.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { threadProgress } from './thread-panel-model.js';
@@ -20,44 +16,12 @@ const STEP_TEXT = {
   later: 'text-content-tertiary',
 } as const;
 
-export function ThreadFacts({
-  todo,
-  machine,
-  prOpen,
-}: {
-  todo: TodoRecord;
-  machine: NamedMachine | null;
-  prOpen: boolean;
-}) {
+export function ThreadFacts({ todo, prOpen }: { todo: TodoRecord; prOpen: boolean }) {
   const { t } = useI18n();
-  const { live, teamId } = useLiveData();
-  const project = useProjects(teamId, live).data?.find((p) => p.id === todo.projectId)?.name;
-  const route = useReportRoute(todo.id, todo.phase);
   const progress = threadProgress(todo, prOpen);
-  const facts = [
-    ...(project !== undefined ? [['project', t('项目'), project]] : []),
-    ...(machine !== null ? [['machine', t('机器'), machine.name]] : []),
-    ...(route !== null ? [['route', t('结果回到'), route]] : []),
-  ];
-  if (facts.length === 0 && progress === null) return null;
+  if (progress === null) return null;
   return (
     <div data-testid="thread-facts" className="flex flex-none flex-col gap-1.5 px-4 pb-3">
-      {facts.length > 0 && (
-        <dl className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-meta">
-          {facts.map(([slot, label, value]) => (
-            <div key={slot} data-slot={`thread-fact-${slot}`} className="flex min-w-0 gap-1.5">
-              <dt className="flex-none text-content-tertiary">{label}</dt>
-              <dd className="m-0 min-w-0 truncate text-foreground">
-                {slot === 'machine' && machine !== null ? (
-                  <MachineName machine={machine} compact />
-                ) : (
-                  value
-                )}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
       {progress !== null && (
         <ol
           aria-label={t('进度')}
