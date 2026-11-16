@@ -1,37 +1,23 @@
-import {
-  type CoordinatorDefault,
-  MACHINE_RUNTIMES,
-  type RoutingRuleRecord,
-  type SessionDefault,
-} from '@cairn/shared';
+import type { CoordinatorDefault, RoutingRuleRecord, SessionDefault } from '@cairn/shared';
 import { cn } from 'cn';
-import { Check, KeyRound, Plus, SquareTerminal } from 'lucide-react';
+import { Check, KeyRound, Plus } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
-import {
-  useApiMutations,
-  useChief,
-  useMachines,
-  useModelSources,
-  useProjects,
-  useProviders,
-} from '../api/hooks.js';
+import { useChief, useMachines, useModelSources, useProjects, useProviders } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
-import { withCodeSpans } from '../components/notice-banner.js';
 import { SettingsCard } from '../components/settings-list.js';
-import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
+import { AddProviderFlow, type AddProviderView } from '../resources/add-provider-flow.js';
 import { ModelPicker } from '../resources/routing-settings-page.js';
 import { safeSessionStorage } from '../safe-storage.js';
-import { settingsHref } from '../settings/settings-href.js';
 import {
   coordinatorCanAnswer,
   modelSides,
@@ -191,63 +177,13 @@ function SourceRow({
 
 function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress }) {
   const { t } = useI18n();
-  const { patchMachine } = useApiMutations(setup.teamId);
-  const online = setup.machines.find((machine) => machine.online);
-  const login = setup.connections.some(
-    (c) => online !== undefined && c.id === `machine:${online.id}` && c.available !== false,
-  );
-  const ccEnabled = (online?.enabledRuntimes ?? []).includes('claude-code');
-  const ccStatus =
-    online === undefined ? (
-      setup.machines.length === 0 ? (
-        <span className="flex items-start gap-2">
-          <Spinner className="mt-0.5 size-3.5 flex-none" aria-label={t('启动中')} />
-          {t('本机执行机正在启动，启动后会检查这台电脑上的 Claude Code')}
-        </span>
-      ) : (
-        t('本机执行机没有启动，查不到 Claude Code。退出 Cairn 再打开一次。')
-      )
-    ) : login ? (
-      t('已在这台电脑上登录')
-    ) : (
-      withCodeSpans(t('没找到已登录的 Claude Code。在终端运行 `claude` 登录后，这里会自己更新。'))
-    );
+  const { live } = useLiveData();
+  const [addView, setAddView] = useState<AddProviderView>('closed');
+  const [connectError, setConnectError] = useState<string | null>(null);
   const hasProvider = progress.models.coordinator;
   return (
     <>
       <div className="divide-y divide-border">
-        <SourceRow
-          icon={<SquareTerminal className="size-5" />}
-          title={t('本机 Claude Code')}
-          status={ccStatus}
-          usedBy={t('只给任务用')}
-          action={
-            online !== undefined && login ? (
-              <div className="flex min-h-8 items-center">
-                <ToggleSwitch
-                  className="pointer-coarse:after:-inset-y-3"
-                  checked={ccEnabled}
-                  aria-label={t('让任务用这台电脑上的 Claude Code')}
-                  onCheckedChange={(next) =>
-                    patchMachine.mutate(
-                      {
-                        id: online.id,
-                        body: {
-                          enabledRuntimes: MACHINE_RUNTIMES.filter((runtime) =>
-                            runtime === 'claude-code'
-                              ? next
-                              : (online.enabledRuntimes ?? []).includes(runtime),
-                          ),
-                        },
-                      },
-                      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
-                    )
-                  }
-                />
-              </div>
-            ) : undefined
-          }
-        />
         <SourceRow
           icon={<KeyRound className="size-5" />}
           title={t('服务商')}
@@ -260,7 +196,8 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
               <div className="flex min-h-8 items-center max-[640px]:w-full max-[640px]:pl-11">
                 <Button
                   className="pointer-coarse:h-11"
-                  render={<Link to={settingsHref('providers')} />}
+                  data-testid="first-run-add-provider"
+                  onClick={() => setAddView('picker')}
                 >
                   <Plus />
                   {t('添加服务商')}
@@ -270,12 +207,14 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
           }
         />
       </div>
-      {progress.models.tasks && !progress.models.coordinator && (
-        <p className="m-0 mt-1 flex items-start gap-2 text-pretty text-meta text-content-secondary">
-          <span className="mt-1.5 size-1.5 flex-none rounded-full bg-(--card-button)" />
-          {t('任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。')}
-        </p>
-      )}
+      <AddProviderFlow
+        teamId={setup.teamId}
+        live={live}
+        view={addView}
+        onViewChange={setAddView}
+        connectError={connectError}
+        onConnectError={setConnectError}
+      />
     </>
   );
 }

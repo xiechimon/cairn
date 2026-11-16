@@ -208,11 +208,11 @@ try {
     check(true, 'API 密钥页空态就绪');
     await shot(page, '01-keys-empty.png');
 
-    await keysEmpty.getByRole('button', { name: '新建密钥' }).click();
+    await keysEmpty.getByRole('button', { name: '新建 API 密钥' }).click();
 
-    const createDialog = page.getByRole('dialog', { name: '新建密钥' });
+    const createDialog = page.getByRole('dialog', { name: '新建 API 密钥' });
     await createDialog.waitFor({ timeout: 15_000 });
-    check(true, '新建密钥弹窗打开(#287 两步流)');
+    check(true, '新建 API 密钥弹窗打开(#287 两步流)');
     await shot(page, '02-keys-create-dialog.png');
     await createDialog.getByRole('button', { name: '创建' }).click();
     const onceCode = page.locator('code', { hasText: 'cairn_' });

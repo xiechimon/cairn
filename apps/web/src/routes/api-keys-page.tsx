@@ -11,7 +11,7 @@ import { CARD_RADIUS_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/s
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -26,12 +26,12 @@ export function ApiKeysPage() {
   const keysQ = useApiKeys(teamId, live);
   const todosQ = useTodos(teamId, live);
   const mutations = useApiMutations(teamId);
-  const [plaintext, setPlaintext] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ name: string; plaintext: string } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const keys = live
     ? [
         ...mapApiKeys(keysQ.data ?? []),
-        ...(plaintext !== null
+        ...(created !== null
           ? [
               {
                 id: 'once',
@@ -40,13 +40,22 @@ export function ApiKeysPage() {
                 gitAccess: false,
                 mcpAccess: false,
                 machineAccess: true,
-                plaintext,
+                plaintext: created.plaintext,
               },
             ]
           : []),
       ]
     : (fixture.apiKeys?.keys ?? []);
   const listed = keys.filter((key) => key.name != null || key.masked !== '');
+  const copyKey = (text: string) => {
+    const failed = (error: unknown) => toastError(t('没能复制，请手动选中 API 密钥复制。'), error);
+    const clip = navigator.clipboard;
+    if (!clip) {
+      failed(null);
+      return;
+    }
+    void clip.writeText(text).then(() => toastSuccess(t('已复制')), failed);
+  };
   return (
     <PageShell
       route="api-keys"
@@ -67,14 +76,17 @@ export function ApiKeysPage() {
             icon={KeyRound}
             title={t('尚无 API 密钥')}
             description={t('API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。')}
-            action={{ label: t('新建密钥'), onClick: () => setCreateOpen(true) }}
+            action={{ label: t('新建 API 密钥'), onClick: () => setCreateOpen(true) }}
           />
         }
       >
         {live && (
           <div className="mt-6 flex justify-end">
-            <Button className={DIALOG_PRIMARY_BUTTON} onClick={() => setCreateOpen(true)}>
-              {t('新建密钥')}
+            <Button
+              className={cn(DIALOG_PRIMARY_BUTTON, 'pointer-coarse:h-11')}
+              onClick={() => setCreateOpen(true)}
+            >
+              {t('新建 API 密钥')}
             </Button>
           </div>
         )}
@@ -85,24 +97,23 @@ export function ApiKeysPage() {
               key={`once-${key.id}`}
               className={cn('mt-6 gap-2 px-4 py-3 shadow-none ring-border', CARD_RADIUS_CLS)}
             >
+              {key.id === 'once' && created !== null && (
+                <span className="font-mono text-ui text-foreground">{created.name}</span>
+              )}
               <div className="flex items-center gap-3">
                 <code className="min-w-0 flex-1 font-mono text-ui break-all text-foreground">
                   {key.plaintext}
                 </code>
                 <Button
                   variant="outline"
-                  className={DIALOG_PRIMARY_BUTTON}
-                  onClick={
-                    live
-                      ? () => void navigator.clipboard?.writeText(key.plaintext ?? '')
-                      : undefined
-                  }
+                  className={cn(DIALOG_PRIMARY_BUTTON, 'pointer-coarse:h-11')}
+                  onClick={live ? () => copyKey(key.plaintext ?? '') : undefined}
                 >
                   {t('复制')}
                 </Button>
               </div>
               <p className="m-0 text-meta text-content-tertiary">
-                {t('请立即复制密钥，它仅显示一次。')}
+                {t('请立即复制 API 密钥，它仅显示一次。')}
               </p>
             </Card>
           ))}
@@ -111,7 +122,9 @@ export function ApiKeysPage() {
             {listed.map((key) => (
               <div key={key.id} className={SETTINGS_ROW_CLS}>
                 <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-ui text-foreground">{key.name ?? key.masked}</span>
+                  <span className="truncate font-mono text-ui text-foreground">
+                    {key.name ?? key.masked}
+                  </span>
                   {key.name != null && (
                     <span className="truncate font-mono text-meta text-content-tertiary">
                       {key.masked}
@@ -133,7 +146,8 @@ export function ApiKeysPage() {
           }
           mutations.createApiKey.mutate(body, {
             onSuccess: (res) => {
-              if (typeof res.plaintext === 'string') setPlaintext(res.plaintext);
+              if (typeof res.plaintext === 'string')
+                setCreated({ name: body.name, plaintext: res.plaintext });
             },
             onError: (error) => toastError(t('新建 API 密钥失败，请重试。'), error),
           });

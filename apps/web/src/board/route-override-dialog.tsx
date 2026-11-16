@@ -104,7 +104,9 @@ export function RouteOverrideDialog({
         .map((machine) => ({ id: machine.id, name: machine.name }));
   const pickedMachine = machines.find((machine) => machine.id === machineId);
   const mcpOptions = live
-    ? (mcpQ.data ?? []).map((row) => ({ id: row.slug, name: row.label }))
+    ? (mcpQ.data ?? [])
+        .filter((row) => row.source === 'local')
+        .map((row) => ({ id: row.slug, name: row.label }))
     : (fixture.resources?.mcpServers ?? []).map((row) => ({ id: row.name, name: row.name }));
 
   const toggleMcp = (id: string, on: boolean) => {

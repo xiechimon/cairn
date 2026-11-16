@@ -34,6 +34,14 @@ test('each sandbox cause names its own fix', () => {
   expect(
     sandboxNotice(unavailable('startup-failed', { kind: 'home-overlay-failed' })),
   ).toContain('findmnt');
+  const tooOld = sandboxNotice(unavailable('startup-failed', { kind: 'bwrap-too-old' }));
+  expect(tooOld).toContain('0.11');
+  expect(tooOld).toContain('/usr/local/bin/bwrap');
+  expect(tooOld).toContain('#sandbox-on-ubuntu-2404-and-debian-12');
+  const denied = sandboxNotice(unavailable('startup-failed', { kind: 'userns-denied' }));
+  expect(denied).toContain('AppArmor');
+  expect(denied).toContain('kernel.unprivileged_userns_clone=1');
+  expect(denied).toContain('#sandbox-on-ubuntu-2404-and-debian-12');
 });
 
 test('no cause, an unknown cause, or a stale cause on a cleanup failure keeps the generic notice', () => {

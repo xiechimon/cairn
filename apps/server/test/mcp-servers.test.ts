@@ -10,7 +10,8 @@ import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { agentMemory } from '../src/db/schema.js';
+import { openMemoryDb } from '../src/db/client.js';
+import { agentMemory, mcpConnector } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
 import { listMcpServers, readClaudeMcpServers } from '../src/services/mcp-servers.js';
@@ -124,7 +125,7 @@ describe('listMcpServers -- wire record projection (shape-preserving = web zero 
     const p = configPath(MIXED);
     const stamp = new Date('2026-09-01T00:00:00Z');
     utimesSync(p, stamp, stamp);
-    const rows = listMcpServers({ mcpConfigPath: p }, 'team-1');
+    const rows = listMcpServers({ mcpConfigPath: p, db: openMemoryDb() }, 'team-1');
     expect(rows).toHaveLength(2);
     for (const row of rows) {
       expect(mcpServerRecordSchema.parse(row).slug).toBe(row.slug);
@@ -136,14 +137,15 @@ describe('listMcpServers -- wire record projection (shape-preserving = web zero 
       createdAt: stamp.getTime(),
       updatedAt: stamp.getTime(),
     });
-    expect(listMcpServers({ mcpConfigPath: p }, 'team-other').map((r) => r.teamId)).toEqual([
-      'team-other',
-      'team-other',
-    ]);
+    expect(
+      listMcpServers({ mcpConfigPath: p, db: openMemoryDb() }, 'team-other').map((r) => r.teamId),
+    ).toEqual(['team-other', 'team-other']);
   });
 
   test('projection surface never shows secret values (even a future bug gets no chance to carry them on the wire)', () => {
-    const raw = JSON.stringify(listMcpServers({ mcpConfigPath: configPath(MIXED) }, 'team-1'));
+    const raw = JSON.stringify(
+      listMcpServers({ mcpConfigPath: configPath(MIXED), db: openMemoryDb() }, 'team-1'),
+    );
     expect(raw).not.toContain('s3cret');
     expect(raw).not.toContain('k3y');
   });
@@ -159,6 +161,50 @@ describe('REST surface: GET re-sourced, management write surface deleted (spec 1
     const raw = JSON.stringify(rows);
     expect(raw).not.toContain('s3cret');
     expect(raw).not.toContain('k3y');
+    s.dispose();
+  });
+
+  test('GET lists connectors after local entries with source and status, names only, URL without query', async () => {
+    const s = bootServer({ mcpConfigPath: configPath(MIXED) });
+    s.db
+      .insert(mcpConnector)
+      .values({
+        id: 'conn-linear',
+        teamId: s.team.id,
+        slug: 'linear',
+        label: 'Linear',
+        catalogId: null,
+        url: 'https://mcp.linear.example/mcp?token=q-s3cret',
+        headerNames: ['Authorization'],
+        valuesCipher: s.secretBox.seal(JSON.stringify({ Authorization: 'Bearer h-s3cret' })),
+        authKind: 'static',
+        oauthMeta: null,
+        oauthCipher: null,
+        status: 'needs_auth',
+        statusReason: null,
+        toolCount: null,
+        checkedAt: null,
+        authRevision: 1,
+        tokenGeneration: 0,
+        createdAt: 5,
+        updatedAt: 6,
+      })
+      .run();
+    const res = await call(s.app, 'GET', `/api/teams/${s.team.id}/mcp-servers`);
+    const rows = mcpServerRecordSchema.array().parse(await res.json());
+    expect(rows.map((r) => [r.slug, r.source, r.status])).toEqual([
+      ['demo', 'local', null],
+      ['local', 'local', null],
+      ['linear', 'connector', 'needs_auth'],
+    ]);
+    expect(rows[2]).toMatchObject({
+      id: 'conn-linear',
+      transport: 'http',
+      url: 'https://mcp.linear.example/mcp',
+      hasCredential: true,
+      credentialKeys: ['Authorization'],
+    });
+    expect(JSON.stringify(rows)).not.toContain('s3cret');
     s.dispose();
   });
 

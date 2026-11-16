@@ -268,6 +268,8 @@ export function recordStepUsage(
           cacheWrite: u.cacheWrite,
           ttftMs: u.ttftMs ?? null,
           contextTokens: u.contextTokens ?? null,
+          contextWindow: u.contextWindow ?? null,
+          compactAt: u.compactAt ?? null,
           createdAt: nowMs(),
         })
         .onConflictDoUpdate({
@@ -278,7 +280,13 @@ export function recordStepUsage(
             cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
             cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
             ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
-            contextTokens: sql`coalesce(${u.contextTokens ?? null}, ${chiefTurnUsage.contextTokens})`,
+            ...(u.contextTokens !== undefined
+              ? {
+                  contextTokens: u.contextTokens,
+                  contextWindow: u.contextWindow ?? null,
+                  compactAt: u.compactAt ?? null,
+                }
+              : {}),
           },
         })
         .run();

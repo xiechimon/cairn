@@ -34,7 +34,7 @@ export const DIALOG_TITLE_CLS =
 export const DIALOG_SUBTITLE_CLS = 'mt-0.5 text-meta text-content-tertiary';
 
 export const DIALOG_CLOSE_CLS =
-  'absolute top-4 right-4 text-content-tertiary hover:text-foreground';
+  'absolute top-4 right-4 text-content-tertiary hover:text-foreground pointer-coarse:top-2 pointer-coarse:right-2 pointer-coarse:size-11';
 
 export const DIALOG_BODY_CLS = 'min-h-0 overflow-y-auto px-4 pt-3 pb-4';
 

@@ -4,7 +4,7 @@ import { CircleCheck, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
-import { useApiMutations, usePrs } from '../api/hooks.js';
+import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { questionDockState } from '../chief/question-dock-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -140,6 +140,7 @@ function unfinishableLead(todo: TaskEntry['todo']): { glyph: GlyphKind; why: str
 
 function PanelTaskRow({
   entry,
+  place,
   prs,
   prsPending,
   selected,
@@ -150,6 +151,7 @@ function PanelTaskRow({
   selected: boolean;
   onToggle: () => void;
   entry: TaskEntry;
+  place: string | undefined;
   prs: readonly PrPanelRow[];
   prsPending: boolean;
   now: number;
@@ -174,6 +176,7 @@ function PanelTaskRow({
         stamp={compactAge(entry.todo.phaseAt, now)}
         {...(entry.section === 'resolved' ? { date: shortDate(entry.todo.phaseAt, t) } : {})}
         waiting={copy.waiting}
+        {...(place !== undefined ? { place } : {})}
         muted={entry.section === 'resolved'}
         check={
           unfinishable === null
@@ -256,6 +259,9 @@ export function TasksPanel({
   const prs = (prsQuery.data ?? []).filter(
     (pr) => projectId === null || pr.projectId === projectId,
   );
+  const projects = useProjects(teamId, connected && projectId === null).data;
+  const placeOf = (entry: TaskEntry) =>
+    projectId === null ? projects?.find((p) => p.id === entry.todo.projectId)?.name : undefined;
   const prsOf = new Map<string, PrPanelRow[]>();
   for (const pr of prs) prsOf.set(pr.threadId, [...(prsOf.get(pr.threadId) ?? []), pr]);
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
@@ -263,6 +269,7 @@ export function TasksPanel({
     <PanelTaskRow
       key={entry.todo.id}
       entry={entry}
+      place={placeOf(entry)}
       prs={prsOf.get(entry.todo.id) ?? []}
       prsPending={connected && prsQuery.isPending}
       selected={picked.has(entry.todo.id)}

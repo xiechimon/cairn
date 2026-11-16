@@ -21,6 +21,7 @@ import {
   type StepKind,
   selectSkillsForTask,
   WORKER_ASK_USER_TOOL,
+  WORKER_CLOSE_AS_DUPLICATE_TOOL,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
   WORKER_THREAD_REPORT_TOOL,
@@ -780,9 +781,13 @@ export function workerRemoteTools(
       (kind === 'plan' || isBuildStepKind(kind) || !isThreadScheduleTool(tool.name)) &&
       (namesTask || tool.name !== 'set_task_meta'),
   );
-  return kind === 'session'
-    ? [...base, WORKER_ASK_USER_TOOL, WORKER_THREAD_REPORT_TOOL]
-    : [...base];
+  if (kind !== 'session') return [...base];
+  return [
+    ...base,
+    WORKER_ASK_USER_TOOL,
+    WORKER_THREAD_REPORT_TOOL,
+    ...(isGithubProject ? [WORKER_CLOSE_AS_DUPLICATE_TOOL] : []),
+  ];
 }
 
 export async function claimStep(

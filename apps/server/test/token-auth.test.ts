@@ -81,7 +81,7 @@ describe('token auth: the four exempt surfaces (failure modes 3/4/5/8)', () => {
   test('on + /api/machine/* with a machine credential (enroll Bearer apiKey) -> works as usual, no CAIRN_TOKEN needed', async () => {
     const s = bootServer({ authToken: TOKEN });
     const issued = await reqWith(s, 'POST', `/api/teams/${s.team.id}/api-keys`, authHeaders, {
-      name: 'machine-bootstrap',
+      name: 'MACHINE_BOOTSTRAP',
       gitAccess: false,
       mcpAccess: false,
       machineAccess: true,
@@ -156,7 +156,7 @@ describe('token auth: the /api/mcp exempt surface (failure modes 11/12, the XMON
 
   async function issueMcpKey(s: TestServer): Promise<string> {
     const issued = await reqWith(s, 'POST', `/api/teams/${s.team.id}/api-keys`, authHeaders, {
-      name: 'mcp-gate-probe',
+      name: 'MCP_GATE_PROBE',
       gitAccess: false,
       mcpAccess: true,
       toolGrants: { read: ALL_READ, write: ALL_WRITE },
