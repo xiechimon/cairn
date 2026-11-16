@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const EXPECT = process.argv.includes('--expect=old') ? 'old' : 'new';
-const SCRIPT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+const SCRIPT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../..');
 const REPO = process.env.VERIFY_REPO_ROOT ?? SCRIPT_REPO;
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(REPO, '.claude', 'verify-run');
 const stack = JSON.parse(readFileSync(join(RUN_DIR, 'ports.json'), 'utf8'));

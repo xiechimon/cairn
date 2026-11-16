@@ -833,15 +833,16 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         },
         "recommended-concurrency": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1241-recommended-concurrency.mjs",
+          "script": ".claude/skills/verify-cairn/archive/1241/drive-1241-recommended-concurrency.mjs",
           "args": [],
           "needs": [
             "stack",
             "daemon"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "The daemon's hardware fingerprint yields a recommended concurrency value. It checks the recommended, manual and estimated states, the basis popover, that a heartbeat does not overwrite a manual value, and that 'restore recommended' works.",
-          "usage": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME"
+          "usage": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+          "note": "Drives the machine-concurrency-* controls that ac769a837 removed from the machines page, so its UI steps cannot pass; the recommended-concurrency API it also reads is still served."
         },
         "zombie-claim": {
           "script": ".claude/skills/verify-cairn/archive/1065/drive-1065-zombie-claim.mjs",

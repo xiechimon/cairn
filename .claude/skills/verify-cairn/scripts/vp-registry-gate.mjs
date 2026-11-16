@@ -21,7 +21,6 @@ const TICKET_NAMED = new Set([
   'drive-1137-webhook-tracer.mjs',
   'drive-1170-skill-import.mjs',
   'drive-1185-import-rollback.mjs',
-  'drive-1241-recommended-concurrency.mjs',
   'drive-1242-project-identity.mjs',
   'drive-1258-fail-links.mjs',
   'drive-1259-1260-binding.mjs',
@@ -39,6 +38,7 @@ const TICKET_NAMED = new Set([
   'drive-953-sealed.mjs',
 ]);
 const TICKET_ARCHIVED = new Set([
+  'drive-1241-recommended-concurrency.mjs',
   'drive-1009-a0-live.mjs',
   'drive-1025-plan-first-round.mjs',
   'drive-1031-account-controls.mjs',
