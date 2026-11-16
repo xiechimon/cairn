@@ -7,8 +7,10 @@ import {
   BRAND,
   CLAUDE_CONFIG_FILE_NAME,
   type CreateMcpConnectorBody,
+  type MachineTokenResponse,
   type McpCatalogEntry,
   type McpConnectorAuthKind,
+  type McpConnectorEndpoint,
   type McpConnectorOAuthMeta,
   type McpConnectorRecord,
   type McpConnectorStatus,
@@ -269,7 +271,10 @@ const UNCHECKED = {
   checkedAt: null,
 } as const;
 
-export function listMcpConnectors(deps: McpConnectorDeps, teamId: string): McpConnectorRecord[] {
+export function listMcpConnectors(
+  deps: Pick<McpConnectorDeps, 'db'>,
+  teamId: string,
+): McpConnectorRecord[] {
   return deps.db
     .select()
     .from(mcpConnector)
@@ -935,6 +940,82 @@ export async function completeMcpConnectorOAuth(
     if (!(err instanceof HttpError)) throw err;
   }
   return id;
+}
+
+export function connectorSlugs(db: Db, teamId: string): Set<string> {
+  return new Set(
+    db
+      .select({ slug: mcpConnector.slug })
+      .from(mcpConnector)
+      .where(eq(mcpConnector.teamId, teamId))
+      .all()
+      .map((row) => row.slug),
+  );
+}
+
+const TOKEN_PATH_REFRESH_LEAD_MS = 10 * 60_000;
+const TOKEN_PATH_REFRESH_BOUND_MS = 5_000;
+
+async function boundedRefresh(deps: McpConnectorDeps, teamId: string, id: string): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const bound = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, TOKEN_PATH_REFRESH_BOUND_MS);
+  });
+  try {
+    await Promise.race([refreshMcpConnectorToken(deps, teamId, id).catch(() => {}), bound]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function deliverableConnector(
+  deps: McpConnectorDeps,
+  teamId: string,
+  row: ConnectorRow,
+): Promise<McpConnectorEndpoint | null> {
+  if (row.status === 'needs_auth') return null;
+  const headers = openHeaders(deps, row);
+  if (row.authKind !== 'oauth') return { slug: row.slug, transport: 'http', url: row.url, headers };
+  const before = openOAuth(deps, row);
+  if (before?.expiresAt != null && before.expiresAt - nowMs() < TOKEN_PATH_REFRESH_LEAD_MS) {
+    await boundedRefresh(deps, teamId, row.id);
+  }
+  const current = connectorRow(deps, teamId, row.id);
+  const secrets = openOAuth(deps, current);
+  if (current.status === 'needs_auth' || secrets === null) return null;
+  if (secrets.expiresAt !== null && secrets.expiresAt <= nowMs()) return null;
+  return {
+    slug: current.slug,
+    transport: 'http',
+    url: current.url,
+    headers: { ...openHeaders(deps, current), Authorization: `Bearer ${secrets.accessToken}` },
+  };
+}
+
+export async function stepConnectorEndpoints(
+  deps: McpConnectorDeps,
+  teamId: string,
+  grant: readonly string[],
+): Promise<Pick<MachineTokenResponse, 'mcpConnectors' | 'withheldMcp'>> {
+  const granted = new Set(grant.map((slug) => slug.toLowerCase()));
+  if (granted.size === 0) return {};
+  const rows = deps.db
+    .select()
+    .from(mcpConnector)
+    .where(eq(mcpConnector.teamId, teamId))
+    .all()
+    .filter((row) => granted.has(row.slug));
+  const mcpConnectors: McpConnectorEndpoint[] = [];
+  const withheldMcp: string[] = [];
+  for (const row of rows) {
+    const endpoint = await deliverableConnector(deps, teamId, row).catch(() => null);
+    if (endpoint === null) withheldMcp.push(row.slug);
+    else mcpConnectors.push(endpoint);
+  }
+  return {
+    ...(mcpConnectors.length > 0 ? { mcpConnectors } : {}),
+    ...(withheldMcp.length > 0 ? { withheldMcp } : {}),
+  };
 }
 
 export function refreshMcpConnectorToken(

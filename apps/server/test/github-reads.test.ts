@@ -254,7 +254,7 @@ async function mcpKey(s: TestServer): Promise<string> {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      name: 'p5a2',
+      name: 'P5A2',
       gitAccess: false,
       mcpAccess: true,
       toolGrants: { read: ['Issues', 'Pull Requests', 'Workflow Runs'], write: [] },

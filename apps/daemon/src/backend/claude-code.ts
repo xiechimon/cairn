@@ -238,9 +238,10 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
           out.push({ type: 'thinking', text: b.thinking });
         } else if (b.type === 'tool_use' && typeof b.id === 'string') {
           const todo = todoFromTodoWrite(b.name, b.input);
+          const name = b.name ?? '';
           const call: ToolCallRecord = {
             id: b.id,
-            name: b.name ?? '',
+            name: name.startsWith(HOST_TOOL_PREFIX) ? name.slice(HOST_TOOL_PREFIX.length) : name,
             arguments: b.input,
             ...(todo !== null ? { todo } : {}),
           };
@@ -467,6 +468,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }[] = [];
   private closed = false;
   private stopping = false;
+  private inputEnded = false;
   private readonly background = new BackgroundSubagents();
   private heldDone: StepEvent | null = null;
   private waitCallId: string | null = null;
@@ -497,6 +499,8 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }
 
   private async pump(): Promise<void> {
+    let finished: StepEvent | undefined;
+    let turnAfterFinish = false;
     try {
       for await (const msg of this.q) {
         this.background.note(msg);
@@ -521,7 +525,15 @@ class ClaudeSessionHandle implements AgentSessionHandle {
             this.closeWait('The session ended its wait for background subagents.');
             this.heldDone = null;
           }
-          if (ev.type === 'done' && this.holdForBackground(ev)) continue;
+          if (ev.type === 'done') {
+            if (this.holdForBackground(ev)) continue;
+            finished = ev;
+            this.flushSteers();
+            this.inputEnded = true;
+            this.input.end();
+            continue;
+          }
+          if (finished !== undefined) turnAfterFinish = true;
           this.queue.push(ev);
           if (TERMINAL_EVENT_TYPES.includes(ev.type)) {
             return;
@@ -532,11 +544,16 @@ class ClaudeSessionHandle implements AgentSessionHandle {
         }
         this.flushSteers();
       }
+      if (finished !== undefined) this.queue.push(finished);
     } catch (err) {
       if (this.stopping) {
         return;
       }
       if (this.heldDone !== null) return;
+      if (finished !== undefined && !turnAfterFinish) {
+        this.queue.push(finished);
+        return;
+      }
       const message = err instanceof Error ? err.message : String(err);
       this.queue.push({ type: 'error', error: { message, retryable: false, processCrash: true } });
     } finally {
@@ -615,7 +632,8 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }
 
   async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
-    if (this.closed) throw new Error('claude-code session closed before steer delivery');
+    if (this.closed || this.inputEnded)
+      throw new Error('claude-code session closed before steer delivery');
     return new Promise<void>((resolve, reject) => {
       this.pendingSteers.push({ message: buildUserMessage(text, images), text, resolve, reject });
       this.flushSteers();
@@ -623,7 +641,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }
 
   private flushSteers(): void {
-    if (this.closed || this.state.runningTools.size > 0) return;
+    if (this.closed || this.inputEnded || this.state.runningTools.size > 0) return;
     for (const pending of this.pendingSteers.splice(0)) {
       this.input.push(pending.message);
       this.queue.push({ type: 'steer', text: pending.text });
@@ -722,6 +740,7 @@ export function sdkTranscriptPath(cwd: string, sessionId: string): string {
 }
 
 const HOST_MCP_SERVER_NAME = 'cairn';
+const HOST_TOOL_PREFIX = `mcp__${HOST_MCP_SERVER_NAME}__`;
 const HOST_BUILTIN_TOOLS = ['Read', 'Glob', 'Grep'] as const;
 const HOST_ALLOWED_TOOLS = [`mcp__${HOST_MCP_SERVER_NAME}`, ...HOST_BUILTIN_TOOLS] as const;
 

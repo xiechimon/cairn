@@ -33,7 +33,11 @@ function fakeCli(script: (cli: Cli) => Promise<void>): string[] {
     const cli: Cli = {
       async nextPrompt() {
         const next = await input.next();
-        if (next.done === true) return new Promise<string>(() => {});
+        if (next.done === true) {
+          ended = true;
+          wake?.();
+          return new Promise<string>(() => {});
+        }
         const content = next.value.message.content;
         const text = typeof content === 'string' ? content : JSON.stringify(content);
         prompts.push(text);

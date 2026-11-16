@@ -67,14 +67,14 @@ export function ApiKeysPage() {
             icon={KeyRound}
             title={t('尚无 API 密钥')}
             description={t('API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。')}
-            action={{ label: t('新建密钥'), onClick: () => setCreateOpen(true) }}
+            action={{ label: t('新建 API 密钥'), onClick: () => setCreateOpen(true) }}
           />
         }
       >
         {live && (
           <div className="mt-6 flex justify-end">
             <Button className={DIALOG_PRIMARY_BUTTON} onClick={() => setCreateOpen(true)}>
-              {t('新建密钥')}
+              {t('新建 API 密钥')}
             </Button>
           </div>
         )}
@@ -102,7 +102,7 @@ export function ApiKeysPage() {
                 </Button>
               </div>
               <p className="m-0 text-meta text-content-tertiary">
-                {t('请立即复制密钥，它仅显示一次。')}
+                {t('请立即复制 API 密钥，它仅显示一次。')}
               </p>
             </Card>
           ))}
@@ -111,7 +111,9 @@ export function ApiKeysPage() {
             {listed.map((key) => (
               <div key={key.id} className={SETTINGS_ROW_CLS}>
                 <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-ui text-foreground">{key.name ?? key.masked}</span>
+                  <span className="truncate font-mono text-ui text-foreground">
+                    {key.name ?? key.masked}
+                  </span>
                   {key.name != null && (
                     <span className="truncate font-mono text-meta text-content-tertiary">
                       {key.masked}

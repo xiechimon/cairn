@@ -258,9 +258,12 @@ export const EN: Record<string, string> = {
   '{role}：{model}': '{role}: {model}',
   '没找到已登录的 Claude Code。在终端运行 `claude` 登录后，这里会自己更新。':
     'No signed-in Claude Code found. Run `claude` in a terminal and sign in; this updates by itself.',
+  '{machine} 上没有检测到 Claude Code。装好后运行 `cairn restart`，这里会自己更新。':
+    'Claude Code is not detected on {machine}. Install it, then run `cairn restart`; this updates by itself.',
+  '还没有在线的执行机。在要跑任务的电脑上装好 CLI，运行 `cairn start` 并批准它。':
+    'No Runner is online yet. On the computer that should run tasks, install the CLI, run `cairn start` and approve it.',
   '本机 Claude Code': 'Claude Code on this computer',
   只给任务用: 'Tasks only',
-  '让任务用这台电脑上的 Claude Code': 'Let tasks use Claude Code on this computer',
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
   '任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。':
@@ -626,7 +629,7 @@ export const EN: Record<string, string> = {
   '尚无 API 密钥': 'No API keys yet',
   'API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。':
     'API keys connect Runners from the command line and let MCP clients reach your workbench.',
-  新建密钥: 'New key',
+  '新建 API 密钥': 'New API key',
   复制: 'Copy',
   展开: 'Expand',
   '回复：{quote}': 'Replying to: {quote}',
@@ -636,7 +639,7 @@ export const EN: Record<string, string> = {
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
-  '请立即复制密钥，它仅显示一次。': 'Copy the key now — it is shown only once.',
+  '请立即复制 API 密钥，它仅显示一次。': 'Copy the API key now — it is shown only once.',
 
   // —— resources routes (r7 06–10, r2 §6) ——
   新建: 'New',
@@ -1155,18 +1158,8 @@ export const EN: Record<string, string> = {
   // #170 create-agent dialog family
   创建: 'Create',
   // W4 #287 API key 新建表单弹窗（r3 §6 权限位 [推断]）
-  '名称（可选）': 'Name (optional)',
-  '如：笔记本、CI 机器': 'e.g. laptop, CI runner',
-  'Git 读写（托管仓库 push/pull）': 'Git read/write (hosted repo push/pull)',
-  'MCP 访问（MCP 客户端接入）': 'MCP access (MCP client connections)',
-  '注册执行机（命令行接入）': 'Runner enrollment (CLI executor registration)',
-  工具权限位: 'Tool grants',
-  // #636 起 zh「全选」归筛选面板的全选行（en 'Select all'）；本面快捷键换
-  // 「授予全部」避开同形碰撞——zh 源串即 key，两个语义域必须分叉。
-  授予全部: 'Grant all',
-  清空: 'Clear all',
-  读: 'Read',
-  写: 'Write',
+  '只能用大写字母、数字和下划线，不能以数字开头。':
+    'Capital letters, digits and _ only; no leading digit.',
   // wayfinder #173 add-secret dialog family (r2 §242 verbatim fields)
   '名称（环境变量名）': 'Name (environment variable name)',
   '描述（可选）': 'Description (optional)',
@@ -1529,13 +1522,12 @@ export const EN: Record<string, string> = {
   已归档项目: 'Archived projects',
   筛选项目: 'Filter projects',
   '筛选项目：{value}': 'Filter projects: {value}',
-  '已归档的项目和它们的对话会一直保留，直到你删除。':
-    'Archived projects and their conversations are kept until you delete them.',
+  '已归档的项目和它们的对话会一直保留，直到你删除。': 'Kept until you delete them.',
   '这个项目已归档。取消归档后才能发消息。':
     'This project is archived. Unarchive it to send messages.',
   '这个项目已归档。取消归档后才能修改。': 'This project is archived. Unarchive it to make changes.',
   没有已归档的项目: 'No archived projects',
-  已归档的项目: 'Archived projects',
+  已归档的项目: 'Archived',
   全部删除: 'Delete all',
   没有可删除的已归档项目: 'No archived projects to delete',
   '删除 {n} 个已归档的项目？': 'Delete {n#1 archived project|# archived projects}?',
@@ -2345,6 +2337,7 @@ export const EN: Record<string, string> = {
   '已是最新版本 {version}': 'Up to date ({version})',
   '更新到 {version}': 'Update to {version}',
   '正在更新 {percent}%': 'Updating {percent}%',
+  '正在安装…': 'Installing…',
   '正在重启…': 'Restarting…',
   '更新失败：{message}': 'Update failed: {message}',
   开发版不检查更新: 'Development builds do not check for updates',

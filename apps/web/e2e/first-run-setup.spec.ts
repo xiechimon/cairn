@@ -6,6 +6,7 @@ interface World {
   bound: boolean;
   rules: { use: string; provider: string; modelId: string }[];
   patches: { use: string; body: unknown }[];
+  machines?: unknown[];
 }
 
 const MACHINE = { id: 'm1', name: 'mac', online: true, enabledRuntimes: ['pi', 'claude-code'] };
@@ -26,7 +27,7 @@ async function open(page: Page, world: World, path = '/app') {
           settings: {},
         });
       }
-      if (p === '/api/teams/t1/machines') return json([MACHINE]);
+      if (p === '/api/teams/t1/machines') return json(world.machines ?? [MACHINE]);
       if (p === '/api/teams/t1/model-sources') {
         return json({
           sources: [
@@ -125,4 +126,16 @@ test('skipping goes to the Coordinator home; a team with projects never sees the
   await open(other, { ...fresh(), projects: [PROJECT] });
   await expect(other.getByTestId('home-c')).toBeVisible();
   await expect(other.getByTestId('first-run-setup')).toHaveCount(0);
+});
+
+test('without a desktop Runner, step 1 says how to bring a Runner online and which Runner lacks Claude Code', async ({ page }) => {
+  await open(page, { ...fresh(), bound: false, machines: [] });
+  const claude = page.getByTestId('first-run-setup');
+  await expect(claude).toContainText('还没有在线的执行机');
+  await expect(claude).not.toContainText('正在启动');
+  await expect(claude.getByRole('link', { name: '添加执行机' })).toHaveAttribute('href', '/app/settings/machines');
+
+  const other = await page.context().newPage();
+  await open(other, { ...fresh(), bound: false, machines: [{ ...MACHINE, id: 'm2', name: 'newbox', enabledRuntimes: ['pi'] }] });
+  await expect(other.getByTestId('first-run-setup')).toContainText('newbox 上没有检测到 Claude Code');
 });
