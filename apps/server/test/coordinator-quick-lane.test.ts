@@ -149,6 +149,22 @@ describe('quick lane on create_todo (docs/design/quick-lane.md L1 to L3)', () =>
       encodeReplyQuote({ sourceMessageId: 'm-1', quote: 'Should I add it to site?' }, 'yes'),
     );
     expect(statusOf(await quick(H.threadId, other, words).catch((e: unknown) => e))).toBe(400);
+    const quoted = await quick(H.threadId, other, words, {
+      params: { quotes: ['Should I add it to site?'] },
+    }).catch((e: unknown) => e);
+    expect(statusOf(quoted)).toBe(400);
+  });
+
+  test('L1: a project name inside another word is not the owner naming it', async () => {
+    const ui = await postProject(H.s.app, 'ui');
+    const inside = seedOwnerMessage(H.s.db, H.threadId, 'fix the build');
+    expect(statusOf(await quick(H.threadId, ui, inside).catch((e: unknown) => e))).toBe(400);
+    const named = seedOwnerMessage(H.s.db, H.threadId, 'fix the ui header');
+    expect(requestOf((await quick(H.threadId, ui, named)).id)?.projectBasis).toEqual({
+      kind: 'owner-named',
+      segment: 0,
+      name: 'ui',
+    });
   });
 
   test('L1: a quick task cannot split a source todo', async () => {
@@ -163,26 +179,34 @@ describe('quick lane on create_todo (docs/design/quick-lane.md L1 to L3)', () =>
     expect(statusOf(error)).toBe(400);
   });
 
-  test('L2: moving a quick task to another project drops the lane and its basis', async () => {
-    const other = await postProject(H.s.app, 'site');
-    const channel = await openChannel();
-    const words = seedOwnerMessage(H.s.db, channel, 'add a node.txt that says hello');
-    const created = await quick(channel, H.projectId, words);
-    H.s.db
-      .update(todoTable)
-      .set({ phase: 'todo', latestBuildId: null, lastRunAt: null })
-      .where(eq(todoTable.id, created.id))
-      .run();
-    await relay(
-      'update_todo',
-      { todoId: created.id, projectId: other },
-      { threadId: channel, conversationId: channel },
-    );
-    const request = requestOf(created.id)!;
-    expect(request.lane).toBeUndefined();
-    expect(request.projectBasis).toBeUndefined();
-    expect(request.segments).toHaveLength(1);
-  });
+  test.each(['coordinator', 'board'] as const)(
+    'L2: moving a quick task to another project from the %s drops the lane and its basis',
+    async (via) => {
+      const other = await postProject(H.s.app, 'site');
+      const channel = await openChannel();
+      const words = seedOwnerMessage(H.s.db, channel, 'add a node.txt that says hello');
+      const created = await quick(channel, H.projectId, words);
+      H.s.db
+        .update(todoTable)
+        .set({ phase: 'todo', latestBuildId: null, lastRunAt: null })
+        .where(eq(todoTable.id, created.id))
+        .run();
+      if (via === 'coordinator') {
+        await relay(
+          'update_todo',
+          { todoId: created.id, projectId: other },
+          { threadId: channel, conversationId: channel },
+        );
+      } else {
+        const res = await req(H.s.app, 'PATCH', `/api/todos/${created.id}`, { projectId: other });
+        expect(res.status).toBe(200);
+      }
+      const request = requestOf(created.id)!;
+      expect(request.lane).toBeUndefined();
+      expect(request.projectBasis).toBeUndefined();
+      expect(request.segments).toHaveLength(1);
+    },
+  );
 
   test('L3: a task created without the lane carries no lane fields', async () => {
     const channel = await openChannel();

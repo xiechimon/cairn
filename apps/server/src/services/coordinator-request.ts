@@ -47,19 +47,38 @@ function sourceIdOf(segment: TaskSegment): string | null {
 }
 
 function namesOf(row: ProjectRow): string[] {
-  return [row.name, row.repoName, row.githubRepo?.split('/').at(-1)]
+  return [row.name, row.repoName, row.githubRepo, row.githubRepo?.split('/').at(-1)]
     .map((name) => (name ?? '').normalize('NFC').trim().toLowerCase())
     .filter((name) => name.length >= 2);
 }
 
-function ownerWordsOf(segment: TaskSegment): string {
-  return (parseReplyQuote(segment.text)?.body ?? segment.text).normalize('NFC').toLowerCase();
+const NAME_CHAR = /[A-Za-z0-9_\-/]/;
+
+function namesWord(words: string, name: string): boolean {
+  for (let at = words.indexOf(name); at !== -1; at = words.indexOf(name, at + 1)) {
+    const before = words[at - 1] ?? '';
+    const after = words[at + name.length] ?? '';
+    if (!NAME_CHAR.test(before) && !NAME_CHAR.test(after)) return true;
+  }
+  return false;
+}
+
+function ownerBodies(cited: readonly CitedSegment[]): Map<string, string> {
+  return new Map(
+    cited.flatMap(({ segment }) => {
+      const id = sourceIdOf(segment);
+      if (id === null || segment.author !== 'owner') return [];
+      const body = parseReplyQuote(segment.text)?.body ?? segment.text;
+      return [[id, body.normalize('NFC').toLowerCase()] as const];
+    }),
+  );
 }
 
 function quickLaneBasis(
   db: Db,
   ctx: RequestCtx,
   projectId: string,
+  cited: readonly CitedSegment[],
   segments: readonly TaskSegment[],
 ): ProjectBasis {
   const target = db
@@ -106,9 +125,10 @@ function quickLaneBasis(
       : undefined;
   if (picked !== undefined) return { kind: 'composer', messageId: picked.id };
   const names = namesOf(target);
+  const bodies = ownerBodies(cited);
   for (const [index, segment] of segments.entries()) {
-    const words = ownerWordsOf(segment);
-    const name = names.find((candidate) => words.includes(candidate));
+    const words = bodies.get(sourceIdOf(segment) ?? '') ?? '';
+    const name = names.find((candidate) => namesWord(words, candidate));
     if (name === undefined) continue;
     return segment.source.kind === 'answer'
       ? { kind: 'owner-answer', segment: index }
@@ -303,7 +323,9 @@ export function createRequestTodo(
   }
   requireTeamTodos(db, ctx.teamId, params.dependsOn ?? []);
   const projectBasis =
-    params.lane === 'quick' ? quickLaneBasis(db, ctx, params.projectId, segments) : undefined;
+    params.lane === 'quick'
+      ? quickLaneBasis(db, ctx, params.projectId, cited, segments)
+      : undefined;
   const keys = new Set(cited.map((c) => segmentKey(c.quoteSource)));
   const siblings = params.quotes === undefined ? [] : splitSiblings(db, ctx.teamId, keys);
   const request: TaskRequest = {
@@ -408,34 +430,16 @@ export function updateRequestTodo(
       );
     }
   }
-  const routed = db.transaction(() => {
-    const before = db
-      .select({ projectId: todo.projectId, request: todo.request })
-      .from(todo)
-      .where(and(eq(todo.id, params.todoId), eq(todo.teamId, ctx.teamId)))
-      .get();
-    const updated = updateAutonomousTodo(
-      deps,
-      params.todoId,
-      {
-        ...(summaryTitle !== undefined ? { title: summaryTitle } : {}),
-        ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
-        ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
-      },
-      summaryTitle !== undefined ? { textWriter: 'coordinator-title' } : {},
-    );
-    const request = before?.request;
-    if (
-      updated !== null &&
-      updated.projectId !== before?.projectId &&
-      request != null &&
-      (request.lane !== undefined || request.projectBasis !== undefined)
-    ) {
-      const { lane: _lane, projectBasis: _basis, ...ordinary } = request;
-      db.update(todo).set({ request: ordinary }).where(eq(todo.id, params.todoId)).run();
-    }
-    return updated;
-  });
+  const routed = updateAutonomousTodo(
+    deps,
+    params.todoId,
+    {
+      ...(summaryTitle !== undefined ? { title: summaryTitle } : {}),
+      ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
+      ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+    },
+    summaryTitle !== undefined ? { textWriter: 'coordinator-title' } : {},
+  );
   if (added === null || routed === null) return routed;
   const row = appendableRow(db, ctx, params.todoId);
   const request: TaskRequest = { ...row.request, segments: [...row.request.segments, ...added] };
