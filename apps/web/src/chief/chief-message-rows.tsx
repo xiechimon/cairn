@@ -5,6 +5,8 @@ import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
+import { reportStatusWord } from '../board/status-words.js';
+import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
@@ -38,10 +40,11 @@ import {
   type ReplyQuoteDraft,
   ReplySourceHighlightContext,
 } from './reply-source-highlight.js';
+import { channelHref, useChannelOf } from './report-route.js';
 import { ResearchReportLine, ResearchReportRow } from './research-report.js';
 import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
-import type { ThreadActivity } from './thread-activity.js';
+import type { ChannelMirror, ThreadActivity } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
 
 const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
@@ -293,6 +296,46 @@ function SubThreadRow({ activity }: { activity: ThreadActivity }) {
   );
 }
 
+const MIRROR_LINK_CLS = 'flex-none text-(--chat-link) no-underline hover:underline';
+
+function ChannelMirrorRow({ mirror }: { mirror: ChannelMirror }) {
+  const { t } = useI18n();
+  const channel = useChannelOf()(mirror.fromThreadId);
+  const name = t('{channel} 频道', { channel: channel?.name ?? t('项目') });
+  return (
+    <MessageScrollerItem
+      messageId={mirror.id}
+      style={SCROLLER_ITEM_STYLE}
+      className={EVENT_ROW_CLS}
+      data-testid="chief-channel-mirror"
+    >
+      <Marker variant="separator" className="gap-1.5 text-meta text-content-tertiary">
+        <span className="flex min-w-0 shrink items-center gap-1.5">
+          <span className="flex-none">{name}</span>
+          <span aria-hidden="true">·</span>
+          <span className="min-w-0 truncate text-content-secondary" title={mirror.title}>
+            {mirror.title}
+          </span>
+          <span className="flex-none">{t(reportStatusWord(mirror))}</span>
+          {channel?.projectId != null ? (
+            <Link
+              to={channelHref(channel.projectId)}
+              aria-label={t('去{channel}', { channel: name })}
+              className={MIRROR_LINK_CLS}
+            >
+              {t('去看')}
+            </Link>
+          ) : (
+            <ThreadLink todoId={mirror.todoId} className={MIRROR_LINK_CLS}>
+              {t('去看')}
+            </ThreadLink>
+          )}
+        </span>
+      </Marker>
+    </MessageScrollerItem>
+  );
+}
+
 function Segments({ segments }: { segments: ChiefSegment[] }) {
   return (
     <>
@@ -362,7 +405,7 @@ function HandoffRow({ todoId }: { todoId: string }) {
 }
 
 export function chiefStreamRowKey(
-  item: ChiefStreamItem | ThreadActivity,
+  item: ChiefStreamItem | ThreadActivity | ChannelMirror,
   index: number,
 ): string | number {
   switch (item.kind) {
@@ -379,6 +422,7 @@ export function chiefStreamRowKey(
     case 'thread-report':
     case 'thread-message':
     case 'thread-activity':
+    case 'channel-mirror':
       return item.id ?? index;
     default:
       return index;
@@ -386,7 +430,7 @@ export function chiefStreamRowKey(
 }
 
 interface ChiefStreamRowProps {
-  item: ChiefStreamItem | ThreadActivity;
+  item: ChiefStreamItem | ThreadActivity | ChannelMirror;
   index: number;
   onCopy: (text: string) => void;
   onRewindRequest: (index: number, id: string | null) => void;
@@ -570,6 +614,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       : {};
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-activity') return <SubThreadRow activity={item} />;
+  if (item.kind === 'channel-mirror') return <ChannelMirrorRow mirror={item} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
     return null;
   if (item.kind === 'error')
