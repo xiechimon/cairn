@@ -73,6 +73,7 @@ import type { UnsentSends } from './outbox.js';
 import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
 import { QuickReplies } from './quick-replies.js';
+import { ReaderFollowContext, useReaderFollow } from './reader-follow.js';
 import { ReplyingToBar } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
 import {
@@ -152,14 +153,16 @@ export function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolea
 
 export function ChiefScrollProvider({ children }: { children: React.ReactNode }) {
   const [atBottom, setAtBottom] = useState(true);
+  const [readerLeft, setReaderLeft] = useState(false);
+  const readerFollow = useMemo(() => ({ readerLeft, setReaderLeft }), [readerLeft]);
   return (
     <MessageScrollerProvider
-      autoScroll={atBottom}
+      autoScroll={atBottom && !readerLeft}
       scrollEdgeThreshold={FOLLOW_THRESHOLD}
       defaultScrollPosition="end"
     >
       <ChiefFollowArmed onAtBottom={setAtBottom} />
-      {children}
+      <ReaderFollowContext.Provider value={readerFollow}>{children}</ReaderFollowContext.Provider>
     </MessageScrollerProvider>
   );
 }
@@ -278,6 +281,7 @@ export function ChiefConversation({
   const onAttachment =
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
   const { scrollToEnd } = useMessageScroller();
+  const reader = useReaderFollow();
   const followSentRef = useRef(false);
   const [enteringKey, setEnteringKey] = useState<string | number | null>(null);
   const latestUserKeyRef = useRef<string | number | null>(null);
@@ -286,8 +290,9 @@ export function ChiefConversation({
   useEffect(() => {
     if (prevThreadRef.current === chief.threadTitle) return;
     prevThreadRef.current = chief.threadTitle;
+    reader.follow();
     scrollToEnd();
-  }, [chief.threadTitle, scrollToEnd]);
+  }, [chief.threadTitle, scrollToEnd, reader]);
   const [rewindConfirm, setRewindConfirm] = useState<{ index: number; id: string | null } | null>(
     null,
   );
@@ -456,8 +461,9 @@ export function ChiefConversation({
     if (latestUserPosition <= sentRowPosition) return;
     followSentRef.current = false;
     setEnteringKey(latestUserKey);
+    reader.follow();
     scrollToEnd();
-  }, [latestUserKey, keyAtSend, sentRowPosition, latestUserPosition, scrollToEnd]);
+  }, [latestUserKey, keyAtSend, sentRowPosition, latestUserPosition, scrollToEnd, reader]);
   const queuedCapsules = allRows.flatMap(({ item }) =>
     item.kind === 'user' && item.pending === 'held' && item.id != null
       ? [
@@ -631,6 +637,7 @@ export function ChiefConversation({
             <FadeScrollerViewport
               reserveEnd
               ref={viewportRef}
+              {...reader.viewportProps}
               data-testid="chief-body"
               className="scrollbar-gutter-both data-pending-scroll:visible data-pending-scroll:opacity-0 [--scroll-fade-size:32px] in-data-[chat-top=under-header]:[--scroll-fade-size-top:80px] [html[data-narrow-chrome]_&]:[--scroll-fade-size-top:80px]"
             >
@@ -661,7 +668,7 @@ export function ChiefConversation({
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>
             </FadeScrollerViewport>
-            <JumpToLatestButton label={t('滚动到最新')}>
+            <JumpToLatestButton label={t('滚动到最新')} onClick={reader.follow}>
               <ArrowDown width={20} height={20} />
             </JumpToLatestButton>
             {earlier != null && (
