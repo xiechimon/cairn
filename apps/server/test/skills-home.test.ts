@@ -6,6 +6,7 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -24,7 +25,7 @@ import { bootServer, req } from './helpers.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = makeTestTempDir('cairn-skills-home-');
+  const root = realpathSync(makeTestTempDir('cairn-skills-home-'));
   roots.push(root);
   return root;
 }
