@@ -44,18 +44,21 @@ test('a secret added from a project defaults to that project and is listed as pr
   });
 
   await page.goto('/app/resources/secrets?project=proj-1');
-  await expect(page.getByText('NPM_TOKEN')).toBeVisible();
-  await expect(page.getByText('全团队', { exact: true })).toBeVisible();
+  const teamRow = page.getByTestId('resource-row').filter({ hasText: 'NPM_TOKEN' });
+  await expect(teamRow).toBeVisible();
+  await expect(teamRow).not.toContainText('仅');
   await page.getByRole('button', { name: '新建', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: '添加密钥' });
+  const dialog = page.getByRole('dialog', { name: '添加密钥或环境变量' });
   await expect(dialog.getByTestId('secret-scope').locator('[data-slot="select-value"]')).toHaveText(
     'cairn',
   );
-  await dialog.getByLabel('名称（环境变量名）').fill('DEPLOY_TOKEN');
-  await dialog.getByLabel('值').fill('deploy-value');
-  await dialog.getByRole('button', { name: '添加密钥' }).click();
+  await dialog.getByLabel('名称', { exact: true }).fill('DEPLOY_TOKEN');
+  await dialog.getByLabel('值', { exact: true }).fill('deploy-value');
+  await dialog.getByRole('button', { name: '添加', exact: true }).click();
   await expect.poll(() => posted).toEqual([
-    { name: 'DEPLOY_TOKEN', value: 'deploy-value', projectId: 'proj-1' },
+    { name: 'DEPLOY_TOKEN', value: 'deploy-value', kind: 'env', projectId: 'proj-1' },
   ]);
-  await expect(page.getByText('仅 cairn')).toBeVisible();
+  await expect(
+    page.getByTestId('resource-row').filter({ hasText: 'DEPLOY_TOKEN' }),
+  ).toContainText('仅 cairn');
 });
