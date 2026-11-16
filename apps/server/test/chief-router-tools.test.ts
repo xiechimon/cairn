@@ -6,6 +6,7 @@ import {
   CHIEF_ROUTER_TOOLS,
   CHIEF_TOOL_COUNT,
   CHIEF_TOOLS_REMOVED_UNDER_D60,
+  COMPUTER_REMOTE_TOOLS,
   chiefDigestThreadId,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -128,9 +129,13 @@ describe('router tool vocabulary', () => {
       ...CHIEF_REMOTE_TOOLS.map((t) => t.name),
       ...CHIEF_ROUTER_TOOL_NAMES,
       ...CHIEF_REPLY_TOOLS.map((t) => t.name),
+      ...COMPUTER_REMOTE_TOOLS.map((t) => t.name),
     ]);
     expect(Object.keys(chiefToolDefHashes())).toHaveLength(
-      CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length + CHIEF_REPLY_TOOLS.length,
+      CHIEF_TOOL_COUNT +
+        CHIEF_ROUTER_TOOL_NAMES.length +
+        CHIEF_REPLY_TOOLS.length +
+        COMPUTER_REMOTE_TOOLS.length,
     );
   });
 });

@@ -98,5 +98,13 @@ describe('Coordinator rule that selects Claude Code', () => {
     const claimed = await claimAs(s, machineId);
     expect(claimed?.step).toMatchObject({ id: 's1', machineId });
     expect(claimed?.agent).toMatchObject({ provider: 'claude-code', modelId: 'sonnet' });
+    expect(claimed?.remoteTools?.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining([
+        'browser_navigate',
+        'browser_snapshot',
+        'browser_act',
+        'request_takeover',
+      ]),
+    );
   });
 });

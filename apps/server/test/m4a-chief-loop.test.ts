@@ -3,6 +3,7 @@ import {
   CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOL_NAMES,
   CHIEF_TOOL_COUNT,
+  COMPUTER_REMOTE_TOOLS,
   claimedStepSchema,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -146,7 +147,10 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     expect(claimed.chief?.threadId).toBe(w.threadId);
     expect(claimed.chief?.systemPrompt).toContain('Coordinator');
     expect(claimed.remoteTools).toHaveLength(
-      CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length + CHIEF_REPLY_TOOLS.length,
+      CHIEF_TOOL_COUNT +
+        CHIEF_ROUTER_TOOL_NAMES.length +
+        CHIEF_REPLY_TOOLS.length +
+        COMPUTER_REMOTE_TOOLS.length,
     );
     expect(claimed.agent?.id).toBe(w.coordinatorRouteId);
     expect(claimed.agent?.modelId).toBe('stub-model');
@@ -357,7 +361,10 @@ describe('Coordinator router tools over the machine protocol (D60)', () => {
     const w = await setupChiefWorld();
     const claimed = await w.claim();
     expect(claimed.remoteTools).toHaveLength(
-      CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length + CHIEF_REPLY_TOOLS.length,
+      CHIEF_TOOL_COUNT +
+        CHIEF_ROUTER_TOOL_NAMES.length +
+        CHIEF_REPLY_TOOLS.length +
+        COMPUTER_REMOTE_TOOLS.length,
     );
     const names = claimed.remoteTools?.map((t) => t.name) ?? [];
     for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(names).toContain(name);
