@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "027952cb857383db231e26d194f209c8065b7d66",
+    "sha": "5e4350f5339511b0cc36dbed15c95d7313987396",
     "date": "2026-11-16"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -219,8 +219,8 @@
       "kind": "registry",
       "upstreamItem": "tooltip",
       "status": "deviated",
-      "reason": "#733 single z ladder (z-50 → z-(--z-dialog)): the portaled tooltip rides the repo overlay-ladder slot like dropdown-menu/popover — values are identical today, the token keeps the ladder the single z truth. The provider keeps Base UI's 600ms open delay instead of the registry's 0, and the popup fades in linearly, so hovering across buttons does not flash tips.",
-      "hash": "f331a0c845e7acce53a5fbff38e3c90eb0e3bba3b50869b0874c87c1f9e6c49b"
+      "reason": "#733 single z ladder (z-50 → z-(--z-dialog)): the portaled tooltip rides the repo overlay-ladder slot like dropdown-menu/popover — values are identical today, the token keeps the ladder the single z truth.",
+      "hash": "3e8c1afd2c5d630af385dc67bd519000d1ae9c5495016c1112b245a429e07cf9"
     },
     "trace.tsx": {
       "kind": "registry",

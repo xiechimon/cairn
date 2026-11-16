@@ -756,7 +756,7 @@ function Head({
             title
           ) : (
             <Tooltip>
-              <TooltipTrigger render={title} />
+              <TooltipTrigger delay={600} render={title} />
               <TooltipContent side="bottom" align="start" sideOffset={6}>
                 {tooltip}
               </TooltipContent>

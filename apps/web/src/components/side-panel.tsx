@@ -24,6 +24,8 @@ import {
 import { Button } from './ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip.js';
 
+const RESIZE_TIP_DELAY = 600;
+
 const listeners = new Set<() => void>();
 let widthNow: number | null = null;
 
@@ -97,6 +99,7 @@ function ResizeHandle({ width }: { width: number }) {
   return (
     <Tooltip open={tip} onOpenChange={(next) => setTip(next && drag.current === null)}>
       <TooltipTrigger
+        delay={RESIZE_TIP_DELAY}
         render={
           <span
             data-slot="side-panel-resize-zone"

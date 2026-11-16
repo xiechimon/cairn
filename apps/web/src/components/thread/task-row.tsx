@@ -31,6 +31,8 @@ export interface TaskRowProps {
   onIntent?: () => void;
 }
 
+const ROW_DESCRIPTION_DELAY = 600;
+
 const LEAD_BOX = 'flex size-7 flex-none items-center justify-center';
 
 function Glyph({ glyph }: { glyph: TaskRowGlyph }) {
@@ -67,6 +69,7 @@ export function TaskRow({
   const row = (
     <Tooltip>
       <TooltipTrigger
+        delay={ROW_DESCRIPTION_DELAY}
         render={
           <Button
             variant="ghost"
