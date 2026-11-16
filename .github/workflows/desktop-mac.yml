@@ -61,6 +61,7 @@ jobs:
       - name: Package the arm64 DMG
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_FOR_PULL_REQUEST: 'true'
         working-directory: apps/desktop
         run: |
           node build.mjs

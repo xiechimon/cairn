@@ -48,6 +48,7 @@ jobs:
     needs: decide
     if: needs.decide.outputs.release == 'true'
     runs-on: macos-latest
+    environment: desktop-release
     permissions:
       contents: write
     timeout-minutes: 60
@@ -76,6 +77,18 @@ jobs:
           pnpm --filter @cairn/desktop stage-server
           pnpm --filter @cairn/desktop stage-runner
 
+      - name: Import the release signing certificate
+        env:
+          P12_BASE64: ${{ secrets.MAC_SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MAC_SIGNING_P12_PASSWORD }}
+        run: |
+          umask 077
+          printf '%s' "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          printf '%s' "$P12_PASSWORD" > "$RUNNER_TEMP/signing.password"
+          apps/desktop/scripts/import-signing-identity.sh "$RUNNER_TEMP/signing.p12" \
+            "$RUNNER_TEMP/signing.password" apps/desktop/signing/cairn-mac-self-signed.crt
+          rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/signing.password"
+
       - name: Package arm64 and x64
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -83,6 +96,16 @@ jobs:
         run: |
           node build.mjs
           pnpm exec electron-builder --mac dmg zip --arm64 --x64 -c.extraMetadata.version="$VERSION"
+
+      - name: Check that the update zips hold apps signed by the release certificate
+        working-directory: apps/desktop
+        run: |
+          for arch in arm64 x64; do
+            mkdir -p "$RUNNER_TEMP/unzipped-$arch"
+            ditto -x -k "release/Cairn-$VERSION-$arch.zip" "$RUNNER_TEMP/unzipped-$arch"
+          done
+          node scripts/check-signature.mjs signing/cairn-mac-self-signed.crt \
+            "$RUNNER_TEMP/unzipped-arm64/Cairn.app" "$RUNNER_TEMP/unzipped-x64/Cairn.app"
 
       - name: Launch the arm64 app before publishing it
         working-directory: apps/desktop
@@ -99,7 +122,14 @@ jobs:
             --target "$GITHUB_SHA" \
             --latest \
             --title "Cairn for Mac $VERSION" \
-            --notes "Built from $GITHUB_SHA. Ad-hoc signed: the first launch needs right-click, Open." \
+            --notes "Built from $GITHUB_SHA. Signed with Cairn's own certificate, not an Apple one: the first launch needs right-click, Open." \
             Cairn-"$VERSION"-arm64.dmg Cairn-"$VERSION"-x64.dmg \
             Cairn-"$VERSION"-arm64.zip Cairn-"$VERSION"-x64.zip \
             desktop-latest.json
+
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          if [ -n "${CAIRN_MAC_SIGN_KEYCHAIN:-}" ]; then
+            security delete-keychain "$CAIRN_MAC_SIGN_KEYCHAIN"
+          fi
