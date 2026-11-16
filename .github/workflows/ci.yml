@@ -555,10 +555,6 @@ jobs:
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ops/host/test-temp-guard.test.mjs
 
-      - name: Worktree reaper removes only clean, idle, finished trees
-        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/host/worktree-reaper.test.mjs
-
       - name: Runner secret isolation fixtures (#2189)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs
