@@ -58,6 +58,7 @@ import {
   type SystemRow,
   stripAnsiEscapes,
   stripSkillRouteSection,
+  stripTurnContext,
   systemRowOf,
   TAKEOVER_HANDED_BACK,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -105,8 +106,7 @@ import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable':
-    '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）',
+  'sandbox-unavailable': '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
   'runtime-disabled':
     '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
   'model-unavailable':
@@ -114,7 +114,7 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
   'local-path': '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了（前面 {ahead} 个）',
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
-    '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
+    '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在 {machine} 上运行 claude 登录（前面 {ahead} 个）',
   'account-switched':
     '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）',
   'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
@@ -122,14 +122,13 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
 };
 
 const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable':
-    '排队中：执行机的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）',
+  'sandbox-unavailable': '排队中：执行机的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
   'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
   'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
   'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）',
   'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
-    '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
+    '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在执行机上运行 claude 登录（前面 {ahead} 个）',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
@@ -1464,7 +1463,7 @@ export function askQuestionOfContent(content: unknown): {
 const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
 
 function chiefUserText(raw: string): string {
-  return stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, '')).trim();
+  return stripTurnContext(stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, ''))).trim();
 }
 
 function takeoverItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {

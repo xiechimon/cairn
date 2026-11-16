@@ -32,7 +32,7 @@ The implementer templates incorporate the same checklist in `docs/agent-dispatch
 | Dimension | Fact |
 |---|---|
 | Surface | web UI (`apps/web`, vite) first; HTTP API (`apps/server`, Hono REST+SSE+SQLite). daemon optional, UI verification does not need it. |
-| Run | `pnpm dev:server` (default 8787, first boot auto-creates the DB + seeds a single user **Owner**) + `pnpm dev:web` (vite dev 5173, proxy `/api`, `/git` to the server). No auth: seeded = auto-logged-in, browser opens usable directly. Production form = root `pnpm start` (build web to server same-origin serving `apps/web/dist`). |
+| Run | `pnpm dev:server` (default 8787, first boot auto-creates the DB and seeds one owner using the server's OS username, falling back to **Owner**) + `pnpm dev:web` (vite dev 5173, proxy `/api`, `/git` to the server). No auth: seeded = auto-logged-in, browser opens usable directly. Production form = root `pnpm start` (build web to server same-origin serving `apps/web/dist`). |
 | Drive | Playwright (`@playwright/test` root devDep, chromium installed). live mode = URL **without** `?scenario=` (with it = the fixture face, e2e-only). |
 | Observe | screenshots (1440x732, same convention as e2e); HTTP JSON (`GET /api/auth/session`, `/api/todos`, `/api/teams`...); SQLite rows (`<CAIRN_HOME>/server/server.db`, better-sqlite3 read-only); server logs (`cairn-server online` line). |
 | Isolate | three axes: `VERIFY_PORT` (server, default 8791) / `VERIFY_WEB_PORT` (vite, default 5273) / `CAIRN_HOME` (scratch). vite dev does not write `dist/`, no collision with e2e's dist. |
@@ -84,7 +84,7 @@ node .claude/skills/verify-cairn/scripts/launch.mjs
 node .../scripts/doctor.mjs   # read-only, zero write operations
 ```
 
-Checks: pid group alive to `GET /api/auth/session` 200 and `displayName === "Owner"` to `GET /api/teams` 200 to `GET /api/projects` 200 to web `GET /app` 200. Any FAIL exit code 1. When the stack is not up, hint to run launch first.
+Checks: pid group alive to `GET /api/auth/session` 200 and a nonempty owner display name to `GET /api/teams` 200 to `GET /api/projects` 200 to web `GET /app` 200. Any FAIL exit code 1. When the stack is not up, hint to run launch first.
 
 ## Drive
 

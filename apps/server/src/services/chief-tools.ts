@@ -15,9 +15,12 @@ import {
   fenceReportText,
   IN_PROGRESS_PHASES,
   isChiefConversationId,
+  isMailSecretName,
   isWaitingPhase,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
+  SECRET_NAME_PATTERN,
+  SECRET_NAME_RULE,
   SUGGEST_REPLIES_TOOL_NAME,
   snoozeTodoBodySchema,
   updateSkillToolParamsSchema,
@@ -269,6 +272,8 @@ const DOCS_FILE_METADATA_RESERVE_BYTES = 2048;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
 export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
+const SEARCH_QUERY_MAX_CHARS = 200;
+const SEARCH_QUERY_MAX_TERMS = 8;
 export const CHIEF_TASK_LIST_SUMMARY_MAX_CHARS = 240;
 
 function requireTeamBuild(db: Db, buildId: string, teamId: string) {
@@ -370,8 +375,29 @@ export async function executeChiefTool(
       }
       const projectId = optStr(params, 'projectId');
       const phase = optStr(params, 'phase');
+      const query = optStr(params, 'query');
+      if (query !== undefined && query.length > SEARCH_QUERY_MAX_CHARS) {
+        throw new HttpError(
+          400,
+          `invalid params.query: at most ${SEARCH_QUERY_MAX_CHARS} characters`,
+        );
+      }
+      const terms =
+        query === undefined ? [] : [...new Set(query.toLowerCase().split(/\s+/).filter(Boolean))];
+      if (query !== undefined && (terms.length === 0 || terms.length > SEARCH_QUERY_MAX_TERMS)) {
+        throw new HttpError(
+          400,
+          `invalid params.query: expected 1 to ${SEARCH_QUERY_MAX_TERMS} distinct search terms`,
+        );
+      }
       let records = listTodos(svc, { teamId: ctx.teamId, ...(projectId ? { projectId } : {}) });
       if (phase) records = records.filter((t) => t.phase === phase);
+      if (terms.length > 0) {
+        records = records.filter((t) => {
+          const text = `${t.title}\n${t.spec}`.toLowerCase();
+          return terms.every((term) => text.includes(term));
+        });
+      }
       const todos: { id: string; seqNum: number; title: string; phase: string; summary: string }[] =
         [];
       const response = { todos, total: records.length, nextOffset: null as number | null };
@@ -801,6 +827,7 @@ export async function executeChiefTool(
     case 'set_secret': {
       const keysvc = { db, box: deps.box };
       const name = str(params, 'name');
+      if (isMailSecretName(name)) throw new HttpError(400, SECRET_NAME_RULE);
       const projectId = optStr(params, 'projectId') ?? null;
       const existing = listSecrets(keysvc, ctx.teamId).find(
         (s) => s.name === name && s.projectId === projectId,
@@ -820,8 +847,16 @@ export async function executeChiefTool(
       const value = str(params, 'value');
       const description = optStr(params, 'description') ?? null;
       if (existing) {
-        return json(updateSecret(keysvc, ctx.teamId, existing.id, { name, value, description }));
+        return json(
+          updateSecret(keysvc, ctx.teamId, existing.id, {
+            name,
+            value,
+            description,
+            kind: 'secret',
+          }),
+        );
       }
+      if (!SECRET_NAME_PATTERN.test(name)) throw new HttpError(400, SECRET_NAME_RULE);
       const record = createSecret(keysvc, {
         teamId: ctx.teamId,
         name,

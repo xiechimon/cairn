@@ -225,7 +225,6 @@ const sessionRouteId = seedSessionRoute(trial, {
   tools: [],
   skillsAllowlist: [],
   defaultSkill: null,
-  mcpServers: [],
 });
 seedRoute(trial, 'coordinator', { provider: 'domestic-proxy', modelId });
 const project = projectRecordSchema.pick({ id: true }).parse(

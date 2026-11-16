@@ -100,7 +100,7 @@ test('a settled account reads one status, never available next to verifying', as
 });
 
 const FAILURES: { mode: Verify; reason: string; shot: string }[] = [
-  { mode: 'auth', reason: '登录已失效，请重新生成令牌后再添加', shot: 'failed-auth' },
+  { mode: 'auth', reason: '这个订阅的登录已失效。先移除它，再在终端运行 claude setup-token，把新的 token 添加回来。', shot: 'failed-auth' },
   { mode: 'timeout', reason: '验证超时，请重试', shot: 'failed-timeout' },
   { mode: 'unavailable', reason: '服务器上找不到 claude 命令', shot: 'failed-unavailable' },
   { mode: 'rate-limited', reason: '验证太频繁，请 10 秒后重试', shot: 'failed-rate-limited' },

@@ -163,96 +163,39 @@ test('typing inside another settings field does not steal focus', async ({ page 
   await expect(name).toBeFocused();
 });
 
-test('machines are single-column rows: name, then status, runtime and capability links; menu on the right, no switch', async ({
+test('machines show only name, default, system, online status and menu, including old deep links', async ({
   page,
 }) => {
   await page.goto(MACHINES);
   await expect(items(page)).toHaveCount(3);
   await expect(detail(page)).toHaveCount(0);
-  await expect(settings(page).getByTestId('machine-toggle').first()).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  );
+  await expect(settings(page).getByTestId('machine-toggle')).toHaveCount(0);
 
   const host = items(page).filter({ hasText: 'omarchy' });
-  await expect(host.locator('[data-orchestration="host"]')).toHaveText('Coordinator 主机');
   await expect(host.getByTestId('machine-item-status')).toHaveText('在线');
-  await expect(host.getByTestId('machine-open-runtime')).toContainText('运行时');
+  await expect(host.getByTestId('machine-open-runtime')).toHaveCount(0);
+  await expect(host.getByTestId('machine-open-capabilities')).toHaveCount(0);
   await expect(host.getByRole('switch')).toHaveCount(0);
   await expect(host.getByTestId('machine-menu')).toBeVisible();
   await expect(host.getByTestId('machine-os')).toHaveText('Linux');
-  await expect(host.getByTestId('machine-os-unknown')).toHaveCount(0);
   await expect(
     items(page).filter({ hasText: 'old-laptop' }).getByTestId('machine-item-status'),
   ).toHaveText('离线');
   const oldDaemon = items(page).filter({ hasText: 'old-laptop' });
-  await expect(oldDaemon.getByTestId('machine-os')).toHaveCount(0);
-  await expect(oldDaemon.getByTestId('machine-os-unknown')).toHaveText('系统未知');
-  await expect(oldDaemon.getByTestId('machine-os-update-hint')).toHaveText(
-    '更新 Cairn 后才能接有平台要求的任务',
-  );
-  await expect(host.getByTestId('machine-os-update-hint')).toHaveCount(0);
+  await expect(oldDaemon.getByTestId('machine-os')).toHaveText('系统未知');
   await expect(
     items(page).filter({ hasText: 'build-box' }).getByTestId('machine-item-status'),
-  ).toHaveText('登录已过期');
+  ).toHaveText('在线');
   await expect(settings(page).getByTestId('machine-list').locator('svg[fill^="#"]')).toHaveCount(0);
   await expect(settings(page).getByTestId('settings-checked')).toHaveCount(0);
 
-  await items(page).filter({ hasText: 'old-laptop' }).getByTestId('machine-toggle').click();
-  await expect(page).toHaveURL(/machine=md-old-laptop/);
-  await expect(items(page).filter({ hasText: 'old-laptop' })).toHaveAttribute(
-    'data-expanded',
-    'true',
-  );
-  await expect(items(page).filter({ hasText: 'omarchy' })).toHaveAttribute(
-    'data-expanded',
-    'false',
-  );
-  await expect(detail(page)).toHaveCount(1);
-  await items(page).filter({ hasText: 'old-laptop' }).getByTestId('machine-toggle').click();
+  await oldDaemon.getByTestId('machine-item-name').click();
   await expect(detail(page)).toHaveCount(0);
-});
-
-test('expansion sections: runtimes, each row a label and description with the control on the right', async ({
-  page,
-}) => {
-  await page.goto(MACHINES);
-  await items(page).filter({ hasText: 'omarchy' }).getByTestId('machine-toggle').click();
-  const pane = detail(page);
-  for (const name of ['运行时']) {
-    await expect(pane.getByRole('heading', { name, exact: true })).toBeVisible();
-  }
-
-  const row = pane.locator('[data-testid="provider-row"][data-runtime="claude-code"]');
-  await expect(row).toContainText('Claude Code');
-  await expect(row).toContainText('2.1.316');
-  await expect(row.locator('svg[fill^="#"]')).toHaveCount(0);
-});
-
-test('the runtime link opens the row and an offline row says when it was last online and freezes its settings', async ({
-  page,
-}) => {
-  await page.goto(MACHINES);
-  const old = items(page).filter({ hasText: 'old-laptop' });
-  await expect(old.getByTestId('machine-last-seen')).toContainText('最后在线');
-  await old.getByTestId('machine-open-runtime').click();
-  await expect(old).toHaveAttribute('data-expanded', 'true');
-  const pane = detail(page);
-  await expect(pane.getByTestId('machine-offline-hint')).toContainText('重新连接 old-laptop');
-  await expect(pane.getByTestId('machine-runtimes').getByRole('switch')).toHaveCount(0);
-  await expect(pane.getByTestId('provider-availability').first()).toBeVisible();
-  await expect(pane.getByTestId('machine-recover')).toContainText('重新启动');
-  await expect(pane.getByTestId('machine-recover').locator('code')).toContainText('start');
-});
-
-test('expired login explains how to bring the machine back, with the command as code', async ({
-  page,
-}) => {
-  await page.goto(MACHINES);
-  await items(page).filter({ hasText: 'build-box' }).getByTestId('machine-toggle').click();
-  const warning = detail(page).getByTestId('claude-login-warning');
-  await expect(warning).toHaveAttribute('data-login', 'expired');
-  await expect(warning.locator('code')).toHaveText('claude auth login');
+  await page.goto(`${MACHINES}&machine=md-old-laptop`);
+  await expect(items(page)).toHaveCount(3);
+  await expect(detail(page)).toHaveCount(0);
+  await expect(settings(page).getByTestId('machine-agent-access')).toHaveCount(0);
+  await expect(settings(page).getByTestId('provider-row')).toHaveCount(0);
 });
 
 test('at 375px the rows keep name, status and controls inside the panel and nothing scrolls sideways', async ({
@@ -261,7 +204,7 @@ test('at 375px the rows keep name, status and controls inside the panel and noth
   await page.setViewportSize({ width: 375, height: 800 });
   await page.goto(`${MACHINES}&machine=md-old-laptop`);
   await expect(items(page)).toHaveCount(3);
-  await expect(detail(page)).toBeVisible();
+  await expect(detail(page)).toHaveCount(0);
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth,
   );
@@ -275,13 +218,11 @@ test('at 375px the rows keep name, status and controls inside the panel and noth
   expect((toggle?.x ?? 0) + (toggle?.width ?? 0) <= (panel?.x ?? 0) + (panel?.width ?? 0)).toBe(true);
 });
 
-test('the old machine detail URL lands on the machine inside settings', async ({ page }) => {
+test('the old machine detail URL lands on the simplified list inside settings', async ({ page }) => {
   await page.goto('/app/resources/machines/md-old-laptop?scenario=machines-master-detail');
   await expect(page).toHaveURL(
     /\/app\/settings\/machines\?scenario=machines-master-detail&machine=md-old-laptop$/,
   );
-  await expect(items(page).filter({ hasText: 'old-laptop' })).toHaveAttribute(
-    'data-expanded',
-    'true',
-  );
+  await expect(items(page).filter({ hasText: 'old-laptop' })).toBeVisible();
+  await expect(detail(page)).toHaveCount(0);
 });

@@ -149,7 +149,7 @@ Stacking: branch from origin/main. If your task depends on an open PR, wait for 
 Size: one self-contained change, under 400 changed lines outside generated files; split anything past 1000 before review.
 ```
 
-Pre-push self-review and the repo's ban on a local `codex exec` / `claude -p` review: the class sweep above is done by the implementing agent in its own session as part of writing the fix, not as a separate review run, so it fits the rule (inferred). The other allowed path is the Codex cloud reviewer itself, asked for a focused full pass (B2), which is the sanctioned other-vendor review on the PR head.
+Pre-push self-review and the repo's ban on a local `codex exec` / `claude -p` review: the class sweep above is done by the implementing agent in its own session as part of writing the fix, not as a separate review run, so it fits the rule (inferred). The historical B2 proposal used Codex cloud review. Current review rules are in `AGENTS.md`: code review is off by default, and a requested independent review uses a separate read-only agent without requiring another model or vendor.
 
 ### D. Decisions for the owner
 

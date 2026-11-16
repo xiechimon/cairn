@@ -116,7 +116,7 @@ The per-task orb differentiator and the execution targets : how a user sees and 
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [The agent's computer](#agent-computer) | 1 | Frontend design: the computer feed, screen view, browser toggle and control handover have no design<br>Backend design: no design for computer access grants, the browser preference, the guard and the screen channel |
+| [The agent's computer](#agent-computer) | 1 | Frontend design: the computer feed, screen view and control handover have no design<br>Backend design: no design for computer access grants, the browser preference, the guard and the screen channel |
 | [Per-task orb isolation](#orb-isolation) | 1 | Frontend design: nothing shows whether a thread ran in an orb or how to turn orbs on for a machine |
 | [Own-key cloud sandboxes](#own-key-sandboxes) | 2 | Research: no note comparing E2B and Daytona against the dispatch contract<br>Frontend design: no design for adding a sandbox provider and its key<br>Backend design: no design for the E2B and Daytona providers, key injection and teardown |
 
@@ -200,10 +200,10 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### agent-computer
 
-**The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.
+**The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.
 
 - Research: [docs/research/coordinator-computer.md](research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](research/user-computer-model-2026-11-08.md) (not on main)
-- Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
+- Frontend design: **gap**: the computer feed, screen view and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
 
 ### coordinator-chat
@@ -400,7 +400,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### machines
 
-**Machines** (shipped). The machines page and machine detail: online state, capabilities, revoke and evacuate.
+**Machines** (shipped). A compact machine list with names, default marker, system, online state and a menu for default, delete and evacuate.
 
 - Research: [docs/research/machine-execution-plane.md](research/machine-execution-plane.md), [docs/research/t3code-devices-and-scope-2026-11-06.md](research/t3code-devices-and-scope-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/settings](design/references/settings), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)
@@ -528,7 +528,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### mcp-servers
 
-**MCP servers** (shipped). The read-only list of MCP servers configured on each machine.
+**MCP servers** (shipped). Connect remote MCP servers from a catalog or by URL and see the local servers each machine configures; every task and review uses what is connected.
 
 - Research: [docs/research/mcp-connectors-2026-11-15.md](research/mcp-connectors-2026-11-15.md)
 - Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md)

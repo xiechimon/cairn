@@ -109,8 +109,8 @@ afterAll(async () => {
   );
 });
 
-describe('MCP client face E2E: local config registration + per-Agent slug authorization + daemon local resolution bridge (spec 13)', () => {
-  test('server projection = config mirror (secret values never leave the API); authorized build step calls external tools for real; dead endpoint/unknown slug degrade without blocking', async () => {
+describe('MCP client face E2E: local config registration + every local server on the step + daemon local resolution bridge (spec 13)', () => {
+  test('server projection = config mirror (secret values never leave the API); a build step calls external tools for real with no grant; dead endpoints degrade without blocking', async () => {
     const list = await api(server.url, 'GET', `/api/teams/${server.teamId}/mcp-servers`);
     expect(list.status).toBe(200);
     const rows = list.body as {
@@ -126,16 +126,6 @@ describe('MCP client face E2E: local config registration + per-Agent slug author
       credentialKeys: ['Authorization'],
     });
     expect(JSON.stringify(rows)).not.toContain('demo-secret');
-
-    const authed = await api(
-      server.url,
-      'PATCH',
-      `/api/teams/${server.teamId}/work-policies/session`,
-      {
-        mcpServers: ['demo', 'dead', 'ghost'],
-      },
-    );
-    expect(authed.status).toBe(200);
 
     world = await seedWorld(
       server.url,
@@ -177,12 +167,11 @@ describe('MCP client face E2E: local config registration + per-Agent slug author
     ).toBe(true);
     expect(
       lines.some((l) =>
-        l.includes('[mcp] ghost: not in local config — its tools are unavailable this turn'),
+        l.includes('[mcp] unselected: connect failed — its tools are unavailable this turn'),
       ),
     ).toBe(true);
     const loadedLine = lines.find((l) => l.startsWith(`[mcp] loaded from ${mcpConfig}`));
-    expect(loadedLine).toBe(`[mcp] loaded from ${mcpConfig}: demo, dead`);
-    expect(JSON.stringify(msgs)).not.toContain('mcp__unselected');
+    expect(loadedLine).toBe(`[mcp] loaded from ${mcpConfig}: dead, demo, unselected`);
   }, 150_000);
 });
 

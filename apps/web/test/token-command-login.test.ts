@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { ACCESS_TOKEN_FILE_NAME, ENV_VARS, formatAccessTokenFile } from '@cairn/shared';
 import { afterEach, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { runTokenCommand } from '../../daemon/src/token-command.js';
+import { runTokenCommand } from '@cairn/shared/token-command';
 
 const homes: string[] = [];
 

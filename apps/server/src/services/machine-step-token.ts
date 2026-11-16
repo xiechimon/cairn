@@ -101,7 +101,7 @@ export async function stepToken(
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     ...(owned.status === 'claimed' && todoRow && agentRow
-      ? await connectorFields(deps, owned, todoRow.teamId, agentRow.mcpServers)
+      ? await connectorFields(deps, owned, todoRow.teamId)
       : {}),
     git,
   };
@@ -126,13 +126,12 @@ async function connectorFields(
   deps: MachineDeps,
   claimed: ClaimedStepRow,
   teamId: string,
-  profileSlugs: readonly string[],
   locked = false,
 ): Promise<Pick<MachineTokenResponse, 'mcpConnectors' | 'withheldMcp'>> {
   if (claimed.machineId === null) return {};
   const machineRow = deps.db.select().from(machine).where(eq(machine.id, claimed.machineId)).get();
-  if (!machineRow) return {};
-  const { grant } = stepMcpGrant(deps.db, machineRow, profileSlugs, locked);
+  if (machineRow?.capabilities?.mcpConnectors !== true) return {};
+  const grant = stepMcpGrant(deps.db, machineRow, locked);
   const fields = await stepConnectorEndpoints(
     {
       db: deps.db,
@@ -258,13 +257,7 @@ async function chiefStepToken(
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     ...(claimed && stepRow && threadRow && agentRow
-      ? await connectorFields(
-          deps,
-          stepRow,
-          threadRow.teamId,
-          agentRow.mcpServers,
-          chiefTurnLocked(stepRow),
-        )
+      ? await connectorFields(deps, stepRow, threadRow.teamId, chiefTurnLocked(stepRow))
       : {}),
     git: null,
     commitIdentity: softwareCommitIdentity(deps),

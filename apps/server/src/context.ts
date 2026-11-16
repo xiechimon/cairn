@@ -50,6 +50,7 @@ export interface AppContext {
     }
   >;
   reposDir: string;
+  workspacesDir?: string | undefined;
   attachmentsDir: string;
   backupStatusPath?: string;
   deployRecordPath?: string;

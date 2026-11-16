@@ -89,7 +89,6 @@ describe('routing settings API (D60 PR8)', () => {
     const s = bootServer();
     const created = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/work-policies/session`, {
       tools: [AGENT_TOOL_PUSH, 'not-a-tool', AGENT_TOOL_MERGE],
-      mcpServers: ['github'],
       secrets: ['OPENAI_API_KEY'],
     });
     expect(created.status).toBe(200);
@@ -98,7 +97,6 @@ describe('routing settings API (D60 PR8)', () => {
       teamId: s.team.id,
       use: 'session',
       tools: [AGENT_TOOL_PUSH, AGENT_TOOL_MERGE],
-      mcpServers: ['github'],
       secrets: ['OPENAI_API_KEY'],
     });
     const updated = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/work-policies/session`, {
@@ -107,7 +105,6 @@ describe('routing settings API (D60 PR8)', () => {
     expect((await updated.json()) as WorkPolicyRecord).toMatchObject({
       id: policy.id,
       tools: [AGENT_TOOL_PUSH],
-      mcpServers: ['github'],
     });
   });
 

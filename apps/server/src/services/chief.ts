@@ -190,7 +190,6 @@ export function coordinatorRecordOf(row: RouteProfile): AgentRecord {
     secrets: row.secrets,
     defaultSkill: row.defaultSkill,
     skillsAllowlist: row.skillsAllowlist,
-    mcpServers: row.mcpServers,
     machineId: row.machineId,
   };
 }
@@ -1683,7 +1682,7 @@ export function buildChiefSystemPrompt(
     '',
     '### 路由',
     '- 原话：你不写任务正文。服务端从引用的用户消息（默认本回合消息）或 sourceTodoId 指定的来源任务逐字拷贝正文。create_todo 后立刻用 update_todo 的 title 写成不超过 50 字的摘要标题；不复述、不总结、不扩写、不翻译正文，也不替用户加要求或步骤。什么时候问用户见下面的「决策边界」。',
-    '- 先找已有的：create_todo 前用 threads 看同一件事是不是已经在做；在做就用 message_thread 把新的话转给那条 thread，不再建任务。只是提问、没要求改动时只回答，不建任务。',
+    '- 先找已有的：create_todo 前用 todos 的 query 按关键词（同一件事的几种说法各试一次）搜标题和正文，再用 threads 看同一件事是不是已经在做（已关闭的任务不算在做）；在做就用 message_thread 把新的话转给那条 thread，不再建任务。只是提问、没要求改动时只回答，不建任务。',
     '- 拆分：按可独立验收的成果拆，不按执行步骤拆；同类小事合成一张卡。每张卡调用一次 create_todo，quotes 填这张卡覆盖的用户原句，逐字照抄；结果的 uncovered 是尚未覆盖的原文。兄弟任务的编号和彼此关系写在给用户的回复里，spec 不添加路由说明；先后顺序用 dependsOn 表达。',
     '- 派活：create_todo 自动启动 thread，不需要 open_thread。用 priority 和 difficulty 路由，并行数由项目并发限制决定。thread 需要用户、做完或失败时会在对话里写一行「任务 #n …」，你不用等待、轮询或睡眠。',
     '- 跟进：threads 列出你开的 thread 和各自一行汇报，needs_you 列出谁在等人。',

@@ -1,11 +1,10 @@
-import type { ChiefNoticeContent, ClaimedStep, MachineClaimBody } from '@cairn/shared';
+import type { ClaimedStep, MachineClaimBody } from '@cairn/shared';
 import {
   AGENT_TOOL_TAG,
   appendMergedPrGuard,
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
-  CHIEF_NOTICE_KIND,
   chiefIdFormat,
   claudeRateBlock,
   confinementDispatchReady,
@@ -44,7 +43,7 @@ import { autonomousMergePolicy } from './autonomous-merge.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
-import { insertChiefMessageOnce, turnProvenance } from './chief.js';
+import { turnProvenance } from './chief.js';
 import { chiefHistoryFor } from './chief-claim-history.js';
 import {
   CHIEF_DIGEST_MIN_CLI_VERSION,
@@ -56,6 +55,7 @@ import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.j
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
+import { quickLaneRefusal } from './coordinator-request.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
@@ -117,12 +117,7 @@ function workerSkillInjection(
   const granted =
     agentRow.skillsAllowlist === null
       ? [...scanned.keys()]
-      : [
-          ...new Set([
-            ...agentRow.skillsAllowlist,
-            ...[...scanned.values()].filter((s) => s.builtin).map((s) => s.id),
-          ]),
-        ];
+      : [...new Set(agentRow.skillsAllowlist)];
   const candidates = granted.map((id) => {
     const s = scanned.get(id);
     return s === undefined
@@ -218,17 +213,14 @@ function cliVersionAtLeast(latestCliVersion: string | null, min: string): boolea
 export function stepMcpGrant(
   db: MachineDeps['db'],
   machineRow: Pick<typeof machine.$inferSelect, 'teamId' | 'latestCliVersion' | 'capabilities'>,
-  profileSlugs: readonly string[],
   locked = false,
-): { grant: string[] | undefined; unsupported: string[] } {
-  if (locked) return { grant: [], unsupported: [] };
-  if (!meetsMcpVersionGate(machineRow.latestCliVersion))
-    return { grant: undefined, unsupported: [] };
-  if (machineRow.capabilities?.mcpConnectors === true || profileSlugs.length === 0)
-    return { grant: [...profileSlugs], unsupported: [] };
-  const connectors = connectorSlugs(db, machineRow.teamId);
-  const unsupported = profileSlugs.filter((slug) => connectors.has(slug.toLowerCase()));
-  return { grant: profileSlugs.filter((slug) => !unsupported.includes(slug)), unsupported };
+): string[] | undefined {
+  if (locked) return [];
+  if (!meetsMcpVersionGate(machineRow.latestCliVersion)) return undefined;
+  const local = machineRow.capabilities?.mcpServers ?? [];
+  const connectors =
+    machineRow.capabilities?.mcpConnectors === true ? connectorSlugs(db, machineRow.teamId) : [];
+  return [...new Set([...local, ...connectors].map((slug) => slug.toLowerCase()))];
 }
 
 export function chiefTurnLocked(stepRow: typeof step.$inferSelect): boolean {
@@ -304,12 +296,7 @@ function chiefClaimPayload(
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const locked = digest || mailTurn;
   const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
-  const mcp = machineRow
-    ? stepMcpGrant(deps.db, machineRow, agentRow.mcpServers, locked)
-    : { grant: locked ? [] : undefined, unsupported: [] };
-  if (mcp.unsupported.length > 0)
-    noteUnsupportedConnectors(deps, threadRow, stepRow, mcp.unsupported);
-  const chiefMcp = mcp.grant;
+  const chiefMcp = machineRow ? stepMcpGrant(deps.db, machineRow, locked) : locked ? [] : undefined;
   return {
     step: {
       id: stepRow.id,
@@ -347,26 +334,6 @@ function chiefClaimPayload(
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(locked ? { remoteToolsOnly: true as const } : {}),
   };
-}
-
-function noteUnsupportedConnectors(
-  deps: MachineDeps,
-  threadRow: typeof chiefThread.$inferSelect,
-  stepRow: typeof step.$inferSelect,
-  slugs: readonly string[],
-): void {
-  const stored = insertChiefMessageOnce(deps.db, {
-    id: `chief-mcp-unsupported-${stepRow.id}`,
-    threadId: threadRow.id,
-    role: 'system',
-    content: JSON.stringify({
-      kind: CHIEF_NOTICE_KIND,
-      message: `MCP connectors ${slugs.join(', ')} are unavailable this turn: the Runner needs a newer cairn.`,
-      provenance: `mcp-connectors:${stepRow.id}`,
-    } satisfies ChiefNoticeContent),
-    createdAt: nowMs(),
-  });
-  if (stored !== null) deps.convHub?.publishMessage(threadRow.id, stored);
 }
 
 function claudeBlockedReader(db: MachineDeps['db']): (id: string | null) => boolean {
@@ -474,6 +441,11 @@ async function tryClaim(
     if (!stillAuthorized()) return null;
     if (shipRefusal !== null) {
       failStepWithEvents(deps, cand.stepRow, `Ship refused: ${shipRefusal}`);
+      continue;
+    }
+    const laneRefusal = quickLaneRefusal(db, cand.todoRow);
+    if (laneRefusal !== null) {
+      failStepWithEvents(deps, cand.stepRow, laneRefusal);
       continue;
     }
     const localMerge = parseLocalMergeInstruction(cand.stepRow.prompt);
@@ -585,6 +557,8 @@ async function tryClaim(
           const fresh = priorSessionOf(tx, cand.stepRow, cand.buildRow, boundId);
           if (accountHeld(cand.stepRow, fresh, boundId)) return false;
         }
+        const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
+        if (latestTodo === undefined || quickLaneRefusal(db, latestTodo) !== null) return false;
         holdBlockedBuild(db, cand.stepRow.buildId);
         const res = tx
           .update(step)
@@ -675,7 +649,7 @@ async function tryClaim(
       repoRef?.kind === 'hosted' && mergeTarget !== null
         ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
         : repoRef;
-    const workerMcp = stepMcpGrant(db, machineRow, agentRow.mcpServers).grant;
+    const workerMcp = stepMcpGrant(db, machineRow);
     const segmentsDaemon = cliVersionAtLeast(
       machineRow.latestCliVersion,
       TASK_SEGMENTS_MIN_CLI_VERSION,

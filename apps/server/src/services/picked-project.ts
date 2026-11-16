@@ -1,4 +1,6 @@
-export const PICKED_PROJECT_OPEN = '【输入框选定项目：';
+import { PICKED_PROJECT_OPEN } from '@cairn/shared';
+
+export { PICKED_PROJECT_OPEN };
 
 export function pickedProjectIdOf(prompt: string | null): string | null {
   if (prompt === null || !prompt.startsWith(PICKED_PROJECT_OPEN)) return null;

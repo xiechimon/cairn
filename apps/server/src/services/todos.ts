@@ -654,7 +654,7 @@ export function updateAutonomousTodo(
     const editor = opts.textWriter;
     if (row.request !== null && editor !== undefined && typeof editor === 'object') {
       sets.request = {
-        ...(sets.request ?? row.request),
+        ...withoutQuickLane(sets.request ?? row.request),
         segments: [
           {
             source: { kind: 'edit', userId: editor.ownerEdit, at: nowMs(), span: 'whole' },
@@ -758,6 +758,11 @@ export function updateAutonomousTodo(
   return record;
 }
 
+function withoutQuickLane(request: TaskRequest): TaskRequest {
+  const { lane: _lane, projectBasis: _basis, ...ordinary } = request;
+  return ordinary;
+}
+
 interface ProjectMove {
   sets: Pick<TodoRow, 'projectId' | 'orderIndex'> &
     Partial<Pick<TodoRow, 'sourceKind' | 'sourceRef' | 'request'>>;
@@ -793,10 +798,7 @@ function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): Proje
   } else if (row.sourceKind === null && targetOpensIssues) {
     sets.sourceKind = 'github-issue-self';
   }
-  if (row.request !== null) {
-    const { lane: _lane, projectBasis: _basis, ...ordinary } = row.request;
-    sets.request = ordinary;
-  }
+  if (row.request !== null) sets.request = withoutQuickLane(row.request);
   return {
     sets,
     closeIssueRef: dropsIssue ? row.sourceRef : null,

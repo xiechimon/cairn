@@ -672,7 +672,7 @@ describe('MCP connector OAuth', () => {
     const started = await t.start(linearStart);
     await t.callback({ code: 'code-ok', state: started.state, iss: AS });
     t.expire(Date.now() + 5 * 60_000);
-    seedSessionRoute(t.s, { provider: 'stub-gw', modelId: 'stub-model', mcpServers: ['linear'] });
+    seedSessionRoute(t.s, { provider: 'stub-gw', modelId: 'stub-model' });
     const projectId = await postProject(t.s.app, 'refresh-race');
     const runner = await enrollConnectorRunner(t.s, 'race-runner', true);
     const [finished, kept] = [0, 1].map(() => {

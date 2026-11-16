@@ -450,7 +450,7 @@ function ConnectorCard({
         {action}
       </div>
       <p className="m-0 line-clamp-2 text-meta text-content-secondary">{description}</p>
-      {status !== undefined && <div className="mt-auto">{status}</div>}
+      {status !== undefined && <div className="mt-auto flex">{status}</div>}
     </Card>
   );
 }

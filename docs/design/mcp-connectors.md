@@ -1,6 +1,6 @@
 # MCP connectors
 
-Status: revision 3, accepted by the owner (mon X) on 2026-11-15. Baseline `origin/main` at `36aa6dc1a`. An independent read-only reviewer reviewed revision 1 on 2026-11-15 (3 blockers, 11 should-fix) and re-checked revision 2 (gate placement, refresh compare, PR order, 9 new items); revision 3 answers both rounds (see "Review answers") and the reviewer's verdict on revision 2 was ready for the owner's decisions once those were fixed. Nothing here is built yet. The owner accepted all six decisions listed at the end. Research: [mcp-connectors-2026-11-15](../research/mcp-connectors-2026-11-15.md).
+Status: revision 3, accepted by the owner (mon X) on 2026-11-15. Baseline `origin/main` at `36aa6dc1a`. An independent read-only reviewer reviewed revision 1 on 2026-11-15 (3 blockers, 11 should-fix) and re-checked revision 2 (gate placement, refresh compare, PR order, 9 new items); revision 3 answers both rounds (see "Review answers") and the reviewer's verdict on revision 2 was ready for the owner's decisions once those were fixed. The owner accepted all six decisions listed at the end. On 2026-11-16 the owner replaced per-step grants with "on for every agent step" ("use it if it works, skip it if not, show no settings"); Decision 1, the Wire grant bullets, the Frontend and owner decision 6 below describe that. Research: [mcp-connectors-2026-11-15](../research/mcp-connectors-2026-11-15.md).
 
 ## Problem
 
@@ -16,13 +16,13 @@ Connectors therefore add a server-managed source next to the local file, which k
 
 ## Decisions
 
-1. **Two sources, one slug namespace.** A slug resolves to a connector (server database) or a local entry (a Runner's `~/.claude.json`). Agents get MCP by grant: the Coordinator route's `mcpServers` and the `session` and `review` work policies' `mcpServers`. The route override's `requiredCapabilities.mcpServers` is a placement requirement, not a grant, and keeps offering local entries only. When a slug is both, the connector wins on a daemon that declares `mcpConnectors`, and the daemon writes one `[mcp]` line naming the shadowed local entry; fixed precedence, never recency. A new connector takes the catalog id as slug, or the next free `-2`, `-3` suffix when a local entry or connector already holds it, editable before saving. `cairn` is reserved (the daemon's host tool server, `HOST_MCP_SERVER_NAME`).
+1. **Two sources, one slug namespace.** A slug resolves to a connector (server database) or a local entry (a Runner's `~/.claude.json`). Every agent step gets every MCP server it can reach: the local entries its Runner reports and, on a Runner that declares `mcpConnectors`, every connector of the team. There is no grant setting; the `mcpServers` columns on routing rules and work policies stay in the database unread. The route override's `requiredCapabilities.mcpServers` is a placement requirement, not a grant, and keeps offering local entries only. When a slug is both, the connector wins on a daemon that declares `mcpConnectors`, and the daemon writes one `[mcp]` line naming the shadowed local entry; fixed precedence, never recency. A new connector takes the catalog id as slug, or the next free `-2`, `-3` suffix when a local entry or connector already holds it, editable before saving. `cairn` is reserved (the daemon's host tool server, `HOST_MCP_SERVER_NAME`).
 2. **Credentials are sealed by the existing `SecretBox` and keyfile** in the connector's own row, as `github_connection`, `provider` and `claude_subscription` hold theirs. They are not `secret` rows, because a `secret` row can be granted to a step and read back with `get_secret`; a connector credential must reach only the MCP client.
-3. **What leaves the server.** Only what an MCP request needs: a static header value or an OAuth access token. Refresh tokens and registered client secrets never leave the server process. They reach a Runner only for a claimed step whose grant names the slug, in the token response.
+3. **What leaves the server.** Only what an MCP request needs: a static header value or an OAuth access token. Refresh tokens and registered client secrets never leave the server process. They reach a Runner only for a claimed agent step, in the token response.
 4. **OAuth with the installed SDK, called step by step.** A server bridge uses only these `@modelcontextprotocol/sdk` 1.30.0 `client/auth.js` functions: `discoverOAuthProtectedResourceMetadata`, `discoverAuthorizationServerMetadata`, `registerClient`, `startAuthorization`, `exchangeAuthorization`, `refreshAuthorization`. It never uses `auth()` or a transport `authProvider`, which refresh, wipe or restart authorization on their own and would bypass the single-flight and compare-and-set below. The bridge adds what 1.30.0 lacks against the spec: always send `resource`; refuse an authorization server whose metadata lacks S256; check `iss` on the callback when advertised, and for a custom server require that its authorization server advertises `iss` (RFC 9207), so a code another vendor sends without `iss` cannot be relayed to an owner-added server's token endpoint (OAuth mix-up, RFC 9700 4.4). Registration is dynamic (DCR) with `application_type` `native` for a loopback origin and `web` for `https`; it is keyed by issuer and redirect URI and redone when either changes. A non-loopback `http://` origin cannot be an OAuth redirect, so there the token form is the only choice. A server that offers only Client ID Metadata Documents or pre-registration shows `需要你自己的 OAuth 应用` with client id and secret fields and the redirect URI to register; Cairn cannot host a public CIMD document.
 5. **Server-side MCP needs a seam exception.** AGENTS.md keeps MCP access behind `apps/daemon/src/backend/` except the in-server Coordinator runtime, and `biome.json` lets only `services/mcp-face.ts` import the SDK on the server. The OAuth bridge and the status check need the SDK on the server, in `services/mcp-servers.ts` (already a security surface). This adds that file to both rules and needs the owner's approval.
 6. **Owner-only writes.** `/api/teams/:id/mcp-connectors` joins `OWNER_ONLY_PATTERNS`. No Coordinator tool creates, edits, connects or grants a connector; the read tool `mcp_servers` lists connectors with names, URL without query and status only.
-7. **v1 is remote connectors.** Catalog entries and custom remote URLs. A local command (stdio) or loopback URL runs on one Runner, so its connector carries a `machineId`, only that machine may claim steps that use it, and the server does not check it; this comes as a later PR (PR 6). The Coordinator gets connectors in PR 7 through an MCP client in `coordinator/runtime/` (the existing seam exception): with `coordinatorInServer` on by default, Runners never claim Coordinator steps, and the in-server runtime has no MCP client today. Until PR 7, the grant sheet shows the Coordinator option disabled with that reason.
+7. **v1 is remote connectors.** Catalog entries and custom remote URLs. A local command (stdio) or loopback URL runs on one Runner, so its connector carries a `machineId`, only that machine may claim steps that use it, and the server does not check it; this comes as a later PR (PR 6). The Coordinator gets connectors in PR 7 through an MCP client in `coordinator/runtime/` (the existing seam exception): with `coordinatorInServer` on by default, Runners never claim Coordinator steps, and the in-server runtime has no MCP client today. Until PR 7, the in-server Coordinator has no connectors; the page does not mention it.
 
 ## Catalog
 
@@ -82,11 +82,10 @@ The status check connects with a static `Authorization` header passed through `r
 
 ## Wire
 
-- **One grant function.** `stepMcpGrant(step)` returns the slugs a step may use: the Coordinator route's or the step's work policy's `mcpServers`, empty for digest and mail turns. Below the MCP version gate the claim payload still omits `mcpServers` (`undefined`, as `claimMcpSlugs` does today, so an old daemon keeps its local MCP) and the token response carries no connectors. Both the claim payload and the token response use it.
-- **Worker gate.** A new `MachineIneligibility` kind in `workerIneligibility` (`machine-routing.ts`) refuses a machine without `capabilities.mcpConnectors` for a step whose grant names a connector, before the claim transaction, so the existing waiting-step diagnostics show `needs a Runner that supports connectors (update cairn)`. The step stays queued for a capable Runner. `machineCapabilitiesSchema` and `parseReportedCapabilities` both gain `mcpConnectors`.
-- **Coordinator steps are not gated.** A chief step runs only on its one machine and later turns wait behind it, so a gate would stall the thread. On a machine without `mcpConnectors`, `chiefClaimPayload` drops connector slugs from the grant and the turn gets a visible system note naming them.
-- **Token response.** `MachineTokenResponse` gains `mcpConnectors?: McpEndpoint[]` (existing `mcpEndpointSchema`, http only in v1) and `withheldMcp?: string[]`. Filled only for a `claimed` step, only for connector slugs in the grant. A static or no-auth connector is delivered unless `needs_auth`. An OAuth connector in `needs_auth` is withheld. Otherwise, when its access token has less than 10 minutes left, the token path tries the refresh single-flight with a 5-second bound and falls back to the old token while it is still valid; with no valid token the slug goes to `withheldMcp`. The call never fails because of a connector. A successful refresh here moves `error` to `connected`.
-- **Daemon.** Declares `mcpConnectors: true`. `stepMcpEndpoints` mounts a connector only if its slug is in `claimed.mcpServers`, preferring it over the local file; a slug in `withheldMcp` logs `[mcp] <slug>: reconnect it in settings`. Connector header values join the runner's `credentialRedactor` list. An older daemon never claims a connector step (claim gate), so its silent schema strip cannot drop tools or substitute a local entry.
+- **One grant function.** `stepMcpGrant(machine)` returns the slugs a step may use: the Runner's reported `capabilities.mcpServers` plus, when it declares `mcpConnectors`, every team connector, lowercased and de-duplicated; empty for digest and mail turns. Below the MCP version gate the claim payload still omits `mcpServers` (`undefined`, as `claimMcpSlugs` does today, so an old daemon keeps its local MCP) and the token response carries no connectors. Both the claim payload and the token response use it.
+- **No claim gate.** A Runner without `mcpConnectors` simply gets no connector slugs, for worker and Coordinator steps alike; no step waits for a newer Runner and no system note is posted.
+- **Token response.** `MachineTokenResponse` gains `mcpConnectors?: McpEndpoint[]` (existing `mcpEndpointSchema`, http only in v1) and `withheldMcp?: string[]`. Filled only for a `claimed` step, for every team connector. A static or no-auth connector is delivered unless `needs_auth`. An OAuth connector in `needs_auth` is withheld. Otherwise, when its access token has less than 10 minutes left, the token path tries the refresh single-flight with a 5-second bound and falls back to the old token while it is still valid; with no valid token the slug goes to `withheldMcp`. The call never fails because of a connector. A successful refresh here moves `error` to `connected`.
+- **Daemon.** Declares `mcpConnectors: true`. `stepMcpEndpoints` mounts a connector only if its slug is in `claimed.mcpServers`, preferring it over the local file; a slug in `withheldMcp` logs `[mcp] <slug>: reconnect it in settings`. Connector header values join the runner's `credentialRedactor` list. An older daemon does not declare `mcpConnectors`, so the server sends it no connector slugs or tokens and its schema strip has nothing to drop.
 - **Mid-step expiry.** A token handed out at step start is not refreshed during the step. The runner already re-calls `client.token(stepId)` for App credentials; reusing it on an MCP 401 is a later change. Known limit.
 - **Orb guests.** The host daemon parses the token reply with its `machineTokenResponseSchema` and the relay forwards that to the guest unparsed (`relay.ts`); a guest always runs the host's release. A local Orb guest therefore receives connector tokens in plaintext, like `secrets` today. A remote sandbox (`openRelayStream` providers, such as E2B) runs on a third party's machines, so the host relay removes `mcpConnectors` from the reply for those and lists the slugs in `withheldMcp`. The secret-gateway PR must add both fields to its planned allowlist and move connector headers to `http` delivery; until then local guests see the values, which is an owner decision.
 
@@ -102,17 +101,17 @@ One test per row.
 | 4 | `POST …/oauth/start` (new or reconnect) | owner only; discovery, registration reuse or redo, PKCE; state entry; returns authorization URL |
 | 5 | `GET /api/oauth/callback` kind `mcp-connector` | state consumed once; `iss` check; exchange; create or compare-and-set; check; lands on settings with result |
 | 6 | `POST …/:cid/check` | owner only; check; writes status |
-| 7 | `GET /api/teams/:id/mcp-servers` | local entries plus connectors with `source`, `status`; names only, never a value; the routing grant picker shows both; the route override picker filters to `source: local` |
+| 7 | `GET /api/teams/:id/mcp-servers` | local entries plus connectors with `source`, `status`; names only, never a value; the route override picker filters to `source: local` |
 | 8 | Coordinator `mcp_servers` tool | same projection, URL without query; no write tool |
-| 9 | `stepMcpGrant` from worker claim and worker token | same slugs on both; mail and digest empty; below version gate empty |
+| 9 | `stepMcpGrant` from worker claim and worker token | same slugs on both (local entries plus every connector on a capable Runner); mail and digest empty; below version gate empty |
 | 10 | `chiefClaimPayload`, `chiefStepToken` (Coordinator on a Runner, `coordinatorInServer` off) | same function; in-server Coordinator untouched until PR 7 |
-| 11 | Claim gate | step granted a connector skipped for a machine without `mcpConnectors`, claimed by one with it |
+| 11 | No claim gate | a Runner without `mcpConnectors` claims the step and gets only its local entries |
 | 12 | Capability parse | `mcpConnectors` survives `parseReportedCapabilities` |
 | 13 | Token path refresh | single-flight; 5 s bound; withheld on failure, never throws; generation compare-and-set |
 | 14 | Daemon resolution | only slugs in `claimed.mcpServers`; connector over local file; shadow and withheld lines |
 | 15 | Redaction and logs | connector values redacted in transcripts and logs; no value in server logs, errors, status reasons or `[mcp]` lines |
 | 16 | Orb guest | local guest mounts the connector; remote sandbox gets it in `withheldMcp` only |
-| 18 | Coordinator on an old Runner | turn runs without connector slugs and shows the system note; thread not stalled |
+| 18 | Coordinator on an old Runner | turn runs with local entries only, no note; thread not stalled |
 | 17 | Step retry, fallback model, continued session | each new step asks for its own token and grant; no state carried in the session |
 
 ## Security notes
@@ -120,15 +119,15 @@ One test per row.
 - The server fetches owner-supplied URLs and URLs from discovery metadata. Discovery, registration and token endpoints must be `https` and follow no redirect to another origin; the public-address check runs at connect time inside the `fetchFn` every chosen SDK function accepts, so DNS rebinding cannot pass it.
 - An access token is sent only to the connector URL's origin, matching the `resource` it was issued for.
 - On a host step, grants are not a boundary between steps: an agent runs as the daemon's user and can read the machine credential and other processes. Claude Code's SDK also puts MCP headers on its command line (`--mcp-config`), readable in `/proc` by that user. This is the same exposure as `~/.claude.json` and plaintext secrets today; connectors do not make it smaller.
-- MCP tool results are third-party text and stay untrusted. Per-tool approval inside a connector (Claude.ai's Always allow, Needs approval, Blocked; Amp's Allow, Ask First, Disabled) is not in v1; access is per slug per grant, and read-only options are offered where the catalog entry has them.
+- MCP tool results are third-party text and stay untrusted. Per-tool approval inside a connector (Claude.ai's Always allow, Needs approval, Blocked; Amp's Allow, Ask First, Disabled) is not in v1; access is per connector, and read-only options are offered where the catalog entry has them.
 - The OAuth callback is exempt from session auth (browser redirect); the single-use, 30-minute `state` (`newRecordId(32)`, about 190 bits) from the owner's own start request is what authorizes it, as for the existing GitHub and provider flows.
 
 ## Frontend
 
 Settings → `MCP` becomes `连接器与 MCP`:
 
-- `已连接`: one row per connector with status (`已连接 · 12 个工具`, `需要重新连接`, `连接失败：…`), `重新检查`, `重新连接`, `断开`.
-- `目录`: catalog cards with `连接`. Sign-in opens the provider page; token entries open a small form with a help link. After success a sheet asks which work may use it: `任务` (the `session` work policy, on), `评审` (the `review` work policy, off), `Coordinator` (disabled until PR 7, with the reason).
+- `已连接`: one row per connector with status only (`已连接 · 12 个工具`, `需要重新连接`, `连接失败：…`), `重新检查`, `重新连接`, `断开`. No word about which work uses it: a connected connector is used by every task and review.
+- `目录`: catalog cards with `连接`. Sign-in opens the provider page; token entries open a small form with a help link. After success the dialog closes; nothing asks which work may use it.
 - `本机配置`: today's read-only list from `~/.claude.json`.
 - `添加 MCP 服务器` (top right): name, URL, header rows (values write-only, never shown again). A server that answers 401 with OAuth metadata offers `用浏览器登录` instead of headers.
 
@@ -143,7 +142,7 @@ Page draft and reference shots (Amp `Integrations & MCP` from mon X's recording,
 | 2 | OAuth start and callback, registration cache, refresh single-flight; live sign-in proof per catalog entry, which needs the owner's vendor accounts | yes (`oauth.ts`, `mcp-servers.ts`) |
 | 3 | daemon: wire fields in the shared schema, declare capability, resolution and precedence, withheld lines, redaction, remote-sandbox strip in the relay; harmless without server data | yes (`machine-client.ts`) |
 | 4 | server wire: `stepMcpGrant`, worker gate, chief note, capability parse, token fields, list merge with `source` and the override picker filter | yes (`machine*.ts`) |
-| 5 | web: page, add dialog, catalog cards, grant sheet; feature-map row; e2e | no |
+| 5 | web: page, add dialog, catalog cards; feature-map row; e2e. 5b: connectors on for every step, grant settings removed (server, 2026-11-16) | 5b yes (`machine*.ts`) |
 | 6 | machine-bound connectors: stdio command and loopback URL with `machineId`, claim gate by machine | yes |
 | 7 | Coordinator connectors: MCP client in `coordinator/runtime/` using server-held tokens | yes |
 
@@ -181,7 +180,7 @@ All six accepted by mon X on 2026-11-15.
 3. Accept that connector tokens reach host steps and Orb guests in plaintext until the secret gateway carries them, as `secrets` do today.
 4. Confirm v1 scope: remote connectors for tasks first (PR 1 to 5); local command connectors (PR 6) and Coordinator connectors (PR 7) after.
 5. Confirm the first catalog of eight, with GitHub token-only.
-6. Accept that granting a connector to `任务` makes every task wait for a Runner on the new daemon (instead of running without the connector).
+6. Superseded 2026-11-16: no grants, so no task waits for a newer Runner; an older Runner runs it without connectors.
 
 ## Out of scope
 

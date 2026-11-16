@@ -6,11 +6,11 @@ const DETAIL = `${LIST}&machine=${REMOTE}`;
 
 const row = (page: Page) => page.getByTestId('machine-item').filter({ hasText: 'mea-wsl' });
 
-test('opening a machine row expands its detail in place', async ({ page }) => {
+test('machine names are plain text and do not expand a detail', async ({ page }) => {
   await page.goto(LIST);
-  await row(page).getByTestId('machine-toggle').click();
-  await expect(page).toHaveURL(new RegExp(`machine=${REMOTE}`));
-  await expect(page.getByTestId('machine-detail')).toBeVisible();
+  await row(page).getByTestId('machine-item-name').click();
+  await expect(page).not.toHaveURL(new RegExp(`machine=${REMOTE}`));
+  await expect(page.getByTestId('machine-detail')).toHaveCount(0);
   await expect(row(page).getByTestId('machine-item-status')).toHaveText('在线');
 });
 
