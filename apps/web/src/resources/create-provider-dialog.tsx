@@ -395,7 +395,7 @@ export function CreateProviderDialog({
       <FormStack className="max-w-none">
         <Button
           variant="ghost"
-          className="self-start px-0 text-content-secondary"
+          className="-ml-2 self-start px-2 text-content-secondary"
           onClick={() => setView('picker')}
         >
           <ChevronLeft />
