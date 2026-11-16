@@ -695,7 +695,7 @@ test('every node --test step in any workflow runs locally when its tests, source
       (name) => readFileSync(join('.github/workflows', name), 'utf8').match(/node --test\b/g) ?? [],
     );
   assert.equal(steps.length, written.length, 'every node --test step is parsed');
-  assert.ok(steps.some(({ workflow }) => workflow === '.github/workflows/silent-revert-gate.yml'));
+  assert.ok(steps.some(({ workflow }) => workflow === '.github/workflows/ci.yml'));
   assert.ok(steps.some(({ tests }) => tests.includes('scripts/lane-model-policy.test.mjs')));
   assert.ok(steps.some(({ tests }) => tests.some((test) => test in ciOnlyTestSteps)));
   for (const { workflow, tests } of steps) {

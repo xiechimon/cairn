@@ -62,13 +62,3 @@ test('a pull request never shares a group with a main push', () => {
   assert.notEqual(pr.group, decision('ci', push('refs/heads/main')).group);
   assert.match(pr.group, /^ci-pr-\d+$/);
 });
-
-for (const name of ['silent-revert-gate']) {
-  test(`${name} cancels a superseded pull request head and never a main push`, () => {
-    assert.equal(decision(name, pull(7)).cancel, true);
-    assert.notEqual(decision(name, pull(7)).group, decision(name, pull(8)).group);
-    const main = decision(name, { ...push('refs/heads/main'), sha: 'c'.repeat(40) });
-    assert.equal(main.cancel, false);
-    assert.notEqual(main.group, decision(name, pull(7)).group);
-  });
-}
