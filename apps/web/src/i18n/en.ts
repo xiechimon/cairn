@@ -1541,8 +1541,6 @@ export const EN: Record<string, string> = {
   '失败了。可以重试，或在下面回复说明怎么改。':
     'It failed. Retry, or reply below with what to change.',
   取消归档: 'Unarchive',
-  归档于: 'Archived',
-  已归档项目: 'Archived projects',
   筛选项目: 'Filter projects',
   '筛选项目：{value}': 'Filter projects: {value}',
   '已归档的项目和它们的对话会一直保留，直到你删除。': 'Kept until you delete them.',
@@ -1558,10 +1556,7 @@ export const EN: Record<string, string> = {
     'Their conversations, tasks and any work still running are deleted with them. This cannot be undone.',
   '{n} 个项目没能删除，已留在列表里。':
     '{n#1 project|# projects} could not be deleted and stay in the list.',
-  '在侧栏项目菜单里归档的项目会出现在这里。':
-    'Projects you archive from the sidebar project menu appear here.',
   '取消归档失败，请重试。': 'Could not unarchive the project. Try again.',
-  '取消归档中…': 'Unarchiving…',
   '批准失败，请重试。': 'Could not approve. Try again.',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /

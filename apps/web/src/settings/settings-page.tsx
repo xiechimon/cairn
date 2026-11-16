@@ -1,5 +1,4 @@
 import {
-  Archive,
   KeyRound,
   Layers,
   type LucideIcon,
@@ -61,7 +60,6 @@ import { ApiKeysPage } from '../routes/api-keys-page.js';
 import { RemoteAccessPage } from '../routes/remote-access-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type ThemePreference } from '../theme.js';
-import { ArchivedProjectsSection } from './archived-projects-section.js';
 import { SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
 
 interface Section {
@@ -121,13 +119,6 @@ const GROUPS: Group[] = [
         Icon: Palette,
         rows: true,
         element: () => <AppearanceSection />,
-      },
-      {
-        id: 'projects',
-        label: '项目',
-        Icon: Archive,
-        rows: true,
-        element: () => <ArchivedProjectsSection />,
       },
     ],
   },

@@ -35,6 +35,15 @@ test('the settings icon opens the window on Account; Escape returns to the page 
   await expect(page).toHaveURL(/\/app\?scenario=providers-fleet&pane=tasks&tab=scheduled$/);
 });
 
+test('archived projects live in the sidebar only: settings has no Projects section and its old link opens Account', async ({
+  page,
+}) => {
+  await page.goto(`/app/settings/projects?${FLEET}`);
+  await expect(settings(page)).toBeVisible();
+  await expect(navItem(page, 'projects')).toHaveCount(0);
+  await expect(navItem(page, 'account')).toHaveAttribute('aria-current', 'page');
+});
+
 test('Escape inside a text field is the field\'s; the window stays open', async ({ page }) => {
   await page.goto(`/app/settings/providers?${FLEET}`);
   const name = settings(page).getByLabel('名称');
