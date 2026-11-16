@@ -273,7 +273,7 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
     }
   });
 
-  test('failure mode 4 (no collateral damage): review step with hasChanges=false records a verdict as usual, not failed', async () => {
+  test('a retired review reporting no changes cannot erase the delivered changes or fail the task', async () => {
     const w = await setupWorld();
     try {
       await w.startBuild(false);
@@ -296,7 +296,8 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
         sessionId: 'pi-r1',
       });
       expect(w.todoRow().phase).toBe('review');
-      expect(w.stepRow(reviewStep.step.id).status).toBe('done');
+      expect(w.todoRow().hasChanges).toBe(true);
+      expect(w.stepRow(reviewStep.step.id).status).toBe('stopped');
       expect(w.buildRow(buildStep.step.buildId).errorMessage).toBeNull();
     } finally {
       w.s.dispose();

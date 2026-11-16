@@ -473,7 +473,7 @@ describe('#1453 other shapes of the same race', () => {
     await expect(report(w, { status: 'success', findings })).resolves.toBeUndefined();
     expect(todoPhase(w)).toBe('closed');
     const steps = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).all();
-    expect(steps.map((r) => r.status)).toEqual(['done']);
+    expect(steps.map((r) => r.status)).toEqual(['stopped']);
   });
 
   test('build step of a done card reports success with zero changes: step done, not marked failed by the artifact gate', async () => {

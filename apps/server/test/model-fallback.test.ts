@@ -253,7 +253,7 @@ describe('model fallback chain (#1493)', () => {
   });
 
   test.each(['review', 'merge'] as const)(
-    'X3：%s 步禁止降级——额度用完只等不换（负对照）',
+    'a %s quota report never switches models: retired reviews stop and explicit merges wait',
     async (kind) => {
       const w = await setupWorld();
       await startBuild(w);
@@ -277,7 +277,7 @@ describe('model fallback chain (#1493)', () => {
       expect(c.stepId).toBe(pending.id);
       await done(w, c.stepId, quotaDone('relay-a'));
       const row = stepRow(w, c.stepId);
-      expect(row.status).toBe('waiting_quota');
+      expect(row.status).toBe(kind === 'review' ? 'stopped' : 'waiting_quota');
       expect(row.fallback).toBeNull();
       const notif = w.s.db
         .select()

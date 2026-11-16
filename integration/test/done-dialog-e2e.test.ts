@@ -5,7 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { message as messageTable, step as stepTable } from '../../apps/server/src/db/schema.js';
+import {
+  build as buildTable,
+  message as messageTable,
+  step as stepTable,
+  todo as todoTable,
+} from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 
@@ -264,7 +269,11 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
     await openDetail(card.todoId);
     await openAcceptDialog();
     const dialog = acceptDialog();
-    await dialog.getByRole('button', { name: '完成' }).click();
+    const box = dialog.locator('input[type="checkbox"]');
+    if (!(await box.isChecked())) {
+      await dialog.getByRole('checkbox', { name: '将改动合并到默认分支' }).click();
+    }
+    await dialog.getByRole('button', { name: /^完成/ }).click();
     await page.waitForTimeout(600);
     await shot('merge-toast');
     await pexpect(page.getByText('已发起合并，合并完成后任务进入已完成。')).toBeVisible();
@@ -286,8 +295,9 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
     await openAcceptDialog();
     const dialog = acceptDialog();
     const box = dialog.locator('input[type="checkbox"]');
-    await pexpect(box).toBeChecked();
-    await dialog.getByRole('checkbox', { name: '将改动合并到默认分支' }).click();
+    if (await box.isChecked()) {
+      await dialog.getByRole('checkbox', { name: '将改动合并到默认分支' }).click();
+    }
     await pexpect(box).not.toBeChecked();
     await shot('uncheck');
     await dialog.getByRole('button', { name: '完成' }).click();
@@ -309,7 +319,11 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
       await openDetail(card.todoId);
       await openAcceptDialog();
       const dialog = acceptDialog();
-      await dialog.getByRole('button', { name: '完成' }).click();
+      const box = dialog.locator('input[type="checkbox"]');
+      if (!(await box.isChecked())) {
+        await dialog.getByRole('checkbox', { name: '将改动合并到默认分支' }).click();
+      }
+      await dialog.getByRole('button', { name: /^完成/ }).click();
       await page.waitForTimeout(600);
       await shot('reject-409');
       await pexpect(dialog).toBeVisible();
@@ -321,21 +335,29 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
   }, 120_000);
 
   test('⑤ failed card (build leg delivered): merge checkbox locked — done can only land via merge', async () => {
-    const reviewRule = await api(
-      server.url,
-      'PATCH',
-      `/api/teams/${server.teamId}/routing-rules/review`,
-      { provider: 'stub-gw', modelId: 'stub-model' },
-    );
-    expect(reviewRule.status).toBe(200);
     const card = await driveToReview('失败卡锁定探针：不许给出假选项。', { rework: false });
-    const review = await api(server.url, 'POST', `/api/builds/${card.buildId}/steps`, {
-      action: 'review',
-    });
-    expect(review.status).toBe(202);
-    const reviewStep = await waitForStep(card.buildId, (s) => s.kind === 'review');
-    await doneStep(reviewStep.id, 'failed', { errorMessage: '探针：审核步失败' });
-    await waitFor(() => server.todoPhase(card.todoId) === 'failed', 15_000);
+    const now = Date.now();
+    server.db
+      .insert(stepTable)
+      .values({
+        id: `legacy-review-${card.buildId}`,
+        buildId: card.buildId,
+        kind: 'review',
+        status: 'failed',
+        createdAt: now,
+        finishedAt: now,
+      })
+      .run();
+    server.db
+      .update(buildTable)
+      .set({ errorMessage: 'Legacy review failed' })
+      .where(eq(buildTable.id, card.buildId))
+      .run();
+    server.db
+      .update(todoTable)
+      .set({ phase: 'failed', phaseAt: now })
+      .where(eq(todoTable.id, card.todoId))
+      .run();
 
     await openDetail(card.todoId);
     await openAcceptDialog();

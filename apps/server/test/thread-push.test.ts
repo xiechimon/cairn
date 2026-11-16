@@ -257,17 +257,20 @@ describe('human attention push', () => {
     );
   });
 
-  test.each(['shadow', 'autonomous'] as const)('%s machine review does not push', (policy) => {
-    const s = world({ policy });
-    const send = vi
-      .spyOn(webpush, 'sendNotification')
-      .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
-    setTodoPhase(s.svc, s.record.id, 'review');
-    expect(send).not.toHaveBeenCalled();
-  });
+  test.each(['shadow', 'autonomous'] as const)(
+    '%s legacy policy still pushes delivery to the user',
+    (policy) => {
+      const s = world({ policy });
+      const send = vi
+        .spyOn(webpush, 'sendNotification')
+        .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
+      setTodoPhase(s.svc, s.record.id, 'review');
+      expect(send).toHaveBeenCalledTimes(1);
+    },
+  );
 
   test.each([['phase-not-review'], ['work-in-flight'], ['phase-not-review', 'work-in-flight']])(
-    'PR review entry defers building-era blockers %j until evaluation',
+    'delivery ignores obsolete building-era blockers %j and pushes once',
     (...codes) => {
       const s = world();
       const at = Date.now();
@@ -302,13 +305,13 @@ describe('human attention push', () => {
         .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
       setTodoPhase(s.svc, s.record.id, 'review');
       setTodoPhase(s.svc, s.record.id, 'review');
-      expect(send).not.toHaveBeenCalled();
+      expect(send).toHaveBeenCalledTimes(1);
       expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
     },
   );
 
   test.each(['checks-pending', 'work-in-flight'])(
-    'a current machine blocker %s still suppresses the human-policy review push',
+    'an obsolete machine blocker %s cannot suppress the delivery push',
     (code) => {
       const s = world();
       vi.spyOn(Date, 'now').mockReturnValue(Date.now());
@@ -328,7 +331,7 @@ describe('human attention push', () => {
         .spyOn(webpush, 'sendNotification')
         .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
       setTodoPhase(s.svc, s.record.id, 'review');
-      expect(send).not.toHaveBeenCalled();
+      expect(send).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -407,13 +410,13 @@ describe('human attention push', () => {
       conversationId: 'build',
       role: 'assistant' as const,
       createdAt: Date.now(),
-      content: JSON.stringify({
+      content: {
         kind: ASK_USER_QUESTION_KIND,
         requestId: 'question',
         status: 'pending',
         questions: [{ header: 'Decision', question: 'Which target?', options: [] }],
         answers: null,
-      }),
+      },
     };
     upsertMessage(s.svc, row);
     upsertMessage(s.svc, row);

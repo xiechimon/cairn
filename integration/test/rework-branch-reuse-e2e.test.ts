@@ -183,17 +183,13 @@ describe('#931 both rework paths return to the original branch (E2E)', () => {
     const commitsAfterRound1 = await branchCommitCount(bareDir, branch);
     expect(commitsAfterRound1).toBeGreaterThanOrEqual(2);
 
-    const reviewRule = await api(
-      server.url,
-      'PATCH',
-      `/api/teams/${server.teamId}/routing-rules/review`,
-      { provider: 'stub-gw', modelId: 'stub-model' },
-    );
-    expect(reviewRule.status).toBe(200);
-    const reviewed = await api(server.url, 'POST', `/api/builds/${buildId}/steps`, {
-      action: 'review',
+    const failedRevision = await api(server.url, 'POST', `/api/builds/${buildId}/steps`, {
+      action: 'revision',
+      side: 'plan',
+      feedback: 'Try another icon variant.',
+      clientMessageId: 'cm-931-e2e-failed-revision',
     });
-    expect(reviewed.status).toBe(202);
+    expect(failedRevision.status).toBe(202);
     await waitFor(() => server.todoPhase(world.todoId) === 'failed', 150_000);
     const newSessionCountBefore = countLog(`new session ${buildId}`);
 

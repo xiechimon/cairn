@@ -418,12 +418,12 @@ describe('#1466 builds.ts delivery gate: legacy invalid githubRepo treated as "n
     },
   );
 
-  test('R9 control: a legal githubRepo PR delivery still stays building waiting for CI, no further step enqueued', () => {
+  test('R9 control: a legal githubRepo PR delivery reaches user review with no further step enqueued', () => {
     const s = boot(recorder());
     const projectId = insertGithubProject(s, VALID_REPO);
     const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId);
     completeStep(s.svc, stepId, { hasChanges: true });
-    expect(phaseOf(s, todoId)).toBe('building');
+    expect(phaseOf(s, todoId)).toBe('review');
     expect(stepsOf(s, buildId)).toEqual([{ kind: 'build', status: 'done' }]);
   });
 });

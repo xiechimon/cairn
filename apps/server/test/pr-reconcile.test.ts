@@ -476,14 +476,11 @@ function addReviewCard(w: World, prNumber: number): void {
 }
 
 describe('#1403 PR reconcile for review-phase builds', () => {
-  test('authenticated sweeps keep merge-gate reads on the injected transport', async () => {
+  test('authenticated sweeps reconcile PR state without evaluating the retired gate', async () => {
     const w = makeWorld({ connected: true });
     const mock = new PullsMock({ [w.prNumber]: { state: 'open', merged: false } });
     await pollerFor(w, mock).sweep();
-    expect(mock.gateFetch).toHaveBeenCalledWith(
-      `https://api.github.com/repos/octo/demo/pulls/${w.prNumber}`,
-      expect.anything(),
-    );
+    expect(mock.gateFetch).not.toHaveBeenCalled();
     expect(mock.requests.filter((url) => url.endsWith(`/pulls/${w.prNumber}`))).toHaveLength(1);
     expect(w.todoRow().phase).toBe('review');
   });

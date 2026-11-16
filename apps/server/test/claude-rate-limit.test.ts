@@ -546,7 +546,7 @@ describe('claude rate limit (#1852)', () => {
     s.dispose();
   });
 
-  test('a pi step on the rejected machine still claims and a pi failure stays a failure', async () => {
+  test('a late failure from a legacy pi reviewer stops it without changing the Claude quota wait', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
     useSessionRoute(s, machine.machineId, 'claude-code');
@@ -578,7 +578,8 @@ describe('claude rate limit (#1852)', () => {
       body: { status: 'failed', errorMessage: 'disk full' },
     });
     expect(done.status).toBe(200);
-    expect(stepOfBuild(s, piBuild).status).toBe('failed');
+    expect(stepOfBuild(s, piBuild).status).toBe('stopped');
+    expect(stepOfBuild(s, claudeBuild).status).toBe('waiting_quota');
     s.dispose();
   });
 });
