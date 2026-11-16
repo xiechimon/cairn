@@ -12,7 +12,7 @@ function priorQuestion(title: string, reason: string, spec: string | null): stri
   const lines = [
     `A code task needs outside research before planning: ${title}.`,
     `The Coordinator asked for it because: ${reason}`,
-    'Find how others solved the same kind of problem. Give each claim a URL and a fetched date, or label it as training knowledge. End with one recommended change.',
+    'Find how similar products and projects solved it, following the method in this brief, and end with one recommended change.',
   ];
   if (spec !== null && spec.trim() !== '') {
     lines.push('', 'Task spec (data):', quoteIssueLines(spec));
