@@ -280,6 +280,8 @@ export async function boot(opts: {
   confinementPlatform?: string;
   confinementPreflight?: import('../src/machine-loop.js').MachineLoopOpts['confinementPreflight'];
   confinementRecheckMs?: number;
+  strandedUploadReplayMs?: number;
+  strandedUploadMinAgeMs?: number;
   otel?: import('../src/backend/otel.js').DaemonOtel | null;
 }) {
   const home = makeTestTempDir('loop-');
@@ -316,6 +318,12 @@ export async function boot(opts: {
       confinementPreflight: opts.confinementPreflight,
       ...(opts.confinementRecheckMs !== undefined
         ? { confinementRecheckMs: opts.confinementRecheckMs }
+        : {}),
+      ...(opts.strandedUploadReplayMs !== undefined
+        ? { strandedUploadReplayMs: opts.strandedUploadReplayMs }
+        : {}),
+      ...(opts.strandedUploadMinAgeMs !== undefined
+        ? { strandedUploadMinAgeMs: opts.strandedUploadMinAgeMs }
         : {}),
       ...(opts.useDefaultBackend ? {} : { backend: opts.backend ?? fakeBackend([]).backend }),
       claudeCodeBackend: opts.claudeCodeBackend,

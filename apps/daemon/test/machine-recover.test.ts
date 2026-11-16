@@ -71,6 +71,32 @@ describe('recover reconciliation (02 §5.4 step journal recovery)', () => {
     await handle.done;
   });
 
+  test('a finished step the server restart left in awaiting-upload is re-delivered while the daemon keeps running', async () => {
+    const api = new FakeMachineApi();
+    const { handle, paths, lines } = await boot({
+      api,
+      strandedUploadReplayMs: 20,
+      strandedUploadMinAgeMs: 0,
+      seedJournal: (seedPaths) =>
+        seedS1Journal(seedPaths, {
+          state: 'awaiting-upload',
+          planContent: '# 方案',
+          doneBody: { status: 'success', sessionId: 'pi-sess-1' },
+        }),
+    });
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]).toMatchObject({
+      stepId: 's1',
+      body: { status: 'success', sessionId: 'pi-sess-1' },
+    });
+    expect(lines.some((l) => l.includes('awaiting upload — replaying final report'))).toBe(true);
+    await waitFor(() => new StepJournal(paths.outboxDir).get('s1') === null);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(api.doneBodies).toHaveLength(1);
+    await handle.stop();
+    await handle.done;
+  });
+
   test('stop received before restart, session never finished → recover reports stopped, no session opened', async () => {
     const api = new FakeMachineApi();
     api.recoverSteps = [
