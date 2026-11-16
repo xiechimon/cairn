@@ -21,6 +21,7 @@ import {
   type UtilityProcess,
   utilityProcess,
 } from 'electron';
+import { type LocalRunner, startLocalRunner } from './runner.js';
 import { createUpdater } from './updater.js';
 
 const LOOPBACK = '127.0.0.1';
@@ -38,14 +39,15 @@ interface RunningServer {
 
 let server: RunningServer | null = null;
 let tray: Tray | null = null;
+let runner: LocalRunner | null = null;
 let quitting = false;
-
-function serverRoot(): string {
-  return app.isPackaged ? join(process.resourcesPath, 'server') : join(app.getAppPath(), 'server');
-}
 
 function cairnHome(): string {
   return join(app.getPath('userData'), 'home');
+}
+
+function bundledRoot(name: string): string {
+  return app.isPackaged ? join(process.resourcesPath, name) : join(app.getAppPath(), name);
 }
 
 function freeLoopbackPort(): Promise<number> {
@@ -69,7 +71,7 @@ function startServer(port: number): RunningServer {
   };
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
-  const child = utilityProcess.fork(join(serverRoot(), 'dist', 'index.mjs'), [], {
+  const child = utilityProcess.fork(join(bundledRoot('server'), 'dist', 'index.mjs'), [], {
     serviceName: 'Cairn server',
     stdio: 'inherit',
     env,
@@ -225,8 +227,21 @@ async function boot(): Promise<void> {
   try {
     server = startServer(await freeLoopbackPort());
     await waitUntilServing(server);
-    signOwnPagesIn(server.origin, readOwnerToken());
+    const ownerToken = readOwnerToken();
+    signOwnPagesIn(server.origin, ownerToken);
     tray = showTray(server.origin);
+    void startLocalRunner({
+      root: bundledRoot('runner'),
+      home: join(app.getPath('userData'), 'runner'),
+      origin: server.origin,
+      ownerToken,
+      isQuitting: () => quitting,
+    }).then(
+      (started) => {
+        runner = started;
+      },
+      (error: unknown) => console.error('Cairn Runner did not start:', error),
+    );
     serveUpdates(server.origin);
     openWindow(server.origin);
   } catch (error) {
@@ -261,10 +276,13 @@ if (!app.requestSingleInstanceLock()) {
     if (quitting || server === null) return;
     quitting = true;
     event.preventDefault();
-    void stopServer(server).then(() => {
-      tray?.destroy();
-      app.quit();
-    });
+    const running = server;
+    void (runner?.stop() ?? Promise.resolve())
+      .then(() => stopServer(running))
+      .then(() => {
+        tray?.destroy();
+        app.quit();
+      });
   });
   void app.whenReady().then(boot);
 }
