@@ -234,10 +234,22 @@ function serveUpdates(origin: string): void {
   const showMenu = (state: DesktopUpdateState): void =>
     Menu.setApplicationMenu(
       Menu.buildFromTemplate(
-        appMenuTemplate(state, {
-          check: () => void checkFromMenu(),
-          install: () => void installFromMenu(),
-        }),
+        appMenuTemplate(
+          state,
+          {
+            check: () => void checkFromMenu(),
+            install: () => void installFromMenu(),
+          },
+          {
+            send: (command) => {
+              focusWindow();
+              BrowserWindow.getAllWindows()[0]?.webContents.send('desktop-menu', command);
+            },
+            back: () => BrowserWindow.getFocusedWindow()?.webContents.navigationHistory.goBack(),
+            forward: () =>
+              BrowserWindow.getFocusedWindow()?.webContents.navigationHistory.goForward(),
+          },
+        ),
       ),
     );
   const updater = createUpdater((state) => {

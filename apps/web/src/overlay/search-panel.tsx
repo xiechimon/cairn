@@ -13,6 +13,7 @@ import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import { useDesktopMenu } from '../desktop-shell.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -551,6 +552,7 @@ export function SearchPanel({
 export function useSearchState(initialOpen: boolean, initialQuery: string) {
   const [open, setOpen] = useState(initialOpen);
   const [query, setQuery] = useState(initialQuery);
+  const openSearch = useCallback(() => setOpen(true), []);
   useLayoutEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'k') {
@@ -563,5 +565,6 @@ export function useSearchState(initialOpen: boolean, initialQuery: string) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  useDesktopMenu('search', openSearch);
   return { open, setOpen, query, setQuery };
 }

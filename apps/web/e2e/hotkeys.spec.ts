@@ -164,3 +164,46 @@ test.describe('⌘J leaves overlay routes for the Coordinator page', () => {
     await expect(page.getByRole('button', { name: '添加执行机' })).toBeVisible();
   });
 });
+
+test('the Mac app menu opens search, settings and the Coordinator composer', async ({ page }) => {
+  await page.addInitScript(() => {
+    const listeners = new Set<(command: string) => void>();
+    const shell = window as unknown as {
+      cairnDesktop: unknown;
+      sendDesktopMenu: (command: string) => void;
+    };
+    shell.cairnDesktop = {
+      menu: {
+        subscribe: (listener: (command: string) => void) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+    };
+    shell.sendDesktopMenu = (command) => {
+      for (const listener of listeners) listener(command);
+    };
+  });
+  const send = (command: string) =>
+    page.evaluate(
+      (sent) => (window as unknown as { sendDesktopMenu: (c: string) => void }).sendDesktopMenu(sent),
+      command,
+    );
+  const search = page.getByRole('dialog', { name: '搜索' });
+  const settings = page.getByRole('dialog', { name: '设置' });
+
+  await page.goto(SCHEDULES);
+  await expect(tasksPanel(page)).toBeVisible();
+  await send('search');
+  await expect(search).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(search).toBeHidden();
+
+  await send('settings');
+  await expect(settings).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/settings\?scenario=01$/);
+
+  await send('compose');
+  await expect(settings).toBeHidden();
+  await expect(page.getByTestId('chief-composer-input')).toBeFocused();
+});

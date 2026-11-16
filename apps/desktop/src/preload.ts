@@ -1,7 +1,21 @@
-import type { DesktopUpdateState, LocalProvider, LocalProviderImport } from '@cairn/shared';
+import type {
+  DesktopMenuCommand,
+  DesktopUpdateState,
+  LocalProvider,
+  LocalProviderImport,
+} from '@cairn/shared';
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('cairnDesktop', {
+  menu: {
+    subscribe: (listener: (command: DesktopMenuCommand) => void): (() => void) => {
+      const relay = (_event: unknown, command: DesktopMenuCommand) => listener(command);
+      ipcRenderer.on('desktop-menu', relay);
+      return () => {
+        ipcRenderer.removeListener('desktop-menu', relay);
+      };
+    },
+  },
   localProviders: {
     scan: (): Promise<LocalProvider[]> => ipcRenderer.invoke('local-providers:scan'),
     read: (providerIds: string[]): Promise<LocalProviderImport[]> =>

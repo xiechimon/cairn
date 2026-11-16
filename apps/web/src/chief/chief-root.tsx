@@ -1,10 +1,12 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo } from 'react';
-import { type RouteObject, useNavigate, useRoutes } from 'react-router';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo } from 'react';
+import { type RouteObject, useLocation, useNavigate, useRoutes } from 'react-router';
 import { useLiveData } from '../api/provider.js';
-import { useOpenComposer } from '../board/open-composer.js';
+import { coordinatorSearch, useOpenComposer } from '../board/open-composer.js';
+import { useDesktopMenu } from '../desktop-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { isEditableTarget } from '../overlay/hotkeys.js';
 import { RouteDialogCloseProvider } from '../overlay/route-dialog.js';
+import { SETTINGS_HREF, settingsSectionOf } from '../settings/settings-href.js';
 import { SettingsDialog } from '../settings/settings-page.js';
 import { useSettingsOverlay } from '../settings/use-settings-overlay.js';
 import { questionDockState } from './question-dock-state.js';
@@ -43,6 +45,17 @@ function useOpenCoordinatorKey(): void {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [openComposer]);
+  useDesktopMenu('compose', openComposer);
+}
+
+function useOpenSettingsMenu(): void {
+  const navigate = useNavigate();
+  const { pathname, search } = useLocation();
+  const openSettings = useCallback(() => {
+    if (settingsSectionOf(pathname) !== null) return;
+    navigate({ pathname: SETTINGS_HREF, search: coordinatorSearch(search) });
+  }, [navigate, pathname, search]);
+  useDesktopMenu('settings', openSettings);
 }
 
 export function ChiefRoot({
@@ -83,6 +96,7 @@ export function ChiefRoot({
   const { teamId } = useLiveData();
   const surface = useChiefSurface(fixture, deepLink);
   useOpenCoordinatorKey();
+  useOpenSettingsMenu();
   const pendingQuestions = useMemo(
     () =>
       originChiefQuestions(surface.chiefData.stream ?? [], {
