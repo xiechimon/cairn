@@ -20,36 +20,31 @@ export const copy = {
     other: { href: '/', label: 'EN', name: 'English' },
     title: 'Cairn：写代码的人的私人助理，跑在你自己的机器上',
     description:
-      'Cairn 是写代码的人自托管的私人助理：在一个对话里说要做什么，agent 用你自己的机器和订阅先研究再动手，代码过合并闸才落地，撤不回的动作都等你点头。',
+      'Cairn 是开源（Apache-2.0）、自托管的私人助理，给写代码的人用：在一个对话里说要做什么，agent 用你自己的机器和模型订阅去做。用 npx @xiechimon/cairn 安装。',
     nav: { docs: '文档', github: 'GitHub', theme: '切换深浅色' },
-    eyebrow: ['自托管', '开源 Apache-2.0', '个人版'],
     h1: ['写代码的人的私人助理，', '跑在你自己的机器上'],
-    lede: '在一个对话里说要做什么，你只拍板。agent 用你自己的机器和订阅，先读开源实现再动手；代码过合并闸才落地，撤不回的动作都等你点头。',
+    lede: '在一个对话里说要做什么，agent 用你自己的订阅去做。',
     start: '开始上手',
     copy: '复制',
     copied: '已复制',
     heroAlt:
       'Cairn 桌面端：左边 Coordinator 对话里有两件事和它们开出的 thread，右边一个 thread 的报告停在等你决定；旁边是同一个对话在手机上',
-    caption: '真实界面，演示数据',
     how: {
       title: '一句话进去，一个决定出来',
       lede: '你定要什么和架构，其余的交给 thread。',
       steps: [
         {
           title: '说一句要什么',
-          body: '跟 Coordinator 说一件事，代码的也好，自己的事也好。它给每件事开一个 thread，在你自己的机器上跑。',
           img: 'ios-home',
           alt: '手机上的 Coordinator 对话：两个请求、它们开出的 thread，和一个带三个选项的问题',
         },
         {
           title: '它先研究，再动手',
-          body: 'thread 先找两三个做得好的开源实现，读源码而不是 README，比较之后再改代码、跑测试。库、文件结构、命名和测试由它自己定。',
           img: 'work',
           alt: '一个 thread 在干活：读了三份实现，改了一个文件，跑了测试',
         },
         {
           title: '你只定要你定的',
-          body: '每份报告最后两栏：“我已自行决定”，每条带理由；“需要你定的”，最多三条，每条带选项、证据和推荐。',
           img: 'report',
           alt: '一份 thread 报告，最后是“我已自行决定”和“需要你定的”',
         },
@@ -71,8 +66,8 @@ export const copy = {
           body: '首页置顶等你拍板的事；只有非你动手不可时才推送通知。',
         },
         {
-          title: '结果经得起查',
-          body: 'agent 合并之前，合并闸只认绑定在当前补丁上的审阅结论。撤不回的动作，等你点头。',
+          title: '撤不回的事，先问你',
+          body: '比如删数据、付费、改凭证、对外发布。',
         },
         {
           title: '电脑上开始，手机上拍板',
@@ -131,7 +126,7 @@ export const copy = {
       first: '第一个任务怎么跑',
     },
     footer: {
-      tagline: 'Cairn 由 Cairn 自己开发：里面的 agent 领自己的票、开 PR。',
+      tagline: 'Cairn 由 Cairn 自己开发。',
       docs: '文档',
       discussions: '讨论区',
       issues: '问题反馈',
@@ -148,36 +143,31 @@ export const copy = {
     other: { href: '/zh-cn/', label: '中文', name: '简体中文' },
     title: 'Cairn: a personal assistant for people who write code, on your own machines',
     description:
-      'Cairn is a self-hosted personal assistant for people who write code. Say what you want in one conversation; agents research and build on your own machines with your own subscriptions, code lands through a merge gate, and anything that cannot be undone waits for your yes.',
+      'Cairn is an open-source (Apache-2.0), self-hosted personal assistant for people who write code. Say what you want in one conversation; agents do it on your own machines with your own model subscriptions. Install with npx @xiechimon/cairn.',
     nav: { docs: 'Docs', github: 'GitHub', theme: 'Toggle theme' },
-    eyebrow: ['Self-hosted', 'Apache-2.0', 'For one person'],
     h1: ['A personal assistant for people who write code, ', 'on your own machines'],
-    lede: 'Say what you want in one conversation and only make the calls. Agents read how open-source projects solved it before they build, on your machines and your subscriptions. Code lands through a merge gate, and nothing that cannot be undone happens without your yes.',
+    lede: 'Say what you want in one conversation; agents do it with your own subscriptions.',
     start: 'Get started',
     copy: 'Copy',
     copied: 'Copied',
     heroAlt:
       'Cairn on a desktop: the Coordinator conversation with two requests and the threads they started, a thread report waiting on a decision at the right, and the same conversation on a phone',
-    caption: 'Real UI, sample data',
     how: {
       title: 'One sentence in, one decision out',
       lede: 'You decide what you want and the architecture. The thread does the rest.',
       steps: [
         {
           title: 'Say what you want',
-          body: 'Tell the Coordinator one thing, about code or your own affairs. It opens a thread for each piece of work and runs it on your own machines.',
           img: 'ios-home',
           alt: 'The Coordinator conversation on a phone: two requests, the threads they started and a question with three options',
         },
         {
           title: 'It researches, then builds',
-          body: 'A thread finds two or three strong open-source implementations, reads their source rather than their README, and compares them before it edits and runs the tests. Libraries, layout, naming and tests are its call.',
           img: 'work',
           alt: 'A thread at work: it read three implementations, edited one file and ran the tests',
         },
         {
           title: 'You decide what is yours',
-          body: 'Every report ends with two lists: Decided myself, each choice with its reason, and Needs your decision, at most three items with options, evidence and a recommendation.',
           img: 'report',
           alt: 'A thread report ending with Decided myself and Needs your decision',
         },
@@ -199,8 +189,8 @@ export const copy = {
           body: 'The home page pins the decisions waiting on you, and a push goes out only when you must act.',
         },
         {
-          title: 'Results you can trust',
-          body: 'Before an agent merges, the gate counts only review verdicts bound to the current patch. Anything that cannot be undone waits for your yes.',
+          title: 'It asks before anything irreversible',
+          body: 'For example: deleting data, paying, changing credentials, publishing.',
         },
         {
           title: 'Start at your desk, decide from your phone',
@@ -259,7 +249,7 @@ export const copy = {
       first: 'Run your first task',
     },
     footer: {
-      tagline: 'Cairn is built with Cairn: agents inside it take its own tickets and open the pull requests.',
+      tagline: 'Cairn is built with Cairn.',
       docs: 'Docs',
       discussions: 'Discussions',
       issues: 'Issues',

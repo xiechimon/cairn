@@ -17,6 +17,37 @@ const stepSize: Record<string, [number, number]> = {
   work: [780, 1520],
   report: [780, 1520],
 };
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'SoftwareApplication',
+      '@id': `${site}/#app`,
+      name: 'Cairn',
+      description: t.description,
+      url: `${site}${t.home}`,
+      inLanguage: t.htmlLang,
+      applicationCategory: 'DeveloperApplication',
+      operatingSystem: 'Linux, macOS, Windows',
+      softwareRequirements: 'Node.js 22 or 24',
+      installUrl: `${site}${t.install}`,
+      downloadUrl: 'https://www.npmjs.com/package/@xiechimon/cairn',
+      license: 'https://www.apache.org/licenses/LICENSE-2.0',
+      isAccessibleForFree: true,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      sameAs: [links.repo],
+    },
+    {
+      '@type': 'SoftwareSourceCode',
+      name: 'Cairn',
+      codeRepository: links.repo,
+      license: 'https://www.apache.org/licenses/LICENSE-2.0',
+      programmingLanguage: 'TypeScript',
+      runtimePlatform: 'Node.js',
+      targetProduct: { '@id': `${site}/#app` },
+    },
+  ],
+};
 ---
 
 <!doctype html>
@@ -29,6 +60,8 @@ const stepSize: Record<string, [number, number]> = {
     <link rel="canonical" href={`${site}${t.home}`} />
     <link rel="alternate" hreflang="en" href={`${site}/`} />
     <link rel="alternate" hreflang="zh-CN" href={`${site}/zh-cn/`} />
+    <link rel="alternate" hreflang="x-default" href={`${site}/`} />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     <link rel="icon" href="/logo.svg" type="image/svg+xml" />
     <meta name="color-scheme" content="light dark" />
     <meta property="og:title" content="Cairn" />
@@ -98,9 +131,6 @@ const stepSize: Record<string, [number, number]> = {
     <main>
       <section class="hero wrap">
         <div class="hero-text">
-        <p class="eyebrow">
-          {t.eyebrow.map((item) => <span>{item}</span>)}
-        </p>
         <h1>{t.h1.map((line) => <span>{line}</span>)}</h1>
         <p class="lede">{t.lede}</p>
         <div class="actions">
@@ -117,29 +147,18 @@ const stepSize: Record<string, [number, number]> = {
           </div>
         </div>
         </div>
-        <nav class="hero-spiral" aria-label={t.how.title}>
-          <svg viewBox="-105 -105 210 210" aria-hidden="true">
+        <div class="hero-spiral" aria-hidden="true">
+          <svg viewBox="-105 -105 210 210">
             <g filter="url(#ink)">
               <path class="spiral" pathLength="1" d="M-7 0 A7 7 0 0 1 7 0 A22 22 0 0 1 -37 0 A37 37 0 0 1 37 0 A52 52 0 0 1 -67 0 A67 67 0 0 1 67 0 A82 82 0 0 1 47.816 52.709"></path>
-              <line class="leader" x1="-60.74" y1="40.21" x2="-71.59" y2="47.38"></line>
-              <line class="leader" x1="-25.23" y1="-71.71" x2="-29.54" y2="-83.97"></line>
-              <line class="leader" x1="75.64" y1="-7.48" x2="88.57" y2="-8.75"></line>
             </g>
           </svg>
-          {
-            t.how.steps.map((step, index) => (
-              <a class={`hang hang-${index}`} href="#how">
-                {step.title}
-              </a>
-            ))
-          }
-        </nav>
+        </div>
       </section>
 
       <figure class="hero-shot wrap" id="hero-shot">
         <img class="for-light" src={shot('hero', 'light')} width="2400" height="1116" alt={t.heroAlt} fetchpriority="high" />
         <img class="for-dark" src={shot('hero', 'dark')} width="2400" height="1116" alt={t.heroAlt} loading="lazy" />
-        <figcaption>{t.caption}</figcaption>
       </figure>
 
       <section class="section wrap" aria-labelledby="how">
@@ -159,7 +178,6 @@ const stepSize: Record<string, [number, number]> = {
                   </div>
                   <span class="num">{String(index + 1).padStart(2, '0')}</span>
                   <h3>{step.title}</h3>
-                  <p>{step.body}</p>
                 </li>
               );
             })
@@ -438,25 +456,6 @@ const stepSize: Record<string, [number, number]> = {
     padding-top: 88px;
     text-align: center;
   }
-  .eyebrow {
-    display: inline-flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 6px 0;
-    margin: 0 0 28px;
-    color: var(--ink-3);
-    font-size: 13px;
-  }
-  .eyebrow span + span::before {
-    content: "";
-    display: inline-block;
-    width: 3px;
-    height: 3px;
-    margin: 0 10px;
-    border-radius: 50%;
-    background: var(--ink-4);
-    vertical-align: middle;
-  }
   h1 {
     max-width: 900px;
     margin: 0 auto;
@@ -485,6 +484,9 @@ const stepSize: Record<string, [number, number]> = {
     font-size: 18px;
     line-height: 1.65;
     text-wrap: pretty;
+  }
+  :lang(zh-CN) .lede {
+    word-break: keep-all;
   }
   .actions {
     display: flex;
@@ -602,7 +604,6 @@ const stepSize: Record<string, [number, number]> = {
       gap: 120px;
       text-align: left;
     }
-    .hero .eyebrow,
     .hero .actions {
       justify-content: flex-start;
     }
@@ -631,51 +632,6 @@ const stepSize: Record<string, [number, number]> = {
     stroke-dasharray: 1 1;
     animation: spiral-draw 1.6s cubic-bezier(0.45, 0.05, 0.3, 1) both;
   }
-  .hero-spiral .leader {
-    stroke-width: 0.9;
-    animation: hang-in 240ms ease-out both;
-  }
-  .hero-spiral .leader:nth-of-type(1) {
-    animation-delay: 520ms;
-  }
-  .hero-spiral .leader:nth-of-type(2) {
-    animation-delay: 710ms;
-  }
-  .hero-spiral .leader:nth-of-type(3) {
-    animation-delay: 900ms;
-  }
-  .hang {
-    position: absolute;
-    padding: 2px 4px;
-    border-radius: var(--radius-control);
-    color: var(--ink-2);
-    font-size: 14px;
-    white-space: nowrap;
-    text-decoration: none;
-    animation: hang-in 240ms ease-out both;
-  }
-  .hang:hover {
-    color: var(--ink);
-    background: var(--hover);
-  }
-  .hang-0 {
-    left: 48.7px;
-    top: 250.3px;
-    transform: translate(-100%, -50%);
-    animation-delay: 520ms;
-  }
-  .hang-1 {
-    left: 120.0px;
-    top: 27.9px;
-    transform: translate(-100%, -50%);
-    animation-delay: 710ms;
-  }
-  .hang-2 {
-    left: 319.8px;
-    top: 155.2px;
-    transform: translate(0, -50%);
-    animation-delay: 900ms;
-  }
   @keyframes spiral-draw {
     from {
       stroke-dashoffset: 1;
@@ -684,15 +640,8 @@ const stepSize: Record<string, [number, number]> = {
       stroke-dashoffset: 0;
     }
   }
-  @keyframes hang-in {
-    from {
-      opacity: 0;
-    }
-  }
   @media (prefers-reduced-motion: reduce) {
-    .hero-spiral .spiral,
-    .hero-spiral .leader,
-    .hang {
+    .hero-spiral .spiral {
       animation: none;
     }
   }
@@ -712,12 +661,6 @@ const stepSize: Record<string, [number, number]> = {
     aspect-ratio: 16 / 9;
     border-radius: var(--radius-panel);
     background: #000;
-  }
-  figcaption {
-    margin-top: 12px;
-    color: var(--ink-3);
-    font-size: 13px;
-    text-align: center;
   }
 
   .section {
@@ -781,7 +724,6 @@ const stepSize: Record<string, [number, number]> = {
     max-width: 100%;
     object-fit: contain;
   }
-  .steps p,
   .points p,
   .install p {
     margin: 8px 0 0;
