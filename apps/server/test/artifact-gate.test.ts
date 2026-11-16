@@ -201,7 +201,7 @@ describe('gate 1 (B-C10): plan step with no plan document -> confirm unreachable
   });
 });
 
-describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -> review unreachable', () => {
+describe('delivery checks (B-C11/B-C14): zero changes / fake completion -> completion unreachable', () => {
   test('done success + hasChanges=false -> needs_input with a no-change question for the Coordinator (task stall S12)', async () => {
     const w = await setupWorld();
     try {
@@ -227,7 +227,7 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
     }
   });
 
-  test('counterexample: hasChanges=true -> proceeds to review as usual (an artifact passes the gate)', async () => {
+  test('counterexample: hasChanges=true -> completes the task', async () => {
     const w = await setupWorld();
     try {
       await w.startBuild(false);
@@ -237,26 +237,26 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
         hasChanges: true,
         sessionId: 'pi-b2',
       });
-      expect(w.todoRow().phase).toBe('review');
+      expect(w.todoRow().phase).toBe('done');
       expect(w.todoRow().hasChanges).toBe(true);
     } finally {
       w.s.dispose();
     }
   });
 
-  test('version-wall counterexample: legacy daemon does not carry hasChanges -> fail-open, review as usual', async () => {
+  test('version-wall counterexample: legacy daemon does not carry hasChanges -> fail-open, completes as usual', async () => {
     const w = await setupWorld();
     try {
       await w.startBuild(false);
       const buildStep = await w.claim();
       await w.done(buildStep.step.id, { status: 'success', sessionId: 'pi-b3' });
-      expect(w.todoRow().phase).toBe('review');
+      expect(w.todoRow().phase).toBe('done');
     } finally {
       w.s.dispose();
     }
   });
 
-  test('failure mode 3 (B-C14 fake-completion shape): done success with zero artifact never reaches review', async () => {
+  test('failure mode 3 (B-C14 fake-completion shape): done success with zero artifact never completes the task', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -283,28 +283,38 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
         hasChanges: true,
         sessionId: 'pi-b5',
       });
-      expect(w.todoRow().phase).toBe('review');
+      expect(w.todoRow().phase).toBe('done');
       const res = await call(w.s.app, 'POST', `/api/builds/${buildStep.step.buildId}/steps`, {
         body: { action: 'review' },
       });
-      expect(res.status).toBe(202);
-      const reviewStep = await w.claim();
-      expect(reviewStep.step.kind).toBe('review');
-      await w.done(reviewStep.step.id, {
+      expect(res.status).toBe(409);
+      const reviewStepId = 'legacy-review';
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: reviewStepId,
+          buildId: buildStep.step.buildId,
+          kind: 'review',
+          status: 'claimed',
+          machineId: buildStep.step.machineId,
+          createdAt: Date.now(),
+        })
+        .run();
+      await w.done(reviewStepId, {
         status: 'success',
         hasChanges: false,
         sessionId: 'pi-r1',
       });
-      expect(w.todoRow().phase).toBe('review');
+      expect(w.todoRow().phase).toBe('done');
       expect(w.todoRow().hasChanges).toBe(true);
-      expect(w.stepRow(reviewStep.step.id).status).toBe('stopped');
+      expect(w.stepRow(reviewStepId).status).toBe('stopped');
       expect(w.buildRow(buildStep.step.buildId).errorMessage).toBeNull();
     } finally {
       w.s.dispose();
     }
   });
 
-  test('failure mode 5 (source of truth): repo-less project with hasChanges=true proceeds to review -- the gate does not read the always-empty projection', async () => {
+  test('failure mode 5 (source of truth): repo-less project with hasChanges=true completes -- delivery does not read the always-empty projection', async () => {
     const w = await setupWorld();
     try {
       await w.startBuild(false);
@@ -314,7 +324,7 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
         hasChanges: true,
         sessionId: 'pi-b6',
       });
-      expect(w.todoRow().phase).toBe('review');
+      expect(w.todoRow().phase).toBe('done');
     } finally {
       w.s.dispose();
     }
