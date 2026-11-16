@@ -23,16 +23,30 @@ test('the existing key flow submits MCP grant labels for Coordinator Thread entr
   await page.getByRole('button', { name: '新建密钥', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '新建密钥' });
   await dialog.getByRole('checkbox', { name: /^MCP 访问/ }).check();
+  const labels: Record<string, string> = {
+    Projects: '项目',
+    'Read Thread': '查看线程',
+    'Threads Waiting on Me': '等我处理的线程',
+    'Thread Pull Requests': '线程的 PR',
+    'Start Thread': '新建线程',
+    'Reply Thread': '回复线程',
+  };
   const read = ['Projects', 'Read Thread', 'Threads Waiting on Me', 'Thread Pull Requests'];
   const write = ['Start Thread', 'Reply Thread'];
+  const readGroup = dialog.getByRole('group', { name: '读取', exact: true });
+  const writeGroup = dialog.getByRole('group', { name: '写入', exact: true });
   for (const grant of read)
-    await dialog.getByRole('checkbox', { name: `读 ${grant}`, exact: true }).check();
+    await readGroup.getByRole('checkbox', { name: labels[grant], exact: true }).check();
   for (const grant of write)
-    await dialog.getByRole('checkbox', { name: `写 ${grant}`, exact: true }).check();
+    await writeGroup.getByRole('checkbox', { name: labels[grant], exact: true }).check();
   for (const grant of write)
-    await expect(dialog.getByRole('checkbox', { name: `读 ${grant}`, exact: true })).toHaveCount(0);
+    await expect(readGroup.getByRole('checkbox', { name: labels[grant], exact: true })).toHaveCount(
+      0,
+    );
   for (const grant of read)
-    await expect(dialog.getByRole('checkbox', { name: `写 ${grant}`, exact: true })).toHaveCount(0);
+    await expect(writeGroup.getByRole('checkbox', { name: labels[grant], exact: true })).toHaveCount(
+      0,
+    );
   await page.screenshot({ path: testInfo.outputPath('thread-key-grants.png') });
   const submitted = page.waitForRequest(
     (request) =>
