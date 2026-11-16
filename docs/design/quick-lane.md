@@ -1,6 +1,6 @@
 # Quick lane for small tasks with a known destination
 
-Status: proposed on 2026-11-16, not built. The owner chose to build it (`两个都要，按这个边界继续出方案，先不改代码`) and decided that the quick lane skips the GitHub overlap check. The owner is asked once more before implementation starts. Companion design: `personal-space.md`. Builds on `coordinator-routes-verbatim.md` (owner segments, `step.ownerMessageIds`) and `coordinator-project-channels.md` (a task's reports return to the channel that created it, #5136).
+Status: approved on 2026-11-16, not built yet. The owner chose to build it (`两个都要，按这个边界继续出方案，先不改代码`) and decided that the quick lane skips the GitHub overlap check. The owner approved implementation on 2026-11-16. Companion design: `personal-space.md`. Builds on `coordinator-routes-verbatim.md` (owner segments, `step.ownerMessageIds`) and `coordinator-project-channels.md` (a task's reports return to the channel that created it, #5136).
 
 ## Problem
 

@@ -1,6 +1,6 @@
 # Personal space: a default place for files that belong to no project
 
-Status: proposed on 2026-11-16, not built. The owner chose to build it and decided four things: there is no separate entry (`不用，该放哪里就放哪里就行了`), and space files show by kind in the existing Results panel groups; a task writes notes, the Coordinator gets no write tool; when the team has no project, a personal request goes to the space without a question. The owner is asked once more before implementation starts. Companion design: `quick-lane.md`.
+Status: approved on 2026-11-16, not built yet. The owner chose to build it and decided four things: there is no separate entry (`不用，该放哪里就放哪里就行了`), and space files show by kind in the existing Results panel groups; a task writes notes, the Coordinator gets no write tool; when the team has no project, a personal request goes to the space without a question. The owner approved implementation on 2026-11-16. Companion design: `quick-lane.md`.
 
 ## Problem
 
