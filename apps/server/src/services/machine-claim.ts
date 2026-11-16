@@ -590,6 +590,8 @@ async function tryClaim(
           const fresh = priorSessionOf(tx, cand.stepRow, cand.buildRow, boundId);
           if (accountHeld(cand.stepRow, fresh, boundId)) return false;
         }
+        const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
+        if (latestTodo === undefined || quickLaneRefusal(db, latestTodo) !== null) return false;
         holdBlockedBuild(db, cand.stepRow.buildId);
         const res = tx
           .update(step)

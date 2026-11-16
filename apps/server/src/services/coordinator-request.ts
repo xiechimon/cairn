@@ -323,7 +323,9 @@ export function quickLaneRefusal(
     const cited = citedMessages(db, ctx, [...new Set(ids)]);
     const changed = request.segments.some((segment) => {
       const now = cited.find((c) => sourceIdOf(c.segment) === sourceIdOf(segment))?.segment.text;
-      return segment.source.span === 'whole' ? now !== segment.text : !now?.includes(segment.text);
+      return segment.source.span === 'whole'
+        ? now !== segment.text
+        : !now?.normalize('NFC').includes(segment.text.normalize('NFC'));
     });
     if (changed) return "quick lane refused: the owner's cited words changed";
     const basis = quickLaneBasis(db, ctx, row.projectId, cited, request.segments);

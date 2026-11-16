@@ -1,13 +1,27 @@
 import { ASK_USER_QUESTION_KIND, encodeReplyQuote, type TaskRequest } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { describe, expect, test } from 'vitest';
-import { build, chiefMessage, todo as todoTable } from '../src/db/schema.js';
+import { describe, expect, test, vi } from 'vitest';
+import { build, chiefMessage, step, todo as todoTable } from '../src/db/schema.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
+import { mergeThroughGithub } from '../src/services/build-github-merge.js';
 import { requestMerge } from '../src/services/build-merge-request.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
+
+const claimRace = vi.hoisted(() => ({ during: null as (() => void) | null }));
+
+vi.mock('../src/services/blocker-handoff.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../src/services/blocker-handoff.js')>();
+  return {
+    ...real,
+    blockerHandoffForClaim: (...args: Parameters<typeof real.blockerHandoffForClaim>) => {
+      claimRace.during?.();
+      return real.blockerHandoffForClaim(...args);
+    },
+  };
+});
 
 registerChiefHarness();
 
@@ -20,6 +34,10 @@ function requestOf(todoId: string): TaskRequest | null {
   return H.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!.request;
 }
 
+function buildError(buildId: string): string | null {
+  return H.s.db.select().from(build).where(eq(build.id, buildId)).get()!.errorMessage;
+}
+
 function todoCount(): number {
   return H.s.db.select().from(todoTable).all().length;
 }
@@ -29,7 +47,7 @@ async function quick(
   projectId: string,
   messageId: string,
   over: { turnMessageIds?: string[]; turnPrompt?: string; params?: Record<string, unknown> } = {},
-): Promise<{ id: string }> {
+): Promise<{ id: string; buildId: string }> {
   return (await relay(
     'create_todo',
     { projectId, messageIds: [messageId], lane: 'quick', ...over.params },
@@ -39,7 +57,7 @@ async function quick(
       turnMessageIds: over.turnMessageIds ?? [messageId],
       turnPrompt: over.turnPrompt ?? 'add it',
     },
-  )) as { id: string };
+  )) as { id: string; buildId: string };
 }
 
 function statusOf(error: unknown): number {
@@ -217,7 +235,7 @@ describe('quick lane on create_todo (docs/design/quick-lane.md L1 to L3)', () =>
       'create_todo',
       { projectId: H.projectId, messageIds: [words] },
       { threadId: channel, conversationId: channel, turnMessageIds: [words] },
-    )) as { id: string };
+    )) as { id: string; buildId: string };
     const request = requestOf(created.id)!;
     expect(request.lane).toBeUndefined();
     expect(request.projectBasis).toBeUndefined();
@@ -236,16 +254,12 @@ describe('quick lane re-checks the destination at claim and merge (L4, L5)', () 
       threadId,
       `add a node.txt${projectName === undefined ? '' : ` to ${projectName}`} that says hello`,
     );
-    const created = (await quick(threadId, projectId, words)) as { id: string; buildId: string };
+    const created = await quick(threadId, projectId, words);
     return { machineId, projectId, words, created };
   }
 
   function claim(machineId: string) {
     return claimStep(toolDeps(), machineId, H.teamId, 0, 'http://localhost');
-  }
-
-  function buildError(buildId: string): string | null {
-    return H.s.db.select().from(build).where(eq(build.id, buildId)).get()!.errorMessage;
   }
 
   test('L4: an intact quick task is claimed', async () => {
@@ -285,6 +299,60 @@ describe('quick lane re-checks the destination at claim and merge (L4, L5)', () 
     const { words, created } = await quickTaskOnMachine();
     H.s.db.delete(chiefMessage).where(eq(chiefMessage.id, words)).run();
     const error = await requestMerge(toolDeps(), created.buildId).catch((e: unknown) => e);
+    expect(statusOf(error)).toBe(409);
+    expect(String((error as Error).message)).toContain('quick lane');
+  });
+});
+
+describe('quick lane re-checks close the gap before the action (L4, L5)', () => {
+  test('L4: a rewind while claim waits on its async checks keeps the step unclaimed', async () => {
+    const machineId = insertMachine(H.s);
+    seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
+    const channel = await openChannel();
+    const words = seedOwnerMessage(H.s.db, channel, 'add a node.txt that says hello');
+    const created = await quick(channel, H.projectId, words);
+    claimRace.during = () => {
+      H.s.db.delete(chiefMessage).where(eq(chiefMessage.id, words)).run();
+    };
+    try {
+      expect(await claimStep(toolDeps(), machineId, H.teamId, 0, 'http://localhost')).toBeNull();
+    } finally {
+      claimRace.during = null;
+    }
+    const steps = H.s.db.select().from(step).where(eq(step.buildId, created.buildId)).all();
+    expect(steps.some((row) => row.status === 'claimed')).toBe(false);
+    expect(await claimStep(toolDeps(), machineId, H.teamId, 0, 'http://localhost')).toBeNull();
+    expect(buildError(created.buildId)).toContain('quick lane');
+  });
+
+  test('L4: a quote matched under NFC at creation still matches at claim', async () => {
+    const machineId = insertMachine(H.s);
+    seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
+    const channel = await openChannel();
+    const words = seedOwnerMessage(H.s.db, channel, 'add cafe\u0301.txt. Also tidy the readme.');
+    const created = await quick(channel, H.projectId, words, {
+      params: { quotes: ['add caf\u00e9.txt'] },
+    });
+    expect(await claimStep(toolDeps(), machineId, H.teamId, 0, 'http://localhost')).toMatchObject({
+      todo: { id: created.id },
+    });
+  });
+
+  test('L5: the GitHub merge gate refuses a quick task whose basis broke', async () => {
+    const channel = await openChannel();
+    const words = seedOwnerMessage(H.s.db, channel, 'add a node.txt that says hello');
+    const created = await quick(channel, H.projectId, words);
+    H.s.db.update(step).set({ status: 'done' }).where(eq(step.buildId, created.buildId)).run();
+    H.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, created.id)).run();
+    H.s.db.delete(chiefMessage).where(eq(chiefMessage.id, words)).run();
+    const row = H.s.db.select().from(build).where(eq(build.id, created.buildId)).get()!;
+    const error = await mergeThroughGithub(
+      toolDeps(),
+      row,
+      7,
+      { owner: 'o', repo: 'r' },
+      'owner',
+    ).catch((e: unknown) => e);
     expect(statusOf(error)).toBe(409);
     expect(String((error as Error).message)).toContain('quick lane');
   });
