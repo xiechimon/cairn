@@ -58,6 +58,7 @@ import {
 } from './services/scheduler.js';
 import { sharedAgentSkillRoots } from './services/skills.js';
 import { prepareSkillsHome } from './services/skills-home.js';
+import { fillSystemAvatar } from './services/system-avatar.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
@@ -138,6 +139,7 @@ const vapidKeys = {
   apns: loadApnsConfig(config.apns),
 };
 const seeded = seed(db);
+await fillSystemAvatar(seeded.user);
 seedLocalMachine(db, seeded.team.id);
 setCoordinatorServerContextEnabled(config.coordinatorServerContext || config.coordinatorInServer);
 setCoordinatorInServer(config.coordinatorInServer);
