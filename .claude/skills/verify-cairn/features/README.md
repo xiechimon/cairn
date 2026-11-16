@@ -45,7 +45,7 @@ Change history: `../changelog/` holds one file per ticket (`<date>-<ticket>.md`,
 - Change-type proofs must have a second pair of eyes: `GET /api/...` JSON truth + SQLite read-only rows (see each feature file).
 - The second pair of eyes for **mechanism-type claims** (CSS/animation, on-disk or wire format, schema, shim traffic, verdict fields) = **compiled output / runtime artifacts**, not source, config or dependency lists — the claim -> artifact -> case path table is in SKILL.md "Mechanism-effect acceptance: real-artifact criteria (hard rule)".
 - Close with `cleanup.mjs` to reap the stack; evidence by default lands in the **main checkout's** `.claude/verify-evidence/` (not the worktree), which is gitignored.
-- **Evidence delivery goes through the PR body, not the PR branch**: `main` has no `docs/verify/`. Screenshots go on the `pr-assets/<pr-number>` side branch: in that checkout run `vp.mjs archive <ticket> --from <evidence directory>` (copy-only, refuses if the target exists, no manual `cp`), commit and push there, and reference the files from the PR body through the commit SHA permanent link (`vp.mjs links <ticket>` prints it after push). Runtime evidence lands in `.claude/verify-evidence/` (gitignored); **a verify claim not referenced from a PR counts as unverified**.
+- **Evidence is not committed**: `main` has no `docs/verify/`. Keep it in the gitignored evidence directory and link or describe it where you report.
 - When reporting a skipped entry, include the commands attempted and the unmet preconditions; "verified from another entry" must not count as "this entry verified".
 
 ## Feature entry contract

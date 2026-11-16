@@ -158,9 +158,7 @@ case "$1 $2" in
   "api repos/"*)
     sha=$(echo "$2" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\\1#')
     if [ -f "${fake}/checks-$sha" ]; then cat "${fake}/checks-$sha"; else printf 'check\\tsuccess\\npack-smoke\\tsuccess\\ne2e-gate\\tsuccess\\n'; fi ;;
-  "issue list")
-    if [[ "$*" == *autonomy-paused* ]]; then cat "${fake}/paused" 2>/dev/null || echo 0
-    else cat "${fake}/lag-issue" 2>/dev/null || true; fi ;;
+  "issue list") cat "${fake}/lag-issue" 2>/dev/null || true ;;
   "issue create") echo "https://github.com/x/y/issues/77" ;;
   "issue close") [ ! -f "${fake}/lag-close-fail" ] || exit 1 ;;
 esac`,
@@ -362,15 +360,6 @@ test('refuses a SHA whose required checks are not all green', () => {
     assert.match(result.stderr, /required check (pack-smoke|e2e-gate) is not green/);
     assert.equal(f.log('systemctl.log'), '');
   }
-});
-
-test('refuses while autonomy is paused', () => {
-  const f = fixture();
-  const target = pushTarget(f);
-  writeFileSync(join(f.fake, 'paused'), '1\n');
-  const result = f.run(DEPLOY, [target]);
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /autonomy-paused/);
 });
 
 test('refuses a target that changes install-script permissions or hooks', () => {

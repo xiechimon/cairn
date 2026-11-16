@@ -2,7 +2,7 @@
 
 Short, checkable rules for any change under `apps/web/src`. `DESIGN.md` is the full reference for tokens, components and motion; this file is what you read first and what a reviewer checks against. Evidence behind it: `docs/research/ai-frontend-quality-2026-11-06.md` and `docs/research/ui-ux-audit-2026-11-06.md`.
 
-Each rule has an id. Put the ids you checked in the PR (Proof, reference row). The Check column says how a violation is found:
+Each rule has an id. Name the ids you checked when you report the change. The Check column says how a violation is found:
 
 - `M` a measurement an assertion can make (candidate for the look-and-feel job in section 5).
 - `G` an existing gate or test, named.
@@ -16,7 +16,7 @@ Each rule has an id. Put the ids you checked in the PR (Proof, reference row). T
 | P2 | A new feature that touches one of the five main surfaces (first run, Coordinator chat, thread list and sidebar, thread and review, settings) needs a page draft (sketch or screenshot mock) before code. Backend-only and single-setting changes are exempt. | H |
 | P3 | List component x state before coding: empty, loading, error, offline, long content, pending question, 390px, dark. A state the stack cannot produce is seeded; a state nobody has seen is not done. | H |
 | P4 | Drafts and fixtures use real copy and real-looking data, never lorem ipsum or `Item 1`. | H |
-| P5 | Fixture screenshots (`?scenario=`) are labelled as fixture evidence and never stand in for the live stack. | G `pr-evidence` |
+| P5 | Fixture screenshots (`?scenario=`) are labelled as fixture evidence and never stand in for the live stack. | H |
 
 ## 2. Composition and state
 

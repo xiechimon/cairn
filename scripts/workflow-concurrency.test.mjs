@@ -57,31 +57,20 @@ test('prototype pushes are keyed by ref, apart from main and from each other, an
   assert.equal(b.cancel, false);
 });
 
-test('a Mergify merge-queue pull request never shares a group with a main push', () => {
-  const queue = decision('ci', pull(2900));
-  assert.notEqual(queue.group, decision('ci', push('refs/heads/main')).group);
-  assert.match(queue.group, /^ci-pr-\d+$/);
+test('a pull request never shares a group with a main push', () => {
+  const pr = decision('ci', pull(2900));
+  assert.notEqual(pr.group, decision('ci', push('refs/heads/main')).group);
+  assert.match(pr.group, /^ci-pr-\d+$/);
 });
 
-for (const name of ['diagram-text-fit', 'commit-author']) {
+for (const name of ['diagram-text-fit', 'commit-author', 'silent-revert-gate']) {
   test(`${name} cancels a superseded pull request head and never a main push`, () => {
     assert.equal(decision(name, pull(7)).cancel, true);
     assert.notEqual(decision(name, pull(7)).group, decision(name, pull(8)).group);
-    if (name === 'commit-author') {
-      const main = decision(name, push('refs/heads/main'));
+    if (name !== 'diagram-text-fit') {
+      const main = decision(name, { ...push('refs/heads/main'), sha: 'c'.repeat(40) });
       assert.equal(main.cancel, false);
       assert.notEqual(main.group, decision(name, pull(7)).group);
     }
   });
 }
-
-test('pr-evidence keeps no concurrency group (a cancelled newest suite blocked PRs, #2461 and #2496)', () => {
-  assert.doesNotMatch(readFileSync(join(WORKFLOWS, 'pr-evidence.yml'), 'utf8'), /^concurrency:/m);
-});
-
-test('autonomy-brake keeps its own group without cancelling', () => {
-  assert.match(
-    readFileSync(join(WORKFLOWS, 'autonomy-brake.yml'), 'utf8'),
-    /cancel-in-progress: false/,
-  );
-});

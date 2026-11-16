@@ -119,8 +119,8 @@ describe('docs/ops/agent-bot-identity.md', () => {
     for (const path of new Set(named)) expect(existsSync(join(REPO_ROOT, path)), path).toBe(true);
   });
 
-  test('states that Code Owners review turns on only after the bot pushes the PR', () => {
-    expect(doc).toContain('Require review from Code Owners');
-    expect(doc).toMatch(/cannot approve his own PR/);
+  test('states that CODEOWNERS is not enforced as a review when commits go straight to main', () => {
+    expect(doc).toContain('it is not enforced as a review');
+    expect(doc).toMatch(/no change may edit what judges it lives in `AGENTS.md`/);
   });
 });

@@ -3,14 +3,16 @@ name: silent-revert-gate
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited, ready_for_review]
+  push:
+    branches: [main]
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: silent-revert-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && format('silent-revert-pr-{0}', github.event.pull_request.number) || format('silent-revert-{0}', github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   silent-revert-gate:
@@ -27,6 +29,7 @@ jobs:
       - name: Test overlap lookup and silent revert detection
         run: node --test scripts/github-overlap.test.mjs scripts/silent-revert-gate.test.mjs
       - name: Check removed work from merged PRs
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/silent-revert-gate.mjs

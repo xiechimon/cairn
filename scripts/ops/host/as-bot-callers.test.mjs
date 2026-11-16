@@ -33,24 +33,11 @@ const line = args.join(' ');
 ${respond}
 `;
 
-const run = (conclusion, slug = 'github-actions', id = 1) => ({
-  id,
-  app: { slug },
-  status: conclusion === 'in_progress' ? 'in_progress' : 'completed',
-  conclusion: conclusion === 'in_progress' ? null : conclusion,
-});
-const ghForMerge = (route, ref) =>
+const ghForMerge = (ref) =>
   recordingStub(
     'gh',
-    `if (line.includes('/check-runs?')) {
-  const name = /check_name=([^&]+)/.exec(line)[1];
-  const expr = args[args.indexOf('--jq') + 1];
-  const runs = name === 'merge-route' ? ${JSON.stringify([run(route)])} : [];
-  const out = require('node:child_process').spawnSync('jq', ['-r', expr], { input: JSON.stringify({ check_runs: runs }), encoding: 'utf8' });
-  process.stdout.write(out.stdout);
-} else if (line.includes('headRefOid')) console.log(${JSON.stringify(HEAD)});
+    `if (line.includes('headRefOid')) console.log(${JSON.stringify(HEAD)});
 else if (line.includes('headRefName')) console.log(${JSON.stringify(ref)});
-else if (line.includes('author')) console.log('app/cairnwright');
 `,
   );
 
@@ -71,7 +58,7 @@ test('merge-pr.sh squash-merges a lane PR with the human login, pinned to the he
   const fixture = hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge('success', 'lane/12'),
+      'bin/gh': ghForMerge('lane/12'),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
     },
   });
@@ -86,7 +73,7 @@ test('merge-pr.sh --auto keeps the squash pin when it arms auto-merge', (t) => {
   const fixture = hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge('success', 'lane/12'),
+      'bin/gh': ghForMerge('lane/12'),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
     },
   });
@@ -99,37 +86,27 @@ test('merge-pr.sh --auto keeps the squash pin when it arms auto-merge', (t) => {
   );
 });
 
-const mergeOf = (t, route, ref) =>
+const mergeOf = (t, ref) =>
   hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge(route, ref),
+      'bin/gh': ghForMerge(ref),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
     },
   }).run('tools/merge-pr.sh', ['7']);
 const merged = (result) => result.ghLines.some((line) => line.startsWith('pr merge 7'));
 
-test('merge-pr.sh merges a lane PR without reading a review-gate check', (t) => {
-  const result = mergeOf(t, 'success', 'lane/12');
-  assert.equal(result.status, 0, result.stderr);
-  assert.ok(merged(result));
-  assert.equal(
-    result.ghLines.some((line) => line.includes('check_name=review-gate')),
-    false,
-  );
-});
-
-test('merge-pr.sh refuses a PR whose merge-route check failed', (t) => {
-  const result = mergeOf(t, 'failure', 'feature/x');
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /merge-route check for c{40} failed/);
-  assert.equal(merged(result), false);
-});
-
-test('merge-pr.sh leaves a routed PR to Mergify', (t) => {
-  const result = mergeOf(t, 'success', 'feature/x');
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(merged(result), false);
+test('merge-pr.sh merges any PR without reading a check run', (t) => {
+  for (const ref of ['lane/12', 'feature/x']) {
+    const result = mergeOf(t, ref);
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(merged(result), ref);
+    assert.equal(
+      result.ghLines.some((line) => line.includes('/check-runs')),
+      false,
+      ref,
+    );
+  }
 });
 
 test('evidence-prune.sh commits through the bot and arms a pinned squash auto-merge as the human login', (t) => {
