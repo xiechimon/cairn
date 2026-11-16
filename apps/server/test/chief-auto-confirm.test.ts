@@ -50,15 +50,16 @@ describe('wakeFacts gate text', () => {
     },
   );
 
-  test('complete_todos documents that a review the Coordinator owns is accepted with it', () => {
+  test('complete_todos accepts research without authorizing a code merge', () => {
     const description = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'complete_todos')?.description;
-    expect(description).toContain('Accepted for a review you own');
-    expect(description).toContain('Rejected at every other confirm/review gate');
+    expect(description).toContain('Accept a delivered research report you own');
+    expect(description).toContain('Successful code tasks finish themselves');
+    expect(description).toContain('does not approve plans or authorize a merge');
   });
 
-  test('settle unchanged', () => {
+  test('settle distinguishes task completion from merging', () => {
     const text = wakeFacts('settle', todo(), null);
-    expect(text).toContain('已合并完成（done）');
+    expect(text).toContain('已完成（done），不代表分支或 PR 已合并');
     expect(text).not.toContain('confirm_builds');
   });
 
