@@ -178,8 +178,18 @@ esac`,
     `for variable in GH_TOKEN GITHUB_TOKEN GIT_CONFIG_VALUE_0; do
   [ -z "\${!variable-}" ] || echo "$variable" >> "${fake}/artifact-credential-names"
 done
-echo "pnpm $* @ $(git -C "${checkout}" rev-parse HEAD 2>/dev/null)" >> "${fake}/pnpm.log"; [ -f "${fake}/pnpm-fail" ] && [[ "$*" == *web* ]] && exit 1; exit 0`,
+echo "pnpm $* @ $(git -C "${checkout}" rev-parse HEAD 2>/dev/null)" >> "${fake}/pnpm.log"; [ -f "${fake}/pnpm-fail" ] && [[ "$*" == *web* ]] && exit 1
+if [ "$*" = "-C apps/daemon build" ]; then
+  mkdir -p apps/daemon/dist
+  { cat marker.txt; git ls-files -s apps/daemon/src; } > apps/daemon/dist/cli.mjs
+fi
+exit 0`,
   );
+  execFileSync(join(bin, 'pnpm'), ['-C', 'apps/daemon', 'build'], {
+    cwd: checkout,
+    env: { PATH: `${bin}:${SYSTEM_PATH}`, HOME: dir, GIT_CONFIG_NOSYSTEM: '1' },
+  });
+  unlinkSync(join(fake, 'pnpm.log'));
   fakeTool(
     bin,
     'node',
@@ -1366,6 +1376,35 @@ test('a server-only deploy refuses when the server rejects the owner token', () 
   assert.equal(f.log('server-stop.log'), '');
 });
 
+test('a change that leaves the daemon build identical deploys without restarting the daemon', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  writeFileSync(join(f.fake, 'lease-unsupported'), '');
+  const target = pushTarget(f, 'paths the old allowlist sent to a daemon restart', {
+    files: {
+      'scripts/ops/connect-relay/ledger.ts': 'export {};\n',
+      'apps/desktop/build.mjs': 'export {};\n',
+      'packages/shared/src/records/report.ts': 'export {};\n',
+      'marker.txt': 'previous\n',
+    },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /daemon build unchanged; only the server will restart/);
+  assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
+  assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+});
+
+test('a lockfile change restarts the daemon even when its bundle is identical', () => {
+  const f = fixture();
+  const target = pushTarget(f, 'lockfile', {
+    files: { 'pnpm-lock.yaml': 'lockfileVersion: 9\n', 'marker.txt': 'previous\n' },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(f.log('systemctl.log'), /stop cairn-daemon/);
+  assert.match(f.log('systemctl.log'), /start cairn-daemon/);
+});
+
 test('iOS, docs, integration and CI changes deploy without restarting the daemon', () => {
   const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
   writeFileSync(join(f.fake, 'lease-unsupported'), '');
@@ -1386,12 +1425,13 @@ test('iOS, docs, integration and CI changes deploy without restarting the daemon
   assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
 });
 
-test('a daemon source change alongside an allowlisted path still restarts the daemon', () => {
+test('a daemon source change restarts the daemon', () => {
   const f = fixture();
   const target = pushTarget(f, 'ios plus daemon', {
     files: {
       'apps/ios/Cairn/App/CairnApp.swift': '// swift\n',
       'apps/daemon/src/machine-loop.ts': 'export {};\n',
+      'marker.txt': 'previous\n',
     },
   });
   const result = f.run(DEPLOY, [target]);
