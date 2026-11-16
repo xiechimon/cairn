@@ -38,7 +38,7 @@ test('model selector shows stored rules with their model and thinking level, nev
   await expect(settings.locator('[data-testid^="work-policy-"]')).toHaveCount(0);
 });
 
-test('the model menu groups by runtime and greys a runtime no Runner has turned on', async ({
+test('the model menu groups by runtime, offers Claude Code to the Coordinator and greys a runtime no Runner has turned on', async ({
   page,
 }) => {
   await page.goto('/app/settings/work-routing?scenario=routing-settings');
@@ -56,10 +56,11 @@ test('the model menu groups by runtime and greys a runtime no Runner has turned 
     .locator('.routing-rule-model-select')
     .click();
   const coordinatorMenu = page.locator('.routing-rule-model-menu:visible');
-  await expect(coordinatorMenu.getByText('Claude Code（Coordinator 用不了）')).toBeVisible();
+  await expect(coordinatorMenu.getByText('Claude Code', { exact: true })).toBeVisible();
+  await expect(coordinatorMenu.getByText('Claude Code（Coordinator 用不了）')).toHaveCount(0);
   await expect(
     coordinatorMenu.locator('.routing-rule-model-row', { hasText: 'claude-haiku-4-5' }),
-  ).toHaveAttribute('data-disabled', '');
+  ).not.toHaveAttribute('data-disabled', '');
   await expect(
     coordinatorMenu.locator('.routing-rule-model-row', { hasText: 'GPT-5.2' }),
   ).not.toHaveAttribute(

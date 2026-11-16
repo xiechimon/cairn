@@ -49,6 +49,8 @@ export const COORDINATOR_ROUTING_HREF = `${settingsHref('work-routing')}#${COORD
 
 const AGENT_USES: readonly RouteUse[] = ['coordinator'];
 
+const COORDINATOR_RUNTIMES: ReadonlySet<string> = new Set(['pi', 'claude-code']);
+
 const STORED_ONLY_USES: readonly RouteUse[] = ['digest', 'compaction'];
 
 const USE_HINTS: Partial<Record<RouteUse, string>> = {
@@ -147,7 +149,8 @@ export function ModelPicker({
   const shownId = picked?.modelId ?? rule?.modelId ?? '';
   const Vendor = vendorMark(shownId);
   const byKey = new Map(options.map((o) => [modelKey(o), o]));
-  const coordinatorCannot = (runtime: string) => use === 'coordinator' && runtime !== 'pi';
+  const coordinatorCannot = (runtime: string) =>
+    use === 'coordinator' && !COORDINATOR_RUNTIMES.has(runtime);
   const runtimeOff = (runtime: string) =>
     coordinatorCannot(runtime) ||
     (enabledRuntimes !== null && runtime !== 'pi' && !enabledRuntimes.has(runtime));
