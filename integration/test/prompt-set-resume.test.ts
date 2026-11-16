@@ -508,7 +508,9 @@ describe('prompt-set resume provenance', () => {
       const currentTexts = systemTexts(relay.requests);
       expect(currentTexts.length).toBeGreaterThan(0);
       const currentPrompt = currentTexts[0] ?? '';
-      expect(currentPrompt).toContain('自动合并（autonomous）');
+      expect(currentPrompt).toContain('代码任务成功后就完成，分支和 PR 保留');
+      expect(currentPrompt).toContain('只有用户在对话里明确要求合并时才用 merge_builds');
+      expect(currentPrompt).not.toContain('自动合并（autonomous）');
       expect(currentPrompt).toContain(CHIEF_CONVENTIONS_HEADER);
 
       relay.requests.length = 0;
