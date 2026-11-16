@@ -11109,6 +11109,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               },
               "type": "array",
             },
+            "osDistribution": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string",
+            },
             "osPlatform": {
               "enum": [
                 "linux",

@@ -1,14 +1,20 @@
+import * as fs from 'node:fs';
 import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { cpus, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { machineHardwareSchema, osPlatformOf } from '@cairn/shared';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   createMachineCapabilitiesProbe,
   probeMachineCapabilities,
   probeMachineHardware,
 } from '../src/machine-capabilities.js';
 import { testTempDir } from './test-temp-dir.js';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return { ...actual, readFileSync: vi.fn(actual.readFileSync) };
+});
 
 const tmpDirs: string[] = [];
 function tmpRoot(): string {
@@ -17,6 +23,9 @@ function tmpRoot(): string {
   return dir;
 }
 afterEach(() => {
+  vi.restoreAllMocks();
+  vi.mocked(fs.readFileSync).mockReset();
+  vi.unstubAllGlobals();
   while (tmpDirs.length > 0) {
     const dir = tmpDirs.pop();
     if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
@@ -199,4 +208,46 @@ test('both machine capability probes report the current OS platform', () => {
   const osPlatform = osPlatformOf(process.platform);
   expect(probeMachineCapabilities(sources)).toMatchObject({ osPlatform });
   expect(createMachineCapabilitiesProbe(sources)()).toMatchObject({ osPlatform });
+});
+
+describe('Linux distribution identity', () => {
+  test.each([
+    ['linux', 'ID="arch"\nID_LIKE=debian', 'ID=ubuntu', 'arch'],
+    ['linux', undefined, "ID='ubuntu'", 'ubuntu'],
+    ['linux', 'ID=ubuntu\nID=arch', 'ID=debian', 'arch'],
+    ['linux', 'ID=manjaro\nID_LIKE=arch', undefined, 'manjaro'],
+    ['linux', 'ID_LIKE=arch', 'ID=ubuntu', undefined],
+    ['linux', 'ID="Arch Linux"', 'ID=ubuntu', undefined],
+    ['linux', 'ID="$(hostname)"', undefined, undefined],
+    ['linux', undefined, undefined, undefined],
+    ['darwin', 'ID=arch', 'ID=ubuntu', undefined],
+    ['win32', 'ID=arch', 'ID=ubuntu', undefined],
+  ])('%s with etc=%s and usr=%s reports %s in both probes', (platform, etc, usr, expected) => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: platform } }));
+    vi.mocked(fs.readFileSync).mockImplementation((path) => {
+      const value =
+        path === '/etc/os-release' ? etc : path === '/usr/lib/os-release' ? usr : undefined;
+      if (value !== undefined) return value;
+      throw Object.assign(new Error('absent'), { code: 'ENOENT' });
+    });
+    const sources = { mcpConfigPath: '/absent/mcp.json', skillsDir: tmpRoot() };
+    expect(probeMachineCapabilities(sources).osDistribution).toBe(expected);
+    expect(createMachineCapabilitiesProbe(sources)().osDistribution).toBe(expected);
+  });
+
+  test('unreadable etc never substitutes the vendor identity; later reports do not retain stale IDs', () => {
+    vi.stubGlobal('process', Object.create(process, { platform: { value: 'linux' } }));
+    let readable = true;
+    vi.mocked(fs.readFileSync).mockImplementation((path) => {
+      if (path === '/etc/os-release' && readable) return 'ID=arch';
+      if (path === '/usr/lib/os-release') return 'ID=ubuntu';
+      throw Object.assign(new Error('unreadable'), { code: 'EACCES' });
+    });
+    const sources = { mcpConfigPath: '/absent/mcp.json', skillsDir: tmpRoot() };
+    const probe = createMachineCapabilitiesProbe(sources);
+    expect(probe().osDistribution).toBe('arch');
+    readable = false;
+    expect(probe().osDistribution).toBeUndefined();
+    expect(probeMachineCapabilities(sources).osDistribution).toBeUndefined();
+  });
 });

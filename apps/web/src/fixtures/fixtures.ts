@@ -112,8 +112,6 @@ export {
   detailR8Fresh,
 } from './r8-overlay.js';
 export {
-  machinesChiefState,
-  machinesClaudeLogin,
   machinesDuplicateNames,
   machinesMasterDetail,
   providersEmpty,

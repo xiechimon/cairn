@@ -105,8 +105,7 @@ import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable':
-    '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）',
+  'sandbox-unavailable': '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
   'runtime-disabled':
     '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
   'model-unavailable':
@@ -122,8 +121,7 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
 };
 
 const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable':
-    '排队中：执行机的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）',
+  'sandbox-unavailable': '排队中：执行机的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
   'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
   'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
   'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）',

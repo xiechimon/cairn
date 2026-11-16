@@ -4,6 +4,7 @@ import { Minimize2 } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import type { useComputerControl } from '../api/use-computer-control.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { MachineName } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
@@ -157,7 +158,9 @@ export function ComputerScreenDialog({
           className="absolute top-[calc(env(safe-area-inset-top)+0.75rem)] left-1/2 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-3 rounded-(--radius-popover) bg-popover py-1.5 pr-1.5 pl-4 text-popover-foreground shadow-(--e2) transition-opacity duration-(--dur-overlay) focus-within:opacity-100 hover:opacity-100 pointer-fine:data-[idle=true]:opacity-0 motion-reduce:transition-none"
         >
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-ui text-foreground">{title}</span>
+            <span className="truncate text-ui text-foreground">
+              <MachineName machine={{ id: computer.machine.id, name: title }} compact />
+            </span>
             <span className="hidden truncate text-meta text-content-tertiary sm:block">
               {status ??
                 (leaseId !== null ? t('你在操作，Coordinator 已暂停') : t('接管后才能点击和键入'))}

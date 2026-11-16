@@ -484,6 +484,28 @@ it('keeps a valid host-permissions report and drops a malformed one without losi
 });
 
 describe('Runner OS platform', () => {
+  it('preserves optional distribution IDs and drops malformed metadata without losing capabilities', () => {
+    const base = { mcpServers: ['figma'], skills: ['deploy'], osPlatform: 'linux' } as const;
+    for (const osDistribution of ['arch', 'ubuntu', 'opensuse-tumbleweed', 'a'.repeat(64)]) {
+      const report = { ...base, osDistribution };
+      expect(parseReportedCapabilities(report)).toEqual(report);
+      expect(machineCapabilitiesSchema.parse(report)).toEqual(report);
+    }
+    for (const osDistribution of [
+      undefined,
+      null,
+      42,
+      '',
+      'Arch',
+      'arch linux',
+      '../arch',
+      'a'.repeat(65),
+    ]) {
+      expect(parseReportedCapabilities({ ...base, osDistribution })).toEqual(base);
+    }
+    expect(parseReportedCapabilities(base)).toEqual(base);
+  });
+
   it('maps Node platform names, with Windows as its own value', () => {
     expect(osPlatformOf('linux')).toBe('linux');
     expect(osPlatformOf('darwin')).toBe('darwin');

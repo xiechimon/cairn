@@ -1,8 +1,10 @@
+import { cn } from 'cn';
 import { type Ref, useEffect } from 'react';
+import { MachineIcon } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { useI18n } from '../i18n/provider.js';
-import { FileCheck, FileText, Layers, Puzzle, Server } from '../icons/index.js';
+import { FileCheck, FileText, Layers, Puzzle } from '../icons/index.js';
 import type { InlineCompletionRow } from './mention-token.js';
 
 export interface MentionInlineProps {
@@ -17,8 +19,8 @@ export interface MentionInlineProps {
   listboxId: string;
 }
 
-function InlineKindIcon({ kind }: { kind: InlineCompletionRow['kind'] }) {
-  switch (kind) {
+function InlineKindIcon({ row }: { row: InlineCompletionRow }) {
+  switch (row.kind) {
     case 'todo':
       return <FileCheck width={16} height={16} />;
     case 'skill':
@@ -26,7 +28,7 @@ function InlineKindIcon({ kind }: { kind: InlineCompletionRow['kind'] }) {
     case 'project':
       return <Layers width={16} height={16} />;
     case 'machine':
-      return <Server width={16} height={16} />;
+      return <MachineIcon machine={row} className="size-4" />;
     case 'file':
       return <FileText width={16} height={16} />;
     case 'agent':
@@ -81,7 +83,12 @@ export function MentionInline({
             tabIndex={-1}
             role="option"
             aria-selected={index === highlight}
-            className={`${INLINE_ROW_CLS}${index === highlight ? ' mention-inline-row--active bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)' : ''}`}
+            className={cn(
+              INLINE_ROW_CLS,
+              row.kind === 'machine' && 'h-auto min-h-7 py-1',
+              index === highlight &&
+                'mention-inline-row--active bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)',
+            )}
             onMouseDown={(event) => event.preventDefault()}
             onMouseEnter={() => onHover(index)}
             onClick={() => onPick(row)}
@@ -94,11 +101,11 @@ export function MentionInline({
               />
             ) : (
               <span className="inline-flex size-4 flex-none items-center justify-center text-icon">
-                <InlineKindIcon kind={row.kind} />
+                <InlineKindIcon row={row} />
               </span>
             )}
             <span
-              className={`min-w-0 truncate ${row.subtitle != null ? 'max-w-2/3 flex-none' : ''}`}
+              className={`min-w-0 ${row.kind === 'machine' ? 'flex-1 whitespace-normal wrap-anywhere' : 'truncate'} ${row.subtitle != null ? 'max-w-2/3 flex-none' : ''}`}
             >
               {row.label}
             </span>
