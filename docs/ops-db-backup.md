@@ -41,7 +41,7 @@ PATH=/opt/homebrew/opt/rsync/bin:$PATH node --test scripts/ops/backup-server-db.
 
 ## Live setup on omarchy
 
-The server runs on omarchy as user `ian` with no `CAIRN_HOME`, so its data is in `~/.cairn/server` (`server.db`, `attachments/`, `coordinator/`, `repos/`, `secretbox.key`) and its skills are in `~/.cairn/skills`. The wrapper `~/.cairn/tools/backup/db-backup.sh` (mirrored in `scripts/ops/host/tools/backup/db-backup.sh`) derives both paths from `CAIRN_HOME` the way the server does. Local backups go to the HDD under `~/backups/cairn-server/` (mode 700): `db/`, `attachments/`, `coordinator/`, `skills/` and `repos/`. After changing the mirrored wrapper, copy it to `~/.cairn/tools/backup/db-backup.sh`.
+The server runs on omarchy as user `ian` with no `CAIRN_HOME`, so its data is in `~/.cairn/server` (`server.db`, `attachments/`, `coordinator/`, `repos/`, `secretbox.key`) and its skills are in `~/.cairn/skills`. The wrapper `~/.cairn/tools/backup/db-backup.sh` (mirrored in `scripts/ops/host/tools/backup/db-backup.sh`) derives both paths from `CAIRN_HOME` the way the server does. Local backups go to the HDD under `~/backups/cairn-server/` (mode 700): `db/`, `attachments/`, `coordinator/`, `skills/` and `repos/`. After changing the mirrored wrapper, copy it to `~/.cairn/tools/backup/db-backup.sh`. The wrapper takes `CAIRN_BACKUP_REMOTE` as an SSH host and appends `:db/`, `:repos/` and the other paths itself, so the value is `dmit-backup` with no trailing colon; `dmit-backup:` turns each destination into `dmit-backup::db/`, which rsync reads as daemon mode on port 873 and fails with `getaddrinfo: dmit-backup 873`.
 
 `~/.config/systemd/user/cairn-db-backup.service`:
 
@@ -56,7 +56,7 @@ UMask=0077
 Nice=10
 StandardOutput=append:%h/.local/state/cairn-db-backup.log
 StandardError=append:%h/.local/state/cairn-db-backup.log
-Environment=CAIRN_BACKUP_REMOTE=dmit-backup:
+Environment=CAIRN_BACKUP_REMOTE=dmit-backup
 ExecStart=%h/.cairn/tools/backup/db-backup.sh
 ExecStopPost=%h/.cairn/tools/backup/record-backup-status.sh --status %h/.cairn/server/backup-status.json
 TimeoutStartSec=30min

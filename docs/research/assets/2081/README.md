@@ -1,8 +1,10 @@
 # Operator review preflight
 
-The operator merged #2081 after a separate Codex session reviewed a Codex-authored fix. ADR 0026 requires a different model. A later different-model audit passed, but it happened after the merge and cannot satisfy the pre-merge timing requirement. That record also called a raw diff hash the patch digest, rather than using the repository's `pd2` tuple format. This archive preserves the actual record as a negative control.
+The operator merged #2081 before the audit recorded here. That audit happened after the merge and cannot satisfy the pre-merge timing requirement. Its record also called a raw diff hash the patch digest, rather than using the repository's `pd2` tuple format. This archive preserves the actual record as a negative control. Archived JSON and logs retain their original wording; model-family restrictions in those historical logs are not current development rules.
 
-`review-preflight.py` is a local operator check for this delivery workflow. It does not change GitHub branch protection, the running omarchy timer, product merge policy or CI. It accepts only a completed approved different-model review of a Codex/GPT patch, with the expected head and a digest derived from captured raw GitHub PR/file facts, nonzero usage, a successful process, at least 1000000 configured context tokens, PASS, and explicit negative answers about gate weakening and eval measurement changes. A justified weakening needs its own further review path; this helper conservatively refuses it.
+`review-preflight.py` is a local operator check for this delivery workflow. It does not change GitHub branch protection, the running omarchy timer, product merge policy or CI. It accepts a completed independent review with the expected head and a digest derived from captured raw GitHub PR/file facts, nonzero usage, a successful process, at least 1000000 configured context tokens, PASS, and explicit negative answers about gate weakening and eval measurement changes. A justified weakening needs its own further review path; this helper conservatively refuses it.
+
+Independence means another agent in a separate, read-only context, as defined in `AGENTS.md`; the author and reviewer may use the same model. The caller must establish that separation: these archived records do not encode it. `--writer-family` checks provenance against the record, not eligibility; any family is accepted, and the reviewer model must match its completed run. Use the available agent tools rather than launching a local Sonnet review with `claude`.
 
 The command also verifies the review input hash and compares every changed UTF-8 file in that input with `git show` at the judged head. Binary artifacts remain bound through the canonical patch digest. This does not establish review quality or independently rerun acceptance tests.
 
@@ -12,12 +14,12 @@ The command also verifies the review input hash and compares every changed UTF-8
 - `pre-merge-review-positive.json` is the actual qualified review of #2082's earlier source head `500969a9d1afc6bf948108163ad1fa0cce36a3fb`, before its archive-only follow-up. It is a fixture, not approval of this correction branch or a later #2082 head.
 - `negative-control.log` and `positive-control.log` record actual CLI exits 1 and 0 for those records.
 - `source-mutation-negative.log` replays a real input-production mistake: global replacement of a reviewer model name also changed source literals. Even recomputing the input hash does not make that input pass the independent source-byte comparison. The failed provider calls had zero token usage and were not approvals.
-- `review-preflight.test.py` has fifteen focused controls for qualification, binding, completion and source integrity. Tests were added before the checker and source-integrity mechanism.
+- `review-preflight.test.py` covers same-model reviews, provenance, binding, completion and source integrity.
 
 Run the focused checks:
 
 ```sh
-python3 docs/verify/2081/review-preflight.test.py
+python3 docs/research/assets/2081/review-preflight.test.py
 ```
 
 Immediately before calling the preflight, the caller must capture raw GitHub facts. This command aggregates every file-list page into one raw array:
@@ -25,7 +27,7 @@ Immediately before calling the preflight, the caller must capture raw GitHub fac
 ```sh
 gh api repos/xiechimon/cairn/pulls/PR_NUMBER > /tmp/current-pr.json
 gh api --paginate --slurp 'repos/xiechimon/cairn/pulls/PR_NUMBER/files?per_page=100' | jq 'add' > /tmp/current-files.json
-python3 docs/verify/2081/review-preflight.py /tmp/completed-review.json \
+python3 docs/research/assets/2081/review-preflight.py /tmp/completed-review.json \
   --head CURRENT_HEAD --digest EXPECTED_GITHUB_PD2 --writer-family GPT \
   --github-pr /tmp/current-pr.json --github-files /tmp/current-files.json \
   --bundle /tmp/exact-reviewed-input.txt --source-root /absolute/repository

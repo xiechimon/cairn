@@ -15,9 +15,12 @@ import {
   fenceReportText,
   IN_PROGRESS_PHASES,
   isChiefConversationId,
+  isMailSecretName,
   isWaitingPhase,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
+  SECRET_NAME_PATTERN,
+  SECRET_NAME_RULE,
   SUGGEST_REPLIES_TOOL_NAME,
   snoozeTodoBodySchema,
   updateSkillToolParamsSchema,
@@ -78,6 +81,7 @@ import { executeMemoryDocumentTool } from './memory-documents.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
+import { listedProjects } from './personal-space.js';
 import { ensureResearchProject } from './projects.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
@@ -174,7 +178,7 @@ function requireProjectRow(db: Db, projectId: string, teamId: string) {
   const row = db
     .select()
     .from(project)
-    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+    .where(and(eq(project.id, projectId), listedProjects(teamId)))
     .get();
   if (!row) throw new HttpError(404, `project ${projectId}`);
   return row;
@@ -348,7 +352,7 @@ export async function executeChiefTool(
   }
   switch (name) {
     case 'projects': {
-      const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();
+      const rows = db.select().from(project).where(listedProjects(ctx.teamId)).all();
       return json(
         rows.map((p) => {
           const todoCount = db
@@ -824,6 +828,7 @@ export async function executeChiefTool(
     case 'set_secret': {
       const keysvc = { db, box: deps.box };
       const name = str(params, 'name');
+      if (isMailSecretName(name)) throw new HttpError(400, SECRET_NAME_RULE);
       const projectId = optStr(params, 'projectId') ?? null;
       const existing = listSecrets(keysvc, ctx.teamId).find(
         (s) => s.name === name && s.projectId === projectId,
@@ -843,8 +848,16 @@ export async function executeChiefTool(
       const value = str(params, 'value');
       const description = optStr(params, 'description') ?? null;
       if (existing) {
-        return json(updateSecret(keysvc, ctx.teamId, existing.id, { name, value, description }));
+        return json(
+          updateSecret(keysvc, ctx.teamId, existing.id, {
+            name,
+            value,
+            description,
+            kind: 'secret',
+          }),
+        );
       }
+      if (!SECRET_NAME_PATTERN.test(name)) throw new HttpError(400, SECRET_NAME_RULE);
       const record = createSecret(keysvc, {
         teamId: ctx.teamId,
         name,

@@ -429,7 +429,6 @@ export interface RouteSeed {
   machineId?: string | null;
   requiredCapabilities?: RequiredCapabilities | null;
   fallbackModels?: ModelRef[] | null;
-  mcpServers?: string[] | null;
 }
 
 export function seedRoute(s: TestServer, use: RouteUse, opts: RouteSeed = {}): string {
@@ -445,7 +444,6 @@ export function seedRoute(s: TestServer, use: RouteUse, opts: RouteSeed = {}): s
     machineId: opts.machineId ?? null,
     requiredCapabilities: opts.requiredCapabilities ?? null,
     fallbackModels: opts.fallbackModels ?? null,
-    mcpServers: opts.mcpServers ?? null,
     updatedAt: Date.now(),
   };
   if (existing !== undefined) {
@@ -462,7 +460,6 @@ export function seedRoute(s: TestServer, use: RouteUse, opts: RouteSeed = {}): s
 
 export interface PolicySeed {
   tools?: string[];
-  mcpServers?: string[];
   skillsAllowlist?: string[] | null;
   defaultSkill?: string | null;
   secrets?: string[];
@@ -471,7 +468,6 @@ export interface PolicySeed {
 export function seedPolicy(s: TestServer, use: PolicyUse, opts: PolicySeed = {}): void {
   const values = {
     tools: opts.tools ?? [],
-    mcpServers: opts.mcpServers ?? [],
     skillsAllowlist: opts.skillsAllowlist ?? null,
     defaultSkill: opts.defaultSkill ?? null,
     secrets: opts.secrets ?? [],
@@ -488,7 +484,14 @@ export function seedPolicy(s: TestServer, use: PolicyUse, opts: PolicySeed = {})
   }
   s.db
     .insert(workPolicy)
-    .values({ id: newRecordId(), teamId: s.team.id, use, ...values, createdAt: Date.now() })
+    .values({
+      id: newRecordId(),
+      teamId: s.team.id,
+      use,
+      ...values,
+      mcpServers: [],
+      createdAt: Date.now(),
+    })
     .run();
 }
 
@@ -576,6 +579,7 @@ export async function enrollConnectorRunner(
   s: TestServer,
   name: string,
   connectors: boolean,
+  localServers: string[] = [],
 ): Promise<{ machineId: string; token: string }> {
   const apiKey = await issueApiKey(s);
   const res = await s.app.request('/api/machine/enroll', {
@@ -585,7 +589,11 @@ export async function enrollConnectorRunner(
       teamId: s.team.id,
       name,
       cliVersion: '0.3.0',
-      capabilities: { mcpServers: [], skills: [], ...(connectors ? { mcpConnectors: true } : {}) },
+      capabilities: {
+        mcpServers: localServers,
+        skills: [],
+        ...(connectors ? { mcpConnectors: true } : {}),
+      },
     }),
   });
   const body = (await res.json()) as { machineId: string; token: string };

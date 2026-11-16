@@ -143,6 +143,7 @@ export const project = sqliteTable('project', {
   autonomy: json<
     (AutonomySettings & Partial<ProjectMergeConfig> & { shipRoute?: ShipRoute }) | null
   >('autonomy'),
+  personalOwnerId: text('personalOwnerId').references(() => user.id),
 });
 
 export const todo = sqliteTable(
@@ -816,6 +817,8 @@ export const secret = sqliteTable(
     httpHeader: text('httpHeader'),
     httpTemplate: text('httpTemplate'),
     policyRevision: integer('policyRevision').notNull().default(1),
+    envSeal: text('envSeal'),
+    updatedAt: epochMs('updatedAt'),
   },
   (t) => [
     check(

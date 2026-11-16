@@ -6,6 +6,7 @@ import { project } from './db/schema.js';
 import { notFound } from './lib/errors.js';
 import { systemGitOps } from './lib/git.js';
 import { GIT_AUTH_REALM, verifyGitBasicAuth } from './routes-helpers.js';
+import { isPersonalSpace, spaceGitAllowed } from './services/personal-space.js';
 
 export function registerGitHostingRoutes(app: Hono, ctx: AppContext): void {
   app.all('/git/*', async (c) => {
@@ -39,6 +40,9 @@ export function registerGitHostingRoutes(app: Hono, ctx: AppContext): void {
     if (remoteUser === undefined) {
       c.header('WWW-Authenticate', `Basic realm="${GIT_AUTH_REALM}"`);
       return c.json({ error: 'git authentication required' }, 401);
+    }
+    if (isPersonalSpace(row) && !spaceGitAllowed(ctx.db, row, remoteUser)) {
+      throw notFound(`repo ${teamId}/${repoName}`);
     }
 
     const body = method === 'POST' ? new Uint8Array(await c.req.arrayBuffer()) : new Uint8Array(0);

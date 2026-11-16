@@ -1,7 +1,9 @@
+import { PROJECT_INSTRUCTIONS_HEADING, PROJECT_MEMORY_HEADING } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project } from '../db/schema.js';
 import { injectMemoryDocuments } from './memory.js';
+import { listedProjects } from './personal-space.js';
 
 export function projectTurnContext(
   db: Db,
@@ -28,7 +30,7 @@ export function projectTurnContextTraced(
   const row = db
     .select({ name: project.name, instructions: project.instructions })
     .from(project)
-    .where(and(eq(project.id, scope.projectId), eq(project.teamId, scope.teamId)))
+    .where(and(eq(project.id, scope.projectId), listedProjects(scope.teamId)))
     .get();
   if (row === undefined) return null;
   const name = row.name.replace(/[\r\n]+/g, ' ');
@@ -44,9 +46,13 @@ export function projectTurnContextTraced(
         });
   const memories = injected.memories;
   const sections = [
-    ...(row.instructions != null ? [`## 项目说明（${name}）\n${row.instructions}`] : []),
+    ...(row.instructions != null
+      ? [`${PROJECT_INSTRUCTIONS_HEADING}${name}）\n${row.instructions}`]
+      : []),
     ...(memories.length > 0 || injected.omitted > 0
-      ? [`## 项目记忆（${name}）\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`]
+      ? [
+          `${PROJECT_MEMORY_HEADING}${name}）\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`,
+        ]
       : []),
   ];
   return sections.length > 0
