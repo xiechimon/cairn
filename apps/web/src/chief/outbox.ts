@@ -63,6 +63,7 @@ export interface Outbox {
   ): string;
   discard(key: string): OutboxEntry | null;
   land(key: string, messageId: string): void;
+  sentKey(messageId: string): string | null;
   settle(threadId: string | null, known: ReadonlySet<string>): void;
   resume(scope: string, deliver: Deliver): Promise<void>;
 }
@@ -169,6 +170,7 @@ export function createOutbox({
   let returned: readonly OutboxEntry[] = [];
   let tail: Promise<void> = Promise.resolve();
   const resumed = new Map<string, Promise<void>>();
+  const sentKeys = new Map<string, string>();
   const listeners = new Set<() => void>();
   const rowOf = (entry: OutboxEntry, state: StoredOutboxEntry['state']) =>
     entry.scope === null
@@ -212,6 +214,7 @@ export function createOutbox({
     if (entry === null) return;
     try {
       const delivered = await deliver(entry);
+      if (delivered.messageId !== null) sentKeys.set(delivered.messageId, key);
       replace(
         list.map((other) =>
           other.key === key
@@ -288,11 +291,13 @@ export function createOutbox({
     land(key, messageId) {
       const entry = sendingEntry(key);
       if (entry === null) return;
+      sentKeys.set(messageId, key);
       replace(
         list.map((other) => (other === entry ? { ...other, state: 'sent', messageId } : other)),
       );
       forget(key);
     },
+    sentKey: (messageId) => sentKeys.get(messageId) ?? null,
     settle(threadId, known) {
       const kept = list.filter(
         (entry) =>
@@ -365,6 +370,17 @@ export function unlandedItems(
           },
         ],
   );
+}
+
+export function keepSentKeys(
+  stream: readonly ChiefStreamItem[],
+  outbox: Pick<Outbox, 'sentKey'>,
+): ChiefStreamItem[] {
+  return stream.map((item) => {
+    if (item.kind !== 'user' || item.id == null || item.outboxKey != null) return item;
+    const key = outbox.sentKey(item.id);
+    return key === null ? item : { ...item, outboxKey: key };
+  });
 }
 
 export const chiefOutbox = createOutbox({ store: indexedDbOutboxStore(), owner: pageLockOwner() });
