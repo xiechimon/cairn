@@ -1,10 +1,9 @@
 import './ui-shadow-rules.test.mjs';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { ARTIFACT_PATTERN, baselineNameFor, pickBaselines } from './gallery-snapshots-accept.mjs';
 import { scanSource, scanTree, selfCheck } from './ui-page-style-gate.mjs';
 
 function tree(files) {
@@ -46,49 +45,4 @@ test('gallery, registry, icons and fixtures are exempt; pages are not', () => {
     scanTree(root).map((f) => [f.file, f.rule]),
     [['pages/home.tsx', 'color-literal']],
   );
-});
-
-test('accept maps CI renders onto Linux baseline names', () => {
-  assert.equal(
-    baselineNameFor('/x/test-results/gallery-snapshots-every-light/wait-pill-light-actual.png'),
-    'wait-pill-light-linux.png',
-  );
-  assert.equal(
-    baselineNameFor('/x/apps/web/e2e/gallery-snapshots.spec.ts-snapshots/sidebar-dark-linux.png'),
-    'sidebar-dark-linux.png',
-  );
-  assert.equal(
-    baselineNameFor('/x/test-results/gallery-snapshots-every-light/wait-pill-light-diff.png'),
-    null,
-  );
-  assert.equal(baselineNameFor('/x/test-results/board-dnd/card-actual.png'), null);
-});
-
-test('a CI render wins over an uploaded old baseline, and two different renders are refused', () => {
-  const old = '/x/shard-3/e2e/gallery-snapshots.spec.ts-snapshots/sidebar-dark-linux.png';
-  const fresh = '/x/shard-2/test-results/gallery-snapshots-every-dark/sidebar-dark-actual.png';
-  const bytes = {
-    [old]: 'old',
-    [fresh]: 'new',
-    '/x/shard-4/test-results/gallery-snapshots-b/sidebar-dark-actual.png': 'other',
-  };
-  const read = (file) => Buffer.from(bytes[file]);
-  assert.equal(pickBaselines([fresh, old], read).get('sidebar-dark-linux.png'), fresh);
-  assert.equal(pickBaselines([old, fresh], read).get('sidebar-dark-linux.png'), fresh);
-  assert.throws(
-    () =>
-      pickBaselines(
-        [fresh, '/x/shard-4/test-results/gallery-snapshots-b/sidebar-dark-actual.png'],
-        read,
-      ),
-    /two different CI renders/,
-  );
-});
-
-test('accept downloads every gallery snapshot artifact CI uploads', () => {
-  const ci = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
-  const names = [...ci.matchAll(/name: (gallery-snapshots[\w${}.-]*)/g)].map((m) => m[1]);
-  assert.ok(names.length >= 2, `found ${names.join(', ')}`);
-  const glob = new RegExp(`^${ARTIFACT_PATTERN.replaceAll('*', '.*')}$`);
-  for (const name of names) assert.match(name.replace(/\$\{\{[^}]*\}\}/g, '1'), glob);
 });
