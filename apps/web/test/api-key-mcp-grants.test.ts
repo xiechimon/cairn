@@ -13,17 +13,19 @@ vi.mock('../src/i18n/provider.js', () => ({
 }));
 
 describe('API key MCP grant selection', () => {
-  test('offers the exact grant labels enforced by the MCP face, including Thread entry', () => {
+  test('offers every MCP grant once, under the group of its registry kind', () => {
     const html = renderToStaticMarkup(
       createElement(ApiKeyCreateDialog, { open: true, onClose: vi.fn(), onCreate: vi.fn() }),
     );
-    for (const { grant, kind } of MCP_TOOL_REGISTRY) {
-      expect(html, grant).toContain(`>${grant}</span>`);
-      expect(html, grant).toContain(`aria-label="${kind === 'read' ? '读' : '写'} ${grant}"`);
-      expect(html, grant).not.toContain(`aria-label="${kind === 'read' ? '写' : '读'} ${grant}"`);
+    const [, readGroup = '', writeGroup = ''] = html.split('<legend');
+    expect(readGroup).toContain('读取');
+    expect(writeGroup).toContain('写入');
+    for (const { name, kind } of MCP_TOOL_REGISTRY) {
+      const box = `id="apikey-tool-${name}"`;
+      expect(kind === 'read' ? readGroup : writeGroup, name).toContain(box);
+      expect(kind === 'read' ? writeGroup : readGroup, name).not.toContain(box);
     }
-    expect(html).not.toContain('aria-label="读 todos"');
-    expect(html).toContain('Start Thread');
-    expect(html).toContain('Reply Thread');
+    expect(writeGroup).toContain('新建线程');
+    expect(writeGroup).toContain('回复线程');
   });
 });
