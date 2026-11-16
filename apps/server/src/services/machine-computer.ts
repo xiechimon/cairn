@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  browserSecretFillActionSchema,
   COMPUTER_FEED_TOOLS,
   COMPUTER_HANDOFF_TIMEOUT_MS,
   COMPUTER_REPLAY_SAFE_TOOLS,
@@ -9,15 +10,17 @@ import {
   type ComputerFrame,
   type ComputerRelayResult,
   type ComputerTool,
+  isBrowserLoopbackOrigin,
   isComputerBrowserTool,
   type MachineComputerFramesResponse,
   type MachineComputerRelayBody,
   redactSecrets,
+  type SecretBox,
   TAKEOVER_HANDED_BACK,
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chiefThread, computer, computerCall, machine, step } from '../db/schema.js';
+import { chiefThread, computer, computerCall, machine, secret, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
@@ -96,8 +99,8 @@ const FINISHED_STATES: ReadonlySet<ComputerCallState> = new Set(['done', 'error'
 type CallRow = typeof computerCall.$inferSelect;
 type CallPatch = Partial<typeof computerCall.$inferInsert>;
 
-function redact(text: string): string {
-  return redactSecrets(text).value as string;
+function redact(text: string, secrets: readonly string[] = []): string {
+  return redactSecrets(text, secrets).value as string;
 }
 
 type Output = Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'> & { pending: string };
@@ -125,6 +128,7 @@ function applyFrames(
   row: CallRow,
   frames: readonly ComputerFrame[],
   now: number,
+  secrets: readonly string[] = [],
 ): { patch: CallPatch; pending: string } {
   let expected = row.lastSeq + 1;
   let finished = false;
@@ -143,6 +147,8 @@ function applyFrames(
     expected++;
     switch (frame.kind) {
       case 'output':
+        if (isComputerBrowserTool(row.tool))
+          throw new HttpError(400, 'browser calls return complete results, not output fragments');
         output = appendOutput(output, frame.text, false);
         break;
       case 'heartbeat':
@@ -151,7 +157,7 @@ function applyFrames(
         finished = true;
         output = appendOutput(output, '', true);
         Object.assign(patch, {
-          resultText: redact(frame.text),
+          resultText: redact(frame.text, secrets),
           resultImages: frame.images ?? null,
           exitCode: frame.exitCode ?? null,
           finishedAt: now,
@@ -162,7 +168,7 @@ function applyFrames(
         finished = true;
         output = appendOutput(output, '', true);
         Object.assign(patch, {
-          errorMessage: redact(frame.message),
+          errorMessage: redact(frame.message, secrets),
           errorDelivery: frame.delivery,
           finishedAt: now,
           ...(row.state === 'cancelled' ? {} : { state: 'error' as const }),
@@ -195,6 +201,7 @@ export function receiveComputerFrames(
   machineId: string,
   callId: string,
   frames: readonly ComputerFrame[],
+  box?: SecretBox,
 ): MachineComputerFramesResponse {
   const result = db.transaction((tx) => {
     const row = tx.select().from(computerCall).where(eq(computerCall.id, callId)).get();
@@ -230,13 +237,37 @@ export function receiveComputerFrames(
     if (FINISHED_STATES.has(row.state) || (cancelled && row.finishedAt !== null)) {
       throw new HttpError(409, `computer call already ${row.state}`);
     }
-    const { patch, pending } = applyFrames(row, fresh, nowMs());
+    const secrets = isComputerBrowserTool(row.tool)
+      ? tx
+          .select({ cipher: secret.valueCipher })
+          .from(secret)
+          .where(and(eq(secret.teamId, row.teamId), eq(secret.delivery, 'browser')))
+          .all()
+          .flatMap(({ cipher }) => {
+            if (cipher === null) return [];
+            if (box === undefined) throw new HttpError(503, 'browser redaction is unavailable');
+            const value = box.open(cipher);
+            return [
+              value,
+              encodeURIComponent(value),
+              new URLSearchParams({ v: value }).toString().slice(2),
+              JSON.stringify(value).slice(1, -1),
+            ];
+          })
+      : [];
+    const { patch, pending } = applyFrames(row, fresh, nowMs(), secrets);
     tx.update(computerCall).set(patch).where(eq(computerCall.id, callId)).run();
     if (
       row.computerId !== null &&
       !cancelled &&
       isComputerBrowserTool(row.tool) &&
-      fresh.some((frame) => frame.kind === 'done' && frame.loginForm !== undefined)
+      fresh.some(
+        (frame) =>
+          frame.kind === 'done' &&
+          frame.loginForm?.signals.some(
+            (signal) => signal === 'challenge' || signal === 'one-time-code',
+          ),
+      )
     ) {
       markHandoffIfNone(tx, row.computerId, 'login', row.stepId, nowMs());
     }
@@ -830,6 +861,45 @@ export async function forwardComputerCall(
   if (refusal !== null) return { text: refusal };
 
   const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
+  const secretActions =
+    tool === 'browser_act' && Array.isArray(body.params.actions)
+      ? body.params.actions
+          .filter(
+            (action): action is Record<string, unknown> =>
+              action !== null && typeof action === 'object' && action.kind === 'fill_secret',
+          )
+          .map((action) => {
+            const parsed = browserSecretFillActionSchema.safeParse(action);
+            if (!parsed.success)
+              throw new HttpError(400, 'fill_secret needs only kind, ref and a saved secret name');
+            return parsed.data;
+          })
+      : [];
+  const host = db.select().from(machine).where(eq(machine.id, target.machineId)).get();
+  if (secretActions.length > 0 && host?.capabilities?.browserSecretFill !== true)
+    throw new HttpError(409, 'Update this machine before filling saved browser passwords.');
+  const browserRows = secretActions.map((action) => {
+    const row = db
+      .select()
+      .from(secret)
+      .where(
+        and(
+          eq(secret.teamId, thread.teamId),
+          eq(secret.name, action.secret),
+          eq(secret.delivery, 'browser'),
+          isNull(secret.projectId),
+        ),
+      )
+      .get();
+    if (row?.browserOrigin == null || row.valueCipher === null)
+      throw new HttpError(400, 'Save this browser-only password in Secrets settings first.');
+    if (isBrowserLoopbackOrigin(row.browserOrigin) && row.browserMachineId !== target.machineId)
+      throw new HttpError(
+        409,
+        'This password belongs to another machine. Open the browser on that machine, or save a new password here.',
+      );
+    return { ...row, browserOrigin: row.browserOrigin, valueCipher: row.valueCipher };
+  });
   const now = nowMs();
   const deadlineAt = now + computerDeadlineMs(tool, body.params);
   if (target.computerId !== null) {
@@ -841,7 +911,18 @@ export async function forwardComputerCall(
     computerId: target.computerId,
     tool,
     replaySafe: safe,
-    params: storedParams(body.params),
+    params: {
+      ...storedParams(body.params),
+      ...(browserRows.length > 0
+        ? {
+            browserPolicies: browserRows.map((row) => ({
+              name: row.name,
+              origin: row.browserOrigin,
+              revision: row.policyRevision,
+            })),
+          }
+        : {}),
+    },
     state: 'dispatched' as const,
     lastSeq: 0,
     outputHead: '',
@@ -892,8 +973,18 @@ export async function forwardComputerCall(
     deadlineAt,
     ...(target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
   };
-  if (!deps.machineHub.pushComputer(target.machineId, call)) {
+  try {
+    if (browserRows.length > 0)
+      call.browserSecrets = browserRows.map((row) => ({
+        name: row.name,
+        origin: row.browserOrigin,
+        value: deps.box.open(row.valueCipher),
+      }));
+    if (!deps.machineHub.pushComputer(target.machineId, call))
+      throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+  } catch {
     db.delete(computerCall).where(eq(computerCall.id, dispatchId)).run();
+    releaseExecutionLease(db, stepId);
     throw new HttpError(409, COMPUTER_NOT_CONNECTED);
   }
   const pending = openPending(deps, call);

@@ -19,9 +19,9 @@
 | status shipped | 44 |
 | status partial | 8 |
 | status planned | 3 |
-| research, frontend design and backend design all present or not applicable | 25 |
+| research, frontend design and backend design all present or not applicable | 26 |
 | Research gaps | 12 |
-| Frontend design gaps | 18 |
+| Frontend design gaps | 17 |
 | Backend design gaps | 19 |
 | notes cited but not on main | 21 |
 
@@ -76,7 +76,7 @@
 | [Research before retry and plan](#research-loop) | 3 | shipped | yes | n/a | yes |  |
 | [Scheduled tasks](#schedules) | 3 | shipped | gap | gap | gap | B7 |
 | [Search and activity](#search-and-activity) | 3 | shipped | gap | yes | gap | B7 |
-| [Secrets](#secrets) | 3 | shipped | yes | gap | yes | B10 |
+| [Secrets](#secrets) | 3 | shipped | yes | yes | yes |  |
 | [Server backup and deploy status](#server-status) | 3 | shipped | yes | gap | yes | B11 |
 | [Sidebar](#sidebar) | 3 | shipped | yes | yes | gap | B7 |
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
@@ -176,7 +176,6 @@ Who can do what and with which credentials: the secrets page, API keys with gran
 |---|---|---|
 | [Account and team](#account-and-team) | 3 | Backend design: no design for the single-user account, the team record and attribution settings |
 | [API keys](#api-keys) | 3 | Research: no note on API key and grant models in reference products<br>Frontend design: the API keys page and grant picker have no design<br>Backend design: no design for key scopes, grants and revocation |
-| [Secrets](#secrets) | 3 | Frontend design: the secrets page and project secrets have no design |
 
 ### B11 · Peripheral surfaces
 
@@ -576,11 +575,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### secrets
 
-**Secrets** (shipped). Team and project secrets stored encrypted and delivered to threads that need them.
+**Secrets** (shipped). Encrypted team and project secrets, with exact-origin browser-only password filling.
 
-- Research: [docs/research/1775-gateway-prior-art.md](research/1775-gateway-prior-art.md)
-- Frontend design: **gap**: the secrets page and project secrets have no design
-- Backend design: [docs/research/1775-secret-gateway-design.md](research/1775-secret-gateway-design.md)
+- Research: [docs/research/1775-gateway-prior-art.md](research/1775-gateway-prior-art.md), [docs/research/browser-secret-fill-2026-11-16.md](research/browser-secret-fill-2026-11-16.md)
+- Frontend design: [docs/design/browser-secret-fill.md](design/browser-secret-fill.md)
+- Backend design: [docs/research/1775-secret-gateway-design.md](research/1775-secret-gateway-design.md), [docs/design/browser-secret-fill.md](design/browser-secret-fill.md)
 
 ### server-status
 

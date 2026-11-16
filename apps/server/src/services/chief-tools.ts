@@ -832,13 +832,13 @@ export async function executeChiefTool(
         listSecrets(keysvc, ctx.teamId).some(
           (s) =>
             s.name === name &&
-            s.delivery === 'http' &&
+            (s.delivery === 'http' || s.delivery === 'browser') &&
             (s.projectId === null || projectId === null || s.projectId === projectId),
         )
       )
         throw new HttpError(
           400,
-          `secret ${name} uses http delivery and can only be changed in settings`,
+          `secret ${name} uses protected delivery and can only be changed in settings`,
         );
       const value = str(params, 'value');
       const description = optStr(params, 'description') ?? null;
@@ -859,6 +859,12 @@ export async function executeChiefTool(
       const names = strArr(params, 'names');
       const projectId = optStr(params, 'projectId') ?? null;
       const all = listSecrets(keysvc, ctx.teamId);
+      if (
+        all.some(
+          (s) => s.delivery === 'browser' && (names.includes(s.name) || names.includes(s.id)),
+        )
+      )
+        throw new HttpError(400, 'browser passwords can only be deleted in settings');
       const deleted: string[] = [];
       for (const n of names) {
         const hit =

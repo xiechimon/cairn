@@ -1,20 +1,25 @@
 import type { SecretBox, SecretDelivery, SecretHttpPolicy, SecretRecord } from '@cairn/shared';
 import {
+  isBrowserLoopbackOrigin,
   isDaemonReadSecretName,
   isHttpSecretValue,
   isMailSecretName,
+  normalizeBrowserSecretOrigin,
   normalizeSecretOrigin,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { project, secret } from '../db/schema.js';
+import { computer, machine, project, secret } from '../db/schema.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
+import { privateComputerWhere } from './computer-access.js';
 import { linkedMailSecretIds } from './mail.js';
 
 export interface SecretDeps {
   db: Db;
   box: SecretBox;
+  userId?: string;
+  cairnOrigins?: readonly string[];
 }
 
 type SecretRow = typeof secret.$inferSelect;
@@ -28,6 +33,8 @@ export function toSecretRecord(row: SecretRow): SecretRecord {
     description: row.description,
     delivery: row.delivery,
     http: httpPolicyOf(row),
+    browserOrigin: row.browserOrigin,
+    browserMachineId: row.browserMachineId,
     policyRevision: row.policyRevision,
   };
 }
@@ -37,10 +44,36 @@ function httpPolicyOf(row: SecretRow): SecretHttpPolicy | null {
   return { origin: row.httpOrigin, header: row.httpHeader, template: row.httpTemplate };
 }
 
-function policyColumns(delivery: SecretDelivery, policy: SecretHttpPolicy | undefined | null) {
+function policyColumns(
+  delivery: SecretDelivery,
+  policy: SecretHttpPolicy | undefined | null,
+  origin?: string | null,
+  browserMachineId: string | null = null,
+) {
+  if (delivery === 'browser') {
+    const browserOrigin = origin == null ? null : normalizeBrowserSecretOrigin(origin);
+    if (policy != null || browserOrigin === null)
+      throw new HttpError(400, 'a browser secret needs one exact HTTPS or loopback origin');
+    return {
+      delivery,
+      httpOrigin: null,
+      httpHeader: null,
+      httpTemplate: null,
+      browserOrigin,
+      browserMachineId,
+    };
+  }
+  if (origin != null) throw new HttpError(400, 'only browser delivery takes a browser origin');
   if (delivery === 'plaintext') {
     if (policy != null) throw new HttpError(400, 'a plaintext secret takes no http policy');
-    return { delivery, httpOrigin: null, httpHeader: null, httpTemplate: null };
+    return {
+      delivery,
+      httpOrigin: null,
+      httpHeader: null,
+      httpTemplate: null,
+      browserOrigin: null,
+      browserMachineId: null,
+    };
   }
   if (policy == null) throw new HttpError(400, 'an http secret needs origin, header and template');
   const httpOrigin = normalizeSecretOrigin(policy.origin);
@@ -50,7 +83,37 @@ function policyColumns(delivery: SecretDelivery, policy: SecretHttpPolicy | unde
     httpOrigin,
     httpHeader: policy.header,
     httpTemplate: policy.template,
+    browserOrigin: null,
+    browserMachineId: null,
   };
+}
+
+function browserBinding(deps: SecretDeps, teamId: string, origin: string): string | null {
+  if (deps.cairnOrigins?.includes(origin))
+    throw new HttpError(400, 'browser passwords cannot target Cairn');
+  if (!isBrowserLoopbackOrigin(origin)) return null;
+  const targets =
+    deps.userId === undefined
+      ? []
+      : deps.db
+          .select({ machineId: computer.machineId })
+          .from(computer)
+          .innerJoin(machine, eq(machine.id, computer.machineId))
+          .where(
+            and(
+              privateComputerWhere(teamId, deps.userId),
+              eq(computer.state, 'running'),
+              eq(computer.browserEnabled, true),
+              eq(machine.online, true),
+            ),
+          )
+          .all();
+  if (targets.length !== 1 || targets[0] === undefined)
+    throw new HttpError(
+      409,
+      'Open your Coordinator browser on the login machine first, then save this password.',
+    );
+  return targets[0].machineId;
 }
 
 function assertHttpDeliverable(name: string, value: string): void {
@@ -110,9 +173,15 @@ export function createSecret(
     projectId?: string | null;
     delivery?: SecretDelivery;
     http?: SecretHttpPolicy;
+    browserOrigin?: string;
   },
 ): SecretRecord {
-  const policy = policyColumns(input.delivery ?? 'plaintext', input.http);
+  const policy = policyColumns(input.delivery ?? 'plaintext', input.http, input.browserOrigin);
+  if (policy.browserOrigin !== null) {
+    if (input.projectId != null || isDaemonReadSecretName(input.name) || input.value === '')
+      throw new HttpError(400, 'browser passwords need a nonempty value and workspace scope');
+    policy.browserMachineId = browserBinding(deps, input.teamId, policy.browserOrigin);
+  }
   if (policy.delivery === 'http') assertHttpDeliverable(input.name, input.value);
   const projectId = input.projectId ?? null;
   if (projectId !== null) {
@@ -152,6 +221,7 @@ export function updateSecret(
     value?: string;
     delivery?: SecretDelivery;
     http?: SecretHttpPolicy;
+    browserOrigin?: string;
   },
 ): SecretRecord {
   const row = getRow(deps, teamId, id);
@@ -163,20 +233,39 @@ export function updateSecret(
   const policy = policyColumns(
     delivery,
     delivery === 'http' ? (patch.http ?? httpPolicyOf(row)) : patch.http,
+    delivery === 'browser' ? (patch.browserOrigin ?? row.browserOrigin) : patch.browserOrigin,
+    row.browserMachineId,
   );
+  if (policy.browserOrigin !== null) {
+    if (
+      row.projectId !== null ||
+      isDaemonReadSecretName(patch.name ?? row.name) ||
+      patch.value === ''
+    )
+      throw new HttpError(400, 'browser passwords need a nonempty value and workspace scope');
+    if (
+      policy.browserOrigin !== row.browserOrigin ||
+      row.delivery !== 'browser' ||
+      patch.value !== undefined
+    )
+      policy.browserMachineId = browserBinding(deps, teamId, policy.browserOrigin);
+  }
   const policyChanged =
     policy.delivery !== row.delivery ||
     policy.httpOrigin !== row.httpOrigin ||
     policy.httpHeader !== row.httpHeader ||
-    policy.httpTemplate !== row.httpTemplate;
-  if (row.delivery === 'http' && policyChanged && patch.value === undefined)
-    throw new HttpError(
-      400,
-      'changing the target of an http secret, or making it plaintext, needs a new value',
-    );
+    policy.httpTemplate !== row.httpTemplate ||
+    policy.browserOrigin !== row.browserOrigin ||
+    policy.browserMachineId !== row.browserMachineId;
+  if (
+    (row.delivery === 'http' || row.delivery === 'browser' || delivery === 'browser') &&
+    policyChanged &&
+    patch.value === undefined
+  )
+    throw new HttpError(400, 'changing a protected secret policy needs a new value');
+  if (policy.delivery !== 'plaintext' && linkedMailSecretIds(deps.db, teamId).has(row.id))
+    throw new HttpError(400, 'a secret linked to a mail account must stay plaintext');
   if (policy.delivery === 'http') {
-    if (linkedMailSecretIds(deps.db, teamId).has(row.id))
-      throw new HttpError(400, 'a secret linked to a mail account cannot use http delivery');
     const value = patch.value ?? (row.valueCipher === null ? '' : deps.box.open(row.valueCipher));
     assertHttpDeliverable(patch.name ?? row.name, value);
   }
@@ -282,7 +371,13 @@ export function openSecretGrants(
         });
       continue;
     }
-    if (row.valueCipher === null || isMailSecretName(row.name) || linked.has(row.id)) continue;
+    if (
+      row.delivery !== 'plaintext' ||
+      row.valueCipher === null ||
+      isMailSecretName(row.name) ||
+      linked.has(row.id)
+    )
+      continue;
     http.delete(row.name);
     values[row.name] = deps.box.open(row.valueCipher);
   }

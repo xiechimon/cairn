@@ -955,24 +955,24 @@ Reach:
 
 ### secrets
 
-**Secrets** (shipped, centrality 3). Team and project secrets stored encrypted and delivered to threads that need them.
+**Secrets** (shipped, centrality 3). Encrypted team and project secrets, with exact-origin browser-only password filling.
 
-States: An empty list, secrets by scope, and an add dialog with team or project scope.
+States: Empty and scoped lists; add plaintext or a masked browser-only password; loopback requires the owner's running browser and displays its automatic machine binding.
 
 Reach:
 
 1. `settings secrets`
 2. `click testid:resource-new`
-3. `click testid:secret-scope`
+3. `click label:只给浏览器`
 
 - Web routes: `/app/resources/secrets`
 - Settings: `设置` (Settings) › `安全` (Security) › `密钥` (Secrets)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `resource-empty`, `secret-scope`
-- Research: [docs/research/1775-gateway-prior-art.md](../../../docs/research/1775-gateway-prior-art.md)
-- Frontend design: **gap**: the secrets page and project secrets have no design
-- Backend design: [docs/research/1775-secret-gateway-design.md](../../../docs/research/1775-secret-gateway-design.md)
-- Evidence: `apps/web/e2e/secret-add-dialog.spec.ts`, `apps/web/e2e/project-secrets.spec.ts`, `apps/server/test/project-secrets.test.ts`
+- Research: [docs/research/1775-gateway-prior-art.md](../../../docs/research/1775-gateway-prior-art.md), [docs/research/browser-secret-fill-2026-11-16.md](../../../docs/research/browser-secret-fill-2026-11-16.md)
+- Frontend design: [docs/design/browser-secret-fill.md](../../../docs/design/browser-secret-fill.md)
+- Backend design: [docs/research/1775-secret-gateway-design.md](../../../docs/research/1775-secret-gateway-design.md), [docs/design/browser-secret-fill.md](../../../docs/design/browser-secret-fill.md)
+- Evidence: `apps/web/e2e/secret-add-dialog.spec.ts`, `apps/web/e2e/project-secrets.spec.ts`, `apps/server/test/project-secrets.test.ts`, `apps/server/test/secret-delivery-policy.test.ts`, `apps/server/test/computer-login-handoff.test.ts`, `apps/daemon/test/browser-secret-fill.test.ts`
 
 ### server-status
 

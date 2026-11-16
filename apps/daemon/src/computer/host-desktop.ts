@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -534,6 +535,30 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
       await this.run(['systemctl', '--user', 'stop', this.ownerUnit(scopeKey)]);
       this.ownerBrowsers.delete(scopeKey);
     }
+    const socketDirectory = join(home, '.agent-browser');
+    mkdirSync(socketDirectory, { recursive: true, mode: 0o700 });
+    chmodSync(socketDirectory, 0o700);
+    const profile = join(home, BROWSER_PROFILE);
+    if (lstatSync(join(profile, 'SingletonLock'), { throwIfNoEntry: false }))
+      await browserCommand(desktop.provider, ['--session', browserSessionName(scopeKey), 'close']);
+    await this.profileReleased(profile);
+    const preferencesPath = join(profile, 'Default', 'Preferences');
+    const preferences = existsSync(preferencesPath)
+      ? (JSON.parse(readFileSync(preferencesPath, 'utf8')) as Record<string, unknown>)
+      : {};
+    mkdirSync(join(profile, 'Default'), { recursive: true, mode: 0o700 });
+    writeFileSync(
+      preferencesPath,
+      JSON.stringify({
+        ...preferences,
+        credentials_enable_service: false,
+        profile: {
+          ...(preferences.profile as Record<string, unknown> | undefined),
+          password_manager_enabled: false,
+        },
+      }),
+      { mode: 0o600 },
+    );
     await this.importSavedLogin(scopeKey, home, desktop.provider).catch(() => {});
     this.desktops.set(scopeKey, desktop);
     return desktop;
@@ -551,6 +576,7 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
         AGENT_BROWSER_EXECUTABLE_PATH: this.browserExecutable(),
         AGENT_BROWSER_NO_VERSION_CHECK: '1',
         AGENT_BROWSER_PROFILE: join(home, BROWSER_PROFILE),
+        AGENT_BROWSER_SOCKET_DIR: '.agent-browser',
         AGENT_BROWSER_ARGS: '--hide-crash-restore-bubble',
       },
     });

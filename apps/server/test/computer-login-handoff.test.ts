@@ -26,6 +26,7 @@ import {
 } from '../src/services/machine-computer.js';
 import type { MachineDeps } from '../src/services/machine-deps.js';
 import { executeRelayToolCall } from '../src/services/machine-relay.js';
+import { createSecret } from '../src/services/secrets.js';
 import { bootServer, seedRoute, type TestServer } from './helpers.js';
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -182,7 +183,124 @@ function track<T>(promise: Promise<T>) {
 }
 
 describe('login handoff gate', () => {
-  test('a done frame with loginForm on a browser call sets the handoff', async () => {
+  test('a later browser result or error redacts all current browser passwords, including encoded forms', async () => {
+    const { s, deps, calls } = boot();
+    const value = 'synthetic "password" \\+&';
+    createSecret(deps, {
+      teamId: s.team.id,
+      name: 'LOGIN',
+      value,
+      delivery: 'browser',
+      browserOrigin: 'https://example.com',
+    });
+    const forms = [
+      value,
+      encodeURIComponent(value),
+      new URLSearchParams({ v: value }).toString().slice(2),
+      JSON.stringify(value).slice(1, -1),
+    ];
+    for (const error of [false, true]) {
+      const pending = forwardComputerCall(
+        deps,
+        'sidecar',
+        'step-a',
+        browser('browser_snapshot', `reveal-${error}`),
+      );
+      const call = calls.at(-1)!;
+      receiveComputerFrames(
+        s.db,
+        s.hub,
+        'omarchy',
+        call.callId,
+        [
+          error
+            ? { kind: 'error', seq: 1, message: forms.join('\n'), delivery: 'unknown' }
+            : { kind: 'done', seq: 1, text: forms.join('\n') },
+        ],
+        s.secretBox,
+      );
+      const result = await pending;
+      for (const form of forms) expect(result.text).not.toContain(form);
+      expect(result.text).toContain('[REDACTED');
+      const row = s.db
+        .select()
+        .from(computerCallTable)
+        .where(eq(computerCallTable.id, call.callId))
+        .get();
+      for (const form of forms) expect(JSON.stringify(row)).not.toContain(form);
+    }
+  });
+
+  test('saved-password dispatch requires a capable matching machine and stores only references', async () => {
+    const { s, deps, calls } = boot();
+    const value = 'synthetic-login-password';
+    setHandoff(s, { state: 'running' });
+    const saved = createSecret(
+      { ...deps, userId: s.user.id },
+      {
+        teamId: s.team.id,
+        name: 'LOGIN',
+        value,
+        delivery: 'browser',
+        browserOrigin: 'https://localhost:8443',
+      },
+    );
+    const body = {
+      computer: true as const,
+      name: 'browser_act' as const,
+      toolCallId: 'fill',
+      params: { actions: [{ kind: 'fill_secret', ref: 'e1', secret: 'LOGIN' }] },
+    };
+    await expect(forwardComputerCall(deps, 'sidecar', 'step-a', body)).rejects.toThrow(
+      'Update this machine',
+    );
+    s.db
+      .update(machineTable)
+      .set({
+        capabilities: {
+          computer: true,
+          browser: true,
+          browserSecretFill: true,
+          mcpServers: [],
+          skills: [],
+        },
+      })
+      .where(eq(machineTable.id, 'omarchy'))
+      .run();
+    const pending = forwardComputerCall(deps, 'sidecar', 'step-a', body);
+    expect(calls[0]?.browserSecrets).toEqual([
+      { name: 'LOGIN', origin: 'https://localhost:8443', value },
+    ]);
+    expect(JSON.stringify(s.db.select().from(computerCallTable).all())).not.toContain(value);
+    receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1)], s.secretBox);
+    await pending;
+    s.db
+      .update(computerTable)
+      .set({ machineId: 'sidecar' })
+      .where(eq(computerTable.id, COMPUTER))
+      .run();
+    s.db
+      .update(machineTable)
+      .set({
+        capabilities: {
+          computer: true,
+          browser: true,
+          browserSecretFill: true,
+          mcpServers: [],
+          skills: [],
+        },
+      })
+      .where(eq(machineTable.id, 'sidecar'))
+      .run();
+    s.machineHub.subscribeMachine(s.team.id, 'sidecar', () => {});
+    expect(saved.browserMachineId).toBe('omarchy');
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', { ...body, toolCallId: 'other-machine' }),
+    ).rejects.toThrow('another machine');
+    expect(calls).toHaveLength(1);
+  });
+
+  test('a challenge on a browser call sets the handoff', async () => {
     const { s, deps, calls } = boot();
     const pending = forwardComputerCall(
       deps,
@@ -191,7 +309,7 @@ describe('login handoff gate', () => {
       browser('browser_snapshot', 'a'),
     );
     receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [
-      done(1, { signals: ['password'] }),
+      done(1, { signals: ['challenge'] }),
     ]);
     await pending;
     expect(computerRow(s)).toMatchObject({
@@ -201,7 +319,7 @@ describe('login handoff gate', () => {
     });
   });
 
-  test('a done frame without loginForm, or from a shell call, sets nothing', async () => {
+  test('a password form or a shell call does not force handoff', async () => {
     const { s, deps, calls } = boot();
     const snapshot = forwardComputerCall(
       deps,
@@ -209,7 +327,9 @@ describe('login handoff gate', () => {
       'step-a',
       browser('browser_snapshot', 'a'),
     );
-    receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1)]);
+    receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [
+      done(1, { signals: ['password'] }),
+    ]);
     await snapshot;
     const shell = forwardComputerCall(deps, 'sidecar', 'step-a', {
       computer: true,

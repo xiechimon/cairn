@@ -2136,8 +2136,8 @@
     {
       "id": "secrets",
       "name": "Secrets",
-      "summary": "Team and project secrets stored encrypted and delivered to threads that need them.",
-      "states": "An empty list, secrets by scope, and an add dialog with team or project scope.",
+      "summary": "Encrypted team and project secrets, with exact-origin browser-only password filling.",
+      "states": "Empty and scoped lists; add plaintext or a masked browser-only password; loopback requires the owner's running browser and displays its automatic machine binding.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2161,23 +2161,27 @@
       "reach": [
         "settings secrets",
         "click testid:resource-new",
-        "click testid:secret-scope"
+        "click label:只给浏览器"
       ],
       "research": [
-        "docs/research/1775-gateway-prior-art.md"
+        "docs/research/1775-gateway-prior-art.md",
+        "docs/research/browser-secret-fill-2026-11-16.md"
       ],
-      "frontendDesign": {
-        "gap": "the secrets page and project secrets have no design"
-      },
+      "frontendDesign": [
+        "docs/design/browser-secret-fill.md"
+      ],
       "backendDesign": [
-        "docs/research/1775-secret-gateway-design.md"
+        "docs/research/1775-secret-gateway-design.md",
+        "docs/design/browser-secret-fill.md"
       ],
       "evidence": [
         "apps/web/e2e/secret-add-dialog.spec.ts",
         "apps/web/e2e/project-secrets.spec.ts",
-        "apps/server/test/project-secrets.test.ts"
-      ],
-      "batch": "B10"
+        "apps/server/test/project-secrets.test.ts",
+        "apps/server/test/secret-delivery-policy.test.ts",
+        "apps/server/test/computer-login-handoff.test.ts",
+        "apps/daemon/test/browser-secret-fill.test.ts"
+      ]
     },
     {
       "id": "api-keys",

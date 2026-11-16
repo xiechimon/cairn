@@ -2050,6 +2050,17 @@ export const EN: Record<string, string> = {
   '搜索没能完成，下面只是本地匹配的结果。': 'Search did not finish. These are local matches only.',
   正在加载对话: 'Loading the conversation',
   远程访问: 'Remote access',
+  只给浏览器: 'Browser only',
+  '团队成员的 Coordinator 可在指定网站代填，不会读到密码。':
+    'Team members’ Coordinators can fill this on the specified website without reading the password.',
+  允许登录的网站: 'Allowed website',
+  '填写完整来源地址，不带路径；HTTP 仅限本机回环地址。':
+    'Enter an exact origin without a path. HTTP is allowed only on loopback addresses.',
+  '绑定到 {name}': 'Bound to {name}',
+  '先打开 Coordinator 的浏览器，再保存本机网站的密码。':
+    'Open the Coordinator browser first, then save a password for a local website.',
+  '仅限 {origin}；不要绑定共享托管或允许用户发布内容的网站。':
+    'Only {origin}. Do not bind shared hosting or websites with user-published content.',
 
   配对新设备: 'Pair a new device',
   '用手机扫描二维码，5 分钟内有效，只能用一次。':

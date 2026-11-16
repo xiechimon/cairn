@@ -251,7 +251,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       executor: orbProvider.kind,
       mcpConnectors: true,
       ...(orbComputer ? { computer: true as const } : {}),
-      ...(hostDesktops?.offersBrowser() ? { browser: true as const } : {}),
+      ...(hostDesktops?.offersBrowser()
+        ? { browser: true as const, browserSecretFill: true as const }
+        : {}),
       ...(hostComputer ? { ownComputer: true as const } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(hostPermissions !== undefined ? { hostPermissions } : {}),

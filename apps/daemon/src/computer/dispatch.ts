@@ -428,6 +428,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         signal: controller.signal,
         session: call.scopeKey,
         cairnOrigins: options.cairnOrigins,
+        browserSecrets: call.browserSecrets,
       });
     } catch (error) {
       await poster.finish(

@@ -1,5 +1,11 @@
 import { setTimeout as sleep } from 'node:timers/promises';
-import { LOGIN_SIGNALS, type LoginForm, type LoginSignal } from '@cairn/shared';
+import {
+  browserSecretFillActionSchema,
+  type ComputerCall,
+  LOGIN_SIGNALS,
+  type LoginForm,
+  type LoginSignal,
+} from '@cairn/shared';
 import { z } from 'zod';
 import { cairnBlockPatterns, isCairnPage } from './host-screen-self.js';
 import type { ComputerProcessEvent, ComputerProvider } from './provider.js';
@@ -50,7 +56,10 @@ const actActionSchema = z.object({
 });
 
 const actParams = z.object({
-  actions: z.array(actActionSchema).min(1).max(32),
+  actions: z
+    .array(z.union([actActionSchema, browserSecretFillActionSchema]))
+    .min(1)
+    .max(32),
 });
 
 export type BrowserToolName = 'browser_navigate' | 'browser_snapshot' | 'browser_act';
@@ -216,6 +225,7 @@ export interface BrowserRunOptions {
   timeoutMs?: number;
   now?: () => number;
   cairnOrigins: readonly string[];
+  browserSecrets?: ComputerCall['browserSecrets'];
   isCairnPage?: (url: string, cairnOrigins: readonly string[]) => Promise<boolean>;
 }
 
@@ -260,6 +270,7 @@ async function collectExecute(
   argv: readonly string[],
   options: BrowserRunOptions & { deadlineAt: number },
   started: boolean,
+  stdin?: string,
 ): Promise<{ text: string; code: number | null }> {
   const clock = options.now ?? Date.now;
   const timeoutMs = remainingTimeoutMs(options.deadlineAt, clock);
@@ -270,6 +281,7 @@ async function collectExecute(
     argv: [...argv],
     timeoutMs,
     signal: options.signal,
+    ...(stdin === undefined ? {} : { stdin }),
   });
   let text = '';
   let code: number | null = null;
@@ -335,6 +347,32 @@ function sameSite(target: string, href: string): boolean {
 
 function refuse(message: string, started: boolean): never {
   throw new ComputerRefusal(message, started ? 'unknown' : 'not_delivered');
+}
+
+export function browserSecretFillScript(origin: string, value?: string): string {
+  return `(() => { 'use strict';
+    if (window.top !== window || location.origin !== ${JSON.stringify(origin)}) return false;
+    const input = document.activeElement;
+    if (!(input instanceof HTMLInputElement) || input.ownerDocument !== document || input.type !== 'password' || input.disabled || input.readOnly) return false;
+    const tokens = input.autocomplete.toLowerCase().split(/\\s+/);
+    if (tokens.includes('new-password') || tokens.includes('one-time-code')) return false;
+    const box = input.getBoundingClientRect();
+    const style = getComputedStyle(input);
+    if (box.width <= 0 || box.height <= 0 || style.visibility !== 'visible' || style.display === 'none') return false;
+    const form = input.form;
+    if (form && new URL(form.action, location.href).origin !== location.origin) return false;
+    if (form) for (const submit of document.querySelectorAll('[formaction]')) {
+      if (submit.form === form && new URL(submit.formAction, location.href).origin !== location.origin) return false;
+    }
+    ${
+      value === undefined
+        ? ''
+        : `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));`
+    }
+    return true;
+  })()`;
 }
 
 export async function runBrowserTool(
@@ -658,13 +696,45 @@ export async function runBrowserTool(
         );
       }
     }
+    if (action.kind === 'fill_secret') {
+      const credential = options.browserSecrets?.find((saved) => saved.name === action.secret);
+      if (credential === undefined)
+        refuse('No saved browser password was authorized for this action.', started);
+      try {
+        await refuseOffBoundTab('browser_act fill_secret');
+        const focused = await execute([...prefix, 'focus', normalizeRef(action.ref)]);
+        if (focused.code !== 0) refuse('The password field could not be focused.', started);
+        for (const value of [undefined, credential.value]) {
+          const result = await collectExecute(
+            provider,
+            [...prefix, '--json', 'eval', '--stdin'],
+            timed,
+            started,
+            browserSecretFillScript(credential.origin, value),
+          );
+          started = true;
+          if (result.code !== 0 || JSON.parse(result.text).data?.result !== true)
+            refuse(
+              'The saved password was not filled: check the website and password field.',
+              started,
+            );
+        }
+      } catch {
+        refuse(
+          'Saved password fill could not be confirmed; take a fresh snapshot before continuing.',
+          started,
+        );
+      }
+      lines.push('Saved browser password filled.');
+      continue;
+    }
     if ((action.kind === 'fill' || action.kind === 'type') && action.ref !== undefined) {
       const ref = normalizeRef(action.ref);
       const type = await read([...prefix, 'get', 'attr', ref, 'type']);
       const autocomplete = await read([...prefix, 'get', 'attr', ref, 'autocomplete']);
       if (secretField(type.text, autocomplete.text)) {
         refuse(
-          `browser_act ${action.kind} refused: ${ref} is a password or one-time code field; ask the owner with request_takeover`,
+          `browser_act ${action.kind} refused: ${ref} is a password or one-time code field; use fill_secret for a saved password, or request_takeover for verification`,
           started,
         );
       }

@@ -3,7 +3,7 @@ import { isMailSecretName } from '../mail.js';
 import { WEB_BRAVE_KEY_SECRET, WEB_EXA_KEY_SECRET } from '../web-search.js';
 import { recordId } from './common.js';
 
-export const SECRET_DELIVERIES = ['plaintext', 'http'] as const;
+export const SECRET_DELIVERIES = ['plaintext', 'http', 'browser'] as const;
 export const secretDeliverySchema = z.enum(SECRET_DELIVERIES);
 export type SecretDelivery = z.infer<typeof secretDeliverySchema>;
 
@@ -31,6 +31,29 @@ export function normalizeSecretOrigin(input: string): string | null {
   if (IPV4_LITERAL.test(url.hostname) || url.hostname.startsWith('[')) return null;
   const folded = input.toLowerCase();
   return folded === url.origin || folded === `${url.origin}:443` ? url.origin : null;
+}
+
+export function isBrowserLoopbackOrigin(origin: string): boolean {
+  return ['127.0.0.1', '[::1]', 'localhost'].includes(new URL(origin).hostname);
+}
+
+export function normalizeBrowserSecretOrigin(input: string): string | null {
+  if (input.includes('*') || !URL.canParse(input)) return null;
+  const url = new URL(input);
+  if (url.username !== '' || url.password !== '' || url.hostname === '') return null;
+  const folded = input.toLowerCase();
+  const defaultPort = url.protocol === 'https:' ? '443' : '80';
+  if (folded !== url.origin && folded !== `${url.origin}:${defaultPort}`) return null;
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  if (isBrowserLoopbackOrigin(url.origin)) return url.origin;
+  if (url.protocol !== 'https:' || IPV4_LITERAL.test(url.hostname)) return null;
+  if (
+    url.hostname.startsWith('[') ||
+    url.hostname.endsWith('.localhost') ||
+    url.hostname.endsWith('.')
+  )
+    return null;
+  return url.origin;
 }
 
 export function isSecretHeaderName(name: string): boolean {
@@ -79,6 +102,8 @@ export const secretRecordSchema = z.object({
   description: z.string().nullable(),
   delivery: secretDeliverySchema.optional(),
   http: secretHttpPolicySchema.nullish(),
+  browserOrigin: z.string().nullable().optional(),
+  browserMachineId: recordId.nullable().optional(),
   policyRevision: z.number().int().positive().optional(),
 });
 export type SecretRecord = z.infer<typeof secretRecordSchema>;
@@ -90,6 +115,7 @@ export const setSecretBodySchema = z.object({
   projectId: recordId.nullish(),
   delivery: secretDeliverySchema.optional(),
   http: secretHttpPolicySchema.optional(),
+  browserOrigin: z.string().optional(),
 });
 export type SetSecretBody = z.infer<typeof setSecretBodySchema>;
 

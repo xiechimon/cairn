@@ -1,7 +1,7 @@
 import { Lightbulb, ShieldEllipsis } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useApiMutations, useProjects, useSecrets } from '../api/hooks.js';
+import { useApiMutations, useComputers, useProjects, useSecrets } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
 import { QueryBoundary } from '../components/query-state.js';
@@ -29,6 +29,11 @@ export function SecretsPage() {
   const secretsQ = useSecrets(teamId, live);
   const secrets = live ? (secretsQ.data ?? []) : (fixture.resources?.secrets ?? []);
   const mutations = useApiMutations(teamId);
+  const computersQ = useComputers(teamId, live);
+  const browserComputer = computersQ.data?.find(
+    (computer) =>
+      computer.state === 'running' && computer.browserEnabled && computer.machine.online,
+  );
   const projectsQ = useProjects(teamId, live);
   const projects = (projectsQ.data ?? []).map((project) => ({
     id: project.id,
@@ -78,6 +83,9 @@ export function SecretsPage() {
                       ? t('全团队')
                       : t('仅 {name}', { name: projectName(secret.projectId) ?? '' }),
                     ...(secret.description != null ? [secret.description] : []),
+                    ...(secret.delivery === 'browser'
+                      ? [t('只给浏览器'), secret.browserOrigin]
+                      : []),
                   ].join(' · ')}
                 </RowDesc>
               </RowText>
@@ -88,6 +96,7 @@ export function SecretsPage() {
       <CreateSecretDialog
         key={searchParams.get('project') ?? ''}
         projects={projects}
+        browserMachineName={browserComputer?.machine.name}
         defaultProjectId={searchParams.get('project')}
         open={createOpen}
         onClose={() => setCreateOpen(false)}

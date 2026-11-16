@@ -49,6 +49,7 @@ const INHERITED_ENV = new Set(
     'AGENT_BROWSER_NO_VERSION_CHECK',
     'AGENT_BROWSER_PROFILE',
     'AGENT_BROWSER_ARGS',
+    'AGENT_BROWSER_SOCKET_DIR',
     'HTTP_PROXY',
     'HTTPS_PROXY',
     'NO_PROXY',
@@ -270,13 +271,15 @@ export class HostComputerProvider implements ComputerProvider {
         env,
         detached: true,
         shell: false,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [request.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
       });
     } catch (error) {
       clearTimeout(deadlineTimer);
       throw error;
     }
     const tree = child.pid ? new ProcessTree(child.pid, marker, this.killGraceMs) : undefined;
+    child.stdin?.on('error', () => {});
+    child.stdin?.end(request.stdin);
     const queue = new AsyncEventQueue();
     let settled = false;
     let stopping: Promise<void> | undefined;

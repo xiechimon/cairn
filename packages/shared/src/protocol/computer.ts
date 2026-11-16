@@ -47,6 +47,12 @@ export const computerImageSchema = z.object({
 });
 export type ComputerImage = z.infer<typeof computerImageSchema>;
 
+export const browserSecretFillActionSchema = z.strictObject({
+  kind: z.literal('fill_secret'),
+  ref: z.string().min(1).max(64),
+  secret: z.string().min(1).max(200),
+});
+
 export const computerCallSchema = z.object({
   callId: computerCallIdSchema,
   stepId: recordId,
@@ -54,6 +60,9 @@ export const computerCallSchema = z.object({
   params: z.record(z.string(), z.unknown()),
   deadlineAt: epochMs,
   scopeKey: z.string().min(1).optional(),
+  browserSecrets: z
+    .array(z.strictObject({ name: z.string(), origin: z.string(), value: z.string() }))
+    .optional(),
 });
 export type ComputerCall = z.infer<typeof computerCallSchema>;
 

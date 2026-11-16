@@ -6,6 +6,7 @@ export interface ComputerExecuteRequest {
   argv: readonly string[];
   cwd?: string;
   env?: Readonly<Record<string, string>>;
+  stdin?: string;
   timeoutMs: number;
   signal: AbortSignal;
 }

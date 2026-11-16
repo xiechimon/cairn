@@ -767,7 +767,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         () => jsonBody(c),
         async (row, decoded) => {
           const body = parseWith(machineComputerFramesBodySchema, decoded, 'body');
-          return c.json(receiveComputerFrames(ctx.db, ctx.hub, row.id, callId, body.frames));
+          return c.json(
+            receiveComputerFrames(ctx.db, ctx.hub, row.id, callId, body.frames, ctx.secretBox),
+          );
         },
       );
     },

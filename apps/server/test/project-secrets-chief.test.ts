@@ -11,6 +11,26 @@ function openedValue(id: string, projectId: string | null): string | undefined {
 }
 
 describe('the Coordinator secret tools respect secret scope (D74 P5)', () => {
+  test('the model cannot overwrite, shadow or delete a browser password', async () => {
+    const saved = createSecret(deps(), {
+      teamId: H.teamId,
+      name: 'LOGIN',
+      value: 'synthetic-password',
+      delivery: 'browser',
+      browserOrigin: 'https://login.example.com',
+    });
+    for (const projectId of [undefined, H.projectId]) {
+      await expect(
+        relay('set_secret', { name: 'LOGIN', value: 'changed', projectId }),
+      ).rejects.toThrow(/settings/);
+      await expect(relay('delete_secrets', { names: ['LOGIN'], projectId })).rejects.toThrow(
+        /settings/,
+      );
+    }
+    await expect(relay('delete_secrets', { names: [saved.id] })).rejects.toThrow(/settings/);
+    expect(openSecretValues(deps(), H.teamId, [saved.id], null)).toEqual({});
+  });
+
   test('set_secret without a project writes the team secret even when a project secret has the name', async () => {
     const projectSecret = createSecret(deps(), {
       teamId: H.teamId,
