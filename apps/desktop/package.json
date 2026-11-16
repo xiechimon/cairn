@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@cairn/shared": "workspace:*",
+    "@electron/osx-sign": "1.3.3",
     "@playwright/test": "catalog:",
     "electron": "45.2.1",
     "electron-builder": "26.18.1",
