@@ -626,7 +626,7 @@ export const EN: Record<string, string> = {
   '尚无 API 密钥': 'No API keys yet',
   'API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。':
     'API keys connect Runners from the command line and let MCP clients reach your workbench.',
-  新建密钥: 'New key',
+  '新建 API 密钥': 'New API key',
   复制: 'Copy',
   展开: 'Expand',
   '回复：{quote}': 'Replying to: {quote}',
@@ -636,7 +636,7 @@ export const EN: Record<string, string> = {
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
-  '请立即复制密钥，它仅显示一次。': 'Copy the key now — it is shown only once.',
+  '请立即复制 API 密钥，它仅显示一次。': 'Copy the API key now — it is shown only once.',
 
   // —— resources routes (r7 06–10, r2 §6) ——
   新建: 'New',

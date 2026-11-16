@@ -47,7 +47,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
 
   return (
     <DialogShell
-      title={t('新建密钥')}
+      title={t('新建 API 密钥')}
       open={open}
       onClose={close}
       size="s"

@@ -20,8 +20,8 @@ test('a new key needs a MY_KEY name, gets every permission, and shows its plaint
     return route.fulfill({ status: 500, json: { error: 'Unrelated API surface' } });
   });
   await page.goto('/app/api-keys');
-  await page.getByRole('button', { name: '新建密钥', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: '新建密钥' });
+  await page.getByRole('button', { name: '新建 API 密钥', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '新建 API 密钥' });
   const name = dialog.getByLabel('名称', { exact: true });
   const create = dialog.getByRole('button', { name: '创建', exact: true });
   await expect(dialog.getByRole('radio')).toHaveCount(0);
@@ -57,8 +57,8 @@ test('a new key needs a MY_KEY name, gets every permission, and shows its plaint
 test('Enter in the name field creates the key once the name is valid', async ({ page }) => {
   await stubLiveApiKeys(page);
   await page.goto('/app/api-keys');
-  await page.getByRole('button', { name: '新建密钥' }).first().click();
-  const dialog = page.getByRole('dialog', { name: '新建密钥' });
+  await page.getByRole('button', { name: '新建 API 密钥' }).first().click();
+  const dialog = page.getByRole('dialog', { name: '新建 API 密钥' });
   const name = dialog.getByLabel('名称', { exact: true });
   await name.fill('bad');
   await name.press('Enter');
