@@ -72,7 +72,7 @@ function logLines(): string[] {
 }
 
 describe('crash recovery (T2: AgentSession seam × host durable orchestration)', () => {
-  test('SIGKILL mid-step → restart → recover reconciliation → continue session resumes → review', async () => {
+  test('SIGKILL mid-step → restart → recover reconciliation → continue session resumes → done', async () => {
     stub = await startStubLlm([
       { content: '第一轮响应（崩溃前）。', delayMs: 6_000 },
       {
@@ -119,7 +119,7 @@ describe('crash recovery (T2: AgentSession seam × host durable orchestration)',
       () => logLines().some((l) => l.includes('[recover] 1 pending step(s) found')),
       60_000,
     );
-    await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
     await waitFor(() => logLines().some((l) => l.includes('finished (0 running)')), 30_000);
 
     const lines = logLines();

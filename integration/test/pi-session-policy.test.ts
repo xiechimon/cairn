@@ -129,7 +129,7 @@ describe('pi session policy (#925 trust/telemetry/settings + #927 cost/cache)', 
     expect(started.status).toBe(201);
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
     await waitFor(() => logLines().some((l) => l.includes('finished (0 running)')), 30_000);
     const lines = logLines();
 

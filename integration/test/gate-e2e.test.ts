@@ -133,7 +133,7 @@ describe('#929 command gate tool_call seam E2E: both directions + MCP coverage',
     expect(started.status).toBe(201);
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'review', 150_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'done', 150_000);
 
     const lines = logLines();
     expect(lines.some((l) => l.includes('[gate] ask: rule=ask-rm-rf-root command=rm -rf /'))).toBe(
@@ -156,6 +156,6 @@ describe('#929 command gate tool_call seam E2E: both directions + MCP coverage',
 
     expect(transcript).toContain('gate probe');
     const todoRow = server.db.select().from(todoTable).where(eq(todoTable.id, world.todoId)).get();
-    expect(todoRow?.phase).toBe('review');
+    expect(todoRow?.phase).toBe('done');
   }, 150_000);
 });
