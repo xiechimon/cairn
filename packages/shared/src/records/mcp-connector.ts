@@ -21,6 +21,9 @@ export interface McpCatalogEntry {
   auth: readonly McpConnectorAuth[];
   tokenLabel?: string;
   tokenHelpUrl?: string;
+  tokenHelp?: string;
+  oauthScope?: string;
+  oauthOptions?: Readonly<Record<string, string>>;
   options: readonly McpCatalogOption[];
 }
 
@@ -28,12 +31,13 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   {
     id: 'github',
     name: 'GitHub',
-    description: '仓库、Issue、Pull Request 与 Actions',
+    description: '仓库、议题、拉取请求与工作流',
     url: 'https://api.githubcopilot.com/mcp/',
     docsUrl: 'https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md',
     auth: ['token'],
     tokenLabel: '个人访问令牌',
     tokenHelpUrl: 'https://github.com/settings/personal-access-tokens/new',
+    tokenHelp: '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull\u00a0requests 读写权限。',
     options: [
       { id: 'readonly', label: '只读', kind: 'header', name: 'X-MCP-Readonly', input: 'flag' },
       { id: 'toolsets', label: '工具集', kind: 'header', name: 'X-MCP-Toolsets', input: 'text' },
@@ -42,7 +46,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   {
     id: 'cloudflare',
     name: 'Cloudflare',
-    description: 'Workers、DNS、R2 等 Cloudflare API',
+    description: '边缘函数、域名解析与对象存储',
     url: 'https://mcp.cloudflare.com/mcp',
     docsUrl: 'https://github.com/cloudflare/mcp',
     auth: ['oauth', 'token'],
@@ -53,7 +57,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   {
     id: 'linear',
     name: 'Linear',
-    description: 'Issue、项目与周期',
+    description: '议题、项目与迭代周期',
     url: 'https://mcp.linear.app/mcp',
     docsUrl: 'https://linear.app/docs/mcp',
     auth: ['oauth', 'token'],
@@ -88,6 +92,8 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     auth: ['oauth', 'token'],
     tokenLabel: '个人访问令牌',
     tokenHelpUrl: 'https://supabase.com/dashboard/account/tokens',
+    oauthScope: 'organizations:read projects:read database:read analytics:read',
+    oauthOptions: { readonly: 'true' },
     options: [
       { id: 'project', label: '项目 ref', kind: 'query', name: 'project_ref', input: 'text' },
       { id: 'readonly', label: '只读', kind: 'query', name: 'read_only', input: 'flag' },
@@ -96,7 +102,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   {
     id: 'context7',
     name: 'Context7',
-    description: '最新的库文档与代码示例',
+    description: '最新的库文档与代码示例，也支持登录',
     url: 'https://mcp.context7.com/mcp',
     docsUrl: 'https://github.com/upstash/context7',
     auth: ['none', 'token'],
@@ -107,12 +113,13 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   {
     id: 'huggingface',
     name: 'Hugging Face',
-    description: '模型、数据集与 Spaces',
+    description: '模型、数据集与演示应用',
     url: 'https://huggingface.co/mcp',
     docsUrl: 'https://github.com/huggingface/hf-mcp-server',
     auth: ['none', 'oauth', 'token'],
     tokenLabel: '访问令牌',
     tokenHelpUrl: 'https://huggingface.co/settings/tokens',
+    oauthScope: 'openid profile read-mcp',
     options: [],
   },
 ];

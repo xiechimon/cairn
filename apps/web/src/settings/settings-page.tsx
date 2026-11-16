@@ -93,7 +93,7 @@ function AppearanceSection() {
           <SettingsSegmented
             label={t('外观')}
             value={theme}
-            className="h-7 [&_[data-segmented=option]]:size-6 [&_[data-segmented=option]]:px-0"
+            className="h-7 pointer-coarse:h-12 [&_[data-segmented=option]]:size-6 [&_[data-segmented=option]]:px-0 pointer-coarse:[&_[data-segmented=option]]:size-11"
             onChange={(next) => {
               applyTheme(next);
               setTheme(next);
@@ -346,7 +346,13 @@ export function SettingsDialog({
           <h1 id={titleId} className="m-0 text-card-title font-semibold text-foreground">
             {t('设置')}
           </h1>
-          <Button variant="ghost" size="icon-sm" aria-label={t('关闭设置')} onClick={onClose}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="pointer-coarse:-mr-2 pointer-coarse:size-11"
+            aria-label={t('关闭设置')}
+            onClick={onClose}
+          >
             <X />
           </Button>
         </header>

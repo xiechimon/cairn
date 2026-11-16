@@ -51,9 +51,11 @@ function TargetRow({ target }: { target: RoutingTargetRow }) {
       <Mark aria-hidden className="size-5 flex-none max-sm:size-4" />
       <span className="flex min-w-0 flex-auto items-baseline gap-2">
         <span className="truncate font-medium">{target.name}</span>
-        <span className="truncate text-meta text-content-tertiary max-sm:text-caption">
-          {detail}
-        </span>
+        {detail !== target.name && (
+          <span className="truncate text-meta text-content-tertiary max-sm:text-caption">
+            {detail}
+          </span>
+        )}
       </span>
       {target.unavailable && (
         <span className="flex-none rounded-sm border border-border px-1.5 text-caption text-content-tertiary">

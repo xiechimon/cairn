@@ -78,13 +78,6 @@ export interface AccountStepsPage {
   hasEarlier: boolean;
 }
 
-export interface StickyThread {
-  threadId: string;
-  title: string;
-  subscriptionId: string;
-  since: number;
-}
-
 export interface AccountMachine {
   id: string;
   name: string;

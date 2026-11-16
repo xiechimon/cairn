@@ -9,7 +9,7 @@ test('a review thread keeps its updates out of the conversation and in the plan 
   await page.goto(`${HOME}&thread=home-c-review`);
   await expect(panel(page)).toBeVisible();
   await expect(page.getByTestId('thread-updates')).toHaveCount(0);
-  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定·1 条更新');
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你审阅·1 条更新');
   await panel(page).getByRole('button', { name: '更多操作…' }).click();
   await page.getByRole('menuitem', { name: '计划' }).click();
   const plan = page.getByTestId('side-chat-plan');
@@ -357,6 +357,15 @@ test('a running thread ends in a reply bubble of three typing dots', async ({ pa
   await expect(page.getByTestId('live-pulse')).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(live.getByTestId('typing-dot').first()).toHaveCSS('animation-name', 'none');
+});
+
+test('a running thread keeps room under its reply for the streaming text', async ({ page }) => {
+  await page.goto(`${HOME}&thread=home-c-working-c`);
+  await expect(page.locator('.side-panel').getByTestId('live-row')).toHaveCount(1);
+  const room = await page
+    .getByTestId('transcript-col')
+    .evaluate((el) => Number.parseFloat(getComputedStyle(el).paddingBottom) / window.innerHeight);
+  expect(room).toBeCloseTo(0.35, 2);
 });
 
 test.describe('phone width thread', () => {

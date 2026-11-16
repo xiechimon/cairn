@@ -4,6 +4,7 @@ import type {
   PolicyUse,
   RouteUse,
   RoutingRuleRecord,
+  RuleFix,
   TeamRoutingSettings,
   WorkPolicyRecord,
 } from '@cairn/shared';
@@ -42,6 +43,16 @@ export function useRoutingSettingsMutations(teamId: string | undefined) {
           void invalidate();
           return;
         }
+        for (const queryKey of routingRuleInvalidateKeys(teamId, vars.use)) {
+          void client.invalidateQueries({ queryKey });
+        }
+      },
+    }),
+    fixRule: useMutation({
+      mutationFn: ({ use, fix }: { use: RouteUse; fix: RuleFix }) =>
+        api.patch<RoutingRuleRecord>(`/api/teams/${teamId}/routing-rules/${use}`, fix),
+      onSettled: (_data, _error, vars) => {
+        if (teamId === undefined) return;
         for (const queryKey of routingRuleInvalidateKeys(teamId, vars.use)) {
           void client.invalidateQueries({ queryKey });
         }

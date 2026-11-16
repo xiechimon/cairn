@@ -4,14 +4,15 @@ import {
   type ModelSourceRuntime,
   type RouteUse,
   type RoutingRuleRecord,
+  type RuleFix,
   type SessionDefault,
   type TeamRoutingSettings,
   THINKING_LEVELS,
   type ThinkingLevel,
 } from '@cairn/shared';
-import { cn } from 'cn';
 import { type ReactNode, useEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
+import { ApiError } from '../api/client.js';
 import { useMachines, useModelSources } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { ROUTE_USE_LABELS } from '../api/model-routing.js';
@@ -19,12 +20,7 @@ import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { useTopModels, useTopModelsMutations } from '../api/top-models.js';
 import { QueryBoundary } from '../components/query-state.js';
-import {
-  SETTINGS_SELECT_TRIGGER_CLS,
-  SettingsCard,
-  SettingsRow,
-  SettingsSection,
-} from '../components/settings-list.js';
+import { SettingsCard, SettingsRow, SettingsSection } from '../components/settings-list.js';
 import {
   Select,
   SelectContent,
@@ -40,7 +36,8 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { settingsHref } from '../settings/settings-href.js';
-import { suggestedTopModels, TopModelsCard } from './top-models-card.js';
+import { RuleIssueNotices } from './rule-issue-notices.js';
+import { suggestedTopModels, TopModelsCard, vendorMark } from './top-models-card.js';
 
 export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
 export const COORDINATOR_ROUTE_ANCHOR = 'route-coordinator';
@@ -145,6 +142,8 @@ export function ModelPicker({
 }) {
   const { t } = useI18n();
   const picked = currentOption(rule, options);
+  const shownId = picked?.modelId ?? rule?.modelId ?? '';
+  const Vendor = vendorMark(shownId);
   const byKey = new Map(options.map((o) => [modelKey(o), o]));
   const runtimes = [...new Set(options.map((o) => o.runtime))];
   const coordinatorCannot = (runtime: string) => use === 'coordinator' && runtime !== 'pi';
@@ -171,21 +170,26 @@ export function ModelPicker({
         }
         className={
           trigger?.className ??
-          cn(
-            SETTINGS_SELECT_TRIGGER_CLS,
-            'routing-rule-model-select w-56 max-sm:h-7 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1 max-sm:text-meta',
-          )
+          'routing-rule-model-select w-auto max-w-64 min-w-0 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:h-7 max-sm:text-meta'
         }
       >
         {trigger !== undefined ? (
           trigger.label
         ) : (
           <SelectValue>
-            {picked !== undefined
-              ? picked.modelName
-              : rule !== null
-                ? t('{model}（不可用）', { model: rule.modelId })
-                : t('未设置模型')}
+            {shownId === '' ? (
+              t('未设置模型')
+            ) : (
+              <>
+                <Vendor aria-hidden className="size-4 flex-none" />
+                {picked?.modelName ??
+                  options.find((o) => o.modelId === shownId)?.modelName ??
+                  shownId}
+                {picked === undefined && (
+                  <span className="text-content-tertiary">{t('不可用')}</span>
+                )}
+              </>
+            )}
           </SelectValue>
         )}
       </SelectTrigger>
@@ -253,7 +257,7 @@ function RuleRow({
       data-testid={rule === null ? `routing-rule-new-${use}` : `routing-rule-${use}`}
     >
       <SettingsRow label={label} hint={hint} className="flex-wrap gap-y-2 py-2.5">
-        <div className="flex items-center justify-end gap-1.5 max-sm:w-full">
+        <div className="flex items-center justify-end gap-1.5 max-sm:w-full max-sm:justify-start">
           <Select
             value={level}
             disabled={rule === null}
@@ -268,10 +272,7 @@ function RuleRow({
           >
             <SelectTrigger
               aria-label={t('{use} 的思考强度', { use: label })}
-              className={cn(
-                SETTINGS_SELECT_TRIGGER_CLS,
-                'routing-rule-level-select w-28 flex-none max-sm:h-7 max-sm:w-24 max-sm:text-meta',
-              )}
+              className="routing-rule-level-select w-auto flex-none max-sm:-ml-2.5 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:h-7 max-sm:text-meta"
             >
               <SelectValue>{levelLabel(level)}</SelectValue>
             </SelectTrigger>
@@ -316,10 +317,9 @@ export function RoutingSettingsPage() {
   const settings = live
     ? (settingsQ.data ?? EMPTY_SETTINGS)
     : (fixture.resources?.routingSettings ?? EMPTY_SETTINGS);
-  const machines = live
-    ? (machinesQ.data ?? []).map((m) => m.enabledRuntimes)
-    : (fixture.resources?.machines ?? []).map((m) => m.enabledRuntimes ?? []);
-  const enabledRuntimes = machines.length === 0 ? null : new Set(machines.flat());
+  const machineRows = live ? (machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
+  const enabledRuntimes =
+    machineRows.length === 0 ? null : new Set(machineRows.flatMap((m) => m.enabledRuntimes ?? []));
   const options = toModelOptions(
     live ? (modelSourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
@@ -342,6 +342,22 @@ export function RoutingSettingsPage() {
       );
     };
   const agentUses = [...AGENT_USES, ...STORED_ONLY_USES.filter((use) => ruleOf(use) !== null)];
+  const fixing = mutations.fixRule.isPending ? (mutations.fixRule.variables?.use ?? null) : null;
+  const fix = (use: RouteUse, body: RuleFix) => {
+    if (!live) return;
+    mutations.fixRule.mutate(
+      { use, fix: body },
+      {
+        onError: (error) =>
+          toastError(
+            error instanceof ApiError && error.status === 409
+              ? t('这条规则刚被改过，已重新读取，请再看一眼。')
+              : t('修复失败，请重试。'),
+            error,
+          ),
+      },
+    );
+  };
   const session = ruleOf('session');
   return (
     <PageShell route={ROUTING_SETTINGS_HREF} title={t('模型选择')} fixture={fixture}>
@@ -354,11 +370,19 @@ export function RoutingSettingsPage() {
         empty={null}
       >
         <div className="flex flex-col gap-8 pt-1 pb-16">
-          <p className="m-0 px-1 text-meta text-content-tertiary">
+          <p className="m-0 text-meta text-pretty break-keep text-content-tertiary">
             {t(
-              '选新任务默认用哪个模型，以及 Coordinator 和其他 Agent 各用什么模型、思考多深。改动马上生效。',
+              '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。其他后台用途（评审、引文检查等）用哪个模型，在模型路由的图里能看到。',
             )}
           </p>
+          <RuleIssueNotices
+            issues={settings.ruleIssues ?? []}
+            options={options}
+            machineName={(id) => machineRows.find((m) => m.id === id)?.name ?? id}
+            editableUses={new Set<RouteUse>(['session', ...agentUses])}
+            pendingUse={fixing}
+            onFix={fix}
+          />
           <SettingsCard>
             <RuleRow
               use="session"

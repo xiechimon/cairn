@@ -1,4 +1,5 @@
 import { cn } from 'cn';
+import { TriangleAlert } from 'lucide-react';
 import { type ComponentType, type SVGProps, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 
@@ -49,7 +50,7 @@ export function RoutingGraph({
     if (box == null) return;
     const draw = () => {
       const origin = box.getBoundingClientRect();
-      const next: Wire[] = [];
+      const ends: { key: string; target: string; broken: boolean; a: DOMRect; b: DOMRect }[] = [];
       for (const group of groups) {
         for (const node of group.nodes) {
           if (node.target == null) continue;
@@ -57,21 +58,33 @@ export function RoutingGraph({
           const from = box.querySelector(`[data-wire-out="${CSS.escape(key)}"]`);
           const to = box.querySelector(`[data-wire-in="${CSS.escape(node.target)}"]`);
           if (from == null || to == null) continue;
-          const a = from.getBoundingClientRect();
-          const b = to.getBoundingClientRect();
-          const x1 = a.right - origin.left;
-          const y1 = a.top + a.height / 2 - origin.top;
-          const x2 = b.left - origin.left;
-          const y2 = b.top + b.height / 2 - origin.top;
-          const mid = (x1 + x2) / 2;
-          next.push({
-            from: key,
-            to: node.target,
-            d: `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`,
+          ends.push({
+            key,
+            target: node.target,
             broken: node.broken === true,
+            a: from.getBoundingClientRect(),
+            b: to.getBoundingClientRect(),
           });
         }
       }
+      const next = ends.map(({ key, target, broken, a, b }) => {
+        const siblings = ends
+          .filter((end) => end.target === target)
+          .sort((p, q) => p.a.top - q.a.top);
+        const slot = siblings.findIndex((end) => end.key === key);
+        const spread = siblings.length > 1 ? (slot / (siblings.length - 1) - 0.5) * 0.6 : 0;
+        const x1 = a.right - origin.left;
+        const y1 = a.top + a.height / 2 - origin.top;
+        const x2 = b.left - origin.left;
+        const y2 = b.top + b.height * (0.5 + spread) - origin.top;
+        const mid = (x1 + x2) / 2;
+        return {
+          from: key,
+          to: target,
+          d: `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`,
+          broken,
+        };
+      });
       setWires(next);
     };
     draw();
@@ -79,6 +92,18 @@ export function RoutingGraph({
     observer.observe(box);
     return () => observer.disconnect();
   }, [groups, targets]);
+
+  const rank = new Map<string, number[]>();
+  groups
+    .flatMap((group) => group.nodes)
+    .forEach((node, index) => {
+      if (node.target != null) rank.set(node.target, [...(rank.get(node.target) ?? []), index]);
+    });
+  const place = (id: string) => {
+    const at = rank.get(id);
+    return at == null ? Number.MAX_VALUE : at.reduce((sum, i) => sum + i, 0) / at.length;
+  };
+  const column = [...targets].sort((a, b) => place(a.id) - place(b.id));
 
   const lit = (wire: Wire) => hot !== null && (wire.from === hot || wire.to === hot);
   const hotNodes = new Set(
@@ -90,7 +115,7 @@ export function RoutingGraph({
       ref={boxRef}
       data-slot="routing-graph"
       onPointerLeave={() => setHot(null)}
-      className="relative grid grid-cols-[minmax(0,15rem)_minmax(1.5rem,1fr)_minmax(0,17rem)] py-1 max-sm:grid-cols-[minmax(0,8.5rem)_minmax(2.5rem,1fr)_minmax(0,8.5rem)]"
+      className="relative grid grid-cols-[minmax(0,15rem)_minmax(1.5rem,1fr)_minmax(0,17rem)] py-1 max-sm:grid-cols-[minmax(0,7.5rem)_minmax(4rem,1fr)_minmax(0,8.5rem)]"
     >
       <svg aria-hidden className="pointer-events-none absolute inset-0 size-full overflow-visible">
         {wires.map((wire) => (
@@ -117,10 +142,10 @@ export function RoutingGraph({
       <div className="col-start-1 flex flex-col gap-4 max-sm:gap-3">
         {groups.map((group) => (
           <div key={group.label} className="flex flex-col gap-1.5">
-            <div className="px-0.5 text-caption font-medium text-content-tertiary">
+            <div className="relative px-0.5 text-caption font-medium text-balance text-content-tertiary max-sm:whitespace-nowrap">
               {group.label}
             </div>
-            <div className="overflow-hidden rounded-lg border border-border bg-background">
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
               {group.nodes.map((node) => {
                 const key = sourceKey(group.label, node.id);
                 return (
@@ -132,16 +157,25 @@ export function RoutingGraph({
                     data-wire-out={key}
                     onPointerEnter={() => setHot(key)}
                     className={cn(
-                      'flex h-8 items-center gap-2 border-t border-border px-2.5 text-meta first:border-t-0 max-sm:h-7 max-sm:px-2 max-sm:text-caption',
+                      'flex h-8 items-center gap-2 border-t border-border px-2.5 text-meta first:border-t-0 max-sm:h-7 max-sm:px-1.5 max-sm:text-caption',
                       hotNodes.has(key) && 'bg-sidebar-hover',
                       node.broken === true ? 'text-destructive' : 'text-foreground',
                     )}
                   >
+                    {node.broken === true && (
+                      <TriangleAlert aria-hidden className="size-4 flex-none" />
+                    )}
                     <span className="min-w-0 truncate">{node.name}</span>
-                    {node.tag != null && (
-                      <span className="ml-auto flex-none truncate text-caption text-content-tertiary max-sm:hidden">
-                        {node.tag}
+                    {node.broken === true ? (
+                      <span className="ml-auto flex-none text-caption max-sm:hidden">
+                        {t('不可用')}
                       </span>
+                    ) : (
+                      node.tag != null && (
+                        <span className="ml-auto flex-none truncate text-caption text-content-tertiary max-sm:hidden">
+                          {node.tag}
+                        </span>
+                      )
                     )}
                   </div>
                 );
@@ -152,7 +186,7 @@ export function RoutingGraph({
       </div>
       <div className="col-start-3 flex flex-col justify-center gap-2">
         <div className="px-0.5 text-caption font-medium text-content-tertiary">{t('服务商')}</div>
-        {targets.map((target) => (
+        {column.map((target) => (
           <div
             key={target.id}
             data-slot="routing-node"
@@ -161,7 +195,7 @@ export function RoutingGraph({
             data-wire-in={target.id}
             onPointerEnter={() => setHot(target.id)}
             className={cn(
-              'flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-meta whitespace-nowrap max-sm:h-8 max-sm:gap-1.5 max-sm:px-2 max-sm:text-caption',
+              'flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-2.5 text-meta whitespace-nowrap max-sm:h-8 max-sm:gap-1.5 max-sm:px-2 max-sm:text-caption',
               target.unavailable === true && 'border-dashed text-content-tertiary',
               hotNodes.has(target.id) && 'bg-sidebar-hover',
             )}

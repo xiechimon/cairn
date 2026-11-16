@@ -9,7 +9,7 @@ const PANES = [
     empty: '[data-testid="routing-section"]',
     ok: { edges: [], connections: [], quota: [] },
   },
-  { section: 'mcp', endpoint: 'mcp-servers', empty: '[data-testid="resource-empty"]', ok: [] },
+  { section: 'mcp', endpoint: 'mcp-*', empty: '[data-testid="mcp-catalog"]', ok: [] },
   { section: 'secrets', endpoint: 'secrets', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'api-keys', endpoint: 'api-keys', empty: '[data-testid="keys-empty"]', ok: [] },
 ] as const;

@@ -61,12 +61,14 @@ test('CDS transcript: jump-to-latest appears past 120px and restores end', async
   const jump = page.locator('.side-panel').getByTestId('jump-to-latest');
   await expect(jump).toHaveAttribute('data-active', 'false');
 
-  // Scroll up so distanceFromBottom > 120
   await page.evaluate(() => {
     const col = document.querySelector('[data-testid="transcript-col"]') as HTMLElement;
-    col.scrollTop = Math.max(0, col.scrollHeight - col.clientHeight - 200);
+    const endSpace = Number.parseFloat(getComputedStyle(col).paddingBottom) || 0;
+    col.scrollTop = Math.max(0, col.scrollHeight - col.clientHeight - endSpace - 200);
   });
   await expect(jump).toHaveAttribute('data-active', 'true', { timeout: 3000 });
+  await jump.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('滚动到最新');
 
   await jump.click();
   await expect(jump).toHaveAttribute('data-active', 'false', { timeout: 3000 });

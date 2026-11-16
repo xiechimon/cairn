@@ -18,7 +18,7 @@ import {
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { ArrowUpDown, ChevronDown, Download, Search } from '../icons/index.js';
+import { ChevronDown, Download, Search } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
 import {
   RES_SEARCH_ROW_CLS,
@@ -47,7 +47,14 @@ export function SkillsPage() {
   const skillsQ = useSkills(teamId, live);
   const rows = live ? mapSkills(skillsQ.data ?? []) : (fixture.resources?.skills ?? []);
   const [sort, setSort] = useState<SortKind>('默认');
-  const skills = sort === '名称' ? [...rows].sort((a, b) => a.name.localeCompare(b.name)) : rows;
+  const [query, setQuery] = useState('');
+  const needle = query.trim().toLowerCase();
+  const matched =
+    needle === ''
+      ? rows
+      : rows.filter((row) => `${row.name} ${row.description}`.toLowerCase().includes(needle));
+  const skills =
+    sort === '名称' ? [...matched].sort((a, b) => a.name.localeCompare(b.name)) : matched;
   const [dialog, setDialog] = useState<{ skill?: SkillEditTarget } | null>(null);
   const openCreate = () => setDialog({});
   const [importOpen, setImportOpen] = useState(false);
@@ -66,7 +73,7 @@ export function SkillsPage() {
             onClick={() => setImportOpen(true)}
             data-testid="resource-import"
           >
-            <Download aria-hidden className="size-4 text-content-tertiary" />
+            <Download aria-hidden className="size-5 text-content-tertiary" />
             {t('导入')}
           </Button>
           <ResourceNewButton onClick={openCreate} />
@@ -76,7 +83,7 @@ export function SkillsPage() {
     >
       <QueryBoundary
         query={live ? skillsQ : undefined}
-        isEmpty={skills.length === 0}
+        isEmpty={rows.length === 0}
         loadingLabel={t('正在加载技能')}
         errorTitle={t('技能没能加载')}
         className="mt-6"
@@ -92,21 +99,24 @@ export function SkillsPage() {
         }
       >
         <div className={RES_SEARCH_ROW_CLS}>
-          <InputGroup className="flex-1">
+          <InputGroup className="flex-1 pointer-coarse:h-11">
             <InputGroupAddon>
-              <Search />
+              <Search className="size-5" />
             </InputGroupAddon>
             <InputGroupInput
               type="text"
-              placeholder={t('搜索技能...')}
-              aria-label={t('搜索技能...')}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('搜索技能')}
+              aria-label={t('搜索技能')}
             />
           </InputGroup>
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-              <ArrowUpDown />
-              <span>{t('排序')}</span>
-              <ChevronDown />
+            <DropdownMenuTrigger
+              render={<Button variant="outline" className="pointer-coarse:h-11" />}
+            >
+              <span>{t('排序：{option}', { option: t(sort) })}</span>
+              <ChevronDown className="size-5" />
             </DropdownMenuTrigger>
             <KeyedMenuContent align="end" side="bottom" sideOffset={8} aria-label={t('排序')}>
               <DropdownMenuRadioGroup
@@ -127,24 +137,30 @@ export function SkillsPage() {
             </KeyedMenuContent>
           </DropdownMenu>
         </div>
-        <ResourceList>
-          {skills.map((skill) => (
-            <ResourceRow
-              key={skill.name}
-              onOpen={() =>
-                setDialog({
-                  skill: { id: skill.name, name: skill.name, description: skill.description },
-                })
-              }
-            >
-              <RowText>
-                <RowTitle>{skill.name}</RowTitle>
-                <RowDesc>{skill.description}</RowDesc>
-              </RowText>
-              <RowChevron />
-            </ResourceRow>
-          ))}
-        </ResourceList>
+        {skills.length === 0 ? (
+          <p data-testid="skill-search-empty" className="mt-4 text-meta text-content-tertiary">
+            {t('没有匹配的技能。')}
+          </p>
+        ) : (
+          <ResourceList>
+            {skills.map((skill) => (
+              <ResourceRow
+                key={skill.name}
+                onOpen={() =>
+                  setDialog({
+                    skill: { id: skill.name, name: skill.name, description: skill.description },
+                  })
+                }
+              >
+                <RowText>
+                  <RowTitle>{skill.name}</RowTitle>
+                  <RowDesc>{skill.description}</RowDesc>
+                </RowText>
+                <RowChevron />
+              </ResourceRow>
+            ))}
+          </ResourceList>
+        )}
       </QueryBoundary>
       <SkillDialog open={dialog !== null} onClose={() => setDialog(null)} skill={dialog?.skill} />
       <SkillImportDialog open={importOpen} onClose={() => setImportOpen(false)} />

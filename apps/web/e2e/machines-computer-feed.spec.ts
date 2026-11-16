@@ -665,7 +665,7 @@ test('opening the machine while a user lease exists elsewhere does not take cont
   await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
 });
 
-test('without a computer row the machine card shows the turn-on hint instead of a screen', async ({
+test('without a computer row the machine card shows no screen and no turn-on hint', async ({
   page,
 }) => {
   const panel = await open(
@@ -675,7 +675,8 @@ test('without a computer row the machine card shows the turn-on hint instead of 
   );
   const card = panel;
   await expect(card.getByTestId('machine-screen')).toHaveCount(0);
-  await expect(card.getByTestId('machine-screen-hint')).toBeVisible();
+  await expect(card.getByTestId('machine-list-row')).toContainText('omarchy');
+  await expect(card.getByText(/桌面控制/)).toHaveCount(0);
   await expect(card.getByRole('switch')).toHaveCount(0);
 });
 

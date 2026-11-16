@@ -8,7 +8,7 @@ test('skills page create entry (topbar `新建` button) in place, fixture row se
 
   await expect(page.getByRole('button', { name: '新建', exact: true })).toHaveCount(1);
   await expect(page.getByTestId('resource-row')).toHaveCount(1);
-  await expect(page.getByTestId('resource-row').first()).toContainText('r3-probe-skill');
+  await expect(page.getByTestId('resource-row').first()).toContainText('code-review');
 });
 
 test('legacy import route unreachable — catch-all redirects back to /app (#149 feedback route same law)', async ({
@@ -165,4 +165,21 @@ test('a clickable resource row answers hover with a fill that stays inside the c
     };
   });
   expect(corners.row).toEqual([corners.card, corners.card]);
+});
+
+test('search keeps the skills whose name or description matches, and says when none do', async ({
+  page,
+}) => {
+  await page.goto(`${SKILLS}?scenario=skills-list`);
+  const rows = page.getByTestId('resource-row');
+  await expect(rows).toHaveCount(3);
+  const search = page.getByRole('textbox', { name: '搜索技能' });
+  await search.fill('许可证');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('repo-audit');
+  await search.fill('zzzz');
+  await expect(rows).toHaveCount(0);
+  await expect(page.getByTestId('skill-search-empty')).toHaveText('没有匹配的技能。');
+  await search.fill('');
+  await expect(rows).toHaveCount(3);
 });

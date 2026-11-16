@@ -32,7 +32,7 @@ test('the chip opens a list with one row per computer, the Coordinator machine f
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText('xmonsMac');
-  await expect(rows.nth(0)).toHaveText('xmonsMac2 个在跑');
+  await expect(rows.nth(0)).toHaveText('xmonsMac在线 · 2/8 在跑');
   await expect(rows.nth(0)).not.toContainText('Coordinator');
   await expect(rows.nth(1)).toContainText('omarchy');
   await expect(rows.nth(1)).toContainText('离线');
@@ -172,7 +172,7 @@ test('the reference list says what runs on an online computer and how long an of
   await page.goto(REF);
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air2 个在跑');
+  await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air在线 · 2/8 在跑');
   await expect(rows.nth(1)).toHaveText(/^办公室 Mac mini离线 · \d+ (分钟|小时)前$/);
   await expect(panel(page).getByRole('button', { name: /云|cloud/i })).toHaveCount(0);
 });

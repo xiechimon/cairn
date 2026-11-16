@@ -144,8 +144,6 @@ export const EN: Record<string, string> = {
   '在线 · 空闲': 'Online · idle',
   '{n} 在跑': '{n} running',
   已安装: 'Installed',
-  '未开启桌面控制，开启后这里显示屏幕':
-    'Desktop control is off; the screen shows here once it is on',
   '桌面控制已上线，屏幕显示在这里': 'Desktop control is online; the screen shows here',
   正在连接屏幕: 'Connecting to the screen',
   屏幕暂时连不上: 'The screen could not connect',
@@ -474,7 +472,7 @@ export const EN: Record<string, string> = {
   '行过长，已退回整行高亮': 'Line too long — whole-line highlight only',
   '完成 {elapsed}': 'Done in {elapsed}',
   运行在: 'Running on',
-  上: '', // tail of 运行在 <machine> 上 — the en template needs no tail
+  ' 上': '',
   由定时发起: 'Started by schedule',
   收起: 'Collapse',
   // #933: the collapsed tool group's identity label (transcript action row).
@@ -541,6 +539,7 @@ export const EN: Record<string, string> = {
   单次: 'Once',
   每小时运行: 'Runs hourly',
   '每天 {time}': 'Daily at {time}',
+  '每月 {d} 日 {time}': 'Monthly on day {d} at {time}',
   '每{weekday} {time}': '{weekday} weekly at {time}',
   周一: 'Mon',
   周二: 'Tue',
@@ -644,7 +643,7 @@ export const EN: Record<string, string> = {
   'MCP 服务器': 'MCP Servers',
   添加执行机: 'Add Runner',
   自定义: 'Custom',
-  '搜索技能...': 'Search skills...',
+  '排序：{option}': 'Sort: {option}',
   排序: 'Sort',
   尚无技能: 'No skills yet',
   '用「导入」或「新建」添加技能。': 'Add skills with Import or New.',
@@ -699,10 +698,6 @@ export const EN: Record<string, string> = {
   '没有匹配的技能。': 'No matching skills.',
   '导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。':
     'Importing copies the skill into Cairn’s own directory; the original is left unchanged.',
-  '尚无 MCP 服务器': 'No MCP servers yet',
-  // spec 13/#368 本地 config 只读制：空态文案 = 配置指引（无添加钮）。
-  '读取服务器本机 ~/.claude.json 的 mcpServers 段：在该文件添加配置并刷新，即出现在这里。MCP 服务器为 Agent 提供额外工具；授权在每个 Agent 的页面上单独进行。':
-    'Reads the mcpServers section of ~/.claude.json on the cairn server machine — add entries there and refresh to see them here. MCP servers give Agents extra tools; authorization happens per Agent, on its own page.',
   尚无密钥: 'No secrets yet',
   '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。':
     'Team secrets are granted per Agent and released to the build steps that need them — never pre-set into the task shell environment. Values are write-only: once saved they can be overwritten or deleted, never viewed again.',
@@ -779,7 +774,15 @@ export const EN: Record<string, string> = {
   '加载中…': 'Loading…',
   文件加载失败: 'Failed to load file',
   二进制文件暂不支持预览: 'Binary files cannot be previewed',
-  '可选。未设置时以首字母代替。': 'Optional. The initial is used when unset.',
+  '项目图标，可选。不选时显示文件夹图标。':
+    'Project icon, optional. A folder shows when none is picked.',
+  '例如：我的应用': 'e.g. My App',
+  切换仓库来源: 'Switch repository source',
+  '图标没能保存，请在项目设置里重试。': 'The icon was not saved. Try again in project settings.',
+  '演示数据不能新建项目。': 'Projects cannot be created in the demo.',
+  '填好项目名称后可以创建。': 'Enter a project name to create it.',
+  '选好 GitHub 仓库后可以创建。': 'Pick a GitHub repository to create it.',
+  '填好本地文件夹路径后可以创建。': 'Enter a local folder path to create it.',
   项目名称: 'Project name',
   仓库: 'Repo',
   选择仓库: 'Select repo',
@@ -823,7 +826,6 @@ export const EN: Record<string, string> = {
   本机加速路径: 'Local acceleration path',
   '绝对路径，留空即清除': 'Absolute path; empty to clear',
   // #1242 项目身份可变面：设置页名称/描述编辑 + local→github 转换卡。
-  保存名称: 'Save name',
   更换项目图标: 'Change project icon',
   搜索图标: 'Search icons',
   没有匹配的图标: 'No matching icons',
@@ -925,17 +927,13 @@ export const EN: Record<string, string> = {
   // #1250（ADR 0018 层 1）review fan-out 三视角（ReviewDialog 勾选行）。
   // #509 审核选人独立性提示：默认值优先跨厂商；无跨厂商可选时出声。两档措辞
   // ——确证同源 vs 无法判定（未配置厂商 = 没有比对基准），都不静默。
-  // M7 #330 AI 审核消息渲染（r8 §3.1 真 findings 上线）：结论先行 + 编号 findings
-  // + 严重度后缀（(blocking)/(suggestion)/(info)）+ 方案引用块 + 修复建议。
-  // 服务端消息 kind = REVIEW_VERDICT_KIND（shared/message.ts 双端单源），
-  // findings 形态 = reviewVerdictSchema（shared/review.ts）。
   审核结论: 'Review conclusion',
   // #700：verdict 提取失败行——daemon findingsError 原因上浮，审核面以
   // danger 色 tag 与「审核未返回结论」兜底（旧 daemon 无信号）相区分。
   判定提取失败: 'Verdict extraction failed',
-  '(blocking)': '(blocking)',
-  '(suggestion)': '(suggestion)',
-  '(info)': '(info)',
+  必须修改: 'Must fix',
+  可改进: 'Could improve',
+  备注: 'Note',
   '建议：': 'Suggestion: ',
   '建议：{body}': 'Suggestion: {body}',
   '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。':
@@ -1629,7 +1627,6 @@ export const EN: Record<string, string> = {
   等待检查: 'Waiting on checks',
   未配置: 'Not configured',
   空闲: 'Idle',
-  '{n} 个在跑': '{n} running',
   项目设置: 'Project settings',
   回答: 'Answer',
   看计划: 'Review plan',
@@ -1648,7 +1645,7 @@ export const EN: Record<string, string> = {
   对话加载失败: 'Could not load the conversation',
   '对话记录还在，重试一下。': 'Your conversation is still there. Try again.',
   待你决定: 'Needs you',
-  '跟 Coordinator 说（在 {name} 里）…': 'Talk to the Coordinator (in {name})…',
+  '在 {name} 里发消息': 'Message in {name}',
   '{name}，你想在 {project} 里做什么？': '{name}, what would you like to do in {project}?',
   首页: 'Home',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
@@ -1657,12 +1654,10 @@ export const EN: Record<string, string> = {
   '冷却至 {time}': 'Cooling until {time}',
   已检测到: 'Detected',
   '没有检测到，装好后重启执行机': 'Not detected. Install it, then restart the Runner',
-  接入命令闸前不能用: 'Unavailable until it uses the command gate',
+  暂不支持: 'Not supported yet',
   '这台执行机上检测到的执行器。检测到就能接任务，不用开关。':
     'Runtimes detected on this Runner. Anything detected takes tasks; there is nothing to switch on.',
   可用: 'Available',
-  '固定于 {ago}': 'pinned {ago}',
-  固定账户的对话: 'Sticky threads',
   在这台执行机上运行: 'Run on this Runner:',
   已登录: 'Signed in',
   已过期: 'Expired',
@@ -1707,15 +1702,14 @@ export const EN: Record<string, string> = {
   '{runtime} · 不可用': '{runtime} · unavailable',
   '{use} 的模型': '{use} model',
   '{use} 的思考强度': '{use} thinking level',
-  '{model}（不可用）': '{model} (unavailable)',
   '{runtime}（没有执行机启用）': '{runtime} (no Runner has it on)',
   新任务默认用: 'New tasks start on',
   '你对话的协调者，派活和汇报': 'The coordinator you talk to; it hands out work and reports back',
   新任务用这个模型和思考强度开始: 'New tasks start with this model and thinking level',
   每日报告和对话摘要: 'Daily reports and conversation summaries',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
-  '选新任务默认用哪个模型，以及 Coordinator 和其他 Agent 各用什么模型、思考多深。改动马上生效。':
-    'Choose the model new tasks start on, and the model and thinking level for the Coordinator and other agents. Changes apply at once.',
+  '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。其他后台用途（评审、引文检查等）用哪个模型，在模型路由的图里能看到。':
+    'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See which model other background uses (review, citation check and so on) use in the Model routing graph.',
   '先给 Coordinator 选模型，它才能回答你的消息。':
     'Pick a model for the Coordinator so it can answer your messages.',
   '「{name}」验证通过': '{name} verified',
@@ -1791,6 +1785,24 @@ export const EN: Record<string, string> = {
   向右滚动: 'Scroll right',
   '还有 {n} 项': '{n} more',
   路由规则: 'Routing rules',
+  需要处理的规则: 'Rules that need attention',
+  '{use}：{problem}': '{use}: {problem}',
+  '没有执行机启用 {runtime}': 'No Runner has {runtime} on',
+  没有执行机满足它的要求: 'No Runner meets its requirements',
+  '固定的执行机 {machine} 用不了': 'Its pinned Runner {machine} is unavailable',
+  '服务商 {provider} 已经不在了': 'Provider {provider} no longer exists',
+  '服务商 {provider} 没有 API key': 'Provider {provider} has no API key',
+  '修复后改用 {target}。': 'Fix switches it to {target}.',
+  '修复后改用 {target}，并清空{resets}。': 'Fix switches it to {target} and clears {resets}.',
+  '没有能自动换上的模型，在下面给它选一个能用的。':
+    'No model can replace it automatically; pick a working one below.',
+  '这个用途没有能自动换上的模型。': 'No model can replace this one automatically.',
+  执行机要求: 'Runner requirements',
+  修复: 'Fix',
+  '修复 {use}': 'Fix {use}',
+  '修复失败，请重试。': "Couldn't fix it. Try again.",
+  '这条规则刚被改过，已重新读取，请再看一眼。':
+    'This rule just changed and has been reloaded. Take another look.',
   不填则沿用规则的执行机: 'Leave empty to keep the rule Runner',
   '跟随 Coordinator 路由规则，在路由设置里调整。':
     'Follows the coordinator routing rules; adjust them in routing settings.',
@@ -1881,6 +1893,7 @@ export const EN: Record<string, string> = {
   加词或筛选: 'Add words or a filter',
   快速筛选: 'Quick filters',
   '{n} 条 · {cost}': '{n#1 thread|# threads} · {cost}',
+  '{n} 条': '{n#1 thread|# threads}',
   '显示 {shown} / {total}': 'Showing {shown} of {total}',
   加载更多: 'Load more',
   正在加载活动: 'Loading activity',
@@ -1960,7 +1973,7 @@ export const EN: Record<string, string> = {
   停止前没有运行: 'Stopped before it ran',
   已删除: 'Deleted',
   'Cron 表达式': 'Cron expression',
-  '服务器按 {timezone} 计算 Cron。': 'Cron is evaluated by the server in {timezone}.',
+  '服务器按{timezone}计算 Cron。': 'Cron is evaluated by the server in {timezone}.',
   'Cron 需要 5 段：分 时 日 月 周。': 'Use five cron fields: minute hour day month weekday.',
   从哪天开始每周重复: 'Day to repeat each week',
   '整点运行可能会晚几分钟开始。': 'Runs on the hour may start a few minutes late.',
@@ -2196,6 +2209,113 @@ export const EN: Record<string, string> = {
   运行机器: 'Machine',
   目录: 'Folder',
   还没分配机器: 'No machine yet',
+  '{name} 拒绝了这个令牌。检查令牌是否填对、有没有过期，然后换一个新的。':
+    '{name} rejected this token. Check that it is correct and not expired, then use a new one.',
+  '令牌有效，但权限不够。给令牌加上需要的权限后重新检查。':
+    'The token works but lacks permissions. Grant the permissions it needs, then check again.',
+  '{name} 10 秒内没有响应。稍后重新检查。':
+    '{name} did not answer within 10 seconds. Check again later.',
+  '连不上这个地址。检查地址是否正确、服务器是否在线。':
+    "Can't reach this address. Check the URL and that the server is online.",
+  '{name} 的授权已失效，重新连接一次。': 'The sign-in for {name} is no longer valid. Reconnect it.',
+  '{name} 收回了这次授权，重新连接一次。': '{name} revoked this sign-in. Reconnect it.',
+  '刷新 {name} 的授权时出错，稍后重新检查。':
+    'Refreshing the sign-in for {name} failed. Check again later.',
+  '{name} 返回了错误。稍后重新检查。': '{name} returned an error. Check again later.',
+  '这个标识已经被占用了，换一个标识再试。': 'This ID is already taken. Choose another one.',
+  '没能保存，稍后重试。': "Couldn't save. Try again later.",
+  令牌: 'Token',
+  '{label}（可选）': '{label} (optional)',
+  '不填也能用；填了额度更高。': 'Works without one; a key raises your limits.',
+  '去 {name} 创建': 'Create one on {name}',
+  '连接 {name}': 'Connect {name}',
+  '正在连接…': 'Connecting…',
+  '添加 MCP 服务器': 'Add MCP server',
+  '任何支持远程 MCP 的服务器都可以加进来。': 'Add any server that speaks remote MCP.',
+  用浏览器登录: 'Sign in with browser',
+  团队知识库: 'Team wiki',
+  标识: 'ID',
+  '必须以 https:// 开头。': 'Must start with https://.',
+  '请求头（可选）': 'Headers (optional)',
+  请求头名称: 'Header name',
+  请求头的值: 'Header value',
+  删除这个请求头: 'Remove this header',
+  添加请求头: 'Add header',
+  保存并检查: 'Save and check',
+  重新检查: 'Check again',
+  重新连接: 'Reconnect',
+  '用浏览器登录连接。删除只移除本机保存的令牌，{name} 那边的授权要在它的设置里撤销。':
+    "Connected by browser sign-in. Deleting removes only the tokens stored here; revoke the grant in {name}'s settings.",
+  '换一个{label}': 'Replace {label}',
+  '已连接 · {n} 个工具': 'Connected · {n#1 tool|# tools}',
+  需要重新授权: 'Needs sign-in',
+  连不上: 'Unreachable',
+  还没检查: 'Not checked yet',
+  '前往 {host} 登录': 'Sign in at {host}',
+  前往登录: 'Continue to sign in',
+  改用令牌: 'Use a token instead',
+  '先确认这个网址属于 {name}，不认识就取消。':
+    "Make sure this address belongs to {name}. If you don't recognize it, cancel.",
+  知道了: 'Dismiss',
+  已接入: 'Connected',
+  '管理 {name}': 'Manage {name}',
+  可接入: 'Available',
+  '正在找到 {name} 的登录地址…': 'Finding the sign-in page for {name}…',
+  '接入 {name}': 'Connect {name}',
+  '正在准备…': 'Preparing…',
+  接入: 'Connect',
+  本机配置: 'Local config',
+  '来自服务器所在电脑的本机配置文件，在那里修改。':
+    "From ~/.claude.json on the server's computer. Edit it there.",
+  '仓库、议题、拉取请求与工作流': 'Repositories, issues, pull requests and workflows',
+  '边缘函数、域名解析与对象存储': 'Edge functions, DNS and object storage',
+  '议题、项目与迭代周期': 'Issues, projects and cycles',
+  页面与数据库: 'Pages and databases',
+  '错误与性能问题（测试版）': 'Errors and performance issues (beta)',
+  '数据库、函数与项目管理（测试版）': 'Databases, functions and project management (beta)',
+  '模型、数据集与演示应用': 'Models, datasets and demo apps',
+  个人访问令牌: 'Personal access token',
+  'API 令牌': 'API token',
+  访问令牌: 'Access token',
+  只读: 'Read-only',
+  工具集: 'Toolsets',
+  '项目 ref': 'Project ref',
+  '有字段格式不对。地址要以 https:// 开头，标识只能用小写字母、数字和连字符（-）。':
+    'A field is not valid. The URL must start with https://, and the identifier may use only lowercase letters, digits and hyphens (-).',
+  '例如：团队知识库': 'For example: Team wiki',
+  'Agent 用这个名字调用它。只能用小写字母、数字和连字符（-）。':
+    'Agents call it by this name. Use only lowercase letters, digits and hyphens (-).',
+  '例如：team-wiki': 'For example: team-wiki',
+  '必须以 https:// 开头。支持浏览器登录的服务器不用填请求头。':
+    'Must start with https://. A server that supports browser sign-in needs no headers.',
+  '例如：https://example.com/mcp': 'For example: https://example.com/mcp',
+  '值加密保存在本机，保存后看不到原文。':
+    'Values are encrypted on this machine and cannot be viewed after saving.',
+  删除连接: 'Delete connection',
+  '登录并授权后会自动回到这里。': 'After you sign in and approve, you come back here.',
+  '你取消了授权，这次什么都没有保存。': 'You cancelled the sign-in, so nothing was saved.',
+  '登录等得太久已经失效，重新接入一次。': 'The sign-in waited too long and expired. Connect again.',
+  '授权期间这个连接有了变动，这次授权没有保存。':
+    'The connection changed during sign-in, so this sign-in was not saved.',
+  '没能连上 {name}': 'Could not connect {name}',
+  '没能开始登录，稍后再试。': 'Could not start the sign-in. Try again later.',
+  '这个标识已经被占用，先删掉旧的连接或换个名字。':
+    'This identifier is taken. Delete the old connection or pick another name.',
+  '{name} 不支持浏览器登录，改用令牌或请求头连接。':
+    'Browser sign-in is not available for {name}. Connect with a token or headers instead.',
+  '{name} 的登录服务没有接受 Cairn 的注册，稍后再试。':
+    "{name}'s sign-in service did not accept Cairn's registration. Try again later.",
+  '最新的库文档与代码示例，也支持登录':
+    'Up-to-date library docs and code examples; sign-in also supported',
+  '登录没有完成，在下面重新接入一次。': 'The sign-in did not finish. Connect again below.',
+  没能完成登录: 'Could not finish the sign-in',
+  '{name}：删除后 Agent 不能再用它的工具。':
+    '{name}: Agents can no longer use its tools after deletion.',
+  '加密保存在本机，保存后看不到原文。':
+    'Encrypted on this machine; it cannot be viewed after saving.',
+  '确定删除这个连接？此操作不可撤销。': 'Delete this connection? This cannot be undone.',
+  '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull\u00a0requests 读写权限。':
+    'Create a fine-grained token, pick the repositories, and give Contents, Issues and Pull requests read and write access.',
   '拖动排序 {model}': 'Drag to reorder {model}',
   '最强，适合复杂任务': 'Strongest, for hard tasks',
   '快，能力强': 'Fast, capable',

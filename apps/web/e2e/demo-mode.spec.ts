@@ -125,16 +125,40 @@ test('banner follows the locale', async ({ page }) => {
   );
 });
 
+test('a waiting task with one request opens at its start and cannot scroll into blank space', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${demo.base}/app?thread=${DEMO.cartMerge}`);
+  const column = page.getByTestId('transcript-col');
+  await expect(column.getByTestId('user-bubble')).toHaveCount(1);
+  await page.waitForTimeout(1000);
+  expect(await column.evaluate((el) => el.scrollTop)).toBe(0);
+  const blankBelow = await column.evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(blankBelow).toBeLessThanOrEqual(24);
+  await page.setViewportSize({ width: 1440, height: 560 });
+  const gapUnderLastRow = await column.evaluate((el) => {
+    el.scrollTo({ top: el.scrollHeight });
+    const rows = [...(el.querySelector('[data-slot="message-scroller-content"]')?.children ?? [])];
+    const last = rows.filter((row) => row.getBoundingClientRect().height > 0).at(-1);
+    return el.getBoundingClientRect().bottom - (last?.getBoundingClientRect().bottom ?? 0);
+  });
+  expect(gapUnderLastRow).toBeLessThanOrEqual(32);
+  await expect(
+    page.getByTestId('side-chat-panel').getByTestId('jump-to-latest'),
+  ).toHaveAttribute('data-active', 'false');
+});
+
 test('the selling points browse end to end with no backend traffic', async ({ page }) => {
   const traffic = watchTraffic(page);
 
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
-  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你回答');
   await expect(page.getByText('AI 审核', { exact: false }).first()).toBeVisible();
   await expect(page.getByText('必须修改').first()).toBeVisible();
 
   await page.goto(`${demo.base}/app/todo/${DEMO.rateLimit}`);
-  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你审阅');
   await expect(page.getByText('验证未通过').first()).toBeVisible();
   await expect(page.getByText('验证通过').first()).toBeVisible();
 
@@ -188,7 +212,7 @@ test('write: sending in the detail composer is blocked', async ({ page }) => {
   await page.locator('.side-panel textarea').fill('请改成先合并再校验库存');
   await page.locator('.side-panel .composer-send').click();
   await expect(toast(page)).toBeVisible();
-  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你回答');
   await expect(page.locator('.chat-streaming-label')).toHaveCount(0);
   expectQuiet(traffic);
 });
@@ -198,14 +222,14 @@ test('write: the primary action and the delete confirm are blocked', async ({ pa
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
   await page.getByTestId('side-chat-action').getByRole('button').first().click();
   await expect(toast(page)).toBeVisible();
-  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你回答');
 
   await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await page.getByRole('menuitem', { name: '删除' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: '删除' }).click();
   await expect(page).toHaveURL(new RegExp(`[?&]thread=${DEMO.cartMerge}$`));
   await page.reload();
-  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你回答');
   expectQuiet(traffic);
 });
 

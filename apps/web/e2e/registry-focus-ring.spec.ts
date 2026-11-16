@@ -197,7 +197,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
 
   test('input-group draws the field ring on the shell, not the control', async ({ page }) => {
     await themed(page, 'dark', LISTED_SKILLS);
-    const control = page.getByRole('textbox', { name: '搜索技能...' });
+    const control = page.getByRole('textbox', { name: '搜索技能' });
     await expect(control).toBeVisible();
     await focusKeyboard(control);
     const controlInfo = await readFocus(control);
