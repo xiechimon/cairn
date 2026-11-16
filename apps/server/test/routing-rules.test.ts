@@ -14,6 +14,7 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { chiefBinding } from '../src/services/chief.js';
+import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
 import { coordinatorRoute } from '../src/services/coordinator-route.js';
 import { createProvider } from '../src/services/providers.js';
@@ -392,13 +393,12 @@ describe('D71 thread override set at dispatch', () => {
   });
 });
 
-describe('work_policy: tools, MCP, skills and secrets live on the policy', () => {
+describe('work_policy: tools, skills and secrets live on the policy', () => {
   test('the policy values are the step permissions', async () => {
     const w = await setupWorld();
     sessionRule(w.s);
     seedPolicy(w.s, 'session', {
       tools: ['policy-tool'],
-      mcpServers: ['policy-mcp'],
       skillsAllowlist: ['policy-skill'],
       defaultSkill: 'policy-skill',
       secrets: ['POLICY_SECRET'],
@@ -406,7 +406,6 @@ describe('work_policy: tools, MCP, skills and secrets live on the policy', () =>
     const todoRow = await buildTodo(w);
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
       tools: ['policy-tool'],
-      mcpServers: ['policy-mcp'],
       skillsAllowlist: ['policy-skill'],
       defaultSkill: 'policy-skill',
       secrets: ['POLICY_SECRET'],
@@ -418,13 +417,12 @@ describe('work_policy: tools, MCP, skills and secrets live on the policy', () =>
     const ruleId = sessionRule(w.s);
     w.s.db
       .update(routingRule)
-      .set({ tools: ['rule-tool'], mcpServers: ['rule-mcp'], secrets: ['RULE_SECRET'] })
+      .set({ tools: ['rule-tool'], secrets: ['RULE_SECRET'] })
       .where(eq(routingRule.id, ruleId))
       .run();
     const todoRow = await buildTodo(w);
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
       tools: [],
-      mcpServers: [],
       secrets: [],
     });
   });
@@ -456,7 +454,6 @@ describe('work_policy: tools, MCP, skills and secrets live on the policy', () =>
     const todoRow = await buildTodo(w);
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
       tools: [],
-      mcpServers: [],
       secrets: [],
       skillsAllowlist: [],
     });
@@ -477,12 +474,11 @@ describe('work_policy: tools, MCP, skills and secrets live on the policy', () =>
 
   test('the coordinator profile takes no session policy permissions', async () => {
     const w = await setupWorld();
-    seedRoute(w.s, 'coordinator', { provider: 'p', modelId: 'm', mcpServers: ['coord-mcp'] });
+    seedRoute(w.s, 'coordinator', { provider: 'p', modelId: 'm' });
     seedPolicy(w.s, 'session', { tools: ['session-tool'], secrets: ['SESSION_SECRET'] });
     expect(coordinatorProfile(w.s.db, w.s.team.id)).toMatchObject({
       tools: [],
       secrets: [],
-      mcpServers: ['coord-mcp'],
     });
   });
 });
@@ -745,6 +741,110 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     });
     seedRoute(s, 'coordinator', { provider: 'vani', modelId: 'm1' });
     expect(coordinatorDefault()).toBeUndefined();
+  });
+
+  test('a Claude subscription with Claude Code installed is the Coordinator default when nothing else can run it', () => {
+    const s = bare();
+    const coordinatorDefault = () => listRoutingSettings(s.db, s.team.id, true).coordinatorDefault;
+    const subscribe = (expiresAt: number | null = null) =>
+      createClaudeSubscription({ db: s.db, box: s.secretBox }, s.team.id, {
+        label: 'mine',
+        token: 'sk-ant-oat01-first-run',
+        ...(expiresAt === null ? {} : { expiresAt }),
+      });
+    const none = { reason: 'none', provider: null, modelId: null };
+    subscribe();
+    expect(coordinatorDefault()).toEqual(none);
+    const machineId = claudeRunner(s);
+    expect(coordinatorDefault()).toEqual({
+      reason: 'claude-code',
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+    });
+    setCoordinatorServerContextEnabled(true);
+    try {
+      expect(coordinatorProfile(s.db, s.team.id)).toMatchObject({
+        provider: 'claude-code',
+        modelId: 'claude-sonnet-5-5',
+      });
+      expect(coordinatorRoute(s.db, s.team.id)).toBeNull();
+    } finally {
+      setCoordinatorServerContextEnabled(false);
+    }
+    s.db
+      .update(machineTable)
+      .set({ claudeCodeReport: null })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    expect(coordinatorDefault()).toEqual(none);
+  });
+
+  test('with several Runners the seeded Coordinator rule is pinned to the one that has Claude Code', async () => {
+    const s = bare();
+    piOnlyRunner(s);
+    const withClaude = claudeRunner(s);
+    await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions`, {
+      label: 'mine',
+      token: `sk-ant-oat01-pin-${'x'.repeat(60)}`,
+    });
+    const rule = listRoutingSettings(s.db, s.team.id, true).rules.find(
+      (r) => r.use === 'coordinator',
+    );
+    expect(rule).toMatchObject({ provider: 'claude-code', machineId: withClaude });
+  });
+
+  test('an expired subscription is no Coordinator default, and a provider key still comes first', () => {
+    const s = bare();
+    const coordinatorDefault = () => listRoutingSettings(s.db, s.team.id, true).coordinatorDefault;
+    claudeRunner(s);
+    createClaudeSubscription({ db: s.db, box: s.secretBox }, s.team.id, {
+      label: 'old',
+      token: 'sk-ant-oat01-expired',
+      expiresAt: Date.now() - 1_000,
+    });
+    expect(coordinatorDefault()).toEqual({ reason: 'none', provider: null, modelId: null });
+    createClaudeSubscription({ db: s.db, box: s.secretBox }, s.team.id, {
+      label: 'live',
+      token: 'sk-ant-oat01-live',
+    });
+    addProvider(s, 'vani', { models: ['m1'] });
+    expect(coordinatorDefault()).toEqual({ reason: 'provider', provider: 'vani', modelId: 'm1' });
+  });
+
+  test('signing in a first Claude subscription saves the Coordinator and task rules, and leaves another source alone', async () => {
+    const s = bare();
+    claudeRunner(s);
+    const subscribe = (label: string) =>
+      req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions`, {
+        label,
+        token: `sk-ant-oat01-${label}-${'x'.repeat(60)}`,
+      });
+    expect((await subscribe('first')).status).toBe(201);
+    const rules = () =>
+      Object.fromEntries(
+        listRoutingSettings(s.db, s.team.id, true).rules.map((r) => [
+          r.use,
+          [r.provider, r.modelId],
+        ]),
+      );
+    expect(rules()).toEqual({
+      coordinator: ['claude-code', 'claude-sonnet-5-5'],
+      session: ['claude-code', 'claude-sonnet-5-5'],
+    });
+    s.db.delete(routingRule).run();
+    expect((await subscribe('second')).status).toBe(201);
+    expect(rules()).toEqual({});
+
+    const other = bare();
+    claudeRunner(other);
+    addProvider(other, 'vani', { models: ['m1'] });
+    await req(other.app, 'POST', `/api/teams/${other.team.id}/claude-subscriptions`, {
+      label: 'mine',
+      token: `sk-ant-oat01-mine-${'x'.repeat(60)}`,
+    });
+    expect(
+      listRoutingSettings(other.db, other.team.id, true).rules.map((r) => [r.use, r.provider]),
+    ).toEqual([['session', 'claude-code']]);
   });
 
   test('memory ownership stays on the stored rule, not the read-time default', () => {

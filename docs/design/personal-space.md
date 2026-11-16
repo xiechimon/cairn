@@ -38,7 +38,7 @@ A request like "note this down" or "write me a weekly report template" has no de
 | P1 | Coordinator `create_todo` with a space `projectId` | owner turn (as quick lane L1); `personalOwnerId` equals the author of the cited owner segments | task | `400`, nothing written |
 | P2 | Claim | as P1; the clone URL is valid only for this build | step | not dispatched; task in needs-you |
 | P3 | `direct` landing | owner segments still valid; regular files only; no symlink, submodule or instruction path; size limit; base not moved | default branch, one commit, result index | refused; the report names each refused file and why |
-| P4 | `/git/*` (`routes-git-hosting.ts`) | a space repo answers only the build that is running its task; a push cannot move the default branch | none | `404`. The wider problem for ordinary hosted repos is #5161 |
+| P4 | `/git/*` (`routes-git-hosting.ts`) | a space repo answers only the step git key of a claimed step whose task is in that space; the repo sets `receive.hideRefs=refs/heads/main`, so a push cannot move the default branch | none | `401` without credentials (git's challenge, as for any hosted repo), then `404` for any other key; a push to `main` is rejected by git. The wider problem for ordinary hosted repos is #5161 |
 | P5 | Coordinator `space_files`, `space_read` (read-only tools) | the thread's owner owns the space | none | `404`; returned content is marked data |
 | P6 | Restore (web or Coordinator request) | session user owns the space | new commit, result index | `409` when the base moved; the owner retries |
 | P7 | Results panel list and search | session user owns the space | none | other members never see the files |
@@ -74,6 +74,6 @@ One per row P1 to P11, including: a user A channel creating into B's space retur
 
 1. S1: `personalOwnerId` migration, first-use creation, list filters, P4.
 2. S2: `direct` landing, P3, P6, history (security surface: `machine-merge-landing.ts`).
-3. S3: Coordinator routing rules, P5, P9, and no project instructions in a space task's prompt.
+3. S3: Coordinator routing rules, P5, P9, and no project instructions in a space task's prompt. Before S3 lets any path create a space task, task and build reads (search, `todos`, `threads`, MCP `todos` and `search_threads`, `/api/todos`, `/api/builds/:id/*`) must hide space tasks from everyone but the owner; S1 refuses every creation path and every project move into a space, so nothing reaches them yet.
 4. S4: Results panel grouping, search and archive (P7, P8), preview history and restore.
 5. E: the newcomer walk-through and its e2e.

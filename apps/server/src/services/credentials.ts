@@ -43,8 +43,16 @@ export function revokeStepGitCredential(deps: { db: Db }, stepId: string): void 
     .run();
 }
 
+const STEP_GIT_KEY_PREFIX = 'git-step-';
+
 function stepGitKeyName(stepId: string): string {
-  return `git-step-${stepId}`;
+  return `${STEP_GIT_KEY_PREFIX}${stepId}`;
+}
+
+export function stepIdOfGitKey(name: string | null): string | null {
+  return name?.startsWith(STEP_GIT_KEY_PREFIX) === true
+    ? name.slice(STEP_GIT_KEY_PREFIX.length)
+    : null;
 }
 
 export interface StepCredentialBundle {

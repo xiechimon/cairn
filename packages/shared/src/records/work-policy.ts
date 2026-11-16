@@ -10,7 +10,6 @@ export const workPolicyRecordSchema = z.object({
   teamId: recordId,
   use: policyUseSchema,
   tools: z.array(z.string()),
-  mcpServers: z.array(z.string()),
   skillsAllowlist: z.array(z.string()).nullable(),
   defaultSkill: z.string().nullable(),
   secrets: z.array(z.string()),
@@ -23,7 +22,6 @@ export type WorkPolicyRecord = z.infer<typeof workPolicyRecordSchema>;
 export const patchWorkPolicyBodySchema = z
   .object({
     tools: z.array(z.string()).optional(),
-    mcpServers: z.array(z.string()).optional(),
     skillsAllowlist: z.array(z.string()).nullable().optional(),
     defaultSkill: z.string().nullable().optional(),
     secrets: z.array(z.string()).optional(),

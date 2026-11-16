@@ -38,15 +38,16 @@ export function subscriptionLoginWarning(
   now: number,
   t: Translate,
 ): string | null {
+  if (connection.enabled === false) return null;
   if (connection.expiresAt === null || connection.expiresAt - now > 30 * 24 * 60 * 60 * 1000)
     return null;
   if (connection.expiresAt <= now)
     return t(
-      '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。',
+      '{name}：已过期，Coordinator 和任务都暂时用不了。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型服务」。',
       { name: connection.label },
     );
   return t(
-    '{name}：Claude 订阅的 token 将在 {days} 天后过期。运行 `claude setup-token`，再添加一个新的订阅。',
+    '{name}：将在 {days} 天后过期。到期前在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型服务」。',
     {
       name: connection.label,
       days: Math.ceil((connection.expiresAt - now) / (24 * 60 * 60 * 1000)),

@@ -38,8 +38,8 @@ export const EN: Record<string, string> = {
   移除订阅: 'Remove subscription',
   '移除后，后续步骤不再使用这个订阅。':
     'After removal, later steps no longer use this subscription.',
-  '登录已失效，请重新生成令牌后再添加':
-    'The login is no longer valid. Generate a new token and add it again.',
+  '这个订阅的登录已失效。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
+    'This subscription is no longer signed in. Remove it, then run `claude setup-token` in a terminal and add the new token.',
   '验证超时，请重试': 'Verification timed out. Try again.',
   '服务器上找不到 claude 命令': 'The claude command was not found on the server.',
   '验证没有通过，请重试': 'Verification did not pass. Try again.',
@@ -47,7 +47,8 @@ export const EN: Record<string, string> = {
     'The connection dropped; the server may be restarting. Try again.',
   '验证太频繁，请 10 秒后重试': 'Verifying too often. Try again in 10 seconds.',
   验证失败: 'Verification failed',
-  '令牌已过期，请重新添加': 'The token has expired. Add it again.',
+  '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
+    'This subscription has expired. Remove it, then run `claude setup-token` in a terminal and add the new token.',
   使用: 'Usage',
   '24 小时步骤': 'Steps in 24 hours',
   Archive: 'Archive',
@@ -57,14 +58,14 @@ export const EN: Record<string, string> = {
   '添加 Claude 订阅': 'Add Claude subscription',
   '在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。':
     'Run `claude setup-token` on your machine, then paste the token below.',
-  'Claude Code 步骤会使用最近添加且未过期的订阅。Token 加密保存，保存后无法再查看。':
-    'Claude Code steps use the most recently added unexpired connection. Tokens are encrypted and cannot be viewed after saving.',
+  'Coordinator 和任务都会用这个订阅，不用再配 API key。Token 加密保存，保存后无法再查看。':
+    'The Coordinator and tasks both use this subscription, so you need no API key. The token is stored encrypted and cannot be viewed after saving.',
   '保存失败，请检查填写内容后重试。':
     'Could not save the connection. Check the fields and try again.',
-  '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。':
-    '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.',
-  '{name}：Claude 订阅的 token 将在 {days} 天后过期。运行 `claude setup-token`，再添加一个新的订阅。':
-    '{name}: Claude subscription token expires in {days## day|# days}. Run `claude setup-token` and add a new connection.',
+  '{name}：已过期，Coordinator 和任务都暂时用不了。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型服务」。':
+    '{name}: expired, so the Coordinator and tasks cannot run for now. Run `claude setup-token` in a terminal and add the new token under Settings → Model services.',
+  '{name}：将在 {days} 天后过期。到期前在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型服务」。':
+    '{name}: expires in {days## day|# days}. Before then, run `claude setup-token` in a terminal and add the new token under Settings → Model services.',
   Archived: 'Archived',
   Agent: 'Agent',
 
@@ -243,7 +244,6 @@ export const EN: Record<string, string> = {
   '还差第 1 步：接入模型': 'Step 1 is still open: connect models',
   '还差第 2 步：确认模型': 'Step 2 is still open: confirm models',
   '{role}：{model}': '{role}: {model}',
-  '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
   '因为你添加了 Anthropic API key': 'Because you added an Anthropic API key',
   '因为这是最早添加、Coordinator 能直接用的服务商':
@@ -267,7 +267,13 @@ export const EN: Record<string, string> = {
   模型配好了: 'Your models are set',
   '现在可以建第一个项目了。模型以后可以在设置里改。':
     'You can create your first project now. You can change the models in Settings later.',
-  'Claude 订阅、API key 或本地模型': 'A Claude subscription, an API key or a local model',
+  'Claude 订阅、API key 或本地模型，任选一个':
+    'A Claude subscription, an API key or a local model, whichever you have',
+  '已添加，Coordinator 和任务都能用': 'Added. The Coordinator and tasks can both use it',
+  '订阅已保存。这台电脑还没找到 Claude Code，装好它之后会自动用上。':
+    'Subscription saved. Claude Code was not found on this computer; it will be used once you install it.',
+  '因为你登录了 Claude 订阅，Coordinator 直接用它':
+    'Because you signed in with a Claude subscription, the Coordinator uses it directly',
   '先跳过，去主页看看': 'skip for now and look around',
   '建项目前要先把模型配好，还差第 1 步：接入模型。':
     'Set up your models before creating a project. Step 1 is still open: connect models.',
@@ -967,8 +973,8 @@ export const EN: Record<string, string> = {
     'Queued: a local project only runs on the Runner that holds it, so this Runner cannot run it ({ahead} ahead)',
   '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
     'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
-    'Queued: Claude Code is not logged in on the Runner. Run claude on that machine to log in ({ahead} ahead)',
+  '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在执行机上运行 claude 登录（前面 {ahead} 个）':
+    'Queued: Claude is not signed in. Add a Claude subscription (run claude setup-token in a terminal) or run claude on the Runner to sign in ({ahead} ahead)',
   '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
     'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks ({ahead} ahead)',
   '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
@@ -979,8 +985,8 @@ export const EN: Record<string, string> = {
     'Queued: a local project only runs on the Runner that holds it, so {machine} cannot run it ({ahead} ahead)',
   '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
     'Queued: Claude is rate limited on {machine}; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
-    'Queued: Claude Code is not logged in on {machine}. Run claude on that machine to log in ({ahead} ahead)',
+  '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在 {machine} 上运行 claude 登录（前面 {ahead} 个）':
+    'Queued: Claude is not signed in. Add a Claude subscription (run claude setup-token in a terminal) or run claude on {machine} to sign in ({ahead} ahead)',
   '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）':
     'Queued: the Claude account was switched and this step keeps the old account. Stop it, then continue, to start over on the new account ({ahead} ahead)',
   'Coordinator 规则用的服务商「{name}」还没添加':
@@ -1322,8 +1328,6 @@ export const EN: Record<string, string> = {
     'Let this Agent modify skills already in the team skill library.',
   '任务执行时，该 Agent 可在需要密钥的执行步中按需取用团队密钥，每次取用都会留下记录；密钥不预置进 shell 环境。所在执行机需要 cairn CLI 0.1.28 及以上。':
     'When running a task, this Agent can retrieve team secrets on demand in the execution steps that need them; every retrieval is recorded, and secrets are never preloaded into the shell environment. The Runner must have cairn CLI 0.1.28 or newer.',
-  '该 Agent 执行任务时可使用的团队 MCP 服务器，其工具以 mcp__<服务器>__<工具> 的形式出现。':
-    'Team MCP servers this Agent may use while running tasks; their tools appear as mcp__<server>__<tool>.',
   '说明该 Agent 的常驻职责，可多行。该说明会注入它执行的每个任务的系统提示词，也会提供给 Coordinator 用于分派。':
     'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':

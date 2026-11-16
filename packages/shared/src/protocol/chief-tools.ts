@@ -471,7 +471,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel, except for a quick-lane todo, whose placeholder title is final. You add routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
     parameters: obj({
       projectId: str(
         'Project id. Omit it only for output "info" research that belongs to no project: the todo goes to the research project and its report comes back to this conversation.',
@@ -507,6 +507,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
       ),
       platform: str(
         `Optional "macos", "windows" or "linux": the operating system the task needs. ${PLATFORM_DOC}`,
+      ),
+      lane: str(
+        'Optional "quick", only in an owner turn whose words state the outcome and whose project has a basis the server can check: this channel\'s project, the composer\'s picked project, a project the owner named, or one the owner chose in ask_user. The todo still runs in a thread through a PR and the merge gate; its session skips tests for data or copy edits. A basis that does not check out returns 400 and writes nothing; create it again without lane. Never in event turns ([wake:…]).',
       ),
     }),
   },

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { delimiter, join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import type {
   AgentBackend,
   AgentBackendCapabilities,
@@ -766,6 +767,13 @@ class PiSessionHandle implements AgentSessionHandle {
   readonly events: AsyncIterable<StepEvent>;
   private readonly queue = new EventQueue();
   private readonly state: MapState;
+  private readonly seenUserMessages = new WeakSet<PiMessageLike>();
+  private readonly pendingSteers: {
+    text: string;
+    content: unknown;
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  }[] = [];
   private closed = false;
   private stopping = false;
 
@@ -782,6 +790,7 @@ class PiSessionHandle implements AgentSessionHandle {
     this.events = this.queue.iterable();
     session.subscribe((event) => {
       const raw = event as unknown as AgentSessionEventLike;
+      this.receiveSteer(raw);
       if (
         raw.type === 'message_end' &&
         raw.message?.role === 'assistant' &&
@@ -805,6 +814,7 @@ class PiSessionHandle implements AgentSessionHandle {
   private finish(): void {
     if (this.closed) return;
     this.closed = true;
+    this.rejectPendingSteers();
     this.queue.end();
     if (this.spans !== undefined) void this.spans.flush();
     void this.shutdownExtensions().finally(() => {
@@ -819,14 +829,59 @@ class PiSessionHandle implements AgentSessionHandle {
     } catch {}
   }
 
-  async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
-    if (images !== undefined && images.length > 0 && this.model !== null) {
-      ensureImageInput(this.model);
-      await this.session.steer(text, toPiImages(images));
-    } else {
-      await this.session.steer(text);
+  private receiveSteer(event: AgentSessionEventLike): void {
+    const message = event.message;
+    if (
+      (event.type !== 'message_start' && event.type !== 'message_end') ||
+      message?.role !== 'user' ||
+      this.seenUserMessages.has(message)
+    ) {
+      return;
     }
-    this.queue.push({ type: 'steer', text });
+    this.seenUserMessages.add(message);
+    if (this.closed || this.stopping) return;
+    const content =
+      typeof message.content === 'string'
+        ? [{ type: 'text', text: message.content }]
+        : message.content;
+    const index = this.pendingSteers.findIndex((pending) =>
+      isDeepStrictEqual(pending.content, content),
+    );
+    if (index === -1) return;
+    const [pending] = this.pendingSteers.splice(index, 1);
+    if (pending === undefined) return;
+    this.queue.push({ type: 'steer', text: pending.text });
+    pending.resolve();
+  }
+
+  private rejectPendingSteers(): void {
+    for (const pending of this.pendingSteers.splice(0)) {
+      pending.reject(new Error('Pi session closed before steer was consumed'));
+    }
+  }
+
+  async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
+    if (this.closed || this.stopping) throw new Error('Pi session is closed or stopping');
+    const piImages = images !== undefined && images.length > 0 ? toPiImages(images) : undefined;
+    if (piImages !== undefined && this.model !== null) {
+      ensureImageInput(this.model);
+    }
+    return new Promise<void>((resolve, reject) => {
+      const pending = {
+        text,
+        content: [{ type: 'text', text }, ...(piImages ?? [])],
+        resolve,
+        reject,
+      };
+      this.pendingSteers.push(pending);
+      const sent =
+        piImages !== undefined ? this.session.steer(text, piImages) : this.session.steer(text);
+      void sent.catch((error: unknown) => {
+        const index = this.pendingSteers.indexOf(pending);
+        if (index !== -1) this.pendingSteers.splice(index, 1);
+        reject(error);
+      });
+    });
   }
 
   emitBackendError(message: string): void {
@@ -836,8 +891,12 @@ class PiSessionHandle implements AgentSessionHandle {
 
   async stop(): Promise<void> {
     this.stopping = true;
-    await this.session.abort();
-    this.finish();
+    this.rejectPendingSteers();
+    try {
+      await this.session.abort();
+    } finally {
+      this.finish();
+    }
   }
 
   usage(): AgentTokenUsage {

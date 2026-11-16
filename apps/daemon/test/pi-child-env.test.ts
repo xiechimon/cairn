@@ -6,7 +6,7 @@ import type { SessionOpts } from '@cairn/shared';
 import { createAgentSession } from '@earendil-works/pi-coding-agent';
 import { afterEach, expect, test, vi } from 'vitest';
 import { daemonOtelFromEnv } from '../src/backend/otel.js';
-import { createPiBackend } from '../src/backend/pi.js';
+import { type AgentSessionEventLike, createPiBackend } from '../src/backend/pi.js';
 import { testTempDir } from './test-temp-dir.js';
 
 vi.mock('@earendil-works/pi-coding-agent', async (importOriginal) => {
@@ -181,3 +181,225 @@ async function bashChildEnv(): Promise<Record<string, string>> {
   if (output?.type !== 'text') throw new Error('Missing child environment output');
   return JSON.parse(output.text) as Record<string, string>;
 }
+
+async function steeringSession(baseUrl?: string) {
+  const directory = testTempDir('cairn-pi-steer-');
+  const opts = syntheticSession(directory);
+  const handle = await createPiBackend({
+    agentDir: join(directory, 'agent'),
+    sessionDir: join(directory, 'sessions'),
+  }).createSession({ ...opts, provider: { ...opts.provider, ...(baseUrl ? { baseUrl } : {}) } });
+  const { session }: Awaited<ReturnType<typeof createAgentSession>> = await vi
+    .mocked(createAgentSession)
+    .mock.results.at(-1)!.value;
+  const emitter = session as unknown as { _emit(event: AgentSessionEventLike): void };
+  return { handle, session, emit: (event: AgentSessionEventLike) => emitter._emit(event) };
+}
+
+test('pi steer waits for consumption and rejects a late enqueue when the agent settles', async () => {
+  const { handle, emit } = await steeringSession();
+  const outcome = vi.fn();
+  const receipt = handle.steer('Too late').then(
+    () => outcome('consumed'),
+    () => outcome('rejected'),
+  );
+  try {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(outcome).not.toHaveBeenCalled();
+    emit({ type: 'agent_settled' });
+    await receipt;
+    expect(outcome).toHaveBeenCalledExactlyOnceWith('rejected');
+    const events = [];
+    for await (const event of handle.events) events.push(event);
+    expect(events.map((event) => event.type)).toEqual(['done']);
+  } finally {
+    await handle.stop();
+  }
+});
+
+test('pi receipts match user content including images and count start/end only once', async () => {
+  const { handle, session, emit } = await steeringSession();
+  const outcomes: string[] = [];
+  const image = { data: 'aW1n', mimeType: 'image/png' };
+  const first = handle.steer('Same text', [image]).then(() => outcomes.push('first'));
+  const second = handle.steer('Same text', [image]).then(() => outcomes.push('second'));
+  try {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(outcomes).toEqual([]);
+    expect(session.model?.input).toContain('image');
+    const queued = session.agent.peekQueuedMessages()[0];
+    expect(queued?.role === 'user' ? queued.content : undefined).toEqual([
+      { type: 'text', text: 'Same text' },
+      { type: 'image', ...image },
+    ]);
+    for (const message of [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Same text' },
+          { type: 'image', ...image },
+        ],
+      },
+      { role: 'user', content: 'Same text' },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Same text' },
+          { type: 'image', ...image, data: 'other' },
+        ],
+      },
+    ]) {
+      emit({ type: 'message_start', message });
+      emit({ type: 'message_end', message });
+    }
+    await Promise.resolve();
+    expect(outcomes).toEqual([]);
+    const message = {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Same text' },
+        { type: 'image', ...image },
+      ],
+    };
+    emit({ type: 'message_start', message });
+    await first;
+    expect(outcomes).toEqual(['first']);
+    emit({ type: 'message_end', message });
+    await Promise.resolve();
+    expect(outcomes).toEqual(['first']);
+    emit({ type: 'message_end', message: { ...message } });
+    await second;
+    expect(outcomes).toEqual(['first', 'second']);
+  } finally {
+    await handle.stop();
+  }
+});
+
+test.each(['stop', 'error'] as const)(
+  'pi rejects pending and future receipts on %s',
+  async (end) => {
+    const { handle } = await steeringSession();
+    const receipt = expect(handle.steer('Pending')).rejects.toThrow(/consum|clos|stop/i);
+    if (end === 'stop') {
+      await handle.stop();
+    } else {
+      (handle as unknown as { emitBackendError(message: string): void }).emitBackendError('Failed');
+    }
+    await receipt;
+    await expect(handle.steer('After finish')).rejects.toThrow(/clos|stop/i);
+    await handle.stop();
+  },
+);
+
+test('pi rejects enqueue failures without rejecting a later matching receipt', async () => {
+  const { handle, session, emit } = await steeringSession();
+  vi.spyOn(session, 'steer').mockRejectedValueOnce(new Error('enqueue failed'));
+  try {
+    await expect(handle.steer('Retry text')).rejects.toThrow('enqueue failed');
+    const receipt = handle.steer('Retry text');
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    emit({ type: 'message_start', message: { role: 'user', content: 'Retry text' } });
+    await receipt;
+  } finally {
+    await handle.stop();
+  }
+});
+
+test('pi tracks consumption before enqueue resolves and ignores an already-started user message', async () => {
+  const { handle, session, emit } = await steeringSession();
+  const earlier = { role: 'user', content: 'Instruction' };
+  emit({ type: 'message_start', message: earlier });
+  const outcome = vi.fn();
+  vi.spyOn(session, 'steer').mockImplementationOnce(async () => {
+    emit({ type: 'message_end', message: earlier });
+    emit({ type: 'agent_end' });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(outcome).not.toHaveBeenCalled();
+    emit({ type: 'message_start', message: { role: 'user', content: 'Instruction' } });
+    return 'queued';
+  });
+  try {
+    await handle.steer('Instruction', []).then(outcome);
+    expect(outcome).toHaveBeenCalledOnce();
+  } finally {
+    await handle.stop();
+  }
+});
+
+test.each(['before polling', 'after agent_end', 'after final poll'])(
+  'real pi loop reports steer consumption accurately %s',
+  async (timing) => {
+    const bodies: string[] = [];
+    let steer: () => void = () => {};
+    let receipt: Promise<void> | undefined;
+    const outcomes: string[] = [];
+    let pendingBeforePolling = false;
+    const server = createServer(async (request, response) => {
+      let raw = '';
+      for await (const chunk of request) raw += chunk;
+      bodies.push(raw);
+      if (timing === 'before polling' && bodies.length === 1) {
+        steer();
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        pendingBeforePolling = outcomes.length === 0;
+      }
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      response.end(
+        `data: ${JSON.stringify({
+          id: 'synthetic-response',
+          object: 'chat.completion.chunk',
+          model: 'synthetic',
+          choices: [
+            { index: 0, delta: { role: 'assistant', content: 'Done' }, finish_reason: 'stop' },
+          ],
+        })}\n\ndata: [DONE]\n\n`,
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as AddressInfo;
+    const { handle, session } = await steeringSession(`http://127.0.0.1:${port}/v1`);
+    steer = () => {
+      receipt = handle.steer('Steered instruction').then(
+        () => {
+          outcomes.push('consumed');
+        },
+        () => {
+          outcomes.push('rejected');
+        },
+      );
+    };
+    if (timing === 'after agent_end') {
+      session.subscribe((event) => {
+        if (event.type === 'agent_end' && receipt === undefined) steer();
+      });
+    }
+    if (timing === 'after final poll') {
+      const boundary = session as unknown as { _runBeforeSettleBoundary(): Promise<boolean> };
+      const beforeSettle = boundary._runBeforeSettleBoundary.bind(boundary);
+      vi.spyOn(boundary, '_runBeforeSettleBoundary').mockImplementationOnce(async () => {
+        const continueRun = await beforeSettle();
+        expect(continueRun).toBe(false);
+        steer();
+        return continueRun;
+      });
+    }
+    try {
+      await session.prompt('Original instruction');
+      expect(receipt).toBeDefined();
+      await receipt;
+      const consumed = timing !== 'after final poll';
+      expect(outcomes).toEqual([consumed ? 'consumed' : 'rejected']);
+      expect(bodies).toHaveLength(consumed ? 2 : 1);
+      if (timing === 'before polling') expect(pendingBeforePolling).toBe(true);
+      if (consumed) expect(bodies[1]).toContain('Steered instruction');
+      const events = [];
+      for await (const event of handle.events) events.push(event);
+      expect(events.filter((event) => event.type === 'steer')).toHaveLength(consumed ? 1 : 0);
+      expect(events.at(-1)?.type).toBe('done');
+    } finally {
+      await handle.stop();
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  },
+);

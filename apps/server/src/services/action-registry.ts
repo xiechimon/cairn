@@ -21,6 +21,7 @@ import {
   REFUSE_CHOICE,
   settlePendingProposal,
 } from './action-proposals.js';
+import { isPersonalSpace } from './personal-space.js';
 import { deleteProject } from './projects.js';
 
 export interface ExecuteActionDeps {
@@ -131,7 +132,9 @@ function journalRow(
 
 function requireOwnedProject(db: Pick<Db, 'select'>, projectId: string, teamId: string) {
   const row = db.select().from(project).where(eq(project.id, projectId)).get();
-  if (row === undefined || row.teamId !== teamId) throw notFound(`project ${projectId}`);
+  if (row === undefined || row.teamId !== teamId || isPersonalSpace(row)) {
+    throw notFound(`project ${projectId}`);
+  }
   return row;
 }
 

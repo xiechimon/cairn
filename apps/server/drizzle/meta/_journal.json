@@ -1177,6 +1177,20 @@
       "when": 1794799241362,
       "tag": "0172_chief_turn_usage_context_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 173,
+      "version": "6",
+      "when": 1794806743426,
+      "tag": "0173_secret_env_seal",
+      "breakpoints": true
+    },
+    {
+      "idx": 174,
+      "version": "6",
+      "when": 1794814526384,
+      "tag": "0174_project_personal_owner",
+      "breakpoints": true
     }
   ]
 }

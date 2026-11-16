@@ -40,6 +40,7 @@ import {
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { machineRuntimeAvailable } from './dispatch-eligibility.js';
@@ -62,7 +63,6 @@ export interface RouteProfile {
   secrets: string[];
   defaultSkill: string | null;
   skillsAllowlist: string[] | null;
-  mcpServers: string[];
   requiredCapabilities: RequiredCapabilities | null;
   fallbackModels: RoutingRuleRow['fallbackModels'];
   routed: boolean;
@@ -102,6 +102,7 @@ const LEGACY_RUNTIME_PROVIDER = 'pi';
 const DEFAULT_SESSION_RULE_ID = 'default-session';
 const DEFAULT_COORDINATOR_RULE_ID = 'default-coordinator';
 const COORDINATOR_MODEL_PREFERENCE = [/haiku/i, /sonnet/i];
+const CLAUDE_CODE_COORDINATOR_MODEL = 'claude-sonnet-5-5';
 const ANTHROPIC_API_HOST = 'api.anthropic.com';
 export const CODEX_LOGIN_PRESENT = new Set(['ok', 'expired']);
 const CITATION_CHECKER_RULE_ID = 'default-citation-check';
@@ -271,6 +272,23 @@ export function anthropicCoordinatorChoice(
   return modelId === undefined ? null : { provider: source.providerId, modelId };
 }
 
+function claudeCodeCoordinatorChoice(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): { provider: string; modelId: string } | null {
+  const machines = db
+    .select({ claudeCodeReport: machine.claudeCodeReport, capabilities: machine.capabilities })
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .all();
+  const installed = machines.filter((row) => machineRuntimeAvailable(row, 'claude-code'));
+  if (installed.length === 0) return null;
+  const signedIn =
+    hasActiveClaudeSubscription({ db }, teamId) ||
+    installed.some((row) => row.claudeCodeReport?.auth?.state === 'logged-in');
+  return signedIn ? { provider: 'claude-code', modelId: CLAUDE_CODE_COORDINATOR_MODEL } : null;
+}
+
 export function defaultCoordinatorChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
@@ -299,7 +317,8 @@ export function defaultCoordinatorChoice(
       return { reason: 'provider', provider: row.providerId, modelId: model.id };
     }
   }
-  return null;
+  const claudeCode = claudeCodeCoordinatorChoice(db, teamId);
+  return claudeCode === null ? null : { reason: 'claude-code', ...claudeCode };
 }
 
 export function defaultCoordinatorRule(
@@ -571,7 +590,6 @@ export function routeProfile(
     secrets: policy?.secrets ?? [],
     defaultSkill: policy?.defaultSkill ?? null,
     skillsAllowlist: policy === null ? [] : policy.skillsAllowlist,
-    mcpServers: route.use === 'coordinator' ? (route.mcpServers ?? []) : (policy?.mcpServers ?? []),
     requiredCapabilities: session
       ? withOverride(route.requiredCapabilities, override?.requiredCapabilities)
       : route.requiredCapabilities,
@@ -687,7 +705,6 @@ function toWorkPolicyRecord(row: WorkPolicyRow): WorkPolicyRecord {
     teamId: row.teamId,
     use: row.use,
     tools: row.tools,
-    mcpServers: row.mcpServers,
     skillsAllowlist: row.skillsAllowlist,
     defaultSkill: row.defaultSkill,
     secrets: row.secrets,
@@ -791,7 +808,7 @@ export function upsertRoutingRule(
         machineId: body.machineId ?? null,
         requiredCapabilities: body.requiredCapabilities ?? null,
         tools: null,
-        mcpServers: body.mcpServers ?? null,
+        mcpServers: null,
         skillsAllowlist: null,
         defaultSkill: null,
         secrets: null,
@@ -811,9 +828,48 @@ export function upsertRoutingRule(
   if (body.requiredCapabilities !== undefined) {
     sets.requiredCapabilities = body.requiredCapabilities;
   }
-  if (body.mcpServers !== undefined) sets.mcpServers = body.mcpServers;
   db.update(routingRule).set(sets).where(eq(routingRule.id, existing.id)).run();
   return requireRoutingRule(db, existing.id);
+}
+
+export function seedClaudeCodeRules(db: Db, teamId: string): void {
+  const stored = new Set(
+    db
+      .select({ use: routingRule.use })
+      .from(routingRule)
+      .where(eq(routingRule.teamId, teamId))
+      .all()
+      .map((row) => row.use),
+  );
+  const coordinator = defaultCoordinatorChoice(db, teamId);
+  if (!stored.has('coordinator') && coordinator?.reason === 'claude-code') {
+    const machines = db
+      .select({
+        id: machine.id,
+        online: machine.online,
+        claudeCodeReport: machine.claudeCodeReport,
+        capabilities: machine.capabilities,
+      })
+      .from(machine)
+      .where(eq(machine.teamId, teamId))
+      .orderBy(asc(machine.id))
+      .all();
+    const capable = machines.filter((row) => machineRuntimeAvailable(row, 'claude-code'));
+    const home =
+      machines.length > 1 ? (capable.find((row) => row.online) ?? capable[0]) : undefined;
+    upsertRoutingRule(db, teamId, 'coordinator', {
+      provider: coordinator.provider,
+      modelId: coordinator.modelId,
+      ...(home !== undefined ? { machineId: home.id } : {}),
+    });
+  }
+  const session = defaultSessionChoice(db, teamId);
+  if (!stored.has('session') && session?.reason === 'claude-code') {
+    upsertRoutingRule(db, teamId, 'session', {
+      provider: session.provider,
+      modelId: session.modelId,
+    });
+  }
 }
 
 export function upsertWorkPolicy(
@@ -836,7 +892,7 @@ export function upsertWorkPolicy(
         teamId,
         use,
         tools: filterAgentTools(body.tools ?? []),
-        mcpServers: body.mcpServers ?? [],
+        mcpServers: [],
         skillsAllowlist: body.skillsAllowlist ?? null,
         defaultSkill: body.defaultSkill ?? null,
         secrets: body.secrets ?? [],
@@ -849,7 +905,6 @@ export function upsertWorkPolicy(
   }
   const sets: Partial<WorkPolicyRow> = { updatedAt: now };
   if (body.tools !== undefined) sets.tools = filterAgentTools(body.tools);
-  if (body.mcpServers !== undefined) sets.mcpServers = body.mcpServers;
   if (body.skillsAllowlist !== undefined) sets.skillsAllowlist = body.skillsAllowlist;
   if (body.defaultSkill !== undefined) sets.defaultSkill = body.defaultSkill;
   if (body.secrets !== undefined) sets.secrets = body.secrets;

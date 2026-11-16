@@ -1,5 +1,5 @@
 import { isBackendRuntimeId } from '@cairn/shared';
-import { and, desc, eq, inArray, isNotNull, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, type SQL } from 'drizzle-orm';
 import {
   type ContextResume,
   contextResumeOf,
@@ -121,7 +121,7 @@ function lastContextBearingTurnUsageWhere(db: Db, scope: SQL): ContextBearingTur
       stepId: chiefTurnUsage.stepId,
     })
     .from(chiefTurnUsage)
-    .where(and(eq(chiefTurnUsage.stepId, stepId), isNotNull(chiefTurnUsage.contextTokens)))
+    .where(and(eq(chiefTurnUsage.stepId, stepId), gt(chiefTurnUsage.contextTokens, 0)))
     .orderBy(desc(chiefTurnUsage.createdAt))
     .get();
   if (last?.contextTokens == null) return null;
