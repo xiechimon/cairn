@@ -760,6 +760,10 @@ body:has([data-testid="chief-body"]),
   -webkit-app-region: drag;
 }
 
+:root[data-shell="mac-desktop"] .sidebar-team-name {
+  visibility: hidden;
+}
+
 :root[data-shell="mac-desktop"] .sidebar-team-row :is(button, a) {
   -webkit-app-region: no-drag;
 }
