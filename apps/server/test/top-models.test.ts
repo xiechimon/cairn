@@ -38,21 +38,22 @@ describe('team top models API', () => {
     expect(await read(s)).toEqual({ models: [SOL] });
   });
 
-  test('an empty list is stored and stays distinct from the reset state', async () => {
+  test('an empty list is stored and stays distinct from never having set one', async () => {
     const s = bootServer();
+    expect(await read(s)).toEqual({ models: null });
     await req(s.app, 'PUT', path(s.team.id), { models: [] });
     expect(await read(s)).toEqual({ models: [] });
-    const reset = await req(s.app, 'DELETE', path(s.team.id));
-    expect(await reset.json()).toEqual({ models: null });
-    expect(await read(s)).toEqual({ models: null });
+  });
+
+  test('any number of models is accepted', async () => {
+    const s = bootServer();
+    const models = Array.from({ length: 12 }, (_, i) => ({ ...SOL, modelId: `m${i}` }));
+    expect((await req(s.app, 'PUT', path(s.team.id), { models })).status).toBe(200);
+    expect(await read(s)).toEqual({ models });
   });
 
   test.each([
     ['a duplicate provider and model', { models: [OPUS, { ...OPUS, thinkingLevel: 'low' }] }],
-    [
-      'more than eight entries',
-      { models: Array.from({ length: 9 }, (_, i) => ({ ...SOL, modelId: `m${i}` })) },
-    ],
     ['an unknown thinking level', { models: [{ ...OPUS, thinkingLevel: 'extreme' }] }],
     ['a missing thinking level', { models: [{ provider: 'openai', modelId: 'gpt-6.1-sol' }] }],
     ['an empty model id', { models: [{ ...SOL, modelId: '' }] }],
@@ -92,7 +93,6 @@ describe('team top models API', () => {
     const s = bootServer();
     expect((await req(s.app, 'GET', path('nope'))).status).toBe(404);
     expect((await req(s.app, 'PUT', path('nope'), { models: [] })).status).toBe(404);
-    expect((await req(s.app, 'DELETE', path('nope'))).status).toBe(404);
   });
 
   test('deleting a team removes only its own stored list', () => {

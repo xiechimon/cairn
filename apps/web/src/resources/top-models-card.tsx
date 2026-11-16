@@ -3,7 +3,6 @@ import {
   type ModelSourceRuntime,
   THINKING_LEVELS,
   type ThinkingLevel,
-  TOP_MODELS_MAX,
   type TopModel,
 } from '@cairn/shared';
 import {
@@ -219,12 +218,10 @@ export function TopModelsCard({
   models,
   options,
   onChange,
-  onReset,
 }: {
   models: TopModel[];
   options: ModelOption[];
   onChange: (next: TopModel[]) => void;
-  onReset: () => void;
 }) {
   const { t } = useI18n();
   const sensors = useSensors(
@@ -252,13 +249,10 @@ export function TopModelsCard({
           <h2 className="m-0 truncate text-card-title font-semibold text-foreground max-sm:text-ui">
             {t('常用模型')}
           </h2>
-          <p className="m-0 text-meta text-content-tertiary">
-            {t('你常用的模型，最多 {max} 个。', { max: TOP_MODELS_MAX })}
-          </p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger
-            disabled={models.length >= TOP_MODELS_MAX || unique.length === 0}
+            disabled={unique.length === 0}
             render={<Button variant="outline" size="sm" data-testid="top-models-add" />}
           >
             <Plus aria-hidden />
@@ -330,12 +324,6 @@ export function TopModelsCard({
           </SortableContext>
         </DndContext>
       )}
-      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 max-sm:py-2.5">
-        <span className="text-meta text-content-tertiary">{t('恢复成推荐的模型和顺序。')}</span>
-        <Button variant="outline" size="sm" data-testid="top-models-reset" onClick={onReset}>
-          {t('恢复推荐')}
-        </Button>
-      </div>
     </section>
   );
 }

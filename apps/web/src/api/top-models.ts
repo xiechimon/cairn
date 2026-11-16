@@ -24,9 +24,5 @@ export function useTopModelsMutations(teamId: string | undefined) {
       onSuccess: store,
       onError: () => client.invalidateQueries({ queryKey: [TOP_MODELS_KEY, teamId] }),
     }),
-    reset: useMutation({
-      mutationFn: () => api.del<TopModelsEnvelope>(`/api/teams/${teamId}/top-models`),
-      onSuccess: store,
-    }),
   };
 }

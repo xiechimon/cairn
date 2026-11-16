@@ -51,7 +51,7 @@ import {
   upsertWorkPolicy,
 } from './services/routing-rules.js';
 import { filterKnownSkillIds } from './services/skills.js';
-import { readTopModels, resetTopModels, writeTopModels } from './services/top-models.js';
+import { readTopModels, writeTopModels } from './services/top-models.js';
 import { dailyUsage } from './services/usage-daily.js';
 
 const ACCESS_REFUSALS = {
@@ -169,12 +169,6 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, id);
     const body = parseWith(putTopModelsBodySchema, await jsonBody(c), 'body');
     return c.json(writeTopModels(ctx.db, id, body.models));
-  });
-
-  app.delete('/api/teams/:id/top-models', (c) => {
-    const id = c.req.param('id');
-    requireTeam(ctx, id);
-    return c.json(resetTopModels(ctx.db, id));
   });
 
   app.patch('/api/teams/:id/routing-rules/:use', async (c) => {

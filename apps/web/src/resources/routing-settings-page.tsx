@@ -448,12 +448,6 @@ export function RoutingSettingsPage() {
                   onError: (error) => toastError(t('保存失败，请重试。'), error),
                 });
               }}
-              onReset={() => {
-                if (!live) return;
-                topModelMutations.reset.mutate(undefined, {
-                  onError: (error) => toastError(t('保存失败，请重试。'), error),
-                });
-              }}
             />
           )}
         </div>

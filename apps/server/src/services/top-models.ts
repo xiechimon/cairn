@@ -34,8 +34,3 @@ export function writeTopModels(db: Db, teamId: string, models: TopModel[]): TopM
     .run();
   return { models };
 }
-
-export function resetTopModels(db: Db, teamId: string): TopModelsEnvelope {
-  db.delete(teamTopModels).where(eq(teamTopModels.teamId, teamId)).run();
-  return { models: null };
-}

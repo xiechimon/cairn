@@ -102,7 +102,7 @@ test('top models list stored entries in order, marks a missing provider and adds
   await expect(menu.locator('.top-models-add-row', { hasText: 'GPT-5.2' })).toHaveCount(0);
 });
 
-test('top models start from the suggestion, save every edit as a whole list and reset with DELETE', async ({
+test('top models start from the suggestion, save every edit as a whole list and offer no reset', async ({
   page,
 }) => {
   const calls: string[] = [];
@@ -133,11 +133,6 @@ test('top models start from the suggestion, save every edit as a whole list and 
         calls.push(`PUT ${(stored as { modelId: string }[]).map((m) => m.modelId).join(',')}`);
         return json({ models: stored });
       }
-      if (method === 'DELETE') {
-        calls.push('DELETE');
-        stored = null;
-        return json({ models: null });
-      }
       return json({ models: stored });
     }
     return undefined;
@@ -165,11 +160,8 @@ test('top models start from the suggestion, save every edit as a whole list and 
   await page.mouse.up();
   await expect.poll(() => calls.at(-1)).toBe('PUT glm-5.3,claude-opus-5-5');
   await expect(rows.nth(0)).toHaveAttribute('data-top-model', 'glm-5.3');
-
-  await card.getByTestId('top-models-reset').click();
-  await expect.poll(() => calls.at(-1)).toBe('DELETE');
-  await expect(rows).toHaveCount(3);
-  await expect(rows.nth(0)).toHaveAttribute('data-top-model', 'claude-opus-5-5');
+  await expect(card).not.toContainText('恢复推荐');
+  await expect(card).not.toContainText('最多');
 });
 
 test('rules that cannot run say why, preview what the fix changes, and offer no fix without a default', async ({
