@@ -1596,7 +1596,6 @@ export const EN: Record<string, string> = {
   等你的事: 'Needs you',
   没有等你的事: 'Nothing is waiting on you',
   复盘: 'Retro',
-  外部动态: 'Outside developments',
   复盘建议: 'Retro suggestions',
   日报: 'Daily report',
   '昨天（{day}）的进展': 'Yesterday ({day})',
@@ -1611,11 +1610,9 @@ export const EN: Record<string, string> = {
     "The report couldn't be written. Yesterday's numbers: done {done} · merged {merged} · failed {failed}",
   '写日报时有 {n} 件等你，现在的情况看任务面板。':
     '{n## item was|# items were} waiting on you when the report was written; the Tasks panel shows the current state.',
-  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 2 条不用了」。':
-    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #2".',
+  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 1 条不用了」。':
+    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #1".',
   '来源：': 'Source: ',
-  '对应：{matches}': 'Matches: {matches}',
-  '建议动作：{action}': 'Suggested action: {action}',
   昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
   '这些来源太长，只读了后面的部分：{sources}。':
     'These sources were too long, so only their latest part was read: {sources}. ',

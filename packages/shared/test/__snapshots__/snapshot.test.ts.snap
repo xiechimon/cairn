@@ -8987,7 +8987,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "mcpConfig": "CAIRN_MCP_CONFIG",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
     "requireToken": "CAIRN_REQUIRE_TOKEN",
-    "researchIntakeProjectId": "CAIRN_RESEARCH_INTAKE_PROJECT_ID",
     "scheduling": "CAIRN_SCHEDULING",
     "server": "CAIRN_SERVER",
     "skillsDir": "CAIRN_SKILLS_DIR",

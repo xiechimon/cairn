@@ -15,7 +15,6 @@ import {
 import { newRecordId, newUuidv7 } from '../src/lib/ids.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { openCitationCheck } from '../src/services/research-citations.js';
-import { planResearchIntake } from '../src/services/research-intake.js';
 import {
   deliverStuckResearch,
   openStuckResearch,
@@ -24,6 +23,7 @@ import {
   stuckResearchWaitState,
 } from '../src/services/research-stuck.js';
 import { retryLessonsOf } from '../src/services/retry-lessons.js';
+import { createScheduler } from '../src/services/scheduler.js';
 import {
   bootServer,
   insertMachine,
@@ -346,7 +346,7 @@ describe('second review rejection', () => {
       .set({ teamId: 'other-team' })
       .where(eq(project.id, owner.projectId))
       .run();
-    expect(() => planResearchIntake(w.deps, null, Date.now())).toThrow(/project/);
+    await createScheduler(w.deps, { tickMs: 60_000 }).tick(Date.now());
     const released = w.s.db.select().from(step).where(eq(step.id, held.id)).get();
     expect(released?.holdUntil).toBeNull();
     expect(released?.prompt ?? '').toContain('没有在等待时间内回来');

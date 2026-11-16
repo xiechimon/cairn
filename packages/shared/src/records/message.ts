@@ -118,7 +118,6 @@ export const CHIEF_REPORT_KIND = 'chief_daily_report';
 export const CHIEF_REPORT_ROW_ID_PREFIX = 'chief-report-';
 export const CHIEF_REPORT_REF_MAX = 8;
 export const CHIEF_REPORT_RETRO_MAX = 5;
-export const CHIEF_REPORT_INTAKE_MAX = 5;
 export const INTAKE_SOURCE_KIND = 'intake';
 
 const chiefReportTodoRefSchema = z.object({
@@ -158,18 +157,6 @@ export const retroProposalSchema = z.object({
 });
 export type RetroProposal = z.infer<typeof retroProposalSchema>;
 
-export const intakeItemSchema = z.object({
-  id: z.string(),
-  url: z.string(),
-  claim: z.string().min(1).max(400),
-  matches: z.string().max(400),
-  action: z.string().max(400),
-  projectId: z.string(),
-  status: retroProposalStatusSchema,
-  todoId: z.string().nullable(),
-});
-export type IntakeItem = z.infer<typeof intakeItemSchema>;
-
 export const chiefReportLedgerSchema = z.object({
   finished: z.array(chiefReportTodoRefSchema),
   finishedCount: z.number().int(),
@@ -196,26 +183,17 @@ export const chiefReportContentSchema = z.object({
     questions: z.number().int(),
   }),
   retro: z.array(retroProposalSchema),
-  intake: z.array(intakeItemSchema).optional(),
   retroRan: z.boolean(),
   truncated: z.array(z.string()),
 });
 export type ChiefReportContent = z.infer<typeof chiefReportContentSchema>;
 
-export type ChiefReportSuggestion =
-  | { n: number; kind: 'retro'; item: RetroProposal }
-  | { n: number; kind: 'intake'; item: IntakeItem };
+export type ChiefReportSuggestion = { n: number; kind: 'retro'; item: RetroProposal };
 
 export function chiefReportSuggestions(
-  report: Pick<ChiefReportContent, 'retro' | 'intake'>,
+  report: Pick<ChiefReportContent, 'retro'>,
 ): ChiefReportSuggestion[] {
-  const retro = report.retro.map((item, i) => ({ n: i + 1, kind: 'retro' as const, item }));
-  const intake = (report.intake ?? []).map((item, i) => ({
-    n: retro.length + i + 1,
-    kind: 'intake' as const,
-    item,
-  }));
-  return [...retro, ...intake];
+  return report.retro.map((item, i) => ({ n: i + 1, kind: 'retro', item }));
 }
 
 export const CHIEF_TURN_STOPPED_KIND = 'chief_turn_stopped';

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { researchIntakeQuestion, researchPrompt } from '../src/records/research-prompts.js';
+import { researchPrompt } from '../src/records/research-prompts.js';
 
 describe('research search requirements', () => {
   test.each([1, 2] as const)(
@@ -19,17 +19,5 @@ describe('research search requirements', () => {
     expect(prompt).toContain('「需要你定的」');
     expect(prompt).toContain('用 ask_user 把这几项一次问完');
     expect(prompt).toContain('「已由你决定」');
-  });
-
-  test('an empty intake still requires checking dependency releases', () => {
-    const question = researchIntakeQuestion({ openThreadTitles: [], previousItems: [] });
-    expect(question).toContain('至少检查 5 个直接依赖');
-    expect(question).toContain('只有完成上述检索后');
-  });
-
-  test('the source audit goes before the final intake JSON block', () => {
-    const question = researchIntakeQuestion({ openThreadTitles: [], previousItems: [] });
-    const prompt = researchPrompt({ tier: 2, title: 'Daily intake', question });
-    expect(prompt).toContain('引用清单放在最终 JSON 代码块之前');
   });
 });

@@ -908,17 +908,25 @@ describe('router tools', () => {
       expect(statusOf(`${id}-p2`)?.status).toBe('draft');
     });
 
-    test('numbers retro suggestions first, then outside developments, as the document does', async () => {
+    test('numbers only retro suggestions and leaves historical intake drafts unchanged', async () => {
       const id = seedReport('2026-11-14');
       const todosBefore = H.s.db.select().from(todo).all().length;
-      const third = (await relay(
+      const intakeBefore = statusOf(`${id}-p1`);
+      await expectRejected(
+        relay('decide_report_suggestion', { n: 3, decision: 'accept' }, OWNER_TURN),
+        404,
+        /no suggestion 3/,
+      );
+      expect(statusOf(`${id}-p1`)).toEqual(intakeBefore);
+      expect(H.s.db.select().from(todo).all()).toHaveLength(todosBefore);
+      const first = (await relay(
         'decide_report_suggestion',
-        { day: '2026-11-14', n: 3, decision: 'accept' },
+        { day: '2026-11-14', n: 1, decision: 'accept' },
         OWNER_TURN,
       )) as { status: string; todoId: string };
-      expect(third).toMatchObject({ day: '2026-11-14', n: 3, status: 'accepted' });
-      expect(statusOf(`${id}-p1`)).toMatchObject({ status: 'accepted', todoId: third.todoId });
-      const created = H.s.db.select().from(todo).where(eq(todo.id, third.todoId)).get();
+      expect(first).toMatchObject({ day: '2026-11-14', n: 1, status: 'accepted' });
+      expect(statusOf(`${id}-p2`)).toMatchObject({ status: 'accepted', todoId: first.todoId });
+      const created = H.s.db.select().from(todo).where(eq(todo.id, first.todoId)).get();
       expect(created?.phase).toBe('todo');
       expect(created?.latestBuildId).toBeNull();
       expect(H.s.db.select().from(todo).all()).toHaveLength(todosBefore + 1);
@@ -926,7 +934,7 @@ describe('router tools', () => {
         await relay('decide_report_suggestion', { n: 2, decision: 'dismiss' }, OWNER_TURN),
       ).toMatchObject({ n: 2, status: 'dismissed', todoId: null });
       expect(statusOf(`${id}-p3`)?.status).toBe('dismissed');
-      expect(statusOf(`${id}-p2`)?.status).toBe('draft');
+      expect(statusOf(`${id}-p1`)).toEqual(intakeBefore);
     });
 
     test('a decided suggestion reports its state instead of deciding again', async () => {
@@ -945,7 +953,7 @@ describe('router tools', () => {
       await expectRejected(
         relay('decide_report_suggestion', { n: 4, decision: 'accept' }, OWNER_TURN),
         404,
-        /2026-11-14 report has no suggestion 4: .*"n":3,"kind":"intake","title":"outside claim"/,
+        /2026-11-14 report has no suggestion 4: \[{"n":1,"kind":"retro","title":"2026-11-14 first retro","status":"draft"},{"n":2,"kind":"retro","title":"2026-11-14 second retro","status":"draft"}\]/,
       );
       await relay(
         'decide_report_suggestion',
