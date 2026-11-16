@@ -22,10 +22,7 @@ import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js
 
 export const EN: Record<string, string> = {
   这里: 'this channel',
-  主频道: 'the main channel',
   '{channel} 频道': '{channel} channel',
-  '结果回到{place}': 'reports to {place}',
-  结果回到: 'Reports to',
   去看: 'Open',
   '去{channel}': 'Open {channel}',
   进度: 'Progress',
@@ -2272,13 +2269,10 @@ export const EN: Record<string, string> = {
   '{model} 的思考强度': 'Thinking level for {model}',
   '删除 {model}': 'Remove {model}',
   常用模型: 'Top models',
-  '你常用的模型，最多 {max} 个。': 'Your models, up to {max}.',
   '还没有常用模型。先在「模型路由」里接入服务商，再回来添加。':
     'No top models yet. Connect one under Model routing first, then add models here.',
   '还没有常用模型。点「添加模型」从已连接的服务商里挑。':
     'No top models yet. Use Add model to pick from your connected providers.',
-  '恢复成推荐的模型和顺序。': 'Go back to the suggested models and their order.',
-  恢复推荐: 'Reset to suggested',
   检查更新: 'Check for updates',
   '正在检查更新…': 'Checking for updates…',
   '已是最新版本 {version}': 'Up to date ({version})',
