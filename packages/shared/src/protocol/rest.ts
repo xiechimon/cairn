@@ -277,6 +277,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'SuperGrok device-code poll; stores the refresh token, not the access token',
   },
   {
+    method: 'POST',
+    path: '/api/teams/{id}/providers/oauth/openai-codex/device',
+    note: 'ChatGPT Codex device-code start; device_auth_id stays on the server',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/providers/oauth/openai-codex/device/poll',
+    note: 'ChatGPT Codex device-code poll; stores the sealed OAuth secret as the openai-codex provider',
+  },
+  {
     method: 'GET',
     path: '/api/oauth/callback',
     query: ['code', 'state', 'error'],
