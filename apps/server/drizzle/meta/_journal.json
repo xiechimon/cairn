@@ -1219,13 +1219,6 @@
       "when": 1794828602635,
       "tag": "0178_mcp_connector_github_app",
       "breakpoints": true
-    },
-    {
-      "idx": 179,
-      "version": "6",
-      "when": 1794828731832,
-      "tag": "0179_browser_secret_fill",
-      "breakpoints": true
     }
   ]
 }

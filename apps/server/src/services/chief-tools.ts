@@ -43,6 +43,7 @@ import { proposalCardId } from './action-proposals.js';
 import { executeAction } from './action-registry.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
+import { browserPasswordIds } from './browser-passwords.js';
 import {
   applyBuildStepAction,
   assertNamedMachineForNewTask,
@@ -833,11 +834,12 @@ export async function executeChiefTool(
       const existing = listSecrets(keysvc, ctx.teamId).find(
         (s) => s.name === name && s.projectId === projectId,
       );
+      const browser = browserPasswordIds(db, ctx.teamId);
       if (
         listSecrets(keysvc, ctx.teamId).some(
           (s) =>
             s.name === name &&
-            (s.delivery === 'http' || s.delivery === 'browser') &&
+            (s.delivery === 'http' || browser.has(s.id)) &&
             (s.projectId === null || projectId === null || s.projectId === projectId),
         )
       )
@@ -872,11 +874,8 @@ export async function executeChiefTool(
       const names = strArr(params, 'names');
       const projectId = optStr(params, 'projectId') ?? null;
       const all = listSecrets(keysvc, ctx.teamId);
-      if (
-        all.some(
-          (s) => s.delivery === 'browser' && (names.includes(s.name) || names.includes(s.id)),
-        )
-      )
+      const browser = browserPasswordIds(db, ctx.teamId);
+      if (all.some((s) => browser.has(s.id) && (names.includes(s.name) || names.includes(s.id))))
         throw new HttpError(400, 'browser passwords can only be deleted in settings');
       const deleted: string[] = [];
       for (const n of names) {

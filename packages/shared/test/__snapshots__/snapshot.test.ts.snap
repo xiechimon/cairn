@@ -6629,14 +6629,10 @@ exports[`body/envelope schema snapshots > setSecretBody > setSecretBody.json 1`]
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "browserOrigin": {
-      "type": "string",
-    },
     "delivery": {
       "enum": [
         "plaintext",
         "http",
-        "browser",
       ],
       "type": "string",
     },
@@ -12056,23 +12052,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "browserMachineId": {
-      "type": [
-        "string",
-        "null",
-      ],
-    },
-    "browserOrigin": {
-      "type": [
-        "string",
-        "null",
-      ],
-    },
     "delivery": {
       "enum": [
         "plaintext",
         "http",
-        "browser",
       ],
       "type": "string",
     },

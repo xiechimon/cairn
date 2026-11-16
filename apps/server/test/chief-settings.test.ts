@@ -247,7 +247,11 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).toContain('先后顺序用 dependsOn 表达');
     expect(prompt).toContain('唯一的例外是用户要你直接操作电脑');
     expect(prompt).toContain('同一回合最多重试 3 次');
-    expect(prompt).toContain('browser_act 的 fill_secret（ref 和 secret 名称）代填密码');
+    expect(prompt).toContain(
+      'browser_act 的 fill_secret（ref、secret 名称和当前网站 origin）代填密码',
+    );
+    expect(prompt).toContain('首次使用会在对话中发出网站授权卡');
+    expect(prompt).toContain('不必填写网站');
     expect(prompt).toContain('不要读取、索取或发送明文密码');
     expect(prompt).toContain('验证码、滑块、短信码、二次验证和设备确认仍用 request_takeover');
     expect(prompt).toContain(

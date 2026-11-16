@@ -426,7 +426,7 @@
           "apps/web/src/chief/research-report.tsx"
         ],
         "server": [
-          "apps/server/drizzle/0173_retire_daily_reports.sql"
+          "apps/server/drizzle/0177_retire_daily_reports.sql"
         ]
       },
       "reach": [
@@ -2168,8 +2168,8 @@
     {
       "id": "secrets",
       "name": "Secrets",
-      "summary": "Encrypted team and project secrets and readable environment variables, with exact-origin browser-only password filling.",
-      "states": "Empty and scoped lists; env values beside hidden secrets; filter, bulk add, edit and one-way conversion; browser-only checkbox reveals the login origin and automatic loopback machine binding.",
+      "summary": "Encrypted secrets and readable environment variables; first-use browser passwords ask for website approval in chat.",
+      "states": "Original add/edit form with name, value and secret checkbox; browser website approval pending, refused or approved; subsequent same-site fills; reapproval after password, website or machine changes.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2194,8 +2194,7 @@
       "reach": [
         "settings secrets",
         "click testid:resource-new",
-        "click label:机密",
-        "click label:只给浏览器用"
+        "click label:机密"
       ],
       "research": [
         "docs/research/1775-gateway-prior-art.md",

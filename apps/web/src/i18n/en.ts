@@ -702,8 +702,8 @@ export const EN: Record<string, string> = {
   '名称要符合环境变量格式（例如 MY_VAR）': 'Use a name like MY_VAR',
   密钥与环境变量: 'Secrets & env vars',
   批量添加: 'Bulk add',
-  '任务在执行机上运行时会拿到普通密钥和环境变量，项目里的同名条目优先。浏览器专用机密只在指定网站代填，值不会交给模型。':
-    'Tasks get ordinary secrets and env vars, with project entries taking priority. Browser-only secrets fill only on their website, without giving the value to the model.',
+  '任务在执行机上运行时会拿到这些密钥和环境变量。项目里的同名条目优先于团队条目。也可以让 Coordinator 添加机密，值不会进入对话。':
+    'Tasks get these secrets and environment variables when they run on a machine. Project entries override team entries with the same name. The Coordinator can also add secrets without the value entering the conversation.',
   还没有密钥或环境变量: 'No secrets or environment variables yet',
   '执行机跑任务时会拿到它们。': 'Machines get them when they run tasks.',
   按名称筛选: 'Filter by name',
@@ -2033,17 +2033,6 @@ export const EN: Record<string, string> = {
   '搜索没能完成，下面只是本地匹配的结果。': 'Search did not finish. These are local matches only.',
   正在加载对话: 'Loading the conversation',
   远程访问: 'Remote access',
-  只给浏览器用: 'Browser only',
-  登录网站: 'Login website',
-  '仅在这个网站代填，不会把密码交给模型。':
-    'Filled only on this website, without giving the password to the model.',
-  '更改浏览器用途或登录网站时，请重新填写密码。':
-    'Enter a new password when changing browser use or the login website.',
-  '填写完整来源地址，不带路径；HTTP 仅限本机回环地址。':
-    'Enter an exact origin without a path. HTTP is allowed only on loopback addresses.',
-  '绑定到 {name}': 'Bound to {name}',
-  '先打开 Coordinator 的浏览器，再保存本机网站的密码。':
-    'Open the Coordinator browser first, then save a password for a local website.',
 
   配对新设备: 'Pair a new device',
   '用手机扫描二维码，5 分钟内有效，只能用一次。':

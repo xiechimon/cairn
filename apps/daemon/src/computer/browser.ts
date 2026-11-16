@@ -5,6 +5,7 @@ import {
   LOGIN_SIGNALS,
   type LoginForm,
   type LoginSignal,
+  normalizeBrowserSecretOrigin,
 } from '@cairn/shared';
 import { z } from 'zod';
 import { cairnBlockPatterns, isCairnPage } from './host-screen-self.js';
@@ -697,7 +698,11 @@ export async function runBrowserTool(
       }
     }
     if (action.kind === 'fill_secret') {
-      const credential = options.browserSecrets?.find((saved) => saved.name === action.secret);
+      const credential = options.browserSecrets?.find(
+        (saved) =>
+          saved.name === action.secret &&
+          saved.origin === normalizeBrowserSecretOrigin(action.origin),
+      );
       if (credential === undefined)
         refuse('No saved browser password was authorized for this action.', started);
       try {

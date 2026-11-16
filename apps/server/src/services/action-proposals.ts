@@ -21,6 +21,7 @@ import {
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { BROWSER_PASSWORD_ACTION, validateBrowserPasswordApproval } from './browser-passwords.js';
 import { type ChiefDeps, enqueueChiefStep } from './chief.js';
 import {
   ACTION_PROPOSAL_CARD_MARKER,
@@ -372,6 +373,11 @@ function runTodoDelete(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: n
 }
 
 function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: number) {
+  if (row.actionId === BROWSER_PASSWORD_ACTION) {
+    validateBrowserPasswordApproval(tx, row.teamId, JSON.parse(row.inputJson));
+    journal(tx, row, 'run', now);
+    return;
+  }
   if (row.actionId === 'todo.delete') {
     runTodoDelete(deps, tx, row, now);
     return;

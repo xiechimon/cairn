@@ -4,6 +4,8 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import webpush from 'web-push';
 import {
+  actionProposal,
+  chiefMessage,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   computerCall as computerCallTable,
@@ -11,8 +13,11 @@ import {
   machine as machineTable,
   pushDelivery,
   pushSubscription,
+  secret,
   step as stepTable,
 } from '../src/db/schema.js';
+import { proposalCardId, sweepExpiredActionProposals } from '../src/services/action-proposals.js';
+import { askQuestionContentOf } from '../src/services/chief-questions.js';
 import {
   acquireComputerControl,
   releaseComputerControl,
@@ -26,8 +31,13 @@ import {
 } from '../src/services/machine-computer.js';
 import type { MachineDeps } from '../src/services/machine-deps.js';
 import { executeRelayToolCall } from '../src/services/machine-relay.js';
-import { createSecret } from '../src/services/secrets.js';
-import { bootServer, seedRoute, type TestServer } from './helpers.js';
+import {
+  createSecret,
+  deleteSecret,
+  openSecretGrants,
+  updateSecret,
+} from '../src/services/secrets.js';
+import { bootServer, req, seedRoute, type TestServer } from './helpers.js';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -62,7 +72,7 @@ function boot() {
         capabilities: {
           mcpServers: [],
           skills: [],
-          ...(id === 'omarchy' ? { computer: true, browser: true } : {}),
+          ...(id === 'omarchy' ? { computer: true, browser: true, browserSecretFill: true } : {}),
         },
       })
       .run();
@@ -136,6 +146,28 @@ function browser(name: 'browser_navigate' | 'browser_snapshot', toolCallId: stri
   return { computer: true as const, name, toolCallId, params: {} };
 }
 
+function fill(toolCallId = 'fill', origin = 'https://localhost:8443') {
+  return {
+    computer: true as const,
+    name: 'browser_act' as const,
+    toolCallId,
+    params: { actions: [{ kind: 'fill_secret', ref: 'e1', secret: 'LOGIN', origin }] },
+  };
+}
+
+function pendingApproval(s: TestServer) {
+  return s.db.select().from(actionProposal).where(eq(actionProposal.status, 'pending')).get()!;
+}
+
+function answer(s: TestServer, id: string, choice = '批准执行') {
+  return req(
+    s.app,
+    'POST',
+    `/api/teams/${s.team.id}/chief/threads/${THREAD}/questions/${proposalCardId(id)}/answer`,
+    { answers: [{ header: '网站授权', choices: [choice] }] },
+  );
+}
+
 function takeover(toolCallId = 'tk-1', reason = 'log in to the job board') {
   return {
     computer: true as const,
@@ -190,9 +222,8 @@ describe('login handoff gate', () => {
       teamId: s.team.id,
       name: 'LOGIN',
       value,
-      delivery: 'browser',
-      browserOrigin: 'https://example.com',
     });
+    await forwardComputerCall(deps, 'sidecar', 'step-a', fill());
     const forms = [
       value,
       encodeURIComponent(value),
@@ -231,49 +262,64 @@ describe('login handoff gate', () => {
     }
   });
 
-  test('saved-password dispatch requires a capable matching machine and stores only references', async () => {
+  test('first use asks once in chat without decrypting; owner approval permits same-site fills', async () => {
     const { s, deps, calls } = boot();
     const value = 'synthetic-login-password';
-    setHandoff(s, { state: 'running' });
-    const saved = createSecret(
-      { ...deps, userId: s.user.id },
-      {
-        teamId: s.team.id,
-        name: 'LOGIN',
-        value,
-        delivery: 'browser',
-        browserOrigin: 'https://localhost:8443',
-      },
+    const saved = createSecret(deps, { teamId: s.team.id, name: 'LOGIN', value });
+    const open = vi.spyOn(deps.box, 'open');
+    expect((await forwardComputerCall(deps, 'sidecar', 'step-a', fill())).text).toContain(
+      '尚未代填',
     );
-    const body = {
-      computer: true as const,
-      name: 'browser_act' as const,
-      toolCallId: 'fill',
-      params: { actions: [{ kind: 'fill_secret', ref: 'e1', secret: 'LOGIN' }] },
-    };
-    await expect(forwardComputerCall(deps, 'sidecar', 'step-a', body)).rejects.toThrow(
-      'Update this machine',
+    const proposal = pendingApproval(s);
+    await forwardComputerCall(deps, 'sidecar', 'step-a', fill('again'));
+    expect(pendingApproval(s).id).toBe(proposal.id);
+    expect(calls).toHaveLength(0);
+    expect(s.db.select().from(computerCallTable).all()).toEqual([]);
+    expect(computerRow(s).executionStepId).toBeNull();
+    expect(open).not.toHaveBeenCalled();
+    const card = askQuestionContentOf(
+      s.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, proposalCardId(proposal.id)))
+        .get()?.content,
     );
-    s.db
-      .update(machineTable)
-      .set({
-        capabilities: {
-          computer: true,
-          browser: true,
-          browserSecretFill: true,
-          mcpServers: [],
-          skills: [],
-        },
-      })
-      .where(eq(machineTable.id, 'omarchy'))
-      .run();
-    const pending = forwardComputerCall(deps, 'sidecar', 'step-a', body);
-    expect(calls[0]?.browserSecrets).toEqual([
-      { name: 'LOGIN', origin: 'https://localhost:8443', value },
-    ]);
+    expect(card?.questions[0]?.question).toContain('https://localhost:8443');
+    expect(card?.questions[0]?.question).toContain('之后在这台电脑的同一网站自动可用');
+    expect(card?.questions[0]?.question).not.toContain(value);
+    expect(openSecretGrants(deps, s.team.id, [saved.id], null)).toEqual({ values: {}, http: [] });
+    expect((await answer(s, proposal.id)).status).toBe(200);
+    for (const toolCallId of ['approved', 'same-site-again']) {
+      const pending = forwardComputerCall(deps, 'sidecar', 'step-a', fill(toolCallId));
+      const call = calls.at(-1)!;
+      expect(call.browserSecrets).toEqual([
+        { name: 'LOGIN', origin: 'https://localhost:8443', value },
+      ]);
+      expect(JSON.stringify(call.params)).not.toContain(value);
+      receiveComputerFrames(s.db, s.hub, 'omarchy', call.callId, [done(1)], s.secretBox);
+      await pending;
+    }
+    expect(s.db.select().from(actionProposal).all()).toHaveLength(1);
     expect(JSON.stringify(s.db.select().from(computerCallTable).all())).not.toContain(value);
-    receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1)], s.secretBox);
-    await pending;
+    expect(JSON.stringify(s.db.select().from(actionProposal).all())).not.toContain(value);
+  });
+
+  test('another website or machine and a rotated or deleted secret cannot reuse approval', async () => {
+    const { s, deps, calls } = boot();
+    const saved = createSecret(deps, {
+      teamId: s.team.id,
+      name: 'LOGIN',
+      value: 'synthetic-password',
+    });
+    await forwardComputerCall(deps, 'sidecar', 'step-a', fill());
+    await answer(s, pendingApproval(s).id);
+    await forwardComputerCall(
+      deps,
+      'sidecar',
+      'step-a',
+      fill('wrong-site', 'https://localhost:9443'),
+    );
+    expect(JSON.parse(pendingApproval(s).inputJson).origin).toBe('https://localhost:9443');
     s.db
       .update(computerTable)
       .set({ machineId: 'sidecar' })
@@ -293,11 +339,88 @@ describe('login handoff gate', () => {
       .where(eq(machineTable.id, 'sidecar'))
       .run();
     s.machineHub.subscribeMachine(s.team.id, 'sidecar', () => {});
-    expect(saved.browserMachineId).toBe('omarchy');
-    await expect(
-      forwardComputerCall(deps, 'sidecar', 'step-a', { ...body, toolCallId: 'other-machine' }),
-    ).rejects.toThrow('another machine');
-    expect(calls).toHaveLength(1);
+    await forwardComputerCall(deps, 'sidecar', 'step-a', fill('wrong-machine'));
+    expect(JSON.parse(pendingApproval(s).inputJson).machineId).toBe('sidecar');
+    s.db
+      .update(computerTable)
+      .set({ machineId: 'omarchy' })
+      .where(eq(computerTable.id, COMPUTER))
+      .run();
+    updateSecret(deps, s.team.id, saved.id, { value: 'synthetic-rotated' });
+    await forwardComputerCall(deps, 'sidecar', 'step-a', fill('rotated'));
+    expect(JSON.parse(pendingApproval(s).inputJson).revision).toBe(2);
+    expect(calls).toHaveLength(0);
+    deleteSecret(deps, s.team.id, saved.id);
+    expect((await answer(s, pendingApproval(s).id)).status).toBe(200);
+    expect(s.db.select().from(actionProposal).all().at(-1)?.status).toBe('failed');
+    await expect(forwardComputerCall(deps, 'sidecar', 'step-a', fill('deleted'))).rejects.toThrow(
+      'Save',
+    );
+  });
+
+  test.each(['refused', 'expired', 'stale'] as const)(
+    '%s approval does not authorize or expose the secret',
+    async (outcome) => {
+      const { s, deps, calls } = boot();
+      const saved = createSecret(deps, {
+        teamId: s.team.id,
+        name: 'LOGIN',
+        value: 'synthetic-password',
+      });
+      await forwardComputerCall(deps, 'sidecar', 'step-a', fill());
+      const pending = pendingApproval(s);
+      if (outcome === 'refused') await answer(s, pending.id, '不执行');
+      else if (outcome === 'expired') sweepExpiredActionProposals(s.db, pending.expiresAt + 1);
+      else {
+        updateSecret(deps, s.team.id, saved.id, { value: 'synthetic-rotated' });
+        await answer(s, pending.id);
+      }
+      await forwardComputerCall(deps, 'sidecar', 'step-a', fill('retry'));
+      expect(calls).toHaveLength(0);
+      expect(pendingApproval(s).id).not.toBe(pending.id);
+      expect(openSecretGrants(deps, s.team.id, [saved.id], null)).toEqual({ values: {}, http: [] });
+      expect((await answer(s, pending.id)).status).toBe(409);
+    },
+  );
+
+  test('only an owner card approval works; model text and an intact but superseded card do not', async () => {
+    const { s, deps, calls } = boot();
+    createSecret(deps, { teamId: s.team.id, name: 'LOGIN', value: 'synthetic-password' });
+    await forwardComputerCall(deps, 'sidecar', 'step-a', fill());
+    const pending = pendingApproval(s);
+    expect(
+      (
+        await req(s.app, 'POST', `/api/actions/proposals/${pending.id}/answer`, {
+          decision: 'allow-once',
+        })
+      ).status,
+    ).toBe(409);
+    await forwardComputerCall(deps, 'sidecar', 'step-a', fill('changed', 'https://example.com'));
+    expect((await answer(s, pending.id)).status).toBe(409);
+    expect(calls).toHaveLength(0);
+  });
+
+  test('environment variables, service credentials and old machines are refused before asking', async () => {
+    const { s, deps } = boot();
+    const saved = createSecret(deps, {
+      teamId: s.team.id,
+      name: 'LOGIN',
+      value: 'public-value',
+      kind: 'env',
+    });
+    await expect(forwardComputerCall(deps, 'sidecar', 'step-a', fill())).rejects.toThrow(
+      'workspace secret',
+    );
+    s.db.update(secret).set({ envSeal: null }).where(eq(secret.id, saved.id)).run();
+    s.db
+      .update(machineTable)
+      .set({ capabilities: { computer: true, browser: true, mcpServers: [], skills: [] } })
+      .where(eq(machineTable.id, 'omarchy'))
+      .run();
+    await expect(forwardComputerCall(deps, 'sidecar', 'step-a', fill())).rejects.toThrow(
+      'Update this machine',
+    );
+    expect(s.db.select().from(actionProposal).all()).toEqual([]);
   });
 
   test('a challenge on a browser call sets the handoff', async () => {

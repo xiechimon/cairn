@@ -3,7 +3,7 @@ import { cn } from 'cn';
 import { Ellipsis, Lock, ShieldEllipsis } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useApiMutations, useComputers, useProjects, useSecrets } from '../api/hooks.js';
+import { useApiMutations, useProjects, useSecrets } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
 import { relativeTime } from '../board/rel-time.js';
@@ -45,12 +45,6 @@ export function SecretsPage() {
   const secretsQ = useSecrets(teamId, live);
   const secrets = live ? (secretsQ.data ?? []) : (fixture.resources?.secrets ?? []);
   const mutations = useApiMutations(teamId);
-  const computersQ = useComputers(teamId, live);
-  const browsers = computersQ.data?.filter(
-    (computer) =>
-      computer.state === 'running' && computer.browserEnabled && computer.machine.online,
-  );
-  const browserMachineName = browsers?.length === 1 ? browsers[0]?.machine.name : undefined;
   const projectsQ = useProjects(teamId, live);
   const projects = (projectsQ.data ?? []).map((project) => ({
     id: project.id,
@@ -86,9 +80,6 @@ export function SecretsPage() {
           value: draft.value,
           kind: draft.secret ? 'secret' : 'env',
           ...(draft.projectId !== undefined ? { projectId: draft.projectId } : {}),
-          ...(draft.browserOrigin !== undefined
-            ? { delivery: 'browser' as const, browserOrigin: draft.browserOrigin }
-            : {}),
         },
         { ...done, onError: (error) => toastError(t('没能添加，请重试。'), error) },
       );
@@ -102,11 +93,6 @@ export function SecretsPage() {
           ...(draft.name !== editing.name ? { name: draft.name } : {}),
           ...(keepsSecretValue ? {} : { value: draft.value }),
           ...(draft.secret && editing.kind === 'env' ? { kind: 'secret' as const } : {}),
-          ...(draft.browserOrigin !== undefined
-            ? { delivery: 'browser' as const, browserOrigin: draft.browserOrigin }
-            : editing.delivery === 'browser'
-              ? { delivery: 'plaintext' as const }
-              : {}),
         },
       },
       { ...done, onError: (error) => toastError(t('没能保存，请重试。'), error) },
@@ -157,7 +143,7 @@ export function SecretsPage() {
     >
       <p className="m-0 mt-2 text-ui text-content-secondary">
         {t(
-          '任务在执行机上运行时会拿到普通密钥和环境变量，项目里的同名条目优先。浏览器专用机密只在指定网站代填，值不会交给模型。',
+          '任务在执行机上运行时会拿到这些密钥和环境变量。项目里的同名条目优先于团队条目。也可以让 Coordinator 添加机密，值不会进入对话。',
         )}
       </p>
       <QueryBoundary
@@ -232,9 +218,6 @@ export function SecretsPage() {
             const detail = [
               ...(scope !== null ? [t('仅 {name}', { name: scope })] : []),
               ...(secret.description != null ? [secret.description] : []),
-              ...(secret.delivery === 'browser' && secret.browserOrigin
-                ? [secret.browserOrigin]
-                : []),
             ].join(' · ');
             return (
               <ResourceRow key={secret.id} data-kind={isEnv ? 'env' : 'secret'}>
@@ -268,7 +251,7 @@ export function SecretsPage() {
                     ) : (
                       <span className="inline-flex items-center gap-1.5 text-ui text-content-tertiary">
                         <Lock aria-hidden strokeWidth={1.75} className="size-4 flex-none" />
-                        {secret.delivery === 'browser' ? t('只给浏览器用') : t('机密')}
+                        {t('机密')}
                       </span>
                     )}
                   </span>
@@ -337,12 +320,6 @@ export function SecretsPage() {
         editing={dialog?.editing ?? null}
         startSecret={dialog?.startSecret ?? false}
         projects={projects}
-        browserMachineName={browserMachineName}
-        boundMachineName={
-          computersQ.data?.find(
-            (computer) => computer.machine.id === dialog?.editing?.browserMachineId,
-          )?.machine.name
-        }
         defaultProjectId={searchParams.get('project')}
         onClose={() => setDialog(null)}
         onSave={save}

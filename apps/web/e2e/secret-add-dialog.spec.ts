@@ -19,6 +19,12 @@ test('topbar `新建` opens the add dialog with name, value and the `机密` che
   await expect(dialog.getByLabel('值', { exact: true })).toBeVisible();
   await expect(dialog.getByText('加密保存在 Cairn 服务器上。')).toBeVisible();
   await expect(dialog.getByRole('checkbox', { name: /机密/ })).not.toBeChecked();
+  await dialog.getByTestId('secret-kind').click();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(1);
+  await expect(dialog.getByLabel('登录网站', { exact: true })).toHaveCount(0);
+  await dialog.getByLabel('名称', { exact: true }).fill('LOGIN_PASSWORD');
+  await dialog.getByLabel('值', { exact: true }).fill('synthetic-password');
+  await expect(dialog.getByRole('button', { name: '添加', exact: true })).toBeEnabled();
 });
 
 test('family law: X, Escape and backdrop dismiss; panel clicks do not', async ({ page }) => {
@@ -65,45 +71,6 @@ test('a cancelled draft is gone when the dialog opens again', async ({ page }) =
   dialog = page.getByRole('dialog', { name: TITLE });
   await expect(dialog.getByLabel('名称', { exact: true })).toHaveValue('');
   await expect(dialog.getByLabel('值', { exact: true })).toHaveValue('');
-});
-
-test('browser-only is a secret option with a masked password and exact login origin', async ({ page }) => {
-  const dialog = await openDialog(page);
-  await expect(dialog.getByRole('checkbox', { name: '只给浏览器用', exact: true })).toHaveCount(0);
-  await dialog.getByLabel('名称', { exact: true }).fill('LOGIN_PASSWORD');
-  await dialog.getByTestId('secret-kind').click();
-  await expect(dialog.getByLabel('登录网站', { exact: true })).toHaveCount(0);
-  await dialog.getByRole('checkbox', { name: '只给浏览器用', exact: true }).click();
-  const password = dialog.getByLabel('值', { exact: true });
-  await expect(password).toHaveAttribute('type', 'password');
-  await password.fill('synthetic-password');
-  const origin = dialog.getByLabel('登录网站', { exact: true });
-  const submit = dialog.getByRole('button', { name: '添加', exact: true });
-  await origin.fill('https://login.example.com/path');
-  await expect(origin).toHaveAttribute('aria-invalid', 'true');
-  await expect(submit).toBeDisabled();
-  await origin.fill('https://login.example.com');
-  await expect(submit).toBeEnabled();
-  await origin.fill('http://localhost:3000');
-  await expect(submit).toBeDisabled();
-  await expect(dialog.getByText('先打开 Coordinator 的浏览器，再保存本机网站的密码。')).toBeVisible();
-  await dialog.getByTestId('secret-kind').click();
-  await expect(origin).toHaveCount(0);
-  await expect(submit).toBeEnabled();
-  await dialog.getByRole('button', { name: '取消', exact: true }).click();
-
-  await page.getByTestId('resource-row').filter({ hasText: 'STRIPE_API_KEY' }).getByTestId('secret-menu').click();
-  await page.getByTestId('secret-menu-edit').click();
-  const edit = page.getByRole('dialog', { name: '编辑 STRIPE_API_KEY', exact: true });
-  const keepValue = edit.getByText('原值已隐藏。留空则保持原值，填写则替换。');
-  await expect(keepValue).toBeVisible();
-  await edit.getByRole('checkbox', { name: '只给浏览器用', exact: true }).click();
-  await edit.getByLabel('登录网站', { exact: true }).fill('https://login.example.com');
-  await expect(keepValue).toHaveCount(0);
-  await expect(edit.getByRole('alert')).toHaveText('更改浏览器用途或登录网站时，请重新填写密码。');
-  await expect(edit.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
-  await edit.getByLabel('值', { exact: true }).fill('synthetic-replacement');
-  await expect(edit.getByRole('button', { name: '保存', exact: true })).toBeEnabled();
 });
 
 test('the empty page offers one add action, in the empty state', async ({ page }) => {

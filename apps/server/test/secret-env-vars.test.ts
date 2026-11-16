@@ -136,40 +136,6 @@ describe('environment variables next to secrets', () => {
     expect(row(env.id)?.updatedAt ?? 0).toBeGreaterThanOrEqual(before);
   });
 
-  test('browser-only conversion needs a replacement and cannot expose an env value', async () => {
-    const browser = { delivery: 'browser', browserOrigin: 'https://login.example.com' };
-    expect(
-      (
-        await req(s.app, 'POST', path(), {
-          name: 'LOGIN',
-          value: SENTINEL,
-          kind: 'env',
-          ...browser,
-        })
-      ).status,
-    ).toBe(400);
-    const env = createSecret(deps(), {
-      teamId: s.team.id,
-      name: 'LOGIN',
-      value: 'old',
-      kind: 'env',
-    });
-    const patch = (body: Record<string, unknown>) => req(s.app, 'PATCH', path(`/${env.id}`), body);
-    expect((await patch({ ...browser, kind: 'secret' })).status).toBe(400);
-    expect((await patch({ ...browser, value: SENTINEL })).status).toBe(400);
-    expect((await list())[0]).toMatchObject({ kind: 'env', value: 'old' });
-    const converted = await patch({ ...browser, kind: 'secret', value: SENTINEL });
-    expect(converted.status).toBe(200);
-    expect(await converted.json()).toMatchObject({ kind: 'secret', delivery: 'browser' });
-    expect((await list())[0]).not.toHaveProperty('value');
-    expect((await patch({ name: 'RENAMED_LOGIN' })).status).toBe(200);
-    expect((await patch({ kind: 'env' })).status).toBe(400);
-    expect((await patch({ delivery: 'plaintext' })).status).toBe(400);
-    expect((await patch({ delivery: 'plaintext', value: 'fresh' })).status).toBe(200);
-    expect((await list())[0]).toMatchObject({ kind: 'secret', delivery: 'plaintext' });
-    expect((await list())[0]).not.toHaveProperty('value');
-  });
-
   test('an env value edit keeps it an env; an old-binary value write makes it a secret for good', async () => {
     const env = createSecret(deps(), { teamId: s.team.id, name: 'E', value: 'a', kind: 'env' });
     updateSecret(deps(), s.team.id, env.id, { value: 'b' });

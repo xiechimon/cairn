@@ -59,7 +59,6 @@ export const patchSecretBodySchema = z.object({
   value: z.string().optional(),
   delivery: secretDeliverySchema.optional(),
   http: secretHttpPolicySchema.optional(),
-  browserOrigin: z.string().optional(),
 });
 
 export const createApiKeyBodySchema = apiKeyRecordSchema.extend({

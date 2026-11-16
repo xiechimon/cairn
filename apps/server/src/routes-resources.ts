@@ -917,20 +917,16 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     const body = parseWith(setSecretBodySchema, await jsonBody(c), 'body');
-    const record = createSecret(
-      { ...keysvc, userId: ctx.user.id, cairnOrigins: [requestOrigin(c)] },
-      {
-        teamId,
-        name: body.name,
-        description: body.description ?? null,
-        value: body.value,
-        projectId: body.projectId ?? null,
-        ...(body.kind !== undefined ? { kind: body.kind } : {}),
-        ...(body.delivery !== undefined ? { delivery: body.delivery } : {}),
-        ...(body.http !== undefined ? { http: body.http } : {}),
-        ...(body.browserOrigin !== undefined ? { browserOrigin: body.browserOrigin } : {}),
-      },
-    );
+    const record = createSecret(keysvc, {
+      teamId,
+      name: body.name,
+      description: body.description ?? null,
+      value: body.value,
+      projectId: body.projectId ?? null,
+      ...(body.kind !== undefined ? { kind: body.kind } : {}),
+      ...(body.delivery !== undefined ? { delivery: body.delivery } : {}),
+      ...(body.http !== undefined ? { http: body.http } : {}),
+    });
     return c.json(record, 201);
   });
 
@@ -938,14 +934,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     const body = parseWith(patchSecretBodySchema, await jsonBody(c), 'body');
-    return c.json(
-      updateSecret(
-        { ...keysvc, userId: ctx.user.id, cairnOrigins: [requestOrigin(c)] },
-        teamId,
-        c.req.param('sid'),
-        body,
-      ),
-    );
+    return c.json(updateSecret(keysvc, teamId, c.req.param('sid'), body));
   });
 
   app.delete('/api/teams/:id/secrets/:sid', (c) => {

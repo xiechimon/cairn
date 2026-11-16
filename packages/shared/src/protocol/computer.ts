@@ -51,6 +51,7 @@ export const browserSecretFillActionSchema = z.strictObject({
   kind: z.literal('fill_secret'),
   ref: z.string().min(1).max(64),
   secret: z.string().min(1).max(200),
+  origin: z.string().min(1).max(2048),
 });
 
 export const computerCallSchema = z.object({

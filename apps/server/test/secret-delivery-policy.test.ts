@@ -1,13 +1,6 @@
-import { chiefIdFormat, normalizeBrowserSecretOrigin } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { computer, machine, mailAccount, secret, user } from '../src/db/schema.js';
-import {
-  createSecret,
-  openSecretGrants,
-  openSecretValues,
-  updateSecret,
-} from '../src/services/secrets.js';
+import { mailAccount, secret, user } from '../src/db/schema.js';
+import { createSecret, openSecretValues, updateSecret } from '../src/services/secrets.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 let s: TestServer;
@@ -39,109 +32,6 @@ beforeEach(() => {
 });
 
 describe('secret delivery policy', () => {
-  test('browser passwords stay encrypted, metadata-only and outside task grants', async () => {
-    const res = await post({
-      name: 'LOGIN',
-      value: 'synthetic-password',
-      delivery: 'browser',
-      browserOrigin: 'https://login.example.com',
-    });
-    expect(res.status).toBe(201);
-    const record = (await res.json()) as { id: string };
-    expect(record).toMatchObject({
-      delivery: 'browser',
-      browserOrigin: 'https://login.example.com',
-      browserMachineId: null,
-    });
-    expect(JSON.stringify(record)).not.toContain('synthetic-password');
-    expect(openSecretGrants(deps(), s.team.id, [record.id], null)).toEqual({
-      values: {},
-      http: [],
-    });
-    const row = s.db.select().from(secret).where(eq(secret.id, record.id)).get();
-    expect(row?.valueCipher).not.toContain('synthetic-password');
-    expect((await patch(record.id, { delivery: 'plaintext' })).status).toBe(400);
-    expect((await patch(record.id, { delivery: 'plaintext', value: 'replacement' })).status).toBe(
-      200,
-    );
-    expect(
-      (await patch(record.id, { delivery: 'browser', browserOrigin: 'https://login.example.com' }))
-        .status,
-    ).toBe(400);
-  });
-
-  test.each([
-    'http://localhost:3000',
-    'https://localhost:8443',
-    'http://127.0.0.1:3000',
-    'https://[::1]',
-  ])('binds %s only to the saving owner’s running browser machine', async (browserOrigin) => {
-    const input = {
-      name: 'LOGIN',
-      value: 'synthetic-password',
-      delivery: 'browser',
-      browserOrigin,
-    };
-    expect((await post(input)).status).toBe(409);
-    s.db
-      .insert(machine)
-      .values({ id: 'browser-host', teamId: s.team.id, name: 'Login machine', online: true })
-      .run();
-    s.db
-      .insert(computer)
-      .values({
-        id: 'owner-browser',
-        teamId: s.team.id,
-        machineId: 'browser-host',
-        scopeKey: `chief:${chiefIdFormat(s.user.id, s.team.id)}`,
-        providerRef: 'synthetic',
-        state: 'running',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
-    expect((await post(input)).status).toBe(409);
-    s.db.update(computer).set({ browserEnabled: true }).run();
-    expect((await post(input)).status).toBe(409);
-    s.db.update(computer).set({ browserEnabled: false }).run();
-    s.db.update(machine).set({ browserOverride: true }).run();
-    const res = await post(input);
-    expect(res.status).toBe(201);
-    const saved = (await res.json()) as { id: string };
-    expect(saved).toMatchObject({ browserMachineId: 'browser-host' });
-    s.db.update(machine).set({ browserOverride: false }).run();
-    s.db.update(computer).set({ browserEnabled: true }).run();
-    expect((await patch(saved.id, { value: 'replacement' })).status).toBe(409);
-    expect((await patch(saved.id, { name: 'RENAMED_LOGIN' })).status).toBe(200);
-    expect(() => s.db.update(secret).set({ browserMachineId: null }).run()).toThrow();
-  });
-
-  test.each([
-    'http://example.com',
-    'http://127.1:3000',
-    'https://127.1',
-    'http://127.0.0.2:3000',
-    'https://192.0.2.1',
-    'https://[2001:db8::1]',
-    'https://sub.localhost',
-    'https://localhost.',
-    'https://example.com/path',
-    'https://user@example.com',
-    'https://*.example.com',
-  ])('refuses unsafe browser origin %s', async (browserOrigin) => {
-    expect(normalizeBrowserSecretOrigin(browserOrigin)).toBeNull();
-    expect(
-      (
-        await post({
-          name: 'LOGIN',
-          value: 'synthetic-password',
-          delivery: 'browser',
-          browserOrigin,
-        })
-      ).status,
-    ).toBe(400);
-  });
-
   test('a secret without a policy is plaintext at revision 1', async () => {
     const res = await post({ name: 'PLAIN', value: 'v' });
     expect(await res.json()).toMatchObject({

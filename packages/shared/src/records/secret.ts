@@ -3,7 +3,7 @@ import { isMailSecretName } from '../mail.js';
 import { WEB_BRAVE_KEY_SECRET, WEB_EXA_KEY_SECRET } from '../web-search.js';
 import { recordId } from './common.js';
 
-export const SECRET_DELIVERIES = ['plaintext', 'http', 'browser'] as const;
+export const SECRET_DELIVERIES = ['plaintext', 'http'] as const;
 export const secretDeliverySchema = z.enum(SECRET_DELIVERIES);
 export type SecretDelivery = z.infer<typeof secretDeliverySchema>;
 
@@ -110,8 +110,6 @@ export const secretRecordSchema = z.object({
   description: z.string().nullable(),
   delivery: secretDeliverySchema.optional(),
   http: secretHttpPolicySchema.nullish(),
-  browserOrigin: z.string().nullable().optional(),
-  browserMachineId: recordId.nullable().optional(),
   policyRevision: z.number().int().positive().optional(),
   kind: secretKindSchema.optional(),
   updatedAt: z.number().int().nullish(),
@@ -129,7 +127,6 @@ export const setSecretBodySchema = z.object({
   projectId: recordId.nullish(),
   delivery: secretDeliverySchema.optional(),
   http: secretHttpPolicySchema.optional(),
-  browserOrigin: z.string().optional(),
 });
 export type SetSecretBody = z.infer<typeof setSecretBodySchema>;
 

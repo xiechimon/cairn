@@ -107,9 +107,9 @@ Reach:
 
 ### daily-report
 
-**Daily report and retro** (shipped, centrality 1). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.
+**Read-only report history** (shipped, centrality 1). Existing report messages remain readable; daily generation, retries, push and suggestion decisions are retired.
 
-States: A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro suggestions and each one's state. Historical intake suggestions are hidden and cannot create tasks.
+States: Historical posted and unfinished reports, read-only draft suggestions and links to already-created tasks. No new report for new users. Historical intake suggestions remain hidden.
 
 Reach:
 
@@ -121,8 +121,8 @@ Reach:
 - Test ids in its code: `chief-report-sentence`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`
 - Research: [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [apps/web/DESIGN-RULES.md](../../../apps/web/DESIGN-RULES.md)
-- Backend design: **gap**: no design for report content, timing, quiet rules and retro proposal storage
-- Evidence: `apps/web/e2e/chief-daily-report.spec.ts`, `apps/server/test/chief-report.test.ts`, `apps/server/test/chief-digest.test.ts`, `apps/server/test/chief-router-tools.test.ts`
+- Backend design: **gap**: Retired: historical tables and records are retained; only active report-linked steps are stopped.
+- Evidence: `apps/web/e2e/chief-daily-report.spec.ts`, `apps/server/test/daily-report-retirement.test.ts`
 
 ### engine-view
 
@@ -968,16 +968,15 @@ Reach:
 
 ### secrets
 
-**Secrets** (shipped, centrality 3). Encrypted team and project secrets and readable environment variables, with exact-origin browser-only password filling.
+**Secrets** (shipped, centrality 3). Encrypted secrets and readable environment variables; first-use browser passwords ask for website approval in chat.
 
-States: Empty and scoped lists; env values beside hidden secrets; filter, bulk add, edit and one-way conversion; browser-only checkbox reveals the login origin and automatic loopback machine binding.
+States: Original add/edit form with name, value and secret checkbox; browser website approval pending, refused or approved; subsequent same-site fills; reapproval after password, website or machine changes.
 
 Reach:
 
 1. `settings secrets`
 2. `click testid:resource-new`
 3. `click label:机密`
-4. `click label:只给浏览器用`
 
 - Web routes: `/app/resources/secrets`
 - Settings: `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars)

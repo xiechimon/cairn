@@ -816,8 +816,6 @@ export const secret = sqliteTable(
     httpOrigin: text('httpOrigin'),
     httpHeader: text('httpHeader'),
     httpTemplate: text('httpTemplate'),
-    browserOrigin: text('browserOrigin'),
-    browserMachineId: text('browserMachineId'),
     policyRevision: integer('policyRevision').notNull().default(1),
     envSeal: text('envSeal'),
     updatedAt: epochMs('updatedAt'),
@@ -825,7 +823,7 @@ export const secret = sqliteTable(
   (t) => [
     check(
       'secret_delivery_policy',
-      sql`(${t.delivery} = 'http' AND ${t.httpOrigin} IS NOT NULL AND ${t.httpHeader} IS NOT NULL AND ${t.httpTemplate} IS NOT NULL AND ${t.browserOrigin} IS NULL AND ${t.browserMachineId} IS NULL) OR (${t.delivery} = 'plaintext' AND ${t.httpOrigin} IS NULL AND ${t.httpHeader} IS NULL AND ${t.httpTemplate} IS NULL AND ${t.browserOrigin} IS NULL AND ${t.browserMachineId} IS NULL) OR (${t.delivery} = 'browser' AND ${t.browserOrigin} IS NOT NULL AND ${t.projectId} IS NULL AND ${t.httpOrigin} IS NULL AND ${t.httpHeader} IS NULL AND ${t.httpTemplate} IS NULL AND ((${t.browserOrigin} GLOB 'http*://localhost' OR ${t.browserOrigin} GLOB 'http*://localhost:*' OR ${t.browserOrigin} GLOB 'http*://127.0.0.1' OR ${t.browserOrigin} GLOB 'http*://127.0.0.1:*' OR ${t.browserOrigin} LIKE 'http%://[::1]' OR ${t.browserOrigin} LIKE 'http%://[::1]:%') = (${t.browserMachineId} IS NOT NULL)))`,
+      sql`(${t.delivery} = 'http' AND ${t.httpOrigin} IS NOT NULL AND ${t.httpHeader} IS NOT NULL AND ${t.httpTemplate} IS NOT NULL) OR (${t.delivery} = 'plaintext' AND ${t.httpOrigin} IS NULL AND ${t.httpHeader} IS NULL AND ${t.httpTemplate} IS NULL)`,
     ),
   ],
 );

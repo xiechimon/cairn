@@ -10,10 +10,10 @@ import {
   type ComputerFrame,
   type ComputerRelayResult,
   type ComputerTool,
-  isBrowserLoopbackOrigin,
   isComputerBrowserTool,
   type MachineComputerFramesResponse,
   type MachineComputerRelayBody,
+  normalizeBrowserSecretOrigin,
   redactSecrets,
   type SecretBox,
   TAKEOVER_HANDED_BACK,
@@ -23,7 +23,20 @@ import type { Db } from '../db/client.js';
 import { chiefThread, computer, computerCall, machine, secret, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import {
+  APPROVE_CHOICE,
+  proposalCardId,
+  proposeAction,
+  REFUSE_CHOICE,
+} from './action-proposals.js';
+import {
+  BROWSER_PASSWORD_ACTION,
+  browserPasswordIds,
+  hasBrowserPasswordGrant,
+  requireBrowserPassword,
+} from './browser-passwords.js';
 import { NotFoundError } from './builds.js';
+import { announceQuestion } from './chief-questions.js';
 import { computerCallOwnerUserId } from './computer-access.js';
 import {
   COMPUTER_HANDOFF_POLL_MS,
@@ -241,7 +254,12 @@ export function receiveComputerFrames(
       ? tx
           .select({ cipher: secret.valueCipher })
           .from(secret)
-          .where(and(eq(secret.teamId, row.teamId), eq(secret.delivery, 'browser')))
+          .where(
+            and(
+              eq(secret.teamId, row.teamId),
+              inArray(secret.id, [...browserPasswordIds(tx, row.teamId)]),
+            ),
+          )
           .all()
           .flatMap(({ cipher }) => {
             if (cipher === null) return [];
@@ -871,35 +889,66 @@ export async function forwardComputerCall(
           .map((action) => {
             const parsed = browserSecretFillActionSchema.safeParse(action);
             if (!parsed.success)
-              throw new HttpError(400, 'fill_secret needs only kind, ref and a saved secret name');
+              throw new HttpError(
+                400,
+                'fill_secret needs kind, ref, a saved secret name and the current website origin',
+              );
             return parsed.data;
           })
       : [];
   const host = db.select().from(machine).where(eq(machine.id, target.machineId)).get();
   if (secretActions.length > 0 && host?.capabilities?.browserSecretFill !== true)
     throw new HttpError(409, 'Update this machine before filling saved browser passwords.');
+  const pendingApprovals: string[] = [];
   const browserRows = secretActions.map((action) => {
-    const row = db
-      .select()
+    const saved = db
+      .select({ id: secret.id })
       .from(secret)
       .where(
         and(
           eq(secret.teamId, thread.teamId),
           eq(secret.name, action.secret),
-          eq(secret.delivery, 'browser'),
           isNull(secret.projectId),
         ),
       )
       .get();
-    if (row?.browserOrigin == null || row.valueCipher === null)
-      throw new HttpError(400, 'Save this browser-only password in Secrets settings first.');
-    if (isBrowserLoopbackOrigin(row.browserOrigin) && row.browserMachineId !== target.machineId)
-      throw new HttpError(
-        409,
-        'This password belongs to another machine. Open the browser on that machine, or save a new password here.',
-      );
-    return { ...row, browserOrigin: row.browserOrigin, valueCipher: row.valueCipher };
+    if (saved === undefined)
+      throw new HttpError(400, 'Save this workspace secret in Secrets settings first.');
+    const row = requireBrowserPassword(db, thread.teamId, saved.id);
+    const origin = normalizeBrowserSecretOrigin(action.origin);
+    if (origin === null)
+      throw new HttpError(400, 'Use an exact HTTPS or loopback website origin, without a path.');
+    const binding = {
+      secretId: row.id,
+      revision: row.policyRevision,
+      origin,
+      machineId: target.machineId,
+    };
+    if (!hasBrowserPasswordGrant(db, thread.teamId, binding)) {
+      const proposal = proposeAction(db, {
+        teamId: thread.teamId,
+        actionId: BROWSER_PASSWORD_ACTION,
+        targetId: row.id,
+        input: binding,
+        threadId: thread.id,
+        scopeProjectId: stepRow.scopeProjectId,
+        card: [
+          {
+            header: '网站授权',
+            question: `允许在 ${origin} 代填机密 ${row.name}？仅限电脑 ${target.machineId}；之后在这台电脑的同一网站自动可用，密码不会交给模型。换网站、电脑或密码后会重新询问。`,
+            options: [{ label: APPROVE_CHOICE }, { label: REFUSE_CHOICE }],
+          },
+        ],
+      });
+      if (proposal.created) announceQuestion(deps, thread.id, proposalCardId(proposal.proposalId));
+      pendingApprovals.push(proposal.proposalId);
+    }
+    return { ...row, browserOrigin: origin };
   });
+  if (pendingApprovals.length > 0)
+    return {
+      text: `尚未代填。网站授权卡已发给用户（${pendingApprovals.join(', ')}），请等用户在卡片上批准。批准后先 browser_snapshot，再用新的 ref 重试；不要索取密码。`,
+    };
   const now = nowMs();
   const deadlineAt = now + computerDeadlineMs(tool, body.params);
   if (target.computerId !== null) {

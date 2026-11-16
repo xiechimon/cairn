@@ -74,7 +74,15 @@ const run = (provider: ComputerProvider, extra: Record<string, unknown> = {}) =>
     provider,
     'browser_act',
     {
-      actions: [{ kind: 'fill_secret', ref: 'e1', secret: 'LOGIN', ...extra }],
+      actions: [
+        {
+          kind: 'fill_secret',
+          ref: 'e1',
+          secret: 'LOGIN',
+          origin: 'https://login.example.com',
+          ...extra,
+        },
+      ],
     },
     {
       cairnOrigins: [],

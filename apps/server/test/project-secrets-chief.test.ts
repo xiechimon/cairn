@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'vitest';
+import { proposeAction } from '../src/services/action-proposals.js';
+import { BROWSER_PASSWORD_ACTION } from '../src/services/browser-passwords.js';
 import { createSecret, listSecrets, openSecretValues } from '../src/services/secrets.js';
 import { H, registerChiefHarness, relay } from './chief-harness.js';
 
@@ -16,8 +18,19 @@ describe('the Coordinator secret tools respect secret scope (D74 P5)', () => {
       teamId: H.teamId,
       name: 'LOGIN',
       value: 'synthetic-password',
-      delivery: 'browser',
-      browserOrigin: 'https://login.example.com',
+    });
+    proposeAction(H.s.db, {
+      teamId: H.teamId,
+      actionId: BROWSER_PASSWORD_ACTION,
+      targetId: saved.id,
+      input: {
+        secretId: saved.id,
+        revision: 1,
+        origin: 'https://login.example.com',
+        machineId: 'browser-host',
+      },
+      threadId: H.threadId,
+      scopeProjectId: null,
     });
     for (const projectId of [undefined, H.projectId]) {
       await expect(
