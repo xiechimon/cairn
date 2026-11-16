@@ -35,7 +35,7 @@ const QUIET_TRACK_CLS =
   'inline-flex h-7 w-fit items-center gap-1 bg-transparent p-0 text-foreground group-data-horizontal/tabs:h-7 pointer-coarse:h-11 pointer-coarse:group-data-horizontal/tabs:h-11';
 
 const QUIET_OPTION_CLS =
-  'rounded-(--cds-radius-md) px-2.5 text-meta data-active:bg-(--sidebar-active) dark:data-active:bg-(--sidebar-active) hover:bg-(--hover-1)';
+  'rounded-(--cds-radius-md) px-2.5 text-meta data-active:bg-(--sidebar-active) dark:data-active:border-transparent dark:data-active:bg-(--sidebar-active) group-data-[variant=default]/tabs-list:data-active:shadow-none hover:bg-(--hover-1)';
 
 const OPTION_ICON_CLS = 'w-7 px-0 pointer-coarse:w-11';
 
