@@ -967,15 +967,13 @@ export async function completeMcpConnectorOAuth(
   return id;
 }
 
-export function connectorSlugs(db: Db, teamId: string): Set<string> {
-  return new Set(
-    db
-      .select({ slug: mcpConnector.slug })
-      .from(mcpConnector)
-      .where(eq(mcpConnector.teamId, teamId))
-      .all()
-      .map((row) => row.slug),
-  );
+export function connectorSlugs(db: Db, teamId: string): string[] {
+  return db
+    .select({ slug: mcpConnector.slug })
+    .from(mcpConnector)
+    .where(eq(mcpConnector.teamId, teamId))
+    .all()
+    .map((row) => row.slug);
 }
 
 const TOKEN_PATH_REFRESH_LEAD_MS = 10 * 60_000;

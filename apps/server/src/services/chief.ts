@@ -190,7 +190,6 @@ export function coordinatorRecordOf(row: RouteProfile): AgentRecord {
     secrets: row.secrets,
     defaultSkill: row.defaultSkill,
     skillsAllowlist: row.skillsAllowlist,
-    mcpServers: row.mcpServers,
     machineId: row.machineId,
   };
 }

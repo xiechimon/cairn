@@ -43,7 +43,6 @@ test('a fresh install with a Claude Code Runner: the session merges without setu
       modelId: 'claude-sonnet-5-5',
       tools: [...AGENT_TOOL_DEFAULTS],
       secrets: [],
-      mcpServers: [],
       skillsAllowlist: null,
     });
   }

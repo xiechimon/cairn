@@ -109,17 +109,6 @@ export function capabilityGatePasses(
   return missingCapabilities(machineRow, agentRow).length === 0;
 }
 
-export function declaredMcpGaps(
-  machineRow: { capabilities: MachineCapabilities | null },
-  agentRow: { mcpServers: string[] },
-): string[] | null {
-  if (machineRow.capabilities === null) return null;
-  const installed = machineRow.capabilities.mcpServers;
-  return agentRow.mcpServers
-    .map((slug) => slug.toLowerCase())
-    .filter((slug) => !installed.includes(slug));
-}
-
 export function unassignedStepReason(kind: StepKind): string {
   if (kind === 'review') {
     return 'review step has no review routing rule: add a `review` routing rule in routing settings, then rerun the task.';
