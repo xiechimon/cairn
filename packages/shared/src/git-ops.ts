@@ -46,6 +46,7 @@ export interface GitOps {
   listBranches(dir: string): Promise<{ defaultBranch: string | null; branches: GitRefInfo[] }>;
   isAncestor(dir: string, ancestor: string, commit: string): Promise<boolean>;
   updateBranchRef(dir: string, branch: string, commit: string): Promise<void>;
+  denyPushTo(dir: string, branch: string): Promise<void>;
   httpBackend(req: GitCgiRequest): Promise<GitCgiResponse>;
 }
 

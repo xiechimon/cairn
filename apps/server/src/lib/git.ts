@@ -48,7 +48,7 @@ export function runGit(
 }
 
 const META_TIMEOUT_MS = 15_000;
-const DEFAULT_HEAD_BRANCH = 'main';
+export const DEFAULT_HEAD_BRANCH = 'main';
 
 export function isSafeRepoPath(path: string): boolean {
   if (path === '' || path.startsWith('/') || path.includes('\0')) return false;
@@ -201,6 +201,15 @@ export const systemGitOps: GitOps = {
       timeoutMs: META_TIMEOUT_MS,
     });
     if (r.code !== 0) throw new Error(`git update-ref failed: ${r.stderr}`);
+  },
+
+  async denyPushTo(dir, branch) {
+    if (!/^[\w./-]+$/.test(branch)) throw new Error(`unsafe branch: ${branch}`);
+    const r = await runGit(['config', 'receive.hideRefs', `refs/heads/${branch}`], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    if (r.code !== 0) throw new Error(`git config receive.hideRefs failed: ${r.stderr}`);
   },
 
   async resolveCommit(dir, ref) {

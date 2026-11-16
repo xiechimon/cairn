@@ -38,7 +38,7 @@ A request like "note this down" or "write me a weekly report template" has no de
 | P1 | Coordinator `create_todo` with a space `projectId` | owner turn (as quick lane L1); `personalOwnerId` equals the author of the cited owner segments | task | `400`, nothing written |
 | P2 | Claim | as P1; the clone URL is valid only for this build | step | not dispatched; task in needs-you |
 | P3 | `direct` landing | owner segments still valid; regular files only; no symlink, submodule or instruction path; size limit; base not moved | default branch, one commit, result index | refused; the report names each refused file and why |
-| P4 | `/git/*` (`routes-git-hosting.ts`) | a space repo answers only the build that is running its task; a push cannot move the default branch | none | `404`. The wider problem for ordinary hosted repos is #5161 |
+| P4 | `/git/*` (`routes-git-hosting.ts`) | a space repo answers only the step git key of a claimed step whose task is in that space; the repo sets `receive.hideRefs=refs/heads/main`, so a push cannot move the default branch | none | `401` without credentials (git's challenge, as for any hosted repo), then `404` for any other key; a push to `main` is rejected by git. The wider problem for ordinary hosted repos is #5161 |
 | P5 | Coordinator `space_files`, `space_read` (read-only tools) | the thread's owner owns the space | none | `404`; returned content is marked data |
 | P6 | Restore (web or Coordinator request) | session user owns the space | new commit, result index | `409` when the base moved; the owner retries |
 | P7 | Results panel list and search | session user owns the space | none | other members never see the files |
