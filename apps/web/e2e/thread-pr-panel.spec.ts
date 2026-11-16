@@ -228,14 +228,26 @@ test('a task row shows its age as a compact stamp', async ({ page }) => {
   await expect(row.locator('[data-slot="task-pr-line"]')).toHaveCount(0);
 });
 
-test('the same PR reaches the Tasks row and the finish dialog', async ({ page }) => {
+test('completing a delivered task keeps its PR visible without a finish dialog', async ({ page }) => {
   await setup(page, { rows: [prRow()] }, 'light', { tasks: [REVIEW_ENTRY] });
+  let task = { ...REVIEW_TASK };
+  await page.route('**/api/todos/todo-1', async (route) => {
+    if (route.request().method() === 'PATCH') {
+      expect(route.request().postDataJSON()).toEqual({ phase: 'done' });
+      task = { ...task, phase: 'done' };
+    }
+    await route.fulfill({ json: task });
+  });
   await page.goto('/app?pane=tasks');
   await expect(page.locator('[data-slot="task-pr-line"]')).toContainText('#42');
   await page.goto('/app?thread=todo-1');
   await page.getByTestId('side-chat').getByRole('button', { name: 'More actions…' }).click();
   await page.getByRole('menuitem', { name: 'Complete' }).click();
-  await expect(page.getByTestId('accept-dialog-pr').getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
+  await expect(status(page)).toContainText('Done');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(panel(page).getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
+  await page.getByTestId('side-chat').getByRole('button', { name: 'More actions…' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Complete', exact: true })).toBeDisabled();
 });
 
 test('the changes view does not leak into the next thread after closing', async ({ page }) => {

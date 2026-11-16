@@ -168,16 +168,6 @@ test('start, approve and retry put the next step in a chip above the composer; r
   }
 });
 
-test('finishing a reviewed thread asks to merge or keep the branch', async ({ page }) => {
-  await page.goto(`${HOME}&thread=home-c-review`);
-  await sideChat(page).getByRole('button', { name: '更多操作…' }).click();
-  await page.getByRole('menuitem', { name: '完成' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(sideChat(page)).toBeVisible();
-});
-
 test('the more menu holds archive and delete, and Escape closes the menu first', async ({
   page,
 }) => {

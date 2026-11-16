@@ -83,17 +83,6 @@ test('charter: `取消`/save charter stay in the viewport', async ({ page }) => 
   await expect(dialog.getByRole('button', { name: '保存章程' })).toBeInViewport();
 });
 
-test('accept(34): `取消`/done stay in the viewport', async ({ page }) => {
-  await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34');
-  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
-  await page.getByRole('menuitem', { name: '完成' }).click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await expectShellCapped(dialog);
-  await expect(dialog.getByRole('button', { name: '取消' })).toBeInViewport();
-  await expect(dialog.getByRole('button', { name: '完成' })).toBeInViewport();
-});
-
 test('schedules `新建定时` editor (900×420): capped to the viewport, its body scrolls inside to reach `取消`/save (#1037)', async ({
   page,
 }) => {
