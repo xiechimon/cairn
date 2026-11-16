@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "861333c6-25e6-4c08-962a-cd81f20eaca8",
+  "id": "303ca2c5-2314-4d4c-bd1c-cbad46d46e51",
   "prevId": "8875659f-5414-434a-ba9a-c586ffbefe35",
   "tables": {
     "action_journal": {
@@ -6816,20 +6816,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "browserOrigin": {
-          "name": "browserOrigin",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "browserMachineId": {
-          "name": "browserMachineId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "policyRevision": {
           "name": "policyRevision",
           "type": "integer",
@@ -6887,7 +6873,7 @@
       "checkConstraints": {
         "secret_delivery_policy": {
           "name": "secret_delivery_policy",
-          "value": "(\"secret\".\"delivery\" = 'http' AND \"secret\".\"httpOrigin\" IS NOT NULL AND \"secret\".\"httpHeader\" IS NOT NULL AND \"secret\".\"httpTemplate\" IS NOT NULL AND \"secret\".\"browserOrigin\" IS NULL AND \"secret\".\"browserMachineId\" IS NULL) OR (\"secret\".\"delivery\" = 'plaintext' AND \"secret\".\"httpOrigin\" IS NULL AND \"secret\".\"httpHeader\" IS NULL AND \"secret\".\"httpTemplate\" IS NULL AND \"secret\".\"browserOrigin\" IS NULL AND \"secret\".\"browserMachineId\" IS NULL) OR (\"secret\".\"delivery\" = 'browser' AND \"secret\".\"browserOrigin\" IS NOT NULL AND \"secret\".\"projectId\" IS NULL AND \"secret\".\"httpOrigin\" IS NULL AND \"secret\".\"httpHeader\" IS NULL AND \"secret\".\"httpTemplate\" IS NULL AND ((\"secret\".\"browserOrigin\" GLOB 'http*://localhost' OR \"secret\".\"browserOrigin\" GLOB 'http*://localhost:*' OR \"secret\".\"browserOrigin\" GLOB 'http*://127.0.0.1' OR \"secret\".\"browserOrigin\" GLOB 'http*://127.0.0.1:*' OR \"secret\".\"browserOrigin\" LIKE 'http%://[::1]' OR \"secret\".\"browserOrigin\" LIKE 'http%://[::1]:%') = (\"secret\".\"browserMachineId\" IS NOT NULL)))"
+          "value": "(\"secret\".\"delivery\" = 'http' AND \"secret\".\"httpOrigin\" IS NOT NULL AND \"secret\".\"httpHeader\" IS NOT NULL AND \"secret\".\"httpTemplate\" IS NOT NULL) OR (\"secret\".\"delivery\" = 'plaintext' AND \"secret\".\"httpOrigin\" IS NULL AND \"secret\".\"httpHeader\" IS NULL AND \"secret\".\"httpTemplate\" IS NULL)"
         }
       }
     },
@@ -7346,6 +7332,123 @@
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "step_usage": {
+      "name": "step_usage",
+      "columns": {
+        "stepId": {
+          "name": "stepId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "buildId": {
+          "name": "buildId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "input": {
+          "name": "input",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "output": {
+          "name": "output",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "cacheRead": {
+          "name": "cacheRead",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "cacheWrite": {
+          "name": "cacheWrite",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "mirroredTokens": {
+          "name": "mirroredTokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "step_usage_team_created_idx": {
+          "name": "step_usage_team_created_idx",
+          "columns": [
+            "teamId",
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "step_usage_build_model_idx": {
+          "name": "step_usage_build_model_idx",
+          "columns": [
+            "buildId",
+            "model"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "step_usage_stepId_model_pk": {
+          "columns": [
+            "stepId",
+            "model"
+          ],
+          "name": "step_usage_stepId_model_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },

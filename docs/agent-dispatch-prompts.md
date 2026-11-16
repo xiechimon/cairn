@@ -24,15 +24,7 @@ node scripts/dispatch-agent.mjs wait 1556-impl
 
 ## Lane completion (#2021)
 
-Do not continue on a banned model from the "Do not use" line of the "Model roles" section in `AGENTS.md` (including `deepseek-v4-flash`; `deepseek-v4.1-flash` remains allowed). If `ai-route` selects a banned model, stop and exit non-zero so the dispatcher can retry. If you abort without opening a PR (overlapping work, human decision required, or any other stop), exit the process with a non-zero status.
-
-## Dependent work on unmerged PRs (#2566, #3515)
-
-No stacked PRs by default. Measured on 81 merged PRs (`docs/research/pr-flow-speed-2026-11-09.md`): a clean small PR merges in about 13 minutes, while stacks were hand-merged up the chain (14 merge commits on one layer) and re-reviewed on every base push.
-
-- Branch every PR from `origin/main`. If your task depends on an open PR, wait for it to merge, or keep your work on a local branch and open the PR only after the base has merged and you have merged `origin/main` into your branch.
-- Never open a PR whose base is another PR's branch, and never point a PR at a lane branch by hand.
-- A stack that exists already is still guarded: a held lower layer blocks every layer above it from reaching `main`, and the queue admits an upper layer only with `Depends-On: #N` for the layer below (measured on 2026-11-02, #2566). Never unstack a layer to merge it.
+Do not continue on a banned model from the "Do not use" line of the "Model roles" section in `docs/ops/lane-workers.md` (including `deepseek-v4-flash`; `deepseek-v4.1-flash` remains allowed). If `ai-route` selects a banned model, stop and exit non-zero so the dispatcher can retry. If you abort without opening a PR (overlapping work, human decision required, or any other stop), exit the process with a non-zero status.
 
 ## Review convergence (#3515)
 
@@ -41,9 +33,8 @@ Add this block to every implementation brief:
 ```text
 Review convergence: for each Codex finding, name its bug class, find every other instance in this PR's diff and the entry paths it touches, and fix them all in one push. Reply on each thread with the class and the sites changed, then resolve it. P0/P1 must be fixed. A real P2/P3 outside this change: open or reuse an issue that tracks it, reply "valid, out of scope for this PR, tracked in #N", resolve the thread. Not a defect: reply with the reason, resolve. Push once per round. After round 3 with findings open, stop and hand the PR to the coordinator with the class list.
 Design first: for persisted state, a protocol or concurrency, write a one-page design listing every read and write path and get it reviewed before code.
-Queue: never post Mergify commands. If the PR is green but not queued after 10 minutes, read the "Mergify Merge Queue" check run and fix the unmet condition. Dequeued for a check that failed only in the queue draft: rerun that test locally on your branch; if it passes, merge origin/main and push so the PR requeues itself, and file the flake separately; if it fails, fix it.
-Stacking: branch from origin/main. If your task depends on an open PR, wait for it to merge or keep your work local until it does.
-Size: one self-contained change, under 400 changed lines outside generated files; split anything past 1000 before review; pr-size fails above 3000.
+Ship: follow the Ship steps in AGENTS.md. Push to main without force; if the push is rejected, rebase onto origin/main, re-run the affected checks and push again. Watch CI on your commit and fix it if it goes red. A failing test is not yours only after it fails on origin/main without your change.
+Size: one small, self-contained change.
 ```
 
 ## Accessing GitHub
@@ -60,9 +51,9 @@ Apply this checklist before reporting verification or handing off a delivery. Fo
 
 - Fixture screenshots cannot establish real-app behavior. Keep focused fixture UI and visual regression tests; label them as fixture evidence. Verify claims about the real app on an isolated live stack without `?scenario=`, using the relevant API, database or runtime observations alongside screenshots.
 - Stub-only runs cannot establish real-provider behavior. Keep deterministic stub regressions, including real-daemon protocol and orchestration checks; name the stubbed boundary and limit the claim to the exercised layers. A real-provider claim requires a real-provider run with recorded provider mode and runtime evidence; if credentials or access are unavailable, report that claim as unverified.
-- Make supporting evidence readable to reviewers. Committing artifacts under `docs/verify/<issue>/` is optional. Preserve ordinary reference links as references; embed image links and check that they are reachable.
+- Make supporting evidence readable: do not commit it to the repository; link or describe it where you report. Embed image links and check that they are reachable.
 - Mechanism claims require compiled or runtime evidence of the claimed effect, such as compiled CSS, observed animation state, actual wire payloads, runtime logs or schema snapshots. Source, configuration and installed dependencies alone do not establish that the mechanism took effect. Record the artifact and the assertion it supports.
-- Separate automated checks from review. `scripts/pr-evidence-gate.py` (required by the merge gate via `pr-evidence-not-green`) rejects missing or empty What/Proof/Review/Risk sections (legacy Verified aliases Proof; Upstream is optional), non-embedded image links, unreachable image URLs, fixture URLs whose query carries `scenario` (#1982), and screenshot embeds outside this repository's associated `docs/verify/<issue>/` archive (#1983). Negative controls live in `scripts/pr-evidence-gate.test.py` and `scripts/pr-evidence-archive.test.py`. The gate still does not judge evidence sufficiency, live-app origin, or real-provider execution. Stub-only runs stay a reviewer check until evidence carries machine-readable provider provenance; do not claim the gate detects them from a screenshot or a passing HTTP request.
+- Separate automated checks from review: no check judges evidence sufficiency, live-app origin or real-provider execution, so state them yourself and label stub-only runs as such.
 
 ## Codex
 

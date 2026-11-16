@@ -32,7 +32,7 @@ export const selfTests = [
   'scripts/ops/push-test.test.mjs',
   'scripts/ops/push-worker.test.mjs',
   'scripts/prepush.test.mjs',
-  'scripts/prepush-refuse-main.test.mjs',
+  'scripts/prepush-main-guard.test.mjs',
   'scripts/heavy-slots.test.mjs',
   'scripts/test-admission.test.mjs',
   'scripts/owned-process.test.mjs',
@@ -43,11 +43,6 @@ export const selfTests = [
   'scripts/doc-reader-tests.test.mjs',
   'scripts/epic-done.test.mjs',
   'scripts/agent-rules.test.mjs',
-  'scripts/pr-screens-harness.test.mjs',
-  'scripts/pr-screens-report.test.mjs',
-  'scripts/pr-screens-select.test.mjs',
-  'scripts/pr-screens-workflow.test.mjs',
-  'scripts/ops/merge-route-audit.test.mjs',
 ];
 
 const selfTest = ['node', '--test', ...selfTests];
@@ -147,7 +142,6 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
     ['node', 'scripts/ui-page-style-gate.mjs'],
-    ['python3', 'scripts/pr-evidence-archive.test.py'],
     ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
@@ -158,7 +152,6 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     ['node', 'scripts/escape-trace.mjs', 'validate-cases', 'integration/eval/review/cases'],
     ['node', '--test', 'scripts/review-escapes.test.mjs'],
     ['node', '--test', 'scripts/escape-eval-loop.test.mjs'],
-    ['python3', 'scripts/pr-evidence-gate.test.py'],
     ...(docPaths.length ? [['node', 'scripts/doc-reader-tests.mjs', ...docPaths]] : []),
   ];
   return mode === 'ci'

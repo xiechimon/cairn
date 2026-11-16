@@ -3,6 +3,8 @@ import { and, eq } from 'drizzle-orm';
 import { probeProvider } from '../coordinator/runtime/provider-probe.js';
 import { provider } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
+import type { FetchLike } from '../lib/github.js';
+import { providerAccessToken } from './provider-access-token.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
 
 export class ProviderTestLimiter {
@@ -25,7 +27,11 @@ export class ProviderTestLimiter {
 }
 
 export async function testProviderConnection(
-  deps: ProviderDeps & { fetch: typeof globalThis.fetch; timeoutMs?: number },
+  deps: ProviderDeps & {
+    fetch: typeof globalThis.fetch;
+    tokenFetch?: FetchLike;
+    timeoutMs?: number;
+  },
   input: { teamId: string; id: string; model?: string },
 ): Promise<ProviderTestResult> {
   const row = deps.db
@@ -37,7 +43,14 @@ export async function testProviderConnection(
   let apiKey: string | null = null;
   let reason: string | null;
   try {
-    apiKey = openProviderKey(deps, input.teamId, row.providerId)?.apiKey ?? null;
+    apiKey =
+      openProviderKey(deps, input.teamId, row.providerId)?.apiKey == null
+        ? null
+        : await providerAccessToken(
+            { db: deps.db, box: deps.box, fetch: deps.tokenFetch ?? globalThis.fetch },
+            input.teamId,
+            row.providerId,
+          );
     const sorted = [...row.models].sort(
       (a, b) =>
         (a.cost?.input ?? 0) +

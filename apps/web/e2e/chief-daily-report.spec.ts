@@ -118,8 +118,8 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     expect(decisions).toEqual([]);
   });
 
-  test('outside developments continue the numbering and show each decision', async ({ page }) => {
-    const retro = [1, 2, 3, 4, 5].map((n) => proposal(`rp-${n}`, `复盘 ${n}`));
+  test('old outside developments stay hidden while retro suggestions keep their numbering', async ({ page }) => {
+    const retro = [proposal('rp-1', '复盘 1')];
     await mockLive(page, {
       threads: [THREAD],
       messages: [
@@ -138,28 +138,17 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     });
     await page.goto('/app');
     const row = page.getByTestId('home-c').getByTestId('chief-report');
-    await expect(row.getByTestId('chief-report-sentence')).toContainText('有 8 条建议等你决定');
+    await expect(row.getByTestId('chief-report-sentence')).toContainText('有 1 条建议等你决定');
     await row.getByTestId('research-report-card').click();
     const doc = page.getByTestId('research-report-doc');
     const lists = doc.getByTestId('md-list-ordered');
-    await expect(lists).toHaveCount(2);
-    await expect(lists.nth(1)).toHaveAttribute('start', '6');
-    const intake = lists.nth(1).locator(':scope > li');
-    await expect(intake).toHaveCount(5);
-    await expect(intake.first()).toContainText('外部动态 in-1：新的并行评审做法 · 已建成线程');
-    await expect(intake.first().getByRole('link', { name: '已建成线程' })).toHaveAttribute(
-      'href',
-      '/app?thread=todo-in-1',
-    );
-    await expect(intake.nth(1)).toContainText('· 已忽略');
-    await expect(intake.nth(2)).toContainText('· 待你决定');
-    await expect(intake.nth(2)).toContainText('对应：#9 修复看板拖拽后计数不刷新');
-    await expect(intake.nth(2)).toContainText('建议动作：在评审步骤里试一次并行评审');
-    await expect(intake.nth(4).getByRole('link', { name: 'example.com' })).toHaveAttribute(
-      'href',
-      'https://example.com/posts/in-5',
-    );
-    await evidencePanelShot(page, 'daily-report-intake.png', page.getByRole('dialog'));
+    await expect(lists).toHaveCount(1);
+    await expect(lists.locator(':scope > li')).toHaveCount(1);
+    await expect(doc).toContainText('第 1 条不用了');
+    await expect(doc).not.toContainText('第 2 条不用了');
+    await expect(doc).not.toContainText('外部动态');
+    await expect(doc.getByRole('link', { name: 'example.com' })).toHaveCount(0);
+    await evidencePanelShot(page, 'daily-report-retired-intake.png', page.getByRole('dialog'));
   });
 
   test('a failed run says so in the chat line and the document has the raw numbers only', async ({

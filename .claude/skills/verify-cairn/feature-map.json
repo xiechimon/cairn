@@ -224,7 +224,7 @@
     {
       "id": "memory",
       "name": "Memory",
-      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. A design plans direct in-place edits of MEMORY.md and memory files.",
+      "summary": "Team and project memories the Coordinator reads, writes and injects into later turns and threads. Oversized indexes prompt normal-turn maintenance; no daily tidy pass runs. A design plans direct in-place edits of MEMORY.md and memory files.",
       "states": "Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.",
       "centrality": 1,
       "status": "shipped",
@@ -237,7 +237,7 @@
         ],
         "server": [
           "apps/server/src/services/memory.ts",
-          "apps/server/src/services/memory-consolidation.ts",
+          "apps/server/src/services/memory-documents.ts",
           "apps/server/src/routes-agents.ts"
         ]
       },
@@ -266,7 +266,7 @@
       "evidence": [
         "apps/web/e2e/chief-memory.spec.ts",
         "apps/web/test/memory-list.test.ts",
-        "apps/server/test/memory-consolidation.test.ts",
+        "apps/server/test/memory-callers-documents.test.ts",
         "apps/server/test/project-memory.test.ts",
         "integration/test/m4b-memory-e2e.test.ts"
       ]
@@ -413,8 +413,8 @@
     {
       "id": "daily-report",
       "name": "Daily report and retro",
-      "summary": "The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.",
-      "states": "A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro and intake suggestions and each one's state.",
+      "summary": "The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.",
+      "states": "A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro suggestions and each one's state. Historical intake suggestions are hidden and cannot create tasks.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -1505,7 +1505,7 @@
       "id": "first-run",
       "name": "First run",
       "summary": "The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.",
-      "states": "A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.",
+      "states": "A team with no projects lands on a full-screen two-step setup page (connect models for the Coordinator and tasks, confirm both models) with a language switch; it can be skipped, and once both steps are done it opens the Coordinator conversation. The first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1768,7 +1768,8 @@
           "/app/activity"
         ],
         "server": [
-          "/api/search"
+          "/api/search",
+          "/api/teams/:id/usage/daily"
         ]
       },
       "reach": [

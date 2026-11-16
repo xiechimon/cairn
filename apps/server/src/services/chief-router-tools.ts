@@ -279,7 +279,7 @@ function decideReportSuggestion(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: 
     suggestions.map((entry) => ({
       n: entry.n,
       kind: entry.kind,
-      title: tidy(entry.kind === 'retro' ? entry.item.title : entry.item.claim, TITLE_MAX),
+      title: tidy(entry.item.title, TITLE_MAX),
       status: entry.item.status,
     }));
   const entry = suggestions.find((candidate) => candidate.n === n);

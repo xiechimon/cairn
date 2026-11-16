@@ -239,9 +239,6 @@ export const EN: Record<string, string> = {
   'Coordinator 还缺模型': 'The Coordinator needs a model',
   '添加一个服务商，Coordinator 用不了 Claude Code 登录':
     'Add a provider; the Coordinator cannot use a Claude Code sign-in',
-  '还差第 1 步：接入模型': 'Step 1 is still open: connect models',
-  '还差第 2 步：确认模型': 'Step 2 is still open: confirm models',
-  '{role}：{model}': '{role}: {model}',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
   '因为你添加了 Anthropic API key': 'Because you added an Anthropic API key',
   '因为这是最早添加、Coordinator 能直接用的服务商':
@@ -258,21 +255,21 @@ export const EN: Record<string, string> = {
     'Cairn picked these two from the models you connected. Nothing is saved until you confirm, and you can change them in Settings later.',
   还没有能用的模型: 'No usable model yet',
   换一个: 'Change',
-  确认这两个模型: 'Confirm both models',
-  先把模型配好: 'Set up your models first',
-  'Cairn 在这台电脑上跑 Agent，用你自己的模型。做完下面两步就能建第一个项目。':
-    'Cairn runs agents on this computer with your own models. Finish the two steps below to create your first project.',
-  模型配好了: 'Your models are set',
-  '现在可以建第一个项目了。模型以后可以在设置里改。':
-    'You can create your first project now. You can change the models in Settings later.',
-  'Claude 订阅、API key 或本地模型，任选一个':
-    'A Claude subscription, an API key or a local model, whichever you have',
-  '已添加，Coordinator 和任务都能用': 'Added. The Coordinator and tasks can both use it',
+  'Claude 订阅、API key 或本地模型': 'A Claude subscription, an API key or a local model',
+  '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   '订阅已保存。这台电脑还没找到 Claude Code，装好它之后会自动用上。':
     'Subscription saved. Claude Code was not found on this computer; it will be used once you install it.',
   '因为你登录了 Claude 订阅，Coordinator 直接用它':
     'Because you signed in with a Claude subscription, the Coordinator uses it directly',
   '先跳过，去主页看看': 'skip for now and look around',
+  '欢迎使用 Cairn': 'Welcome to Cairn',
+  'Cairn 在这台电脑上跑 Agent，用你自己的模型。配好模型就能开始对话。':
+    'Cairn runs agents on this computer with your own models. Set them up and you can start chatting.',
+  接一个服务商就够: 'One provider is enough',
+  '选 Coordinator 和新任务用哪个模型': 'Pick the models for the Coordinator and new tasks',
+  '开始和 Coordinator 对话': 'Start chatting with the Coordinator',
+  两步做完就直接进入对话: 'Finish both steps and the conversation opens',
+  确认并开始对话: 'Confirm and start chatting',
   '建项目前要先把模型配好，还差第 1 步：接入模型。':
     'Set up your models before creating a project. Step 1 is still open: connect models.',
   '建项目前要先把模型配好，还差第 2 步：确认模型。':
@@ -285,7 +282,6 @@ export const EN: Record<string, string> = {
   接入模型: 'Connect models',
   'Coordinator 和任务都有模型': 'The Coordinator and tasks both have models',
   确认模型: 'Confirm models',
-  新建第一个项目: 'Create your first project',
   不急的话可以: 'No rush: ',
   '，下次打开 Cairn 时这页还在。': '; this page is here the next time you open Cairn.',
   去完成设置: 'Finish setup',
@@ -1236,14 +1232,40 @@ export const EN: Record<string, string> = {
   '手动输入 owner/repo': 'Enter owner/repo manually',
   // wayfinder #181 add-machine dialog family (r2 11b verbatim copy; the
   // command strings themselves stay untranslated — brand slots via BRAND)
-  '有条件时优先使用云主机：笔记本会休眠或断网，云主机常在线，构建更稳定。':
-    'Prefer a cloud host when you can: laptops sleep or drop off the network, while cloud hosts stay online and build more reliably.',
-  '当前地址只适用于这台电脑。添加另一台电脑前，请用 Tailscale 地址打开 Cairn，再复制命令。':
-    'This address only works on this computer. To add another computer, open Cairn at its Tailscale address before copying the command.',
-  '在待接入的执行机上执行以下命令。浏览器将打开登录页，授权团队 {team} 后执行机即可上线。此后它在后台常驻运行，无需保持终端开启。':
-    'Run the following commands on the Runner you want to connect. Your browser will open a sign-in page; once you authorize the team {team}, the Runner comes online. It then keeps running in the background — no need to keep the terminal open.',
-  '安装 CLI': 'Install the CLI',
-  在执行机上运行: 'Run on the Runner',
+  '让另一台电脑帮你跑任务。两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。':
+    'Let another computer run tasks for you. The two computers connect through Tailscale, and this computer has to stay on and online.',
+  '用 Tailscale 连通两台电脑': 'Connect the two computers with Tailscale',
+  '在另一台电脑上安装 CLI': 'Install the CLI on the other computer',
+  在另一台电脑上启动执行机: 'Start the Runner on the other computer',
+  '终端会打印一个批准链接。打开链接，确认把这台电脑加入团队 {team}，执行机就会上线。之后它在后台常驻运行，关掉终端也没关系。':
+    'The terminal prints an approval link. Open it and confirm adding that computer to the team {team}, and the Runner comes online. It then keeps running in the background, so you can close the terminal.',
+  '查不到 Tailscale 的状态。点「重新检查」再试。':
+    'Could not read the Tailscale status. Choose Check again to retry.',
+  '正在检查 Tailscale…': 'Checking Tailscale…',
+  '这台电脑还没装 Tailscale。下载安装并登录，另一台电脑也装上、登录同一个账号，装好后点「重新检查」。':
+    'Tailscale is not installed on this computer. Install it and sign in, install it on the other computer with the same account, then choose Check again.',
+  '下载 Tailscale →': 'Download Tailscale →',
+  'Tailscale 装好了，但还没登录或没连上。打开 Tailscale 登录并连接，再点「重新检查」。':
+    'Tailscale is installed but not signed in or not connected. Open Tailscale, sign in and connect, then choose Check again.',
+  'Tailscale 需要允许当前用户修改它的设置。在这台电脑的终端运行一次下面的命令，再点「重试」。':
+    'Tailscale has to let your user change its settings. Run this command once in a terminal on this computer, then choose Retry.',
+  '你的 Tailscale 网络还没开 HTTPS 证书。在 Tailscale 网页上开启后，回来点「重试」。':
+    'HTTPS certificates are off in your Tailscale network. Turn them on in Tailscale, then come back and choose Retry.',
+  '去 Tailscale 开启 →': 'Turn it on in Tailscale →',
+  '这台电脑的 Tailscale Serve 端口 `443`、`8443`、`10000` 都被别的服务占着。腾出一个再点「重试」。':
+    'Other services already use the Tailscale Serve ports `443`, `8443` and `10000` on this computer. Free one, then choose Retry.',
+  'Tailscale 已连接。点「开启」后，你 Tailscale 网络里的设备就能打开这台电脑上的 Cairn，打开时仍要登录 Cairn。':
+    'Tailscale is connected. Choose Turn on so devices in your Tailscale network can open Cairn on this computer; they still have to sign in to Cairn.',
+  '已开启，正在确认 {url} 能打开。第一次可能要等一分钟。':
+    'Turned on. Checking that {url} can be opened; the first time can take a minute.',
+  '{url} 现在打不开。确认 Tailscale 还连着，再点「重新检查」。':
+    'Cannot open {url} right now. Check that Tailscale is still connected, then choose Check again.',
+  '已连通，另一台电脑用这个地址连回来：{url}':
+    'Connected. The other computer reaches this one at {url}',
+  '没能开启 Tailscale 访问，请重试。': 'Could not turn on Tailscale access. Try again.',
+  '正在开启…': 'Turning on…',
+  '先在执行机页的「添加执行机」里用 Tailscale 连通这台电脑，命令会出现在这里。':
+    'First connect this computer with Tailscale under Add Runner on the Runners page; the commands then appear here.',
   '在云服务器上运行？改用 API key 注册':
     'Running on a cloud server? Register with an API key instead',
   '获取 API key →': 'Get an API key →',
@@ -1587,7 +1609,6 @@ export const EN: Record<string, string> = {
   等你的事: 'Needs you',
   没有等你的事: 'Nothing is waiting on you',
   复盘: 'Retro',
-  外部动态: 'Outside developments',
   复盘建议: 'Retro suggestions',
   日报: 'Daily report',
   '昨天（{day}）的进展': 'Yesterday ({day})',
@@ -1602,11 +1623,9 @@ export const EN: Record<string, string> = {
     "The report couldn't be written. Yesterday's numbers: done {done} · merged {merged} · failed {failed}",
   '写日报时有 {n} 件等你，现在的情况看任务面板。':
     '{n## item was|# items were} waiting on you when the report was written; the Tasks panel shows the current state.',
-  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 2 条不用了」。':
-    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #2".',
+  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 1 条不用了」。':
+    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #1".',
   '来源：': 'Source: ',
-  '对应：{matches}': 'Matches: {matches}',
-  '建议动作：{action}': 'Suggested action: {action}',
   昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
   '这些来源太长，只读了后面的部分：{sources}。':
     'These sources were too long, so only their latest part was read: {sources}. ',
@@ -1835,6 +1854,10 @@ export const EN: Record<string, string> = {
     'A newer xAI credential is already stored. This sign-in did not replace it.',
   '验证码已过期，请重试。': 'The code expired. Try again.',
   'xAI 登录失败，请重试。': 'xAI sign-in failed. Try again.',
+  'OpenAI Codex 登录被拒绝。': 'OpenAI Codex sign-in was denied.',
+  '已有更新的 OpenAI Codex 凭证，这次登录没有覆盖它。':
+    'A newer OpenAI Codex credential is already stored. This sign-in did not replace it.',
+  'OpenAI Codex 登录失败，请重试。': 'OpenAI Codex sign-in failed. Try again.',
   找不到这个项目: 'That project is not here',
   '它可能已被删除、改名，或你不在它所属的团队。':
     'It may have been deleted, renamed, or you may not be on its team.',
@@ -1960,6 +1983,8 @@ export const EN: Record<string, string> = {
   'Cron 表达式': 'Cron expression',
   '服务器按{timezone}计算 Cron。': 'Cron is evaluated by the server in {timezone}.',
   'Cron 需要 5 段：分 时 日 月 周。': 'Use five cron fields: minute hour day month weekday.',
+  'Cron 表达式有误': 'Fix the cron expression',
+  先选择任务: 'Pick a task first',
   从哪天开始每周重复: 'Day to repeat each week',
   '整点运行可能会晚几分钟开始。': 'Runs on the hour may start a few minutes late.',
   提示词: 'Saved prompt',

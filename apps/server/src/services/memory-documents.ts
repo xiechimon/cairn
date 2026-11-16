@@ -133,7 +133,7 @@ function result(row: Row) {
     ...page(row),
     ...(bounded && bounded.omitted > 0
       ? {
-          reminder: `Keep MEMORY.md to short one-line entries. Move detail into memory files, merge or drop stale lines; use memories to read the full index. ${bounded.omitted} lines exceed the load bound.`,
+          reminder: `${bounded.omitted} MEMORY.md lines exceed the load bound. During a normal turn, use memories to page through the full index, update_memory to merge or remove stale entries and move detail into files, and delete_memory for obsolete files. Do not start a background turn for this.`,
         }
       : {}),
   };

@@ -108,9 +108,9 @@ Reach:
 
 ### daily-report
 
-**Daily report and retro** (shipped, centrality 1). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.
+**Daily report and retro** (shipped, centrality 1). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.
 
-States: A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro and intake suggestions and each one's state.
+States: A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro suggestions and each one's state. Historical intake suggestions are hidden and cannot create tasks.
 
 Reach:
 
@@ -185,7 +185,7 @@ Reach:
 
 ### memory
 
-**Memory** (shipped, centrality 1). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. A design plans direct in-place edits of MEMORY.md and memory files.
+**Memory** (shipped, centrality 1). Team and project memories the Coordinator reads, writes and injects into later turns and threads. Oversized indexes prompt normal-turn maintenance; no daily tidy pass runs. A design plans direct in-place edits of MEMORY.md and memory files.
 
 States: Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.
 
@@ -200,7 +200,7 @@ Reach:
 - Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](../../../docs/research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](../../../docs/research/memory-inplace-edit-2026-11-09.md)
 - Frontend design: [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
 - Backend design: [docs/design/memory-backend.md](../../../docs/design/memory-backend.md), [docs/design/memory-inplace-edit.md](../../../docs/design/memory-inplace-edit.md) (not on main)
-- Evidence: `apps/web/e2e/chief-memory.spec.ts`, `apps/web/test/memory-list.test.ts`, `apps/server/test/memory-consolidation.test.ts`, `apps/server/test/project-memory.test.ts`, `integration/test/m4b-memory-e2e.test.ts`
+- Evidence: `apps/web/e2e/chief-memory.spec.ts`, `apps/web/test/memory-list.test.ts`, `apps/server/test/memory-callers-documents.test.ts`, `apps/server/test/project-memory.test.ts`, `integration/test/m4b-memory-e2e.test.ts`
 
 ### merge-gate
 
@@ -479,7 +479,7 @@ Reach:
 
 **First run** (shipped, centrality 2). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
 
-States: A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.
+States: A team with no projects lands on a full-screen two-step setup page (connect models for the Coordinator and tasks, confirm both models) with a language switch; it can be skipped, and once both steps are done it opens the Coordinator conversation. The first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.
 
 Reach:
 
@@ -489,7 +489,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `first-run-add-provider`, `first-run-confirm`, `first-run-pick-*`, `first-run-setup`, `first-run-step-*`
+- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `first-run-add-provider`, `first-run-confirm`, `first-run-pick-*`, `first-run-setup`, `first-run-skip`, `first-run-step-*`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
 - Backend design: **gap**: no design for checklist state, first-PR detection and the 10-minute path
@@ -507,7 +507,7 @@ Reach:
 
 - Web routes: `/app/machines/authorize`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: none
+- Test ids in its code: `tailscale-ready`
 - Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md)
 - Frontend design: **gap**: the add-machine dialog and authorize page have no design
 - Backend design: **gap**: no design for the browser enrollment handshake and its failure modes
@@ -1009,7 +1009,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: `A`, `D`, `M`, `N`, `R`, `S`, `U`
-- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `team-row`
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices

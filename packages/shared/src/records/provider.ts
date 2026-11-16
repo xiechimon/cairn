@@ -126,6 +126,10 @@ export const PROVIDER_XAI_PRESET = {
   oauthLabel: 'Sign in with SuperGrok or X Premium',
 } as const;
 
+export const PROVIDER_CODEX_PRESET = {
+  id: 'openai-codex',
+} as const;
+
 export const providerPresetSchema = z.object({
   id: z.string(),
   auth: z.enum(['api_key', 'oauth']),
@@ -177,3 +181,9 @@ export const xaiDevicePollResponseSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('expired') }),
 ]);
 export type XaiDevicePollResponse = z.infer<typeof xaiDevicePollResponseSchema>;
+
+export const codexDeviceStartResponseSchema = xaiDeviceStartResponseSchema;
+export type CodexDeviceStartResponse = XaiDeviceStartResponse;
+
+export const codexDevicePollResponseSchema = xaiDevicePollResponseSchema;
+export type CodexDevicePollResponse = XaiDevicePollResponse;

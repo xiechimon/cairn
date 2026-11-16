@@ -226,18 +226,8 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   assert.match(changes, /node scripts\/prepush.mjs --has-sidecar/);
   assert.match(changes, /has_sidecar=true/);
   assert.match(changes, /\|\| has_sidecar=true/);
-  assert.match(changes, /tested-in-queue: \$\{\{ steps.classify.outputs.tested-in-queue \}\}/);
-  assert.match(changes, /^ {10}tested_in_queue=false$/m);
-  assert.match(changes, /elif \[ "\$GITHUB_REF" = refs\/heads\/main \]; then/);
-  assert.ok(
-    changes.includes(
-      'tested_in_queue=$(node scripts/ops/merge-route-audit.mjs landed $commits) || tested_in_queue=false',
-    ),
-  );
-  const warm = jobs.get('warm-caches');
-  assert.match(warm ?? '', /^ {4}if: needs.changes.outputs.tested-in-queue == 'true'$/m);
-  assert.ok(warm.includes('pnpm install --frozen-lockfile'));
-  assert.ok(warm.includes('uses: ./.github/actions/playwright-chromium\n'));
+  assert.doesNotMatch(changes, /tested-in-queue|merge-route-audit/);
+  assert.equal(jobs.get('warm-caches'), undefined);
   assert.match(changes, /fetch-depth: 0/);
   assert.doesNotMatch(readFileSync('.github/workflows/ci.yml', 'utf8'), /^ {4}paths(?:-ignore)?:/m);
   for (const name of ['vitest-light', 'vitest-integration', 'pack-smoke', 'dead-class-gate']) {
@@ -620,7 +610,6 @@ test('code changes keep suites in CI and out of local plans', () => {
         ['node', 'scripts/ui-debt-gate.mjs'],
         ['node', 'scripts/ui-drift-gate.mjs'],
         ['node', 'scripts/ui-page-style-gate.mjs'],
-        ['python3', 'scripts/pr-evidence-archive.test.py'],
         ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
         ['pnpm', 'lint'],
         ['pnpm', 'typecheck'],
@@ -631,7 +620,6 @@ test('code changes keep suites in CI and out of local plans', () => {
         ['node', 'scripts/escape-trace.mjs', 'validate-cases', 'integration/eval/review/cases'],
         ['node', '--test', 'scripts/review-escapes.test.mjs'],
         ['node', '--test', 'scripts/escape-eval-loop.test.mjs'],
-        ['python3', 'scripts/pr-evidence-gate.test.py'],
       ]);
     }
   }

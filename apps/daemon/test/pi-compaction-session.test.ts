@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import type { StepEvent } from '@cairn/shared';
+import { parseOtlpTarget, stepOtelContext } from '@cairn/shared/otel';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
+import { shutdownDaemonOtel } from '../src/backend/otel.js';
 import { createPiBackend } from '../src/backend/pi.js';
 import { testTempDir } from './test-temp-dir.js';
 
@@ -67,9 +69,18 @@ test('real worker session compacts a full context through Responses and finishes
   const summarySizes: number[] = [];
   const normalBodies: string[] = [];
   const logs: string[] = [];
+  const spans: { name: string; attributes: { key: string; value: unknown }[] }[] = [];
   const server = createServer(async (req, res) => {
     let raw = '';
     for await (const chunk of req) raw += chunk;
+    if (req.url === '/v1/traces') {
+      const payload = JSON.parse(raw) as {
+        resourceSpans: { scopeSpans: { spans: (typeof spans)[number][] }[] }[];
+      };
+      spans.push(...payload.resourceSpans.flatMap((r) => r.scopeSpans.flatMap((s) => s.spans)));
+      res.end('{}');
+      return;
+    }
     const body = JSON.parse(raw) as { input: unknown[]; max_output_tokens?: number };
     const summary = raw.includes('You are a context summarization assistant.');
     if (summary) {
@@ -108,6 +119,11 @@ test('real worker session compacts a full context through Responses and finishes
   });
   const handle = await backend.continueSession(manager.getSessionId(), {
     cwd: directory,
+    telemetry: stepOtelContext(
+      'compaction-build',
+      'compaction-step',
+      parseOtlpTarget({ CAIRN_OTEL_ENDPOINT: `http://127.0.0.1:${address.port}` })!,
+    ),
     systemPrompt: 'Finish the assigned task.',
     modelId: 'ceiling',
     prompt: 'Finish now.',
@@ -139,6 +155,20 @@ test('real worker session compacts a full context through Responses and finishes
     expect(normalBodies[0]).toContain('Finish the task after compaction.');
     expect(normalBodies[0]).not.toContain('x'.repeat(1_000));
     expect(readFileSync(file, 'utf8')).toContain('"type":"compaction"');
+    await vi.waitFor(() =>
+      expect(spans.filter((span) => span.name.startsWith('chat '))).toHaveLength(2),
+    );
+    const chats = spans.filter((span) => span.name.startsWith('chat '));
+    const summaryAttrs = Object.fromEntries(chats[0]!.attributes.map((a) => [a.key, a.value]));
+    expect(summaryAttrs['gen_ai.request.model']).toEqual({ stringValue: 'ceiling' });
+    expect(summaryAttrs['gen_ai.usage.input_tokens']).toEqual({ intValue: 100 });
+    expect(summaryAttrs['gen_ai.usage.output_tokens']).toEqual({ intValue: 10 });
+    expect(summaryAttrs['langfuse.observation.input']).toBeUndefined();
+    expect(summaryAttrs['langfuse.observation.output']).toBeUndefined();
+    const mainAttrs = Object.fromEntries(chats[1]!.attributes.map((a) => [a.key, a.value]));
+    expect(JSON.stringify(mainAttrs['langfuse.observation.output'])).toContain(
+      'Task completed after recovery.',
+    );
     console.info(
       JSON.stringify({
         summarySizes,
@@ -149,6 +179,7 @@ test('real worker session compacts a full context through Responses and finishes
     );
   } finally {
     await handle.stop();
+    await shutdownDaemonOtel();
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

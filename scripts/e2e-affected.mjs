@@ -88,7 +88,7 @@ const shard = argv.find((a) => a.startsWith('--shard='))?.slice('--shard='.lengt
 
 if (argv.includes('--check-coverage')) {
   const prefixes = [...FILE_RULES.values(), ...DIR_RULES.map((rule) => rule.specs)].flat();
-  prefixes.push('a11y-axe', 'gallery-snapshots', ...SHARED_SURFACE_ONLY);
+  prefixes.push('a11y-axe', ...SHARED_SURFACE_ONLY);
   const specNames = (explicit.length > 0 ? explicit : listSpecs()).map((path) => basename(path));
   const notSpecs = specNames.filter((name) => !name.endsWith('.spec.ts'));
   const missing = specNames.filter(

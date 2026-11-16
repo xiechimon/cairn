@@ -81,3 +81,11 @@ One secret-free declarative profile renders into each harness's native files, pe
 - `unified` with `skills` enabled serves `skills` and not `mcpDefinitions`; `paused` and `independent` serve nothing regardless of the stored capabilities.
 - An undeclared key in a patch body is rejected; an unknown mode, capability or target is rejected; an empty patch is rejected.
 - `upsertHarnessProfile` keeps one row per team and increments `version`.
+
+## Agent rules for this feature
+
+- It is off by default and stays testable that way: a team with no `harness_profile` row serves nothing, and a test proves it. Never gate it on `flag()`, whose absent value is on for the owner.
+- A profile holds no secret value: server names, transports, commands, URLs and environment-variable names only. A strict schema rejects anything else, and a new field needs a reason it cannot carry a credential.
+- A renderer that does not understand a field, or a harness version whose schema is unverified, stops the apply and names the field. Silent loss counts as a defect.
+- Apply never overwrites content it does not manage, never resolves a conflict by recency, and reads the file back after writing.
+- Any machine-level manifest or apply path touches `apps/server/src/routes-machine.ts` or `apps/server/src/services/machine*.ts`. Those are security surfaces and merge under Merge routes.

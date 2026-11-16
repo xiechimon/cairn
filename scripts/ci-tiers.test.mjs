@@ -73,33 +73,9 @@ const events = {
     login: 'xiechimon',
     head: 'C1/ci-tiers',
   }),
-  'merge-queue draft': githubContext({
-    event: 'pull_request',
-    draft: true,
-    login: 'mergify[bot]',
-    head: 'mergify/merge-queue/0123456789abcdef',
-  }),
-  'non-draft PR from a mergify branch': githubContext({
-    event: 'pull_request',
-    draft: false,
-    login: 'mergify[bot]',
-    head: 'mergify/merge-queue/0123456789abcdef',
-  }),
-  'draft PR from a mergify branch by a person': githubContext({
-    event: 'pull_request',
-    draft: true,
-    login: 'xiechimon',
-    head: 'mergify/merge-queue/0123456789abcdef',
-  }),
-  'mergify draft on another branch': githubContext({
-    event: 'pull_request',
-    draft: true,
-    login: 'mergify[bot]',
-    head: 'mergify/bp/main/pr-1',
-  }),
   'push to main': githubContext({ event: 'push' }),
 };
-const fullTier = new Set(['merge-queue draft', 'push to main']);
+const fullTier = new Set(['push to main']);
 
 function plan(github, hasCode, webUi = 'false') {
   const changes = { 'needs.changes.outputs.has-code': hasCode };
@@ -146,7 +122,7 @@ function gatePasses(scenarios) {
   return statuses.map((status) => status === '0');
 }
 
-test('the full 4-shard e2e runs exactly on merge-queue drafts and pushes', () => {
+test('the full 4-shard e2e runs exactly on pushes', () => {
   assert.ok(tierExpression);
   assert.match(job('e2e'), /shard: \[1, 2, 3, 4\]/);
   assert.match(job('e2e'), /run: pnpm prepush --e2e-shard \$\{\{ matrix.shard \}\}\/4/);
@@ -195,7 +171,7 @@ function expectedGate(tier, hasCode, e2e, affected) {
 test('e2e-gate passes only when the tier it picked ran and succeeded', () => {
   assert.match(job('e2e-gate'), /^ {4}needs: \[changes, e2e, e2e-affected\]$/m);
   assert.match(job('e2e-gate'), /^ {4}if: always\(\)$/m);
-  assert.doesNotMatch(job('e2e-gate'), /uses:|checkout|continue-on-error|mergify/);
+  assert.doesNotMatch(job('e2e-gate'), /uses:|checkout|continue-on-error/);
   const outcomes = ['success', 'failure', 'cancelled'];
   const scenarios = [];
   for (const [name, github] of Object.entries(events))

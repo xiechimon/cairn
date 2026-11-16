@@ -19,8 +19,8 @@ usage() {
 usage: deploy-self.sh <40-hex sha on origin/main> | --recover
 
 Deploys one green main commit to this host's cairn checkout and user units, with rollback.
-  1. refuses a SHA not on origin/main, without every required check green, while autonomy
-     is paused, or whose pnpm-workspace.yaml allows a new install script (exit 2)
+  1. refuses a SHA not on origin/main, without every required check green, or whose
+     pnpm-workspace.yaml allows a new install script (exit 2)
   2. respects $CAIRN_DEPLOY_STATE/hold; daemon changes pause claims with a durable lease
      and drain within CAIRN_DEPLOY_STEP_WAIT_SECONDS (exit 75 on timeout), always resuming;
      server-only changes pause claims the same way and wait up to
@@ -500,11 +500,11 @@ assert_deployable() {
   git -C "$CHECKOUT" cat-file -e "$TARGET^{commit}" 2>/dev/null || refuse "$TARGET is not on origin/main"
   git -C "$CHECKOUT" merge-base --is-ancestor "$TARGET" origin/main || refuse "$TARGET is not on origin/main"
 
-  local paused
-  paused="$(gh issue list -R "$REPO" --label autonomy-paused --state open --json number --jq length)"
-  [ "$paused" = 0 ] || refuse "an autonomy-paused issue is open"
-
-  local checks name
+  local ci checks name
+  ci="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=$TARGET&per_page=1" \
+    --jq '.workflow_runs[0] | [.head_sha, .head_branch, .event, .status, .conclusion] | @tsv')" ||
+    refuse "cannot read main push CI for $TARGET"
+  [ "$ci" = "$TARGET"$'\tmain\tpush\tcompleted\tsuccess' ] || refuse "main push CI is not successful on $TARGET"
   checks="$(gh api "repos/$REPO/commits/$TARGET/check-runs?per_page=100" --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')"
   for name in $REQUIRED_CHECKS; do
     grep -qxF "$name"$'\t'success <<<"$checks" || refuse "required check $name is not green on $TARGET"

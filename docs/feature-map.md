@@ -231,7 +231,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### daily-report
 
-**Daily report and retro** (shipped). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.
+**Daily report and retro** (shipped). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.
 
 - Research: [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: [apps/web/DESIGN-RULES.md](../apps/web/DESIGN-RULES.md)
@@ -263,7 +263,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### memory
 
-**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. A design plans direct in-place edits of MEMORY.md and memory files.
+**Memory** (shipped). Team and project memories the Coordinator reads, writes and injects into later turns and threads. Oversized indexes prompt normal-turn maintenance; no daily tidy pass runs. A design plans direct in-place edits of MEMORY.md and memory files.
 
 - Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](research/memory-inplace-edit-2026-11-09.md)
 - Frontend design: [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)

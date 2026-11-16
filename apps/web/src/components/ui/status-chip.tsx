@@ -30,8 +30,8 @@ export interface StatusChipProps {
 export function StatusChip({ tone, className, children }: StatusChipProps) {
   const Icon = TONE_ICON[tone];
   return (
-    <Badge data-tone={tone} className={cn('gap-1 pl-1.5', TONE_SKIN[tone], className)}>
-      <Icon aria-hidden="true" />
+    <Badge data-tone={tone} className={cn('gap-1', TONE_SKIN[tone], className)}>
+      <Icon data-icon="inline-start" aria-hidden="true" />
       {children}
     </Badge>
   );
