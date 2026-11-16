@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "545a7af5d3c1084010ec537da01711b373cfb094",
+    "sha": "5e4350f5339511b0cc36dbed15c95d7313987396",
     "date": "2026-11-16"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -31,8 +31,9 @@
     "badge.tsx": {
       "kind": "registry",
       "upstreamItem": "badge",
-      "status": "pristine",
-      "hash": "d0e5e9a1757981cf46abe24a29cad025af2fb931a621cc4fa0bf2a69e1958703"
+      "status": "deviated",
+      "hash": "8197b13728e28f09a68f332e81990beb016fd7f1b0e1b65da3fdfa467f91e397",
+      "reason": "Leading and trailing icon insets: has-data-[icon=inline-start] / inline-end padding is 0.75 spacing (3px) instead of upstream 1.5, so a 12px icon in the 20px pill with its 1px border sits 4px from the start edge, equal to its top and bottom gap. Checked by e2e/chip-icon-trace-guide-geometry.spec.ts."
     },
     "bubble.tsx": {
       "kind": "registry",
@@ -183,7 +184,7 @@
     "status-chip.tsx": {
       "kind": "adapter",
       "reason": "#942 canon table §5.2 / #983 verdict (kept as zero-skin adapter): five-state task chip = registry Badge skeleton + data-tone state carrier + one neutral bg-secondary fill with the state in the text colour (confirm: --waiting-ink, failed: text-destructive; the five --chip-* fill pairs were retired by #3186, anti-slop palette roles). The sm geometry tier is retired per #983 — all faces converge on the registry Badge h-5 default (#1006).",
-      "hash": "c995f7b9e463bec1b24ec1482d4fc13fa8fad84d22d19b61b65e0cd8f10c8e1a"
+      "hash": "b4e0670aeff0aa85cd223ab007c0a09602dc2c377b0551bf39137a87edec6d6c"
     },
     "switch.tsx": {
       "kind": "registry",
@@ -224,8 +225,9 @@
     "trace.tsx": {
       "kind": "registry",
       "upstreamItem": "trace",
-      "status": "pristine",
-      "hash": "2c638f3af6c0400eb516fc7ced69bf4e903760fb98b3004f663dd1f08e20d7dc"
+      "status": "deviated",
+      "hash": "a2617284c8c5afc9efa3525cd4903efe9f3b91c5455cf576587c56164ada8091",
+      "reason": "Collapsible guide offset: the content border sits at --spacing(2) minus half its 1px width instead of minus the full width, so the guide runs through the centre of the 16px row icon (upstream lands 0.5px left of it). Checked by e2e/chip-icon-trace-guide-geometry.spec.ts."
     }
   }
 }
