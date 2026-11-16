@@ -737,7 +737,7 @@ html:not(.light)
 }
 
 :is([data-slot="message-scroller"], [data-trace-card], [data-slot="trace"], .chat-interactions)
-  :is(button, a, [role="button"]),
+  :is(button, a, [role="button"]):not(.mention-chip--todo),
 .chat-interaction {
   box-shadow: none;
   transition-duration: 0s;
