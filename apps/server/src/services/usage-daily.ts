@@ -2,7 +2,6 @@ import type { DailyUsage, DailyUsageDay } from '@cairn/shared';
 import { sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { HttpError } from '../lib/errors.js';
-import { localDay } from './chief-report.js';
 
 const SLOT_MS = 15 * 60_000;
 const PREFILTER_SLACK_MS = 26 * 3_600_000;
@@ -11,6 +10,10 @@ interface SlotRow {
   coordinator: number;
   slot: number;
   tokens: number;
+}
+
+function localDay(ms: number, tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(ms));
 }
 
 function windowDates(now: number, days: number, tz: string): { dates: Set<string>; from: number } {
