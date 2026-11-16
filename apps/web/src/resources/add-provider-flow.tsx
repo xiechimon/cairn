@@ -1,5 +1,5 @@
 import type { ClaudeSubscription } from '@cairn/shared';
-import { useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useCreateClaudeSubscription } from '../api/claude-subscriptions.js';
 import { useApiMutations } from '../api/hooks.js';
@@ -11,11 +11,80 @@ import type { CreateProviderDialog as CreateProviderDialogModule } from './creat
 
 export type AddProviderView = 'closed' | 'picker' | 'subscription';
 
-interface XaiDevice {
+interface DeviceLogin {
   state: string;
   userCode: string;
   verificationUri: string;
   intervalSeconds: number;
+}
+
+type DevicePoll = UseMutationResult<
+  { status: 'pending' | 'complete' | 'superseded' | 'denied' | 'expired' },
+  Error,
+  string
+>;
+
+function useDeviceLogin({
+  active,
+  poll,
+  onComplete,
+  messages,
+}: {
+  active: boolean;
+  poll: DevicePoll;
+  onComplete: () => void;
+  messages: { denied: string; superseded: string; expired: string; failed: string };
+}) {
+  const [device, setDevice] = useState<DeviceLogin | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef(poll);
+  pollRef.current = poll;
+  const completeRef = useRef(onComplete);
+  completeRef.current = onComplete;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
+  useEffect(() => {
+    if (!active || device === null) return;
+    let stopped = false;
+    const timer = setInterval(() => {
+      void pollRef.current.mutateAsync(device.state).then(
+        (result) => {
+          if (stopped || result.status === 'pending') return;
+          setDevice(null);
+          if (result.status === 'complete') {
+            setError(null);
+            completeRef.current();
+          } else {
+            setError(messagesRef.current[result.status]);
+          }
+        },
+        () => {
+          if (!stopped) setError(messagesRef.current.failed);
+        },
+      );
+    }, device.intervalSeconds * 1000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [active, device]);
+
+  return {
+    device,
+    error,
+    reset: () => {
+      setDevice(null);
+      setError(null);
+    },
+    begin: (start: UseMutationResult<DeviceLogin, Error, void>) => {
+      setError(null);
+      start.mutate(undefined, {
+        onSuccess: setDevice,
+        onError: () => setError(messagesRef.current.failed),
+      });
+    },
+  };
 }
 
 export function AddProviderFlow({
@@ -42,10 +111,28 @@ export function AddProviderFlow({
   const [CreateProviderDialog, setCreateProviderDialog] = useState<
     typeof CreateProviderDialogModule | null
   >(null);
-  const [xaiDevice, setXaiDevice] = useState<XaiDevice | null>(null);
-  const [xaiDeviceError, setXaiDeviceError] = useState<string | null>(null);
-  const pollXai = useRef(mutations.pollXaiDevice);
-  pollXai.current = mutations.pollXaiDevice;
+  const xai = useDeviceLogin({
+    active: view === 'picker',
+    poll: mutations.pollXaiDevice,
+    onComplete: () => onViewChange('closed'),
+    messages: {
+      denied: t('xAI 登录被拒绝。'),
+      superseded: t('已有更新的 xAI 凭证，这次登录没有覆盖它。'),
+      expired: t('验证码已过期，请重试。'),
+      failed: t('xAI 登录失败，请重试。'),
+    },
+  });
+  const codex = useDeviceLogin({
+    active: view === 'picker',
+    poll: mutations.pollCodexDevice,
+    onComplete: () => onViewChange('closed'),
+    messages: {
+      denied: t('OpenAI Codex 登录被拒绝。'),
+      superseded: t('已有更新的 OpenAI Codex 凭证，这次登录没有覆盖它。'),
+      expired: t('验证码已过期，请重试。'),
+      failed: t('OpenAI Codex 登录失败，请重试。'),
+    },
+  });
   const pickerOpen = view === 'picker';
 
   useEffect(() => {
@@ -58,41 +145,6 @@ export function AddProviderFlow({
     };
   }, []);
 
-  useEffect(() => {
-    if (!pickerOpen || xaiDevice === null) return;
-    let stopped = false;
-    const timer = setInterval(() => {
-      void pollXai.current.mutateAsync(xaiDevice.state).then(
-        (result) => {
-          if (stopped) return;
-          if (result.status === 'complete') {
-            setXaiDevice(null);
-            setXaiDeviceError(null);
-            onViewChange('closed');
-            return;
-          }
-          if (result.status === 'denied') {
-            setXaiDevice(null);
-            setXaiDeviceError(t('xAI 登录被拒绝。'));
-          } else if (result.status === 'superseded') {
-            setXaiDevice(null);
-            setXaiDeviceError(t('已有更新的 xAI 凭证，这次登录没有覆盖它。'));
-          } else if (result.status === 'expired') {
-            setXaiDevice(null);
-            setXaiDeviceError(t('验证码已过期，请重试。'));
-          }
-        },
-        () => {
-          if (!stopped) setXaiDeviceError(t('xAI 登录失败，请重试。'));
-        },
-      );
-    }, xaiDevice.intervalSeconds * 1000);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-    };
-  }, [pickerOpen, t, xaiDevice, onViewChange]);
-
   return (
     <>
       {CreateProviderDialog !== null ? (
@@ -101,23 +153,17 @@ export function AddProviderFlow({
           onClose={() => {
             onViewChange('closed');
             onConnectError(null);
-            setXaiDevice(null);
-            setXaiDeviceError(null);
+            xai.reset();
+            codex.reset();
           }}
-          onXaiSignIn={
-            live
-              ? () => {
-                  setXaiDeviceError(null);
-                  mutations.startXaiDevice.mutate(undefined, {
-                    onSuccess: (started) => setXaiDevice(started),
-                    onError: () => setXaiDeviceError(t('xAI 登录失败，请重试。')),
-                  });
-                }
-              : undefined
-          }
+          onXaiSignIn={live ? () => xai.begin(mutations.startXaiDevice) : undefined}
           xaiSignInPending={mutations.startXaiDevice.isPending}
-          xaiDevice={xaiDevice}
-          xaiDeviceError={xaiDeviceError}
+          xaiDevice={xai.device}
+          xaiDeviceError={xai.error}
+          onCodexSignIn={live ? () => codex.begin(mutations.startCodexDevice) : undefined}
+          codexSignInPending={mutations.startCodexDevice.isPending}
+          codexDevice={codex.device}
+          codexDeviceError={codex.error}
           pending={mutations.createProvider.isPending}
           onCreate={
             live

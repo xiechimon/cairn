@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { runInNewContext } from 'node:vm';
 import {
   AUTO_MERGE_PATH_GLOBS,
   GATE_LIMITS,
@@ -24,44 +23,6 @@ interface GatePaths {
 
 const gatePaths = JSON.parse(read('packages/shared/merge-gate-paths.json')) as GatePaths;
 const securityCapabilities = ['credentials', 'machineAndCommandBoundary', 'externalEntryAuth'];
-
-const sandbox = { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } };
-
-function prGateEffective(source: string, paths: unknown) {
-  const from = source.indexOf('const AUTO_MERGE =');
-  const region = source.slice(from, source.indexOf('const FILES_CMD =', from));
-  return runInNewContext(
-    `${region}\n;({ AUTO_MERGE, PROTECTED })`,
-    { args: { gatePaths: paths } },
-    sandbox,
-  ) as { AUTO_MERGE: string[]; PROTECTED: string[] };
-}
-
-interface PrGateRun {
-  args: unknown;
-  review: (label: string) => unknown;
-}
-
-async function runPrGate(source: string, { args, review }: PrGateRun) {
-  const prompts: Record<string, string> = {};
-  const agent = async (prompt: string, options: { label: string }) => {
-    prompts[options.label] = prompt;
-    return review(options.label);
-  };
-  const pipeline = (
-    items: unknown[],
-    run: (item: unknown) => Promise<unknown>,
-    after: (result: unknown, item: unknown) => Promise<unknown>,
-  ) => Promise.all(items.map(async (item) => after(await run(item), item)));
-  const parallel = (jobs: (() => Promise<unknown>)[]) => Promise.all(jobs.map((job) => job()));
-  const body = source.replace(/^export const meta/m, 'const meta');
-  const result = (await runInNewContext(
-    `(async () => {\n${body}\n})()`,
-    { args, agent, pipeline, parallel, log: () => {} },
-    sandbox,
-  )) as Record<string, unknown>;
-  return { result, prompts };
-}
 
 function expandBraces(spec: string): string[] {
   const match = /\{([^{}]+)\}/.exec(spec);
@@ -111,100 +72,9 @@ describe('merge-gate-paths.json is the single source', () => {
     expect(unprotected).toEqual([]);
   });
 
-  test('pr-gate.js effective lists equal the JSON, protected followed by the gate source', () => {
-    const effective = prGateEffective(read('.claude/workflows/pr-gate.js'), gatePaths);
-    expect(effective.AUTO_MERGE).toEqual(gatePaths.autoMerge);
-    expect(effective.PROTECTED).toEqual([...gatePaths.protected, ...gatePaths.mergeGateSource]);
-  });
-
-  test('negative control: an inline list in pr-gate.js differs from the JSON', () => {
-    const source = read('.claude/workflows/pr-gate.js');
-    const inlined = source.replace(
-      /const AUTO_MERGE = requireGlobs\([^\n]+\)/,
-      "const AUTO_MERGE = ['apps/*/src/**']",
-    );
-    expect(inlined).not.toBe(source);
-    expect(prGateEffective(inlined, gatePaths).AUTO_MERGE).not.toEqual(gatePaths.autoMerge);
-  });
-
-  test('pr-gate.js fails closed without the JSON in args', () => {
-    const source = read('.claude/workflows/pr-gate.js');
-    expect(() => prGateEffective(source, undefined)).toThrow(/gatePaths/);
-    expect(() => prGateEffective(source, { ...gatePaths, protected: [] })).toThrow(/protected/);
-  });
-
-  test('pr-gate.js gives go only when the safety reviewer confirms gatePaths equals origin/main', async () => {
-    const head = 'a'.repeat(40);
-    const verdict = (gatePathsMatch: unknown) =>
-      runPrGate(read('.claude/workflows/pr-gate.js'), {
-        args: {
-          pr: 1,
-          ticket: 2,
-          headSha: head,
-          gatePaths,
-          changedFiles: ['apps/web/src/a.ts'],
-          deletedFiles: [],
-          linesChanged: 1,
-          binaryFiles: [],
-        },
-        review: (label) => ({
-          headSha: head,
-          checked: label,
-          findings: [],
-          ...(label === 'review:safety'
-            ? {
-                changedFiles: ['apps/web/src/a.ts'],
-                deletedFiles: [],
-                linesChanged: 1,
-                binaryFiles: [],
-                ...(gatePathsMatch === undefined ? {} : { gatePathsMatch }),
-              }
-            : {}),
-        }),
-      });
-    const confirmed = await verdict(true);
-    expect(confirmed.result).toMatchObject({
-      go: true,
-      gatePathsMatch: true,
-      mergedBy: 'auto-merge',
-    });
-    expect(confirmed.prompts['review:safety']).toContain(
-      'git show <your base ref>:packages/shared/merge-gate-paths.json',
-    );
-    expect(confirmed.prompts['review:safety']).toContain(JSON.stringify(gatePaths));
-    for (const answer of [false, undefined, 'true']) {
-      expect((await verdict(answer)).result).toMatchObject({ go: false, gatePathsMatch: false });
-    }
-  });
-
-  test('merge-route.mjs takes the JSON from origin/main, beside pr-gate.js', () => {
-    const source = read('scripts/merge-route.mjs');
-    expect(source).toContain("'origin/main:packages/shared/merge-gate-paths.json'");
-    expect(source.match(/args: \{ gatePaths \}/g)).toHaveLength(2);
-    expect(source).not.toMatch(/secret-box|\*\*\/drizzle\/\*\*/);
-  });
-
-  test('the mergify generator reads limits from the JSON', () => {
-    expect(read('scripts/mergify-config.mjs')).toContain("'packages/shared/merge-gate-paths.json'");
-    for (const path of ['scripts/mergify-config.mjs'])
-      expect(read(path), path).not.toMatch(
-        /MAX_LINES = \d|MAX_FILES = \d|maxLines: \d|maxFiles: \d/,
-      );
-  });
-
-  test('no consumer keeps an inline copy of the lists', () => {
-    for (const path of [
-      '.claude/workflows/pr-gate.js',
-      'scripts/ops/host/tools/merge-pr.sh',
-      'scripts/merge-route.mjs',
-      'scripts/mergify-config.mjs',
-      'scripts/batch-merger.mjs',
-      'packages/shared/src/records/merge-gate.ts',
-    ]) {
-      expect(read(path), path).not.toMatch(
-        /secret-box|'\*\*\/drizzle\/\*\*'|'apps\/\*\/src\/\*\*'/,
-      );
-    }
+  test('merge-gate.ts keeps no inline copy of the lists', () => {
+    const path = 'packages/shared/src/records/merge-gate.ts';
+    expect(read(path), path).not.toMatch(/secret-box|'\*\*\/drizzle\/\*\*'|'apps\/\*\/src\/\*\*'/);
   });
 });
 

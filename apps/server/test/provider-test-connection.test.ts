@@ -102,6 +102,24 @@ describe('provider connection check', () => {
     expect(calls[0]?.headers.get('authorization') === `Bearer ${KEY}`).toBe(true);
   });
 
+  test('sends the access token, not the stored OAuth secret, for a subscription provider', async () => {
+    const secret = JSON.stringify({
+      kind: 'xai-oauth',
+      refresh: 'refresh-fixture',
+      access: 'access-fixture',
+      expires: Date.now() + 3_600_000,
+    });
+    const calls = transport((call) => ({
+      status: call.headers.get('authorization') === 'Bearer access-fixture' ? 200 : 401,
+      body: completion(),
+    }));
+    const s = bootServer();
+    const data = await result(s, await addProvider(s, { apiKey: secret }));
+    expect(data.status).toBe('ok');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.headers.get('authorization')).toBe('Bearer access-fixture');
+  });
+
   test('honours compat.maxTokensField on the actual request', async () => {
     const calls = transport({ status: 200, body: completion() });
     const s = bootServer();

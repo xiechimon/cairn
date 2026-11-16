@@ -284,13 +284,13 @@ describe('PiStepSpanSink', () => {
   test('observation payloads are redacted and bounded on the SDK wire', async () => {
     const { sink } = makeSink();
     const captured = captureFetch();
-    sink.request([
+    const input = [
       {
         role: 'user',
         content: { token: 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz', text: '🧪'.repeat(12_000) },
       },
-    ]);
-    sink.chat(1000, { output: { role: 'assistant', content: 'answer '.repeat(8_000) } });
+    ];
+    sink.chat(1000, { input, output: { role: 'assistant', content: 'answer '.repeat(8_000) } });
     await sink.flush();
     await flushDaemonOtel();
     const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;

@@ -44,7 +44,9 @@ export function catalogContextWindow(providerId: string, modelId: string): numbe
 export type KeyResolver = () => string | null | Promise<string | null>;
 
 export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): Provider | null {
-  const subscription = config.providerId === CODEX_PROVIDER_ID && !config.baseUrl;
+  const subscription =
+    config.providerId === CODEX_PROVIDER_ID &&
+    (!config.baseUrl || config.baseUrl === CODEX_BASE_URL);
   const api = subscription ? CODEX_API : config.api;
   const streams = api === undefined ? undefined : STREAMS[api];
   const baseUrl = subscription ? CODEX_BASE_URL : config.baseUrl;

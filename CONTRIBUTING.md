@@ -44,14 +44,7 @@ pnpm dev          # web on :5173, server on :8787, daemon, all with hot reload
 
 ## Pull requests
 
-Fill in every section of the [pull request template](./.github/PULL_REQUEST_TEMPLATE.md). The `pr-evidence` check fails when a required section is empty:
-
-- **What**: the change and why, the ticket, and the overlap lookup result.
-- **Proof**: old-code failing output followed by new-code passing output, or a before / after / unchanged screenshot table with SHA-pinned raw links under `docs/verify/<ticket>/`.
-- **Review**: vendor, model, fresh context, head SHA, rounds, verdict, and unfixed findings with reasons.
-- **Risk**: one-way or two-way door, blast radius, and whether the owner must merge.
-
-Upstream is optional and belongs only on PRs that add a mechanism. When the title names a ticket, such as `server(1570): ...`, the body says `Closes #1570` if the PR finishes it or `Part of #1570` if it is one segment; the `pr-evidence` check fails without one. No tasks are required; any unchecked task outside fenced code and HTML comments blocks merging.
+Describe what changed, why, and how you verified it; the [pull request template](./.github/PULL_REQUEST_TEMPLATE.md) is an optional outline. When the change finishes a ticket, put `Closes #N` on its own line, or `Part of #N` for one segment.
 
 Commit messages follow `area(issue): summary`, for example `server(1570): skip already-pushed traces`.
 

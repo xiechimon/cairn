@@ -108,8 +108,9 @@ test('schedules `新建定时` editor (900×420): capped to the viewport, its bo
   if (box == null) return;
   expect(box.y).toBeGreaterThanOrEqual(0);
   expect(box.y + box.height).toBeLessThanOrEqual(420.5);
-  expect(await popover.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
-  await popover.evaluate((el) => {
+  const body = popover.locator('.overflow-y-auto').first();
+  expect(await body.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  await body.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
   await expect(popover.getByRole('button', { name: '保存' })).toBeInViewport();

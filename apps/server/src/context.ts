@@ -7,6 +7,7 @@ import type { FetchLike } from './lib/github.js';
 import type { LoopbackOwner } from './lib/loopback-owner.js';
 import type { KeySecretBox } from './lib/secret-box.js';
 import type { SidecarStatus } from './lib/tsnet-sidecar.js';
+import type { CodexDeviceState } from './services/codex-device-login.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import type { PendingUpload } from './services/machine-uploads.js';
 import type { MachineWakeHub } from './services/machine-wake-hub.js';
@@ -14,6 +15,7 @@ import type { McpOAuthState } from './services/mcp-servers.js';
 import type { OAuthClientConfig, OAuthStateEntry } from './services/oauth.js';
 import type { VapidKeys } from './services/push.js';
 import type { SkillImportFetch } from './services/skill-import.js';
+import type { TailscaleServe } from './services/tailscale-serve.js';
 import type { XaiDeviceState } from './services/xai-device-login.js';
 
 export interface RemoteAccessContext {
@@ -21,6 +23,7 @@ export interface RemoteAccessContext {
   listenHost: string;
   listenPort: number;
   tailnetStatus: () => SidecarStatus | null;
+  tailscale?: TailscaleServe;
   networkInterfaces?: () => NodeJS.Dict<NetworkInterfaceInfo[]>;
 }
 
@@ -62,6 +65,7 @@ export interface AppContext {
   githubFetch?: FetchLike;
   oauthStates: Map<string, OAuthStateEntry>;
   xaiDeviceStates: Map<string, XaiDeviceState>;
+  codexDeviceStates: Map<string, CodexDeviceState>;
   oauthFetch?: FetchLike;
   providerTestFetch?: typeof fetch;
   providerTestTimeoutMs?: number;

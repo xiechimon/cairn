@@ -2,6 +2,8 @@ import { expect, type Page, test } from '@playwright/test';
 
 const AUTHORIZE = '/app/machines/authorize';
 const POLL = '**/api/machine/enroll/poll';
+const TAILSCALE = '**/api/remote/tailscale';
+const TAILSCALE_URL = 'https://studio-mac.tail4c2a.ts.net';
 
 async function pollSays(page: Page, body: Record<string, unknown>): Promise<void> {
   await page.route(POLL, (route) => route.fulfill({ status: 200, json: body }));
@@ -11,17 +13,15 @@ function card(page: Page) {
   return page.getByRole('region', { name: '授权执行机' });
 }
 
-test('arriving with no params → the start command to run on the new computer, with copy and a way back', async ({ page, context }) => {
+test('arriving with no params → the start command for the checked Tailscale address, with copy and a way back', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route(TAILSCALE, (route) =>
+    route.fulfill({ status: 200, json: { state: 'ready', url: TAILSCALE_URL, consentUrl: null } }),
+  );
   await page.goto(AUTHORIZE);
   await expect(page.locator('.authorize-backdrop')).toBeVisible();
   await expect(page.getByRole('heading', { name: '授权执行机' })).toBeVisible();
-  await expect(
-    card(page).getByText(
-      '在要接入的电脑上依次运行这两条命令。终端会给出授权链接，打开它就能确认。',
-    ),
-  ).toBeVisible();
-  const command = `cairn start --server ${new URL(page.url()).origin}`;
+  const command = `cairn start --server ${TAILSCALE_URL}`;
   await expect(card(page).locator('code')).toHaveText([
     'npm install -g @xiechimon/cairn-cli@latest',
     command,
@@ -30,6 +30,17 @@ test('arriving with no params → the start command to run on the new computer, 
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(command);
   await page.getByRole('link', { name: '← 返回执行机' }).click();
   await page.waitForURL((u) => u.pathname === '/app/settings/machines');
+});
+
+test('without a checked Tailscale address the page sends you to Add Runner instead of a command', async ({ page }) => {
+  await page.route(TAILSCALE, (route) =>
+    route.fulfill({ status: 200, json: { state: 'not-connected', url: null, consentUrl: null } }),
+  );
+  await page.goto(AUTHORIZE);
+  await expect(
+    card(page).getByText('先在执行机页的「添加执行机」里用 Tailscale 连通这台电脑，命令会出现在这里。'),
+  ).toBeVisible();
+  await expect(card(page).locator('code')).toHaveCount(0);
 });
 
 test('before the first poll answers, confirm is disabled and says it is connecting', async ({ page }) => {

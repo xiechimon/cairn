@@ -54,11 +54,9 @@ Retain existing routes, authenticated with `requireTeam`:
 
 No public write API for editing is added by B1. At this baseline, existing save/update/delete/list tools provide correction through conversation. The separately approved edit API is owned by #3677; this inventory must not be dispatched as a reason to block or duplicate it. Failed mutations must not be retried automatically.
 
-## Consolidation and pre-compaction flush
+## Pre-compaction flush
 
-Retain the weekly pass already integrated into the daily digest: at least four valid core entries; seven days between completed passes; at most 80 rows, 16,000 total characters, 600 characters per displayed line; at most five merges and ten expirations; merged content at most 500 characters. Truncated entries cannot merge. Only same-project facts may merge. An expiry candidate must be unchanged and uninjected for at least 30 days; age alone does not establish that a fact is false.
-
-The current pass applies validated output automatically, not a new approval queue. Do not implement the older research's propose-only variant. Preserve atomic successor/invalidation for each merge. Improve stale-input safety by binding proposed row ids to the versions actually supplied in the digest; changed rows require a new proposal, not a blind reread of newer text.
+The automatic memory tidy pass is retired. An oversized index retains its model-facing truncation reminder and paged reads. During a normal turn, the Coordinator uses the existing memory tools to merge or remove stale entries; no scheduled or compaction-triggered tidy call replaces the retired pass.
 
 The pre-compaction flush uses the same save/update validation and does not delete facts to make quota room. Failure is reported and compaction can proceed; overlap is not permission to discard a new adjacent fact. No shadow mode or second background summarizer is added.
 
@@ -72,13 +70,11 @@ The pre-compaction flush uses the same save/update validation and does not delet
 | Similar facts | Exact duplicate conflicts, overlap returns candidates, forced adjacent fact persists independently |
 | Quota | Boundary save and concurrent saves never exceed active-entry limit; invalidation releases capacity |
 | Injection | Deterministic equal timestamps, recency preference, oversized fact/title, truthful omitted count and use stamps |
-| Consolidation | Cross-project/self/missing/truncated drops rejected; changed input version rejected; merge rollback preserves all rows |
-| Expiry | Recently updated/injected entry retained; invalidated entry never injected; uncertain fact not expired solely by age |
 | Delete | Wrong-team 404, conflict fingerprint cleanup, UI failure retains row, explicit historical-erasure limits |
 | Flush failure | Reported once, canonical history remains, no duplicate writes on task replay |
 
-Extend existing suites: `memory-invalidation`, `memory-dedupe`, `project-memory`, `memory-injection-cap`, `memory-consolidation`, and Coordinator flush tests. Add route-level authorization and real UI mutation tests. #1773/#1777 own eval work; B1 does not modify `integration/eval/**`.
+Extend existing suites: `memory-invalidation`, `memory-dedupe`, `project-memory`, `memory-injection-cap`, and Coordinator flush tests. Add route-level authorization and real UI mutation tests. #1773/#1777 own eval work; B1 does not modify `integration/eval/**`.
 
 ## Code areas and old code replaced
 
-`services/memory.ts` owns scope, identity and mutations; `services/memory-consolidation.ts` owns bounded weekly validation; `routes-agents.ts` retains the team-memory HTTP contract; `coordinator/memory-flush.ts` owns compaction-boundary extraction. #3608 already removed retired-agent gating from `chief/chief-settings.tsx`; subsequent frontend work belongs to #3666 and #3677 and is excluded from B1. The unchecked promotion branch and unversioned consolidation input identify baseline failure modes; #3677 replaces the promotion and consolidation mechanisms as part of the approved document model, rather than dispatching parallel row-model changes.
+`services/memory.ts` owns scope, identity and mutations; `routes-agents.ts` retains the team-memory HTTP contract; `coordinator/memory-flush.ts` owns compaction-boundary extraction. #3608 already removed retired-agent gating from `chief/chief-settings.tsx`; subsequent frontend work belongs to #3666 and #3677 and is excluded from B1. #3677 replaces the baseline promotion mechanism as part of the approved document model.

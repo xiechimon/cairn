@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Providers · three directions</title>
+<style>
+  :root { --ink:#1a1a1a; --mute:#6b6b6b; --faint:#a3a3a3; --line:#e4e4e4; --fill:#f4f4f4; --bg:#ececec; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); font:13px/1.45 -apple-system, "Inter", "PingFang SC", sans-serif; color:var(--ink); }
+  .stage { position:relative; width:1440px; height:820px; margin:0 auto; }
+  .frame { position:absolute; left:250px; top:40px; width:940px; height:640px; background:#fff; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,.08); display:flex; overflow:hidden; }
+  .nav { width:190px; border-right:1px solid var(--line); padding:14px 10px; }
+  .nav .search { border:1px solid var(--line); border-radius:7px; padding:5px 9px; color:var(--faint); margin-bottom:10px; }
+  .nav .item { padding:5px 9px; border-radius:6px; color:var(--mute); }
+  .nav .item.on { background:var(--fill); color:var(--ink); font-weight:500; }
+  .nav hr { border:0; border-top:1px solid var(--line); margin:8px 9px; }
+  .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .top { height:46px; border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 18px; gap:6px; color:var(--mute); }
+  .top b { color:var(--ink); font-weight:500; }
+  .top .x { margin-left:auto; }
+  .body { flex:1; padding:22px 28px; overflow:auto; }
+  h2 { font-size:15px; margin:0; font-weight:600; }
+  .row { display:flex; align-items:center; gap:8px; }
+  .sp { flex:1; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:7px; padding:5px 11px; cursor:pointer; font:inherit; color:var(--ink); }
+  .btn.pri { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .btn.ghost { border-color:transparent; color:var(--mute); }
+  .btn:hover { filter:brightness(.96); }
+  .chip { border:1px solid var(--line); border-radius:7px; padding:3px 9px; }
+  .muted { color:var(--mute); } .faint { color:var(--faint); font-size:12px; }
+  .card { border:1px solid var(--line); border-radius:10px; }
+  .empty { padding:46px 20px; text-align:center; }
+  .ico { width:34px; height:34px; border:1px solid var(--line); border-radius:8px; margin:0 auto 12px; display:grid; place-items:center; color:var(--mute); }
+  .md { display:grid; grid-template-columns:240px 1fr; min-height:360px; }
+  .md .list { border-right:1px solid var(--line); }
+  .li { padding:11px 14px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .li.on { background:var(--fill); }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--ink); margin-right:6px; }
+  .dot.off { background:#fff; border:1px solid var(--mute); }
+  .sw { width:28px; height:16px; border-radius:9px; background:var(--ink); position:relative; cursor:pointer; flex:none; }
+  .sw::after { content:""; position:absolute; top:2px; left:14px; width:12px; height:12px; border-radius:50%; background:#fff; transition:left .15s; }
+  .sw.off { background:#cfcfcf; } .sw.off::after { left:2px; }
+  .field { display:flex; align-items:center; padding:12px 16px; border-top:1px solid var(--line); gap:12px; }
+  .input { border:1px solid var(--line); border-radius:6px; padding:4px 9px; width:220px; color:var(--mute); }
+  .tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+  .tile { border:1px solid var(--line); border-radius:10px; padding:16px; cursor:pointer; }
+  .tile:hover { border-color:var(--mute); }
+  .tile .ico { margin:0 0 10px; }
+  .note { position:absolute; width:200px; font-family:"Bradley Hand","Segoe Print","Xingkai SC",cursive; font-size:14px; line-height:1.35; color:#555; }
+  svg.arrows { position:absolute; inset:0; pointer-events:none; }
+  .bar { position:absolute; left:50%; transform:translateX(-50%); top:712px; display:flex; gap:4px; background:#fff; border-radius:9px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .bar button { border:0; background:none; padding:5px 12px; border-radius:6px; font:inherit; cursor:pointer; color:var(--mute); }
+  .bar button.on { background:var(--fill); color:var(--ink); font-weight:500; }
+  .bar kbd { font:11px ui-monospace,monospace; color:var(--faint); margin-left:4px; }
+  .bar .sep { width:1px; background:var(--line); margin:4px 4px; }
+  .dialog { position:absolute; inset:0; background:rgba(0,0,0,.18); display:grid; place-items:center; }
+  .dialog .card { background:#fff; width:360px; padding:18px; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="frame">
+    <div class="nav">
+      <div class="search">Search</div>
+      <div class="item">Account</div><div class="item">Appearance</div><div class="item">Project</div><hr>
+      <div class="item on">Providers</div><div class="item">Model selector</div><div class="item">Model routing</div><hr>
+      <div class="item">Runners</div><div class="item">Skills</div><div class="item">MCP</div><hr>
+      <div class="item">Secrets &amp; env vars</div><div class="item">API keys</div><div class="item">Remote access</div>
+    </div>
+    <div class="main">
+      <div class="top"><span>Settings</span><span>/</span><b>Providers</b><span class="x">✕</span></div>
+      <div class="body" id="body"></div>
+    </div>
+    <div id="modal"></div>
+  </div>
+  <div id="notes"></div>
+  <svg class="arrows" id="arrows" width="1440" height="820"><defs><marker id="h" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 1 L9 5 L0 9" fill="none" stroke="#555" stroke-width="1.4"/></marker></defs></svg>
+  <div class="bar" id="bar"></div>
+</div>
+<script>
+const STATES = ['empty', 'filled'];
+const STATE_LABELS = ['Empty', 'Populated'];
+const S = { opt: 1, state: 0, sel: 0, on: [true, true], adding: false };
+const OPTS = ['One card', 'Empty = picker', 'Lean master-detail'];
+const PROVIDERS = [
+  { name: 'Claude', kind: 'Subscription', status: 'Connected', models: 3 },
+  { name: 'OpenAI', kind: 'API key', status: 'Key rejected · re-enter it', models: 0 },
+];
+const icon = s => `<div class="ico">${s}</div>`;
+const sw = i => `<div class="sw ${S.on[i] ? '' : 'off'}" data-act="tog" data-i="${i}"></div>`;
+
+function list() {
+  return PROVIDERS.map((p, i) => `
+    <div class="li ${S.sel === i ? 'on' : ''}" data-act="sel" data-i="${i}">
+      <div class="row"><b>${p.name}</b><span class="faint">${p.kind}</span><span class="sp"></span>${sw(i)}</div>
+      <div class="faint" style="margin-top:3px"><span class="dot ${p.models ? '' : 'off'}"></span>${p.status}</div>
+    </div>`).join('');
+}
+function detail() {
+  const p = PROVIDERS[S.sel];
+  return `<div style="padding:16px"><div class="row"><h2>${p.name}</h2><span class="sp"></span><span class="faint">${p.kind}</span></div>
+    <div class="muted" style="margin-top:10px"><span class="dot ${p.models ? '' : 'off'}"></span>${p.status}</div></div>
+    <div class="field"><span>Display name</span><span class="sp"></span><span class="input">${p.name}</span></div>
+    <div class="field"><span>Models</span><span class="sp"></span><span class="muted">${p.models ? p.models + ' available' : 'None until the key works'}</span></div>
+    <div class="field"><span>Applies to</span><span class="sp"></span><span class="chip">All Runners ▾</span></div>`;
+}
+
+const V = {
+  1: {
+    empty: () => `
+      <div class="row"><h2>Providers</h2><span class="sp"></span><button class="btn ghost" data-act="add">+ Add provider</button></div>
+      <div class="card empty" style="margin-top:14px">${icon('▦')}
+        <b>No providers yet</b><div class="muted" style="margin-top:4px">Add a subscription, API key or local model and its models show up here.</div>
+        <div style="margin-top:14px"><button class="btn pri" data-act="add">Add provider</button></div></div>`,
+    filled: () => `
+      <div class="row"><h2>Providers</h2><span class="faint" style="margin-left:6px">Checked just now ↻</span><span class="sp"></span><span class="muted">Applies to</span><span class="chip">All Runners ▾</span></div>
+      <div class="card md" style="margin-top:14px"><div class="list">${list()}<div class="li muted" data-act="add">+ Add provider</div></div><div>${detail()}</div></div>`,
+    notes: {
+      empty: [
+        { x: 1205, y: 92, t: 'No data, no two panes: an empty left column reads as broken', ax: 1000, ay: 160 },
+        { x: 1205, y: 300, t: 'The empty state has one job, so it gets one button; the header button waits for data', ax: 760, ay: 318 },
+        { x: 30, y: 120, t: 'Hide the Runner scope and Checked just now: with nothing added, neither means anything', ax: 600, ay: 122 },
+      ],
+      filled: [
+        { x: 1205, y: 92, t: 'Expand to master-detail once there is data; the scope sits on the header row beside the list it governs', ax: 1120, ay: 112 },
+        { x: 30, y: 300, t: '+ Add provider stays at the end of the list, where the second one gets added', ax: 476, ay: 294 },
+      ],
+    },
+  },
+  2: {
+    empty: () => `
+      <h2>Connect your first provider</h2>
+      <div class="muted" style="margin-top:4px">Pick what you already have. Cairn's agents run on it.</div>
+      <div class="tiles">
+        <div class="tile" data-act="add">${icon('◎')}<b>Claude subscription</b><div class="faint" style="margin-top:4px">Sign in once; nothing to copy.</div></div>
+        <div class="tile" data-act="add">${icon('⌘')}<b>API key</b><div class="faint" style="margin-top:4px">Anthropic, OpenAI or any compatible endpoint.</div></div>
+        <div class="tile" data-act="add">${icon('▣')}<b>Local model</b><div class="faint" style="margin-top:4px">Ollama or LM Studio on a Runner.</div></div>
+      </div>
+      <div class="faint" style="margin-top:18px">Not sure? Start with the one you pay for already. You can add more later.</div>`,
+    filled: () => `
+      <div class="row"><h2>Providers</h2><span class="sp"></span><span class="faint">Checked just now ↻</span><button class="btn" data-act="add">+ Add</button></div>
+      <div class="card" style="margin-top:14px">${PROVIDERS.map((p, i) => `
+        <div class="field" style="${i ? '' : 'border-top:0'}"><div><b>${p.name}</b> <span class="faint">${p.kind}</span><div class="faint"><span class="dot ${p.models ? '' : 'off'}"></span>${p.status}</div></div><span class="sp"></span>
+        ${p.models ? '' : '<button class="btn" data-act="add">Re-enter key</button>'}${sw(i)}</div>`).join('')}</div>
+      <div class="faint" style="margin-top:10px">Applies to all Runners. <u>Set per Runner</u></div>`,
+    notes: {
+      empty: [
+        { x: 1205, y: 92, t: 'The empty page is step one of adding, which saves the Add provider click', ax: 680, ay: 118 },
+        { x: 1205, y: 290, t: 'The three kinds reuse the first-run wording: subscription, API key or local model', ax: 1100, ay: 225 },
+        { x: 30, y: 330, t: 'One line tells a newcomer which to pick, so nobody stalls on the choice', ax: 464, ay: 330 },
+      ],
+      filled: [
+        { x: 1205, y: 92, t: 'No detail pane: a provider has few settings, so one row each scans faster', ax: 1100, ay: 150 },
+        { x: 1205, y: 300, t: 'The failing row carries its fix, with no click-through to find it', ax: 1060, ay: 262 },
+        { x: 30, y: 330, t: 'Scope defaults to all Runners, so it shrinks to one line; per-Runner is opt-in', ax: 464, ay: 296 },
+      ],
+    },
+  },
+  3: {
+    empty: () => `
+      <div class="row"><h2>Providers</h2><span class="sp"></span><span class="faint">Checked just now ↻</span></div>
+      <div class="card md" style="margin-top:14px">
+        <div class="list"><div class="li muted" data-act="add">+ Add provider</div></div>
+        <div class="empty" style="padding-top:70px"><div class="muted">Select a provider to see its status and models.</div><div class="faint" style="margin-top:6px">Nothing here yet. Add one on the left.</div></div>
+      </div>`,
+    filled: () => `
+      <div class="row"><h2>Providers</h2><span class="sp"></span><span class="faint">Checked just now ↻</span></div>
+      <div class="card md" style="margin-top:14px"><div class="list">${list()}<div class="li muted" data-act="add">+ Add provider</div></div><div>${detail()}</div></div>`,
+    notes: {
+      empty: [
+        { x: 1205, y: 92, t: 'One title: the breadcrumb already says Providers', ax: 545, ay: 118 },
+        { x: 30, y: 200, t: 'The left column starts with + Add provider, where t3code puts it', ax: 520, ay: 177 },
+        { x: 1205, y: 300, t: 'Same layout with or without data, so the first add does not jump the page', ax: 1000, ay: 250 },
+      ],
+      filled: [
+        { x: 1205, y: 92, t: 't3code master-detail: the list shows status, the right pane edits', ax: 1000, ay: 160 },
+        { x: 1205, y: 330, t: 'The scope picker moves into each provider, since scope is set per provider', ax: 1040, ay: 351 },
+        { x: 30, y: 300, t: 'The switch lives on the row, so disabling needs no click-through', ax: 664, ay: 172 },
+      ],
+    },
+  },
+};
+
+function render() {
+  const v = V[S.opt];
+  document.getElementById('body').innerHTML = v[STATES[S.state]]();
+  document.getElementById('modal').innerHTML = S.adding ? `<div class="dialog"><div class="card"><h2>Add provider</h2>
+    <div class="muted" style="margin:8px 0 14px">This prototype stops here. Click Done to see the page with providers.</div>
+    <div class="row"><span class="sp"></span><button class="btn" data-act="cancel">Cancel</button><button class="btn pri" data-act="done">Done</button></div></div></div>` : '';
+  const notes = v.notes[STATES[S.state]];
+  document.getElementById('notes').innerHTML = notes.map(n => `<div class="note" style="left:${n.x}px;top:${n.y}px">${n.t}</div>`).join('');
+  const svg = document.getElementById('arrows');
+  svg.querySelectorAll('path.a').forEach(p => p.remove());
+  notes.forEach(n => {
+    const sx = n.x < 700 ? n.x + 205 : n.x - 6, sy = n.y + 12;
+    const mx = (sx + n.ax) / 2, my = Math.min(sy, n.ay) - 30;
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('class', 'a'); p.setAttribute('d', `M${sx} ${sy} Q${mx} ${my} ${n.ax} ${n.ay}`);
+    p.setAttribute('fill', 'none'); p.setAttribute('stroke', '#555'); p.setAttribute('stroke-width', '1.2'); p.setAttribute('marker-end', 'url(#h)');
+    svg.appendChild(p);
+  });
+  document.getElementById('bar').innerHTML = OPTS.map((o, i) => `<button class="${S.opt === i + 1 ? 'on' : ''}" data-opt="${i + 1}">${o}<kbd>${i + 1}</kbd></button>`).join('')
+    + `<span class="sep"></span><button data-act="state">${STATE_LABELS[S.state]}<kbd>E</kbd></button>`;
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act],[data-opt]');
+  if (!t) return;
+  if (t.dataset.opt) S.opt = +t.dataset.opt;
+  const a = t.dataset.act;
+  if (a === 'add') S.adding = true;
+  if (a === 'cancel') S.adding = false;
+  if (a === 'done') { S.adding = false; S.state = STATES.indexOf('filled'); }
+  if (a === 'state') S.state = (S.state + 1) % STATES.length;
+  if (a === 'sel') S.sel = +t.dataset.i;
+  if (a === 'tog') { S.on[+t.dataset.i] = !S.on[+t.dataset.i]; e.stopPropagation(); }
+  render();
+});
+document.addEventListener('keydown', e => {
+  if (['1', '2', '3'].includes(e.key)) S.opt = +e.key;
+  else if (e.key.toLowerCase() === 'e') S.state = (S.state + 1) % STATES.length;
+  else if (e.key === 'Escape') S.adding = false;
+  else return;
+  render();
+});
+render();
+</script>
+</body>
+</html>

@@ -55,6 +55,7 @@ function world() {
     enrollments: new Map(),
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),
+    codexDeviceStates: new Map(),
     mcpOAuthState: newMcpOAuthState(),
     oauthClient: null,
     authToken: null,

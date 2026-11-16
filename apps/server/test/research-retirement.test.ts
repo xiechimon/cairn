@@ -18,7 +18,7 @@ test('an upgrade stops only active retired research steps and discards their lat
     sqlite.close();
     rmSync(directory, { recursive: true, force: true });
   });
-  migrateUpTo(sqlite, directory, '0174_project_personal_owner');
+  migrateUpTo(sqlite, directory, '0175_step_usage');
   const s = bootServer({ db: drizzle(sqlite, { schema }) });
   onTestFinished(() => s.dispose());
   const projectId = await postProject(s.app, 'research');

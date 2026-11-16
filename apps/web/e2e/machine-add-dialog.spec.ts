@@ -1,28 +1,33 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const MACHINES = '/app/resources/machines?scenario=06';
+const TAILSCALE_URL = 'https://studio-mac.tail4c2a.ts.net';
 
-async function openDialog(page: Page) {
-  await page.goto(MACHINES);
+async function openDialog(page: Page, path = MACHINES) {
+  await page.goto(path);
   await page.getByRole('button', { name: '添加执行机' }).click();
   const dialog = page.getByRole('dialog', { name: '添加执行机' });
   await expect(dialog).toBeVisible();
   return dialog;
 }
 
-test('`添加执行机` button opens the dialog with the two-step command blocks', async ({ page }) => {
+test('the start command carries the checked Tailscale address, not the page origin', async ({
+  page,
+}) => {
   const dialog = await openDialog(page);
   await expect(dialog).toHaveAccessibleName('添加执行机');
-  await expect(dialog.getByText('有条件时优先使用云主机')).toContainText('有条件时优先使用云主机');
-
-  await expect(dialog.getByText("授权团队 Xmon Dai's team 后执行机即可上线")).toContainText(
-    "授权团队 Xmon Dai's team 后执行机即可上线",
+  await expect(dialog.getByTestId('tailscale-ready')).toHaveText(
+    `已连通，另一台电脑用这个地址连回来：${TAILSCALE_URL}`,
   );
+  await expect(
+    dialog.getByText("确认把这台电脑加入团队 Xmon Dai's team", { exact: false }),
+  ).toBeVisible();
   const commands = dialog.locator('code');
   await expect(commands).toHaveCount(2);
   await expect(commands.nth(0)).toHaveText('npm install -g @xiechimon/cairn-cli@latest');
-  await expect(commands.nth(1)).toHaveText(`cairn start --server ${new URL(page.url()).origin}`);
-  await expect(dialog.getByText('当前地址只适用于这台电脑。', { exact: false })).toBeVisible();
+  await expect(commands.nth(1)).toHaveText(`cairn start --server ${TAILSCALE_URL}`);
+  expect(new URL(page.url()).origin).not.toBe(TAILSCALE_URL);
+  await expect(dialog.getByText('有条件时优先使用云主机', { exact: false })).toHaveCount(0);
   // API key disclosure collapsed by default
   await expect(
     dialog.getByRole('button', { name: '在云服务器上运行？改用 API key 注册' }),
@@ -52,7 +57,7 @@ test('API key disclosure expands the key command and the api-keys link', async (
   await toggle.click();
 
   await expect(dialog.locator('code').filter({ hasText: '--api-key' })).toHaveText(
-    `cairn start --server ${new URL(page.url()).origin} --api-key <key> --team <teamId>`,
+    `cairn start --server ${TAILSCALE_URL} --api-key <key> --team <teamId>`,
   );
   const link = dialog.getByRole('link', { name: '获取 API key →' });
   await expect(link).toHaveText('获取 API key →');
@@ -77,23 +82,28 @@ test('copy buttons write their command to the clipboard', async ({ page, context
   await copy.nth(1).click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe(`cairn start --server ${new URL(page.url()).origin}`);
+    .toBe(`cairn start --server ${TAILSCALE_URL}`);
 });
 
-test('both enrollment commands keep the remote HTTPS origin, not the new Runner loopback', async ({ page, baseURL }) => {
-  const origin = 'https://cairn.tailnet.example';
-  await page.route(`${origin}/**`, async (route) => {
-    const url = new URL(route.request().url());
-    const response = await route.fetch({ url: `${baseURL}${url.pathname}${url.search}` });
-    await route.fulfill({ response });
-  });
-  await page.goto(`${origin}${MACHINES}`);
-  await page.getByRole('button', { name: '添加执行机' }).click();
-  const dialog = page.getByRole('dialog', { name: '添加执行机' });
-  await expect(dialog.getByText('当前地址只适用于这台电脑。', { exact: false })).toHaveCount(0);
-  await expect(dialog.locator('code').nth(1)).toHaveText(`cairn start --server ${origin}`);
-  await dialog.getByRole('button', { name: '在云服务器上运行？改用 API key 注册' }).click();
-  await expect(dialog.locator('code').nth(2)).toHaveText(
-    `cairn start --server ${origin} --api-key <key> --team <teamId>`,
+test('until Tailscale reaches this computer no command is shown, only the next step', async ({
+  page,
+}) => {
+  const missing = await openDialog(page, `${MACHINES}&tailscale=not-installed`);
+  await expect(missing.getByText('这台电脑还没装 Tailscale。', { exact: false })).toBeVisible();
+  await expect(missing.getByRole('link', { name: '下载 Tailscale →' })).toHaveAttribute(
+    'href',
+    'https://tailscale.com/download',
   );
+  await expect(missing.locator('code')).toHaveCount(0);
+  await expect(missing.getByRole('button', { name: '重新检查' })).toBeVisible();
+
+  const off = await openDialog(page, `${MACHINES}&tailscale=off`);
+  await expect(off.getByText('点「开启」后', { exact: false })).toBeVisible();
+  await expect(off.locator('code')).toHaveCount(0);
+  await expect(off.getByRole('button', { name: '开启' })).toBeVisible();
+  await expect(off.getByRole('button', { name: '完成' })).toHaveCount(0);
+
+  const operator = await openDialog(page, `${MACHINES}&tailscale=needs-operator`);
+  await expect(operator.locator('code')).toHaveText(['sudo tailscale set --operator=$USER']);
+  await expect(operator.getByRole('button', { name: '重试' })).toBeVisible();
 });

@@ -666,7 +666,13 @@ export function BoardSidebar({
         className="flex h-14 flex-none items-center gap-1 border-t border-border pr-2 pl-1"
       >
         <div className="flex min-w-0 flex-1 items-center">
-          <DesktopUpdateButton iconClassName={ICON} idleClassName={ICON_BTN} />
+          <span
+            data-testid="sidebar-footer-brand"
+            className="sidebar-footer-brand hidden min-w-0 items-center gap-2 pl-2 text-foreground"
+          >
+            <BrandGlyph className={ICON} />
+            <span className="truncate voice-title text-brand">{BRAND.manifestName}</span>
+          </span>
         </div>
         {usageNav && (
           <FooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
@@ -674,6 +680,7 @@ export function BoardSidebar({
           </FooterIcon>
         )}
         <div className="flex flex-none items-center gap-0.5">
+          <DesktopUpdateButton iconClassName={ICON} idleClassName={ICON_BTN} />
           <FooterIcon label={t('活动')} testId="sidebar-activity" to={activityTarget}>
             <Activity className={ICON} strokeWidth={STROKE} />
           </FooterIcon>

@@ -7,6 +7,8 @@ import type {
   CapabilitiesResponse,
   ChiefGetResponse,
   ChiefThread,
+  CodexDevicePollResponse,
+  CodexDeviceStartResponse,
   ComputerCommandsResponse,
   ComputerRecord,
   ConversationMessagesResponse,
@@ -62,6 +64,7 @@ import type {
   SkillRecord,
   StartMcpConnectorOAuthBody,
   StepJournalRow,
+  TailscaleAccess,
   TeamMember,
   TeamRecord,
   ThreadMessageResult,
@@ -577,6 +580,27 @@ export const useRemoteDevices = (enabled: boolean) =>
     refetchInterval: DEVICES_POLL_MS,
   });
 
+const TAILSCALE_READY_POLL_MS = 30_000;
+const TAILSCALE_SETUP_POLL_MS = 3_000;
+
+export const useTailscaleAccess = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['tailscaleAccess'],
+    queryFn: () => api.get<TailscaleAccess>('/api/remote/tailscale'),
+    enabled,
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.state === 'ready' ? TAILSCALE_READY_POLL_MS : TAILSCALE_SETUP_POLL_MS,
+  });
+
+export function useEnableTailscaleAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<TailscaleAccess>('/api/remote/tailscale', {}),
+    onSuccess: (access) => queryClient.setQueryData(['tailscaleAccess'], access),
+  });
+}
+
 export function useRemoteMutations() {
   const queryClient = useQueryClient();
   return {
@@ -1066,6 +1090,23 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<XaiDevicePollResponse>(`/api/teams/${teamId}/providers/oauth/xai/device/poll`, {
           state,
         }),
+      onSuccess: (result) => {
+        if (result.status === 'complete') invalidateAll();
+      },
+    }),
+    startCodexDevice: useMutation({
+      mutationFn: () =>
+        api.post<CodexDeviceStartResponse>(
+          `/api/teams/${teamId}/providers/oauth/openai-codex/device`,
+          {},
+        ),
+    }),
+    pollCodexDevice: useMutation({
+      mutationFn: (state: string) =>
+        api.post<CodexDevicePollResponse>(
+          `/api/teams/${teamId}/providers/oauth/openai-codex/device/poll`,
+          { state },
+        ),
       onSuccess: (result) => {
         if (result.status === 'complete') invalidateAll();
       },

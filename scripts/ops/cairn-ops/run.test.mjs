@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  chownSync,
   copyFileSync,
   existsSync,
   lstatSync,
@@ -496,6 +497,7 @@ test('refuses Node beneath a group-writable ancestor without executing the task'
 
 test('refuses to run anything when its files live in a checkout not owned by the trusted user', () => {
   const { out, layout, mainSha } = fixture({ trustedUid: process.getuid() + 1 });
+  if (process.getuid() === 0) chownSync(dirname(layout.module), 4242, 4242);
   const { code, messages } = run(layout, ['demo', mainSha]);
   assert.equal(code, 2);
   assert.match(messages, /not owned by uid/);

@@ -107,6 +107,8 @@
   --radius-popover: 14px;
   --menu-pad: 4px;
   --focus-width: 2.4px;
+  --mask-keep: #ffffff;
+  --mask-cut: #000000;
   --focus-field-border: var(--focus-ring);
   --focus-halo: color-mix(in srgb, var(--focus-ring) 22%, transparent);
   --radius-menu-item: 8px;

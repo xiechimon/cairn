@@ -7,7 +7,7 @@ import type { SessionOpts, StepEvent } from '@cairn/shared';
 import { parseOtlpTarget, stepOtelContext } from '@cairn/shared/otel';
 import { afterEach, expect, test, vi } from 'vitest';
 import { createClaudeCodeBackend } from '../src/backend/claude-code.js';
-import { flushDaemonOtel } from '../src/backend/otel.js';
+import { flushDaemonOtel, shutdownDaemonOtel } from '../src/backend/otel.js';
 import { testTempDir } from './test-temp-dir.js';
 
 interface OtlpTracesRequest {
@@ -58,12 +58,79 @@ for await (const line of input) {
       method: 'POST', body: JSON.stringify({ tool_output: result }),
     });
   }
+  const generation = Number(process.env.TEST_GENERATIONS) > 0;
+  const stream = (event) => send({ type: 'stream_event', parent_tool_use_id: null, event });
+  if (generation) {
+    stream({ type: 'message_start', message: {
+      id: 'model-call-1', model: 'resolved-model', role: 'assistant', content: [],
+      usage: { input_tokens: 7, output_tokens: 1, cache_read_input_tokens: 11, cache_creation_input_tokens: 13 }
+    } });
+    send({ type: 'assistant', parent_tool_use_id: null, message: {
+      id: 'model-call-1', model: 'resolved-model', role: 'assistant',
+      content: [{ type: 'thinking', thinking: 'Check the synthetic tool.' }],
+      usage: { input_tokens: 7, output_tokens: 1 }
+    } });
+  }
   send({ type: 'assistant', message: { role: 'assistant', content: [
     { type: 'tool_use', id: 'tool-1', name: 'Bash', input: { command: process.env.TEST_TOOL_OUTPUT } }
-  ] } });
+  ], ...(generation ? { id: 'model-call-1', model: 'resolved-model' } : {}) } });
+  if (generation) {
+    stream({ type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 17 } });
+    stream({ type: 'message_stop' });
+  }
   send({ type: 'user', parent_tool_use_id: null, message: { role: 'user', content: [
     { type: 'tool_result', tool_use_id: 'tool-1', content: result, is_error: false }
   ] } });
+  if (generation) {
+    stream({ type: 'message_start', message: {
+      id: 'model-call-2', model: 'resolved-model', role: 'assistant', content: [],
+      usage: { input_tokens: 19, output_tokens: 1, cache_read_input_tokens: 23, cache_creation_input_tokens: 29 }
+    } });
+    send({ type: 'assistant', parent_tool_use_id: null, message: {
+      id: 'model-call-2', model: 'resolved-model', role: 'assistant',
+      content: [{ type: 'text', text: result }], usage: { input_tokens: 19, output_tokens: 1 }
+    } });
+    stream({ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 31 } });
+    stream({ type: 'message_stop' });
+  }
+  if (generation && process.env.OTEL_SDK_DISABLED !== 'true') {
+    const attribute = ([key, value]) => ({ key, value: typeof value === 'number'
+      ? { intValue: value } : typeof value === 'boolean' ? { boolValue: value } : { stringValue: value } });
+    const post = (signal, body) => fetch(process.env.OTEL_EXPORTER_OTLP_ENDPOINT + '/v1/' + signal,
+      { method: 'POST', body: JSON.stringify(body) });
+    const logs = (values) => ({ resourceLogs: [{ scopeLogs: [{ logRecords: values.map(
+      (value) => ({ attributes: Object.entries(value).map(attribute) })
+    ) }] }] });
+    const count = Number(process.env.TEST_GENERATIONS);
+    const requests = [];
+    const responses = [];
+    const native = [];
+    for (let index = 0; index < count; index++) {
+      const summary = index === 2;
+      const source = summary ? 'compact' : 'sdk';
+      requests.push({ 'event.name': 'api_request_body', request_body_id: 'body-' + index,
+        query_source: source, body: JSON.stringify({ model: 'native-request-model',
+          system: 'Synthetic CLI system.', messages: [{ role: 'user', content: summary
+            ? 'PRIVATE_SUMMARY_INPUT' : 'Run the synthetic tool.' },
+            ...(index === 1 ? [{ role: 'user', content: result }] : [])] }) });
+      responses.push({ 'event.name': 'api_response_body', request_body_id: 'body-' + index,
+        request_id: 'req-' + index, query_source: source,
+        body: JSON.stringify({ model: 'resolved-model', role: 'assistant', content: [{ type: 'text',
+          text: summary ? 'PRIVATE_SUMMARY_OUTPUT' : index === 0 ? 'Check the synthetic tool.' : result }] }) });
+      native.push({ name: 'claude_code.llm_request', spanId: 'native-' + index,
+        startTimeUnixNano: String(1700000000000000000 + index * 1000000000),
+        endTimeUnixNano: String(1700000000500000000 + index * 1000000000),
+        attributes: Object.entries({ model: 'native-request-model', request_id: 'req-' + index,
+          input_tokens: index === 0 ? 7 : 19, cache_read_tokens: index === 0 ? 11 : 23,
+          cache_creation_tokens: index === 0 ? 13 : 29, output_tokens: index === 0 ? 17 : 31,
+          success: true, stop_reason: index === 0 ? 'tool_use' : 'end_turn' }).map(attribute) });
+    }
+    const traces = { resourceSpans: [{ scopeSpans: [{ spans: native }] }] };
+    await post('traces', traces);
+    await post('logs', logs(responses.reverse()));
+    await post('logs', logs(requests.reverse()));
+    await post('traces', traces);
+  }
   if (process.env.TEST_COMPLETION === 'crash') throw new Error('Synthetic CLI crash');
   if (process.env.TEST_COMPLETION !== 'eof') {
     send({ type: 'result', subtype: process.env.TEST_COMPLETION,
@@ -74,9 +141,19 @@ for await (const line of input) {
 input.close();
 `;
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(async () => {
+  vi.unstubAllEnvs();
+  await shutdownDaemonOtel();
+});
 
-async function runCli(completion: string, configured = true, status = 200, token = secret) {
+async function runCli(
+  completion: string,
+  configured = true,
+  status = 200,
+  token = secret,
+  generations = 0,
+  credentialKey = 'CLAUDE_CODE_OAUTH_TOKEN',
+) {
   const directory = testTempDir('cairn-claude-otel-');
   const executablePath = join(directory, 'cli.mjs');
   const envFile = join(directory, 'env.json');
@@ -142,7 +219,8 @@ async function runCli(completion: string, configured = true, status = 200, token
       TEST_ENV_FILE: envFile,
       TEST_TOOL_OUTPUT: `Tool output: ${token}`,
       TEST_COMPLETION: completion,
-      CLAUDE_CODE_OAUTH_TOKEN: token,
+      TEST_GENERATIONS: String(generations),
+      [credentialKey]: token,
       CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1',
       CLAUDE_CODE_ENABLE_TELEMETRY: '1',
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: `${endpoint}/v1/traces`,
@@ -154,7 +232,17 @@ async function runCli(completion: string, configured = true, status = 200, token
   try {
     const events: StepEvent[] = [];
     for await (const event of handle.events) events.push(event);
-    if (configured) await vi.waitFor(() => expect(requests).toHaveLength(1));
+    if (configured)
+      await vi.waitFor(() => {
+        if (generations > 0) {
+          const spans = requests.flatMap((request) =>
+            (JSON.parse(request.body) as OtlpTracesRequest).resourceSpans.flatMap((resource) =>
+              resource.scopeSpans.flatMap((scope) => scope.spans),
+            ),
+          );
+          expect(spans.filter((span) => span.name.startsWith('chat '))).toHaveLength(generations);
+        } else expect(requests).toHaveLength(1);
+      });
     return {
       requests,
       events,
@@ -201,10 +289,16 @@ test.each(['success', 'error', 'eof', 'crash'])(
       key: 'gen_ai.tool.call.result',
       value: { stringValue: 'Tool output: [REDACTED]' },
     });
-    expect(childEnv.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('0');
-    expect(childEnv.OTEL_SDK_DISABLED).toBe('true');
-    expect(childEnv.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT).toBeUndefined();
-    expect(childEnv.OTEL_EXPORTER_OTLP_HEADERS).toBeUndefined();
+    expect(childEnv.CLAUDE_CODE_ENABLE_TELEMETRY).toBe('1');
+    expect(childEnv.OTEL_SDK_DISABLED).toBe('false');
+    expect(childEnv.OTEL_EXPORTER_OTLP_ENDPOINT).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/[a-f0-9-]+$/);
+    expect(childEnv.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT).toBe(
+      `${childEnv.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
+    );
+    expect(childEnv.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT).toBe(
+      `${childEnv.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/logs`,
+    );
+    expect(childEnv.OTEL_EXPORTER_OTLP_HEADERS).toBe('');
     expect(childEnv.BETA_TRACING_ENDPOINT).toBe('');
     expect(childEnv.ENABLE_BETA_TRACING_DETAILED).toBe('0');
     expect(childEnv.CLAUDE_CODE_OAUTH_TOKEN).toBe(secret);
@@ -225,14 +319,65 @@ test('a failed collector does not fail the CLI session', async () => {
   expect(events.at(-1)?.type).toBe('done');
 });
 
-test('the exact credential redactor also covers tokens outside the shared secret patterns', async () => {
-  const token = 'synthetic-credential-without-a-standard-prefix';
-  const { requests } = await runCli('success', true, 200, token);
-  expect(requests[0]!.body).toContain('[REDACTED]');
-  expect(requests[0]!.body).not.toContain(token);
-});
+test.each(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'])(
+  'the exact %s redactor covers native bodies outside the shared secret patterns',
+  async (credentialKey) => {
+    const token = 'synthetic-credential-without-a-standard-prefix';
+    const { requests } = await runCli('success', true, 200, token, 2, credentialKey);
+    const body = requests.map((request) => request.body).join('');
+    expect(body).toContain('[REDACTED]');
+    expect(body).not.toContain(token);
+  },
+);
 
 test('a stalled collector cannot delay CLI session completion', async () => {
   const { completedBeforeResponse } = await runCli('success', true, 0);
   expect(completedBeforeResponse).toBe(true);
 });
+
+test.each([2, 3])(
+  'native capture exports %i real calls once despite reordered batches, without summary content',
+  async (count) => {
+    const { requests, telemetry } = await runCli('success', true, 200, secret, count);
+    const chats = requests
+      .flatMap((request) =>
+        (JSON.parse(request.body) as OtlpTracesRequest).resourceSpans.flatMap((resource) =>
+          resource.scopeSpans.flatMap((scope) => scope.spans),
+        ),
+      )
+      .filter((span) => span.name.startsWith('chat '));
+    expect(chats).toHaveLength(count);
+    for (const chat of chats) {
+      expect(chat).toMatchObject({
+        name: 'chat resolved-model',
+        traceId: telemetry.traceId,
+        parentSpanId: telemetry.stepSpanId,
+      });
+      const attrs = Object.fromEntries(chat.attributes.map((entry) => [entry.key, entry.value]));
+      expect(attrs['gen_ai.response.model']).toEqual({ stringValue: 'resolved-model' });
+      if (attrs['langfuse.observation.input'] === undefined) {
+        expect(count).toBe(3);
+        expect(attrs['langfuse.observation.output']).toBeUndefined();
+        continue;
+      }
+      const first = JSON.stringify(attrs['langfuse.observation.output']).includes(
+        'Check the synthetic tool.',
+      );
+      expect(attrs['gen_ai.usage.input_tokens']).toEqual({ intValue: first ? 31 : 71 });
+      expect(attrs['gen_ai.usage.output_tokens']).toEqual({ intValue: first ? 17 : 31 });
+      expect(JSON.stringify(attrs['langfuse.observation.input'])).toContain(
+        'Run the synthetic tool.',
+      );
+      if (!first) {
+        expect(JSON.stringify(attrs['langfuse.observation.input'])).toContain(
+          'Tool output: [REDACTED]',
+        );
+      }
+      expect(JSON.stringify(attrs['langfuse.observation.output'])).toContain(
+        first ? 'Check the synthetic tool.' : 'Tool output: [REDACTED]',
+      );
+    }
+    expect(requests.map((request) => request.body).join('')).not.toContain(secret);
+    expect(requests.map((request) => request.body).join('')).not.toContain('PRIVATE_SUMMARY');
+  },
+);

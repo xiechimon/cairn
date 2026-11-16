@@ -16,7 +16,7 @@ Read `apps/web/DESIGN-RULES.md` first (rules with ids), then `apps/web/DESIGN.md
 
 ## Draft first
 
-A new feature that touches first run, Coordinator chat, thread list and sidebar, thread and review, or settings needs a page draft (sketch or screenshot mock, built from the real components) and the owner's pick before code. Backend-only changes and single settings are exempt. A fix to an existing screen needs no draft but still needs the reference comparison below.
+A new feature that touches first run, Coordinator chat, thread list and sidebar, thread and review, or settings needs a page draft (sketch or screenshot mock, built from the real components) and the owner's pick before code. Get the pick with `options-prototype-cairn`: three grayscale directions with why-notes; the draft then builds the picked one. Backend-only changes and single settings are exempt. A fix to an existing screen needs no draft but still needs the reference comparison below.
 
 ## Brief template
 
