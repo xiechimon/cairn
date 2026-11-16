@@ -105,8 +105,13 @@ test('a Claude Code login alone leaves step 1 open and says the Coordinator stil
   await open(page, { ...fresh(), bound: false });
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
   await expect(page.getByTestId('first-run-setup')).toContainText('Coordinator 用不了 Claude Code 登录');
-  await expect(page.getByTestId('first-run-setup').getByRole('link', { name: '添加服务商' })).toBeVisible();
   await expect(page.getByTestId('first-run-setup')).toContainText('还差第 1 步');
+  await page.getByTestId('first-run-add-provider').click();
+  const picker = page.getByRole('dialog', { name: '添加模型服务' });
+  await expect(picker).toBeVisible();
+  await expect(page).toHaveURL(/\/app(\?|$)/);
+  await picker.locator('[data-preset-id="claude-subscription"]').click();
+  await expect(page.getByRole('dialog', { name: '添加 Claude 订阅' })).toBeVisible();
 });
 
 test('the new-project dialog says which step is missing until setup is done', async ({ page }) => {

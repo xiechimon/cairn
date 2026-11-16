@@ -16,9 +16,9 @@ import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
+import { AddProviderFlow, type AddProviderView } from '../resources/add-provider-flow.js';
 import { ModelPicker } from '../resources/routing-settings-page.js';
 import { safeSessionStorage } from '../safe-storage.js';
-import { settingsHref } from '../settings/settings-href.js';
 import {
   coordinatorCanAnswer,
   modelSides,
@@ -178,6 +178,9 @@ function SourceRow({
 
 function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress }) {
   const { t } = useI18n();
+  const { live } = useLiveData();
+  const [addView, setAddView] = useState<AddProviderView>('closed');
+  const [connectError, setConnectError] = useState<string | null>(null);
   const online = setup.machines.find((machine) => machine.online);
   const login = setup.connections.some(
     (c) => online !== undefined && c.id === `machine:${online.id}` && c.available !== false,
@@ -244,7 +247,8 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
               <div className="flex min-h-8 items-center max-[640px]:w-full max-[640px]:pl-11">
                 <Button
                   className="pointer-coarse:h-11"
-                  render={<Link to={settingsHref('providers')} />}
+                  data-testid="first-run-add-provider"
+                  onClick={() => setAddView('picker')}
                 >
                   <Plus />
                   {t('添加服务商')}
@@ -260,6 +264,14 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
           {t('任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。')}
         </p>
       )}
+      <AddProviderFlow
+        teamId={setup.teamId}
+        live={live}
+        view={addView}
+        onViewChange={setAddView}
+        connectError={connectError}
+        onConnectError={setConnectError}
+      />
     </>
   );
 }
