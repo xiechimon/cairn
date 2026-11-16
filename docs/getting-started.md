@@ -2,6 +2,12 @@
 
 Cairn is one server you browse plus a daemon on every machine that runs builds. The server alone is enough to look around; a daemon is what lets agents work on your own machines.
 
+## Cairn for Mac
+
+On a Mac, the desktop app is the whole install. Download it from the [latest release](https://github.com/xiechimon/cairn/releases/latest) (`-arm64.dmg` for Apple silicon, `-x64.dmg` for Intel), drag it to Applications and open it. The app is not notarized yet, so macOS blocks the first launch: open System Settings, then Privacy & Security, and click **Open Anyway** next to Cairn; on macOS 14 and earlier, right-click Cairn in Applications and choose Open instead.
+
+The app runs the server and a Runner on this Mac, approves that Runner and signs you in as the owner. Tasks run with Claude Code: install it and run `claude` once in Terminal to sign in. The app finds `claude` on your `PATH` or in its usual install folders. The rest of this page is for Linux, Windows and extra Runners.
+
 ## Run the server
 
 Requirements: Node.js 22 or 24 (LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to source compilation and need a build toolchain).
@@ -20,17 +26,27 @@ curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" http://127.0
 
 Open the returned code in the browser pairing page. Another device uses the same one-time code from Remote access. `cairn token` prints the owner token for this machine only. To reach the server from another machine, put Tailscale Serve or another route in front of loopback; the route does not sign the browser in. `CAIRN_AUTH=off` disables auth and works only on a loopback bind.
 
+A browser signed in with a pairing code is a paired device, not the owner, so on macOS and Windows, and in any browser on another machine, it cannot yet add providers, secrets or API keys, manage pairing, or approve the server's own machine as a Runner ([#5201](https://github.com/xiechimon/cairn/issues/5201)). Do those with the owner token for now. For example, to approve the Runner that `cairn start --server` printed a link for, take the `enroll=` value from that link:
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" -H "Content-Type: application/json" \
+  -d '{"enrollId":"<enroll value>"}' http://127.0.0.1:8787/api/machine/enroll/confirm
+```
+
+Cairn for Mac signs in as the owner and needs none of this.
+
 ## Run builds on your own machines
 
 The UI is fully usable without a daemon; register a machine when you want agents to actually run builds on it. On each machine that executes builds:
 
 ```sh
 npm i -g @xiechimon/cairn-cli
-# One-time enrollment: create an API key in the web UI (/app/api-keys, plaintext shown once), then
-cairn start --api-key <cairn_...> --team <teamId>
-# Daily use (credentials persisted in ~/.cairn/machine.json):
-cairn start        # also: stop / restart / logs -f / status
+cairn start --server http://127.0.0.1:8787
 ```
+
+The first start prints a link. Open it in the browser where you use Cairn and approve the machine; the daemon then connects by itself and keeps its credentials in `~/.cairn/machine.json`. When the Runner is on another machine, use the address that reaches your server instead. Later, `cairn start` alone is enough; there are also `cairn stop`, `restart`, `logs -f` and `status`.
+
+On a machine without a browser, create an API key in the web UI (API keys in Settings; the key is shown once) and enroll with `cairn start --api-key <cairn_...> --team <teamId>` instead.
 
 Both packages install a `cairn` bin: installing both globally on the same machine means whichever came last wins the name. The clean split is running the server where you browse and `cairn-cli` where agents build.
 
