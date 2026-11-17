@@ -19,12 +19,20 @@ const RECORD = {
   updatedAt: 1,
 };
 
-const OK = { status: 'ok', reason: null, failure: null, httpStatus: null, latencyMs: 412 };
+const OK = {
+  status: 'ok',
+  reason: null,
+  failure: null,
+  httpStatus: null,
+  detail: null,
+  latencyMs: 412,
+};
 const NOT_FOUND = {
   status: 'failed',
   reason: 'The provider request failed. Check the key, model and connection settings.',
   failure: 'not-found',
   httpStatus: 404,
+  detail: 'Model "large-model" is not supported by any configured account in this group',
   latencyMs: null,
 };
 
@@ -71,6 +79,9 @@ test('test all sends one request per model and shows latency or the failure kind
   await expect(chip(page, 'large-model')).toContainText('模型不存在');
   await expect(editor(page).getByTestId('provider-model-failures')).toContainText(
     '上游没有这个模型',
+  );
+  await expect(editor(page).getByTestId('provider-model-failure-detail')).toHaveText(
+    'HTTP 404 · Model "large-model" is not supported by any configured account in this group',
   );
   await expect(editor(page).getByTestId('provider-models-summary')).toHaveText(
     '1 个可用 · 1 个失败',

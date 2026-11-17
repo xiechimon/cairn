@@ -10,15 +10,13 @@ import {
   toClaudeAccount,
 } from '../api/claude-accounts.js';
 import {
-  hasUsableClaudeSubscription,
   useClaudeSubscriptionSteps,
   useClaudeSubscriptions,
   useDeleteClaudeSubscription,
   useRenameClaudeSubscription,
   useSubscriptionVerification,
 } from '../api/claude-subscriptions.js';
-import { useApiMutations, useMachines, useModelSources, useProviders } from '../api/hooks.js';
-import { mapMachines } from '../api/mappers.js';
+import { useApiMutations, useModelSources, useProviders } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useClock } from '../components/accounts/account-parts.js';
@@ -29,16 +27,12 @@ import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
-import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { AddProviderFlow, type AddProviderView } from './add-provider-flow.js';
 import {
-  ClaudeCodeEditor,
-  type ClaudeCodeMachine,
-  claudeCodeStatus,
   type ProviderEditActions,
   providerKind,
   providerMark,
@@ -57,14 +51,6 @@ interface Entry {
 }
 
 const CLAUDE_SUBSCRIPTION_ADD = 'claude-subscription';
-
-function sourceFor(machine: MachineRow, sources: readonly ModelSource[]): ModelSource | undefined {
-  const claude = sources.filter((s) => s.runtime === 'claude-code');
-  return (
-    claude.find((s) => s.machineId !== undefined && s.machineId === machine.id) ??
-    claude.find((s) => s.machineId === undefined && s.hostname === machine.name)
-  );
-}
 
 function deadModelIds(sources: readonly ModelSource[]): Set<string> {
   return new Set(
@@ -149,30 +135,6 @@ function subscriptionEntries(
   });
 }
 
-function claudeCodeEntry(
-  machines: readonly MachineRow[],
-  sources: readonly ModelSource[],
-  subscribed: boolean,
-  t: TFunc,
-): Entry | null {
-  const rows: ClaudeCodeMachine[] = machines.map((machine) => {
-    const source = sourceFor(machine, sources);
-    return { machine, source, ...claudeCodeStatus(source, machine.online !== false, subscribed) };
-  });
-  const installed = rows.filter((r) => typeof r.source?.bin === 'object' && r.source.bin !== null);
-  if (rows.every((r) => r.source === undefined)) return null;
-  return {
-    item: {
-      id: 'claude-code',
-      name: 'Claude Code',
-      Mark: ClaudeMark,
-      status: t('{installed}/{n} 台执行机已装', { installed: installed.length, n: rows.length }),
-      tone: rows.some((r) => r.tone === 'ok') ? 'ok' : installed.length > 0 ? 'warn' : 'off',
-    },
-    editor: <ClaudeCodeEditor machines={rows} all={machines} />,
-  };
-}
-
 export function ProvidersSection() {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -180,7 +142,6 @@ export function ProvidersSection() {
   const { live, teamId } = useLiveData();
   const sourcesQ = useModelSources(teamId, live);
   const providersQ = useProviders(teamId, live);
-  const machinesQ = useMachines(teamId, live);
   const mutations = useApiMutations(teamId);
   const client = useQueryClient();
   const clock = useClock();
@@ -200,7 +161,6 @@ export function ProvidersSection() {
   const providers = live
     ? (providersQ.data?.providers ?? [])
     : (fixture.resources?.providers ?? []);
-  const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
   const now = live ? Date.now() : fixture.now;
   const fixtureAccounts = fixture.resources?.accounts;
   const subscriptions: SubscriptionAccount[] = (
@@ -296,12 +256,6 @@ export function ProvidersSection() {
       : {}),
   });
 
-  const claudeCode = claudeCodeEntry(
-    machines,
-    sources,
-    !live || hasUsableClaudeSubscription(subscriptionsQ.data, now),
-    t,
-  );
   const entries = [
     ...subscriptionEntries(subscriptions, {
       now,
@@ -312,7 +266,6 @@ export function ProvidersSection() {
       clock,
     }),
     ...teamEntries(providers, deadModelIds(sources), actionsFor, t),
-    ...(claudeCode === null ? [] : [claudeCode]),
   ];
   const partialFailure = subscriptionsQ.isError
     ? 'subscriptions'

@@ -573,7 +573,6 @@ export const EN: Record<string, string> = {
   设置: 'Settings',
   // team empty state, grid and chart (r2 §8.1 17c title)
   ' · 默认': ' · Default',
-  未配置模型: 'No model configured',
 
   // —— api-keys route (r2 19, 02 §8 canon note) ——
   '尚无 API 密钥': 'No API keys yet',
@@ -1158,8 +1157,6 @@ export const EN: Record<string, string> = {
   其他: 'Other',
   // #356 runtime tabs(spec 11 §A1-A4;tab 名 pi/Claude Code 不译,槽位名
   // default/opus/… 为配置标识符不译;{hostname} = 上报机器名插值)
-  未安装: 'Not installed',
-  '已安装，未配置模型槽': 'Installed, no model slots configured',
   未登录: 'Not signed in',
   尚未添加服务商: 'No providers yet',
   // #231/#243 OAuth 落地 reason 三译(providers-page 喂 connectError 行)
@@ -1574,7 +1571,6 @@ export const EN: Record<string, string> = {
   合并: 'Merge',
   运行中: 'Running',
   等待检查: 'Waiting on checks',
-  未配置: 'Not configured',
   空闲: 'Idle',
   项目设置: 'Project settings',
   回答: 'Answer',
@@ -1681,20 +1677,15 @@ export const EN: Record<string, string> = {
   移除服务商: 'Remove provider',
   '移除后，用到它的模型和路由不再可用。':
     'After removal, the models and routes that use it stop working.',
-  '离线 · 显示最后一次上报': 'Offline · showing the last report',
   程序: 'Binary',
   配置: 'Config',
-  模型槽: 'Model slots',
   服务商: 'Providers',
   '{n} 个模型': '{n#1 model|# models}',
   '{n} 个已下架': '{n} retired',
   范围: 'Scope',
   '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
     'Add an API key, subscription or custom endpoint and its models show up here.',
-  还没上报: 'Not reported yet',
   模型列表: 'Models',
-  '已安装，添加 Claude 订阅后才能用': 'Installed; add a Claude subscription to use it',
-  '已安装，用团队的 Claude 订阅': "Installed, runs on the team's Claude subscription",
   '{online}/{total} 台电脑在线': '{online} of {total#1 computer|# computers} online',
   '{online} 台在线 · {offline} 台离线（{names}）': '{online} online · {offline} offline ({names})',
   设置分区: 'Settings sections',
@@ -2294,13 +2285,6 @@ export const EN: Record<string, string> = {
   全部测试: 'Test all',
   '还没选模型。从上游拉一份清单来勾选。': 'No models yet. Fetch the upstream list and pick some.',
   获取上游模型: 'Fetch upstream models',
-  '执行机上的 CLI · 用团队的 Claude 订阅':
-    "CLI on your Runners · uses the team's Claude subscription",
-  '{installed}/{n} 台已装': '{installed} of {n} installed',
-  '还没有执行机上报装了 Claude Code。': 'No Runner has reported Claude Code yet.',
-  '在执行机上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。':
-    'Set the env.ANTHROPIC_*_MODEL slots in ~/.claude/settings.json on a Runner and they show here.',
-  '{installed}/{n} 台执行机已装': 'Installed on {installed} of {n#1 Runner|# Runners}',
   '上游拒绝了 API key。检查 key 后重试。':
     'The upstream refused the API key. Check the key and retry.',
   '上游没有提供模型清单。': 'The upstream does not offer a model list.',

@@ -1,5 +1,4 @@
 import {
-  type ModelSource,
   PROVIDER_OAUTH_PRESET_IDS,
   PROVIDER_PRESET_IDS,
   type ProviderApi,
@@ -14,24 +13,12 @@ import { type ReactNode, useRef, useState } from 'react';
 import { ClaudeMark, GeminiMark, GrokMark, OpenAIMark } from '../components/brand-marks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
-import { MachineName } from '../components/machine-label.js';
-import {
-  ProviderEditorHead,
-  type ProviderMark,
-  ProviderSection,
-  TONE_DOT,
-} from '../components/providers/provider-panel.js';
-import {
-  SETTINGS_HINT_CLS,
-  SettingsCard,
-  SettingsDangerZone,
-  SettingsSection,
-} from '../components/settings-list.js';
+import { ProviderEditorHead, type ProviderMark } from '../components/providers/provider-panel.js';
+import { SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Spinner } from '../components/ui/spinner.js';
-import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { UpstreamModelPicker } from './upstream-model-picker.js';
 
@@ -500,28 +487,42 @@ export function TeamProviderEditor({
         {failed.length > 0 && (
           <ul
             data-testid="provider-model-failures"
-            className="m-0 flex list-none flex-col gap-1 p-0"
+            className="m-0 flex list-none flex-col gap-2 p-0"
           >
             {failed.map((id) => {
               const failure = failureOf(checks[id]);
               const check = checks[id];
-              const status = check?.phase === 'done' ? check.result.httpStatus : null;
+              const upstream =
+                check?.phase === 'done'
+                  ? [
+                      check.result.httpStatus === null ? null : `HTTP ${check.result.httpStatus}`,
+                      check.result.detail ?? null,
+                    ]
+                      .filter((part) => part !== null)
+                      .join(' · ')
+                  : '';
               return (
-                <li key={id} className="flex flex-wrap items-baseline gap-x-2 text-meta">
+                <li key={id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-meta">
                   <code className="text-destructive">{id}</code>
-                  <span
-                    className="text-content-secondary"
-                    title={status === null ? undefined : `HTTP ${status}`}
-                  >
+                  <span className="text-content-secondary">
                     {failure === 'unavailable' || failure === null
                       ? t('测试没能跑完，请重试。')
                       : t(FAILURE_SENTENCE[failure])}
                   </span>
+                  {upstream !== '' && (
+                    <span
+                      data-testid="provider-model-failure-detail"
+                      title={upstream}
+                      className="order-last min-w-0 basis-full truncate text-content-tertiary max-sm:line-clamp-2 max-sm:whitespace-normal max-sm:[overflow-wrap:anywhere]"
+                    >
+                      {upstream}
+                    </span>
+                  )}
                   {actions.patch !== undefined && (
                     <Button
                       variant="link"
                       size="xs"
-                      className="h-auto p-0 text-meta"
+                      className="-my-1 ml-auto h-6 px-1 text-meta pointer-coarse:-my-3 pointer-coarse:h-11"
                       disabled={savingModels}
                       onClick={() => removeModel(id)}
                     >
@@ -579,127 +580,6 @@ export function TeamProviderEditor({
       >
         <p className="m-0">{t('移除后，用到它的模型和路由不再可用。')}</p>
       </AlertDialogShell>
-    </>
-  );
-}
-
-export function claudeCodeStatus(
-  source: ModelSource | undefined,
-  online: boolean,
-  subscribed: boolean,
-): { status: string; tone: 'ok' | 'warn' | 'off' } {
-  if (source === undefined) return { status: '还没上报', tone: 'off' };
-  if (!online) return { status: '离线 · 显示最后一次上报', tone: 'warn' };
-  if (source.bin === null) return { status: '未安装', tone: 'warn' };
-  if (!subscribed) return { status: '已安装，添加 Claude 订阅后才能用', tone: 'warn' };
-  if (source.models.length === 0) return { status: '已安装，未配置模型槽', tone: 'warn' };
-  return { status: '已安装，用团队的 Claude 订阅', tone: 'ok' };
-}
-
-export interface ClaudeCodeMachine {
-  machine: MachineRow;
-  source: ModelSource | undefined;
-  status: string;
-  tone: 'ok' | 'warn' | 'off';
-}
-
-export function ClaudeCodeEditor({
-  machines,
-  all,
-}: {
-  machines: readonly ClaudeCodeMachine[];
-  all: readonly MachineRow[];
-}) {
-  const { t } = useI18n();
-  const installed = machines.filter(
-    (m) => typeof m.source?.bin === 'object' && m.source.bin !== null,
-  );
-  const slots = new Map<string, { slot: string; id: string }>();
-  for (const { source } of installed) {
-    for (const model of source?.models ?? []) {
-      const slot = model.slot ?? model.name;
-      if (!slots.has(`${slot}:${model.id}`))
-        slots.set(`${slot}:${model.id}`, { slot, id: model.id });
-    }
-  }
-  return (
-    <>
-      <ProviderEditorHead
-        Mark={ClaudeMark}
-        name="Claude Code"
-        kind={t('执行机上的 CLI · 用团队的 Claude 订阅')}
-      />
-      <ProviderSection
-        title={t('执行机')}
-        hint={t('{installed}/{n} 台已装', { installed: installed.length, n: machines.length })}
-      >
-        <SettingsCard>
-          {machines.map(({ machine, source, status, tone }) => {
-            const bin = typeof source?.bin === 'object' && source.bin !== null ? source.bin : null;
-            return (
-              <div
-                key={machine.id ?? machine.name}
-                data-testid="claude-code-machine"
-                data-machine-id={machine.id}
-                data-tone={tone}
-                className="settings-flat-block flex min-h-11 flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-1.5"
-              >
-                <span className="flex min-w-0 flex-auto items-center gap-2">
-                  <span
-                    aria-hidden
-                    className={cn('size-1.5 flex-none rounded-full', TONE_DOT[tone])}
-                  />
-                  <span className="min-w-0 truncate text-ui text-foreground">
-                    <MachineName machine={machine} all={all} compact />
-                  </span>
-                </span>
-                {bin?.version != null && (
-                  <code className="flex-none text-meta text-content-tertiary">v{bin.version}</code>
-                )}
-                <span
-                  className={cn(
-                    'text-meta max-sm:basis-full max-sm:pl-3.5',
-                    tone === 'warn' ? 'text-(--waiting-ink)' : 'text-content-secondary',
-                  )}
-                >
-                  {t(status)}
-                </span>
-              </div>
-            );
-          })}
-        </SettingsCard>
-      </ProviderSection>
-      <ProviderSection title={t('模型槽')}>
-        {slots.size === 0 ? (
-          <p className={cn(SETTINGS_HINT_CLS, 'm-0 px-1')}>
-            {installed.length === 0
-              ? t('还没有执行机上报装了 Claude Code。')
-              : t(
-                  '在执行机上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。',
-                )}
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {[...slots.values()].map(({ slot, id }) => (
-              <span
-                key={`${slot}:${id}`}
-                data-testid="claude-code-slot"
-                className="inline-flex h-7 max-w-full items-center gap-2 rounded-md bg-secondary px-2.5 text-ui text-foreground ring-1 ring-border"
-              >
-                <span className="truncate">{slot}</span>
-                {slot !== id && (
-                  <span aria-hidden className="text-content-tertiary">
-                    →
-                  </span>
-                )}
-                {slot !== id && (
-                  <code className="truncate text-meta text-content-tertiary">{id}</code>
-                )}
-              </span>
-            ))}
-          </div>
-        )}
-      </ProviderSection>
     </>
   );
 }

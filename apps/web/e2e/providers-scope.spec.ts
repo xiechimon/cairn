@@ -13,7 +13,8 @@ test('one provider list for every Runner: no scope menu, no checked stamp', asyn
   await expect(page.getByRole('combobox', { name: '设置作用于' })).toHaveCount(0);
   await expect(page.getByTestId('settings-scope')).toHaveCount(0);
   await expect(page.getByTestId('settings-checked')).toHaveCount(0);
-  await expect(instance(page, 'claude-code')).toBeVisible();
+  await expect(page.getByTestId('provider-instance')).toHaveCount(3);
+  await expect(instance(page, 'claude-code')).toHaveCount(0);
 });
 
 test('provider rows open an editor; the selection lives in the URL and survives reload', async ({
@@ -21,7 +22,7 @@ test('provider rows open an editor; the selection lives in the URL and survives 
 }) => {
   await page.goto(FLEET);
   const rows = page.getByTestId('provider-instance');
-  await expect(rows).toHaveCount(4);
+  await expect(rows).toHaveCount(3);
   await expect(rows.first()).toHaveAttribute('aria-current', 'true');
   await instance(page, 'provider:prov-relay').getByRole('button').first().click();
   await expect(page).toHaveURL(/item=provider%3Aprov-relay/);
@@ -60,28 +61,6 @@ test('an unknown item and a leftover scope param fall back to the first row', as
     'aria-current',
     'true',
   );
-});
-
-test('Claude Code is one row that lists every Runner with its version and state', async ({
-  page,
-}) => {
-  await page.goto(`${FLEET}&item=claude-code`);
-  const cc = instance(page, 'claude-code');
-  await expect(cc).toHaveAttribute('aria-current', 'true');
-  await expect(cc).toContainText(/\d+\/5 台执行机已装/);
-  const machines = editor(page).getByTestId('claude-code-machine');
-  await expect(machines).toHaveCount(5);
-  const orb = machines.filter({ hasText: 'build-box-orb' });
-  await expect(orb).toContainText('v2.1.316');
-  await expect(orb).toContainText('用团队的 Claude 订阅');
-  await expect(orb).toHaveAttribute('data-tone', 'ok');
-  const old = machines.filter({ hasText: 'old-laptop' });
-  await expect(old).toContainText('离线');
-  await expect(old).toHaveAttribute('data-tone', 'warn');
-  await expect(machines.filter({ hasText: 'new-box' })).toContainText('还没上报');
-  const slots = editor(page).getByTestId('claude-code-slot');
-  await expect(slots.filter({ hasText: 'default-sonnet' })).toContainText('claude-sonnet-5-5');
-  await expect(page.getByTestId('provider-list').getByRole('switch')).toHaveCount(0);
 });
 
 test('empty team: the list offers to add a provider and opens the picker', async ({ page }) => {
@@ -210,23 +189,6 @@ test('live: provider edits send the agreed requests and touch no Runner', async 
 
   expect(calls.filter((call) => call.startsWith('PATCH m1'))).toEqual([]);
 });
-
-const REMOTE = 'Kd8fG2hJ4mN9pQ1rStUvWx3';
-const LOCAL = 'TlZ2sSD4EJCxjNJqVhdo_';
-
-for (const [scenario, machine, status] of [
-  ['10', REMOTE, '用团队的 Claude 订阅'],
-  ['10-cc-loggedout', REMOTE, '用团队的 Claude 订阅'],
-  ['10-cc-bin-gone', REMOTE, '未安装'],
-  ['10-cc-noconfig', LOCAL, '已安装，未配置模型槽'],
-] as const) {
-  test(`Claude Code state from the daemon report: ${scenario} reads ${status}`, async ({ page }) => {
-    await page.goto(`/app/resources/providers?scenario=${scenario}&item=claude-code`);
-    await expect(
-      editor(page).locator(`[data-testid="claude-code-machine"][data-machine-id="${machine}"]`),
-    ).toContainText(status);
-  });
-}
 
 test('live: a second model edit waits for the first and keeps its result', async ({ page }) => {
   const bodies: string[] = [];
