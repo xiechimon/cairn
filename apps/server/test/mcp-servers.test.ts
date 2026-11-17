@@ -53,7 +53,7 @@ function configPath(content?: unknown): string {
 const MIXED = {
   mcpServers: {
     demo: { url: 'https://example.invalid/mcp', headers: { Authorization: 'Bearer s3cret' } },
-    local: { command: 'npx', args: ['-y', 'mcp-browser'], env: { API_KEY: 'k3y' } },
+    local: { command: 'npx', args: ['-y', 'mcp-browser'], env: { API_KEY: 'k3y!' } },
     broken: { nope: true },
     alsoBroken: { command: 42 },
   },
@@ -97,7 +97,7 @@ describe('readClaudeMcpServers -- config read seam (spec 13: bad = empty set, do
   test('security invariant: env/headers secret values never leave the read seam (spec 13 credential surface narrowed)', () => {
     const raw = JSON.stringify(readClaudeMcpServers(configPath(MIXED)));
     expect(raw).not.toContain('s3cret');
-    expect(raw).not.toContain('k3y');
+    expect(raw).not.toContain('k3y!');
   });
 
   test('slug = key lowercased; label = original key; lowercase name collision first-wins', () => {
@@ -146,7 +146,7 @@ describe('listMcpServers -- wire record projection (shape-preserving = web zero 
       listMcpServers({ mcpConfigPath: configPath(MIXED), db: openMemoryDb() }, 'team-1'),
     );
     expect(raw).not.toContain('s3cret');
-    expect(raw).not.toContain('k3y');
+    expect(raw).not.toContain('k3y!');
   });
 });
 
@@ -159,7 +159,7 @@ describe('REST surface: GET re-sourced, management write surface deleted (spec 1
     expect(rows.map((r) => r.slug)).toEqual(['demo', 'local']);
     const raw = JSON.stringify(rows);
     expect(raw).not.toContain('s3cret');
-    expect(raw).not.toContain('k3y');
+    expect(raw).not.toContain('k3y!');
     s.dispose();
   });
 
@@ -350,7 +350,7 @@ describe('chief mcp_servers read tool: data source = local config (spec 13 re-so
     expect(rows[0]).toMatchObject({ transport: 'http', url: 'https://example.invalid/mcp' });
     expect(rows[1]).toMatchObject({ transport: 'stdio', url: 'npx' });
     expect(text).not.toContain('s3cret');
-    expect(text).not.toContain('k3y');
+    expect(text).not.toContain('k3y!');
     s.dispose();
   });
 });
