@@ -72,8 +72,8 @@ test('the runner clones the hosted repo and pushes its own work branch with the 
   expect(toMain.code).not.toBe(0);
   const work = `refs/heads/${conversationBranch(stepRow.buildId)}`;
   const pushed = await git(['push', 'origin', `HEAD:${work}`], clone);
-  expect(pushed.stderr.toString()).not.toContain('403');
-  expect(pushed.code).toBe(0);
+  expect(pushed.stderr.toString()).not.toMatch(/returned error: 403\b/);
+  expect(pushed.code, pushed.stderr.toString()).toBe(0);
   expect((await git(['ls-remote', 'origin', work], clone)).stdout.toString()).toContain(work);
   expect((await git(['push', 'origin', 'HEAD:refs/heads/other'], clone)).code).not.toBe(0);
 });
