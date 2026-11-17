@@ -32,7 +32,7 @@ export function SourceIssueLine({
         <span className="flex-none text-(--text-tertiary)">{t('来源')}</span>
         <Button
           variant="link"
-          className="h-auto p-0"
+          className="h-auto p-0 text-meta text-content-secondary decoration-content-tertiary hover:text-foreground"
           data-testid="source-orchestration-link"
           onClick={
             parsed !== null && onOpenThread ? () => onOpenThread(parsed.threadId) : undefined

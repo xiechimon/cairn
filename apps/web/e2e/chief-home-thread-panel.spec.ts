@@ -27,26 +27,36 @@ test('a working thread has no updates and no plan row in the more menu', async (
   await expect(page.getByRole('menuitem', { name: '计划' })).toHaveCount(0);
 });
 
-test('the origin line is one right-aligned link that scrolls the conversation to the request', async ({
+test('the origin line is one link under the request that scrolls the conversation to it', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
   await expect(page.getByTestId('thread-origin')).toHaveText('在主对话中查看');
-  const [origin, jump, request] = await Promise.all([
-    page.getByTestId('thread-origin').boundingBox(),
+  const [jump, request] = await Promise.all([
     page.getByTestId('thread-origin-jump').boundingBox(),
-    page.getByTestId('thread-request').boundingBox(),
+    page.getByTestId('thread-purpose').boundingBox(),
   ]);
-  expect(Math.round((jump?.x ?? 0) + (jump?.width ?? 0))).toBe(
-    Math.round((origin?.x ?? 0) + (origin?.width ?? 0)),
-  );
-  expect(
-    Math.abs((jump?.x ?? 0) + (jump?.width ?? 0) - ((request?.x ?? 0) + (request?.width ?? 0))),
-  ).toBeLessThanOrEqual(8);
+  expect(Math.round(jump?.x ?? 0)).toBe(Math.round(request?.x ?? 0));
+  expect((jump?.y ?? 0) - ((request?.y ?? 0) + (request?.height ?? 0))).toBeLessThan(12);
   await page.getByTestId('thread-origin-jump').click();
   await expect(
     page.locator('[data-testid="home-c"] [data-reply-source="home-c-ask-fold"]'),
   ).toBeInViewport();
+});
+
+test('a task the Coordinator quoted shows the quote once and leaves the jump to the source line', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&thread=home-c-working-c`);
+  const lead = page.getByTestId('thread-lead');
+  await expect(lead.getByTestId('thread-purpose').locator('blockquote')).toHaveText(
+    'Run the orb canary until it passes, then send the first real ticket through cairn.',
+  );
+  await expect(
+    page.locator('.side-panel').getByText('Run the orb canary until it passes', { exact: false }),
+  ).toHaveCount(1);
+  await expect(page.getByTestId('thread-request')).toHaveCount(0);
+  await expect(page.getByTestId('thread-origin')).toHaveCount(0);
 });
 
 test('a thread with no originating message shows no origin line', async ({ page }) => {
@@ -294,19 +304,13 @@ test('the head is one calm row: a one-line title, the status in the task tone, c
   );
 });
 
-test('the request shows once as an owner bubble with its origin under it, and replies sit in reply bubbles', async ({
+test('the request shows once as the task text, and replies sit in reply bubbles', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
-  const request = page.getByTestId('thread-request');
-  await expect(request).toHaveText('Fold finished turns before review.');
-  await expect(page.getByTestId('thread-purpose')).toHaveCount(0);
+  await expect(page.getByTestId('thread-purpose')).toHaveText('Fold finished turns before review.');
+  await expect(page.getByTestId('thread-request')).toHaveCount(0);
   await expect(page.locator('.side-panel').getByText('Fold finished turns before review.')).toHaveCount(1);
-  const [bubbleBox, originBox] = await Promise.all([
-    request.boundingBox(),
-    page.getByTestId('thread-origin').boundingBox(),
-  ]);
-  expect((originBox?.y ?? 0) - ((bubbleBox?.y ?? 0) + (bubbleBox?.height ?? 0))).toBeLessThan(12);
   const fills = await page
     .getByTestId('transcript-col')
     .locator('[data-slot="reply-bubble"]')

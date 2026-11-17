@@ -63,17 +63,23 @@ function usageRow(
   };
 }
 
-function askedIn(todo: TodoRecord, messageId: string, spec: string): TodoRecord {
+function askedIn(todo: TodoRecord, messageId: string, text: string, quoted = false): TodoRecord {
   return {
     ...todo,
-    spec,
+    spec: quoted ? `> ${text}` : text,
+    ...(quoted ? { sourceKind: 'orchestration', sourceRef: 'chief:global' } : {}),
     request: {
       segments: [
         {
-          source: { kind: 'chat', threadId: 'chief-global', messageId, span: 'whole' },
+          source: {
+            kind: 'chat',
+            threadId: 'chief-global',
+            messageId,
+            span: quoted ? 'quote' : 'whole',
+          },
           author: 'owner',
           sourceRef: null,
-          text: spec,
+          text,
         },
       ],
       siblings: [],
@@ -205,6 +211,7 @@ export const homeC: FixtureSet = {
       },
       'home-c-ask-orb',
       'Run the orb canary until it passes, then send the first real ticket through cairn.',
+      true,
     ),
     homeTodo('home-c-idle', 2240, 'Sidebar status groups', 'todo', PROJECT_ID),
     homeTodo('home-c-done', 2201, 'Unread dot on threads', 'done', PROJECT_ID),

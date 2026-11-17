@@ -47,7 +47,6 @@ import {
   type ThreadOrigin,
   type ThreadUpdates,
   threadOrigin,
-  threadPurpose,
   threadUpdates,
 } from './thread-panel-model.js';
 import { ThreadPrPanel } from './thread-pr-panel.js';
@@ -76,19 +75,15 @@ function StatusLine({
   now,
   waitingOnChecks,
   updates,
-  originText,
 }: {
   todo: TodoRecord;
   platformWait: ThreadChat['platformWait'];
   now: number;
   waitingOnChecks: boolean;
   updates: ThreadUpdates | null;
-  originText: string | null;
 }) {
   const { t } = useI18n();
   const needsYou = threadStatus(todo) === 'needs-you';
-  const stated = threadPurpose(todo);
-  const purpose = stated === originText?.trim() ? '' : stated;
   const need = platformWait?.platform ?? todo.routeOverride?.requiredCapabilities?.os;
   const needText =
     need === undefined ? null : t('需要 {platform}', { platform: RUNNER_OS_LABELS[need] });
@@ -99,9 +94,7 @@ function StatusLine({
         : ''
       : needsYou && updates !== null
         ? t('{n} 条更新', { n: updates.lines.length })
-        : purpose !== ''
-          ? purpose
-          : joinMeta([needText, relativeTime(todo.phaseAt, now, t)]);
+        : joinMeta([needText, relativeTime(todo.phaseAt, now, t)]);
   return (
     <p
       data-testid="side-chat-status"
@@ -619,7 +612,6 @@ function ReadyThread({
           now={now}
           waitingOnChecks={chat.waitingOnChecks}
           updates={updates}
-          originText={origin?.text ?? null}
         />
       </Head>
       <ThreadFacts todo={todo} prOpen={prRows.length > 0} />

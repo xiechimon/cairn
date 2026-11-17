@@ -102,11 +102,6 @@ export function clockTime(ts: number, locale: string): string {
   }).format(ts);
 }
 
-export function threadPurpose(todo: Pick<TodoRecord, 'spec' | 'title'>): string {
-  const line = firstLine(todo.spec);
-  return line === todo.title ? '' : line;
-}
-
 export interface ThreadProgress {
   steps: readonly string[];
   at: number;
