@@ -16,13 +16,13 @@ import {
   type CreateSkillBody,
   MAX_SKILL_FILE_BYTES,
   MAX_SKILL_TOTAL_BYTES,
-  parseSkillFrontmatter,
   SKILL_DIR_NAME_RE,
   SKILL_ENTRY_FILE,
   type SkillFileBody,
   type SkillRecord,
   skillRecordSchema,
 } from '@cairn/shared';
+import { parseSkillFrontmatter } from '@cairn/shared/skill-frontmatter';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { skillAudit } from '../db/schema.js';

@@ -13,7 +13,6 @@ import {
   type ImportSkillBody,
   MAX_SKILL_FILE_BYTES,
   MAX_SKILL_TOTAL_BYTES,
-  parseSkillFrontmatter,
   SKILL_DIR_NAME_RE,
   SKILL_ENTRY_FILE,
   type SkillFileBody,
@@ -21,6 +20,7 @@ import {
   type SkillImportCandidatesResponse,
   type SkillRecord,
 } from '@cairn/shared';
+import { parseSkillFrontmatter } from '@cairn/shared/skill-frontmatter';
 import type { Db } from '../db/client.js';
 import { HttpError } from '../lib/errors.js';
 import { githubApiBaseUrl } from '../lib/github-api-base.js';

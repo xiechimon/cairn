@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSkillFrontmatter, skillRecordSchema } from '@cairn/shared';
+import { skillRecordSchema } from '@cairn/shared';
+import { parseSkillFrontmatter } from '@cairn/shared/skill-frontmatter';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';

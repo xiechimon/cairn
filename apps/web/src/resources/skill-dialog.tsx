@@ -1,11 +1,9 @@
+import { MAX_SKILL_FILE_BYTES, SKILL_DIR_NAME_RE, SKILL_ENTRY_FILE } from '@cairn/shared';
 import {
   buildSkillEntry,
-  MAX_SKILL_FILE_BYTES,
   parseSkillFrontmatter,
-  SKILL_DIR_NAME_RE,
-  SKILL_ENTRY_FILE,
   splitSkillEntry,
-} from '@cairn/shared';
+} from '@cairn/shared/skill-frontmatter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';

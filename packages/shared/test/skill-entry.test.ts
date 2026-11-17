@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { SKILL_DIR_NAME_RE } from '../src/index.js';
 import {
   buildSkillEntry,
   parseSkillFrontmatter,
-  SKILL_DIR_NAME_RE,
   splitSkillEntry,
-} from '../src/index.js';
+} from '../src/records/skill-frontmatter.js';
 
 describe('SKILL_DIR_NAME_RE (directory-name safety domain)', () => {
   it('accepts normal names', () => {

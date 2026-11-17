@@ -1,6 +1,6 @@
 import { SKILL_PAGE_COPY } from '@cairn/shared';
 import { Puzzle } from 'lucide-react';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useSkills } from '../api/hooks.js';
 import { mapSkills } from '../api/mappers.js';
@@ -30,8 +30,12 @@ import {
   RowText,
   RowTitle,
 } from './parts.js';
-import { SkillDialog, type SkillEditTarget } from './skill-dialog.js';
+import type { SkillEditTarget } from './skill-dialog.js';
 import { SkillImportDialog } from './skill-import-dialog.js';
+
+const SkillDialog = lazy(() =>
+  import('./skill-dialog.js').then((m) => ({ default: m.SkillDialog })),
+);
 
 export const SKILLS_HREF = '/app/resources/skills';
 
@@ -162,7 +166,9 @@ export function SkillsPage() {
           </ResourceList>
         )}
       </QueryBoundary>
-      <SkillDialog open={dialog !== null} onClose={() => setDialog(null)} skill={dialog?.skill} />
+      <Suspense fallback={null}>
+        <SkillDialog open={dialog !== null} onClose={() => setDialog(null)} skill={dialog?.skill} />
+      </Suspense>
       <SkillImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </PageShell>
   );
