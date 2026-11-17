@@ -12101,6 +12101,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       },
       "type": "array",
     },
+    "hostname": {
+      "type": "string",
+    },
     "id": {
       "type": "string",
     },
