@@ -5,6 +5,8 @@ import { pathToFileURL } from 'node:url';
 const TEST_FILE = /^(apps|packages)\/[^/]+\/test\/.+\.test\.(ts|tsx|mts|mjs)$/;
 const SOURCE_FILE = /^((apps|packages)\/[^/]+)\/src\/.+\.(ts|tsx|mts)$/;
 const BUDGET_MS = 10 * 60_000;
+const CONTRACT_SOURCES = /^(packages\/shared\/src|apps\/server\/src)\//;
+const CONTRACT_TESTS = ['packages/shared/test/snapshot.test.ts', 'apps/server/test/wire.test.ts'];
 
 export function selectTests(changed, tests) {
   const known = new Set(tests);
@@ -16,6 +18,8 @@ export function selectTests(changed, tests) {
     }
     const source = SOURCE_FILE.exec(file);
     if (!source) continue;
+    if (CONTRACT_SOURCES.test(file))
+      for (const contract of CONTRACT_TESTS) if (known.has(contract)) picked.add(contract);
     const pkg = source[1];
     if (pkg === 'packages/shared') continue;
     const stem = basename(file).replace(/\.(ts|tsx|mts)$/, '');

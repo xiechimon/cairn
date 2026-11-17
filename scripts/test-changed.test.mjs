@@ -9,6 +9,7 @@ const tests = [
   'apps/server/test/coordinator-computer-tool-offers.test.ts',
   'apps/web/test/fleet-status.test.ts',
   'packages/shared/test/snapshot.test.ts',
+  'apps/server/test/wire.test.ts',
 ];
 
 test('a changed test file is selected', () => {
@@ -23,11 +24,23 @@ test('a changed source file selects same-package tests whose name contains its b
   ]);
   assert.deepEqual(selectTests(['apps/server/src/services/machine-computer.ts'], tests), [
     'apps/server/test/machine-computer.test.ts',
+    'apps/server/test/wire.test.ts',
+    'packages/shared/test/snapshot.test.ts',
   ]);
 });
 
-test('a shared protocol change does not fan out to every importer', () => {
-  assert.deepEqual(selectTests(['packages/shared/src/protocol/computer.ts'], tests), []);
+test('a shared protocol change runs the contract tests but does not fan out to every importer', () => {
+  assert.deepEqual(selectTests(['packages/shared/src/protocol/computer.ts'], tests), [
+    'apps/server/test/wire.test.ts',
+    'packages/shared/test/snapshot.test.ts',
+  ]);
+});
+
+test('a server source change runs the route and schema contract tests', () => {
+  assert.deepEqual(selectTests(['apps/server/src/routes-computers.ts'], tests), [
+    'apps/server/test/wire.test.ts',
+    'packages/shared/test/snapshot.test.ts',
+  ]);
 });
 
 test('docs, styles and other packages select nothing', () => {
