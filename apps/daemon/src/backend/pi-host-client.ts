@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import type {
   AgentSessionHandle,
   AgentTokenUsage,
@@ -209,7 +209,7 @@ class PiHostSession implements AgentSessionHandle {
 
   private checkSessionFile(file: string | undefined): void {
     if (file === undefined) return;
-    const resolved = realpathSync(file);
+    const resolved = join(realpathSync(dirname(file)), basename(file));
     if (this.allowedFiles.includes(resolved)) return;
     if (dirname(resolved) === this.privateDirectory) return;
     throw new PiHostProtocolError('pi host reported a session file outside its private directory');

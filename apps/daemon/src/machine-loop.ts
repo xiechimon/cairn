@@ -25,7 +25,7 @@ import { AgentReachProbe } from './agent-reach.js';
 import { configuredAcpBackends, createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
-import { createSessionConfiner } from './backend/confine-session.js';
+import { createSessionConfiner, type Launch } from './backend/confine-session.js';
 import { ConfinementAvailability } from './backend/confinement-availability.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
@@ -105,6 +105,7 @@ export interface MachineLoopOpts {
   orphanTtlMs?: number;
   hookTimeoutMs?: number;
   otel?: DaemonOtel | null;
+  piHostLaunch?: () => Launch;
   confinementPlatform?: string;
   confinementPreflight?: ConstructorParameters<typeof ConfinementAvailability>[0]['launch'];
   seatbeltProbe?: ConstructorParameters<typeof ConfinementAvailability>[0]['seatbeltProbe'];
@@ -328,6 +329,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           onCompactionLog: (msg) => logger.step(msg),
           machineName: config.name,
           ...(confine !== null ? { confine } : {}),
+          ...(opts.piHostLaunch !== undefined ? { hostLaunch: opts.piHostLaunch } : {}),
         });
         logger.machine(piSessionPolicyLine(process.env));
       }
