@@ -413,3 +413,25 @@ test('a research card in Made opens its report as a document; one with no report
   await expect(page).toHaveURL(/todo-bare/);
   await expect(page.getByTestId('research-report-doc')).toHaveCount(0);
 });
+
+test('a task created with no reply after it hangs on an elbow over a short reply bubble', async ({
+  page,
+}) => {
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'ask', role: 'user', content: 'Create HELLO.md', createdAt: 10 },
+      createTodoRow('create', { ...TASK, title: 'Create HELLO.md' }, 20),
+    ],
+    todos: [{ ...TASK, title: 'Create HELLO.md', phase: 'building' }],
+  });
+  await page.goto('/app');
+  const started = page.getByTestId('home-c').getByTestId('chief-task-started');
+  await expect(started.getByTestId('chief-task-ref')).toHaveText(/^Create HELLO\.md/);
+  await expect(started.locator('[data-slot="task-ref-elbow"]')).toHaveCount(1);
+  await expect(started.getByTestId('chief-task-started-said')).toHaveText('已建任务');
+  const row = await started.getByTestId('chief-task-ref').boundingBox();
+  const said = await started.getByTestId('chief-task-started-said').boundingBox();
+  expect((row?.y ?? 0) + (row?.height ?? 0)).toBeLessThanOrEqual(said?.y ?? 0);
+  expect(row?.x ?? 0).toBeGreaterThan(said?.x ?? 0);
+});

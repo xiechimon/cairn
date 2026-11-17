@@ -379,16 +379,20 @@ function TaskStartedRow({
         data-testid="chief-task-started"
         className={EVENT_ROW_CLS}
       >
-        <TaskRefWithChildren
-          elbow={false}
-          reportsBelow
-          taskRef={{
-            todoId,
-            seq: glance.seq ?? seq,
-            title: glance.title ?? title,
-            phase: glance.phase,
-          }}
-        />
+        <div className="mb-1.5 flex flex-col">
+          <TaskRefWithChildren
+            reportsBelow
+            taskRef={{
+              todoId,
+              seq: glance.seq ?? seq,
+              title: glance.title ?? title,
+              phase: glance.phase,
+            }}
+          />
+        </div>
+        <div className={SAID_CLS} data-testid="chief-task-started-said">
+          {t('已建任务')}
+        </div>
       </MessageScrollerItem>
     );
   }
