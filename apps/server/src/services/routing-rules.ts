@@ -42,7 +42,11 @@ import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
-import { claudeCodeUsable, machineRuntimeAvailable } from './dispatch-eligibility.js';
+import {
+  claudeCodeUsable,
+  machineRuntimeAvailable,
+  stepRuntimeFor,
+} from './dispatch-eligibility.js';
 import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
 import { decideStepRoute } from './step-route.js';
 
@@ -317,13 +321,14 @@ export function routeForStep(
   const stored = storedRouteForStep(db, todoRow, kind);
   if (kind === 'review' || (!isSessionStepKind(kind) && kind !== 'merge')) return stored;
   const base = stored ?? defaultSessionRule(db, todoRow.teamId);
-  const choice = projectModelChoice(db, todoRow.projectId ?? null, 'session');
+  const choice = projectModelChoice(db, todoRow.teamId, todoRow.projectId ?? null, 'session');
   if (choice === null) return base;
   return { ...(base ?? syntheticRule(todoRow.teamId, 'session', choice)), ...choice };
 }
 
 export function projectModelChoice(
   db: Pick<Db, 'select'>,
+  teamId: string,
   projectId: string | null,
   use: ProjectModelUse,
 ): ProjectModelChoice | null {
@@ -331,7 +336,7 @@ export function projectModelChoice(
   const row = db
     .select({ modelOverrides: project.modelOverrides })
     .from(project)
-    .where(eq(project.id, projectId))
+    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
     .get();
   return row?.modelOverrides?.[use] ?? null;
 }
@@ -498,11 +503,47 @@ export function profileForStep(
   };
 }
 
-export function coordinatorProfile(db: Pick<Db, 'select'>, teamId: string): RouteProfile | null {
+export function providerRefusal(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  providerId: string,
+): 'rule-provider-missing' | 'rule-provider-has-no-key' | null {
+  const row = db
+    .select({ keyed: sql<number>`${provider.apiKeyCipher} is not null` })
+    .from(provider)
+    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
+    .get();
+  if (row === undefined) return 'rule-provider-missing';
+  return row.keyed === 1 || keylessEndpoint(providerId) ? null : 'rule-provider-has-no-key';
+}
+
+export function withProjectCoordinatorModel<T extends RoutingRuleRow>(
+  db: Pick<Db, 'select'>,
+  rule: T,
+  projectId: string | null,
+): T {
+  const choice = projectModelChoice(db, rule.teamId, projectId, 'coordinator');
+  if (choice === null || stepRuntimeFor(choice.provider) !== stepRuntimeFor(rule.provider)) {
+    return rule;
+  }
+  if (
+    choice.provider !== rule.provider &&
+    providerRefusal(db, rule.teamId, choice.provider) !== null
+  ) {
+    return rule;
+  }
+  return { ...rule, ...choice };
+}
+
+export function coordinatorProfile(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  projectId: string | null = null,
+): RouteProfile | null {
   const route =
     ruleRow(db, teamId, 'coordinator') ??
     (coordinatorRunsOnPi() ? defaultCoordinatorRule(db, teamId) : null);
-  return route === null ? null : routeProfile(route);
+  return route === null ? null : routeProfile(withProjectCoordinatorModel(db, route, projectId));
 }
 
 export function coordinatorMemoryOwner(db: Pick<Db, 'select'>, teamId: string): string | undefined {

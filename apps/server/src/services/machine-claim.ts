@@ -178,7 +178,7 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     .orderBy(asc(step.createdAt))
     .all()
     .flatMap((row) => {
-      const agentRow = coordinatorProfile(deps.db, teamId);
+      const agentRow = coordinatorProfile(deps.db, teamId, row.threadRow.projectId);
       return agentRow === null ? [] : [{ ...row, agentRow }];
     })
     .filter((row) => !serverTakesTurn(deps.db, teamId, row.stepRow));

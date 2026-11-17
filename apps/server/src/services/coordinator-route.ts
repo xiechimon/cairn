@@ -1,12 +1,12 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { provider, routingRule } from '../db/schema.js';
+import { routingRule } from '../db/schema.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import {
   defaultCoordinatorRule,
-  keylessEndpoint,
-  projectModelChoice,
+  providerRefusal,
   resolveRuleProvider,
+  withProjectCoordinatorModel,
 } from './routing-rules.js';
 
 const CLAUDE_CODE_PROVIDER = 'claude-code';
@@ -39,20 +39,6 @@ export function coordinatorRouteVerdict(
   return refusal === null ? { rule } : { refusal, rule };
 }
 
-export function providerRefusal(
-  db: Db,
-  teamId: string,
-  providerId: string,
-): Exclude<CoordinatorRouteRefusal, 'no-api-key-provider'> | null {
-  const row = db
-    .select({ keyed: sql<number>`${provider.apiKeyCipher} is not null` })
-    .from(provider)
-    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
-    .get();
-  if (row === undefined) return 'rule-provider-missing';
-  return row.keyed === 1 || keylessEndpoint(providerId) ? null : 'rule-provider-has-no-key';
-}
-
 export function coordinatorRoute(
   db: Db,
   teamId: string,
@@ -60,13 +46,5 @@ export function coordinatorRoute(
 ): CoordinatorRule | null {
   const verdict = coordinatorRouteVerdict(db, teamId);
   if (verdict === null || 'refusal' in verdict) return null;
-  const choice = projectModelChoice(db, projectId, 'coordinator');
-  if (
-    choice === null ||
-    choice.provider === CLAUDE_CODE_PROVIDER ||
-    providerRefusal(db, teamId, choice.provider) !== null
-  ) {
-    return verdict.rule;
-  }
-  return { ...verdict.rule, ...choice };
+  return withProjectCoordinatorModel(db, verdict.rule, projectId);
 }

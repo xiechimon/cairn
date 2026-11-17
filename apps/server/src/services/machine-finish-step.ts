@@ -743,9 +743,9 @@ function requeueStep(
 function chiefStepAgent(deps: MachineDeps, stepRow: typeof step.$inferSelect): RouteProfile | null {
   if (stepRow.kind !== 'chief' || !isChiefConversation(stepRow.buildId)) return null;
   const thread = deps.db
-    .select({ teamId: chiefThread.teamId })
+    .select({ teamId: chiefThread.teamId, projectId: chiefThread.projectId })
     .from(chiefThread)
     .where(eq(chiefThread.id, stepRow.buildId))
     .get();
-  return thread ? coordinatorProfile(deps.db, thread.teamId) : null;
+  return thread ? coordinatorProfile(deps.db, thread.teamId, thread.projectId) : null;
 }

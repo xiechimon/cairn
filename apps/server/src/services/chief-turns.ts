@@ -125,7 +125,7 @@ export function chiefThreadFallbackModel(db: Db, threadId: string): string | nul
 export function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
   const now = nowMs();
   const rows = db
-    .select({ stepRow: step })
+    .select({ stepRow: step, projectId: chiefThread.projectId })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .where(
@@ -137,12 +137,12 @@ export function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
     )
     .orderBy(sql`${step.createdAt} desc`)
     .all()
-    .map((r) => r.stepRow)
-    .filter((row) => isParked(row, now));
-  const latest = rows[0];
-  if (latest === undefined) return null;
+    .filter((row) => isParked(row.stepRow, now));
+  const parked = rows[0];
+  if (parked === undefined) return null;
+  const latest = parked.stepRow;
   const chiefRow = db.select().from(chief).where(eq(chief.id, chiefId)).get();
-  const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId) : null;
+  const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId, parked.projectId) : null;
   const ran = latest.fallback?.model ?? {
     provider: agentRow?.provider ?? null,
     modelId: agentRow?.modelId ?? null,

@@ -204,9 +204,8 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     const agentRow = profileForStep(deps.db, row.todo, row.step.kind, row.step.id);
     if (agentRow) consider(row.step, agentRow, row.todo, row.build);
   }
-  const coordinator = coordinatorProfile(deps.db, teamId);
   const chiefs = deps.db
-    .select({ step })
+    .select({ step, projectId: chiefThread.projectId })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .where(
@@ -217,7 +216,10 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
       ),
     )
     .all();
-  if (coordinator !== null) for (const row of chiefs) consider(row.step, coordinator, null, null);
+  for (const row of chiefs) {
+    const coordinator = coordinatorProfile(deps.db, teamId, row.projectId);
+    if (coordinator !== null) consider(row.step, coordinator, null, null);
+  }
   if (changed) deps.machineHub.wake(teamId);
 }
 
@@ -259,11 +261,11 @@ export function recoverClaudeRateLimitFailure(
   let agentPick: Pick<AgentRow, 'provider' | 'modelId'> | null = null;
   if (isChiefConversation(stepRow.buildId)) {
     const thread = deps.db
-      .select({ teamId: chiefThread.teamId })
+      .select({ teamId: chiefThread.teamId, projectId: chiefThread.projectId })
       .from(chiefThread)
       .where(eq(chiefThread.id, stepRow.buildId))
       .get();
-    agentPick = thread ? coordinatorProfile(deps.db, thread.teamId) : null;
+    agentPick = thread ? coordinatorProfile(deps.db, thread.teamId, thread.projectId) : null;
   } else {
     const linked = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
     const todoRow = linked

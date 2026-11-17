@@ -181,7 +181,7 @@ export function resolveChiefStepCredentials(
   if (!threadRow) throw notFound(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   if (!chiefRow) throw notFound(`chief ${threadRow.chiefId}`);
-  const agentRow = coordinatorProfile(deps.db, threadRow.teamId);
+  const agentRow = coordinatorProfile(deps.db, threadRow.teamId, threadRow.projectId);
   if (!agentRow) throw notFound(`coordinator routing rule for ${threadId}`);
 
   const boxDeps: ProviderDeps & SecretDeps = deps;

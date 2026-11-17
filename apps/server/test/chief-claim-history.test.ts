@@ -7,6 +7,7 @@ import {
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   machine as machineTable,
+  project as projectTable,
   step as stepTable,
 } from '../src/db/schema.js';
 import {
@@ -306,5 +307,39 @@ describe('the earlier conversation carried to a Runner claim', () => {
     expect(withHistory.claimed?.chief?.systemPrompt).toBe(
       withoutHistory.claimed?.chief?.systemPrompt,
     );
+  });
+});
+
+describe('a project Coordinator model on a Runner', () => {
+  test('a Claude Code project model replaces the team model in the claim; a model from another runtime is ignored', async () => {
+    const { s, machineId } = world();
+    const choose = (provider: string, modelId: string) => {
+      s.db
+        .insert(projectTable)
+        .values({
+          id: `p-${modelId}`,
+          name: modelId,
+          teamId: s.team.id,
+          modelOverrides: { coordinator: { provider, modelId, thinkingLevel: null } },
+        })
+        .run();
+      s.db
+        .update(chiefThreadTable)
+        .set({ projectId: `p-${modelId}` })
+        .where(eq(chiefThreadTable.id, 't1'))
+        .run();
+    };
+    choose('claude-code', 'opus');
+    chiefStep(s, 's1', 100);
+    const claimed = await claimAs(s, machineId);
+    expect(claimed?.agent).toMatchObject({ provider: 'claude-code', modelId: 'opus' });
+    expect(claimed?.agent?.thinkingLevel).toBeNull();
+    s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, 's1')).run();
+    choose('anthropic', 'claude-haiku-5-5');
+    chiefStep(s, 's2', 200);
+    expect((await claimAs(s, machineId))?.agent).toMatchObject({
+      provider: 'claude-code',
+      modelId: 'sonnet',
+    });
   });
 });

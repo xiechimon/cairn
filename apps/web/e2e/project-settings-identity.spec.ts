@@ -192,3 +192,66 @@ test('settings: non-local projects hide the conversion card', async ({ page }) =
   await expect(page.getByText('想做什么', { exact: true })).toBeVisible();
   await expect(page.getByText('转换为 GitHub 形态', { exact: true })).toHaveCount(0);
 });
+
+test('settings: the project Coordinator picker lists the models of the runtime the Coordinator runs on', async ({
+  page,
+}) => {
+  const stub = await stubWorld(page, [localProject()]);
+  await page.route('**/api/teams/team-1/routing-settings', (route) =>
+    route.fulfill({
+      json: {
+        rules: [
+          {
+            id: 'r-coord',
+            teamId: TEAM_ID,
+            use: 'coordinator',
+            provider: 'claude-code',
+            modelId: 'sonnet',
+            thinkingLevel: null,
+            fallbackModels: null,
+            machineId: null,
+            requiredCapabilities: null,
+            seededFromAgentId: null,
+            createdAt: 0,
+            updatedAt: 0,
+          },
+        ],
+        policies: [],
+      },
+    }),
+  );
+  await page.route('**/api/teams/team-1/model-sources', (route) =>
+    route.fulfill({
+      json: {
+        sources: [
+          {
+            runtime: 'pi',
+            provider: 'anthropic',
+            providerLabel: 'Anthropic',
+            installed: true,
+            models: [{ id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' }],
+          },
+          {
+            runtime: 'claude-code',
+            provider: 'claude-code',
+            installed: true,
+            models: [
+              { id: 'sonnet', name: 'sonnet' },
+              { id: 'opus', name: 'opus' },
+            ],
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto(`/app/project/${LOCAL_PROJECT_ID}/settings`);
+  await page.getByTestId('project-model-coordinator').locator('.routing-rule-model-select').click();
+  const menu = page.locator('.routing-rule-model-menu');
+  await expect(menu.getByText('opus', { exact: true })).toBeVisible();
+  await expect(menu.getByText('Claude Haiku 5.5')).toHaveCount(0);
+  await menu.getByText('opus', { exact: true }).click();
+  await expect.poll(() => stub.patches.length).toBe(1);
+  expect(stub.patches[0]?.body).toEqual({
+    modelOverrides: { coordinator: { provider: 'claude-code', modelId: 'opus', thinkingLevel: null } },
+  });
+});

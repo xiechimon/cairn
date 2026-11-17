@@ -11,10 +11,9 @@ import { and, desc, eq, gte } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment, machine, type step, type todo } from '../db/schema.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
-import { providerRefusal } from './coordinator-route.js';
 import { stepRuntimeFor } from './dispatch-eligibility.js';
 import { effectiveModel } from './model-fallback.js';
-import { profileForStep, type RouteProfile } from './routing-rules.js';
+import { profileForStep, providerRefusal, type RouteProfile } from './routing-rules.js';
 
 export type InfoCardPlan =
   | { kind: 'pi'; profile: RouteProfile; provider: string; modelId: string; machineId: string }
