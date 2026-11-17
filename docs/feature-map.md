@@ -537,7 +537,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### im-connections
 
-**IM connections** (partial). Outbound-polling chat connections that reach the Coordinator without a native app or a public callback. Slice 1 is Telegram: connect a bot token, approve pairing senders, receive a message as a coordinator turn, and get the text reply back in the same chat.
+**IM connections** (partial). Outbound-polling chat connections that reach the Coordinator without a native app or a public callback. Telegram connects with a bot token; WeChat connects by scanning a Tencent iLink QR that creates the connection and pairs the scanning account. Paired senders' messages become coordinator turns and text replies return to the same chat.
 
 - Research: n/a: the binding contract is docs/design/im-connections.md; no reference product is copied
 - Frontend design: [docs/design/references/settings](design/references/settings)

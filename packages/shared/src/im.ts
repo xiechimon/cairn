@@ -52,3 +52,17 @@ export const imTelegramConnectBodySchema = z
   .object({ botToken: z.string().min(1).max(256) })
   .strict();
 export type ImTelegramConnectBody = z.infer<typeof imTelegramConnectBodySchema>;
+
+export const imWechatLoginStartSchema = z.object({
+  loginId: z.string().min(1),
+  qr: z.string().optional(),
+  expiresAt: z.number().int(),
+});
+export type ImWechatLoginStart = z.infer<typeof imWechatLoginStartSchema>;
+
+export const imWechatLoginPollSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('pending') }),
+  z.object({ status: z.literal('expired') }),
+  z.object({ status: z.literal('done'), connection: imConnectionRecordSchema }),
+]);
+export type ImWechatLoginPoll = z.infer<typeof imWechatLoginPollSchema>;

@@ -58,6 +58,50 @@ const adapter: ImAdapter = {
   },
 };
 
+const wechatSessions: FakeSession[] = [];
+const wechatWaits = new Map<
+  string,
+  { status: 'pending' | 'expired' } | { status: 'done'; fields: Record<string, string> }
+>();
+let wechatLoginSeq = 0;
+
+const wechatAdapterFake: ImAdapter = {
+  platform: 'wechat',
+  check: async (fields) =>
+    fields.token === 'bad-token'
+      ? { ok: false, reason: 'missing iLink bot token' }
+      : { ok: true, accountLabel: `WeChat ${fields.ilinkBotId ?? 'bot'}` },
+  connect: async (_fields, handlers, _env) => {
+    const session: FakeSession = {
+      handlers,
+      sent: [],
+      sendCount: 0,
+      stopped: false,
+      failWith: null,
+    };
+    wechatSessions.push(session);
+    return {
+      send: async (msg) => {
+        session.sendCount += 1;
+        if (session.failWith !== null) throw session.failWith;
+        session.sent.push(msg);
+      },
+      stop: async () => {
+        session.stopped = true;
+      },
+    };
+  },
+  loginStart: async (env) => {
+    wechatLoginSeq += 1;
+    return {
+      loginId: `wx_test_${wechatLoginSeq}`,
+      qr: 'https://ilink.example/q/ABC',
+      expiresAt: env.now() + 300_000,
+    };
+  },
+  loginWait: async (loginId) => wechatWaits.get(loginId) ?? { status: 'pending' },
+};
+
 const env = (): ImEnv => ({
   fetch: (() => Promise.reject(new Error('offline'))) as typeof fetch,
   now: () => Date.now(),
@@ -102,10 +146,15 @@ const firstPairingRequest = () => {
   return row;
 };
 
+let adapters: Partial<Record<'telegram' | 'wechat', ImAdapter>>;
+
 beforeEach(() => {
   s = bootServer({ vapidKeys: null });
   slept = [];
   sessions.length = 0;
+  wechatSessions.length = 0;
+  wechatWaits.clear();
+  adapters = { telegram: adapter };
   service = createImService({
     db: s.db,
     hub: s.hub,
@@ -114,7 +163,7 @@ beforeEach(() => {
     box: s.secretBox,
     user: s.user,
     env: env(),
-    adapters: { telegram: adapter },
+    adapters,
   });
   setImRuntime(service.runtime);
 });
@@ -410,5 +459,79 @@ describe('restart and send queue', () => {
     await vi.waitFor(() => {
       expect(connRow()?.status).toBe('expired');
     });
+  });
+});
+
+describe('wechat qr login', () => {
+  const doneFields = {
+    token: 'BOT-TOKEN',
+    ilinkBotId: 'bot@im.bot',
+    ilinkUserId: 'scanner@im.wechat',
+    baseUrl: 'https://ilink.example/',
+  };
+
+  const startLogin = () => {
+    adapters.wechat = wechatAdapterFake;
+    return service.startWechatLogin();
+  };
+
+  test('start returns the adapter QR code', async () => {
+    const login = await startLogin();
+    expect(login.loginId).toMatch(/^wx_test_/);
+    expect(login.qr).toBe('https://ilink.example/q/ABC');
+    expect(login.expiresAt).toBeGreaterThan(Date.now());
+  });
+
+  test('start and poll are a 400 without a login-capable wechat adapter', async () => {
+    await expect(service.startWechatLogin()).rejects.toMatchObject({ status: 400 });
+    await expect(service.pollWechatLogin(s.team.id, 'wx_test_1')).rejects.toMatchObject({
+      status: 400,
+    });
+  });
+
+  test('poll passes pending and expired through without creating a connection', async () => {
+    const login = await startLogin();
+    await expect(service.pollWechatLogin(s.team.id, login.loginId)).resolves.toEqual({
+      status: 'pending',
+    });
+    wechatWaits.set(login.loginId, { status: 'expired' });
+    await expect(service.pollWechatLogin(s.team.id, login.loginId)).resolves.toEqual({
+      status: 'expired',
+    });
+    expect(s.db.select().from(imConnection).all()).toHaveLength(0);
+  });
+
+  test('a confirmed scan creates a connection paired to the scanning account', async () => {
+    const login = await startLogin();
+    wechatWaits.set(login.loginId, { status: 'done', fields: doneFields });
+    const result = await service.pollWechatLogin(s.team.id, login.loginId);
+    expect(result.status).toBe('done');
+    if (result.status !== 'done') return;
+    expect(result.connection.platform).toBe('wechat');
+    expect(result.connection.accountLabel).toBe('WeChat bot@im.bot');
+    expect(result.connection.pairedSenders).toEqual([
+      {
+        id: 'scanner@im.wechat',
+        name: null,
+        chatKey: 'scanner@im.wechat',
+        addedAt: expect.any(Number),
+      },
+    ]);
+    expect(wechatSessions).toHaveLength(1);
+
+    wechatSessions[0]?.handlers.onMessage(inbound('scanner@im.wechat', 'hi', 'scanner@im.wechat'));
+    expect(pairingRequests()).toHaveLength(0);
+    expect(latestChiefStep().prompt).toContain('provenance=im:wechat:');
+  });
+
+  test('a wechat connection reconnects through the generic path', async () => {
+    const login = await startLogin();
+    wechatWaits.set(login.loginId, { status: 'done', fields: doneFields });
+    const result = await service.pollWechatLogin(s.team.id, login.loginId);
+    if (result.status !== 'done') throw new Error('expected a confirmed login');
+    const reconnected = await service.reconnectConnection(s.team.id, result.connection.id);
+    expect(reconnected.status).toBe('connecting');
+    expect(wechatSessions).toHaveLength(2);
+    expect(wechatSessions[0]?.stopped).toBe(true);
   });
 });

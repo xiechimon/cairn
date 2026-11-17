@@ -45,6 +45,7 @@ import { refreshingGithubFetch } from './services/github-connection.js';
 import { createImService } from './services/im/core.js';
 import { setImRuntime } from './services/im/runtime.js';
 import { createTelegramAdapter, liveImEnv } from './services/im/telegram.js';
+import { wechatAdapter } from './services/im/wechat.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { newMcpOAuthState } from './services/mcp-servers.js';
@@ -189,7 +190,7 @@ const im = createImService({
   box: secretBox,
   user: seeded.user,
   env: liveImEnv,
-  adapters: { telegram: createTelegramAdapter() },
+  adapters: { telegram: createTelegramAdapter(), wechat: wechatAdapter },
 });
 setImRuntime(im.runtime);
 const app = createApp(

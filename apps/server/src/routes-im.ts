@@ -25,6 +25,17 @@ export function registerImRoutes(app: Hono, ctx: AppContext): void {
     return c.json({ connection: record });
   });
 
+  app.post('/api/teams/:id/im/wechat/login', async (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    return c.json(await requireIm(ctx).startWechatLogin());
+  });
+
+  app.get('/api/teams/:id/im/wechat/login/:loginId', async (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    const result = await requireIm(ctx).pollWechatLogin(ctx.team.id, c.req.param('loginId'));
+    return c.json(result);
+  });
+
   app.delete('/api/teams/:id/im/connections/:connId', async (c) => {
     requireTeam(ctx, c.req.param('id'));
     await requireIm(ctx).deleteConnection(ctx.team.id, c.req.param('connId'));

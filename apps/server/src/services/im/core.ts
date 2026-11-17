@@ -4,6 +4,8 @@ import type {
   ImPairedSender,
   ImPairingRequestRecord,
   ImPlatform,
+  ImWechatLoginPoll,
+  ImWechatLoginStart,
 } from '@cairn/shared';
 import { and, desc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import {
@@ -47,7 +49,10 @@ export interface ImService {
     teamId: string,
     platform: ImPlatform,
     fields: Record<string, string>,
+    opts?: { pairedSenders?: ImPairedSender[] },
   ): Promise<ImConnectionRecord>;
+  startWechatLogin(): Promise<ImWechatLoginStart>;
+  pollWechatLogin(teamId: string, loginId: string): Promise<ImWechatLoginPoll>;
   deleteConnection(teamId: string, connId: string): Promise<{ ok: true }>;
   reconnectConnection(teamId: string, connId: string): Promise<ImConnectionRecord>;
   listPairingRequests(teamId: string): ImPairingRequestRecord[];
@@ -100,6 +105,17 @@ export function createImService(deps: ImServiceDeps): ImService {
       throw new HttpError(404, `im connection ${connId}`);
     }
     return row;
+  };
+
+  const wechatLoginAdapter = (): Required<Pick<ImAdapter, 'loginStart' | 'loginWait'>> => {
+    const adapter = deps.adapters.wechat;
+    if (adapter?.loginStart === undefined || adapter.loginWait === undefined) {
+      throw new HttpError(400, 'wechat qr login is not available');
+    }
+    return {
+      loginStart: adapter.loginStart.bind(adapter),
+      loginWait: adapter.loginWait.bind(adapter),
+    };
   };
 
   const recordOf = (row: ConnectionRow): ImConnectionRecord => ({
@@ -420,6 +436,7 @@ export function createImService(deps: ImServiceDeps): ImService {
       teamId: string,
       platform: ImPlatform,
       fields: Record<string, string>,
+      opts?: { pairedSenders?: ImPairedSender[] },
     ): Promise<ImConnectionRecord> {
       const adapter = deps.adapters[platform];
       if (adapter === undefined) {
@@ -438,7 +455,7 @@ export function createImService(deps: ImServiceDeps): ImService {
           platform,
           accountLabel: checked.accountLabel,
           secretCipher: deps.box.seal(JSON.stringify(fields)),
-          pairedSenders: [],
+          pairedSenders: opts?.pairedSenders ?? [],
           status: 'connecting',
           createdAt: now,
           updatedAt: now,
@@ -448,6 +465,22 @@ export function createImService(deps: ImServiceDeps): ImService {
       const row = connRow(id);
       if (row === undefined) throw new HttpError(500, 'im connection vanished');
       return recordOf(row);
+    },
+
+    async startWechatLogin(): Promise<ImWechatLoginStart> {
+      return wechatLoginAdapter().loginStart(deps.env);
+    },
+
+    async pollWechatLogin(teamId: string, loginId: string): Promise<ImWechatLoginPoll> {
+      const result = await wechatLoginAdapter().loginWait(loginId, deps.env);
+      if (result.status !== 'done') return result;
+      const scanner = result.fields.ilinkUserId?.trim() ?? '';
+      const pairedSenders: ImPairedSender[] =
+        scanner === '' ? [] : [{ id: scanner, name: null, chatKey: scanner, addedAt: nowMs() }];
+      const connection = await service.createConnection(teamId, 'wechat', result.fields, {
+        pairedSenders,
+      });
+      return { status: 'done', connection };
     },
 
     async deleteConnection(teamId: string, connId: string): Promise<{ ok: true }> {

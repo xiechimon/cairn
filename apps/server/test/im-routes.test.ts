@@ -35,6 +35,39 @@ const adapter: ImAdapter = {
   },
 };
 
+const wechatWaits = new Map<
+  string,
+  { status: 'pending' | 'expired' } | { status: 'done'; fields: Record<string, string> }
+>();
+let wechatLoginSeq = 0;
+
+const wechatAdapterFake: ImAdapter = {
+  platform: 'wechat',
+  check: async (fields) => ({
+    ok: true,
+    accountLabel: `WeChat ${fields.ilinkBotId ?? 'bot'}`,
+  }),
+  connect: async (_fields, handlers, _env) => {
+    const session = { handlers, sent: [] as ImOutboundMessage[] };
+    sessions.push(session);
+    return {
+      send: async (msg) => {
+        session.sent.push(msg);
+      },
+      stop: async () => {},
+    };
+  },
+  loginStart: async (env) => {
+    wechatLoginSeq += 1;
+    return {
+      loginId: `wx_route_${wechatLoginSeq}`,
+      qr: 'https://ilink.example/q/ABC',
+      expiresAt: env.now() + 300_000,
+    };
+  },
+  loginWait: async (loginId) => wechatWaits.get(loginId) ?? { status: 'pending' },
+};
+
 const env: ImEnv = {
   fetch: (() => Promise.reject(new Error('offline'))) as typeof fetch,
   now: () => Date.now(),
@@ -58,11 +91,15 @@ let s: TestServer;
 let service: ImService;
 let teamId: string;
 
+let adapters: Partial<Record<'telegram' | 'wechat', ImAdapter>>;
+
 beforeEach(() => {
   sessions.length = 0;
+  wechatWaits.clear();
   const db = openMemoryDb();
   const seeded = seed(db);
   teamId = seeded.team.id;
+  adapters = { telegram: adapter };
   service = createImService({
     db,
     hub: new TeamStreamHub(),
@@ -71,7 +108,7 @@ beforeEach(() => {
     box: createEphemeralSecretBox(),
     user: seeded.user,
     env,
-    adapters: { telegram: adapter },
+    adapters,
   });
   setImRuntime(service.runtime);
   s = bootServer({ db, im: service, vapidKeys: null });
@@ -171,5 +208,69 @@ describe('im routes', () => {
       `/api/teams/${teamId}/im/pairing-requests/missing/approve`,
     );
     expect(res.status).toBe(404);
+  });
+
+  test('wechat qr login starts, waits and creates the connection on confirm', async () => {
+    adapters.wechat = wechatAdapterFake;
+    const start = await req(s.app, 'POST', `/api/teams/${teamId}/im/wechat/login`);
+    expect(start.status).toBe(200);
+    const login = (await start.json()) as {
+      loginId: string;
+      qr?: string;
+      expiresAt: number;
+    };
+    expect(login.qr).toBe('https://ilink.example/q/ABC');
+    expect(login.expiresAt).toBeGreaterThan(Date.now());
+
+    const pending = await req(
+      s.app,
+      'GET',
+      `/api/teams/${teamId}/im/wechat/login/${login.loginId}`,
+    );
+    expect(pending.status).toBe(200);
+    expect(await pending.json()).toEqual({ status: 'pending' });
+
+    wechatWaits.set(login.loginId, {
+      status: 'done',
+      fields: {
+        token: 'BOT-TOKEN',
+        ilinkBotId: 'bot@im.bot',
+        ilinkUserId: 'scanner@im.wechat',
+        baseUrl: 'https://ilink.example/',
+      },
+    });
+    const done = await req(s.app, 'GET', `/api/teams/${teamId}/im/wechat/login/${login.loginId}`);
+    expect(done.status).toBe(200);
+    const body = (await done.json()) as {
+      status: string;
+      connection: { platform: string; pairedSenders: { id: string }[] };
+    };
+    expect(body.status).toBe('done');
+    expect(body.connection.platform).toBe('wechat');
+    expect(body.connection.pairedSenders.map((sender) => sender.id)).toEqual(['scanner@im.wechat']);
+
+    const listed = await req(s.app, 'GET', `/api/teams/${teamId}/im/connections`);
+    const { connections } = (await listed.json()) as {
+      connections: { platform: string }[];
+    };
+    expect(connections.map((row) => row.platform)).toEqual(['wechat']);
+  });
+
+  test('wechat login reports expired and is a 400 without the adapter', async () => {
+    const missing = await req(s.app, 'POST', `/api/teams/${teamId}/im/wechat/login`);
+    expect(missing.status).toBe(400);
+    const missingPoll = await req(s.app, 'GET', `/api/teams/${teamId}/im/wechat/login/wx_route_0`);
+    expect(missingPoll.status).toBe(400);
+
+    adapters.wechat = wechatAdapterFake;
+    const start = await req(s.app, 'POST', `/api/teams/${teamId}/im/wechat/login`);
+    const login = (await start.json()) as { loginId: string };
+    wechatWaits.set(login.loginId, { status: 'expired' });
+    const expired = await req(
+      s.app,
+      'GET',
+      `/api/teams/${teamId}/im/wechat/login/${login.loginId}`,
+    );
+    expect(await expired.json()).toEqual({ status: 'expired' });
   });
 });
