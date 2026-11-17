@@ -6,12 +6,15 @@ const TEST_FILE = /^(apps|packages)\/[^/]+\/test\/.+\.test\.(ts|tsx|mts|mjs)$/;
 const SOURCE_FILE = /^((apps|packages)\/[^/]+)\/src\/.+\.(ts|tsx|mts)$/;
 const BUDGET_MS = 10 * 60_000;
 const CONTRACT_SOURCES = /^(packages\/shared\/src|apps\/server\/src)\//;
+const SCHEMA_CHANGE = /^apps\/server\/(drizzle\/|src\/db\/schema\.ts$)/;
 const CONTRACT_TESTS = ['packages/shared/test/snapshot.test.ts', 'apps/server/test/wire.test.ts'];
 
-export function selectTests(changed, tests) {
+export function selectTests(changed, tests, migrationTests = []) {
   const known = new Set(tests);
   const picked = new Set();
   for (const file of changed) {
+    if (SCHEMA_CHANGE.test(file))
+      for (const migration of migrationTests) if (known.has(migration)) picked.add(migration);
     if (TEST_FILE.test(file)) {
       if (known.has(file)) picked.add(file);
       continue;
@@ -51,7 +54,10 @@ function main() {
     'apps',
     'packages',
   ]).filter((file) => TEST_FILE.test(file));
-  const selected = selectTests(changed, tests);
+  const migrationTests = git(['grep', '-l', 'migrateUpTo(', '--', 'apps/server/test']).filter(
+    (file) => TEST_FILE.test(file),
+  );
+  const selected = selectTests(changed, tests, migrationTests);
   if (selected.length === 0) {
     console.log('test:changed: no related test files; CI runs the full suite');
     return;

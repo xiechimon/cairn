@@ -53,3 +53,17 @@ test('docs, styles and other packages select nothing', () => {
 test('a deleted test file is not selected', () => {
   assert.deepEqual(selectTests(['apps/daemon/test/gone.test.ts'], tests), []);
 });
+
+test('a schema or migration change runs every old-database migration test', () => {
+  const migrationTests = ['apps/server/test/research-retirement.test.ts'];
+  for (const change of [
+    'apps/server/src/db/schema.ts',
+    'apps/server/drizzle/0184_machine_own_computer_enabled.sql',
+  ])
+    assert.deepEqual(
+      selectTests([change], [...tests, ...migrationTests], migrationTests).includes(
+        'apps/server/test/research-retirement.test.ts',
+      ),
+      true,
+    );
+});
