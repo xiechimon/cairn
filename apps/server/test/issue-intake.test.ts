@@ -217,6 +217,7 @@ function rebindChief(s: TestServer, id: string): void {
 
 const GATES_OFF: AutonomySettings = {
   enabled: true,
+  actionTier: 'guarded',
   quietMinutes: 0,
   cooldownMinutes: 0,
   dailyBudgetUsd: 0,

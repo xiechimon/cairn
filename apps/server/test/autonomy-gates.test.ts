@@ -15,6 +15,7 @@ const NOW = Date.UTC(2026, 9, 22, 12, 0, 0);
 
 const SETTINGS: AutonomySettings = {
   enabled: true,
+  actionTier: 'guarded',
   quietMinutes: 10,
   cooldownMinutes: 15,
   dailyBudgetUsd: 5,

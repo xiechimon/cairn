@@ -27,6 +27,7 @@ const PROJECTS = [
 interface Autonomy {
   settings: {
     enabled: boolean;
+    actionTier: 'guarded' | 'full';
     quietMinutes: number;
     cooldownMinutes: number;
     dailyBudgetUsd: number;
@@ -42,7 +43,13 @@ interface Autonomy {
 
 function initialAutonomy(): Autonomy {
   return {
-    settings: { enabled: true, quietMinutes: 10, cooldownMinutes: 15, dailyBudgetUsd: 10 },
+    settings: {
+      enabled: true,
+      actionTier: 'guarded',
+      quietMinutes: 10,
+      cooldownMinutes: 15,
+      dailyBudgetUsd: 10,
+    },
     spentTodayUsd: 3.5,
     kinds: [
       {
@@ -104,6 +111,23 @@ test('autonomy card: github project shows thresholds and the last verdict per ki
   );
 
   await expect(card.getByTestId('autonomy-state-scheduling')).toHaveText('最近一次放行');
+});
+
+test('autonomy card: decision tier selector defaults to ask and patches the tier at once', async ({
+  page,
+}) => {
+  const stub = await stubWorld(page);
+  await page.goto(`/app/project/${GITHUB_PROJECT_ID}/settings`);
+  const card = page.getByRole('region', { name: '后台自动任务' });
+  const tier = card.getByTestId('autonomy-tier');
+  await expect(tier).toBeVisible();
+  await expect(tier).toContainText('先问过我');
+  await expect(card.getByText('发送、发布等对外动作先问过再跑；其余动作自动。')).toBeVisible();
+  await tier.click();
+  await page.getByRole('option', { name: '自动做' }).click();
+  await expect.poll(() => stub.patches.length).toBe(1);
+  expect(stub.patches[0]).toEqual({ actionTier: 'full' });
+  await expect(tier).toContainText('自动做');
 });
 
 test('autonomy card: local project has no card', async ({ page }) => {

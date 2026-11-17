@@ -53,12 +53,27 @@ describe('GET / PATCH /api/projects/{id}/autonomy', () => {
     expect(((await again.json()) as { settings: unknown }).settings).toEqual(body.settings);
   });
 
+  test('PATCH actionTier persists; the default is guarded', async () => {
+    const { s, projectId } = await boot();
+    const res = await req(s.app, 'PATCH', `/api/projects/${projectId}/autonomy`, {
+      actionTier: 'full',
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { settings: { actionTier: string } };
+    expect(body.settings.actionTier).toBe('full');
+    const again = await req(s.app, 'GET', `/api/projects/${projectId}/autonomy`);
+    expect(
+      ((await again.json()) as { settings: { actionTier: string } }).settings.actionTier,
+    ).toBe('full');
+  });
+
   test.each([
     ['unknown key', { surprise: 1 }],
     ['negative minutes', { quietMinutes: -1 }],
     ['fractional minutes', { cooldownMinutes: 1.5 }],
     ['negative budget', { dailyBudgetUsd: -0.01 }],
     ['wrong type', { enabled: 'yes' }],
+    ['unknown tier', { actionTier: 'bold' }],
   ])('PATCH rejects %s with 400', async (_name, body) => {
     const { s, projectId } = await boot();
     const res = await req(s.app, 'PATCH', `/api/projects/${projectId}/autonomy`, body);

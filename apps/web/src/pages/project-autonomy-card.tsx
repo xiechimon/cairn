@@ -1,4 +1,5 @@
 import type {
+  ActionTier,
   AutonomyGateReason,
   AutonomyKind,
   AutonomyRecord,
@@ -8,11 +9,23 @@ import { cn } from 'cn';
 import { useState } from 'react';
 import { useApiMutations, useProjectAutonomy } from '../api/hooks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
-import { SETTINGS_ROW_CLS, SettingsCard, SettingsRow } from '../components/settings-list.js';
+import {
+  SETTINGS_ROW_CLS,
+  SETTINGS_SELECT_TRIGGER_CLS,
+  SettingsCard,
+  SettingsRow,
+} from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
@@ -32,6 +45,11 @@ const REASON_LABELS: Record<AutonomyGateReason, string> = {
   cooldown: '冷却中',
   budget: '今日预算已用完',
   'budget-unreadable': '花费读不到，先不跑',
+};
+
+const TIER_LABELS: Record<ActionTier, string> = {
+  guarded: '先问过我（默认）',
+  full: '自动做',
 };
 
 type NumberKey = 'quietMinutes' | 'cooldownMinutes' | 'dailyBudgetUsd';
@@ -83,6 +101,28 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
             disabled={mutations.patchAutonomy.isPending}
             onCheckedChange={(enabled) => save({ enabled })}
           />
+        </SettingsRow>
+        <SettingsRow
+          label={t('对外动作')}
+          hint={t('发送、发布等对外动作先问过再跑；其余动作自动。')}
+        >
+          <Select
+            value={settings.actionTier}
+            disabled={mutations.patchAutonomy.isPending}
+            onValueChange={(tier) => save({ actionTier: tier as ActionTier })}
+          >
+            <SelectTrigger
+              aria-label={t('对外动作')}
+              className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
+              data-testid="autonomy-tier"
+            >
+              <SelectValue>{t(TIER_LABELS[settings.actionTier])}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="guarded">{t('先问过我（默认）')}</SelectItem>
+              <SelectItem value="full">{t('自动做')}</SelectItem>
+            </SelectContent>
+          </Select>
         </SettingsRow>
         {NUMBER_FIELDS.map(({ key, label, step }) => (
           <SettingsRow key={key} label={t(label)}>

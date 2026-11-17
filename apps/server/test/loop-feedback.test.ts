@@ -55,6 +55,7 @@ async function world(prime = true) {
     .set({
       autonomy: {
         enabled: true,
+        actionTier: 'guarded',
         quietMinutes: 0,
         cooldownMinutes: 0,
         dailyBudgetUsd: 0,

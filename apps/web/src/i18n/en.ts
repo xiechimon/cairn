@@ -908,6 +908,11 @@ export const EN: Record<string, string> = {
   // #1491 project settings: background autonomy gates card
   后台自动任务: 'Background tasks',
   允许后台自动开跑: 'Allow background runs',
+  对外动作: 'External actions',
+  '先问过我（默认）': 'Ask me first (default)',
+  自动做: 'Run automatically',
+  '发送、发布等对外动作先问过再跑；其余动作自动。':
+    'Send, publish and other external-output actions ask first; everything else runs automatically.',
   '有人在用时让路（分钟）': 'Yield while someone is active (minutes)',
   '同类任务冷却（分钟）': 'Cooldown between runs (minutes)',
   '每日预算（USD）': 'Daily budget (USD)',
