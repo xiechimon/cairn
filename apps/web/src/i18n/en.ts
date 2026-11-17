@@ -1408,6 +1408,7 @@ export const EN: Record<string, string> = {
   '像 AGENTS.md：本项目的每个对话和 Coordinator 都会读到并遵守。':
     'Like an AGENTS.md: every thread and the Coordinator in this project read and follow it.',
   自动记忆: 'Auto memory',
+  'Coordinator 的长期记忆': "The Coordinator's long-term memory",
   'Coordinator 在这个项目里工作时自己写下的笔记。':
     'Notes the Coordinator writes itself as it works in this project.',
   'Coordinator 还没有记下团队笔记。': 'The Coordinator has not written team notes yet.',

@@ -38,8 +38,8 @@ export function SidebarNavRow({
             : 'hover:bg-sidebar-hover group-hover/row:bg-sidebar-hover group-has-aria-expanded/row:bg-sidebar-hover dark:hover:bg-sidebar-hover',
           actions != null &&
             (actionsPinned
-              ? 'pr-14'
-              : 'group-focus-within/row:pr-8 group-hover/row:pr-8 [@media(hover:none)]:pr-12'),
+              ? 'pr-20'
+              : 'group-focus-within/row:pr-20 group-hover/row:pr-20 [@media(hover:none)]:pr-20'),
         )}
       >
         <span className="flex-none text-sidebar-ink">{icon}</span>

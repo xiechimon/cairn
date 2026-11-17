@@ -2,6 +2,7 @@ import { BRAND, type ProjectColor, type ProjectIcon } from '@cairn/shared';
 import { cn } from 'cn';
 import {
   Archive,
+  Brain,
   ChartNoAxesColumn,
   ChevronLeft,
   Clock,
@@ -22,6 +23,7 @@ import {
   useState,
 } from 'react';
 import { Link, type NavigateFunction, type To, useLocation, useNavigate } from 'react-router';
+import { ChiefMemoryDialog } from '../chief/memory-dialog.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import {
@@ -389,6 +391,7 @@ export function BoardSidebar({
   const activeLayout = useMemo(() => sidebarProjects(present), [present]);
   const groupNames = useMemo(() => activeLayout.groups.map((group) => group.name), [activeLayout]);
   const [confirmingAll, setConfirmingAll] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
   const archivedPage = filter === 'archived';
   const archivedRows = useMemo(
     () => (archivedPage ? [...layout.ungrouped, ...layout.groups.flatMap((g) => g.projects)] : []),
@@ -505,6 +508,17 @@ export function BoardSidebar({
             archivedPage ? undefined : (
               <>
                 <ProjectFilterMenu filter={filter} onFilter={chooseFilter} />
+                <SidebarTip label={t('记忆')}>
+                  <Button
+                    variant="ghost"
+                    aria-label={t('记忆')}
+                    data-testid="sidebar-coordinator-memory"
+                    onClick={() => setMemoryOpen(true)}
+                    className={`grid place-items-center ${SIDEBAR_ROW_ACTION} ${FOCUS}`}
+                  >
+                    <Brain strokeWidth={STROKE} />
+                  </Button>
+                </SidebarTip>
                 <SidebarTip label={t('新建项目')}>
                   <Link
                     to={newProjectTarget}
@@ -681,6 +695,7 @@ export function BoardSidebar({
           </FooterIcon>
         </div>
       </div>
+      <ChiefMemoryDialog open={memoryOpen} onClose={() => setMemoryOpen(false)} />
       {actions !== undefined && (
         <DeleteArchivedProjectsConfirm
           count={archivedCount}
