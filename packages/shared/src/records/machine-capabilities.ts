@@ -269,6 +269,7 @@ export const stepQueueBlockedSchema = z.object({
     'account-switched',
     'coordinator-provider-missing',
     'coordinator-provider-no-key',
+    'no-computer',
   ]),
   missing: z.array(z.string()),
   platform: runnerOsSchema.optional(),

@@ -29,7 +29,6 @@ import { parseChiefTrigger } from '../services/chief.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep, STEER_HOLDS } from '../services/chief-turns.js';
 import { teamHasVmComputer } from '../services/cloak-license.js';
-import { materializeCodexAccessToken } from '../services/codex-device-login.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
 import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
@@ -43,19 +42,19 @@ import { ownComputerOffered } from '../services/own-computer.js';
 import { ownershipOf } from '../services/owner.js';
 import { listedProjects } from '../services/personal-space.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
-import { CODEX_PROVIDER_ID } from './codex-login.js';
 import {
   type CoordinatorProviders,
-  coordinatorApiKey,
   coordinatorProviders,
   scrubProviderError,
 } from './credentials.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
 import { settleInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
+import { providerBinding } from './provider-binding.js';
 import { isColdResume, resolveCacheRetentionTier, retentionMsFor } from './runtime/cold-slim.js';
 import { summarizerFor } from './runtime/compaction.js';
 import { reportCompactionFailure, setFailureSink } from './runtime/failure-report.js';
+import { startInfoCardRunner } from './runtime/info-card-runner.js';
 import type { MachineApi } from './runtime/machine-api.js';
 import { createCoordinatorModels } from './runtime/models.js';
 import type { ReconcileFacts } from './runtime/reconcile.js';
@@ -334,18 +333,8 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     api,
   );
 
-  const binding = (teamId: string, route: CoordinatorProviders['router']): ProviderBinding => ({
-    config: route.config,
-    modelId: route.modelId,
-    resolveKey: async () => {
-      const key = coordinatorApiKey({ db, box: machine.box }, teamId, route.provider);
-      if (key === null || route.provider !== CODEX_PROVIDER_ID || !key.startsWith('{')) return key;
-      return materializeCodexAccessToken(
-        { db, box: machine.box, fetch: globalThis.fetch, states: new Map() },
-        teamId,
-      );
-    },
-  });
+  const binding = (teamId: string, route: CoordinatorProviders['router']): ProviderBinding =>
+    providerBinding({ db, box: machine.box }, teamId, route);
 
   setFailureSink({
     log: (fields, message) => logger.error(fields, message),
@@ -769,6 +758,16 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       });
   };
 
+  const infoCards = startInfoCardRunner({
+    machine,
+    storageDir: options.storageDir,
+    logger,
+    ...(options.fixedProviders === undefined ? {} : { fixedProviders: options.fixedProviders }),
+    ...(options.heartbeatMs === undefined ? {} : { heartbeatMs: options.heartbeatMs }),
+    ...(options.tickMs === undefined ? {} : { tickMs: options.tickMs }),
+    ...(options.stopPollMs === undefined ? {} : { stopPollMs: options.stopPollMs }),
+  });
+
   const timer = setInterval(tick, options.tickMs ?? TICK_MS);
   timer.unref();
   tick();
@@ -780,11 +779,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       await Promise.resolve();
       while (draining.size > 0 || preparing.size > 0)
         await Promise.allSettled([...draining.values(), ...preparing.values()]);
+      await infoCards.idle();
     },
     close: async () => {
       closing = true;
       clearInterval(timer);
       try {
+        await infoCards.close();
         await runtime.close();
       } finally {
         for (const lease of leases.values()) lease.release();

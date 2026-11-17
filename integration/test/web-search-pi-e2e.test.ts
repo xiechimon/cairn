@@ -3,14 +3,12 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { WEB_FETCH_TOOL_NAME, WEB_SEARCH_TOOL_NAME } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { EXA_BASE_URL_ENV } from '../../apps/daemon/src/backend/web-search.js';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
-import { build as buildTable } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
@@ -86,7 +84,6 @@ beforeAll(async () => {
   savedBaseUrl = process.env[EXA_BASE_URL_ENV];
   process.env[EXA_BASE_URL_ENV] = exaUrl;
   home = makeTestTempDir('cairn-web-search-home-');
-  const reportsDir = join(home, 'reports');
   stub = await startStubLlm([
     {
       toolCall: {
@@ -96,15 +93,7 @@ beforeAll(async () => {
       },
     },
     { toolCall: { id: 'call-get-secret', name: 'get_secret', arguments: { name: 'EXA_API_KEY' } } },
-    {
-      toolCall: {
-        name: 'bash',
-        arguments: {
-          command: `for d in ${reportsDir}/*/; do printf '# report\\n${REPORT_MARK}\\n${FIXTURE_URL}\\n' > "$d/report.md"; done; true`,
-        },
-      },
-    },
-    { content: 'report written.' },
+    { content: `report written. ${REPORT_MARK}` },
   ]);
   server = await bootRealServer({
     providerBaseUrl: stub.url,
@@ -166,7 +155,7 @@ afterAll(async () => {
   if (home) rmSync(home, { recursive: true, force: true });
 });
 
-describe('Phase 1b: a pi info step uses web_search through the daemon tool', () => {
+describe('Phase 1b: a pi step uses web_search through the daemon tool', () => {
   test('transcript shows web_search with a fixture result; the key never leaves the daemon', async () => {
     const project = await api(server.url, 'POST', '/api/projects', {
       name: 'web-search-it',
@@ -177,7 +166,6 @@ describe('Phase 1b: a pi info step uses web_search through the daemon tool', () 
     const todoRes = await api(server.url, 'POST', `/api/projects/${projectId}/todos`, {
       title: 'Research CI sharding',
       spec: 'Search the web for time-balanced test sharding and write a report.',
-      output: 'info',
     });
     expect(todoRes.status).toBe(201);
     const todoId = (todoRes.body as { id: string }).id;
@@ -188,17 +176,12 @@ describe('Phase 1b: a pi info step uses web_search through the daemon tool', () 
     expect(started.status).toBe(201);
     const buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    await waitFor(() => server.todoPhase(todoId) === 'review', 120_000);
+    await waitFor(() => ['review', 'done'].includes(server.todoPhase(todoId) ?? ''), 120_000);
 
     const messagesRes = await api(server.url, 'GET', `/api/conversations/${buildId}/messages`);
     expect(messagesRes.status).toBe(200);
     const messages = (messagesRes.body as { messages: unknown[] }).messages;
     const storedMessages = JSON.stringify(messages);
-    const build = server.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
-    expect(build.reportAttachmentId).not.toBeNull();
-    const report = await (
-      await fetch(`${server.url}/api/attachments/${build.reportAttachmentId}`)
-    ).text();
     const daemonLog = readFileSync(paths.daemonLog, 'utf8');
     const ledger = JSON.parse(readFileSync(join(home, 'web-search-spend.json'), 'utf8')) as Record<
       string,
@@ -219,7 +202,6 @@ describe('Phase 1b: a pi info step uses web_search through the daemon tool', () 
             apiKey: r.apiKey === FAKE_EXA_KEY ? '<fake-key-seen>' : r.apiKey,
           })),
           ledger,
-          report,
           webToolLogLines: daemonLog.split('\n').filter((l) => l.includes('web tool step=')),
           stubToolResults: stub.requests.map((r) => r.messages.filter((m) => m.role === 'tool')),
         },
@@ -239,8 +221,7 @@ describe('Phase 1b: a pi info step uses web_search through the daemon tool', () 
     expect(exaRequests[0]!.body.query).toBe('time-balanced test sharding');
 
     expect(storedMessages).not.toContain(FAKE_EXA_KEY);
-    expect(report).not.toContain(FAKE_EXA_KEY);
-    expect(report).toContain(REPORT_MARK);
+    expect(storedMessages).toContain(REPORT_MARK);
     expect(daemonLog).not.toContain(FAKE_EXA_KEY);
     expect(JSON.stringify(stub.requests)).not.toContain(FAKE_EXA_KEY);
 

@@ -52,7 +52,7 @@ export function composeStepSessionOpts(input: StepSessionOptsInput): SessionOpts
     onSkillsResolved: input.onSkillsResolved,
     ...(input.teamSkillsDir !== null ? { teamSkillsDir: input.teamSkillsDir } : {}),
     ...(isReview ? { readOnly: true } : {}),
-    ...(isChief || isReview ? { lockedDown: true } : {}),
+    ...(isChief || isReview || input.remoteToolsOnly ? { lockedDown: true } : {}),
     ...(input.remoteToolsOnly ? { remoteToolsOnly: true } : {}),
     ...(input.telemetry !== undefined ? { telemetry: input.telemetry } : {}),
     ...(Object.keys(input.env).length > 0 ? { env: input.env } : {}),

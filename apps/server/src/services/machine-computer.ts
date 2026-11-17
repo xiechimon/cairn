@@ -61,8 +61,9 @@ import {
   TAKEOVER_NO_COMPUTER,
   TAKEOVER_NOT_DONE,
 } from './computer-handoff.js';
+import { type ComputerThread, computerThreadOf, NO_CARD_THREAD } from './computer-thread.js';
 import type { TeamStreamHub } from './events.js';
-import { isChiefConversation, type MachineDeps, ownedStep } from './machine-deps.js';
+import { type MachineDeps, ownedStep } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { type GateResult, isOwnComputerTool, ownComputerGate } from './own-computer.js';
 import { sendMustReachAlert } from './push-alerts.js';
@@ -728,7 +729,7 @@ type HandoffWait = 'handed_back' | 'not_done';
 
 async function holdTakeover(
   deps: MachineDeps,
-  thread: typeof chiefThread.$inferSelect,
+  thread: ComputerThread,
   stepId: string,
   body: MachineComputerRelayBody,
   opts: { signal?: AbortSignal; takeover?: { timeoutMs?: number; pollMs?: number } },
@@ -780,7 +781,7 @@ async function holdTakeover(
     void sendMustReachAlert(db, deps.vapidKeys ?? null, thread.userId, thread.teamId, {
       title: '需要你登录',
       body: reason || 'Coordinator 需要你接管它的电脑。',
-      href: `/app?chief=${encodeURIComponent(thread.id)}`,
+      href: thread.id === NO_CARD_THREAD ? '/app' : `/app?chief=${encodeURIComponent(thread.id)}`,
       tag: `${thread.userId}:${callId}`,
     }).catch(() => {
       process.stderr.write('takeover push failed\n');
@@ -873,7 +874,7 @@ function finishInstallWait(db: Db, callId: string, approval: PackageApproval | n
 
 async function holdPackageInstall(
   deps: MachineDeps,
-  thread: typeof chiefThread.$inferSelect,
+  thread: ComputerThread,
   stepId: string,
   body: MachineComputerRelayBody,
   opts: { signal?: AbortSignal; takeover?: { timeoutMs?: number; pollMs?: number } },
@@ -1077,23 +1078,35 @@ export async function forwardComputerCall(
 ): Promise<ComputerRelayResult> {
   const { db } = deps;
   const stepRow = ownedStep(deps, machineId, stepId);
-  if (stepRow.kind !== 'chief' || !isChiefConversation(stepRow.buildId)) {
-    throw new HttpError(400, `step ${stepId} is not a chief step`);
+  const thread = computerThreadOf(db, stepRow);
+  if (thread === null) {
+    throw new HttpError(400, `step ${stepId} is not a chief step or an info card`);
   }
   if (stepRow.status !== 'claimed') {
     throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
   }
-  const thread = db.select().from(chiefThread).where(eq(chiefThread.id, stepRow.buildId)).get();
-  if (!thread) throw new NotFoundError(`chief thread ${stepRow.buildId}`);
 
   const tool = body.name;
   if (tool === 'computer_manage') throw new HttpError(400, COMPUTER_MANAGE_PANEL_ONLY);
   let own: Extract<GateResult, { kind: 'granted' }> | null = null;
   if (isOwnComputerTool(tool)) {
-    const gate = await ownComputerGate(deps, stepRow, thread, tool, body.toolCallId, body.params, {
-      ...opts.ownComputer,
-      ...(opts.signal === undefined ? {} : { signal: opts.signal }),
-    });
+    const chiefRow =
+      stepRow.kind === 'chief'
+        ? db.select().from(chiefThread).where(eq(chiefThread.id, stepRow.buildId)).get()
+        : undefined;
+    if (chiefRow === undefined) throw new NotFoundError(`chief thread ${stepRow.buildId}`);
+    const gate = await ownComputerGate(
+      deps,
+      stepRow,
+      chiefRow,
+      tool,
+      body.toolCallId,
+      body.params,
+      {
+        ...opts.ownComputer,
+        ...(opts.signal === undefined ? {} : { signal: opts.signal }),
+      },
+    );
     if (gate.kind === 'refused') return { text: gate.text };
     own = gate;
   }
@@ -1203,6 +1216,11 @@ export async function forwardComputerCall(
       machineId: target.machineId,
     };
     if (!hasBrowserPasswordGrant(db, thread.teamId, binding)) {
+      if (thread.id === NO_CARD_THREAD)
+        throw new HttpError(
+          409,
+          'No Coordinator conversation can ask the owner to approve this website.',
+        );
       const proposal = proposeAction(db, {
         teamId: thread.teamId,
         actionId: BROWSER_PASSWORD_ACTION,

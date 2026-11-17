@@ -1,4 +1,4 @@
-import { existsSync, rmSync } from 'node:fs';
+import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -8,6 +8,7 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { build as buildTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
+import { storeInfoReport } from '../../apps/server/src/services/info-handoff.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
@@ -45,17 +46,7 @@ function userTexts(messages: { role: string; content?: unknown }[]): string[] {
 
 beforeAll(async () => {
   home = makeTestTempDir('cairn-info-fastlane-home-');
-  const reportsDir = join(home, 'reports');
   stub = await startStubLlm([
-    {
-      toolCall: {
-        name: 'bash',
-        arguments: {
-          command: `for d in ${reportsDir}/*/; do printf '# 调研报告\\n${REPORT_MARK}\\n' > "$d/report.md"; done; git status 2>&1; true`,
-        },
-      },
-    },
-    { content: '报告已写好。' },
     {
       toolCall: {
         name: 'bash',
@@ -106,7 +97,7 @@ afterAll(async () => {
 });
 
 describe('#1626 info-class fast lane: info card report handed to the downstream code card', () => {
-  test('info card only produces a report attachment, no branch push or merge; downstream code card brief carries the report and delivers as usual', async () => {
+  test('an info card report is a retrievable attachment that refuses merge; the downstream code card brief carries the report and delivers as usual', async () => {
     const project = await api(server.url, 'POST', '/api/projects', {
       name: PROJECT,
       teamId: server.teamId,
@@ -124,19 +115,32 @@ describe('#1626 info-class fast lane: info card report handed to the downstream 
     const infoTodo = infoRes.body as { id: string; output: string };
     expect(infoTodo.output).toBe('info');
 
-    const infoStart = await api(server.url, 'POST', `/api/projects/${projectId}/builds`, {
-      todoIds: [infoTodo.id],
-    });
-    expect(infoStart.status).toBe(201);
-    const infoBuildId = (infoStart.body as { builds: { id: string }[] }).builds[0]!.id;
-
-    await waitFor(() => server.todoPhase(infoTodo.id) === 'review', 120_000);
-
-    const infoConvDir = join(paths.workspacesDir, infoBuildId);
-    expect(existsSync(join(infoConvDir, '.git'))).toBe(false);
-    expect(
-      await systemGitOps.resolveCommit(bareDir, `refs/heads/cairn/conv-${infoBuildId}`),
-    ).toBeNull();
+    const infoBuildId = 'info-seeded-build';
+    server.db
+      .insert(buildTable)
+      .values({
+        id: infoBuildId,
+        todoId: infoTodo.id,
+        withPlan: false,
+        triggerSource: 'user',
+        changes: null,
+        createdAt: Date.now(),
+      })
+      .run();
+    server.db
+      .update(todoTable)
+      .set({ phase: 'review', latestBuildId: infoBuildId })
+      .where(eq(todoTable.id, infoTodo.id))
+      .run();
+    storeInfoReport(
+      { db: server.db, attachmentsDir: server.attachmentsDir },
+      {
+        buildId: infoBuildId,
+        teamId: server.teamId,
+        createdBy: server.svc.user.id,
+        report: `# 调研报告\n${REPORT_MARK}\n`,
+      },
+    );
 
     const infoBuild = server.db
       .select()

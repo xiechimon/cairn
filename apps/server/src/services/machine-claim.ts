@@ -10,6 +10,7 @@ import {
   confinementDispatchReady,
   confinementEnforced,
   fencedTitle,
+  infoCardBrief,
   isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
@@ -72,7 +73,9 @@ import {
 import { projectOfTodo, projectRepoRef } from './git.js';
 import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
-import { deliverableCapability, failEarlierClaimDeliverables } from './machine-deliverables.js';
+import { infoCardPlan, infoCardRemoteTools } from './info-card.js';
+import { infoRepoOffered } from './info-repo-snapshot.js';
+import { failEarlierClaimDeliverables } from './machine-deliverables.js';
 import {
   type MachineDeps,
   profileForStep,
@@ -469,6 +472,8 @@ async function tryClaim(
         continue;
       }
     }
+    const infoCard = isBuildStepKind(cand.stepRow.kind) && cand.todoRow.output === 'info';
+    if (infoCard && infoCardPlan(db, cand.todoRow, cand.stepRow).kind !== 'claude-code') continue;
     const agentRow = profileForStep(deps, cand.todoRow, cand.stepRow.kind, cand.stepRow.id);
     if (agentRow === null) {
       failStepWithEvents(deps, cand.stepRow, unassignedStepReason(cand.stepRow.kind));
@@ -538,7 +543,6 @@ async function tryClaim(
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
     if (!stillAuthorized()) return null;
     const claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
-    const deliverables = deliverableCapability(cand.stepRow.kind, cand.todoRow.output, claimedAt);
     let won = false;
     try {
       won = db.transaction((tx) => {
@@ -600,7 +604,7 @@ async function tryClaim(
           )
           .run();
         if (res.changes === 0) return false;
-        if (deliverables !== undefined) failEarlierClaimDeliverables(db, cand.stepRow.id);
+        if (infoCard) failEarlierClaimDeliverables(db, cand.stepRow.id);
         if (cand.stepRow.kind !== 'review') {
           recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, agentRow);
         }
@@ -657,14 +661,14 @@ async function tryClaim(
             .where(eq(chief.id, chiefIdFormat(charterOwner, teamId)))
             .get()?.charter
         : undefined;
-    const repoRef = projectRepoRef(projectRow, origin);
+    const repoRef = infoCard ? null : projectRepoRef(projectRow, origin);
     const mergeTarget =
       cand.stepRow.kind === 'merge' ? parseHostedMergeInstruction(cand.stepRow.prompt) : null;
     const repo =
       repoRef?.kind === 'hosted' && mergeTarget !== null
         ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
         : repoRef;
-    const workerMcp = stepMcpGrant(db, machineRow);
+    const workerMcp = stepMcpGrant(db, machineRow, infoCard);
     const segmentsDaemon = cliVersionAtLeast(
       machineRow.latestCliVersion,
       TASK_SEGMENTS_MIN_CLI_VERSION,
@@ -735,7 +739,14 @@ async function tryClaim(
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,
-        description: agentRow.description,
+        description: infoCard
+          ? [
+              agentRow.description,
+              infoCardBrief(cand.stepRow.buildId, infoRepoOffered(deps, cand.todoRow)),
+            ]
+              .filter((part): part is string => part !== null && part !== '')
+              .join('\n\n')
+          : agentRow.description,
         provider: model.provider,
         modelId: model.modelId,
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
@@ -751,10 +762,12 @@ async function tryClaim(
         injectedSkills: skillInjection.hits.map((h) => h.id),
         tools: [...agentRow.tools],
       },
-      remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
-      localTools: claimLocalTools(agentRow.tools),
+      remoteTools: infoCard
+        ? infoCardRemoteTools(cand.stepRow.kind)
+        : workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
+      ...(infoCard ? { remoteToolsOnly: true as const } : {}),
+      localTools: infoCard ? [] : claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
-      ...(deliverables !== undefined ? { deliverables } : {}),
     };
   }
   return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);

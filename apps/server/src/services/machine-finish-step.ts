@@ -58,9 +58,11 @@ import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
+import { acceptedInfoReport } from './info-card.js';
 import { applyLocalMergeReport } from './local-merge.js';
 import { stopStepComputer } from './machine-computer.js';
 import {
+  deliverableManifestOf,
   failUnpublishedDeliverables,
   hasDeliverableRows,
   withEventsAfterCommit,
@@ -202,16 +204,10 @@ function recordSkillInjectionCheck(
 
 export async function finishStep(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   body: MachineDoneBody,
 ): Promise<void> {
-  if (
-    body.generation === undefined &&
-    (body.deliverables !== undefined || body.deliverablesSkipped !== undefined)
-  ) {
-    throw new HttpError(400, 'deliverables need the claim generation');
-  }
   const claimed = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (body.generation !== undefined && claimed?.claimedAt !== body.generation) {
     throw conflict(`step ${stepId} was claimed again after generation ${body.generation}`);
@@ -225,7 +221,7 @@ export async function finishStep(
 
 async function finishStepReport(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   body: MachineDoneBody,
 ): Promise<void> {
@@ -233,6 +229,7 @@ async function finishStepReport(
   const found = db.select().from(step).where(eq(step.id, stepId)).get();
   if (found && found.status !== 'claimed') {
     const released =
+      machineId !== null &&
       found.machineId === null &&
       stepTeamId(deps, found) ===
         db.select({ teamId: machine.teamId }).from(machine).where(eq(machine.id, machineId)).get()
@@ -350,10 +347,7 @@ async function finishStepReport(
     spaceNote,
   };
   const grantGeneration = stepRow.claimedAt;
-  if (
-    grantGeneration !== null &&
-    (body.generation !== undefined || hasDeliverableRows(db, stepId, grantGeneration))
-  ) {
+  if (grantGeneration !== null && hasDeliverableRows(db, stepId, grantGeneration)) {
     withEventsAfterCommit(deps, (settleDeps) => {
       applyStepReport(settleDeps, report);
       failUnpublishedDeliverables(settleDeps.db, stepId, grantGeneration);
@@ -364,7 +358,7 @@ async function finishStepReport(
 }
 
 interface StepReport {
-  machineId: string;
+  machineId: string | null;
   stepId: string;
   stepRow: typeof step.$inferSelect;
   body: MachineDoneBody;
@@ -661,13 +655,9 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   }
   if (outcome.status === 'success') {
     const manifest =
-      body.generation !== undefined
-        ? {
-            generation: body.generation,
-            files: body.deliverables ?? [],
-            skipped: body.deliverablesSkipped ?? [],
-          }
-        : undefined;
+      worker?.todoRow.output === 'info' ? deliverableManifestOf(db, stepRow) : undefined;
+    const infoReport =
+      worker?.todoRow.output === 'info' ? acceptedInfoReport(deps, stepRow) : undefined;
     const complete = (completeDeps: MachineDeps) =>
       completeStep(completeDeps, stepId, {
         hasChanges: outcome.hasChanges,
@@ -680,7 +670,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
         ...(outcome.verifyVerdictError !== undefined
           ? { verifyVerdictError: outcome.verifyVerdictError }
           : {}),
-        ...(outcome.report !== undefined ? { report: outcome.report } : {}),
+        ...(infoReport !== undefined ? { report: infoReport } : {}),
         ...(manifest !== undefined ? { deliverables: manifest } : {}),
         verdictReport,
       });

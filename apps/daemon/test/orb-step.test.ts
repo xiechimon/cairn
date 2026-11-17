@@ -370,7 +370,6 @@ test('orb fixed roots exclude host runtime credentials and workspace directories
       paths.agentRuntimeDir,
       paths.workspacesDir,
       paths.plansDir,
-      paths.reportsDir,
       paths.stepAttachmentsDir,
       paths.teamSkillsCacheDir,
     ])

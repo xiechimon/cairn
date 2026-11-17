@@ -1,28 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import {
-  INFO_REPORT_MAX_BYTES,
-  PLAN_FILE_NAME,
-  REPORT_FILE_NAME,
-  type VerifyVerdict,
-} from '@cairn/shared';
-
-export type InfoReportRead =
-  | { kind: 'absent' }
-  | { kind: 'report'; content: string }
-  | { kind: 'too-large'; error: string };
-
-export function readInfoReport(reportFile: string): InfoReportRead {
-  if (!existsSync(reportFile)) return { kind: 'absent' };
-  const content = readFileSync(reportFile, 'utf8');
-  if (Buffer.byteLength(content, 'utf8') > INFO_REPORT_MAX_BYTES) {
-    return {
-      kind: 'too-large',
-      error: `${REPORT_FILE_NAME} 超过上限 ${INFO_REPORT_MAX_BYTES} 字节，请压缩报告后重试`,
-    };
-  }
-  return content.trim() === '' ? { kind: 'absent' } : { kind: 'report', content };
-}
+import { PLAN_FILE_NAME, type VerifyVerdict } from '@cairn/shared';
 
 function nonBlankFile(path: string): string | null {
   if (!existsSync(path)) return null;

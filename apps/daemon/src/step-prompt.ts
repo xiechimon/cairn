@@ -6,9 +6,7 @@ import {
   appendBlockerHandoff,
   appendConfirmedPlanNote,
   appendDecisionsNote,
-  appendDeliverablesLocationNote,
   appendPlanLocationNote,
-  appendReportLocationNote,
   appendWorkBranchNote,
   buildPlanFirstRoundInstruction,
   buildTaskPromptText,
@@ -20,11 +18,9 @@ import {
   PLAN_FILE_NAME,
   parseReviewPromptMeta,
   parseVerifyPromptMeta,
-  REPORT_FILE_NAME,
   type ReviewGate,
   WORKER_DECISION_BOUNDARY,
 } from '@cairn/shared';
-import { deliverablesDirOf } from './step-deliverables.js';
 
 export function buildTaskPrompt(claimed: ClaimedStep): string {
   const todo = claimed.todo;
@@ -68,20 +64,11 @@ function confirmedPlanFile(plansDir: string, convId: string): string | null {
   }
 }
 
-function appendInfoNotes(prompt: string, claimed: ClaimedStep, reportFile: string): string {
-  const withReport = appendReportLocationNote(prompt, reportFile);
-  return claimed.deliverables !== undefined
-    ? appendDeliverablesLocationNote(withReport, deliverablesDirOf(reportFile))
-    : withReport;
-}
-
 export function freshSessionPrompt(
   claimed: ClaimedStep,
-  input: { isInfoBuild: boolean; reportFile: string; plansDir: string; convId: string },
+  input: { plansDir: string; convId: string },
 ): string {
-  return input.isInfoBuild
-    ? appendInfoNotes(buildTaskPrompt(claimed), claimed, input.reportFile)
-    : degradedFreshPrompt(claimed, input.plansDir, input.convId);
+  return degradedFreshPrompt(claimed, input.plansDir, input.convId);
 }
 
 export function degradedFreshPrompt(
@@ -184,16 +171,13 @@ export interface StepPromptPlan {
   attachmentVerify: boolean;
   verifyEvidenceDirectory: string | undefined;
   reviewGate: ReviewGate;
-  isInfoBuild: boolean;
-  readonlyWorkspace: boolean;
-  reportFile: string;
   prompt: string;
 }
 
 export function planStepPrompt(
   claimed: ClaimedStep,
   resumePrompt: string | null | undefined,
-  paths: { plansDir: string; reportsDir: string },
+  paths: { plansDir: string },
 ): StepPromptPlan {
   const convId = claimed.conversationId;
   const isChief = claimed.step.kind === 'chief';
@@ -213,18 +197,13 @@ export function planStepPrompt(
             carriedAnswers(claimed),
           )
         : buildTaskPrompt(claimed));
-  const isInfoBuild = isBuildStepKind(claimed.step.kind) && claimed.todo?.output === 'info';
-  const reportFile = join(paths.reportsDir, convId, REPORT_FILE_NAME);
   const promptWithPlanNote =
     basePrompt !== null && claimed.step.kind === 'plan'
       ? appendPlanLocationNote(basePrompt, join(paths.plansDir, convId, PLAN_FILE_NAME))
-      : basePrompt !== null && isInfoBuild
-        ? appendInfoNotes(basePrompt, claimed, reportFile)
-        : basePrompt;
+      : basePrompt;
   const prompt =
     promptWithPlanNote !== null &&
     promptWithPlanNote.trim() !== '' &&
-    !isInfoBuild &&
     (isBuildStepKind(claimed.step.kind) ||
       claimed.step.kind === 'merge' ||
       (claimed.step.kind === 'verify' && !attachmentVerify)) &&
@@ -243,9 +222,6 @@ export function planStepPrompt(
     attachmentVerify,
     verifyEvidenceDirectory: verifyMeta?.evidenceDirectory,
     reviewGate,
-    isInfoBuild,
-    readonlyWorkspace: !isChief && claimed.todo?.output === 'info',
-    reportFile,
     prompt,
   };
 }

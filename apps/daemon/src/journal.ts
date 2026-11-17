@@ -2,7 +2,6 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs
 import { join } from 'node:path';
 import type { ClaimedStep, MachineDoneBody, StepKind, TranscriptUpload } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from './private-fs.js';
-import { type DeliverableSnapshot, deliverablesOutboxOf } from './step-deliverables.js';
 import type { StopRequest } from './step-stops.js';
 
 const STEP_OUTBOX_SUFFIXES = ['.transcript.json', '.session.jsonl'];
@@ -21,7 +20,6 @@ export interface StepJournalEntry {
   prompt: string | null;
   claimed: ClaimedStep | null;
   doneBody?: MachineDoneBody | null;
-  deliverables?: DeliverableSnapshot | null;
   planContent?: string | null;
   sessionFile?: string | null;
   stopRequest?: StopRequest | null;
@@ -97,20 +95,11 @@ export class StepJournal {
       .sort((a, b) => a.claimedAt - b.claimedAt);
   }
 
-  deliverablesDir(stepId: string): string {
-    return deliverablesOutboxOf(this.dir, stepId);
-  }
-
-  dropDeliverables(stepId: string): void {
-    rmSync(this.deliverablesDir(stepId), { recursive: true, force: true });
-    this.update(stepId, { deliverables: null });
-  }
-
   remove(stepId: string): void {
     if (existsSync(this.file(stepId))) rmSync(this.file(stepId));
     for (const suffix of STEP_OUTBOX_SUFFIXES)
       rmSync(join(this.dir, `step-${stepId}${suffix}`), { force: true });
-    rmSync(this.deliverablesDir(stepId), { recursive: true, force: true });
+    rmSync(join(this.dir, `step-${stepId}.deliverables`), { recursive: true, force: true });
   }
 
   sweepOrphanFiles(input: { now: number; ttlMs: number }): string[] {

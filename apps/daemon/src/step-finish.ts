@@ -27,7 +27,6 @@ export interface StepFinishInput
   headAtStart: string | null;
   stepStartMs: number;
   reviewCheckout: boolean;
-  readonlyWorkspace: boolean;
   appIdentity: CommitIdentity | null;
   identity: CommitIdentity;
   runGit: StepGitRunner;
@@ -92,8 +91,7 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     stepStartMs: input.stepStartMs,
     runGit: input.runGit,
     headCommit: attachmentVerify ? input.headAtStart : null,
-    hasChanges:
-      isReview || attachmentVerify || input.readonlyWorkspace ? false : passState.sawChangeTool,
+    hasChanges: isReview || attachmentVerify ? false : passState.sawChangeTool,
     lastError: outcome.lastError,
     stopped,
     closes: outcome.lastError === null && !stopped && !isReview && !attachmentVerify,
@@ -132,7 +130,6 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     stopped,
     isReview,
     attachmentVerify,
-    infoReportFile: input.infoReportFile,
     quotaBlock,
     skillInjectionFacts: input.skillInjectionFacts,
     uploadedEvidence: input.uploadedEvidence,

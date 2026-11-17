@@ -1,11 +1,5 @@
 import { join } from 'node:path';
-import {
-  appendPlanLocationNote,
-  appendReportLocationNote,
-  type ClaimedStep,
-  PLAN_FILE_NAME,
-  REPORT_FILE_NAME,
-} from '@cairn/shared';
+import { appendPlanLocationNote, type ClaimedStep, PLAN_FILE_NAME } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   buildTaskPrompt,
@@ -14,7 +8,7 @@ import {
   planStepPrompt,
 } from '../src/step-prompt.js';
 
-const paths = { plansDir: '/state/plans', reportsDir: '/state/reports' };
+const paths = { plansDir: '/state/plans' };
 const repo = { cloneUrl: 'https://github.com/octo/alpha.git', baseBranch: 'main' };
 
 function claimed(opts: {
@@ -55,7 +49,6 @@ describe('planStepPrompt', () => {
     const plan = planStepPrompt(claimed({ kind: 'chief', instruction: 'hello' }), undefined, paths);
     expect(plan.prompt).toBe('hello');
     expect(plan.isChief).toBe(true);
-    expect(plan.readonlyWorkspace).toBe(false);
   });
 
   test('a plan step points at the plan file', () => {
@@ -64,16 +57,6 @@ describe('planStepPrompt', () => {
     expect(plan.prompt).toBe(
       appendPlanLocationNote(buildTaskPrompt(step), join(paths.plansDir, 'conv-1', PLAN_FILE_NAME)),
     );
-  });
-
-  test('an info build points at the report file, skips the branch note and is read-only', () => {
-    const step = claimed({ kind: 'build', output: 'info', withRepo: true });
-    const plan = planStepPrompt(step, undefined, paths);
-    const reportFile = join(paths.reportsDir, 'conv-1', REPORT_FILE_NAME);
-    expect(plan.reportFile).toBe(reportFile);
-    expect(plan.isInfoBuild).toBe(true);
-    expect(plan.readonlyWorkspace).toBe(true);
-    expect(plan.prompt).toBe(appendReportLocationNote(buildTaskPrompt(step), reportFile));
   });
 
   test('a repo-bound build gets the work branch note; one without a repo does not', () => {
@@ -108,19 +91,9 @@ describe('planStepPrompt', () => {
 });
 
 describe('freshSessionPrompt', () => {
-  const reportFile = '/state/reports/conv-1/report.md';
-  const input = { reportFile, plansDir: paths.plansDir, convId: 'conv-1' };
-
-  test('an info build resends the task with the report location', () => {
-    const step = claimed({ kind: 'build', output: 'info', withRepo: true });
-    expect(freshSessionPrompt(step, { ...input, isInfoBuild: true })).toBe(
-      appendReportLocationNote(buildTaskPrompt(step), reportFile),
-    );
-  });
-
-  test('any other step resends the degraded fresh prompt', () => {
+  test('resends the degraded fresh prompt', () => {
     const step = claimed({ kind: 'plan' });
-    expect(freshSessionPrompt(step, { ...input, isInfoBuild: false })).toBe(
+    expect(freshSessionPrompt(step, { plansDir: paths.plansDir, convId: 'conv-1' })).toBe(
       degradedFreshPrompt(step, paths.plansDir, 'conv-1'),
     );
   });

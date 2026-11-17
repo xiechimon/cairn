@@ -1,31 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { INFO_REPORT_MAX_BYTES, PLAN_FILE_NAME, type VerifyVerdict } from '@cairn/shared';
+import { PLAN_FILE_NAME, type VerifyVerdict } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { readDeliveredPlan, readInfoReport, requireUploadedEvidence } from '../src/step-outputs.js';
+import { readDeliveredPlan, requireUploadedEvidence } from '../src/step-outputs.js';
 import { testTempDir } from './test-temp-dir.js';
-
-describe('readInfoReport', () => {
-  test('a missing or blank report is absent', () => {
-    const dir = testTempDir('cairn-step-outputs-report-');
-    expect(readInfoReport(join(dir, 'missing.md'))).toEqual({ kind: 'absent' });
-    writeFileSync(join(dir, 'blank.md'), '  \n', 'utf8');
-    expect(readInfoReport(join(dir, 'blank.md'))).toEqual({ kind: 'absent' });
-  });
-
-  test('returns the report content', () => {
-    const file = join(testTempDir('cairn-step-outputs-report-'), 'report.md');
-    writeFileSync(file, '# Findings\n', 'utf8');
-    expect(readInfoReport(file)).toEqual({ kind: 'report', content: '# Findings\n' });
-  });
-
-  test('refuses a report over the byte limit', () => {
-    const file = join(testTempDir('cairn-step-outputs-report-'), 'report.md');
-    writeFileSync(file, 'x'.repeat(INFO_REPORT_MAX_BYTES + 1), 'utf8');
-    const read = readInfoReport(file);
-    expect(read.kind).toBe('too-large');
-  });
-});
 
 describe('readDeliveredPlan', () => {
   test('prefers the conversation plan file over the worktree one', () => {

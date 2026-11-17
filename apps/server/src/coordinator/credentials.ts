@@ -23,7 +23,7 @@ interface CredentialDeps {
   box: SecretBox;
 }
 
-function routeOf(
+export function routeOf(
   deps: CredentialDeps,
   teamId: string,
   provider: string,

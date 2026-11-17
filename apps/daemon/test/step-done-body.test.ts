@@ -20,7 +20,6 @@ const outcome: StepDoneOutcome = {
   branchDrift: null,
   quotaBlock: null,
   skillInjectionFacts: null,
-  report: null,
 };
 
 const assistant = (content: string) =>
@@ -62,7 +61,6 @@ describe('composeDoneBody', () => {
         preservedCommits: ['a'.repeat(40)],
         prProbe: { number: 7, url: 'https://example.test/pr/7' },
         branchDrift: { expected: 'x', actual: 'y' },
-        report: '# r',
       },
       source({}),
     );
@@ -75,7 +73,6 @@ describe('composeDoneBody', () => {
       prUrl: 'https://example.test/pr/7',
       prNumber: 7,
       workBranchDrift: { expected: 'x', actual: 'y' },
-      report: '# r',
     });
   });
 

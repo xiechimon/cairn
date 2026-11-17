@@ -1,6 +1,7 @@
 import {
   type ChiefThread,
   confinementDispatchReady,
+  isBuildStepKind,
   isChiefDigestThreadId,
   MODEL_SOURCE_RUNTIME_LABELS,
   parseLocalMergeInstruction,
@@ -24,6 +25,7 @@ import {
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
+import { infoCardPlan } from './info-card.js';
 import {
   platformFallbackMachineId,
   priorSessionOf,
@@ -294,6 +296,17 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const pool = queue.filter((r) => r.home === target.homeMachineId);
     const position = pool.findIndex((r) => r.id === target.id) + 1;
     if (position === 0) return null;
+    const infoPlan =
+      'todoRow' in queueRow && isBuildStepKind(queueRow.kind) && queueRow.todoRow.output === 'info'
+        ? infoCardPlan(db, queueRow.todoRow, queueRow)
+        : null;
+    if (infoPlan !== null && infoPlan.kind !== 'claude-code') {
+      return {
+        position,
+        waitingFor: null,
+        ...(infoPlan.kind === 'wait' ? { blocked: infoPlan.blocked } : {}),
+      };
+    }
     const routing =
       'todoRow' in queueRow && routeForStep(db, queueRow.todoRow, queueRow.kind) !== null
         ? workerRouting(target, queueRow)

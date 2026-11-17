@@ -20,7 +20,6 @@ export interface StepWorkspaceInput {
   repo: StepRepo;
   workspacesRoot: string;
   credentials: BoundGitCredentials | null;
-  readonly: boolean;
   refresh: GitCredentialFallbackOpts['refresh'];
   machineName: string;
 }
@@ -43,7 +42,6 @@ export async function prepareStepWorkspace(
         credentials: input.credentials,
         localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
         machineCredentialFallback: repo.kind === 'github',
-        ...(input.readonly ? { readonly: true } : {}),
       });
     const prepared: { workspace: PreparedWorkspace | null } = { workspace: null };
     await withGitCredentialFallback(
@@ -113,7 +111,6 @@ export interface StepWorkspaceSetupInput {
   repo: StepRepo | null;
   workspacesRoot: string;
   credentials: BoundGitCredentials | null;
-  readonly: boolean;
   refresh: GitCredentialFallbackOpts['refresh'];
   machineName: string;
   attachmentVerify: boolean;
@@ -144,7 +141,6 @@ export async function setUpStepWorkspace(
       repo,
       workspacesRoot: input.workspacesRoot,
       credentials: input.credentials,
-      readonly: input.readonly,
       refresh: input.refresh,
       machineName: input.machineName,
     });

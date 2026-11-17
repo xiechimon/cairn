@@ -30,15 +30,22 @@ export function coordinatorRouteVerdict(
   const rule = coordinatorRule(db, teamId) ?? defaultCoordinatorRule(db, teamId) ?? undefined;
   if (rule === undefined) return { refusal: 'no-api-key-provider' };
   if (rule.provider === CLAUDE_CODE_PROVIDER) return null;
+  const refusal = providerRefusal(db, teamId, rule.provider);
+  return refusal === null ? { rule } : { refusal, rule };
+}
+
+export function providerRefusal(
+  db: Db,
+  teamId: string,
+  providerId: string,
+): Exclude<CoordinatorRouteRefusal, 'no-api-key-provider'> | null {
   const row = db
     .select({ keyed: sql<number>`${provider.apiKeyCipher} is not null` })
     .from(provider)
-    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, rule.provider)))
+    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
     .get();
-  if (row === undefined) return { refusal: 'rule-provider-missing', rule };
-  const runnable = row.keyed === 1 || keylessEndpoint(rule.provider);
-  if (!runnable) return { refusal: 'rule-provider-has-no-key', rule };
-  return { rule };
+  if (row === undefined) return 'rule-provider-missing';
+  return row.keyed === 1 || keylessEndpoint(providerId) ? null : 'rule-provider-has-no-key';
 }
 
 export function coordinatorRoute(db: Db, teamId: string): CoordinatorRule | null {

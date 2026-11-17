@@ -5,6 +5,7 @@ import {
   INSTALL_PACKAGES_TIMEOUT_MS,
   INSTALL_PACKAGES_TOOL,
   isComputerBrowserTool,
+  isInfoCardComputerTool,
   REQUEST_CLOAK_LICENSE_TOOL,
   type RemoteToolDef,
 } from '@cairn/shared';
@@ -51,7 +52,8 @@ export function stepRemoteToolExecutor(input: {
     const def = remoteTools.find((t) => t.name === name);
     const ownerWait = name === 'request_takeover' || name === REQUEST_CLOAK_LICENSE_TOOL;
     const install = name === INSTALL_PACKAGES_TOOL;
-    const computerCall = isComputerBrowserTool(name) || ownerWait || install;
+    const computerCall =
+      isComputerBrowserTool(name) || isInfoCardComputerTool(name) || ownerWait || install;
     return client.relayTool(stepId, name, params, {
       ...(def?.replaySafe ? { replaySafe: true } : {}),
       ...(computerCall

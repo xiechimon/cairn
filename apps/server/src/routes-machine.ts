@@ -3,7 +3,6 @@ import type { ToolCallRecord } from '@cairn/shared';
 import {
   claudeRateLimitReportSchema,
   computerCallIdSchema,
-  DELIVERABLE_GRANT_MAX_BODY_BYTES,
   enrollDisplayName,
   MACHINE_ENROLL_TTL_MS,
   machineActivityBodySchema,
@@ -50,12 +49,6 @@ import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
-import {
-  DeliverableUploadGate,
-  deliverableReceipt,
-  grantDeliverables,
-  receiveDeliverable,
-} from './services/machine-deliverables.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import {
   createUploadUrls,
@@ -161,6 +154,7 @@ function unauthorized(): HttpError {
 }
 
 const CLOSED_ORBS_MAX_BODY_BYTES = 64 * 1024;
+const UPLOAD_URLS_MAX_BODY_BYTES = 64 * 1024;
 const COMPUTER_FRAMES_MAX_BODY_BYTES = 24 * 1024 * 1024;
 const DONE_MAX_BODY_BYTES = 16 * 1024 * 1024;
 
@@ -234,8 +228,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     if (!row) throw unauthorized();
     return row;
   };
-
-  const deliverableGate = new DeliverableUploadGate();
 
   const executeMachineCommand = async <T, R>(
     c: Context,
@@ -636,7 +628,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   app.post(
     '/api/machine/upload-urls/:stepId',
     bodyLimit({
-      maxSize: DELIVERABLE_GRANT_MAX_BODY_BYTES,
+      maxSize: UPLOAD_URLS_MAX_BODY_BYTES,
       onError: (c) => c.json({ error: 'upload-urls body too large' }, 413),
     }),
     async (c) => {
@@ -646,21 +638,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         async (row, decoded) => {
           const body = parseWith(machineUploadUrlsBodySchema, decoded, 'body');
           const stepId = c.req.param('stepId');
-          const deliverables =
-            body.deliverables !== undefined
-              ? grantDeliverables(
-                  deps,
-                  row,
-                  stepId,
-                  body.generation,
-                  body.deliverables,
-                  originOf(c),
-                )
-              : undefined;
-          return c.json({
-            ...createUploadUrls(deps, row.id, stepId, body.files, originOf(c), ctx.uploads),
-            ...(deliverables !== undefined ? { deliverables } : {}),
-          });
+          return c.json(
+            createUploadUrls(deps, row.id, stepId, body.files, originOf(c), ctx.uploads),
+          );
         },
       );
     },
@@ -704,30 +684,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         return completeUpload();
       },
     );
-  });
-
-  app.put('/api/machine/deliverable/:attachmentId', async (c) => {
-    const row = me(c);
-    const token = bearer(c) ?? '';
-    await receiveDeliverable(deps, deliverableGate, {
-      machineId: row.id,
-      attachmentId: c.req.param('attachmentId'),
-      contentLength: c.req.header('content-length'),
-      body: c.req.raw.body,
-      confirmMachine: () => {
-        if (findMachineByToken(ctx.db, token)?.id !== row.id) throw unauthorized();
-      },
-    });
-    return c.json({ ok: true as const });
-  });
-
-  app.get('/api/machine/steps/:stepId/receipt', (c) => {
-    const row = me(c);
-    const generation = Number(c.req.query('generation'));
-    if (!Number.isInteger(generation)) throw new HttpError(400, 'generation must be an integer');
-    return c.json({
-      state: deliverableReceipt(ctx.db, row.id, c.req.param('stepId'), generation),
-    });
   });
 
   app.get('/api/machine/session/:stepId', (c) => {

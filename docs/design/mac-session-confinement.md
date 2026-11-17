@@ -25,7 +25,7 @@ Paths use the packaged layout; `userData` is `~/Library/Application Support/@cai
 | --- | --- | --- | --- |
 | `userData/home/` (server home: `token`, `server/server.db`, skills source, uploads) | deny | deny | owner token; server database |
 | `userData/runner/` (Runner home) except the entries below | deny | deny | `machine.json` machine token, `device.json`, `daemon.log`, outbox, `chat-sessions`, `agent-runtime` |
-| `runner/reports/` and `runner/plans/` (info-card report and plan handoff) | allow | allow | the agent writes `report.md`, deliverables and `plan.md` there; carved out of the denied Runner root, passed as `handoffDirectories`; nothing else under `runner/` is opened |
+| `runner/plans/` (plan handoff) | allow | allow | the agent writes `plan.md` there; carved out of the denied Runner root, passed as `handoffDirectories`; nothing else under `runner/` is opened. Info-card reports no longer use a host path: they run in the agent computer ([info-cards-in-agent-computer](info-cards-in-agent-computer.md)) |
 | `runner/workspaces/<this session's worktree>` and the git common directory of its repository | allow | allow | the work; `.git/config`, `.git/config.worktree`, `.git/hooks` and any `.git` pointer file stay write-denied, as on Linux |
 | `runner/workspaces/` siblings (other conversations, project `repo/` caches) | deny | deny | other tasks' code and credentials in remotes |
 | The harness's own state: `runner/claude` (Claude config dir, `CLAUDE_CONFIG_DIR`), the Codex dir, pi `agentDir` | own only | own only | other harness state denied, as on Linux |

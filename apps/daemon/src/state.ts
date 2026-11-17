@@ -24,7 +24,6 @@ export interface StatePaths {
   teamSkillsCacheDir: string;
   stepAttachmentsDir: string;
   plansDir: string;
-  reportsDir: string;
 }
 
 export function statePaths(home: string, workspacesDir?: string): StatePaths {
@@ -41,7 +40,6 @@ export function statePaths(home: string, workspacesDir?: string): StatePaths {
     teamSkillsCacheDir: join(home, 'team-skills'),
     stepAttachmentsDir: join(home, 'step-attachments'),
     plansDir: join(home, 'plans'),
-    reportsDir: join(home, 'reports'),
   };
 }
 

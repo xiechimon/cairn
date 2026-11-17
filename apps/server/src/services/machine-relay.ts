@@ -35,6 +35,7 @@ import {
 } from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
 import { holdCloakLicense } from './cloak-license.js';
+import { infoCardTodoOf } from './computer-thread.js';
 import {
   capturePreCallWorld,
   captureToolResult,
@@ -43,6 +44,7 @@ import {
 } from './coordinator-turn-capture.js';
 import { projectOfTodo } from './git.js';
 import { resolveProjectGithubLabelIds } from './github-labels.js';
+import { executeInfoCardTool } from './info-card-tools.js';
 import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { stepScopeProjectId } from './picked-project.js';
@@ -162,11 +164,14 @@ export async function executeRelayToolCall(
   toolCallId?: string,
   signal?: AbortSignal,
 ): Promise<string> {
+  const row = ownedStep(deps, machineId, stepId);
+  if (infoCardTodoOf(deps.db, row) !== null) {
+    return executeInfoCardTool(deps, machineId, row, name, params, toolCallId, signal);
+  }
   if (isCoordinatorComputerTool(name)) {
     return (await relayComputerTool(deps, machineId, stepId, name, params, toolCallId, signal))
       .text;
   }
-  const row = ownedStep(deps, machineId, stepId);
   refuseRestrictedTurnTool(row.prompt, name, params, row.ownerMessageIds ?? []);
   if (isThreadScheduleTool(name)) {
     if (row.kind !== 'plan' && !isBuildStepKind(row.kind)) {

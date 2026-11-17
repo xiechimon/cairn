@@ -36,13 +36,12 @@ const input = (workspace: WorktreeOps) => ({
   repo,
   workspacesRoot: '/tmp/ws',
   credentials: null,
-  readonly: true,
   refresh: undefined,
   machineName: 'box',
 });
 
 describe('prepareStepWorkspace', () => {
-  it('passes the claim and readonly flag to prepare and returns the workspace', async () => {
+  it('passes the claim to prepare and returns the workspace', async () => {
     const seen: unknown[] = [];
     const ws = { cwd: '/tmp/ws/conv_1' } as PreparedWorkspace;
     const result = await prepareStepWorkspace(
@@ -58,7 +57,6 @@ describe('prepareStepWorkspace', () => {
       projectId: 'proj_1',
       conversationId: 'conv_1',
       machineCredentialFallback: true,
-      readonly: true,
     });
   });
 
@@ -120,7 +118,6 @@ describe('setUpStepWorkspace', () => {
       repo: null,
       workspacesRoot: testTempDir('step-workspace-setup'),
       credentials: null,
-      readonly: false,
       refresh: undefined,
       machineName: 'box',
       attachmentVerify: false,
@@ -147,12 +144,6 @@ describe('setUpStepWorkspace', () => {
     const ws = { cwd: '/tmp/ws/conv_1' } as PreparedWorkspace;
     const result = await setup({ repo, workspace: ops(async () => ws) });
     expect(result).toMatchObject({ ws, cwd: ws.cwd, headAtStart: 'a'.repeat(40) });
-  });
-
-  it('skips the head of a readonly workspace', async () => {
-    const ws = { cwd: '/tmp/ws/conv_1', readonly: true } as PreparedWorkspace;
-    const result = await setup({ repo, readonly: true, workspace: ops(async () => ws) });
-    expect(result).toMatchObject({ ws, headAtStart: null });
   });
 
   it('passes a verify clone failure through', async () => {

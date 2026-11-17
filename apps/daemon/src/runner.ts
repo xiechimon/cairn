@@ -1,6 +1,6 @@
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -23,7 +23,6 @@ import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { deliverablesDirOf } from './step-deliverables.js';
 import { prepareStepEnv } from './step-env.js';
 import { reportStepProvenance, stepSkillsCatalog } from './step-executor-record.js';
 import { finishStepRun } from './step-finish.js';
@@ -185,22 +184,10 @@ async function runClaimedStep(
     attachmentVerify,
     verifyEvidenceDirectory,
     reviewGate,
-    isInfoBuild,
-    readonlyWorkspace,
-    reportFile,
     prompt,
   } = planStepPrompt(claimed, opts.resume?.prompt, deps.paths);
   if (claimed.step.kind === 'plan') {
     mkdirSync(join(deps.paths.plansDir, convId), { recursive: true });
-  }
-  if (isInfoBuild) {
-    mkdirSync(dirname(reportFile), { recursive: true });
-    if (!opts.resume) rmSync(reportFile, { force: true });
-    if (claimed.deliverables !== undefined) {
-      for (const folder of ['pages', 'slides']) {
-        mkdirSync(join(deliverablesDirOf(reportFile), folder), { recursive: true });
-      }
-    }
   }
 
   const claimedEntry = journal.claim({
@@ -323,7 +310,6 @@ async function runClaimedStep(
     repo,
     workspacesRoot: deps.workspacesDir,
     credentials: creds.git,
-    readonly: readonlyWorkspace,
     refresh: refreshGit,
     machineName: deps.machineName ?? hostname(),
     attachmentVerify,
@@ -408,7 +394,7 @@ async function runClaimedStep(
       inherited: opts.env,
       git: repo?.kind === 'github' ? creds.git : null,
       appCredential,
-      readonlyGit: readonlyWorkspace || attachmentVerify,
+      readonlyGit: attachmentVerify,
       claudeSubscriptionToken:
         runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
       devinToken: runtimeId === 'devin' ? creds.devinToken : undefined,
@@ -531,8 +517,6 @@ async function runClaimedStep(
       ? PROVIDER_NETWORK_RETRY_DELAYS_MS
       : [0, 5_000];
   const freshPromptPaths = {
-    isInfoBuild,
-    reportFile,
     plansDir: deps.paths.plansDir,
     convId,
   };
@@ -628,7 +612,6 @@ async function runClaimedStep(
     transcript,
     isReview,
     attachmentVerify,
-    infoReportFile: isInfoBuild ? reportFile : null,
     skillInjectionFacts: skillInjection.facts,
     uploadedEvidence: uploadedVerifyEvidence,
     running,
@@ -647,7 +630,6 @@ async function runClaimedStep(
     headAtStart,
     stepStartMs,
     reviewCheckout: checkout,
-    readonlyWorkspace,
     appIdentity,
     identity: stepIdentity,
     runGit: withStepGit,
