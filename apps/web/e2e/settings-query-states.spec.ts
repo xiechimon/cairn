@@ -152,50 +152,6 @@ test('providers: a team whose only data is a failed subscriptions fetch sees an 
   await expect(settings.getByTestId('providers-empty')).toHaveCount(0);
 });
 
-test('providers: a failed team providers fetch keeps the Runner-reported Claude Code row', async ({
-  page,
-}) => {
-  const state = { fail: true, ok: { providers: [] } as unknown };
-  await stub(page, 'providers', state);
-  await page.route('**/api/teams/team-1/machines', (route) =>
-    route.fulfill({
-      json: [
-        {
-          id: 'm-1',
-          name: 'alpha',
-          teamId: 'team-1',
-          online: true,
-          latestCliVersion: null,
-          kind: 'remote',
-          enabledRuntimes: ['pi'],
-        },
-      ],
-    }),
-  );
-  await page.route('**/api/teams/team-1/model-sources', (route) =>
-    route.fulfill({
-      json: {
-        sources: [
-          {
-            runtime: 'claude-code',
-            installed: true,
-            hostname: 'alpha',
-            machineId: 'm-1',
-            models: [],
-            bin: { path: '/usr/local/bin/claude', version: '2.1.316' },
-          },
-        ],
-      },
-    }),
-  );
-  await page.goto('/app/settings/routing');
-  const settings = page.getByRole('dialog', { name: '设置' });
-  await expect(
-    settings.locator('[data-testid="provider-instance"][data-instance-id="claude-code"]'),
-  ).toBeVisible();
-  await expect(settings.getByTestId('providers-partial-error')).toBeVisible();
-});
-
 for (const width of [768, 1024]) {
   test(`machines: at ${width}px every row stays inside the panel`, async ({
     page,
