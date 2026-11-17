@@ -308,7 +308,7 @@ export function GithubDeviceDialog({
   );
 }
 
-function DeviceCode({ code }: { code: string }) {
+export function DeviceCode({ code }: { code: string }) {
   const { t } = useI18n();
   const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
   return (

@@ -63,6 +63,13 @@ import {
   readGithubConnectionStatus,
   teamGithubToken,
 } from './services/github-connection.js';
+import {
+  cancelGithubConnectionDevice,
+  type GithubConnectionDeviceDeps,
+  githubConnectionInstallUrl,
+  pollGithubConnectionDevice,
+  startGithubConnectionDevice,
+} from './services/github-connection-device.js';
 import { isOwner } from './services/instance-owner.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
@@ -82,6 +89,7 @@ import {
   checkMcpConnector,
   createMcpConnector,
   deleteMcpConnector,
+  githubAppOfDeps,
   listMcpConnectors,
   listMcpServers,
   type McpConnectorDeps,
@@ -346,6 +354,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       capabilitiesResponseSchema.parse({
         thinkingLevels: THINKING_LEVELS,
         githubOAuth: ctx.oauthClient !== null,
+        githubDeviceInstallUrl: githubConnectionInstallUrl(
+          githubAppOfDeps(ctx.mcpGithubApp === undefined ? {} : { githubApp: ctx.mcpGithubApp }),
+        ),
       }),
     );
   });
@@ -784,6 +795,45 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     deleteGithubConnection({ db: ctx.db, box: ctx.secretBox }, teamId);
+    return c.body(null, 204);
+  });
+
+  const connectionDeviceDeps = (): GithubConnectionDeviceDeps => ({
+    db: ctx.db,
+    box: ctx.secretBox,
+    fetch: ctx.githubFetch ?? globalThis.fetch,
+    app: githubAppOfDeps(ctx.mcpGithubApp === undefined ? {} : { githubApp: ctx.mcpGithubApp }),
+    attempts: ctx.githubConnectionDeviceStates,
+  });
+
+  app.post('/api/teams/:id/github/connection/device', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(
+      await startGithubConnectionDevice(connectionDeviceDeps(), { teamId, userId: ctx.user.id }),
+    );
+  });
+
+  app.post('/api/teams/:id/github/connection/device/:attempt', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(
+      await pollGithubConnectionDevice(connectionDeviceDeps(), {
+        teamId,
+        userId: ctx.user.id,
+        attemptId: c.req.param('attempt'),
+      }),
+    );
+  });
+
+  app.delete('/api/teams/:id/github/connection/device/:attempt', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    cancelGithubConnectionDevice(connectionDeviceDeps(), {
+      teamId,
+      userId: ctx.user.id,
+      attemptId: c.req.param('attempt'),
+    });
     return c.body(null, 204);
   });
 

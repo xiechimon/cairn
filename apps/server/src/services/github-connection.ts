@@ -4,13 +4,15 @@ import {
   type GitIdentity,
   type SecretBox,
 } from '@cairn/shared';
-import { eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { githubConnection } from '../db/schema.js';
+import { HttpError } from '../lib/errors.js';
 import { type FetchLike, refreshOAuthAccessToken } from '../lib/github.js';
 import { isAppToken, type UserToken } from '../lib/github-token.js';
-import { nowMs } from '../lib/ids.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
 import { SecretBoxError } from '../lib/secret-box.js';
+import { refreshGithubDeviceToken } from './github-device-core.js';
 import type { OAuthClientConfig } from './oauth.js';
 
 const REFRESH_SKEW_MS = 60_000;
@@ -52,6 +54,7 @@ export function upsertGithubConnection(
     scope: string;
     refreshToken?: string | null | undefined;
     accessTokenExpiresAt?: number | null | undefined;
+    device?: { clientId: string; refreshTokenExpiresAt: number } | undefined;
   },
 ): void {
   const accessTokenCipher = deps.box.seal(input.accessToken);
@@ -59,35 +62,25 @@ export function upsertGithubConnection(
     input.refreshToken === undefined || input.refreshToken === null
       ? null
       : deps.box.seal(input.refreshToken);
-  const createdAt = nowMs();
+  const fields = {
+    login: input.login,
+    githubUserId: input.githubUserId ?? null,
+    githubName: input.githubName ?? null,
+    accessTokenCipher,
+    refreshTokenCipher,
+    accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
+    refreshTokenExpiresAt: input.device?.refreshTokenExpiresAt ?? null,
+    appClientId: input.device?.clientId ?? null,
+    connectionGeneration: input.device === undefined ? null : newRecordId(32),
+    refreshLeaseUntil: null,
+    disconnectedReason: null,
+    scope: input.scope,
+    createdAt: nowMs(),
+  };
   deps.db
     .insert(githubConnection)
-    .values({
-      teamId: input.teamId,
-      login: input.login,
-      githubUserId: input.githubUserId ?? null,
-      githubName: input.githubName ?? null,
-      accessTokenCipher,
-      refreshTokenCipher,
-      accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
-      disconnectedReason: null,
-      scope: input.scope,
-      createdAt,
-    })
-    .onConflictDoUpdate({
-      target: githubConnection.teamId,
-      set: {
-        login: input.login,
-        githubUserId: input.githubUserId ?? null,
-        githubName: input.githubName ?? null,
-        accessTokenCipher,
-        refreshTokenCipher,
-        accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
-        disconnectedReason: null,
-        scope: input.scope,
-        createdAt,
-      },
-    })
+    .values({ teamId: input.teamId, ...fields })
+    .onConflictDoUpdate({ target: githubConnection.teamId, set: fields })
     .run();
 }
 
@@ -118,7 +111,7 @@ export function saveRefreshedTokens(
         tokens.expiresInSeconds === null ? null : nowMs() + tokens.expiresInSeconds * 1000,
       disconnectedReason: null,
     })
-    .where(eq(githubConnection.teamId, row.teamId))
+    .where(and(eq(githubConnection.teamId, row.teamId), isNull(githubConnection.appClientId)))
     .run();
 }
 
@@ -170,7 +163,8 @@ function refreshConnectionToken(
   if (chained !== undefined) return chained;
   const refresh = (async (): Promise<GithubTokenAccess> => {
     const client = deps.oauthClient ?? null;
-    if (client === null || row.refreshTokenCipher === null) return { token: staleToken, box };
+    if (row.refreshTokenCipher === null || (client === null && row.appClientId === null))
+      return { token: staleToken, box };
     const fetchImpl = deps.githubFetch ?? globalThis.fetch;
     let refreshToken: string;
     try {
@@ -179,6 +173,16 @@ function refreshConnectionToken(
       markGithubConnectionDisconnected(connectionDeps, teamId, 'stored refresh token unreadable');
       return { reason: 'github-disconnected' };
     }
+    if (row.appClientId !== null)
+      return refreshDeviceGrant(
+        connectionDeps,
+        fetchImpl,
+        row,
+        row.appClientId,
+        refreshToken,
+        staleToken,
+      );
+    if (client === null) return { token: staleToken, box };
     try {
       const tokens = await refreshOAuthAccessToken(fetchImpl, {
         tokenUrl: GITHUB_CONNECTION_OAUTH.tokenUrl,
@@ -187,11 +191,17 @@ function refreshConnectionToken(
         refreshToken,
       });
       saveRefreshedTokens(connectionDeps, row, tokens);
+      if (getRow(connectionDeps, teamId)?.appClientId != null)
+        return currentConnectionToken(connectionDeps, teamId);
       return { token: tokens.accessToken, box };
     } catch (err) {
       const why = err instanceof Error ? err.message : String(err);
-      markGithubConnectionDisconnected(connectionDeps, teamId, `oauth refresh failed: ${why}`);
-      return { reason: 'github-disconnected' };
+      connectionDeps.db
+        .update(githubConnection)
+        .set({ disconnectedReason: `oauth refresh failed: ${why}` })
+        .where(and(eq(githubConnection.teamId, teamId), isNull(githubConnection.appClientId)))
+        .run();
+      return currentConnectionToken(connectionDeps, teamId);
     }
   })();
   refreshChains.set(teamId, refresh);
@@ -201,6 +211,59 @@ function refreshConnectionToken(
     })
     .catch(() => undefined);
   return refresh;
+}
+
+async function refreshDeviceGrant(
+  deps: GithubConnectionDeps,
+  fetchImpl: FetchLike,
+  row: typeof githubConnection.$inferSelect,
+  clientId: string,
+  refreshToken: string,
+  staleToken: string,
+): Promise<GithubTokenAccess> {
+  const sameGeneration = and(
+    eq(githubConnection.teamId, row.teamId),
+    eq(githubConnection.connectionGeneration, row.connectionGeneration ?? ''),
+  );
+  let grant: Awaited<ReturnType<typeof refreshGithubDeviceToken>>;
+  try {
+    grant = await refreshGithubDeviceToken({ fetch: fetchImpl }, clientId, refreshToken);
+  } catch (err) {
+    if (!(err instanceof HttpError && err.status === 401))
+      return { token: staleToken, box: deps.box };
+    deps.db
+      .update(githubConnection)
+      .set({ disconnectedReason: 'GitHub authorization expired' })
+      .where(sameGeneration)
+      .run();
+    return currentConnectionToken(deps, row.teamId);
+  }
+  const now = nowMs();
+  const saved = deps.db
+    .update(githubConnection)
+    .set({
+      accessTokenCipher: deps.box.seal(grant.accessToken),
+      refreshTokenCipher: deps.box.seal(grant.refreshToken),
+      accessTokenExpiresAt: now + grant.expiresInSeconds * 1000,
+      refreshTokenExpiresAt: now + grant.refreshTokenExpiresInSeconds * 1000,
+      disconnectedReason: null,
+    })
+    .where(sameGeneration)
+    .run().changes;
+  if (saved === 0) return currentConnectionToken(deps, row.teamId);
+  return { token: grant.accessToken, box: deps.box };
+}
+
+function currentConnectionToken(deps: GithubConnectionDeps, teamId: string): GithubTokenAccess {
+  const current = getRow(deps, teamId);
+  if (!current) return { reason: 'no-github-connection' };
+  if (current.disconnectedReason !== null) return { reason: 'github-disconnected' };
+  try {
+    return { token: deps.box.open(current.accessTokenCipher), box: deps.box };
+  } catch (err) {
+    if (!(err instanceof SecretBoxError)) throw err;
+    return { reason: 'token-unreadable' };
+  }
 }
 
 export function refreshingGithubFetch(deps: GithubTokenDeps, inner: FetchLike): FetchLike {

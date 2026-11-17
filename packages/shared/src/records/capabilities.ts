@@ -4,5 +4,6 @@ import { thinkingLevelSchema } from '../agent-backend.js';
 export const capabilitiesResponseSchema = z.object({
   thinkingLevels: z.array(thinkingLevelSchema),
   githubOAuth: z.boolean(),
+  githubDeviceInstallUrl: z.string().nullable(),
 });
 export type CapabilitiesResponse = z.infer<typeof capabilitiesResponseSchema>;

@@ -42,6 +42,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ArrowUpDown, Check, ChevronDown } from '../icons/index.js';
 import { RouteDialog } from '../overlay/route-dialog.js';
 import { DirBrowser } from './dir-browser.js';
+import { GithubConnectionDeviceDialog } from './github-connection-device-dialog.js';
 
 const REPO_TRIGGER_CLS = `${FORM_CONTROL_CLS} flex-1 justify-between px-2.5 font-normal`;
 
@@ -110,6 +111,7 @@ export function ProjectNewPage() {
   const [manualRepo, setManualRepo] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [deviceOpen, setDeviceOpen] = useState(false);
   const [repoQuery, setRepoQuery] = useState('');
   const [fixtureAuth, setFixtureAuth] = useState<boolean | null>(null);
   const autoName = useRef('');
@@ -150,8 +152,13 @@ export function ProjectNewPage() {
   const connected = live
     ? (connectionQ.data?.connected ?? false)
     : (fixtureAuth ?? fixture.github?.connected === true);
+  const deviceInstallUrl = capabilitiesQ.data?.githubDeviceInstallUrl ?? null;
   const signInOff =
-    live && !connectionPending && !connected && capabilitiesQ.data?.githubOAuth !== true;
+    live &&
+    !connectionPending &&
+    !connected &&
+    deviceInstallUrl === null &&
+    capabilitiesQ.data?.githubOAuth !== true;
   const manualEntry = manualRepo || signInOff;
   const login = live ? connectionQ.data?.login : fixture.github?.login;
   const disconnectReason = live ? (connectionQ.data?.disconnectReason ?? null) : null;
@@ -210,7 +217,9 @@ export function ProjectNewPage() {
 
   const startAuth = () => {
     setOauthError(null);
-    if (live) {
+    if (live && deviceInstallUrl !== null) {
+      setDeviceOpen(true);
+    } else if (live) {
       mutations.startGithubOAuth.mutate(undefined, {
         onSuccess: (data) => window.location.assign(data.authorizationUrl),
         onError: () => setOauthError(t('暂时连不上 GitHub，稍后再试。')),
@@ -696,6 +705,17 @@ export function ProjectNewPage() {
           }}
         />
       </FormStack>
+      {deviceOpen && deviceInstallUrl !== null && (
+        <GithubConnectionDeviceDialog
+          teamId={teamId}
+          installUrl={deviceInstallUrl}
+          onClose={() => setDeviceOpen(false)}
+          onConnected={() => {
+            setDeviceOpen(false);
+            setPickerOpen(true);
+          }}
+        />
+      )}
     </RouteDialog>
   );
 }

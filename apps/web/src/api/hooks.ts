@@ -22,6 +22,8 @@ import type {
   DocumentDiffFile,
   FsListResult,
   FsPickResult,
+  GithubConnectionDevicePoll,
+  GithubConnectionDeviceStart,
   GithubConnectionStatus,
   GithubConnectorAvailability,
   GithubConnectorDevicePoll,
@@ -1144,6 +1146,24 @@ export function useApiMutations(teamId: string | undefined) {
     startGithubOAuth: useMutation({
       mutationFn: () =>
         api.post<OAuthAuthorizeResponse>(`/api/teams/${teamId}/github/oauth/authorize`, {}),
+    }),
+    startGithubConnectionDevice: useMutation({
+      mutationFn: () =>
+        api.post<GithubConnectionDeviceStart>(`/api/teams/${teamId}/github/connection/device`, {}),
+    }),
+    pollGithubConnectionDevice: useMutation({
+      mutationFn: (attemptId: string) =>
+        api.post<GithubConnectionDevicePoll>(
+          `/api/teams/${teamId}/github/connection/device/${attemptId}`,
+          {},
+        ),
+      onSuccess: (result) => {
+        if (result.status === 'complete') invalidateAll();
+      },
+    }),
+    cancelGithubConnectionDevice: useMutation({
+      mutationFn: (attemptId: string) =>
+        api.del<void>(`/api/teams/${teamId}/github/connection/device/${attemptId}`),
     }),
     disconnectGithub: useMutation({
       mutationFn: () => api.del<void>(`/api/teams/${teamId}/github/connection`),

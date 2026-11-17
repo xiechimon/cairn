@@ -2141,6 +2141,8 @@ export const EN: Record<string, string> = {
   仍然完成: 'Finish anyway',
   '在 GitHub 上选好 Agent 能读写的仓库，以后也能改。':
     'On GitHub, pick the repositories agents can read and write. You can change this later.',
+  '在 GitHub 上选好 Agent 能读写的仓库。':
+    'On GitHub, pick the repositories agents can read and write.',
   '还没有选择仓库；组织仓库可能要等组织管理员批准。':
     'No repositories chosen yet; organization repositories may need an admin to approve.',
   'GitHub 拒绝了访问。组织可能要求先做 SSO 授权，或等管理员批准 Cairn 应用。':

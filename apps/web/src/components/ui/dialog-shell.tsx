@@ -4,7 +4,15 @@ import { type ReactNode, useCallback, useEffect, useRef } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { X } from '../../icons/index.js';
 import { Button } from './button.js';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './dialog.js';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+} from './dialog.js';
 
 const SHELL_EXIT_BRIDGE_CLS =
   '[transition:visibility_0s_linear_var(--dur-overlay)] data-[ending-style]:invisible';
@@ -80,6 +88,7 @@ interface DialogShellProps {
   onEscapeWhileNested?: () => void;
   viewportRoot?: boolean;
   backdropClassName?: string;
+  stacked?: boolean;
   initialFocus?: DialogPrimitive.Popup.Props['initialFocus'];
 }
 
@@ -128,6 +137,7 @@ export function DialogShell({
   viewportRoot = false,
   initialFocus,
   backdropClassName,
+  stacked = false,
 }: DialogShellProps) {
   const { t } = useI18n();
   const { restore } = useReturnFocus(open);
@@ -188,6 +198,11 @@ export function DialogShell({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange} modal>
+      {stacked && (
+        <DialogPortal>
+          <DialogOverlay forceRender />
+        </DialogPortal>
+      )}
       <DialogContent
         initialFocus={initialFocus}
         finalFocus={restore}

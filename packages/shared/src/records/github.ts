@@ -28,6 +28,24 @@ export const githubConnectionStatusSchema = z.object({
 });
 export type GithubConnectionStatus = z.infer<typeof githubConnectionStatusSchema>;
 
+export const githubConnectionDeviceStartSchema = z.object({
+  attemptId: z.string(),
+  userCode: z.string(),
+  verificationUri: z.string(),
+  intervalSeconds: z.number().int().positive(),
+  expiresInSeconds: z.number().int().positive(),
+});
+export type GithubConnectionDeviceStart = z.infer<typeof githubConnectionDeviceStartSchema>;
+
+export const githubConnectionDevicePollSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('pending'), intervalSeconds: z.number().int().positive() }),
+  z.object({ status: z.literal('complete'), login: z.string() }),
+  z.object({ status: z.literal('expired') }),
+  z.object({ status: z.literal('denied') }),
+  z.object({ status: z.literal('failed') }),
+]);
+export type GithubConnectionDevicePoll = z.infer<typeof githubConnectionDevicePollSchema>;
+
 export const importGithubIssueBodySchema = z.object({
   number: z.number().int().positive(),
 });

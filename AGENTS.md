@@ -16,7 +16,7 @@ Before any change under `apps/web/src`, read `apps/web/DESIGN-RULES.md` and invo
 
 Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json`; `apps/server/test/merge-gate-paths-json.test.ts` fails when this list differs):
 
-- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth}.ts`, `apps/server/src/coordinator/{credentials,codex-login}.ts`
+- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth,github-connection,github-connection-device,github-device-core}.ts`, `apps/server/src/coordinator/{credentials,codex-login}.ts`
 - Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,machine-client}.ts`, `apps/daemon/src/backend/command-gate.ts`
 - MCP auth and external entry points: `apps/server/src/services/{mcp-face,mcp-servers}.ts`
 

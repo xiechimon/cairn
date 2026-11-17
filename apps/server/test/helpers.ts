@@ -156,6 +156,7 @@ export function bootServer(
       oauthStates,
       xaiDeviceStates,
       codexDeviceStates,
+      githubConnectionDeviceStates: new Map(),
       mcpOAuthState,
       oauthClient: opts.oauthClient ?? null,
       ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
@@ -228,6 +229,7 @@ export function bootServer(
       oauthStates,
       xaiDeviceStates,
       codexDeviceStates,
+      githubConnectionDeviceStates: new Map(),
       mcpOAuthState,
       svc: {
         db,

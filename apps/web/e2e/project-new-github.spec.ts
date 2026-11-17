@@ -193,3 +193,71 @@ test('10. row-list keyboard contract: focus enters the list, Arrow/typeahead mov
   await expect(picker).not.toBeVisible();
   await expect(page.locator('#prj-new-repo')).toBeFocused();
 });
+
+test('11. device sign-in: auth button shows a code, completion offers the App install, then the picker lists repos', async ({
+  page,
+}) => {
+  let connected = false;
+  const polls: string[] = [];
+  await page.route('**/api/**', (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    return route.fulfill({ status: 500, json: { error: 'e2e stub' } });
+  });
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({ json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }] }),
+  );
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
+  );
+  await page.route('**/api/capabilities', (route) =>
+    route.fulfill({
+      json: {
+        thinkingLevels: [],
+        githubOAuth: false,
+        githubDeviceInstallUrl: 'https://github.com/apps/cairnwright/installations/new',
+      },
+    }),
+  );
+  await page.route('**/api/teams/team-1/github/connection', (route) =>
+    route.fulfill({ json: connected ? { connected: true, login: 'octo' } : { connected: false } }),
+  );
+  await page.route('**/api/github/repos', (route) =>
+    route.fulfill({
+      json: { repos: [{ id: 1, owner: 'octo', name: 'alpha', full_name: 'octo/alpha', private: true }] },
+    }),
+  );
+  await page.route('**/api/teams/team-1/github/connection/device', (route) =>
+    route.fulfill({
+      json: {
+        attemptId: 'attempt-1',
+        userCode: 'WDJB-MJHT',
+        verificationUri: 'https://github.com/login/device',
+        intervalSeconds: 1,
+        expiresInSeconds: 900,
+      },
+    }),
+  );
+  await page.route('**/api/teams/team-1/github/connection/device/attempt-1', (route) => {
+    polls.push(route.request().method());
+    if (polls.length < 2) return route.fulfill({ json: { status: 'pending', intervalSeconds: 1 } });
+    connected = true;
+    return route.fulfill({ json: { status: 'complete', login: 'octo' } });
+  });
+
+  await page.goto('/app/project/new');
+  await selectGithub(page);
+  const field = page.locator('#prj-new-repo');
+  await expect(field).toHaveText('认证 GitHub');
+  await field.click();
+  const device = page.getByRole('dialog', { name: '在 GitHub 上授权 Cairn' });
+  await expect(device.getByText('WDJB-MJHT')).toBeVisible();
+  await expect(page.getByText(/CAIRN_GITHUB/)).toHaveCount(0);
+  const install = page.getByRole('dialog', { name: '选择 Cairn 能用的仓库' });
+  await expect(install).toBeVisible({ timeout: 10_000 });
+  await install.getByRole('button', { name: '完成' }).click();
+  const picker = page.getByTestId('github-picker');
+  await expect(picker).toBeVisible();
+  await picker.getByRole('option', { name: 'octo/alpha' }).click();
+  await expect(field).toHaveText('octo/alpha');
+  await expect(page.locator('#prj-new-name')).toHaveValue('alpha');
+});

@@ -60,6 +60,7 @@ function principalApp(s: TestServer, principal: UserRecord) {
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),
     codexDeviceStates: new Map(),
+    githubConnectionDeviceStates: new Map(),
     mcpOAuthState: newMcpOAuthState(),
     oauthClient: null,
     authToken: AUTH,

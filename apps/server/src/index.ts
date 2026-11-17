@@ -202,6 +202,7 @@ const app = createApp(
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),
     codexDeviceStates: new Map(),
+    githubConnectionDeviceStates: new Map(),
     mcpOAuthState: newMcpOAuthState(),
     oauthClient: config.githubOauth,
     githubAppTokenSocket: config.githubAppTokenSocket,

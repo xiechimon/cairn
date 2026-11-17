@@ -12,6 +12,7 @@ describe('GET /api/capabilities (capabilities read surface)', () => {
     expect(body).toEqual({
       thinkingLevels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
       githubOAuth: false,
+      githubDeviceInstallUrl: null,
     });
   });
 
