@@ -1326,6 +1326,7 @@ export function mapMachines(
     id: m.id,
     kind: m.kind,
     name: m.name,
+    ...(m.hostname !== undefined ? { hostname: m.hostname } : {}),
     online: m.online,
     ...(m.lastSeenAt !== undefined ? { lastSeenAt: m.lastSeenAt } : {}),
     enabledRuntimes: m.enabledRuntimes,

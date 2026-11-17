@@ -136,6 +136,19 @@ export function MachineRowView({
             <span data-testid="machine-os" className="whitespace-nowrap text-content-secondary">
               {osName ?? t('系统未知')}
             </span>
+            {machine.hostname !== undefined && machine.hostname !== machine.name && (
+              <>
+                <span aria-hidden className="text-content-dim">
+                  ·
+                </span>
+                <span
+                  data-testid="machine-hostname"
+                  className="min-w-0 truncate text-content-secondary"
+                >
+                  {machine.hostname}
+                </span>
+              </>
+            )}
             <span aria-hidden className="text-content-dim">
               ·
             </span>

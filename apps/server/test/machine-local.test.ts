@@ -157,6 +157,43 @@ describe('enroll hostname same law (spec 11 A9: loopback enroll lands kind=local
   });
 });
 
+describe('machine record hostname', () => {
+  test('the record carries the hostname the Runner reported, and the seeded local row the server hostname', async () => {
+    const s = bootServer();
+    try {
+      seedLocalMachine(s.db, s.team.id);
+      const key = await issueApiKey(s);
+      const enrolled = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key,
+        body: {
+          teamId: s.team.id,
+          name: 'office-runner',
+          cliVersion: '0.1.0',
+          claudeCode: { installed: true, hostname: 'thinkbox-02', models: [] },
+        },
+      });
+      expect(enrolled.status).toBe(200);
+      const legacy = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: await issueApiKey(s),
+        body: { teamId: s.team.id, name: 'legacy-runner', cliVersion: '0.1.0' },
+      });
+      expect(legacy.status).toBe(200);
+      const list = (await (
+        await req(s.app, 'GET', `/api/teams/${s.team.id}/machines`)
+      ).json()) as unknown[];
+      const byName = (name: string) =>
+        machineRecordSchema.parse(
+          list.find((m) => (m as { name: string }).name === name),
+        );
+      expect(byName(HOST).hostname).toBe(HOST);
+      expect(byName('office-runner').hostname).toBe('thinkbox-02');
+      expect(byName('legacy-runner').hostname).toBeUndefined();
+    } finally {
+      s.dispose();
+    }
+  });
+});
+
 describe('PATCH /api/machines/{id} (runtimes follow detection)', () => {
   test('the record lists what the Runner detects, and a runtime write is refused without touching the row', async () => {
     const s = bootServer();

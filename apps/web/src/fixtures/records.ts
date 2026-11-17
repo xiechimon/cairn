@@ -298,6 +298,7 @@ export interface MachineRow {
   id?: string;
   kind?: 'local' | 'remote';
   name: string;
+  hostname?: string;
   online?: boolean;
   lastSeenAt?: number | null;
   pill?: string;

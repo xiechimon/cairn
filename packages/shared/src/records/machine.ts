@@ -17,6 +17,7 @@ export type MachineRunningThread = z.infer<typeof machineRunningThreadSchema>;
 export const machineRecordSchema = z.object({
   id: recordId,
   name: z.string(),
+  hostname: z.string().optional(),
   teamId: recordId,
   online: z.boolean(),
   lastSeenAt: z.number().int().nullable().optional(),

@@ -17,6 +17,18 @@ test('local machine pinned first: data-kind=local + id handle + hostname canon',
   await expect(page.locator(PANE)).toHaveCount(0);
 });
 
+test('rows show the reported hostname only when it differs from the display name', async ({
+  page,
+}) => {
+  await page.goto(MACHINES);
+  const local = page.locator(`${ITEM}[data-kind="local"]`);
+  const remote = page.locator(`${ITEM}[data-kind="remote"]`).first();
+  await expect(local).toBeVisible();
+  await expect(remote).toBeVisible();
+  await expect(local.getByTestId('machine-hostname')).toHaveCount(0);
+  await expect(remote.getByTestId('machine-hostname')).toHaveText('mea-workstation');
+});
+
 test('managed facade row removed (spec 11 A8 negative)', async ({ page }) => {
   await page.goto(MACHINES);
   await expect(page.locator(`${ITEM}[data-kind="local"]`)).toBeVisible();

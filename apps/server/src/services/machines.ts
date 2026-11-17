@@ -177,9 +177,12 @@ export { machineRunningCount } from './dispatch-eligibility.js';
 export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?: number) {
   const recommendation = recommendMachineConcurrency(row.capabilities?.hardware);
   const login = claudeLoginSchema.safeParse(row.claudeCodeReport?.login);
+  const reportedHostname =
+    row.claudeCodeReport?.hostname ?? (row.kind === 'local' ? hostname() : undefined);
   return machineRecordSchema.parse({
     id: row.id,
     name: row.name,
+    ...(reportedHostname !== undefined ? { hostname: reportedHostname } : {}),
     teamId: row.teamId,
     online: row.online,
     lastSeenAt: row.lastSeenAt,
