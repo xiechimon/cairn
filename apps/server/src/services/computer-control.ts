@@ -1,7 +1,7 @@
 import { COMPUTER_CONTROL_LEASE_MS, type ComputerControlLease } from '@cairn/shared';
-import { and, eq, gt, inArray, isNull, notInArray, or } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { computer, computerCall } from '../db/schema.js';
+import { computer } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { ownedPrivateComputer } from './computer-access.js';
@@ -40,56 +40,6 @@ export function acquireComputerControl(
     const now = Date.now();
     if (!machineHub.isConnected(row.machineId))
       throw new HttpError(409, 'the computer is not connected');
-    const driving = tx
-      .select({ id: computerCall.id })
-      .from(computerCall)
-      .where(
-        and(
-          eq(computerCall.computerId, row.id),
-          eq(computerCall.replaySafe, false),
-          notInArray(computerCall.tool, [
-            'request_takeover',
-            'install_packages',
-            'computer_manage',
-          ]),
-          or(
-            inArray(computerCall.state, ['dispatched', 'running']),
-            and(
-              eq(computerCall.state, 'cancelled'),
-              isNull(computerCall.finishedAt),
-              gt(computerCall.deadlineAt, now),
-            ),
-          ),
-        ),
-      )
-      .get();
-    if (driving) throw new HttpError(409, 'Stop the Coordinator first');
-    const executionHeld =
-      row.executionStepId !== null &&
-      row.executionLeaseExpiresAt !== null &&
-      row.executionLeaseExpiresAt > now;
-    const botControlHeld =
-      row.controlHolder === 'bot' &&
-      (row.controlLeaseExpiresAt === null || row.controlLeaseExpiresAt > now);
-    if (executionHeld || botControlHeld) {
-      const waiting =
-        row.executionStepId === null
-          ? undefined
-          : tx
-              .select({ id: computerCall.id })
-              .from(computerCall)
-              .where(
-                and(
-                  eq(computerCall.computerId, row.id),
-                  eq(computerCall.stepId, row.executionStepId),
-                  eq(computerCall.tool, 'request_takeover'),
-                  gt(computerCall.deadlineAt, now),
-                  inArray(computerCall.state, ['dispatched', 'running']),
-                ),
-              )
-              .get();
-      if (!waiting) throw new HttpError(409, 'Stop the Coordinator first');
-    }
     const lease = {
       leaseId: newRecordId(),
       expiresAt: now + COMPUTER_CONTROL_LEASE_MS,

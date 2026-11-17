@@ -85,7 +85,8 @@ export const COMPUTER_STORED_PARAM_CHARS = 8 * 1024;
 
 export const COMPUTER_NOT_CONNECTED = 'the computer is not connected';
 export const COMPUTER_BUSY = 'the computer is busy with another Coordinator turn';
-export const COMPUTER_USER_CONTROL = 'ian has control of this computer';
+export const COMPUTER_USER_CONTROL =
+  'the owner is using this computer right now; wait a few seconds and retry the same call';
 export const COMPUTER_INTERRUPTED = 'interrupted, may have partially run; it was not retried';
 export const COMPUTER_CANCELLED = 'cancelled because the Coordinator turn was stopped';
 export const COMPUTER_BROWSER_DISABLED =

@@ -9,7 +9,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import WebSocket from 'ws';
-import { chief, computer, computerCall, machine, step } from '../src/db/schema.js';
+import { chief, computer, computerCall, machine } from '../src/db/schema.js';
 import { hashCredential } from '../src/lib/hash.js';
 import { ComputerScreenGateway } from '../src/services/computer-screen.js';
 import { deviceStreams } from '../src/services/paired-devices.js';
@@ -151,74 +151,19 @@ describe('screen capabilities and control leases', () => {
     expect(opened.kind).toBe('terminal');
   });
 
-  test('takeover is refused while a Coordinator holds its execution lease', () => {
-    boot();
-    s.db
-      .update(computer)
-      .set({ executionStepId: 'active-bot', executionLeaseExpiresAt: Date.now() + 60000 })
-      .where(eq(computer.id, 'computer-screen'))
-      .run();
-    expect(() => gateway.acquireControl(s.team.id, s.user.id, 'computer-screen')).toThrow(
-      /Stop the Coordinator first/,
-    );
-  });
-
-  test('a live bot control lease cannot be replaced by user control', () => {
-    boot();
-    s.db
-      .update(computer)
-      .set({
-        controlHolder: 'bot',
-        controlLeaseId: 'bot-control',
-        controlLeaseExpiresAt: Date.now() + 60000,
-      })
-      .run();
-    expect(() => gateway.acquireControl(s.team.id, s.user.id, 'computer-screen')).toThrow(
-      /Stop the Coordinator first/,
-    );
-  });
-
-  test('a current takeover request allows user control but an expired request does not', () => {
+  test('the owner takes control while the Coordinator is using the computer', () => {
     boot();
     const now = Date.now();
     s.db
-      .insert(step)
-      .values({
-        id: 'takeover-step',
-        buildId: 'takeover-thread',
-        kind: 'chief',
-        status: 'claimed',
-        machineId: 'screen-machine',
-        createdAt: now,
-      })
-      .run();
-    s.db
       .update(computer)
-      .set({ executionStepId: 'takeover-step', executionLeaseExpiresAt: now + 60000 })
-      .run();
-    s.db
-      .insert(computerCall)
-      .values({
-        id: 'a'.repeat(64),
-        teamId: s.team.id,
-        computerId: 'computer-screen',
-        machineId: 'screen-machine',
-        stepId: 'takeover-step',
-        toolCallId: 'takeover',
-        tool: 'request_takeover',
-        params: {},
-        replaySafe: false,
-        state: 'running',
-        deadlineAt: now - 1,
-        createdAt: now,
+      .set({
+        executionStepId: 'active-bot',
+        executionLeaseExpiresAt: now + 60000,
+        controlHolder: 'bot',
+        controlLeaseId: 'bot-control',
+        controlLeaseExpiresAt: now + 60000,
       })
-      .run();
-    expect(() => gateway.acquireControl(s.team.id, s.user.id, 'computer-screen')).toThrow(
-      /Stop the Coordinator first/,
-    );
-    s.db
-      .update(computerCall)
-      .set({ deadlineAt: now + 60000 })
+      .where(eq(computer.id, 'computer-screen'))
       .run();
     s.db
       .insert(computerCall)
@@ -227,7 +172,7 @@ describe('screen capabilities and control leases', () => {
         teamId: s.team.id,
         computerId: 'computer-screen',
         machineId: 'screen-machine',
-        stepId: 'takeover-step',
+        stepId: 'active-bot',
         toolCallId: 'still-running',
         tool: 'computer_act',
         params: {},
@@ -237,32 +182,10 @@ describe('screen capabilities and control leases', () => {
         createdAt: now,
       })
       .run();
-    expect(() => gateway.acquireControl(s.team.id, s.user.id, 'computer-screen')).toThrow(
-      /Stop the Coordinator first/,
-    );
-    s.db
-      .update(computerCall)
-      .set({ state: 'done', finishedAt: now })
-      .where(eq(computerCall.id, 'b'.repeat(64)))
-      .run();
     const lease = gateway.acquireControl(s.team.id, s.user.id, 'computer-screen');
     expect(lease.leaseId).toBeTruthy();
-    gateway.releaseControl(s.team.id, s.user.id, 'computer-screen', lease.leaseId);
-    s.db.update(computer).set({ executionStepId: null, executionLeaseExpiresAt: null }).run();
-    s.db
-      .update(computerCall)
-      .set({ state: 'cancelled', finishedAt: null })
-      .where(eq(computerCall.id, 'b'.repeat(64)))
-      .run();
-    expect(() => gateway.acquireControl(s.team.id, s.user.id, 'computer-screen')).toThrow(
-      /Stop the Coordinator first/,
-    );
-    s.db
-      .update(computerCall)
-      .set({ finishedAt: now })
-      .where(eq(computerCall.id, 'b'.repeat(64)))
-      .run();
-    expect(gateway.acquireControl(s.team.id, s.user.id, 'computer-screen').leaseId).toBeTruthy();
+    const row = s.db.select().from(computer).where(eq(computer.id, 'computer-screen')).get();
+    expect(row?.controlHolder).toBe('user');
   });
 
   test('renewal keeps its fence and release rejects a different lease', () => {
