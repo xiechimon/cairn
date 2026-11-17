@@ -19,15 +19,10 @@ import { z } from 'zod';
 import { AGENT_BROWSER_BINARY, browserSessionName, isStealthBrowserCommand } from './browser.js';
 import { CloakBrowser, shellQuote, writeCloakLauncher } from './cloak-browser.js';
 import { executableOnPath } from './contained-spawn.js';
+import type { ComputerDesktops } from './desktops.js';
 import { HostComputerProvider } from './host.js';
 import type { ComputerInputFence, ComputerInputLease } from './input-fence.js';
-import type { ComputerPresenceSource } from './presence.js';
-import {
-  type ComputerProcessEvent,
-  type ComputerProvider,
-  ComputerRefusal,
-  type ScopedComputerProviders,
-} from './provider.js';
+import { type ComputerProcessEvent, type ComputerProvider, ComputerRefusal } from './provider.js';
 
 export const PINNED_AGENT_BROWSER_VERSION = '0.41.2';
 
@@ -208,7 +203,8 @@ interface Desktop {
   provider: HostComputerProvider;
 }
 
-export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSource {
+export class HostDesktops implements ComputerDesktops {
+  readonly kind = 'host';
   readonly hostRoot: string;
   private readonly env: NodeJS.ProcessEnv;
   private readonly run: CommandRunner;

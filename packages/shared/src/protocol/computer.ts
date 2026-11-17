@@ -64,6 +64,7 @@ export const computerCallSchema = z.object({
   browserSecrets: z
     .array(z.strictObject({ name: z.string(), origin: z.string(), value: z.string() }))
     .optional(),
+  browserLicense: z.string().min(1).max(4096).optional(),
 });
 export type ComputerCall = z.infer<typeof computerCallSchema>;
 

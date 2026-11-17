@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
 import type { ScopedComputerProviders } from '../src/computer/provider.js';
+import { VmRuntime } from '../src/computer/vm-runtime.js';
 import { MachineApiError } from '../src/machine-client.js';
 import { boot, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { FakeOrbProvider } from './orb-fake.js';
@@ -230,8 +231,11 @@ describe('D75 computer capability', () => {
         : {}),
     });
     await waitFor(() => api.presenceBodies.length > 0 || api.enrollBodies.length > 0);
-    const caps = (api.enrollBodies[0] as { capabilities?: { computer?: true; browser?: true } })
-      .capabilities;
+    const caps = (
+      api.enrollBodies[0] as {
+        capabilities?: { computer?: true; browser?: true; computerKind?: 'host' | 'vm' };
+      }
+    ).capabilities;
     await handle.stop();
     await handle.done;
     return caps;
@@ -259,17 +263,23 @@ describe('D75 computer capability', () => {
   test('a Linux daemon with the desktop programs offers the host desktop', async () => {
     const caps = await report({ platform: 'linux', capEnv: { PATH: desktopPrograms() } });
     expect(caps?.computer).toBe(true);
+    expect(caps?.computerKind).toBe('host');
     expect(caps?.browser).toBeUndefined();
   });
 
-  test('a Linux daemon missing them, or a Mac, offers no computer', async () => {
+  test('a Mac offers a VM computer exactly when its runtime is supported', async () => {
+    const supported =
+      new VmRuntime({ root: testTempDir('machine-boot-vm-') }).unsupported() === undefined;
+    const caps = await report({ platform: 'darwin', capEnv: { PATH: desktopPrograms() } });
+    expect(caps?.computer).toBe(supported ? true : undefined);
+    expect(caps?.computerKind).toBe(supported ? 'vm' : undefined);
+  });
+
+  test('a Linux daemon missing them offers no computer', async () => {
     const empty = join(testTempDir('machine-boot-empty-'), 'bin');
     mkdirSync(empty, { recursive: true });
     expect(
       (await report({ platform: 'linux', capEnv: { PATH: empty } }))?.computer,
-    ).toBeUndefined();
-    expect(
-      (await report({ platform: 'darwin', capEnv: { PATH: desktopPrograms() } }))?.computer,
     ).toBeUndefined();
   });
 });

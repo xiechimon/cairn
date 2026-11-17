@@ -6,7 +6,7 @@ const CONTROL_PTY = [
   'import os, pty, select, signal, sys',
   'pid, fd = pty.fork()',
   'if pid == 0:',
-  '    os.execvp(sys.argv[1], [sys.argv[1]])',
+  '    os.execvp(sys.argv[1], sys.argv[1:])',
   'os.write(2, f"{pid}\\n".encode())',
   'def stop(_signum, _frame):',
   '    try:',
@@ -39,9 +39,12 @@ export interface UserControlPty extends ComputerScreenConnection {
   shellPid: Promise<number>;
 }
 
-export function openUserControlPty(signal: AbortSignal): UserControlPty {
+export function openUserControlPty(
+  signal: AbortSignal,
+  command: readonly string[] = ['bash'],
+): UserControlPty {
   if (signal.aborted) throw new Error('computer control closed');
-  const child = spawn('python3', ['-S', '-c', CONTROL_PTY, 'bash'], {
+  const child = spawn('python3', ['-S', '-c', CONTROL_PTY, ...command], {
     stdio: ['pipe', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
   });

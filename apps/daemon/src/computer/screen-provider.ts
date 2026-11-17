@@ -45,8 +45,9 @@ export function openReadOnlyView(): ReadOnlyView {
 export interface ComputerScreenProviderOptions {
   holdComputer?: (scopeKey: string, kind: 'view' | 'control') => Promise<() => void>;
   socketPath?: (scopeKey: string, kind: 'view' | 'control') => string;
+  terminalCommand?: (scopeKey: string) => Promise<readonly string[]>;
   socketWaitMs?: number;
-  connect?: (path: string) => Socket;
+  connect?: (address: string) => Socket;
   now?: () => number;
 }
 
@@ -119,17 +120,25 @@ async function openUnixScreen(
     : new Error(`computer screen socket missing: ${path}`);
 }
 
+export function dialScreen(address: string): Socket {
+  const tcp = /^(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$/.exec(address);
+  return tcp ? connect({ host: tcp[1], port: Number(tcp[2]) }) : connect(address);
+}
+
 export function createComputerScreenProvider(
   options: ComputerScreenProviderOptions = {},
 ): ComputerScreenProvider {
   const socketWaitMs = options.socketWaitMs ?? COMPUTER_SCREEN_SOCKET_WAIT_MS;
-  const connectSocket = options.connect ?? connect;
+  const connectSocket = options.connect ?? dialScreen;
   const now = options.now ?? Date.now;
   return {
     async connectScreen(request) {
       if (request.kind === 'terminal') {
         if (!request.controlLeaseId) throw new Error('a live control lease is required');
-        return openUserControlPty(request.signal);
+        return openUserControlPty(
+          request.signal,
+          options.terminalCommand ? await options.terminalCommand(request.scopeKey) : undefined,
+        );
       }
       if (request.kind === 'control' && !request.controlLeaseId) {
         throw new Error('a live control lease is required');

@@ -41,8 +41,12 @@ export interface ComputerProvider {
   killAll(): Promise<void>;
 }
 
+export interface ComputerScopeGrant {
+  browserLicense?: string;
+}
+
 export interface ScopedComputerProviders {
   readonly hostRoot?: string;
-  forScope(scopeKey: string): ComputerProvider;
+  forScope(scopeKey: string, grant?: ComputerScopeGrant): ComputerProvider;
   killAll(): Promise<void>;
 }

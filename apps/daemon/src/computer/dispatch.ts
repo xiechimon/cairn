@@ -183,7 +183,10 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     if (!ORB_TOOLS.has(call.tool) || !options.orb) return NO_COMPUTER_PROVIDER_MESSAGE;
     if (!call.scopeKey) return NO_COMPUTER_SCOPE_MESSAGE;
     return {
-      provider: options.orb.forScope(call.scopeKey),
+      provider: options.orb.forScope(
+        call.scopeKey,
+        call.browserLicense === undefined ? {} : { browserLicense: call.browserLicense },
+      ),
       guard: options.orb.hostRoot
         ? protectedComputerLifecycleRefusal
         : orbComputerProtectionRefusal,

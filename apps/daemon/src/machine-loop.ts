@@ -37,6 +37,7 @@ import {
 } from './claude-code-auth.js';
 import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
+import type { ComputerDesktops } from './computer/desktops.js';
 import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
 import { HostDesktops } from './computer/host-desktop.js';
@@ -46,6 +47,8 @@ import { ComputerPresenceReporter, type ComputerPresenceSource } from './compute
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
 import { OutboundComputerScreens } from './computer/screen-channel.js';
 import { createComputerScreenProvider } from './computer/screen-provider.js';
+import { VmDesktops } from './computer/vm-desktop.js';
+import { VmRuntime } from './computer/vm-runtime.js';
 import type { DaemonConfig } from './config.js';
 import { HostPermissionsProbe } from './host-permissions.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
@@ -240,18 +243,29 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const hostScreen = opts.hostScreen ?? createHostScreenFromEnv(capEnv);
   const enrolledIdentity = { machineId: '' };
   const computerInputLocks = join(paths.home, 'computer-input');
-  const desktops =
-    opts.orbComputer === undefined && platform === 'linux'
-      ? new HostDesktops({
-          root: join(paths.home, 'desktops'),
-          toolsRoot: join(paths.home, 'tools'),
-          env: capEnv,
-          inputFence: new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId),
-        })
-      : undefined;
+  const inputFence = new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId);
+  const vmRoot = join(paths.home, 'vm');
+  const desktops: ComputerDesktops | undefined =
+    opts.orbComputer !== undefined
+      ? undefined
+      : platform === 'linux'
+        ? new HostDesktops({
+            root: join(paths.home, 'desktops'),
+            toolsRoot: join(paths.home, 'tools'),
+            env: capEnv,
+            inputFence,
+          })
+        : platform === 'darwin'
+          ? new VmDesktops({
+              root: vmRoot,
+              runtime: new VmRuntime({ root: vmRoot, env: capEnv }),
+              env: capEnv,
+              inputFence,
+            })
+          : undefined;
   const hostDesktops = desktops?.missingPrograms().length === 0 ? desktops : undefined;
-  if (hostDesktops) {
-    ensurePrivateDir(computerInputLocks);
+  if (hostDesktops) ensurePrivateDir(computerInputLocks);
+  if (hostDesktops instanceof HostDesktops) {
     await hostDesktops.prepareBrowser().then(
       (version) => logger.machine(`CloakBrowser prepared build ${version}`),
       (error: unknown) => {
@@ -282,6 +296,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         ? { browser: true as const, browserSecretFill: true as const }
         : {}),
       ...(hostDesktops?.offersStealthBrowser() ? { stealthBrowser: true as const } : {}),
+      ...(hostDesktops ? { computerKind: hostDesktops.kind } : {}),
       ...(hostComputer ? { ownComputer: true as const } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(scraper !== undefined ? { scrapling: scraper } : {}),
@@ -412,6 +427,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         ? {
             holdComputer: (scopeKey, kind) => hostDesktops.hold(scopeKey, kind),
             socketPath: (scopeKey, kind) => hostDesktops.socketPath(scopeKey, kind),
+            ...(hostDesktops instanceof VmDesktops
+              ? { terminalCommand: (scopeKey: string) => hostDesktops.terminalCommand(scopeKey) }
+              : {}),
           }
         : {},
     ),

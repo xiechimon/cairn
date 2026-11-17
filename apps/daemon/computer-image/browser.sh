@@ -33,6 +33,23 @@ lock_released() {
   return 1
 }
 
+launch_owner() {
+  local url=$1 pid
+  read_key || { echo 'No CloakBrowser license; set team secret CLOAKBROWSER_LICENSE_KEY' >&2; exit 2; }
+  . "$env_file"
+  read -r -a args <<< "$CAIRN_CLOAK_ARGS"
+  CLOAKBROWSER_LICENSE_KEY=$key setsid "$CAIRN_CLOAK_EXECUTABLE" "${args[@]}" "--user-data-dir=$profile" ${url:+"$url"} >/dev/null 2>&1 < /dev/null &
+  pid=$!
+  printf '%s\n' "$pid" > "$owner_pid"
+  for _ in $(seq 100); do
+    kill -0 "$pid" 2>/dev/null || { echo 'The owner browser could not be started' >&2; exit 1; }
+    xdotool search --onlyvisible --pid "$pid" >/dev/null 2>&1 && exit 0
+    sleep 0.1
+  done
+  echo 'The owner browser could not be started' >&2
+  exit 1
+}
+
 case ${1:-} in
   key)
     umask 077
@@ -47,30 +64,15 @@ case ${1:-} in
     ;;
   owner)
     session=${2:?session}
-    url=${3:-}
     owner_alive && exit 0
-    [[ -r $env_file ]] || { echo 'Open the browser once from the agent first' >&2; exit 2; }
-    read_key || { echo 'Open the browser once from the agent first' >&2; exit 2; }
-    if agent-browser --json session list 2>/dev/null | grep -qF "\"$session\""; then
-      if [[ -z $url ]]; then
-        current=$(agent-browser --session "$session" get url 2>/dev/null | tail -n 1 || true)
-        [[ $current =~ ^https?:// ]] && url=$current
-      fi
-      agent-browser --session "$session" close >/dev/null 2>&1 || { echo 'The agent browser did not close' >&2; exit 1; }
-    fi
+    [[ -r $env_file ]] || exit 0
+    agent-browser --json session list 2>/dev/null | grep -qF "\"$session\"" || exit 0
+    current=$(agent-browser --session "$session" get url 2>/dev/null | tail -n 1 || true)
+    url=
+    [[ $current =~ ^https?:// ]] && url=$current
+    agent-browser --session "$session" close >/dev/null 2>&1 || { echo 'The agent browser did not close' >&2; exit 1; }
     lock_released || { echo 'The agent browser did not close' >&2; exit 1; }
-    . "$env_file"
-    read -r -a args <<< "$CAIRN_CLOAK_ARGS"
-    CLOAKBROWSER_LICENSE_KEY=$key setsid "$CAIRN_CLOAK_EXECUTABLE" "${args[@]}" "--user-data-dir=$profile" ${url:+"$url"} >/dev/null 2>&1 < /dev/null &
-    pid=$!
-    printf '%s\n' "$pid" > "$owner_pid"
-    for _ in $(seq 100); do
-      kill -0 "$pid" 2>/dev/null || { echo 'The owner browser could not be started' >&2; exit 1; }
-      xdotool search --onlyvisible --pid "$pid" >/dev/null 2>&1 && exit 0
-      sleep 0.1
-    done
-    echo 'The owner browser could not be started' >&2
-    exit 1
+    launch_owner "$url"
     ;;
   agent)
     owner_alive || exit 0
@@ -93,12 +95,14 @@ case ${1:-} in
     session=${2:?session}
     "$0" agent
     agent-browser --session "$session" close >/dev/null 2>&1 || true
+    agent-browser --session "${session%-stealth}" close >/dev/null 2>&1 || true
     lock_released
     ;;
   open)
     owner_alive && exit 0
-    lock_released || { echo 'The agent is using the browser' >&2; exit 1; }
-    exec "$0" owner "${2:-cairn-stealth}"
+    [[ -r $env_file ]] || { echo 'Open the stealth browser once from the agent first' >&2; exit 2; }
+    lock_released || { echo 'The agent is using the stealth browser' >&2; exit 1; }
+    launch_owner ''
     ;;
   *)
     echo 'usage: cairn-browser key|prepare|owner|agent|quit|open' >&2
