@@ -145,11 +145,11 @@ test.describe('sidebar form is route-invariant', () => {
   });
 });
 
-test('legacy team route redirects to work routing with no subscription surface', async ({
+test('legacy team route redirects to the model page with no subscription surface', async ({
   page,
 }) => {
   await page.goto('/app/team?scenario=12');
-  await expect(page).toHaveURL(/\/app\/settings\/work-routing\?scenario=12$/);
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=12$/);
   await expect(page.locator('.team-plan')).toHaveCount(0);
   await expect(page.locator('.team-upgrade')).toHaveCount(0);
   const body = await page.locator('body').innerText();

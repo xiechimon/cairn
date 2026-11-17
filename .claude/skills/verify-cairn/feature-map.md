@@ -12,8 +12,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 |---|---|---|
 | `account` | `设置` (Settings) › `账号` (Account) | [Account and team](#account-and-team) |
 | `appearance` | `设置` (Settings) › `外观` (Appearance) | [Appearance and visual system](#appearance) |
-| `work-routing` | `设置` (Settings) › `模型` (Model) › `模型选择` (Model selector) | [Model and work routing](#routing) |
-| `routing` | `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing) | [Model and work routing](#routing) |
+| `routing` | `设置` (Settings) › `模型` (Model) › `模型` (Model) | [Model and work routing](#routing) |
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
@@ -152,7 +151,7 @@ States: No user page of its own; the thread transcript shows which harness and m
 
 Reach:
 
-1. `settings work-routing`
+1. `settings routing`
 2. `click testid:routing-section`
 
 - Web routes: none
@@ -308,12 +307,11 @@ Reach:
 
 1. `settings routing`
 2. `click testid:routing-section`
-3. `settings work-routing`
 
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
-- Settings: `设置` (Settings) › `模型` (Model) › `模型选择` (Model selector); `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing)
+- Settings: `设置` (Settings) › `模型` (Model) › `模型` (Model)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-add-provider`, `routing-coordinator-default`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`
+- Test ids in its code: `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-add-provider`, `routing-coordinator-default`, `routing-project-overrides`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)
@@ -449,7 +447,7 @@ States: No product page; results appear as command-line reports and traces.
 
 Reach:
 
-1. `settings work-routing`
+1. `settings routing`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
@@ -581,7 +579,7 @@ Reach:
 3. `click testid:subscription-verify`
 
 - Web routes: `/app/resources/providers`
-- Settings: `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing)
+- Settings: `设置` (Settings) › `模型` (Model) › `模型` (Model)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `devin-local-import`, `devin-local-login`, `devin-local-login-cancel`, `devin-paste-toggle`, `devin-subscription-label`, `devin-subscription-token`, `providers-empty`, `providers-partial-error`, `subscription-label`, `subscription-token`
 - Verify recipes: [.claude/skills/verify-cairn/features/providers-tabs.md](features/providers-tabs.md), [.claude/skills/verify-cairn/features/provider-picker.md](features/provider-picker.md)

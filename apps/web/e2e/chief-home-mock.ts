@@ -82,7 +82,7 @@ export const PROJECT = {
 };
 
 export const READY_MACHINE = { id: 'm-ready', name: 'omarchy', online: true };
-export const READY_PROVIDER = { id: 'p-ready', providerId: 'r3-gw', label: 'r3-gw' };
+export const READY_PROVIDER = { id: 'p-ready', providerId: 'r3-gw', label: 'r3-gw', models: [] };
 
 export const toolRow = (id: string, name: string, args: unknown, at: number) => ({
   id,

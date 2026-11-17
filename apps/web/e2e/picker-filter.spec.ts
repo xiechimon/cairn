@@ -20,7 +20,6 @@ async function open(page: Page, patches: unknown[]) {
     if (path === '/api/teams/t1/routing-settings')
       return json({ rules: rule === null ? [] : [rule], policies: [] });
     if (path === '/api/teams/t1/machines') return json([]);
-    if (path === '/api/teams/t1/top-models') return json({ models: [] });
     if (path === '/api/teams/t1/model-sources')
       return json({
         sources: [
@@ -61,7 +60,7 @@ async function open(page: Page, patches: unknown[]) {
     }
     return undefined;
   });
-  await page.goto('/app/settings/work-routing');
+  await page.goto('/app/settings/routing');
   return page
     .getByRole('dialog', { name: '设置' })
     .getByTestId('routing-rule-new-session')

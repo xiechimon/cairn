@@ -29,7 +29,7 @@ const SCREENS = [
   },
   {
     title: 'Work routing',
-    url: '/app/settings/work-routing?scenario=routing-settings',
+    url: '/app/settings/routing?scenario=routing-settings',
     parts: 'Settings list, runtime and model pickers',
   },
   {

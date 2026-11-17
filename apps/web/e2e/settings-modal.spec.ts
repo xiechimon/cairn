@@ -107,7 +107,8 @@ test('groups follow the design: models, execution, security', async ({ page }) =
   );
   expect(order.indexOf('secrets')).toBeGreaterThan(order.indexOf('mcp'));
   expect(order).toContain('remote');
-  expect(order).toContain('work-routing');
+  expect(order).toContain('routing');
+  expect(order).not.toContain('work-routing');
 });
 
 test('phone: full screen with the title row and a section tab strip', async ({ page }) => {

@@ -115,7 +115,7 @@ describe('routing targets and the rule graph', () => {
     expect(agents?.nodes).toEqual([
       {
         id: 'session',
-        name: '新任务',
+        name: '任务',
         tag: 'GPT-6.1 Sol · 默认',
         target: 'provider:rec-codex',
         broken: false,
@@ -123,17 +123,23 @@ describe('routing targets and the rule graph', () => {
     ]);
   });
 
-  test('top models come first, each wired to its own provider, and one whose provider is gone breaks', () => {
+  test('project model choices follow the team rules, each wired to its own provider, and one whose provider is gone breaks', () => {
     const groups = ruleGraphGroups({ rules: [], policies: [] }, targets, options, t, [
-      { provider: 'openai-codex', modelId: 'gpt-6.1-sol', thinkingLevel: 'medium' },
-      { provider: 'claude-code', modelId: 'claude-opus-5-5', thinkingLevel: 'high' },
-      { provider: 'deleted-provider', modelId: 'glm-5.3', thinkingLevel: null },
+      {
+        id: 'p1:session',
+        name: 'web · 任务',
+        choice: { provider: 'openai-codex', modelId: 'gpt-6.1-sol', thinkingLevel: 'medium' },
+      },
+      {
+        id: 'p2:coordinator',
+        name: 'site · Coordinator',
+        choice: { provider: 'deleted-provider', modelId: 'glm-5.3', thinkingLevel: null },
+      },
     ]);
-    expect(groups[0]?.label).toBe('常用模型');
-    expect(groups[0]?.nodes.map((node) => [node.name, node.target ?? null, node.broken])).toEqual([
-      ['GPT-6.1 Sol', 'provider:rec-codex', false],
-      ['claude-opus-5-5', 'subscription:main', false],
-      ['glm-5.3', null, true],
+    expect(groups.map((group) => group.label).slice(0, 1)).toEqual(['项目单独设置']);
+    expect(groups[0]?.nodes.map((node) => [node.name, node.tag, node.target ?? null, node.broken])).toEqual([
+      ['web · 任务', 'GPT-6.1 Sol', 'provider:rec-codex', false],
+      ['site · Coordinator', 'glm-5.3', null, true],
     ]);
   });
 });

@@ -472,7 +472,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
             description: t('多台执行机在线时，开工前要在规则里点名一台。'),
             action: {
               label: t('去选择'),
-              onClick: () => navigate(settingsHref('work-routing')),
+              onClick: () => navigate(settingsHref('routing')),
             },
           });
           return Promise.reject(new Error('Name a machine first'));

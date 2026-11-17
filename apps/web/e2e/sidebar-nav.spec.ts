@@ -58,8 +58,8 @@ test('settings sections hop client-side', async ({ page }) => {
   await expect(page).toHaveURL('/app/settings/skills?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 
-  await settings.getByRole('link', { name: '模型选择' }).click();
-  await expect(page).toHaveURL('/app/settings/work-routing?scenario=01');
+  await settings.getByRole('link', { name: '模型', exact: true }).click();
+  await expect(page).toHaveURL('/app/settings/routing?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 });
 

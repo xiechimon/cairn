@@ -298,13 +298,9 @@ function ConfirmBody({ setup }: { setup: Setup }) {
       return same ? rest : { ...rest, [use]: option };
     });
   };
-  const enabledRuntimes =
-    setup.machines.length === 0
-      ? null
-      : new Set(setup.machines.flatMap((machine) => machine.enabledRuntimes ?? []));
   const rows = [
     { use: 'coordinator' as const, who: t('Coordinator'), pick: picks[0] },
-    { use: 'session' as const, who: t('新任务'), pick: picks[1] },
+    { use: 'session' as const, who: t('任务'), pick: picks[1] },
   ];
   const ready = picks.every((p) => p != null);
   const confirm = async () => {
@@ -325,6 +321,7 @@ function ConfirmBody({ setup }: { setup: Setup }) {
   };
   return (
     <>
+      <h3 className="mx-0 mt-2 mb-1.5 text-meta font-normal text-content-tertiary">{t('模型')}</h3>
       <ul className="m-0 list-none divide-y divide-border border-y border-border p-0">
         {rows.map(({ use, who, pick }, index) => (
           <li
@@ -345,7 +342,6 @@ function ConfirmBody({ setup }: { setup: Setup }) {
                 use={use}
                 rule={pick ?? null}
                 options={setup.options}
-                enabledRuntimes={enabledRuntimes}
                 onPick={pickFor(use, index)}
                 trigger={{
                   label: t('换一个'),
@@ -356,28 +352,35 @@ function ConfirmBody({ setup }: { setup: Setup }) {
             </span>
           </li>
         ))}
-        {vm?.download != null && (
-          <li data-testid="first-run-vm" className="flex min-h-13 items-start gap-x-4 py-2">
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="font-title text-foreground">
-                {t('Linux 虚拟机')}
-                <span className="ml-2 font-normal text-meta text-content-tertiary tabular-nums">
-                  {formatDownloadBytes(vm.download.totalBytes)}
+      </ul>
+      {vm?.download != null && (
+        <>
+          <h3 className="mx-0 mt-6 mb-1.5 text-meta font-normal text-content-tertiary">
+            {t('电脑')}
+          </h3>
+          <ul className="m-0 list-none border-y border-border p-0">
+            <li data-testid="first-run-vm" className="flex min-h-13 items-start gap-x-4 py-2">
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="font-title text-foreground">
+                  {t('Linux 虚拟机')}
+                  <span className="ml-2 font-normal text-meta text-content-tertiary tabular-nums">
+                    {formatDownloadBytes(vm.download.totalBytes)}
+                  </span>
+                </span>
+                <span className="text-pretty text-meta text-content-tertiary">
+                  {t('不占用你的鼠标键盘，和你的文件、账号隔开，可以放心装软件')}
                 </span>
               </span>
-              <span className="text-pretty text-meta text-content-tertiary">
-                {t('不占用你的鼠标键盘，和你的文件、账号隔开，可以放心装软件')}
-              </span>
-            </span>
-            <ToggleSwitch
-              className="mt-0.5 flex-none"
-              aria-label={t('Linux 虚拟机')}
-              checked={downloadVm}
-              onCheckedChange={setDownloadVm}
-            />
-          </li>
-        )}
-      </ul>
+              <ToggleSwitch
+                className="mt-0.5 flex-none"
+                aria-label={t('Linux 虚拟机')}
+                checked={downloadVm}
+                onCheckedChange={setDownloadVm}
+              />
+            </li>
+          </ul>
+        </>
+      )}
       <div className="mt-6">
         <Button
           data-testid="first-run-confirm"
@@ -439,7 +442,7 @@ function Rail({ open }: { open: SetupStepId }) {
   const { t } = useI18n();
   const steps = [
     { n: 1, id: 'models' as const, title: t('接入模型') },
-    { n: 2, id: 'confirm' as const, title: t('确认模型') },
+    { n: 2, id: 'confirm' as const, title: t('确认设置') },
   ];
   return (
     <ol className="m-0 mt-10 list-none p-0 max-lg:hidden">
@@ -488,7 +491,7 @@ function Segments({ open }: { open: SetupStepId }) {
                   : 'bg-content-dim',
             )}
           >
-            <span className="sr-only">{id === 'models' ? t('接入模型') : t('确认模型')}</span>
+            <span className="sr-only">{id === 'models' ? t('接入模型') : t('确认设置')}</span>
           </li>
         );
       })}
@@ -539,11 +542,11 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
       <div className="flex flex-1 flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] lg:items-center lg:overflow-y-auto lg:px-16 lg:pt-28 lg:pb-15">
         <section
           key={open}
-          aria-label={open === 'models' ? t('接入模型') : t('确认模型')}
+          aria-label={open === 'models' ? t('接入模型') : t('确认设置')}
           className="w-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 lg:my-auto lg:max-w-130"
         >
           <h2 className="m-0 voice-response text-page lg:sr-only">
-            {open === 'models' ? t('接入模型') : t('确认模型')}
+            {open === 'models' ? t('接入模型') : t('确认设置')}
           </h2>
           {open === 'models' ? (
             <div className="mt-5 lg:mt-0">

@@ -10,13 +10,7 @@ import { cn } from 'cn';
 import { Archive, ArchiveRestore, BookText, FolderSearch, Settings2 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { type To, useParams, useSearchParams } from 'react-router';
-import {
-  useApiMutations,
-  useMachines,
-  useMemories,
-  useModelSources,
-  useProjects,
-} from '../api/hooks.js';
+import { useApiMutations, useMemories, useModelSources, useProjects } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
@@ -110,7 +104,6 @@ function ProjectModels({
   const fixture = resolveScenario(searchParams);
   const routingQ = useRoutingSettings(teamId, live);
   const sourcesQ = useModelSources(teamId, live);
-  const machinesQ = useMachines(teamId, live);
   const mutations = useApiMutations(teamId);
   const settings = live
     ? (routingQ.data ?? EMPTY_ROUTING)
@@ -118,9 +111,6 @@ function ProjectModels({
   const options = toModelOptions(
     live ? (sourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
-  const machineRows = live ? (machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
-  const enabledRuntimes =
-    machineRows.length === 0 ? null : new Set(machineRows.flatMap((m) => m.enabledRuntimes ?? []));
   const save = (use: ProjectModelUse, choice: ProjectModelChoice | null) => {
     if (project === undefined) return;
     if (!live) {
@@ -147,7 +137,6 @@ function ProjectModels({
           testId={`project-model-${use}`}
           rule={project?.modelOverrides?.[use] ?? null}
           options={options}
-          enabledRuntimes={enabledRuntimes}
           followDefault={{
             label: t('跟随团队默认'),
             detail: teamModelLabel(settings, use, options),

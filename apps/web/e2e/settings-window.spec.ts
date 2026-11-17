@@ -101,15 +101,15 @@ test('old resource URLs land on their settings section with the query intact', a
   const cases = [
     ['/app/resources/providers', 'routing'],
     ['/app/settings/providers', 'routing'],
-    ['/app/resources/routing-settings', 'work-routing'],
+    ['/app/resources/routing-settings', 'routing'],
     ['/app/resources/machines', 'machines'],
     ['/app/resources/skills', 'skills'],
     ['/app/resources/mcp-servers', 'mcp'],
     ['/app/resources/secrets', 'secrets'],
     ['/app/account', 'account'],
     ['/app/api-keys', 'api-keys'],
-    ['/app/team', 'work-routing'],
-    ['/app/settings/team', 'work-routing'],
+    ['/app/team', 'routing'],
+    ['/app/settings/team', 'routing'],
   ] as const;
   for (const [from, section] of cases) {
     await page.goto(`${from}?scenario=10&scope=x`);

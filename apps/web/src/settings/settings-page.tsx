@@ -13,7 +13,6 @@ import {
   Smartphone,
   Sun,
   User,
-  Waypoints,
   X,
 } from 'lucide-react';
 import {
@@ -51,7 +50,6 @@ import { EmbeddedShell, PageShell } from '../pages/shell.js';
 import { MachinesPage } from '../resources/machines-page.js';
 import { McpServersPage } from '../resources/mcp-servers-page.js';
 import { ModelRoutingPage } from '../resources/model-routing-page.js';
-import { RoutingSettingsPage } from '../resources/routing-settings-page.js';
 import { SecretsPage } from '../resources/secrets-page.js';
 import { SkillsPage } from '../resources/skills-page.js';
 import { AccountPage } from '../routes/account-page.js';
@@ -126,20 +124,17 @@ const GROUPS: Group[] = [
     heading: '模型',
     sections: [
       {
-        id: 'work-routing',
-        label: '模型选择',
-        Icon: SlidersHorizontal,
-        keywords: ['model', 'coordinator', '思考强度', 'effort'],
-        element: () => <RoutingSettingsPage />,
-      },
-      {
         id: 'routing',
-        label: '模型路由',
-        Icon: Waypoints,
+        label: '模型',
+        Icon: SlidersHorizontal,
         keywords: [
+          'model',
+          'coordinator',
+          '思考强度',
+          'effort',
           'routing',
+          '模型路由',
           '服务商',
-
           'provider',
           '订阅',
           'subscription',
@@ -269,7 +264,8 @@ export function SettingsDialog({
   const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null);
   const machineNote = useMachineNote();
   const titleId = useId();
-  const movedTo = sectionParam === 'providers' ? 'routing' : null;
+  const movedTo =
+    sectionParam === 'providers' || sectionParam === 'work-routing' ? 'routing' : null;
   const section = SECTIONS.find((s) => s.id === (movedTo ?? sectionParam)) ?? null;
   const shown = section ?? SECTIONS[0];
   const opener = useRef<HTMLElement | null>(

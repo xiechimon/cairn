@@ -56,18 +56,17 @@ test('fixture: with no rules the routing page shows the providers and no rule gr
   await expect(page.getByTestId('routing-section')).toHaveCount(0);
 });
 
-test('the settings nav lists Model selector and Model routing, not Providers', async ({ page }) => {
+test('the settings nav lists one Model page, not Providers or the old selector', async ({ page }) => {
   await page.goto('/app/resources/providers?scenario=10');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByRole('link', { name: '用量与连接' })).toHaveCount(0);
   await expect(settings.getByRole('link', { name: '规则与策略' })).toHaveCount(0);
   await expect(settings.getByRole('link', { name: '模型服务', exact: true })).toHaveCount(0);
-  await settings.getByRole('link', { name: '模型路由', exact: true }).click();
+  await expect(settings.getByRole('link', { name: '模型路由', exact: true })).toHaveCount(0);
+  await expect(settings.getByRole('link', { name: '模型选择', exact: true })).toHaveCount(0);
+  await settings.getByRole('link', { name: '模型', exact: true }).click();
   await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=10/);
-  await expect(page.getByRole('heading', { name: '模型路由', exact: true })).toBeVisible();
-  await settings.getByRole('link', { name: '模型选择', exact: true }).click();
-  await expect(page).toHaveURL(/\/app\/settings\/work-routing\?scenario=10/);
-  await expect(page.getByRole('heading', { name: '模型选择', exact: true })).toBeVisible();
+  await expect(settings.getByTestId('settings-head')).toHaveText('模型');
 });
 
 test('live: rename, verify and remove hit the agreed routes', async ({

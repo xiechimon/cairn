@@ -1,11 +1,11 @@
 import type {
+  ProjectModelChoice,
   ProviderRecord,
   RouteUse,
   RoutingConnection,
   RoutingEdge,
   RoutingQuota,
   TeamRoutingSettings,
-  TopModel,
 } from '@cairn/shared';
 import { useQuery } from '@tanstack/react-query';
 import type { RoutingSourceGroup } from '../components/settings/routing-graph.js';
@@ -35,7 +35,7 @@ export function useModelRouting(teamId: string | undefined, live: boolean) {
 
 export const ROUTE_USE_LABELS: Record<RouteUse, string> = {
   coordinator: 'Coordinator',
-  session: '新任务',
+  session: '任务',
   review: '评审',
   digest: '摘要',
   compaction: '压缩',
@@ -120,13 +120,14 @@ export function ruleGraphGroups(
   targets: readonly RoutingTargetRow[],
   options: readonly ModelOption[],
   t: TFunc,
-  topModels: readonly TopModel[] = [],
+  projectChoices: readonly { id: string; name: string; choice: ProjectModelChoice }[] = [],
 ): RoutingSourceGroup[] {
-  const top = topModels.map((model) => {
-    const target = targetOfRule(model.provider, targets);
+  const projects = projectChoices.map(({ id, name, choice }) => {
+    const target = targetOfRule(choice.provider, targets);
     return {
-      id: `top:${model.provider}/${model.modelId}`,
-      name: modelName(model.provider, model.modelId, options),
+      id: `project:${id}`,
+      name,
+      tag: modelName(choice.provider, choice.modelId, options),
       ...(target !== undefined ? { target: target.id } : {}),
       broken: target === undefined || target.unavailable,
     };
@@ -149,8 +150,8 @@ export function ruleGraphGroups(
     });
   }
   const groups: RoutingSourceGroup[] = [];
-  if (top.length > 0) groups.push({ label: t('常用模型'), nodes: top });
   if (agents.length > 0) groups.push({ label: t('Coordinator 和其他 Agent'), nodes: agents });
+  if (projects.length > 0) groups.push({ label: t('项目单独设置'), nodes: projects });
   const claude = targetOfRule(CLAUDE_CODE_TARGET, targets);
   if (claude !== undefined) {
     groups.push({

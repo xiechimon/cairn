@@ -8,24 +8,27 @@ import {
   THINKING_LEVELS,
   type ThinkingLevel,
 } from '@cairn/shared';
-import { type ReactNode, useEffect } from 'react';
-import { useLocation, useSearchParams } from 'react-router';
-import {
-  hasUsableClaudeSubscription,
-  useClaudeSubscriptions,
-} from '../api/claude-subscriptions.js';
+import { Box, ChevronRight } from 'lucide-react';
+import { type ComponentType, type ReactNode, type SVGProps, useEffect, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
-import { hasUsableDevinSubscription, useDevinSubscriptions } from '../api/devin-subscriptions.js';
-import { useMachines, useModelSources } from '../api/hooks.js';
+import { useMachines, useModelSources, useProjects } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { ROUTE_USE_LABELS } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
-import { useTopModels, useTopModelsMutations } from '../api/top-models.js';
+import {
+  ClaudeMark,
+  DevinMark,
+  GeminiMark,
+  GrokMark,
+  OpenAIMark,
+} from '../components/brand-marks.js';
 import { FilterPicker } from '../components/filter-picker.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SettingsCard, SettingsRow } from '../components/settings-list.js';
+import { Button } from '../components/ui/button.js';
 import {
   Select,
   SelectContent,
@@ -37,23 +40,19 @@ import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { PageShell } from '../pages/shell.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { RuleIssueNotices } from './rule-issue-notices.js';
-import { suggestedTopModels, TopModelsCard, vendorMark } from './top-models-card.js';
 
 export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
 export const COORDINATOR_ROUTE_ANCHOR = 'route-coordinator';
-export const COORDINATOR_ROUTING_HREF = `${settingsHref('work-routing')}#${COORDINATOR_ROUTE_ANCHOR}`;
+export const COORDINATOR_ROUTING_HREF = `${settingsHref('routing')}#${COORDINATOR_ROUTE_ANCHOR}`;
 
 const AGENT_USES: readonly RouteUse[] = ['coordinator'];
-
-const COORDINATOR_RUNTIMES: ReadonlySet<string> = new Set(['pi', 'claude-code']);
 
 const STORED_ONLY_USES: readonly RouteUse[] = ['digest', 'compaction'];
 
 const USE_HINTS: Partial<Record<RouteUse, string>> = {
-  coordinator: '你对话的协调者，派活和汇报',
+  coordinator: '和你对话、派活',
   digest: '对话摘要',
   compaction: '上下文快满时压缩对话',
 };
@@ -66,6 +65,15 @@ const modelKey = (option: Pick<ModelOption, 'provider' | 'modelId'>) =>
 const FOLLOW_DEFAULT = 'follow-default';
 
 const levelLabel = (level: string) => level.charAt(0).toUpperCase() + level.slice(1);
+
+function vendorMark(modelId: string): ComponentType<SVGProps<SVGSVGElement>> {
+  if (modelId.startsWith('claude')) return ClaudeMark;
+  if (modelId.startsWith('devin')) return DevinMark;
+  if (/^(gpt|o\d|codex)/.test(modelId)) return OpenAIMark;
+  if (modelId.startsWith('gemini')) return GeminiMark;
+  if (modelId.startsWith('grok')) return GrokMark;
+  return Box;
+}
 
 function SessionDefaultHint({
   sessionDefault,
@@ -134,7 +142,6 @@ export function ModelPicker({
   use,
   rule,
   options,
-  enabledRuntimes,
   onPick,
   trigger,
   followDefault,
@@ -142,7 +149,6 @@ export function ModelPicker({
   use: RouteUse;
   rule: RuleModel | null;
   options: ModelOption[];
-  enabledRuntimes: ReadonlySet<string> | null;
   onPick: (option: ModelOption) => void;
   trigger?: { label: string; className: string };
   followDefault?: { label: string; detail: string | null; onPick: () => void };
@@ -151,34 +157,28 @@ export function ModelPicker({
   const picked = currentOption(rule, options);
   const shownId = picked?.modelId ?? rule?.modelId ?? '';
   const Vendor = vendorMark(shownId);
-  const coordinatorCannot = (runtime: string) =>
-    use === 'coordinator' && !COORDINATOR_RUNTIMES.has(runtime);
-  const runtimeOff = (runtime: string) =>
-    coordinatorCannot(runtime) ||
-    (enabledRuntimes !== null && runtime !== 'pi' && !enabledRuntimes.has(runtime));
   const byKey = new Map(options.map((o) => [modelKey(o), o]));
-  const rows = [...byKey.values()].sort(
-    (a, b) => Number(runtimeOff(a.runtime)) - Number(runtimeOff(b.runtime)),
-  );
-  const groupLabel = (o: ModelOption) =>
-    coordinatorCannot(o.runtime)
-      ? t('{runtime}（Coordinator 用不了）', { runtime: modelGroupName(o) })
-      : runtimeOff(o.runtime)
-        ? t('{runtime}（没有执行机启用）', { runtime: modelGroupName(o) })
-        : modelGroupName(o);
+  const rows = [...byKey.values()];
   return (
     <FilterPicker
       options={[
         ...(followDefault === undefined
           ? []
-          : [{ value: FOLLOW_DEFAULT, label: followDefault.label, group: FOLLOW_DEFAULT, groupLabel: '' }]),
+          : [
+              {
+                value: FOLLOW_DEFAULT,
+                label: followDefault.label,
+                group: FOLLOW_DEFAULT,
+                groupLabel: '',
+              },
+            ]),
         ...rows.map((o) => ({
           value: modelKey(o),
           label: o.liveness === 'dead' ? `${o.modelName}（${t('已下架')}）` : o.modelName,
           detail: modelGroupName(o),
           group: modelGroupKey(o),
-          groupLabel: groupLabel(o),
-          disabled: o.liveness === 'dead' || runtimeOff(o.runtime),
+          groupLabel: modelGroupName(o),
+          disabled: o.liveness === 'dead',
           keywords: `${o.modelId} ${o.runtime}`,
         })),
       ]}
@@ -253,7 +253,6 @@ export function RuleRow({
   hint,
   rule,
   options,
-  enabledRuntimes,
   onSave,
   followDefault,
   testId,
@@ -263,7 +262,6 @@ export function RuleRow({
   hint: ReactNode;
   rule: (RuleModel & Partial<Pick<RoutingRuleRecord, 'thinkingLevel'>>) | null;
   options: ModelOption[];
-  enabledRuntimes: ReadonlySet<string> | null;
   onSave: (body: {
     provider: string;
     modelId: string;
@@ -306,7 +304,10 @@ export function RuleRow({
                 aria-label={t('{use} 的思考强度', { use: label })}
                 className="routing-rule-level-select w-auto flex-none max-sm:-ml-2.5 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:h-7 max-sm:text-meta"
               >
-                <SelectValue>{levelLabel(level)}</SelectValue>
+                <SelectValue>
+                  <span className="text-content-tertiary">{t('思考')}</span>
+                  {levelLabel(level)}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {THINKING_LEVELS.map((value) => (
@@ -321,7 +322,6 @@ export function RuleRow({
             use={use}
             rule={rule}
             options={options}
-            enabledRuntimes={enabledRuntimes}
             {...(followDefault !== undefined ? { followDefault } : {})}
             onPick={(option) =>
               onSave({
@@ -337,7 +337,61 @@ export function RuleRow({
   );
 }
 
-export function RoutingSettingsPage() {
+function ProjectOverrides({ options }: { options: ModelOption[] }) {
+  const { t } = useI18n();
+  const { live, teamId } = useLiveData();
+  const projectsQ = useProjects(teamId, live);
+  const [open, setOpen] = useState(false);
+  const projects = (projectsQ.data ?? []).filter(
+    (p) => p.modelOverrides?.coordinator != null || p.modelOverrides?.session != null,
+  );
+  if (projects.length === 0) return null;
+  const nameOf = (choice: RuleModel) => currentOption(choice, options)?.modelName ?? choice.modelId;
+  return (
+    <div data-testid="routing-project-overrides" className="-mt-5 flex flex-col gap-2">
+      <Button
+        variant="link"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="h-auto min-h-6 w-fit gap-1 px-1 font-normal text-meta text-content-secondary no-underline hover:text-foreground hover:no-underline pointer-coarse:min-h-11"
+      >
+        {t('{count} 个项目单独设置了模型', { count: projects.length })}
+        <ChevronRight
+          aria-hidden
+          className={
+            open ? 'size-4 rotate-90 text-content-tertiary' : 'size-4 text-content-tertiary'
+          }
+        />
+      </Button>
+      {open && (
+        <SettingsCard>
+          {projects.map((p) => {
+            const parts = [
+              p.modelOverrides?.coordinator != null
+                ? `Coordinator · ${nameOf(p.modelOverrides.coordinator)}`
+                : null,
+              p.modelOverrides?.session != null
+                ? `${t('任务')} · ${nameOf(p.modelOverrides.session)}`
+                : null,
+            ].filter((part): part is string => part !== null);
+            return (
+              <SettingsRow key={p.id} label={p.name} hint={parts.join('　')}>
+                <Link
+                  to={`/app/project/${p.id}/settings`}
+                  className="text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current"
+                >
+                  {t('项目设置')}
+                </Link>
+              </SettingsRow>
+            );
+          })}
+        </SettingsCard>
+      )}
+    </div>
+  );
+}
+
+export function ModelRulesSection() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
@@ -346,26 +400,13 @@ export function RoutingSettingsPage() {
   const machinesQ = useMachines(teamId, live);
   const modelSourcesQ = useModelSources(teamId, live);
   const mutations = useRoutingSettingsMutations(teamId);
-  const topModelsQ = useTopModels(teamId, live);
-  const subscriptionsQ = useClaudeSubscriptions(teamId, live);
-  const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
-  const topModelMutations = useTopModelsMutations(teamId);
   const settings = live
     ? (settingsQ.data ?? EMPTY_SETTINGS)
     : (fixture.resources?.routingSettings ?? EMPTY_SETTINGS);
   const machineRows = live ? (machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
-  const enabledRuntimes =
-    machineRows.length === 0 ? null : new Set(machineRows.flatMap((m) => m.enabledRuntimes ?? []));
   const options = toModelOptions(
     live ? (modelSourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
-  const storedTopModels = live ? topModelsQ.data?.models : fixture.resources?.topModels;
-  const topModels =
-    storedTopModels ??
-    suggestedTopModels(options, {
-      claude: !live || hasUsableClaudeSubscription(subscriptionsQ.data, Date.now()),
-      devin: !live || hasUsableDevinSubscription(devinSubscriptionsQ.data, Date.now()),
-    });
   const { hash } = useLocation();
   const loaded = !live || settingsQ.data !== undefined;
   useEffect(() => {
@@ -401,80 +442,64 @@ export function RoutingSettingsPage() {
   };
   const session = ruleOf('session');
   return (
-    <PageShell route={ROUTING_SETTINGS_HREF} title={t('模型选择')} fixture={fixture}>
-      <QueryBoundary
-        query={live ? settingsQ : undefined}
-        isEmpty={live && settingsQ.data === undefined}
-        loadingLabel={t('正在加载模型选择')}
-        errorTitle={t('模型选择没能加载')}
-        className="mt-6"
-        empty={null}
-      >
-        <div className="flex flex-col gap-8 pt-1 pb-16">
-          <RuleIssueNotices
-            issues={settings.ruleIssues ?? []}
-            options={options}
-            machineName={(id) => machineRows.find((m) => m.id === id)?.name ?? id}
-            editableUses={new Set<RouteUse>(['session', ...agentUses])}
-            pendingUse={fixing}
-            onFix={fix}
-          />
-          <SettingsCard>
+    <QueryBoundary
+      query={live ? settingsQ : undefined}
+      isEmpty={live && settingsQ.data === undefined}
+      loadingLabel={t('正在加载模型')}
+      errorTitle={t('模型没能加载')}
+      empty={null}
+    >
+      <div className="flex flex-col gap-8">
+        <RuleIssueNotices
+          issues={settings.ruleIssues ?? []}
+          options={options}
+          machineName={(id) => machineRows.find((m) => m.id === id)?.name ?? id}
+          editableUses={new Set<RouteUse>(['session', ...agentUses])}
+          pendingUse={fixing}
+          onFix={fix}
+        />
+        <SettingsCard>
+          {agentUses.map((use) => (
             <RuleRow
-              use="session"
-              label={t('新任务默认用')}
+              key={use}
+              use={use}
+              label={t(ROUTE_USE_LABELS[use])}
               hint={
-                session === null && settings.sessionDefault !== undefined ? (
-                  <SessionDefaultHint sessionDefault={settings.sessionDefault} options={options} />
+                use === 'coordinator' && ruleOf(use) === null ? (
+                  settings.coordinatorDefault !== undefined ? (
+                    <CoordinatorDefaultHint
+                      coordinatorDefault={settings.coordinatorDefault}
+                      options={options}
+                    />
+                  ) : (
+                    t('先给 Coordinator 选模型，它才能回答你的消息。')
+                  )
                 ) : (
-                  t('新任务用这个模型和思考强度开始')
+                  t(USE_HINTS[use] ?? '')
                 )
               }
-              rule={session}
+              rule={ruleOf(use)}
               options={options}
-              enabledRuntimes={enabledRuntimes}
-              onSave={save('session')}
+              onSave={save(use)}
             />
-            {agentUses.map((use) => (
-              <RuleRow
-                key={use}
-                use={use}
-                label={t(ROUTE_USE_LABELS[use])}
-                hint={
-                  use === 'coordinator' && ruleOf(use) === null ? (
-                    settings.coordinatorDefault !== undefined ? (
-                      <CoordinatorDefaultHint
-                        coordinatorDefault={settings.coordinatorDefault}
-                        options={options}
-                      />
-                    ) : (
-                      t('先给 Coordinator 选模型，它才能回答你的消息。')
-                    )
-                  ) : (
-                    t(USE_HINTS[use] ?? '')
-                  )
-                }
-                rule={ruleOf(use)}
-                options={options}
-                enabledRuntimes={enabledRuntimes}
-                onSave={save(use)}
-              />
-            ))}
-          </SettingsCard>
-          {(!live || topModelsQ.data !== undefined) && (
-            <TopModelsCard
-              models={topModels}
-              options={options}
-              onChange={(next) => {
-                if (!live) return;
-                topModelMutations.put.mutate(next, {
-                  onError: (error) => toastError(t('保存失败，请重试。'), error),
-                });
-              }}
-            />
-          )}
-        </div>
-      </QueryBoundary>
-    </PageShell>
+          ))}
+          <RuleRow
+            use="session"
+            label={t('任务')}
+            hint={
+              session === null && settings.sessionDefault !== undefined ? (
+                <SessionDefaultHint sessionDefault={settings.sessionDefault} options={options} />
+              ) : (
+                t('执行每个任务')
+              )
+            }
+            rule={session}
+            options={options}
+            onSave={save('session')}
+          />
+        </SettingsCard>
+        <ProjectOverrides options={options} />
+      </div>
+    </QueryBoundary>
   );
 }

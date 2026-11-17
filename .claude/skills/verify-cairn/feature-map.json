@@ -884,7 +884,7 @@
         ]
       },
       "reach": [
-        "settings work-routing",
+        "settings routing",
         "click testid:routing-section"
       ],
       "verify": [
@@ -1127,8 +1127,7 @@
           "/app/resources/routing-settings",
           "/app/team",
           "/app/settings/team",
-          "settings:routing",
-          "settings:work-routing"
+          "settings:routing"
         ],
         "server": [
           "/api/teams/:id/model-routing",
@@ -1141,8 +1140,7 @@
       },
       "reach": [
         "settings routing",
-        "click testid:routing-section",
-        "settings work-routing"
+        "click testid:routing-section"
       ],
       "research": [
         "docs/research/capability-routing-2026-11-06.md",
@@ -1175,7 +1173,7 @@
         ]
       },
       "reach": [
-        "settings work-routing"
+        "settings routing"
       ],
       "research": [
         "docs/research/eval-methods.md",

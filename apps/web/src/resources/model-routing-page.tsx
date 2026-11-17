@@ -2,16 +2,9 @@ import type { TeamRoutingSettings } from '@cairn/shared';
 import { Plus } from 'lucide-react';
 import { Navigate, useSearchParams } from 'react-router';
 import { toClaudeAccount } from '../api/claude-accounts.js';
-import {
-  hasUsableClaudeSubscription,
-  useClaudeSubscriptions,
-} from '../api/claude-subscriptions.js';
-import {
-  hasUsableDevinSubscription,
-  toDevinAccount,
-  useDevinSubscriptions,
-} from '../api/devin-subscriptions.js';
-import { useModelSources, useProviders } from '../api/hooks.js';
+import { useClaudeSubscriptions } from '../api/claude-subscriptions.js';
+import { toDevinAccount, useDevinSubscriptions } from '../api/devin-subscriptions.js';
+import { useModelSources, useProjects, useProviders } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import {
   type ModelRouting,
@@ -21,7 +14,6 @@ import {
 } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
-import { useTopModels } from '../api/top-models.js';
 import { ClaudeMark, DevinMark } from '../components/brand-marks.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
@@ -34,7 +26,7 @@ import { legacyAccountsSearch, opensLegacyAccounts } from '../settings/settings-
 import { MODEL_ROUTING_HREF } from './hrefs.js';
 import { providerMark } from './provider-editors.js';
 import { ProvidersSection } from './providers-page.js';
-import { suggestedTopModels } from './top-models-card.js';
+import { ModelRulesSection } from './routing-settings-page.js';
 
 const EMPTY_SETTINGS: TeamRoutingSettings = { rules: [], policies: [] };
 
@@ -52,7 +44,7 @@ function RoutingContent() {
   const routingQ = useModelRouting(teamId, live);
   const settingsQ = useRoutingSettings(teamId, live);
   const sourcesQ = useModelSources(teamId, live);
-  const topModelsQ = useTopModels(teamId, live);
+  const projectsQ = useProjects(teamId, live);
 
   const routing: ModelRouting | undefined = live
     ? Array.isArray(routingQ.data?.edges)
@@ -79,18 +71,26 @@ function RoutingContent() {
   const options = toModelOptions(
     live ? (sourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
-  const topModels =
-    (live ? topModelsQ.data?.models : fixture.resources?.topModels) ??
-    suggestedTopModels(options, {
-      claude: !live || hasUsableClaudeSubscription(subscriptionsQ.data, now),
-      devin: !live || hasUsableDevinSubscription(devinSubscriptionsQ.data, now),
-    });
-  const groups = ruleGraphGroups(settings, targets, options, t, topModels);
+  const projectChoices = (projectsQ.data ?? []).flatMap((project) =>
+    (['coordinator', 'session'] as const).flatMap((use) => {
+      const choice = project.modelOverrides?.[use];
+      return choice == null
+        ? []
+        : [
+            {
+              id: `${project.id}:${use}`,
+              name: `${project.name} · ${use === 'coordinator' ? 'Coordinator' : t('任务')}`,
+              choice,
+            },
+          ];
+    }),
+  );
+  const groups = ruleGraphGroups(settings, targets, options, t, projectChoices);
 
   return (
     <PageShell
       route={MODEL_ROUTING_HREF}
-      title={t('模型路由')}
+      title={t('模型')}
       selected={MODEL_ROUTING_HREF}
       fixture={fixture}
       actions={
@@ -114,7 +114,11 @@ function RoutingContent() {
       }
     >
       <div className="flex min-w-0 flex-col gap-8 pb-16">
-        <ProvidersSection />
+        <ModelRulesSection />
+        <section className="flex min-w-0 flex-col gap-3">
+          <h3 className="m-0 text-ui font-semibold text-foreground">{t('服务商')}</h3>
+          <ProvidersSection />
+        </section>
         <QueryBoundary
           query={live ? routingQ : undefined}
           isEmpty={live && routingQ.data === undefined}

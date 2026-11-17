@@ -47,12 +47,12 @@ test('account switch: denied-state click lands the preference on-panel + interce
   await expect(page.locator('.account-notify-blocked')).toContainText('重新允许');
 });
 
-test('legacy team URLs land on work routing', async ({ page }) => {
+test('legacy team URLs land on the model page', async ({ page }) => {
   for (const from of ['/app/team?scenario=12', '/app/settings/team?scenario=12']) {
     await page.goto(from);
-    await expect(page).toHaveURL(/\/app\/settings\/work-routing\?scenario=12$/);
+    await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=12$/);
     await expect(
-      page.getByRole('dialog', { name: '设置' }).locator('[data-settings-section="work-routing"]'),
+      page.getByRole('dialog', { name: '设置' }).locator('[data-settings-section="routing"]'),
     ).toHaveAttribute('aria-current', 'page');
   }
 });
