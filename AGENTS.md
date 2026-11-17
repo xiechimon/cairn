@@ -31,7 +31,7 @@ Work lands on `main` directly. There is no pull request, merge queue or PR-body 
 5. Push without force: `git push origin HEAD:main`.
 6. If the push is rejected because `origin/main` is ahead, fetch, rebase and push again. Do not repeat step 4 after a later fetch, rebase or rejected push unless conflict resolution or other local edits changed files after it passed.
 7. A conflict that changes behavior: resolve it, then stop and ask ian before pushing.
-8. Watch CI on the commit you pushed. If it goes red, fixing it is your next task; if you cannot fix it quickly, revert your commit. While main is red, do not push on top of the broken area.
+8. Check CI on `origin/main` before pushing. If it is red, compare the failing jobs with the area your change touches: overlap means fix it or wait; no overlap means you may push, but when a red job covers your tests, verify them locally yourself. After pushing, watch CI on your commit and diff its failing jobs against the parent's: new failures are yours — fix them, or revert your commit if you cannot fix quickly; an identical failure signature is inherited — report the owning lane in chat, your commit stays. A red that survives several runs unclaimed and blocks deploys falls to the next lane needing a green deploy, or to ian.
 
 ## How to work
 
