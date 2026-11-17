@@ -70,7 +70,7 @@ export function TasksScheduleList({
             variant="secondary"
             size="sm"
             data-testid="schedule-new"
-            title={t('也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则。')}
+            title={t('也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则')}
           />
         ) : (
           <Button

@@ -563,7 +563,7 @@ export const EN: Record<string, string> = {
   闭环录像: 'Closed-loop video',
   '这是演示数据，改动不会保存': 'Demo data: changes are not saved',
   还没有定时任务: 'No schedules yet',
-  '也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则。':
+  '也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则':
     'You can also just tell the Coordinator how often a task should rerun, and it will write the rule for you.',
 
   // —— account route (r7 13) ——
