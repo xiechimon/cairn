@@ -55,9 +55,12 @@ test.each(['fresh', 'upgrade'])(
       });
       sqlite.exec("DELETE FROM build WHERE id = 'build'");
       expect(sqlite.prepare('SELECT * FROM queued_message').all()).toEqual([]);
-      expect(sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger'").all()).toEqual(
-        [],
-      );
+      expect(
+        sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name").all(),
+      ).toEqual([
+        { name: 'step_git_key_revoke_on_delete' },
+        { name: 'step_git_key_revoke_on_release' },
+      ]);
     } finally {
       sqlite.close();
       rmSync(directory, { recursive: true, force: true });

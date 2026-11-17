@@ -14,7 +14,7 @@ let statements;
 try {
   statements = native.$client
     .prepare(
-      "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '__drizzle%' ORDER BY type DESC, name",
+      "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '__drizzle%' ORDER BY CASE type WHEN 'table' THEN 0 WHEN 'index' THEN 1 ELSE 2 END, name",
     )
     .all()
     .map((row) => row.sql);
