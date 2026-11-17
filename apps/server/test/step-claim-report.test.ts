@@ -178,6 +178,7 @@ describe('#1473 a report counts only for the current claim', () => {
     issueStepGitCredential(w.deps, { teamId: w.teamId, stepId: STEP });
     w.sweep();
     expect(w.stepRow()).toMatchObject({ status: 'pending', machineId: null });
+    expect(w.credentialCount()).toBe(0);
     w.s.db.insert(teamTable).values({ id: 'team-other', name: 'other', createdAt: nowMs() }).run();
     w.s.db
       .insert(machineTable)
@@ -188,7 +189,6 @@ describe('#1473 a report counts only for the current claim', () => {
     await expect(
       finishStep(w.deps, 'machine-other-team', STEP, { status: 'failed', errorMessage: 'x' }),
     ).rejects.toThrow(/not yours/);
-    expect(w.credentialCount()).toBe(1);
     await finishStep(w.deps, MACHINE, STEP, { status: 'failed', errorMessage: 'late' });
     expect(w.stepRow()).toMatchObject({ status: 'pending', machineId: null });
     expect(w.todoRow().phase).toBe('building');

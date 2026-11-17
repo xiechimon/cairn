@@ -2,7 +2,7 @@ import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema, machineTokenResponseSchema } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, like } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -18,8 +18,9 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { systemGitOps } from '../src/lib/git.js';
+import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { MERGE_NOT_LANDED_NOTE } from '../src/services/machines.js';
+import { MERGE_NOT_LANDED_NOTE, sweepStaleMachines } from '../src/services/machines.js';
 import { stubGithubApp } from './github-identity-fixture.js';
 import {
   bootServer,
@@ -239,6 +240,68 @@ describe('per-step one-time git credential (02 section 5.4/8; relay tool name ma
       .where(eq(stepTable.id, claimed.step.id))
       .run();
     expect((await infoRefs()).status).toBe(401);
+  });
+
+  async function claimWithStepKey(w: GitWorld): Promise<string> {
+    w.startBuild();
+    const claimed = await w.claim();
+    await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, { cred: w.token });
+    expect(stepKeyNames(w)).toEqual([`git-step-${claimed.step.id}`]);
+    return claimed.step.id;
+  }
+
+  function stepKeyNames(w: GitWorld): (string | null)[] {
+    return w.s.db
+      .select({ name: apiKeyTable.name })
+      .from(apiKeyTable)
+      .where(like(apiKeyTable.name, 'git-step-%'))
+      .all()
+      .map((row) => row.name);
+  }
+
+  function stepStatus(w: GitWorld, stepId: string): string | undefined {
+    return w.s.db
+      .select({ status: stepTable.status })
+      .from(stepTable)
+      .where(eq(stepTable.id, stepId))
+      .get()?.status;
+  }
+
+  const LATER = () => Date.now() + 24 * 60 * 60_000;
+
+  test('a step released after its machine went offline loses its git key', async () => {
+    const w = await setupGitWorld();
+    const stepId = await claimWithStepKey(w);
+    sweepStaleMachines(w.s.svc, LATER());
+    sweepAbandonedBuildSteps(w.s.svc, LATER());
+    expect(stepStatus(w, stepId)).toBe('pending');
+    expect(stepKeyNames(w)).toEqual([]);
+  });
+
+  test('a step the abandoned sweep stops loses its git key, and asking for its token again issues none', async () => {
+    const w = await setupGitWorld();
+    const stepId = await claimWithStepKey(w);
+    w.s.db
+      .update(todoTable)
+      .set({ archivedAt: Date.now() })
+      .where(eq(todoTable.id, w.todoId))
+      .run();
+    sweepAbandonedBuildSteps(w.s.svc, LATER());
+    expect(stepStatus(w, stepId)).toBe('stopped');
+    expect(stepKeyNames(w)).toEqual([]);
+    const again = machineTokenResponseSchema.parse(
+      await (await call(w.s.app, 'GET', `/api/machine/token/${stepId}`, { cred: w.token })).json(),
+    );
+    expect(again.git).toBeNull();
+    expect(stepKeyNames(w)).toEqual([]);
+  });
+
+  test('deleting the task removes its running step and that step git key', async () => {
+    const w = await setupGitWorld();
+    const stepId = await claimWithStepKey(w);
+    expect((await call(w.s.app, 'DELETE', `/api/todos/${w.todoId}`)).status).toBeLessThan(300);
+    expect(stepStatus(w, stepId)).toBeUndefined();
+    expect(stepKeyNames(w)).toEqual([]);
   });
 
   test('repo-less project -> git null (M3a compatible shape)', async () => {

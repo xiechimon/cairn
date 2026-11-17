@@ -46,9 +46,12 @@ test.each(['fresh', 'upgrade'])(
           .prepare("SELECT name FROM pragma_table_info('step') WHERE name = 'archiveStop'")
           .get(),
       ).toEqual({ name: 'archiveStop' });
-      expect(sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger'").all()).toEqual(
-        [],
-      );
+      expect(
+        sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name").all(),
+      ).toEqual([
+        { name: 'step_git_key_revoke_on_delete' },
+        { name: 'step_git_key_revoke_on_release' },
+      ]);
       sqlite.exec('UPDATE todo SET archivedAt = 123');
       migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
       expect(sqlite.prepare('SELECT phase, archivedAt FROM todo').get()).toEqual({
