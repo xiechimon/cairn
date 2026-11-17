@@ -89,4 +89,26 @@ describe('ContextMeterRing', () => {
     expect(html).not.toContain('上下文（示意）');
     expect(html).not.toContain('%');
   });
+
+  test('keeps the ring still while the reading loads', () => {
+    const html = renderRing({ loading: true });
+    expect(html).not.toContain('animate-spin');
+    expect(html).not.toContain('<path ');
+  });
+
+  test('keeps the ring still while a run has no reading yet', () => {
+    const html = renderRing({ busy: true, loading: true });
+    expect(html).toContain('aria-busy="true"');
+    expect(html).not.toContain('animate-spin');
+    expect(html).not.toContain('<path ');
+  });
+
+  test('spins while a turn runs with a reading', () => {
+    const html = renderRing({
+      busy: true,
+      context: { tokens: 24_000, contextWindow: 200_000 },
+    });
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('animate-spin');
+  });
 });

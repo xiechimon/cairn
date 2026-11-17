@@ -52,7 +52,7 @@ test('reduced motion keeps the busy ring still and draws only its track', async 
   await expect(meter.locator('path')).toBeHidden();
 });
 
-test('usage loading spins until the request settles, not forever on an empty reading', async ({ page }) => {
+test('usage loading draws a still bare ring until the request settles', async ({ page }) => {
   let release = () => {};
   const held = new Promise<void>((resolve) => { release = resolve; });
   await mockLive(page, { threads: [THREAD], messages: [] });
@@ -65,9 +65,9 @@ test('usage loading spins until the request settles, not forever on an empty rea
   try {
     await expect(meter).toHaveAttribute('aria-busy', 'true');
     await expect(meter).toHaveAccessibleName('正在加载用量…');
-    await expect
-      .poll(() => meter.evaluate((el) => el.getAnimations({ subtree: true }).some((a) => a.playState === 'running')))
-      .toBe(true);
+    expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
+    await expect(meter.locator('circle')).toBeVisible();
+    await expect(meter.locator('path')).toHaveCount(0);
   } finally {
     release();
   }
@@ -90,7 +90,6 @@ test('usage loading stays truthful during a first reply without a reading', asyn
   );
   await expect(meter).toHaveAccessibleName('正在加载用量…');
   await expect(meter).toHaveText('');
-  await expect
-    .poll(() => meter.evaluate((el) => el.getAnimations({ subtree: true }).some((a) => a.playState === 'running')))
-    .toBe(true);
+  expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
+  await expect(meter.locator('path')).toHaveCount(0);
 });

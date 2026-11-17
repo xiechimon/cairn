@@ -140,7 +140,7 @@ export function ContextMeterRing({
           />
         }
       >
-        <ContextMeterGlyph filled={filled} busy={busy || loading} />
+        <ContextMeterGlyph filled={loading ? 0 : filled} busy={busy && !loading} />
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={8} className="flex-col items-start gap-0.5">
         {lines.map((line, index) => (
@@ -167,7 +167,7 @@ export function ContextMeterLine({
       data-percent={filled}
       className="flex h-8 items-center gap-2.5 px-2.5 text-meta tabular-nums text-content-tertiary"
     >
-      <ContextMeterGlyph filled={filled} busy={busy || loading} />
+      <ContextMeterGlyph filled={loading ? 0 : filled} busy={busy && !loading} />
       {lines.join(' · ')}
     </div>
   );
