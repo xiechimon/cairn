@@ -2443,14 +2443,16 @@ export const EN: Record<string, string> = {
   安装: 'Install',
   '没能撤销，请重试': 'Could not revoke; retry',
   消息: 'Messages',
-  消息连接: 'Chat connections',
   '连接 Telegram': 'Connect Telegram',
   '连接 Telegram 机器人': 'Connect a Telegram bot',
   '在 @BotFather 里创建机器人，把 bot token 粘到这里。':
     'Create a bot in @BotFather and paste the bot token here.',
-  还没有消息连接: 'No chat connections yet',
   '连接 Telegram 机器人或微信后，就能直接用手机和 Coordinator 对话。':
     'Connect a Telegram bot or WeChat and talk to the Coordinator from your phone.',
+  待处理: 'Needs attention',
+  '官方 Bot API：按钮和回复都支持。': 'Official Bot API — buttons and replies supported.',
+  '扫码登录，在平时的聊天里和 Coordinator 对话。':
+    'Scan to sign in and talk to the Coordinator in your usual chat.',
   'Telegram 机器人': 'Telegram bot',
   连接中: 'Connecting',
   不稳定: 'Unstable',

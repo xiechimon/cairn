@@ -192,9 +192,9 @@ const GROUPS: Group[] = [
     sections: [
       {
         id: 'im',
-        label: '消息连接',
+        label: 'IM',
         Icon: MessageCircle,
-        keywords: ['telegram', 'im', 'message', '聊天', '微信'],
+        keywords: ['telegram', 'im', 'message', '聊天', '微信', 'wechat'],
         element: () => <ImConnectionsPage />,
       },
     ],

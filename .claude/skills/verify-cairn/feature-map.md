@@ -20,7 +20,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `secrets` | `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars) | [Secrets](#secrets) |
 | `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
-| `im` | `设置` (Settings) › `消息` (Messages) › `消息连接` (Chat connections) | [IM connections](#im-connections) |
+| `im` | `设置` (Settings) › `消息` (Messages) › `IM` | [IM connections](#im-connections) |
 
 ## Features
 
@@ -857,9 +857,9 @@ Reach:
 3. `click testid:im-connect-wechat`
 
 - Web routes: none
-- Settings: `设置` (Settings) › `消息` (Messages) › `消息连接` (Chat connections)
+- Settings: `设置` (Settings) › `消息` (Messages) › `IM`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `im-approve-*`, `im-connect-submit`, `im-connect-telegram`, `im-connect-wechat`, `im-connection-*`, `im-connections-empty`, `im-delete-*`, `im-pairing-*`, `im-reconnect-*`, `im-reject-*`, `im-rescan-*`, `im-token-input`, `im-wechat-expired`, `im-wechat-retry`
+- Test ids in its code: `im-approve-*`, `im-catalog`, `im-connect-submit`, `im-connect-telegram`, `im-connect-wechat`, `im-connected`, `im-connection-*`, `im-delete-*`, `im-pairing-*`, `im-pending`, `im-platform-telegram`, `im-platform-wechat`, `im-reconnect-*`, `im-reject-*`, `im-rescan-*`, `im-token-input`, `im-wechat-expired`, `im-wechat-retry`
 - Research: n/a: the binding contract is docs/design/im-connections.md; no reference product is copied
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/design/im-connections.md](../../../docs/design/im-connections.md)
