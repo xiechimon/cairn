@@ -668,6 +668,13 @@ test('a click on the card screen takes control in place, and Enlarge fills the w
   const viewport = page.viewportSize();
   expect(box?.width).toBe(viewport?.width);
   expect(box?.height).toBe(viewport?.height);
+  const bar = await enlarged.getByTestId('machine-screen-chrome').boundingBox();
+  const shown = await enlarged.getByTestId('machine-screen').boundingBox();
+  expect(bar).not.toBeNull();
+  expect(shown).not.toBeNull();
+  if (!bar || !shown) return;
+  expect(bar.y + bar.height).toBeLessThanOrEqual(shown.y);
+  expect(shown.y + shown.height).toBeLessThanOrEqual(viewport?.height ?? 0);
   await enlarged.getByRole('button', { name: '点一下接管' }).click();
   await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE', 'POST']);
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-interactive', 'true', {
@@ -819,7 +826,7 @@ test.describe('on a touch phone', () => {
     const enlarged = page.getByTestId('machine-screen-enlarged');
     await expect(enlarged).toBeVisible();
     const screen = await enlarged.getByTestId('machine-screen').boundingBox();
-    const bar = await page.getByTestId('machine-screen-chrome').boundingBox();
+    const bar = await page.getByTestId('machine-screen-exit').boundingBox();
     expect(screen).not.toBeNull();
     expect(bar).not.toBeNull();
     if (!screen || !bar) return;

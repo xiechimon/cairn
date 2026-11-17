@@ -9,6 +9,18 @@ import { useI18n } from '../i18n/provider.js';
 type ScreenStatus = 'connecting' | 'connected' | 'placeholder' | 'failed';
 type NovncRfb = import('@novnc/novnc').default;
 
+const lastFrames = new Map<string, string>();
+
+function rememberFrame(computerId: string, host: HTMLElement) {
+  const canvas = host.querySelector('canvas');
+  if (canvas === null || canvas.width === 0 || canvas.height === 0) return;
+  try {
+    lastFrames.set(computerId, canvas.toDataURL('image/jpeg', 0.8));
+  } catch {
+    lastFrames.delete(computerId);
+  }
+}
+
 function resyncScale(rfb: NovncRfb) {
   rfb.scaleViewport = false;
   rfb.scaleViewport = true;
@@ -51,6 +63,7 @@ export function MachineScreenSurface({
   const host = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<NovncRfb | null>(null);
   const [status, setStatus] = useState<ScreenStatus>('connecting');
+  const [lastFrame, setLastFrame] = useState(() => lastFrames.get(computer.id) ?? null);
   const online = computer.machine.online && computer.state !== 'failed';
   const controlLease = interactive ? leaseId : null;
 
@@ -94,7 +107,10 @@ export function MachineScreenSurface({
           });
         });
         rfb.addEventListener('disconnect', () => {
-          if (!cancelled) setStatus('placeholder');
+          if (cancelled) return;
+          rememberFrame(computer.id, target);
+          setLastFrame(lastFrames.get(computer.id) ?? null);
+          setStatus('placeholder');
         });
         rfb.addEventListener('securityfailure', () => {
           if (!cancelled) setStatus('failed');
@@ -112,19 +128,12 @@ export function MachineScreenSurface({
     return () => {
       cancelled = true;
       rfbRef.current = null;
+      rememberFrame(computer.id, target);
+      setLastFrame(lastFrames.get(computer.id) ?? null);
       rfb?.disconnect();
       target.replaceChildren();
     };
-  }, [
-    teamId,
-    computer.id,
-    computer.machine.online,
-    computer.state,
-    interactive,
-    controlLease,
-    online,
-    autoFocus,
-  ]);
+  }, [teamId, computer.id, computer.machine.online, interactive, controlLease, online, autoFocus]);
 
   useEffect(() => {
     const rfb = rfbRef.current;
@@ -145,8 +154,17 @@ export function MachineScreenSurface({
       data-fill={fill ? 'true' : 'false'}
       className={`relative overflow-hidden ${fill ? 'h-full w-full' : 'aspect-[16/10] bg-(--surface-1)'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
     >
+      {status !== 'connected' && lastFrame !== null && (
+        <img
+          alt=""
+          aria-hidden="true"
+          data-testid="machine-screen-last-frame"
+          src={lastFrame}
+          className="absolute inset-0 h-full w-full object-contain"
+        />
+      )}
       <div ref={host} className="h-full w-full overflow-hidden [&_canvas]:outline-none" />
-      {status !== 'connected' && (
+      {status !== 'connected' && (lastFrame === null || status === 'failed') && (
         <div className="absolute inset-0 grid place-items-center px-6 text-center text-meta text-content-tertiary">
           <span className="flex flex-col items-center gap-2">
             <MonitorSmartphone aria-hidden="true" className="size-5.5 opacity-60" />

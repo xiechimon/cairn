@@ -1,7 +1,7 @@
 import type { ComputerRecord } from '@cairn/shared';
 import { cn } from 'cn';
 import { Minimize2 } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { useComputerControl } from '../api/use-computer-control.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { MachineName } from '../components/machine-label.js';
@@ -66,23 +66,6 @@ export function ComputerControlBar({
   );
 }
 
-const CHROME_IDLE_MS = 2_500;
-
-function useIdleChrome(): [boolean, () => void] {
-  const [idle, setIdle] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  const wake = useCallback(() => {
-    setIdle(false);
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setIdle(true), CHROME_IDLE_MS);
-  }, []);
-  useEffect(() => {
-    wake();
-    return () => window.clearTimeout(timer.current);
-  }, [wake]);
-  return [idle, wake];
-}
-
 export function ComputerScreenDialog({
   open,
   onClose,
@@ -102,7 +85,6 @@ export function ComputerScreenDialog({
 }) {
   const { t } = useI18n();
   const { leaseId } = control;
-  const [idle, wake] = useIdleChrome();
   return (
     <DialogShell
       open={open}
@@ -115,32 +97,19 @@ export function ComputerScreenDialog({
         role="dialog"
         aria-label={title}
         data-testid="machine-screen-enlarged"
-        className="fixed inset-0 z-(--z-modal) bg-(--screen-letterbox) pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
-        onPointerMoveCapture={wake}
-        onPointerDownCapture={wake}
-        onKeyDownCapture={wake}
+        className="fixed inset-0 z-(--z-modal) flex flex-col bg-(--screen-letterbox) pb-[env(safe-area-inset-bottom)]"
       >
-        <MachineScreenSurface
-          teamId={teamId}
-          computer={computer}
-          leaseId={leaseId}
-          interactive={leaseId !== null}
-          fill
-          autoFocus
-          onActivate={control.busy ? undefined : () => control.setHeld(true)}
-        />
         <div
           data-testid="machine-screen-chrome"
-          data-idle={idle ? 'true' : 'false'}
-          className="absolute top-[calc(env(safe-area-inset-top)+0.75rem)] left-1/2 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-3 rounded-(--radius-popover) bg-popover py-1.5 pr-1.5 pl-4 text-popover-foreground shadow-(--e2) transition-opacity duration-(--dur-overlay) focus-within:opacity-100 hover:opacity-100 pointer-fine:data-[idle=true]:opacity-0 motion-reduce:transition-none"
+          className="machine-screen-bar flex min-h-12 flex-none items-center gap-3 border-b border-border bg-background pt-[env(safe-area-inset-top)] pr-1.5 pl-4 text-foreground"
         >
-          <div className="flex min-w-0 flex-col">
-            <span className="truncate text-ui text-foreground">
+          <div className="flex min-w-0 flex-1 items-baseline gap-2">
+            <span className="min-w-0 truncate text-ui text-foreground">
               <MachineName machine={{ id: computer.machine.id, name: title }} compact />
             </span>
-            <span className="hidden truncate text-meta text-content-tertiary sm:block">
+            <span className="hidden min-w-0 truncate text-meta text-content-tertiary sm:block">
               {status ??
-                (leaseId !== null ? t('你在操作，Coordinator 已暂停') : t('接管后才能点击和键入'))}
+                (leaseId !== null ? t('你在操作，Coordinator 已暂停') : t('点画面就能接管'))}
             </span>
           </div>
           <ComputerControlBar
@@ -168,6 +137,17 @@ export function ComputerScreenDialog({
           >
             <Minimize2 aria-hidden="true" className="size-5" />
           </IconTooltip>
+        </div>
+        <div className="min-h-0 flex-1">
+          <MachineScreenSurface
+            teamId={teamId}
+            computer={computer}
+            leaseId={leaseId}
+            interactive={leaseId !== null}
+            fill
+            autoFocus
+            onActivate={control.busy ? undefined : () => control.setHeld(true)}
+          />
         </div>
       </div>
     </DialogShell>

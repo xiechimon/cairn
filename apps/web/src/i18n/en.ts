@@ -175,6 +175,7 @@ export const EN: Record<string, string> = {
   放大: 'Enlarge',
   缩小: 'Shrink',
   点一下接管: 'Click to take control',
+  点画面就能接管: 'Click the screen to take control',
   接管后才能点击和键入: 'Take control to click and type',
   接管: 'Take control',
   需要你登录: 'Login needed',

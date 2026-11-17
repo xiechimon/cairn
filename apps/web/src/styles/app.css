@@ -824,6 +824,15 @@ body:has([data-testid="chief-body"]),
   -webkit-app-region: drag;
 }
 
+:root[data-shell="mac-desktop"] .machine-screen-bar {
+  padding-left: 82px;
+  -webkit-app-region: drag;
+}
+
+:root[data-shell="mac-desktop"] .machine-screen-bar :is(button, a) {
+  -webkit-app-region: no-drag;
+}
+
 :root[data-shell="mac-desktop"] .sidebar-peek-trigger {
   left: 90px;
 }
