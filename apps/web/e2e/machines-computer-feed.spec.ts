@@ -603,7 +603,7 @@ test('the owner screen has no take-over or give-back buttons', async ({ page }) 
   await expect(panel.getByTestId('machine-screen-note')).toHaveCount(0);
 });
 
-test('resting the pointer on the card screen takes control after a short dwell, and leaving gives it back after a delay', async ({
+test('the card screen only highlights under the pointer, and a click opens the enlarged desktop', async ({
   page,
 }) => {
   const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
@@ -612,33 +612,11 @@ test('resting the pointer on the card screen takes control after a short dwell, 
   await expect(cardScreen).toBeVisible();
   const center = await screenCenter(cardScreen);
   await page.mouse.move(center.x, center.y);
-  await page.mouse.move(AWAY.x, AWAY.y);
-  await page.waitForTimeout(400);
-  expect(feed.controlCalls).toEqual([]);
-  await page.mouse.move(center.x, center.y);
-  await expect.poll(() => feed.controlCalls).toEqual(['POST']);
-  await expect(cardScreen).toHaveAttribute('data-interactive', 'true', { timeout: 15_000 });
-  await page.mouse.move(AWAY.x, AWAY.y);
-  await page.waitForTimeout(300);
-  expect(feed.controlCalls).toEqual(['POST']);
-  await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
-  await expect(cardScreen).toHaveAttribute('data-interactive', 'false');
-  await expect(page.getByTestId('machine-screen-enlarged')).toHaveCount(0);
-});
-
-test('coming back onto the screen before the release delay keeps the lease', async ({ page }) => {
-  const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
-  await open(page, feed, [SCREEN_MACHINE]);
-  const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
-  const center = await screenCenter(cardScreen);
-  await page.mouse.move(center.x, center.y);
-  await expect.poll(() => feed.controlCalls).toEqual(['POST']);
-  await page.mouse.move(AWAY.x, AWAY.y);
-  await page.waitForTimeout(300);
-  await page.mouse.move(center.x, center.y);
   await page.waitForTimeout(1_200);
-  expect(feed.controlCalls).toEqual(['POST']);
-  await expect(cardScreen).toHaveAttribute('data-interactive', 'true');
+  expect(feed.controlCalls).toEqual([]);
+  await expect(cardScreen).toHaveAttribute('data-interactive', 'false');
+  await page.mouse.click(center.x, center.y);
+  await expect(page.getByTestId('machine-screen-enlarged')).toBeVisible();
 });
 
 test('Enlarge fills the window with the screen, and the bar shows only while the pointer is at the top', async ({
@@ -676,7 +654,6 @@ test('Enlarge fills the window with the screen, and the bar shows only while the
   await expect(bar).toHaveAttribute('data-shown', 'true');
   await expect.poll(opacity).toBe('1');
   await expect(bar).toContainText('omarchy');
-  await expect(bar).toContainText('你在操作，Coordinator 先等着');
   await expect.poll(windowButtons).toEqual([false, true]);
   await shot(page, 'enlarged-bar-shown');
   await page.mouse.move(viewport.width / 2, viewport.height / 2);
@@ -902,24 +879,6 @@ test.describe('on a touch phone', () => {
     if (!tabs || !box) return;
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThanOrEqual(tabs.y);
-  });
-
-  test('a tap on the card screen takes control and a tap outside gives it back', async ({
-    page,
-  }) => {
-    const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
-    const panel = await open(page, feed, [SCREEN_MACHINE]);
-    const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
-    await expect(cardScreen).toBeVisible();
-    await cardScreen.tap();
-    await expect.poll(() => feed.controlCalls).toEqual(['POST']);
-    await expect(cardScreen).toHaveAttribute('data-interactive', 'true', { timeout: 15_000 });
-    await cardScreen.tap();
-    await page.waitForTimeout(1_200);
-    expect(feed.controlCalls).toEqual(['POST']);
-    await panel.getByRole('heading', { name: '你的电脑' }).tap();
-    await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
-    await expect(cardScreen).toHaveAttribute('data-interactive', 'false');
   });
 
   test('a tap on the enlarged screen takes control and a tap on the bar gives it back', async ({

@@ -181,17 +181,15 @@ export function MachineScreenSurface({
       {onExpand != null && (
         <Button
           type="button"
-          variant="secondary"
-          size="icon-sm"
+          variant="ghost"
           data-testid="machine-screen-expand"
           aria-label={t('放大')}
-          className="absolute top-2 right-2 z-10 shadow-sm"
-          onClick={(event) => {
-            event.stopPropagation();
-            onExpand();
-          }}
+          className="group absolute inset-0 z-10 h-auto cursor-pointer rounded-none p-0 outline-none hover:text-inherit transition-colors duration-(--dur-overlay) hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset motion-reduce:transition-none"
+          onClick={onExpand}
         >
-          <Maximize2 aria-hidden="true" className="size-4" />
+          <span className="absolute top-2 right-2 grid size-7 place-items-center rounded-(--radius-control) bg-secondary text-secondary-foreground opacity-0 shadow-sm transition-opacity duration-(--dur-overlay) group-hover:opacity-100 group-focus-visible:opacity-100 pointer-coarse:opacity-100 motion-reduce:transition-none">
+            <Maximize2 aria-hidden="true" className="size-4" />
+          </span>
         </Button>
       )}
     </div>

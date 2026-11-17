@@ -265,9 +265,8 @@ function MachineCard({
             teamId={teamId}
             computer={computer}
             leaseId={control.leaseId}
-            interactive={control.leaseId !== null && !fullscreen}
+            interactive={false}
             onExpand={() => setFullscreen(true)}
-            pointer={fullscreen ? undefined : hover.pointer}
           />
           {(computer.handoffReason !== null || control.failed) && (
             <p
