@@ -1,5 +1,5 @@
 import type { TeamRoutingSettings } from '@cairn/shared';
-import { accountsDefault, accountsEmpty } from './accounts.js';
+import { accountsDefault, accountsEmpty, accountsNoRunner } from './accounts.js';
 import { activityFixture } from './activity.js';
 import { chiefBubbleRuns } from './chief-bubble-runs.js';
 import { chiefDraft, sidebarRef } from './chief-draft.js';
@@ -390,6 +390,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'providers-empty': providersEmpty,
       'model-routing': accountsDefault,
       'model-routing-empty': accountsEmpty,
+      'model-routing-no-runner': accountsNoRunner,
       'routing-settings': routingSettingsFixture,
       'routing-settings-pi-only': {
         ...routingSettingsFixture,

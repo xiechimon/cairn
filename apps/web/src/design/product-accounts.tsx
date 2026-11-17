@@ -1,4 +1,4 @@
-import type { ProviderRecord } from '@cairn/shared';
+import type { ModelSourceModel, ProviderRecord } from '@cairn/shared';
 import { Layers, Monitor, Palette, Server, User } from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
@@ -22,12 +22,19 @@ import { OnlineStatus } from '../resources/parts.js';
 import { TeamProviderEditor } from '../resources/provider-editors.js';
 import {
   SubscriptionDetail,
+  subscriptionRowTone,
   subscriptionStatusView,
   subscriptionSummary,
 } from '../resources/subscription-detail.js';
 import { Section, Specimen } from './specimen.js';
 
 const NOW = r7(13, 14);
+
+const SPECIMEN_SUBSCRIPTION_MODELS: ModelSourceModel[] = [
+  { id: 'claude-opus-5-5', name: 'claude-opus-5-5', slot: 'default' },
+  { id: 'claude-sonnet-5-5', name: 'claude-sonnet-5-5', slot: 'sonnet' },
+  { id: 'claude-haiku-5-5', name: 'claude-haiku-5-5', slot: 'haiku' },
+];
 
 const settledQuery: QueryLike = {
   isPending: false,
@@ -100,8 +107,8 @@ function SubscriptionPanelSpecimen() {
       id: account.id,
       name: account.label,
       Mark: ClaudeMark,
-      status: subscriptionSummary(account, view, NOW, t),
-      tone: view.tone,
+      status: subscriptionSummary(account, view, SPECIMEN_SUBSCRIPTION_MODELS, NOW, t),
+      tone: subscriptionRowTone(view, SPECIMEN_SUBSCRIPTION_MODELS),
     })),
     {
       id: 'anthropic',
@@ -122,6 +129,7 @@ function SubscriptionPanelSpecimen() {
       {current !== undefined && (
         <SubscriptionDetail
           account={current.account}
+          models={SPECIMEN_SUBSCRIPTION_MODELS}
           now={NOW}
           view={current.view}
           verifying={current.verification?.phase === 'verifying'}
@@ -146,6 +154,7 @@ function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
     <div data-state={state} className="flex flex-col gap-6">
       <SubscriptionDetail
         account={account}
+        models={SPECIMEN_SUBSCRIPTION_MODELS}
         now={NOW}
         view={view}
         verifying={false}

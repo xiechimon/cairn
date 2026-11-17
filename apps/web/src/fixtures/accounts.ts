@@ -1,4 +1,4 @@
-import type { RoutingRuleRecord } from '@cairn/shared';
+import { DEFAULT_DEVIN_MODELS, type ModelSource, type RoutingRuleRecord } from '@cairn/shared';
 import type {
   AccountMachine,
   AccountStep,
@@ -386,16 +386,27 @@ const routingRule = (
   updatedAt: NOW - DAY,
 });
 
+const DEVIN_SOURCE: ModelSource = {
+  runtime: 'devin',
+  installed: true,
+  hostname: MACHINE_REMOTE_NAME,
+  machineId: MACHINE_REMOTE_ID,
+  models: [...DEFAULT_DEVIN_MODELS],
+};
+
 export const accountsDefault: FixtureSet = {
   ...resourcesDefault,
   now: NOW,
   resources: {
     ...RESOURCES,
-    providerSources: RESOURCES.providerSources.map((source) =>
-      source.runtime === 'pi'
-        ? { ...source, provider: 'r3-gateway', providerLabel: 'R3 网关' }
-        : source,
-    ),
+    providerSources: [
+      ...RESOURCES.providerSources.map((source) =>
+        source.runtime === 'pi'
+          ? { ...source, provider: 'r3-gateway', providerLabel: 'R3 网关' }
+          : source,
+      ),
+      DEVIN_SOURCE,
+    ],
     routingSettings: {
       rules: [
         routingRule('coordinator', 'claude-code', 'claude-sonnet-5', 'high'),
@@ -409,6 +420,16 @@ export const accountsDefault: FixtureSet = {
       return providers === undefined ? machine : { ...machine, providers };
     }),
     accounts: ACCOUNTS,
+  },
+};
+
+export const accountsNoRunner: FixtureSet = {
+  ...accountsDefault,
+  resources: accountsDefault.resources && {
+    ...accountsDefault.resources,
+    providerSources: accountsDefault.resources.providerSources.filter(
+      (source) => source.runtime === 'pi',
+    ),
   },
 };
 

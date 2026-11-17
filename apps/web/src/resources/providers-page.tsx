@@ -1,4 +1,4 @@
-import type { ModelSource, ProviderRecord } from '@cairn/shared';
+import type { ModelSource, ModelSourceModel, ProviderRecord } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cpu } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
@@ -49,6 +49,8 @@ import {
 import {
   type SubscriptionActions,
   SubscriptionDetail,
+  subscriptionModels,
+  subscriptionRowTone,
   subscriptionStatusView,
   subscriptionSummary,
 } from './subscription-detail.js';
@@ -101,6 +103,7 @@ function teamEntries(
 
 interface SubscriptionEntryDeps {
   now: number;
+  models: readonly ModelSourceModel[];
   steps: Record<string, AccountStep[]>;
   verifications: Record<string, Verification>;
   actionsFor: (account: SubscriptionAccount) => SubscriptionActions;
@@ -126,13 +129,14 @@ function subscriptionEntries(
         id: `subscription:${account.id}`,
         name: account.label,
         Mark: VENDORS[account.vendor].Mark,
-        status: subscriptionSummary(account, view, deps.now, deps.t),
-        tone: view.tone,
+        status: subscriptionSummary(account, view, deps.models, deps.now, deps.t),
+        tone: subscriptionRowTone(view, deps.models),
       },
       editor: (
         <SubscriptionDetail
           key={account.id}
           account={account}
+          models={deps.models}
           now={deps.now}
           view={view}
           verifying={verification?.phase === 'verifying'}
@@ -296,8 +300,14 @@ export function ProvidersSection() {
     clock,
   };
   const entries = [
-    ...subscriptionEntries(subscriptions, subscriptionDeps),
-    ...subscriptionEntries(devinSubscriptions, subscriptionDeps),
+    ...subscriptionEntries(subscriptions, {
+      ...subscriptionDeps,
+      models: subscriptionModels(sources, 'claude'),
+    }),
+    ...subscriptionEntries(devinSubscriptions, {
+      ...subscriptionDeps,
+      models: subscriptionModels(sources, 'devin'),
+    }),
     ...teamEntries(providers, deadModelIds(sources), actionsFor, t),
   ];
   const partialFailure =

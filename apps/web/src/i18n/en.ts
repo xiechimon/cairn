@@ -1762,6 +1762,7 @@ export const EN: Record<string, string> = {
   服务商: 'Providers',
   '{n} 个模型': '{n#1 model|# models}',
   '{n} 个已下架': '{n} retired',
+  '还没有执行机上报 {runtime} 模型': 'No Runner has reported models for {runtime} yet',
   范围: 'Scope',
   '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
     'Add an API key, subscription or custom endpoint and its models show up here.',

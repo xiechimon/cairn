@@ -37,7 +37,23 @@ async function open(page: Page, verify: { current: Verify }, subscriptions?: unk
     if (path === '/api/teams/t1/claude-subscriptions') return json(accounts);
     if (path.endsWith('/steps')) return json({ steps: [], hasEarlier: false });
     if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
-    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/model-sources') {
+      return json({
+        sources: [
+          {
+            runtime: 'claude-code',
+            installed: true,
+            hostname: 'runner-1',
+            machineId: 'm1',
+            models: [
+              { id: 'claude-opus-5-5', name: 'claude-opus-5-5', slot: 'default' },
+              { id: 'claude-sonnet-5-5', name: 'claude-sonnet-5-5', slot: 'sonnet' },
+              { id: 'claude-haiku-5-5', name: 'claude-haiku-5-5', slot: 'haiku' },
+            ],
+          },
+        ],
+      });
+    }
     if (path === '/api/teams/t1/claude-subscriptions/s1/verify') {
       switch (verify.current) {
         case 'ok':
@@ -81,7 +97,7 @@ const verify = (page: Page) => page.getByTestId('subscription-verify');
 test('a settled account reads one status, never available next to verifying', async ({ page }) => {
   const mode = { current: 'slow' as Verify };
   await open(page, mode);
-  await expect(row(page)).toContainText('订阅 · Max · 可用');
+  await expect(row(page)).toContainText('订阅 · Max · 3 个模型 · 可用');
   await expect(status(page)).toHaveText('可用');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await shot(page, 'available-with-quota');
@@ -117,7 +133,7 @@ for (const failure of FAILURES) {
     await verify(page).click();
     await expect(status(page)).toHaveText('验证失败');
     await expect(page.getByTestId('subscription-detail')).toContainText(failure.reason);
-    await expect(row(page)).toContainText('订阅 · Max · 验证失败');
+    await expect(row(page)).toContainText('订阅 · Max · 3 个模型 · 验证失败');
     await expect(page.getByTestId('subscription-reason')).toHaveText(failure.reason);
     await expect(row(page)).not.toContainText('可用');
     await expect(page.getByText('验证失败', { exact: true })).toHaveCount(1);

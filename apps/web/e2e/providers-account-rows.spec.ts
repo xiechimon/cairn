@@ -34,9 +34,42 @@ test('the Personal detail reads status, last use, steps and each quota window in
   await expect(detail.getByTestId('subscription-status')).toHaveText('可用');
   await expect(detail).toContainText('最近使用');
   await expect(detail).toContainText('24 小时步骤');
+  await expect(detail.getByTestId('subscription-model')).toHaveCount(4);
+  await expect(detail.getByTestId('subscription-model').first()).toContainText('claude-opus-4-5');
   await expect(detail.getByRole('progressbar')).toHaveCount(2);
   await expect(detail).not.toContainText('还没有额度读数');
   await expect(detail).not.toContainText('—');
+});
+
+test('the Devin subscription lists its Runner models and shows no quota section', async ({
+  page,
+}) => {
+  await page.goto(URL);
+  const row = page.locator('[data-instance-id="subscription:sub-devin"]');
+  await expect(row).toContainText('订阅 · 3 个模型 · 可用');
+  await row.click();
+  const detail = page.getByTestId('subscription-detail');
+  await expect(detail.getByTestId('subscription-model')).toHaveCount(3);
+  await expect(detail.getByTestId('subscription-model').first()).toContainText('SWE-2');
+  await expect(detail.getByTestId('subscription-model').first()).toContainText('swe-2-high');
+  await expect(detail).not.toContainText('额度');
+  await expect(detail).not.toContainText('—');
+});
+
+test('subscriptions whose Runner reports nothing read 0 models with the warn tone', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/routing?scenario=model-routing-no-runner');
+  const row = page.locator('[data-instance-id="subscription:sub-personal"]');
+  await expect(row).toContainText('订阅 · Max · 0 个模型 · 可用');
+  await expect(row).toHaveAttribute('data-tone', 'warn');
+  await row.click();
+  const detail = page.getByTestId('subscription-detail');
+  await expect(detail).toContainText('还没有执行机上报 Claude Code 模型');
+  const devin = page.locator('[data-instance-id="subscription:sub-devin"]');
+  await expect(devin).toContainText('订阅 · 0 个模型 · 可用');
+  await devin.click();
+  await expect(detail).toContainText('还没有执行机上报 Devin 模型');
 });
 
 test('an account nobody has used says so once, and still has a quota line of its own', async ({
@@ -52,10 +85,11 @@ test('an account nobody has used says so once, and still has a quota line of its
   await page.goto('/app/settings/routing');
   const row = page.getByTestId('provider-instance');
   await expect(row).toHaveCount(1);
-  await expect(row).toContainText('订阅 · 可用');
+  await expect(row).toContainText('订阅 · 0 个模型 · 可用');
   await expect(row).not.toContainText('最近使用');
   const detail = page.getByTestId('subscription-detail');
   await expect(detail.getByText('还没用过')).toHaveCount(1);
+  await expect(detail).toContainText('还没有执行机上报 Claude Code 模型');
   await expect(detail).toContainText('还没有额度读数');
   await expect(detail).not.toContainText('—');
 });

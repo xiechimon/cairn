@@ -1,3 +1,9 @@
+import {
+  MODEL_SOURCE_RUNTIME_LABELS,
+  type ModelSource,
+  type ModelSourceModel,
+  type ModelSourceRuntime,
+} from '@cairn/shared';
 import { cn } from 'cn';
 import type { AccountStatus, VerifyFailure } from '../api/account-verification.js';
 import type {
@@ -136,15 +142,53 @@ export function subscriptionStatusView(
 const leftPercent = (window: QuotaWindow) =>
   Math.max(0, Math.round((1 - window.utilization) * 100));
 
+const SUBSCRIPTION_RUNTIME: Partial<Record<AccountVendor, ModelSourceRuntime>> = {
+  claude: 'claude-code',
+  devin: 'devin',
+};
+
+export function subscriptionModels(
+  sources: readonly ModelSource[],
+  vendor: AccountVendor,
+): ModelSourceModel[] {
+  const runtime = SUBSCRIPTION_RUNTIME[vendor];
+  if (runtime === undefined) return [];
+  const byId = new Map<string, ModelSourceModel>();
+  for (const source of sources) {
+    if (source.runtime !== runtime || !source.installed) continue;
+    for (const model of source.models) {
+      if (model.id === '') continue;
+      const prev = byId.get(model.id);
+      if (prev === undefined || (model.liveness === 'dead' && prev.liveness !== 'dead')) {
+        byId.set(model.id, model);
+      }
+    }
+  }
+  return [...byId.values()];
+}
+
+export function subscriptionRowTone(
+  view: SubscriptionStatusView,
+  models: readonly ModelSourceModel[],
+): ProviderTone {
+  if (view.tone === 'fail') return 'fail';
+  if (models.length === 0 || models.some((model) => model.liveness === 'dead')) return 'warn';
+  return view.tone;
+}
+
 export function subscriptionSummary(
   account: SubscriptionAccount,
   view: SubscriptionStatusView,
+  models: readonly ModelSourceModel[],
   now: number,
   t: TFunc,
 ): string {
+  const retired = models.filter((model) => model.liveness === 'dead').length;
   return [
     t('订阅'),
     ...(account.plan === null ? [] : [account.plan]),
+    t('{n} 个模型', { n: models.length }),
+    ...(retired === 0 ? [] : [t('{n} 个已下架', { n: retired })]),
     view.label,
     ...(account.lastUsedAt === null || view.tone !== 'ok'
       ? []
@@ -212,8 +256,37 @@ export interface SubscriptionActions {
   onRemove: () => void;
 }
 
+function SubscriptionModelChip({ model }: { model: ModelSourceModel }) {
+  const { t } = useI18n();
+  const dead = model.liveness === 'dead';
+  return (
+    <span
+      data-testid="subscription-model"
+      data-model-id={model.id}
+      data-liveness={dead ? 'dead' : 'alive'}
+      className="inline-flex min-h-7 max-w-full items-center gap-1.5 rounded-md bg-secondary px-2.5 py-0.5 text-ui text-foreground ring-1 ring-border pointer-coarse:min-h-9"
+    >
+      <span
+        className={cn(
+          'min-w-0 [overflow-wrap:anywhere]',
+          dead && 'text-content-tertiary line-through',
+        )}
+      >
+        {model.name}
+      </span>
+      {model.name !== model.id && (
+        <code className="flex-none truncate font-mono text-caption text-content-tertiary">
+          {model.id}
+        </code>
+      )}
+      {dead && <span className="flex-none text-meta text-content-tertiary">{t('已下架')}</span>}
+    </span>
+  );
+}
+
 export function SubscriptionDetail({
   account,
+  models,
   now,
   view,
   verifying,
@@ -221,6 +294,7 @@ export function SubscriptionDetail({
   actions,
 }: {
   account: SubscriptionAccount;
+  models: readonly ModelSourceModel[];
   now: number;
   view: SubscriptionStatusView;
   verifying: boolean;
@@ -229,6 +303,9 @@ export function SubscriptionDetail({
 }) {
   const { t } = useI18n();
   const neverUsed = account.lastUsedAt === null && account.stepsLast24h === null;
+  const runtime = SUBSCRIPTION_RUNTIME[account.vendor];
+  const runtimeLabel =
+    runtime === undefined ? VENDORS[account.vendor].label : MODEL_SOURCE_RUNTIME_LABELS[runtime];
   return (
     <>
       <ProviderEditorHead
@@ -307,11 +384,31 @@ export function SubscriptionDetail({
             </>
           )}
         </SettingsCard>
-        <SettingsSection title={t('额度')}>
+        <SettingsSection title={t('模型')}>
           <SettingsCard>
-            <QuotaRows windows={account.windows} now={now} />
+            {models.length === 0 ? (
+              <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
+                {t('还没有执行机上报 {runtime} 模型', { runtime: runtimeLabel })}
+              </div>
+            ) : (
+              <div
+                data-testid="subscription-models"
+                className={cn(SETTINGS_ROW_CLS, 'flex-wrap justify-start gap-1.5 py-2.5')}
+              >
+                {models.map((model) => (
+                  <SubscriptionModelChip key={model.id} model={model} />
+                ))}
+              </div>
+            )}
           </SettingsCard>
         </SettingsSection>
+        {account.vendor !== 'devin' && (
+          <SettingsSection title={t('额度')}>
+            <SettingsCard>
+              <QuotaRows windows={account.windows} now={now} />
+            </SettingsCard>
+          </SettingsSection>
+        )}
         {steps !== undefined && (
           <SettingsSection title={t('最近步骤')}>
             <ListCard>
