@@ -4,6 +4,7 @@ import {
   existsSync,
   linkSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -76,6 +77,8 @@ describe('deliverable snapshot', () => {
     writeFileSync(join(sourceDir, 'pages', 'summary.html'), PAGE);
     writeFileSync(join(sourceDir, 'pages', 'notes.pdf'), PDF);
     writeFileSync(join(sourceDir, 'pages', 'SUMMARY.HTML'), PAGE);
+    const caseInsensitive =
+      readdirSync(join(sourceDir, 'pages')).filter((n) => /^summary\.html$/i.test(n)).length === 1;
     writeFileSync(join(sourceDir, 'pages', 'bad.html'), Buffer.from([0x3c, 0xff, 0x3e]));
     writeFileSync(join(sourceDir, 'slides', 'deck.pptx'), DECK);
     writeFileSync(join(sourceDir, 'slides', 'deck.pdf'), PDF);
@@ -93,13 +96,15 @@ describe('deliverable snapshot', () => {
     expect(result.files.map((f) => [f.kind, f.name, f.size, f.sha256])).toEqual([
       ['slides', 'deck.pdf', PDF.length, sha(PDF)],
       ['slides', 'deck.pptx', DECK.length, sha(DECK)],
-      ['page', 'SUMMARY.HTML', PAGE.length, sha(PAGE)],
+      ['page', caseInsensitive ? 'summary.html' : 'SUMMARY.HTML', PAGE.length, sha(PAGE)],
     ]);
     for (const file of result.files) {
       expect(file.path.startsWith(deliverablesOutboxOf(outboxDir, 's1'))).toBe(true);
       expect(sha(readFileSync(file.path))).toBe(file.sha256);
     }
+    const duplicate = caseInsensitive ? {} : { 'summary.html': 'duplicate-name' };
     expect(Object.fromEntries(result.skipped.map((s) => [s.name, s.reason]))).toEqual({
+      ...duplicate,
       'stray.html': 'outside-kind-folder',
       'fake.pptx': 'invalid-content',
       'huge.pptx': 'too-large',
@@ -108,7 +113,6 @@ describe('deliverable snapshot', () => {
       'link.html': 'not-regular-file',
       'notes.pdf': 'unsupported-kind',
       'pipe.html': 'not-regular-file',
-      'summary.html': 'duplicate-name',
     });
   });
 

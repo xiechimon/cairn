@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { CONFIRM_ANNOUNCEMENT, MERGE_ANNOUNCEMENT, trajectoryPackSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -26,7 +34,7 @@ afterEach(() => {
 });
 
 function fixture(spec = 'Implement export') {
-  const home = makeTestTempDir('cairn-traj-');
+  const home = realpathSync(makeTestTempDir('cairn-traj-'));
   homes.push(home);
   const dbPath = join(home, 'server/server.db');
   const opened = openDbWithHandle(dbPath);

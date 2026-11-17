@@ -37,7 +37,11 @@ export function prepareFileAttachment(
   ) {
     throw new Error('attach_file evidence directory must be a real directory inside the worktree');
   }
-  const requested = resolve(root, params.path);
+  const given = resolve(root, params.path);
+  const requested =
+    containsPath(resolve(cwd), given) && !containsPath(root, given)
+      ? resolve(root, relative(resolve(cwd), given))
+      : given;
   const file = realpathSync(requested);
   if (!containsPath(scope, requested) || !containsPath(scope, file)) {
     throw new Error('attach_file path is outside the step worktree');

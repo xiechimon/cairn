@@ -139,7 +139,10 @@ describe('commitAll stages only the agent work, never workspace setup drift (tas
   }, 60_000);
 
   test('a merge step over a setup-edited tracked file that changed upstream elsewhere merges and regenerates the setup output', async () => {
-    await seedRepo(userRepo, 'sed -i "s/^alpha$/alpha-setup/" config.txt\n');
+    await seedRepo(
+      userRepo,
+      'sed "s/^alpha$/alpha-setup/" config.txt > config.tmp && mv config.tmp config.txt\n',
+    );
     writeFileSync(join(userRepo, 'config.txt'), 'alpha\nbeta\ngamma\n');
     await git(userRepo, ['add', 'config.txt']);
     await git(userRepo, ['commit', '-m', 'config']);
