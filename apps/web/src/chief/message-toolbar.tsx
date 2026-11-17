@@ -13,10 +13,9 @@ import { Copy, Restore } from '../icons/index.js';
 export type ToolbarPlacement = 'right' | 'left' | 'below-start' | 'below-end';
 
 const TOOL_BTN_CLS =
-  "size-8 cursor-pointer pointer-coarse:size-11 rounded-(--radius-control) border-none bg-transparent text-(--foreground) transition-none hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
+  "size-8 cursor-pointer pointer-coarse:size-11 rounded-(--radius-control) border-none bg-transparent text-(--text-tertiary) transition-none hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) aria-expanded:text-foreground [&_svg:not([class*='size-'])]:size-auto";
 
-const PILL_CLS =
-  'flex flex-none items-center rounded-(--radius-tile) bg-popover p-px shadow-(--e2)';
+const TOOLS_CLS = 'flex flex-none items-center';
 
 const HOVER_REVEAL =
   'pointer-events-none opacity-0 group-hover/reply-block:pointer-events-auto group-hover/reply-block:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[aria-expanded=true]]:pointer-events-auto has-[[aria-expanded=true]]:opacity-100 pointer-coarse:hidden';
@@ -149,11 +148,11 @@ export function MessageToolbar({
         />
       }
     >
-      <Undo width={22} height={22} />
+      <Undo width={20} height={20} />
     </IconTooltip>
   );
   const pill = !armed ? (
-    <div className={PILL_CLS} data-slot="message-toolbar-pill">
+    <div className={TOOLS_CLS} data-slot="message-toolbar-tools">
       {withdraw}
       {onReply !== undefined && (
         <PlainButton
@@ -164,7 +163,7 @@ export function MessageToolbar({
           data-testid="chief-msg-reply"
           data-tool="reply"
         >
-          <Reply width={22} height={22} />
+          <Reply width={20} height={20} />
         </PlainButton>
       )}
       <PlainButton
@@ -177,11 +176,11 @@ export function MessageToolbar({
         data-testid="chief-msg-more"
         data-tool="more"
       >
-        <Ellipsis width={22} height={22} />
+        <Ellipsis width={20} height={20} />
       </PlainButton>
     </div>
   ) : (
-    <div className={PILL_CLS} data-slot="message-toolbar-pill">
+    <div className={TOOLS_CLS} data-slot="message-toolbar-tools">
       {withdraw}
       {onReply !== undefined && (
         <IconTooltip
@@ -197,7 +196,7 @@ export function MessageToolbar({
             />
           }
         >
-          <Reply width={22} height={22} />
+          <Reply width={20} height={20} />
         </IconTooltip>
       )}
       <DropdownMenu>
@@ -218,7 +217,7 @@ export function MessageToolbar({
               />
             }
           >
-            <Ellipsis width={22} height={22} />
+            <Ellipsis width={20} height={20} />
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={8}>
             {t('更多')}
@@ -258,7 +257,7 @@ export function MessageToolbar({
   const meta =
     stamp == null && note == null ? null : (
       <span
-        className="flex items-center gap-2 text-caption whitespace-nowrap text-(--text-tertiary) group-data-clamped/toolbar:rounded-(--radius-control) group-data-clamped/toolbar:bg-popover group-data-clamped/toolbar:px-1.5 group-data-clamped/toolbar:py-0.5 group-data-clamped/toolbar:shadow-(--e2)"
+        className="flex items-center gap-2 text-caption whitespace-nowrap text-(--text-tertiary) group-data-clamped/toolbar:rounded-(--radius-control) group-data-clamped/toolbar:bg-popover group-data-clamped/toolbar:px-1.5 group-data-clamped/toolbar:py-0.5 group-data-clamped/toolbar:shadow-(--e1)"
         data-slot="message-toolbar-meta"
       >
         {stamp}
