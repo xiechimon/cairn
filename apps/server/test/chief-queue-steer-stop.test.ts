@@ -209,6 +209,20 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
       const res = await call(s.app, 'GET', `/api/machine/steer?stepId=${stepId}`, { cred: token });
       return ((await res.json()) as { content: string | null }).content;
     },
+    async fetchBatch(stepId: string) {
+      const res = await call(s.app, 'GET', `/api/machine/steer?stepId=${stepId}&batches=1`, {
+        cred: token,
+      });
+      expect(res.status).toBe(200);
+      return (await res.json()) as { content: string | null; messageIds?: string[] };
+    },
+    async ackBatch(stepId: string, messageIds: string[]) {
+      const res = await call(s.app, 'POST', `/api/machine/steer/ack?stepId=${stepId}`, {
+        cred: token,
+        body: { messageIds },
+      });
+      expect(res.status).toBe(200);
+    },
     stepRow(id: string) {
       return s.db.select().from(stepTable).where(eq(stepTable.id, id)).get();
     },
@@ -438,6 +452,51 @@ describe('steer (T5): `现在插话`', () => {
     expect(w.stepRow(b)).toBeDefined();
     expect(await w.fetchSteer(running!.step.id)).toBe('插话 B');
     await w.done(running!.step.id, { status: 'success' });
+    const next = await w.claim();
+    expect(next?.step.id).toBe(b);
+  });
+
+  test('batched: every interruption sent so far is fetched together, each one in the text the model reads', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const ids = [w.queue('ok'), w.queue('回复ok'), w.queue('即可')];
+    for (const id of ids) expect((await w.steer(id)).status).toBe(200);
+    const batch = await w.fetchBatch(running!.step.id);
+    expect(batch.messageIds).toEqual(ids);
+    expect(batch.content).toBe('ok\n\n回复ok\n\n即可');
+    expect(await w.fetchBatch(running!.step.id)).toEqual({ content: null });
+    await w.ackBatch(running!.step.id, batch.messageIds!);
+    expect((await w.thread()).pending).toEqual([]);
+    for (const id of ids) {
+      expect(w.stepRow(id)).toBeUndefined();
+      expect(w.messages().some((m) => m.id === id)).toBe(true);
+    }
+  });
+
+  test('batched: a later interruption is fetched while an earlier batch is unread, and each ack settles only its own messages', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const a = w.queue('插话 A');
+    const b = w.queue('插话 B');
+    const c = w.queue('插话 C');
+    expect((await w.steer(a)).status).toBe(200);
+    const first = await w.fetchBatch(running!.step.id);
+    expect(first).toEqual({ content: '插话 A', messageIds: [a] });
+    expect((await w.steer(b)).status).toBe(200);
+    const second = await w.fetchBatch(running!.step.id);
+    expect(second).toEqual({ content: '插话 B', messageIds: [b] });
+    expect((await w.steer(c)).status).toBe(200);
+    await w.ackBatch(running!.step.id, [...first.messageIds!, c, 'chief-msg-from-elsewhere']);
+    expect(w.stepRow(a)).toBeUndefined();
+    expect(w.stepRow(b)?.holdReason).toBe('steer_sent');
+    expect(w.stepRow(c)?.holdReason).toBe('steer');
+    await w.ackBatch(running!.step.id, first.messageIds!);
+    expect(w.stepRow(b)?.holdReason).toBe('steer_sent');
+    await w.done(running!.step.id, { status: 'success' });
+    expect(w.stepRow(b)?.holdReason).toBeNull();
+    expect(w.stepRow(c)?.holdReason).toBeNull();
     const next = await w.claim();
     expect(next?.step.id).toBe(b);
   });

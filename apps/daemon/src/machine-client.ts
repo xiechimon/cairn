@@ -598,7 +598,7 @@ export class MachineClient implements MachineApi {
   async steer(stepId: string): Promise<MachineSteerResponse> {
     return this.request<MachineSteerResponse>(
       'GET',
-      `/api/machine/steer?stepId=${encodeURIComponent(stepId)}`,
+      `/api/machine/steer?stepId=${encodeURIComponent(stepId)}&batches=1`,
       { parse: (raw) => machineSteerResponseSchema.parse(raw) },
     );
   }

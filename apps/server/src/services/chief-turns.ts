@@ -298,7 +298,11 @@ export function addTurnOwnerMessage(db: Db, threadId: string, messageId: string)
     .run();
 }
 
-export function takeChiefSteer(db: Db, threadId: string): boolean {
+export function takeChiefSteer(
+  db: Db,
+  threadId: string,
+  options: { batches?: boolean } = {},
+): string[] | null {
   const native = new Set(
     db
       .select({ id: coordinatorInput.id })
@@ -308,23 +312,19 @@ export function takeChiefSteer(db: Db, threadId: string): boolean {
       .map((input) => input.id),
   );
   const live = liveChiefSteps(db, threadId).filter((row) => !native.has(row.id));
-  if (live.some((row) => row.holdReason === STEER_SENT_HOLD)) return false;
-  for (const waiting of live) {
-    if (waiting.status !== 'pending' || waiting.holdReason !== STEERED_HOLD) continue;
+  if (options.batches !== true && live.some((row) => row.holdReason === STEER_SENT_HOLD))
+    return null;
+  const batch = live.filter((row) => row.status === 'pending' && row.holdReason === STEERED_HOLD);
+  for (const waiting of batch) {
     for (const id of waiting.ownerMessageIds ?? []) addTurnOwnerMessage(db, threadId, id);
   }
-  db.update(step)
-    .set({ holdReason: STEER_SENT_HOLD })
-    .where(
-      and(
-        eq(step.buildId, threadId),
-        eq(step.status, 'pending'),
-        eq(step.holdReason, STEERED_HOLD),
-        native.size === 0 ? undefined : notInArray(step.id, [...native]),
-      ),
-    )
-    .run();
-  return true;
+  const ids = batch.map((row) => row.id);
+  if (ids.length > 0)
+    db.update(step)
+      .set({ holdReason: STEER_SENT_HOLD })
+      .where(and(inArray(step.id, ids), eq(step.holdReason, STEERED_HOLD)))
+      .run();
+  return ids;
 }
 
 export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[] {
@@ -382,6 +382,7 @@ export function ackChiefSteer(
   deps: Pick<ChiefTurnDeps, 'db' | 'convHub' | 'machineHub'>,
   teamId: string,
   running: StepRow,
+  messageIds?: readonly string[],
 ): void {
   const threadId = running.buildId;
   const native = new Set(
@@ -393,7 +394,11 @@ export function ackChiefSteer(
       .map((input) => input.id),
   );
   const sent = liveChiefSteps(deps.db, threadId).filter(
-    (row) => row.status === 'pending' && row.holdReason === STEER_SENT_HOLD && !native.has(row.id),
+    (row) =>
+      row.status === 'pending' &&
+      row.holdReason === STEER_SENT_HOLD &&
+      !native.has(row.id) &&
+      (messageIds === undefined || messageIds.includes(row.id)),
   );
   const now = nowMs();
   for (const row of sent) {

@@ -104,6 +104,7 @@ export const PI_DAEMON_SETTINGS: PiSettingsSeed = {
   compaction: { enabled: true },
   enableInstallTelemetry: false,
   cacheWarming: 'off',
+  steeringMode: 'all',
 };
 
 export function daemonSettingsManager(): SettingsManager {

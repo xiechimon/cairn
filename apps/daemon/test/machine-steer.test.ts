@@ -1,7 +1,10 @@
-import type { AgentBackend, DeliveredImage, StepEvent } from '@cairn/shared';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import type { AgentBackend, DeliveredImage, MachineSteerResponse, StepEvent } from '@cairn/shared';
 import { formatAttachmentToken } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { PI_CAPABILITIES } from '../src/backend/pi.js';
+import { PI_CAPABILITIES, PI_DAEMON_SETTINGS } from '../src/backend/pi.js';
+import { MachineClient } from '../src/machine-client.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 
 describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer)', () => {
@@ -427,5 +430,106 @@ describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.st
     expect(steered).toEqual([]);
     await handle.stop();
     await handle.done;
+  });
+});
+
+describe('steer batches: interruptions sent while the model works are read together', () => {
+  test('the client asks for batches and acknowledges exactly the messages of its batch', async () => {
+    const requests: { url: string; body: string }[] = [];
+    const server = createServer((req, res) => {
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk;
+      });
+      req.on('end', () => {
+        requests.push({ url: req.url ?? '', body });
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify(
+            req.method === 'GET'
+              ? { content: 'ok\n\n即可', messageIds: ['m1', 'm2'] }
+              : { ok: true },
+          ),
+        );
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const client = new MachineClient({ serverUrl: `http://127.0.0.1:${port}` });
+      const fetched = await client.steer('s 1');
+      expect(fetched).toEqual({ content: 'ok\n\n即可', messageIds: ['m1', 'm2'] });
+      await client.steerAck('s 1', { messageIds: fetched.messageIds });
+      expect(requests[0]?.url).toBe('/api/machine/steer?stepId=s%201&batches=1');
+      expect(requests[1]?.url).toBe('/api/machine/steer/ack?stepId=s%201');
+      expect(JSON.parse(requests[1]?.body ?? '')).toEqual({ messageIds: ['m1', 'm2'] });
+    } finally {
+      server.close();
+    }
+  });
+
+  test('a second batch reaches the session before the first is read, and each ack names only its own messages', async () => {
+    const api = new FakeMachineApi();
+    const batches: MachineSteerResponse[] = [
+      { content: '插话 A', messageIds: ['a'] },
+      { content: '插话 B\n\n插话 C', messageIds: ['b', 'c'] },
+    ];
+    api.steer = async (stepId: string) => {
+      api.calls.push(`steer:${stepId}`);
+      return batches.shift() ?? { content: null };
+    };
+    const steered: string[] = [];
+    const reads: (() => void)[] = [];
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'claude-sess-batch',
+          events: (async function* () {
+            yield { type: 'text_delta', text: '跑着' } as StepEvent;
+            await gate;
+            yield { type: 'done', usage: [] } as StepEvent;
+          })(),
+          steer(text: string) {
+            steered.push(text);
+            return new Promise<void>((resolve) => {
+              reads.push(resolve);
+            });
+          },
+          async stop() {},
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new Error('unused in steer tests');
+      },
+    };
+    const { handle, lines } = await boot({ api, backend });
+    try {
+      await waitFor(() => api.parked !== null);
+      api.parked?.(CLAIMED);
+      await waitFor(() => lines.some((line) => line.includes('new session conv-1')));
+      api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+      await waitFor(() => steered.length === 1);
+      api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+      await waitFor(() => steered.length === 2);
+      expect(steered).toEqual(['插话 A', '插话 B\n\n插话 C']);
+      expect(api.steerAckBodies).toEqual([]);
+      for (const read of reads) read();
+      await waitFor(() => api.steerAckBodies.length === 2);
+      expect(api.steerAckBodies).toEqual([{ messageIds: ['a'] }, { messageIds: ['b', 'c'] }]);
+    } finally {
+      release();
+      await handle.stop();
+      await handle.done;
+    }
+  });
+
+  test('the daemon pi session reads every queued interruption at once, like the Coordinator runtime', () => {
+    expect(PI_DAEMON_SETTINGS.steeringMode).toBe('all');
   });
 });

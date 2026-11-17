@@ -737,16 +737,19 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         logger.step(`steer dropped (no live session) step=${stepId}`);
         return;
       }
-      const delivery = live
-        .steer(deliveryText, images)
-        .then(() =>
-          client.steerAck?.(
-            stepId,
-            answers.length > 0
-              ? { answerIds: answers.map((answer) => answer.requestId), via: 'steer' }
-              : undefined,
-          ),
-        );
+      const delivery = live.steer(deliveryText, images).then(() =>
+        client.steerAck?.(
+          stepId,
+          answers.length > 0 || fetched?.messageIds !== undefined
+            ? {
+                ...(answers.length > 0
+                  ? { answerIds: answers.map((answer) => answer.requestId), via: 'steer' as const }
+                  : {}),
+                ...(fetched?.messageIds !== undefined ? { messageIds: fetched.messageIds } : {}),
+              }
+            : undefined,
+        ),
+      );
       const pending = steerAcks.get(stepId) ?? new Set<Promise<void>>();
       steerAcks.set(stepId, pending);
       pending.add(delivery);

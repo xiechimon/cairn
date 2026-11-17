@@ -74,6 +74,7 @@ export function fetchSteer(
   deps: { db: Db },
   machine: { id: string | null },
   stepId: string,
+  options: { batches?: boolean } = {},
 ): MachineSteerResponse {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
@@ -92,18 +93,18 @@ export function fetchSteer(
     .where(eq(steerPending.conversationId, stepRow.buildId))
     .get();
   if (!pending) return withAnswers(null);
-  if (
-    pending.stepId === stepId &&
-    isChiefConversation(stepRow.buildId) &&
-    !takeChiefSteer(db, stepRow.buildId)
-  ) {
-    return { content: null };
-  }
+  const batch =
+    pending.stepId === stepId && isChiefConversation(stepRow.buildId)
+      ? takeChiefSteer(db, stepRow.buildId, options)
+      : undefined;
+  if (batch === null) return { content: null };
   db.delete(steerPending).where(eq(steerPending.conversationId, stepRow.buildId)).run();
   if (pending.stepId !== stepId) {
     return withAnswers(null);
   }
-  return withAnswers(pending.content);
+  return batch === undefined
+    ? withAnswers(pending.content)
+    : { content: pending.content, messageIds: batch };
 }
 
 export function ackSteer(
@@ -115,7 +116,7 @@ export function ackSteer(
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (stepRow === undefined || stepRow.machineId !== machine.id) return { ok: true };
   if (isChiefConversation(stepRow.buildId)) {
-    if (stepRow.status === 'claimed') ackChiefSteer(deps, machine.teamId, stepRow);
+    if (stepRow.status === 'claimed') ackChiefSteer(deps, machine.teamId, stepRow, body.messageIds);
   } else if (body.answerIds !== undefined && body.answerIds.length > 0) {
     markDelivered(deps, stepRow.buildId, body.answerIds, body.via ?? 'steer', stepId);
   }

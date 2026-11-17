@@ -483,7 +483,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const row = me(c);
     const stepId = c.req.query('stepId');
     if (!stepId) throw new HttpError(400, 'stepId required');
-    return c.json(fetchSteer({ db: ctx.db }, row, stepId));
+    return c.json(
+      fetchSteer({ db: ctx.db }, row, stepId, { batches: c.req.query('batches') === '1' }),
+    );
   });
 
   app.post('/api/machine/steer/ack', async (c) => {
