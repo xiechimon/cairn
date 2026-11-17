@@ -3,6 +3,7 @@ import {
   ACTIVE_STEP_STATUSES,
   CHIEF_TURN_ERROR_KIND,
   formatSkillRouteSection,
+  stripTurnContext,
   suggestSkillsForMessage,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
@@ -39,6 +40,7 @@ import {
   upsertChiefRow,
 } from './machine-deps.js';
 import { injectMemoryDocuments } from './memory.js';
+import { recallMemorySection } from './memory-recall.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContextTraced } from './project-instructions.js';
 import { scanLocalSkills } from './skills.js';
@@ -195,12 +197,27 @@ export function chiefTurnContext(
         projectId: stepScopeProjectId(stepRow),
         threadId: threadRow.id,
       });
-  const sections = [project?.text, routeSection].filter((part): part is string => !!part);
+  const recall =
+    ctx && trigger === 'user' && agentId !== null
+      ? recallMemorySection(
+          deps.db,
+          { agentId, teamId: threadRow.teamId, threadId: threadRow.id },
+          stripTurnContext(stepRow.prompt ?? ''),
+          [
+            ...injected.memories.map((memory) => `${memory.title}\n${memory.content}`),
+            ...(project === null ? [] : [project.text]),
+          ],
+        )
+      : null;
+  const sections = [project?.text, routeSection, recall?.text ?? ''].filter(
+    (part): part is string => !!part,
+  );
   const memoryTrace = {
     teamMemoryIds: ctx?.memoryIds ?? [],
     teamMemoriesOmitted: ctx?.memoriesOmitted ?? 0,
     projectMemoryIds: project?.memoryIds ?? [],
     projectMemoriesOmitted: project?.memoriesOmitted ?? 0,
+    recalledMemoryIds: recall?.memoryIds ?? [],
   };
   const instruction =
     stepRow.prompt === null
