@@ -22,6 +22,7 @@ import type { TFunc } from '../i18n/translate.js';
 import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
 import { inlineSegments } from '../lib/markdown.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS, TaskCard } from './chat-markdown.js';
+import { failFactsText } from './fail-facts.js';
 import { Segments } from './segments.js';
 import { shouldExpandLastWork } from './work-expansion.js';
 import { WorkTrace } from './work-trace.js';
@@ -605,18 +606,7 @@ function FailRow({
   const [rawOpen, setRawOpen] = useState(false);
   const title =
     item.facts === undefined ? item.title : t('本步异常结束：{reason}', { reason: item.title });
-  const facts =
-    item.facts === undefined
-      ? ''
-      : [
-          item.facts.files !== null ? t('改动 {n} 个文件', { n: item.facts.files }) : null,
-          item.facts.commits.length > 0
-            ? t('提交 {shas}', { shas: item.facts.commits.join(', ') })
-            : null,
-          item.facts.pr !== null ? t('PR #{n}', { n: item.facts.pr }) : t('未开 PR'),
-        ]
-          .filter((part): part is string => part !== null)
-          .join(' · ');
+  const facts = failFactsText(item.facts, t);
   const copy = [title, item.body === '' ? '' : t(item.body), facts]
     .filter((part) => part !== '')
     .join('\n');
@@ -636,7 +626,7 @@ function FailRow({
           )}
           {item.title !== '' && (
             <p
-              className={`${PARA} ${PARA_GAP} flex flex-wrap items-center gap-3 text-meta text-(--text-tertiary)`}
+              className={`${PARA} mt-1 flex flex-wrap items-center gap-x-3 text-meta text-(--text-tertiary)`}
             >
               {facts !== '' && <span>{facts}</span>}
               <Button

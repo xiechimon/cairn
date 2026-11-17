@@ -135,7 +135,6 @@ export const EN: Record<string, string> = {
   改动没加载出来: 'The changes did not load',
   '提交 {shas}': 'Commit {shas}',
   'PR #{n}': 'PR #{n}',
-  '未开 PR': 'No PR',
   'git 凭据': 'git credentials',
   'integration：每步下发的 token': 'integration: a token issued for each step',
   'machine：执行机本机的 git 凭据': "machine: the Runner's own git credentials",
