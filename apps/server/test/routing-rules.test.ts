@@ -220,6 +220,54 @@ describe('profileForStep: the session rule supplies the model and machine', () =
   });
 });
 
+describe('project task model: overrides the session rule for one project', () => {
+  test('the project choice replaces model and thinking for its tasks only, review keeps its rule, and null clears it', async () => {
+    const w = await setupWorld();
+    const ruleId = sessionRule(w.s, { machineId: w.machineId });
+    seedRoute(w.s, 'review', { provider: 'review-provider', modelId: 'review-model' });
+    const otherProjectId = await postProject(w.s.app, 'route-proj-other');
+    const choice = { provider: 'project-provider', modelId: 'project-model', thinkingLevel: 'low' };
+    const patched = await req(w.s.app, 'PATCH', `/api/projects/${w.projectId}`, {
+      modelOverrides: { session: choice },
+    });
+    expect(patched.status).toBe(200);
+    expect(((await patched.json()) as { modelOverrides?: unknown }).modelOverrides).toEqual({
+      session: choice,
+    });
+    const todoRow = await buildTodo(w);
+    const profile = profileForStep(w.s.db, todoRow, 'build');
+    expect(profile).toMatchObject({
+      id: ruleId,
+      provider: 'project-provider',
+      modelId: 'project-model',
+      thinkingLevel: 'low',
+      machineId: w.machineId,
+    });
+    expect(profileForStep(w.s.db, todoRow, 'review')?.modelId).toBe('review-model');
+    expect(
+      routeForStep(w.s.db, { teamId: w.s.team.id, projectId: otherProjectId }, 'build')?.modelId,
+    ).toBe('rule-model');
+    expect((await claim(w))?.agent?.modelId).toBe('project-model');
+    const cleared = await req(w.s.app, 'PATCH', `/api/projects/${w.projectId}`, {
+      modelOverrides: { session: null },
+    });
+    expect(cleared.status).toBe(200);
+    expect('modelOverrides' in ((await cleared.json()) as object)).toBe(false);
+    expect(profileForStep(w.s.db, todoRow, 'build')?.modelId).toBe('rule-model');
+  });
+
+  test('without a team session rule the project choice still routes its tasks', async () => {
+    const w = await setupWorld();
+    await req(w.s.app, 'PATCH', `/api/projects/${w.projectId}`, {
+      modelOverrides: {
+        session: { provider: 'project-provider', modelId: 'project-model', thinkingLevel: null },
+      },
+    });
+    const todoRow = await buildTodo(w);
+    expect(routeForStep(w.s.db, todoRow, 'session')?.modelId).toBe('project-model');
+  });
+});
+
 describe('D71 the session rule carries the hard constraints', () => {
   test('the rule constraints are the step constraints', async () => {
     const w = await setupWorld();

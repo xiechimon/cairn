@@ -220,6 +220,7 @@ export async function mockLive(
     if (p === '/api/teams') return json([TEAM]);
     if (p === '/api/user/me') return json(USER);
     if (p === '/api/teams/t1/notifications') return json({ unreadThreadIds: [] });
+    if (p === '/api/teams/t1/routing-settings') return json({ rules: [], policies: [] });
     if (p === '/api/teams/t1/chief/threads' && request.method() === 'POST') {
       const content = (request.postDataJSON() as { content: string }).content;
       sent.push(content);

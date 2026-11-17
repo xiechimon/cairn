@@ -9,7 +9,7 @@ import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-
 import { coordinatorRoute } from '../src/services/coordinator-route.js';
 import { resolveChiefStepCredentials } from '../src/services/credentials.js';
 import { createProvider } from '../src/services/providers.js';
-import { bootServer, issueApiKey, seedRoute, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, postProject, seedRoute, type TestServer } from './helpers.js';
 
 const BYOK_KEY = 'sk-ant-api-test-byok';
 
@@ -342,6 +342,32 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
     });
     const deps = { db: w.s.db, box: w.s.secretBox };
     expect(coordinatorProviders(deps, w.teamId)?.summary.provider).toBe('anthropic');
+    setCoordinatorServerContextEnabled(false);
+  });
+  test('a project Coordinator model drives its own channel, and a removed provider falls back to the team model', async () => {
+    const w = await world();
+    setCoordinatorServerContextEnabled(true);
+    addKeyless(w, 'local-llm', 'team-model');
+    addAnthropicKey(w);
+    const projectId = await postProject(w.s.app, 'route-project');
+    const setChoice = (provider: string) =>
+      call(w.s.app, 'PATCH', `/api/projects/${projectId}`, {
+        body: {
+          modelOverrides: {
+            coordinator: { provider, modelId: 'claude-haiku-5-5', thinkingLevel: 'low' },
+          },
+        },
+      });
+    expect((await setChoice('anthropic')).status).toBe(200);
+    const deps = { db: w.s.db, box: w.s.secretBox };
+    expect(coordinatorProviders(deps, w.teamId, projectId)?.router).toMatchObject({
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+      thinkingLevel: 'low',
+    });
+    expect(coordinatorRoute(w.s.db, w.teamId)?.modelId).toBe('team-model');
+    expect((await setChoice('removed-provider')).status).toBe(200);
+    expect(coordinatorRoute(w.s.db, w.teamId, projectId)?.modelId).toBe('team-model');
     setCoordinatorServerContextEnabled(false);
   });
   test('coordinatorRoute: a keyless custom endpoint drives the Coordinator with no key', async () => {

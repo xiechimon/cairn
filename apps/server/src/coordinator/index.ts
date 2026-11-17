@@ -118,7 +118,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     const teamId = row === undefined ? null : threadTeam(row.buildId);
     if (teamId === null)
       return { ...body, errorMessage: String(redactSecrets(body.errorMessage).value) };
-    const providers = coordinatorProviders({ db, box: machine.box }, teamId);
+    const providers = coordinatorProviders(
+      { db, box: machine.box },
+      teamId,
+      row === undefined ? null : threadProject(row.buildId),
+    );
     const ids = [providers?.router.provider, providers?.summary.provider].filter(
       (id): id is string => id !== undefined,
     );
@@ -151,6 +155,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       .from(chiefThread)
       .where(eq(chiefThread.id, threadId))
       .get()?.teamId ?? null;
+
+  const threadProject = (threadId: string): string | null =>
+    db
+      .select({ projectId: chiefThread.projectId })
+      .from(chiefThread)
+      .where(eq(chiefThread.id, threadId))
+      .get()?.projectId ?? null;
 
   const liveSteps = (threadId: string) =>
     db
@@ -193,7 +204,9 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       seed: async () => {
         const teamId = threadTeam(threadId);
         const providers =
-          teamId === null ? null : coordinatorProviders({ db, box: machine.box }, teamId);
+          teamId === null
+            ? null
+            : coordinatorProviders({ db, box: machine.box }, teamId, threadProject(threadId));
         const watermark = parseWatermark(row?.lastMirroredEntryId ?? null);
         const pendingUsers = new Set(
           live.flatMap((r) => [r.id, transcriptPromptRowId(r.id), ...(r.ownerMessageIds ?? [])]),
@@ -293,7 +306,9 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       providersFor: (threadId) => {
         const teamId = threadTeam(threadId);
         const providers =
-          teamId === null ? null : coordinatorProviders({ db, box: machine.box }, teamId);
+          teamId === null
+            ? null
+            : coordinatorProviders({ db, box: machine.box }, teamId, threadProject(threadId));
         if (providers === null || teamId === null) return [];
         return [binding(teamId, providers.router), binding(teamId, providers.summary)];
       },
@@ -342,7 +357,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     scrub: (threadId, message) => {
       const teamId = threadTeam(threadId);
       if (teamId === null) return message;
-      const providers = coordinatorProviders({ db, box: machine.box }, teamId);
+      const providers = coordinatorProviders(
+        { db, box: machine.box },
+        teamId,
+        threadProject(threadId),
+      );
       const keyed = [providers?.router.provider, providers?.summary.provider].filter(
         (id): id is string => id !== undefined,
       );
@@ -609,7 +628,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   const runStep = async (row: StepRow): Promise<void> => {
     const teamId = threadTeam(row.buildId);
     if (teamId === null) return;
-    const providers = coordinatorProviders({ db, box: machine.box }, teamId);
+    const providers = coordinatorProviders(
+      { db, box: machine.box },
+      teamId,
+      threadProject(row.buildId),
+    );
     const keyed = [providers?.router.provider, providers?.summary.provider].filter(
       (id): id is string => id !== undefined,
     );

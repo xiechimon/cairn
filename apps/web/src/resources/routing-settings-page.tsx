@@ -63,6 +63,8 @@ const EMPTY_SETTINGS: TeamRoutingSettings = { rules: [], policies: [] };
 const modelKey = (option: Pick<ModelOption, 'provider' | 'modelId'>) =>
   JSON.stringify([option.provider, option.modelId]);
 
+const FOLLOW_DEFAULT = 'follow-default';
+
 const levelLabel = (level: string) => level.charAt(0).toUpperCase() + level.slice(1);
 
 function SessionDefaultHint({
@@ -135,6 +137,7 @@ export function ModelPicker({
   enabledRuntimes,
   onPick,
   trigger,
+  followDefault,
 }: {
   use: RouteUse;
   rule: RuleModel | null;
@@ -142,6 +145,7 @@ export function ModelPicker({
   enabledRuntimes: ReadonlySet<string> | null;
   onPick: (option: ModelOption) => void;
   trigger?: { label: string; className: string };
+  followDefault?: { label: string; detail: string | null; onPick: () => void };
 }) {
   const { t } = useI18n();
   const picked = currentOption(rule, options);
@@ -164,17 +168,32 @@ export function ModelPicker({
         : modelGroupName(o);
   return (
     <FilterPicker
-      options={rows.map((o) => ({
-        value: modelKey(o),
-        label: o.liveness === 'dead' ? `${o.modelName}（${t('已下架')}）` : o.modelName,
-        detail: modelGroupName(o),
-        group: modelGroupKey(o),
-        groupLabel: groupLabel(o),
-        disabled: o.liveness === 'dead' || runtimeOff(o.runtime),
-        keywords: `${o.modelId} ${o.runtime}`,
-      }))}
-      value={picked === undefined ? null : modelKey(picked)}
+      options={[
+        ...(followDefault === undefined
+          ? []
+          : [{ value: FOLLOW_DEFAULT, label: followDefault.label, group: FOLLOW_DEFAULT }]),
+        ...rows.map((o) => ({
+          value: modelKey(o),
+          label: o.liveness === 'dead' ? `${o.modelName}（${t('已下架')}）` : o.modelName,
+          detail: modelGroupName(o),
+          group: modelGroupKey(o),
+          groupLabel: groupLabel(o),
+          disabled: o.liveness === 'dead' || runtimeOff(o.runtime),
+          keywords: `${o.modelId} ${o.runtime}`,
+        })),
+      ]}
+      value={
+        picked !== undefined
+          ? modelKey(picked)
+          : followDefault !== undefined && rule === null
+            ? FOLLOW_DEFAULT
+            : null
+      }
       onPick={(key) => {
+        if (key === FOLLOW_DEFAULT) {
+          followDefault?.onPick();
+          return;
+        }
         const option = byKey.get(key);
         if (option !== undefined) onPick(option);
       }}
@@ -193,6 +212,15 @@ export function ModelPicker({
       triggerContent={
         trigger !== undefined ? (
           trigger.label
+        ) : followDefault !== undefined && rule === null ? (
+          <>
+            <span className="flex-none truncate">{followDefault.label}</span>
+            {followDefault.detail !== null && (
+              <span className="min-w-0 truncate text-meta text-content-tertiary">
+                {followDefault.detail}
+              </span>
+            )}
+          </>
         ) : shownId === '' ? (
           t('未设置模型')
         ) : (
@@ -219,7 +247,7 @@ export function ModelPicker({
   );
 }
 
-function RuleRow({
+export function RuleRow({
   use,
   label,
   hint,
@@ -227,11 +255,13 @@ function RuleRow({
   options,
   enabledRuntimes,
   onSave,
+  followDefault,
+  testId,
 }: {
   use: RouteUse;
   label: string;
   hint: ReactNode;
-  rule: RoutingRuleRecord | null;
+  rule: (RuleModel & Partial<Pick<RoutingRuleRecord, 'thinkingLevel'>>) | null;
   options: ModelOption[];
   enabledRuntimes: ReadonlySet<string> | null;
   onSave: (body: {
@@ -239,6 +269,8 @@ function RuleRow({
     modelId: string;
     thinkingLevel: ThinkingLevel | null;
   }) => void;
+  followDefault?: { label: string; detail: string | null; onPick: () => void };
+  testId?: string;
 }) {
   const { t } = useI18n();
   const devinPicked = currentOption(rule, options)?.runtime === 'devin';
@@ -247,8 +279,8 @@ function RuleRow({
     : ((rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off');
   return (
     <div
-      id={`route-${use}`}
-      data-testid={rule === null ? `routing-rule-new-${use}` : `routing-rule-${use}`}
+      id={testId === undefined ? `route-${use}` : undefined}
+      data-testid={testId ?? (rule === null ? `routing-rule-new-${use}` : `routing-rule-${use}`)}
     >
       <SettingsRow
         label={label}
@@ -257,7 +289,7 @@ function RuleRow({
         hintClassName="text-pretty break-keep"
       >
         <div className="flex items-center justify-end gap-1.5 max-sm:w-full max-sm:justify-start">
-          {!devinPicked && (
+          {!devinPicked && (followDefault === undefined || rule !== null) && (
             <Select
               value={level}
               disabled={rule === null}
@@ -290,6 +322,7 @@ function RuleRow({
             rule={rule}
             options={options}
             enabledRuntimes={enabledRuntimes}
+            {...(followDefault !== undefined ? { followDefault } : {})}
             onPick={(option) =>
               onSave({
                 provider: option.provider,

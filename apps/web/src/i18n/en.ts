@@ -298,12 +298,6 @@ export const EN: Record<string, string> = {
   已暂停: 'Paused',
   全团队: 'Whole team',
   '仅 {name}': 'Only {name}',
-  并发与优先级: 'Concurrency and priority',
-  '不限（跟随执行机上限）': 'No limit (Runner limits apply)',
-  '串行，一次一个': 'Serial, one at a time',
-  '最多 {n} 个': 'Up to {n}',
-  '本项目同时运行的对话上限。你发的消息会插队，并可多用一个位置。':
-    'How many threads in this project run at once. Your own messages go first and may use one extra slot.',
   项目说明: 'Instructions',
   定时任务: 'Schedules',
   没有定时任务: 'No schedules',
@@ -536,7 +530,6 @@ export const EN: Record<string, string> = {
   由定时发起: 'Started by schedule',
   收起: 'Collapse',
   // #933: the collapsed tool group's identity label (transcript action row).
-  尚无描述: 'No description yet',
 
   账号: 'Account',
   'API 密钥': 'API keys',
@@ -896,9 +889,7 @@ export const EN: Record<string, string> = {
   选择: 'Select',
   'git 仓库': 'Git repository',
   '目录条目过多，只列出前 {n} 条': 'Too many entries — showing the first {n}',
-  基本信息: 'Basic info',
   标签: 'Tags',
-  'Cairn 托管': 'Cairn hosted',
   '没有仓库，可让 Coordinator 连接': 'No repository yet; the Coordinator can connect one',
   目标分支: 'Target branch',
   '{branch}（默认）': '{branch} (default)',
@@ -913,15 +904,11 @@ export const EN: Record<string, string> = {
   没有匹配的图标: 'No matching icons',
   图标: 'Icon',
   重置图标: 'Reset icon',
-  保存描述: 'Save description',
-  '描述保存失败，请重试。': 'Failed to save description. Try again.',
   保存仓库: 'Save repository',
   '仓库保存失败，请重试。': 'Failed to save repository. Try again.',
   // #1491 project settings: background autonomy gates card
   后台自动任务: 'Background tasks',
   允许后台自动开跑: 'Allow background runs',
-  'issue 进料、园丁等后台任务开一轮前先过这道闸；下面的分钟数或预算填 0 = 关掉那一道。':
-    'Issue intake, the gardener and other background tasks check these gates before each run; set a number to 0 to turn that gate off.',
   '有人在用时让路（分钟）': 'Yield while someone is active (minutes)',
   '同类任务冷却（分钟）': 'Cooldown between runs (minutes)',
   '每日预算（USD）': 'Daily budget (USD)',
@@ -929,8 +916,6 @@ export const EN: Record<string, string> = {
   读不到: 'Unavailable',
   保存后台自动任务设置: 'Save background task settings',
   'issue 进料': 'Issue intake',
-  园丁: 'Gardener',
-  自治合并: 'Auto-merge',
   排期扫票: 'Schedule sweep',
   还没判过: 'Not checked yet',
   最近一次放行: 'Last check: allowed',
@@ -949,13 +934,10 @@ export const EN: Record<string, string> = {
   'GitHub 仓库（owner/repo）': 'GitHub repository (owner/repo)',
   'GitHub 仓库格式应为 owner/repo。': 'GitHub repository must be in owner/repo form.',
   转换: 'Convert',
-  危险操作: 'Danger zone',
   删除项目: 'Delete project',
   // #1174：删除卡文案列真级联（正本 = server services/projects.ts 清图序：
   // step/build → schedule → tag → todo → 托管 bare repo 磁盘面；技能不入库
   // 亦不按项目授权，不在级联）。
-  '删除项目将级联删除其下所有任务、构建历史、定时任务、标签与托管仓库文件，此操作不可恢复。':
-    'Deleting the project cascade-deletes all its tasks, build history, schedules, tags, and hosted repository files. This cannot be undone.',
   // #207 确认弹层(r2 24d): 标题镜像删除任务句,确认输入行 {name} = 项目名。
   '确定删除该项目？此操作不可撤销。': 'Delete this project? This cannot be undone.',
   '输入 {name} 以确认删除': 'Type {name} to confirm deletion.',
@@ -2502,4 +2484,23 @@ export const EN: Record<string, string> = {
   '二维码获取失败，请重新扫码。': 'Could not get a QR code. Try again.',
   重新扫码: 'Scan again',
   '微信登录失败，请重试。': 'Could not start WeChat sign-in. Try again.',
+  想做什么: 'What do you want to work on?',
+  '可选。写下这个项目的目标，Coordinator 拆任务时会参考。':
+    'Optional. Write down what this project is for; the Coordinator uses it when it splits work into tasks.',
+  保存想做什么: 'Save the goal',
+  '改一下这个项目的记忆：{text}': "Update this project's memory: {text}",
+  '没有发出去，请重试。': 'It was not sent. Try again.',
+  '让 agent 改记忆': 'Ask the agent to change memory',
+  '告诉 agent 记住什么，例如：周四晚上 8 点发 B 站':
+    'Tell the agent what to remember, such as: post on Bilibili Thursdays at 8 pm',
+  '告诉 agent 怎么改，例如：发布时间改成周二':
+    'Tell the agent what to change, such as: move posting day to Tuesday',
+  '已改 {title}': 'Updated {title}',
+  'Coordinator 正在改记忆…': 'The Coordinator is updating memory…',
+  '已交给 Coordinator，改完会出现在上面。':
+    'Sent to the Coordinator. The change shows up above when it is done.',
+  通用: 'General',
+  跟随团队默认: 'Team default',
+  名称和图标: 'Name and icon',
+  归档项目: 'Archive project',
 };

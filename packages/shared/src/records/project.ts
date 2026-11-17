@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { thinkingLevelSchema } from '../agent-backend.js';
 import { epochMs, recordId } from './common.js';
 import { mergePolicySchema } from './merge-gate.js';
 import { workerBriefTextSchema } from './worker-brief-text.js';
@@ -53,6 +54,22 @@ export const PROJECT_COLORS = ['moss', 'amber', 'slate', 'plum', 'teal', 'rose',
 export const projectColorSchema = z.enum(PROJECT_COLORS);
 export type ProjectColor = z.infer<typeof projectColorSchema>;
 
+export const PROJECT_GOAL_MAX = 8_000;
+
+export const projectModelChoiceSchema = z.object({
+  provider: z.string().min(1),
+  modelId: z.string().min(1),
+  thinkingLevel: thinkingLevelSchema.nullable(),
+});
+export type ProjectModelChoice = z.infer<typeof projectModelChoiceSchema>;
+
+export const projectModelOverridesSchema = z.object({
+  coordinator: projectModelChoiceSchema.optional(),
+  session: projectModelChoiceSchema.optional(),
+});
+export type ProjectModelOverrides = z.infer<typeof projectModelOverridesSchema>;
+export type ProjectModelUse = keyof ProjectModelOverrides;
+
 export const projectRecordSchema = z.object({
   id: recordId,
   name: z.string(),
@@ -71,6 +88,7 @@ export const projectRecordSchema = z.object({
   icon: projectIconSchema.nullable().optional(),
   color: projectColorSchema.nullable().optional(),
   archivedAt: epochMs.nullable().optional(),
+  modelOverrides: projectModelOverridesSchema.optional(),
   mergePolicy: mergePolicySchema.optional(),
   localChecks: z.array(z.string().min(1)).optional(),
   requireUpToDate: z.boolean().optional(),
@@ -133,8 +151,15 @@ export const patchProjectBodySchema = z
     group: z.string().trim().min(1).nullable().optional(),
     splitPolicy: splitPolicySchema.optional(),
     evidenceStore: evidenceStoreSchema.optional(),
-    description: z.string().nullish(),
+    description: z.string().max(PROJECT_GOAL_MAX).nullish(),
     instructions: workerBriefTextSchema.nullish(),
+    modelOverrides: z
+      .object({
+        coordinator: projectModelChoiceSchema.nullable().optional(),
+        session: projectModelChoiceSchema.nullable().optional(),
+      })
+      .strict()
+      .optional(),
     maxConcurrent: z.number().int().min(1).max(PROJECT_MAX_CONCURRENT).nullable().optional(),
     repoKind: projectRepoKindSchema.optional(),
     githubRepo: z.string().optional(),

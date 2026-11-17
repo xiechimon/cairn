@@ -423,16 +423,10 @@ export const AUTONOMY: AutonomyRecord = {
       lastEvaluatedAt: NOW - 5 * MIN,
     },
     {
-      kind: 'gardener',
+      kind: 'scheduling',
       lastStartedAt: null,
       lastBlockedReason: 'member-active',
       lastEvaluatedAt: NOW - 9 * MIN,
-    },
-    {
-      kind: 'auto-merge',
-      lastStartedAt: null,
-      lastBlockedReason: 'budget',
-      lastEvaluatedAt: NOW - 2 * MIN,
     },
   ],
 };

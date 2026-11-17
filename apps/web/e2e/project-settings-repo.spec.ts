@@ -59,7 +59,7 @@ test('settings: github project can retarget its repo; save writes githubRepo and
   page,
 }) => {
   const stub = await stubWorld(page, [githubProject('octo/pacman')]);
-  await page.goto(`/app/project/${PROJECT_ID}/settings?tab=repo`);
+  await page.goto(`/app/project/${PROJECT_ID}/settings`);
 
   const input = page.getByRole('textbox', { name: FIELD });
   await expect(input).toBeVisible();
@@ -79,7 +79,7 @@ test('settings: github project can retarget its repo; save writes githubRepo and
 
 test('settings: a malformed repo shows an inline error and sends no PATCH', async ({ page }) => {
   const stub = await stubWorld(page, [githubProject('octo/pacman')]);
-  await page.goto(`/app/project/${PROJECT_ID}/settings?tab=repo`);
+  await page.goto(`/app/project/${PROJECT_ID}/settings`);
 
   const input = page.getByRole('textbox', { name: FIELD });
   await input.fill('no-slash');
@@ -99,23 +99,23 @@ test('settings: hosted project keeps the read-only repo row (github-only edit)',
       githubRepo: null,
     },
   ]);
-  await page.goto(`/app/project/${HOSTED_PROJECT_ID}/settings?tab=repo`);
+  await page.goto(`/app/project/${HOSTED_PROJECT_ID}/settings`);
   await expect(page.getByText('目标分支', { exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: FIELD })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '保存仓库' })).toHaveCount(0);
 });
 
-test('settings: a project without a repository has no Repository tab; ?tab=repo opens the basics', async ({
+test('settings: a project without a repository says so in one row and has only the 通用 and 记忆 sections', async ({
   page,
 }) => {
   await stubWorld(page, [{ id: PROJECT_ID, name: 'plain-probe', teamId: TEAM_ID, githubRepo: null }]);
   await page.goto(`/app/project/${PROJECT_ID}/settings?tab=repo`);
-  await expect(page.getByRole('tab', { name: '基本信息', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
+  const nav = page.getByRole('navigation', { name: '设置分区' });
+  await expect(nav.getByRole('link', { name: '通用', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
   );
-  await expect(page.getByRole('tab', { name: '记忆', exact: true })).toBeVisible();
-  await expect(page.getByRole('tab', { name: '仓库', exact: true })).toHaveCount(0);
+  await expect(nav.getByRole('link')).toHaveText(['通用', '记忆']);
   await expect(page.getByText('目标分支', { exact: true })).toHaveCount(0);
   await expect(page.getByText('没有仓库，可让 Coordinator 连接')).toBeVisible();
 });

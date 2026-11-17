@@ -45,7 +45,7 @@ export function SettingsHeader({
   titleClassName,
 }: SettingsHeaderProps) {
   return (
-    <div className={cn('settings-header flex min-h-14 items-center gap-4 px-1', className)}>
+    <div className={cn('flex min-h-14 items-center gap-4 px-1', className)}>
       {avatar != null && (
         <span
           className={cn(

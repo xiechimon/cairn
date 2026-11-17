@@ -212,10 +212,15 @@ test('project settings has a 记忆 tab laid out like the Claude Code project me
   await evidenceShot(page, 'project-memory.png');
 });
 
-test('the project settings basic tab no longer carries the instructions editor', async ({ page }) => {
+test('the project settings general section does not carry the instructions editor', async ({
+  page,
+}) => {
   await mockMemory(page);
   await page.goto('/app/project/p-notes/settings');
-  await expect(page.getByRole('tab', { name: '基本信息' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('link', { name: '通用', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
   await expect(page.getByTestId('project-instructions-input')).toHaveCount(0);
   await expect(page.getByTestId('memory-list')).toHaveCount(0);
 });
@@ -432,8 +437,8 @@ test('saved instructions survive a failed projects refresh and a tab remount', a
   await failed;
   await expect(input).toHaveValue('保存后仍然显示。');
   await expect(page.getByRole('button', { name: '保存项目说明' })).toBeDisabled();
-  await page.getByRole('tab', { name: '基本信息' }).click();
-  await page.getByRole('tab', { name: '记忆' }).click();
+  await page.getByRole('link', { name: '通用', exact: true }).click();
+  await page.getByRole('link', { name: '记忆', exact: true }).click();
   await expect(input).toHaveValue('保存后仍然显示。');
 });
 

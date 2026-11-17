@@ -207,15 +207,11 @@ test('the schedules tab scrolls to its last row and the new schedule button (#10
 test('project settings page scrolls to the bottom (#1032)', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 360 });
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c');
-  const danger = page.getByText('危险操作');
-  await expect(danger).toBeAttached();
-  const firstPanel = page.locator('.prj-set-avatar');
+  const archive = page.getByTestId('project-archive');
+  await expect(archive).toBeAttached();
+  const firstPanel = page.getByTestId('project-icon-trigger');
   await expect(firstPanel).toBeVisible();
-  await expectScrollerReachesBottom(
-    page,
-    firstPanel,
-    page.getByRole('button', { name: '删除', exact: true }),
-  );
+  await expectScrollerReachesBottom(page, firstPanel, archive);
 });
 
 test('new project page scrolls to the bottom (#1032)', async ({ page }) => {

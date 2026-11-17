@@ -77,76 +77,65 @@ function applyPatch(p: WireProject, body: Record<string, unknown>): WireProject 
   return next;
 }
 
-const NAME_FIELD = '名称';
-const DESC_FIELD = '描述';
+const NAME_FIELD = '项目名称';
+const GOAL_FIELD = '想做什么';
 
-test('settings: name and description edits reach PATCH; description clear writes explicit null', async ({
+test('settings: name and goal edits reach PATCH; clearing the goal writes explicit null', async ({
   page,
 }) => {
   const stub = await stubWorld(page, [localProject()]);
   await page.goto(`/app/project/${LOCAL_PROJECT_ID}/settings`);
 
-  const header = page.locator('.settings-header');
-  await expect(page.locator('.prj-set-card').getByText(NAME_FIELD, { exact: true })).toHaveCount(0);
-  await header.getByRole('button', { name: '编辑名称' }).click();
-  const nameInput = header.getByRole('textbox', { name: NAME_FIELD });
+  const nameInput = page.getByRole('textbox', { name: NAME_FIELD });
   await expect(nameInput).toHaveValue('cairn-local');
-
   await nameInput.fill('cairn-main');
   const refetched = page.waitForResponse(
     (r) => r.url().includes('/api/projects') && r.request().method() === 'GET',
   );
-  await header.getByRole('button', { name: '保存', exact: true }).click();
+  await nameInput.press('Enter');
   await refetched;
   expect(stub.patches[0]?.body).toEqual({ name: 'cairn-main' });
+  await expect(nameInput).toHaveValue('cairn-main');
 
-  await expect(header.getByRole('heading', { name: 'cairn-main' })).toBeVisible();
-
-  const descInput = page.getByRole('textbox', { name: DESC_FIELD });
-  await expect(descInput).toHaveValue('');
-  await descInput.fill('迁移期的主项目');
-
-  const descRefetched = page.waitForResponse(
+  const goalInput = page.getByRole('textbox', { name: GOAL_FIELD });
+  await expect(goalInput).toHaveValue('');
+  await goalInput.fill('迁移期的主项目');
+  const goalRefetched = page.waitForResponse(
     (r) => r.url().includes('/api/projects') && r.request().method() === 'GET',
   );
-  await page.getByRole('button', { name: '保存描述' }).click();
-  await descRefetched;
-  await expect(descInput).toHaveValue('迁移期的主项目');
+  await page.getByRole('button', { name: '保存想做什么' }).click();
+  await goalRefetched;
+  await expect(goalInput).toHaveValue('迁移期的主项目');
   await expect.poll(() => stub.patches.length).toBe(2);
   expect(stub.patches[1]?.body).toEqual({ description: '迁移期的主项目' });
 
-  await descInput.fill('');
-  await page.getByRole('button', { name: '保存描述' }).click();
+  await goalInput.fill('');
+  await page.getByRole('button', { name: '保存想做什么' }).click();
   await expect.poll(() => stub.patches.length).toBe(3);
   expect(stub.patches[2]?.raw).toContain('"description":null');
 });
 
-test('settings: Escape in the rename field cancels the edit and keeps the dialog open', async ({
+test('settings: Escape in the name field drops the edit and keeps the dialog open', async ({
   page,
 }) => {
-  await stubWorld(page, [localProject()]);
+  const stub = await stubWorld(page, [localProject()]);
   await page.goto(`/app/project/${LOCAL_PROJECT_ID}/settings`);
-  const header = page.locator('.settings-header');
-  await header.getByRole('button', { name: '编辑名称' }).click();
-  const input = header.getByRole('textbox', { name: NAME_FIELD });
+  const input = page.getByRole('textbox', { name: NAME_FIELD });
   await input.fill('half-typed');
   await input.press('Escape');
-  await expect(input).toHaveCount(0);
-  await expect(header.getByRole('heading', { name: 'cairn-local' })).toBeVisible();
+  await expect(input).toHaveValue('cairn-local');
   await expect(page.getByRole('dialog', { name: '项目设置' })).toBeVisible();
-  await expect(header.getByRole('button', { name: '编辑名称' })).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: '项目设置' })).toHaveCount(0);
+  await input.blur();
+  expect(stub.patches).toHaveLength(0);
 });
 
 test('settings: identity save failure is visible (toast, not silent)', async ({ page }) => {
   await stubWorld(page, [localProject()], true);
   await page.goto(`/app/project/${LOCAL_PROJECT_ID}/settings`);
 
-  const header = page.locator('.settings-header');
-  await header.getByRole('button', { name: '编辑名称' }).click();
-  await header.getByRole('textbox', { name: NAME_FIELD }).fill('改名失败可见');
-  await header.getByRole('button', { name: '保存', exact: true }).click();
+  const input = page.getByRole('textbox', { name: NAME_FIELD });
+  await input.fill('改名失败可见');
+  await input.press('Enter');
 
   const toast = page.getByText('保存失败，请重试。');
   await expect(toast).toBeVisible();
@@ -156,7 +145,7 @@ test('settings: local project shows conversion card; submit carries repoKind/git
   page,
 }) => {
   const stub = await stubWorld(page, [localProject()]);
-  await page.goto(`/app/project/${LOCAL_PROJECT_ID}/settings?tab=repo`);
+  await page.goto(`/app/project/${LOCAL_PROJECT_ID}/settings`);
 
   const card = page.getByText('转换为 GitHub 形态', { exact: true });
   await expect(card).toBeVisible();
@@ -200,6 +189,6 @@ test('settings: non-local projects hide the conversion card', async ({ page }) =
     },
   ]);
   await page.goto(`/app/project/${GITHUB_PROJECT_ID}/settings`);
-  await expect(page.getByText('描述', { exact: true })).toBeVisible();
+  await expect(page.getByText('想做什么', { exact: true })).toBeVisible();
   await expect(page.getByText('转换为 GitHub 形态', { exact: true })).toHaveCount(0);
 });

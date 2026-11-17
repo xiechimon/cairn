@@ -2,7 +2,12 @@ import { and, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { provider, routingRule } from '../db/schema.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
-import { defaultCoordinatorRule, keylessEndpoint, resolveRuleProvider } from './routing-rules.js';
+import {
+  defaultCoordinatorRule,
+  keylessEndpoint,
+  projectModelChoice,
+  resolveRuleProvider,
+} from './routing-rules.js';
 
 const CLAUDE_CODE_PROVIDER = 'claude-code';
 
@@ -48,7 +53,20 @@ export function providerRefusal(
   return row.keyed === 1 || keylessEndpoint(providerId) ? null : 'rule-provider-has-no-key';
 }
 
-export function coordinatorRoute(db: Db, teamId: string): CoordinatorRule | null {
+export function coordinatorRoute(
+  db: Db,
+  teamId: string,
+  projectId: string | null = null,
+): CoordinatorRule | null {
   const verdict = coordinatorRouteVerdict(db, teamId);
-  return verdict === null || 'refusal' in verdict ? null : verdict.rule;
+  if (verdict === null || 'refusal' in verdict) return null;
+  const choice = projectModelChoice(db, projectId, 'coordinator');
+  if (
+    choice === null ||
+    choice.provider === CLAUDE_CODE_PROVIDER ||
+    providerRefusal(db, teamId, choice.provider) !== null
+  ) {
+    return verdict.rule;
+  }
+  return { ...verdict.rule, ...choice };
 }

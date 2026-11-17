@@ -12480,6 +12480,88 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
       ],
       "type": "string",
     },
+    "modelOverrides": {
+      "additionalProperties": false,
+      "properties": {
+        "coordinator": {
+          "additionalProperties": false,
+          "properties": {
+            "modelId": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "provider": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "thinkingLevel": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "off",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+          "required": [
+            "provider",
+            "modelId",
+            "thinkingLevel",
+          ],
+          "type": "object",
+        },
+        "session": {
+          "additionalProperties": false,
+          "properties": {
+            "modelId": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "provider": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "thinkingLevel": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "off",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+          "required": [
+            "provider",
+            "modelId",
+            "thinkingLevel",
+          ],
+          "type": "object",
+        },
+      },
+      "type": "object",
+    },
     "name": {
       "type": "string",
     },

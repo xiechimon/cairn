@@ -45,7 +45,11 @@ export function openResearchThread(
       buildId: existing.latestBuildId,
     };
   }
-  const route = routeForStep(deps.db, { teamId: input.teamId }, 'build');
+  const route = routeForStep(
+    deps.db,
+    { teamId: input.teamId, projectId: input.projectId },
+    'build',
+  );
   if (route === null) {
     throw new HttpError(409, 'Research needs a session routing rule, but this team has none.');
   }

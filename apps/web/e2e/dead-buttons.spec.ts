@@ -177,8 +177,7 @@ test('project settings drops the avatar `更换` ink (#307, supersedes the #177 
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c');
   await expect(page.locator('.prj-set-change')).toHaveCount(0);
 
-  await expect(page.locator('.prj-set-avatar')).toBeVisible();
-  await page.getByRole('tab', { name: '仓库', exact: true }).click();
+  await expect(page.getByTestId('project-icon-trigger')).toBeVisible();
   await expect(page.locator('span.prj-set-branch')).toBeVisible();
 });
 

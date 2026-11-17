@@ -11,7 +11,6 @@ import {
   bootServer,
   insertMachineIntoOldSchema,
   insertStepIntoOldSchema,
-  postProject,
   stepRowsRaw,
 } from './helpers.js';
 import { migrateAll, migrateUpTo } from './migrate-helpers.js';
@@ -26,7 +25,10 @@ test('an upgrade stops only active retired research steps and discards their lat
   migrateUpTo(sqlite, directory, '0175_step_usage');
   const s = bootServer({ db: drizzle(sqlite, { schema }) });
   onTestFinished(() => s.dispose());
-  const projectId = await postProject(s.app, 'research');
+  const projectId = 'research-project';
+  sqlite
+    .prepare('INSERT INTO project (id, name, teamId) VALUES (?, ?, ?)')
+    .run(projectId, 'research', s.team.id);
   const machineId = insertMachineIntoOldSchema(sqlite, s.team.id);
   const sources = ['research-intake', 'research-citation-check', 'research-stuck', null] as const;
   for (const [index, sourceKind] of sources.entries()) {

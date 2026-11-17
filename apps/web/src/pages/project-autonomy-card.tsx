@@ -21,8 +21,6 @@ const NUMBER_INPUT_CLS = `${FORM_CONTROL_CLS} w-24`;
 
 const KIND_LABELS: Record<AutonomyKind, string> = {
   'issue-intake': 'issue 进料',
-  gardener: '园丁',
-  'auto-merge': '自治合并',
   scheduling: '排期扫票',
 };
 
@@ -76,15 +74,9 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
   }
   const dirty = Object.keys(parsed).length > 0;
   return (
-    <section className="flex flex-col gap-2" aria-label={t('后台自动任务')}>
-      <h3 className="m-0 px-1 text-meta font-normal text-content-tertiary">{t('后台自动任务')}</h3>
+    <section aria-label={t('后台自动任务')}>
       <SettingsCard>
-        <SettingsRow
-          label={t('允许后台自动开跑')}
-          hint={t(
-            'issue 进料、园丁等后台任务开一轮前先过这道闸；下面的分钟数或预算填 0 = 关掉那一道。',
-          )}
-        >
+        <SettingsRow label={t('允许后台自动开跑')}>
           <ToggleSwitch
             aria-label={t('允许后台自动开跑')}
             checked={settings.enabled}

@@ -42,6 +42,7 @@ import type {
   ProjectColor,
   ProjectIcon,
   ProjectMergeConfig,
+  ProjectModelOverrides,
   ProjectRepoKind,
   ProviderApi,
   ProviderCompat,
@@ -147,6 +148,7 @@ export const project = sqliteTable('project', {
   icon: text('icon').$type<ProjectIcon>(),
   color: text('color').$type<ProjectColor>(),
   archivedAt: epochMs('archivedAt'),
+  modelOverrides: json<ProjectModelOverrides>('modelOverrides'),
   autonomy: json<
     (AutonomySettings & Partial<ProjectMergeConfig> & { shipRoute?: ShipRoute }) | null
   >('autonomy'),

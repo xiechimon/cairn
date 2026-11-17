@@ -52,8 +52,9 @@ export function routeOf(
 export function coordinatorProviders(
   deps: CredentialDeps,
   teamId: string,
+  projectId: string | null = null,
 ): CoordinatorProviders | null {
-  const rule = coordinatorRoute(deps.db, teamId);
+  const rule = coordinatorRoute(deps.db, teamId, projectId);
   if (rule === null) return null;
   const router = routeOf(deps, teamId, rule.provider, rule.modelId, rule.thinkingLevel ?? null);
   if (router === null) return null;

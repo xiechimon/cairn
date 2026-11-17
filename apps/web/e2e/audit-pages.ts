@@ -87,7 +87,7 @@ export const PAGES: AuditPage[] = [
   {
     name: 'project settings',
     url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c',
-    ready: (p) => p.locator('.prj-set-avatar'),
+    ready: (p) => p.getByTestId('project-icon-trigger'),
   },
   {
     name: 'machines',

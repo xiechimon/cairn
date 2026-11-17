@@ -7,6 +7,8 @@ import {
   type PatchWorkPolicyBody,
   type PolicyUse,
   PROVIDER_PRESET_IDS,
+  type ProjectModelChoice,
+  type ProjectModelUse,
   type RemoteToolDef,
   type RequiredCapabilities,
   ROUTE_USES,
@@ -29,6 +31,7 @@ import {
   build,
   chief,
   machine,
+  project,
   provider,
   routingRule,
   step,
@@ -66,6 +69,7 @@ export interface RouteProfile {
 
 export interface RoutedTodo {
   teamId: string;
+  projectId?: string | null;
   sourceKind?: TodoSourceKind | null;
   sourceRef?: string | null;
   routeOverride?: RouteOverride | null;
@@ -311,10 +315,25 @@ export function routeForStep(
   kind: StepKind,
 ): RoutingRuleRow | null {
   const stored = storedRouteForStep(db, todoRow, kind);
-  if (stored !== null || kind === 'review' || (!isSessionStepKind(kind) && kind !== 'merge')) {
-    return stored;
-  }
-  return defaultSessionRule(db, todoRow.teamId);
+  if (kind === 'review' || (!isSessionStepKind(kind) && kind !== 'merge')) return stored;
+  const base = stored ?? defaultSessionRule(db, todoRow.teamId);
+  const choice = projectModelChoice(db, todoRow.projectId ?? null, 'session');
+  if (choice === null) return base;
+  return { ...(base ?? syntheticRule(todoRow.teamId, 'session', choice)), ...choice };
+}
+
+export function projectModelChoice(
+  db: Pick<Db, 'select'>,
+  projectId: string | null,
+  use: ProjectModelUse,
+): ProjectModelChoice | null {
+  if (projectId === null) return null;
+  const row = db
+    .select({ modelOverrides: project.modelOverrides })
+    .from(project)
+    .where(eq(project.id, projectId))
+    .get();
+  return row?.modelOverrides?.[use] ?? null;
 }
 
 function policyUse(kind: StepKind): 'session' | 'review' | null {

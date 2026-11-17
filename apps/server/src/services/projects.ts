@@ -5,6 +5,7 @@ import {
   DEFAULT_SHIP_ROUTE,
   type PatchProjectBody,
   type ProjectMergeConfig,
+  type ProjectModelOverrides,
   patchProjectMergeConfigSchema,
   projectConvertedNote,
   projectGithubRepoRetargetedNote,
@@ -352,11 +353,12 @@ export async function updateProject(
     body.localPath !== undefined ||
     body.baseBranch !== undefined ||
     body.icon !== undefined ||
-    body.color !== undefined;
+    body.color !== undefined ||
+    body.modelOverrides !== undefined;
   if (!carriesKey) {
     throw new HttpError(
       400,
-      'invalid body: nothing to update (at least one of group/name/splitPolicy/evidenceStore/description/instructions/maxConcurrent/repoKind/githubRepo/localPath/baseBranch/icon/color)',
+      'invalid body: nothing to update (at least one of group/name/splitPolicy/evidenceStore/description/instructions/maxConcurrent/repoKind/githubRepo/localPath/baseBranch/icon/color/modelOverrides)',
     );
   }
 
@@ -480,6 +482,10 @@ export async function updateProject(
       baseBranch: body.baseBranch !== undefined ? body.baseBranch : row.baseBranch,
       icon: body.icon !== undefined ? body.icon : row.icon,
       color: body.color !== undefined ? body.color : row.color,
+      modelOverrides:
+        body.modelOverrides === undefined
+          ? row.modelOverrides
+          : mergedModelOverrides(row.modelOverrides, body.modelOverrides),
     })
     .where(eq(project.id, id))
     .run();
@@ -510,6 +516,19 @@ export async function updateProject(
   const updated = db.select().from(project).where(eq(project.id, id)).get();
   if (updated === undefined) throw new Error(`project ${id} missing after update`);
   return updated;
+}
+
+function mergedModelOverrides(
+  current: ProjectModelOverrides | null,
+  patch: NonNullable<PatchProjectBody['modelOverrides']>,
+): ProjectModelOverrides | null {
+  const next: ProjectModelOverrides = { ...current };
+  for (const use of ['coordinator', 'session'] as const) {
+    const choice = patch[use];
+    if (choice === null) delete next[use];
+    else if (choice !== undefined) next[use] = choice;
+  }
+  return Object.keys(next).length > 0 ? next : null;
 }
 
 async function assertNoInFlightBuilds(db: Db, projectId: string): Promise<void> {

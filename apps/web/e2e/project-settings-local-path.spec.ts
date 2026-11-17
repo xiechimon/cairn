@@ -61,7 +61,7 @@ test('settings: github project shows local-path field; save writes path; clear w
   page,
 }) => {
   const stub = await stubWorld(page, [githubProject()]);
-  await page.goto(`/app/project/${PROJECT_ID}/settings?tab=repo`);
+  await page.goto(`/app/project/${PROJECT_ID}/settings`);
 
   const row = page.getByText(FIELD, { exact: true });
   await expect(row).toBeVisible();
@@ -100,7 +100,7 @@ test('settings: hosted project hides the local-path field (github-only)', async 
       githubRepo: null,
     },
   ]);
-  await page.goto(`/app/project/${HOSTED_PROJECT_ID}/settings?tab=repo`);
+  await page.goto(`/app/project/${HOSTED_PROJECT_ID}/settings`);
   await expect(page.getByText('目标分支', { exact: true })).toBeVisible();
   await expect(page.getByText(FIELD, { exact: true })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: FIELD })).toHaveCount(0);

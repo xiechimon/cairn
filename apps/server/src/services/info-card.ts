@@ -40,7 +40,10 @@ export function infoComputerHosts(db: Pick<Db, 'select'>, teamId: string) {
 
 export function infoCardPlan(
   db: Db,
-  todoRow: Pick<typeof todo.$inferSelect, 'teamId' | 'sourceKind' | 'sourceRef' | 'routeOverride'>,
+  todoRow: Pick<
+    typeof todo.$inferSelect,
+    'teamId' | 'projectId' | 'sourceKind' | 'sourceRef' | 'routeOverride'
+  >,
   stepRow: Pick<typeof step.$inferSelect, 'id' | 'kind' | 'fallback'>,
 ): InfoCardPlan {
   const host = infoComputerHosts(db, todoRow.teamId)[0];

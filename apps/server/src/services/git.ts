@@ -214,6 +214,7 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     ...(row.icon !== null ? { icon: row.icon } : {}),
     ...(row.color !== null ? { color: row.color } : {}),
     archivedAt: row.archivedAt,
+    ...(row.modelOverrides !== null ? { modelOverrides: row.modelOverrides } : {}),
     ...(row.description !== null ? { description: row.description } : {}),
     ...(row.instructions !== null ? { instructions: row.instructions } : {}),
     ...(row.maxConcurrent !== null ? { maxConcurrent: row.maxConcurrent } : {}),

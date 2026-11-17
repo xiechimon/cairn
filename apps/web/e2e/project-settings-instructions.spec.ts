@@ -36,7 +36,7 @@ test('project instructions save, survive reload and clear back to empty', async 
     route.fulfill({ json: { defaultBranch: 'main', branches: [{ name: 'main', isDefault: true }] } }),
   );
 
-  const openMemoryTab = () => page.getByRole('tab', { name: '记忆' }).click();
+  const openMemoryTab = () => page.getByRole('link', { name: '记忆', exact: true }).click();
   await page.goto('/app/project/rules-project/settings');
   await openMemoryTab();
   const input = page.getByTestId('project-instructions-input');
