@@ -1,0 +1,34 @@
+# CANON — current rulings
+
+Generated from `docs/canon/rulings.json` by `scripts/generate-canon.mjs`. Edit the registry, not this file;
+CI fails when this file is stale. One line per standing ruling; the spec volume stays the full record.
+Lanes add an entry when they land or revise a ruling, keyed `area.topic`.
+
+## docs/spec/18-positioning-and-differentiation.md
+
+- **positioning.runtime-axis** (2026-09-30, §3.2) — The runtime axis follows the Multica runtime model: runtime = one computer x one CLI tool, daemon as runtime, self-hosted single data root.
+- **positioning.shape** (2026-10-24, §3.5) — One chief; the entry is chosen by the user; output that is code passes the gates; whether a PR opens is only how the code lands.
+- **positioning.merge-gate-axis** (2026-11-01, §3.1) — The semantic axis is the machine-verified, evidence-bound merge gate (ADR 0026 / 0028); a verdict counts only for the patch digest it judged.
+- **positioning.license** (2026-11-06, §4) — All code is Apache-2.0 open source with DCO sign-off and no CLA; nothing is sold and no feature is gated.
+- **positioning.no-hosted-plane** (2026-11-06, §4) — No project-run hosted control plane and no resold compute; credentials stay on the user's machine.
+- **positioning.no-team** (2026-11-14, §4) — No team features: no shared channels, roles and permissions, or team billing; another person runs their own copy.
+- **positioning.second-person** (2026-11-14, §2) — Every trade-off first asks whether a second person can run it, then whether it differentiates; replaces self-use first.
+- **positioning.thesis** (2026-11-14, §1) — cairn is a self-hosted personal assistant for people who write code: code work and personal affairs in one loop, one person and not a team.
+- **positioning.eval-scope** (2026-11-16, §1) — Evaluation and harness self-improvement stay in scope; judged adoption and self-evolution are not built (the in-repo bench and adoption judge were removed on 2026-11-16).
+- **positioning.action-bound-approvals** (2026-11-17, §3.5) — Approvals bind the irreversible-action boundary, not a mandatory lifecycle stage: merge/send/submit-class actions gate at the moment of effect via the action registry; the phase machine stays as the work-lifecycle spine for code output.
+- **positioning.desktop-x3** (2026-11-17, §4) — Electron desktop on all three OSes is decided; Windows and Linux join the shipped macOS app.
+- **positioning.im-entry** (2026-11-17, §4) — Chat apps are entry points, not the residence: Telegram and WeChat iLink are the IM entries; further platforms stay C class.
+- **positioning.roadmap-board** (2026-11-17, §1) — Remaining direction work is tracked on the owner's roadmap board as the single checklist entry; no in-repo plan tracker.
+## docs/spec/19-test-layering-and-blast-radius.md
+
+- **test.scope** (2026-10-08, volume) — Test layering and blast-radius rules live here; use real e2e for complex features, fixture surfaces for regression.
+## docs/spec/22-color-and-geometry-token-scale-canonical-table.md
+
+- **tokens.canonical** (2026-10-08, volume) — The canonical color and geometry token table lives here; UI code consumes tokens, not literals.
+## docs/spec/29-evaluation-and-data-loop.md
+
+- **eval.data-loop** (2026-10-08, volume) — The trajectory exporter and the trajectory-pack schema are protected paths; no change may edit what judges it.
+## docs/spec/30-harness-profile-opt-in.md
+
+- **harness.profile-opt-in** (2026-10-08, volume) — Harness profile rules live here; new harness surfaces are opt-in.
+

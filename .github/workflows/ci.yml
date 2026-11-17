@@ -523,9 +523,13 @@ jobs:
           if [ -n "$FEATURE_REGISTRY_BASE_SHA" ]; then git fetch origin "$FEATURE_REGISTRY_BASE_SHA"; fi
           node scripts/generate-feature-map.mjs --check
 
+      - name: Canon digest stays in step with the rulings registry
+        if: ${{ !cancelled() }}
+        run: node scripts/generate-canon.mjs --check
+
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
-        run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs scripts/feature-map-maintain.test.mjs scripts/generate-feature-map.test.mjs
+        run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs scripts/feature-map-maintain.test.mjs scripts/generate-feature-map.test.mjs scripts/generate-canon.test.mjs
 
       - name: Nightly scan self-test (§11.1)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}

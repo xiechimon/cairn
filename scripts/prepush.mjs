@@ -53,6 +53,7 @@ export const localOnly = [
   ['node', 'scripts/ui-consumer-shape-gate.mjs'],
   ['node', 'scripts/lint-warning-cap.mjs'],
   ['node', 'scripts/generate-feature-map.mjs', '--check'],
+  ['node', 'scripts/generate-canon.mjs', '--check'],
 ];
 
 const SOURCE_TREES = /^(apps|packages|integration)\//;
