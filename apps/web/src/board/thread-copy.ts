@@ -86,7 +86,7 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
     case 'done':
       return { state: STATUS_WORDS.done, reason: '任务已完成，发送消息即可继续。' };
     case 'closed':
-      return { state: STATUS_WORDS.cancelled, reason: '任务已取消。' };
+      return { state: STATUS_WORDS.archived, reason: '任务已归档。' };
     case 'todo':
       return { state: STATUS_WORDS.idle, reason: '还没开始。' };
   }

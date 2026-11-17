@@ -400,6 +400,15 @@ function waitingOnOf(
   return undefined;
 }
 
+function archiveWithPhase(
+  row: Pick<TodoRow, 'phase' | 'archivedAt'>,
+  to: Phase,
+  at: number,
+): Partial<Pick<TodoRow, 'archivedAt'>> {
+  if (to === 'closed') return row.archivedAt === null ? { archivedAt: at } : {};
+  return row.phase === 'closed' ? { archivedAt: null } : {};
+}
+
 function getRow(deps: Pick<TodoDeps, 'db'>, id: string): TodoRow | undefined {
   return deps.db.select().from(todo).where(eq(todo.id, id)).get();
 }
@@ -407,6 +416,7 @@ function getRow(deps: Pick<TodoDeps, 'db'>, id: string): TodoRow | undefined {
 export function setTodoArchived(deps: TodoDeps, id: string, archived: boolean): TodoRecord | null {
   const row = getRow(deps, id);
   if (!row) return null;
+  if (!archived && row.phase === 'closed') return setTodoPhase(deps, id, 'todo');
   if ((row.archivedAt !== null) === archived) return getTodo(deps, id);
   deps.db
     .update(todo)
@@ -705,6 +715,7 @@ export function updateAutonomousTodo(
     if (patch.phase === 'done') assertCorrectionDone(db, row);
     sets.phase = patch.phase;
     sets.phaseAt = nowMs();
+    Object.assign(sets, archiveWithPhase(row, patch.phase, sets.phaseAt));
   }
   db.transaction((tx) => {
     if (Object.keys(sets).length > 0) {
@@ -756,6 +767,7 @@ export function updateAutonomousTodo(
     notifyPhaseEntry(deps, record, row.phase, patch.phase);
   }
   if (sets.phase === 'done') settleSplitOnDone(deps, id);
+  if (sets.phase === 'closed') pauseTodoSchedule(deps, id, ARCHIVED_SCHEDULE_PAUSE_REASON);
   return record;
 }
 
@@ -854,15 +866,18 @@ export function setTodoPhase(
         'The thread moved on before an answer.',
       );
     }
+    const at = nowMs();
     db.update(todo)
       .set({
         ...extra,
         phase: to,
-        phaseAt: nowMs(),
+        phaseAt: at,
         v: row.v + 1,
+        ...archiveWithPhase(row, to, at),
       })
       .where(eq(todo.id, id))
       .run();
+    if (to === 'closed') pauseTodoSchedule(deps, id, ARCHIVED_SCHEDULE_PAUSE_REASON);
     const record = getTodo(deps, id);
     if (!record) return null;
     deps.hub.publishTodoDoc(record.teamId, record);
@@ -945,10 +960,12 @@ export function resetTodo(
     db.delete(build).where(eq(build.todoId, id)).run();
     for (const bid of buildIds) deps.convHub?.clearConversationBuffer(bid);
   }
+  const resetAt = nowMs();
   db.update(todo)
     .set({
       phase: 'todo',
-      phaseAt: nowMs(),
+      phaseAt: resetAt,
+      ...archiveWithPhase(row, 'todo', resetAt),
       hasPlan: false,
       hasChanges: false,
       latestBuildId: null,

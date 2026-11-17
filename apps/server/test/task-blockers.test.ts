@@ -13,6 +13,7 @@ import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
 import { claimStep, heartbeatStep } from '../src/services/machines.js';
 import { reconcileOwners } from '../src/services/owner.js';
 import { applyQuotaWaitStep, sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
+import { RETRY_PARKED_MARK } from '../src/services/retry-parking.js';
 import * as shipGate from '../src/services/ship-gate.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { H, ownerTodo, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
@@ -62,29 +63,33 @@ describe('the Coordinator starts what it creates (task stall class 3)', () => {
     expect(buildRow?.triggerSource).toBe('chief');
   });
 
-  test('reopen_todos starts a new build instead of parking the task in todo', async () => {
+  test('unarchive_todos starts a new build instead of parking the task in todo', async () => {
     const id = await create();
     const first = row(id).latestBuildId;
     finish(id, 'closed');
-    await relay('reopen_todos', { todoIds: [id] });
+    await relay('unarchive_todos', { todoIds: [id] });
     expect(row(id).phase).toBe('queued');
     expect(row(id).latestBuildId).not.toBe(first);
   });
 });
 
-describe('reopen_todos reports a task it could not start', () => {
+describe('unarchive_todos reports a task it could not start', () => {
   test('a reopened task whose start is refused is listed with the reason', async () => {
     const id = await create();
+    H.s.db
+      .update(build)
+      .set({ errorMessage: `${RETRY_PARKED_MARK}: quota` })
+      .where(eq(build.id, row(id).latestBuildId!))
+      .run();
     finish(id, 'closed');
-    H.s.db.update(todo).set({ archivedAt: Date.now() }).where(eq(todo.id, id)).run();
-    const out = (await relay('reopen_todos', { todoIds: [id] })) as {
-      transitioned: string[];
+    const out = (await relay('unarchive_todos', { todoIds: [id] })) as {
+      unarchived: string[];
       started: string[];
       notStarted?: Record<string, string>;
     };
-    expect(out.transitioned).toEqual([id]);
+    expect(out.unarchived).toEqual([id]);
     expect(out.started).toEqual([]);
-    expect(out.notStarted?.[id]).toMatch(/Unarchive/);
+    expect(out.notStarted?.[id]).toMatch(new RegExp(RETRY_PARKED_MARK));
   });
 });
 

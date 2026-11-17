@@ -77,10 +77,7 @@ export function desiredIssue(
   return {
     state: 'closed',
     stateReason: 'not_planned',
-    comment:
-      row.phase === 'closed'
-        ? 'Cairn：这个任务已取消，这里的 issue 关闭（未计划）。'
-        : 'Cairn：这个任务已归档，这里的 issue 关闭（未计划）。',
+    comment: 'Cairn：这个任务已归档，这里的 issue 关闭（未计划）。',
   };
 }
 

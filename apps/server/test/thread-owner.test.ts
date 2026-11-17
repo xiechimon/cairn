@@ -852,7 +852,7 @@ describe('a Coordinator turn that changes nothing hands the task to the owner (t
   test('the failed wake names the settling actions and no longer allows a silent end', () => {
     const w = failedWorld();
     const [prompt] = wakes(w);
-    for (const tool of ['message_thread', 'close_todos', 'update_todo', 'blockedBy']) {
+    for (const tool of ['message_thread', 'archive_todos', 'update_todo', 'blockedBy']) {
       expect(prompt).toContain(tool);
     }
     expect(prompt).toMatch(/update_todo.*blockedBy.*message_thread/);

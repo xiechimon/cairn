@@ -159,10 +159,11 @@ describe('router tools', () => {
       },
     );
 
-    test('closing missing tasks retains skipped results', async () => {
-      expect(await relay('close_todos', { todoIds: ['missing-task'] })).toEqual({
+    test('archiving missing tasks retains skipped results', async () => {
+      expect(await relay('archive_todos', { todoIds: ['missing-task'] })).toEqual({
         transitioned: [],
         skipped: ['missing-task'],
+        archived: [],
       });
     });
 

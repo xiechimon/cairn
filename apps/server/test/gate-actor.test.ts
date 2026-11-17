@@ -190,11 +190,11 @@ describe('#900 chief may not self-pass the review gate (complete_todos)', () => 
     }
   });
 
-  test('failure mode 9: chief close_todos allowed as usual (the gate only bites done; close takes the legal funnel edge todo->closed)', async () => {
+  test('failure mode 9: chief archive_todos allowed as usual (the gate only bites done; close takes the legal funnel edge todo->closed)', async () => {
     const s = await withConfirmTodo();
     try {
       s.db.update(todoTable).set({ phase: 'todo' }).where(eq(todoTable.id, s.todoId)).run();
-      const out = (await runChiefTool(s, 'close_todos', {
+      const out = (await runChiefTool(s, 'archive_todos', {
         todoIds: [s.todoId],
       })) as { transitioned: string[]; skipped: string[] };
       expect(out.transitioned).toContain(s.todoId);

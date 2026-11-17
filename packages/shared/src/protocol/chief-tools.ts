@@ -40,7 +40,12 @@ export const machineToolRelayResponseSchema = z.object({
 });
 export type MachineToolRelayResponse = z.infer<typeof machineToolRelayResponseSchema>;
 
-export const CHIEF_TOOLS_REMOVED = ['delete_skills', 'set_remote_shell'] as const;
+export const CHIEF_TOOLS_REMOVED = [
+  'delete_skills',
+  'set_remote_shell',
+  'close_todos',
+  'reopen_todos',
+] as const;
 
 export const CHIEF_TOOLS_ADDED = [
   'create_skill',
@@ -82,8 +87,6 @@ export const CHIEF_TOOL_CATEGORIES = {
     'create_todo',
     'update_todo',
     'delete_todos',
-    'close_todos',
-    'reopen_todos',
     'archive_todos',
     'unarchive_todos',
     'complete_todos',
@@ -555,31 +558,21 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     parameters: obj({ todoIds: idArr('Todo ids to delete.') }, ['todoIds']),
   },
   {
-    name: 'close_todos',
+    name: 'archive_todos',
     description:
-      'Close todos as shelved (phase → closed). Each closed todo closes its own GitHub issue as not planned. Set supersededBy when another todo replaces them: the closing comment links that todo’s issue.',
+      'Archive todos: stop their running work, pause their schedules and put them away from the task lists. This is the only way to end a todo the user no longer wants: use it when the user says archive, close, drop or delete it. Set supersededBy when another todo replaces them. Reversible with unarchive_todos.',
     parameters: obj(
       {
-        todoIds: idArr('Todo ids to close.'),
-        supersededBy: str('Optional id of the todo that replaces the closed ones.'),
+        todoIds: idArr('Todo ids to archive.'),
+        supersededBy: str('Optional id of the todo that replaces the archived ones.'),
       },
       ['todoIds'],
     ),
   },
   {
-    name: 'reopen_todos',
-    description: 'Reopen closed todos and start a new thread on each (phase closed → queued).',
-    parameters: obj({ todoIds: idArr('Todo ids to reopen.') }, ['todoIds']),
-  },
-  {
-    name: 'archive_todos',
-    description:
-      'Archive todos: stop their running work, pause their schedules and put them away from the task lists. Use this when the user says archive (归档). Archiving is reversible with unarchive_todos and keeps the phase, unlike close_todos.',
-    parameters: obj({ todoIds: idArr('Todo ids to archive.') }, ['todoIds']),
-  },
-  {
     name: 'unarchive_todos',
-    description: 'Unarchive todos so they show in the task lists and can run again.',
+    description:
+      'Unarchive todos so they show in the task lists again. A todo that was archived before it finished starts a new thread.',
     parameters: obj({ todoIds: idArr('Todo ids to unarchive.') }, ['todoIds']),
   },
   {
@@ -824,7 +817,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-export const CHIEF_TOOL_COUNT = 50;
+export const CHIEF_TOOL_COUNT = 48;
 
 export const CHIEF_ROUTER_TOOL_NAMES = [
   'open_thread',
@@ -841,7 +834,7 @@ export const CHIEF_ROUTER_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'open_thread',
     description:
-      'Open a thread on a todo the user created that has not started (create_todo and reopen_todos already start theirs): one session plans, writes tests, implements and checks its own work end to end. Pass the todo id (from todos). You pick no agent and no plan mode; the thread reports back to this conversation when it needs the user, finishes or fails.',
+      'Open a thread on a todo the user created that has not started (create_todo and unarchive_todos already start theirs): one session plans, writes tests, implements and checks its own work end to end. Pass the todo id (from todos). You pick no agent and no plan mode; the thread reports back to this conversation when it needs the user, finishes or fails.',
     parameters: obj({ todoId: str('Id of the todo to open a thread on.') }, ['todoId']),
   },
   {

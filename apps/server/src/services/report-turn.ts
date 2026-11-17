@@ -31,7 +31,7 @@ const REPORT_REF_TOOLS = new Set([
   'attachment',
   'notify_user',
   'complete_todos',
-  'close_todos',
+  'archive_todos',
   'message_thread',
 ]);
 
@@ -68,7 +68,7 @@ function reportTurnAllows(ref: ReportRef, name: string, params: Record<string, u
   if (REPORT_OPEN_TOOLS.has(name)) return true;
   if (name === 'attachment') return params.attachmentId === ref.attachmentId;
   if (name === 'message_thread') return params.todoId === ref.todoId;
-  if (name === 'complete_todos' || name === 'close_todos') {
+  if (name === 'complete_todos' || name === 'archive_todos') {
     const ids = params.todoIds;
     return Array.isArray(ids) && ids.length === 1 && ids[0] === ref.todoId;
   }
@@ -153,7 +153,7 @@ export function requireCurrentReportTurn(
   if ((name === 'notify_user' || name === 'message_thread') && reportOriginGone(db, ref)) {
     throw new HttpError(
       409,
-      'report-origin-gone: the conversation that asked for this report is archived or deleted; accept it with complete_todos {silent: true} or close it with close_todos',
+      'report-origin-gone: the conversation that asked for this report is archived or deleted; accept it with complete_todos {silent: true} or archive it with archive_todos',
     );
   }
 }

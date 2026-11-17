@@ -133,7 +133,7 @@ describe('rows that do not wait on the owner', () => {
       word: '已完成',
       what: { key: 'PR #{n} 已合并', params: { n: 3558 } },
     });
-    expect(taskRowCopy(entry(2, 'closed', 'resolved')).word).toBe('已关闭');
+    expect(taskRowCopy(entry(2, 'closed', 'resolved')).word).toBe('已归档');
   });
 });
 

@@ -509,13 +509,7 @@ function ThreadBody({
       )}
       {!archived && (
         <Composer
-          placeholder={
-            todo.phase === 'closed'
-              ? t('已关闭，不能再回复')
-              : chat.started
-                ? t('回复这个任务')
-                : t('开始后才能回复')
-          }
+          placeholder={chat.started ? t('回复这个任务') : t('开始后才能回复')}
           aiReview={false}
           streaming={chat.running}
           editable={chat.send !== undefined}

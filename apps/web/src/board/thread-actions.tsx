@@ -121,16 +121,6 @@ export function useThreadActions({
       { onError: (error) => toastError(t('完成请求未送出，请重试。'), error) },
     );
   });
-  const closeTask = guard(() => {
-    setMenuOpen(false);
-    mutations.patchTodo.mutate(
-      { id: todo.id, body: { phase: 'closed' } },
-      {
-        onSuccess: onGone,
-        onError: (error) => toastError(t('关闭任务失败，请重试。'), error),
-      },
-    );
-  });
   const deleteTask = guard(() => {
     setDialog(null);
     mutations.deleteTodo.mutate(todo.id, {
@@ -178,7 +168,7 @@ export function useThreadActions({
           size="sm"
           onClick={runPrimary.unarchive}
           disabled={pending}
-          className="h-7.5 px-3 text-ui font-normal"
+          className="h-7.5 border-border px-3 text-ui font-medium text-foreground"
         >
           {pending && <Spinner data-icon="inline-start" />}
           {t(ACTION_COPY.unarchive.primary)}
@@ -249,8 +239,6 @@ export function useThreadActions({
         }}
         onComplete={phase === 'confirm' ? approve : complete}
         canComplete={!archived && canComplete}
-        onCloseTask={closeTask}
-        canClose={!archived && (phase === 'todo' || phase === 'failed' || phase === 'queued')}
         {...(!archived ? { onArchive: setArchived(true) } : {})}
         {...(!archived && running && buildId != null
           ? {

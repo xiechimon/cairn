@@ -772,7 +772,7 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     s.dispose();
   });
 
-  test('cancelling on the board closes the issue as not planned, with the reason, once', async () => {
+  test('archiving an unfinished task on the board closes the issue as not planned, with the reason, once', async () => {
     const mock = lifecycleMock();
     const { s, id, sync } = await startedTask(mock);
     expect(
@@ -781,7 +781,7 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     await sync.sweep();
     await sync.sweep();
     expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
-    expect(comments(mock)).toEqual(['Cairn：这个任务已取消，这里的 issue 关闭（未计划）。']);
+    expect(comments(mock)).toEqual(['Cairn：这个任务已归档，这里的 issue 关闭（未计划）。']);
     s.dispose();
   });
 
@@ -899,7 +899,7 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     mock.set(`POST ${issuePath(101)}/comments`, { status: 201, body: { id: 1 } });
     await sync.sweep(1_000 + TASK_ISSUE_RETRY_MS);
     expect(writes(mock)).toEqual([{ state: 'closed', state_reason: 'not_planned' }]);
-    expect(comments(mock).at(-1)).toBe('Cairn：这个任务已取消，这里的 issue 关闭（未计划）。');
+    expect(comments(mock).at(-1)).toBe('Cairn：这个任务已归档，这里的 issue 关闭（未计划）。');
     s.dispose();
   });
 
@@ -1073,7 +1073,7 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     s.dispose();
   });
 
-  test('resetting a cancelled started task reopens its issue', async () => {
+  test('resetting a started task archived before it finished reopens its issue', async () => {
     const mock = lifecycleMock();
     const { s, id, sync } = await startedTask(mock);
     setRow(s, id, { lastRunAt: 5 });

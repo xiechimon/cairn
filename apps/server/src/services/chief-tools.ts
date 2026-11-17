@@ -50,7 +50,6 @@ import {
   cancelBuild,
   requestMerge,
   stopActiveStepsAfterExit,
-  stopActiveStepsForArchive,
 } from './builds.js';
 import {
   addChiefWatch,
@@ -203,8 +202,6 @@ const PROJECT_WRITE_TOOLS = new Set([
   'split_todo',
   'update_todo',
   'delete_todos',
-  'close_todos',
-  'reopen_todos',
   'archive_todos',
   'unarchive_todos',
   'complete_todos',
@@ -726,48 +723,49 @@ export async function executeChiefTool(
       svc.machineHub?.wake(ctx.teamId);
       return json({ ...record, ...getTodo(svc, body.todoId) });
     }
-    case 'close_todos': {
+    case 'archive_todos': {
       const supersededBy = optStr(params, 'supersededBy');
-      return json(
-        transitionTodos(
-          deps,
-          ctx.teamId,
-          strArr(params, 'todoIds'),
-          'closed',
-          chiefActor,
-          supersededBy !== undefined ? { supersededBy } : {},
-        ),
+      const ids = strArr(params, 'todoIds');
+      const finished = new Set(
+        db
+          .select({ id: todo.id })
+          .from(todo)
+          .where(and(inArray(todo.id, ids), eq(todo.teamId, ctx.teamId), eq(todo.phase, 'done')))
+          .all()
+          .map((row) => row.id),
       );
+      const out = transitionTodos(
+        deps,
+        ctx.teamId,
+        ids.filter((id) => !finished.has(id)),
+        'closed',
+        chiefActor,
+        supersededBy !== undefined ? { supersededBy } : {},
+      );
+      for (const id of finished) setTodoArchived(svc, id, true);
+      return json({ ...out, archived: [...finished, ...out.transitioned] });
     }
-    case 'archive_todos':
     case 'unarchive_todos': {
-      const archive = name === 'archive_todos';
-      const changed: string[] = [];
+      const unarchived: string[] = [];
       const skipped: string[] = [];
+      const started: string[] = [];
+      const notStarted: Record<string, string> = {};
       for (const id of strArr(params, 'todoIds')) {
         const owned = db
-          .select({ id: todo.id })
+          .select({ phase: todo.phase, archivedAt: todo.archivedAt })
           .from(todo)
           .where(and(eq(todo.id, id), eq(todo.teamId, ctx.teamId)))
           .get();
-        if (!owned || !setTodoArchived(svc, id, archive)) {
+        if (
+          !owned ||
+          (owned.archivedAt === null && owned.phase !== 'closed') ||
+          !setTodoArchived(svc, id, false)
+        ) {
           skipped.push(id);
           continue;
         }
-        if (archive)
-          stopActiveStepsForArchive(svc, id, {
-            actor: 'coordinator',
-            reason: 'archived by Coordinator',
-          });
-        changed.push(id);
-      }
-      return json({ [archive ? 'archived' : 'unarchived']: changed, skipped });
-    }
-    case 'reopen_todos': {
-      const out = transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor);
-      const started: string[] = [];
-      const notStarted: Record<string, string> = {};
-      for (const id of out.transitioned) {
+        unarchived.push(id);
+        if (owned.phase !== 'closed') continue;
         try {
           startThreadBuild(svc, requireTeamTodo(db, id, ctx.teamId), {
             origin: 'coordinator',
@@ -779,7 +777,8 @@ export async function executeChiefTool(
         }
       }
       return json({
-        ...out,
+        unarchived,
+        skipped,
         started,
         ...(Object.keys(notStarted).length > 0 ? { notStarted } : {}),
       });
@@ -1179,7 +1178,7 @@ export function transitionTodos(
   if (opts.supersededBy !== undefined) {
     requireTeamTodo(deps.db, opts.supersededBy, teamId);
     if (todoIds.includes(opts.supersededBy)) {
-      throw new HttpError(400, 'supersededBy must name a todo that is not being closed');
+      throw new HttpError(400, 'supersededBy must name a todo that is not being archived');
     }
   }
   const transitioned: string[] = [];

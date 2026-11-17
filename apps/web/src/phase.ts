@@ -42,7 +42,7 @@ export const PHASE_UI: Record<Phase, PhaseUi> = {
     action: '重跑',
     placeholder: '请求修改…',
   },
-  closed: { chip: '已取消', tone: 'idle', action: null, placeholder: null },
+  closed: { chip: '已归档', tone: 'idle', action: null, placeholder: null },
 };
 
 export const ACCENT_INK = 'text-(--card-button)';

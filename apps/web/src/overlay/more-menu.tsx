@@ -12,7 +12,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
 import { useI18n } from '../i18n/provider.js';
-import { Ban, Check, Copy, MessageSquare, Trash2 } from '../icons/index.js';
+import { Check, Copy, MessageSquare, Trash2 } from '../icons/index.js';
 
 interface MoreMenuProps {
   open: boolean;
@@ -22,8 +22,6 @@ interface MoreMenuProps {
   onComplete: () => void;
   canComplete: boolean;
   onArchive?: () => void;
-  onCloseTask: () => void;
-  canClose: boolean;
   onStop?: () => void;
   onReject?: () => void;
   onDiscard?: () => void;
@@ -45,8 +43,6 @@ export function MoreMenu({
   onComplete,
   canComplete,
   onArchive,
-  onCloseTask,
-  canClose,
   onStop,
   onReject,
   onDiscard,
@@ -183,14 +179,6 @@ export function MoreMenu({
           },
         ]
       : []),
-    {
-      key: 'close',
-      shortcut: 'X',
-      label: t('关闭'),
-      Icon: Ban,
-      disabled: !canClose,
-      onClick: onCloseTask,
-    },
     ...(onDiscard
       ? [
           {

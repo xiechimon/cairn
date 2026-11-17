@@ -134,7 +134,7 @@ function SelectionBar({
 
 function unfinishableLead(todo: TaskEntry['todo']): { glyph: GlyphKind; why: string } {
   if (todo.phase === 'failed') return { glyph: 'failed', why: '运行失败了，先重跑才能完成' };
-  if (todo.phase === 'closed') return { glyph: 'closed', why: '已关闭' };
+  if (todo.phase === 'closed') return { glyph: 'closed', why: '已归档' };
   if (todo.phase === 'done') return { glyph: 'done', why: '已完成' };
   return { glyph: 'todo', why: '已归档，不能标记完成' };
 }

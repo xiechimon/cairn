@@ -85,7 +85,7 @@ export function taskRowCopy(entry: TaskEntry, pr?: PrPanelRow): TaskRowCopy {
       return { ...base, running, word: '进行中', what, where: null };
     }
     case 'resolved': {
-      const word = todo.phase === 'closed' ? '已关闭' : '已完成';
+      const word = todo.phase === 'closed' ? '已归档' : '已完成';
       if (pr?.state === 'merged')
         return {
           ...base,

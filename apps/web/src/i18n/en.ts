@@ -479,7 +479,7 @@ export const EN: Record<string, string> = {
   '任务已完成，发送消息即可继续。': 'The task is done. Send a message to continue.',
   '这次运行失败了，可以重跑，或移回待开始。':
     'This run failed. Rerun it, or move it back to To start.',
-  '任务已取消。': 'The task was cancelled.',
+  '任务已归档。': 'The task is archived.',
   面板视图: 'Pane view',
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
@@ -1469,7 +1469,6 @@ export const EN: Record<string, string> = {
   拖动调宽: 'Drag to resize',
   编排中: 'Orchestrating',
   查看计划: 'View plan',
-  '已关闭，不能再回复': 'Closed. It takes no more replies',
   '计划已就绪。要改计划，直接在下面回复。': 'The plan is ready. To change it, reply below.',
   批准计划: 'Approve plan',
   '失败了。可以重试，或在下面回复说明怎么改。':
@@ -1496,7 +1495,6 @@ export const EN: Record<string, string> = {
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
   // issue 导入内联 / fs-pick 提示行 / OAuth 内联 / 技能弹窗内联——不在此列）——
   '创建项目失败，请重试。': 'Could not create the project. Try again.',
-  '关闭任务失败，请重试。': 'Could not close the task. Try again.',
   '删除任务失败，请重试。': 'Could not delete the task. Try again.',
   '重试失败，请稍后再试。': 'Retry failed. Try again later.',
   '删除定时失败，请重试。': 'Could not delete the schedule. Try again.',

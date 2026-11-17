@@ -19,7 +19,7 @@ An isolated run on 2026-11-15 reproduced it: the owner wrote "prepare the deleti
 | Confirm a plan from an agent client (MCP `confirm_builds`) | MCP | Starts work | Executes |
 | Create a task's GitHub self-issue | Coordinator `create_todo` | Closable | Fired after the insert without an idempotency key |
 | Remove a task's schedules (`unschedule_todo`) | Coordinator, MCP | Recreatable | Executes |
-| Close / reopen a task's GitHub issue (`close_todos`, `reopen_todos`) | Coordinator, MCP | Yes, reopen | Executes; outbox reads issue state before writing |
+| Close / reopen a task's GitHub issue (Coordinator `archive_todos`, `unarchive_todos`; MCP `close_todos`, `reopen_todos`) | Coordinator, MCP | Yes, reopen | Executes; outbox reads issue state before writing |
 | Stop or cancel work (`stop_thread`, `cancel_builds`) | Coordinator, MCP | Work can be restarted | Executes |
 | Git push from a task | Daemon worker | Branch push only; merge stays a person's click | Command gate asks on destructive shell shapes |
 | Send mail, calendar writes | none | — | Not in the code: mail is read-only intake and a mail turn refuses every tool (`refuseMailTurnTool`); no calendar connector exists |

@@ -525,27 +525,33 @@ describe('archived projects stay read-only for the Coordinator', () => {
     expect(chiefPrompts(old)).toEqual([]);
   });
 
-  test('archive_todos archives without closing, unarchive_todos brings it back, unknown ids are skipped', async () => {
+  test('archive_todos ends an unfinished task as archived, unarchive_todos reopens it, unknown ids are skipped', async () => {
     const created = (await relay('create_todo', ownerTodo('put away'))) as { id: string };
-    expect(await relay('archive_todos', { todoIds: [created.id, 'nope'] })).toEqual({
-      archived: [created.id],
-      skipped: ['nope'],
-    });
+    const out = (await relay('archive_todos', { todoIds: [created.id, 'nope'] })) as {
+      archived: string[];
+      skipped: string[];
+    };
+    expect(out.archived).toEqual([created.id]);
+    expect(out.skipped).toEqual(['nope']);
     const archived = getTodo({ db: H.s.db }, created.id);
     expect(archived?.archivedAt).toBeTypeOf('number');
-    expect(archived?.phase).not.toBe('closed');
-    expect(await relay('unarchive_todos', { todoIds: [created.id] })).toEqual({
-      unarchived: [created.id],
-      skipped: [],
-    });
-    expect(getTodo({ db: H.s.db }, created.id)?.archivedAt).toBeNull();
+    expect(archived?.phase).toBe('closed');
+    const back = (await relay('unarchive_todos', { todoIds: [created.id] })) as {
+      unarchived: string[];
+      started: string[];
+    };
+    expect(back.unarchived).toEqual([created.id]);
+    expect(back.started).toEqual([created.id]);
+    const reopened = getTodo({ db: H.s.db }, created.id);
+    expect(reopened?.archivedAt).toBeNull();
+    expect(reopened?.phase).toBe('queued');
   });
 
   test('Coordinator tool writes targeting an archived project are refused; reads still work', async () => {
     const created = (await relay('create_todo', ownerTodo('kept'))) as { id: string };
     await archive(H.projectId);
     await expect(relay('create_todo', ownerTodo('new'))).rejects.toThrow(/archived/);
-    await expect(relay('close_todos', { todoIds: [created.id] })).rejects.toThrow(/archived/);
+    await expect(relay('archive_todos', { todoIds: [created.id] })).rejects.toThrow(/archived/);
     await expect(relay('update_todo', { todoId: created.id, tagIds: [] })).rejects.toThrow(
       /archived/,
     );

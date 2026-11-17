@@ -16,7 +16,7 @@ import {
 export const MERGE_LANDING_SKIPPED = Symbol('merge-landing-skipped');
 
 export const MERGE_NOT_LANDED_NOTE =
-  '合并步跑完时任务已取消或已挪回待开始，合并没有落地：默认分支保持不变';
+  '合并步跑完时任务已归档或已挪回待开始，合并没有落地：默认分支保持不变';
 
 export function mergeCardLeftReview(deps: MachineDeps, stepRow: typeof step.$inferSelect): boolean {
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();

@@ -132,7 +132,7 @@ const claim = (w: World) =>
   claimStep(machineDepsOf(w.s), w.machineId, w.teamId, 10, 'http://localhost');
 
 describe('#1445 closing a queued card stops pending steps', () => {
-  test('close_todos (chief / MCP same funnel): step stopped, machine cannot claim it', async () => {
+  test('archive_todos (chief / MCP same funnel): step stopped, machine cannot claim it', async () => {
     const w = makeWorld({ phase: 'queued', stepStatus: 'pending' });
     const out = transitionTodos(chiefDepsOf(w), w.teamId, [w.todoId], 'closed', chiefActor);
     expect(out.transitioned).toEqual([w.todoId]);
@@ -144,13 +144,19 @@ describe('#1445 closing a queued card stops pending steps', () => {
     ).toBe(STOP_MESSAGE);
   });
 
-  test('PATCH phase=closed: step stopped, machine cannot claim it', async () => {
+  test('PATCH phase=closed: step stopped, machine cannot claim it, the task is archived until it is unarchived', async () => {
     const w = makeWorld({ phase: 'queued', stepStatus: 'pending' });
     const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'closed' });
     expect(res.status).toBe(200);
     expect(todoPhase(w)).toBe('closed');
     expect(await claim(w)).toBeNull();
     expect(stepStatus(w)).toBe('stopped');
+    const archivedAt = () =>
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!.archivedAt;
+    expect(archivedAt()).toBeTypeOf('number');
+    expect((await req(w.s.app, 'POST', `/api/todos/${w.todoId}/unarchive`)).status).toBe(200);
+    expect(todoPhase(w)).toBe('todo');
+    expect(archivedAt()).toBeNull();
   });
 });
 

@@ -43,7 +43,7 @@ describe('wakeFacts gate text', () => {
     (output) => {
       const text = wakeFacts('gate', todo({ phase: 'review', output }), null);
       expect(text).toContain('验收归你');
-      for (const tool of ['complete_todos', 'message_thread', 'close_todos']) {
+      for (const tool of ['complete_todos', 'message_thread', 'archive_todos']) {
         expect(text).toContain(tool);
       }
       expect(text).not.toContain('confirm_builds');

@@ -114,7 +114,6 @@ describe('archive is independent of task phase', () => {
     'review',
     'failed',
     'done',
-    'closed',
   ] as const)('%s archives and unarchives without changing phase or phase time', async (phase) => {
     const { s, now } = world(phase, 'done');
     const archived = await action(s, 'archive');
@@ -132,6 +131,16 @@ describe('archive is independent of task phase', () => {
       hasChanges: true,
     });
     expect((await req(s.app, 'GET', '/api/todos/todo-archive')).status).toBe(200);
+  });
+
+  test('a task closed before it finished keeps its phase when archived and goes back to todo when unarchived', async () => {
+    const { s, now } = world('closed', 'done');
+    expect(await action(s, 'archive')).toMatchObject({
+      phase: 'closed',
+      phaseAt: now,
+      archivedAt: expect.any(Number),
+    });
+    expect(await action(s, 'unarchive')).toMatchObject({ phase: 'todo', archivedAt: null });
   });
 
   test.each(['stopped', 'success', 'failed'] as const)(

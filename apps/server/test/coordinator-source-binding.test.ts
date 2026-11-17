@@ -62,7 +62,7 @@ describe('Coordinator source bindings', () => {
     async (state) => {
       const id = message('Fix the caret.');
       const first = unstarted([id]);
-      if (state === 'closed task') await relay('close_todos', { todoIds: [first.id] });
+      if (state === 'closed task') await relay('archive_todos', { todoIds: [first.id] });
       if (state === 'archived task') {
         H.s.db.update(todo).set({ archivedAt: Date.now() }).where(eq(todo.id, first.id)).run();
       }

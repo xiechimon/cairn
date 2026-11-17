@@ -301,7 +301,7 @@ describe('a delivered research report reaches the conversation once', () => {
       ['attachment', { attachmentId: w.task.attachmentId }],
       ['notify_user', { message: 'old', provenance: `report:${w.task.todoId}` }],
       ['complete_todos', { todoIds: [w.task.todoId], silent: true }],
-      ['close_todos', { todoIds: [w.task.todoId] }],
+      ['archive_todos', { todoIds: [w.task.todoId] }],
     ] as const) {
       await expect(w.call(turn, name, params)).rejects.toThrow(/report-stale/);
     }
@@ -346,8 +346,8 @@ describe('an owner message steered into a stale report turn', () => {
       .run();
     const relay = (name: string, params: Record<string, unknown>) =>
       executeRelayToolCall(w.toolDeps, machineId, turn.id, name, params);
-    await expect(relay('reopen_todos', { todoIds: [w.task.todoId] })).rejects.toThrow(
-      /report turn cannot call reopen_todos/,
+    await expect(relay('unarchive_todos', { todoIds: [w.task.todoId] })).rejects.toThrow(
+      /report turn cannot call unarchive_todos/,
     );
 
     const messageId = newRecordId();
@@ -367,10 +367,10 @@ describe('an owner message steered into a stale report turn', () => {
     await expect(stale).rejects.toThrow(/report-stale/);
     await expect(stale).rejects.toThrow(/still do what they asked/);
     await expect(stale).rejects.not.toThrow(/end the turn/);
-    const reopened = JSON.parse(await relay('reopen_todos', { todoIds: [w.task.todoId] }));
-    expect(reopened.transitioned).toEqual([w.task.todoId]);
+    const reopened = JSON.parse(await relay('unarchive_todos', { todoIds: [w.task.todoId] }));
+    expect(reopened.unarchived).toEqual([w.task.todoId]);
     expect(w.phaseOf(w.task.todoId)).not.toBe('closed');
-    await relay('close_todos', { todoIds: [w.other.todoId] });
+    await relay('archive_todos', { todoIds: [w.other.todoId] });
     expect(w.phaseOf(w.other.todoId)).toBe('closed');
   });
 });
@@ -393,8 +393,8 @@ describe('a report turn treats the report as third-party data', () => {
       ['set_secret', { name: 'X', value: 'y' }],
       ['create_todo', { projectId: 'p', title: 'x', spec: 'y' }],
       ['attachment', { attachmentId: w.other.attachmentId }],
-      ['close_todos', { todoIds: [w.task.todoId, w.other.todoId] }],
-      ['close_todos', { todoIds: [w.other.todoId] }],
+      ['archive_todos', { todoIds: [w.task.todoId, w.other.todoId] }],
+      ['archive_todos', { todoIds: [w.other.todoId] }],
       ['message_thread', { todoId: w.other.todoId, content: 'go' }],
     ] as const) {
       await expect(w.call(turn, name, params)).rejects.toThrow(

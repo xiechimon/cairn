@@ -25,7 +25,7 @@ const NEXT_NOTE: Record<Phase, string> = {
   review: '审核无误后，你可以把它标记为已完成。',
   done: '任务已完成，发送消息即可继续。',
   failed: '这次运行失败了，可以重跑，或移回待开始。',
-  closed: '任务已取消。',
+  closed: '任务已归档。',
 };
 
 const ROW_CLS =

@@ -7,7 +7,7 @@ export const STATUS_WORDS = {
   inReview: '审阅中',
   failed: '失败',
   done: '已完成',
-  cancelled: '已取消',
+  archived: '已归档',
   idle: '空闲',
 } as const;
 

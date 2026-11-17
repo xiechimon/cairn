@@ -276,8 +276,6 @@ function MenusSpecimen() {
           onComplete={() => setLast('Complete')}
           canComplete
           onArchive={() => setLast('Archive')}
-          onCloseTask={() => setLast('Cancel task')}
-          canClose={false}
           onDiscard={() => setLast('Discard changes')}
         />
       </Cell>

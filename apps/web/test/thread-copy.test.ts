@@ -37,10 +37,10 @@ describe('threadCopy', () => {
     expect(threadCopy(todo({ phase: 'done', verified: false }))).toEqual(DONE);
   });
 
-  it('a cancelled thread does not read as finished', () => {
+  it('a task archived before it finished does not read as finished', () => {
     expect(threadCopy(todo({ phase: 'closed' }))).toEqual({
-      state: '已取消',
-      reason: '任务已取消。',
+      state: '已归档',
+      reason: '任务已归档。',
     });
   });
 });
