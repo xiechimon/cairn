@@ -59,14 +59,9 @@ describe('machineStateLabel', () => {
     expect(machineStateLabel(machine({ online: false, runningSteps: 3 }), t)).toBe('离线');
   });
 
-  it('reads online and idle for a quiet machine', () => {
-    expect(machineStateLabel(machine({ runningSteps: 0 }), t)).toBe('在线 · 空闲');
-  });
-
-  it('reads the running count against the limit', () => {
-    expect(machineStateLabel(machine({ runningSteps: 2, maxConcurrent: 8 }), t)).toBe(
-      '在线 · 2/8 在跑',
-    );
-    expect(machineStateLabel(machine({ runningSteps: 2 }), t)).toBe('在线 · 2 在跑');
+  it('reads online without a running count, busy or idle', () => {
+    expect(machineStateLabel(machine({ runningSteps: 0 }), t)).toBe('在线');
+    expect(machineStateLabel(machine({ runningSteps: 2, maxConcurrent: 8 }), t)).toBe('在线');
+    expect(machineStateLabel(machine({ runningSteps: 2 }), t)).toBe('在线');
   });
 });

@@ -26,10 +26,5 @@ export function fleetStatusLine(status: FleetStatus, t: Translate): string | nul
 }
 
 export function machineStateLabel(machine: MachineRow, t: Translate): string {
-  if (machine.online !== true) return t('离线');
-  const running = machine.runningSteps ?? 0;
-  if (running === 0) return t('在线 · 空闲');
-  return machine.maxConcurrent != null
-    ? t('在线 · {n}/{max} 在跑', { n: running, max: machine.maxConcurrent })
-    : t('在线 · {n} 在跑', { n: running });
+  return machine.online === true ? t('在线') : t('离线');
 }

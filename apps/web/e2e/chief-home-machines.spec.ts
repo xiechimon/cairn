@@ -6,12 +6,13 @@ const MIDDAY_IN_BEIJING = Date.UTC(2026, 10, 12, 4);
 const chip = (page: Page) => page.getByTestId('machines-button');
 const panel = (page: Page) => page.getByRole('complementary', { name: '电脑' });
 
-test('the computer chip names the Coordinator machine, its running count and any offline machine', async ({
+test('the computer chip names the Coordinator machine, its state and any offline machine', async ({
   page,
 }) => {
   await page.goto(HOME);
   await expect(chip(page)).toHaveAccessibleName(/xmonsMac/);
-  await expect(chip(page)).toHaveAccessibleName(/2\/8 在跑/);
+  await expect(chip(page)).toHaveAccessibleName(/xmonsMac · 在线 ·/);
+  await expect(chip(page)).not.toHaveAccessibleName(/在跑/);
   await expect(chip(page)).not.toHaveAccessibleName(/\+1/);
   await expect(chip(page)).toHaveText('');
   await expect(chip(page).locator('span:not([data-slot="fleet-badge"])')).toHaveCount(0);
@@ -32,7 +33,7 @@ test('the chip opens a list with one row per computer, the Coordinator machine f
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText('xmonsMac');
-  await expect(rows.nth(0)).toHaveText('xmonsMac在线 · 2/8 在跑');
+  await expect(rows.nth(0)).toHaveText('xmonsMac在线');
   await expect(rows.nth(0)).not.toContainText('Coordinator');
   await expect(rows.nth(1)).toContainText('omarchy');
   await expect(rows.nth(1)).toContainText('离线');
@@ -85,7 +86,7 @@ test('re-checking refreshes the checked time without leaving the list', async ({
 
 test('the chip name carries the Coordinator machine and its state', async ({ page }) => {
   await page.goto(HOME);
-  await expect(chip(page)).toHaveAccessibleName('电脑 · xmonsMac · 在线 · 2/8 在跑 · 1 台在线 · 1 台离线（omarchy）');
+  await expect(chip(page)).toHaveAccessibleName('电脑 · xmonsMac · 在线 · 1 台在线 · 1 台离线（omarchy）');
 });
 
 test('at phone width the chip stays an icon and the title stays for screen readers', async ({ page }) => {
@@ -105,7 +106,7 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
   for (const [name, tip] of [
     ['任务', '任务，3 件等你'],
     ['成果', '成果'],
-    ['电脑', '电脑 · xmonsMac · 在线 · 2/8 在跑 · 1 台在线 · 1 台离线（omarchy）'],
+    ['电脑', '电脑 · xmonsMac · 在线 · 1 台在线 · 1 台离线（omarchy）'],
   ] as const) {
     const button = page.getByTestId('home-c-pane-buttons').getByRole('button', { name });
     await button.hover();
@@ -167,7 +168,7 @@ test('the reference list says what runs on an online computer and how long an of
   await page.goto(REF);
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air在线 · 2/8 在跑');
+  await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air在线');
   await expect(rows.nth(1)).toHaveText(/^办公室 Mac mini离线 · \d+ (分钟|小时)前$/);
   await expect(panel(page).getByRole('button', { name: /云|cloud/i })).toHaveCount(0);
 });
