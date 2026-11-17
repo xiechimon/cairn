@@ -26,7 +26,7 @@ plank >/tmp/plank.log 2>&1 &
 sleep 1
 gsettings set "$dock" hide-mode intelligent 2>/dev/null || true
 gsettings set "$dock" hide-mode none 2>/dev/null || true
-x11vnc -display :1 -rfbport 5900 -nopw -forever -shared -quiet &
+x11vnc -display :1 -rfbport 5900 -nopw -forever -shared -quiet -gone "xdotool keyup Shift_L Shift_R Control_L Control_R Alt_L Alt_R Meta_L Meta_R Super_L Super_R Hyper_L Hyper_R ISO_Level3_Shift Mode_switch" &
 x11vnc -display :1 -rfbport 5901 -viewonly -nopw -forever -shared -quiet &
 touch /run/cairn/ready
 wait -n
