@@ -5,11 +5,11 @@ import { ENV_VARS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { step as stepTable } from '../../apps/server/src/db/schema.js';
-import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
   bootRealServer,
   daemonLogLines,
+  makeDaemonHome,
   type RealServer,
   seedWorld,
   waitFor,
@@ -86,7 +86,7 @@ describe('crash recovery (T2: AgentSession seam × host durable orchestration)',
       { content: '恢复后续跑完成。' },
     ]);
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 500 });
-    home = makeTestTempDir('cairn-crash-home-');
+    home = makeDaemonHome('cairn-crash-home-');
     const world = await seedWorld(server.url, server.teamId, {
       title: '崩溃恢复探针',
       spec: '写一行崩溃恢复探针。',

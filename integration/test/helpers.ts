@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
@@ -11,6 +11,7 @@ import { type Page, expect as pexpect } from '@playwright/test';
 import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, onTestFinished } from 'vitest';
 import { z } from 'zod';
+import { SCRAPLING_VERSION, webToolsBin } from '../../apps/daemon/src/web-tools.js';
 import { createApp } from '../../apps/server/src/app.js';
 import { openDbWithHandle, openMemoryDb } from '../../apps/server/src/db/client.js';
 import {
@@ -34,6 +35,16 @@ import { stampPersonSendBody } from '../../apps/server/test/helpers.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 export const AGENT_ID = 'agent-it-1';
+
+export function makeDaemonHome(prefix: string): string {
+  const home = join(makeTestTempDir(prefix), 'state');
+  const bin = webToolsBin(home);
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(join(bin, 'python'), `#!/bin/sh\nprintf '%s\\n' '${SCRAPLING_VERSION}'\n`, {
+    mode: 0o700,
+  });
+  return home;
+}
 
 const liveServers = new Set<() => Promise<void>>();
 

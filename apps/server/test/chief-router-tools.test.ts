@@ -802,7 +802,7 @@ describe('router tools', () => {
       const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
       expect(text).toContain('create_todo 前用 todos 的 query 按关键词');
       expect(text).toContain('scrapling extract get');
-      expect(text).toContain('Agent Reach is opt-in');
+      expect(text).toContain('Agent Reach 需主动启用');
       expect(text).toContain('服务端没有 shell');
     });
 

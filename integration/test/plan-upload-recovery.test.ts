@@ -16,6 +16,7 @@ import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   bootRealServer,
   daemonLogLines,
+  makeDaemonHome,
   pinSessionRouteMachine,
   type RealServer,
   seedWorld,
@@ -179,7 +180,7 @@ describe('#1026/#1028 final-report failure recovery (real process restarts)', ()
       { content: '规划完成。' },
     ]);
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 500 });
-    home = makeTestTempDir('cairn-plan-uploads-');
+    home = makeDaemonHome('cairn-plan-uploads-');
     proxyHandle = await startProxy(server.url);
     const { buildId } = await startBuild(
       '幂等恢复探针',
@@ -265,7 +266,7 @@ describe('#1026/#1028 final-report failure recovery (real process restarts)', ()
     );
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 500, dbPath });
     const port = Number(new URL(server.url).port);
-    home = makeTestTempDir('cairn-plan-restart-home-');
+    home = makeDaemonHome('cairn-plan-restart-home-');
 
     const probeKey = createApiKey(
       { db: server.db },
