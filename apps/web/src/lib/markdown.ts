@@ -28,6 +28,7 @@ export type ChatBlock =
 export interface ChatBubbleGroup {
   bubble: boolean;
   blocks: ChatBlock[];
+  spaced: boolean[];
   source: string;
 }
 
@@ -398,16 +399,13 @@ export function chatBubbleGroups(text: string): ChatBubbleGroup[] {
   for (const { block, spaced, source } of topBlocks(text)) {
     const bubble = !UNBUBBLED.has(block.kind);
     const open = groups.at(-1);
-    const joins =
-      bubble &&
-      open?.bubble === true &&
-      (!spaced || (block.kind === 'list' && open.blocks.at(-1)?.kind === 'list'));
-    if (open !== undefined && joins) {
+    if (open !== undefined && bubble && open.bubble) {
       open.blocks.push(block);
+      open.spaced.push(spaced);
       open.source = `${open.source}\n${source}`;
       continue;
     }
-    groups.push({ bubble, blocks: [block], source });
+    groups.push({ bubble, blocks: [block], spaced: [false], source });
   }
   return groups;
 }

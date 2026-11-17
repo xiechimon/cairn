@@ -266,6 +266,8 @@ const FLOW_GAP: Record<Flow, string> = {
   list: 'mt-0.5',
 };
 
+const BUBBLE_SPACED_GAP = 'mt-2.5';
+
 function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
   switch (block.kind) {
     case 'head':
@@ -306,13 +308,22 @@ function MarkdownBlocks({
   blocks,
   depth,
   flow,
+  spaced,
 }: {
   blocks: ChatBlock[];
   depth: number;
   flow: Flow;
+  spaced?: boolean[];
 }) {
   return blocks.map((block, i) => (
-    <div key={i} className={cn('chat-md-block', i > 0 && FLOW_GAP[flow])} data-kind={block.kind}>
+    <div
+      key={i}
+      className={cn(
+        'chat-md-block',
+        i > 0 && (spaced?.[i] === true ? BUBBLE_SPACED_GAP : FLOW_GAP[flow]),
+      )}
+      data-kind={block.kind}
+    >
       <MarkdownBlock block={block} depth={depth} />
     </div>
   ));
@@ -515,12 +526,12 @@ function ReplyGroup({
           data-testid="chief-reply-bubble"
           {...(highlighted ? { 'data-reply-highlight': '' } : {})}
         >
-          <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" />
+          <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" spaced={group.spaced} />
           {footer}
         </div>
       ) : (
         <>
-          <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" />
+          <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" spaced={group.spaced} />
           {footer}
         </>
       )}

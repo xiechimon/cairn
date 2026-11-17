@@ -128,27 +128,26 @@ describe('streaming partial markdown', () => {
 });
 
 describe('reply bubbles', () => {
-  it('gives each block separated by a blank line its own bubble', () => {
+  it('puts all text blocks of a reply into one bubble and marks blank-line boundaries', () => {
     const groups = chatBubbleGroups('第一段\n\n# 一级标题\n\n## 二级标题\n\n> 引用');
-    expect(groups.map((g) => g.blocks.map((b) => b.kind))).toEqual([
-      ['para'],
-      ['head'],
-      ['head'],
-      ['quote'],
-    ]);
-    expect(groups.every((g) => g.bubble)).toBe(true);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.bubble).toBe(true);
+    expect(groups[0]?.blocks.map((b) => b.kind)).toEqual(['para', 'head', 'head', 'quote']);
+    expect(groups[0]?.spaced).toEqual([false, true, true, true]);
   });
 
   it('keeps a paragraph and the list right under it in one bubble', () => {
     const groups = chatBubbleGroups('你当前任务的进展：\n1. 第一项\n2. 第二项');
     expect(groups).toHaveLength(1);
     expect(groups[0]?.blocks.map((b) => b.kind)).toEqual(['para', 'list']);
+    expect(groups[0]?.spaced).toEqual([false, false]);
     expect(groups[0]?.source).toBe('你当前任务的进展：\n1. 第一项\n2. 第二项');
   });
 
-  it('merges consecutive lists even across a blank line', () => {
+  it('keeps consecutive lists in one bubble and marks the blank line', () => {
     const groups = chatBubbleGroups('- 无序一\n- 无序二\n\n1. 有序一\n2. 有序二');
     expect(groups.map((g) => g.blocks.map((b) => b.kind))).toEqual([['list', 'list']]);
+    expect(groups[0]?.spaced).toEqual([false, true]);
   });
 
   it('gives each run of a mixed list its own source, once', () => {

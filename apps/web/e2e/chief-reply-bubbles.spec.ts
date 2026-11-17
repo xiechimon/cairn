@@ -9,18 +9,28 @@ const reply = (page: Page) =>
     .getByTestId('chief-msg')
     .filter({ hasText: '这是一段测试用的 Markdown' });
 
-test('every top-level block of a reply is its own grey bubble; tables and code are bordered surfaces', async ({
+test('one reply is one grey bubble with loose paragraph spacing inside; tables and code are bordered surfaces', async ({
   page,
 }) => {
   await page.goto(ROUTE);
   const message = reply(page);
   const blocks = message.locator('[data-slot="reply-block"]');
-  await expect(blocks).toHaveCount(10);
-  await expect(message.getByTestId('chief-reply-bubble')).toHaveCount(8);
+  await expect(blocks).toHaveCount(5);
+  await expect(message.getByTestId('chief-reply-bubble')).toHaveCount(3);
   const bubble = message.getByTestId('chief-reply-bubble').first();
   await expect(bubble).toHaveCSS('border-top-left-radius', '16px');
   await expect(bubble).toHaveCSS('padding-left', '14px');
   await expect(bubble).toHaveCSS('padding-top', '7px');
+  const inner = await bubble
+    .locator('.chat-md-block')
+    .evaluateAll((els) => els.map((el) => el.getBoundingClientRect()));
+  expect(inner.length).toBe(4);
+  for (let i = 1; i < inner.length; i++) {
+    const prev = inner[i - 1];
+    const next = inner[i];
+    if (prev === undefined || next === undefined) continue;
+    expect(Math.round(next.top - prev.bottom), `loose gap before inner block ${i}`).toBe(10);
+  }
   const boxes = await blocks.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()));
   for (let i = 1; i < boxes.length; i++) {
     const prev = boxes[i - 1];
@@ -85,7 +95,7 @@ test('reply quotes the hovered bubble and the Replying to bar darkens only that 
   const tools = quote.locator('xpath=..').getByTestId('chief-msg-block-tools');
   await tools.getByTestId('chief-msg-reply').click();
   const bar = page.getByTestId('composer-reply-quote');
-  await expect(bar).toContainText('这是一段引用');
+  await expect(bar).toContainText('无序列表一');
   await bar.hover();
   await expect(quote).toHaveAttribute('data-reply-highlight', '');
   await expect(
