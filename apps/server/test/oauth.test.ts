@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppContext } from '../src/context.js';
 import { openProviderKey } from '../src/services/providers.js';
 import { bootServer, req, type TestServer } from './helpers.js';
@@ -22,6 +22,8 @@ function mockOAuthFetch(script: { status?: number; json?: unknown; throw?: boole
 
 const CLIENT = { clientId: 'cid-test', clientSecret: 'cs-test' };
 const ORIGIN = 'http://127.0.0.1:8787';
+
+afterEach(() => vi.unstubAllEnvs());
 
 function bootOAuth(
   script: Parameters<typeof mockOAuthFetch>[0],
@@ -87,6 +89,15 @@ describe('POST /api/teams/:id/providers/oauth/:preset/authorize', () => {
     expect(url?.searchParams.get('scope')).toBe('read:user');
     expect(state).toBeTruthy();
     expect(s.oauthStates.has(state as string)).toBe(true);
+  });
+
+  it('3b. github.com authorize and token URLs follow a loopback OAuth base', async () => {
+    vi.stubEnv('CAIRN_GITHUB_OAUTH_BASE_URL', 'http://127.0.0.1:4002');
+    const { s, mock } = bootOAuth({ json: { access_token: 'gho_fake', token_type: 'bearer' } });
+    const { url, state } = await authorize(s);
+    expect(url?.origin + url?.pathname).toBe('http://127.0.0.1:4002/login/oauth/authorize');
+    await callback(s, `code=fakecode&state=${state}`);
+    expect(mock.calls[0]?.url).toBe('http://127.0.0.1:4002/login/oauth/access_token');
   });
 });
 

@@ -1609,6 +1609,22 @@
           "purpose": "D109 PrWatch, CI checks, review feedback and merge against stateful emulate.dev over loopback HTTP; saves wire responses and SQLite rows."
         }
       }
+    },
+    "github-auth-emulator": {
+      "recipe": "features/github-auth-emulator.md",
+      "cases": {
+        "device-sign-in": {
+          "script": "integration/verify/github-auth-emulator.mts",
+          "runner": "tsx",
+          "cwd": "integration",
+          "args": [],
+          "needs": [
+            "own-stack"
+          ],
+          "status": "current",
+          "purpose": "Team GitHub device sign-in, profile adoption, repo list, refresh rotation and revocation against the in-repo githubAuthFake over loopback HTTP through CAIRN_GITHUB_OAUTH_BASE_URL; a real Chromium leg approves the code on the fake /login/device page."
+        }
+      }
     }
   }
 }

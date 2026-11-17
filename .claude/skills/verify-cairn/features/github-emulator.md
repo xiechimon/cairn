@@ -39,7 +39,7 @@ PR coverage lines:
 ```text
 Live: Cairn PrWatch and GitHub helpers over loopback HTTP; migrated SQLite DB.
 Mocked: GitHub emulator (emulate.dev), version 0.13.0.
-Not covered: real GitHub, OAuth authorization/token exchange, daemon git/gh calls, skill-import raw downloads, browser PR journey, E2B, Langfuse.
+Not covered: real GitHub, OAuth authorization/token exchange (see github-auth-emulator.md), daemon git/gh calls, skill-import raw downloads, browser PR journey, E2B, Langfuse.
 ```
 
 ## Gotchas

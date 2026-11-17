@@ -820,7 +820,7 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`
-- Verify recipes: [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/github-emulator.md](features/github-emulator.md)
+- Verify recipes: [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/github-emulator.md](features/github-emulator.md), [.claude/skills/verify-cairn/features/github-auth-emulator.md](features/github-auth-emulator.md)
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)

@@ -1679,7 +1679,8 @@
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/github-oauth-picker.md",
-        ".claude/skills/verify-cairn/features/github-emulator.md"
+        ".claude/skills/verify-cairn/features/github-emulator.md",
+        ".claude/skills/verify-cairn/features/github-auth-emulator.md"
       ],
       "research": [
         "docs/research/bot-identity-and-coauthorship-2026-11-07.md"

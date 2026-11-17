@@ -11,6 +11,7 @@ import {
   githubUserIdentity,
   type OAuthTokenExchange,
 } from '../lib/github.js';
+import { onGithubOauthBase } from '../lib/github-oauth-base.js';
 import { newRecordId } from '../lib/ids.js';
 import { upsertGithubConnection } from './github-connection.js';
 import {
@@ -106,7 +107,7 @@ function issueAuthorize(
   sweep(deps.states);
   const state = newRecordId(32);
   deps.states.set(state, entry);
-  const url = new URL(target.authorizeUrl);
+  const url = new URL(onGithubOauthBase(target.authorizeUrl));
   url.searchParams.set('client_id', client.clientId);
   url.searchParams.set('redirect_uri', `${entry.origin}/api/oauth/callback`);
   url.searchParams.set('scope', target.scope);
@@ -205,7 +206,7 @@ async function exchangeToken(
 ): Promise<OAuthTokenExchange> {
   try {
     return await exchangeOAuthCode(deps.fetch, {
-      tokenUrl,
+      tokenUrl: onGithubOauthBase(tokenUrl),
       clientId: client.clientId,
       clientSecret: client.clientSecret,
       code,

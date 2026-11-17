@@ -9,6 +9,7 @@ import type { Db } from '../db/client.js';
 import { githubConnection } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { type FetchLike, refreshOAuthAccessToken } from '../lib/github.js';
+import { onGithubOauthBase } from '../lib/github-oauth-base.js';
 import { isAppToken, type UserToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { SecretBoxError } from '../lib/secret-box.js';
@@ -185,7 +186,7 @@ function refreshConnectionToken(
     if (client === null) return { token: staleToken, box };
     try {
       const tokens = await refreshOAuthAccessToken(fetchImpl, {
-        tokenUrl: GITHUB_CONNECTION_OAUTH.tokenUrl,
+        tokenUrl: onGithubOauthBase(GITHUB_CONNECTION_OAUTH.tokenUrl),
         clientId: client.clientId,
         clientSecret: client.clientSecret,
         refreshToken,

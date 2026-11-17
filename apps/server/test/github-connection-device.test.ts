@@ -9,54 +9,10 @@ import {
   pollGithubConnectionDevice,
   startGithubConnectionDevice,
 } from '../src/services/github-connection-device.js';
+import { type GithubAuthFake, githubAuthFake } from './fakes/github-auth.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const APP = { clientId: 'Iv23shared', slug: 'cairnwright' };
-
-interface Call {
-  url: string;
-  form: URLSearchParams;
-  auth: string | undefined;
-}
-
-function scripted(onCall?: (call: Call) => void) {
-  const calls: Call[] = [];
-  const replies: { status: number; body: unknown }[] = [];
-  const fetch: FetchLike = async (input, init) => {
-    const call = {
-      url: String(input),
-      form: new URLSearchParams(typeof init?.body === 'string' ? init.body : ''),
-      auth: init?.headers?.authorization,
-    };
-    calls.push(call);
-    onCall?.(call);
-    const reply = replies.shift() ?? { status: 500, body: {} };
-    return {
-      ok: reply.status >= 200 && reply.status < 300,
-      status: reply.status,
-      headers: { get: () => null },
-      json: async () => reply.body,
-      text: async () => JSON.stringify(reply.body),
-    };
-  };
-  const reply = (body: unknown, status = 200) => replies.push({ status, body });
-  return { fetch, calls, reply };
-}
-
-const CODE = {
-  device_code: 'private-device-code',
-  user_code: 'WDJB-MJHT',
-  verification_uri: 'https://github.com/login/device',
-  interval: 5,
-  expires_in: 900,
-};
-const GRANT = {
-  access_token: 'ghu_first_access',
-  refresh_token: 'ghr_first_refresh',
-  expires_in: 28_800,
-  refresh_token_expires_in: 15_552_000,
-  scope: '',
-};
 
 let s: TestServer | undefined;
 beforeEach(() => {
@@ -82,8 +38,7 @@ const row = (server: TestServer) =>
     .where(eq(githubConnection.teamId, server.team.id))
     .get();
 
-async function startAttempt(server: TestServer, gh: ReturnType<typeof scripted>) {
-  gh.reply(CODE);
+async function startAttempt(server: TestServer) {
   const res = await req(server.app, 'POST', base(server), {});
   expect(res.status).toBe(200);
   return (await res.json()) as { attemptId: string; userCode: string; verificationUri: string };
@@ -96,11 +51,11 @@ async function poll(server: TestServer, attemptId: string) {
 
 describe('team GitHub connection through device flow', () => {
   test('capabilities name the App install page only when a registration exists', async () => {
-    const off = boot(scripted().fetch, null);
+    const off = boot(githubAuthFake().fetch, null);
     const offBody = await (await req(off.app, 'GET', '/api/capabilities')).json();
     expect(capabilitiesResponseSchema.parse(offBody).githubDeviceInstallUrl).toBeNull();
     off.dispose();
-    const on = boot(scripted().fetch);
+    const on = boot(githubAuthFake().fetch);
     const onBody = await (await req(on.app, 'GET', '/api/capabilities')).json();
     expect(capabilitiesResponseSchema.parse(onBody).githubDeviceInstallUrl).toBe(
       'https://github.com/apps/cairnwright/installations/new',
@@ -108,7 +63,7 @@ describe('team GitHub connection through device flow', () => {
   });
 
   test('start without a registration is 400 and makes no GitHub request', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch, null);
     const res = await req(server.app, 'POST', base(server), {});
     expect(res.status).toBe(400);
@@ -116,14 +71,12 @@ describe('team GitHub connection through device flow', () => {
   });
 
   test('start keeps the device code private; polling before the interval asks GitHub nothing', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch);
-    const started = await startAttempt(server, gh);
-    expect(started).toMatchObject({
-      userCode: 'WDJB-MJHT',
-      verificationUri: 'https://github.com/login/device',
-    });
-    expect(JSON.stringify(started)).not.toContain('private-device-code');
+    const started = await startAttempt(server);
+    expect(started).toMatchObject({ verificationUri: 'https://github.com/login/device' });
+    expect(started.userCode).toMatch(/^[A-Z0-9-]+$/);
+    expect(JSON.stringify(started)).not.toContain(gh.latestDevice()?.deviceCode ?? '');
     expect(gh.calls[0]?.form.get('client_id')).toBe('Iv23shared');
     expect(gh.calls[0]?.form.has('client_secret')).toBe(false);
     expect(await poll(server, started.attemptId)).toEqual({
@@ -134,11 +87,11 @@ describe('team GitHub connection through device flow', () => {
   });
 
   test('slow_down widens the interval; denied ends the attempt and writes nothing', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch);
-    const { attemptId } = await startAttempt(server, gh);
+    const { attemptId, userCode } = await startAttempt(server);
     vi.advanceTimersByTime(5_000);
-    gh.reply({ error: 'slow_down', interval: 10 });
+    gh.slowDownDevice(userCode, 10);
     expect((await poll(server, attemptId)).body).toEqual({
       status: 'pending',
       intervalSeconds: 10,
@@ -150,28 +103,27 @@ describe('team GitHub connection through device flow', () => {
     });
     expect(gh.calls).toHaveLength(2);
     vi.advanceTimersByTime(5_000);
-    gh.reply({ error: 'access_denied' });
+    gh.denyDevice(userCode);
     expect((await poll(server, attemptId)).body).toEqual({ status: 'denied' });
     expect((await poll(server, attemptId)).status).toBe(404);
     expect(row(server)).toBeUndefined();
   });
 
   test('an attempt past its expiry reports expired without asking GitHub', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch);
-    const { attemptId } = await startAttempt(server, gh);
+    const { attemptId } = await startAttempt(server);
     vi.advanceTimersByTime(900_000);
     expect((await poll(server, attemptId)).body).toEqual({ status: 'expired' });
     expect(gh.calls).toHaveLength(1);
   });
 
   test('complete writes a sealed device row; a later OAuth reconnect clears its device fields', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch);
-    const { attemptId } = await startAttempt(server, gh);
+    const { attemptId, userCode } = await startAttempt(server);
     vi.advanceTimersByTime(5_000);
-    gh.reply(GRANT);
-    gh.reply({ login: 'octo', id: 42, name: 'Octo' });
+    gh.approveDevice(userCode);
     const done = await poll(server, attemptId);
     expect(githubConnectionDevicePollSchema.parse(done.body)).toEqual({
       status: 'complete',
@@ -186,8 +138,10 @@ describe('team GitHub connection through device flow', () => {
       refreshTokenExpiresAt: 1_800_000_000_000 + 5_000 + 15_552_000_000,
     });
     expect(saved?.connectionGeneration).toEqual(expect.any(String));
-    expect(JSON.stringify(saved)).not.toContain('ghu_first_access');
-    expect(JSON.stringify(saved)).not.toContain('ghr_first_refresh');
+    for (const [accessToken, grant] of gh.grants) {
+      expect(JSON.stringify(saved)).not.toContain(accessToken);
+      expect(JSON.stringify(saved)).not.toContain(grant.refreshToken);
+    }
     const status = await (
       await req(server.app, 'GET', `/api/teams/${server.team.id}/github/connection`)
     ).json();
@@ -205,7 +159,7 @@ describe('team GitHub connection through device flow', () => {
   });
 
   test('another team or user cannot poll or cancel the attempt', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch);
     const deps = {
       db: server.db,
@@ -214,7 +168,6 @@ describe('team GitHub connection through device flow', () => {
       app: APP,
       attempts: new Map(),
     };
-    gh.reply(CODE);
     const { attemptId } = await startGithubConnectionDevice(deps, { teamId: 't1', userId: 'u1' });
     for (const who of [
       { teamId: 't1', userId: 'u2' },
@@ -229,20 +182,23 @@ describe('team GitHub connection through device flow', () => {
   });
 
   test('cancel drops the attempt', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch);
-    const { attemptId } = await startAttempt(server, gh);
+    const { attemptId } = await startAttempt(server);
     expect((await req(server.app, 'DELETE', `${base(server)}/${attemptId}`)).status).toBe(204);
     expect((await poll(server, attemptId)).status).toBe(404);
   });
 });
 
 describe('GitHub profile adoption on connect', () => {
-  async function connectAs(server: TestServer, gh: ReturnType<typeof scripted>, identity: object) {
-    const { attemptId } = await startAttempt(server, gh);
+  async function connectAs(
+    server: TestServer,
+    gh: GithubAuthFake,
+    identity: { id: number; login: string; name: string | null },
+  ) {
+    const { attemptId, userCode } = await startAttempt(server);
     vi.advanceTimersByTime(5_000);
-    gh.reply(GRANT);
-    gh.reply(identity);
+    gh.approveDevice(userCode, identity);
     expect((await poll(server, attemptId)).body).toMatchObject({ status: 'complete' });
     return (await (await req(server.app, 'GET', '/api/user/me')).json()) as {
       displayName: string;
@@ -251,7 +207,7 @@ describe('GitHub profile adoption on connect', () => {
   }
 
   test('an untouched name follows GitHub; a name the owner set survives while the avatar still updates', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch);
     expect(await connectAs(server, gh, { login: 'octo', id: 42, name: ' Octo Cat ' })).toEqual(
       expect.objectContaining({
@@ -281,7 +237,7 @@ describe('GitHub profile adoption on connect', () => {
   });
 
   test('an owner from before the rename flag keeps a non-default name', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch);
     server.db.update(user).set({ displayName: 'Mon', displayNameEdited: null }).run();
     expect(await connectAs(server, gh, { login: 'octo', id: 42, name: 'Octo Cat' })).toMatchObject({
@@ -291,7 +247,7 @@ describe('GitHub profile adoption on connect', () => {
 });
 
 describe('device-grant refresh', () => {
-  function seedDevice(server: TestServer, access: string, expiresAt: number) {
+  function seedDevice(server: TestServer, gh: GithubAuthFake, access: string, expiresAt: number) {
     upsertGithubConnection(
       { db: server.db, box: server.secretBox },
       {
@@ -304,62 +260,62 @@ describe('device-grant refresh', () => {
         device: { clientId: 'Iv23stored', refreshTokenExpiresAt: expiresAt + 1e10 },
       },
     );
+    gh.knowGrant(access, `${access}-refresh`);
   }
   const read = (server: TestServer, fetch: FetchLike) =>
     githubTokenOrNull({ db: server.db, box: server.secretBox, githubFetch: fetch }, server.team.id);
 
   test('an expiring device token refreshes with the stored client ID and no secret', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch);
-    seedDevice(server, 'ghu_old', Date.now() + 30_000);
-    gh.reply({ ...GRANT, access_token: 'ghu_new', refresh_token: 'ghr_new' });
-    expect(await read(server, gh.fetch)).toBe('ghu_new');
+    seedDevice(server, gh, 'ghu_old', Date.now() + 30_000);
+    const refreshed = await read(server, gh.fetch);
+    expect(refreshed).toMatch(/^ghu_/);
+    expect(refreshed).not.toBe('ghu_old');
     expect(gh.calls[0]?.form.get('client_id')).toBe('Iv23stored');
     expect(gh.calls[0]?.form.get('refresh_token')).toBe('ghu_old-refresh');
     expect(gh.calls[0]?.form.has('client_secret')).toBe(false);
-    expect(await read(server, gh.fetch)).toBe('ghu_new');
+    expect(await read(server, gh.fetch)).toBe(refreshed);
     expect(gh.calls).toHaveLength(1);
   });
 
   test('a refresh that loses to a newer sign-in keeps the newer grant', async () => {
+    const gh = githubAuthFake();
     let server: TestServer;
-    const gh = scripted((call) => {
+    gh.setOnRequest((call) => {
       if (call.form.get('grant_type') === 'refresh_token')
-        seedDevice(server, 'ghu_newer_signin', Date.now() + 3_600_000);
+        seedDevice(server, gh, 'ghu_newer_signin', Date.now() + 3_600_000);
     });
     server = boot(gh.fetch);
-    seedDevice(server, 'ghu_old', Date.now() + 30_000);
-    gh.reply({ ...GRANT, access_token: 'ghu_lost_race', refresh_token: 'ghr_lost_race' });
+    seedDevice(server, gh, 'ghu_old', Date.now() + 30_000);
     expect(await read(server, gh.fetch)).toBe('ghu_newer_signin');
     expect(await read(server, gh.fetch)).toBe('ghu_newer_signin');
   });
 
   test('a revoked refresh token disconnects; an outage keeps the row and the stale token', async () => {
-    const gh = scripted();
+    const gh = githubAuthFake();
     const server = boot(gh.fetch);
-    seedDevice(server, 'ghu_old', Date.now() + 30_000);
-    gh.reply({}, 503);
+    seedDevice(server, gh, 'ghu_old', Date.now() + 30_000);
+    gh.setFault(503);
     expect(await read(server, gh.fetch)).toBe('ghu_old');
     expect(row(server)?.disconnectedReason).toBeNull();
-    gh.reply({ error: 'bad_refresh_token' }, 400);
+    gh.setFault(null);
+    gh.revoke('ghu_old-refresh');
     expect(await read(server, gh.fetch)).toBeNull();
     expect(row(server)?.disconnectedReason).toBe('GitHub authorization expired');
   });
 
   test.each([
-    [
-      'succeeds',
-      200,
-      { access_token: 'gho_refreshed', refresh_token: 'ghr_x', expires_in: 28_800 },
-    ],
-    ['fails', 401, { error: 'bad_refresh_token' }],
+    ['succeeds', true],
+    ['fails', false],
   ] as const)(
     'a legacy OAuth refresh that %s after a device sign-in leaves the device row alone',
-    async (_, status, body) => {
+    async (_, keepsGrant) => {
+      const gh = githubAuthFake();
       let server: TestServer;
-      const gh = scripted((call) => {
+      gh.setOnRequest((call) => {
         if (call.form.get('client_secret') === 'oauth-secret')
-          seedDevice(server, 'ghu_device_signin', Date.now() + 3_600_000);
+          seedDevice(server, gh, 'ghu_device_signin', Date.now() + 3_600_000);
       });
       server = boot(gh.fetch);
       upsertGithubConnection(
@@ -373,7 +329,8 @@ describe('device-grant refresh', () => {
           scope: 'repo',
         },
       );
-      gh.reply(body, status);
+      gh.knowGrant('gho_legacy', 'ghr_legacy');
+      if (!keepsGrant) gh.revoke('ghr_legacy');
       const token = await githubTokenOrNull(
         {
           db: server.db,

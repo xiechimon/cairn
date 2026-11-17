@@ -1,9 +1,6 @@
 import { HttpError } from '../lib/errors.js';
 import { type FetchLike, githubUserIdentity } from '../lib/github.js';
-
-const VERIFICATION_URI = 'https://github.com/login/device';
-const DEVICE_URL = 'https://github.com/login/device/code';
-const TOKEN_URL = 'https://github.com/login/oauth/access_token';
+import { githubOauthEndpoints } from '../lib/github-oauth-base.js';
 
 function requiredString(body: Record<string, unknown>, field: string): string {
   const value = body[field];
@@ -82,7 +79,8 @@ function tokenGrant(body: Record<string, unknown>) {
 }
 
 export async function requestGithubDeviceCode(deps: { fetch: FetchLike }, clientId: string) {
-  const body = await postForm(deps, DEVICE_URL, {
+  const endpoints = githubOauthEndpoints();
+  const body = await postForm(deps, endpoints.deviceCodeUrl, {
     client_id: clientId,
     scope: 'offline_access',
   });
@@ -92,13 +90,13 @@ export async function requestGithubDeviceCode(deps: { fetch: FetchLike }, client
       'GitHub device authorization failed; check the public App registration',
     );
   }
-  if (body.verification_uri !== VERIFICATION_URI) {
+  if (body.verification_uri !== endpoints.verificationUri) {
     throw new HttpError(502, 'GitHub returned an untrusted verification URL');
   }
   return {
     deviceCode: requiredString(body, 'device_code'),
     userCode: requiredString(body, 'user_code'),
-    verificationUri: VERIFICATION_URI,
+    verificationUri: endpoints.verificationUri,
     intervalSeconds: body.interval === undefined ? 5 : positiveSeconds(body, 'interval'),
     expiresInSeconds: positiveSeconds(body, 'expires_in'),
   };
@@ -109,7 +107,7 @@ export async function pollGithubDeviceCode(
   clientId: string,
   deviceCode: string,
 ) {
-  const body = await postForm(deps, TOKEN_URL, {
+  const body = await postForm(deps, githubOauthEndpoints().tokenUrl, {
     client_id: clientId,
     device_code: deviceCode,
     grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
@@ -141,7 +139,7 @@ export async function refreshGithubDeviceToken(
   clientId: string,
   refreshToken: string,
 ) {
-  const body = await postForm(deps, TOKEN_URL, {
+  const body = await postForm(deps, githubOauthEndpoints().tokenUrl, {
     client_id: clientId,
     grant_type: 'refresh_token',
     refresh_token: refreshToken,

@@ -23,6 +23,7 @@ import {
 } from '@cairn/shared';
 import type { Db } from '../db/client.js';
 import { HttpError } from '../lib/errors.js';
+import { githubApiBaseUrl } from '../lib/github-api-base.js';
 import { nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
 import { readSkillSource, writeSkillSource } from './skill-source-store.js';
@@ -58,7 +59,6 @@ export const SKILL_IMPORT_DEADLINE_MS = 120_000;
 
 export const SKILL_IMPORT_MAX_FILES = 256;
 
-const GH_API_BASE = 'https://api.github.com';
 const GH_RAW_BASE = 'https://raw.githubusercontent.com';
 // GitHub rejects API requests without a User-Agent (403).
 const GH_USER_AGENT = 'cairn-skill-import';
@@ -412,7 +412,7 @@ async function collectFromGithubUrl(rawUrl: string, opts: SkillImportOpts): Prom
   const target = parseGithubUrl(rawUrl);
   const meta = await fetchGithubJson<{ default_branch?: unknown }>(
     opts,
-    `${GH_API_BASE}/repos/${target.owner}/${target.repo}`,
+    `${githubApiBaseUrl()}/repos/${target.owner}/${target.repo}`,
   );
   if (meta.status !== 200) throw githubApiError(`repo ${target.owner}/${target.repo}`, meta.status);
   const defaultBranch =
@@ -422,7 +422,7 @@ async function collectFromGithubUrl(rawUrl: string, opts: SkillImportOpts): Prom
   const ref = target.ref ?? defaultBranch;
   const tree = await fetchGithubJson<{ truncated?: boolean; tree?: GhTreeEntry[] }>(
     opts,
-    `${GH_API_BASE}/repos/${target.owner}/${target.repo}/git/trees/${ref}?recursive=1`,
+    `${githubApiBaseUrl()}/repos/${target.owner}/${target.repo}/git/trees/${ref}?recursive=1`,
   );
   if (tree.status !== 200)
     throw githubApiError(`ref ${ref} of ${target.owner}/${target.repo}`, tree.status);
