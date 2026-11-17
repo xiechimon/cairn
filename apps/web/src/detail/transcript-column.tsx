@@ -16,6 +16,7 @@ import {
   MessageScrollerContent,
   MessageScrollerProvider,
   useMessageScroller,
+  useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
 import type { TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -50,13 +51,14 @@ interface TranscriptColumnProps {
 
 export const TranscriptColumn = forwardRef<TranscriptColumnHandle, TranscriptColumnProps>(
   function TranscriptColumn({ autoScroll, ...rest }, ref) {
+    const [unpinned, setUnpinned] = useState(false);
     return (
       <MessageScrollerProvider
-        autoScroll={autoScroll}
+        autoScroll={autoScroll && !unpinned}
         scrollEdgeThreshold={FOLLOW_THRESHOLD}
         defaultScrollPosition="end"
       >
-        <TranscriptColumnInner {...rest} handleRef={ref} />
+        <TranscriptColumnInner {...rest} handleRef={ref} setUnpinned={setUnpinned} />
       </MessageScrollerProvider>
     );
   },
@@ -76,11 +78,17 @@ function TranscriptColumnInner({
   earlier,
   shortEnd = false,
   handleRef,
+  setUnpinned,
 }: Omit<TranscriptColumnProps, 'autoScroll'> & {
   handleRef: React.ForwardedRef<TranscriptColumnHandle>;
+  setUnpinned: (unpinned: boolean) => void;
 }) {
   const { t } = useI18n();
   const { scrollToEnd, scrollToMessage } = useMessageScroller();
+  const scrollable = useMessageScrollerScrollable();
+  useEffect(() => {
+    if (!scrollable.end) setUnpinned(false);
+  }, [scrollable.end, setUnpinned]);
   useImperativeHandle(handleRef, () => ({ scrollToEnd: () => void scrollToEnd() }), [scrollToEnd]);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [rows, setRows] = useState<HTMLDivElement | null>(null);
@@ -123,6 +131,13 @@ function TranscriptColumnInner({
       <FadeScrollerViewport
         ref={viewportRef}
         reserveEnd={compactEnd}
+        onClickCapture={(event) => {
+          const toggle =
+            event.target instanceof Element
+              ? event.target.closest('[aria-expanded]:not([aria-haspopup])')
+              : null;
+          if (toggle !== null) setUnpinned(true);
+        }}
         data-testid="transcript-col"
         className={compactEnd ? VIEWPORT_CLS : `${VIEWPORT_CLS} pb-(--chat-extra-space)`}
       >

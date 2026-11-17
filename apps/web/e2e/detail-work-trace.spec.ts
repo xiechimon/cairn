@@ -87,12 +87,17 @@ const MESSAGES = [
   msg('assistant', call('running-1', 'Bash', { command: 'pnpm lint', description: 'Check formatting' }), 22000),
 ];
 
-async function stubWorld(page: Page, stepStatus: 'claimed' | 'stopped' = 'claimed') {
+async function stubWorld(
+  page: Page,
+  stepStatus: 'claimed' | 'stopped' = 'claimed',
+  phase: string = 'review',
+) {
   const json = (body: unknown, status = 200) => ({
     status,
     contentType: 'application/json',
     body: JSON.stringify(body),
   });
+  const card = { ...WIRE_CARD, phase };
   await page.route('**/api/**', (route, request) => {
     const url = new URL(request.url());
     const path = url.pathname;
@@ -100,8 +105,8 @@ async function stubWorld(page: Page, stepStatus: 'claimed' | 'stopped' = 'claime
       if (path === '/api/teams') return route.fulfill(json([TEAM]));
       if (path === '/api/user/me') return route.fulfill(json(USER));
       if (path === '/api/projects') return route.fulfill(json([PROJECT]));
-      if (path === '/api/todos') return route.fulfill(json([WIRE_CARD]));
-      if (path === `/api/todos/${CARD_ID}`) return route.fulfill(json(WIRE_CARD));
+      if (path === '/api/todos') return route.fulfill(json([card]));
+      if (path === `/api/todos/${CARD_ID}`) return route.fulfill(json(card));
       if (path === `/api/teams/${TEAM_ID}/members`) {
         return route.fulfill(json([
           { id: 'member-user', teamId: TEAM_ID, actorId: USER_ID, memberType: 'user', actor: USER },
@@ -269,6 +274,43 @@ test('a long summary stays on one line in a narrow column and keeps the full tex
     lineHeight: Number.parseFloat(getComputedStyle(el).lineHeight),
   }));
   expect(box.height).toBeLessThanOrEqual(box.lineHeight + 1);
+});
+
+test('expanding a row at the bottom keeps the reading position', async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 460 });
+  await stubWorld(page, 'claimed', 'building');
+  const col = page.getByTestId('transcript-col');
+  const gap = () => col.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+  await expect.poll(gap).toBeLessThanOrEqual(1);
+  const scrollTop = await col.evaluate((el) => el.scrollTop);
+  const row = page.getByTestId('work-call').last();
+  const box = await row.boundingBox();
+  if (box == null) throw new Error('work-call not visible');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(row).toHaveAttribute('aria-expanded', 'true');
+  await page.waitForTimeout(150);
+  expect(await col.evaluate((el) => el.scrollTop)).toBe(scrollTop);
+  expect(await row.evaluate((el) => el.getBoundingClientRect().top)).toBe(box.y);
+  await expect.poll(gap).toBeGreaterThan(0);
+});
+
+test('returning to the bottom after expanding resumes following', async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 460 });
+  await stubWorld(page, 'claimed', 'building');
+  const col = page.getByTestId('transcript-col');
+  const gap = () => col.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+  await expect.poll(gap).toBeLessThanOrEqual(1);
+  const row = page.getByTestId('work-call').last();
+  const box = await row.boundingBox();
+  if (box == null) throw new Error('work-call not visible');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(row).toHaveAttribute('aria-expanded', 'true');
+  await expect.poll(gap).toBeGreaterThan(0);
+  await col.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await expect.poll(gap).toBeLessThanOrEqual(1);
+  await row.evaluate((el) => el.click());
+  await expect(row).toHaveAttribute('aria-expanded', 'false');
+  await expect.poll(gap).toBeLessThanOrEqual(1);
 });
 
 for (const theme of ['light', 'dark'] as const) {
