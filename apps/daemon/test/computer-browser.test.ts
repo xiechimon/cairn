@@ -459,8 +459,33 @@ describe('login form detection', () => {
     const { text } = await run(provider, 'browser_snapshot');
     expect(text.startsWith('- textbox "Password" [ref=e2]')).toBe(true);
     expect(text).toContain('\n\n[page text]\nJob description\nBuild agents\nxxx');
-    expect(text.endsWith('[page text truncated]')).toBe(true);
-    expect(text.length).toBeLessThan(PAGE_TEXT_MAX_CHARS + 200);
+    expect(text).toContain('[page text truncated here');
+    expect(text.length).toBeLessThanOrEqual(PAGE_TEXT_MAX_CHARS + 200);
+  });
+
+  test('a selector reads one element in full, text the capped page text cut off', async () => {
+    const tail = 'Salary 30-50K, 5 days a week';
+    const argvs: string[] = [];
+    const provider = detectingProvider([], evalResult([]));
+    provider.execute = async (request) => {
+      argvs.push(request.argv.join(' '));
+      const body = request.argv.includes('text')
+        ? JSON.stringify({ success: true, data: { text: `Job description\n${tail}` } })
+        : '{}';
+      return (async function* () {
+        yield { kind: 'stdout' as const, text: body };
+        yield { kind: 'exit' as const, code: 0 };
+      })();
+    };
+    const result = await runBrowserTool(
+      provider,
+      'browser_snapshot',
+      { selector: '.job-detail' },
+      { timeoutMs: 5_000, signal: new AbortController().signal, cairnOrigins: [], session: 's' },
+    );
+    expect(result.text).toBe(`Job description\n${tail}`);
+    expect(argvs.some((line) => line.includes('get text .job-detail'))).toBe(true);
+    expect(argvs.some((line) => line.includes('snapshot'))).toBe(false);
   });
 
   test('a page without login signals adds nothing', async () => {

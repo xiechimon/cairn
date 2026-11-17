@@ -23,8 +23,13 @@ export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'browser_snapshot',
     description:
-      'Read the current page as an accessibility tree with interactive refs (@e1, @e2, …). Prefer this before browser_act.',
-    parameters: obj({ stealth }),
+      'Read the current page as an accessibility tree with interactive refs (@e1, @e2, …), followed by the page text, which is cut at 12000 characters. Prefer this before browser_act. On long pages, for example a result list beside a detail pane, pass selector to read one element in full instead: a CSS selector for the section (such as the job description pane) or an @ref.',
+    parameters: obj({
+      selector: str(
+        'CSS selector or @ref of one element whose full text to return instead of the page snapshot.',
+      ),
+      stealth,
+    }),
     replaySafe: true,
   },
   {

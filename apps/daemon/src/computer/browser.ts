@@ -76,7 +76,23 @@ export const AUTO_STEALTH_NOTE =
 
 export const PAGE_TEXT_MAX_CHARS = 12_000;
 export const PAGE_TEXT_SCRIPT = "document.body ? document.body.innerText : ''";
-const PAGE_TEXT_TRUNCATED = '\n[page text truncated]';
+const PAGE_TEXT_TRUNCATED =
+  '\n[page text truncated here; the rest of the page is not shown. Call browser_snapshot with selector (a CSS selector or an @ref) to read one section in full]';
+const ELEMENT_TEXT_TRUNCATED = '\n[element text truncated]';
+
+function tidyText(raw: string): string {
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .join('\n');
+}
+
+function capText(text: string, notice: string): string {
+  return text.length <= PAGE_TEXT_MAX_CHARS
+    ? text
+    : text.slice(0, PAGE_TEXT_MAX_CHARS - notice.length) + notice;
+}
 
 export function pageTextSection(output: string): string {
   let result: unknown;
@@ -86,17 +102,20 @@ export function pageTextSection(output: string): string {
     return '';
   }
   if (typeof result !== 'string') return '';
-  const text = result
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '')
-    .join('\n');
+  const text = tidyText(result);
   if (text === '') return '';
-  const capped =
-    text.length <= PAGE_TEXT_MAX_CHARS
-      ? text
-      : text.slice(0, PAGE_TEXT_MAX_CHARS - PAGE_TEXT_TRUNCATED.length) + PAGE_TEXT_TRUNCATED;
-  return `\n\n[page text]\n${capped}`;
+  return `\n\n[page text]\n${capText(text, PAGE_TEXT_TRUNCATED)}`;
+}
+
+export function elementTextSection(output: string): string {
+  let result: unknown;
+  try {
+    result = (JSON.parse(output) as { data?: { text?: unknown } } | null)?.data?.text;
+  } catch {
+    return '';
+  }
+  if (typeof result !== 'string') return '';
+  return capText(tidyText(result), ELEMENT_TEXT_TRUNCATED);
 }
 
 export function isAutomationBlankSnapshot(text: string): boolean {
@@ -725,6 +744,24 @@ export async function runBrowserTool(
 
   if (tool === 'browser_snapshot') {
     await refuseOnCairn('browser_snapshot');
+    const selector = typeof params.selector === 'string' ? params.selector.trim() : '';
+    if (selector !== '') {
+      const element = await execute([
+        ...prefix,
+        '--json',
+        'get',
+        'text',
+        selector.startsWith('@') || /^e\d+$/.test(selector) ? normalizeRef(selector) : selector,
+      ]);
+      if (element.code !== 0 && element.code !== null) {
+        refuse(
+          element.text || `agent-browser get text failed with exit code ${element.code}`,
+          started,
+        );
+      }
+      await refuseOffBoundTab('browser_snapshot');
+      return { text: elementTextSection(element.text) || '(element has no text)' };
+    }
     const result = await execute([...prefix, 'snapshot', '-i']);
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser snapshot failed with exit code ${result.code}`, started);
