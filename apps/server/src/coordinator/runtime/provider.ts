@@ -20,7 +20,7 @@ const STREAMS: Record<string, () => ProviderStreams> = {
 };
 
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
-const DEFAULT_MAX_TOKENS = 8_192;
+const DEFAULT_MAX_TOKENS = 32_768;
 const KEYLESS_PLACEHOLDER = 'cairn-keyless';
 
 export function isBuiltinProvider(providerId: string): providerId is BuiltinProvider {

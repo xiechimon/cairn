@@ -33,6 +33,7 @@ const BUSY_RETRY_MS = 2_000;
 const BUSY_RETRY_LIMIT_MS = 3 * 60_000;
 const REPORT_CHUNK_BYTES = 40 * 1024;
 const SNAPSHOT_CHUNK_CHARS = 192 * 1024;
+const APPEND_MAX_CHARS = 48_000;
 
 const ensured = new Set<string>();
 
@@ -335,6 +336,44 @@ async function collectDeliverables(
   }`;
 }
 
+async function appendFile(
+  deps: MachineDeps,
+  machineId: string | null,
+  row: StepRow,
+  params: Record<string, unknown>,
+  toolCallId: string,
+  signal: AbortSignal | undefined,
+): Promise<string> {
+  if (typeof params.path !== 'string' || params.path.trim() === '') {
+    throw new HttpError(400, 'write_file needs a path');
+  }
+  if (typeof params.content !== 'string') throw new HttpError(400, 'write_file needs content');
+  if (params.content.length > APPEND_MAX_CHARS) {
+    throw new HttpError(
+      400,
+      `append is limited to ${APPEND_MAX_CHARS} characters per call; split the content into smaller parts`,
+    );
+  }
+  const path = posix.resolve(infoTaskDir(row.buildId), params.path.trim());
+  const encoded = Buffer.from(params.content, 'utf8').toString('base64');
+  const result = await computerCall(
+    deps,
+    machineId,
+    row,
+    'shell',
+    {
+      command: `mkdir -p ${shellQuote(posix.dirname(path))} && printf %s ${shellQuote(encoded)} | base64 -d >> ${shellQuote(path)}`,
+      cwd: infoTaskDir(row.buildId),
+    },
+    toolCallId,
+    signal,
+  );
+  if (result.text.includes('[exit code') || result.text.includes('computer error:')) {
+    throw new HttpError(409, result.text);
+  }
+  return `appended ${Buffer.byteLength(params.content)} bytes to ${path}`;
+}
+
 export async function executeInfoCardTool(
   deps: MachineDeps,
   machineId: string | null,
@@ -355,6 +394,9 @@ export async function executeInfoCardTool(
     throw new HttpError(400, `${name} is not an info card tool`);
   }
   await ensureTaskDir(deps, machineId, row, signal);
+  if (name === 'write_file' && params.append === true) {
+    return appendFile(deps, machineId, row, params, toolCallId ?? randomUUID(), signal);
+  }
   const withCwd =
     name === 'shell' && typeof params.cwd !== 'string'
       ? { ...params, cwd: infoTaskDir(row.buildId) }

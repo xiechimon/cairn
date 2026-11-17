@@ -6,6 +6,7 @@ import {
   buildTaskPromptText,
   type ClaimedStep,
   composeTaskPromptWithInstruction,
+  INFO_SUBMIT_REPORT_TOOL,
   infoCardBrief,
   type MachineDoneBody,
 } from '@cairn/shared';
@@ -29,6 +30,7 @@ import { routeOf, scrubProviderError } from '../credentials.js';
 import { providerBinding } from '../provider-binding.js';
 import { createCoordinatorServerApi } from '../server-api.js';
 import { openCoordinatorHarness } from './harness.js';
+import { createInfoCardRunGuard } from './info-card-guard.js';
 import type { MachineApi } from './machine-api.js';
 import { createCoordinatorModels } from './models.js';
 import { coordinatorTool, createStepGate } from './tools.js';
@@ -226,8 +228,14 @@ export function startInfoCardRunner(options: InfoCardRunnerOptions): InfoCardRun
       suggestReplies: _suggest,
       ...base
     } = serverApi;
+    const guard = createInfoCardRunGuard();
     const api: MachineApi = {
       ...base,
+      relayTool: async (stepId, name, params, callId, signal) => {
+        const text = await base.relayTool(stepId, name, params, callId, signal);
+        if (name === INFO_SUBMIT_REPORT_TOOL) guard.reportSubmitted();
+        return text;
+      },
       done: async (stepId, body: MachineDoneBody) => {
         if (stopped()) return;
         await finishStep(
@@ -249,6 +257,7 @@ export function startInfoCardRunner(options: InfoCardRunnerOptions): InfoCardRun
       const gate = createStepGate();
       const extension = defineExtension({
         name: TOOLS_PAGE,
+        hooks: guard.hooks,
         tools: infoCardRemoteTools(stepRow.kind).map((def) =>
           coordinatorTool(def, api, gate, stopped),
         ),

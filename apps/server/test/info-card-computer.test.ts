@@ -74,6 +74,20 @@ function fakeComputer(s: TestServer, machineId: string): { calls: ComputerCall[]
       return { text: 'wrote' };
     }
     const command = params.command ?? '';
+    const appended = /^mkdir -p '[^']+' && printf %s '([^']*)' \| base64 -d >> '([^']+)'$/.exec(
+      command,
+    );
+    if (appended !== null) {
+      const path = appended[2] ?? '';
+      files.set(
+        path,
+        Buffer.concat([
+          files.get(path) ?? Buffer.alloc(0),
+          Buffer.from(appended[1] ?? '', 'base64'),
+        ]),
+      );
+      return { text: 'exit code: 0' };
+    }
     const listing = /^cd '([^']+\/deliverables)'/.exec(command);
     if (listing !== null) {
       const root = listing[1] ?? '';
@@ -120,40 +134,78 @@ function fakeComputer(s: TestServer, machineId: string): { calls: ComputerCall[]
   return { calls };
 }
 
+async function runInfoCard(
+  responses: (dir: string) => Parameters<ReturnType<typeof fauxProvider>['setResponses']>[0],
+): Promise<{ s: TestServer; buildId: string; todoId: string; vm: { calls: ComputerCall[] } }> {
+  setCoordinatorInServer(true);
+  setCoordinatorServerContextEnabled(true);
+  const s = bootServer();
+  disposables.push(() => s.dispose());
+  const machineId = insertMachine(s, { name: 'mac', capabilities: VM_CAPABILITIES });
+  createProvider(
+    { db: s.db, box: s.secretBox },
+    {
+      teamId: s.team.id,
+      body: {
+        providerId: 'stub',
+        label: 'Stub',
+        baseUrl: 'http://127.0.0.1:9',
+        api: 'openai-completions',
+        apiKey: 'sk-stub-secret-key-0123456789',
+        models: [{ id: 'm', name: 'm' }],
+      },
+      createdBy: s.user.id,
+    },
+  );
+  seedRoute(s, 'session', { provider: 'stub', modelId: 'm' });
+  const vm = fakeComputer(s, machineId);
+  const { todoId, buildId } = await infoCard(s);
+  const dir = infoTaskDir(buildId);
+
+  const faux = fauxProvider({
+    provider: 'stub',
+    models: [{ id: 'm', contextWindow: 200_000 }],
+    tokensPerSecond: 1e9,
+  });
+  faux.setResponses(responses(dir));
+  const storageDir = makeTestTempDir('info-card-runner-');
+  disposables.push(() => {
+    releaseTestTempDir(storageDir);
+  });
+  const coordinator = startCoordinator({
+    machine: {
+      db: s.db,
+      hub: s.hub,
+      machineHub: s.machineHub,
+      box: s.secretBox,
+      user: s.user,
+      vapidKeys: s.vapidKeys,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+      skillsDir: s.skillsDir,
+      convHub: s.convHub,
+    },
+    storageDir,
+    logger: { info: () => {}, warn: () => {}, error: () => {} },
+    heartbeatMs: 1_000,
+    tickMs: 3_600_000,
+    stopPollMs: 50,
+    fixedProviders: [faux.provider],
+  });
+  disposables.push(async () => {
+    await coordinator.close();
+  });
+
+  coordinator.tick();
+  await coordinator.idle();
+
+  return { s, buildId, todoId, vm };
+}
+
 describe('info cards run in the agent computer', () => {
   test('a provider route writes its report through submit_report from the computer', async () => {
-    setCoordinatorInServer(true);
-    setCoordinatorServerContextEnabled(true);
-    const s = bootServer();
-    disposables.push(() => s.dispose());
-    const machineId = insertMachine(s, { name: 'mac', capabilities: VM_CAPABILITIES });
-    createProvider(
-      { db: s.db, box: s.secretBox },
-      {
-        teamId: s.team.id,
-        body: {
-          providerId: 'stub',
-          label: 'Stub',
-          baseUrl: 'http://127.0.0.1:9',
-          api: 'openai-completions',
-          apiKey: 'sk-stub-secret-key-0123456789',
-          models: [{ id: 'm', name: 'm' }],
-        },
-        createdBy: s.user.id,
-      },
-    );
-    seedRoute(s, 'session', { provider: 'stub', modelId: 'm' });
-    const vm = fakeComputer(s, machineId);
-    const { todoId, buildId } = await infoCard(s);
-    const dir = infoTaskDir(buildId);
-
     let shellResult = '';
-    const faux = fauxProvider({
-      provider: 'stub',
-      models: [{ id: 'm', contextWindow: 200_000 }],
-      tokensPerSecond: 1e9,
-    });
-    faux.setResponses([
+    const { s, buildId, todoId, vm } = await runInfoCard((dir) => [
       () =>
         fauxAssistantMessage(
           [
@@ -174,36 +226,6 @@ describe('info cards run in the agent computer', () => {
       },
       () => fauxAssistantMessage('报告已提交。'),
     ]);
-    const storageDir = makeTestTempDir('info-card-runner-');
-    disposables.push(() => {
-      releaseTestTempDir(storageDir);
-    });
-    const coordinator = startCoordinator({
-      machine: {
-        db: s.db,
-        hub: s.hub,
-        machineHub: s.machineHub,
-        box: s.secretBox,
-        user: s.user,
-        vapidKeys: s.vapidKeys,
-        reposDir: s.reposDir,
-        attachmentsDir: s.attachmentsDir,
-        skillsDir: s.skillsDir,
-        convHub: s.convHub,
-      },
-      storageDir,
-      logger: { info: () => {}, warn: () => {}, error: () => {} },
-      heartbeatMs: 1_000,
-      tickMs: 3_600_000,
-      stopPollMs: 50,
-      fixedProviders: [faux.provider],
-    });
-    disposables.push(async () => {
-      await coordinator.close();
-    });
-
-    coordinator.tick();
-    await coordinator.idle();
 
     const row = s.db.select().from(step).where(eq(step.buildId, buildId)).get();
     expect(row?.status).toBe('done');
@@ -229,6 +251,79 @@ describe('info cards run in the agent computer', () => {
     expect(vm.calls.map((call) => call.tool)).toContain('write_file');
     expect(shellResult).toContain('hello');
     expect(vm.calls.every((call) => call.scopeKey?.startsWith('chief:') === true)).toBe(true);
+  });
+
+  test('a length-truncated tool call comes back to the model and the run still submits the report', async () => {
+    let retryContext = '';
+    const { s, buildId } = await runInfoCard((dir) => [
+      () =>
+        fauxAssistantMessage(
+          [{ type: 'text', text: 'Writing the report now.' }, fauxToolCall('write_file', {})],
+          { stopReason: 'length' },
+        ),
+      (context) => {
+        retryContext = JSON.stringify(context.messages);
+        return fauxAssistantMessage(
+          [fauxToolCall('write_file', { path: `${dir}/report.md`, content: '# Part one\n' })],
+          { stopReason: 'toolUse' },
+        );
+      },
+      () =>
+        fauxAssistantMessage(
+          [
+            fauxToolCall('write_file', {
+              path: `${dir}/report.md`,
+              content: 'Part two\n',
+              append: true,
+            }),
+          ],
+          { stopReason: 'toolUse' },
+        ),
+      () =>
+        fauxAssistantMessage([fauxToolCall('submit_report', { path: `${dir}/report.md` })], {
+          stopReason: 'toolUse',
+        }),
+      () => fauxAssistantMessage('Report submitted.'),
+    ]);
+
+    expect(retryContext).toContain('cut off at the length limit');
+    expect(retryContext).not.toContain('"type":"toolCall"');
+    expect(s.db.select().from(step).where(eq(step.buildId, buildId)).get()?.status).toBe('done');
+    const reportId = s.db
+      .select()
+      .from(build)
+      .where(eq(build.id, buildId))
+      .get()?.reportAttachmentId;
+    const stored = s.db
+      .select()
+      .from(attachment)
+      .where(eq(attachment.id, reportId ?? ''))
+      .get();
+    expect(readFileSync(join(s.attachmentsDir, stored?.storageKey ?? ''), 'utf8')).toBe(
+      '# Part one\nPart two\n',
+    );
+  });
+
+  test('a run that ends without submit_report is nudged before the card fails', async () => {
+    let nudged = '';
+    const { s, buildId } = await runInfoCard((dir) => [
+      () => fauxAssistantMessage('I have everything I need.'),
+      (context) => {
+        nudged = JSON.stringify(context.messages);
+        return fauxAssistantMessage(
+          [fauxToolCall('write_file', { path: `${dir}/report.md`, content: '# Late report\n' })],
+          { stopReason: 'toolUse' },
+        );
+      },
+      () =>
+        fauxAssistantMessage([fauxToolCall('submit_report', { path: `${dir}/report.md` })], {
+          stopReason: 'toolUse',
+        }),
+      () => fauxAssistantMessage('Report submitted.'),
+    ]);
+
+    expect(nudged).toContain('without a successful submit_report call');
+    expect(s.db.select().from(step).where(eq(step.buildId, buildId)).get()?.status).toBe('done');
   });
 
   test('a claude-code route is claimed by the Runner with only relay tools, locked down', async () => {
