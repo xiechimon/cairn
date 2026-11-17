@@ -458,6 +458,7 @@ test('an empty scheduled tab says so and offers one grey pill that opens the new
   await panel(page).getByRole('tab', { name: '定时' }).click();
   await expect(panel(page).getByTestId('tasks-schedules-empty')).toHaveText('还没有定时任务');
   await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(0);
+  await expect(panel(page).getByText('也可以直接告诉 Coordinator')).toHaveCount(0);
   const manage = panel(page).getByRole('button', { name: '新建定时' });
   await expect(manage).toHaveCount(1);
   const pill = await manage.evaluate((el) => {

@@ -66,7 +66,12 @@ export function TasksScheduleList({
       onOpenChange={setCreating}
       trigger={
         empty ? (
-          <Button variant="secondary" size="sm" data-testid="schedule-new" />
+          <Button
+            variant="secondary"
+            size="sm"
+            data-testid="schedule-new"
+            title={t('也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则。')}
+          />
         ) : (
           <Button
             variant="ghost"
@@ -172,9 +177,6 @@ export function TasksScheduleList({
             {t('还没有定时任务')}
           </p>
           {newSchedule(true)}
-          <p className="m-0 text-meta text-content-tertiary">
-            {t('也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则。')}
-          </p>
         </div>
       }
     >
