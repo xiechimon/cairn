@@ -43,6 +43,7 @@ export interface ServerRuntimeConfig {
   fixedProviders?: readonly Provider[];
   stopPollMs?: number;
   factsFor(threadId: string): ReconcileFacts;
+  desktopTools?(threadId: string): boolean;
   providersFor?(threadId: string): readonly ProviderBinding[];
   recordConversation?(threadId: string, conversationId: string, entryId: number): void;
   setConversation?(
@@ -116,6 +117,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     const extensions = [
       coordinatorToolsExtension(api, gate, {
         routerTools: config.routerTools,
+        desktopTools: config.desktopTools?.(threadId) === true,
         shuttingDown: () => shuttingDown,
         ...(inputs === undefined
           ? {}

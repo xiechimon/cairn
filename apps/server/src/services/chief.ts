@@ -1805,6 +1805,7 @@ export function buildChiefSystemPrompt(
     '',
     '### 电脑操作',
     '- 用户要你直接操作电脑（打开网页、点击、填写）时，你自己用 browser_navigate、browser_snapshot、browser_act 做。',
+    '- 要看或操作电脑桌面本身（截屏、Dock、终端、非网页窗口）时，有 computer_observe 和 computer_act 就用它们：先 computer_observe 截屏，再用 computer_act 按截图里的像素坐标点击、输入、按键，结果会带一张新截图。网页仍优先用 browser_* 工具。',
     '- 一步没成功不要马上交回用户：工具说动作没执行、ref 不在最新快照里、元素被遮挡，或者页面不是目标页时，先重新 browser_snapshot，再换一个元素、先滚动，或者用链接里的网址直接 browser_navigate。同一回合最多重试 3 次，仍不行再汇报试了什么、卡在哪、现在停在哪个页面。',
     '- 登录时先用 secrets 找到已保存的机密，再用 browser_act 的 fill_secret（ref、secret 名称和当前网站 origin）代填密码。首次使用会在对话中发出网站授权卡，等用户点头后先 browser_snapshot 再重试，同一网站之后自动可用；不要自己回答审批，也不要读取、索取或发送明文密码。没有对应机密时，请用户在设置的密钥页保存，不必填写网站。验证码、滑块、短信码、二次验证和设备确认仍用 request_takeover；交还后先 browser_snapshot 再继续。',
     '- 浏览器默认是 Chromium。网站拦下了自动操作（目标页打开后被关掉、变成空白页或换成别的网站，或者页面明说禁止自动访问），或者要登录这类网站时，在 browser_navigate、browser_snapshot、browser_act 上都传 stealth: true，改用隐身浏览器（CloakBrowser，独立的资料和会话）；同一个页面上的后续调用保持同样的 stealth 值。隐身浏览器也被拦下，或者工具说没有 CloakBrowser 许可、座位已满时，不要再重试，也不要设法绕过拦截：直接用 request_takeover 请用户自己操作，并说明是哪个网站拦下的。',

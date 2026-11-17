@@ -26,7 +26,7 @@ import { bindCoordinatorRun, coordinatorRuns } from '../services/coordinator-run
 import { finishCoordinatorTurn, recordStepUsage } from '../services/coordinator-steps.js';
 import { stopStepComputer } from '../services/machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from '../services/machine-deps.js';
-import { executeRelayToolCall, machineAsk } from '../services/machine-relay.js';
+import { executeRelayToolCall, machineAsk, relayComputerTool } from '../services/machine-relay.js';
 import {
   fetchStop,
   heartbeatStep,
@@ -202,6 +202,8 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     },
     relayTool: (stepId, name, params, toolCallId, signal) =>
       executeRelayToolCall(deps, null, stepId, name, params, toolCallId, signal),
+    relayComputer: (stepId, name, params, toolCallId, signal) =>
+      relayComputerTool(deps, null, stepId, name, params, toolCallId, signal),
     askUser: (stepId, body, signal) =>
       machineAsk(deps, null, stepId, body, {
         holdMs: ASK_HOLD_MS,

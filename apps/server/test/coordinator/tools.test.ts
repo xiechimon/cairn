@@ -168,6 +168,52 @@ describe('coordinator tools', () => {
     }
   });
 
+  it('offers the desktop tools only when asked and feeds their screenshot to the model as an image', async () => {
+    const without = coordinatorToolsExtension(fakeMachineApi(), createStepGate()).tools ?? [];
+    expect(without.map((t) => t.name)).not.toContain('computer_observe');
+    const { coordinatorModels, seenResults } = toolThenAnswer('computer_observe', {});
+    const api = fakeMachineApi();
+    const relayed: string[] = [];
+    api.relayComputer = async (_stepId, name) => {
+      relayed.push(name);
+      return {
+        text: 'screen 1600x1000, image 1568x980',
+        images: [{ data: validPng.toString('base64'), mimeType: 'image/png' }],
+      };
+    };
+    const gate = createStepGate();
+    const extension = coordinatorToolsExtension(api, gate, { desktopTools: true });
+    expect(extension.tools?.find((t) => t.name === 'computer_observe')?.replay).toBe('safe');
+    expect(extension.tools?.find((t) => t.name === 'computer_act')?.replay).toBe('unsafe');
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+      extensions: [extension],
+    });
+    try {
+      await runCoordinatorTurn(
+        {
+          harness,
+          models: coordinatorModels,
+          api,
+          context: ctx,
+          heartbeatMs: 1000,
+          now: () => 1,
+          gate,
+        },
+        chiefStep('step-observe', 'Screenshot your computer'),
+      );
+      expect(relayed).toEqual(['computer_observe']);
+      const blocks = JSON.parse(seenResults[0]!) as {
+        type: string;
+        text?: string;
+        mimeType?: string;
+      }[];
+      expect(blocks.find((block) => block.type === 'text')?.text).toContain('screen 1600x1000');
+      expect(blocks.find((block) => block.type === 'image')?.mimeType).toBe('image/png');
+    } finally {
+      await harness.close(ctx);
+    }
+  });
+
   it.each([
     {
       label: 'oversized PNG',

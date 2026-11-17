@@ -68,6 +68,49 @@ export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
+export const COMPUTER_DESKTOP_TOOLS: readonly RemoteToolDef[] = [
+  {
+    name: 'computer_observe',
+    description:
+      'Take a screenshot of the whole Coordinator computer desktop (terminal, dock, every window). Returns the image and its size; computer_act x and y are pixels in the latest screenshot.',
+    parameters: obj({}),
+    replaySafe: true,
+  },
+  {
+    name: 'computer_act',
+    description:
+      'Drive the Coordinator computer desktop with the mouse and keyboard, then return a fresh screenshot. Call computer_observe first; x and y are pixels in its latest screenshot. Prefer browser_* tools for web pages.',
+    parameters: obj(
+      {
+        actions: arr(
+          obj(
+            {
+              kind: str('One of click, double_click, move, drag, scroll, type, key, wait.'),
+              x: {
+                type: 'integer',
+                description:
+                  'Screenshot x for click, double_click, move, drag start and optional scroll position.',
+              },
+              y: { type: 'integer', description: 'Screenshot y, paired with x.' },
+              to_x: { type: 'integer', description: 'Drag end x.' },
+              to_y: { type: 'integer', description: 'Drag end y.' },
+              button: str('left (default), right or middle, for click.'),
+              direction: str('up, down, left or right, for scroll.'),
+              amount: { type: 'integer', description: 'Scroll steps, default 3.' },
+              text: str('Text for type.'),
+              key: str('xdotool key for key, for example Return, ctrl+l or ctrl+shift+t.'),
+              ms: { type: 'integer', description: 'Milliseconds for wait, at most 10000.' },
+            },
+            ['kind'],
+          ),
+          'Ordered actions, at most 24.',
+        ),
+      },
+      ['actions'],
+    ),
+  },
+];
+
 export const COMPUTER_HANDOFF_TIMEOUT_MS = 15 * 60_000;
 export const TAKEOVER_HANDED_BACK =
   'The owner handed the computer back. Take a fresh browser_snapshot before acting.';

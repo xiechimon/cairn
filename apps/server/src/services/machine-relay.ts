@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import type { MachineAskBody, MachineAskResponse } from '@cairn/shared';
+import type { ComputerRelayResult, MachineAskBody, MachineAskResponse } from '@cairn/shared';
 import {
   AGENT_TOOL_SKILL_CREATE,
   AGENT_TOOL_SKILL_UPDATE,
+  computerToolSchema,
   createSkillBodySchema,
   derivePlaceholderTitle,
   isBuildStepKind,
@@ -104,6 +105,50 @@ export async function machineAsk(
   };
 }
 
+export function isCoordinatorComputerTool(name: string): boolean {
+  return (
+    isComputerBrowserTool(name) ||
+    name === 'request_takeover' ||
+    name === 'computer_observe' ||
+    name === 'computer_act'
+  );
+}
+
+export async function relayComputerTool(
+  deps: MachineDeps,
+  machineId: string | null,
+  stepId: string,
+  name: string,
+  params: Record<string, unknown>,
+  toolCallId?: string,
+  signal?: AbortSignal,
+): Promise<ComputerRelayResult> {
+  const row = ownedStep(deps, machineId, stepId);
+  refuseRestrictedTurnTool(row.prompt, name, params, row.ownerMessageIds ?? []);
+  assertChiefDigestTool(row.buildId, name);
+  if (row.kind !== 'chief') {
+    throw new HttpError(400, 'computer tools require a chief step');
+  }
+  if (!isChiefConversation(row.buildId)) {
+    throw new HttpError(400, `step ${stepId} is not a chief step`);
+  }
+  if (row.status !== 'claimed') {
+    throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
+  }
+  return forwardComputerCall(
+    deps,
+    machineId,
+    stepId,
+    {
+      computer: true,
+      name: computerToolSchema.parse(name),
+      toolCallId: toolCallId ?? randomUUID(),
+      params,
+    },
+    signal !== undefined ? { signal } : {},
+  );
+}
+
 export async function executeRelayToolCall(
   deps: MachineDeps,
   machineId: string | null,
@@ -113,34 +158,12 @@ export async function executeRelayToolCall(
   toolCallId?: string,
   signal?: AbortSignal,
 ): Promise<string> {
+  if (isCoordinatorComputerTool(name)) {
+    return (await relayComputerTool(deps, machineId, stepId, name, params, toolCallId, signal))
+      .text;
+  }
   const row = ownedStep(deps, machineId, stepId);
   refuseRestrictedTurnTool(row.prompt, name, params, row.ownerMessageIds ?? []);
-  if (isComputerBrowserTool(name) || name === 'request_takeover') {
-    assertChiefDigestTool(row.buildId, name);
-    if (row.kind !== 'chief') {
-      throw new HttpError(400, 'browser tools require a chief step');
-    }
-    if (!isChiefConversation(row.buildId)) {
-      throw new HttpError(400, `step ${stepId} is not a chief step`);
-    }
-    if (row.status !== 'claimed') {
-      throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
-    }
-    const callId = toolCallId ?? randomUUID();
-    const result = await forwardComputerCall(
-      deps,
-      machineId,
-      stepId,
-      {
-        computer: true,
-        name,
-        toolCallId: callId,
-        params,
-      },
-      signal !== undefined ? { signal } : {},
-    );
-    return result.text;
-  }
   if (isThreadScheduleTool(name)) {
     if (row.kind !== 'plan' && !isBuildStepKind(row.kind)) {
       throw new HttpError(400, 'schedule tools require a plan or build step');

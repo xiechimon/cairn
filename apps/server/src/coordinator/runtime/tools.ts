@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
-import { coordinatorToolSourceId, type MachineAskBody, type RemoteToolDef } from '@cairn/shared';
+import {
+  COMPUTER_DESKTOP_TOOLS,
+  coordinatorToolSourceId,
+  type MachineAskBody,
+  type RemoteToolDef,
+} from '@cairn/shared';
 import {
   defineExtension,
   defineTool,
@@ -20,7 +25,11 @@ export class ShutdownInterrupt extends Error {
 
 export const COORDINATOR_TOOL_OUTPUT_MAX_BYTES = 32_768;
 
-export type ToolChannel = Pick<MachineApi, 'relayTool' | 'askUser'>;
+export type ToolChannel = Pick<MachineApi, 'relayTool' | 'relayComputer' | 'askUser'>;
+
+const DESKTOP_TOOL_NAMES: ReadonlySet<string> = new Set(
+  COMPUTER_DESKTOP_TOOLS.map((def) => def.name),
+);
 
 export function askRequestId(stepId: string, callId: string): string {
   return `ask-${createHash('sha256').update(`${stepId}\0${callId}`).digest('hex').slice(0, 32)}`;
@@ -144,6 +153,21 @@ export function coordinatorTool(
         return { output: [{ type: 'text', text }] };
       }
       try {
+        if (DESKTOP_TOOL_NAMES.has(def.name)) {
+          const result = await channel.relayComputer(
+            stepId,
+            def.name,
+            params,
+            callId,
+            context.abortSignal,
+          );
+          const images = await Promise.all(
+            (result.images ?? []).map((image) =>
+              prepareCoordinatorImage(image.data, image.mimeType),
+            ),
+          );
+          return { output: [{ type: 'text', text: result.text }, ...images] };
+        }
         const text = await channel.relayTool(stepId, def.name, params, callId, context.abortSignal);
         if (def.name === 'attachment') {
           const attachment = JSON.parse(text) as {
@@ -172,6 +196,7 @@ export function coordinatorToolsExtension(
   gate: StepResolver,
   options: {
     routerTools?: boolean;
+    desktopTools?: boolean;
     shuttingDown?: () => boolean;
     beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>;
     storeId?: () => string | undefined;

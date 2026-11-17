@@ -66,6 +66,10 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
       api.tools.push({ stepId, name, params });
       return `result of ${name}`;
     },
+    relayComputer: async (stepId, name, params) => {
+      api.tools.push({ stepId, name, params });
+      return { text: `result of ${name}` };
+    },
     transcriptRow: async (stepId, row) => {
       api.rows.push({ stepId, row });
     },

@@ -28,6 +28,7 @@ import {
   OWN_COMPUTER_UNGATED_MESSAGE,
   receiveComputerFrames,
   stopStepComputer,
+  teamOffersDesktop,
 } from '../src/services/machine-computer.js';
 import type { MachineDeps } from '../src/services/machine-deps.js';
 import { markPresence } from '../src/services/machines.js';
@@ -183,6 +184,41 @@ test('every dispatched Orb tool has a server grant regression case', () => {
     'browser_snapshot',
     'browser_act',
   ]);
+});
+
+describe('Coordinator desktop tools', () => {
+  test('teamOffersDesktop follows the computer capability and the desktop grant', () => {
+    const { s, deps } = boot();
+    expect(teamOffersDesktop(deps.db, s.team.id)).toBe(false);
+    addMachine(s, 'omarchy', { computer: true });
+    expect(teamOffersDesktop(deps.db, s.team.id)).toBe(true);
+    s.db
+      .update(machineTable)
+      .set({ desktopOverride: false })
+      .where(eq(machineTable.id, 'omarchy'))
+      .run();
+    expect(teamOffersDesktop(deps.db, s.team.id)).toBe(false);
+  });
+
+  test('computer_observe reaches the scope computer and its screenshot comes back as an image', async () => {
+    const { s, deps, chiefId } = boot();
+    addMachine(s, 'omarchy', { computer: true });
+    const calls = connect(s, 'omarchy');
+    s.db.update(stepTable).set({ machineId: null }).where(eq(stepTable.id, 'step-a')).run();
+    const image = { data: 'iVBORw0KGgo=', mimeType: 'image/png' as const };
+    const result = createCoordinatorServerApi(deps).relayComputer(
+      'step-a',
+      'computer_observe',
+      {},
+      'tc-observe',
+    );
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({ tool: 'computer_observe', scopeKey: `chief:${chiefId}` });
+    receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [
+      { kind: 'done', seq: 1, text: 'screen 1600x1000', images: [image] },
+    ]);
+    expect(await result).toEqual({ text: 'screen 1600x1000', images: [image] });
+  });
 });
 
 describe('forwardComputerCall target and presence', () => {

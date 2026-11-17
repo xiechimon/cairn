@@ -582,6 +582,15 @@ function machineAcceptsTool(row: typeof machine.$inferSelect, tool: ComputerTool
   return row.desktopOverride !== false && row.capabilities?.computer === true;
 }
 
+export function teamOffersDesktop(db: Db, teamId: string): boolean {
+  return db
+    .select()
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .all()
+    .some((row) => machineAcceptsTool(row, 'computer_observe'));
+}
+
 function assertMachineGrant(db: Db, machineId: string, tool: ComputerTool): void {
   const host = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (isComputerBrowserTool(tool)) {

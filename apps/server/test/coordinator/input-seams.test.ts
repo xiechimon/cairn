@@ -34,15 +34,19 @@ test('receipt seams hold provider and tool dispatch separately and qualify the t
   gate.set('producer');
   const registry = createRegistry();
   registry.install(
-    coordinatorToolsExtension({ relayTool: relay, askUser: vi.fn() }, gate, {
-      beforeTool: async (_signal, conversationId) => {
-        expect(conversationId).toBeDefined();
-        barriers++;
-        if (barriers === 1) await providerBarrier;
-        if (barriers === 2) await toolBarrier;
+    coordinatorToolsExtension(
+      { relayTool: relay, relayComputer: vi.fn(), askUser: vi.fn() },
+      gate,
+      {
+        beforeTool: async (_signal, conversationId) => {
+          expect(conversationId).toBeDefined();
+          barriers++;
+          if (barriers === 1) await providerBarrier;
+          if (barriers === 2) await toolBarrier;
+        },
+        storeId: () => 'opened-store',
       },
-      storeId: () => 'opened-store',
-    }),
+    ),
   );
   const harness = await Harness.open(
     new MemoryStorage(),

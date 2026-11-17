@@ -1,5 +1,6 @@
 import type {
   ClaimedStep,
+  ComputerRelayResult,
   MachineAskBody,
   MachineAskResponse,
   MachineDoneBody,
@@ -30,6 +31,13 @@ export interface MachineApi {
     toolCallId?: string,
     signal?: AbortSignal,
   ): Promise<string>;
+  relayComputer(
+    stepId: string,
+    name: string,
+    params: Record<string, unknown>,
+    toolCallId: string,
+    signal?: AbortSignal,
+  ): Promise<ComputerRelayResult>;
   askUser(stepId: string, body: MachineAskBody, signal?: AbortSignal): Promise<MachineAskResponse>;
   transcriptRow(stepId: string, row: TranscriptRow, entryId?: string): Promise<void>;
   mapUserEntry?(stepId: string, entryId: string): Promise<void>;
