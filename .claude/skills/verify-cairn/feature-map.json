@@ -650,7 +650,7 @@
       ],
       "backendDesign": [
         "docs/design/durable-threads-and-engines.md",
-        "docs/design/home-redesign-backend-todo.md"
+        "docs/design/side-panels-backend-gaps.md"
       ],
       "evidence": [
         "apps/web/e2e/chief-home-engine-run.spec.ts",

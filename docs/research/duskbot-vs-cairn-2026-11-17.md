@@ -1,0 +1,117 @@
+# dusk bot against cairn: what differs and what cairn can borrow (2026-11-17)
+
+Labels: `实测` = read first-hand this round (repo files through `gh api`, cairn files in this checkout at `7f35fa6b4`). `推断` = follows from `实测` facts. `猜测` = the rest. dusk bot was read at `main` on 2026-11-17 (pushed 2026-11-17T10:05Z; repo created 2026-11-05; 218 stars, 19 forks, ~2,984 commits essentially all by one account; 9,382 files, ~2,876 of them flat under `server/`). Source: https://github.com/DuskBotAI/duskbot
+
+Scope limits: I read its README, LICENSE, `package.json`, `docs/{decision-model,memory,runtime-contract,bot-walls,computer-use-integration}`, the full file tree, and heads of `server/{coordinator.ts,routes/bot-patch.ts,connector-verdict.ts,skill-review.ts}` plus the `server/host/` and `server/drivers/acp/` listings. I did not install or operate the app, so behavior claims rest on its own docs and code text, not on a running product.
+
+## 0. Answer in five lines
+
+1. Same family, different center of gravity. dusk bot is a **team of persistent bot personas you text**, each with its own memory and its own computer, aimed at consumer life tasks; cairn is a **Coordinator that turns a request into gated task threads** whose output is code that lands. (`实测`: dusk README "What it is"; cairn `docs/spec/18` §1)
+2. dusk bot has **no code pipeline at all**: no repo model, no worktrees, no review, no merge gate — work ends in a chat reply or a file. cairn's merge gate binds verdicts to `patchDigest`/`headSha` and is TLA+-checked. (`实测`: full-tree grep for worktree/branch/verdict surfaces only chat-merge and a Composio connector verdict)
+3. dusk bot is far ahead on **personal-affairs surface area**: shipped app integrations (Composio + one-click OAuth apps + MCP both ways), routines on cron/events/webhooks, two-tier memory with nightly tidy, a secrets vault, bot-to-bot rooms. cairn lists mail/calendar/job-search as planned (`docs/spec/18` §1).
+4. cairn is ahead on **trust machinery and shipping form**: merge gate, eval ruler, per-build isolation, shipped iOS app. dusk bot's phone app is "coming soon" and its trust model is per-bot approval levels + tool allowlists + secret redaction. (`实测`: both READMEs)
+5. Provenance correction (2026-11-17, Amp report): the repo is **not 12-days-from-scratch** — its first commit imports **OpenMausBot 0.1.141** (Apache-2.0, `milind-soni/OpenMausBot`): ~474k source lines, ~8,209 upstream commits, ~86 days of history. The 12-day repo adds ~179k real lines on top, still heavily agent-built (2,726 commits carry a Claude coauthor). Imported parts stay Apache; new parts are PolyForm — borrow designs, not code. (`实测`: report + `gh api` contributors/LICENSE)
+
+## 1. Comparison
+
+| Axis | dusk bot | cairn | Trade-off |
+|---|---|---|---|
+| Thesis | "Free Grok bot alternative": bots as contacts you text; each does work on a computer of its own ([README](https://github.com/DuskBotAI/duskbot/blob/HEAD/README.md)) | "Self-hosted personal assistant for people who write code" (`docs/spec/18` §1) | dusk's unit is a bot identity; cairn's is a task |
+| Unit of work | Bot chat thread, room turn, or routine run; ends in a reply/card/file (`实测`: `server/host/` runtime) | Todo → build → one worktree + branch (`CONTEXT.md`) | cairn work ends in a landed artifact |
+| Orchestration | Runtime **tree of handoff nodes**: `coordinate_bots` spawns children that park on cards and wake the requester once on terminal outcome; permission level inherits one hop, `level = max(own, inherited)` capped by engine capability (`实测`: `docs/runtime-contract`, `server/coordinator.ts`) | Chief dispatches todos; orchestration splits children via `sourceKind=orchestration`; step claim/heartbeat model-checked (`CONTEXT.md`, verify-step-claim) | dusk's tree is chat-native; cairn's is a phase machine |
+| Rooms / multi-bot | Bots share rooms; responder = lead or a fast **decision model** (Jev classifier via TypeSafe/OpenRouter, 0.6 threshold, fallback to lead) (`实测`: `docs/decision-model.md`) | No bot-to-bot chat; one Coordinator | dusk spends tokens on persona routing; cairn routes tasks |
+| Computer | **One persistent computer per bot**: embedded Chromium via `WebContentsView`+CDP, real desktop via bundled Cua driver (macOS/Ubuntu Xorg), container/VM bot-box or dusk cloud; live watch, Take control for sign-in/captcha, hand back (`实测`: `docs/computer-use-integration.md`, README) | Runner daemon per machine × CLI harness; per-build worktree + seatbelt/bubblewrap confine, orb opt-in; computer surface in `apps/daemon/src/computer/` is background-first (`docs/research/user-computer-model-2026-11-08.md`) | dusk's computer is a long-lived bot asset; cairn's isolation is per-task |
+| Bot walls | Never defeats bot detection. Ladder: wait/reload → **reroute the blocked site through the owner's own home connection** (per-site PAC + SOCKS over the E2E link) → alternate routes → one card per site per task; hand-back is automatic once the page clears (`实测`: `docs/bot-walls.md`, `server/computer-egress.ts`) | Login handoff is designed (`docs/design/computer-login-handoff.md`), no per-site egress reroute (`推断`: nothing similar in daemon) | The home-route pattern is the interesting part |
+| Engines | ~14 sign-in CLIs via ACP drivers (Claude Code, Codex, Gemini, Grok, Cursor, Copilot, Kimi, Qwen, OpenCode, Hermes, Cline, DeepSeek, Droid, Antigravity) + own loop for API keys + Ollama/LM Studio + custom ACP; tools mounted per-turn via MCP (`实测`: README, `server/drivers/acp/`) | pi runtime + Claude Code/Codex harnesses behind `apps/daemon/src/backend/`; Gemini listed as not-yet in README | dusk's ACP-driver breadth is a real lead |
+| Approvals | Per-bot level ask/edits/auto/full; question/approval **cards park the node**; send-on-your-behalf is its own setting (`实测`: README, runtime-contract) | Confirm/Review hard gates + confirm-once outward actions (`docs/design/ai-native-actions.md`) | dusk parks a chat node; cairn gates a phase |
+| Secrets | Vault: host types the login, model never sees it; values redacted from chats/logs/memory; 1Password supported (`实测`: README, `docs/memory.md`) | Team secrets issued per step, retrieval leaves an audit row (`CONTEXT.md`); `docs/design/browser-secret-fill.md` | Parity in intent; cairn's audit row is stronger |
+| Tool scoping | Connector verdict: server-side allowlist "this bot may call exactly these tools", must hold even against a garbled model (`server/connector-verdict.ts`) | apiKey read/write tool whitelists (`CONTEXT.md`) | Same pattern, both enforce outside the model |
+| Memory | Two tiers: global About-me + per-bot `MEMORY.md` + topic files; writes in-chat, post-quiet extraction, nightly tidy, daily log, journal; secrets redacted pre-write; imports `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` (`实测`: `docs/memory.md`) | `agent_memory` rows; recency-capped injection; tidy pass retired deliberately (`docs/design/memory-backend.md`) | dusk's is file-shaped and editable; cairn's is row-shaped |
+| Routines | once/daily/interval/cron + app events + webhooks; app keeps the computer awake for the hour before a due run; missed run fires up to 12 h late (`实测`: README, `docs/routine-schedules.md`) | Schedule entity, cron/one-shot → new build (`CONTEXT.md`) | dusk solves the sleeping-laptop problem explicitly |
+| Reach | Electron desktop Mac/Win/Linux, notch island, Capacitor phone app in App-Store prep, link = direct→Cloudflare tunnel→relay, AES-256-GCM sealed, pairing codes (`实测`: README, repo tree `apps/{mobile,companion,link-service}`) | Web app, Mac desktop, shipped iOS app, push; Tailscale for phone access | dusk chases the breadth cairn parked as "C class" (spec 18 §4) |
+| Money / license | **PolyForm Noncommercial** + paid dusk cloud + work licenses; anonymous telemetry on by default (`实测`: LICENSE, README) | Apache-2.0, no hosted control plane, nothing sent anywhere (`docs/spec/18` §4, README) | Opposite rulings; not a gap, a positioning choice |
+| Provenance | Repo 12 days old but first commit imports OpenMausBot (~86 days, 8,209 commits of upstream); ~3k own commits on top, one author, heavily agent-built (`实测`: `gh api`, Amp report) | Public repo with spec canon, DCO, CI gates | dusk's breadth is a product baseline + fast agent iteration |
+
+## 2. Where dusk bot's design is stronger on a point cairn also has or plans
+
+- **The blocked-site home route** (`docs/bot-walls.md`): when a Cloudflare/Turnstile wall stops a bot browser on a remote computer, only that site's traffic is rerouted through the owner's own connection (PAC entry → SOCKS stream over the existing E2E link), for the session, without asking. cairn's Mode-A direction (agent drives the user's computer, `docs/research/user-computer-model-2026-11-08.md`) will hit the same wall class on home machines; dusk's per-site PAC + session-sticky reroute is a concrete, shipped prior art. Its anti-nagging rule — one card per site per task, automatic hand-back when the check clears — also fits cairn's `computer-login-handoff` design.
+- **A fast decision model next to the slow router.** dusk runs a cheap classifier (few hundred ms, fraction of a cent) for room routing with a measured threshold and an explicit fallback to the deterministic path. cairn measures the Coordinator slow-path share (#2487) but every routing decision still costs a chief turn; a classifier for "does this event need a chief turn at all" is the same shape (`推断`).
+- **Runtime-tree parking.** A turn that needs the person ends `needs_input` with card ids on the row; the person's act answers the card and resumes exactly that node; Stop settles `cancelled`. cairn's decision cards exist; dusk's park/wake semantics over an explicit node tree (children resumed by requester, not by polling) is cleaner than inbox-polling and worth a look when cairn's outward-action cards grow.
+- **"Move in" import.** Onboarding reads `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, Windsurf rules into per-bot memory topics marked unverified. Cheap second-person win: the new user arrives with their existing agent context loaded (`实测`: `docs/memory.md`).
+- **Sleeping-computer routines.** Wake-for-the-hour-before-due + 12 h catch-up window states the laptop-as-server problem plainly and ships an answer (`实测`: README).
+
+## 3. Recommendations for cairn
+
+Ordered by value. Each names the code area. None is started.
+
+1. **Per-site egress reroute for the agent browser** — adopt dusk's PAC+SOCKS-over-link pattern (and its one-card-per-site-per-task rule, auto hand-back) in cairn's computer surface. Touches `apps/daemon/src/computer/` (screen/browser providers) and the machine link layer; read `server/computer-egress.ts` and `docs/bot-walls.md` first. Needs a design note (concurrency + routing state).
+2. **Decide whether a cheap pre-router classifier belongs in the chief path** once the #2487 measurement lands. If the slow-path share is dominated by events that plainly need no chief turn, a small classifier with a deterministic fallback mirrors dusk's decision-model shape. Touches `apps/server/src/coordinator/`. Owner-facing decision, not yet.
+3. **Import-the-existing-agent-context onboarding.** First-run step that offers to fold `CLAUDE.md`/`AGENTS.md`/global rules into Coordinator memory as unverified entries. Touches server memory service + a small onboarding card. Supports spec 18 §2 (a second person can run it).
+4. **Steady-state parity check, not new work**: secrets typed by host with redaction (`browser-secret-fill.md`), tool allowlists (apiKey whitelists), approval cards. dusk confirms the same three patterns at shipping scale; keep cairn's audit row — it is the stronger piece.
+
+## 4. Not worth copying
+
+- **Persistent bot personas, rooms, bot-to-bot handoffs as the product core.** cairn's unit is the task; the park/wake mechanics may be borrowed (§3), the persona model should not.
+- **Hosted cloud + relay + default-on telemetry + noncommercial license.** All ruled out by `docs/spec/18` §4 (no hosted control plane, no resold compute) and the Apache-2.0 ruling.
+- **Per-bot persistent computers as the primary substrate.** cairn's substrate is per-build isolation on Runners; a long-lived per-agent machine is a different threat model and not needed for the dispatch shape.
+- **Engine-breadth race** (14 ACP drivers). Worth watching only if users ask for a specific CLI; the ACP driver list is a good catalog when that day comes.
+- **Electron-first multi-OS breadth.** Already parked as C class in spec 18 §4; dusk doing it does not un-park it.
+
+## 5. Owner decisions noted during the 2026-11-17 discussion
+
+Recorded from ian's replies, not implemented anywhere yet:
+
+- **Form factor is decided**: Electron desktop on all three OSes + IM entry on Telegram and WeChat. This un-parks the "IM / desktop breadth" C class in `docs/spec/18` §4 for these two platforms only; the §4 line about not chasing breadth needs a spec amendment when this lands.
+- **Output shape**: he wants replies and files as outputs too (dusk's shape), with multi-thread dispatch underneath — i.e. cairn's info-class lane (#1626) and chief fan-out are the model, not board-only artifacts.
+- **Feature inventory management**: he asked where a feature checklist should live (his instinct: Notion, because a shared repo file gathers merge conflicts). Recommendation given in chat: GitHub Projects board for planned/in-flight items (API state, no conflicts, agents read it via `gh`/`gh api`), `feature-map.json` stays the generated shipped-truth; a single in-repo list file stays avoided, per-feature design files remain the in-repo form.
+- **"Mine is also a persistent computer"**: clarified in chat that cairn's persistence binds to the machine/workspace, not to an agent identity — the dusk "one computer per bot" binding is a different model, not a missing feature.
+
+Second round of owner decisions (2026-11-17, same discussion):
+
+- **Work shape aligned to dusk's model**: no forced task lifecycle — a request becomes a thread; gates attach to the irreversible-action boundary (merge, send, submit, pay), not to a phase pipeline. This revisits the "code must pass the gates" shape in `docs/spec/18` §3.5: the gate stays for code output, the lifecycle-as-mandatory-pipeline goes. The enforcement surface that `PHASE_TRANSITIONS` provides today must be re-derived per action class before any phase-machine removal.
+- **Approvals as chat primitives**: gates surface as at-the-moment, one-tap cards for the action in front of the person, plus a per-agent autonomy level (dusk's ask/edits/auto/full shape). Direction: less standing instruction injection, more event-bound cards.
+- **Browser isolation per thread**: he flagged the real contention — one shared `cairn` agent-browser session (`AGENT_BROWSER_SESSION` in `apps/daemon/src/computer/browser.ts`) means a long browser task blocks every other task. Recommendation given: browser profile keyed by thread/conversation (dusk keys by bot); desktop stays one per machine.
+- **Affairs surface aligned to dusk's**: connector fabric (OAuth apps + broker + per-agent grants + server-side tool allowlist), routines with event/webhook triggers, vault-type-in secrets, editable memory files. Recorded as direction, not scoped work.
+- **Schedule adds**: Windows and Linux desktop packaging join the form-factor item, plus "the rest" of the parity surface.
+- **Remaining-work tracking moves to a checklist**: remaining features live as check-off items in a GitHub Projects board (decided in round one as the management tool), not as plan-style documents. "Done = ticked off." What exactly "plan" covers in-product (the confirm-gate plan artifact) was left open — recommendation pending.
+- **Default-on telemetry, dusk's model**: anonymous usage counts + crash reports, never message/file content, with a first-screen opt-out. Two flags raised: it contradicts the README's "nothing is sent anywhere" and spec 18 §4's no-hosted-control-plane ruling, so docs/privacy must change with it; and it needs a collection endpoint he operates — new infra the checklist must include.
+- **Vault decision**: persistent, reusable, named login credentials the host types into pages on demand — model never sees values, redacted in chats/logs/memory (dusk vault parity). Builds on `secret-box.ts` and `docs/design/browser-secret-fill.md`; the delta is named long-lived logins + a UI + type-in integration.
+- **Orchestration: adopt semantics, not the copy**: take dusk's assignment-tree semantics (one record, park/wake lanes, dedup of identical in-flight requests, restart reconciliation table, three-authority envelope, level inheritance) and re-express them on cairn's chief + step-claim runtime. Explicitly not adopted: bot personas, rooms, the Jev room router. Needs a one-page design first (persisted state + concurrency, repo rule).
+- **Docs-too-many pain point** (owner observation): spec canon + design + research + ops is wide and history-laden — hard for a model to consume. Recommendation given: keep granular sources (they prevent cross-lane write conflicts), add a **generated digest** — one compact "current rulings only" file per domain, produced by a script like `generate-feature-map.mjs`; agents read the digest, full volumes stay the archive. Ruling-history text stays in git/spec, not in the digest.
+- **Ship-speed finding** (measured 2026-11-17): latest green main commit went push → required-checks green in ~5 min, → live on omarchy in ~11 min total (`deployed.json` + ci run timestamps). CI is not the 50-minute cost; candidates for the felt cost are local `pnpm prepush` + `pnpm test:changed`, CI queueing behind other lanes, and flaky-red retry cycles. No human review exists in the flow — what could change is which checks gate deploy, not whether checks exist.
+- **Blocked**: `gh` keyring token was refreshed but still lacks `project` scope; board creation needs `gh auth refresh -s project,read:project`. Checklist items (form factor, IM adapters, orchestration adoption, autonomy levels + action-boundary cards, per-thread browser profiles, vault, affairs fabric, routines triggers, editable memory + move-in import, telemetry + collector, tiered verification, docs digest, launch checklist, spec 18 amendments) are staged here until the board exists.
+
+Third round of owner decisions (2026-11-17, same discussion):
+
+- **Omarchy self-deploy surface retired**: the owner is desktop-focused; stop maintaining the omarchy control-plane deploy (`docs/ops/control-plane-omarchy.md`, `scripts/ops/deploy-watch.sh`, systemd units). Consequence pending: the ship pipeline's target becomes desktop-installer releases (dusk's `prepare-release` → `release.yml` shape is the reference); AGENTS.md Ship step 8 and ops docs need amending when this lands.
+- **One plan entry only**: in-repo trackers are deleted so the GitHub Projects board is the single entry. `docs/cairn-plan.md` (self-retired) and `docs/design/home-redesign-backend-todo.md` removed; its open items staged below until the board exists. `docs/design/side-panels-backend-gaps.md` stays as a design doc.
+- **Persona revised**: earlier "do not take personas" was scoped to the orchestration layer. Given the desktop+IM form factor, take **one** named assistant persona (identity/avatar/memory — an IM presence needs a face); still skip the multi-bot cast, rooms and the Jev room router.
+- **Amp report folded in** (`ampcode.com/artifacts/cairn-…f419`, read 2026-11-17): corrects the "12-day from-scratch" claim — dusk's first commit imports **OpenMausBot 0.1.141** (Apache-2.0, upstream `milind-soni/OpenMausBot`): ~474k source lines, ~529k test/support lines, ~8,209 commits, ~86 days of upstream history; the repo's own delta is real (~179k lines added) but built on a complete product baseline. Licensing note from the report: imported parts stay Apache, dusk's new parts are PolyForm — borrow designs, not code. Its cairn diagnosis: high throughput, low convergence; the expensive surface is the self-owned distributed task lifecycle × multi-runtime × multi-deploy; recommends "stranger installs → connects model → first real result" as the release hard-condition.
+
+### Migrated open items (from `docs/design/home-redesign-backend-todo.md`, staged for the board)
+
+- AI-native action registry: remaining faces generation + undo (owner route)
+- G1: store and return machine hostname (owner route)
+- G2: report/store/enforce agent-usable folders per machine (owner route, design first)
+- Agent browser and desktop control on by default (daemon stamp check + folders; design first)
+- Context usage for task threads (`todo.context` field + daemon reports `contextTokens`)
+- Save-for-later task without choosing a project (team-level create or default project)
+- G5: finer result kinds than code/document
+- Windowed rendering for long conversation lists (virtualization)
+- SSE resume via Last-Event-ID + quiet reconnecting state
+- GitHub webhooks instead of polling
+- Conditional requests (ETag / 304)
+- Whole-account data export
+- Live-stack e2e pass before each release
+- Decide: task thread inside an archived project stays writable or not
+- Verification owed: redesigned home on a live stack
+- Clients order: web settled first, then native iOS (owner decision 2026-11-12; phone reference recording stays outside the repo)
+- Shelved: voice input (`docs/design/composer-voice-input.md` keeps the contract)
+
+## 6. What I did not check
+
+- Running behavior of any dusk bot feature; every "dusk does X" is from its docs/code text.
+- The body of `server/runtime-coordinator.ts` and `server/host/` (118 files) — the §1 orchestration claims rest on `docs/runtime-contract.md`, which is unusually detailed but may drift from code (`推断`).
+- Whether dusk's "code work" is truly absent in practice: a bot can still run Claude Code in its own computer and edit files, it just has no repo/gate model around it (`推断`).
+- Quality signal: 218 stars in 12 days is a launch signal, not an assessment; the repo may also be marketing-first (heavy `apps/site/` SEO surface, 181+ doc/asset files).
+- Whether dusk bot's team knew of cairn: terminology is fully distinct (bots/rooms/routines/computer vs coordinator/threads/schedules/runners), and its README positions against Grok bot, OpenClaw and Hermes — no cairn reference found (`实测`: README, grep of fetched docs).

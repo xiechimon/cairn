@@ -141,7 +141,7 @@ Reach:
 - Test ids in its code: `engine-question`, `engine-raw`, `engine-raw-copy`, `engine-raw-view`, `engine-take-over-confirm`
 - Research: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md)
 - Frontend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
-- Backend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/home-redesign-backend-todo.md](../../../docs/design/home-redesign-backend-todo.md)
+- Backend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/side-panels-backend-gaps.md](../../../docs/design/side-panels-backend-gaps.md)
 - Evidence: `apps/web/e2e/chief-home-engine-run.spec.ts`, `apps/web/test/engine-run.test.ts`
 
 ### harness-dispatch

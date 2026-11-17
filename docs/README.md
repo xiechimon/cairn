@@ -7,7 +7,6 @@ This directory holds two kinds of things: **long-lived documents** (specs, decis
 | Directory / file | Content |
 |---|---|
 | `spec/` | Numbered specs that still govern current behavior. The numbering skips retired volumes; `docs/spec/README.md` lists what was removed and where the live contract moved |
-| `cairn-plan.md` | Retired. Decisions are written where an agent reads them; do not cite `D…` ids |
 | `getting-started.md` | Run the server, enroll a machine, Docker, deploy publicly, build from source |
 | `configuration.md` | Every server and daemon environment variable |
 | `privacy.md` | What Cairn sends (nothing) and what the optional first-PR discussion prompt does and does not carry |

@@ -245,7 +245,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 - Research: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md)
 - Frontend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/references/thread-review](design/references/thread-review)
-- Backend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/home-redesign-backend-todo.md](design/home-redesign-backend-todo.md)
+- Backend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/side-panels-backend-gaps.md](design/side-panels-backend-gaps.md)
 
 ### harness-dispatch
 
