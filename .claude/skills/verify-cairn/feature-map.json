@@ -989,7 +989,7 @@
       "id": "agent-computer",
       "name": "The agent's computer",
       "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.",
-      "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; CloakBrowser license card waiting, rejected key reason, saved, not saved, owner-only refusal; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
+      "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; CloakBrowser license card waiting, rejected key reason, saved, not saved, owner-only refusal; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; own-Mac switch in Settings, Computers: off with the warning, finish setup in the Cairn app, installing, install failed with reason and retry, not installed, verifying, Accessibility missing, Screen Recording missing (text only), ready with standing grants and revoke; own-Mac approval card in the Coordinator conversation (allow once, allow in this conversation or always allow this command, deny); browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
       "centrality": 1,
       "status": "partial",
       "code": {
@@ -1002,7 +1002,8 @@
           "apps/web/src/chief/cloak-license-card.tsx",
           "apps/web/src/chief/package-install-card.tsx",
           "apps/web/src/board/computer-actions-menu.tsx",
-          "apps/web/src/board/machine-capabilities.ts"
+          "apps/web/src/board/machine-capabilities.ts",
+          "apps/web/src/resources/own-computer-panel.tsx"
         ],
         "server": [
           "apps/server/src/routes-computers.ts",
@@ -1010,7 +1011,8 @@
           "apps/server/src/services/computer-control.ts",
           "apps/server/src/services/computer-screen.ts",
           "apps/server/src/services/computer-feed.ts",
-          "apps/server/src/services/cloak-license.ts"
+          "apps/server/src/services/cloak-license.ts",
+          "apps/server/src/services/own-computer.ts"
         ],
         "daemon": [
           "apps/daemon/src/computer",
@@ -1025,7 +1027,9 @@
           "/api/teams/:teamId/computers/**",
           "/api/teams/:id/cloak-license",
           "/api/computers/package-install",
-          "/api/computers/:id/actions"
+          "/api/computers/:id/actions",
+          "/api/machines/:id/own-computer/grants",
+          "/api/machines/:id/own-computer/grants/:proposalId"
         ]
       },
       "reach": [
@@ -1044,10 +1048,14 @@
       },
       "backendDesign": [
         "docs/design/computer-login-handoff.md",
-        "docs/design/cloakbrowser-computer.md"
+        "docs/design/cloakbrowser-computer.md",
+        "docs/design/own-mac-computer.md"
       ],
       "evidence": [
         "apps/web/e2e/machines-computer-feed.spec.ts",
+        "apps/web/e2e/machines-own-computer.spec.ts",
+        "apps/server/test/own-computer-gate.test.ts",
+        "apps/daemon/test/own-computer-daemon.test.ts",
         "apps/web/test/machine-capabilities.test.ts",
         "apps/server/test/computer-screen-routes.test.ts",
         "apps/server/test/computer-feed-routes.test.ts",

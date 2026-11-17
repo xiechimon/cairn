@@ -1325,6 +1325,7 @@ export function mapMachines(
     ...(m.concurrencyRange !== undefined ? { concurrencyRange: m.concurrencyRange } : {}),
     ...(m.claudeLogin !== undefined ? { claudeLogin: m.claudeLogin } : {}),
     ...(m.providers !== undefined ? { providers: m.providers } : {}),
+    ...(m.ownComputerEnabled !== undefined ? { ownComputerEnabled: m.ownComputerEnabled } : {}),
   }));
 }
 

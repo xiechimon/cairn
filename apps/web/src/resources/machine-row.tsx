@@ -19,6 +19,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { OwnComputerPanel, shouldShowOwnComputer } from './own-computer-panel.js';
 
 export function MachineRowView({
   machine,
@@ -199,6 +200,7 @@ export function MachineRowView({
           </KeyedMenuContent>
         </DropdownMenu>
       </div>
+      {shouldShowOwnComputer(machine) && <OwnComputerPanel machine={machine} />}
       <AlertDialogShell
         title={t('整机迁移')}
         subtitle={t('把固定在这台执行机上的路由规则一起迁到另一台执行机。')}

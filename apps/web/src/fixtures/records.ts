@@ -11,6 +11,8 @@ import {
   type MachineOsPlatform,
   type MemoryRecord,
   type ModelSource,
+  type OwnComputerGrant,
+  type OwnComputerInstallFailure,
   type PermissionState,
   PHASE_VALUES,
   type Phase,
@@ -314,6 +316,8 @@ export interface MachineRow {
     confinementCause?: ConfinementCause;
     computer?: true;
     ownComputer?: true;
+    ownComputerHost?: true;
+    ownComputerShell?: true;
     browser?: true;
     hostPermissions?: {
       accessibility: PermissionState;
@@ -327,6 +331,14 @@ export interface MachineRow {
   concurrencySource?: 'measured' | 'estimate' | 'manual';
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
+  ownComputerEnabled?: boolean;
+  ownComputerFixture?: OwnComputerFixture;
+}
+
+export interface OwnComputerFixture {
+  inMacApp?: boolean;
+  install?: 'installing' | OwnComputerInstallFailure;
+  grants?: OwnComputerGrant[];
 }
 
 export interface ResourcesContent {

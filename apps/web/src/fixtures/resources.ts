@@ -9,7 +9,7 @@ import {
   r7,
   TEAM_ID,
 } from './core.js';
-import type { FixtureSet, ResourcesContent } from './records.js';
+import type { FixtureSet, MachineRow, ResourcesContent } from './records.js';
 
 const PROVIDER_SOURCE_PI: ModelSource = {
   runtime: 'pi',
@@ -571,4 +571,108 @@ export const resourcesMcpGithubConnected: FixtureSet = {
 export const resourcesMcpGithubManage: FixtureSet = {
   ...resourcesMcpGithubConnected,
   ui: { mcpDialog: { kind: 'manage', connectorId: 'mcp-github-app' } },
+};
+
+type OwnMacCapabilities = NonNullable<MachineRow['capabilities']>;
+
+const OWN_MAC_READY: OwnMacCapabilities = {
+  mcpServers: [],
+  skills: [],
+  osPlatform: 'darwin',
+  ownComputerHost: true,
+  ownComputer: true,
+  ownComputerShell: true,
+  hostPermissions: { accessibility: 'granted', automation: 'unknown', screenRecording: 'granted' },
+};
+
+function ownMac(
+  id: string,
+  name: string,
+  patch: Partial<MachineRow>,
+  capabilities: Partial<OwnMacCapabilities> = {},
+): MachineRow {
+  return {
+    id,
+    kind: 'local',
+    name,
+    online: true,
+    enabledRuntimes: ['pi'],
+    maxConcurrent: 3,
+    runningSteps: 0,
+    ownComputerEnabled: true,
+    ...patch,
+    capabilities: { ...OWN_MAC_READY, ...capabilities },
+  };
+}
+
+export const ownComputerStates: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    machines: [
+      ownMac('oc-off', 'off-mac', { ownComputerEnabled: false }),
+      ownMac(
+        'oc-browser',
+        'browser-mac',
+        { ownComputerFixture: { inMacApp: false } },
+        {
+          ownComputerHost: undefined,
+          ownComputer: undefined,
+        },
+      ),
+      ownMac('oc-installing', 'installing-mac', {
+        ownComputerFixture: { inMacApp: true, install: 'installing' },
+      }),
+      ownMac('oc-failed', 'failed-mac', {
+        ownComputerFixture: { inMacApp: true, install: 'checksum' },
+      }),
+      ownMac(
+        'oc-no-ax',
+        'no-access-mac',
+        { ownComputerFixture: { inMacApp: true } },
+        {
+          hostPermissions: {
+            accessibility: 'denied',
+            automation: 'unknown',
+            screenRecording: 'denied',
+          },
+        },
+      ),
+      ownMac(
+        'oc-no-screen',
+        'no-screen-mac',
+        { ownComputerFixture: { inMacApp: true } },
+        {
+          hostPermissions: {
+            accessibility: 'granted',
+            automation: 'unknown',
+            screenRecording: 'denied',
+          },
+        },
+      ),
+      ownMac('oc-ready', 'ians-macbook', {
+        ownComputerFixture: {
+          inMacApp: true,
+          grants: [
+            {
+              proposalId: 'grant-finder',
+              kind: 'app',
+              key: 'finder',
+              threadId: 'chief-thread-1',
+              threadTitle: '整理下载文件夹',
+              decidedAt: Date.now() - 20 * 60_000,
+            },
+            {
+              proposalId: 'grant-git',
+              kind: 'shell',
+              key: 'git status',
+              threadId: null,
+              threadTitle: null,
+              decidedAt: Date.now() - 2 * 60 * 60_000,
+            },
+          ],
+        },
+      }),
+    ],
+  },
 };

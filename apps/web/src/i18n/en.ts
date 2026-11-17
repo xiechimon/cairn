@@ -2358,4 +2358,37 @@ export const EN: Record<string, string> = {
   搜索分支: 'Search branches',
   搜索任务或项目: 'Search tasks or projects',
   搜索模型或服务商: 'Search models or providers',
+  '没能下载 agent-desktop，检查网络后重试':
+    'Could not download agent-desktop; check the network and retry',
+  '下载的 agent-desktop 校验不通过，没有安装':
+    'The downloaded agent-desktop failed its checksum; nothing was installed',
+  'agent-desktop 安装包不完整，没有安装':
+    'The agent-desktop package is incomplete; nothing was installed',
+  '下载的 agent-desktop 版本不对，没有安装':
+    'The downloaded agent-desktop is the wrong version; nothing was installed',
+  '没能写入 Runner 的工具目录，检查磁盘空间后重试':
+    "Could not write to the Runner's tools folder; check disk space and retry",
+  '这台 Mac 的处理器不受 agent-desktop 支持': "agent-desktop does not support this Mac's processor",
+  '开启后，Coordinator 可以在这台 Mac 上以你的身份读取文件和运行程序；每个应用和每条命令第一次用都会先问你':
+    'When on, the Coordinator can read files and run programs on this Mac as you; it asks you before each new app and each command',
+  '在这台 Mac 上打开 Cairn 应用完成设置': 'Open the Cairn app on this Mac to finish setup',
+  '正在安装 agent-desktop': 'Installing agent-desktop',
+  'agent-desktop 还没装在这台 Mac 上': 'agent-desktop is not installed on this Mac yet',
+  '正在等 Runner 确认 agent-desktop': 'Waiting for the Runner to confirm agent-desktop',
+  'Cairn 还没有“辅助功能”权限': 'Cairn does not have the Accessibility permission yet',
+  'Cairn 没有“屏幕录制”权限：Coordinator 只能以文字读取应用':
+    'Cairn does not have the Screen Recording permission: the Coordinator reads apps as text only',
+  '你批准后，Coordinator 可以使用这台 Mac 上的应用':
+    'After you approve, the Coordinator can use apps on this Mac',
+  '命令 {key}': 'Command {key}',
+  所有对话: 'All conversations',
+  一个对话: 'One conversation',
+  '对话「{title}」': 'Conversation “{title}”',
+  '没能开启，请在这台 Mac 上的 Cairn 应用里重试':
+    'Could not turn it on; retry in the Cairn app on this Mac',
+  '没能关闭，请重试': 'Could not turn it off; retry',
+  打开系统设置: 'Open System Settings',
+  '让 Coordinator 使用这台 Mac': 'Let the Coordinator use this Mac',
+  安装: 'Install',
+  '没能撤销，请重试': 'Could not revoke; retry',
 };
