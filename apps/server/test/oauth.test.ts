@@ -95,7 +95,8 @@ describe('POST /api/teams/:id/providers/oauth/:preset/authorize', () => {
     vi.stubEnv('CAIRN_GITHUB_OAUTH_BASE_URL', 'http://127.0.0.1:4002');
     const { s, mock } = bootOAuth({ json: { access_token: 'gho_fake', token_type: 'bearer' } });
     const { url, state } = await authorize(s);
-    expect(url?.origin + url?.pathname).toBe('http://127.0.0.1:4002/login/oauth/authorize');
+    if (!url) throw new Error('authorizationUrl missing');
+    expect(url.origin + url.pathname).toBe('http://127.0.0.1:4002/login/oauth/authorize');
     await callback(s, `code=fakecode&state=${state}`);
     expect(mock.calls[0]?.url).toBe('http://127.0.0.1:4002/login/oauth/access_token');
   });
