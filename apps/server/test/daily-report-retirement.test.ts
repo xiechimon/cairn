@@ -21,7 +21,15 @@ import {
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { finishStep } from '../src/services/machines.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, insertMachineIntoOldSchema, postProject, req, seedRoute } from './helpers.js';
+import {
+  bootServer,
+  insertMachineIntoOldSchema,
+  insertStepIntoOldSchema,
+  postProject,
+  req,
+  seedRoute,
+  stepRowsRaw,
+} from './helpers.js';
 import { migrateAll, migrateUpTo } from './migrate-helpers.js';
 
 const YESTERDAY = Date.parse('2026-11-15T12:00:00+08:00');
@@ -193,9 +201,8 @@ test.each(['report', 'daily'] as const)(
     const s = world(drizzle(sqlite, { schema }));
     const machineId = insertMachineIntoOldSchema(sqlite, s.team.id);
     for (const [i, status] of (['pending', 'claimed', 'done', 'failed'] as const).entries()) {
-      s.db
-        .insert(step)
-        .values({
+      insertStepIntoOldSchema(sqlite, [
+        {
           id: `report-${status}`,
           buildId: 'chief-digest-chief',
           kind: 'chief',
@@ -207,8 +214,8 @@ test.each(['report', 'daily'] as const)(
             kind === 'daily'
               ? `Conversation\0with earlier binary text\nDigest thread=main until=${YESTERDAY} last=yesterday-message reason=daily`
               : null,
-        })
-        .run();
+        },
+      ]);
       s.db
         .insert(chiefReport)
         .values({
@@ -247,36 +254,31 @@ test.each(['report', 'daily'] as const)(
         `Conversation\nDigest thread=main until=${YESTERDAY} last=yesterday-message reason=daily\0junk`,
       ],
     ] as const;
-    s.db
-      .insert(step)
-      .values(
-        controls.map(([id, prompt]) => ({
-          id,
-          prompt,
-          buildId: 'chief-digest-chief',
-          kind: 'chief' as const,
-          status: 'pending' as const,
-          createdAt: YESTERDAY,
-        })),
-      )
-      .run();
-    s.db
-      .insert(step)
-      .values({
+    insertStepIntoOldSchema(
+      sqlite,
+      controls.map(([id, prompt]) => ({
+        id,
+        prompt,
+        buildId: 'chief-digest-chief',
+        kind: 'chief' as const,
+        status: 'pending' as const,
+        createdAt: YESTERDAY,
+      })),
+    );
+    insertStepIntoOldSchema(sqlite, [
+      {
         id: 'ordinary',
         buildId: 'task-build',
         kind: 'session',
         status: 'claimed',
         machineId,
         createdAt: YESTERDAY,
-      })
-      .run();
+      },
+    ]);
     const reports = s.db.select().from(chiefReport).all();
-    const ended = s.db
-      .select()
-      .from(step)
-      .all()
-      .filter((row) => ['done', 'failed'].includes(row.status));
+    const ended = stepRowsRaw(sqlite).filter((row) =>
+      ['done', 'failed'].includes(row.status as string),
+    );
     migrateAll(sqlite);
     expect(
       Object.fromEntries(
@@ -301,12 +303,8 @@ test.each(['report', 'daily'] as const)(
       ordinary: 'claimed',
     });
     expect(
-      s.db
-        .select()
-        .from(step)
-        .all()
-        .filter((row) => ['done', 'failed'].includes(row.status)),
-    ).toEqual(ended);
+      stepRowsRaw(sqlite).filter((row) => ['done', 'failed'].includes(row.status as string)),
+    ).toMatchObject(ended);
     const stopped = s.db.select().from(step).where(eq(step.id, 'report-claimed')).get();
     s.db
       .insert(chiefThread)

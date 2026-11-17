@@ -1,14 +1,19 @@
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { expect, onTestFinished, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import * as schema from '../src/db/schema.js';
 import { build, message, step, todo } from '../src/db/schema.js';
 import { finishStep } from '../src/services/machines.js';
-import { bootServer, insertMachineIntoOldSchema, postProject } from './helpers.js';
+import {
+  bootServer,
+  insertMachineIntoOldSchema,
+  insertStepIntoOldSchema,
+  postProject,
+  stepRowsRaw,
+} from './helpers.js';
 import { migrateAll, migrateUpTo } from './migrate-helpers.js';
 
 test('an upgrade stops only active retired research steps and discards their late results', async () => {
@@ -58,9 +63,8 @@ test('an upgrade stops only active retired research steps and discards their lat
       'failed',
       'stopped',
     ] as const) {
-      s.db
-        .insert(step)
-        .values({
+      insertStepIntoOldSchema(sqlite, [
+        {
           id: `${id}-${status}`,
           buildId: id,
           kind: 'session',
@@ -68,19 +72,19 @@ test('an upgrade stops only active retired research steps and discards their lat
           machineId: status === 'pending' ? null : machineId,
           claimedAt: status === 'pending' ? null : 123,
           createdAt: 1,
-        })
-        .run();
+        },
+      ]);
     }
   }
   const tasks = s.db.select().from(todo).all();
   const builds = s.db.select().from(build).all();
-  const before = s.db.select().from(step).all();
+  const before = stepRowsRaw(sqlite);
   migrateAll(sqlite);
   for (const row of before) {
     const retired = row.buildId === 'research-0' || row.buildId === 'research-1';
     const active = row.status === 'pending' || row.status === 'claimed';
-    const current = s.db.select().from(step).where(eq(step.id, row.id)).get();
-    expect(current).toEqual(
+    const current = stepRowsRaw(sqlite).find((entry) => entry.id === row.id);
+    expect(current).toMatchObject(
       retired && active ? { ...row, status: 'stopped', finishedAt: expect.any(Number) } : row,
     );
   }

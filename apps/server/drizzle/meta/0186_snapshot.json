@@ -7227,6 +7227,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "devinSubscriptionId": {
+          "name": "devinSubscriptionId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {

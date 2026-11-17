@@ -488,6 +488,33 @@ export function insertMachineIntoOldSchema(sqlite: BetterSqlite.Database, teamId
   return id;
 }
 
+export function stepRowsRaw(sqlite: BetterSqlite.Database): Record<string, unknown>[] {
+  return sqlite.prepare('SELECT * FROM step').all() as Record<string, unknown>[];
+}
+
+export function insertStepIntoOldSchema(
+  sqlite: BetterSqlite.Database,
+  rows: Record<string, unknown>[],
+): void {
+  const columns = new Set(
+    (sqlite.prepare('PRAGMA table_info(step)').all() as { name: string }[]).map(
+      (column) => column.name,
+    ),
+  );
+  for (const row of rows) {
+    const entries = Object.entries(row).filter(
+      ([key, value]) => columns.has(key) && value !== undefined,
+    );
+    sqlite
+      .prepare(
+        `INSERT INTO step (${entries.map(([key]) => `"${key}"`).join(', ')}) VALUES (${entries
+          .map(() => '?')
+          .join(', ')})`,
+      )
+      .run(...entries.map(([, value]) => sqliteValue(value)));
+  }
+}
+
 export interface RouteSeed {
   id?: string;
   provider?: string;
