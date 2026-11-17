@@ -186,7 +186,7 @@ function MachineCard({
   const [fullscreen, setFullscreen] = useState(false);
   const [screenRequested, setScreenRequested] = useState(openScreen);
   const control = useComputerControl({ teamId, computer });
-  const hover = useScreenHoverControl(control);
+  const hover = useScreenHoverControl(control, computer?.handoffReason != null);
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 

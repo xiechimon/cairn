@@ -68,7 +68,7 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
   const computersQ = useComputers(teamId, live && waiting, COMPUTERS_REFRESH_MS);
   const computer = computersQ.data?.[0] ?? null;
   const control = useComputerControl({ teamId, computer });
-  const hover = useScreenHoverControl(control);
+  const hover = useScreenHoverControl(control, computer?.handoffReason != null);
   const [open, setOpen] = useState(false);
   const now = useNow(waiting);
   const push = useDevicePushOff(teamId, waiting);

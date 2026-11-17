@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   HOVER_DWELL_MS,
   HOVER_RELEASE_MS,
+  LOGIN_RELEASE_MS,
   screenHoverIntent,
   TOUCH_IDLE_MS,
 } from '../src/board/screen-hover-control.js';
@@ -78,5 +79,27 @@ describe('screen hover intent', () => {
     intent.dispose();
     vi.advanceTimersByTime(TOUCH_IDLE_MS);
     expect(wants).toEqual([true, false]);
+  });
+
+  test('while a login is pending, leaving the screen keeps control until the login grace ends', () => {
+    const wants: boolean[] = [];
+    let login = true;
+    const intent = screenHoverIntent(
+      (held) => wants.push(held),
+      () => login,
+    );
+    intent.enter();
+    vi.advanceTimersByTime(HOVER_DWELL_MS);
+    intent.leave();
+    vi.advanceTimersByTime(HOVER_RELEASE_MS * 10);
+    expect(wants).toEqual([true]);
+    vi.advanceTimersByTime(LOGIN_RELEASE_MS);
+    expect(wants).toEqual([true, false]);
+    login = false;
+    intent.enter();
+    vi.advanceTimersByTime(HOVER_DWELL_MS);
+    intent.leave();
+    vi.advanceTimersByTime(HOVER_RELEASE_MS);
+    expect(wants).toEqual([true, false, true, false]);
   });
 });

@@ -140,7 +140,7 @@ export function MachineName({
         compact ? 'gap-1.5' : 'gap-2',
       )}
     >
-      {showIcon && <MachineIcon machine={machine} className={compact ? 'size-[1em]' : undefined} />}
+      {showIcon && <MachineIcon machine={machine} className={compact ? 'size-3.5' : undefined} />}
       <span className="min-w-0 wrap-anywhere">
         {machine.name}
         {secondary !== null && (

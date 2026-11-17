@@ -148,7 +148,6 @@ export const EN: Record<string, string> = {
   Coordinator: 'Coordinator',
   成果: 'Made',
   电脑: 'Computers',
-  '{n} 在跑': '{n} running',
   已安装: 'Installed',
   '桌面控制已上线，屏幕显示在这里': 'Desktop control is online; the screen shows here',
   正在连接屏幕: 'Connecting to the screen',

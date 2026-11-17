@@ -6,6 +6,7 @@ export type ComputerControl = ReturnType<typeof useComputerControl>;
 
 export const HOVER_DWELL_MS = 150;
 export const HOVER_RELEASE_MS = 800;
+export const LOGIN_RELEASE_MS = 60_000;
 export const TOUCH_IDLE_MS = 30_000;
 
 const NOVNC_CAPTURE_ID = 'noVNC_mouse_capture_elem';
@@ -18,7 +19,10 @@ export interface ScreenHoverIntent {
   dispose: () => void;
 }
 
-export function screenHoverIntent(want: (held: boolean) => void): ScreenHoverIntent {
+export function screenHoverIntent(
+  want: (held: boolean) => void,
+  loginPending: () => boolean = () => false,
+): ScreenHoverIntent {
   let wanted = false;
   let dwell: ReturnType<typeof setTimeout> | undefined;
   let release: ReturnType<typeof setTimeout> | undefined;
@@ -50,10 +54,13 @@ export function screenHoverIntent(want: (held: boolean) => void): ScreenHoverInt
       clearTimeout(dwell);
       dwell = undefined;
       if (!wanted || release !== undefined) return;
-      release = setTimeout(() => {
-        release = undefined;
-        set(false);
-      }, HOVER_RELEASE_MS);
+      release = setTimeout(
+        () => {
+          release = undefined;
+          set(false);
+        },
+        loginPending() ? LOGIN_RELEASE_MS : HOVER_RELEASE_MS,
+      );
     },
     touch: () => {
       clearAll();
@@ -103,9 +110,11 @@ function leaveUnlessDraggingInside(event: ReactPointerEvent<HTMLElement>, leave:
   );
 }
 
-export function useScreenHoverControl(control: ComputerControl): ScreenHover {
+export function useScreenHoverControl(control: ComputerControl, loginPending = false): ScreenHover {
   const [wanted, setWanted] = useState(false);
-  const [intent] = useState(() => screenHoverIntent(setWanted));
+  const login = useRef(loginPending);
+  login.current = loginPending;
+  const [intent] = useState(() => screenHoverIntent(setWanted, () => login.current));
   const pendingChange = useRef(false);
   const insideDown = useRef<Event | null>(null);
   const latest = useRef(control);
