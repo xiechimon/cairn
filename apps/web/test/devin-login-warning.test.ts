@@ -33,7 +33,7 @@ describe('devin subscription brief warning', () => {
     );
     expect(expired).toContain('已过期');
     expect(expired).toContain('Coordinator 和任务都暂时用不了');
-    expect(expired).toContain('windsurf_api_key');
+    expect(expired).toContain('credentials.toml');
     expect(expired).toContain('设置 → 模型路由');
   });
   test('does not warn about a stored subscription that is not the enabled one', () => {

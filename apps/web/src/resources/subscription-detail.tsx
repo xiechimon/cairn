@@ -43,7 +43,7 @@ const AUTH_RENEWAL: Record<AccountVendor, string> = {
   codex: '这个订阅的登录已失效。先移除它，再重新添加新的 token。',
   grok: '这个订阅的登录已失效。先移除它，再重新添加新的 token。',
   devin:
-    '这个订阅的登录已失效。先移除它，再在 `~/.local/share/devin/credentials.toml` 里拿新的 `windsurf_api_key` 添加回来。',
+    '这个订阅的登录已失效。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml` 把输出整个添加回来。',
 };
 
 const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
@@ -51,7 +51,7 @@ const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
   codex: '这个订阅已过期。先移除它，再重新添加新的 token。',
   grok: '这个订阅已过期。先移除它，再重新添加新的 token。',
   devin:
-    '这个订阅已过期。先移除它，再在 `~/.local/share/devin/credentials.toml` 里拿新的 `windsurf_api_key` 添加回来。',
+    '这个订阅已过期。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml` 把输出整个添加回来。',
 };
 
 const UNAVAILABLE_COPY: Record<AccountVendor, string> = {

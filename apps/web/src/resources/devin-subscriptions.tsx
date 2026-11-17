@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { CreateDevinSubscription } from '../api/devin-subscriptions.js';
+import { extractDevinToken } from '../api/devin-subscriptions.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { withCodeSpans } from '../components/notice-banner.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -37,7 +38,7 @@ export function AddDevinSubscriptionDialog({
             onClick: () =>
               onCreate({
                 label: label.trim(),
-                token: token.trim(),
+                token: extractDevinToken(token),
                 expiresAt: Date.now() + DEVIN_TOKEN_LIFETIME_MS,
               }),
           }}
@@ -49,7 +50,7 @@ export function AddDevinSubscriptionDialog({
         <p>
           {withCodeSpans(
             t(
-              '在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把 `windsurf_api_key` 的值粘贴到下面。',
+              '在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把输出整个粘贴到下面，会自动取出 `windsurf_api_key`。',
             ),
           )}
         </p>

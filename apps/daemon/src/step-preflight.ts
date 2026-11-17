@@ -10,8 +10,8 @@ import { type AttachmentDownloader, resolveDeliveredPrompt } from './step-attach
 
 export function devinSubscriptionMissingMessage(): string {
   return (
-    '团队还没有可用的 Devin 订阅：到「我的订阅」把已登录机器上 ' +
-    '~/.local/share/devin/credentials.toml 里的 windsurf_api_key 贴进来，然后重跑这个任务。'
+    '团队还没有可用的 Devin 订阅：在已登录机器上运行 cat ' +
+    '~/.local/share/devin/credentials.toml，把输出整个贴到「我的订阅」，然后重跑这个任务。'
   );
 }
 

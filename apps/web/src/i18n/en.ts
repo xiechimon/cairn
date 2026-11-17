@@ -70,19 +70,19 @@ export const EN: Record<string, string> = {
     '{name}: expires in {days## day|# days}. Before then, run `claude setup-token` in a terminal and add the new token under Settings → Model routing.',
   'Devin 订阅': 'Devin subscription',
   '添加 Devin 订阅': 'Add Devin subscription',
-  '在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把 `windsurf_api_key` 的值粘贴到下面。':
-    'Run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin, then paste the `windsurf_api_key` value below.',
+  '在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把输出整个粘贴到下面，会自动取出 `windsurf_api_key`。':
+    'Run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin, paste the whole output below, and the `windsurf_api_key` is picked out automatically.',
   '任务会用这个订阅跑 Devin，不用再配 API key。Token 加密保存，保存后无法再查看。':
     'Tasks run Devin with this subscription, so you need no API key. The token is stored encrypted and cannot be viewed after saving.',
-  '这个订阅的登录已失效。先移除它，再在 `~/.local/share/devin/credentials.toml` 里拿新的 `windsurf_api_key` 添加回来。':
-    'This subscription is no longer signed in. Remove it, then take the new `windsurf_api_key` from `~/.local/share/devin/credentials.toml` and add it back.',
-  '这个订阅已过期。先移除它，再在 `~/.local/share/devin/credentials.toml` 里拿新的 `windsurf_api_key` 添加回来。':
-    'This subscription has expired. Remove it, then take the new `windsurf_api_key` from `~/.local/share/devin/credentials.toml` and add it back.',
+  '这个订阅的登录已失效。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml` 把输出整个添加回来。':
+    'This subscription is no longer signed in. Remove it, then run `cat ~/.local/share/devin/credentials.toml` and add the whole output back.',
+  '这个订阅已过期。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml` 把输出整个添加回来。':
+    'This subscription has expired. Remove it, then run `cat ~/.local/share/devin/credentials.toml` and add the whole output back.',
   '服务器上找不到 devin 命令': 'The devin command was not found on the server.',
-  '{name}：已过期，Coordinator 和任务都暂时用不了。在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把新的 windsurf_api_key 添加到「设置 → 模型路由」。':
-    '{name}: expired, so the Coordinator and tasks cannot run for now. Run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin and add the new windsurf_api_key under Settings → Model routing.',
-  '{name}：将在 {days} 天后过期。到期前在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把新的 windsurf_api_key 添加到「设置 → 模型路由」。':
-    '{name}: expires in {days## day|# days}. Before then, run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin and add the new windsurf_api_key under Settings → Model routing.',
+  '{name}：已过期，Coordinator 和任务都暂时用不了。在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把输出整个添加到「设置 → 模型路由」。':
+    '{name}: expired, so the Coordinator and tasks cannot run for now. Run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin and add the whole output under Settings → Model routing.',
+  '{name}：将在 {days} 天后过期。到期前在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把输出整个添加到「设置 → 模型路由」。':
+    '{name}: expires in {days## day|# days}. Before then, run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin and add the whole output under Settings → Model routing.',
   Archived: 'Archived',
   Agent: 'Agent',
 
@@ -1059,8 +1059,8 @@ export const EN: Record<string, string> = {
     'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
   '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由（前面 {ahead} 个）':
     'Queued: the team has no usable Claude subscription. Run claude setup-token in a terminal and add the token under Model routing ({ahead} ahead)',
-  '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把 windsurf_api_key 添加到模型路由（前面 {ahead} 个）':
-    'Queued: the team has no usable Devin subscription. Run cat ~/.local/share/devin/credentials.toml on a machine signed in to Devin and add the windsurf_api_key under Model routing ({ahead} ahead)',
+  '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把输出整个添加到模型路由（前面 {ahead} 个）':
+    'Queued: the team has no usable Devin subscription. Run cat ~/.local/share/devin/credentials.toml on a machine signed in to Devin and add the whole output under Model routing ({ahead} ahead)',
   '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
     'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks ({ahead} ahead)',
   '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':

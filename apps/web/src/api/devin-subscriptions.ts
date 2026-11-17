@@ -30,6 +30,12 @@ export type DevinSubscriptionWire = DevinSubscription & {
 const isAccountState = (value: unknown): value is AccountState =>
   typeof value === 'string' && (ACCOUNT_STATES as readonly string[]).includes(value);
 
+export function extractDevinToken(input: string): string {
+  const trimmed = input.trim();
+  const fromToml = /^windsurf_api_key\s*=\s*"([^"]+)"\s*$/m.exec(trimmed);
+  return fromToml?.[1] ?? trimmed;
+}
+
 export function toDevinAccount(wire: DevinSubscriptionWire, now: number): SubscriptionAccount {
   const expired = wire.expiresAt !== null && wire.expiresAt <= now;
   return {
