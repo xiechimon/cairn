@@ -101,7 +101,11 @@ const TONE_CLASS: Record<StatusTone, { ink: string; tile: string; chip: string }
     tile: 'bg-(--task-wait-tint)',
     chip: 'text-(--chat-link)',
   },
-  quiet: { ink: 'text-tint-quiet-ink', tile: 'bg-tint-quiet', chip: 'text-tint-quiet-ink' },
+  quiet: {
+    ink: 'text-tint-quiet-ink',
+    tile: 'bg-tint-quiet',
+    chip: 'text-(color:--task-chip-quiet-ink)',
+  },
   fail: { ink: 'text-tint-fail-ink', tile: 'bg-tint-fail', chip: 'text-tint-fail-ink' },
 };
 
@@ -119,7 +123,8 @@ const CONVERSATION_STATUS: Record<Phase, { glyph: GlyphKind; tone: StatusTone }>
 };
 
 const TASK_CHIP_CLS =
-  'mx-1 inline-flex cursor-pointer items-center gap-1.5 rounded-sm bg-popover px-1.5 py-0 align-top font-sans text-ui leading-[inherit] font-normal text-popover-foreground no-underline shadow-(--e1-lift)';
+  'mr-1 ml-0 inline cursor-pointer rounded-sm bg-(color:--task-chip-fill) px-1.5 py-0 align-baseline font-sans text-ui leading-[inherit] font-normal text-popover-foreground break-keep no-underline shadow-(--e1-lift) [overflow-wrap:anywhere]';
+const TASK_CHIP_WHOLE_MAX = 16;
 
 export function taskChipClass(phase: Phase | undefined): string {
   return cn(
@@ -180,15 +185,26 @@ function MentionChip({ seg }: { seg: DocSegment }) {
     todoId != null && TASK_NUMBER_LABEL.test(seg.text) ? (glance?.title ?? t('任务')) : seg.text;
   if (seg.mentionKind === 'agent') return <span data-slot="agent-mention">{label}</span>;
   return href != null ? (
-    <Link
-      className={cn(chipClass, todoId != null ? taskChipClass(phase) : 'cursor-pointer')}
-      to={href}
-      data-phase={phase}
-      data-slot={todoId != null ? 'task-mention' : undefined}
-    >
-      {phase != null && <TodoStatus phase={phase} />}
-      <span className="max-w-48 truncate">{label}</span>
-    </Link>
+    <>
+      {' '}
+      <Link
+        className={cn(
+          chipClass,
+          taskChipClass(phase),
+          label.length <= TASK_CHIP_WHOLE_MAX && 'whitespace-nowrap',
+        )}
+        to={href}
+        data-phase={phase}
+        data-slot="task-mention"
+      >
+        {phase != null && (
+          <span className="mr-1.5 inline-flex align-[-0.125em]">
+            <TodoStatus phase={phase} />
+          </span>
+        )}
+        {label}
+      </Link>
+    </>
   ) : (
     <span className={chipClass}>
       {seg.mentionKind === 'machine' ? (

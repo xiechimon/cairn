@@ -260,6 +260,8 @@
   --tint-quiet: #2a2b2a;
   --tint-quiet-soft: var(--secondary);
   --tint-quiet-ink: var(--text-secondary);
+  --task-chip-fill: #363735;
+  --task-chip-quiet-ink: var(--foreground);
   --tint-fail: #4a2a24;
   --tint-fail-soft: #3a2420;
   --tint-fail-ink: var(--destructive);
@@ -422,6 +424,8 @@
   --tint-quiet: #dad9d5;
   --tint-quiet-soft: var(--secondary);
   --tint-quiet-ink: var(--text-secondary);
+  --task-chip-fill: var(--popover);
+  --task-chip-quiet-ink: var(--tint-quiet-ink);
   --tint-fail: #f5ddd6;
   --tint-fail-soft: #f9e8e3;
   --tint-fail-ink: var(--destructive);

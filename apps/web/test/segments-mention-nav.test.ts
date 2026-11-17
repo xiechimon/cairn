@@ -23,7 +23,7 @@ function render(segments: DocSegment[]): string {
 }
 
 function plain(markup: string): string {
-  return markup.replace(/<[^>]+>/g, '');
+  return markup.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function mention(
@@ -122,7 +122,7 @@ describe('a Markdown task link names the task by its title (C15)', () => {
       }),
       ESSAY,
     );
-    expect(plain(markup)).toBe('已停掉写作文的那个任务写一篇 100 字的作文，任务还开着。');
+    expect(plain(markup)).toBe('已停掉写作文的那个任务 写一篇 100 字的作文，任务还开着。');
     expect(markup).toMatch(/<a [^>]*data-phase="closed"[^>]*href="\/app\?thread=e6"/);
   });
 
