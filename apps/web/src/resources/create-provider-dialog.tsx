@@ -7,7 +7,6 @@ import {
   type ProviderApi,
   type ProviderModel,
 } from '@cairn/shared';
-import { Claude, Devin } from '@lobehub/icons';
 import { type ReactNode, useEffect, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
@@ -25,6 +24,7 @@ import {
 } from '../components/ui/select.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, PlusSmall, Search } from '../icons/index.js';
+import { LOBEHUB_MONO } from '../icons/lobehub-mono.js';
 import { ProviderConnectionDisclosure } from './provider-connection-disclosure.js';
 import { ProviderModelChips, pickedModels } from './provider-model-list.js';
 import { PROVIDER_PRESET_DEFAULTS } from './provider-preset-data.js';
@@ -136,6 +136,24 @@ const matchesQuery = (label: string, query: string) =>
   query.trim() === '' || label.includes(query.trim().toLowerCase());
 
 const BASE_URL_PLACEHOLDER = /\{[A-Za-z_]+\}/;
+
+function MonoMark({ mark }: { mark: { viewBox: string; paths: readonly string[] } }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox={mark.viewBox}
+      fill="currentColor"
+      fillRule="evenodd"
+      clipRule="evenodd"
+      width={14}
+      height={14}
+    >
+      {mark.paths.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
 
 function connectionSummary(
   connection: { baseUrl: string; api: ProviderApi; authHeader: boolean },
@@ -361,7 +379,7 @@ export function CreateProviderDialog({
                     onClick={onPickClaudeSubscription}
                   >
                     <span aria-hidden className={PICKER_TILE_CLS}>
-                      <Claude size={14} />
+                      <MonoMark mark={LOBEHUB_MONO.claude} />
                     </span>
                     <span className="min-w-0 truncate">{t('Claude 订阅')}</span>
                   </Button>
@@ -374,7 +392,7 @@ export function CreateProviderDialog({
                     onClick={onPickDevinSubscription}
                   >
                     <span aria-hidden className={PICKER_TILE_CLS}>
-                      <Devin size={14} />
+                      <MonoMark mark={LOBEHUB_MONO.devin} />
                     </span>
                     <span className="min-w-0 truncate">{t('Devin 订阅')}</span>
                   </Button>

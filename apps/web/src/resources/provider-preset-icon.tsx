@@ -1,8 +1,7 @@
 import type { PROVIDER_PRESET_IDS } from '@cairn/shared';
-import { ProviderIcon } from '@lobehub/icons';
-import { useLayoutEffect, useRef } from 'react';
+import { LOBEHUB_MONO } from '../icons/lobehub-mono.js';
 
-const PRESET_ICON: Record<(typeof PROVIDER_PRESET_IDS)[number], string> = {
+const PRESET_ICON: Record<(typeof PROVIDER_PRESET_IDS)[number], keyof typeof LOBEHUB_MONO> = {
   'github-copilot': 'github-copilot',
   'openai-codex': 'openai',
   xai: 'xai',
@@ -44,19 +43,21 @@ const PRESET_ICON: Record<(typeof PROVIDER_PRESET_IDS)[number], string> = {
 };
 
 export function ProviderPresetIcon({ id }: { id: (typeof PROVIDER_PRESET_IDS)[number] }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    for (const node of ref.current?.querySelectorAll('title') ?? []) node.remove();
-  }, [id]);
+  const mark = LOBEHUB_MONO[PRESET_ICON[id]];
   return (
-    <span ref={ref} className="contents">
-      <ProviderIcon
-        provider={PRESET_ICON[id]}
-        size={14}
-        type="mono"
-        forceMono
-        className="text-current"
-      />
-    </span>
+    <svg
+      aria-hidden
+      viewBox={mark.viewBox}
+      fill="currentColor"
+      fillRule="evenodd"
+      clipRule="evenodd"
+      width={14}
+      height={14}
+      className="text-current"
+    >
+      {mark.paths.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
   );
 }

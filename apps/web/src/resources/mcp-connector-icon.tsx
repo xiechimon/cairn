@@ -1,7 +1,27 @@
-import { Cloudflare, Github, HuggingFace, MCP, Notion } from '@lobehub/icons';
-import { type ComponentType, useLayoutEffect, useRef } from 'react';
+import type { ComponentType } from 'react';
+import { LOBEHUB_MONO } from '../icons/lobehub-mono.js';
 
 type BrandIcon = ComponentType<{ size?: number }>;
+
+function lobehubMark(mark: { viewBox: string; paths: readonly string[] }): BrandIcon {
+  return function LobehubMark({ size }: { size?: number }) {
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox={mark.viewBox}
+        fill="currentColor"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        aria-hidden
+      >
+        {mark.paths.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </svg>
+    );
+  };
+}
 
 function brandMark(viewBox: string, paths: readonly string[]): BrandIcon {
   return function BrandMark({ size }: { size?: number }) {
@@ -35,25 +55,22 @@ const Context7 = brandMark('5 5 18 18', [
 ]);
 
 const BRAND_ICONS: Record<string, BrandIcon> = {
-  github: Github,
-  cloudflare: Cloudflare,
-  huggingface: HuggingFace,
-  notion: Notion,
+  github: lobehubMark(LOBEHUB_MONO.github),
+  cloudflare: lobehubMark(LOBEHUB_MONO.cloudflare),
+  huggingface: lobehubMark(LOBEHUB_MONO.huggingface),
+  notion: lobehubMark(LOBEHUB_MONO.notion),
   linear: Linear,
   sentry: Sentry,
   supabase: Supabase,
   context7: Context7,
 };
 
+const McpFallback = lobehubMark(LOBEHUB_MONO.mcp);
+
 export function McpConnectorIcon({ catalogId }: { catalogId: string | null }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const Icon = (catalogId !== null ? BRAND_ICONS[catalogId] : undefined) ?? MCP;
-  useLayoutEffect(() => {
-    for (const node of ref.current?.querySelectorAll('title') ?? []) node.remove();
-  }, [catalogId]);
+  const Icon = (catalogId !== null ? BRAND_ICONS[catalogId] : undefined) ?? McpFallback;
   return (
     <span
-      ref={ref}
       aria-hidden
       className="flex size-5 flex-none items-center justify-center text-content-secondary"
     >

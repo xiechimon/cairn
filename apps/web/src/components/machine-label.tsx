@@ -1,5 +1,4 @@
 import type { MachineCapabilities } from '@cairn/shared';
-import { Apple, Microsoft } from '@lobehub/icons';
 import { cn } from 'cn';
 import { Monitor } from 'lucide-react';
 import { createContext, useContext } from 'react';
@@ -27,6 +26,7 @@ import {
   siVoidlinux,
   siZorin,
 } from 'simple-icons';
+import { LOBEHUB_MONO } from '../icons/lobehub-mono.js';
 
 const SUFFIX_LENGTH = 4;
 const NON_ALPHANUMERIC = /[^a-z0-9]/gi;
@@ -66,14 +66,14 @@ const DISTRIBUTIONS: Readonly<Record<string, SimpleIcon>> = {
 
 export function machineOsIdentity(machine: Pick<NamedMachine, 'capabilities'>) {
   const platform = machine.capabilities?.osPlatform;
-  if (platform === 'darwin') return { label: 'macOS', Mark: Apple };
-  if (platform === 'windows') return { label: 'Windows', Mark: Microsoft };
+  if (platform === 'darwin') return { label: 'macOS', ...LOBEHUB_MONO.apple };
+  if (platform === 'windows') return { label: 'Windows', ...LOBEHUB_MONO.microsoft };
   if (platform !== 'linux') return null;
   const id = machine.capabilities?.osDistribution;
   const icon =
     (id !== undefined && Object.hasOwn(DISTRIBUTIONS, id) ? DISTRIBUTIONS[id] : undefined) ??
     siLinux;
-  return { label: icon.title, path: icon.path };
+  return { label: icon.title, viewBox: '0 0 24 24', paths: [icon.path] };
 }
 
 export function MachineIcon({
@@ -95,11 +95,18 @@ export function MachineIcon({
     >
       {identity === null ? (
         <Monitor aria-hidden className="size-full" />
-      ) : identity.Mark !== undefined ? (
-        <identity.Mark aria-hidden size="100%" />
       ) : (
-        <svg aria-hidden viewBox="0 0 24 24" fill="currentColor" className="size-full">
-          <path d={identity.path} />
+        <svg
+          aria-hidden
+          viewBox={identity.viewBox}
+          fill="currentColor"
+          fillRule="evenodd"
+          clipRule="evenodd"
+          className="size-full"
+        >
+          {identity.paths.map((d) => (
+            <path key={d} d={d} />
+          ))}
         </svg>
       )}
     </span>

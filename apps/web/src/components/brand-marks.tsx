@@ -1,5 +1,5 @@
-import { Devin } from '@lobehub/icons';
 import type { SVGProps } from 'react';
+import { LOBEHUB_MONO } from '../icons/lobehub-mono.js';
 
 export function PiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
   return (
@@ -51,7 +51,23 @@ export function OpenAIMark({ width = 16, height = 16, ...props }: SVGProps<SVGSV
 }
 
 export function DevinMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
-  return <Devin width={width} height={height} aria-hidden="true" {...props} />;
+  const mark = LOBEHUB_MONO.devin;
+  return (
+    <svg
+      aria-hidden="true"
+      width={width}
+      height={height}
+      viewBox={mark.viewBox}
+      fill="currentColor"
+      fillRule="evenodd"
+      clipRule="evenodd"
+      {...props}
+    >
+      {mark.paths.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
 }
 
 export function GrokMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
