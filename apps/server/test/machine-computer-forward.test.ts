@@ -875,8 +875,8 @@ describe('feed and redaction', () => {
     expect(JSON.stringify(feed)).not.toContain(FAKE_TOKEN);
     receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [next]);
     expect(commands()).toHaveLength(3);
-    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [done(3, 'finished')]);
-    expect((await result).text).toBe('finished');
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [done(3, 'exit code: 0')]);
+    expect((await result).text).toBe('first line\n[REDACTED]\nsecond line\n');
     expect(feed.at(-1)).toMatchObject({ command: { status: 'done' } });
   });
 

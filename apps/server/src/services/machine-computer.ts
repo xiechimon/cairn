@@ -435,10 +435,21 @@ function storedParams(params: Record<string, unknown>): Record<string, unknown> 
   return clip(redactSecrets(params).value) as Record<string, unknown>;
 }
 
+function shellOutputText(row: CallRow): string {
+  const head = redact(row.outputHead);
+  const tail = redact(row.outputTail);
+  const truncated = row.outputChars > COMPUTER_OUTPUT_HEAD_CHARS + COMPUTER_OUTPUT_TAIL_CHARS;
+  const omitted = row.outputChars - row.outputHead.length - row.outputTail.length;
+  return truncated ? `${head}\n[... ${omitted} characters omitted ...]\n${tail}` : head + tail;
+}
+
 function resultOfRow(row: CallRow): ComputerRelayResult {
   switch (row.state) {
     case 'done': {
-      const text = row.resultText ?? redact(row.outputHead + row.outputTail);
+      const text =
+        SHELL_TOOLS.has(row.tool as ComputerTool) && row.outputChars > 0
+          ? shellOutputText(row)
+          : (row.resultText ?? redact(row.outputHead + row.outputTail));
       const exit =
         row.exitCode !== null && row.exitCode !== 0 ? `\n[exit code ${row.exitCode}]` : '';
       const images = row.resultImages ?? undefined;

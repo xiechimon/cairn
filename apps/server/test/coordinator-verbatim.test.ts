@@ -510,4 +510,25 @@ describe('owner answers and appended words', () => {
     );
     expect(row(created.id).spec).toBe('原话');
   });
+
+  test('an info card carries the Coordinator briefing next to the owner words, a code task refuses one', async () => {
+    const words = '去补完这 8 条：每个岗位单独打开详情读全 JD';
+    const id = ownerMessage(words);
+    const created = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [id],
+      output: 'info',
+      briefing: '1. 后端工程师 https://www.zhipin.com/job_detail/abc.html',
+    })) as Created;
+    expect(created.spec).toContain(words);
+    expect(created.spec).toContain('https://www.zhipin.com/job_detail/abc.html');
+    expect(row(created.id).request?.segments[0]?.text).toBe(words);
+    await expect(
+      relay('create_todo', {
+        projectId: H.projectId,
+        messageIds: [ownerMessage('加一个 node.txt')],
+        briefing: 'x',
+      }),
+    ).rejects.toThrow(/briefing/);
+  });
 });

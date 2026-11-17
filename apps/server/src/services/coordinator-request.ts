@@ -428,6 +428,7 @@ export function createRequestTodo(
     titleSource: summaryTitle !== '' ? 'coordinator' : (segments[0]?.author ?? 'owner'),
     titleSourceRef: summaryTitle !== '' ? null : (segments[0]?.sourceRef ?? null),
     ...(params.research !== undefined ? { research: params.research } : {}),
+    ...(params.briefing !== undefined ? { briefing: params.briefing } : {}),
     ...(projectBasis !== undefined ? { lane: 'quick', projectBasis } : {}),
   };
   const record = createAutonomousTodo(deps, {

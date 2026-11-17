@@ -87,6 +87,7 @@ export function infoCardBrief(conversationId: string, hasRepo: boolean): string 
     ...(hasRepo ? [`项目默认分支的只读快照在 ${dir}/${INFO_REPO_DIR}/ ，只读它，不要改。`] : []),
     `本步的交付物是一份 markdown 报告：把完整报告写成 ${dir}/report.md ，然后调用 \`${INFO_SUBMIT_REPORT_TOOL}\` 工具并传入该路径。报告不超过 512 KiB。工具报错时按原因修正后再交。没有成功交出报告就结束，本步会失败。`,
     `可选：本步如果做出了网页或 PPT，在调用 ${INFO_SUBMIT_REPORT_TOOL} 之前，把网页（.html）放进 ${dir}/deliverables/pages/ ，把 PPT（.pptx 或 .pdf）放进 ${dir}/deliverables/slides/ ；文件直接放在这两个文件夹里，不要再分子文件夹，最多 5 个文件，网页每个不超过 2 MiB，PPT 每个不超过 20 MiB。`,
-    '网页用 browser_navigate / browser_snapshot / browser_act。需要主人登录、验证码时用 request_takeover。',
+    '任务的输入在任务正文里：主人的原话，加上「Coordinator briefing」里它已经查到的链接、名称和结果。任务文件夹一开始是空的是正常的；先读正文，别因为文件夹空就说没有输入。正文确实没给你要的东西时，用提问工具问主人，不要猜。',
+    '网页用 browser_navigate / browser_snapshot / browser_act。主人登录过的网站（招聘站、社交平台、各类后台，例如 zhipin.com）的登录状态在隐身浏览器里，不在默认浏览器里：打开这类网站时在 browser_navigate、browser_snapshot、browser_act 上都传 stealth: true，同一个页面上保持同样的值；默认浏览器里看到未登录，不代表主人没登录。网站拦下自动操作时也改用 stealth: true。需要主人登录、验证码时用 request_takeover。',
   ].join('\n');
 }

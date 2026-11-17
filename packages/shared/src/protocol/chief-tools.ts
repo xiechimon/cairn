@@ -8,6 +8,7 @@ import {
   SUGGEST_REPLIES_TOOL_NAME,
 } from '../records/quick-replies.js';
 import {
+  TASK_BRIEFING_MAX_CHARS,
   TASK_REQUEST_DIFFICULTIES,
   TASK_REQUEST_LANES,
   TASK_REQUEST_PRIORITIES,
@@ -202,8 +203,13 @@ export const coordinatorCreateTodoParamsSchema = z
       .optional(),
     platform: runnerOsSchema.optional(),
     lane: z.enum(TASK_REQUEST_LANES).optional(),
+    briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
   })
   .strict()
+  .refine((params) => params.briefing === undefined || params.output === 'info', {
+    message: 'briefing is only for output "info" cards',
+    path: ['briefing'],
+  })
   .refine((params) => params.messageIds === undefined || params.sourceTodoId === undefined, {
     message: 'pass messageIds or sourceTodoId, not both',
   })
@@ -486,7 +492,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo. Always pass title, a short summary of the outcome for the Tasks panel. You add the title and routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. When you already did part of the request yourself, such as create_project, pass quotes covering only the rest: a task thread cannot do your part and must never receive it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo. Always pass title, a short summary of the outcome for the Tasks panel. You add the title and routing only, except that an info card (output 'info') also takes a briefing: an info card runs alone in its own computer and sees only the owner's cited words and the briefing, so put every link, name, id and finding you already have into the briefing instead of assuming the card can see this conversation. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. When you already did part of the request yourself, such as create_project, pass quotes covering only the rest: a task thread cannot do your part and must never receive it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
     parameters: obj(
       {
         title: str(
@@ -526,6 +532,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         ),
         platform: str(
           `Optional "macos", "windows" or "linux": the operating system the task needs. ${PLATFORM_DOC}`,
+        ),
+        briefing: str(
+          'Only with output "info". The concrete inputs you already have that the card needs and cannot get from the owner\'s words: links, names, ids, figures, what you found earlier in this conversation or with your own tools. Plain facts, copied exactly, no instructions and no plan. An info card runs alone in its own computer and sees only the owner\'s cited words plus this briefing, so anything you leave out is lost to it.',
         ),
         lane: str(
           'Optional "quick", only in an owner turn whose words state the outcome and whose project has a basis the server can check: this channel\'s project, the composer\'s picked project, a project the owner named, or one the owner chose in ask_user. The todo still runs in a thread through a PR and the merge gate; its session skips tests for data or copy edits. A basis that does not check out returns 400 and writes nothing; create it again without lane. Never in event turns ([wake:…]).',

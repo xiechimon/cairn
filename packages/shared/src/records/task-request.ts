@@ -63,6 +63,7 @@ export const taskSegmentSchema = z.object({
 export type TaskSegment = z.infer<typeof taskSegmentSchema>;
 
 export const TASK_REQUEST_LANES = ['quick'] as const;
+export const TASK_BRIEFING_MAX_CHARS = 20_000;
 
 export const projectBasisSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('channel'), threadId: z.string().min(1) }),
@@ -84,6 +85,7 @@ export const taskRequestSchema = z.object({
   titleSourceRef: z.string().nullable(),
   research: z.object({ reason: z.string().trim().min(1).max(200) }).optional(),
   lane: z.enum(TASK_REQUEST_LANES).optional(),
+  briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
   projectBasis: projectBasisSchema.optional(),
 });
 export type TaskRequest = z.infer<typeof taskRequestSchema>;
@@ -114,7 +116,7 @@ export function renderReplyText(text: string): string {
     : `${blockquote(renderAttachmentTokensToLabels(reply.quote))}\n\n${reply.body}`.trimEnd();
 }
 
-export function renderTaskText(request: Pick<TaskRequest, 'segments'>): string {
+export function renderTaskText(request: Pick<TaskRequest, 'segments' | 'briefing'>): string {
   const parts: string[] = [];
   const shown = new Set<string>();
   let fence: { ref: string | null; texts: string[] } | null = null;
@@ -159,6 +161,10 @@ export function renderTaskText(request: Pick<TaskRequest, 'segments'>): string {
     if (wholeChatKey !== null) shown.add(wholeChatKey);
   }
   flush();
+  if (request.briefing !== undefined)
+    parts.push(
+      `[Briefing from the Coordinator: inputs it had already gathered for this task, not the owner's words]\n${request.briefing}\n[End of Coordinator briefing]`,
+    );
   return parts.join('\n\n');
 }
 

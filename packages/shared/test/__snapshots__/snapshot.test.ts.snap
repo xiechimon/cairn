@@ -624,6 +624,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "request": {
           "additionalProperties": false,
           "properties": {
+            "briefing": {
+              "maxLength": 20000,
+              "minLength": 1,
+              "type": "string",
+            },
             "difficulty": {
               "anyOf": [
                 {
@@ -1721,6 +1726,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "request": {
                   "additionalProperties": false,
                   "properties": {
+                    "briefing": {
+                      "maxLength": 20000,
+                      "minLength": 1,
+                      "type": "string",
+                    },
                     "difficulty": {
                       "anyOf": [
                         {
@@ -7443,6 +7453,11 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 {
                   "additionalProperties": false,
                   "properties": {
+                    "briefing": {
+                      "maxLength": 20000,
+                      "minLength": 1,
+                      "type": "string",
+                    },
                     "difficulty": {
                       "anyOf": [
                         {
@@ -13398,6 +13413,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         {
           "additionalProperties": false,
           "properties": {
+            "briefing": {
+              "maxLength": 20000,
+              "minLength": 1,
+              "type": "string",
+            },
             "difficulty": {
               "anyOf": [
                 {

@@ -67,7 +67,7 @@ async function infoCard(s: TestServer): Promise<{ todoId: string; buildId: strin
 function fakeComputer(s: TestServer, machineId: string): { calls: ComputerCall[] } {
   const files = new Map<string, Buffer>();
   const calls: ComputerCall[] = [];
-  const answer = (call: ComputerCall): { text: string; exitCode?: number } => {
+  const answer = (call: ComputerCall): { text: string; exitCode?: number; output?: string } => {
     const params = call.params as { command?: string; path?: string; content?: string };
     if (call.tool === 'write_file') {
       files.set(String(params.path), Buffer.from(String(params.content)));
@@ -84,6 +84,7 @@ function fakeComputer(s: TestServer, machineId: string): { calls: ComputerCall[]
           .join(''),
       };
     }
+    if (command === 'echo hello') return { output: 'hello\n', text: 'exit code: 0' };
     const size = /^test -f '([^']+)' && wc -c/.exec(command);
     if (size !== null) {
       const file = files.get(size[1] ?? '');
@@ -104,9 +105,12 @@ function fakeComputer(s: TestServer, machineId: string): { calls: ComputerCall[]
     const result = answer(event.call);
     queueMicrotask(() =>
       receiveComputerFrames(s.db, s.hub, machineId, event.call.callId, [
+        ...(result.output === undefined
+          ? []
+          : [{ kind: 'output' as const, seq: 1, stream: 'stdout' as const, text: result.output }]),
         {
           kind: 'done',
-          seq: 1,
+          seq: result.output === undefined ? 1 : 2,
           text: result.text,
           ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }),
         },
@@ -143,6 +147,7 @@ describe('info cards run in the agent computer', () => {
     const { todoId, buildId } = await infoCard(s);
     const dir = infoTaskDir(buildId);
 
+    let shellResult = '';
     const faux = fauxProvider({
       provider: 'stub',
       models: [{ id: 'm', contextWindow: 200_000 }],
@@ -152,6 +157,7 @@ describe('info cards run in the agent computer', () => {
       () =>
         fauxAssistantMessage(
           [
+            fauxToolCall('shell', { command: 'echo hello' }),
             fauxToolCall('write_file', { path: `${dir}/report.md`, content: REPORT }),
             fauxToolCall('write_file', {
               path: `${dir}/deliverables/pages/summary.html`,
@@ -160,10 +166,12 @@ describe('info cards run in the agent computer', () => {
           ],
           { stopReason: 'toolUse' },
         ),
-      () =>
-        fauxAssistantMessage([fauxToolCall('submit_report', { path: `${dir}/report.md` })], {
+      (context) => {
+        shellResult = JSON.stringify(context.messages.filter((m) => m.role === 'toolResult'));
+        return fauxAssistantMessage([fauxToolCall('submit_report', { path: `${dir}/report.md` })], {
           stopReason: 'toolUse',
-        }),
+        });
+      },
       () => fauxAssistantMessage('报告已提交。'),
     ]);
     const storageDir = makeTestTempDir('info-card-runner-');
@@ -219,6 +227,7 @@ describe('info cards run in the agent computer', () => {
       .get();
     expect(JSON.stringify(deliverables?.content)).toContain('summary.html');
     expect(vm.calls.map((call) => call.tool)).toContain('write_file');
+    expect(shellResult).toContain('hello');
     expect(vm.calls.every((call) => call.scopeKey?.startsWith('chief:') === true)).toBe(true);
   });
 
