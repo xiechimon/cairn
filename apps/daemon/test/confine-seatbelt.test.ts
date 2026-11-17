@@ -99,6 +99,28 @@ describe('seatbelt profile', () => {
 });
 
 describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
+  const finderName = `osascript -e 'tell application "Finder" to get name'`;
+
+  test('without confinement a session can drive another app through Apple Events', () => {
+    const fixture = layout();
+    const result = runConfined(null, finderName, fixture.worktree);
+    expect(result.stdout).toContain('Finder');
+  });
+
+  test('a confined session cannot start or script an unsandboxed app', () => {
+    const fixture = layout();
+    const launch = seatbeltCommand(fixture.policy, '/bin/sh', ['-c', finderName]);
+    const events = spawnSync(launch.command, launch.args, {
+      cwd: fixture.worktree,
+      encoding: 'utf8',
+      timeout: 4000,
+    });
+    expect(events.stdout).not.toContain('Finder');
+    expect(events.status).not.toBe(0);
+    const open = runConfined(fixture.policy, 'open -a TextEdit', fixture.worktree);
+    expect(open.status).not.toBe(0);
+  }, 20000);
+
   test('without confinement a session reads the owner token and edits the database', () => {
     const fixture = layout();
     const result = runConfined(

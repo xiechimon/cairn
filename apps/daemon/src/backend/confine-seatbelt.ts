@@ -16,6 +16,10 @@ const MAC_DENIED_DIRECTORIES = [
 const OWN_STATE_NAMES = ['.claude', '.codex', '.pi', '.gemini', '.claude.json'];
 const DEVICE_WRITES = ['/dev/null', '/dev/dtracehelper'];
 
+const LAUNCH_SERVICE_DENIALS = [
+  '(deny mach-lookup (global-name-prefix "com.apple.coreservices") (global-name-prefix "com.apple.lsd"))',
+];
+
 export interface SeatbeltPolicy {
   home: string;
   deniedRoots: string[];
@@ -87,6 +91,7 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
     `(allow file-read* file-write* ${subpaths(reexposed)})`,
     ...(readable.length > 0 ? [`(allow file-read* ${subpaths(readable)})`] : []),
     `(deny file-write* ${subpaths(protectedGit)} (literal ${quoted(workspaceGit)}))`,
+    ...LAUNCH_SERVICE_DENIALS,
   ];
   if (policy.serverPort !== undefined) {
     if (!Number.isInteger(policy.serverPort) || policy.serverPort < 1 || policy.serverPort > 65535)
