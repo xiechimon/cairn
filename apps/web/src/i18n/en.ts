@@ -70,10 +70,8 @@ export const EN: Record<string, string> = {
     '{name}: expires in {days## day|# days}. Before then, run `claude setup-token` in a terminal and add the new token under Settings → Model routing.',
   'Devin 订阅': 'Devin subscription',
   '添加 Devin 订阅': 'Add Devin subscription',
-  '在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把输出整个粘贴到下面，会自动取出 `windsurf_api_key`。':
-    'Run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin, paste the whole output below, and the `windsurf_api_key` is picked out automatically.',
-  '任务会用这个订阅跑 Devin，不用再配 API key。Token 加密保存，保存后无法再查看。':
-    'Tasks run Devin with this subscription, so you need no API key. The token is stored encrypted and cannot be viewed after saving.',
+  '也可以在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴（取 `windsurf_api_key`）。Token 加密保存，保存后无法再查看。':
+    'Or run `cat ~/.local/share/devin/credentials.toml` on a signed-in machine and paste the whole output (the `windsurf_api_key` is picked out). The token is stored encrypted and cannot be viewed after saving.',
   '这台 Mac 已登录 Devin。': 'This Mac is signed in to Devin.',
   '从这台 Mac 导入': 'Import from this Mac',
   '在这台 Mac 上登录 Devin': 'Sign in to Devin on this Mac',

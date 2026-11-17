@@ -191,14 +191,13 @@ export function AddDevinSubscriptionDialog({
               : loginFailCopy(failReason, t)}
           </p>
         )}
-        <p>
+        <p className="text-meta text-content-tertiary">
           {withCodeSpans(
             t(
-              '在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把输出整个粘贴到下面，会自动取出 `windsurf_api_key`。',
+              '也可以在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴（取 `windsurf_api_key`）。Token 加密保存，保存后无法再查看。',
             ),
           )}
         </p>
-        <p>{t('任务会用这个订阅跑 Devin，不用再配 API key。Token 加密保存，保存后无法再查看。')}</p>
         <FormField label={t('名称')} htmlFor="devin-subscription-label">
           <Input
             className={FORM_CONTROL_CLS}
