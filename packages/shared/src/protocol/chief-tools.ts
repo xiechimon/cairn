@@ -489,7 +489,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           'Project id. Omit it only for output "info" research that belongs to no project: the todo goes to the research project and its report comes back to this conversation.',
         ),
         messageIds: idArr(
-          'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Default: the owner messages of this turn. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
+          'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Default: the owner messages of this turn. When this turn only follows up on a request the owner made in an earlier turn (a retry, a correction, a clarification), pass the id of that request message too, so the task carries the request itself. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
         ),
         sourceTodoId: str(
           'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds. This explicitly declares a split of the same request.',
