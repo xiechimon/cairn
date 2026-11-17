@@ -1415,6 +1415,12 @@ export const EN: Record<string, string> = {
   'Coordinator 还没有在这个项目里记下笔记。':
     'The Coordinator has not written notes in this project yet.',
   可自动注入: 'Eligible for automatic injection',
+  本轮使用: 'Used this turn',
+  '最近一轮对话实际注入给 Coordinator 的记忆。':
+    'The memories actually injected into the Coordinator in the latest turn.',
+  '这一轮没有注入记忆。': 'No memories were injected in this turn.',
+  已失效的记忆: 'Memory no longer valid',
+  按消息召回: 'Recalled by the message',
   记忆文件: 'Memory files',
   '记忆没有加载出来，请重试。': 'Memories did not load. Try again.',
   正在加载记忆: 'Loading memories',

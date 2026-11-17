@@ -234,18 +234,21 @@
         "web": [
           "apps/web/src/chief/chief-settings.tsx",
           "apps/web/src/chief/memory-panel.tsx",
+          "apps/web/src/chief/memory-dialog.tsx",
           "apps/web/src/chief/memory-list.ts",
           "apps/web/src/board/project-instructions-field.tsx"
         ],
         "server": [
           "apps/server/src/services/memory.ts",
           "apps/server/src/services/memory-documents.ts",
+          "apps/server/src/services/memory-recall.ts",
           "apps/server/src/routes-agents.ts"
         ]
       },
       "routes": {
         "server": [
-          "/api/teams/:id/memories**"
+          "/api/teams/:id/memories**",
+          "/api/teams/:id/chief/memory-usage"
         ]
       },
       "reach": [

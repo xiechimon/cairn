@@ -8,6 +8,7 @@ import type {
   BlockerHandoffRecord,
   BuildEvidence,
   BuildStop,
+  ChiefMemoryTrace,
   ChiefMessageDelivery,
   ChiefWatch,
   ClaudeCodeReport,
@@ -338,6 +339,7 @@ export const step = sqliteTable(
     holdUntil: epochMs('holdUntil'),
     holdCount: integer('holdCount').notNull().default(0),
     claimCount: integer('claimCount').notNull().default(0),
+    memoryTrace: json<ChiefMemoryTrace>('memoryTrace'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [

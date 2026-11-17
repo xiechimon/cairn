@@ -204,6 +204,26 @@ export const coordinatorSendBodySchema = z.object({
 });
 export type CoordinatorSendBody = z.infer<typeof coordinatorSendBodySchema>;
 
+export const chiefMemoryTraceSchema = z.object({
+  teamMemoryIds: z.array(z.string()).default([]),
+  teamMemoriesOmitted: z.number().int().nonnegative().default(0),
+  projectMemoryIds: z.array(z.string()).default([]),
+  projectMemoriesOmitted: z.number().int().nonnegative().default(0),
+  recalledMemoryIds: z.array(z.string()).default([]),
+});
+export type ChiefMemoryTrace = z.infer<typeof chiefMemoryTraceSchema>;
+
+export const chiefMemoryUsageResponseSchema = z.object({
+  usage: chiefMemoryTraceSchema
+    .extend({
+      stepId: z.string(),
+      threadId: z.string(),
+      createdAt: epochMs,
+    })
+    .nullable(),
+});
+export type ChiefMemoryUsageResponse = z.infer<typeof chiefMemoryUsageResponseSchema>;
+
 export const COORDINATOR_PAGE_LIMIT = 50;
 
 export const coordinatorPageQuerySchema = z.object({

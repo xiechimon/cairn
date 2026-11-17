@@ -6,6 +6,7 @@ import type {
   BuildRecord,
   CapabilitiesResponse,
   ChiefGetResponse,
+  ChiefMemoryUsageResponse,
   ChiefThread,
   CloakLicenseBody,
   CloakLicenseSaved,
@@ -538,6 +539,13 @@ export const useMemories = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['memories', teamId],
     queryFn: () => api.get<MemoryRecord[]>(`/api/teams/${teamId}/memories`),
+    enabled: enabled && teamId !== undefined,
+  });
+
+export const useChiefMemoryUsage = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['chief-memory-usage', teamId],
+    queryFn: () => api.get<ChiefMemoryUsageResponse>(`/api/teams/${teamId}/chief/memory-usage`),
     enabled: enabled && teamId !== undefined,
   });
 

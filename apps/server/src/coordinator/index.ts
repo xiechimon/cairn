@@ -421,6 +421,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             },
       activeModel: routerModel,
     });
+    db.update(step).set({ memoryTrace: context.memoryTrace }).where(eq(step.id, row.id)).run();
     logger.info(
       {
         threadId: row.buildId,

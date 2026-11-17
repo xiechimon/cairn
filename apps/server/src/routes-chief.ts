@@ -45,6 +45,7 @@ import {
 } from './services/chief-questions.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { readCoordinatorPage } from './services/coordinator.js';
+import { latestChiefMemoryUsage } from './services/coordinator-steps.js';
 import { isJobOwnerCaller, jobSubmitAnswerActor } from './services/job-applications.js';
 import { isChiefConversation } from './services/machines.js';
 import { ownComputerDecisionOf } from './services/own-computer.js';
@@ -125,6 +126,12 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     return c.json(listChiefThreads(svc, teamId));
+  });
+
+  app.get('/api/teams/:id/chief/memory-usage', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json({ usage: latestChiefMemoryUsage(ctx.db, teamId) });
   });
 
   app.post('/api/teams/:id/chief/threads', async (c) => {

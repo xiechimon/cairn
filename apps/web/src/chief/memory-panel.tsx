@@ -2,7 +2,7 @@ import type { MemoryRecord, ProjectRecord } from '@cairn/shared';
 import { cn } from 'cn';
 import { useRef, useState } from 'react';
 import { useConnected } from '../api/connection-state.js';
-import { useApiMutations, useMemories } from '../api/hooks.js';
+import { useApiMutations, useChiefMemoryUsage, useMemories } from '../api/hooks.js';
 import { ProjectInstructionsField } from '../board/project-instructions-field.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
@@ -38,6 +38,7 @@ export function MemoryPanel({
   const { t } = useI18n();
   const connected = useConnected();
   const memoriesQ = useMemories(teamId, live);
+  const usageQ = useChiefMemoryUsage(teamId, live && project === null);
   const mutations = useApiMutations(teamId);
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -153,8 +154,72 @@ export function MemoryPanel({
 
   const empty = (!live || memoriesQ.data !== undefined) && injected.length + lookup.length === 0;
   const content = open === null ? null : splitMemoryContent(open.content);
+  const usage = project === null ? (usageQ.data?.usage ?? null) : null;
+  const usageRows = (() => {
+    if (usage === null) return null;
+    const byId = new Map(memories.map((memory) => [memory.id, memory]));
+    const ids = [
+      ...usage.teamMemoryIds.map((id) => ({ id, tag: null as string | null })),
+      ...usage.projectMemoryIds.map((id) => ({ id, tag: t('项目') })),
+      ...usage.recalledMemoryIds.map((id) => ({ id, tag: t('按消息召回') })),
+    ];
+    return (
+      <div className="mt-6" data-testid="memory-usage">
+        <h3 className={HEAD_CLS}>{t('本轮使用')}</h3>
+        <p className={HINT_CLS}>{t('最近一轮对话实际注入给 Coordinator 的记忆。')}</p>
+        {ids.length === 0 ? (
+          <p className="mt-2 text-ui text-content-secondary">{t('这一轮没有注入记忆。')}</p>
+        ) : (
+          <ul className="-mx-3 mt-2 border-t border-border">
+            {ids.map(({ id, tag }) => {
+              const memory = byId.get(id);
+              return (
+                <li key={`${tag ?? 'team'}-${id}`} className="border-b border-border">
+                  {memory === undefined ? (
+                    <div className="px-3 py-3 text-ui text-content-tertiary">
+                      {t('已失效的记忆')}
+                      {tag !== null && <span className="ml-2 text-meta">{tag}</span>}
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      data-slot="memory-row"
+                      aria-label={t('打开记忆：{title}', { title: memory.title })}
+                      className="h-auto min-h-11 w-full justify-start rounded-none border-0 px-3 py-3 text-left text-ui font-normal whitespace-normal"
+                      onClick={() => setOpenId(memory.id)}
+                    >
+                      <span className={ROW_GRID_CLS}>
+                        <span
+                          data-slot="memory-title"
+                          className="col-start-1 row-start-1 min-w-0 truncate text-foreground underline decoration-content-tertiary underline-offset-4"
+                        >
+                          {memory.title}
+                        </span>
+                        <span
+                          data-slot="memory-summary"
+                          className="col-span-2 row-start-2 truncate text-content-secondary sm:col-span-1 sm:col-start-2 sm:row-start-1"
+                        >
+                          {splitMemoryContent(memory.content).summary}
+                        </span>
+                        {tag !== null && (
+                          <span className="col-start-2 row-start-1 whitespace-nowrap text-content-tertiary sm:col-start-3">
+                            {tag}
+                          </span>
+                        )}
+                      </span>
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    );
+  })();
   return (
     <div ref={listRef} data-testid="memory-list">
+      {usageRows}
       {project !== null && live && (
         <div className="mt-6">
           <h3 className={HEAD_CLS}>{t('项目说明')}</h3>

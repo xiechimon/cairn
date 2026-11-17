@@ -278,12 +278,13 @@ function chiefClaimPayload(
   machineRow?: typeof machine.$inferSelect,
 ): ClaimedStep {
   const model = effectiveModel(agentRow, stepRow);
-  const { digest, trigger, systemPrompt, memories, instruction } = chiefTurnContext(
+  const { digest, trigger, systemPrompt, memories, instruction, memoryTrace } = chiefTurnContext(
     deps,
     stepRow,
     threadRow,
     coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
   );
+  deps.db.update(step).set({ memoryTrace }).where(eq(step.id, stepRow.id)).run();
   const boundSubscriptionId =
     stepRuntimeFor(model.provider) === 'claude-code'
       ? (deps.db

@@ -6,9 +6,10 @@ import {
   stripTurnContext,
   suggestSkillsForMessage,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import {
-  type chiefThread,
+  chiefThread,
   chiefTurnUsage,
   claudeSubscription,
   coordinatorInput,
@@ -224,6 +225,29 @@ export function chiefTurnContext(
       ? null
       : [stepRow.prompt, ...sections].filter((part) => part).join('\n\n');
   return { digest, trigger, systemPrompt, memories, instruction, sections, memoryTrace };
+}
+
+export function latestChiefMemoryUsage(db: Db, teamId: string) {
+  const row = db
+    .select({
+      stepId: step.id,
+      threadId: step.buildId,
+      createdAt: step.createdAt,
+      memoryTrace: step.memoryTrace,
+    })
+    .from(step)
+    .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
+    .where(and(eq(chiefThread.teamId, teamId), eq(step.kind, 'chief'), isNotNull(step.memoryTrace)))
+    .orderBy(desc(step.createdAt))
+    .limit(1)
+    .get();
+  if (row === undefined || row.memoryTrace === null) return null;
+  return {
+    stepId: row.stepId,
+    threadId: row.threadId,
+    createdAt: row.createdAt,
+    ...row.memoryTrace,
+  };
 }
 
 export function finishCoordinatorTurn(
