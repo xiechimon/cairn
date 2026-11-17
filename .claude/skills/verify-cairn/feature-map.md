@@ -20,6 +20,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `secrets` | `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars) | [Secrets](#secrets) |
 | `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
+| `im` | `设置` (Settings) › `消息` (Messages) › `消息连接` (Chat connections) | [IM connections](#im-connections) |
 
 ## Features
 
@@ -842,6 +843,26 @@ Reach:
 - Frontend design: **gap**: the settings section planned in plan §22.7 is not in the repository
 - Backend design: [docs/spec/30-harness-profile-opt-in.md](../../../docs/spec/30-harness-profile-opt-in.md)
 - Evidence: `apps/server/test/harness-profile-default-off.test.ts`
+
+### im-connections
+
+**IM connections** (partial, centrality 3). Outbound-polling chat connections that reach the Coordinator without a native app or a public callback. Slice 1 is Telegram: connect a bot token, approve pairing senders, receive a message as a coordinator turn, and get the text reply back in the same chat.
+
+States: An empty connections list, a connecting/ready/degraded/expired/error status per connection, pending pairing requests with approve/reject, and paired senders listed under the connection.
+
+Reach:
+
+1. `settings im`
+2. `click testid:im-connect-telegram`
+
+- Web routes: none
+- Settings: `设置` (Settings) › `消息` (Messages) › `消息连接` (Chat connections)
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `im-approve-*`, `im-connect-submit`, `im-connect-telegram`, `im-connection-*`, `im-connections-empty`, `im-delete-*`, `im-pairing-*`, `im-reconnect-*`, `im-reject-*`, `im-token-input`
+- Research: n/a: the binding contract is docs/design/im-connections.md; no reference product is copied
+- Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
+- Backend design: [docs/design/im-connections.md](../../../docs/design/im-connections.md)
+- Evidence: `apps/server/test/im-telegram.test.ts`, `apps/server/test/im-core.test.ts`, `apps/server/test/im-routes.test.ts`
 
 ### mcp-servers
 

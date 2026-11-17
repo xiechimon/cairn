@@ -1,6 +1,7 @@
 import {
   KeyRound,
   type LucideIcon,
+  MessageCircle,
   Monitor,
   Moon,
   Palette,
@@ -55,6 +56,7 @@ import { SecretsPage } from '../resources/secrets-page.js';
 import { SkillsPage } from '../resources/skills-page.js';
 import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
+import { ImConnectionsPage } from '../routes/im-page.js';
 import { RemoteAccessPage } from '../routes/remote-access-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type ThemePreference } from '../theme.js';
@@ -182,6 +184,18 @@ const GROUPS: Group[] = [
         label: '远程访问',
         Icon: Smartphone,
         element: () => <RemoteAccessPage />,
+      },
+    ],
+  },
+  {
+    heading: '消息',
+    sections: [
+      {
+        id: 'im',
+        label: '消息连接',
+        Icon: MessageCircle,
+        keywords: ['telegram', 'im', 'message', '聊天', '微信'],
+        element: () => <ImConnectionsPage />,
       },
     ],
   },

@@ -15,11 +15,11 @@
 
 | Item | Count |
 |---|---|
-| Features | 56 |
+| Features | 57 |
 | status shipped | 45 |
-| status partial | 8 |
+| status partial | 9 |
 | status planned | 3 |
-| research, frontend design and backend design all present or not applicable | 27 |
+| research, frontend design and backend design all present or not applicable | 28 |
 | Research gaps | 13 |
 | Frontend design gaps | 16 |
 | Backend design gaps | 18 |
@@ -71,6 +71,7 @@
 | [Built-in git hosting](#git-hosting) | 3 | shipped | gap | n/a | gap | B11 |
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [Harness profile](#harness-profile) | 3 | partial | yes (not on main) | gap | yes | B9 |
+| [IM connections](#im-connections) | 3 | partial | n/a | yes | yes |  |
 | [MCP servers](#mcp-servers) | 3 | shipped | yes | yes | yes |  |
 | [Projects](#projects) | 3 | shipped | yes | yes | yes |  |
 | [Quota wait](#quota-wait) | 3 | shipped | yes | gap | gap | B9 |
@@ -533,6 +534,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: [docs/research/t3code-devices-and-scope-2026-11-06.md](research/t3code-devices-and-scope-2026-11-06.md) (not on main)
 - Frontend design: **gap**: the settings section planned in plan §22.7 is not in the repository
 - Backend design: [docs/spec/30-harness-profile-opt-in.md](spec/30-harness-profile-opt-in.md)
+
+### im-connections
+
+**IM connections** (partial). Outbound-polling chat connections that reach the Coordinator without a native app or a public callback. Slice 1 is Telegram: connect a bot token, approve pairing senders, receive a message as a coordinator turn, and get the text reply back in the same chat.
+
+- Research: n/a: the binding contract is docs/design/im-connections.md; no reference product is copied
+- Frontend design: [docs/design/references/settings](design/references/settings)
+- Backend design: [docs/design/im-connections.md](design/im-connections.md)
 
 ### mcp-servers
 

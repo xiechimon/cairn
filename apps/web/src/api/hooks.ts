@@ -34,6 +34,8 @@ import type {
   GithubConnectorDeviceStart,
   GithubIssueEcho,
   GithubReposResponse,
+  ImConnectionRecord,
+  ImPairingRequestRecord,
   ImportSkillBody,
   MachineRecord,
   McpConnectorRecord,
@@ -678,6 +680,66 @@ export const usePairingGrants = (enabled: boolean) =>
     enabled,
     refetchInterval: DEVICES_POLL_MS,
   });
+
+const IM_POLL_MS = 5_000;
+
+export const useImConnections = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['imConnections', teamId],
+    queryFn: () =>
+      api.get<{ connections: ImConnectionRecord[] }>(`/api/teams/${teamId}/im/connections`),
+    enabled: enabled && teamId !== undefined,
+    refetchInterval: IM_POLL_MS,
+  });
+
+export const useImPairingRequests = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['imPairingRequests', teamId],
+    queryFn: () =>
+      api.get<{ requests: ImPairingRequestRecord[] }>(`/api/teams/${teamId}/im/pairing-requests`),
+    enabled: enabled && teamId !== undefined,
+    refetchInterval: IM_POLL_MS,
+  });
+
+export function useImMutations(teamId: string | undefined) {
+  const queryClient = useQueryClient();
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['imConnections', teamId] });
+    void queryClient.invalidateQueries({ queryKey: ['imPairingRequests', teamId] });
+  };
+  return {
+    connectTelegram: useMutation({
+      mutationFn: (botToken: string) =>
+        api.post<{ connection: ImConnectionRecord }>(`/api/teams/${teamId}/im/telegram`, {
+          botToken,
+        }),
+      onSuccess: invalidate,
+    }),
+    deleteConnection: useMutation({
+      mutationFn: (id: string) =>
+        api.del<void>(`/api/teams/${teamId}/im/connections/${encodeURIComponent(id)}`),
+      onSuccess: invalidate,
+    }),
+    reconnectConnection: useMutation({
+      mutationFn: (id: string) =>
+        api.post<{ connection: ImConnectionRecord }>(
+          `/api/teams/${teamId}/im/connections/${encodeURIComponent(id)}/reconnect`,
+          {},
+        ),
+      onSuccess: invalidate,
+    }),
+    decidePairing: useMutation({
+      mutationFn: ({ id, decision }: { id: string; decision: 'approved' | 'rejected' }) =>
+        api.post<{ request: ImPairingRequestRecord }>(
+          `/api/teams/${teamId}/im/pairing-requests/${encodeURIComponent(id)}/${
+            decision === 'approved' ? 'approve' : 'reject'
+          }`,
+          {},
+        ),
+      onSuccess: invalidate,
+    }),
+  };
+}
 
 export const useMcpServers = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
