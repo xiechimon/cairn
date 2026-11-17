@@ -19,6 +19,7 @@ export interface AnswerComposerProps {
   onAttachment?: ((files: File[]) => string[] | Promise<string[]>) | undefined;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   handleRef?: Ref<ComposerSurfaceHandle>;
+  tab?: ReactNode;
   above: ReactNode;
   tools: ReactNode;
   context?: ChiefContextUsage | undefined;
@@ -35,6 +36,7 @@ export function AnswerComposer({
   onAttachment,
   composerRef,
   handleRef,
+  tab,
   above,
   tools,
   context,
@@ -91,6 +93,7 @@ export function AnswerComposer({
       onFocusLeave={onFocusLeave}
       placeholder={t('输入你自己的回答…')}
       composerRef={composerRef}
+      tab={tab}
       above={above}
       tools={tools}
       context={context}

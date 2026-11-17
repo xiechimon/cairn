@@ -504,6 +504,10 @@ export function ChiefConversation({
         ]
       : [],
   );
+  const rawQueuedText = (message: QueuedMessage) => {
+    const row = allRows.find(({ item }) => item.kind === 'user' && item.id === message.id);
+    return row?.item.kind === 'user' ? row.item.text : message.text;
+  };
   const stashedDraftRef = useRef('');
   const editingQueued = editingId !== null && queuedMessages.some((m) => m.id === editingId);
   useEffect(() => {
@@ -528,8 +532,7 @@ export function ChiefConversation({
     onEditQueued == null
       ? undefined
       : (message: QueuedMessage) => {
-          const raw = allRows.find(({ item }) => item.kind === 'user' && item.id === message.id);
-          const text = raw?.item.kind === 'user' ? raw.item.text : message.text;
+          const text = rawQueuedText(message);
           if (editingId === null) stashedDraftRef.current = liveDraft;
           setEditingId(message.id);
           setLiveDraft(text);
@@ -575,7 +578,7 @@ export function ChiefConversation({
           ? undefined
           : (message) => {
               if (message.held) {
-                withdraw?.(message.id, message.text);
+                withdraw?.(message.id, rawQueuedText(message));
                 return;
               }
               if (message.id === editingId) endEdit(true);
@@ -854,6 +857,7 @@ export function ChiefConversation({
                 onFocusLeave={leaveComposer}
                 onAttachment={onAttachment}
                 composerRef={answerActive ? composerRef : undefined}
+                tab={answerActive ? queueTab : null}
                 above={answerActive ? capsules : null}
                 tools={answerActive ? composerTools : null}
                 context={chief.context}

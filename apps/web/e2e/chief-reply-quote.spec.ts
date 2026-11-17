@@ -111,7 +111,7 @@ test.describe('a staged or queued quote keeps its source', () => {
     });
     await page.goto('/app');
     const home = page.getByTestId('home-c');
-    const held = home.getByTestId('queued-message');
+    const held = home.getByTestId('chief-queued-message');
     await expect(held).toHaveCount(1);
     await expect(held).toContainText('补完记得跑一下 e2e');
     await expect(held).not.toContainText('<!--');

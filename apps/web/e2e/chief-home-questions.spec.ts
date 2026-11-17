@@ -796,7 +796,7 @@ test('an answer upload in flight still blocks a chip answer and moving to anothe
     buffer: Buffer.from('slow'),
   });
   await expect(activeComposer.getByTestId('attachment-pending')).toBeVisible();
-  await page.getByTestId('home-c').getByTestId('queued-message').getByRole('button', { name: '撤回' }).click();
+  await page.getByTestId('home-c').getByTestId('chief-queued-message').getByRole('button', { name: '撤回' }).click();
   await expect(composer).toHaveValue('queued note');
   const chip = dock.getByTestId('chief-question-option-0-0');
   await expect(chip).toBeDisabled();
@@ -922,12 +922,12 @@ test('answer drafts per request and the thread draft stay separate through every
       name: 'withdrawing a queued message while answering shows it in the focused thread composer',
       run: async () => {
         await composer.fill('customA');
-        await page.getByTestId('home-c').getByTestId('queued-message').getByRole('button', { name: '撤回' }).click();
+        await page.getByTestId('home-c').getByTestId('chief-queued-message').getByRole('button', { name: '撤回' }).click();
       },
       composer: 'queued note',
       extra: async () => {
         await expect(composer).toBeFocused();
-        await expect(page.getByTestId('home-c').getByTestId('queued-message')).toHaveCount(0);
+        await expect(page.getByTestId('home-c').getByTestId('chief-queued-message')).toHaveCount(0);
         await expect(page.getByTestId('chief-question')).toBeVisible();
         await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
         await expect(option(0)).toBeEnabled();
