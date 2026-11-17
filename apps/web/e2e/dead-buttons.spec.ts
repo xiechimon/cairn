@@ -273,20 +273,13 @@ test('more menu `完成` does not open an accept dialog', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: '完成任务' })).toHaveCount(0);
 });
 
-test('more menu `关闭` is phase-gated by the server funnel edges (#318)', async ({ page }) => {
-
-  await page.goto(REVIEW_DETAIL);
-  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
-  await expect(page.getByRole('menuitem', { name: '关闭' })).toBeDisabled();
-
+test('more menu ends a task only by archiving it: `归档` is offered and there is no `关闭`', async ({
+  page,
+}) => {
   await page.goto('/app/todo/r8-12?scenario=54');
   await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
-  const closeRow = page.getByRole('menuitem', { name: '关闭' });
-  await expect(closeRow).toBeEnabled();
-
-  await expect(page.getByRole('menuitem', { name: '完成' })).toBeDisabled();
-  await closeRow.click();
-  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: '归档' })).toBeEnabled();
+  await expect(page.getByRole('menuitem', { name: '关闭' })).toHaveCount(0);
 });
 
 test('todo-phase `开始` fires orchestration directly — no start dialog (#640)', async ({ page }) => {
