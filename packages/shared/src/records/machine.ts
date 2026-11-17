@@ -3,7 +3,7 @@ import { claudeLoginSchema } from './claude-login.js';
 import { epochMs, recordId } from './common.js';
 import { machineCapabilitiesSchema } from './machine-capabilities.js';
 
-export const MACHINE_RUNTIMES = ['pi', 'claude-code', 'gemini'] as const;
+export const MACHINE_RUNTIMES = ['pi', 'claude-code', 'gemini', 'devin'] as const;
 export type MachineRuntime = (typeof MACHINE_RUNTIMES)[number];
 
 export const machineRunningThreadSchema = z.object({

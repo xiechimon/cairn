@@ -6,19 +6,21 @@ export { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END };
 
 export const BRIEF_MANAGED_SEPARATOR = '\n\n';
 
-export const BRIEF_BACKEND_IDS = ['pi', 'claude-code', 'gemini'] as const;
+export const BRIEF_BACKEND_IDS = ['pi', 'claude-code', 'gemini', 'devin'] as const;
 export type BriefBackendId = (typeof BRIEF_BACKEND_IDS)[number];
 
 export const BRIEF_CANDIDATES: Record<BriefBackendId, readonly string[]> = {
   pi: ['AGENTS.override.md', 'AGENTS.md', 'AGENTS.MD', 'CLAUDE.md', 'CLAUDE.MD'],
   'claude-code': ['CLAUDE.md'],
   gemini: ['GEMINI.md'],
+  devin: ['AGENTS.md', 'AGENTS.MD'],
 };
 
 export const BRIEF_CREATE_NAME: Record<BriefBackendId, string> = {
   pi: 'AGENTS.md',
   'claude-code': 'CLAUDE.md',
   gemini: 'GEMINI.md',
+  devin: 'AGENTS.md',
 };
 
 export const BRIEF_RECONCILE_FILENAMES: readonly string[] = [
@@ -32,6 +34,7 @@ export interface BriefTarget {
 
 export function briefBackendForProvider(provider: string | null | undefined): BriefBackendId {
   if (provider === 'gemini') return 'gemini';
+  if (provider === 'devin') return 'devin';
   return isBackendRuntimeId(provider) ? 'claude-code' : 'pi';
 }
 

@@ -109,7 +109,7 @@ export type RuleFix = z.infer<typeof ruleFixSchema>;
 export const ruleIssueSchema = z.object({
   use: routeUseSchema,
   reason: z.enum(RULE_ISSUE_REASONS),
-  runtime: z.enum(['pi', 'claude-code', 'gemini']).optional(),
+  runtime: z.enum(['pi', 'claude-code', 'gemini', 'devin']).optional(),
   provider: z.string().optional(),
   machineId: recordId.optional(),
   suggested: ruleFixSchema.nullable(),

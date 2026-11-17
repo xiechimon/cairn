@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { claudeLoginSchema } from './claude-login.js';
 
-export const MODEL_SOURCE_RUNTIMES = ['pi', 'claude-code', 'gemini'] as const;
+export const MODEL_SOURCE_RUNTIMES = ['pi', 'claude-code', 'gemini', 'devin'] as const;
 export const modelSourceRuntimeSchema = z.enum(MODEL_SOURCE_RUNTIMES);
 export type ModelSourceRuntime = z.infer<typeof modelSourceRuntimeSchema>;
 
@@ -9,7 +9,14 @@ export const MODEL_SOURCE_RUNTIME_LABELS: Record<ModelSourceRuntime, string> = {
   pi: 'pi',
   'claude-code': 'Claude Code',
   gemini: 'Gemini',
+  devin: 'Devin',
 };
+
+export const DEFAULT_DEVIN_MODELS: readonly ModelSourceModel[] = [
+  { id: 'swe-2-high', name: 'SWE-2', slot: 'builtin' },
+  { id: 'swe-2-flash-medium', name: 'SWE-2 Flash', slot: 'builtin' },
+  { id: 'adaptive', name: 'Adaptive', slot: 'builtin' },
+];
 
 export const modelSourceModelSchema = z.object({
   id: z.string().min(1),

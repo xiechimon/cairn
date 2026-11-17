@@ -205,7 +205,7 @@ export interface AgentBackend {
   rememberNoVision?(provider: ProviderConfig, modelId: string): void;
 }
 
-export const BACKEND_RUNTIME_IDS = ['claude-code', 'gemini'] as const;
+export const BACKEND_RUNTIME_IDS = ['claude-code', 'gemini', 'devin'] as const;
 export type BackendRuntimeId = (typeof BACKEND_RUNTIME_IDS)[number];
 
 export function isBackendRuntimeId(v: unknown): v is BackendRuntimeId {

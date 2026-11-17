@@ -21,22 +21,24 @@ import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
-): 'pi' | 'claude-code' | 'gemini' {
+): 'pi' | 'claude-code' | 'gemini' | 'devin' {
   if (agentProvider === 'gemini') return 'gemini';
+  if (agentProvider === 'devin') return 'devin';
   return isBackendRuntimeId(agentProvider) ? 'claude-code' : 'pi';
 }
 
 export interface MachineRuntimeFacts {
   claudeCodeReport: Pick<ClaudeCodeReport, 'installed'> | null;
-  capabilities: Pick<MachineCapabilities, 'executor'> | null;
+  capabilities: Pick<MachineCapabilities, 'executor' | 'devin'> | null;
 }
 
 export function machineRuntimeAvailable(
   machineRow: MachineRuntimeFacts,
-  runtime: 'pi' | 'claude-code' | 'gemini',
+  runtime: MachineRuntime,
 ): boolean {
   if (runtime === 'pi') return true;
   if (runtime === 'gemini') return false;
+  if (runtime === 'devin') return machineRow.capabilities?.devin?.installed === true;
   return (
     machineRow.claudeCodeReport?.installed === true || machineRow.capabilities?.executor === 'orb'
   );
@@ -79,7 +81,7 @@ export function codexProviderKeyed(db: Pick<Db, 'select'>, teamId: string): bool
   );
 }
 
-function runtimeMissingReason(name: string, runtime: 'pi' | 'claude-code' | 'gemini'): string {
+function runtimeMissingReason(name: string, runtime: MachineRuntime): string {
   return runtime === 'gemini'
     ? `执行机 ${name} 不能运行 Gemini：它的权限请求还没接入命令闸。`
     : `执行机 ${name} 上没有检测到 ${MODEL_SOURCE_RUNTIME_LABELS[runtime]}：装好后重启执行机。`;

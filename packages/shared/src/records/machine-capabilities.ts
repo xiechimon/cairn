@@ -91,6 +91,14 @@ export function runnerOsOf(
   return platform === 'linux' || platform === 'windows' ? platform : null;
 }
 
+export const devinReportSchema = z
+  .object({
+    installed: z.boolean(),
+    version: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+export type DevinReport = z.infer<typeof devinReportSchema>;
+
 export const agentReachReportSchema = z.object({
   version: z.string().min(1).max(32),
   channels: z
@@ -160,6 +168,7 @@ export const machineCapabilitiesSchema = z.object({
   secretGateway: z.literal(true).optional(),
   mcpConnectors: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
+  devin: devinReportSchema.optional(),
   confinement: confinementReportSchema.optional(),
   confinementCause: confinementCauseSchema.optional().catch(undefined),
   agentReach: agentReachReportSchema.optional(),
@@ -187,6 +196,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const hardware = machineHardwareSchema.safeParse(rec.hardware);
   const executor = machineExecutorSchema.safeParse(rec.executor);
   const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
+  const devin = devinReportSchema.safeParse(rec.devin);
   const agentReach = agentReachReportSchema.safeParse(rec.agentReach);
   const scrapling = machineCapabilitiesSchema.shape.scrapling.safeParse(rec.scrapling);
   const hostPermissions = hostPermissionsSchema.safeParse(rec.hostPermissions);
@@ -200,6 +210,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(confinement.success ? { confinement: confinement.data } : {}),
     ...(confinementCause.success ? { confinementCause: confinementCause.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
+    ...(devin.success ? { devin: devin.data } : {}),
     ...(agentReach.success ? { agentReach: agentReach.data } : {}),
     ...(scrapling.success && scrapling.data !== undefined ? { scrapling: scrapling.data } : {}),
     ...(hostPermissions.success ? { hostPermissions: hostPermissions.data } : {}),
@@ -254,6 +265,7 @@ export const stepQueueBlockedSchema = z.object({
     'local-path',
     'claude-rate-limited',
     'claude-logged-out',
+    'devin-subscription',
     'account-switched',
     'coordinator-provider-missing',
     'coordinator-provider-no-key',
