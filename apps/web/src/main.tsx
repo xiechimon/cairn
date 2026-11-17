@@ -80,6 +80,14 @@ flushSync(() => {
 });
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
-    document.getElementById('boot')?.remove();
+    const boot = document.getElementById('boot');
+    if (boot === null) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      boot.remove();
+      return;
+    }
+    boot.style.pointerEvents = 'none';
+    boot.style.opacity = '0';
+    window.setTimeout(() => boot.remove(), 240);
   });
 });

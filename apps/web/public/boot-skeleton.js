@@ -7,71 +7,47 @@
     if (theme === 'light') document.documentElement.classList.add('light');
     document.documentElement.dataset.theme = theme;
 
-    let shape = { cols: [3, 3, 3, 3] };
-    const raw = localStorage.getItem('cairn-boot-shape');
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed?.cols) && parsed.cols.length > 0) shape = parsed;
-      } catch {}
-    }
-
     const boot = document.getElementById('boot');
     if (!boot) return;
 
-    const ink = theme === 'light' ? '#e0dfda' : '#222322';
     const page = theme === 'light' ? '#e7e6e1' : '#1b1c1b';
-    if (localStorage.getItem('cairn.firstRunOpen') === '1') {
-      const sheet = theme === 'light' ? '#ecebe6' : '#151615';
-      const line = theme === 'light' ? 'rgb(0 0 0 / 0.1)' : 'rgb(255 255 255 / 0.1)';
-      boot.style.cssText = `position:fixed;inset:0;display:flex;background:${sheet};z-index:0`;
-      if (window.innerWidth >= 1024) {
-        const aside = document.createElement('div');
-        aside.style.cssText = `flex:0 0 40%;max-width:600px;background:${page};border-right:1px solid ${line}`;
-        boot.appendChild(aside);
-      }
-      return;
-    }
-    boot.style.cssText = `position:fixed;inset:0;display:grid;grid-template-columns:288px 1fr;background:${page};z-index:0`;
+    const ink = theme === 'light' ? '#343633' : '#bbbab7';
+    const meta = theme === 'light' ? '#4b4d4a' : '#9c9b98';
+    boot.style.cssText = `position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px;background:${page};z-index:0;transition:opacity .24s ease`;
 
-    const rail = document.createElement('div');
-    rail.style.cssText = 'padding:16px 12px';
-    for (let r = 0; r < 8; r += 1) {
-      const row = document.createElement('div');
-      row.style.cssText = `height:28px;border-radius:8px;margin-bottom:8px;background:${ink}`;
-      rail.appendChild(row);
-    }
-    boot.appendChild(rail);
-
-    const params = new URLSearchParams(location.search);
-    if (params.get('view') !== 'board') {
-      const list = document.createElement('div');
-      list.style.cssText = 'width:100%;max-width:792px;margin:0 auto;padding:76px 16px 0;box-sizing:border-box';
-      for (let i = 0; i < 4; i += 1) {
-        const row = document.createElement('div');
-        row.style.cssText = `height:56px;border-radius:20px;margin-bottom:8px;background:${ink}`;
-        list.appendChild(row);
-      }
-      boot.appendChild(list);
-      return;
+    let locale = localStorage.getItem('cairn.locale') || localStorage.getItem('cairn-locale') || '';
+    if (locale !== 'zh' && locale !== 'en') {
+      locale = (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
     }
 
-    const grid = document.createElement('div');
-    grid.style.cssText =
-      'display:grid;grid-template-columns:repeat(4,minmax(200px,1fr));gap:14px;padding:28px 17px 13px';
-    for (const n of shape.cols.slice(0, 4)) {
-      const col = document.createElement('div');
-      const count = Math.max(0, Math.min(12, Number(n) || 0));
-      for (let i = 0; i < count; i += 1) {
-        const card = document.createElement('div');
-        card.style.cssText = `height:72px;border-radius:20px;margin-bottom:8px;background:${ink}`;
-        col.appendChild(card);
-      }
-      grid.appendChild(col);
-    }
-    while (grid.children.length < 4) {
-      grid.appendChild(document.createElement('div'));
-    }
-    boot.appendChild(grid);
+    const size = Math.max(160, Math.min(300, window.innerWidth - 96, window.innerHeight - 220));
+    const d =
+      'M-7 0 A7 7 0 0 1 7 0 A22 22 0 0 1 -37 0 A37 37 0 0 1 37 0 A52 52 0 0 1 -67 0 A67 67 0 0 1 67 0 A82 82 0 0 1 47.816 52.709';
+    const caption = locale === 'zh' ? '正在连接…' : 'Connecting…';
+
+    boot.innerHTML = `
+      <svg width="${size}" height="${size}" viewBox="-105 -105 210 210" aria-hidden="true" style="overflow:visible;color:${ink}">
+        <defs>
+          <filter id="cairn-boot-ink" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="7" result="warp" />
+            <feDisplacementMap in="SourceGraphic" in2="warp" scale="1.6" xChannelSelector="R" yChannelSelector="G" result="rough" />
+            <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="1" seed="2" result="grain" />
+            <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -3.2 2.55" result="holes" />
+            <feComposite in="rough" in2="holes" operator="in" />
+          </filter>
+        </defs>
+        <g filter="url(#cairn-boot-ink)">
+          <path class="boot-path" d="${d}" pathLength="1" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+        </g>
+      </svg>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+        <span style="font-family:'Source Serif 4',Georgia,serif;font-size:20px;color:${ink}">Cairn</span>
+        <span style="font-family:'Instrument Sans',system-ui,sans-serif;font-size:13px;color:${meta}">${caption}</span>
+      </div>
+      <style>
+        @keyframes cairn-boot-draw { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
+        #boot .boot-path { stroke-dasharray: 1 1; animation: cairn-boot-draw 1.6s cubic-bezier(0.45, 0.05, 0.3, 1) both }
+        @media (prefers-reduced-motion: reduce) { #boot .boot-path { animation: none; stroke-dashoffset: 0 } }
+      </style>`;
   } catch {}
 })();

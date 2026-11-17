@@ -58,6 +58,10 @@ describe('V16 no texture or gradient surfaces', () => {
       'board/home-spiral.tsx',
       'design/foundations-texture.tsx',
     ]);
+    const publicJs = readdirSync(join(ROOT, 'public')).filter((name) => name.endsWith('.js'));
+    expect(
+      publicJs.filter((name) => /feTurbulence/.test(readFileSync(join(ROOT, 'public', name), 'utf8'))),
+    ).toEqual(['boot-skeleton.js']);
   });
 
   test('ink specks fill only the filled buttons, under a crisp label', () => {
