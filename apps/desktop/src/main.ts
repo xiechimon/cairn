@@ -13,6 +13,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  type IpcMainEvent,
   type IpcMainInvokeEvent,
   ipcMain,
   Menu,
@@ -328,7 +329,12 @@ function serveUpdates(origin: string): void {
       });
   };
   showMenu(updater.state());
-  const fromOwnPage = (event: IpcMainInvokeEvent): boolean => event.senderFrame?.origin === origin;
+  const fromOwnPage = (event: IpcMainInvokeEvent | IpcMainEvent): boolean =>
+    event.senderFrame?.origin === origin;
+  ipcMain.on('window-controls:set-visible', (event, visible: unknown) => {
+    if (!fromOwnPage(event)) return;
+    BrowserWindow.fromWebContents(event.sender)?.setWindowButtonVisibility(visible === true);
+  });
   ipcMain.handle('desktop-update:state', (event) => (fromOwnPage(event) ? updater.state() : null));
   ipcMain.handle('desktop-update:check', (event) => (fromOwnPage(event) ? check() : undefined));
   ipcMain.handle('desktop-update:install', (event) =>

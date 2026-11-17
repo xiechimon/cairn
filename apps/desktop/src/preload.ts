@@ -24,6 +24,11 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
   localRunner: {
     reconnect: (): Promise<void> => ipcRenderer.invoke('local-runner:reconnect'),
   },
+  windowControls: {
+    setVisible: (visible: boolean): void => {
+      ipcRenderer.send('window-controls:set-visible', visible === true);
+    },
+  },
   update: {
     state: (): Promise<DesktopUpdateState> => ipcRenderer.invoke('desktop-update:state'),
     check: (): Promise<void> => ipcRenderer.invoke('desktop-update:check'),
