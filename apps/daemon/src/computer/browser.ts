@@ -68,6 +68,14 @@ export type BrowserToolName = 'browser_navigate' | 'browser_snapshot' | 'browser
 export interface BrowserToolResult {
   text: string;
   loginForm?: LoginForm;
+  automationBlocked?: true;
+}
+
+export const AUTO_STEALTH_NOTE =
+  'The default browser got a blank anti-automation page here, so Cairn opened this address in the stealth browser. Pass stealth: true on the following browser calls for this site.';
+
+export function isAutomationBlankSnapshot(text: string): boolean {
+  return text.includes('(no interactive elements)') && !text.includes('[ref=');
 }
 
 const CHALLENGE_HOSTS = [
@@ -681,6 +689,11 @@ export async function runBrowserTool(
           : `browser_navigate refused: ${landed} ${CAIRN_PAGE_REFUSAL}`,
         started,
       );
+    }
+    if (params.stealth !== true && landed !== 'about:blank') {
+      const probe = await read([...prefix, 'snapshot', '-i']);
+      if (probe.code === 0 && isAutomationBlankSnapshot(probe.text))
+        return { text: result.text || `opened ${url}`, automationBlocked: true };
     }
     return withDetection(result.text || `opened ${url}`);
   }

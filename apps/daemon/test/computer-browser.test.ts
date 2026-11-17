@@ -433,7 +433,10 @@ describe('login form detection', () => {
     const log: string[] = [];
     const result = await run(detectingProvider(log, evalResult(['challenge'])), 'browser_navigate');
     const browserLog = log.filter(
-      (line) => !line.startsWith('xdotool ') && !/ get (title|url)$/.test(line),
+      (line) =>
+        !line.startsWith('xdotool ') &&
+        !/ get (title|url)$/.test(line) &&
+        !line.endsWith(' snapshot -i'),
     );
     expect(browserLog[0]).toContain(' open https://example.com');
     expect(browserLog[1]).toContain(' --json eval ');

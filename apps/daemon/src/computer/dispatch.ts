@@ -12,7 +12,12 @@ import {
 import { z } from 'zod';
 import type { DaemonLogger } from '../log.js';
 import type { MachineApi } from '../machine-client.js';
-import { type BrowserToolName, type BrowserToolResult, runBrowserTool } from './browser.js';
+import {
+  AUTO_STEALTH_NOTE,
+  type BrowserToolName,
+  type BrowserToolResult,
+  runBrowserTool,
+} from './browser.js';
 import { DesktopScreen } from './desktop-screen.js';
 import { FramePoster } from './frame-poster.js';
 import {
@@ -453,8 +458,8 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     const poster = posterFor(call, controller);
     let result: BrowserToolResult;
-    try {
-      result = await runBrowserTool(route.provider, call.tool as BrowserToolName, call.params, {
+    const run = (params: Record<string, unknown>) =>
+      runBrowserTool(route.provider, call.tool as BrowserToolName, params, {
         deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
         now,
         signal: controller.signal,
@@ -462,6 +467,12 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         cairnOrigins: options.cairnOrigins,
         browserSecrets: call.browserSecrets,
       });
+    try {
+      result = await run(call.params);
+      if (result.automationBlocked) {
+        const stealthy = await run({ ...call.params, stealth: true });
+        result = { ...stealthy, text: `${AUTO_STEALTH_NOTE}\n${stealthy.text}` };
+      }
     } catch (error) {
       await poster.finish(
         error instanceof ComputerRefusal

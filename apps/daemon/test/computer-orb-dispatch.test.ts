@@ -8,6 +8,7 @@ import {
   PACKAGES_INSTALLED_PREFIX,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { AUTO_STEALTH_NOTE } from '../src/computer/browser.js';
 import {
   createComputerDispatcher,
   NO_COMPUTER_PROVIDER_MESSAGE,
@@ -18,7 +19,12 @@ import {
   orbComputerProtectionRefusal,
   protectedComputerLifecycleRefusal,
 } from '../src/computer/guard.js';
-import type { ComputerProvider, ScopedComputerProviders } from '../src/computer/provider.js';
+import {
+  type ComputerProvider,
+  ComputerRefusal,
+  type ScopedComputerProviders,
+} from '../src/computer/provider.js';
+import { NO_CLOAK_LICENSE } from '../src/computer/vm-desktop.js';
 
 const FAST = { flushMs: 20, heartbeatMs: 5_000, retryBaseMs: 5, retryMaxMs: 20, cairnOrigins: [] };
 
@@ -180,6 +186,53 @@ describe('orb routing', () => {
       true,
     );
     expect(fake.frames.some((frame) => frame.kind === 'done')).toBe(true);
+  });
+
+  test.each([
+    ['a license reopens the address in the stealth browser and says so', true],
+    ['no license returns the no-license refusal', false],
+  ])('a blank anti-automation page after browser_navigate: %s', async (_name, licensed) => {
+    const fake = fakeClient();
+    const ran: string[][] = [];
+    const provider: ComputerProvider = {
+      async execute(request) {
+        const stealth = request.argv.includes('chief_c1-stealth');
+        if (stealth && !licensed) throw new ComputerRefusal(NO_CLOAK_LICENSE);
+        ran.push([...request.argv]);
+        const blank = !stealth && request.argv.includes('snapshot');
+        return (async function* () {
+          if (blank) yield { kind: 'stdout' as const, text: '(no interactive elements)' };
+          yield { kind: 'exit' as const, code: 0 };
+        })();
+      },
+      async listFiles() {
+        return [];
+      },
+      async readFile() {
+        return '';
+      },
+      async writeFile() {},
+      async killAll() {},
+    };
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      orb: { forScope: () => provider, async killAll() {} },
+      ...FAST,
+    });
+    await dispatcher.dispatch(
+      call('browser_navigate', { url: 'https://www.zhipin.com/' }, { scopeKey: 'chief:c1' }),
+    );
+    if (licensed) {
+      const done = fake.frames.find((frame) => frame.kind === 'done');
+      expect(done?.kind === 'done' && done.text.startsWith(AUTO_STEALTH_NOTE)).toBe(true);
+      expect(
+        ran.some(
+          (argv) => argv.includes('chief_c1-stealth') && argv.at(-1) === 'https://www.zhipin.com/',
+        ),
+      ).toBe(true);
+    } else {
+      expect(errorOf(fake.frames)?.message).toBe(NO_CLOAK_LICENSE);
+    }
   });
 
   test('browser_snapshot truncates oversized done text', async () => {

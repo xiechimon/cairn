@@ -1166,19 +1166,15 @@ export async function forwardComputerCall(
           })
       : [];
   const host = db.select().from(machine).where(eq(machine.id, target.machineId)).get();
-  const licenseCipher =
+  const stealthOnVm =
     isComputerBrowserTool(tool) &&
     body.params.stealth === true &&
-    host?.capabilities?.computerKind === 'vm'
+    host?.capabilities?.computerKind === 'vm';
+  const licenseCipher =
+    stealthOnVm || (tool === 'browser_navigate' && host?.capabilities?.computerKind === 'vm')
       ? cloakLicenseCipher(db, thread.teamId)
       : null;
-  if (
-    isComputerBrowserTool(tool) &&
-    body.params.stealth === true &&
-    host?.capabilities?.computerKind === 'vm' &&
-    licenseCipher === null
-  )
-    return { text: COMPUTER_NO_CLOAK_LICENSE };
+  if (stealthOnVm && licenseCipher === null) return { text: COMPUTER_NO_CLOAK_LICENSE };
   if (secretActions.length > 0 && host?.capabilities?.browserSecretFill !== true)
     throw new HttpError(409, 'Update this machine before filling saved browser passwords.');
   const pendingApprovals: string[] = [];
