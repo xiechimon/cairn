@@ -214,3 +214,18 @@ Each step is one PR off `main`:
 3. The GitHub footer; worker renames of request tasks together with the `named by the worker` mark (W11); the `message_thread` change (M1).
 
 Protected paths: step 1 adds migrations under `**/drizzle/**` and touches `services/machine-claim.ts` and `machine-relay.ts`; step 2 touches `machine-relay.ts`. Each step needs the Codex review on its head.
+
+## Amendment, 2026-11-17: the default quote and replacing a quote
+
+Owner decision. A task once quoted only a follow-up ("the BOSS window is the private browser") because the turn that created it held only that message; the request was two turns earlier. The Coordinator archived the task and made a duplicate.
+
+States. The quoted messages of a task live only in `todo.request.segments`; a message is bound when a segment of any task of the team names it (`sourceIdOf`). No other state is written.
+
+Paths that read or write the quoted messages:
+- `create_todo` without `messageIds` (`createRequestTodo`) now cites `ownerMessagesSinceLastTask`: the owner messages of this thread that are not bound and were created after the newest bound message of this thread, plus every message of the current turn, oldest first. Transcript prompts and orchestration requests are skipped. Older candidates are dropped once the text passes 8000 characters; the current turn is always kept. A turn with no owner message (a wake turn) keeps the 400. A current-turn message that is already bound still returns 409.
+- `create_todo` with `messageIds`, `quotes` or `sourceTodoId`: unchanged.
+- `update_todo.addMessageIds`: unchanged. It stays because an issue split needs the owner's correction appended after the issue quote (W4).
+- `update_todo.replaceMessageIds` (new): replaces `request.segments` with the cited messages as whole segments, in the given order, for an unstarted task with `request`. The task's own previous binding does not count as bound, while a message bound to another task returns 409. Attachment grants are recomputed from the new owner segments. `siblings`, `difficulty` and the title are kept. It cannot be sent together with `addMessageIds`.
+- Readers (prompt builders, board, claim payload) read `request.segments` as before.
+
+Failure: a replace that fails validation or a routing change writes nothing, as for append.

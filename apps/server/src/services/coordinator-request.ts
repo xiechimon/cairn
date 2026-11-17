@@ -281,7 +281,12 @@ function requireTeamTodos(db: Db, teamId: string, ids: readonly string[]): void 
   if (missing !== undefined) throw new HttpError(404, `todo ${missing}`);
 }
 
-function requireUnboundMessages(db: Db, ctx: RequestCtx, segments: readonly TaskSegment[]): void {
+function requireUnboundMessages(
+  db: Db,
+  ctx: RequestCtx,
+  segments: readonly TaskSegment[],
+  exceptTodoId?: string,
+): void {
   const keys = new Set(segments.map((segment) => segmentKey(segment.source)));
   const existing = db
     .select({ id: todo.id, request: todo.request })
@@ -289,6 +294,7 @@ function requireUnboundMessages(db: Db, ctx: RequestCtx, segments: readonly Task
     .where(and(eq(todo.teamId, ctx.teamId), isNotNull(todo.request)))
     .all();
   for (const row of existing) {
+    if (row.id === exceptTodoId) continue;
     const bound = row.request?.segments.find((segment) => keys.has(segmentKey(segment.source)));
     if (bound !== undefined) {
       throw new HttpError(
@@ -340,6 +346,49 @@ export function quickLaneRefusal(
   return null;
 }
 
+const MAX_DEFAULT_QUOTE_CHARS = 8000;
+
+function ownerMessagesSinceLastTask(db: Db, ctx: RequestCtx): string[] {
+  const turn = ctx.turnMessageIds ?? [];
+  if (turn.length === 0) return [];
+  const boundKeys = new Set(
+    db
+      .select({ request: todo.request })
+      .from(todo)
+      .where(and(eq(todo.teamId, ctx.teamId), isNotNull(todo.request)))
+      .all()
+      .flatMap((row) => row.request?.segments ?? [])
+      .map((segment) => sourceIdOf(segment))
+      .filter((id): id is string => id !== null),
+  );
+  const rows = db
+    .select()
+    .from(chiefMessage)
+    .where(and(eq(chiefMessage.threadId, ctx.threadId), eq(chiefMessage.role, 'user')))
+    .orderBy(chiefMessage.createdAt, chiefMessage.id)
+    .all();
+  const lastBound = rows.findLast((row) => boundKeys.has(row.id));
+  const turnSet = new Set(turn);
+  const picked = rows.filter(
+    (row) =>
+      turnSet.has(row.id) ||
+      (typeof row.content === 'string' &&
+        !boundKeys.has(row.id) &&
+        !row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) &&
+        orchestratedTodoIdOf(row.content) === null &&
+        (lastBound === undefined || row.createdAt > lastBound.createdAt)),
+  );
+  let size = 0;
+  const kept: string[] = [];
+  for (const row of picked.toReversed()) {
+    size += typeof row.content === 'string' ? row.content.length : 0;
+    if (size > MAX_DEFAULT_QUOTE_CHARS && !turnSet.has(row.id)) break;
+    kept.unshift(row.id);
+  }
+  const answered = turn.filter((id) => !rows.some((row) => row.id === id));
+  return [...kept, ...answered];
+}
+
 export function createRequestTodo(
   deps: TodoDeps,
   ctx: RequestCtx,
@@ -348,7 +397,7 @@ export function createRequestTodo(
 ): TodoRecord & { uncovered?: string[] } {
   parseWith(categoryFreeTaskInputSchema, params, 'params');
   const { db } = deps;
-  const messageIds = params.messageIds ?? ctx.turnMessageIds ?? [];
+  const messageIds = params.messageIds ?? ownerMessagesSinceLastTask(db, ctx);
   if (params.sourceTodoId === undefined && messageIds.length === 0) {
     throw new HttpError(400, NO_OWNER_WORDS);
   }
@@ -449,13 +498,17 @@ export function updateRequestTodo(
 ): TodoRecord | null {
   parseWith(categoryFreeTaskInputSchema, params, 'params');
   const { db } = deps;
+  const citedIds = params.replaceMessageIds ?? params.addMessageIds;
   const added =
-    params.addMessageIds === undefined
-      ? null
-      : citedMessages(db, ctx, params.addMessageIds).map((c) => c.segment);
+    citedIds === undefined ? null : citedMessages(db, ctx, citedIds).map((c) => c.segment);
   if (added !== null) {
     appendableRow(db, ctx, params.todoId);
-    requireUnboundMessages(db, ctx, added);
+    requireUnboundMessages(
+      db,
+      ctx,
+      added,
+      params.replaceMessageIds === undefined ? undefined : params.todoId,
+    );
   }
   const summaryTitle =
     params.title === undefined ? undefined : derivePlaceholderTitle(params.title);
@@ -488,8 +541,17 @@ export function updateRequestTodo(
   );
   if (added === null || routed === null) return routed;
   const row = appendableRow(db, ctx, params.todoId);
-  const request: TaskRequest = { ...row.request, segments: [...row.request.segments, ...added] };
-  const grants = [...new Set([...row.userSpecAttachmentIds, ...ownerGrants(added, ctx.teamId)])];
+  const replacing = params.replaceMessageIds !== undefined;
+  const request: TaskRequest = {
+    ...row.request,
+    segments: replacing ? added : [...row.request.segments, ...added],
+  };
+  const grants = [
+    ...new Set([
+      ...(replacing ? [] : row.userSpecAttachmentIds),
+      ...ownerGrants(added, ctx.teamId),
+    ]),
+  ];
   return db.transaction(() => {
     db.update(todo).set({ request }).where(eq(todo.id, row.id)).run();
     return updateAutonomousTodo(

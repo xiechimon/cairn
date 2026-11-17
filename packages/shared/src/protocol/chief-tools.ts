@@ -219,10 +219,17 @@ export const coordinatorUpdateTodoParamsSchema = z
     title: z.string().trim().min(1).max(200).optional(),
     projectId: z.string().min(1).optional(),
     addMessageIds: ownerMessageIdListSchema.optional(),
+    replaceMessageIds: ownerMessageIdListSchema.optional(),
     blockedBy: todoIdListSchema.optional(),
     platform: z.enum([...RUNNER_OS, 'any']).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (params) => params.addMessageIds === undefined || params.replaceMessageIds === undefined,
+    {
+      message: 'pass addMessageIds or replaceMessageIds, not both',
+    },
+  );
 export type CoordinatorUpdateTodoParams = z.infer<typeof coordinatorUpdateTodoParamsSchema>;
 
 const PLATFORM_DOC =
@@ -489,7 +496,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           'Project id. Omit it only for output "info" research that belongs to no project: the todo goes to the research project and its report comes back to this conversation.',
         ),
         messageIds: idArr(
-          'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Default: the owner messages of this turn. When this turn only follows up on a request the owner made in an earlier turn (a retry, a correction, a clarification), pass the id of that request message too, so the task carries the request itself. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
+          'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Default: every owner message in this conversation since the last task was created, including the current turn. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
         ),
         sourceTodoId: str(
           'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds. This explicitly declares a split of the same request.',
@@ -530,7 +537,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'update_todo',
     description:
-      "Update a todo's summary title (Coordinator create_todo request tasks only), move an unstarted todo to another project, or append later owner messages to an unstarted todo (addMessageIds, copied verbatim; already-bound messages return 409 before any routing changes). After create_todo, set title to a short summary (≤50 chars) for the Tasks panel; the owner's cited request body stays in the task text and is never rewritten here. Board tasks and imported GitHub issues keep their titles. A running thread gets body corrections through message_thread.",
+      "Update a todo's summary title (Coordinator create_todo request tasks only), move an unstarted todo to another project, or append later owner messages to an unstarted todo (addMessageIds), or replace what it quotes (replaceMessageIds; messages bound to another todo return 409 before any routing changes; both copy owner messages verbatim). After create_todo, set title to a short summary (≤50 chars) for the Tasks panel; the owner's cited request body stays in the task text and is never rewritten here. Board tasks and imported GitHub issues keep their titles. A running thread gets body corrections through message_thread.",
     parameters: obj(
       {
         todoId: str('Todo id.'),
@@ -543,6 +550,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         ),
         addMessageIds: idArr(
           'Optional unique ids of later owner messages in this Coordinator thread to append verbatim. Only for a todo that has not started.',
+        ),
+        replaceMessageIds: idArr(
+          'Optional unique ids of owner messages in this Coordinator thread that replace the whole quoted request of the todo, verbatim and in this order. Use it to fix a wrong quote instead of archiving the todo and creating another; list every message the task should quote. Only for a todo that has not started.',
         ),
         platform: str(
           `Optional "macos", "windows" or "linux" to set the operating system the task needs, or "any" to remove it. Refused with 409 once the task has a session. ${PLATFORM_DOC}`,

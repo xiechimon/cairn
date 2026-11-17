@@ -47,6 +47,33 @@ describe('Coordinator source bindings', () => {
     ]);
   });
 
+  test('a task created on a follow-up turn quotes the earlier request too', async () => {
+    message('Summarize 10 AI application developer jobs on BOSS.');
+    const followUp = message('The BOSS window is the private browser.');
+    await relay('create_todo', { projectId: H.projectId }, { turnMessageIds: [followUp] });
+    const rows = H.s.db.select().from(todo).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.request?.segments.map((segment) => segment.text)).toEqual([
+      'Summarize 10 AI application developer jobs on BOSS.',
+      'The BOSS window is the private browser.',
+    ]);
+  });
+
+  test('update_todo replaces a wrong quote without appending', async () => {
+    const request = message('Summarize 10 AI application developer jobs on BOSS.');
+    const followUp = message('The BOSS window is the private browser.');
+    const created = unstarted([followUp]);
+    await relay('update_todo', { todoId: created.id, replaceMessageIds: [request, followUp] });
+    const stored = H.s.db.select().from(todo).where(eq(todo.id, created.id)).get();
+    expect(stored?.request?.segments.map((segment) => segment.text)).toEqual([
+      'Summarize 10 AI application developer jobs on BOSS.',
+      'The BOSS window is the private browser.',
+    ]);
+    expect(stored?.spec).toBe(
+      'Summarize 10 AI application developer jobs on BOSS.\n\nThe BOSS window is the private browser.',
+    );
+  });
+
   test('schema preserves the turn source default', () => {
     expect(coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p' }).success).toBe(true);
     expect(
