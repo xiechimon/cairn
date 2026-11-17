@@ -6,15 +6,17 @@ import { ownedPrivateComputer } from './services/computer-access.js';
 import {
   clampCommandsLimit,
   ensureComputerBrowserEnabled,
+  ensureCoordinatorComputer,
   listComputers,
   recentComputerCommands,
   setComputerBrowserEnabled,
 } from './services/computer-feed.js';
 
 export function registerComputerRoutes(app: Hono, ctx: AppContext): void {
-  app.get('/api/computers', (c) =>
-    c.json({ computers: listComputers(ctx.db, ctx.team.id, ctx.user.id) }),
-  );
+  app.get('/api/computers', (c) => {
+    ensureCoordinatorComputer(ctx.db, ctx.team.id, ctx.user.id);
+    return c.json({ computers: listComputers(ctx.db, ctx.team.id, ctx.user.id) });
+  });
 
   app.post('/api/computers', async (c) => {
     if (!c.get('ownerIdentity')) throw new HttpError(403, 'owner session required');

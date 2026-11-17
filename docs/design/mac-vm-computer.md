@@ -53,6 +53,9 @@ Input policy drop: lo, established, gateway → tcp 5900, 5901. Output: lo, esta
 
 ## Server change
 
+Owner requirement (ian, 2026-11-17): the machine card shows the screen before the Coordinator has used the computer. `GET /api/computers` makes sure the caller's Coordinator scope has a computer row, state `stopped`, on the most recently seen online machine whose `capabilities.computer` is set and whose desktop is not turned off; the card then renders the screen and opening it starts the VM through `hold(scope,'view')`, with the screen's loading state during the 2 to 3 s cold start. The first computer call reuses that row.
+
+
 `forwardComputerCall` attaches `browserLicense` (the team secret `CLOAKBROWSER_LICENSE_KEY`, opened only in memory) to browser calls with `stealth: true` when the target machine reports `computerKind: 'vm'`. Wire: optional `browserLicense?: string` on the computer call schema, never logged, redacted like `browserSecrets`. The secrets page lists the name with a hint. Linux host desktops keep the license file until decision 4 moves them onto the image.
 
 ## Failure behavior

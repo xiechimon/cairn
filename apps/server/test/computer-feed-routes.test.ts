@@ -170,6 +170,62 @@ describe('computer feed routes', () => {
     });
   });
 
+  test('an online computer machine lists a stopped Coordinator computer before any computer call', async () => {
+    const s = boot();
+    addMachine(s, s.team.id, 'plain');
+    s.db
+      .insert(machineTable)
+      .values({
+        id: 'mac',
+        teamId: s.team.id,
+        name: 'name-mac',
+        online: true,
+        lastSeenAt: 2,
+        capabilities: { mcpServers: [], skills: [], computer: true, computerKind: 'vm' },
+      })
+      .run();
+    const first = (await (await req(s.app, 'GET', '/api/computers')).json()) as {
+      computers: { id: string; scopeKey: string; state: string; machine: { id: string } }[];
+    };
+    expect(first.computers).toHaveLength(1);
+    expect(first.computers[0]).toMatchObject({
+      scopeKey: `chief:${chiefIdFormat(s.user.id, s.team.id)}`,
+      state: 'stopped',
+      machine: { id: 'mac' },
+    });
+    const again = (await (await req(s.app, 'GET', '/api/computers')).json()) as {
+      computers: { id: string }[];
+    };
+    expect(again.computers.map((row) => row.id)).toEqual([first.computers[0]?.id]);
+  });
+
+  test('no Coordinator computer appears without an online computer machine or with the desktop turned off', async () => {
+    const s = boot();
+    s.db
+      .insert(machineTable)
+      .values([
+        {
+          id: 'offline',
+          teamId: s.team.id,
+          name: 'offline',
+          online: false,
+          lastSeenAt: 3,
+          capabilities: { mcpServers: [], skills: [], computer: true },
+        },
+        {
+          id: 'off',
+          teamId: s.team.id,
+          name: 'off',
+          online: true,
+          lastSeenAt: 2,
+          desktopOverride: false,
+          capabilities: { mcpServers: [], skills: [], computer: true },
+        },
+      ])
+      .run();
+    expect(await (await req(s.app, 'GET', '/api/computers')).json()).toEqual({ computers: [] });
+  });
+
   test('a pending login handoff is listed so the panel can ask the owner to log in', async () => {
     const s = boot();
     addMachine(s, s.team.id, 'm1', false);

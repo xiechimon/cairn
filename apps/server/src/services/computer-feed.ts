@@ -24,6 +24,34 @@ export function clampCommandsLimit(raw: string | undefined): number {
   return Math.min(asked, COMPUTER_COMMANDS_LIMIT_MAX);
 }
 
+export function ensureCoordinatorComputer(db: Db, teamId: string, userId: string): void {
+  const scopeKey = `chief:${chiefIdFormat(userId, teamId)}`;
+  if (db.select({ id: computer.id }).from(computer).where(eq(computer.scopeKey, scopeKey)).get())
+    return;
+  const host = db
+    .select()
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
+    .orderBy(desc(machine.lastSeenAt))
+    .all()
+    .find((row) => row.capabilities?.computer === true && row.desktopOverride !== false);
+  if (host === undefined) return;
+  const now = nowMs();
+  db.insert(computer)
+    .values({
+      id: newRecordId(),
+      teamId,
+      scopeKey,
+      machineId: host.id,
+      providerRef: computerMachineName(scopeKey),
+      state: 'stopped',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing()
+    .run();
+}
+
 export function listComputers(db: Db, teamId: string, userId: string): ComputerRecord[] {
   return db
     .select({
