@@ -366,6 +366,42 @@ describe('info cards run in the agent computer', () => {
     expect(names).not.toContain('computer_observe');
   });
 
+  test('a devin route is not claimed and the queue says info cards cannot run on it', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const runner = insertMachine(s, { name: 'runner' });
+    insertMachine(s, { name: 'vm-host', capabilities: VM_CAPABILITIES });
+    seedRoute(s, 'session', { provider: 'devin', modelId: 'swe-2-high', machineId: runner });
+    const { todoId, buildId } = await infoCard(s);
+
+    const claimed = await claimStep(
+      {
+        ...s.svc,
+        box: s.secretBox,
+        reposDir: s.reposDir,
+        attachmentsDir: s.attachmentsDir,
+        skillsDir: s.skillsDir,
+      },
+      runner,
+      s.team.id,
+      10,
+      'http://localhost',
+    );
+    expect(claimed).toBeNull();
+    const pending = s.db.select().from(step).where(eq(step.buildId, buildId)).get();
+    const todoRow = s.db.select().from(todo).where(eq(todo.id, todoId)).get();
+    const queue = stepQueueProjector(s.db, s.team.id).project({
+      id: pending?.id ?? '',
+      createdAt: pending?.createdAt ?? 0,
+      homeMachineId:
+        todoRow === undefined || pending === undefined
+          ? null
+          : (profileForStep(s.db, todoRow, pending.kind, pending.id)?.machineId ?? null),
+    });
+    expect(queue?.blocked).toEqual({ kind: 'info-card-runtime', missing: ['devin'] });
+    expect(pending?.status).toBe('pending');
+  });
+
   test('with no usable computer the card waits and says why', async () => {
     setCoordinatorInServer(true);
     const s = bootServer();

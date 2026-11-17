@@ -57,6 +57,9 @@ export function infoCardPlan(
   }
   const runtime = stepRuntimeFor(model.provider);
   if (runtime === 'claude-code') return { kind: 'claude-code', profile, machineId: host.id };
+  if (runtime === 'devin' || runtime === 'gemini') {
+    return { kind: 'wait', blocked: { kind: 'info-card-runtime', missing: [runtime] } };
+  }
   if (
     runtime !== 'pi' ||
     !coordinatorInServerEnabled() ||
