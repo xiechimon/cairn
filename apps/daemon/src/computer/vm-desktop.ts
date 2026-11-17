@@ -15,6 +15,7 @@ import {
 } from '@cairn/shared';
 import { z } from 'zod';
 import { AGENT_BROWSER_BINARY, browserSessionName, isStealthBrowserCommand } from './browser.js';
+import { resolveHostBrowserLocaleAndTimezone } from './cloak-browser.js';
 import type { ComputerDesktops } from './desktops.js';
 import { AsyncEventQueue, HOST_MAX_FILE_BYTES } from './host.js';
 import { HOST_DESKTOP_IDLE_STOP_MS } from './host-desktop.js';
@@ -394,7 +395,10 @@ export class VmDesktops implements ComputerDesktops {
     const stored = await this.browserScript(scopeKey, ['key'], `${license}\n`);
     if (stored.code !== 0)
       throw new ComputerRefusal('The CloakBrowser license could not be stored');
-    const prepared = await this.browserScript(scopeKey, ['prepare']);
+    const { locale, timezone } = resolveHostBrowserLocaleAndTimezone(
+      this.options.env ?? process.env,
+    );
+    const prepared = await this.browserScript(scopeKey, ['prepare', locale, timezone]);
     if (prepared.code === 3)
       throw new ComputerRefusal('CloakBrowser license denied or unavailable');
     if (prepared.code !== 0)

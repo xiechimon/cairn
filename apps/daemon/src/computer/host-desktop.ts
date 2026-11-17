@@ -54,6 +54,7 @@ const BROWSER_PROFILE = join('.cairn', 'browser-profile');
 const CLOAK_PROFILE = join('.cairn', 'cloak-profile');
 const CLOAK_IDENTITY = '.cairn-cloak-identity.json';
 const CHROMIUM_ARGS = [
+  '--disable-blink-features=AutomationControlled',
   '--start-maximized',
   '--ozone-platform=x11',
   '--password-store=basic',

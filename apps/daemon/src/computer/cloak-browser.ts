@@ -13,12 +13,64 @@ export interface CloakSdk {
   licenseErrorFrom(error: unknown): Error | null;
 }
 
+function isValidLocale(value: string): boolean {
+  if (!/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(value) || value.length > 35) return false;
+  try {
+    return Intl.getCanonicalLocales(value)[0] === value;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeLocaleCandidate(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const base = raw.trim().split(/[.@]/)[0]?.replaceAll('_', '-') ?? '';
+  if (!base || /^(?:c|posix)$/i.test(base)) return undefined;
+  try {
+    const canonical = Intl.getCanonicalLocales(base)[0];
+    return canonical && isValidLocale(canonical) ? canonical : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isValidTimezone(value: string): boolean {
+  if (!/^[A-Za-z0-9_+/-]{1,64}$/.test(value)) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveHostBrowserLocaleAndTimezone(env: NodeJS.ProcessEnv): {
+  locale: string;
+  timezone: string;
+} {
+  const resolved = Intl.DateTimeFormat().resolvedOptions();
+  const locale =
+    normalizeLocaleCandidate(env.LC_ALL) ??
+    normalizeLocaleCandidate(env.LC_MESSAGES) ??
+    normalizeLocaleCandidate(env.LANG) ??
+    normalizeLocaleCandidate(resolved.locale) ??
+    'en-US';
+  const envTimezone = env.TZ?.trim();
+  const timezone =
+    envTimezone && isValidTimezone(envTimezone)
+      ? envTimezone
+      : resolved.timeZone && isValidTimezone(resolved.timeZone)
+        ? resolved.timeZone
+        : 'UTC';
+  return { locale, timezone };
+}
+
 const identitySchema = z
   .object({
     seed: z.number().int().min(10000).max(99999),
     platform: z.enum(['windows', 'macos', 'linux']),
-    locale: z.literal('en-US'),
-    timezone: z.literal('UTC'),
+    locale: z.string().refine(isValidLocale),
+    timezone: z.string().refine(isValidTimezone),
   })
   .strict();
 
@@ -35,7 +87,7 @@ export class CloakBrowser {
   version: string | null = null;
 
   constructor(
-    env: NodeJS.ProcessEnv,
+    private readonly env: NodeJS.ProcessEnv,
     private readonly sdk: CloakSdk = {
       binaryInfo,
       ensureBinary,
@@ -95,11 +147,12 @@ export class CloakBrowser {
         throw new ComputerRefusal('CloakBrowser profile identity is invalid');
     }
     const defaults = this.sdk.getDefaultStealthArgs();
+    const { locale, timezone } = resolveHostBrowserLocaleAndTimezone(this.env);
     const identity = identitySchema.parse({
       seed: Number(defaults.find((arg) => arg.startsWith('--fingerprint='))?.split('=')[1]),
       platform: defaults.find((arg) => arg.startsWith('--fingerprint-platform='))?.split('=')[1],
-      locale: 'en-US',
-      timezone: 'UTC',
+      locale,
+      timezone,
     });
     await mkdir(profile, { recursive: true, mode: 0o700 });
     const temporary = join(profile, `.cloak-identity-${randomUUID()}`);

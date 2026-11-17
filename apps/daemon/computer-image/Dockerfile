@@ -29,7 +29,10 @@ RUN set -eu; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
       xvfb x11vnc openbox picom hsetroot xdotool dbus-x11 libglib2.0-bin \
-      chromium lxterminal fonts-noto-cjk fonts-noto-color-emoji adwaita-icon-theme gnome-themes-extra \
+      chromium lxterminal fonts-noto-cjk fonts-noto-color-emoji \
+      fonts-freefont-ttf fonts-unifont fonts-ipafont-gothic fonts-wqy-zenhei fonts-tlwg-loma-otf \
+      fonts-liberation2 fonts-crosextra-carlito fonts-crosextra-caladea \
+      adwaita-icon-theme gnome-themes-extra \
       ca-certificates curl procps nftables util-linux earlyoom x11-apps netpbm \
       git python3 python3-pip python3-venv jq ripgrep fd-find unzip zip less; \
     case "$TARGETARCH" in \

@@ -27,7 +27,7 @@ function setup() {
     ]),
     licenseErrorFrom: vi.fn(() => null),
   };
-  const env = { HOME: root, CLOAKBROWSER_LICENSE_FILE: file };
+  const env = { HOME: root, CLOAKBROWSER_LICENSE_FILE: file, TZ: 'UTC', LANG: 'en_US.UTF-8' };
   return { root, file, sdk, env, engine: new CloakBrowser(env, sdk) };
 }
 
@@ -129,11 +129,99 @@ test('corrupt seed and extra credential fields never rotate identity', async () 
   for (const value of [
     { seed: 0, platform: 'windows', locale: 'en-US', timezone: 'UTC' },
     { seed: 12345, platform: 'windows', locale: 'en-US', timezone: 'UTC', key },
+    { seed: 12345, platform: 'windows', locale: 'en-US,fr', timezone: 'UTC' },
+    { seed: 12345, platform: 'windows', locale: 'en-US', timezone: 'Not/A_Timezone' },
   ]) {
     writeFileSync(file, JSON.stringify(value));
     await expect(engine.launch(profile)).rejects.toThrow('identity');
     expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(value);
   }
+});
+
+test('first profile launch inherits host timezone and locale and preserves existing identities across restarts', async () => {
+  const { root, file, sdk } = setup();
+  const shanghai = new CloakBrowser(
+    { HOME: root, CLOAKBROWSER_LICENSE_FILE: file, TZ: 'Asia/Shanghai', LANG: 'zh_CN.UTF-8' },
+    sdk,
+  );
+  await shanghai.prepare();
+  const profile = join(root, 'shanghai-profile');
+  const first = await shanghai.launch(profile);
+  expect(first.args).toContain('--lang=zh-CN');
+  expect(first.args).toContain('--fingerprint-locale=zh-CN');
+  expect(first.args).toContain('--fingerprint-timezone=Asia/Shanghai');
+  const tokyo = new CloakBrowser(
+    { HOME: root, CLOAKBROWSER_LICENSE_FILE: file, TZ: 'Asia/Tokyo', LANG: 'ja_JP.UTF-8' },
+    sdk,
+  );
+  await tokyo.prepare();
+  const reused = await tokyo.launch(profile);
+  expect(reused.args).toEqual(first.args);
+});
+
+test('computer-image scripts and Dockerfile configure stealth locale, non-stealth automation flags and fonts', () => {
+  const { root } = setup();
+  const imageDir = join(import.meta.dirname, '..', 'computer-image');
+  const dockerfile = readFileSync(join(imageDir, 'Dockerfile'), 'utf8');
+  for (const pkg of [
+    'fonts-freefont-ttf',
+    'fonts-unifont',
+    'fonts-ipafont-gothic',
+    'fonts-wqy-zenhei',
+    'fonts-tlwg-loma-otf',
+    'fonts-liberation2',
+    'fonts-crosextra-carlito',
+    'fonts-crosextra-caladea',
+  ]) {
+    expect(dockerfile).toContain(pkg);
+  }
+  const agentBrowserScript = readFileSync(join(imageDir, 'agent-browser.sh'), 'utf8');
+  expect(agentBrowserScript).toContain('--disable-blink-features=AutomationControlled');
+  expect(spawnSync('/bin/bash', ['-n', join(imageDir, 'agent-browser.sh')]).status).toBe(0);
+  expect(spawnSync('/bin/bash', ['-n', join(imageDir, 'browser.sh')]).status).toBe(0);
+
+  const profile = join(root, 'vm-cloak-profile');
+  const envFile = join(root, 'cloak.env');
+  const fakeCloakModule = join(root, 'node_modules', 'cloakbrowser');
+  mkdirSync(fakeCloakModule, { recursive: true });
+  writeFileSync(
+    join(fakeCloakModule, 'package.json'),
+    JSON.stringify({ name: 'cloakbrowser', type: 'module', exports: './index.mjs' }),
+  );
+  writeFileSync(
+    join(fakeCloakModule, 'index.mjs'),
+    [
+      "export const binaryInfo = () => ({ installed: true, binaryPath: '/opt/fake-cloak', version: '156.0' });",
+      "export const ensureBinary = async () => '/opt/fake-cloak';",
+      "export const getDefaultStealthArgs = () => ['--no-sandbox', '--fingerprint=54321', '--fingerprint-platform=windows'];",
+      'export const licenseErrorFrom = () => null;',
+    ].join('\n'),
+  );
+  const scriptCopy = join(root, 'cloak.mjs');
+  writeFileSync(scriptCopy, readFileSync(join(imageDir, 'cloak.mjs')));
+  const runCloak = (extraArgs: string[]) =>
+    spawnSync(process.execPath, [scriptCopy, profile, envFile, ...extraArgs], {
+      env: {
+        PATH: process.env.PATH,
+        CLOAKBROWSER_LICENSE_KEY: key,
+      },
+      encoding: 'utf8',
+    });
+  expect(runCloak(['en-US,fr', 'UTC']).status).toBe(4);
+  const prepared = runCloak(['zh-CN', 'Asia/Shanghai']);
+  expect(prepared.status).toBe(0);
+  const generatedEnv = readFileSync(envFile, 'utf8');
+  expect(generatedEnv).toContain('--lang=zh-CN');
+  expect(generatedEnv).toContain('--fingerprint-locale=zh-CN');
+  expect(generatedEnv).toContain('--fingerprint-timezone=Asia/Shanghai');
+  const second = runCloak(['en-US', 'UTC']);
+  expect(second.status).toBe(0);
+  expect(readFileSync(envFile, 'utf8')).toContain('--fingerprint-timezone=Asia/Shanghai');
+  writeFileSync(
+    join(profile, '.cairn-cloak-identity.json'),
+    JSON.stringify({ seed: 54321, platform: 'windows', locale: 'en-US', timezone: 'Bad/Zone' }),
+  );
+  expect(runCloak(['en-US', 'UTC']).status).toBe(4);
 });
 
 test('generated Dock launcher runs the fake engine with file-only credentials and rejects a live lock', async () => {

@@ -3,7 +3,48 @@ import { linkSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSyn
 import { join } from 'node:path';
 import { binaryInfo, ensureBinary, getDefaultStealthArgs, licenseErrorFrom } from 'cloakbrowser';
 
-const [profile, envFile] = process.argv.slice(2);
+const [profile, envFile, requestedLocale = '', requestedTimezone = ''] = process.argv.slice(2);
+
+function isValidLocale(value) {
+  if (typeof value !== 'string' || !/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(value) || value.length > 35)
+    return false;
+  try {
+    return Intl.getCanonicalLocales(value)[0] === value;
+  } catch {
+    return false;
+  }
+}
+
+function isValidTimezone(value) {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_+/-]{1,64}$/.test(value)) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveInitialLocaleAndTimezone() {
+  if (requestedLocale !== '' && !isValidLocale(requestedLocale))
+    throw new Error('CloakBrowser profile identity is invalid');
+  if (requestedTimezone !== '' && !isValidTimezone(requestedTimezone))
+    throw new Error('CloakBrowser profile identity is invalid');
+  const resolved = Intl.DateTimeFormat().resolvedOptions();
+  const locale =
+    requestedLocale !== ''
+      ? requestedLocale
+      : isValidLocale(resolved.locale)
+        ? resolved.locale
+        : 'en-US';
+  const timezone =
+    requestedTimezone !== ''
+      ? requestedTimezone
+      : isValidTimezone(resolved.timeZone)
+        ? resolved.timeZone
+        : 'UTC';
+  return { locale, timezone };
+}
 
 function readIdentity(file) {
   const identity = JSON.parse(readFileSync(file, 'utf8'));
@@ -14,8 +55,8 @@ function readIdentity(file) {
     identity.seed < 10000 ||
     identity.seed > 99999 ||
     !['windows', 'macos', 'linux'].includes(identity.platform) ||
-    identity.locale !== 'en-US' ||
-    identity.timezone !== 'UTC'
+    !isValidLocale(identity.locale) ||
+    !isValidTimezone(identity.timezone)
   )
     throw new Error('CloakBrowser profile identity is invalid');
   return identity;
@@ -29,11 +70,12 @@ function identityOf(directory) {
     if (error.code !== 'ENOENT') throw new Error('CloakBrowser profile identity is invalid');
   }
   const defaults = getDefaultStealthArgs();
+  const { locale, timezone } = resolveInitialLocaleAndTimezone();
   const created = {
     seed: Number(defaults.find((arg) => arg.startsWith('--fingerprint='))?.split('=')[1]),
     platform: defaults.find((arg) => arg.startsWith('--fingerprint-platform='))?.split('=')[1],
-    locale: 'en-US',
-    timezone: 'UTC',
+    locale,
+    timezone,
   };
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const temporary = join(directory, `.cloak-identity-${randomUUID()}`);

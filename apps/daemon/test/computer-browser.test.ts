@@ -54,12 +54,20 @@ describe('browserSessionName', () => {
 });
 
 describe('runBrowserTool', () => {
-  test('stealth: true drives the separate stealth session', async () => {
+  test('stealth: true drives the separate stealth session without injecting the DOM cursor script', async () => {
     const log: string[] = [];
+    const written: string[] = [];
+    const base = cursorProvider(log);
+    const provider: ComputerProvider = {
+      ...base,
+      async writeFile(path) {
+        written.push(path);
+      },
+    };
     await runBrowserTool(
-      recordingProvider(log),
-      'browser_snapshot',
-      { stealth: true },
+      provider,
+      'browser_act',
+      { stealth: true, actions: [{ kind: 'click', ref: 'e1' }] },
       {
         timeoutMs: 5_000,
         signal: new AbortController().signal,
@@ -67,10 +75,14 @@ describe('runBrowserTool', () => {
         session: 'chief:1',
       },
     );
+    expect(written).toEqual([]);
     expect(log.some((line) => line.startsWith('agent-browser --session chief_1-stealth '))).toBe(
       true,
     );
     expect(log.some((line) => line.startsWith('agent-browser --session chief_1 '))).toBe(false);
+    expect(log.some((line) => line.includes('--init-script'))).toBe(false);
+    expect(log.some((line) => line.includes('__cairnAgentCursor'))).toBe(false);
+    expect(log.some((line) => line.endsWith(' click @e1'))).toBe(true);
   });
 
   test('navigates with headed agent-browser open', async () => {

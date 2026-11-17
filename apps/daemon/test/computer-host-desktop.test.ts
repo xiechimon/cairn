@@ -53,7 +53,10 @@ function workspace(programs: readonly string[]) {
   }
   const license = join(root, 'license.key');
   writeFileSync(license, 'fake-cloak-test-key');
-  return { root, env: { PATH: bin, CLOAKBROWSER_LICENSE_FILE: license } };
+  return {
+    root,
+    env: { PATH: bin, CLOAKBROWSER_LICENSE_FILE: license, TZ: 'UTC', LANG: 'en_US.UTF-8' },
+  };
 }
 
 function listen(path: string): Promise<Server> {
@@ -211,6 +214,7 @@ describe('HostDesktops', () => {
     const [key, executable, args] = readFileSync(`${log}.env`, 'utf8').split('|');
     expect(key).toBe('');
     expect(executable).toBe(join(env.PATH, 'chromium'));
+    expect(args).toContain('--disable-blink-features=AutomationControlled');
     expect(args).toContain('--restore-last-session');
     expect(args).not.toContain('--fingerprint');
     expect(readFileSync(log, 'utf8')).toContain(

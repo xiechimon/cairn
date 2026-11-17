@@ -391,18 +391,21 @@ export async function runBrowserTool(
   options: BrowserRunOptions,
 ): Promise<BrowserToolResult> {
   const binary = options.binary ?? AGENT_BROWSER_BINARY;
-  const session = browserSessionName(options.session, params.stealth === true);
+  const stealth = params.stealth === true;
+  const session = browserSessionName(options.session, stealth);
   const deadlineAt = browserDeadlineAt(options);
   const timed = { ...options, deadlineAt };
-  const cursorScriptWritten = await provider
-    .writeFile(AGENT_CURSOR_INIT_PATH, AGENT_CURSOR_INIT_SCRIPT, {
-      timeoutMs: remainingTimeoutMs(deadlineAt, options.now ?? Date.now),
-      signal: options.signal,
-    })
-    .then(
-      () => true,
-      () => false,
-    );
+  const cursorScriptWritten = stealth
+    ? false
+    : await provider
+        .writeFile(AGENT_CURSOR_INIT_PATH, AGENT_CURSOR_INIT_SCRIPT, {
+          timeoutMs: remainingTimeoutMs(deadlineAt, options.now ?? Date.now),
+          signal: options.signal,
+        })
+        .then(
+          () => true,
+          () => false,
+        );
   const prefix = [
     binary,
     ...sessionFlag(session),
@@ -753,7 +756,7 @@ export async function runBrowserTool(
         );
       }
     }
-    if (action.ref !== undefined) {
+    if (!stealth && action.ref !== undefined) {
       await showAgentCursor(normalizeRef(action.ref), action.kind === 'click' ? 'click' : 'point');
     }
     let argv: string[];

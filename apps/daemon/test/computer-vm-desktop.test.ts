@@ -425,9 +425,9 @@ describe('VmDesktops', () => {
     expect(env.calls().some((argv) => argv.includes('agent-browser'))).toBe(false);
   });
 
-  test('a stealth license goes in on stdin once per VM life and prepares Cloak', async () => {
+  test('a stealth license goes in on stdin once per VM life and prepares Cloak with host locale and timezone', async () => {
     const env = setup();
-    const desktops = env.make();
+    const desktops = env.make({ env: { TZ: 'Asia/Shanghai', LANG: 'zh_CN.UTF-8' } });
     const provider = desktops.forScope('chief:a', { browserLicense: 'cloak-test-key' });
     const stealth = ['agent-browser', '--session', 'chief_a-stealth', 'snapshot'];
     await expect(provider.execute(request(stealth))).resolves.toBeDefined();
@@ -437,7 +437,7 @@ describe('VmDesktops', () => {
       .calls()
       .filter((argv) => argv.includes('cairn-browser'))
       .map((argv) => argv.slice(argv.indexOf('cairn-browser') + 1).join(' '));
-    expect(browserCalls).toEqual(['key', 'prepare', 'agent', 'agent']);
+    expect(browserCalls).toEqual(['key', 'prepare zh-CN Asia/Shanghai', 'agent', 'agent']);
     expect(env.calls().flat().join(' ')).not.toContain('cloak-test-key');
   });
 

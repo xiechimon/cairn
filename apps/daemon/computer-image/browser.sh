@@ -60,7 +60,7 @@ case ${1:-} in
   prepare)
     read_key || { echo 'The CloakBrowser license is not set in this computer' >&2; exit 2; }
     mkdir -p "$profile"
-    CLOAKBROWSER_LICENSE_KEY=$key exec node /opt/cloak/cloak.mjs "$profile" "$env_file"
+    CLOAKBROWSER_LICENSE_KEY=$key exec node /opt/cloak/cloak.mjs "$profile" "$env_file" "${2:-}" "${3:-}"
     ;;
   owner)
     session=${2:?session}
