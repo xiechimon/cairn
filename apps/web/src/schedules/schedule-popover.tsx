@@ -80,7 +80,7 @@ export function SchedulePopover({
               },
               collisionAvoidance: { side: 'shift' as const, align: 'shift' as const },
               className:
-                'h-(--available-height) w-(--anchor-width) min-w-80 gap-3 overflow-hidden p-3 pb-0',
+                'max-h-(--available-height) w-(--available-width) gap-3 overflow-hidden p-3 pb-0',
             }
           : {
               side: 'left' as const,
