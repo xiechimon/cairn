@@ -1435,8 +1435,6 @@ export const EN: Record<string, string> = {
   '只删除这条记忆，不影响保存它的对话。':
     'Deletes only this memory, not the conversation it was saved from.',
   '没有删除成功，记忆保持原样，请重试。': 'The memory was not deleted and is unchanged. Try again.',
-  '离线中。记忆只能查看，重新连接后才能删除。':
-    'Offline. Memories are read-only until you reconnect.',
   文件名: 'File name',
   记忆内容: 'Memory content',
   '没有保存成功，原内容保持不变，请重试。':
@@ -2144,6 +2142,8 @@ export const EN: Record<string, string> = {
   设计: 'Designs',
   网页: 'Web pages',
   PPT: 'Slides',
+  数据集: 'Datasets',
+  链接: 'Links',
   下载后打开: 'Open after download',
   '含脚本，下载后打开': 'Has scripts; open after download',
   预览不运行脚本: 'Preview runs no scripts',
