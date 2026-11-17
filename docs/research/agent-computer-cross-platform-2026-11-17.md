@@ -69,6 +69,8 @@ Code areas: `apps/daemon/src/computer/host-desktop.ts`, `screen-provider.ts`, `p
 
 ## 6. Decisions for ian
 
+Decided by ian on 2026-11-17: items 1, 2, 4 and 5 as recommended, and item 3 as macOS 26+ with Apple Containerization. He wants to try a Debian desktop before implementation starts.
+
 1. **Direction:** the Mac's agent computer is a local Linux VM shipped by the Mac app (not your own Mac screen, not a cloud sandbox). Recommended: yes.
 2. **Guest distro:** Debian stable instead of Arch. Recommended: Debian (Arch has no official arm64, and its ARM repos failed to install on this Mac today).
 3. **macOS floor:** macOS 26+ with Apple Containerization, or macOS 13+ with vfkit. Recommended: 26+, one path, Apple-maintained.
