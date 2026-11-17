@@ -424,7 +424,7 @@
   --tint-quiet: #dad9d5;
   --tint-quiet-soft: var(--secondary);
   --tint-quiet-ink: var(--text-secondary);
-  --task-chip-fill: var(--popover);
+  --task-chip-fill: color-mix(in srgb, var(--popover) 45%, transparent);
   --task-chip-quiet-ink: var(--tint-quiet-ink);
   --tint-fail: #f5ddd6;
   --tint-fail-soft: #f9e8e3;

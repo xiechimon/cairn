@@ -99,7 +99,7 @@ const TONE_CLASS: Record<StatusTone, { ink: string; tile: string; chip: string }
   wait: {
     ink: 'text-(--task-wait-ink)',
     tile: 'bg-(--task-wait-tint)',
-    chip: 'text-(--chat-link)',
+    chip: 'text-foreground',
   },
   quiet: {
     ink: 'text-tint-quiet-ink',
@@ -146,9 +146,9 @@ export function TodoStatus({ phase }: { phase: Phase }) {
         role="img"
         aria-label={t(PHASE_UI[phase].chip)}
         data-glyph="eye"
-        className="grid size-4 flex-none place-items-center rounded-full bg-(--task-wait-tint) text-(--task-wait-ink)"
+        className="grid size-3 flex-none place-items-center text-(--task-wait-ink)"
       >
-        <Eye width={11} height={11} />
+        <Eye width={12} height={12} />
       </span>
     );
   return (
