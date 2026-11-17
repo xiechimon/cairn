@@ -15,6 +15,7 @@ import {
   CollapsibleTrigger,
 } from '../components/ui/collapsible.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
+import { Marker, MarkerContent, MarkerIcon } from '../components/ui/marker.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -617,28 +618,31 @@ function FailRow({
           className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
           data-testid="agent-text"
         >
-          <p className={`${PARA} chat-para--fail flex items-start gap-1.5 text-(--fail-fg)`}>
-            <CircleAlert aria-hidden="true" className="mt-0.75 size-4 flex-none" />
-            {title}
-          </p>
-          {item.body !== '' && (
-            <p className={`${PARA} ${PARA_GAP} text-foreground`}>{t(item.body)}</p>
-          )}
-          {item.title !== '' && (
-            <p
-              className={`${PARA} mt-1 flex flex-wrap items-center gap-x-3 text-meta text-(--text-tertiary)`}
-            >
-              {facts !== '' && <span>{facts}</span>}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="-ml-2 h-6 px-2 text-meta font-normal text-foreground pointer-coarse:h-11"
-                onClick={() => setRawOpen(true)}
-              >
-                {t('查看原始错误')}
-              </Button>
-            </p>
-          )}
+          <Marker
+            role="alert"
+            className="items-start gap-2 text-ui leading-5.5 text-(--foreground)"
+          >
+            <MarkerIcon className="flex h-lh items-center text-(--fail-fg)">
+              <CircleAlert />
+            </MarkerIcon>
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <MarkerContent className="chat-para--fail text-(--fail-fg)">{title}</MarkerContent>
+              {item.body !== '' && <span className="text-foreground">{t(item.body)}</span>}
+              {item.title !== '' && (
+                <span className="flex flex-wrap items-center gap-x-3 text-meta text-content-secondary">
+                  {facts !== '' && <span>{facts}</span>}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-0 text-meta font-normal text-content-secondary pointer-coarse:h-11"
+                    onClick={() => setRawOpen(true)}
+                  >
+                    {t('查看原始错误')}
+                  </Button>
+                </span>
+              )}
+            </span>
+          </Marker>
         </span>
         <RowTools placement="right" copy={copy} />
       </div>
