@@ -396,6 +396,10 @@ export function computerMachineName(scopeKey: string): string {
   return `cairn-orb-computer-${createHash('sha256').update(scopeKey).digest('hex').slice(0, 40)}`;
 }
 
+export function computerVmName(scopeKey: string): string {
+  return `cairn-computer-${createHash('sha256').update(scopeKey).digest('hex').slice(0, 24)}`;
+}
+
 export function computerDeadlineMs(tool: ComputerTool, params: Record<string, unknown>): number {
   if (SHELL_TOOLS.has(tool)) {
     const asked = params.timeoutMs;
