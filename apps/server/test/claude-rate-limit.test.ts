@@ -4,7 +4,12 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import { machine as machineTable, routingRule, step as stepTable } from '../src/db/schema.js';
+import {
+  claudeSubscription as claudeSubscriptionTable,
+  machine as machineTable,
+  routingRule,
+  step as stepTable,
+} from '../src/db/schema.js';
 import {
   bootServer,
   insertClaudeSubscription,
@@ -592,6 +597,168 @@ describe('claude rate limit (#1852)', () => {
     expect(done.status).toBe(200);
     expect(stepOfBuild(s, piBuild).status).toBe('stopped');
     expect(stepOfBuild(s, claudeBuild).status).toBe('waiting_quota');
+    s.dispose();
+  });
+});
+
+describe('subscription quota attribution', () => {
+  function quotaWindows(s: ReturnType<typeof bootServer>, subscriptionId: string) {
+    return s.db
+      .select()
+      .from(claudeSubscriptionTable)
+      .where(eq(claudeSubscriptionTable.id, subscriptionId))
+      .get()?.quotaWindows;
+  }
+
+  function seedStep(
+    s: ReturnType<typeof bootServer>,
+    row: {
+      id: string;
+      machineId: string | null;
+      subscriptionId: string | null;
+      status?: 'pending' | 'claimed' | 'done' | 'failed' | 'stopped';
+    },
+  ) {
+    s.db
+      .insert(stepTable)
+      .values({
+        id: row.id,
+        buildId: `b-${row.id}`,
+        kind: 'build',
+        status: row.status ?? 'claimed',
+        machineId: row.machineId,
+        claudeSubscriptionId: row.subscriptionId,
+        claimedAt: 10,
+        createdAt: 1,
+      })
+      .run();
+  }
+
+  test('a report for a claimed bound step writes the subscription quota windows beside the machine windows', async () => {
+    const s = bootServer({ claimHoldMs: 50 });
+    const subscriptionId = insertClaudeSubscription(s);
+    const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
+    useSessionRoute(s, machine.machineId, 'claude-code');
+    const buildId = await startBuild(s);
+    const claimed = await claim(s, machine.token);
+    expect(claimed?.step.buildId).toBe(buildId);
+    expect(stepOfBuild(s, buildId).claudeSubscriptionId).toBe(subscriptionId);
+    const resetsAt = Date.now() + HOUR;
+    const res = await report(s, machine.token, machine.machineId, {
+      stepId: claimed!.step.id,
+      status: 'rejected',
+      rateLimitType: 'five_hour',
+      utilization: 1,
+      resetsAt,
+    });
+    expect(res.status).toBe(200);
+    expect(quotaWindows(s, subscriptionId)).toEqual([
+      expect.objectContaining({
+        subscription: 'five_hour',
+        status: 'rejected',
+        utilization: 1,
+        resetsAt,
+      }),
+    ]);
+    expect(
+      s.db.select().from(machineTable).where(eq(machineTable.id, machine.machineId)).get()
+        ?.claudeRateLimits,
+    ).toEqual([
+      expect.objectContaining({
+        subscription: 'five_hour',
+        status: 'rejected',
+        utilization: 1,
+        resetsAt,
+      }),
+    ]);
+    s.dispose();
+  });
+
+  test.each([
+    ['no stepId', undefined],
+    ['an unknown step', 'missing-step'],
+    ['an unbound step', 'unbound-step'],
+    ['a step another machine claimed', 'foreign-step'],
+    ['a requeued step', 'requeued-step'],
+  ])('a report citing %s writes machine windows only', async (_name, stepId) => {
+    const s = bootServer({ claimHoldMs: 50 });
+    const subscriptionId = insertClaudeSubscription(s);
+    const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
+    seedStep(s, { id: 'unbound-step', machineId: machine.machineId, subscriptionId: null });
+    seedStep(s, {
+      id: 'foreign-step',
+      machineId: 'another-machine',
+      subscriptionId,
+    });
+    seedStep(s, { id: 'requeued-step', machineId: null, subscriptionId, status: 'pending' });
+    const res = await report(s, machine.token, machine.machineId, {
+      ...(stepId !== undefined ? { stepId } : {}),
+      status: 'rejected',
+      rateLimitType: 'five_hour',
+      utilization: 1,
+      resetsAt: Date.now() + HOUR,
+    });
+    expect(res.status).toBe(200);
+    expect(quotaWindows(s, subscriptionId) ?? null).toBeNull();
+    expect(
+      s.db.select().from(machineTable).where(eq(machineTable.id, machine.machineId)).get()
+        ?.claudeRateLimits,
+    ).toHaveLength(1);
+    s.dispose();
+  });
+
+  test('a report arriving after the step finished still attributes by the stored row', async () => {
+    const s = bootServer({ claimHoldMs: 50 });
+    const subscriptionId = insertClaudeSubscription(s);
+    const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
+    seedStep(s, {
+      id: 'finished-step',
+      machineId: machine.machineId,
+      subscriptionId,
+      status: 'done',
+    });
+    const res = await report(s, machine.token, machine.machineId, {
+      stepId: 'finished-step',
+      status: 'allowed_warning',
+      rateLimitType: 'seven_day',
+      utilization: 0.7,
+      resetsAt: Date.now() + 7 * 24 * HOUR,
+    });
+    expect(res.status).toBe(200);
+    expect(quotaWindows(s, subscriptionId)).toEqual([
+      expect.objectContaining({
+        subscription: 'seven_day',
+        status: 'allowed_warning',
+        utilization: 0.7,
+      }),
+    ]);
+    s.dispose();
+  });
+
+  test('a second report replaces the same subscription window', async () => {
+    const s = bootServer({ claimHoldMs: 50 });
+    const subscriptionId = insertClaudeSubscription(s);
+    const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
+    seedStep(s, {
+      id: 'bound-2',
+      machineId: machine.machineId,
+      subscriptionId,
+    });
+    await report(s, machine.token, machine.machineId, {
+      stepId: 'bound-2',
+      status: 'rejected',
+      rateLimitType: 'five_hour',
+      resetsAt: Date.now() + HOUR,
+    });
+    await report(s, machine.token, machine.machineId, {
+      stepId: 'bound-2',
+      status: 'allowed',
+      rateLimitType: 'five_hour',
+      utilization: 0.1,
+    });
+    expect(quotaWindows(s, subscriptionId)).toEqual([
+      expect.objectContaining({ subscription: 'five_hour', status: 'allowed', utilization: 0.1 }),
+    ]);
     s.dispose();
   });
 });

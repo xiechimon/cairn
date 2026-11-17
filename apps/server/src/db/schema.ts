@@ -1482,6 +1482,7 @@ export const claudeSubscription = sqliteTable(
     tokenCipher: text('tokenCipher').notNull(),
     expiresAt: epochMs('expiresAt'),
     enabledAt: epochMs('enabledAt'),
+    quotaWindows: json<ClaudeRateLimitWindow[] | null>('quotaWindows'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [

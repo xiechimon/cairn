@@ -397,3 +397,52 @@ test('expired enabled subscription does not verify and no run reaches it', async
   expect(enabled.status).toBe(409);
   expect(await enabled.json()).toMatchObject({ code: 'expired' });
 });
+
+describe('the devin subscription list wire carries usage stats', () => {
+  test('lastUsedAt and stepsLast24h come from bound steps, and no quota fields are sent', async () => {
+    const s = bootServer();
+    const path = `/api/teams/${s.team.id}/devin-subscriptions`;
+    const created = await req(s.app, 'POST', path, { label: 'Devin', token: TOKEN });
+    const { id } = (await created.json()) as { id: string };
+    const now = Date.now();
+    s.db
+      .insert(stepTable)
+      .values([
+        {
+          id: 'd-old',
+          buildId: 'b1',
+          kind: 'build',
+          status: 'done',
+          claimedAt: now - 30 * 3_600_000,
+          createdAt: 1,
+          devinSubscriptionId: id,
+        },
+        {
+          id: 'd-recent',
+          buildId: 'b2',
+          kind: 'build',
+          status: 'claimed',
+          claimedAt: now - 60_000,
+          createdAt: 2,
+          devinSubscriptionId: id,
+        },
+        {
+          id: 'd-queued',
+          buildId: 'b3',
+          kind: 'build',
+          status: 'pending',
+          createdAt: 3,
+          devinSubscriptionId: id,
+        },
+      ])
+      .run();
+    const rows = (await (await req(s.app, 'GET', path)).json()) as Record<string, unknown>[];
+    const row = rows.find((entry) => entry.id === id)!;
+    expect(row.lastUsedAt).toBe(now - 60_000);
+    expect(row.stepsLast24h).toBe(1);
+    expect(row.windows).toBeUndefined();
+    expect(row.state).toBeUndefined();
+    expect(row.cooldownUntil).toBeUndefined();
+    s.dispose();
+  });
+});

@@ -11,7 +11,15 @@ import {
   claudeRateProbeAt,
 } from '@cairn/shared';
 import { and, eq, or } from 'drizzle-orm';
-import { build, chiefThread, machine, type QuotaWaitRow, step, todo } from '../db/schema.js';
+import {
+  build,
+  chiefThread,
+  claudeSubscription,
+  machine,
+  type QuotaWaitRow,
+  step,
+  todo,
+} from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { holdBlockedBuild } from './blockers.js';
 import { accountHeld } from './claude-account-hold.js';
@@ -228,13 +236,47 @@ export function recordClaudeRateLimit(
   machineRow: { id: string; teamId: string; claudeRateLimits: ClaudeRateLimitWindow[] | null },
   body: ClaudeRateLimitReport,
 ): void {
-  const windows = applyClaudeRateLimit(machineRow.claudeRateLimits ?? [], body, nowMs());
+  const now = nowMs();
+  const windows = applyClaudeRateLimit(machineRow.claudeRateLimits ?? [], body, now);
   deps.db
     .update(machine)
     .set({ claudeRateLimits: windows })
     .where(eq(machine.id, machineRow.id))
     .run();
+  attributeQuotaWindows(deps, machineRow, body, now);
   refreshClaudeRateParks(deps, machineRow.teamId);
+}
+
+function attributeQuotaWindows(
+  deps: MachineDeps,
+  machineRow: { id: string; teamId: string },
+  body: ClaudeRateLimitReport,
+  now: number,
+): void {
+  if (body.stepId === undefined) return;
+  const stepRow = deps.db
+    .select({ machineId: step.machineId, claudeSubscriptionId: step.claudeSubscriptionId })
+    .from(step)
+    .where(eq(step.id, body.stepId))
+    .get();
+  if (stepRow?.machineId !== machineRow.id || stepRow.claudeSubscriptionId === null) return;
+  const subscriptionId = stepRow.claudeSubscriptionId;
+  const current = deps.db
+    .select({ quotaWindows: claudeSubscription.quotaWindows })
+    .from(claudeSubscription)
+    .where(
+      and(
+        eq(claudeSubscription.id, subscriptionId),
+        eq(claudeSubscription.teamId, machineRow.teamId),
+      ),
+    )
+    .get();
+  if (current === undefined) return;
+  deps.db
+    .update(claudeSubscription)
+    .set({ quotaWindows: applyClaudeRateLimit(current.quotaWindows ?? [], body, now) })
+    .where(eq(claudeSubscription.id, subscriptionId))
+    .run();
 }
 
 function handBackClaimed(deps: MachineDeps, stepId: string): boolean {

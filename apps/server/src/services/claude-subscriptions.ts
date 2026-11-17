@@ -1,15 +1,18 @@
 import type {
+  ClaudeRateLimitWindow,
   ClaudeSubscription,
   ClaudeSubscriptionVerifyResult,
   CreateClaudeSubscription,
   SecretBox,
 } from '@cairn/shared';
+import { claudeRateBlock } from '@cairn/shared';
 import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, claudeSubscription, machine, step, todo } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { verifyClaudeSubscription } from './claude-subscription-verification.js';
+import { subscriptionUsageStats } from './subscription-usage.js';
 
 export type AccountStepsPage = {
   steps: {
@@ -220,14 +223,59 @@ export function listSubscriptionSteps(
   };
 }
 
-export function listClaudeSubscriptions(deps: Deps, teamId: string): ClaudeSubscription[] {
-  return deps.db
+export interface ClaudeSubscriptionQuotaWindow {
+  name: string;
+  utilization: number;
+  resetsAt: number | null;
+  observedAt: number;
+}
+
+export interface ClaudeSubscriptionListEntry extends ClaudeSubscription {
+  state?: 'exhausted';
+  cooldownUntil?: number | null;
+  windows?: ClaudeSubscriptionQuotaWindow[];
+  lastUsedAt?: number | null;
+  stepsLast24h?: number | null;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function quotaWindowWire(window: ClaudeRateLimitWindow): ClaudeSubscriptionQuotaWindow | null {
+  if (window.utilization === null) return null;
+  return {
+    name: window.subscription,
+    utilization: window.utilization,
+    resetsAt: window.resetsAt,
+    observedAt: window.reportedAt,
+  };
+}
+
+export function listClaudeSubscriptions(deps: Deps, teamId: string): ClaudeSubscriptionListEntry[] {
+  const rows = deps.db
     .select()
     .from(claudeSubscription)
     .where(eq(claudeSubscription.teamId, teamId))
     .orderBy(desc(claudeSubscription.createdAt), desc(claudeSubscription.id))
-    .all()
-    .map(toRecord);
+    .all();
+  const now = nowMs();
+  const usage = subscriptionUsageStats(
+    deps.db,
+    step.claudeSubscriptionId,
+    rows.map((row) => row.id),
+    now - DAY_MS,
+  );
+  return rows.map((row) => {
+    const stored = row.quotaWindows ?? [];
+    const block = claudeRateBlock(stored, now);
+    const stats = usage.get(row.id);
+    return {
+      ...toRecord(row),
+      windows: stored.map(quotaWindowWire).filter((window) => window !== null),
+      ...(block !== null ? { state: 'exhausted' as const, cooldownUntil: block.until } : {}),
+      lastUsedAt: stats?.lastUsedAt ?? null,
+      stepsLast24h: stats?.stepsLast24h ?? null,
+    };
+  });
 }
 
 export function createClaudeSubscription(
@@ -245,6 +293,7 @@ export function createClaudeSubscription(
     tokenCipher: deps.box.seal(body.token),
     expiresAt: body.expiresAt ?? null,
     enabledAt: null as number | null,
+    quotaWindows: null,
     createdAt: now,
   };
   deps.db.transaction((tx) => {

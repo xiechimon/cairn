@@ -1,0 +1,1 @@
+ALTER TABLE `claude_subscription` ADD `quotaWindows` text;

@@ -9,7 +9,13 @@ import {
   machine as machineTable,
   step as stepTable,
 } from '../src/db/schema.js';
-import { bootServer, insertMachine, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertClaudeSubscription,
+  insertMachine,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 const TOKEN =
   'sk-ant-oat01-subscription-test-private-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
@@ -547,5 +553,159 @@ describe('switching the enabled Claude subscription', () => {
       });
       expect([401, 403]).toContain(response.status);
     }
+  });
+});
+
+describe('the subscription list wire carries quota windows and usage stats', () => {
+  const list = async (s: TestServer) =>
+    (await (
+      await req(s.app, 'GET', `/api/teams/${s.team.id}/claude-subscriptions`)
+    ).json()) as Record<string, unknown>[];
+
+  test('windows, exhausted state, cooldown and usage stats ride the list response', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    const now = Date.now();
+    const observed = now - 60_000;
+    const resetsAt = now + 3_600_000;
+    s.db
+      .update(claudeSubscription)
+      .set({
+        quotaWindows: [
+          {
+            subscription: 'five_hour',
+            status: 'rejected',
+            utilization: 1,
+            resetsAt,
+            reportedAt: observed,
+          },
+          {
+            subscription: 'seven_day',
+            status: 'allowed_warning',
+            utilization: 0.4,
+            resetsAt: resetsAt + 86_400_000,
+            reportedAt: observed,
+          },
+          {
+            subscription: 'overage',
+            status: 'allowed',
+            utilization: null,
+            resetsAt: null,
+            reportedAt: observed,
+          },
+        ],
+      })
+      .where(eq(claudeSubscription.id, id))
+      .run();
+    s.db
+      .insert(stepTable)
+      .values([
+        {
+          id: 's-old',
+          buildId: 'b1',
+          kind: 'build',
+          status: 'done',
+          claimedAt: now - 30 * 3_600_000,
+          createdAt: 1,
+          claudeSubscriptionId: id,
+        },
+        {
+          id: 's-done',
+          buildId: 'b2',
+          kind: 'build',
+          status: 'done',
+          claimedAt: now - 2 * 3_600_000,
+          createdAt: 2,
+          claudeSubscriptionId: id,
+        },
+        {
+          id: 's-run',
+          buildId: 'b3',
+          kind: 'build',
+          status: 'claimed',
+          claimedAt: now - 60_000,
+          createdAt: 3,
+          claudeSubscriptionId: id,
+        },
+        {
+          id: 's-queued',
+          buildId: 'b4',
+          kind: 'build',
+          status: 'pending',
+          createdAt: 4,
+          claudeSubscriptionId: id,
+        },
+        {
+          id: 's-elsewhere',
+          buildId: 'b5',
+          kind: 'build',
+          status: 'done',
+          claimedAt: now - 1_000,
+          createdAt: 5,
+          claudeSubscriptionId: 'other-subscription',
+        },
+      ])
+      .run();
+    const [row] = await list(s);
+    expect(row).toMatchObject({
+      id,
+      state: 'exhausted',
+      cooldownUntil: resetsAt,
+      lastUsedAt: now - 60_000,
+      stepsLast24h: 2,
+      windows: [
+        { name: 'five_hour', utilization: 1, resetsAt, observedAt: observed },
+        {
+          name: 'seven_day',
+          utilization: 0.4,
+          resetsAt: resetsAt + 86_400_000,
+          observedAt: observed,
+        },
+      ],
+    });
+    s.dispose();
+  });
+
+  test('a rejection past its reset reads ok again and a fresh account sends null usage stats', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    const fresh = insertClaudeSubscription(s, { label: 'Fresh' });
+    const observed = Date.now() - 3_600_000;
+    s.db
+      .update(claudeSubscription)
+      .set({
+        quotaWindows: [
+          {
+            subscription: 'five_hour',
+            status: 'rejected',
+            utilization: 1,
+            resetsAt: observed + 1_000,
+            reportedAt: observed,
+          },
+        ],
+      })
+      .where(eq(claudeSubscription.id, id))
+      .run();
+    const rows = await list(s);
+    const byId = new Map(rows.map((row) => [row.id as string, row]));
+    const used = byId.get(id)!;
+    expect(used.state).toBeUndefined();
+    expect(used.cooldownUntil).toBeUndefined();
+    expect(used.windows).toEqual([
+      {
+        name: 'five_hour',
+        utilization: 1,
+        resetsAt: observed + 1_000,
+        observedAt: observed,
+      },
+    ]);
+    expect(used.lastUsedAt).toBeNull();
+    expect(used.stepsLast24h).toBeNull();
+    const freshRow = byId.get(fresh)!;
+    expect(freshRow.state).toBeUndefined();
+    expect(freshRow.windows).toEqual([]);
+    expect(freshRow.lastUsedAt).toBeNull();
+    expect(freshRow.stepsLast24h).toBeNull();
+    s.dispose();
   });
 });

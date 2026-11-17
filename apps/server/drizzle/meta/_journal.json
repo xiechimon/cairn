@@ -1296,6 +1296,13 @@
       "when": 1794924877027,
       "tag": "0189_glorious_mariko_yashida",
       "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "6",
+      "when": 1794932015774,
+      "tag": "0190_robust_strong_guy",
+      "breakpoints": true
     }
   ]
 }

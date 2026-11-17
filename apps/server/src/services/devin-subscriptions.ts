@@ -10,6 +10,7 @@ import { build, chiefThread, devinSubscription, step, todo } from '../db/schema.
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { verifyDevinSubscription } from './devin-subscription-verification.js';
+import { subscriptionUsageStats } from './subscription-usage.js';
 
 export type DevinAccountStepsPage = {
   steps: {
@@ -216,14 +217,34 @@ export function listDevinSubscriptionSteps(
   };
 }
 
-export function listDevinSubscriptions(deps: Deps, teamId: string): DevinSubscription[] {
-  return deps.db
+export interface DevinSubscriptionListEntry extends DevinSubscription {
+  lastUsedAt?: number | null;
+  stepsLast24h?: number | null;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function listDevinSubscriptions(deps: Deps, teamId: string): DevinSubscriptionListEntry[] {
+  const rows = deps.db
     .select()
     .from(devinSubscription)
     .where(eq(devinSubscription.teamId, teamId))
     .orderBy(desc(devinSubscription.createdAt), desc(devinSubscription.id))
-    .all()
-    .map(toRecord);
+    .all();
+  const usage = subscriptionUsageStats(
+    deps.db,
+    step.devinSubscriptionId,
+    rows.map((row) => row.id),
+    nowMs() - DAY_MS,
+  );
+  return rows.map((row) => {
+    const stats = usage.get(row.id);
+    return {
+      ...toRecord(row),
+      lastUsedAt: stats?.lastUsedAt ?? null,
+      stepsLast24h: stats?.stepsLast24h ?? null,
+    };
+  });
 }
 
 export function createDevinSubscription(
