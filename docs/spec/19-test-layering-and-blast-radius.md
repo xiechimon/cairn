@@ -23,11 +23,11 @@ CI side (step breakdown of the green run 37098721348): check job 7.4min, among w
 
 ## Layering Responsibility Table
 
-`pnpm prepush` runs fast checks only, including script self-tests and workflow test steps. Vitest, the full `@cairn/web` unit suite and e2e run in CI as required checks. A push is unverified until CI reports on that head. During development, run related unit tests by hand with `pnpm exec vitest run --changed`; web e2e runs in CI, and locally only the one spec being written or fixed (ian, 2026-11-16).
+`pnpm prepush` runs fast checks only, including script self-tests and workflow test steps. Vitest, the full `@cairn/web` unit suite and e2e run in CI as required checks. A push is unverified until CI reports on that head. During development, run related unit tests with `pnpm test:changed`; web e2e runs in CI, and locally only the one spec being written or fixed (ian, 2026-11-16).
 
 | Layer | Shape | When to run (responsibility) | Entry |
 |---|---|---|---|
-| **unit** | vitest projects, each package colocated `test/`, pure functions / schema / mapper | **CI required check**; run related tests by hand during development | `pnpm test`; affected surface `pnpm exec vitest run --changed` |
+| **unit** | vitest projects, each package colocated `test/`, pure functions / schema / mapper | **CI required check**; run related tests during development | `pnpm test`; related tests `pnpm test:changed` |
 | **stack integration** | vitest `integration` project: in-process real server + daemon + Chromium walking the full chain | **CI required check**; run related tests by hand when changing the server / daemon / shared contract surface | `VITEST_PROJECT_SET=integration pnpm test` |
 | **web e2e** | playwright fixture surface: 83 specs / 617 cases, UI behavior and geometry | **CI runs it after the push**; locally only the one spec being written or fixed | one spec `pnpm exec playwright test <spec>`; CI selection `pnpm --filter @cairn/web e2e:affected` |
 | **verify-cairn** | isolated live stack (8791/5273 + independent CAIRN_HOME) walking real user paths | **ticket-level acceptance** (proof before delivery that "it really runs", not daily regression) | `.claude/skills/verify-cairn/SKILL.md` |

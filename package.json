@@ -27,6 +27,7 @@
     "rel:report": "pnpm --filter @xiechimon/cairn exec node --import tsx src/reliability-report-cli.ts",
     "lint": "biome ci .",
     "prepush": "node scripts/prepush.mjs",
+    "test:changed": "node scripts/test-changed.mjs",
     "spec:parse": "node scripts/spec-parse-gate.mjs",
     "format": "biome format --write .",
     "migration-oracle:full": "node scripts/migration-oracle-full.mjs"

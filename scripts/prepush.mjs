@@ -42,6 +42,7 @@ export const selfTests = [
   'scripts/doc-reader-tests.test.mjs',
   'scripts/epic-done.test.mjs',
   'scripts/agent-rules.test.mjs',
+  'scripts/test-changed.test.mjs',
 ];
 
 const selfTest = ['node', '--test', ...selfTests];
