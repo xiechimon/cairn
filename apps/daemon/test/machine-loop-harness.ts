@@ -321,7 +321,7 @@ export async function boot(opts: {
       client: api,
       confinementPlatform: opts.confinementPlatform ?? 'darwin',
       confinementPreflight: opts.confinementPreflight,
-      seatbeltProbe: opts.seatbeltProbe,
+      seatbeltProbe: opts.seatbeltProbe ?? (async () => {}),
       ...(opts.confinementRecheckMs !== undefined
         ? { confinementRecheckMs: opts.confinementRecheckMs }
         : {}),
