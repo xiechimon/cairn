@@ -1,6 +1,6 @@
 import { userInfo } from 'node:os';
 import type { AutonomyPauseEntry, TeamRecord, UserRecord } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { Db } from './client.js';
 import { team, user } from './schema.js';
@@ -10,7 +10,7 @@ export interface SeedResult {
   team: TeamRecord;
 }
 
-function defaultOwnerName(): string {
+export function defaultOwnerName(): string {
   try {
     return userInfo().username.trim() || 'Owner';
   } catch {
@@ -20,7 +20,7 @@ function defaultOwnerName(): string {
 
 export function seed(db: Db): SeedResult {
   const existingTeam = db.select().from(team).all()[0];
-  const existingUser = db.select().from(user).all()[0];
+  const existingUser = db.select(userRecordColumns).from(user).all()[0];
   if (existingTeam && existingUser) {
     if (existingUser.displayName === 'Owner') {
       existingUser.displayName = defaultOwnerName();
@@ -36,7 +36,9 @@ export function seed(db: Db): SeedResult {
   const teamId = newRecordId();
   const createdAt = nowMs();
   const displayName = defaultOwnerName();
-  db.insert(user).values({ id: userId, displayName, avatarUrl: null }).run();
+  db.run(
+    sql`insert into ${user} (${sql.identifier(user.id.name)}, ${sql.identifier(user.displayName.name)}) values (${userId}, ${displayName})`,
+  );
   db.insert(team)
     .values({
       id: teamId,
@@ -47,13 +49,23 @@ export function seed(db: Db): SeedResult {
     })
     .run();
 
-  const userRow = db.select().from(user).where(eq(user.id, userId)).get();
+  const userRow = db.select(userRecordColumns).from(user).where(eq(user.id, userId)).get();
   const teamRow = db.select().from(team).where(eq(team.id, teamId)).get();
   if (!userRow || !teamRow) throw new Error('seed failed: rows missing after insert');
   return { user: toUserRecord(userRow), team: toTeamRecord(teamRow) };
 }
 
-export function toUserRecord(row: typeof user.$inferSelect): UserRecord {
+const userRecordColumns = {
+  id: user.id,
+  displayName: user.displayName,
+  avatarUrl: user.avatarUrl,
+};
+
+export function toUserRecord(row: {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+}): UserRecord {
   return { type: 'user', id: row.id, displayName: row.displayName, avatarUrl: row.avatarUrl };
 }
 

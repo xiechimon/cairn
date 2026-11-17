@@ -161,6 +161,10 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
       expect(status.login).toBe('octocat');
       expect(status.scope).toBe('read:user,repo');
       expect(s.db.select().from(githubConnection).get()?.githubUserId).toBe(1);
+      expect(await (await req(s.app, 'GET', '/api/user/me')).json()).toMatchObject({
+        displayName: 'octocat',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/1?v=4',
+      });
     } finally {
       s.dispose();
     }

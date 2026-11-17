@@ -29,6 +29,10 @@ Start without registration: 400, and the web never offers the button because `/a
 
 Server: start without registration, start and poll pending within the interval, slow_down, denied, expired, complete writes a device row and the legacy upsert clears it, cross-team or cross-user poll is 404, cancel, refresh with the stored client id and no secret, refresh losing to a newer generation, refresh 401 disconnects, refresh 502 keeps the row. Web: the auth button opens the code dialog when the capability is present and the picker opens after completion.
 
+## Profile adoption
+
+`user.displayNameEdited` records whether the owner chose the display name. States: null (never classified, including rows from before this column), false (the name came from the account default or GitHub, written by the profile adoption) and true (set through `PATCH /api/user/me`). The seed never reads or writes the column, so it boots on a database migrated to any earlier point. A null row counts as renamed when its name differs from the OS account default, which covers owners who renamed before the column existed. After a GitHub connection completes, by device flow or the legacy OAuth callback, the server sets `avatarUrl` to `https://avatars.githubusercontent.com/u/<githubUserId>?v=4`, and sets `displayName` to the GitHub name, else the login, only while `displayNameEdited` is not true. A connection without a GitHub user id leaves the avatar alone. Token refreshes do not touch the profile. Tests: an untouched name follows each new connection, an owner-set name survives a reconnect while the avatar updates, an owner from before the column with a non-default name keeps it, and the OAuth callback adopts the profile.
+
 ## Release boundary
 
 The registration names the public `cairnwright` App. Live checks on 2026-11-17 against it: A3, a device-issued token refreshed with no client secret, the new token read `/user` and the old one returned 401; A4, a second device authorization for the same user left the first grant valid and still refreshable.

@@ -1,7 +1,7 @@
 import { capabilitiesResponseSchema, githubConnectionDevicePollSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { githubConnection } from '../src/db/schema.js';
+import { githubConnection, user } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { githubTokenOrNull, upsertGithubConnection } from '../src/services/github-connection.js';
 import {
@@ -234,6 +234,59 @@ describe('team GitHub connection through device flow', () => {
     const { attemptId } = await startAttempt(server, gh);
     expect((await req(server.app, 'DELETE', `${base(server)}/${attemptId}`)).status).toBe(204);
     expect((await poll(server, attemptId)).status).toBe(404);
+  });
+});
+
+describe('GitHub profile adoption on connect', () => {
+  async function connectAs(server: TestServer, gh: ReturnType<typeof scripted>, identity: object) {
+    const { attemptId } = await startAttempt(server, gh);
+    vi.advanceTimersByTime(5_000);
+    gh.reply(GRANT);
+    gh.reply(identity);
+    expect((await poll(server, attemptId)).body).toMatchObject({ status: 'complete' });
+    return (await (await req(server.app, 'GET', '/api/user/me')).json()) as {
+      displayName: string;
+      avatarUrl: string | null;
+    };
+  }
+
+  test('an untouched name follows GitHub; a name the owner set survives while the avatar still updates', async () => {
+    const gh = scripted();
+    const server = boot(gh.fetch);
+    expect(await connectAs(server, gh, { login: 'octo', id: 42, name: ' Octo Cat ' })).toEqual(
+      expect.objectContaining({
+        displayName: 'Octo Cat',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/42?v=4',
+      }),
+    );
+    expect(await connectAs(server, gh, { login: 'hubot', id: 7, name: null })).toEqual(
+      expect.objectContaining({
+        displayName: 'hubot',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/7?v=4',
+      }),
+    );
+    await req(server.app, 'PATCH', '/api/user/me', { displayName: 'Mon' });
+    expect(await connectAs(server, gh, { login: 'octo', id: 42, name: 'Octo Cat' })).toEqual(
+      expect.objectContaining({
+        displayName: 'Mon',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/42?v=4',
+      }),
+    );
+    const restarted = bootServer({ db: server.db });
+    expect(restarted.user).toMatchObject({
+      displayName: 'Mon',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/42?v=4',
+    });
+    restarted.dispose();
+  });
+
+  test('an owner from before the rename flag keeps a non-default name', async () => {
+    const gh = scripted();
+    const server = boot(gh.fetch);
+    server.db.update(user).set({ displayName: 'Mon', displayNameEdited: null }).run();
+    expect(await connectAs(server, gh, { login: 'octo', id: 42, name: 'Octo Cat' })).toMatchObject({
+      displayName: 'Mon',
+    });
   });
 });
 

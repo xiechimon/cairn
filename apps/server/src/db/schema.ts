@@ -78,6 +78,7 @@ const json = <T>(name: string) => text(name, { mode: 'json' }).$type<T>();
 export const user = sqliteTable('user', {
   id: text('id').primaryKey(),
   displayName: text('displayName').notNull(),
+  displayNameEdited: bool('displayNameEdited'),
   avatarUrl: text('avatarUrl'),
 });
 

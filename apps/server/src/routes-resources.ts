@@ -70,6 +70,7 @@ import {
   pollGithubConnectionDevice,
   startGithubConnectionDevice,
 } from './services/github-connection-device.js';
+import { adoptGithubProfile } from './services/github-profile.js';
 import { isOwner } from './services/instance-owner.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
@@ -746,6 +747,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         iss: c.req.query('iss'),
         createdBy: ctx.user.id,
       });
+      if (outcome.kind === 'github-connection') adoptGithubProfile(ctx, ctx.team.id);
       const result =
         outcome.kind === 'provider'
           ? `oauth=connected&provider=${outcome.presetId}`
@@ -817,13 +819,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/github/connection/device/:attempt', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(
-      await pollGithubConnectionDevice(connectionDeviceDeps(), {
-        teamId,
-        userId: ctx.user.id,
-        attemptId: c.req.param('attempt'),
-      }),
-    );
+    const result = await pollGithubConnectionDevice(connectionDeviceDeps(), {
+      teamId,
+      userId: ctx.user.id,
+      attemptId: c.req.param('attempt'),
+    });
+    if (result.status === 'complete') adoptGithubProfile(ctx, teamId);
+    return c.json(result);
   });
 
   app.delete('/api/teams/:id/github/connection/device/:attempt', (c) => {

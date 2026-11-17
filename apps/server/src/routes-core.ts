@@ -120,7 +120,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (body.displayName !== undefined) {
       ctx.db
         .update(user)
-        .set({ displayName: body.displayName })
+        .set({ displayName: body.displayName, displayNameEdited: true })
         .where(eq(user.id, ctx.user.id))
         .run();
       ctx.user.displayName = body.displayName;
