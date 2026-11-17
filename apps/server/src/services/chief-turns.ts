@@ -93,8 +93,9 @@ export function chiefPendingMessages(db: Db, threadId: string): ChiefPendingMess
   );
   let parked = false;
   live.forEach((row, index) => {
-    if (row.status === 'claimed' || STEER_HOLDS.includes(row.holdReason ?? '')) return;
-    parked = parked || isParked(row, now);
+    if (row.status === 'claimed') return;
+    const steered = STEER_HOLDS.includes(row.holdReason ?? '');
+    if (!steered) parked = parked || isParked(row, now);
     for (const messageId of successors.has(row.id) ? (row.ownerMessageIds ?? []) : [row.id]) {
       const userRow = db
         .select({ id: chiefMessage.id })
@@ -108,7 +109,8 @@ export function chiefPendingMessages(db: Db, threadId: string): ChiefPendingMess
         )
         .get();
       if (userRow === undefined) continue;
-      if (parked) out.push({ messageId, state: 'held' });
+      if (steered) out.push({ messageId, state: 'queued' });
+      else if (parked) out.push({ messageId, state: 'held' });
       else if (running || index > 0) out.push({ messageId, state: 'queued' });
     }
   });
@@ -399,6 +401,7 @@ export function ackChiefSteer(
     deps.db.update(chiefMessage).set({ createdAt: now }).where(eq(chiefMessage.id, row.id)).run();
     const message = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, row.id)).get();
     if (message) deps.convHub?.publishMessage(threadId, message);
+    publishStepRow(deps, row);
   }
   const next = deps.db
     .select()

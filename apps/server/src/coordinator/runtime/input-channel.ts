@@ -41,7 +41,12 @@ export interface InputChannel {
     content: string,
     existingEntryId?: string,
   ): Promise<NativeInput>;
-  consume(requestId: string, conversationId: string, entryId: string): Promise<void>;
+  consume(
+    requestId: string,
+    conversationId: string,
+    entryId: string,
+    placedAt?: number,
+  ): Promise<void>;
   release(requestId: string, conversationId: string | null): Promise<void>;
   checkpoint(threadId: string, conversationId: string, entryId: string): Promise<void>;
 }

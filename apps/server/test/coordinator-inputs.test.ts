@@ -9,6 +9,7 @@ import {
   step,
 } from '../src/db/schema.js';
 import { sendChiefMessage } from '../src/services/chief.js';
+import { chiefPendingMessages } from '../src/services/chief-turns.js';
 import {
   consumeCoordinatorInput,
   coordinatorInputIsLive,
@@ -95,6 +96,36 @@ test('consumption atomically records the exact batch and a repeated old receipt 
   expect(() => consumeCoordinatorInput(H.s.db, first, 'conversation-1', '6')).toThrow(
     'different receipt',
   );
+});
+
+test('a steered message waits below the reply until read, then sits where the model read it', () => {
+  const sentAt = (id: string) =>
+    H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, id)).get()!.createdAt;
+  const startedAt = sentAt(parentId);
+  prepareCoordinatorInput(H.s.db, parentId, 'conversation-1', 'Start.');
+  consumeCoordinatorInput(H.s.db, parentId, 'conversation-1', '1', startedAt + 60_000);
+  expect(sentAt(parentId)).toBe(startedAt);
+  const first = queue('First.');
+  const second = queue('Second.');
+  expect(chiefPendingMessages(H.s.db, H.threadId)).toEqual([
+    { messageId: first, state: 'queued' },
+    { messageId: second, state: 'queued' },
+  ]);
+  pull();
+  const readAt = sentAt(second) + 5_000;
+  const result = consumeCoordinatorInput(H.s.db, first, 'conversation-1', '3', readAt);
+  expect(sentAt(first)).toBe(readAt);
+  expect(sentAt(second)).toBeLessThan(readAt);
+  expect(result.placed.map((message) => message.id)).toEqual([first]);
+  expect(result.retired?.id).toBe(first);
+  expect(chiefPendingMessages(H.s.db, H.threadId)).toEqual([
+    { messageId: second, state: 'queued' },
+  ]);
+  expect(consumeCoordinatorInput(H.s.db, first, 'conversation-1', '3', readAt + 1)).toEqual({
+    placed: [],
+    retired: undefined,
+  });
+  expect(sentAt(first)).toBe(readAt);
 });
 
 test('receipt write failure rolls back attribution and leaves the batch retryable', () => {

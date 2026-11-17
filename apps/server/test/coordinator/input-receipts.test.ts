@@ -55,8 +55,12 @@ test('stored placement is persisted while the native submission is still waiting
     'owner',
     w.receipts.key(String(w.root.id)),
     String(status.entry),
+    expect.any(Number),
   );
   expect((await input.status(context)).status).toBe('placed');
+  const entryId = status.entry!;
+  const placed = await w.harness.commit((tx) => tx.entry(entryId), context);
+  expect(w.channel.consume.mock.calls[0]?.[3]).toBe(placed?.model?.[0]?.timestamp);
 });
 
 test('admission alone grants nothing, and abort without placement releases the exact request', async () => {
@@ -120,6 +124,7 @@ test('recovery reads a stored placement even when the producer is retired', asyn
     'image',
     w.receipts.key(String(w.root.id)),
     String(record.entry),
+    expect.any(Number),
   );
   expect(w.channel.release).not.toHaveBeenCalled();
 });
@@ -178,6 +183,7 @@ test('a failed shutdown receipt remains recoverable by a fresh observer', async 
     'retained',
     again.key(String(w.root.id)),
     String(record.entry),
+    expect.any(Number),
   );
   await again.close();
 });

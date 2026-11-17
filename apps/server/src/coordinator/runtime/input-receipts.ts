@@ -17,7 +17,7 @@ export function createInputReceipts(
   report: (error: unknown) => void,
 ) {
   type Work =
-    | { kind: 'receipt'; record: SubmissionRecord }
+    | { kind: 'receipt'; record: SubmissionRecord; placedAt?: number }
     | {
         kind: 'run';
         conversationId: ConversationId;
@@ -71,6 +71,7 @@ export function createInputReceipts(
               record.requestId,
               key(String(record.conversationId)),
               String(record.entry),
+              work.placedAt,
             );
           else if (record.status === 'unanswered')
             await channel.release(record.requestId, key(String(record.conversationId)));
@@ -143,13 +144,25 @@ export function createInputReceipts(
           for (const change of publication.changes) {
             if (change.type === 'submission') submissions.set(change.value.id, change.value);
           }
+          const placedAt = new Map(
+            publication.changes.flatMap((change) =>
+              change.type === 'entry' && change.value.model?.[0]?.role === 'user'
+                ? [[change.value.id, change.value.model[0].timestamp] as const]
+                : [],
+            ),
+          );
           for (const change of publication.changes) {
             if (
               change.type === 'submission' &&
               change.value.type === 'input' &&
               change.value.status !== 'queued'
             )
-              pending.push({ kind: 'receipt', record: change.value });
+              pending.push({
+                kind: 'receipt',
+                record: change.value,
+                placedAt:
+                  change.value.entry === undefined ? undefined : placedAt.get(change.value.entry),
+              });
           }
           for (const change of publication.changes) {
             if (
@@ -228,8 +241,18 @@ export function createInputReceipts(
           );
         }
         if (record !== undefined) {
+          const entryId = record.entry;
+          const entry =
+            entryId === undefined
+              ? undefined
+              : await harness.commit((tx) => tx.entry(entryId), context);
+          const message = entry?.model?.[0];
           submissions.set(record.id, record);
-          pending.push({ kind: 'receipt', record });
+          pending.push({
+            kind: 'receipt',
+            record,
+            placedAt: message?.role === 'user' ? message.timestamp : undefined,
+          });
         } else if (!batch.live) await channel.release(batch.id, batch.conversationId);
       }
       const conversations = new Set(

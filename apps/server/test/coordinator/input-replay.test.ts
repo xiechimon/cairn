@@ -151,7 +151,9 @@ async function fixture(reversePublications = false) {
       ...prepareCoordinatorInput(H.s.db, stepId, conversationId, content, existingEntryId),
       live: true,
     }),
-    consume: async (...args) => consumeCoordinatorInput(H.s.db, ...args),
+    consume: async (...args) => {
+      consumeCoordinatorInput(H.s.db, ...args);
+    },
     release: async (...args) => releaseCoordinatorInput(H.s.db, ...args),
     runs: async () => coordinatorRuns(H.s.db, H.threadId),
     bindRun: async (...args) => bindCoordinatorRun(H.s.db, ...args),

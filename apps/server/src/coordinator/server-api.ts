@@ -33,6 +33,7 @@ import {
   reportTranscriptDelta,
   reportTranscriptRow,
 } from '../services/machines.js';
+import { publishStepRow } from '../services/quota-wait.js';
 import { InputAuthorityError } from './runtime/input-channel.js';
 import type { MachineApi } from './runtime/machine-api.js';
 import { parseWatermark } from './watermark.js';
@@ -162,8 +163,13 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         );
         return { ...input, live: coordinatorInputIsLive(deps.db, input.id) === true };
       },
-      consume: async (requestId, conversationId, entryId) =>
-        inputTransition(() => consumeCoordinatorInput(deps.db, requestId, conversationId, entryId)),
+      consume: async (requestId, conversationId, entryId, placedAt) => {
+        const { placed, retired } = inputTransition(() =>
+          consumeCoordinatorInput(deps.db, requestId, conversationId, entryId, placedAt),
+        );
+        for (const message of placed) deps.convHub?.publishMessage(message.threadId, message);
+        if (retired !== undefined) publishStepRow(deps, retired);
+      },
       release: async (requestId, conversationId) =>
         inputTransition(() => releaseCoordinatorInput(deps.db, requestId, conversationId)),
       checkpoint: async (threadId, conversationId, entryId) => {

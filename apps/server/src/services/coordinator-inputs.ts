@@ -12,6 +12,7 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
 type StepRow = typeof step.$inferSelect;
+type ChiefMessageRow = typeof chiefMessage.$inferSelect;
 export type CoordinatorInput = typeof coordinatorInput.$inferSelect;
 
 export function coordinatorInputs(db: Db, threadId: string): CoordinatorInput[] {
@@ -208,9 +209,11 @@ export function consumeCoordinatorInput(
   requestId: string,
   conversationId: string,
   entryId: string,
-): void {
+  placedAt?: number,
+): { placed: ChiefMessageRow[]; retired: StepRow | undefined } {
+  const unchanged = { placed: [], retired: undefined };
   const batch = db.select().from(coordinatorInput).where(eq(coordinatorInput.id, requestId)).get();
-  if (batch === undefined) return;
+  if (batch === undefined) return unchanged;
   if (
     !Number.isSafeInteger(Number(entryId)) ||
     Number(entryId) < 1 ||
@@ -220,13 +223,14 @@ export function consumeCoordinatorInput(
   if (batch.state === 'consumed') {
     if (batch.entryId !== entryId)
       throw new HttpError(409, 'Coordinator input already has a different receipt');
-    return;
+    return unchanged;
   }
   if (batch.state !== 'pending') throw new HttpError(409, 'Coordinator input is already released');
   requireCoordinatorConversation(db, batch.threadId, conversationId);
-  db.transaction(() => {
+  return db.transaction(() => {
     const producer = db.select().from(step).where(eq(step.id, batch.stepId)).get();
     const owners: string[] = [];
+    const placed: ChiefMessageRow[] = [];
     for (const id of batch.ownerMessageIds) {
       const source = db
         .select()
@@ -234,6 +238,10 @@ export function consumeCoordinatorInput(
         .where(and(eq(chiefMessage.id, id), eq(chiefMessage.threadId, batch.threadId)))
         .get();
       if (source === undefined) continue;
+      if (batch.kind === 'steer' && placedAt !== undefined && placedAt > source.createdAt) {
+        db.update(chiefMessage).set({ createdAt: placedAt }).where(eq(chiefMessage.id, id)).run();
+        placed.push({ ...source, createdAt: placedAt });
+      }
       db.insert(coordinatorEntry)
         .values({ chiefMessageId: id, threadId: batch.threadId, conversationId, entryId })
         .onConflictDoUpdate({
@@ -252,10 +260,13 @@ export function consumeCoordinatorInput(
       .set({ state: 'consumed', entryId })
       .where(eq(coordinatorInput.id, batch.id))
       .run();
-    if (batch.kind === 'steer')
-      db.delete(step)
-        .where(and(eq(step.id, batch.id), inArray(step.status, ['pending', 'waiting_quota'])))
-        .run();
+    if (batch.kind !== 'steer') return { placed, retired: undefined };
+    const retired = db
+      .delete(step)
+      .where(and(eq(step.id, batch.id), inArray(step.status, ['pending', 'waiting_quota'])))
+      .returning()
+      .get();
+    return { placed, retired };
   });
 }
 
