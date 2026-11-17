@@ -2314,9 +2314,9 @@ export const EN: Record<string, string> = {
   还没有用量: 'No usage yet',
   '和 Coordinator 说第一句话后，这里会按天显示用了多少 token。':
     'After your first message to the Coordinator, this shows how many tokens each day used.',
-  '近 {n} 天': 'Last {n} days',
+  '近 {n} 天': 'Last {n#1 day|# days}',
   '自 {date}': 'Since {date}',
-  '比上一个 {n} 天 {change}': '{change} on the previous {n} days',
+  '比上一个 {n} 天 {change}': '{change} on the previous {n#1 day|# days}',
   '{n} 个任务': '{n#1 task|# tasks}',
   '按标价 {cost}': '{cost} at list price',
   缓存读取: 'Cache read',
