@@ -49,7 +49,7 @@ jobs:
           pnpm --filter @cairn/desktop stage-runner
 
       - name: Run the desktop unit tests
-        run: node --test apps/desktop/scripts/check-signature.test.mjs apps/desktop/scripts/keep-awake.test.mjs apps/desktop/scripts/otel-config.test.mjs apps/desktop/scripts/app-menu.test.mjs apps/desktop/scripts/restart-budget.test.mjs
+        run: node --test apps/desktop/scripts/check-signature.test.mjs apps/desktop/scripts/keep-awake.test.mjs apps/desktop/scripts/otel-config.test.mjs apps/desktop/scripts/app-menu.test.mjs apps/desktop/scripts/restart-budget.test.mjs apps/desktop/scripts/server-log.test.mjs
 
       - name: Import a throwaway signing certificate
         run: |

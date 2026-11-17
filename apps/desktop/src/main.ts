@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
+import { format } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
   DESKTOP_SHELL_USER_AGENT,
@@ -29,6 +30,7 @@ import { createKeepAwake } from './keep-awake.js';
 import { readLocalProviders, scanLocalProviders } from './local-providers.js';
 import { desktopOtelEnv, type OtelEnv, withOtelEnv } from './otel-config.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
+import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
 import { trayMenuTemplate } from './tray-menu.js';
 import { createUpdater, removeLeftoverUpdates } from './updater.js';
 
@@ -51,6 +53,21 @@ let tray: Tray | null = null;
 let runner: LocalRunner | null = null;
 let runnerStarting: Promise<void> | null = null;
 let quitting = false;
+const otelHeaderLogSecrets: string[] = [];
+let ownerTokenLogSecret: string | null = null;
+
+function logSecrets(): string[] {
+  if (ownerTokenLogSecret === null) {
+    try {
+      ownerTokenLogSecret = parseAccessTokenFile(
+        readFileSync(join(cairnHome(), ACCESS_TOKEN_FILE_NAME), 'utf8'),
+      );
+    } catch {}
+  }
+  return ownerTokenLogSecret === null
+    ? otelHeaderLogSecrets
+    : [...otelHeaderLogSecrets, ownerTokenLogSecret];
+}
 
 function cairnHome(): string {
   return join(app.getPath('userData'), 'home');
@@ -94,9 +111,12 @@ function startServer(port: number, otelEnv: OtelEnv): RunningServer {
   delete env[ENV_VARS.auth];
   const child = utilityProcess.fork(join(bundledRoot('server'), 'dist', 'index.mjs'), [], {
     serviceName: 'Cairn server',
-    stdio: 'inherit',
+    stdio: 'pipe',
     env,
   });
+  const log = createServerLog(serverLogPath(app.getPath('userData')), logSecrets);
+  child.stdout?.on('data', (chunk) => log.write(chunk));
+  child.stderr?.on('data', (chunk) => log.write(chunk));
   const running: RunningServer = {
     process: child,
     origin: `http://${LOOPBACK}:${port}`,
@@ -104,6 +124,7 @@ function startServer(port: number, otelEnv: OtelEnv): RunningServer {
   };
   child.on('exit', (code) => {
     running.exitCode = code;
+    log.close();
     if (quitting) return;
     dialog.showErrorBox('Cairn server stopped', `The Cairn server exited with code ${code}.`);
     app.quit();
@@ -328,9 +349,22 @@ function serveUpdates(origin: string): void {
   });
 }
 
+function captureMainConsole(): void {
+  const log = createServerLog(join(app.getPath('userData'), 'logs', 'main.log'), logSecrets);
+  for (const level of ['log', 'info', 'warn', 'error'] as const) {
+    const original = console[level].bind(console);
+    console[level] = (...args: unknown[]) => {
+      original(...args);
+      log.write(`${new Date().toISOString()} ${level} ${format(...args)}\n`);
+    };
+  }
+}
+
 async function boot(): Promise<void> {
   try {
+    captureMainConsole();
     const otelEnv = desktopOtelEnv(join(app.getPath('userData'), 'otel.env'), console.error);
+    otelHeaderLogSecrets.push(...otelHeaderSecrets(otelEnv.CAIRN_OTEL_HEADERS));
     server = startServer(await serverPort(), otelEnv);
     await waitUntilServing(server);
     const ownerToken = readOwnerToken();

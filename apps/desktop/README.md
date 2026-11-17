@@ -4,6 +4,8 @@ An Electron shell for macOS. The main process starts the bundled Cairn server on
 
 ## Telemetry
 
+The server's stdout and stderr (the main process pipes them instead of inheriting them, since a Finder launch has no terminal) are written to `~/Library/Application Support/@cairn/desktop/logs/server.log`, and the main process's own `console` output to `logs/main.log`. Each file is mode `0600`, capped at 5 MB, and keeps one backup (`server.log.1`, `main.log.1`); the Runner keeps writing `runner/daemon.log` itself. Complete lines pass through a redactor that replaces the owner token and the `CAIRN_OTEL_HEADERS` values with `[redacted]` before they reach disk.
+
 Export to an OTLP collector such as Langfuse is off unless `~/Library/Application Support/@cairn/desktop/otel.env` exists. It is dotenv text with `CAIRN_OTEL_ENDPOINT`, optional `CAIRN_OTEL_HEADERS` and optional `CAIRN_OTEL_ENVIRONMENT` (default `mac`), and must be mode `0600`; a file readable by others is ignored. The main process reads it once at launch and passes those three variables to the server and the Runner, replacing any it inherited; other keys are ignored. Quit and reopen Cairn after editing it. Design: `docs/design/desktop-otel-export.md`; reaching the deployment's Langfuse from a Mac: `docs/ops/langfuse.md`.
 
 Only the macOS package is maintained. The research behind the stack is `docs/research/desktop-app-stack-2026-11-08.md`.
