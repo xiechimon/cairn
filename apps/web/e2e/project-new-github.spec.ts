@@ -112,14 +112,22 @@ test('7. manual fallback: picker footer and the unconnected-face link both switc
   await expect(input).toHaveValue('octocat/hello-world');
 });
 
-test('7b. unconnected-face manual link → input; swap button can go back to the repo menu', async ({ page }) => {
+test('7b. manual entry switches back to the auth button by the footer link and by the swap menu', async ({ page }) => {
   await page.goto(NEW_PROJECT);
   await selectGithub(page);
-  await page.getByRole('button', { name: '手动输入 owner/repo' }).click();
-  const input = page.locator('#prj-new-repo');
-  await expect(input).toHaveAttribute('placeholder', 'owner/repo');
+  const field = page.locator('#prj-new-repo');
+  const manual = page.getByRole('button', { name: '手动输入 owner/repo' });
+  await manual.click();
+  await expect(field).toHaveAttribute('placeholder', 'owner/repo');
+  await page.getByRole('button', { name: '从 GitHub 选择' }).click();
+  await expect(field).toHaveText('认证 GitHub');
+
+  await manual.click();
+  await expect(field).toHaveAttribute('placeholder', 'owner/repo');
   await page.getByRole('button', { name: '切换仓库来源' }).click();
-  await expect(page.getByRole('menu', { name: '仓库' })).toBeVisible();
+  const menu = page.getByRole('menu', { name: '仓库' });
+  await menu.getByRole('menuitemradio', { name: 'GitHub 仓库' }).click();
+  await expect(field).toHaveText('认证 GitHub');
 });
 
 test('8. landing param error three translations → inline error row (denied/state/exchange)', async ({ page }) => {

@@ -26,6 +26,14 @@ async function revealManualRepoInput(page: Page) {
   return page.locator('#prj-new-repo');
 }
 
+async function liveGithubInputWithoutSignIn(page: Page) {
+  const input = page.locator('#prj-new-repo');
+  await expect(input).toHaveAttribute('placeholder', 'owner/repo');
+  await expect(page.getByRole('button', { name: '认证 GitHub' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '从 GitHub 选择' })).toHaveCount(0);
+  return input;
+}
+
 /** Live-face boot stub (skills-readonly.stubBoot precedent): seed team +
  *  session succeed, every other GET 500s (the shell tolerates it). Route
  *  match order = registration reverse: catch-all first, specifics after. */
@@ -69,7 +77,7 @@ async function fillLiveForm(page: Page, opts: { kind: 'local' | 'github'; value:
   await selectLiveRow(page, opts.kind === 'local' ? '本地文件夹' : 'GitHub 仓库');
   const input =
     opts.kind === 'github'
-      ? await revealManualRepoInput(page)
+      ? await liveGithubInputWithoutSignIn(page)
       : page.locator('#prj-new-repo');
   await input.fill(opts.value);
   return input;
@@ -287,18 +295,15 @@ test('empty local path / invalid github ref keep `创建项目` disabled', async
   await stubCreateProject(page, () => ({ json: okProject }));
   await page.goto(NEW_PROJECT_LIVE);
   const submit = page.getByRole('button', { name: '创建项目' });
-  const why = page.getByTestId('form-actions-hint');
-  await expect(why).toHaveText('填好项目名称后可以创建。');
+  await expect(submit).toBeDisabled();
   await page.locator('#prj-new-name').fill('Gated');
   await selectLiveRow(page, '本地文件夹');
   await expect(submit).toBeDisabled();
-  await expect(why).toHaveText('填好本地文件夹路径后可以创建。');
   await page.locator('#prj-new-repo').fill('/tmp/ok');
   await expect(submit).toBeEnabled();
-  await expect(why).toHaveCount(0);
   await selectLiveRow(page, 'GitHub 仓库');
   await expect(submit).toBeDisabled();
-  await revealManualRepoInput(page);
+  await liveGithubInputWithoutSignIn(page);
   await page.locator('#prj-new-repo').fill('xiechimon/cairn');
   await expect(submit).toBeEnabled();
 });

@@ -134,7 +134,6 @@ test('Anthropic folds its pi route behind a summary and picks the newest Claude 
     'claude-fable-5-1',
   ]);
   await expect(dialog.locator('[data-model-chip="claude-haiku-5-5"]')).toContainText('Claude Haiku 5.5');
-  await expect(dialog.getByText('目录里还有 13 个模型')).toBeVisible();
 
   await dialog.locator('[data-model-chip="claude-fable-5-1"]').getByRole('button', { name: '移除模型' }).click();
   await expect(chips).toHaveCount(3);

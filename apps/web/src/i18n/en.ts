@@ -770,15 +770,10 @@ export const EN: Record<string, string> = {
   '加载中…': 'Loading…',
   文件加载失败: 'Failed to load file',
   二进制文件暂不支持预览: 'Binary files cannot be previewed',
-  '项目图标，可选。不选时显示方盒图标。':
-    'Project icon, optional. A box shows when none is picked.',
   '例如：我的应用': 'e.g. My App',
   切换仓库来源: 'Switch repository source',
   '图标没能保存，请在项目设置里重试。': 'The icon was not saved. Try again in project settings.',
   '演示数据不能新建项目。': 'Projects cannot be created in the demo.',
-  '填好项目名称后可以创建。': 'Enter a project name to create it.',
-  '选好 GitHub 仓库后可以创建。': 'Pick a GitHub repository to create it.',
-  '填好本地文件夹路径后可以创建。': 'Enter a local folder path to create it.',
   项目名称: 'Project name',
   仓库: 'Repo',
   选择仓库: 'Select repo',
@@ -1140,8 +1135,6 @@ export const EN: Record<string, string> = {
   '搜索模型或输入 ID': 'Search models or type an ID',
   '填写 Base URL 和协议': 'Set the base URL and protocol',
   原生鉴权: 'native auth',
-  '目录里还有 {n} 个模型，点「添加模型」搜索。':
-    '{n#1 more model|# more models} in the catalog. Use Add model to search.',
   '把 Base URL 中的占位符换成你的账户值':
     'Replace the placeholders in the Base URL with your account values',
   // #355 picker 形态(spec 11 §A6;preset 显示名 = 品牌串不译,OAuth 徽标
@@ -1172,6 +1165,7 @@ export const EN: Record<string, string> = {
   'GitHub 连接已断开': 'GitHub connection disconnected',
   已连接: 'Connected',
   '手动输入 owner/repo': 'Enter owner/repo manually',
+  '从 GitHub 选择': 'Pick from GitHub',
   // wayfinder #181 add-machine dialog family (r2 11b verbatim copy; the
   // command strings themselves stay untranslated — brand slots via BRAND)
   '让另一台电脑帮你跑任务。两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。':

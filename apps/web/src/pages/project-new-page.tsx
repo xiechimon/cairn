@@ -12,7 +12,12 @@ import { cn } from 'cn';
 import { type KeyboardEvent, type Ref, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
-import { useApiMutations, useGithubConnection, useGithubRepos } from '../api/hooks.js';
+import {
+  useApiMutations,
+  useCapabilities,
+  useGithubConnection,
+  useGithubRepos,
+} from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { projectCreationBlocked, setupOpenStep } from '../board/first-run-checklist-model.js';
 import { SETUP_HREF, useFirstRunSetup } from '../board/first-run-setup.js';
@@ -136,10 +141,15 @@ export function ProjectNewPage() {
 
   const githubSelected = repoSel === 'github';
   const connectionQ = useGithubConnection(teamId, live && githubSelected);
-  const connectionPending = live && githubSelected && connectionQ.isPending;
+  const capabilitiesQ = useCapabilities(live && githubSelected);
+  const connectionPending =
+    live && githubSelected && (connectionQ.isPending || capabilitiesQ.isPending);
   const connected = live
     ? (connectionQ.data?.connected ?? false)
     : (fixtureAuth ?? fixture.github?.connected === true);
+  const signInOff =
+    live && !connectionPending && !connected && capabilitiesQ.data?.githubOAuth !== true;
+  const manualEntry = manualRepo || signInOff;
   const login = live ? connectionQ.data?.login : fixture.github?.login;
   const disconnectReason = live ? (connectionQ.data?.disconnectReason ?? null) : null;
   const reposQ = useGithubRepos(live && githubSelected && connected && !manualRepo);
@@ -200,7 +210,7 @@ export function ProjectNewPage() {
     if (live) {
       mutations.startGithubOAuth.mutate(undefined, {
         onSuccess: (data) => window.location.assign(data.authorizationUrl),
-        onError: (err) => setOauthError(err.message),
+        onError: () => setOauthError(t('暂时连不上 GitHub，稍后再试。')),
       });
     } else if (!blockDemoWrite()) {
       setFixtureAuth(true);
@@ -224,7 +234,7 @@ export function ProjectNewPage() {
       : repoSel === 'local'
         ? localPath.trim() !== ''
         : true;
-  const showGithubField = githubSelected && !manualRepo;
+  const showGithubField = githubSelected && !manualEntry;
 
   const pickerVisible = showGithubField && connected && pickerOpen;
   const ghListRef = useRef<HTMLDivElement>(null);
@@ -392,20 +402,15 @@ export function ProjectNewPage() {
   return (
     <RouteDialog title={t('新建项目')} size="form" initialFocus={nameRef}>
       <FormStack>
-        <div className="flex items-center gap-4">
-          <span className="flex size-14 flex-none overflow-hidden rounded-full bg-card text-content-tertiary ring-1 ring-border">
-            <ProjectIconPicker
-              icon={icon}
-              color={null}
-              onChange={(patch) => setIcon(patch.icon ?? null)}
-              triggerClassName="grid place-items-center rounded-full"
-              trigger={<NewProjectIcon icon={icon} />}
-            />
-          </span>
-          <span className="text-meta text-content-tertiary">
-            {t('项目图标，可选。不选时显示方盒图标。')}
-          </span>
-        </div>
+        <span className="flex size-14 flex-none overflow-hidden rounded-full bg-card text-content-tertiary ring-1 ring-border">
+          <ProjectIconPicker
+            icon={icon}
+            color={null}
+            onChange={(patch) => setIcon(patch.icon ?? null)}
+            triggerClassName="grid place-items-center rounded-full"
+            trigger={<NewProjectIcon icon={icon} />}
+          />
+        </span>
         <FormField label={t('项目名称')} htmlFor="prj-new-name">
           <Input
             ref={nameRef}
@@ -438,7 +443,7 @@ export function ProjectNewPage() {
             >
               <div className="relative flex" ref={repoFieldRef}>
                 {repoSel === 'github' ? (
-                  manualRepo ? (
+                  manualEntry ? (
                     <>
                       <Input
                         id="prj-new-repo"
@@ -562,7 +567,12 @@ export function ProjectNewPage() {
                       if (sel === 'github') setPickerOpen(false);
                     }}
                   >
-                    <KeyedMenuRadioItem value="github" shortcut="G" closeOnClick>
+                    <KeyedMenuRadioItem
+                      value="github"
+                      shortcut="G"
+                      closeOnClick
+                      onClick={() => setManualRepo(false)}
+                    >
                       {t('GitHub 仓库')}
                     </KeyedMenuRadioItem>
                     <KeyedMenuRadioItem value="local" shortcut="L" closeOnClick>
@@ -658,13 +668,6 @@ export function ProjectNewPage() {
               {t('GitHub 连接已断开')}：{disconnectReason}
             </div>
           )}
-          {showGithubField && !connected && !connectionPending && (
-            <div>
-              <Button variant="link" className={GH_LINK_CLS} onClick={() => setManualRepo(true)}>
-                {t('手动输入 owner/repo')}
-              </Button>
-            </div>
-          )}
           {localErrorText !== null && (
             <div className={`${FIELD_NOTE_CLS} text-destructive`} role="alert">
               {localErrorText}
@@ -685,15 +688,17 @@ export function ProjectNewPage() {
         </FormField>
         <FormActions
           hint={
-            !live
-              ? t('演示数据不能新建项目。')
-              : name.trim() === ''
-                ? t('填好项目名称后可以创建。')
-                : formOk
-                  ? undefined
-                  : repoSel === 'github'
-                    ? t('选好 GitHub 仓库后可以创建。')
-                    : t('填好本地文件夹路径后可以创建。')
+            githubSelected && manualRepo && !signInOff ? (
+              <Button variant="link" className={GH_LINK_CLS} onClick={() => setManualRepo(false)}>
+                {t('从 GitHub 选择')}
+              </Button>
+            ) : showGithubField && !connected && !connectionPending ? (
+              <Button variant="link" className={GH_LINK_CLS} onClick={() => setManualRepo(true)}>
+                {t('手动输入 owner/repo')}
+              </Button>
+            ) : live ? undefined : (
+              t('演示数据不能新建项目。')
+            )
           }
           primary={{
             label: t('创建项目'),

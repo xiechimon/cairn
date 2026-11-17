@@ -3,14 +3,12 @@ import { useState } from 'react';
 import { FORM_CONTROL_CLS, FormField } from '../components/form-layout.js';
 import { DIALOG_FACE } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
-import { useI18n } from '../i18n/provider.js';
 import { ProviderConnectionDisclosure } from '../resources/provider-connection-disclosure.js';
 import { ProviderModelChips } from '../resources/provider-model-list.js';
 import { PROVIDER_PRESET_DEFAULTS } from '../resources/provider-preset-data.js';
 import { Section, Specimen } from './specimen.js';
 
 function PresetForm({ defaults, open }: { defaults: ProviderPresetDefaults; open: boolean }) {
-  const { t } = useI18n();
   const [expanded, setExpanded] = useState(open);
   const [picked, setPicked] = useState<string[]>(defaults.picks);
   return (
@@ -29,11 +27,6 @@ function PresetForm({ defaults, open }: { defaults: ProviderPresetDefaults; open
         selected={picked}
         onSelectedChange={setPicked}
       />
-      <span className="text-meta text-content-tertiary">
-        {t('目录里还有 {n} 个模型，点「添加模型」搜索。', {
-          n: defaults.models.length - picked.length,
-        })}
-      </span>
     </div>
   );
 }

@@ -525,13 +525,6 @@ export function CreateProviderDialog({
               {t('至少添加一个模型：点「添加模型」，输入端点支持的模型 ID，比如 gpt-4o-mini。')}
             </FieldDescription>
           )}
-          {modelIds.length > 0 && catalog.length > modelIds.length && (
-            <FieldDescription className="text-meta text-content-tertiary">
-              {t('目录里还有 {n} 个模型，点「添加模型」搜索。', {
-                n: catalog.filter((model) => !modelIds.includes(model.id)).length,
-              })}
-            </FieldDescription>
-          )}
         </Field>
       </FormStack>
     );
