@@ -283,6 +283,7 @@ export async function boot(opts: {
   orbComputer?: ScopedComputerProviders;
   confinementPlatform?: string;
   confinementPreflight?: import('../src/machine-loop.js').MachineLoopOpts['confinementPreflight'];
+  seatbeltProbe?: import('../src/machine-loop.js').MachineLoopOpts['seatbeltProbe'];
   confinementRecheckMs?: number;
   strandedUploadReplayMs?: number;
   strandedUploadMinAgeMs?: number;
@@ -320,6 +321,7 @@ export async function boot(opts: {
       client: api,
       confinementPlatform: opts.confinementPlatform ?? 'darwin',
       confinementPreflight: opts.confinementPreflight,
+      seatbeltProbe: opts.seatbeltProbe,
       ...(opts.confinementRecheckMs !== undefined
         ? { confinementRecheckMs: opts.confinementRecheckMs }
         : {}),

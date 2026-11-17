@@ -16,6 +16,7 @@ import type {
 } from '@cairn/shared';
 import {
   claudeLoginSchema,
+  confinementEnforced,
   isActiveStepStatus,
   machineRecordSchema,
   parseReportedCapabilities,
@@ -213,7 +214,7 @@ function mergeReportedCapabilities(
   const previousReport = previous?.confinement;
   const report = reported.confinement;
   if (
-    reported.osPlatform === 'linux' &&
+    confinementEnforced(reported.osPlatform) &&
     report &&
     (report.generation === (previousReport?.generation ?? 0) + 1
       ? report.state !== 'checking'

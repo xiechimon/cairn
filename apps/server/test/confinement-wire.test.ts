@@ -98,14 +98,14 @@ test('old macOS daemon without platform or confinement report still claims', asy
   expect((await w.claim(null))?.step.id).toBe('step-availability');
 });
 
-test('macOS not-applicable report still claims without a confinement identity', async () => {
+test('macOS not-applicable report no longer opens a claim', async () => {
   const w = await world('darwin');
   expect((await w.presence(w.report)).status).toBe(200);
   expect((await w.presence({ ...w.report, state: 'not-applicable', revision: 2 })).status).toBe(
     200,
   );
   w.enqueue();
-  expect((await w.claim(null))?.step.id).toBe('step-availability');
+  expect(await w.claim(null)).toBeNull();
 });
 
 test.each([undefined, { state: 'ready' }])(
@@ -189,14 +189,14 @@ test('worker rechecks readiness after asynchronous ship verification before any 
 
 test.each([
   ['linux', 'ready'],
-  ['darwin', 'not-applicable'],
+  ['darwin', 'ready'],
 ] as const)('%s worker and chief dispatch with %s', async (platform, state) => {
   const w = await world(platform);
   await w.presence(w.report);
   w.enqueue();
-  if (platform === 'linux') expect(await w.claim()).toBeNull();
+  expect(await w.claim()).toBeNull();
   await w.presence({ ...w.report, state, revision: 2 });
-  if (platform === 'linux') expect(await w.claim(null)).toBeNull();
+  expect(await w.claim(null)).toBeNull();
   expect((await w.claim(w.report))?.step.id).toBe('step-availability');
   seedRoute(w.s, 'coordinator', { provider: 'stub-gw', modelId: 'stub', machineId: w.machineId });
   w.s.db
@@ -265,7 +265,7 @@ test('non-enforcing ready fixture can enroll and claim without a Linux handshake
   expect((await w.claim(null))?.step.id).toBe('step-availability');
 });
 
-test.each([undefined, 'darwin', 'other'] as const)(
+test.each([undefined, 'other'] as const)(
   'non-enforcing %s report never prevents credential rotation on re-enrollment',
   async (osPlatform) => {
     const capabilities = readyMachine({

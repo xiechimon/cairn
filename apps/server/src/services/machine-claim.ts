@@ -8,6 +8,7 @@ import {
   chiefIdFormat,
   claudeRateBlock,
   confinementDispatchReady,
+  confinementEnforced,
   fencedTitle,
   isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
@@ -787,7 +788,7 @@ export async function claimStep(
       !signal?.aborted &&
       readDeployLease(deps.db).status === 'accepting' &&
       confinementDispatchReady(capabilities) &&
-      (capabilities?.osPlatform !== 'linux' ||
+      (!confinementEnforced(capabilities?.osPlatform) ||
         (report?.generation === body?.confinement?.generation &&
           report?.invocation === body?.confinement?.invocation))
     );

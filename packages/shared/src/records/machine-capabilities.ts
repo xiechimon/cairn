@@ -46,16 +46,24 @@ export const confinementCauseSchema = z
       'bwrap-too-old',
       'userns-denied',
       'home-overlay-failed',
+      'seatbelt-missing',
+      'seatbelt-probe-failed',
     ]),
     mountPoint: z.string().startsWith('/').max(4096).optional(),
   })
   .strict();
 export type ConfinementCause = z.infer<typeof confinementCauseSchema>;
 
+export function confinementEnforced(osPlatform: string | undefined): boolean {
+  return osPlatform === 'linux' || osPlatform === 'darwin';
+}
+
 export function confinementDispatchReady(
   capabilities: MachineCapabilities | null | undefined,
 ): boolean {
-  return capabilities?.osPlatform !== 'linux' || capabilities.confinement?.state === 'ready';
+  return (
+    !confinementEnforced(capabilities?.osPlatform) || capabilities?.confinement?.state === 'ready'
+  );
 }
 
 const machineOsPlatformSchema = z.enum(['linux', 'darwin', 'windows', 'other']);

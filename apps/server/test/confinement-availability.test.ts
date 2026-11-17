@@ -65,18 +65,19 @@ test('validated confinement observations survive the shared capability parser', 
   });
 });
 
-test('macOS not-applicable preserves dispatch and survives parsing', () => {
+test('a not-applicable report survives parsing but no longer opens dispatch on macOS', () => {
   const report = { ...checking, state: 'not-applicable' };
   expect(
     parseReportedCapabilities({ mcpServers: [], skills: [], confinement: report })?.confinement,
   ).toEqual(report);
-  expect(eligibility(report, 'darwin')).toBeNull();
+  expect(eligibility(report, 'darwin')).toEqual({ kind: 'confinement' });
+  expect(eligibility({ ...checking, state: 'ready' }, 'darwin')).toBeNull();
 });
 
-test('legacy unknown platform and non-Linux reports never gate eligibility', () => {
+test('legacy unknown platform never gates eligibility; macOS needs readiness like Linux', () => {
   expect(eligibility(undefined, 'legacy')).toBeNull();
-  expect(eligibility(undefined, 'darwin')).toBeNull();
-  expect(eligibility(checking, 'darwin')).toBeNull();
+  expect(eligibility(undefined, 'darwin')).toEqual({ kind: 'confinement' });
+  expect(eligibility(checking, 'darwin')).toEqual({ kind: 'confinement' });
 });
 
 test('Linux cannot use a not-applicable report to bypass readiness', () => {

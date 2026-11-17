@@ -1,4 +1,8 @@
+import { execFile } from 'node:child_process';
+import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { canonical, contains, DENIED_DIRECTORIES, DENIED_FILES } from './confine.js';
 
 export const SANDBOX_EXEC = '/usr/bin/sandbox-exec';
@@ -107,4 +111,43 @@ export function seatbeltCommand(
   args: string[],
 ): { command: string; args: string[] } {
   return { command: SANDBOX_EXEC, args: ['-p', seatbeltProfile(policy), command, ...args] };
+}
+
+export class SeatbeltProbeError extends Error {
+  constructor(readonly kind: 'seatbelt-missing' | 'seatbelt-probe-failed') {
+    super(kind);
+  }
+}
+
+const execute = promisify(execFile);
+
+export async function runSeatbeltProbe(directory: string): Promise<void> {
+  const root = realpathSync(directory);
+  const denied = join(root, 'probe-denied');
+  const scratch = join(root, 'probe-scratch');
+  mkdirSync(denied, { recursive: true });
+  mkdirSync(scratch, { recursive: true });
+  writeFileSync(join(denied, 'sentinel'), 'secret');
+  const launch = seatbeltCommand(
+    {
+      home: realpathSync(homedir()),
+      deniedRoots: [denied],
+      workspace: scratch,
+      gitDirectories: [],
+      taskTemp: scratch,
+      state: [],
+      caches: [],
+    },
+    '/bin/sh',
+    [
+      '-c',
+      `if cat '${join(denied, 'sentinel')}' >/dev/null 2>&1; then exit 3; fi; echo ok > '${join(scratch, 'written')}' || exit 4`,
+    ],
+  );
+  try {
+    await execute(launch.command, launch.args, { timeout: 10000 });
+  } catch (error) {
+    const missing = error instanceof Error && 'code' in error && error.code === 'ENOENT';
+    throw new SeatbeltProbeError(missing ? 'seatbelt-missing' : 'seatbelt-probe-failed');
+  }
 }

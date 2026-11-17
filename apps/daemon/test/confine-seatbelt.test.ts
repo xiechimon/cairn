@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
+  runSeatbeltProbe,
   type SeatbeltPolicy,
   seatbeltCommand,
   seatbeltProfile,
@@ -177,5 +178,11 @@ describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe.runIf(process.platform === 'darwin')('seatbelt startup probe', () => {
+  test('the real probe passes on this Mac', async () => {
+    await expect(runSeatbeltProbe(testTempDir('seatbelt-probe-'))).resolves.toBeUndefined();
   });
 });

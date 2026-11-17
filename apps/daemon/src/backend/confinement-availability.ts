@@ -10,6 +10,7 @@ import {
   launchConfined,
   reconcileConfinement,
 } from './confine.js';
+import { runSeatbeltProbe, SeatbeltProbeError } from './confine-seatbelt.js';
 
 const MOUNTINFO_ESCAPES: Record<string, string> = {
   '\\040': ' ',
@@ -75,6 +76,7 @@ export class ConfinementAvailability {
       invocationId?: string;
       me(): Promise<{ capabilities?: MachineCapabilities | null }>;
       send(): Promise<void>;
+      seatbeltProbe?: (directory: string) => Promise<void>;
       launch?: typeof launchConfined;
       reconcile?: typeof reconcileConfinement;
       mountinfo?: () => string;
@@ -140,6 +142,22 @@ export class ConfinementAvailability {
     )
       throw new Error('Confinement generation was not acknowledged');
     const platform = this.options.platform ?? process.platform;
+    if (platform === 'darwin') {
+      try {
+        const directory = join(this.options.home, 'confinement');
+        ensurePrivateDir(directory);
+        await (this.options.seatbeltProbe ?? runSeatbeltProbe)(directory);
+        this.report = { ...this.report, state: 'ready' };
+      } catch (error) {
+        this.report = { ...this.report, state: 'unavailable', reason: 'startup-failed' };
+        this.cause = {
+          kind: error instanceof SeatbeltProbeError ? error.kind : 'seatbelt-probe-failed',
+        };
+      }
+      await this.options.send();
+      this.accepted = true;
+      return;
+    }
     if (platform !== 'linux') {
       this.report = { ...this.report, state: 'not-applicable' };
       await this.options.send();

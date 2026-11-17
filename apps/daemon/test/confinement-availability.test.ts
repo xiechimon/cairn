@@ -8,6 +8,7 @@ import {
   ConfinementOwnerError,
   type launchConfined,
 } from '../src/backend/confine.js';
+import { SeatbeltProbeError } from '../src/backend/confine-seatbelt.js';
 import {
   ConfinementAvailability,
   confinementCauseOf,
@@ -121,17 +122,38 @@ test('cleanup reservation survives a restart and failed reconciliation prevents 
   expect(existsSync(join(home, 'confinement/reservation.json'))).toBe(false);
 });
 
-test('macOS reports not-applicable without a Linux launch and keeps claiming', async () => {
+test('macOS runs the Seatbelt probe instead of a Linux launch and claims once ready', async () => {
   const launch = vi.fn<typeof launchConfined>();
+  const probe = vi.fn(async () => {});
   const { api, handle } = await boot({
     confinementPlatform: 'darwin',
     confinementPreflight: launch,
+    seatbeltProbe: probe,
   });
   expect(launch).not.toHaveBeenCalled();
+  expect(probe).toHaveBeenCalledTimes(1);
   expect(api.presenceBodies.at(-1)).toMatchObject({
-    capabilities: { osPlatform: 'darwin', confinement: { state: 'not-applicable' } },
+    capabilities: { osPlatform: 'darwin', confinement: { state: 'ready' } },
   });
   expect(api.claimCalls).toBe(1);
+  await handle.stop();
+});
+
+test('macOS stays unavailable with a named cause and claims nothing when the profile cannot be applied', async () => {
+  const { api, handle } = await boot({
+    confinementPlatform: 'darwin',
+    seatbeltProbe: async () => {
+      throw new SeatbeltProbeError('seatbelt-missing');
+    },
+  });
+  expect(api.presenceBodies.at(-1)).toMatchObject({
+    capabilities: {
+      osPlatform: 'darwin',
+      confinement: { state: 'unavailable', reason: 'startup-failed' },
+      confinementCause: { kind: 'seatbelt-missing' },
+    },
+  });
+  expect(api.claimCalls).toBe(0);
   await handle.stop();
 });
 

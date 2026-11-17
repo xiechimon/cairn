@@ -107,6 +107,7 @@ export interface MachineLoopOpts {
   otel?: DaemonOtel | null;
   confinementPlatform?: string;
   confinementPreflight?: ConstructorParameters<typeof ConfinementAvailability>[0]['launch'];
+  seatbeltProbe?: ConstructorParameters<typeof ConfinementAvailability>[0]['seatbeltProbe'];
   confinementRecheckMs?: number;
   strandedUploadReplayMs?: number;
   strandedUploadMinAgeMs?: number;
@@ -451,6 +452,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     home: paths.home,
     platform,
     launch: opts.confinementPreflight,
+    ...(opts.seatbeltProbe !== undefined ? { seatbeltProbe: opts.seatbeltProbe } : {}),
     me: () => client.me(),
     send: () => presenceReporter.send(),
   });
