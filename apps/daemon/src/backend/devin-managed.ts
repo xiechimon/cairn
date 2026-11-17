@@ -19,23 +19,37 @@ import { z } from 'zod';
 const exec = promisify(execFile);
 
 const REGISTRY_URL = 'https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json';
+const MANIFEST_URL = 'https://static.devin.ai/cli/current/manifest.json';
 const LOCK_STALE_MS = 15 * 60_000;
 const FETCH_TIMEOUT_MS = 15_000;
 const DOWNLOAD_TIMEOUT_MS = 120_000;
+
+const manifestSchema = z.object({
+  version: z.string(),
+  platforms: z.record(
+    z.string(),
+    z.object({
+      url: z.string().url(),
+      sha256: z.string().regex(/^[a-f0-9]{64}$/i),
+    }),
+  ),
+});
 
 const registryAgentSchema = z.object({
   id: z.string(),
   version: z.string(),
   distribution: z
     .object({
-      binary: z.record(
-        z.string(),
-        z.object({
-          archive: z.string().url(),
-          cmd: z.string(),
-          args: z.array(z.string()).optional(),
-        }),
-      ),
+      binary: z
+        .record(
+          z.string(),
+          z.object({
+            archive: z.string().url(),
+            cmd: z.string(),
+            args: z.array(z.string()).optional(),
+          }),
+        )
+        .nullish(),
     })
     .optional(),
 });
@@ -71,6 +85,7 @@ export interface DevinManagedOptions {
   arch?: string;
   fetchImpl?: typeof fetch;
   registryUrl?: string;
+  manifestUrl?: string;
   log?: (message: string) => void;
 }
 
@@ -88,6 +103,13 @@ function platformKey(platform: string, arch: string): string | null {
   return os !== null && cpu !== null ? `${os}-${cpu}` : null;
 }
 
+const MANIFEST_TARGETS: Record<string, string> = {
+  'darwin-aarch64': 'aarch64-apple-darwin',
+  'darwin-x86_64': 'x86_64-apple-darwin',
+  'linux-aarch64': 'aarch64-unknown-linux',
+  'linux-x86_64': 'x86_64-unknown-linux',
+};
+
 function markerOf(versionDir: string): InstallMarker | null {
   try {
     return installMarkerSchema.parse(
@@ -104,6 +126,7 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
   const arch = options.arch ?? process.arch;
   const fetchImpl = options.fetchImpl ?? fetch;
   const registryUrl = options.registryUrl ?? REGISTRY_URL;
+  const manifestUrl = options.manifestUrl ?? MANIFEST_URL;
   const log = options.log ?? (() => {});
   const key = platformKey(platform, arch);
   const home = join(root, 'home');
@@ -142,45 +165,81 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
     return null;
   }
 
-  async function resolveSpec(): Promise<{
+  interface InstallSpec {
     version: string;
     archive: string;
     binRelPath: string;
     args: string[];
-  } | null> {
-    if (key === null) return null;
-    const body = await (async () => {
+    archiveSha256?: string;
+  }
+
+  async function fetchCachedJson(url: string, cacheName: string): Promise<string | null> {
+    try {
+      const response = await fetchImpl(url, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!response.ok) throw new Error(`${cacheName} HTTP ${response.status}`);
+      const text = await response.text();
+      mkdirSync(root, { recursive: true });
+      writeFileSync(join(root, cacheName), text);
+      return text;
+    } catch {
       try {
-        const response = await fetchImpl(registryUrl, {
-          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        });
-        if (!response.ok) throw new Error(`registry HTTP ${response.status}`);
-        const text = await response.text();
-        mkdirSync(root, { recursive: true });
-        writeFileSync(join(root, 'registry-cache.json'), text);
-        return text;
+        return readFileSync(join(root, cacheName), 'utf8');
       } catch {
-        try {
-          return readFileSync(join(root, 'registry-cache.json'), 'utf8');
-        } catch {
-          return null;
-        }
+        return null;
       }
-    })();
+    }
+  }
+
+  function parseJson(text: string): unknown {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  }
+
+  async function manifestSpec(): Promise<InstallSpec | null> {
+    if (key === null) return null;
+    const target = MANIFEST_TARGETS[key];
+    if (target === undefined) return null;
+    const body = await fetchCachedJson(manifestUrl, 'manifest-cache.json');
     if (body === null) return null;
-    const parsed = registrySchema.safeParse(
-      (() => {
-        try {
-          return JSON.parse(body);
-        } catch {
-          return null;
-        }
-      })(),
-    );
-    if (!parsed.success) return null;
+    const parsed = manifestSchema.safeParse(parseJson(body));
+    if (!parsed.success) {
+      log('devin manifest did not match the expected shape');
+      return null;
+    }
+    const entry = parsed.data.platforms[target];
+    if (entry === undefined) {
+      log(`devin manifest has no archive for ${target}`);
+      return null;
+    }
+    return {
+      version: parsed.data.version,
+      archive: entry.url,
+      binRelPath: 'bin/devin',
+      args: ['acp'],
+      archiveSha256: entry.sha256.toLowerCase(),
+    };
+  }
+
+  async function registrySpec(): Promise<InstallSpec | null> {
+    if (key === null) return null;
+    const body = await fetchCachedJson(registryUrl, 'registry-cache.json');
+    if (body === null) return null;
+    const parsed = registrySchema.safeParse(parseJson(body));
+    if (!parsed.success) {
+      log('devin registry did not match the expected shape');
+      return null;
+    }
     const agent = parsed.data.agents.find((entry) => entry.id === 'devin');
     const binary = agent?.distribution?.binary?.[key];
-    if (agent === undefined || binary === undefined) return null;
+    if (agent === undefined || binary === undefined) {
+      log(`devin registry has no binary entry for ${key}`);
+      return null;
+    }
     const binRelPath = binary.cmd.replace(/^\.[/\\]/, '').replaceAll('\\', '/');
     return {
       version: agent.version,
@@ -190,9 +249,16 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
     };
   }
 
-  async function install(
-    spec: NonNullable<Awaited<ReturnType<typeof resolveSpec>>>,
-  ): Promise<DevinInstall | null> {
+  async function resolveSpecs(): Promise<InstallSpec[]> {
+    const specs: InstallSpec[] = [];
+    const manifest = await manifestSpec();
+    if (manifest !== null) specs.push(manifest);
+    const registry = await registrySpec();
+    if (registry !== null && registry.version !== manifest?.version) specs.push(registry);
+    return specs;
+  }
+
+  async function install(spec: InstallSpec): Promise<DevinInstall | null> {
     const versionDir = join(root, 'versions', spec.version);
     const existing = installFor(versionDir);
     if (existing !== null) return existing;
@@ -205,8 +271,11 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
       if (!response.ok) throw new Error(`devin download: HTTP ${response.status}`);
       const tarball = join(staging, 'devin.tar.gz');
       const bytes = Buffer.from(await response.arrayBuffer());
-      writeFileSync(tarball, bytes);
       const archiveSha256 = createHash('sha256').update(bytes).digest('hex');
+      if (spec.archiveSha256 !== undefined && archiveSha256 !== spec.archiveSha256.toLowerCase()) {
+        throw new Error('devin archive checksum mismatch');
+      }
+      writeFileSync(tarball, bytes);
       await exec('tar', ['-xzf', tarball, '-C', staging], { timeout: 60_000 });
       rmSync(tarball, { force: true });
       let binPath = join(staging, spec.binRelPath);
@@ -263,14 +332,19 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
 
   async function ensure(): Promise<DevinInstall | null> {
     if (key === null) return null;
-    const spec = await resolveSpec();
-    if (spec === null) return current();
-    const done = await withLock(() => install(spec));
-    if (done === null) {
-      return installFor(join(root, 'versions', spec.version)) ?? current();
+    const specs = await resolveSpecs();
+    if (specs.length === 0) return current();
+    for (const spec of specs) {
+      const done = await withLock(() => install(spec));
+      if (done !== null) {
+        writeFileSync(join(root, 'current.json'), JSON.stringify({ version: spec.version }));
+        return done;
+      }
     }
-    writeFileSync(join(root, 'current.json'), JSON.stringify({ version: spec.version }));
-    return done;
+    const head = specs[0];
+    return (
+      (head === undefined ? null : installFor(join(root, 'versions', head.version))) ?? current()
+    );
   }
 
   return {
