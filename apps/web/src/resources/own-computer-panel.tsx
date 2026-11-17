@@ -5,16 +5,18 @@ import type {
   OwnComputerInstallResult,
 } from '@cairn/shared';
 import { cn } from 'cn';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useApiMutations, useOwnComputerGrants, useRevokeOwnComputerGrant } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
+import { ChevronDown } from '../icons/index.js';
 
 interface OwnComputerBridge {
   install: () => Promise<OwnComputerInstallResult | null>;
@@ -46,6 +48,13 @@ export type OwnComputerPanelState =
   | 'ready';
 
 const SETTLED = new Set(['granted', 'not_required']);
+const NEEDS_ACTION = new Set<OwnComputerPanelState>([
+  'install-failed',
+  'not-installed',
+  'no-accessibility',
+  'no-screen-recording',
+]);
+const EXPANDABLE = new Set<OwnComputerPanelState>([...NEEDS_ACTION, 'ready']);
 
 export function ownComputerPanelState(input: {
   enabled: boolean;
@@ -118,6 +127,29 @@ function stateText(state: OwnComputerPanelState, t: TFunc): string {
   }
 }
 
+function stateSegment(state: OwnComputerPanelState, grants: number, t: TFunc): string | null {
+  switch (state) {
+    case 'off':
+      return null;
+    case 'finish-in-app':
+      return t('在 Cairn 应用里完成设置');
+    case 'installing':
+      return t('正在安装 agent-desktop');
+    case 'verifying':
+      return t('正在确认 agent-desktop');
+    case 'not-installed':
+      return t('还没装 agent-desktop');
+    case 'install-failed':
+      return t('安装失败');
+    case 'no-accessibility':
+      return t('缺“辅助功能”权限');
+    case 'no-screen-recording':
+      return t('缺“屏幕录制”权限');
+    case 'ready':
+      return grants > 0 ? t('{n} 项授权', { n: grants }) : t('还没授权');
+  }
+}
+
 function grantLabel(grant: OwnComputerGrant, t: TFunc): string {
   return grant.kind === 'shell' ? t('命令 {key}', { key: grant.key }) : grant.key;
 }
@@ -129,7 +161,12 @@ function grantScope(grant: OwnComputerGrant, t: TFunc): string {
     : t('对话「{title}」', { title: grant.threadTitle });
 }
 
-export function OwnComputerPanel({ machine }: { machine: MachineRow }) {
+export function useOwnComputerRow(machine: MachineRow): {
+  state: OwnComputerPanelState | null;
+  meta: ReactNode;
+  control: ReactNode;
+  drawer: ReactNode;
+} {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
@@ -153,6 +190,13 @@ export function OwnComputerPanel({ machine }: { machine: MachineRow }) {
     install,
     permissions,
   });
+  const [open, setOpen] = useState<boolean | null>(null);
+  const prevState = useRef(state);
+  if (prevState.current !== state) {
+    prevState.current = state;
+    setOpen(null);
+  }
+  const expanded = open ?? NEEDS_ACTION.has(state);
 
   const runInstall = async () => {
     if (bridge === undefined) return;
@@ -196,108 +240,160 @@ export function OwnComputerPanel({ machine }: { machine: MachineRow }) {
     );
   };
 
-  const permissionActions = (
-    <div className="flex flex-wrap gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        data-testid="own-computer-guide"
-        disabled={bridge === undefined}
-        onClick={() => void bridge?.guide()}
-      >
-        {t('打开系统设置')}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        data-testid="own-computer-recheck"
-        disabled={bridge === undefined || checking}
-        aria-busy={checking}
-        onClick={() => void recheck()}
-      >
-        {t('再检查一次')}
-      </Button>
-    </div>
-  );
+  if (!shouldShowOwnComputer(machine)) {
+    return { state: null, meta: null, control: null, drawer: null };
+  }
 
   const failed = state === 'install-failed';
-  return (
-    <div
-      data-testid="own-computer-panel"
-      data-state={state}
-      className="flex min-w-0 flex-col gap-2 border-t border-border px-4 py-3"
-    >
-      <div className="flex min-w-0 items-center justify-between gap-3">
-        <label
-          htmlFor={`own-computer-${machine.id ?? machine.name}`}
-          className="min-w-0 text-ui text-foreground"
-        >
-          {t('让 Coordinator 使用这台 Mac')}
-        </label>
-        <ToggleSwitch
-          id={`own-computer-${machine.id ?? machine.name}`}
-          data-testid="own-computer-switch"
-          checked={enabled}
-          disabled={mutations.patchMachine.isPending}
-          onCheckedChange={(next) => toggle(next)}
-        />
-      </div>
-      <p
-        data-testid="own-computer-status"
-        role={failed ? 'alert' : 'status'}
-        className={cn('m-0 text-meta', failed ? 'text-destructive' : 'text-content-secondary')}
-      >
-        {failed ? installFailureText(install, t) : stateText(state, t)}
-      </p>
-      {(failed || state === 'not-installed') && (
-        <div>
+  const segment = stateSegment(state, grants.length, t);
+  const expandable = EXPANDABLE.has(state);
+  const segmentCls = failed
+    ? 'text-destructive'
+    : NEEDS_ACTION.has(state)
+      ? 'text-(--waiting-ink)'
+      : 'text-content-tertiary';
+  const meta =
+    segment === null ? null : (
+      <>
+        <span aria-hidden className="text-content-dim">
+          ·
+        </span>
+        {expandable ? (
           <Button
-            variant="outline"
-            size="sm"
-            data-testid="own-computer-install"
-            disabled={bridge === undefined}
-            onClick={() => void runInstall()}
+            variant="ghost"
+            data-testid="own-computer-meta"
+            aria-expanded={expanded}
+            onClick={() => setOpen(!expanded)}
+            className={cn(
+              'h-auto min-h-0 gap-0.5 rounded-sm px-0 py-0 text-meta font-normal whitespace-nowrap hover:bg-transparent hover:text-foreground focus-visible:ring-2 focus-visible:ring-(--focus-ring) dark:hover:bg-transparent pointer-coarse:min-h-11',
+              segmentCls,
+            )}
           >
-            {failed ? t('重试') : t('安装')}
+            {segment}
+            <ChevronDown
+              aria-hidden
+              className={cn(
+                'size-3 flex-none transition-transform duration-(--dur-fast)',
+                expanded && 'rotate-180',
+              )}
+            />
           </Button>
-        </div>
-      )}
-      {(state === 'no-accessibility' || state === 'no-screen-recording') && permissionActions}
-      {(state === 'ready' || state === 'no-screen-recording') && grants.length > 0 && (
-        <ul data-testid="own-computer-grants" className="m-0 flex list-none flex-col p-0">
-          {grants.map((grant) => (
-            <li
-              key={grant.proposalId}
-              data-testid="own-computer-grant"
-              className="flex min-w-0 items-center gap-3 py-1"
-            >
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-ui text-foreground">{grantLabel(grant, t)}</span>
-                <span className="truncate text-meta text-content-tertiary">
-                  {grantScope(grant, t)}
-                </span>
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                data-testid="own-computer-revoke"
-                disabled={revoke.isPending}
-                onClick={() => {
-                  if (!live) {
-                    blockDemoWrite();
-                    return;
-                  }
-                  revoke.mutate(grant.proposalId, {
-                    onError: (error) => toastError(t('没能撤销，请重试'), error),
-                  });
-                }}
-              >
-                {t('撤销')}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+        ) : (
+          <span data-testid="own-computer-meta" className={cn('whitespace-nowrap', segmentCls)}>
+            {segment}
+          </span>
+        )}
+      </>
+    );
+
+  const switchEl = (
+    <ToggleSwitch
+      id={`own-computer-${machine.id ?? machine.name}`}
+      data-testid="own-computer-switch"
+      checked={enabled}
+      disabled={mutations.patchMachine.isPending}
+      onCheckedChange={(next) => toggle(next)}
+      aria-label={t('让 Coordinator 使用这台 Mac')}
+    />
   );
+  const control =
+    state === 'off' ? (
+      <Tooltip>
+        <TooltipTrigger render={switchEl} />
+        <TooltipContent side="top" sideOffset={8} className="max-w-72">
+          {stateText('off', t)}
+        </TooltipContent>
+      </Tooltip>
+    ) : (
+      switchEl
+    );
+
+  const drawer =
+    !expandable || !expanded ? null : (
+      <div
+        data-testid="own-computer-drawer"
+        className="flex min-w-0 flex-col gap-2 border-t border-border px-4 py-2"
+      >
+        <p
+          data-testid="own-computer-status"
+          role={failed ? 'alert' : 'status'}
+          className={cn('m-0 text-meta', failed ? 'text-destructive' : 'text-content-secondary')}
+        >
+          {failed ? installFailureText(install, t) : stateText(state, t)}
+        </p>
+        {(failed || state === 'not-installed') && (
+          <div>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="own-computer-install"
+              disabled={bridge === undefined}
+              onClick={() => void runInstall()}
+            >
+              {failed ? t('重试') : t('安装')}
+            </Button>
+          </div>
+        )}
+        {(state === 'no-accessibility' || state === 'no-screen-recording') && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="own-computer-guide"
+              disabled={bridge === undefined}
+              onClick={() => void bridge?.guide()}
+            >
+              {t('打开系统设置')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid="own-computer-recheck"
+              disabled={bridge === undefined || checking}
+              aria-busy={checking}
+              onClick={() => void recheck()}
+            >
+              {t('再检查一次')}
+            </Button>
+          </div>
+        )}
+        {(state === 'ready' || state === 'no-screen-recording') && grants.length > 0 && (
+          <ul data-testid="own-computer-grants" className="m-0 flex list-none flex-col p-0">
+            {grants.map((grant) => (
+              <li
+                key={grant.proposalId}
+                data-testid="own-computer-grant"
+                className="flex min-w-0 items-center gap-3 py-1"
+              >
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-ui text-foreground">{grantLabel(grant, t)}</span>
+                  <span className="truncate text-meta text-content-tertiary">
+                    {grantScope(grant, t)}
+                  </span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid="own-computer-revoke"
+                  disabled={revoke.isPending}
+                  onClick={() => {
+                    if (!live) {
+                      blockDemoWrite();
+                      return;
+                    }
+                    revoke.mutate(grant.proposalId, {
+                      onError: (error) => toastError(t('没能撤销，请重试'), error),
+                    });
+                  }}
+                >
+                  {t('撤销')}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+
+  return { state, meta, control, drawer };
 }

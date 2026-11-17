@@ -19,7 +19,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-import { OwnComputerPanel, shouldShowOwnComputer } from './own-computer-panel.js';
+import { useOwnComputerRow } from './own-computer-panel.js';
 
 export function MachineRowView({
   machine,
@@ -44,6 +44,7 @@ export function MachineRowView({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const ownComputer = useOwnComputerRow(machine);
   const pickedTarget = others.find((m) => m.id === evacuateTarget);
   const evacuate = async () => {
     if (evacuateTarget === null) return;
@@ -112,6 +113,7 @@ export function MachineRowView({
       data-testid="machine-item"
       data-machine-id={machine.id}
       data-kind={machine.kind ?? 'remote'}
+      data-oc-state={ownComputer.state ?? undefined}
       className="flex min-w-0 flex-col border-b border-border last:border-b-0"
     >
       <div className="flex min-w-0 items-center gap-3 px-4 py-2 pointer-coarse:pb-3">
@@ -150,8 +152,10 @@ export function MachineRowView({
             >
               {online ? t('在线') : t('离线')}
             </span>
+            {ownComputer.meta}
           </div>
         </div>
+        {ownComputer.control}
         <DropdownMenu>
           <IconTooltip
             label={t('{name} 的菜单', { name: machine.name })}
@@ -200,7 +204,7 @@ export function MachineRowView({
           </KeyedMenuContent>
         </DropdownMenu>
       </div>
-      {shouldShowOwnComputer(machine) && <OwnComputerPanel machine={machine} />}
+      {ownComputer.drawer}
       <AlertDialogShell
         title={t('整机迁移')}
         subtitle={t('把固定在这台执行机上的路由规则一起迁到另一台执行机。')}

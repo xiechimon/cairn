@@ -33,17 +33,17 @@ agent-desktop publication (`实测` via `gh api repos/vercel-labs/agent-desktop/
 
 **D4 TCC.** Accessibility is required: without it agent-desktop cannot read or act (`实测` docs). Screen Recording is optional: `user_computer_observe` already returns text with `screenshot: unavailable` when capture fails (`实测` host-screen), so a missing grant degrades to text and the panel says so. Automation is not shown. `own-computer:guide` runs `<binary> permissions --guide`; `own-computer:permissions` runs `<binary> permissions` so the panel updates at once in the Mac app. The daemon probe refreshes every 30 s while Accessibility or Screen Recording is not `granted`, every 10 min otherwise, and immediately after a call ends with agent-desktop `PERM_DENIED`.
 
-Panel states for the local Mac's row:
+Panel states for the local Mac's row — the switch sits on the machine row itself; the state folds into the row's meta line, and expandable segments open an inline drawer under the row:
 
-| State | Shown |
-|---|---|
-| Off | Switch off, the warning |
-| On, not in the Mac app and no `ownComputerHost` | "Finish setup in the Cairn app on this Mac" |
-| On, installing | Progress, no switch flicker |
-| On, install failed | The reason from D3, Retry |
-| On, Accessibility not `granted` (or no report yet) | "Accessibility not granted to Cairn", Open System Settings (guide), Check again |
-| On, Screen Recording not `granted` | "Screen Recording not granted: the agent reads apps as text only", same buttons |
-| On, ready | "The agent can use apps on this Mac after you approve each app", list of this conversation's approvals with Revoke |
+| State | Meta segment | Drawer |
+|---|---|---|
+| Off | none — the warning rides the switch's hover | — |
+| On, not in the Mac app and no `ownComputerHost` | "Finish setup in the Cairn app" | not expandable |
+| On, installing or verifying | "Installing agent-desktop" / "Confirming agent-desktop" | not expandable |
+| On, install failed or not installed | "Install failed" / "agent-desktop not installed yet" | open by default: the reason from D3, Retry/Install |
+| On, Accessibility not `granted` (or no report yet) | "Missing the Accessibility permission" | open by default: the D4 text, Open System Settings (guide), Check again |
+| On, Screen Recording not `granted` | "Missing the Screen Recording permission" | open by default: the degraded text, same buttons, grants |
+| On, ready | "{n} grants" or "No grants yet" | collapsed by default: the approval explainer plus this conversation's approvals with Revoke when any stand |
 
 **D5 Approval rows.** Reuse `action_proposal` with `actionId 'user_computer.app'`, `targetId '<machineId>:<app key>'`, where the app key is the app name trimmed and lowercased, the same exact, case-insensitive match the driver uses for `app_name` (`实测`). `inputJson` binds `{ machineId, app, threadId, sessionId, stepId, toolCallId }`. The card (built like the browser-password card) names the app and the Mac and offers allow once / allow in this conversation / deny. `decision` gains the value `conversation`; `answerProposal` accepts it only for this action.
 
