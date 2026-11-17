@@ -18,7 +18,27 @@ import {
   computerVmName,
   NO_CLOAK_LICENSE,
   VmDesktops,
+  vmMemoryFlag,
 } from '../src/computer/vm-desktop.js';
+
+const GIB = 1024 ** 3;
+
+describe('VM memory', () => {
+  test.each([
+    [8, '3g'],
+    [16, '4g'],
+    [24, '6g'],
+    [32, '8g'],
+    [64, '8g'],
+  ])('a %i GiB host gives the VM %s', (host, flag) => {
+    expect(vmMemoryFlag(host * GIB)).toBe(flag);
+  });
+
+  test('a quarter of the host is rounded down to whole GiB', () => {
+    expect(vmMemoryFlag(18 * GIB)).toBe('4g');
+  });
+});
+
 import { COMPUTER_IMAGE_MANIFEST } from '../src/computer/vm-runtime.js';
 
 const cleanups: (() => void)[] = [];
@@ -141,6 +161,7 @@ function setup(options: { unsupported?: string; resolveError?: Error } = {}) {
     forget() {},
   };
   const open = { ports: true };
+  const logs: string[] = [];
   let clock = 0;
   const make = (extra: Partial<ConstructorParameters<typeof VmDesktops>[0]> = {}) =>
     new VmDesktops({
@@ -149,6 +170,8 @@ function setup(options: { unsupported?: string; resolveError?: Error } = {}) {
       probe: async () => open.ports,
       readyMs: 1_000,
       now: () => clock,
+      totalMemory: () => 16 * GIB,
+      log: (message: string) => logs.push(message),
       ...extra,
     });
   const calls = (): string[][] =>
@@ -171,6 +194,7 @@ function setup(options: { unsupported?: string; resolveError?: Error } = {}) {
     runtime,
     open,
     make,
+    logs,
     calls,
     state,
     flag: (name: string, content = '') => writeFileSync(join(fake, name), content),
@@ -234,6 +258,9 @@ describe('VmDesktops', () => {
       '--cap-add CAP_SETGID',
       '--cap-add CAP_CHOWN',
     ]);
+    expect(run[run.indexOf('--memory') + 1]).toBe(vmMemoryFlag(16 * GIB));
+    expect(env.logs).toEqual(['computer VM memory 4g (host 16 GiB)']);
+    expect(run[run.indexOf('--cpus') + 1]).toBe('2');
     expect(run).toContain('/run/cairn');
     expect(run).toContain(`${NAME}:/home/agent`);
     expect(run.at(-1)).toBe(COMPUTER_IMAGE_MANIFEST.image);

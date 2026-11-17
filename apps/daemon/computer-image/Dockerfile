@@ -30,7 +30,7 @@ RUN set -eu; \
     apt-get install -y --no-install-recommends \
       xvfb x11vnc openbox picom hsetroot xdotool dbus-x11 libglib2.0-bin \
       chromium lxterminal fonts-noto-cjk fonts-noto-color-emoji adwaita-icon-theme gnome-themes-extra \
-      ca-certificates curl procps nftables util-linux x11-apps netpbm \
+      ca-certificates curl procps nftables util-linux earlyoom x11-apps netpbm \
       git python3 python3-pip python3-venv jq ripgrep fd-find unzip zip less; \
     case "$TARGETARCH" in \
       arm64) plank=bea8743bffbf924740240e4e59d578028b099cceba6b491f0689ccd24f689465 ;; \

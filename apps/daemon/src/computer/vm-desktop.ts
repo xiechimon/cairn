@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
+import { totalmem } from 'node:os';
 import { join, posix } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
@@ -28,6 +29,15 @@ export const VM_HOME = '/home/agent';
 export const VM_CONTROL_PORT = 5900;
 export const VM_VIEW_PORT = 5901;
 const VM_USER = '1000';
+const GIB = 1024 ** 3;
+const VM_MEMORY_MIN_GIB = 3;
+const VM_MEMORY_MAX_GIB = 8;
+const VM_MEMORY_HOST_SHARE = 0.25;
+
+export function vmMemoryFlag(hostBytes: number): string {
+  const quarter = Math.floor((hostBytes * VM_MEMORY_HOST_SHARE) / GIB);
+  return `${Math.min(VM_MEMORY_MAX_GIB, Math.max(VM_MEMORY_MIN_GIB, quarter))}g`;
+}
 const SCOPE_LABEL = 'cairn.scope';
 const BROWSER_COMMAND_MS = 60_000;
 const KILL_GRACE_MS = 1_000;
@@ -159,6 +169,8 @@ export interface VmDesktopsOptions {
   readyMs?: number;
   idleStopMs?: number;
   now?: () => number;
+  totalMemory?: () => number;
+  log?: (message: string) => void;
 }
 
 interface Desktop {
@@ -461,6 +473,9 @@ export class VmDesktops implements ComputerDesktops {
     if (!entry) {
       const volume = await this.run([binary, 'volume', 'inspect', name]);
       if (volume.code !== 0) await this.run([binary, 'volume', 'create', name]);
+      const hostBytes = (this.options.totalMemory ?? totalmem)();
+      const memory = vmMemoryFlag(hostBytes);
+      this.options.log?.(`computer VM memory ${memory} (host ${Math.round(hostBytes / GIB)} GiB)`);
       const created = await this.run(
         [
           binary,
@@ -473,7 +488,7 @@ export class VmDesktops implements ComputerDesktops {
           '--cpus',
           '2',
           '--memory',
-          '2g',
+          memory,
           '--cap-drop',
           'ALL',
           '--cap-add',

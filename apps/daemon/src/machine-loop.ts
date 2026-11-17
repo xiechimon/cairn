@@ -261,6 +261,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
               runtime: new VmRuntime({ root: vmRoot, env: capEnv }),
               env: capEnv,
               inputFence,
+              log: (message) => logger.machine(message),
             })
           : undefined;
   const hostDesktops = desktops?.missingPrograms().length === 0 ? desktops : undefined;
