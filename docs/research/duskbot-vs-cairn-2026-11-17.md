@@ -49,15 +49,7 @@ Ordered by value. Each names the code area. None is started.
 3. **Import-the-existing-agent-context onboarding.** First-run step that offers to fold `CLAUDE.md`/`AGENTS.md`/global rules into Coordinator memory as unverified entries. Touches server memory service + a small onboarding card. Supports spec 18 §2 (a second person can run it).
 4. **Steady-state parity check, not new work**: secrets typed by host with redaction (`browser-secret-fill.md`), tool allowlists (apiKey whitelists), approval cards. dusk confirms the same three patterns at shipping scale; keep cairn's audit row — it is the stronger piece.
 
-## 4. Not worth copying
-
-- **Persistent bot personas, rooms, bot-to-bot handoffs as the product core.** cairn's unit is the task; the park/wake mechanics may be borrowed (§3), the persona model should not.
-- **Hosted cloud + relay + default-on telemetry + noncommercial license.** All ruled out by `docs/spec/18` §4 (no hosted control plane, no resold compute) and the Apache-2.0 ruling.
-- **Per-bot persistent computers as the primary substrate.** cairn's substrate is per-build isolation on Runners; a long-lived per-agent machine is a different threat model and not needed for the dispatch shape.
-- **Engine-breadth race** (14 ACP drivers). Worth watching only if users ask for a specific CLI; the ACP driver list is a good catalog when that day comes.
-- **Electron-first multi-OS breadth.** Already parked as C class in spec 18 §4; dusk doing it does not un-park it.
-
-## 5. Owner decisions noted during the 2026-11-17 discussion
+## 4. Owner decisions noted during the 2026-11-17 discussion
 
 Recorded from ian's replies, not implemented anywhere yet:
 
@@ -76,16 +68,16 @@ Second round of owner decisions (2026-11-17, same discussion):
 - **Remaining-work tracking moves to a checklist**: remaining features live as check-off items in a GitHub Projects board (decided in round one as the management tool), not as plan-style documents. "Done = ticked off." What exactly "plan" covers in-product (the confirm-gate plan artifact) was left open — recommendation pending.
 - **Default-on telemetry, dusk's model**: anonymous usage counts + crash reports, never message/file content, with a first-screen opt-out. Two flags raised: it contradicts the README's "nothing is sent anywhere" and spec 18 §4's no-hosted-control-plane ruling, so docs/privacy must change with it; and it needs a collection endpoint he operates — new infra the checklist must include.
 - **Vault decision**: persistent, reusable, named login credentials the host types into pages on demand — model never sees values, redacted in chats/logs/memory (dusk vault parity). Builds on `secret-box.ts` and `docs/design/browser-secret-fill.md`; the delta is named long-lived logins + a UI + type-in integration.
-- **Orchestration: adopt semantics, not the copy**: take dusk's assignment-tree semantics (one record, park/wake lanes, dedup of identical in-flight requests, restart reconciliation table, three-authority envelope, level inheritance) and re-express them on cairn's chief + step-claim runtime. Explicitly not adopted: bot personas, rooms, the Jev room router. Needs a one-page design first (persisted state + concurrency, repo rule).
+- **Orchestration: adopt semantics, not the copy**: take dusk's assignment-tree semantics (one record, park/wake lanes, dedup of identical in-flight requests, restart reconciliation table, three-authority envelope, level inheritance) and re-express them on cairn's chief + step-claim runtime. Needs a one-page design first (persisted state + concurrency, repo rule).
 - **Docs-too-many pain point** (owner observation): spec canon + design + research + ops is wide and history-laden — hard for a model to consume. Recommendation given: keep granular sources (they prevent cross-lane write conflicts), add a **generated digest** — one compact "current rulings only" file per domain, produced by a script like `generate-feature-map.mjs`; agents read the digest, full volumes stay the archive. Ruling-history text stays in git/spec, not in the digest.
 - **Ship-speed finding** (measured 2026-11-17): latest green main commit went push → required-checks green in ~5 min, → live on omarchy in ~11 min total (`deployed.json` + ci run timestamps). CI is not the 50-minute cost; candidates for the felt cost are local `pnpm prepush` + `pnpm test:changed`, CI queueing behind other lanes, and flaky-red retry cycles. No human review exists in the flow — what could change is which checks gate deploy, not whether checks exist.
-- **Board created** (2026-11-17): GitHub Projects `cairn roadmap` (user project #2) holds the checklist — 19 new-direction items plus the 16 migrated open items below. Agents tick items off as they land; this section is the decision record, the board is the tracker.
+- **Board created** (2026-11-17): GitHub Projects `cairn roadmap` (user project #2) is the single tracker — direction items, the migrated open items below, and every open repo issue linked as a project item (closing the issue ticks it off). This section is the decision record, the board is the tracker.
 
 Third round of owner decisions (2026-11-17, same discussion):
 
 - **Ship target is desktop releases**: the product direction is Electron installers + IM, so the ship pipeline's destination becomes desktop-installer releases (dusk's `prepare-release` → `release.yml` shape is the reference). The omarchy deploy path (`docs/ops/control-plane-omarchy.md`, `scripts/ops/deploy-watch.sh`, systemd units) remains the interim landing mechanism until the release pipeline exists; AGENTS.md Ship step 8 and ops docs get amended when it lands.
 - **One plan entry only**: in-repo trackers are deleted so the GitHub Projects board is the single entry. `docs/cairn-plan.md` (self-retired) and `docs/design/home-redesign-backend-todo.md` removed; its open items moved to the board (record kept below). `docs/design/side-panels-backend-gaps.md` stays as a design doc.
-- **Persona revised**: earlier "do not take personas" was scoped to the orchestration layer. Given the desktop+IM form factor, take **one** named assistant persona (identity/avatar/memory — an IM presence needs a face); still skip the multi-bot cast, rooms and the Jev room router.
+- **Per-repository identity** (revises the earlier persona note): identity binds to the repository — each repo carries its own name, icon, memory, goals and instructions. Rooms and the Jev room router have no counterpart in this shape: one assistant fans out internally, so there is no bot audience to route between.
 - **Amp report folded in** (`ampcode.com/artifacts/cairn-…f419`, read 2026-11-17): corrects the "12-day from-scratch" claim — dusk's first commit imports **OpenMausBot 0.1.141** (Apache-2.0, upstream `milind-soni/OpenMausBot`): ~474k source lines, ~529k test/support lines, ~8,209 commits, ~86 days of upstream history; the repo's own delta is real (~179k lines added) but built on a complete product baseline. Licensing note from the report: imported parts stay Apache, dusk's new parts are PolyForm — borrow designs, not code. Its cairn diagnosis: high throughput, low convergence; the expensive surface is the self-owned distributed task lifecycle × multi-runtime × multi-deploy; recommends "stranger installs → connects model → first real result" as the release hard-condition.
 
 ### Migrated open items (from `docs/design/home-redesign-backend-todo.md`, now on the board)
@@ -108,7 +100,7 @@ Third round of owner decisions (2026-11-17, same discussion):
 - Clients order: web settled first, then native iOS (owner decision 2026-11-12; phone reference recording stays outside the repo)
 - Shelved: voice input (`docs/design/composer-voice-input.md` keeps the contract)
 
-## 6. What I did not check
+## 5. What I did not check
 
 - Running behavior of any dusk bot feature; every "dusk does X" is from its docs/code text.
 - The body of `server/runtime-coordinator.ts` and `server/host/` (118 files) — the §1 orchestration claims rest on `docs/runtime-contract.md`, which is unusually detailed but may drift from code (`推断`).
