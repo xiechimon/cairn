@@ -12,6 +12,7 @@ import {
   fencedTitle,
   infoCardBrief,
   isBuildStepKind,
+  isInfoOutput,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
@@ -483,7 +484,7 @@ async function tryClaim(
         continue;
       }
     }
-    const infoCard = isBuildStepKind(cand.stepRow.kind) && cand.todoRow.output === 'info';
+    const infoCard = isBuildStepKind(cand.stepRow.kind) && isInfoOutput(cand.todoRow.output);
     if (infoCard && infoCardPlan(db, cand.todoRow, cand.stepRow).kind !== 'claude-code') continue;
     const agentRow = profileForStep(deps, cand.todoRow, cand.stepRow.kind, cand.stepRow.id);
     if (agentRow === null) {

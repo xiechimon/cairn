@@ -3,6 +3,7 @@ import {
   confinementDispatchReady,
   isBuildStepKind,
   isChiefDigestThreadId,
+  isInfoOutput,
   MODEL_SOURCE_RUNTIME_LABELS,
   parseLocalMergeInstruction,
   RUNNER_OS_LABELS,
@@ -304,7 +305,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const position = pool.findIndex((r) => r.id === target.id) + 1;
     if (position === 0) return null;
     const infoPlan =
-      'todoRow' in queueRow && isBuildStepKind(queueRow.kind) && queueRow.todoRow.output === 'info'
+      'todoRow' in queueRow &&
+      isBuildStepKind(queueRow.kind) &&
+      isInfoOutput(queueRow.todoRow.output)
         ? infoCardPlan(db, queueRow.todoRow, queueRow)
         : null;
     if (infoPlan !== null && infoPlan.kind !== 'claude-code') {

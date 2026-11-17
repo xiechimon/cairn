@@ -8,6 +8,7 @@ import {
   classifyStepFailure,
   conversationBranch,
   isBuildStepKind,
+  isInfoOutput,
   parseLocalMergeInstruction,
   QUOTA_BLOCK_REASON_MAX_CHARS,
   SKILL_INJECTION_CHECK_KIND,
@@ -654,10 +655,12 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     return;
   }
   if (outcome.status === 'success') {
-    const manifest =
-      worker?.todoRow.output === 'info' ? deliverableManifestOf(db, stepRow) : undefined;
-    const infoReport =
-      worker?.todoRow.output === 'info' ? acceptedInfoReport(deps, stepRow) : undefined;
+    const manifest = isInfoOutput(worker?.todoRow.output)
+      ? deliverableManifestOf(db, stepRow)
+      : undefined;
+    const infoReport = isInfoOutput(worker?.todoRow.output)
+      ? acceptedInfoReport(deps, stepRow)
+      : undefined;
     const complete = (completeDeps: MachineDeps) =>
       completeStep(completeDeps, stepId, {
         hasChanges: outcome.hasChanges,

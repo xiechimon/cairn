@@ -1,7 +1,7 @@
 import type { MadeKind, TodoRecord } from '../fixtures/records.js';
 import { dayIndex } from './rel-time.js';
 
-type MadeKindGroup = Exclude<MadeKind, 'code'> | 'other';
+type MadeKindGroup = Exclude<MadeKind, 'code'> | 'dataset' | 'link' | 'other';
 
 export type MadeGroupKey = MadeKindGroup | 'earlier';
 
@@ -10,6 +10,8 @@ const GROUP_ORDER: readonly MadeGroupKey[] = [
   'design',
   'page',
   'slides',
+  'dataset',
+  'link',
   'other',
   'earlier',
 ];
@@ -21,14 +23,18 @@ export const MADE_GROUP_LABEL: Record<MadeGroupKey, string> = {
   design: '设计',
   page: '网页',
   slides: 'PPT',
+  dataset: '数据集',
+  link: '链接',
   other: '其他',
   earlier: '更早',
 };
 
 export function madeGroupOf(todo: Pick<TodoRecord, 'madeKind' | 'output'>): MadeKindGroup | null {
-  const kind = todo.madeKind ?? (todo.output === 'info' ? 'document' : todo.output);
-  if (kind === 'code') return null;
-  return kind ?? 'other';
+  if (todo.madeKind !== undefined) return todo.madeKind === 'code' ? null : todo.madeKind;
+  if (todo.output === undefined) return 'other';
+  if (todo.output === 'code') return null;
+  if (todo.output === 'dataset' || todo.output === 'link') return todo.output;
+  return 'document';
 }
 
 export interface MadeGroup<T> {

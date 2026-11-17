@@ -1,5 +1,6 @@
 import {
   isBuildStepKind,
+  isInfoOutput,
   type RunnerOs,
   resolvedBuildPrNumber,
   STOP_MESSAGE,
@@ -375,7 +376,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         }
       : {}),
     buildId,
-    infoOutput: wire?.output === 'info',
+    infoOutput: isInfoOutput(wire?.output),
     planDoc: live
       ? latestPlan !== undefined
         ? mapPlanDoc(latestPlan.content)

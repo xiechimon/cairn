@@ -1,3 +1,4 @@
+import { isInfoOutput } from '@cairn/shared';
 import { Lock, Presentation } from 'lucide-react';
 import {
   type FocusEvent,
@@ -46,7 +47,7 @@ function useSeen(ref: RefObject<Element | null>): boolean {
 function useCardExcerpt(todo: TodoRecord, seen: boolean): { excerpt: string; loading: boolean } {
   const thread = useMemo(
     () =>
-      seen && todo.output === 'info' && todo.latestBuildId !== null
+      seen && isInfoOutput(todo.output) && todo.latestBuildId !== null
         ? { buildId: todo.latestBuildId, title: todo.title, phase: todo.phase }
         : null,
     [seen, todo.output, todo.latestBuildId, todo.title, todo.phase],

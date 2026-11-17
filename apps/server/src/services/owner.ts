@@ -1,5 +1,6 @@
 import {
   ASK_USER_QUESTION_KIND,
+  isInfoOutput,
   type NeedsYouReason,
   type TodoOwner,
   type TodoSection,
@@ -72,7 +73,7 @@ function phaseWork(row: TodoRow): string {
 
 function reviewOwnership(row: TodoRow): Ownership {
   const workKey = `review:${phaseWork(row)}`;
-  return { owner: row.output === 'info' ? 'coordinator' : 'owner', reason: 'review', workKey };
+  return { owner: isInfoOutput(row.output) ? 'coordinator' : 'owner', reason: 'review', workKey };
 }
 
 function failedOwnership(db: Db, row: TodoRow): Ownership | null {

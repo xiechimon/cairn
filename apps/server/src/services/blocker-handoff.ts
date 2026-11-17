@@ -5,6 +5,7 @@ import {
   clipHandoffSummary,
   conversationBranch,
   isBuildStepKind,
+  isInfoOutput,
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -105,7 +106,7 @@ export async function blockerHandoffForClaim(
     }
     const changes = await readBuildChanges(deps, buildRow.id).catch(() => ({ files: [] }));
     const report =
-      blockerRow.output === 'info' && buildRow.reportAttachmentId !== null
+      isInfoOutput(blockerRow.output) && buildRow.reportAttachmentId !== null
         ? (() => {
             try {
               const attachment = readAttachmentMeta(

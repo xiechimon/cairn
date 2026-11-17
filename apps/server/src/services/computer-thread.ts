@@ -1,4 +1,4 @@
-import { chiefIdFormat, isBuildStepKind } from '@cairn/shared';
+import { chiefIdFormat, isBuildStepKind, isInfoOutput } from '@cairn/shared';
 import { desc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, type step, todo } from '../db/schema.js';
@@ -22,7 +22,7 @@ export function infoCardTodoOf(
     .innerJoin(todo, eq(build.todoId, todo.id))
     .where(eq(build.id, stepRow.buildId))
     .get();
-  return row?.todoRow.output === 'info' ? row.todoRow : null;
+  return row !== undefined && isInfoOutput(row.todoRow.output) ? row.todoRow : null;
 }
 
 export function computerThreadOf(

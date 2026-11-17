@@ -8,6 +8,9 @@ describe('madeGroupOf', () => {
 
   it('falls back to the deliverable output, then to other', () => {
     expect(madeGroupOf({ output: 'info' })).toBe('document');
+    expect(madeGroupOf({ output: 'report' })).toBe('document');
+    expect(madeGroupOf({ output: 'dataset' })).toBe('dataset');
+    expect(madeGroupOf({ output: 'link' })).toBe('link');
     expect(madeGroupOf({})).toBe('other');
   });
 

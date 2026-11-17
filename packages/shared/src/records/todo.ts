@@ -56,9 +56,14 @@ export function parseOrchestrationSourceRef(ref: string): { threadId: string } |
   return { threadId: `${CHIEF_THREAD_ID_PREFIX}${m[1]}` };
 }
 
-export const DELIVERABLE_OUTPUT_KINDS = ['code', 'info'] as const;
+export const INFO_OUTPUT_KINDS = ['info', 'report', 'dataset', 'link'] as const;
+export const DELIVERABLE_OUTPUT_KINDS = ['code', ...INFO_OUTPUT_KINDS] as const;
 export const todoOutputSchema = z.enum(DELIVERABLE_OUTPUT_KINDS);
 export type TodoOutputKind = z.infer<typeof todoOutputSchema>;
+export type InfoOutputKind = Exclude<TodoOutputKind, 'code'>;
+export function isInfoOutput(output: string | null | undefined): output is InfoOutputKind {
+  return (INFO_OUTPUT_KINDS as readonly string[]).includes(output ?? '');
+}
 
 export const usageCostSchema = z.object({
   input: z.number(),

@@ -1,3 +1,4 @@
+import { isInfoOutput } from '@cairn/shared';
 import { PackageCheck, Search, SearchX } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router';
@@ -90,7 +91,7 @@ function MadeReport({
 
 const isMade = (todo: TodoRecord) =>
   madeGroupOf(todo) !== null &&
-  (threadStatus(todo) === 'done' || (todo.output === 'info' && todo.phase === 'needs_input'));
+  (threadStatus(todo) === 'done' || (isInfoOutput(todo.output) && todo.phase === 'needs_input'));
 
 export function WorkPanel({
   todos,
@@ -201,7 +202,7 @@ export function WorkPanel({
                   projectOf(todo),
                 ])}
                 onOpen={() =>
-                  todo.output === 'info' && todo.latestBuildId !== null
+                  isInfoOutput(todo.output) && todo.latestBuildId !== null
                     ? setReportTodo(todo)
                     : onOpenThread(todo.id)
                 }

@@ -6,6 +6,7 @@ import {
   buildTaskPromptText,
   type ClaimedStep,
   composeTaskPromptWithInstruction,
+  INFO_OUTPUT_KINDS,
   INFO_SUBMIT_REPORT_TOOL,
   infoCardBrief,
   type MachineDoneBody,
@@ -89,7 +90,7 @@ export function startInfoCardRunner(options: InfoCardRunnerOptions): InfoCardRun
         and(
           eq(step.status, 'pending'),
           inArray(step.kind, ['build', 'session']),
-          eq(todo.output, 'info'),
+          inArray(todo.output, INFO_OUTPUT_KINDS),
           isNull(todo.archivedAt),
           sql`coalesce(${todo.sourceKind}, '') NOT IN ('research-intake', 'research-citation-check')`,
           or(isNull(step.holdUntil), lte(step.holdUntil, sql`${nowMs()}`)),

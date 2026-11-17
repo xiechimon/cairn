@@ -9,11 +9,13 @@ import {
   chiefGetResponseSchema,
   chiefThreadSchema,
   chiefThreadTitle,
+  coordinatorCreateTodoParamsSchema,
   createTodoBodySchema,
   daemonJsonSchema,
   deviceJsonSchema,
   filterAgentTools,
   githubIssueSourceRef,
+  isInfoOutput,
   machineJsonSchema,
   mcpServerRecordSchema,
   memoryRecordSchema,
@@ -105,6 +107,49 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
       title: 't',
       spec: 's',
     });
+  });
+
+  it('accepts the finer non-code deliverable kinds and rejects others', () => {
+    for (const output of ['report', 'dataset', 'link'] as const) {
+      expect(todoRecordSchema.parse({ ...sample, output })).toEqual({ ...sample, output });
+      expect(createTodoBodySchema.parse({ title: 't', spec: 's', output }).output).toBe(output);
+    }
+    expect(todoRecordSchema.safeParse({ ...sample, output: 'media' }).success).toBe(false);
+    expect(createTodoBodySchema.safeParse({ title: 't', spec: 's', output: 'media' }).success).toBe(
+      false,
+    );
+  });
+
+  it('isInfoOutput names every non-code kind and only those', () => {
+    for (const output of ['info', 'report', 'dataset', 'link'] as const) {
+      expect(isInfoOutput(output)).toBe(true);
+    }
+    expect(isInfoOutput('code')).toBe(false);
+    expect(isInfoOutput(undefined)).toBe(false);
+    expect(isInfoOutput(null)).toBe(false);
+    expect(isInfoOutput('media')).toBe(false);
+  });
+
+  it('create_todo params treat every non-code kind like an info card', () => {
+    for (const output of ['info', 'report', 'dataset', 'link'] as const) {
+      expect(
+        coordinatorCreateTodoParamsSchema.safeParse({ title: 't', output, briefing: 'b' }).success,
+      ).toBe(true);
+      expect(coordinatorCreateTodoParamsSchema.safeParse({ title: 't', output }).success).toBe(
+        true,
+      );
+    }
+    expect(
+      coordinatorCreateTodoParamsSchema.safeParse({
+        title: 't',
+        projectId: 'p',
+        output: 'code',
+        briefing: 'b',
+      }).success,
+    ).toBe(false);
+    expect(
+      coordinatorCreateTodoParamsSchema.safeParse({ title: 't', output: 'code' }).success,
+    ).toBe(false);
   });
 });
 

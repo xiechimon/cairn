@@ -4,6 +4,7 @@ import {
   buildPlanContractRewritePrompt,
   buildPlanRewritePrompt,
   isBuildStepKind,
+  isInfoOutput,
   isPlanContractRewritePrompt,
   type PlanContractCheck,
   type TodoOutputKind,
@@ -87,7 +88,7 @@ function stepArtifactGate(
   }
   if (isBuildStepKind(stepRow.kind)) {
     if (blockingWorkerQuestions(deps.db, stepRow.buildId).length > 0) return null;
-    if (outcome.output === 'info') {
+    if (isInfoOutput(outcome.output)) {
       if (outcome.report === undefined) return '信息卡未产出报告';
       return outcome.deliverables !== undefined
         ? deliverableManifestFailure(deps.db, stepRow.id, outcome.deliverables)
@@ -282,7 +283,7 @@ export function completeStep(
     canTransitionPhase(todoRow.phase, 'needs_input') &&
     pendingWorkerQuestions(deps.db, stepRow.buildId).length > 0
   ) {
-    if (todoRow.output === 'info') keepInfoReport();
+    if (isInfoOutput(todoRow.output)) keepInfoReport();
     setTodoPhase(
       deps,
       todoRow.id,
@@ -291,7 +292,7 @@ export function completeStep(
     );
     return;
   }
-  if (isBuildStepKind(stepRow.kind) && todoRow.output === 'info') {
+  if (isBuildStepKind(stepRow.kind) && isInfoOutput(todoRow.output)) {
     keepInfoReport();
     if (outcome.deliverables !== undefined) {
       publishDeliverables(deps.db, {

@@ -1,4 +1,4 @@
-import { RESEARCH_BEFORE_PLAN_SOURCE_KIND } from '@cairn/shared';
+import { isInfoOutput, RESEARCH_BEFORE_PLAN_SOURCE_KIND } from '@cairn/shared';
 import type { TodoGlance } from '../detail/segments.js';
 import type { ChiefSegment } from '../fixtures/records.js';
 import { parseMentionSegments } from '../overlay/mention-token.js';
@@ -37,7 +37,7 @@ export function todoGlanceOf(todo: GlanceSource): TodoGlance {
     ...(todo.seqNum !== undefined ? { seq: todo.seqNum } : {}),
     title: todo.title,
     ...(parentId !== undefined ? { parentId } : {}),
-    ...(todo.output === 'info' ? { report: true } : {}),
+    ...(isInfoOutput(todo.output) ? { report: true } : {}),
     ...(todo.latestBuildId != null ? { buildId: todo.latestBuildId } : {}),
     ...(todo.projectId !== undefined ? { projectId: todo.projectId } : {}),
   };

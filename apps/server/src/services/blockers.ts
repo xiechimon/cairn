@@ -1,5 +1,6 @@
 import {
   infoReportMessageSchema,
+  isInfoOutput,
   isSessionStepKind,
   quoteIssueLines,
   stepKindSchema,
@@ -27,7 +28,7 @@ function blockersOf(db: Db, row: Pick<TodoRow, 'blockedBy'>): TodoRow[] {
 }
 
 function reportLesson(db: Db, blocker: TodoRow): string | null {
-  if (blocker.output !== 'info' || blocker.latestBuildId === null) return null;
+  if (!isInfoOutput(blocker.output) || blocker.latestBuildId === null) return null;
   const buildRow = db.select().from(build).where(eq(build.id, blocker.latestBuildId)).get();
   const row = db
     .select({ content: message.content })

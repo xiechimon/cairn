@@ -1,4 +1,4 @@
-import { ASK_USER_QUESTION_KIND, isBuildStepKind } from '@cairn/shared';
+import { ASK_USER_QUESTION_KIND, isBuildStepKind, isInfoOutput } from '@cairn/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { type build, message, type step, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
@@ -19,7 +19,7 @@ export function undeliveredEnd(
   buildRow: BuildRow,
   outcome: { hasChanges?: boolean; workBranchDrift?: unknown },
 ): Undelivered | null {
-  if (!isBuildStepKind(stepRow.kind) || todoRow.output === 'info') return null;
+  if (!isBuildStepKind(stepRow.kind) || isInfoOutput(todoRow.output)) return null;
   if (outcome.workBranchDrift !== undefined) return null;
   if (outcome.hasChanges === false) return 'no-commits';
   const githubProject = githubRepoOfProject(projectOfTodo(deps.db, todoRow)) !== null;

@@ -3,6 +3,7 @@ import {
   hasBlockingFinding,
   isActiveStepStatus,
   isBuildStepKind,
+  isInfoOutput,
   type MachineDoneBody,
   REVIEW_VERDICT_KIND,
   VERIFY_VERDICT_KIND,
@@ -104,7 +105,7 @@ export function retireMergeGateSteps(deps: BuildDeps): void {
     .all();
   for (const { task, run } of stalled) {
     if (run.afterStopPhase === 'keep') continue;
-    if (task.output === 'info') continue;
+    if (isInfoOutput(task.output)) continue;
     if (task.phase === 'confirm' && run.afterStopPhase !== 'done') continue;
     const steps = deps.db.select().from(step).where(eq(step.buildId, run.id)).all();
     if (task.phase !== 'review' && !steps.some((s) => s.kind === 'review' || s.kind === 'verify'))

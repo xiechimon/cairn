@@ -31,6 +31,7 @@ import {
   fencedTitle,
   ISSUE_FENCE_OPEN,
   isChiefDigestThreadId,
+  isInfoOutput,
   MAIL_FENCE_OPEN,
   mailSharedTranscript,
   newChiefThreadId,
@@ -1438,7 +1439,7 @@ function ownershipWakeThread(deps: ChiefDeps, todoRecord: TodoRecord): string {
 }
 
 function reportRefOfTodo(deps: ChiefDeps, record: TodoRecord): ReportRef | 'origin-gone' | null {
-  if (record.output !== 'info' || record.phase !== 'review' || record.latestBuildId === null)
+  if (!isInfoOutput(record.output) || record.phase !== 'review' || record.latestBuildId === null)
     return null;
   const attachmentId = deps.db
     .select({ id: build.reportAttachmentId })
@@ -1627,8 +1628,9 @@ function wakeFactText(
   switch (kind) {
     case 'gate': {
       if (todo.phase === 'review') {
-        const deliverable =
-          todo.output === 'info' ? '研究报告' : '工作分支上的改动（没有可合并的 PR）';
+        const deliverable = isInfoOutput(todo.output)
+          ? '研究报告'
+          : '工作分支上的改动（没有可合并的 PR）';
         return `任务 ${ref} 已交付${deliverable}，验收归你，不归用户：读完后三选一——满意就用 complete_todos 收下；需要补充或返工就用 message_thread 让它继续；不再需要就用 archive_todos 归档。只有需要用户决定的事才用 ask_user。`;
       }
       return `任务 ${ref} 停驻在 ${todo.phase} 关口，等人处理。不要自己放行：需要用户知道或决定时，用 notify_user 或 ask_user 说明，否则直接结束本轮。`;

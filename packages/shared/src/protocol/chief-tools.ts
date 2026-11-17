@@ -13,7 +13,7 @@ import {
   TASK_REQUEST_LANES,
   TASK_REQUEST_PRIORITIES,
 } from '../records/task-request.js';
-import { todoOutputSchema } from '../records/todo.js';
+import { isInfoOutput, todoOutputSchema } from '../records/todo.js';
 import { COMPUTER_IMAGES_MAX, computerImageSchema } from './computer.js';
 
 export const remoteToolDefSchema = z.object({
@@ -206,15 +206,15 @@ export const coordinatorCreateTodoParamsSchema = z
     briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
   })
   .strict()
-  .refine((params) => params.briefing === undefined || params.output === 'info', {
-    message: 'briefing is only for output "info" cards',
+  .refine((params) => params.briefing === undefined || isInfoOutput(params.output), {
+    message: 'briefing is only for non-code outputs ("info", "report", "dataset", "link")',
     path: ['briefing'],
   })
   .refine((params) => params.messageIds === undefined || params.sourceTodoId === undefined, {
     message: 'pass messageIds or sourceTodoId, not both',
   })
-  .refine((params) => params.projectId !== undefined || params.output === 'info', {
-    message: 'pass projectId; only output "info" research that belongs to no project may omit it',
+  .refine((params) => params.projectId !== undefined || isInfoOutput(params.output), {
+    message: 'pass projectId; only a non-code output that belongs to no project may omit it',
     path: ['projectId'],
   });
 export type CoordinatorCreateTodoParams = z.infer<typeof coordinatorCreateTodoParamsSchema>;
@@ -492,7 +492,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo. Always pass title, a short summary of the outcome for the Tasks panel. You add the title and routing only, except that an info card (output 'info') also takes a briefing: an info card runs alone in its own computer and sees only the owner's cited words and the briefing, so put every link, name, id and finding you already have into the briefing instead of assuming the card can see this conversation. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. When you already did part of the request yourself, such as create_project, pass quotes covering only the rest: a task thread cannot do your part and must never receive it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo. Always pass title, a short summary of the outcome for the Tasks panel. You add the title and routing only, except that an info card (output 'info', 'report', 'dataset' or 'link') also takes a briefing: an info card runs alone in its own computer and sees only the owner's cited words and the briefing, so put every link, name, id and finding you already have into the briefing instead of assuming the card can see this conversation. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. When you already did part of the request yourself, such as create_project, pass quotes covering only the rest: a task thread cannot do your part and must never receive it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
     parameters: obj(
       {
         title: str(
@@ -517,7 +517,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
         ),
         output: str(
-          'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
+          'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or one of "info", "report", "dataset", "link" (info card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment; pick the kind that names the artifact).',
         ),
         blockedBy: idArr(
           'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
@@ -534,7 +534,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           `Optional "macos", "windows" or "linux": the operating system the task needs. ${PLATFORM_DOC}`,
         ),
         briefing: str(
-          'Only with output "info". The concrete inputs you already have that the card needs and cannot get from the owner\'s words: links, names, ids, figures, what you found earlier in this conversation or with your own tools. Plain facts, copied exactly, no instructions and no plan. An info card runs alone in its own computer and sees only the owner\'s cited words plus this briefing, so anything you leave out is lost to it.',
+          'Only with a non-code output ("info", "report", "dataset", "link"). The concrete inputs you already have that the card needs and cannot get from the owner\'s words: links, names, ids, figures, what you found earlier in this conversation or with your own tools. Plain facts, copied exactly, no instructions and no plan. An info card runs alone in its own computer and sees only the owner\'s cited words plus this briefing, so anything you leave out is lost to it.',
         ),
         lane: str(
           'Optional "quick", only in an owner turn whose words state the outcome and whose project has a basis the server can check: this channel\'s project, the composer\'s picked project, a project the owner named, or one the owner chose in ask_user. The todo still runs in a thread through a PR and the merge gate; its session skips tests for data or copy edits. A basis that does not check out returns 400 and writes nothing; create it again without lane. Never in event turns ([wake:…]).',

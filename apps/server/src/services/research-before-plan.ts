@@ -1,4 +1,4 @@
-import { quoteIssueLines, RESEARCH_BEFORE_PLAN_SOURCE_KIND } from '@cairn/shared';
+import { isInfoOutput, quoteIssueLines, RESEARCH_BEFORE_PLAN_SOURCE_KIND } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -22,7 +22,7 @@ function priorQuestion(title: string, reason: string, spec: string | null): stri
 
 export function holdCodeThreadForPriorResearch(deps: BuildDeps, codeTodoId: string): void {
   const row = deps.db.select().from(todo).where(eq(todo.id, codeTodoId)).get();
-  if (row === undefined || row.output === 'info') return;
+  if (row === undefined || isInfoOutput(row.output)) return;
   const reason = row.request?.research?.reason;
   if (reason === undefined) return;
   let researchId: string;

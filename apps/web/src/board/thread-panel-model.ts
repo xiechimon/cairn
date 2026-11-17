@@ -1,4 +1,4 @@
-import { IN_PROGRESS_PHASES, isWaitingPhase, type TaskRequest } from '@cairn/shared';
+import { IN_PROGRESS_PHASES, isInfoOutput, isWaitingPhase, type TaskRequest } from '@cairn/shared';
 import type { ChiefStreamItem, TodoRecord, TranscriptItem } from '../fixtures/records.js';
 
 export const MAX_UPDATE_LINES = 3;
@@ -121,7 +121,7 @@ export function threadProgress(
     : (IN_PROGRESS_PHASES as readonly string[]).includes(phase)
       ? 'run'
       : 'idle';
-  if (todo.output === 'info') {
+  if (isInfoOutput(todo.output)) {
     return { steps: INFO_STEPS, at: phase === 'done' ? 2 : phase === 'review' ? 1 : 0, tone };
   }
   return null;

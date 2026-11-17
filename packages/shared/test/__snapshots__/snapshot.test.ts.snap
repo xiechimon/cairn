@@ -5893,6 +5893,9 @@ exports[`body/envelope schema snapshots > createTodoBody > createTodoBody.json 1
       "enum": [
         "code",
         "info",
+        "report",
+        "dataset",
+        "link",
       ],
       "type": "string",
     },
@@ -7389,6 +7392,9 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               "enum": [
                 "code",
                 "info",
+                "report",
+                "dataset",
+                "link",
               ],
               "type": "string",
             },
@@ -13466,6 +13472,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
       "enum": [
         "code",
         "info",
+        "report",
+        "dataset",
+        "link",
       ],
       "type": "string",
     },
