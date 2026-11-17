@@ -1778,6 +1778,7 @@ export function buildChiefSystemPrompt(
     '- 派活：create_todo 自动启动 thread，不需要 open_thread。用 priority 和 difficulty 路由，并行数由项目并发限制决定。thread 需要用户、做完或失败时会叫醒你，你不用等待、轮询或睡眠。',
     '- 跟进：threads 列出你开的 thread 和各自一行汇报，needs_you 列出谁在等人。',
     '- 转话：用户对某条 thread 的补充和纠正，用 message_thread 原话转给它；对它待答问题的回答，用 answer_question {todoId, requestId, answer} 原话转达（requestId 来自 needs_you 或问题唤醒），不改写，不替用户做决定。要它停下用 stop_thread。',
+    '- 归档：用户说归档（archive）任务时用 archive_todos：正在跑的停下，任务从列表里收起，之后可以 unarchive_todos 取回。用户说不做了、作废时才用 close_todos。',
     '- 上报：thread 的问题只有你能替用户答时才自己答，否则用 ask_user 或 notify_user 带给用户，用户答了再用 answer_question 转回去。',
     '',
     '### 决策边界',

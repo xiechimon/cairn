@@ -118,7 +118,7 @@ export function TaskRowMenu({
           toastArchived(t, todo.title, (handlers) =>
             mutations.setTodoArchived.mutate({ id: todo.id, archived: false }, handlers),
           ),
-        onError: (error) => toastError(t('Could not archive task.'), error),
+        onError: (error) => toastError(t('无法归档任务。'), error),
       },
     );
   };

@@ -111,7 +111,7 @@ export function useThreadActions({
               );
           },
           onError: (error) =>
-            toastError(next ? t('Could not archive task.') : t('Could not unarchive task.'), error),
+            toastError(next ? t('无法归档任务。') : t('无法取消归档任务。'), error),
         },
       );
     });

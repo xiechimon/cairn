@@ -50,6 +50,7 @@ import {
   cancelBuild,
   requestMerge,
   stopActiveStepsAfterExit,
+  stopActiveStepsForArchive,
 } from './builds.js';
 import {
   addChiefWatch,
@@ -102,7 +103,7 @@ import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js
 import { snoozeTodo } from './snooze.js';
 import { listBuildStepRoutes } from './step-route.js';
 import { startThreadBuild } from './thread-message.js';
-import { getTodo, listTodos, setTodoPhase } from './todos.js';
+import { getTodo, listTodos, setTodoArchived, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
@@ -204,6 +205,8 @@ const PROJECT_WRITE_TOOLS = new Set([
   'delete_todos',
   'close_todos',
   'reopen_todos',
+  'archive_todos',
+  'unarchive_todos',
   'complete_todos',
   'message_todo',
   'update_project',
@@ -735,6 +738,30 @@ export async function executeChiefTool(
           supersededBy !== undefined ? { supersededBy } : {},
         ),
       );
+    }
+    case 'archive_todos':
+    case 'unarchive_todos': {
+      const archive = name === 'archive_todos';
+      const changed: string[] = [];
+      const skipped: string[] = [];
+      for (const id of strArr(params, 'todoIds')) {
+        const owned = db
+          .select({ id: todo.id })
+          .from(todo)
+          .where(and(eq(todo.id, id), eq(todo.teamId, ctx.teamId)))
+          .get();
+        if (!owned || !setTodoArchived(svc, id, archive)) {
+          skipped.push(id);
+          continue;
+        }
+        if (archive)
+          stopActiveStepsForArchive(svc, id, {
+            actor: 'coordinator',
+            reason: 'archived by Coordinator',
+          });
+        changed.push(id);
+      }
+      return json({ [archive ? 'archived' : 'unarchived']: changed, skipped });
     }
     case 'reopen_todos': {
       const out = transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor);

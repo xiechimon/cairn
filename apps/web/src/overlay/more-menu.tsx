@@ -175,7 +175,7 @@ export function MoreMenu({
           {
             key: 'archive',
             shortcut: 'A',
-            label: t('Archive'),
+            label: t('归档'),
             Icon: Archive,
             action: 'archive',
             disabled: false,

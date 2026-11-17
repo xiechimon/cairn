@@ -48,9 +48,8 @@ export const EN: Record<string, string> = {
     'This subscription has expired. Remove it, then run `claude setup-token` in a terminal and add the new token.',
   使用: 'Usage',
   '24 小时步骤': 'Steps in 24 hours',
-  Archive: 'Archive',
-  'Could not unarchive task.': 'Could not unarchive task.',
-  'Could not archive task.': 'Could not archive task.',
+  '无法取消归档任务。': 'Could not unarchive the task.',
+  '无法归档任务。': 'Could not archive the task.',
   'Claude 订阅': 'Claude subscription',
   '添加 Claude 订阅': 'Add Claude subscription',
   '在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。':

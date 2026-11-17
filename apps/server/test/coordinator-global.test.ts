@@ -525,6 +525,22 @@ describe('archived projects stay read-only for the Coordinator', () => {
     expect(chiefPrompts(old)).toEqual([]);
   });
 
+  test('archive_todos archives without closing, unarchive_todos brings it back, unknown ids are skipped', async () => {
+    const created = (await relay('create_todo', ownerTodo('put away'))) as { id: string };
+    expect(await relay('archive_todos', { todoIds: [created.id, 'nope'] })).toEqual({
+      archived: [created.id],
+      skipped: ['nope'],
+    });
+    const archived = getTodo({ db: H.s.db }, created.id);
+    expect(archived?.archivedAt).toBeTypeOf('number');
+    expect(archived?.phase).not.toBe('closed');
+    expect(await relay('unarchive_todos', { todoIds: [created.id] })).toEqual({
+      unarchived: [created.id],
+      skipped: [],
+    });
+    expect(getTodo({ db: H.s.db }, created.id)?.archivedAt).toBeNull();
+  });
+
   test('Coordinator tool writes targeting an archived project are refused; reads still work', async () => {
     const created = (await relay('create_todo', ownerTodo('kept'))) as { id: string };
     await archive(H.projectId);

@@ -52,6 +52,8 @@ export const CHIEF_TOOLS_ADDED = [
   'read_history',
   'job_profile',
   'channel_messages',
+  'archive_todos',
+  'unarchive_todos',
 ] as const;
 
 export const CHIEF_TOOL_CATEGORIES = {
@@ -82,6 +84,8 @@ export const CHIEF_TOOL_CATEGORIES = {
     'delete_todos',
     'close_todos',
     'reopen_todos',
+    'archive_todos',
+    'unarchive_todos',
     'complete_todos',
     'create_project',
     'update_project',
@@ -568,6 +572,17 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     parameters: obj({ todoIds: idArr('Todo ids to reopen.') }, ['todoIds']),
   },
   {
+    name: 'archive_todos',
+    description:
+      'Archive todos: stop their running work, pause their schedules and put them away from the task lists. Use this when the user says archive (归档). Archiving is reversible with unarchive_todos and keeps the phase, unlike close_todos.',
+    parameters: obj({ todoIds: idArr('Todo ids to archive.') }, ['todoIds']),
+  },
+  {
+    name: 'unarchive_todos',
+    description: 'Unarchive todos so they show in the task lists and can run again.',
+    parameters: obj({ todoIds: idArr('Todo ids to unarchive.') }, ['todoIds']),
+  },
+  {
     name: 'complete_todos',
     description:
       'Accept a delivered research report you own and mark its todo done, without merging. Successful code tasks finish themselves. This tool does not approve plans or authorize a merge.',
@@ -809,7 +824,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-export const CHIEF_TOOL_COUNT = 48;
+export const CHIEF_TOOL_COUNT = 50;
 
 export const CHIEF_ROUTER_TOOL_NAMES = [
   'open_thread',

@@ -87,9 +87,9 @@ describe('47-item vocabulary', () => {
     ...added,
   ].sort();
 
-  it('raw key set is exactly 49; live vocabulary = raw - removals - D60 removals + additions = 48', () => {
+  it('raw key set is exactly 49; live vocabulary = raw - removals - D60 removals + additions = 50', () => {
     expect(rawKeys).toHaveLength(49);
-    expect(CHIEF_TOOL_COUNT).toBe(48);
+    expect(CHIEF_TOOL_COUNT).toBe(50);
     expect(CHIEF_TOOL_COUNT).toBe(
       rawKeys.filter((name) => !removedUnderD60.includes(name)).length -
         removed.length +
@@ -102,7 +102,7 @@ describe('47-item vocabulary', () => {
     expect(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort()).toEqual(expected);
   });
 
-  it('removal registry = delete_skills + set_remote_shell; addition registry = create_skill + update_skill + models + update_memory + snooze_todos + search_history + read_history + job_profile + channel_messages', () => {
+  it('removal registry = delete_skills + set_remote_shell; addition registry = create_skill + update_skill + models + update_memory + snooze_todos + search_history + read_history + job_profile + channel_messages + archive_todos + unarchive_todos', () => {
     expect(removed).toEqual(['delete_skills', 'set_remote_shell']);
     expect(added).toEqual([
       'create_skill',
@@ -114,6 +114,8 @@ describe('47-item vocabulary', () => {
       'read_history',
       'job_profile',
       'channel_messages',
+      'archive_todos',
+      'unarchive_todos',
     ]);
     for (const name of removed) {
       expect(CHIEF_TOOL_NAMES).not.toContain(name);
@@ -125,9 +127,9 @@ describe('47-item vocabulary', () => {
     }
   });
 
-  it('groups = 19 read + 16 organize + 2 execute + 11 private', () => {
+  it('groups = 19 read + 18 organize + 2 execute + 11 private', () => {
     expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(19);
-    expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(16);
+    expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(18);
     expect(CHIEF_TOOL_CATEGORIES.execute).toHaveLength(2);
     expect(CHIEF_TOOL_CATEGORIES.private).toHaveLength(11);
   });
@@ -187,7 +189,7 @@ describe('Coordinator task text contract', () => {
 });
 
 describe('D60 router tools', () => {
-  it('are six tools outside the 48-item base vocabulary, so the base count stays 48', () => {
+  it('are six tools outside the 50-item base vocabulary, so the base count stays 50', () => {
     expect(CHIEF_ROUTER_TOOL_NAMES).toEqual([
       'open_thread',
       'message_thread',
@@ -197,7 +199,7 @@ describe('D60 router tools', () => {
       'needs_you',
     ]);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
-    expect(CHIEF_TOOL_COUNT).toBe(48);
+    expect(CHIEF_TOOL_COUNT).toBe(50);
     for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(CHIEF_TOOL_NAMES).not.toContain(name);
   });
 
