@@ -313,6 +313,8 @@ describe('claim/wake timing (r3 section 1.5 measured: ~75s long poll cadence + w
       headers: { authorization: `Bearer ${w.token}` },
       signal: ctrl.signal,
     });
+    expect(res.headers.get('x-accel-buffering')).toBe('no');
+    expect(res.headers.get('cache-control')).toBe('no-cache, no-transform');
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();
     const readWake = (async () => {

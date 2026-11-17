@@ -37,12 +37,12 @@ import {
 import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
 import type { Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
 import { build, type machine as machineTable, step, todo } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
+import { openSseStream } from './lib/sse-headers.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { isLoopbackPeer, pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody } from './routes-helpers.js';
@@ -439,7 +439,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/machine/stream', (c) => {
     const row = me(c);
     const token = bearer(c) ?? '';
-    return streamSSE(c, async (stream) => {
+    return openSseStream(c, async (stream) => {
       let lastWrite: Promise<unknown> = Promise.resolve();
       const unsubscribe = ctx.machineHub.subscribeMachine(
         row.teamId,

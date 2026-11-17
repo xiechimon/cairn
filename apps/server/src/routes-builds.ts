@@ -13,11 +13,11 @@ import {
 } from '@cairn/shared';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
 import { chiefMessage, message, plan as planTable, todo, tokenUsage } from './db/schema.js';
 import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
+import { openSseStream } from './lib/sse-headers.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requestOrigin, requireProject, svcOf } from './routes-helpers.js';
 import {
@@ -129,9 +129,10 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/conversations/:id/stream', (c) => {
     const conversationId = c.req.param('id');
-    return streamSSE(c, async (stream) => {
-      const conn = createSerialConnection((payload) =>
-        stream.writeSSE({ data: JSON.stringify(payload) }),
+    return openSseStream(c, async (stream) => {
+      const conn = createSerialConnection(
+        (payload) => stream.writeSSE({ data: JSON.stringify(payload) }),
+        { onOverflow: () => stream.abort() },
       );
       const unsubscribe = ctx.convHub?.subscribe(conversationId, conn) ?? (() => {});
       const deviceId = pairedDeviceIdOf(c);

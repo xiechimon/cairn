@@ -73,15 +73,38 @@ export class TeamStreamHub {
   }
 }
 
+export const SSE_MAX_PENDING_WRITES = 4096;
+
+export interface SerialConnectionOptions {
+  maxPending?: number;
+  onOverflow?: () => void;
+}
+
 export function createSerialConnection(
   write: (payload: object) => Promise<void>,
+  options: SerialConnectionOptions = {},
 ): TeamStreamConnection {
+  const maxPending = options.maxPending ?? SSE_MAX_PENDING_WRITES;
   let seq = 0;
+  let pending = 0;
+  let overflowed = false;
   let tail: Promise<void> = Promise.resolve();
   return {
     nextSeq: () => ++seq,
     send(payload) {
-      tail = tail.then(() => write(payload)).catch(() => {});
+      if (overflowed) return tail;
+      if (pending >= maxPending) {
+        overflowed = true;
+        options.onOverflow?.();
+        return tail;
+      }
+      pending += 1;
+      tail = tail
+        .then(() => write(payload))
+        .catch(() => {})
+        .finally(() => {
+          pending -= 1;
+        });
       return tail;
     },
   };

@@ -14,12 +14,12 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
-import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
 import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
 import { parseWith } from './lib/errors.js';
 import { loopbackOwnerOriginOf } from './lib/loopback-owner.js';
+import { openSseStream } from './lib/sse-headers.js';
 import { isOpenRemotePath, pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
@@ -266,9 +266,10 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/stream', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return streamSSE(c, async (stream) => {
-      const conn = createSerialConnection((payload) =>
-        stream.writeSSE({ data: JSON.stringify(payload) }),
+    return openSseStream(c, async (stream) => {
+      const conn = createSerialConnection(
+        (payload) => stream.writeSSE({ data: JSON.stringify(payload) }),
+        { onOverflow: () => stream.abort() },
       );
       const unsubscribe = ctx.hub.subscribe(teamId, conn, ctx.user.id);
       const deviceId = pairedDeviceIdOf(c);
