@@ -45,7 +45,7 @@ Panel states for the local Mac's row:
 | On, Screen Recording not `granted` | "Screen Recording not granted: the agent reads apps as text only", same buttons |
 | On, ready | "The agent can use apps on this Mac after you approve each app", list of this conversation's approvals with Revoke |
 
-**D5 Approval rows.** Reuse `action_proposal` with `actionId 'user_computer.app'`, `targetId '<machineId>:<app key>'`, where the app key is the app name trimmed and lowercased, the same exact, case-insensitive match the driver uses for `app_name` (`实测`). `inputJson` binds `{ machineId, app, threadId, sessionId, stepId, toolCallId }`. The card (built like the browser-password card) names the app and the Mac and offers 允许一次 / 本次对话内允许 / 拒绝. `decision` gains the value `conversation`; `answerProposal` accepts it only for this action.
+**D5 Approval rows.** Reuse `action_proposal` with `actionId 'user_computer.app'`, `targetId '<machineId>:<app key>'`, where the app key is the app name trimmed and lowercased, the same exact, case-insensitive match the driver uses for `app_name` (`实测`). `inputJson` binds `{ machineId, app, threadId, sessionId, stepId, toolCallId }`. The card (built like the browser-password card) names the app and the Mac and offers allow once / allow in this conversation / deny. `decision` gains the value `conversation`; `answerProposal` accepts it only for this action.
 
 | Scope | Allows | Ends |
 |---|---|---|
