@@ -2,14 +2,7 @@ import { type ProjectRecord, projectBranchesResponseSchema } from '@cairn/shared
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select.js';
+import { FilterPicker } from '../components/filter-picker.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -41,34 +34,22 @@ export function ProjectBaseBranchSelect({ project }: { project: ProjectRecord })
   ];
   return (
     <>
-      <Select
-        items={items}
+      <FilterPicker
+        options={items}
         value={selected}
         disabled={branches.data === undefined || mutations.patchProject.isPending}
-        onValueChange={(value) =>
+        onPick={(value) =>
           mutations.patchProject.mutate(
             { id: project.id, body: { baseBranch: value || null } },
             { onError: (error) => toastError(t('保存失败，请重试。'), error) },
           )
         }
-      >
-        <SelectTrigger
-          data-testid="project-base-branch"
-          aria-label={t('目标分支')}
-          className="w-48"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+        label={t('目标分支')}
+        placeholder={t('搜索分支')}
+        noun={t('分支')}
+        triggerTestId="project-base-branch"
+        triggerClassName="w-48"
+      />
       {branches.isError && (
         <span role="alert" className="text-meta text-destructive">
           {t('读取失败')}

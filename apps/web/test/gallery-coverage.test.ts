@@ -11,8 +11,10 @@ const NOT_IN_GALLERY: Record<string, string> = {
     'Renders nothing: it requests earlier history pages when the reader nears the top and restores the reading position.',
   'ui/alert-dialog.tsx':
     'Registry copy with no consumer; confirm surfaces use alert-dialog-shell.tsx, shown in the Dialog section.',
+  'filter-picker.tsx':
+    'Gap: rendered on the model selector page, the project base branch and the schedule task field; no specimen yet.',
   'model-select-core.tsx':
-    'Gap: rendered only through src/routes/agent-model-select.tsx on the routing settings page; no specimen yet.',
+    'Labels and grouping helpers only; renders nothing.',
   'conversation-skeleton.tsx':
     'Gap: rendered only by src/board/home-c.tsx while the Coordinator data loads; no specimen yet.',
   'queued-capsules.tsx':

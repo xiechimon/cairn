@@ -261,6 +261,17 @@ export const FILE_RULES = new Map([
   ['apps/web/src/routes/machine-authorize-page.tsx', ['machine-']],
   ['apps/web/src/components/model-select-core.tsx', [...AGENT, 'chief-settings']],
   [
+    'apps/web/src/components/filter-picker.tsx',
+    [
+      'picker-filter',
+      'settings-routing',
+      'first-run-setup',
+      'project-settings-base-branch',
+      'schedules-',
+      'chief-home-tasks-panel',
+    ],
+  ],
+  [
     'apps/web/src/components/profile-card.tsx',
     ['avatar-', 'user-menu-', 'paper-', 'account-', ...AGENT],
   ],

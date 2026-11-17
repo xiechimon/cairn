@@ -6,17 +6,11 @@ import { useLiveData } from '../api/provider.js';
 import { joinMeta, relativeTime } from '../board/rel-time.js';
 import { useThreadHref } from '../board/thread-link.js';
 import { useNarrow } from '../board/use-narrow.js';
+import { FilterPicker } from '../components/filter-picker.js';
 import { FormField } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../components/ui/popover.js';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
@@ -36,6 +30,7 @@ export interface ScheduleCandidate {
   id: string;
   title: string;
   projectId: string;
+  place?: string;
 }
 
 const RUN_STATUS: Record<string, string> = {
@@ -228,30 +223,25 @@ function ScheduleEditor({
             </p>
           ) : (
             <FormField label={t('任务')} htmlFor={taskId}>
-              <Select
+              <FilterPicker
+                options={candidates.map((candidate) => ({
+                  value: candidate.id,
+                  label: candidate.title,
+                  ...(candidate.place === undefined
+                    ? {}
+                    : { detail: candidate.place, group: candidate.place }),
+                }))}
                 value={todoId}
-                onValueChange={(value) => {
-                  if (value !== null) setTodoId(value);
-                }}
+                onPick={setTodoId}
                 disabled={busy}
-              >
-                <SelectTrigger
-                  id={taskId}
-                  aria-label={t('任务')}
-                  className="w-full min-w-0 pointer-coarse:h-11"
-                >
-                  <SelectValue>
-                    <span className="truncate">{target?.title ?? t('选择任务')}</span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent aria-label={t('任务')}>
-                  {candidates.map((candidate) => (
-                    <SelectItem key={candidate.id} value={candidate.id}>
-                      {candidate.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                label={t('任务')}
+                placeholder={t('搜索任务或项目')}
+                noun={t('任务')}
+                triggerId={taskId}
+                triggerClassName="w-full min-w-0 pointer-coarse:h-11"
+                popupClassName="w-(--anchor-width) max-sm:w-(--anchor-width)"
+                triggerContent={target === undefined ? t('选择任务') : undefined}
+              />
             </FormField>
           )
         ) : (

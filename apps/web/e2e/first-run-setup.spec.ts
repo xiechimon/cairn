@@ -353,5 +353,5 @@ test('the change menu groups models by provider name without a generic heading',
   const menu = page.locator('.routing-rule-model-menu:visible');
   await expect(menu.getByRole('option', { name: 'Claude Opus 5.5' })).toBeVisible();
   await expect(menu).not.toContainText('服务商');
-  await expect(menu).not.toContainText('Claude token');
+  await expect(menu.getByText('Claude token', { exact: true })).toHaveCount(1);
 });

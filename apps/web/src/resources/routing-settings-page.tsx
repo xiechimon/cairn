@@ -1,7 +1,5 @@
 import {
   type CoordinatorDefault,
-  MODEL_SOURCE_RUNTIME_LABELS,
-  type ModelSourceRuntime,
   type RouteUse,
   type RoutingRuleRecord,
   type RuleFix,
@@ -23,14 +21,14 @@ import { ROUTE_USE_LABELS } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { useTopModels, useTopModelsMutations } from '../api/top-models.js';
+import { FilterPicker } from '../components/filter-picker.js';
+import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SettingsCard, SettingsRow } from '../components/settings-list.js';
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select.js';
@@ -148,90 +146,75 @@ export function ModelPicker({
   const picked = currentOption(rule, options);
   const shownId = picked?.modelId ?? rule?.modelId ?? '';
   const Vendor = vendorMark(shownId);
-  const byKey = new Map(options.map((o) => [modelKey(o), o]));
   const coordinatorCannot = (runtime: string) =>
     use === 'coordinator' && !COORDINATOR_RUNTIMES.has(runtime);
   const runtimeOff = (runtime: string) =>
     coordinatorCannot(runtime) ||
     (enabledRuntimes !== null && runtime !== 'pi' && !enabledRuntimes.has(runtime));
-  const groupKey = (o: ModelOption) => (o.runtime === 'pi' ? `pi/${o.provider}` : o.runtime);
-  const groups = [...new Map(options.map((o) => [groupKey(o), o])).entries()]
-    .map(([key, first]) => {
-      const name =
-        first.runtime === 'pi'
-          ? first.providerLabel
-          : (MODEL_SOURCE_RUNTIME_LABELS[first.runtime as ModelSourceRuntime] ?? first.runtime);
-      const label = coordinatorCannot(first.runtime)
-        ? t('{runtime}（Coordinator 用不了）', { runtime: name })
-        : runtimeOff(first.runtime)
-          ? t('{runtime}（没有执行机启用）', { runtime: name })
-          : name;
-      return { key, label, off: runtimeOff(first.runtime) };
-    })
-    .sort((a, b) => Number(a.off) - Number(b.off));
+  const byKey = new Map(options.map((o) => [modelKey(o), o]));
+  const rows = [...byKey.values()].sort(
+    (a, b) => Number(runtimeOff(a.runtime)) - Number(runtimeOff(b.runtime)),
+  );
+  const groupLabel = (o: ModelOption) =>
+    coordinatorCannot(o.runtime)
+      ? t('{runtime}（Coordinator 用不了）', { runtime: modelGroupName(o) })
+      : runtimeOff(o.runtime)
+        ? t('{runtime}（没有执行机启用）', { runtime: modelGroupName(o) })
+        : modelGroupName(o);
   return (
-    <Select
+    <FilterPicker
+      options={rows.map((o) => ({
+        value: modelKey(o),
+        label: o.liveness === 'dead' ? `${o.modelName}（${t('已下架')}）` : o.modelName,
+        detail: modelGroupName(o),
+        group: modelGroupKey(o),
+        groupLabel: groupLabel(o),
+        disabled: o.liveness === 'dead' || runtimeOff(o.runtime),
+        keywords: `${o.modelId} ${o.runtime}`,
+      }))}
       value={picked === undefined ? null : modelKey(picked)}
-      onValueChange={(next) => {
-        const option = next === null ? undefined : byKey.get(next as string);
+      onPick={(key) => {
+        const option = byKey.get(key);
         if (option !== undefined) onPick(option);
       }}
-    >
-      <SelectTrigger
-        aria-label={
-          trigger === undefined
-            ? t('{use} 的模型', { use: t(ROUTE_USE_LABELS[use]) })
-            : t('{label}（{use} 的模型）', { label: trigger.label, use: t(ROUTE_USE_LABELS[use]) })
-        }
-        className={
-          trigger?.className ??
-          'routing-rule-model-select w-auto max-w-64 min-w-0 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:h-7 max-sm:text-meta'
-        }
-      >
-        {trigger !== undefined ? (
+      label={
+        trigger === undefined
+          ? t('{use} 的模型', { use: t(ROUTE_USE_LABELS[use]) })
+          : t('{label}（{use} 的模型）', { label: trigger.label, use: t(ROUTE_USE_LABELS[use]) })
+      }
+      placeholder={t('搜索模型或服务商')}
+      noun={t('模型')}
+      align="end"
+      triggerClassName={
+        trigger?.className ??
+        'routing-rule-model-select w-auto max-w-72 min-w-0 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:h-7 max-sm:max-w-full max-sm:text-meta'
+      }
+      triggerContent={
+        trigger !== undefined ? (
           trigger.label
+        ) : shownId === '' ? (
+          t('未设置模型')
         ) : (
-          <SelectValue>
-            {shownId === '' ? (
-              t('未设置模型')
+          <>
+            <Vendor aria-hidden className="size-4 flex-none" />
+            <span className="max-w-full flex-none truncate">
+              {picked?.modelName ??
+                options.find((o) => o.modelId === shownId)?.modelName ??
+                shownId}
+            </span>
+            {picked === undefined ? (
+              <span className="text-content-tertiary">{t('不可用')}</span>
             ) : (
-              <>
-                <Vendor aria-hidden className="size-4 flex-none" />
-                {picked?.modelName ??
-                  options.find((o) => o.modelId === shownId)?.modelName ??
-                  shownId}
-                {picked === undefined && (
-                  <span className="text-content-tertiary">{t('不可用')}</span>
-                )}
-              </>
+              <span className="min-w-0 truncate text-meta text-content-tertiary">
+                {modelGroupName(picked)}
+              </span>
             )}
-          </SelectValue>
-        )}
-      </SelectTrigger>
-      <SelectContent
-        className="routing-rule-model-menu w-max min-w-(--anchor-width) max-w-(--available-width)"
-        alignItemWithTrigger={false}
-        {...(trigger === undefined ? {} : { align: 'end' as const })}
-      >
-        {groups.map((group) => (
-          <SelectGroup key={group.key}>
-            {(groups.length > 1 || group.off) && <SelectLabel>{group.label}</SelectLabel>}
-            {options
-              .filter((o) => groupKey(o) === group.key)
-              .map((o) => (
-                <SelectItem
-                  key={`${o.machineId ?? ''}/${modelKey(o)}`}
-                  className="routing-rule-model-row pointer-coarse:min-h-11"
-                  value={modelKey(o)}
-                  disabled={o.liveness === 'dead' || group.off}
-                >
-                  {o.liveness === 'dead' ? `${o.modelName}（${t('已下架')}）` : o.modelName}
-                </SelectItem>
-              ))}
-          </SelectGroup>
-        ))}
-      </SelectContent>
-    </Select>
+          </>
+        )
+      }
+      popupClassName="routing-rule-model-menu"
+      rowClassName="routing-rule-model-row"
+    />
   );
 }
 

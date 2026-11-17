@@ -442,7 +442,15 @@ export function TasksPanel({
             now={now}
             candidates={entries
               .filter((entry) => entry.todo.archivedAt == null)
-              .map(({ todo }) => ({ id: todo.id, title: todo.title, projectId: todo.projectId }))}
+              .map((entry) => {
+                const place = placeOf(entry);
+                return {
+                  id: entry.todo.id,
+                  title: entry.todo.title,
+                  projectId: entry.todo.projectId,
+                  ...(place === undefined ? {} : { place }),
+                };
+              })}
           />
         ) : (
           <QueryBoundary

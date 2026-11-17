@@ -1,10 +1,4 @@
-import {
-  MODEL_SOURCE_RUNTIME_LABELS,
-  type ModelSourceRuntime,
-  THINKING_LEVELS,
-  type ThinkingLevel,
-  type TopModel,
-} from '@cairn/shared';
+import { THINKING_LEVELS, type ThinkingLevel, type TopModel } from '@cairn/shared';
 import {
   closestCenter,
   DndContext,
@@ -25,14 +19,9 @@ import { cn } from 'cn';
 import { Box, GripVertical, Plus, Server, X } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 import { ClaudeMark, GeminiMark, GrokMark, OpenAIMark } from '../components/brand-marks.js';
-import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
+import { FilterPicker } from '../components/filter-picker.js';
+import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import { Button } from '../components/ui/button.js';
-import {
-  DropdownMenu,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu.js';
 import {
   Select,
   SelectContent,
@@ -42,7 +31,6 @@ import {
 } from '../components/ui/select.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { BUILTIN_RUNTIME_LABEL } from '../routes/agent-model-select.js';
 
 type Mark = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -233,7 +221,6 @@ export function TopModelsCard({
   const listed = new Set(models.map(topModelKey));
   const addable = options.filter((o) => o.liveness !== 'dead' && !listed.has(topModelKey(o)));
   const unique = [...new Map(addable.map((o) => [topModelKey(o), o])).values()];
-  const runtimes = [...new Set(unique.map((o) => o.runtime))];
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (over === null || active.id === over.id) return;
     const keys = models.map(topModelKey);
@@ -250,51 +237,41 @@ export function TopModelsCard({
             {t('常用模型')}
           </h2>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            disabled={unique.length === 0}
-            render={<Button variant="outline" size="sm" data-testid="top-models-add" />}
-          >
-            <Plus aria-hidden />
-            {t('添加模型')}
-          </DropdownMenuTrigger>
-          <KeyedMenuContent
-            align="end"
-            side="bottom"
-            sideOffset={6}
-            aria-label={t('添加模型')}
-            className="top-models-add-menu max-h-80 w-max max-w-(--available-width)"
-          >
-            {runtimes.map((runtime) => (
-              <DropdownMenuGroup key={runtime}>
-                <DropdownMenuLabel>
-                  {runtime === 'pi'
-                    ? t(BUILTIN_RUNTIME_LABEL)
-                    : (MODEL_SOURCE_RUNTIME_LABELS[runtime as ModelSourceRuntime] ?? runtime)}
-                </DropdownMenuLabel>
-                {unique
-                  .filter((o) => o.runtime === runtime)
-                  .map((o) => (
-                    <KeyedMenuItem
-                      key={topModelKey(o)}
-                      className="top-models-add-row"
-                      onClick={() =>
-                        onChange([
-                          ...models,
-                          { provider: o.provider, modelId: o.modelId, thinkingLevel: null },
-                        ])
-                      }
-                    >
-                      {o.modelName}
-                      {o.provider !== o.runtime && (
-                        <span className="text-meta text-content-tertiary">{o.providerLabel}</span>
-                      )}
-                    </KeyedMenuItem>
-                  ))}
-              </DropdownMenuGroup>
-            ))}
-          </KeyedMenuContent>
-        </DropdownMenu>
+        <FilterPicker
+          options={unique.map((o) => ({
+            value: topModelKey(o),
+            label: o.modelName,
+            detail: modelGroupName(o),
+            group: modelGroupKey(o),
+            groupLabel: modelGroupName(o),
+            keywords: o.modelId,
+          }))}
+          value={null}
+          onPick={(key) => {
+            const o = unique.find((row) => topModelKey(row) === key);
+            if (o !== undefined) {
+              onChange([
+                ...models,
+                { provider: o.provider, modelId: o.modelId, thinkingLevel: null },
+              ]);
+            }
+          }}
+          disabled={unique.length === 0}
+          label={t('添加模型')}
+          placeholder={t('搜索模型或服务商')}
+          noun={t('模型')}
+          align="end"
+          trigger={<Button variant="outline" size="sm" />}
+          triggerTestId="top-models-add"
+          triggerContent={
+            <>
+              <Plus aria-hidden />
+              {t('添加模型')}
+            </>
+          }
+          popupClassName="top-models-add-menu"
+          rowClassName="top-models-add-row"
+        />
       </div>
       {models.length === 0 ? (
         <p
