@@ -1,6 +1,8 @@
 import type {
   DesktopMenuCommand,
   DesktopUpdateState,
+  DevinLocalStatus,
+  DevinLoginOutcome,
   HostPermissions,
   LocalProvider,
   LocalProviderImport,
@@ -32,6 +34,13 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
   },
   localRunner: {
     reconnect: (): Promise<void> => ipcRenderer.invoke('local-runner:reconnect'),
+  },
+  devin: {
+    status: (): Promise<DevinLocalStatus> => ipcRenderer.invoke('devin:status'),
+    importKey: (): Promise<{ ok: true; key: string } | { ok: false; reason: string }> =>
+      ipcRenderer.invoke('devin:import-key'),
+    login: (): Promise<DevinLoginOutcome> => ipcRenderer.invoke('devin:login'),
+    cancelLogin: (): Promise<void> => ipcRenderer.invoke('devin:cancel-login'),
   },
   windowControls: {
     setVisible: (visible: boolean): void => {

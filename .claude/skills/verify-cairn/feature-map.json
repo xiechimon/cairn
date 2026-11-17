@@ -1289,8 +1289,10 @@
       "evidence": [
         "apps/web/e2e/providers-claude-subscription.spec.ts",
         "apps/web/e2e/provider-add-dialog.spec.ts",
+        "apps/web/e2e/devin-local-login.spec.ts",
         "apps/server/test/claude-subscriptions.test.ts",
         "apps/server/test/devin-subscriptions.test.ts",
+        "packages/shared/test/devin-local.test.ts",
         "apps/daemon/test/devin-acp.test.ts",
         "apps/daemon/test/devin-managed.test.ts"
       ]

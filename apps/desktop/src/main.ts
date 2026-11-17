@@ -30,6 +30,13 @@ import {
   utilityProcess,
 } from 'electron';
 import { appMenuTemplate } from './app-menu.js';
+import {
+  devinCancelLogin,
+  devinImportKey,
+  devinLocalStatus,
+  devinLogin,
+  stopDevinLogin,
+} from './devin-auth.js';
 import { createKeepAwake } from './keep-awake.js';
 import { readLocalProviders, scanLocalProviders } from './local-providers.js';
 import { desktopOtelEnv, type OtelEnv, withOtelEnv } from './otel-config.js';
@@ -380,6 +387,18 @@ function serveUpdates(origin: string): void {
   ipcMain.handle('local-providers:read', (event, providerIds: unknown) =>
     fromOwnPage(event) ? readLocalProviders(providerIds) : [],
   );
+  ipcMain.handle('devin:status', (event) =>
+    fromOwnPage(event) ? devinLocalStatus() : { loggedIn: false, canLogin: false },
+  );
+  ipcMain.handle('devin:import-key', (event) =>
+    fromOwnPage(event) ? devinImportKey() : { ok: false, reason: 'no-key' },
+  );
+  ipcMain.handle('devin:login', (event) =>
+    fromOwnPage(event) ? devinLogin() : { ok: false, reason: 'cancelled' },
+  );
+  ipcMain.handle('devin:cancel-login', (event) => {
+    if (fromOwnPage(event)) devinCancelLogin();
+  });
   setTimeout(() => void check(), UPDATE_FIRST_CHECK_MS);
   setInterval(() => void check(), UPDATE_CHECK_EVERY_MS);
   app.on('browser-window-focus', () => {
@@ -476,6 +495,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', (event) => {
     if (quitting || server === null) return;
     quitting = true;
+    stopDevinLogin();
     event.preventDefault();
     const running = server;
     void (runner?.stop() ?? Promise.resolve())

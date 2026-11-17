@@ -3,6 +3,7 @@ import type {
   DevinSubscription,
   DevinSubscriptionVerifyResult,
 } from '@cairn/shared';
+import { devinKeyFromToml } from '@cairn/shared';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
@@ -32,8 +33,7 @@ const isAccountState = (value: unknown): value is AccountState =>
 
 export function extractDevinToken(input: string): string {
   const trimmed = input.trim();
-  const fromToml = /^windsurf_api_key\s*=\s*"([^"]+)"\s*$/m.exec(trimmed);
-  return fromToml?.[1] ?? trimmed;
+  return devinKeyFromToml(trimmed) ?? trimmed;
 }
 
 export function toDevinAccount(wire: DevinSubscriptionWire, now: number): SubscriptionAccount {

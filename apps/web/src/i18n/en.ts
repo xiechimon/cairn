@@ -74,6 +74,18 @@ export const EN: Record<string, string> = {
     'Run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin, paste the whole output below, and the `windsurf_api_key` is picked out automatically.',
   '任务会用这个订阅跑 Devin，不用再配 API key。Token 加密保存，保存后无法再查看。':
     'Tasks run Devin with this subscription, so you need no API key. The token is stored encrypted and cannot be viewed after saving.',
+  '这台 Mac 已登录 Devin。': 'This Mac is signed in to Devin.',
+  '从这台 Mac 导入': 'Import from this Mac',
+  '在这台 Mac 上登录 Devin': 'Sign in to Devin on this Mac',
+  '会打开浏览器完成登录。': 'A browser opens to finish signing in.',
+  '已在浏览器中打开 Devin 登录页，完成后会自动继续。':
+    'The Devin sign-in page is open in your browser; this continues automatically when it finishes.',
+  '等待 Devin 登录超时，可以再试一次，或改用下方粘贴。':
+    'Signing in to Devin timed out. Try again, or paste below instead.',
+  'Devin 登录没有完成，可以再试一次，或改用下方粘贴。':
+    'Devin sign-in did not finish. Try again, or paste below instead.',
+  '没有读到这台 Mac 上的 Devin 登录，请改用下方粘贴。':
+    'Could not read a Devin sign-in on this Mac. Paste below instead.',
   '这个订阅的登录已失效。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml` 把输出整个添加回来。':
     'This subscription is no longer signed in. Remove it, then run `cat ~/.local/share/devin/credentials.toml` and add the whole output back.',
   '这个订阅已过期。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml` 把输出整个添加回来。':
