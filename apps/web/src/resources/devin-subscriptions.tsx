@@ -49,6 +49,7 @@ export function AddDevinSubscriptionDialog({
   const [local, setLocal] = useState<DevinLocalStatus | null>(null);
   const [phase, setPhase] = useState<'idle' | 'waiting' | 'failed' | 'import-failed'>('idle');
   const [failReason, setFailReason] = useState('');
+  const [pasteOpen, setPasteOpen] = useState(false);
   const submittedRef = useRef(false);
   const waitingRef = useRef(false);
 
@@ -191,13 +192,6 @@ export function AddDevinSubscriptionDialog({
               : loginFailCopy(failReason, t)}
           </p>
         )}
-        <p className="text-meta text-content-tertiary">
-          {withCodeSpans(
-            t(
-              '也可以在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴（取 `windsurf_api_key`）。Token 加密保存，保存后无法再查看。',
-            ),
-          )}
-        </p>
         <FormField label={t('名称')} htmlFor="devin-subscription-label">
           <Input
             className={FORM_CONTROL_CLS}
@@ -207,17 +201,38 @@ export function AddDevinSubscriptionDialog({
             onChange={(event) => setLabel(event.target.value)}
           />
         </FormField>
-        <FormField label="Token" htmlFor="devin-subscription-token">
-          <Input
-            className={FORM_CONTROL_CLS}
-            id="devin-subscription-token"
-            data-testid="devin-subscription-token"
-            type="password"
-            autoComplete="off"
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-          />
-        </FormField>
+        {bridge !== null && !pasteOpen ? (
+          <Button
+            variant="link"
+            size="sm"
+            className="self-start px-0"
+            data-testid="devin-paste-toggle"
+            onClick={() => setPasteOpen(true)}
+          >
+            {t('也可以粘贴 token')}
+          </Button>
+        ) : (
+          <>
+            <p className="m-0 text-meta text-content-tertiary">
+              {withCodeSpans(
+                t(
+                  '在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴（取 `windsurf_api_key`）。Token 加密保存，保存后无法再查看。',
+                ),
+              )}
+            </p>
+            <FormField label="Token" htmlFor="devin-subscription-token">
+              <Input
+                className={FORM_CONTROL_CLS}
+                id="devin-subscription-token"
+                data-testid="devin-subscription-token"
+                type="password"
+                autoComplete="off"
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
+              />
+            </FormField>
+          </>
+        )}
         {error && <p role="alert">{t('保存失败，请检查填写内容后重试。')}</p>}
       </FormStack>
     </DialogShell>

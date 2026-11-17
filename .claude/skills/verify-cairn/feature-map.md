@@ -583,7 +583,7 @@ Reach:
 - Web routes: `/app/resources/providers`
 - Settings: `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `devin-local-import`, `devin-local-login`, `devin-local-login-cancel`, `devin-subscription-label`, `devin-subscription-token`, `providers-empty`, `providers-partial-error`, `subscription-label`, `subscription-token`
+- Test ids in its code: `devin-local-import`, `devin-local-login`, `devin-local-login-cancel`, `devin-paste-toggle`, `devin-subscription-label`, `devin-subscription-token`, `providers-empty`, `providers-partial-error`, `subscription-label`, `subscription-token`
 - Verify recipes: [.claude/skills/verify-cairn/features/providers-tabs.md](features/providers-tabs.md), [.claude/skills/verify-cairn/features/provider-picker.md](features/provider-picker.md)
 - Research: [docs/research/r16-model-catalog-liveness.md](../../../docs/research/r16-model-catalog-liveness.md), [docs/research/2330-claude-entrypoint-and-setup-token-quota.md](../../../docs/research/2330-claude-entrypoint-and-setup-token-quota.md), [docs/design/devin-subscription-source.md](../../../docs/design/devin-subscription-source.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings), [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)

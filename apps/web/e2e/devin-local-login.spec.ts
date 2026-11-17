@@ -124,6 +124,7 @@ test('a failed login shows a mapped reason and the paste path still works', asyn
   });
   await expect(dialog).toContainText('等待 Devin 登录超时');
   await expect(dialog.getByTestId('devin-local-login')).toBeVisible();
+  await dialog.getByTestId('devin-paste-toggle').click();
   await dialog.getByTestId('devin-subscription-token').fill(`windsurf_api_key = "${KEY}"`);
   await dialog.getByRole('button', { name: '保存', exact: true }).click();
   await expect(dialog).not.toBeVisible();
