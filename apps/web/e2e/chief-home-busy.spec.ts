@@ -215,7 +215,7 @@ test.describe('chief unavailable (T4)', () => {
     await expect(home.getByRole('button', { name: '停止 Coordinator 这次回复' })).toHaveCount(0);
     await expect(home.getByTestId('chief-composer-input')).toHaveAttribute(
       'placeholder',
-      '可以继续说，Coordinator 恢复后会按顺序处理…',
+      '可以继续说，恢复后按顺序处理',
     );
     await evidenceShot(page, 'outage-desktop.png');
     await banner.getByRole('button', { name: '给 Coordinator 换模型' }).click();
@@ -395,7 +395,7 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     });
     await page.goto('/app');
     const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
-    await expect(input).toHaveAttribute('placeholder', '还没开始处理，新发的话会排在这条后面');
+    await expect(input).toHaveAttribute('placeholder', '还没开始，新消息会排在后面');
   });
 
   test('a running turn takes new messages into itself and the composer says so', async ({
@@ -406,7 +406,7 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-composer-input')).toHaveAttribute(
       'placeholder',
-      '发出的话会直接插进 Coordinator 这一轮',
+      '补充的话会一起插进这一轮',
     );
     await expect(home.getByTestId('queued-message')).toHaveCount(0);
   });

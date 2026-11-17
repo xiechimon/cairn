@@ -1416,10 +1416,9 @@ export const EN: Record<string, string> = {
   'Coordinator 的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。':
     "The Coordinator's main model is unavailable, so backup model {model} is replying. Its judgment may be less sharp.",
   换模型: 'Change model',
-  '可以继续说，Coordinator 恢复后会按顺序处理…':
-    'Keep typing; the Coordinator handles messages in order once it is back…',
-  '发出的话会直接插进 Coordinator 这一轮': 'Steer the current reply',
-  '还没开始处理，新发的话会排在这条后面': 'Not started yet. New messages queue behind it',
+  '可以继续说，恢复后按顺序处理': 'Keep typing; it resumes in order',
+  补充的话会一起插进这一轮: 'Add to the current reply',
+  '还没开始，新消息会排在后面': 'New messages queue behind it',
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——

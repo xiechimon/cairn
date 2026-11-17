@@ -263,7 +263,7 @@ export function ChiefConversation({
     (replyQuote !== null
       ? t('回复这条消息')
       : chief.outage != null
-        ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
+        ? t('可以继续说，恢复后按顺序处理')
         : chief.waitingTurn !== undefined
           ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
           : chief.running === true
@@ -648,7 +648,7 @@ export function ChiefConversation({
               ref={viewportRef}
               {...reader.viewportProps}
               data-testid="chief-body"
-              className="scrollbar-gutter-both data-pending-scroll:visible data-pending-scroll:opacity-0 [--scroll-fade-size:32px] in-data-[chat-top=under-header]:[--scroll-fade-size-top:80px] [html[data-narrow-chrome]_&]:[--scroll-fade-size-top:80px]"
+              className="scrollbar-gutter-both data-pending-scroll:visible data-pending-scroll:opacity-0 [--scroll-fade-size:32px] in-data-[chat-top=under-header]:[--scroll-fade-size-top:96px] in-data-[chat-top=under-header]:[--scroll-fade-inset-top:24px] [html[data-narrow-chrome]_&]:[--scroll-fade-size-top:108px] [html[data-narrow-chrome]_&]:[--scroll-fade-inset-top:60px]"
             >
               <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
                 <TodoGlanceContext.Provider value={glances}>

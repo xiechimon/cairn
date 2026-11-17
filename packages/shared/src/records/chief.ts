@@ -258,8 +258,8 @@ export const CHIEF_WATCHES_EMPTY_COPY =
   '暂无跟进事项。Coordinator 关注某个任务，或约定到点回头核实时，会按主题列在这里。';
 
 export const CHIEF_INPUT_PLACEHOLDER = '有什么可以帮你的？';
-export const CHIEF_INPUT_PLACEHOLDER_STEERING = '发出的话会直接插进 Coordinator 这一轮';
-export const CHIEF_INPUT_PLACEHOLDER_QUEUED = '还没开始处理，新发的话会排在这条后面';
+export const CHIEF_INPUT_PLACEHOLDER_STEERING = '补充的话会一起插进这一轮';
+export const CHIEF_INPUT_PLACEHOLDER_QUEUED = '还没开始，新消息会排在后面';
 
 export const COORDINATOR_SUMMARY_MAX_CHARS = 20_000;
 export const COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS = 40_000;

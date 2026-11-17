@@ -55,3 +55,26 @@ test('a mid-turn message keeps its send time once the thread lists it as queued'
   expect(queued).toMatchObject({ pending: 'queued', createdAt: SENT_AT });
   expect(queued?.kind === 'user' && queued.at).toBe(unlisted?.kind === 'user' && unlisted.at);
 });
+
+test('a message still waiting to be read keeps the working row after a finished reply', () => {
+  const messages: MessageRow[] = [
+    { id: 'first', role: 'user', content: '先看看计数', createdAt: SENT_AT - 4_000 },
+    {
+      id: 'reply',
+      role: 'assistant',
+      content: [{ type: 'text', text: '看过了。' }],
+      createdAt: SENT_AT - 2_000,
+    },
+    { id: 'second', role: 'user', content: '顺便看下空列', createdAt: SENT_AT },
+  ];
+  const kinds = (pending: ChiefThread['pending']) =>
+    mapChief(ENV, { threads: [thread(pending)], activeThreadId: 'chief-ttt', messages }).stream?.map(
+      (item) => item.kind,
+    );
+  expect(kinds([{ messageId: 'second', state: 'queued' }])).toEqual([
+    'user',
+    'robot',
+    'streaming',
+    'user',
+  ]);
+});

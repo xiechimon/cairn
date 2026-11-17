@@ -86,7 +86,7 @@ test('usage loading stays truthful during a first reply without a reading', asyn
   const meter = page.getByTestId('home-c').getByTestId('composer-context-meter');
   await expect(page.getByTestId('chief-composer-input')).toHaveAttribute(
     'placeholder',
-    '发出的话会直接插进 Coordinator 这一轮',
+    '补充的话会一起插进这一轮',
   );
   await expect(meter).toHaveAccessibleName('正在加载用量…');
   await expect(meter).toHaveText('');

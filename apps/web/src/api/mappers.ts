@@ -1863,7 +1863,11 @@ export function mapChief(
     }
     if (liveReply !== null) {
       chiefStream.push(liveReply);
-    } else if (chiefStream[chiefStream.length - 1]?.kind !== 'robot' || trailingTools.length > 0) {
+    } else if (
+      chiefStream[chiefStream.length - 1]?.kind !== 'robot' ||
+      trailingTools.length > 0 ||
+      (collected?.pending.length ?? 0) > 0
+    ) {
       const lastUser = collected?.items.findLastIndex((item) => item.kind === 'user') ?? -1;
       const turnStartedAt = lastUser >= 0 ? collected?.itemsAt[lastUser] : undefined;
       const turnQueue = active?.turnQueue ?? null;
