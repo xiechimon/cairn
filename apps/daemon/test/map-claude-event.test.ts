@@ -483,4 +483,95 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
       },
     ]);
   });
+
+  test('rate_limit_event with unifiedWindows emits one notice per window under the event status', () => {
+    const msg = {
+      type: 'rate_limit_event',
+      rate_limit_info: {
+        status: 'allowed_warning',
+        rateLimitType: 'seven_day',
+        utilization: 0.6,
+        resetsAt: 1_800_000_000,
+        unifiedWindows: {
+          five_hour: { utilization: 0.01, resetsAt: 1_700_003_600 },
+          seven_day: { utilization: 0.6, resetsAt: 1_800_000_000 },
+        },
+      },
+      uuid: '22222222-2222-4222-8222-222222222222',
+      session_id: 'sdk-sess-uuid-1',
+    } as SDKMessage;
+    const { events, state } = feed([msg]);
+    expect(events).toEqual([]);
+    expect(state.rateLimits).toEqual([
+      {
+        status: 'allowed_warning',
+        rateLimitType: 'five_hour',
+        utilization: 0.01,
+        resetsAt: 1_700_003_600,
+      },
+      {
+        status: 'allowed_warning',
+        rateLimitType: 'seven_day',
+        utilization: 0.6,
+        resetsAt: 1_800_000_000,
+      },
+    ]);
+  });
+
+  test('a top-level rate limit type absent from unifiedWindows is emitted beside the windows', () => {
+    const msg = {
+      type: 'rate_limit_event',
+      rate_limit_info: {
+        status: 'rejected',
+        rateLimitType: 'seven_day',
+        utilization: 1,
+        resetsAt: 1_800_000_000,
+        unifiedWindows: {
+          five_hour: { utilization: 1, resetsAt: 1_700_003_600 },
+        },
+      },
+      uuid: '33333333-3333-4333-8333-333333333333',
+      session_id: 'sdk-sess-uuid-1',
+    } as SDKMessage;
+    const { state } = feed([msg]);
+    expect(state.rateLimits).toEqual([
+      {
+        status: 'rejected',
+        rateLimitType: 'five_hour',
+        utilization: 1,
+        resetsAt: 1_700_003_600,
+      },
+      {
+        status: 'rejected',
+        rateLimitType: 'seven_day',
+        utilization: 1,
+        resetsAt: 1_800_000_000,
+      },
+    ]);
+  });
+
+  test('malformed unifiedWindows entries are skipped without dropping the valid ones', () => {
+    const msg = {
+      type: 'rate_limit_event',
+      rate_limit_info: {
+        status: 'rejected',
+        unifiedWindows: {
+          '': { utilization: 1, resetsAt: 1_700_003_600 },
+          five_hour: 'not-an-object',
+          seven_day: { utilization: 'half', resetsAt: 1_800_000_000 },
+        },
+      },
+      uuid: '44444444-4444-4444-8444-444444444444',
+      session_id: 'sdk-sess-uuid-1',
+    } as SDKMessage;
+    const { state } = feed([msg]);
+    expect(state.rateLimits).toEqual([
+      {
+        status: 'rejected',
+        rateLimitType: 'seven_day',
+        resetsAt: 1_800_000_000,
+      },
+      { status: 'rejected' },
+    ]);
+  });
 });

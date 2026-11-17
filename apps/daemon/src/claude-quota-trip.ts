@@ -10,10 +10,12 @@ export interface QuotaTrip {
 export function claudeRateLimitReport(
   machineId: string,
   notice: ClaudeRateLimitNotice,
+  stepId: string,
 ): ClaudeRateLimitReport {
   return {
     machineId,
     status: notice.status,
+    stepId,
     ...(notice.rateLimitType !== undefined ? { rateLimitType: notice.rateLimitType } : {}),
     ...(notice.utilization !== undefined ? { utilization: notice.utilization } : {}),
     ...(notice.resetsAt !== undefined ? { resetsAt: notice.resetsAt } : {}),
@@ -27,12 +29,13 @@ export interface ClaudeRateLimitSink {
 export function forwardClaudeRateLimit(
   sink: ClaudeRateLimitSink,
   machineId: string | null,
+  stepId: string,
   notice: ClaudeRateLimitNotice,
   log: (line: string) => void,
 ): void {
   if (machineId === null) return;
   void sink
-    .reportClaudeRateLimit?.(claudeRateLimitReport(machineId, notice))
+    .reportClaudeRateLimit?.(claudeRateLimitReport(machineId, notice, stepId))
     .catch((err: unknown) => {
       log(`claude rate limit report failed: ${err instanceof Error ? err.message : String(err)}`);
     });

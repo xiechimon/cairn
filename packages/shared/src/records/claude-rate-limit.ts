@@ -33,6 +33,7 @@ export interface ClaudeRateBlock {
 
 export const claudeRateLimitReportSchema = z.object({
   machineId: recordId,
+  stepId: recordId.optional(),
   status: z.enum(CLAUDE_RATE_LIMIT_STATUSES),
   rateLimitType: z.string().min(1).max(64).optional(),
   utilization: z.number().finite().optional(),

@@ -47,6 +47,12 @@ describe('createStepPassControls', () => {
     expect(passState.quotaTrip?.kind).toBe('quota');
     expect(stopSession).toHaveBeenCalledOnce();
     expect(reportClaudeRateLimit).toHaveBeenCalledTimes(2);
+    expect(reportClaudeRateLimit).toHaveBeenCalledWith({
+      machineId: 'm1',
+      status: 'rejected',
+      rateLimitType: 'five_hour',
+      stepId: 's1',
+    });
     built.watchdog.stop();
   });
 

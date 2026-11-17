@@ -55,7 +55,7 @@ export function createStepPassControls(input: StepPassControlsInput): StepPassCo
     log,
   });
   input.sessionOpts.onClaudeRateLimit = (notice) => {
-    forwardClaudeRateLimit(input.client, input.machineId, notice, log);
+    forwardClaudeRateLimit(input.client, input.machineId, input.stepId, notice, log);
     if (passState.quotaTrip !== null) return;
     const trip = claudeQuotaTrip(notice, Date.now());
     if (trip === null) return;

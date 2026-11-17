@@ -7,26 +7,32 @@ import {
 
 describe('claudeRateLimitReport', () => {
   it('carries only the fields the notice has', () => {
-    expect(claudeRateLimitReport('machine-1', { status: 'allowed' })).toEqual({
+    expect(claudeRateLimitReport('machine-1', { status: 'allowed' }, 'step-1')).toEqual({
       machineId: 'machine-1',
       status: 'allowed',
+      stepId: 'step-1',
     });
   });
 
   it('passes the limit type, utilization and reset time through', () => {
     expect(
-      claudeRateLimitReport('machine-1', {
-        status: 'rejected',
-        rateLimitType: 'five_hour',
-        utilization: 1,
-        resetsAt: 1_800_000_000,
-      }),
+      claudeRateLimitReport(
+        'machine-1',
+        {
+          status: 'rejected',
+          rateLimitType: 'five_hour',
+          utilization: 1,
+          resetsAt: 1_800_000_000,
+        },
+        'step-1',
+      ),
     ).toEqual({
       machineId: 'machine-1',
       status: 'rejected',
       rateLimitType: 'five_hour',
       utilization: 1,
       resetsAt: 1_800_000_000,
+      stepId: 'step-1',
     });
   });
 });
@@ -58,24 +64,37 @@ describe('claudeQuotaTrip', () => {
 });
 
 describe('forwardClaudeRateLimit', () => {
-  it('reports the notice for the step machine', async () => {
+  it('reports the notice for the step on its machine', async () => {
     const reportClaudeRateLimit = vi.fn(async () => undefined);
-    forwardClaudeRateLimit({ reportClaudeRateLimit }, 'machine-1', { status: 'allowed' }, () => {});
+    forwardClaudeRateLimit(
+      { reportClaudeRateLimit },
+      'machine-1',
+      'step-1',
+      { status: 'allowed' },
+      () => {},
+    );
     expect(reportClaudeRateLimit).toHaveBeenCalledWith({
       machineId: 'machine-1',
       status: 'allowed',
+      stepId: 'step-1',
     });
   });
 
   it('skips a step without a machine', () => {
     const reportClaudeRateLimit = vi.fn(async () => undefined);
-    forwardClaudeRateLimit({ reportClaudeRateLimit }, null, { status: 'rejected' }, () => {});
+    forwardClaudeRateLimit(
+      { reportClaudeRateLimit },
+      null,
+      'step-1',
+      { status: 'rejected' },
+      () => {},
+    );
     expect(reportClaudeRateLimit).not.toHaveBeenCalled();
   });
 
   it('tolerates a client without the report endpoint', () => {
     expect(() =>
-      forwardClaudeRateLimit({}, 'machine-1', { status: 'allowed' }, () => {}),
+      forwardClaudeRateLimit({}, 'machine-1', 'step-1', { status: 'allowed' }, () => {}),
     ).not.toThrow();
   });
 
@@ -84,6 +103,7 @@ describe('forwardClaudeRateLimit', () => {
     forwardClaudeRateLimit(
       { reportClaudeRateLimit: () => Promise.reject(new Error('offline')) },
       'machine-1',
+      'step-1',
       { status: 'allowed' },
       (line) => lines.push(line),
     );

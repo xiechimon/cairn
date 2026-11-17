@@ -4,6 +4,7 @@ import {
   CLAUDE_RATE_LIMIT_UNSPECIFIED,
   type ClaudeRateLimitWindow,
   claudeRateBlock,
+  claudeRateLimitReportSchema,
   claudeRateProbeAt,
   normalizeClaudeResetsAt,
   subscriptionKeyOf,
@@ -126,5 +127,17 @@ describe('claude rate limit windows', () => {
         reportedAt: 10,
       },
     ]);
+  });
+});
+
+describe('claudeRateLimitReportSchema', () => {
+  test('an old report without a step id still parses, and a step id rides along', () => {
+    expect(claudeRateLimitReportSchema.parse({ machineId: 'm1', status: 'allowed' })).toEqual({
+      machineId: 'm1',
+      status: 'allowed',
+    });
+    expect(
+      claudeRateLimitReportSchema.parse({ machineId: 'm1', status: 'rejected', stepId: 's-1' }),
+    ).toEqual({ machineId: 'm1', status: 'rejected', stepId: 's-1' });
   });
 });

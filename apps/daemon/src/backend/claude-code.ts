@@ -38,7 +38,12 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
-import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES, contextTokensOf } from '@cairn/shared';
+import {
+  AGENT_TODO_MAX_ITEMS,
+  CLAUDE_TODO_STATUS_STATES,
+  contextTokensOf,
+  subscriptionKeyOf,
+} from '@cairn/shared';
 import { z } from 'zod';
 import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-auth.js';
 import { credentialRedactor } from '../credential-output.js';
@@ -122,6 +127,18 @@ export function createClaudeMapState(opts?: { modelId?: string }): ClaudeMapStat
 
 function positiveInt(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function fillRateLimitReading(
+  notice: ClaudeRateLimitNotice,
+  source: { utilization?: unknown; resetsAt?: unknown },
+): void {
+  if (typeof source.utilization === 'number' && Number.isFinite(source.utilization)) {
+    notice.utilization = source.utilization;
+  }
+  if (typeof source.resetsAt === 'number' && Number.isFinite(source.resetsAt)) {
+    notice.resetsAt = source.resetsAt;
+  }
 }
 
 function toUsageRows(
@@ -392,6 +409,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
             rateLimitType?: string;
             utilization?: number;
             resetsAt?: number;
+            unifiedWindows?: Record<string, { utilization?: unknown; resetsAt?: unknown }>;
           };
         }
       ).rate_limit_info;
@@ -402,17 +420,28 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
       ) {
         return [];
       }
-      const notice: ClaudeRateLimitNotice = { status: info.status };
-      if (typeof info.rateLimitType === 'string' && info.rateLimitType.trim() !== '') {
-        notice.rateLimitType = info.rateLimitType.trim();
+      const notices: ClaudeRateLimitNotice[] = [];
+      const windows = info.unifiedWindows;
+      if (windows !== null && typeof windows === 'object') {
+        for (const [name, window] of Object.entries(windows)) {
+          const rateLimitType = name.trim();
+          if (rateLimitType === '' || window === null || typeof window !== 'object') continue;
+          const notice: ClaudeRateLimitNotice = { status: info.status, rateLimitType };
+          fillRateLimitReading(notice, window);
+          notices.push(notice);
+        }
       }
-      if (typeof info.utilization === 'number' && Number.isFinite(info.utilization)) {
-        notice.utilization = info.utilization;
+      if (
+        !notices.some((notice) => notice.rateLimitType === subscriptionKeyOf(info.rateLimitType))
+      ) {
+        const notice: ClaudeRateLimitNotice = { status: info.status };
+        if (typeof info.rateLimitType === 'string' && info.rateLimitType.trim() !== '') {
+          notice.rateLimitType = info.rateLimitType.trim();
+        }
+        fillRateLimitReading(notice, info);
+        notices.push(notice);
       }
-      if (typeof info.resetsAt === 'number' && Number.isFinite(info.resetsAt)) {
-        notice.resetsAt = info.resetsAt;
-      }
-      state.rateLimits.push(notice);
+      state.rateLimits.push(...notices);
       return [];
     }
     default:
