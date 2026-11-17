@@ -77,6 +77,8 @@ export const COMPUTER_INTERRUPTED = 'interrupted, may have partially run; it was
 export const COMPUTER_CANCELLED = 'cancelled because the Coordinator turn was stopped';
 export const COMPUTER_BROWSER_DISABLED =
   'browser tools are off for this computer; enable 浏览器 in the Computers panel';
+export const CLOAK_LICENSE_SECRET = 'CLOAKBROWSER_LICENSE_KEY';
+export const COMPUTER_NO_CLOAK_LICENSE = `No CloakBrowser license; set team secret ${CLOAK_LICENSE_SECRET}`;
 export const COMPUTER_BROWSER_UNAVAILABLE =
   'this machine no longer reports browser capability; turn off 浏览器 or rebuild the computer image';
 
@@ -112,13 +114,34 @@ const FINISHED_STATES: ReadonlySet<ComputerCallState> = new Set(['done', 'error'
 type CallRow = typeof computerCall.$inferSelect;
 type CallPatch = Partial<typeof computerCall.$inferInsert>;
 
+function cloakLicenseCipher(db: Pick<Db, 'select'>, teamId: string): string | null {
+  return (
+    db
+      .select({ cipher: secret.valueCipher })
+      .from(secret)
+      .where(
+        and(
+          eq(secret.teamId, teamId),
+          eq(secret.name, CLOAK_LICENSE_SECRET),
+          isNull(secret.projectId),
+        ),
+      )
+      .get()?.cipher ?? null
+  );
+}
+
 function redact(text: string, secrets: readonly string[] = []): string {
   return redactSecrets(text, secrets).value as string;
 }
 
 type Output = Pick<CallRow, 'outputHead' | 'outputTail' | 'outputChars'> & { pending: string };
 
-function appendOutput(out: Output, text: string, flush: boolean): Output {
+function appendOutput(
+  out: Output,
+  text: string,
+  flush: boolean,
+  secrets: readonly string[] = [],
+): Output {
   const raw = out.pending + text;
   let start = raw.length;
   while (start > 0 && !/\s/.test(raw[start - 1] ?? '')) start--;
@@ -128,7 +151,7 @@ function appendOutput(out: Output, text: string, flush: boolean): Output {
   const joined =
     settled === ''
       ? out.outputHead + out.outputTail
-      : redact(out.outputHead + out.outputTail + settled);
+      : redact(out.outputHead + out.outputTail + settled, secrets);
   return {
     outputHead: joined.slice(0, COMPUTER_OUTPUT_HEAD_CHARS),
     outputTail: joined.slice(COMPUTER_OUTPUT_HEAD_CHARS).slice(-COMPUTER_OUTPUT_TAIL_CHARS),
@@ -162,13 +185,13 @@ function applyFrames(
       case 'output':
         if (isComputerBrowserTool(row.tool))
           throw new HttpError(400, 'browser calls return complete results, not output fragments');
-        output = appendOutput(output, frame.text, false);
+        output = appendOutput(output, frame.text, false, secrets);
         break;
       case 'heartbeat':
         break;
       case 'done':
         finished = true;
-        output = appendOutput(output, '', true);
+        output = appendOutput(output, '', true, secrets);
         Object.assign(patch, {
           resultText: redact(frame.text, secrets),
           resultImages: frame.images ?? null,
@@ -179,7 +202,7 @@ function applyFrames(
         break;
       case 'error':
         finished = true;
-        output = appendOutput(output, '', true);
+        output = appendOutput(output, '', true, secrets);
         Object.assign(patch, {
           errorMessage: redact(frame.message, secrets),
           errorDelivery: frame.delivery,
@@ -250,6 +273,10 @@ export function receiveComputerFrames(
     if (FINISHED_STATES.has(row.state) || (cancelled && row.finishedAt !== null)) {
       throw new HttpError(409, `computer call already ${row.state}`);
     }
+    const license = cloakLicenseCipher(tx, row.teamId);
+    if (license !== null && box === undefined)
+      throw new HttpError(503, 'browser redaction is unavailable');
+    const licenseValues = license !== null && box !== undefined ? [box.open(license)] : [];
     const secrets = isComputerBrowserTool(row.tool)
       ? tx
           .select({ cipher: secret.valueCipher })
@@ -272,7 +299,8 @@ export function receiveComputerFrames(
               JSON.stringify(value).slice(1, -1),
             ];
           })
-      : [];
+          .concat(licenseValues)
+      : licenseValues;
     const { patch, pending } = applyFrames(row, fresh, nowMs(), secrets);
     tx.update(computerCall).set(patch).where(eq(computerCall.id, callId)).run();
     if (
@@ -897,6 +925,19 @@ export async function forwardComputerCall(
           })
       : [];
   const host = db.select().from(machine).where(eq(machine.id, target.machineId)).get();
+  const licenseCipher =
+    isComputerBrowserTool(tool) &&
+    body.params.stealth === true &&
+    host?.capabilities?.computerKind === 'vm'
+      ? cloakLicenseCipher(db, thread.teamId)
+      : null;
+  if (
+    isComputerBrowserTool(tool) &&
+    body.params.stealth === true &&
+    host?.capabilities?.computerKind === 'vm' &&
+    licenseCipher === null
+  )
+    return { text: COMPUTER_NO_CLOAK_LICENSE };
   if (secretActions.length > 0 && host?.capabilities?.browserSecretFill !== true)
     throw new HttpError(409, 'Update this machine before filling saved browser passwords.');
   const pendingApprovals: string[] = [];
@@ -1029,6 +1070,7 @@ export async function forwardComputerCall(
         origin: row.browserOrigin,
         value: deps.box.open(row.valueCipher),
       }));
+    if (licenseCipher !== null) call.browserLicense = deps.box.open(licenseCipher);
     if (!deps.machineHub.pushComputer(target.machineId, call))
       throw new HttpError(409, COMPUTER_NOT_CONNECTED);
   } catch {

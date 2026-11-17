@@ -939,3 +939,119 @@ describe('the Runner relay route', () => {
     expect(computerRow(s).executionStepId).toBeNull();
   });
 });
+
+describe('CloakBrowser license for VM computers', () => {
+  const LICENSE = 'synthetic-cloak-license';
+  const stealth = (toolCallId: string, name = 'browser_snapshot' as const) => ({
+    computer: true as const,
+    name,
+    toolCallId,
+    params: { stealth: true },
+  });
+  const kind = (s: TestServer, computerKind: 'host' | 'vm') =>
+    s.db
+      .update(machineTable)
+      .set({
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          computer: true,
+          browser: true,
+          browserSecretFill: true,
+          computerKind,
+        },
+      })
+      .where(eq(machineTable.id, 'omarchy'))
+      .run();
+  const finish = (s: TestServer, call: ComputerCall, text = 'ok') =>
+    receiveComputerFrames(
+      s.db,
+      s.hub,
+      'omarchy',
+      call.callId,
+      [{ kind: 'done', seq: 1, text }],
+      s.secretBox,
+    );
+
+  test('a stealth browser call on a VM machine carries the team license, never stored', async () => {
+    const { s, deps, calls } = boot();
+    kind(s, 'vm');
+    createSecret(deps, { teamId: s.team.id, name: 'CLOAKBROWSER_LICENSE_KEY', value: LICENSE });
+    const pending = forwardComputerCall(deps, 'sidecar', 'step-a', stealth('stealth-1'));
+    const call = calls.at(-1)!;
+    expect(call.browserLicense).toBe(LICENSE);
+    finish(s, call);
+    await pending;
+    expect(JSON.stringify(s.db.select().from(computerCallTable).all())).not.toContain(LICENSE);
+  });
+
+  test('the license is absent for default browser calls, other tools and host machines', async () => {
+    const { s, deps, calls } = boot();
+    kind(s, 'vm');
+    createSecret(deps, { teamId: s.team.id, name: 'CLOAKBROWSER_LICENSE_KEY', value: LICENSE });
+    for (const body of [
+      browser('browser_snapshot', 'plain'),
+      {
+        computer: true as const,
+        name: 'shell' as const,
+        toolCallId: 'sh',
+        params: { command: 'true', stealth: true },
+      },
+    ]) {
+      const pending = forwardComputerCall(deps, 'sidecar', 'step-a', body);
+      const call = calls.at(-1)!;
+      expect(call.browserLicense).toBeUndefined();
+      finish(s, call);
+      await pending;
+    }
+    kind(s, 'host');
+    const pending = forwardComputerCall(deps, 'sidecar', 'step-a', stealth('host-stealth'));
+    const call = calls.at(-1)!;
+    expect(call.browserLicense).toBeUndefined();
+    finish(s, call);
+    await pending;
+  });
+
+  test('a stealth call on a VM machine without the secret is refused before dispatch', async () => {
+    const { s, deps, calls } = boot();
+    kind(s, 'vm');
+    const result = await forwardComputerCall(deps, 'sidecar', 'step-a', stealth('no-license'));
+    expect(result.text).toBe('No CloakBrowser license; set team secret CLOAKBROWSER_LICENSE_KEY');
+    expect(calls).toHaveLength(0);
+  });
+
+  test('the license is redacted from any computer output of the team', async () => {
+    const { s, deps, calls } = boot();
+    kind(s, 'vm');
+    createSecret(deps, { teamId: s.team.id, name: 'CLOAKBROWSER_LICENSE_KEY', value: LICENSE });
+    const pending = forwardComputerCall(
+      deps,
+      'sidecar',
+      'step-a',
+      browser('browser_snapshot', 'leak'),
+    );
+    finish(s, calls.at(-1)!, `key is ${LICENSE}`);
+    const result = await pending;
+    expect(result.text).not.toContain(LICENSE);
+    const shell = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true as const,
+      name: 'shell' as const,
+      toolCallId: 'cat-key',
+      params: { command: 'cat /run/cairn/cloak.key' },
+    });
+    const call = calls.at(-1)!;
+    receiveComputerFrames(
+      s.db,
+      s.hub,
+      'omarchy',
+      call.callId,
+      [
+        { kind: 'output', seq: 1, stream: 'stdout', text: `${LICENSE}\n` },
+        { kind: 'done', seq: 2, text: '', exitCode: 0 },
+      ],
+      s.secretBox,
+    );
+    expect(JSON.stringify(await shell)).not.toContain(LICENSE);
+    expect(JSON.stringify(s.db.select().from(computerCallTable).all())).not.toContain(LICENSE);
+  });
+});
