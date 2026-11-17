@@ -123,8 +123,8 @@ One test per path; each is written to fail on the baseline first.
 - The binary is not Developer ID signed; trust rests on the sha256 pinned in this repo, read from the GitHub release API.
 - Rakazo also asks before saving memory after outside content entered the run; this design does not narrow a conversation grant after the agent reads a web page.
 
-## Open for ian
+## Owner decisions (ian, 2026-11-17)
 
-1. Approve this gate for E6 (the commit replacing `refuseOwnComputerUntilGated` records the approval). Recommended: approve.
-2. "This conversation" grants end at a new Coordinator session or 24 h, whichever first. Recommended: keep; Rakazo's per-space grant has no end, but Cairn's Coordinator thread is one long thread.
-3. Host shell (`user_computer_shell`) stays withheld. Recommended: keep it out of step 5.
+1. The gate replacing `refuseOwnComputerUntilGated` is approved for E6; the replacing commit records this approval.
+2. "This conversation" grants do not expire by time or session: they last until the owner revokes them on the panel or turns the switch off. The panel lists every standing grant per Mac with a revoke control. This supersedes the 24 h and new-session ends in the grant table and transitions above.
+3. Host shell is in scope: `user_computer_shell` is offered behind the same switch and gate, and every command asks the owner first (allow once, or always allow this exact command line on this Mac, revocable on the panel). Gate row 1 changes from "refused" to "approval required". The command runs as the owner in the Runner's own working folder, with the existing host command guard.
