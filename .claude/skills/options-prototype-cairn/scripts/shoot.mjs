@@ -14,7 +14,8 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto(`file://${path.resolve(html)}`);
 const stateCount = await page.evaluate(() => STATES.length);
-for (const opt of [1, 2, 3]) {
+const optCount = await page.evaluate(() => OPTS.length);
+for (const opt of Array.from({ length: optCount }, (_, i) => i + 1)) {
   for (let state = 0; state < stateCount; state++) {
     const name = await page.evaluate(
       ([o, s]) => {
