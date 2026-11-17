@@ -11,7 +11,7 @@ import { testTempDir } from './test-temp-dir.js';
 vi.mock('../src/machine-loop.js', () => ({
   runMachine: vi.fn(async () => ({ done: Promise.resolve(), stop: vi.fn() })),
 }));
-vi.mock('../src/web-tools.js', () => ({ ensureWebTools: async () => {} }));
+vi.mock('../src/web-tools.js', () => ({ activateWebTools: () => {} }));
 vi.mock('../src/config.js', async (original) => ({
   ...(await original<typeof import('../src/config.js')>()),
   loadDaemonConfig: () => ({ home: '/tmp/synthetic-otel-foreground', workspacesDir: '/tmp' }),

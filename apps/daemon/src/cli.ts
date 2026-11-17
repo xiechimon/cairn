@@ -39,6 +39,7 @@ import {
 } from './supervisor.js';
 import { DAEMON_VERSION } from './version.js';
 import {
+  activateWebTools,
   agentReachEnabled,
   ensureWebTools,
   readScrapling,
@@ -109,7 +110,7 @@ export async function runForeground(opts: StartOptions): Promise<void> {
   const paths = statePaths(config.home, config.workspacesDir);
   const logger = createDaemonLogger({ logFile: paths.daemonLog, stdout: true });
   process.env.CAIRN_HOME = config.home;
-  await ensureWebTools(config.home, (message) => logger.raw(message));
+  activateWebTools(config.home);
   const handle = await runMachine({
     config,
     paths,
@@ -323,9 +324,7 @@ export function buildProgram(): Command {
     .action(async (opts: { socket?: string; stdio?: boolean }) => {
       if (process.env.CAIRN_ORB !== '1') throw new Error('Orb worker requires CAIRN_ORB=1');
       process.env.CAIRN_HOME = join(orbAgentHome(), '.cairn');
-      await ensureWebTools(process.env.CAIRN_HOME, (message) =>
-        process.stderr.write(`${message}\n`),
-      );
+      activateWebTools(process.env.CAIRN_HOME);
       if (opts.stdio) {
         const token = process.env[ORB_RELAY_TOKEN_ENV];
         delete process.env[ORB_RELAY_TOKEN_ENV];

@@ -1915,7 +1915,7 @@ export function buildChiefSystemPrompt(
     '',
     '### 网页调研',
     WEB_RESEARCH_GUIDANCE,
-    '调研仍交给任务在执行机上做；服务端没有 shell，不要声称自己运行了 Scrapling。执行前可用 machines 核对 capabilities.scrapling；没有上报就先让执行机重试 cairn web-tools install。',
+    '调研仍交给任务在执行机上做；服务端没有 shell，不要声称自己运行了 Scrapling。machines 里有 capabilities.scrapling 的执行机才装了 Scrapling；没有也照常派调研任务。',
     '',
   ];
   const teamLines: string[] = [
