@@ -8,7 +8,7 @@ import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import * as schema from '../src/db/schema.js';
 import { build, message, step, todo } from '../src/db/schema.js';
 import { finishStep } from '../src/services/machines.js';
-import { bootServer, insertMachine, postProject } from './helpers.js';
+import { bootServer, insertMachineIntoOldSchema, postProject } from './helpers.js';
 import { migrateAll, migrateUpTo } from './migrate-helpers.js';
 
 test('an upgrade stops only active retired research steps and discards their late results', async () => {
@@ -22,7 +22,7 @@ test('an upgrade stops only active retired research steps and discards their lat
   const s = bootServer({ db: drizzle(sqlite, { schema }) });
   onTestFinished(() => s.dispose());
   const projectId = await postProject(s.app, 'research');
-  const machineId = insertMachine(s);
+  const machineId = insertMachineIntoOldSchema(sqlite, s.team.id);
   const sources = ['research-intake', 'research-citation-check', 'research-stuck', null] as const;
   for (const [index, sourceKind] of sources.entries()) {
     const id = `research-${index}`;

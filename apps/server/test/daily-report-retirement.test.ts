@@ -21,7 +21,7 @@ import {
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { finishStep } from '../src/services/machines.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, insertMachine, postProject, req, seedRoute } from './helpers.js';
+import { bootServer, insertMachineIntoOldSchema, postProject, req, seedRoute } from './helpers.js';
 import { migrateAll, migrateUpTo } from './migrate-helpers.js';
 
 const YESTERDAY = Date.parse('2026-11-15T12:00:00+08:00');
@@ -191,7 +191,7 @@ test.each(['report', 'daily'] as const)(
     });
     migrateUpTo(sqlite, directory, '0176_retire_research_jobs');
     const s = world(drizzle(sqlite, { schema }));
-    const machineId = insertMachine(s);
+    const machineId = insertMachineIntoOldSchema(sqlite, s.team.id);
     for (const [i, status] of (['pending', 'claimed', 'done', 'failed'] as const).entries()) {
       s.db
         .insert(step)

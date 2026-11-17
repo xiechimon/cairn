@@ -9,6 +9,7 @@ import type {
   RequiredCapabilities,
   RouteUse,
 } from '@cairn/shared';
+import type BetterSqlite from 'better-sqlite3';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { onTestFinished } from 'vitest';
@@ -435,6 +436,41 @@ export function insertMachine(
       }),
     )
     .run();
+  return id;
+}
+
+function sqliteValue(value: unknown): unknown {
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (value instanceof Date) return value.getTime();
+  if (value !== null && typeof value === 'object') return JSON.stringify(value);
+  return value;
+}
+
+export function insertMachineIntoOldSchema(sqlite: BetterSqlite.Database, teamId: string): string {
+  const id = `machine-${Math.random().toString(36).slice(2, 10)}`;
+  const row: Record<string, unknown> = readyMachine({
+    id,
+    teamId,
+    name: 'test-machine',
+    online: true,
+    enabledRuntimes: ['pi', 'claude-code'],
+    claudeCodeReport: null,
+  });
+  const columns = new Set(
+    (sqlite.prepare('PRAGMA table_info(machine)').all() as { name: string }[]).map(
+      (column) => column.name,
+    ),
+  );
+  const entries = Object.entries(row).filter(
+    ([key, value]) => columns.has(key) && value !== undefined,
+  );
+  sqlite
+    .prepare(
+      `INSERT INTO machine (${entries.map(([key]) => `"${key}"`).join(', ')}) VALUES (${entries
+        .map(() => '?')
+        .join(', ')})`,
+    )
+    .run(...entries.map(([, value]) => sqliteValue(value)));
   return id;
 }
 
