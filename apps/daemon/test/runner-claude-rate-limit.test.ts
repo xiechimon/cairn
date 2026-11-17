@@ -27,6 +27,7 @@ class FakeClient implements MachineApi {
     rateLimitType?: string;
     utilization?: number;
     resetsAt?: number;
+    stepId?: string;
   }[] = [];
 
   async enroll(): Promise<never> {
@@ -101,6 +102,7 @@ class FakeClient implements MachineApi {
     rateLimitType?: string;
     utilization?: number;
     resetsAt?: number;
+    stepId?: string;
   }) {
     this.rateLimits.push(body);
   }
@@ -192,6 +194,7 @@ describe('runner claude rate limit (#1852)', () => {
         status: 'allowed_warning',
         rateLimitType: 'seven_day',
         utilization: 0.8,
+        stepId: 's1',
       },
     ]);
     expect(client.doneBodies[0]?.status).toBe('success');
@@ -215,6 +218,7 @@ describe('runner claude rate limit (#1852)', () => {
         rateLimitType: 'five_hour',
         utilization: 1,
         resetsAt,
+        stepId: 's1',
       },
     ]);
     expect(client.doneBodies[0]?.status).toBe('failed');
