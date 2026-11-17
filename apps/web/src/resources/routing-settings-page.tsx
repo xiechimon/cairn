@@ -14,6 +14,7 @@ import {
   hasUsableClaudeSubscription,
   useClaudeSubscriptions,
 } from '../api/claude-subscriptions.js';
+import { hasUsableDevinSubscription, useDevinSubscriptions } from '../api/devin-subscriptions.js';
 import { ApiError } from '../api/client.js';
 import { useMachines, useModelSources } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
@@ -240,7 +241,10 @@ function RuleRow({
   }) => void;
 }) {
   const { t } = useI18n();
-  const level = (rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off';
+  const devinPicked = currentOption(rule, options)?.runtime === 'devin';
+  const level = devinPicked
+    ? 'off'
+    : ((rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off');
   return (
     <div
       id={`route-${use}`}
@@ -253,32 +257,34 @@ function RuleRow({
         hintClassName="text-pretty break-keep"
       >
         <div className="flex items-center justify-end gap-1.5 max-sm:w-full max-sm:justify-start">
-          <Select
-            value={level}
-            disabled={rule === null}
-            onValueChange={(next) => {
-              if (rule === null || next === null) return;
-              onSave({
-                provider: rule.provider,
-                modelId: rule.modelId,
-                thinkingLevel: next === 'off' ? null : (next as ThinkingLevel),
-              });
-            }}
-          >
-            <SelectTrigger
-              aria-label={t('{use} 的思考强度', { use: label })}
-              className="routing-rule-level-select w-auto flex-none max-sm:-ml-2.5 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:h-7 max-sm:text-meta"
+          {!devinPicked && (
+            <Select
+              value={level}
+              disabled={rule === null}
+              onValueChange={(next) => {
+                if (rule === null || next === null) return;
+                onSave({
+                  provider: rule.provider,
+                  modelId: rule.modelId,
+                  thinkingLevel: next === 'off' ? null : (next as ThinkingLevel),
+                });
+              }}
             >
-              <SelectValue>{levelLabel(level)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {THINKING_LEVELS.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {levelLabel(value)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <SelectTrigger
+                aria-label={t('{use} 的思考强度', { use: label })}
+                className="routing-rule-level-select w-auto flex-none max-sm:-ml-2.5 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:h-7 max-sm:text-meta"
+              >
+                <SelectValue>{levelLabel(level)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {THINKING_LEVELS.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {levelLabel(value)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <ModelPicker
             use={use}
             rule={rule}
@@ -288,7 +294,8 @@ function RuleRow({
               onSave({
                 provider: option.provider,
                 modelId: option.modelId,
-                thinkingLevel: level === 'off' ? null : level,
+                thinkingLevel:
+                  option.runtime === 'devin' || level === 'off' ? null : level,
               })
             }
           />
@@ -309,6 +316,7 @@ export function RoutingSettingsPage() {
   const mutations = useRoutingSettingsMutations(teamId);
   const topModelsQ = useTopModels(teamId, live);
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
+  const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
   const topModelMutations = useTopModelsMutations(teamId);
   const settings = live
     ? (settingsQ.data ?? EMPTY_SETTINGS)
@@ -322,10 +330,10 @@ export function RoutingSettingsPage() {
   const storedTopModels = live ? topModelsQ.data?.models : fixture.resources?.topModels;
   const topModels =
     storedTopModels ??
-    suggestedTopModels(
-      options,
-      !live || hasUsableClaudeSubscription(subscriptionsQ.data, Date.now()),
-    );
+    suggestedTopModels(options, {
+      claude: !live || hasUsableClaudeSubscription(subscriptionsQ.data, Date.now()),
+      devin: !live || hasUsableDevinSubscription(devinSubscriptionsQ.data, Date.now()),
+    });
   const { hash } = useLocation();
   const loaded = !live || settingsQ.data !== undefined;
   useEffect(() => {

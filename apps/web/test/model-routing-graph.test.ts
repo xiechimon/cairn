@@ -1,6 +1,7 @@
 import type { ProviderRecord, RoutingRuleRecord, TeamRoutingSettings } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { toClaudeAccount } from '../src/api/claude-accounts.js';
+import { toDevinAccount } from '../src/api/devin-subscriptions.js';
 import { type ModelRouting, routingTargets, ruleGraphGroups } from '../src/api/model-routing.js';
 import type { ModelOption } from '../src/fixtures/records.js';
 
@@ -134,5 +135,46 @@ describe('routing targets and the rule graph', () => {
       ['claude-opus-5-5', 'subscription:main', false],
       ['glm-5.3', null, true],
     ]);
+  });
+});
+
+describe('devin subscription targets', () => {
+  const expiredDevin = toDevinAccount(
+    { id: 'd-old', kind: 'devin-subscription', label: 'Old Devin', expiresAt: NOW - 1, createdAt: 1 },
+    NOW,
+  );
+  const liveDevin = toDevinAccount(
+    { id: 'd-main', kind: 'devin-subscription', label: 'Devin', expiresAt: null, createdAt: 2 },
+    NOW,
+  );
+  const targets = routingTargets({
+    subscriptions: [],
+    devinSubscriptions: [expiredDevin, liveDevin],
+    providers: [],
+    routing: { connections: [], quota: [], edges: [] },
+  });
+
+  test('devin accounts become devin targets, expired ones marked unavailable', () => {
+    expect(targets.map((target) => [target.id, target.runtime, target.unavailable])).toEqual([
+      ['subscription:d-old', 'devin', true],
+      ['subscription:d-main', 'devin', false],
+    ]);
+  });
+
+  test('a devin rule wires to the live devin subscription and the devin group is drawn', () => {
+    const settings: TeamRoutingSettings = {
+      rules: [rule('session', 'devin', 'devin-swe-2')],
+      policies: [],
+    };
+    const groups = ruleGraphGroups(settings, targets, [], t);
+    const agents = groups.find((group) => group.label === 'Coordinator 和其他 Agent');
+    const devin = groups.find((group) => group.label === 'Devin');
+    expect(
+      agents?.nodes.map((node) => [node.id, node.target ?? null, node.broken, node.tag]),
+    ).toEqual([['session', 'subscription:d-main', false, 'devin-swe-2']]);
+    expect(devin?.nodes).toEqual([
+      { id: 'devin-models', name: '所有 Devin 模型', target: 'subscription:d-main' },
+    ]);
+    expect(groups.some((group) => group.label === 'Claude Code')).toBe(false);
   });
 });

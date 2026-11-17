@@ -50,21 +50,24 @@ const GRAPH_USES: readonly RouteUse[] = [
 ];
 
 const CLAUDE_CODE_TARGET = 'claude-code';
+const DEVIN_TARGET = 'devin';
 
 export interface RoutingTargetRow {
   id: string;
   name: string;
-  runtime: 'claude-code' | 'pi';
+  runtime: 'claude-code' | 'devin' | 'pi';
   unavailable: boolean;
   record?: ProviderRecord;
 }
 
 export function routingTargets({
   subscriptions,
+  devinSubscriptions = [],
   providers,
   routing,
 }: {
   subscriptions: readonly SubscriptionAccount[];
+  devinSubscriptions?: readonly SubscriptionAccount[];
   providers: readonly ProviderRecord[];
   routing: ModelRouting | undefined;
 }): RoutingTargetRow[] {
@@ -74,6 +77,14 @@ export function routingTargets({
     runtime: 'claude-code',
     unavailable: account.state === 'expired',
   }));
+  rows.push(
+    ...devinSubscriptions.map((account) => ({
+      id: `subscription:${account.id}`,
+      name: account.label,
+      runtime: 'devin' as const,
+      unavailable: account.state === 'expired',
+    })),
+  );
   for (const record of providers) {
     const connections = (routing?.connections ?? []).filter((c) => c.id === record.id);
     rows.push({
@@ -88,9 +99,10 @@ export function routingTargets({
 }
 
 function targetOfRule(provider: string, targets: readonly RoutingTargetRow[]) {
-  if (provider === CLAUDE_CODE_TARGET) {
-    const claude = targets.filter((target) => target.runtime === 'claude-code');
-    return claude.find((target) => !target.unavailable) ?? claude[0];
+  if (provider === CLAUDE_CODE_TARGET || provider === DEVIN_TARGET) {
+    const runtime = provider === CLAUDE_CODE_TARGET ? 'claude-code' : 'devin';
+    const owned = targets.filter((target) => target.runtime === runtime);
+    return owned.find((target) => !target.unavailable) ?? owned[0];
   }
   return targets.find((target) => target.record?.providerId === provider);
 }
@@ -144,6 +156,13 @@ export function ruleGraphGroups(
     groups.push({
       label: 'Claude Code',
       nodes: [{ id: 'claude-models', name: t('所有 Claude 模型'), target: claude.id }],
+    });
+  }
+  const devin = targetOfRule(DEVIN_TARGET, targets);
+  if (devin !== undefined) {
+    groups.push({
+      label: 'Devin',
+      nodes: [{ id: 'devin-models', name: t('所有 Devin 模型'), target: devin.id }],
     });
   }
   return groups;

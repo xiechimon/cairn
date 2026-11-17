@@ -17,6 +17,7 @@ import { AppSidebar } from '../board/app-sidebar.js';
 import type { ArchivedProjectState } from '../board/archived-project-bar.js';
 import { BackupBanner } from '../board/backup-banner.js';
 import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
+import { DevinLoginBanner, useDevinLoginWarnings } from '../board/devin-login-banner.js';
 import { setupShown } from '../board/first-run-checklist-model.js';
 import {
   FirstRunFrame,
@@ -160,6 +161,7 @@ export function BoardPage() {
   const quotaInfos = quotaBannerInfo(todos);
   const backupWarning = backupQ.data ?? null;
   const loginWarnings = useClaudeLoginWarnings(now);
+  const devinLoginWarnings = useDevinLoginWarnings(now);
   const setup = useFirstRunSetup();
   const [skipped, setSkipped] = useState(setupSkipped);
   const resumeStep = live ? setupResumeStep(setup) : null;
@@ -185,11 +187,16 @@ export function BoardPage() {
     ...(backupWarning != null
       ? [{ kind: 'backup' as const, node: <BackupBanner key="backup" notice={backupWarning} /> }]
       : []),
-    ...(loginWarnings.length > 0
+    ...(loginWarnings.length > 0 || devinLoginWarnings.length > 0
       ? [
           {
             kind: 'login' as const,
-            node: <ClaudeLoginBanner key="login" warnings={loginWarnings} />,
+            node: (
+              <div key="login" className="flex flex-col gap-2">
+                <ClaudeLoginBanner warnings={loginWarnings} />
+                <DevinLoginBanner warnings={devinLoginWarnings} />
+              </div>
+            ),
           },
         ]
       : []),

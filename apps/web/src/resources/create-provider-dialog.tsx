@@ -7,7 +7,7 @@ import {
   type ProviderApi,
   type ProviderModel,
 } from '@cairn/shared';
-import { Claude } from '@lobehub/icons';
+import { Claude, Devin } from '@lobehub/icons';
 import { type ReactNode, useEffect, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
@@ -186,6 +186,7 @@ interface CreateProviderDialogProps {
   connectPending?: boolean;
   connectError?: string | null;
   onPickClaudeSubscription?: () => void;
+  onPickDevinSubscription?: () => void;
   onXaiSignIn?: () => void;
   xaiSignInPending?: boolean;
   xaiDevice?: { userCode: string; verificationUri: string } | null;
@@ -209,6 +210,7 @@ export function CreateProviderDialog({
   connectPending,
   connectError,
   onPickClaudeSubscription,
+  onPickDevinSubscription,
   onXaiSignIn,
   xaiSignInPending,
   xaiDevice,
@@ -343,7 +345,11 @@ export function CreateProviderDialog({
               group === '订阅登录' &&
               onPickClaudeSubscription !== undefined &&
               matchesQuery(t('Claude 订阅').toLowerCase(), query);
-            if (groupRows.length === 0 && !claudeRow) return null;
+            const devinRow =
+              group === '订阅登录' &&
+              onPickDevinSubscription !== undefined &&
+              matchesQuery(t('Devin 订阅').toLowerCase(), query);
+            if (groupRows.length === 0 && !claudeRow && !devinRow) return null;
             return (
               <fieldset key={group} className={PICKER_GROUP_CLS}>
                 <legend className={inline ? 'sr-only' : PICKER_GROUP_HEAD_CLS}>{t(group)}</legend>
@@ -358,6 +364,19 @@ export function CreateProviderDialog({
                       <Claude size={14} />
                     </span>
                     <span className="min-w-0 truncate">{t('Claude 订阅')}</span>
+                  </Button>
+                )}
+                {devinRow && (
+                  <Button
+                    variant="ghost"
+                    data-preset-id="devin-subscription"
+                    className={PICKER_ROW_CLS}
+                    onClick={onPickDevinSubscription}
+                  >
+                    <span aria-hidden className={PICKER_TILE_CLS}>
+                      <Devin size={14} />
+                    </span>
+                    <span className="min-w-0 truncate">{t('Devin 订阅')}</span>
                   </Button>
                 )}
                 {groupRows.map((row) => (

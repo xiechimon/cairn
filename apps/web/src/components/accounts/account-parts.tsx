@@ -10,7 +10,7 @@ import type {
 } from '../../api/claude-accounts.js';
 import { relativeTime } from '../../board/rel-time.js';
 import { useI18n } from '../../i18n/provider.js';
-import { ClaudeMark, GrokMark, OpenAIMark, PiMark } from '../brand-marks.js';
+import { ClaudeMark, DevinMark, GrokMark, OpenAIMark, PiMark } from '../brand-marks.js';
 import { ListRow } from '../list-card.js';
 import { MachineName } from '../machine-label.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
@@ -25,12 +25,14 @@ export const VENDORS: Record<AccountVendor, { label: string; short: string; Mark
   claude: { label: 'Claude', short: 'Claude', Mark: ClaudeMark },
   codex: { label: 'ChatGPT · Codex', short: 'Codex', Mark: OpenAIMark },
   grok: { label: 'Grok', short: 'Grok', Mark: GrokMark },
+  devin: { label: 'Devin', short: 'Devin', Mark: DevinMark },
 };
 
 export const PROVIDERS: Record<ProviderRuntime, { label: string; Mark: Mark }> = {
   'claude-code': { label: 'Claude Code', Mark: ClaudeMark },
   codex: { label: 'Codex', Mark: OpenAIMark },
   pi: { label: 'pi', Mark: PiMark },
+  devin: { label: 'Devin', Mark: DevinMark },
 };
 
 export function useClock(): (ts: number, now: number) => string {

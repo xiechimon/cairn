@@ -35,7 +35,7 @@ export function runtimeOfProvider(
   options: readonly ModelOption[],
 ): string | null {
   if (provider === null) return null;
-  if (provider === 'claude-code') return 'claude-code';
+  if (provider === 'claude-code' || provider === 'devin') return provider;
   return options.find((row) => row.provider === provider)?.runtime ?? 'pi';
 }
 

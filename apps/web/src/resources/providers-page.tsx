@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
 import {
   type AccountStep,
+  type AccountVendor,
   type SubscriptionAccount,
   toClaudeAccount,
 } from '../api/claude-accounts.js';
@@ -16,11 +17,18 @@ import {
   useRenameClaudeSubscription,
   useSubscriptionVerification,
 } from '../api/claude-subscriptions.js';
+import {
+  toDevinAccount,
+  useDeleteDevinSubscription,
+  useDevinSubscriptionSteps,
+  useDevinSubscriptions,
+  useDevinSubscriptionVerification,
+  useRenameDevinSubscription,
+} from '../api/devin-subscriptions.js';
 import { useApiMutations, useModelSources, useProviders } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
-import { useClock } from '../components/accounts/account-parts.js';
-import { ClaudeMark } from '../components/brand-marks.js';
+import { useClock, VENDORS } from '../components/accounts/account-parts.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
 import { mergeQueries, QueryBoundary } from '../components/query-state.js';
@@ -51,6 +59,7 @@ interface Entry {
 }
 
 const CLAUDE_SUBSCRIPTION_ADD = 'claude-subscription';
+const DEVIN_SUBSCRIPTION_ADD = 'devin-subscription';
 
 function deadModelIds(sources: readonly ModelSource[]): Set<string> {
   return new Set(
@@ -116,7 +125,7 @@ function subscriptionEntries(
       item: {
         id: `subscription:${account.id}`,
         name: account.label,
-        Mark: ClaudeMark,
+        Mark: VENDORS[account.vendor].Mark,
         status: subscriptionSummary(account, view, deps.now, deps.t),
         tone: view.tone,
       },
@@ -146,9 +155,13 @@ export function ProvidersSection() {
   const client = useQueryClient();
   const clock = useClock();
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
+  const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
   const deleteSubscription = useDeleteClaudeSubscription(teamId);
+  const deleteDevinSubscription = useDeleteDevinSubscription(teamId);
   const renameSubscription = useRenameClaudeSubscription(teamId);
+  const renameDevinSubscription = useRenameDevinSubscription(teamId);
   const verification = useSubscriptionVerification(teamId);
+  const devinVerification = useDevinSubscriptionVerification(teamId);
   const [addView, setAddView] = useState<AddProviderView>('closed');
   const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
     null,
@@ -166,14 +179,21 @@ export function ProvidersSection() {
   const subscriptions: SubscriptionAccount[] = (
     live ? (subscriptionsQ.data ?? []) : (fixtureAccounts?.subscriptions ?? [])
   ).map((wire) => toClaudeAccount(wire, now));
+  const devinSubscriptions: SubscriptionAccount[] = (
+    live ? (devinSubscriptionsQ.data ?? []) : (fixtureAccounts?.devinSubscriptions ?? [])
+  ).map((wire) => toDevinAccount(wire, now));
   const subscriptionApiIds = live
     ? (subscriptionsQ.data ?? []).filter((s) => s.state !== undefined).map((s) => s.id)
     : [];
+  const devinApiIds = live
+    ? (devinSubscriptionsQ.data ?? []).filter((s) => s.state !== undefined).map((s) => s.id)
+    : [];
   const stepsQ = useClaudeSubscriptionSteps(teamId, subscriptionApiIds, live);
+  const devinStepsQ = useDevinSubscriptionSteps(teamId, devinApiIds, live);
   const stepsByAccount: Record<string, AccountStep[]> = live
     ? Object.fromEntries(
-        subscriptionApiIds.flatMap((id, index) => {
-          const page = stepsQ[index]?.data;
+        [...subscriptionApiIds, ...devinApiIds].flatMap((id, index) => {
+          const page = [...stepsQ, ...devinStepsQ][index]?.data;
           return page == null || !Array.isArray(page.steps) ? [] : [[id, page.steps]];
         }),
       )
@@ -195,7 +215,13 @@ export function ProvidersSection() {
   useEffect(() => {
     const add = searchParams.get('add');
     if (add === null) return;
-    setAddView(add === CLAUDE_SUBSCRIPTION_ADD ? 'subscription' : 'picker');
+    setAddView(
+      add === CLAUDE_SUBSCRIPTION_ADD
+        ? 'subscription'
+        : add === DEVIN_SUBSCRIPTION_ADD
+          ? 'devin-subscription'
+          : 'picker',
+    );
     const next = new URLSearchParams(searchParams);
     next.delete('add');
     setSearchParams(next, { replace: true });
@@ -232,46 +258,57 @@ export function ProvidersSection() {
         }
       : {};
 
-  const announceVerification = (id: string, label: string) => {
-    void verification.verify(id).then((outcome) => {
-      if (outcome?.ok) toastSuccess(t('「{name}」验证通过', { name: label }));
+  const announceVerification = (ref: { id: string; label: string; vendor: AccountVendor }) => {
+    const verify = ref.vendor === 'devin' ? devinVerification.verify : verification.verify;
+    void verify(ref.id).then((outcome) => {
+      if (outcome?.ok) toastSuccess(t('「{name}」验证通过', { name: ref.label }));
     });
   };
 
-  const subscriptionActionsFor = (account: SubscriptionAccount): SubscriptionActions => ({
-    onRemove: () => setRemovingSubscription(account),
-    ...(live
-      ? {
-          onVerify: () => announceVerification(account.id, account.label),
-          ...(subscriptionApiIds.includes(account.id)
-            ? {
-                onRename: (label: string) =>
-                  renameSubscription.mutate(
-                    { id: account.id, label },
-                    { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
-                  ),
-              }
-            : {}),
-        }
-      : {}),
-  });
+  const subscriptionActionsFor = (account: SubscriptionAccount): SubscriptionActions => {
+    const rename =
+      account.vendor === 'devin'
+        ? renameDevinSubscription
+        : renameSubscription;
+    const apiIds = account.vendor === 'devin' ? devinApiIds : subscriptionApiIds;
+    return {
+      onRemove: () => setRemovingSubscription(account),
+      ...(live
+        ? {
+            onVerify: () => announceVerification(account),
+            ...(apiIds.includes(account.id)
+              ? {
+                  onRename: (label: string) =>
+                    rename.mutate(
+                      { id: account.id, label },
+                      { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
+                    ),
+                }
+              : {}),
+          }
+        : {}),
+    };
+  };
 
+  const subscriptionDeps = {
+    now,
+    steps: stepsByAccount,
+    verifications: { ...verification.states, ...devinVerification.states },
+    actionsFor: subscriptionActionsFor,
+    t,
+    clock,
+  };
   const entries = [
-    ...subscriptionEntries(subscriptions, {
-      now,
-      steps: stepsByAccount,
-      verifications: verification.states,
-      actionsFor: subscriptionActionsFor,
-      t,
-      clock,
-    }),
+    ...subscriptionEntries(subscriptions, subscriptionDeps),
+    ...subscriptionEntries(devinSubscriptions, subscriptionDeps),
     ...teamEntries(providers, deadModelIds(sources), actionsFor, t),
   ];
-  const partialFailure = subscriptionsQ.isError
-    ? 'subscriptions'
-    : providersQ.isError
-      ? 'providers'
-      : null;
+  const partialFailure =
+    subscriptionsQ.isError || devinSubscriptionsQ.isError
+      ? 'subscriptions'
+      : providersQ.isError
+        ? 'providers'
+        : null;
   const itemParam = searchParams.get('item');
   const selected = entries.find((e) => e.item.id === itemParam) ?? entries[0];
 
@@ -288,9 +325,14 @@ export function ProvidersSection() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
-                void (partialFailure === 'subscriptions' ? subscriptionsQ : providersQ).refetch()
-              }
+              onClick={() => {
+                if (partialFailure === 'subscriptions') {
+                  void subscriptionsQ.refetch();
+                  void devinSubscriptionsQ.refetch();
+                } else {
+                  void providersQ.refetch();
+                }
+              }}
             >
               {t('重试')}
             </Button>
@@ -302,7 +344,9 @@ export function ProvidersSection() {
           onSelect={(id) => setParams({ item: id })}
           empty={
             <QueryBoundary
-              query={live ? mergeQueries(providersQ, subscriptionsQ) : undefined}
+              query={
+                live ? mergeQueries(providersQ, subscriptionsQ, devinSubscriptionsQ) : undefined
+              }
               isEmpty
               loadingLabel={t('正在加载模型服务')}
               errorTitle={t('模型服务没能加载')}
@@ -330,9 +374,9 @@ export function ProvidersSection() {
         onViewChange={setAddView}
         connectError={connectError}
         onConnectError={setConnectError}
-        onSubscriptionCreated={(created) => {
+        onSubscriptionCreated={(created, source) => {
           setParams({ item: `subscription:${created.id}` }, true);
-          announceVerification(created.id, created.label);
+          announceVerification({ id: created.id, label: created.label, vendor: source });
         }}
       />
       <AlertDialogShell
@@ -344,13 +388,15 @@ export function ProvidersSection() {
           <AlertDialogActions
             cancelLabel={t('取消')}
             confirmLabel={t('移除')}
-            confirmDisabled={deleteSubscription.isPending}
+            confirmDisabled={deleteSubscription.isPending || deleteDevinSubscription.isPending}
             onCancel={() => setRemovingSubscription(null)}
             onConfirm={() => {
               const target = removingSubscription;
               setRemovingSubscription(null);
               if (target === null || !live) return;
-              deleteSubscription.mutate(target.id, {
+              const remove =
+                target.vendor === 'devin' ? deleteDevinSubscription : deleteSubscription;
+              remove.mutate(target.id, {
                 onSuccess: () =>
                   void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] }),
                 onError: (error) => toastError(t('移除失败，请重试。'), error),

@@ -6,6 +6,11 @@ import {
   hasUsableClaudeSubscription,
   useClaudeSubscriptions,
 } from '../api/claude-subscriptions.js';
+import {
+  hasUsableDevinSubscription,
+  toDevinAccount,
+  useDevinSubscriptions,
+} from '../api/devin-subscriptions.js';
 import { useModelSources, useProviders } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import {
@@ -17,7 +22,7 @@ import {
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
 import { useTopModels } from '../api/top-models.js';
-import { ClaudeMark } from '../components/brand-marks.js';
+import { ClaudeMark, DevinMark } from '../components/brand-marks.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { Button } from '../components/ui/button.js';
@@ -42,6 +47,7 @@ function RoutingContent() {
   const now = live ? Date.now() : fixture.now;
 
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
+  const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
   const providersQ = useProviders(teamId, live);
   const routingQ = useModelRouting(teamId, live);
   const settingsQ = useRoutingSettings(teamId, live);
@@ -58,6 +64,10 @@ function RoutingContent() {
       ? (subscriptionsQ.data ?? [])
       : (fixtureAccounts?.subscriptions ?? [])
     ).map((wire) => toClaudeAccount(wire, now)),
+    devinSubscriptions: (live
+      ? (devinSubscriptionsQ.data ?? [])
+      : (fixtureAccounts?.devinSubscriptions ?? [])
+    ).map((wire) => toDevinAccount(wire, now)),
     providers: live ? (providersQ.data?.providers ?? []) : (fixture.resources?.providers ?? []),
     routing,
   });
@@ -71,7 +81,10 @@ function RoutingContent() {
   );
   const topModels =
     (live ? topModelsQ.data?.models : fixture.resources?.topModels) ??
-    suggestedTopModels(options, !live || hasUsableClaudeSubscription(subscriptionsQ.data, now));
+    suggestedTopModels(options, {
+      claude: !live || hasUsableClaudeSubscription(subscriptionsQ.data, now),
+      devin: !live || hasUsableDevinSubscription(devinSubscriptionsQ.data, now),
+    });
   const groups = ruleGraphGroups(settings, targets, options, t, topModels);
 
   return (
@@ -116,8 +129,18 @@ function RoutingContent() {
                 targets={targets.map((target) => ({
                   id: target.id,
                   name: target.name,
-                  runtime: target.runtime === 'claude-code' ? 'Claude Code' : 'pi',
-                  Mark: target.record === undefined ? ClaudeMark : providerMark(target.record),
+                  runtime:
+                    target.runtime === 'claude-code'
+                      ? 'Claude Code'
+                      : target.runtime === 'devin'
+                        ? 'Devin'
+                        : 'pi',
+                  Mark:
+                    target.record === undefined
+                      ? target.runtime === 'devin'
+                        ? DevinMark
+                        : ClaudeMark
+                      : providerMark(target.record),
                   unavailable: target.unavailable,
                 }))}
               />

@@ -18,7 +18,13 @@ import {
 import { cn } from 'cn';
 import { Box, GripVertical, Plus, Server, X } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
-import { ClaudeMark, GeminiMark, GrokMark, OpenAIMark } from '../components/brand-marks.js';
+import {
+  ClaudeMark,
+  DevinMark,
+  GeminiMark,
+  GrokMark,
+  OpenAIMark,
+} from '../components/brand-marks.js';
 import { FilterPicker } from '../components/filter-picker.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import { Button } from '../components/ui/button.js';
@@ -59,6 +65,7 @@ const levelLabel = (level: string) => level.charAt(0).toUpperCase() + level.slic
 
 export function vendorMark(modelId: string): Mark {
   if (modelId.startsWith('claude')) return ClaudeMark;
+  if (modelId.startsWith('devin')) return DevinMark;
   if (/^(gpt|o\d|codex)/.test(modelId)) return OpenAIMark;
   if (modelId.startsWith('gemini')) return GeminiMark;
   if (modelId.startsWith('grok')) return GrokMark;
@@ -67,20 +74,22 @@ export function vendorMark(modelId: string): Mark {
 
 function providerChipMark(provider: string): Mark {
   if (provider === 'claude-code' || provider === 'anthropic') return ClaudeMark;
+  if (provider === 'devin') return DevinMark;
   if (provider.startsWith('openai') || provider === 'codex') return OpenAIMark;
   return Server;
 }
 
 export function suggestedTopModels(
   options: readonly ModelOption[],
-  claudeSubscribed: boolean,
+  subscribed: { claude: boolean; devin: boolean },
 ): TopModel[] {
   return SUGGESTED.flatMap(({ modelId, thinkingLevel }) => {
     const option = options.find(
       (o) =>
         o.modelId === modelId &&
         o.liveness !== 'dead' &&
-        (claudeSubscribed || o.runtime !== 'claude-code'),
+        (subscribed.claude || o.runtime !== 'claude-code') &&
+        (subscribed.devin || o.runtime !== 'devin'),
     );
     return option === undefined ? [] : [{ provider: option.provider, modelId, thinkingLevel }];
   });
@@ -106,6 +115,7 @@ function TopModelRow({
   const Chip = providerChipMark(model.provider);
   const blurb = BLURBS.find(([pattern]) => pattern.test(model.modelId))?.[1];
   const level = model.thinkingLevel ?? 'off';
+  const thinkingLocked = option?.runtime === 'devin';
   return (
     <li
       ref={setNodeRef}
@@ -168,26 +178,28 @@ function TopModelRow({
             </>
           )}
         </span>
-        <Select
-          value={level}
-          onValueChange={(next) => {
-            if (next !== null) onLevel(next === 'off' ? null : (next as ThinkingLevel));
-          }}
-        >
-          <SelectTrigger
-            aria-label={t('{model} 的思考强度', { model: name })}
-            className="top-model-level ml-2 w-auto min-w-25 flex-none max-sm:min-w-0 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:ml-1 max-sm:h-7 max-sm:text-meta"
+        {!thinkingLocked && (
+          <Select
+            value={level}
+            onValueChange={(next) => {
+              if (next !== null) onLevel(next === 'off' ? null : (next as ThinkingLevel));
+            }}
           >
-            <SelectValue className="justify-end">{levelLabel(level)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {THINKING_LEVELS.map((value) => (
-              <SelectItem key={value} value={value}>
-                {levelLabel(value)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              aria-label={t('{model} 的思考强度', { model: name })}
+              className="top-model-level ml-2 w-auto min-w-25 flex-none max-sm:min-w-0 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:ml-1 max-sm:h-7 max-sm:text-meta"
+            >
+              <SelectValue className="justify-end">{levelLabel(level)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {THINKING_LEVELS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {levelLabel(value)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Button
           variant="ghost"
           size="icon-sm"

@@ -1,15 +1,20 @@
-import type { ClaudeSubscription } from '@cairn/shared';
 import { type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useCreateClaudeSubscription } from '../api/claude-subscriptions.js';
+import { useCreateDevinSubscription } from '../api/devin-subscriptions.js';
 import { useApiMutations, useCapabilities } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
 import type { CreateProviderDialog as CreateProviderDialogModule } from './create-provider-dialog.js';
+import { AddDevinSubscriptionDialog } from './devin-subscriptions.js';
 
-export type AddProviderView = 'closed' | 'picker' | 'subscription';
+export type AddProviderView = 'closed' | 'picker' | 'subscription' | 'devin-subscription';
+
+export type CreatedSubscription = { id: string; label: string };
+
+export type SubscriptionSource = 'claude' | 'devin';
 
 interface DeviceLogin {
   state: string;
@@ -105,7 +110,7 @@ export function AddProviderFlow({
   onViewChange: (view: AddProviderView) => void;
   connectError: string | null;
   onConnectError: (message: string | null) => void;
-  onSubscriptionCreated?: (created: ClaudeSubscription) => void;
+  onSubscriptionCreated?: (created: CreatedSubscription, source: SubscriptionSource) => void;
   inline?: boolean;
   testId?: string;
   lead?: ReactNode;
@@ -114,6 +119,7 @@ export function AddProviderFlow({
   const mutations = useApiMutations(teamId);
   const client = useQueryClient();
   const createSubscription = useCreateClaudeSubscription(teamId);
+  const createDevinSubscription = useCreateDevinSubscription(teamId);
   const capabilities = useCapabilities(live);
   const [CreateProviderDialog, setCreateProviderDialog] = useState<
     typeof CreateProviderDialogModule | null
@@ -206,6 +212,14 @@ export function AddProviderFlow({
                 }
               : undefined
           }
+          onPickDevinSubscription={
+            live
+              ? () => {
+                  createDevinSubscription.reset();
+                  onViewChange('devin-subscription');
+                }
+              : undefined
+          }
         />
       ) : null}
       {view === 'subscription' && (
@@ -220,12 +234,32 @@ export function AddProviderFlow({
                 createSubscription.reset();
                 onViewChange('closed');
                 void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
-                onSubscriptionCreated?.(created);
+                onSubscriptionCreated?.(created, 'claude');
               },
             })
           }
           pending={createSubscription.isPending}
           error={createSubscription.isError}
+        />
+      )}
+      {view === 'devin-subscription' && (
+        <AddDevinSubscriptionDialog
+          onClose={() => {
+            createDevinSubscription.reset();
+            onViewChange('closed');
+          }}
+          onCreate={(body) =>
+            createDevinSubscription.mutate(body, {
+              onSuccess: (created) => {
+                createDevinSubscription.reset();
+                onViewChange('closed');
+                void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
+                onSubscriptionCreated?.(created, 'devin');
+              },
+            })
+          }
+          pending={createDevinSubscription.isPending}
+          error={createDevinSubscription.isError}
         />
       )}
     </>

@@ -20,7 +20,7 @@ export type ClaudeSubscriptionWire = ClaudeSubscription & {
   stepsLast24h?: number;
 };
 
-export const ACCOUNT_VENDORS = ['claude', 'codex', 'grok'] as const;
+export const ACCOUNT_VENDORS = ['claude', 'codex', 'grok', 'devin'] as const;
 export type AccountVendor = (typeof ACCOUNT_VENDORS)[number];
 
 const PLAN_LABELS: Record<AccountPlan, string> = { pro: 'Pro', max: 'Max' };
@@ -83,7 +83,7 @@ export interface AccountMachine {
   name: string;
 }
 
-export type ProviderRuntime = 'claude-code' | 'codex' | 'pi';
+export type ProviderRuntime = 'claude-code' | 'codex' | 'pi' | 'devin';
 export type ProviderLogin = 'logged-in' | 'logged-out' | 'unknown';
 
 export interface MachineProvider {

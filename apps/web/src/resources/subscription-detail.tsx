@@ -1,9 +1,13 @@
 import { cn } from 'cn';
 import type { AccountStatus, VerifyFailure } from '../api/account-verification.js';
-import type { AccountStep, QuotaWindow, SubscriptionAccount } from '../api/claude-accounts.js';
+import type {
+  AccountStep,
+  AccountVendor,
+  QuotaWindow,
+  SubscriptionAccount,
+} from '../api/claude-accounts.js';
 import { relativeTime } from '../board/rel-time.js';
-import { AccountStepRow, useClock } from '../components/accounts/account-parts.js';
-import { ClaudeMark } from '../components/brand-marks.js';
+import { AccountStepRow, useClock, VENDORS } from '../components/accounts/account-parts.js';
 import { ListCard } from '../components/list-card.js';
 import { withCodeSpans } from '../components/notice-banner.js';
 import {
@@ -33,14 +37,41 @@ const WINDOW_LABELS: Record<string, string> = {
 
 const WINDOW_ORDER = ['five_hour', 'seven_day', 'billing_period'];
 
-const FAILURE_COPY: Record<VerifyFailure, string> = {
-  auth: '这个订阅的登录已失效。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。',
-  timeout: '验证超时，请重试',
-  unavailable: '服务器上找不到 claude 命令',
-  failed: '验证没有通过，请重试',
-  network: '连接中断，服务器可能正在重启，请重试',
-  'rate-limited': '验证太频繁，请 10 秒后重试',
+const AUTH_RENEWAL: Record<AccountVendor, string> = {
+  claude:
+    '这个订阅的登录已失效。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。',
+  codex: '这个订阅的登录已失效。先移除它，再重新添加新的 token。',
+  grok: '这个订阅的登录已失效。先移除它，再重新添加新的 token。',
+  devin:
+    '这个订阅的登录已失效。先移除它，再在 `~/.local/share/devin/credentials.toml` 里拿新的 `windsurf_api_key` 添加回来。',
 };
+
+const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
+  claude:
+    '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。',
+  codex: '这个订阅已过期。先移除它，再重新添加新的 token。',
+  grok: '这个订阅已过期。先移除它，再重新添加新的 token。',
+  devin:
+    '这个订阅已过期。先移除它，再在 `~/.local/share/devin/credentials.toml` 里拿新的 `windsurf_api_key` 添加回来。',
+};
+
+const UNAVAILABLE_COPY: Record<AccountVendor, string> = {
+  claude: '服务器上找不到 claude 命令',
+  codex: '服务器上找不到 codex 命令',
+  grok: '服务器上找不到可执行的 agent',
+  devin: '服务器上找不到 devin 命令',
+};
+
+function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
+  return {
+    auth: AUTH_RENEWAL[vendor],
+    timeout: '验证超时，请重试',
+    unavailable: UNAVAILABLE_COPY[vendor],
+    failed: '验证没有通过，请重试',
+    network: '连接中断，服务器可能正在重启，请重试',
+    'rate-limited': '验证太频繁，请 10 秒后重试',
+  };
+}
 
 export interface SubscriptionStatusView {
   tone: ProviderTone;
@@ -67,7 +98,11 @@ export function subscriptionStatusView(
 ): SubscriptionStatusView {
   if (status.kind === 'verifying') return { tone: 'off', label: t('验证中…'), reason: null };
   if (status.kind === 'verify-failed') {
-    return { tone: 'fail', label: t('验证失败'), reason: t(FAILURE_COPY[status.reason]) };
+    return {
+      tone: 'fail',
+      label: t('验证失败'),
+      reason: t(failureCopy(account.vendor)[status.reason]),
+    };
   }
   switch (status.state) {
     case 'ok':
@@ -94,9 +129,7 @@ export function subscriptionStatusView(
       return {
         tone: 'warn',
         label: t('已过期'),
-        reason: t(
-          '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。',
-        ),
+        reason: t(EXPIRED_RENEWAL[account.vendor]),
       };
   }
 }
@@ -200,7 +233,7 @@ export function SubscriptionDetail({
   return (
     <>
       <ProviderEditorHead
-        Mark={ClaudeMark}
+        Mark={VENDORS[account.vendor].Mark}
         name={account.label}
         kind={[t('订阅'), ...(account.plan === null ? [] : [account.plan])].join(' · ')}
       />

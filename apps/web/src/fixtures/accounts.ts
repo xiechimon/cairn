@@ -6,6 +6,7 @@ import type {
   MachineWithProviders,
   SubscriptionAccount,
 } from '../api/claude-accounts.js';
+import type { DevinSubscriptionWire } from '../api/devin-subscriptions.js';
 import type { ModelRouting } from '../api/model-routing.js';
 import { MACHINE_ID, MACHINE_NAME, MACHINE_REMOTE_ID, MACHINE_REMOTE_NAME, r7 } from './core.js';
 import type { FixtureSet } from './records.js';
@@ -13,6 +14,7 @@ import { RESOURCES, resourcesDefault } from './resources.js';
 
 export interface AccountsContent {
   subscriptions: ClaudeSubscriptionWire[];
+  devinSubscriptions: DevinSubscriptionWire[];
   otherAccounts: SubscriptionAccount[];
   stepsByAccount: Record<string, AccountStep[]>;
   machines: AccountMachine[];
@@ -89,6 +91,23 @@ export const ACCOUNT_SUBSCRIPTIONS: ClaudeSubscriptionWire[] = [
     windows: [],
     lastUsedAt: NOW - 5 * DAY,
     stepsLast24h: 0,
+  },
+];
+
+export const DEVIN_SUBSCRIPTION_ID = 'sub-devin';
+
+export const DEVIN_SUBSCRIPTIONS: DevinSubscriptionWire[] = [
+  {
+    id: DEVIN_SUBSCRIPTION_ID,
+    kind: 'devin-subscription',
+    label: 'Devin',
+    expiresAt: NOW + 180 * DAY,
+    createdAt: NOW - 6 * DAY,
+    state: 'ok',
+    cooldownUntil: null,
+    windows: [],
+    lastUsedAt: NOW - 3 * HOUR,
+    stepsLast24h: 4,
   },
 ];
 
@@ -195,6 +214,7 @@ export const ACCOUNT_STEPS: Record<string, AccountStep[]> = {
     (s): s is AccountStep => s !== undefined,
   ),
   [ACCOUNT_EXPIRED_ID]: [],
+  [DEVIN_SUBSCRIPTION_ID]: [STEPS[0]].filter((s): s is AccountStep => s !== undefined),
 };
 
 export const ACCOUNT_MACHINES: AccountMachine[] = [
@@ -335,6 +355,7 @@ export const ACCOUNT_ROUTING: ModelRouting = {
 
 export const ACCOUNTS: AccountsContent = {
   subscriptions: ACCOUNT_SUBSCRIPTIONS,
+  devinSubscriptions: DEVIN_SUBSCRIPTIONS,
   otherAccounts: OTHER_ACCOUNTS,
   stepsByAccount: ACCOUNT_STEPS,
   machines: ACCOUNT_MACHINES,
@@ -398,6 +419,7 @@ export const accountsEmpty: FixtureSet = {
     ...RESOURCES,
     accounts: {
       subscriptions: [],
+      devinSubscriptions: [],
       otherAccounts: [],
       stepsByAccount: {},
       machines: [],

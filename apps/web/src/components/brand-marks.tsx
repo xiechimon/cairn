@@ -1,3 +1,4 @@
+import { Devin } from '@lobehub/icons';
 import type { SVGProps } from 'react';
 
 export function PiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
@@ -47,6 +48,10 @@ export function OpenAIMark({ width = 16, height = 16, ...props }: SVGProps<SVGSV
       />
     </svg>
   );
+}
+
+export function DevinMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
+  return <Devin width={width} height={height} aria-hidden="true" {...props} />;
 }
 
 export function GrokMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
