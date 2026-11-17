@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { chmodSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -11,12 +11,13 @@ afterEach(() => {
   for (const root of roots.splice(0)) expect(releaseTestTempDir(root)).toBe(true);
 });
 function fixture() {
-  const root = makeTestTempDir('computer-input-fence-');
-  roots.push(root);
+  const made = makeTestTempDir('computer-input-fence-');
+  roots.push(made);
+  const root = realpathSync(made);
   return { root, fence: new ComputerInputFence(root, 'machine-one') };
 }
 
-describe.skipIf(process.platform !== 'linux')(
+describe.skipIf(process.platform !== 'linux' && process.platform !== 'darwin')(
   'computer input ownership across daemon instances',
   () => {
     test('same-scope writers exclude each other until the input lease is released', async () => {

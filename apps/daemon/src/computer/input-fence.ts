@@ -7,6 +7,31 @@ export interface ComputerInputLease {
   release(): void;
 }
 
+const DARWIN_OPEN_EXCLUSIVE_LOCK = 0x20;
+
+function openLockFile(path: string): number {
+  const flags = constants.O_CREAT | constants.O_RDWR | constants.O_NOFOLLOW | constants.O_NONBLOCK;
+  if (process.platform !== 'darwin') return openSync(path, flags, 0o600);
+  try {
+    return openSync(path, flags | DARWIN_OPEN_EXCLUSIVE_LOCK, 0o600);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EAGAIN')
+      throw new Error('Computer already has an input owner');
+    throw error;
+  }
+}
+
+function lease(descriptor: number): ComputerInputLease {
+  let released = false;
+  return {
+    release: () => {
+      if (released) return;
+      released = true;
+      closeSync(descriptor);
+    },
+  };
+}
+
 export class ComputerInputFence {
   private pinnedOwnerId: string | undefined;
 
@@ -17,8 +42,8 @@ export class ComputerInputFence {
 
   async acquire(scopeKey: string, signal?: AbortSignal): Promise<ComputerInputLease> {
     signal?.throwIfAborted();
-    if (process.platform !== 'linux')
-      throw new Error('Computer input ownership requires Linux file locks');
+    if (process.platform !== 'linux' && process.platform !== 'darwin')
+      throw new Error('Computer input ownership requires Linux or macOS file locks');
     if (scopeKey.length === 0) throw new Error('Computer input scope is empty');
     if (this.pinnedOwnerId === undefined) {
       const ownerId = typeof this.ownerId === 'function' ? this.ownerId() : this.ownerId;
@@ -38,11 +63,7 @@ export class ComputerInputFence {
       .update(JSON.stringify([this.pinnedOwnerId, scopeKey]))
       .digest('hex')}.lock`;
     const path = join(this.directory, name);
-    const descriptor = openSync(
-      path,
-      constants.O_CREAT | constants.O_RDWR | constants.O_NOFOLLOW | constants.O_NONBLOCK,
-      0o600,
-    );
+    const descriptor = openLockFile(path);
     try {
       const file = fstatSync(descriptor);
       const current = lstatSync(path);
@@ -55,6 +76,7 @@ export class ComputerInputFence {
         current.dev !== file.dev
       )
         throw new Error('Computer input lock must be a private file owned by the daemon');
+      if (process.platform === 'darwin') return lease(descriptor);
       const deadline = AbortSignal.timeout(3_000);
       const acquisitionSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
       const status = await new Promise<number | null>((accept, reject) => {
@@ -72,13 +94,6 @@ export class ComputerInputFence {
       closeSync(descriptor);
       throw error;
     }
-    let released = false;
-    return {
-      release: () => {
-        if (released) return;
-        released = true;
-        closeSync(descriptor);
-      },
-    };
+    return lease(descriptor);
   }
 }
