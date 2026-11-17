@@ -1,5 +1,6 @@
 import { chiefGetResponseSchema } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
+import { installConversationStreams } from './tab-stream-fakes.js';
 
 async function runningTask(page: Page, readDelay = 0) {
   const chief = chiefGetResponseSchema.parse({
@@ -102,6 +103,7 @@ async function runningTask(page: Page, readDelay = 0) {
     Object.defineProperty(window, '__streams', { value: streams });
     Object.defineProperty(window, 'EventSource', { value: FakeEventSource });
   });
+  await page.addInitScript(installConversationStreams, '__streams');
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;

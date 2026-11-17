@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test';
+import { installConversationStreams } from './tab-stream-fakes.js';
 
 declare global {
   interface Window {
@@ -206,6 +207,7 @@ export async function mockLive(
     }
     Object.defineProperty(window, 'EventSource', { configurable: true, value: FakeEventSource });
   });
+  await page.addInitScript(installConversationStreams, '__es');
   const sent: string[] = [];
   await page.route('**/api/**', (route) => {
     const request = route.request();

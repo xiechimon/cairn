@@ -24,6 +24,15 @@ import { agentTodoStore } from './agent-todo.js';
 import { useAuth } from './auth.js';
 import { computerFeedStore } from './computer-feed.js';
 import { computerQueryKeys } from './computer-query-scope.js';
+import {
+  attachConnection,
+  conversationsInFlight,
+  deliverConversationEvent,
+  detachConnection,
+  reconcileConversations,
+  resyncConversations,
+  subscribeConversation,
+} from './conversation-subscriptions.js';
 import { invalidateConverged } from './invalidate.js';
 import { liveTextStore } from './live-text.js';
 import { liveThinkingStore } from './live-thinking.js';
@@ -74,13 +83,23 @@ export function startTeamStream(
 ): () => void {
   computerFeedStore.clear();
   const resync = () => {
+    detachConnection();
     computerFeedStore.clear();
+    resyncConversations();
     void invalidateConverged(qc);
   };
   const guards = streamGuards(qc);
   const disconnect = connect(
     resolvePath ?? withTicket(`/api/teams/${teamId}/stream`, ticket),
     (ev) => {
+      if (ev.type === 'hello') {
+        attachConnection(ev.connectionId as string);
+        return;
+      }
+      if (ev.type === 'conversation') {
+        deliverConversationEvent(ev.conversationId as string, ev.event as Record<string, unknown>);
+        return;
+      }
       const patched = applyTeamStreamEvent(qc, teamId, ev);
       for (const queryKey of teamEventInvalidations(ev, teamId)) {
         void invalidateConverged(qc, { queryKey });
@@ -101,10 +120,10 @@ export function startTeamStream(
     },
     resync,
     {
-      ...guards,
+      inFlight: () => guards.inFlight() || conversationsInFlight(),
       reconcile: () => {
         computerFeedStore.clear();
-        guards.reconcile();
+        void reconcileConversations(() => guards.reconcile());
         void invalidateConverged(qc, { queryKey: ['computers', teamId] });
         void invalidateConverged(qc, { queryKey: ['computer-commands'] });
       },
@@ -112,6 +131,7 @@ export function startTeamStream(
   );
   return () => {
     disconnect();
+    detachConnection();
     computerFeedStore.clear();
     for (const queryKey of Object.values(computerQueryKeys(teamId, generation))) {
       qc.removeQueries({ queryKey });
@@ -195,9 +215,7 @@ export function useConversationStream(
   const auth = useAuth();
   useEffect(() => {
     if (conversationId === undefined || !enabled || auth.gateOpen) return;
-    const stop = startConversationStream(conversationId, qc, { onMessage, onStep }, null, () =>
-      streamUrl(`/api/conversations/${conversationId}/stream`),
-    );
+    const stop = startConversationStream(conversationId, qc, { onMessage, onStep });
     return () => {
       stop();
     };
@@ -208,8 +226,6 @@ export function startConversationStream(
   conversationId: string,
   qc: QueryClient,
   handlers: ConversationStreamHandlers,
-  ticket: string | null = null,
-  resolvePath: (() => Promise<string>) | null = null,
 ): () => void {
   const onMessage = handlers.onMessage;
   const onStep = handlers.onStep;
@@ -228,10 +244,9 @@ export function startConversationStream(
     agentTodoStore.clear(conversationId);
     void invalidateConverged(qc);
   };
-  const disconnect = connect(
-    resolvePath ?? withTicket(`/api/conversations/${conversationId}/stream`, ticket),
-    (ev) => {
-      if (ev.type !== 'ping') businessRevision++;
+  const disconnect = subscribeConversation(conversationId, {
+    onEvent: (ev) => {
+      businessRevision++;
       switch (ev.type) {
         case 'text_delta':
           liveTextStore.append(conversationId, ev.text as string);
@@ -317,33 +332,31 @@ export function startConversationStream(
           break;
       }
     },
-    resync,
-    {
-      inFlight: () =>
-        guards.inFlight() ||
-        liveTextStore.get(conversationId) !== '' ||
-        liveThinkingStore.get(conversationId) !== '',
-      reconcile: async () => {
-        const revision = businessRevision;
-        const before = qc.getQueryState(messagesKey)?.dataUpdateCount;
-        await guards.reconcile();
-        const read = qc.getQueryState<InfiniteData<ConversationMessagesResponse>>(messagesKey);
-        if (
-          disposed ||
-          !isChiefConversationId(conversationId) ||
-          revision !== businessRevision ||
-          read?.dataUpdateCount === before ||
-          read?.isInvalidated !== false ||
-          read.data?.pages[0]?.activeRun !== null
-        )
-          return;
-        liveTextStore.clear(conversationId);
-        liveThinkingStore.clear(conversationId);
-        activityStore.clear(conversationId);
-        agentTodoStore.clear(conversationId);
-      },
+    onResync: resync,
+    inFlight: () =>
+      guards.inFlight() ||
+      liveTextStore.get(conversationId) !== '' ||
+      liveThinkingStore.get(conversationId) !== '',
+    reconcile: async (refetch) => {
+      const revision = businessRevision;
+      const before = qc.getQueryState(messagesKey)?.dataUpdateCount;
+      await refetch();
+      const read = qc.getQueryState<InfiniteData<ConversationMessagesResponse>>(messagesKey);
+      if (
+        disposed ||
+        !isChiefConversationId(conversationId) ||
+        revision !== businessRevision ||
+        read?.dataUpdateCount === before ||
+        read?.isInvalidated !== false ||
+        read.data?.pages[0]?.activeRun !== null
+      )
+        return;
+      liveTextStore.clear(conversationId);
+      liveThinkingStore.clear(conversationId);
+      activityStore.clear(conversationId);
+      agentTodoStore.clear(conversationId);
     },
-  );
+  });
   return () => {
     disposed = true;
     disconnect();

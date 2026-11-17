@@ -14,13 +14,13 @@ export const SSE_CHANNELS = [
     id: 'team',
     endpoint: '/api/teams/{id}/stream',
     audience: 'browser',
-    note: '团队流：ping/machine_presence/todo/build/notification/branch_sync（02 §1.2，r5 §7.2 扩充 + M7 #319）',
+    note: '团队流（每个标签页唯一的浏览器流）：hello/ping/machine_presence/todo/build/notification/branch_sync，以及承载已订阅会话事件的 conversation 信封；会话订阅由 PUT /api/streams/{connectionId}/conversations 设定',
   },
   {
     id: 'conversation',
     endpoint: '/api/conversations/{id}/stream',
-    audience: 'browser',
-    note: '会话流：transcript 实时流（r3 §3.5 抓包）；逐事件载荷未枚举，承载 pi 流词表 [推断]（protocol/executor.ts）',
+    audience: 'ios',
+    note: '会话流（仅供 iOS 客户端；浏览器改走团队流内的 conversation 信封）：transcript 实时流（r3 §3.5 抓包）；逐事件载荷未枚举，承载 pi 流词表 [推断]（protocol/executor.ts）',
   },
   {
     id: 'machine',
@@ -81,18 +81,6 @@ export const computerStateEventSchema = z.object({
 });
 export type ComputerStateEvent = z.infer<typeof computerStateEventSchema>;
 
-export const teamStreamEventSchema = z.discriminatedUnion('type', [
-  pingEventSchema,
-  machinePresenceEventSchema,
-  todoDocEventSchema,
-  buildDocEventSchema,
-  notificationEventSchema,
-  branchSyncEventSchema,
-  computerCommandEventSchema,
-  computerStateEventSchema,
-]);
-export type TeamStreamEvent = z.infer<typeof teamStreamEventSchema>;
-
 export const conversationMessageEventSchema = z.object({
   type: z.literal('message'),
   conversationId: recordId.optional(),
@@ -140,3 +128,36 @@ export const conversationStreamEventSchema = z.discriminatedUnion('type', [
   conversationAgentTodoEventSchema,
 ]);
 export type ConversationStreamEvent = z.infer<typeof conversationStreamEventSchema>;
+
+export const streamHelloEventSchema = z.object({
+  type: z.literal('hello'),
+  connectionId: z.string().min(1),
+});
+export type StreamHelloEvent = z.infer<typeof streamHelloEventSchema>;
+
+export const conversationEnvelopeEventSchema = z.object({
+  type: z.literal('conversation'),
+  conversationId: recordId,
+  event: conversationStreamEventSchema,
+});
+export type ConversationEnvelopeEvent = z.infer<typeof conversationEnvelopeEventSchema>;
+
+export const MAX_STREAM_CONVERSATIONS = 16;
+
+export const streamConversationsBodySchema = z.object({
+  conversationIds: z.array(recordId).max(MAX_STREAM_CONVERSATIONS),
+});
+
+export const teamStreamEventSchema = z.discriminatedUnion('type', [
+  pingEventSchema,
+  machinePresenceEventSchema,
+  todoDocEventSchema,
+  buildDocEventSchema,
+  notificationEventSchema,
+  branchSyncEventSchema,
+  computerCommandEventSchema,
+  computerStateEventSchema,
+  streamHelloEventSchema,
+  conversationEnvelopeEventSchema,
+]);
+export type TeamStreamEvent = z.infer<typeof teamStreamEventSchema>;

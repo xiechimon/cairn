@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   dailyUsageQuerySchema,
   patchRoutingRuleBodySchema,
@@ -7,6 +8,7 @@ import {
   policyUseSchema,
   putTopModelsBodySchema,
   routeUseSchema,
+  streamConversationsBodySchema,
   type TeamMember,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -31,7 +33,7 @@ import {
 } from './services/browser-session.js';
 import { coordinatorRunsOnPi } from './services/coordinator-context.js';
 import { readDeployStatus } from './services/deploy-status.js';
-import { createSerialConnection } from './services/events.js';
+import { createSerialConnection, StreamSessionRegistry } from './services/events.js';
 import {
   openAutonomyPauses,
   pauseTeamGithubRepos,
@@ -61,6 +63,7 @@ const ACCESS_REFUSALS = {
 } as const;
 
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
+  const streamSessions = new StreamSessionRegistry();
   app.use('/api/*', async (c, next) => {
     if (!getCookie(c, SESSION_COOKIE) && !isOpenRemotePath(c.req.path)) {
       setCookie(c, SESSION_COOKIE, ctx.user.id, { httpOnly: true, path: '/' });
@@ -269,6 +272,8 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       );
       const unsubscribe = ctx.hub.subscribe(teamId, conn, ctx.user.id);
       const deviceId = pairedDeviceIdOf(c);
+      const connectionId = randomUUID();
+      const closeSession = streamSessions.open(connectionId, { conn, teamId, deviceId });
       const timer = setInterval(() => {
         if (deviceId !== null && !pairedDeviceExists(ctx.db, deviceId)) {
           stream.abort();
@@ -284,11 +289,23 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       stream.onAbort(() => {
         clearInterval(timer);
         unsubscribe();
+        closeSession();
         unbindDevice();
         release();
       });
+      void conn.send({ type: 'hello', connectionId });
       await conn.send({ type: 'ping', seq: conn.nextSeq() });
       await held;
     });
+  });
+
+  app.put('/api/streams/:connectionId/conversations', async (c) => {
+    const session = streamSessions.get(c.req.param('connectionId'));
+    if (session === undefined || session.deviceId !== pairedDeviceIdOf(c)) {
+      return c.json({ error: 'unknown stream connection' }, 404);
+    }
+    const body = parseWith(streamConversationsBodySchema, await jsonBody(c), 'body');
+    streamSessions.setConversations(session, body.conversationIds, ctx.convHub);
+    return c.body(null, 204);
   });
 }

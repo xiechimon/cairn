@@ -2365,6 +2365,7 @@
         "server": [
           "/*",
           "/api/teams/:id/stream",
+          "/api/streams/:connectionId/conversations",
           "/api/analytics/first-touch",
           "/_mp/api/track"
         ]

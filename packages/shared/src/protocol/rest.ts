@@ -170,6 +170,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/conversations/{id}/messages', note: 'chief 会话同族（r5 §3.6）' },
   { method: 'GET', path: '/api/conversations/{id}/stream', note: 'SSE，见 protocol/sse.ts' },
   {
+    method: 'PUT',
+    path: '/api/streams/{connectionId}/conversations',
+    note: '设定团队流连接订阅的会话集合，见 protocol/sse.ts',
+  },
+  {
     method: 'GET',
     path: '/api/documents/{id}/diff',
     note: 'plan.md unified diff（02 §4.2/r5 §4）',

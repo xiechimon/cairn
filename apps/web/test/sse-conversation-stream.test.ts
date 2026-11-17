@@ -4,33 +4,7 @@ import { activityStore } from '../src/api/activity.js';
 import { agentTodoStore } from '../src/api/agent-todo.js';
 import { liveTextStore } from '../src/api/live-text.js';
 import { liveThinkingStore } from '../src/api/live-thinking.js';
-import { startConversationStream } from '../src/api/sse.js';
-
-class FakeEventSource {
-  static readonly CONNECTING = 0;
-  static readonly OPEN = 1;
-  static readonly CLOSED = 2;
-  static instances: FakeEventSource[] = [];
-  readonly url: string;
-  readyState: number = FakeEventSource.CONNECTING;
-  onopen: (() => void) | null = null;
-  onmessage: ((e: { data: string }) => void) | null = null;
-  onerror: (() => void) | null = null;
-  constructor(url: string) {
-    this.url = url;
-    FakeEventSource.instances.push(this);
-  }
-  close(): void {
-    this.readyState = FakeEventSource.CLOSED;
-  }
-  fireOpen(): void {
-    this.readyState = FakeEventSource.OPEN;
-    this.onopen?.();
-  }
-  push(payload: unknown): void {
-    this.onmessage?.({ data: JSON.stringify(payload) });
-  }
-}
+import { type ConvHandle, FakeEventSource, startConv, stopAllTabStreams } from './tab-stream-harness.js';
 
 const CONV = 'chief-t-740';
 
@@ -38,10 +12,9 @@ function freshClient(): QueryClient {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
-function startStream(qc: QueryClient): FakeEventSource {
+function startStream(qc: QueryClient): ConvHandle {
   FakeEventSource.instances = [];
-  startConversationStream(CONV, qc, {});
-  const es = FakeEventSource.instances[0] as FakeEventSource;
+  const es = startConv(CONV, qc);
   es.fireOpen();
   return es;
 }
@@ -58,6 +31,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopAllTabStreams();
   vi.unstubAllGlobals();
   vi.useRealTimers();
   liveTextStore.clear(CONV);
@@ -74,16 +48,16 @@ describe('confirmed user message visibility', () => {
     const keep = { id: 'keep-queued', content: delivered.content, createdAt: 2 };
     const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null, queuedMessages: [{ ...keep, id: 'source-queued' }, keep] };
     qc.setQueryData(['messages', CONV, 'pages'], { pages: [envelope], pageParams: [null] });
-    const stopSource = startConversationStream(CONV, qc, { onMessage });
-    const source = FakeEventSource.instances.at(-1)!;
+    const source = startConv(CONV, qc, { onMessage });
+    const stopSource = source.stop;
     source.fireOpen();
     const event = { type: 'message', conversationId: 'replacement-build', message: delivered, deliveredQueue: { conversationId: CONV, messageId: 'source-queued' } };
     source.push(event);
     expect(qc.getQueryData(['messages', CONV, 'pages'])).toMatchObject({ pages: [{ messages: [], queuedMessages: [keep] }] });
     expect(qc.getQueryData(['messages', 'replacement-build', 'pages'])).toMatchObject({ pages: [{ messages: [delivered] }] });
     expect(onMessage).toHaveBeenCalledWith(delivered);
-    const stopTarget = startConversationStream('replacement-build', qc, {});
-    const target = FakeEventSource.instances.at(-1)!;
+    const target = startConv('replacement-build', qc, {});
+    const stopTarget = target.stop;
     target.fireOpen();
     target.push({ type: 'message', message: delivered, deliveredQueue: event.deliveredQueue });
     source.push(event);
@@ -100,8 +74,8 @@ describe('confirmed user message visibility', () => {
     const keep = { id: 'keep-queued', content: delivered.content, createdAt: 2 };
     const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null, queuedMessages: [{ ...keep, id: 'source-queued' }, keep] };
     qc.setQueryData(['messages', CONV, 'pages'], { pages: [envelope], pageParams: [null] });
-    const stop = startConversationStream(target, qc, {});
-    const es = FakeEventSource.instances.at(-1) as FakeEventSource;
+    const es = startConv(target, qc, {});
+    const stop = es.stop;
     es.fireOpen();
     const event = { type: 'message', message: delivered, deliveredQueue: { conversationId: CONV, messageId: 'source-queued' } };
     es.push(event);
@@ -153,8 +127,8 @@ describe('confirmed user message visibility', () => {
       pages: [{ ...envelope, nextCursor: 'older' }, older],
       pageParams: [null, 'older'],
     });
-    const stop = startConversationStream(id, qc, {});
-    const es = FakeEventSource.instances.at(-1) as FakeEventSource;
+    const es = startConv(id, qc, {});
+    const stop = es.stop;
     es.fireOpen();
     es.push({ type: 'message', message });
     es.push({ type: 'message', message });
@@ -173,10 +147,10 @@ describe('clear on entry: a replay is a snapshot (failure mode 1)', () => {
     liveTextStore.append(CONV, '旧缓冲');
     const qc = freshClient();
     FakeEventSource.instances = [];
-    startConversationStream(CONV, qc, {});
+    const started = startConv(CONV, qc, {});
 
     expect(liveTextStore.get(CONV)).toBe('');
-    const es = FakeEventSource.instances[0] as FakeEventSource;
+    const es = started;
     es.fireOpen();
     es.push({ type: 'text_delta', text: '补发前缀' });
     expect(liveTextStore.get(CONV)).toBe('补发前缀');
@@ -192,7 +166,7 @@ describe('reconnect: rebuild clears (failure mode 2)', () => {
     expect(liveTextStore.get(CONV)).toBe('断线前');
 
     vi.advanceTimersByTime(20_000);
-    const rebuilt = FakeEventSource.instances[1] as FakeEventSource;
+    const rebuilt = es;
     expect(rebuilt).toBeDefined();
     rebuilt.fireOpen();
 
@@ -234,8 +208,8 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
       await qc.fetchQuery(options);
       const observer = new QueryObserver(qc, options);
       const unsubscribe = observer.subscribe(() => {});
-      const stop = startConversationStream(CONV, qc, {});
-      const es = FakeEventSource.instances.at(-1)!;
+      const es = startConv(CONV, qc, {});
+      const stop = es.stop;
       es.fireOpen();
       settled = true;
       es.push({ type: 'step', step: { id: 's1', status } });
@@ -271,8 +245,8 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
     await qc.fetchQuery(options);
     const observer = new QueryObserver(qc, options);
     const unsubscribe = observer.subscribe(() => {});
-    const stop = startConversationStream(CONV, qc, {});
-    const es = FakeEventSource.instances.at(-1)!;
+    const es = startConv(CONV, qc, {});
+    const stop = es.stop;
     es.fireOpen();
     es.push({ type: 'text_delta', text: answer.content });
     es.push({ type: 'thinking_delta', text: 'Finished thinking' });
@@ -312,8 +286,8 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
       await qc.fetchQuery(options);
       const observer = new QueryObserver(qc, options);
       const unsubscribe = observer.subscribe(() => {});
-      const stop = startConversationStream(CONV, qc, {});
-      const es = FakeEventSource.instances.at(-1)!;
+      const es = startConv(CONV, qc, {});
+      const stop = es.stop;
       es.fireOpen();
       es.push({ type: 'text_delta', text: 'Do not erase this' });
       for (let i = 0; i < 4; i++) {
@@ -428,8 +402,8 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
     const onMessage = vi.fn();
     const onStep = vi.fn();
     FakeEventSource.instances = [];
-    startConversationStream(CONV, qc, { onMessage, onStep });
-    const es = FakeEventSource.instances[0] as FakeEventSource;
+    const started = startConv(CONV, qc, { onMessage, onStep });
+    const es = started;
     es.fireOpen();
     es.push({
       type: 'message',
@@ -491,10 +465,10 @@ describe('activity phase single slot (#905)', () => {
     activityStore.set(CONV, { stepId: 's0', phase: 'thinking', at: 50 });
     const qc = freshClient();
     FakeEventSource.instances = [];
-    startConversationStream(CONV, qc, {});
+    const started = startConv(CONV, qc, {});
     expect(activityStore.get(CONV)).toBeNull();
 
-    const es = FakeEventSource.instances[0] as FakeEventSource;
+    const es = started;
     es.fireOpen();
     es.push({ type: 'activity', activity: { stepId: 's1', phase: 'tool', tool: 'read', at: 300 } });
     expect(activityStore.get(CONV)).toMatchObject({ phase: 'tool', tool: 'read' });
@@ -526,9 +500,9 @@ describe('thinking increments (#1308)', () => {
   it('stale thinking buffer from before the subscription is cleared before the replay', () => {
     liveThinkingStore.append(CONV, '旧思考');
     FakeEventSource.instances = [];
-    startConversationStream(CONV, freshClient(), {});
+    const started = startConv(CONV, freshClient(), {});
     expect(liveThinkingStore.get(CONV)).toBe('');
-    const es = FakeEventSource.instances[0] as FakeEventSource;
+    const es = started;
     es.fireOpen();
     es.push({ type: 'thinking_delta', text: '补发思考' });
     expect(liveThinkingStore.get(CONV)).toBe('补发思考');
@@ -555,7 +529,7 @@ describe('thinking increments (#1308)', () => {
     const es = startStream(freshClient());
     es.push({ type: 'thinking_delta', text: '断线前' });
     vi.advanceTimersByTime(20_000);
-    const rebuilt = FakeEventSource.instances[1] as FakeEventSource;
+    const rebuilt = es;
     rebuilt.fireOpen();
     expect(liveThinkingStore.get(CONV)).toBe('');
     rebuilt.push({ type: 'thinking_delta', text: '断线前后缀' });
@@ -642,9 +616,9 @@ describe('agent todo list single slot (#1524)', () => {
   it('stream rebuild clears the slot: the new subscription voids the old list first, the hub replay takes over', () => {
     agentTodoStore.set(CONV, { stepId: 's0', at: 50, items: [{ text: '旧', state: 'todo' }] });
     FakeEventSource.instances = [];
-    startConversationStream(CONV, freshClient(), {});
+    const started = startConv(CONV, freshClient(), {});
     expect(agentTodoStore.get(CONV)).toBeNull();
-    const es = FakeEventSource.instances[0] as FakeEventSource;
+    const es = started;
     es.fireOpen();
     es.push(todoEvent([{ text: '补发', state: 'doing' }]));
     expect(agentTodoStore.get(CONV)).toMatchObject({ items: [{ text: '补发', state: 'doing' }] });

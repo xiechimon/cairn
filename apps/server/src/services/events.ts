@@ -87,6 +87,52 @@ export function createSerialConnection(
   };
 }
 
+export interface StreamSession {
+  readonly conn: TeamStreamConnection;
+  readonly teamId: string;
+  readonly deviceId: string | null;
+  readonly subscriptions: Map<string, () => void>;
+}
+
+export class StreamSessionRegistry {
+  private readonly sessions = new Map<string, StreamSession>();
+
+  open(connectionId: string, session: Omit<StreamSession, 'subscriptions'>): () => void {
+    const entry: StreamSession = { ...session, subscriptions: new Map() };
+    this.sessions.set(connectionId, entry);
+    return () => {
+      this.sessions.delete(connectionId);
+      for (const unsubscribe of entry.subscriptions.values()) unsubscribe();
+      entry.subscriptions.clear();
+    };
+  }
+
+  get(connectionId: string): StreamSession | undefined {
+    return this.sessions.get(connectionId);
+  }
+
+  setConversations(
+    session: StreamSession,
+    conversationIds: readonly string[],
+    hub: ConversationStreamHub | undefined,
+  ): void {
+    const wanted = new Set(conversationIds);
+    for (const [id, unsubscribe] of session.subscriptions) {
+      if (wanted.has(id)) continue;
+      unsubscribe();
+      session.subscriptions.delete(id);
+    }
+    for (const id of wanted) {
+      if (session.subscriptions.has(id)) continue;
+      const channel: TeamStreamConnection = {
+        nextSeq: () => session.conn.nextSeq(),
+        send: (event) => session.conn.send({ type: 'conversation', conversationId: id, event }),
+      };
+      session.subscriptions.set(id, hub?.subscribe(id, channel) ?? (() => {}));
+    }
+  }
+}
+
 export const CONV_TEXT_BUFFER_MAX_BYTES = 128 * 1024;
 
 export const CONV_TEXT_BUFFER_MAX_CONVS = 128;

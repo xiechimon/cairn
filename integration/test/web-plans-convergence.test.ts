@@ -123,7 +123,7 @@ test('the plan converges via the team-stream phase event when the conv stream is
   startLegacyBuild(server, todoId, { withPlan: true });
 
   let blocked = 0;
-  await page.route('**/api/conversations/*/stream', (route) => {
+  await page.route('**/api/streams/*/conversations', (route) => {
     blocked += 1;
     void route.abort();
   });

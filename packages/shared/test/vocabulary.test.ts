@@ -239,6 +239,7 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
       ['GET', '/api/builds/{id}/steps'],
       ['GET', '/api/conversations/{id}/messages'],
       ['GET', '/api/conversations/{id}/stream'],
+      ['PUT', '/api/streams/{connectionId}/conversations'],
       ['GET', '/api/documents/{id}/diff'],
       ['GET', '/api/schedules'],
       ['GET', '/api/skills'],

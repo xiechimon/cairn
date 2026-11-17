@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { installConversationStreams } from './tab-stream-fakes.js';
 
 declare global {
   interface Window {
@@ -6,8 +7,8 @@ declare global {
   }
 }
 
-function stubEventSource(page: Page) {
-  return page.addInitScript(() => {
+async function stubEventSource(page: Page) {
+  await page.addInitScript(() => {
     window.__es = [];
     class FakeEventSource {
       static CONNECTING = 0;
@@ -35,6 +36,7 @@ function stubEventSource(page: Page) {
     }
     Object.defineProperty(window, 'EventSource', { configurable: true, value: FakeEventSource });
   });
+  return page.addInitScript(installConversationStreams, '__es');
 }
 
 const PX_1 = Buffer.from(

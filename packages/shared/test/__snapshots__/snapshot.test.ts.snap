@@ -8781,6 +8781,855 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
       ],
       "type": "object",
     },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "connectionId": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": {
+          "const": "hello",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "connectionId",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "type": "string",
+        },
+        "event": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "seq": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "ping",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "type",
+                "seq",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "clientMessageId": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "conversationId": {
+                  "type": "string",
+                },
+                "deliveredQueue": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "conversationId": {
+                      "type": "string",
+                    },
+                    "messageId": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "conversationId",
+                    "messageId",
+                  ],
+                  "type": "object",
+                },
+                "message": {
+                  "additionalProperties": {},
+                  "properties": {
+                    "actor": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                    "content": {},
+                    "createdAt": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "id": {
+                      "type": "string",
+                    },
+                    "role": {
+                      "enum": [
+                        "system",
+                        "user",
+                        "assistant",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "role",
+                    "content",
+                    "id",
+                    "createdAt",
+                  ],
+                  "type": "object",
+                },
+                "type": {
+                  "const": "message",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "type",
+                "message",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "text": {
+                  "type": "string",
+                },
+                "type": {
+                  "const": "text_delta",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "type",
+                "text",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "text": {
+                  "type": "string",
+                },
+                "type": {
+                  "const": "thinking_delta",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "type",
+                "text",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "step": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "blockerHandoff": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "blockers": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "changedFiles": {
+                                "items": {
+                                  "type": "string",
+                                },
+                                "type": "array",
+                              },
+                              "delivery": {
+                                "anyOf": [
+                                  {
+                                    "oneOf": [
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "kind": {
+                                            "const": "pr",
+                                            "type": "string",
+                                          },
+                                          "number": {
+                                            "maximum": 9007199254740991,
+                                            "minimum": -9007199254740991,
+                                            "type": "integer",
+                                          },
+                                          "title": {
+                                            "type": [
+                                              "string",
+                                              "null",
+                                            ],
+                                          },
+                                          "url": {
+                                            "type": [
+                                              "string",
+                                              "null",
+                                            ],
+                                          },
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "number",
+                                          "url",
+                                          "title",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "branch": {
+                                            "type": "string",
+                                          },
+                                          "head": {
+                                            "type": [
+                                              "string",
+                                              "null",
+                                            ],
+                                          },
+                                          "kind": {
+                                            "const": "branch",
+                                            "type": "string",
+                                          },
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "branch",
+                                          "head",
+                                        ],
+                                        "type": "object",
+                                      },
+                                    ],
+                                  },
+                                  {
+                                    "type": "null",
+                                  },
+                                ],
+                              },
+                              "omittedFiles": {
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer",
+                              },
+                              "phase": {
+                                "enum": [
+                                  "todo",
+                                  "queued",
+                                  "planning",
+                                  "confirm",
+                                  "building",
+                                  "needs_input",
+                                  "review",
+                                  "done",
+                                  "failed",
+                                  "closed",
+                                ],
+                                "type": "string",
+                              },
+                              "report": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "attachmentId": {
+                                    "type": "string",
+                                  },
+                                  "content": {
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "attachmentId",
+                                  "content",
+                                ],
+                                "type": "object",
+                              },
+                              "summary": {
+                                "type": [
+                                  "string",
+                                  "null",
+                                ],
+                              },
+                              "title": {
+                                "type": "string",
+                              },
+                              "todoId": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "todoId",
+                              "title",
+                              "phase",
+                              "delivery",
+                              "changedFiles",
+                              "omittedFiles",
+                              "summary",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                      },
+                      "required": [
+                        "blockers",
+                      ],
+                      "type": "object",
+                    },
+                    "buildId": {
+                      "type": "string",
+                    },
+                    "checkpointCommit": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                    "createdAt": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "finishedAt": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "id": {
+                      "type": "string",
+                    },
+                    "kind": {
+                      "enum": [
+                        "plan",
+                        "build",
+                        "session",
+                        "merge",
+                        "chief",
+                        "review",
+                        "verify",
+                      ],
+                      "type": "string",
+                    },
+                    "machineId": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                    "promptOrigin": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "ci-fix",
+                              "type": "string",
+                            },
+                            "round": {
+                              "maximum": 9007199254740991,
+                              "minimum": 1,
+                              "type": "integer",
+                            },
+                            "roundsMax": {
+                              "maximum": 9007199254740991,
+                              "minimum": 1,
+                              "type": "integer",
+                            },
+                            "trigger": {
+                              "enum": [
+                                "ci-checks",
+                                "pre-push",
+                              ],
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "trigger",
+                            "round",
+                            "roundsMax",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "merge-conflict",
+                              "type": "string",
+                            },
+                            "round": {
+                              "maximum": 9007199254740991,
+                              "minimum": 1,
+                              "type": "integer",
+                            },
+                            "roundsMax": {
+                              "maximum": 9007199254740991,
+                              "minimum": 1,
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "round",
+                            "roundsMax",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "rework",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "queue": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "blocked": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "machine-offline",
+                                "capability-missing",
+                                "sandbox-unavailable",
+                                "runtime-disabled",
+                                "model-unavailable",
+                                "local-path",
+                                "claude-rate-limited",
+                                "claude-logged-out",
+                                "account-switched",
+                                "coordinator-provider-missing",
+                                "coordinator-provider-no-key",
+                              ],
+                              "type": "string",
+                            },
+                            "missing": {
+                              "items": {
+                                "type": "string",
+                              },
+                              "type": "array",
+                            },
+                            "platform": {
+                              "enum": [
+                                "linux",
+                                "macos",
+                                "windows",
+                              ],
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "missing",
+                          ],
+                          "type": "object",
+                        },
+                        "hold": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "reason": {
+                              "const": "quota",
+                              "type": "string",
+                            },
+                            "retryAt": {
+                              "maximum": 9007199254740991,
+                              "minimum": -9007199254740991,
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "reason",
+                            "retryAt",
+                          ],
+                          "type": "object",
+                        },
+                        "position": {
+                          "maximum": 9007199254740991,
+                          "minimum": 1,
+                          "type": "integer",
+                        },
+                        "waitingFor": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "capacity": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": -9007199254740991,
+                                  "type": "integer",
+                                },
+                                "machineId": {
+                                  "type": "string",
+                                },
+                                "name": {
+                                  "type": "string",
+                                },
+                                "running": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": -9007199254740991,
+                                  "type": "integer",
+                                },
+                              },
+                              "required": [
+                                "machineId",
+                                "name",
+                                "running",
+                                "capacity",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                      },
+                      "required": [
+                        "position",
+                        "waitingFor",
+                      ],
+                      "type": "object",
+                    },
+                    "quotaWait": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "quota",
+                            "capacity",
+                          ],
+                          "type": "string",
+                        },
+                        "label": {
+                          "type": [
+                            "string",
+                            "null",
+                          ],
+                        },
+                        "probeAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer",
+                        },
+                        "providerId": {
+                          "type": "string",
+                        },
+                        "retryAfterMs": {
+                          "anyOf": [
+                            {
+                              "maximum": 9007199254740991,
+                              "minimum": -9007199254740991,
+                              "type": "integer",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "providerId",
+                        "label",
+                        "retryAfterMs",
+                        "probeAt",
+                      ],
+                      "type": "object",
+                    },
+                    "route": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "harness": {
+                              "anyOf": [
+                                {
+                                  "enum": [
+                                    "claude-code",
+                                    "pi",
+                                  ],
+                                  "type": "string",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                            "modelId": {
+                              "type": [
+                                "string",
+                                "null",
+                              ],
+                            },
+                          },
+                          "required": [
+                            "harness",
+                            "modelId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "skillInjection": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "hits": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "reason": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "rule": {
+                                    "enum": [
+                                      "explicit-mention",
+                                      "domain",
+                                    ],
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "id",
+                                  "rule",
+                                  "reason",
+                                ],
+                                "type": "object",
+                              },
+                              "type": "array",
+                            },
+                          },
+                          "required": [
+                            "hits",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "startedAt": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "status": {
+                      "enum": [
+                        "pending",
+                        "claimed",
+                        "done",
+                        "failed",
+                        "stopped",
+                        "waiting_quota",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "buildId",
+                    "kind",
+                    "machineId",
+                    "createdAt",
+                    "status",
+                    "checkpointCommit",
+                    "skillInjection",
+                  ],
+                  "type": "object",
+                },
+                "type": {
+                  "const": "step",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "type",
+                "step",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "activity": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "at": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "attempt": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "phase": {
+                      "enum": [
+                        "preparing",
+                        "starting",
+                        "thinking",
+                        "responding",
+                        "tool",
+                        "retrying",
+                        "compacting",
+                        "awaiting_model",
+                      ],
+                      "type": "string",
+                    },
+                    "resetLive": {
+                      "type": "boolean",
+                    },
+                    "skills": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "denied": {
+                            "type": "boolean",
+                          },
+                          "name": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "name",
+                          "denied",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "stepId": {
+                      "type": "string",
+                    },
+                    "tool": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "phase",
+                    "stepId",
+                    "at",
+                  ],
+                  "type": "object",
+                },
+                "type": {
+                  "const": "activity",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "type",
+                "activity",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "todo": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "at": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "items": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "state": {
+                            "enum": [
+                              "todo",
+                              "doing",
+                              "done",
+                            ],
+                            "type": "string",
+                          },
+                          "text": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "text",
+                          "state",
+                        ],
+                        "type": "object",
+                      },
+                      "maxItems": 64,
+                      "type": "array",
+                    },
+                    "stepId": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "items",
+                    "stepId",
+                    "at",
+                  ],
+                  "type": "object",
+                },
+                "type": {
+                  "const": "agent_todo",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "type",
+                "todo",
+              ],
+              "type": "object",
+            },
+          ],
+        },
+        "type": {
+          "const": "conversation",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "conversationId",
+        "event",
+      ],
+      "type": "object",
+    },
   ],
 }
 `;
@@ -8856,13 +9705,13 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > SSE's three chann
     "audience": "browser",
     "endpoint": "/api/teams/{id}/stream",
     "id": "team",
-    "note": "团队流：ping/machine_presence/todo/build/notification/branch_sync（02 §1.2，r5 §7.2 扩充 + M7 #319）",
+    "note": "团队流（每个标签页唯一的浏览器流）：hello/ping/machine_presence/todo/build/notification/branch_sync，以及承载已订阅会话事件的 conversation 信封；会话订阅由 PUT /api/streams/{connectionId}/conversations 设定",
   },
   {
-    "audience": "browser",
+    "audience": "ios",
     "endpoint": "/api/conversations/{id}/stream",
     "id": "conversation",
-    "note": "会话流：transcript 实时流（r3 §3.5 抓包）；逐事件载荷未枚举，承载 pi 流词表 [推断]（protocol/executor.ts）",
+    "note": "会话流（仅供 iOS 客户端；浏览器改走团队流内的 conversation 信封）：transcript 实时流（r3 §3.5 抓包）；逐事件载荷未枚举，承载 pi 流词表 [推断]（protocol/executor.ts）",
   },
   {
     "audience": "daemon",
@@ -9824,6 +10673,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "SSE，见 protocol/sse.ts",
     "path": "/api/conversations/{id}/stream",
+  },
+  {
+    "method": "PUT",
+    "note": "设定团队流连接订阅的会话集合，见 protocol/sse.ts",
+    "path": "/api/streams/{connectionId}/conversations",
   },
   {
     "method": "GET",

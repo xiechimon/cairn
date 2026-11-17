@@ -199,6 +199,7 @@ const M5_ROUTES = [
   'GET /api/skills',
   'POST /api/analytics/first-touch',
   'GET /api/conversations/{id}/stream',
+  'PUT /api/streams/{connectionId}/conversations',
   'GET /api/builds/{id}/plans',
   'GET /api/builds/{id}/changes',
   'GET /api/builds/{id}/changes/file',

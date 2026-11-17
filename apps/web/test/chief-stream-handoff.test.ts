@@ -3,34 +3,8 @@ import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { liveTextStore } from '../src/api/live-text.js';
 import { mapChief, type MessageRow } from '../src/api/mappers.js';
-import { startConversationStream } from '../src/api/sse.js';
+import { type ConvHandle, FakeEventSource, startConv, stopAllTabStreams } from './tab-stream-harness.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
-
-class FakeEventSource {
-  static readonly CONNECTING = 0;
-  static readonly OPEN = 1;
-  static readonly CLOSED = 2;
-  static instances: FakeEventSource[] = [];
-  readonly url: string;
-  readyState: number = FakeEventSource.CONNECTING;
-  onopen: (() => void) | null = null;
-  onmessage: ((e: { data: string }) => void) | null = null;
-  onerror: (() => void) | null = null;
-  constructor(url: string) {
-    this.url = url;
-    FakeEventSource.instances.push(this);
-  }
-  close(): void {
-    this.readyState = FakeEventSource.CLOSED;
-  }
-  fireOpen(): void {
-    this.readyState = FakeEventSource.OPEN;
-    this.onopen?.();
-  }
-  push(payload: unknown): void {
-    this.onmessage?.({ data: JSON.stringify(payload) });
-  }
-}
 
 const CONV = 'chief-t-857';
 const NOW = 1_758_000_000_000;
@@ -125,15 +99,15 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stopAllTabStreams();
   vi.unstubAllGlobals();
   vi.useRealTimers();
   liveTextStore.clear(CONV);
 });
 
-function startStream(qc: QueryClient): FakeEventSource {
+function startStream(qc: QueryClient): ConvHandle {
   FakeEventSource.instances = [];
-  startConversationStream(CONV, qc, {});
-  const es = FakeEventSource.instances[0] as FakeEventSource;
+  const es = startConv(CONV, qc);
   es.fireOpen();
   return es;
 }
@@ -244,7 +218,7 @@ describe('chief streaming handoff (#857 F-H1..H6)', () => {
     es.push({ type: 'message', message: textRow('m1', '段') });
 
     FakeEventSource.instances = [];
-    startConversationStream(CONV, qc, {});
+    const started = startConv(CONV, qc, {});
     expect(liveTextStore.get(CONV)).toBe('');
   });
 });
