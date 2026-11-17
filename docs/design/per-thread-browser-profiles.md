@@ -1,0 +1,46 @@
+# Per-thread browser profiles on the chief computer
+
+Status: proposal for the owner's review. Nothing here is built. Baseline `e541ed535` on `origin/main`. Owner decision already made: per-thread profile directories inside the existing per-chief desktop, not VM-per-thread. Preserves `docs/design/computer-login-handoff.md` semantics, reinterpreted per thread.
+
+## Problem
+
+Browser state and browser locking are per-chief today. `selectTarget` keys the `computer` row `chief:${chiefId}` (`apps/server/src/services/machine-computer.ts:655`, unique index `computer_scope_key_idx`, `schema.ts:442`), so every thread of one chief shares one desktop, one Chromium profile (`home/.cairn/browser-profile` and `home/.cairn/cloak-profile`, `apps/daemon/src/computer/host-desktop.ts:60-61`), one agent-browser session (`browserSessionName(scopeKey, stealth)`), and one execution lease: `acquireExecutionLease` throws `409 COMPUTER_BUSY` when another step holds the unexpired `executionStepId` lease (`machine-computer.ts:88, 692-723`). Two chief threads can run steps concurrently (ordering is per `buildId`, not per chief), so thread B's `browser_navigate` collides with thread A's lease, and when it does run it shares A's cookies, tabs, and CDP session.
+
+## Decision
+
+1. **Desktop stays chief-wide; browser identity becomes per-thread.** The `computer` row, `providerRef`, the VM (`computerVmName(scopeKey)`), and the host desktop directory (`host-desktop.ts:302-306`, `root/sha256(scopeKey)[0:16]`) keep the chief scope. A new optional `browserScope` field on `computerCallSchema` (`packages/shared/src/protocol/computer.ts:111`) is stamped server-side on `browser_*` calls in `forwardComputerCall` (`machine-computer.ts:1177-1334`): `browserScope = thread.id` from `computerThreadOf` (`apps/server/src/services/computer-thread.ts`), falling back to `chief-fallback:${chiefId}` when the thread is `NO_CARD_THREAD` (info-card builds without a chief thread). Unstamped calls (old server → new daemon) keep the legacy profile — a rolling upgrade stays correct, just shared.
+2. **Profile location.** `home/.cairn/browser-profiles/<key>/{chromium,cloak}` inside the existing per-chief home, `<key>` a sanitized form of `browserScope` (record ids are already fs-safe). The daemon names the agent-browser session `browserSessionName(browserScope, stealth)` and points `AGENT_BROWSER_PROFILE` at the thread's dir (`host-desktop.ts:753-764`). `dispatch.ts` routes the call by `scopeKey` to the desktop as today and passes `browserScope` into `runBrowserTool`'s `session` field (currently `call.scopeKey`, `dispatch.ts:462-466`). On the VM path, `agent-browser.sh` maps fixed session-name suffixes to fixed profile paths, so the daemon writes a session→profile map entry before dispatch (same dir pattern as `cloak.env`) and the script falls back to legacy paths when absent [inferred — guest-side plumbing not fully traced].
+3. **Lease granularity.** New `computer_browser_lease` table `(computerId, profileKey, stepId, expiresAt, fence)`; `browser_*` calls acquire the matching profile lease instead of the computer execution lease. All other tools (`shell`, file tools, `computer_observe/act`, install/manage, `request_takeover`) keep `executionStepId`/`executionFence` — they share one screen and filesystem and still serialize. The owner control lease (`controlHolder === 'user'`) is checked before either lease and still blocks everything. The handoff refusal stays computer-scoped: while `handoffStepId` is open, all `browser_*` calls on that desktop refuse — the owner is at the screen, regardless of which thread asked.
+4. **Concurrency and `COMPUTER_BUSY` after.** Browser calls from different threads run concurrently — separate Chromium processes, separate profile locks, `profileReleased` already waits per-profile (`host-desktop.ts:473`). `COMPUTER_BUSY` remains the error, now thrown only for same-profile lease contention or desktop-tool/owner-lease contention. The daemon's `using(scopeKey)` serialization (`host-desktop.ts:524-531`) is per-desktop provider operation; browser ops get keyed on `browserScope` so two threads' commands don't queue behind each other. `computer_observe`/`computer_act` still see the one physical screen including other threads' windows — accepted, listed under risks.
+5. **Owner-browser handoff per thread.** `computer.handoffStepId` identifies the asking step → `computerThreadOf` → its `browserScope`; the handoff request to the daemon carries that key so `takeOver`/`openOwnerBrowser` (`host-desktop.ts:380-383, 449-471`) close *that thread's* stealth session and open the owner manual browser on *that thread's* cloak profile. Shared-login semantics become per-thread: the login the owner completes is the agent's login for that thread's profile only. Another thread needing the same account requests its own takeover — intended isolation, documented in the handoff card copy. The daemon-side refusal also stays desktop-wide: `forScope` throws `ComputerRefusal` for any agent-browser command while `takeovers.has(scopeKey)` (`host-desktop.ts:776`, `vm-desktop.ts:1012`), so other threads' browsers cannot run mid-handoff even though their profiles are untouched.
+6. **Migration of the legacy chief profile.** The first keyed call on a desktop that has a legacy profile adopts it: `.cairn/cloak-profile` renames to `browser-profiles/<key>/cloak` on the first stealth keyed call, `.cairn/browser-profile` likewise for non-stealth — rename, not copy, so cookie state has one source and no forked sessions. Subsequent threads get fresh profiles. `importSavedLogin` (`.agent-browser/sessions` one-time cookie import, `host-desktop.ts:492`) runs per profile on first use. `stop`/teardown enumerates `browser-profiles/*` to close every session instead of the two fixed names (`host-desktop.ts:848-864`). Presence, `computer` rows, and the chief `scopeKey` wire field are unchanged — no new row per thread.
+
+## States and transitions
+
+| State | Values | Transitions |
+|---|---|---|
+| Browser lease | none, held | Browser `forwardComputerCall` acquires per `(computerId, profileKey)`; expiry or step finish releases; another step on the same profile → `COMPUTER_BUSY`. |
+| Profile dir | absent, present, legacy-adopted | Created on first keyed call; legacy dir adopted once by rename; removed only with the desktop. |
+| Handoff | none, open | `handoffStepId` set/cleared unchanged; now carries the requesting thread's `browserScope` to the daemon. |
+| Execution lease | unchanged | Still serializes all non-browser calls and `request_takeover`. |
+
+## Paths, failures, and the first test
+
+| Path | Reads or writes | On failure | First test |
+|---|---|---|---|
+| `forwardComputerCall` `browser_*` | stamps `browserScope`, acquires browser lease, writes `computer_call` | same-profile held → `COMPUTER_BUSY`; handoff open → existing refusal; no claimed step → `409` as today | two threads' `browser_navigate` run concurrently on one computer row; a second step on the same thread's profile 409s |
+| `routeFor`/`handleBrowser` | reads `scopeKey` (desktop) + `browserScope` (profile/session) | missing `scopeKey` → unchanged `NO_COMPUTER_SCOPE`; missing `browserScope` → legacy profile | unkeyed call uses `.cairn/browser-profile`; keyed call uses `browser-profiles/<key>` |
+| Browser-lease acquire/release/sweep | writes `computer_browser_lease` | stale lease expiry like `executionLeaseExpiresAt` sweep; released on step finish | lease survives neither step end nor expiry for another step on that profile |
+| Legacy adopt | renames legacy profile dirs | rename fails mid-move → keyed call falls back to fresh profile, legacy kept | first keyed stealth call on a desktop with `cloak-profile` inherits it; second thread starts fresh |
+| Handoff `takeOver`/`openOwnerBrowser` | reads `browserScope` of `handoffStepId`; closes that session, opens owner browser on that profile | profile lock held → `profileReleased` wait as today; handoff with no `browserScope` → legacy profile | thread-B handoff closes B's session and opens the owner browser on B's cloak profile; A's session untouched, and A's browser calls still refuse while the handoff is open |
+| `stop`/teardown, presence | enumerates `browser-profiles/*` | missing dir → skip | stopping the desktop closes every thread session |
+| VM guest `agent-browser.sh` | reads session→profile map | absent map entry → legacy fixed path [inferred] | keyed session inside the VM gets the thread profile; old image falls back |
+| `using()` daemon serialization | keyed on `browserScope` for browser ops, `scopeKey` otherwise | — | two threads' browser commands are not serialized; a file op still serializes per desktop |
+
+## Risks
+
+Two threads' browsers share one screen: `computer_observe` returns whichever window is frontmost, and `computer_act` can click the other thread's window — mitigated only by the existing handoff/lease discipline, not by this change. An old daemon ignores `browserScope` and runs every call on the shared profile — correct but unisolated during rolling upgrade. Login state forked before migration (owner logged in pre-change under the chief profile) belongs to whichever thread adopts the legacy dir.
+
+## Out of scope
+
+Per-thread desktops or VMs, `computer_observe` window attribution, and any UI surfacing of profile membership.
