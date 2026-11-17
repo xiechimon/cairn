@@ -97,7 +97,7 @@ async function open(page: Page, world: World, path = '/app') {
               browserEnabled: true,
               handoffReason: null,
               kind: 'vm',
-              download: { state: 'absent', doneBytes: 0, totalBytes: 1_453_613_041 },
+              download: { state: 'absent', doneBytes: 0, totalBytes: 1_481_435_942 },
               machine: { id: 'm1', name: 'mac', online: true },
             },
           ],

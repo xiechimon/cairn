@@ -5,7 +5,7 @@ import { evidencePanelShot } from './evidence';
 const MACHINE = { id: 'm1', name: 'Mac', online: true, kind: 'local', runningSteps: 0 };
 
 type Download = { state: string; doneBytes: number; totalBytes: number } | null;
-const TOTAL = 1_453_613_041;
+const TOTAL = 1_481_435_942;
 
 const computer = (kind: 'host' | 'vm', download: Download = null) => ({
   id: 'comp-1',
@@ -115,7 +115,7 @@ test.describe('Coordinator computer actions menu', () => {
     await expect(surface).toHaveAttribute('data-state', 'downloading');
     await page.reload();
     await expect(panel.getByTestId('vm-download')).toContainText('580 MB / 1.5 GB');
-    await expect(panel.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40');
+    await expect(panel.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '39');
     expect(actions).toEqual(['install']);
   });
 
