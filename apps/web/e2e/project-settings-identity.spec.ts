@@ -193,7 +193,7 @@ test('settings: non-local projects hide the conversion card', async ({ page }) =
   await expect(page.getByText('转换为 GitHub 形态', { exact: true })).toHaveCount(0);
 });
 
-test('settings: the project Coordinator picker lists the models of the runtime the Coordinator runs on', async ({
+test('settings: the project Coordinator picker lists models of every runtime the Coordinator can run on', async ({
   page,
 }) => {
   const stub = await stubWorld(page, [localProject()]);
@@ -248,10 +248,12 @@ test('settings: the project Coordinator picker lists the models of the runtime t
   await page.getByTestId('project-model-coordinator').locator('.routing-rule-model-select').click();
   const menu = page.locator('.routing-rule-model-menu');
   await expect(menu.getByText('opus', { exact: true })).toBeVisible();
-  await expect(menu.getByText('Claude Haiku 5.5')).toHaveCount(0);
-  await menu.getByText('opus', { exact: true }).click();
+  await expect(menu.getByText('follow-default')).toHaveCount(0);
+  await menu.getByText('Claude Haiku 5.5').click();
   await expect.poll(() => stub.patches.length).toBe(1);
   expect(stub.patches[0]?.body).toEqual({
-    modelOverrides: { coordinator: { provider: 'claude-code', modelId: 'opus', thinkingLevel: null } },
+    modelOverrides: {
+      coordinator: { provider: 'anthropic', modelId: 'claude-haiku-5-5', thinkingLevel: null },
+    },
   });
 });

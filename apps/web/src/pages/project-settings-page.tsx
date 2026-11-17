@@ -132,11 +132,6 @@ function ProjectModels({
       { onError: (error) => toastError(t('保存失败，请重试。'), error) },
     );
   };
-  const teamCoordinatorProvider =
-    settings.rules.find((r) => r.use === 'coordinator')?.provider ??
-    settings.coordinatorDefault?.provider;
-  const coordinatorRuntime =
-    options.find((o) => o.provider === teamCoordinatorProvider)?.runtime ?? 'pi';
   const rows: { use: ProjectModelUse; route: RouteUse; label: string }[] = [
     { use: 'coordinator', route: 'coordinator', label: 'Coordinator' },
     { use: 'session', route: 'session', label: t('任务') },
@@ -151,11 +146,7 @@ function ProjectModels({
           hint={null}
           testId={`project-model-${use}`}
           rule={project?.modelOverrides?.[use] ?? null}
-          options={
-            use === 'coordinator'
-              ? options.filter((o) => o.runtime === coordinatorRuntime)
-              : options
-          }
+          options={options}
           enabledRuntimes={enabledRuntimes}
           followDefault={{
             label: t('跟随团队默认'),

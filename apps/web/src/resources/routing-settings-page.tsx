@@ -171,7 +171,7 @@ export function ModelPicker({
       options={[
         ...(followDefault === undefined
           ? []
-          : [{ value: FOLLOW_DEFAULT, label: followDefault.label, group: FOLLOW_DEFAULT }]),
+          : [{ value: FOLLOW_DEFAULT, label: followDefault.label, group: FOLLOW_DEFAULT, groupLabel: '' }]),
         ...rows.map((o) => ({
           value: modelKey(o),
           label: o.liveness === 'dead' ? `${o.modelName}（${t('已下架')}）` : o.modelName,
