@@ -31,4 +31,4 @@ Server: start without registration, start and poll pending within the interval, 
 
 ## Release boundary
 
-The code can merge with the registration null. Filling the registration is the activation step and waits for live A3 (refresh of a device-issued token without a secret) and A4 (repeated MCP connector reconnects keep this row's grant) on a real App, per the device-core release boundary.
+The registration names the public `cairnwright` App. Live checks on 2026-11-17 against it: A3, a device-issued token refreshed with no client secret, the new token read `/user` and the old one returned 401; A4, a second device authorization for the same user left the first grant valid and still refreshable.

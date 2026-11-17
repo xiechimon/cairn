@@ -1,6 +1,6 @@
 # Shared GitHub device transport
 
-This preparatory change adds a storage-free transport for the owner publication connection and the optional writable GitHub MCP connector. It does not activate either integration, change existing OAuth routes, migrate connections or change task identity. The public App registration remains null until its operator supplies the real public client ID and slug. Research: [GitHub identity sources](../research/owner-github-identity-2026-11-16.md).
+This preparatory change adds a storage-free transport for the owner publication connection and the optional writable GitHub MCP connector. It does not activate either integration, change existing OAuth routes, migrate connections or change task identity. The public App registration names the public `cairnwright` App (device flow and token expiry on, public, no webhook); live A3 and A4 passed on 2026-11-17. Research: [GitHub identity sources](../research/owner-github-identity-2026-11-16.md).
 
 ## Public contract
 
