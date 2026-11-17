@@ -300,7 +300,7 @@ export function RuleRow({
                 className="routing-rule-level-select w-auto flex-none max-sm:-ml-2.5 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:h-7 max-sm:text-meta"
               >
                 <SelectValue>
-                  <span className="text-content-tertiary">{t('思考')}</span>
+                  <span className="text-content-secondary">{t('思考')}</span>
                   {levelLabel(level)}
                 </SelectValue>
               </SelectTrigger>
