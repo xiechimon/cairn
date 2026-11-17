@@ -595,6 +595,12 @@ export type ChiefStreamItem =
       outcome: 'waiting' | 'saved' | 'not-saved';
     }
   | {
+      kind: 'package-install';
+      id: string;
+      packages: string[];
+      outcome: 'waiting' | 'installed' | 'declined' | 'not-answered' | 'failed';
+    }
+  | {
       kind: 'task-card';
       todoId: string;
       id: string;

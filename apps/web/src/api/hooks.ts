@@ -12,6 +12,8 @@ import type {
   CodexDevicePollResponse,
   CodexDeviceStartResponse,
   ComputerCommandsResponse,
+  ComputerManageAction,
+  ComputerManageResult,
   ComputerRecord,
   ConversationMessagesResponse,
   CreateMcpConnectorBody,
@@ -42,6 +44,7 @@ import type {
   NotificationRecord,
   NotificationsResponse,
   OAuthAuthorizeResponse,
+  PackageInstallDecisionBody,
   PairedDevice,
   PairingCodeResponse,
   PatchAutonomyBody,
@@ -1267,6 +1270,17 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (body: CloakLicenseBody) =>
         api.put<CloakLicenseSaved>(`/api/teams/${teamId}/cloak-license`, body),
       onSuccess: invalidateAll,
+    }),
+    decidePackageInstall: useMutation({
+      mutationFn: (body: PackageInstallDecisionBody) =>
+        api.post<{ ok: true }>('/api/computers/package-install', body),
+    }),
+    manageComputer: useMutation({
+      mutationFn: (input: { computerId: string; action: ComputerManageAction }) =>
+        api.post<ComputerManageResult>(`/api/computers/${input.computerId}/actions`, {
+          action: input.action,
+        }),
+      onSettled: invalidateAll,
     }),
     createApiKey: useMutation({
       mutationFn: (body: {

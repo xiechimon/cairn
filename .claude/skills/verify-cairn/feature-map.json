@@ -989,7 +989,7 @@
       "id": "agent-computer",
       "name": "The agent's computer",
       "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.",
-      "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; CloakBrowser license card waiting, rejected key reason, saved, not saved, owner-only refusal; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
+      "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; CloakBrowser license card waiting, rejected key reason, saved, not saved, owner-only refusal; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
       "centrality": 1,
       "status": "partial",
       "code": {
@@ -1000,6 +1000,8 @@
           "apps/web/src/board/computer-screen-dialog.tsx",
           "apps/web/src/chief/takeover-card.tsx",
           "apps/web/src/chief/cloak-license-card.tsx",
+          "apps/web/src/chief/package-install-card.tsx",
+          "apps/web/src/board/computer-actions-menu.tsx",
           "apps/web/src/board/machine-capabilities.ts"
         ],
         "server": [
@@ -1021,7 +1023,9 @@
           "/api/computers/:id",
           "/api/computers/:id/commands",
           "/api/teams/:teamId/computers/**",
-          "/api/teams/:id/cloak-license"
+          "/api/teams/:id/cloak-license",
+          "/api/computers/package-install",
+          "/api/computers/:id/actions"
         ]
       },
       "reach": [

@@ -20,6 +20,11 @@ import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { settingsHref } from '../settings/settings-href.js';
+import {
+  ComputerActionsMenu,
+  computerActionNoteText,
+  useComputerActions,
+} from './computer-actions-menu.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface } from './computer-screen.js';
 import { ComputerScreenDialog } from './computer-screen-dialog.js';
@@ -187,6 +192,7 @@ function MachineCard({
   const [screenRequested, setScreenRequested] = useState(openScreen);
   const control = useComputerControl({ teamId, computer });
   const hover = useScreenHoverControl(control, computer?.handoffReason != null);
+  const actions = useComputerActions(teamId, computer);
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
@@ -231,7 +237,28 @@ function MachineCard({
             {t('编辑')}
           </Button>
         )}
+        {computer?.kind === 'vm' && (
+          <ComputerActionsMenu
+            machineName={machine.name}
+            disabled={actions.pending || machine.online !== true}
+            onAction={actions.run}
+          />
+        )}
       </div>
+      {actions.note !== null && (
+        <p
+          role="status"
+          data-testid="computer-action-note"
+          data-note={actions.note.kind}
+          title={actions.note.kind === 'failed' ? actions.note.detail : undefined}
+          className={cn(
+            'm-0 px-5 py-2 text-meta',
+            actions.note.kind === 'failed' ? 'text-destructive' : 'text-content-secondary',
+          )}
+        >
+          {computerActionNoteText(actions.note, t)}
+        </p>
+      )}
       {screenLive && (
         <>
           <MachineScreenSurface

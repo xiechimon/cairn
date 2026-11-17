@@ -40,11 +40,15 @@ import {
   derivePlaceholderTitle,
   GATE_ANNOUNCEMENTS,
   GIT_CREDENTIAL_ROW_KIND,
+  INSTALL_PACKAGES_TOOL,
   infoReportMessageSchema,
   liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
   orchestratedTodoIdOf,
   orchestratePromptHeadOf,
+  PACKAGES_DECLINED,
+  PACKAGES_INSTALLED_PREFIX,
+  PACKAGES_NOT_ANSWERED,
   PLACEHOLDER_TITLE_FALLBACK,
   PLAN_SECTIONS,
   REQUEST_CLOAK_LICENSE_TOOL,
@@ -1520,6 +1524,29 @@ function cloakLicenseItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
   };
 }
 
+function packageInstallItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
+  const asked = (call.arguments as { packages?: unknown } | null)?.packages;
+  const packages = Array.isArray(asked)
+    ? asked.filter((name): name is string => typeof name === 'string')
+    : [];
+  const finished = call.result !== undefined || call.endedAt !== undefined || call.isError === true;
+  const text = call.isError === true ? '' : (toolResultText(call.result) ?? '');
+  return {
+    kind: 'package-install',
+    id,
+    packages,
+    outcome: !finished
+      ? 'waiting'
+      : text.startsWith(PACKAGES_INSTALLED_PREFIX)
+        ? 'installed'
+        : text === PACKAGES_DECLINED
+          ? 'declined'
+          : text === PACKAGES_NOT_ANSWERED
+            ? 'not-answered'
+            : 'failed',
+  };
+}
+
 function handoffTodoOf(call: ToolCallRecord): string | null {
   if (call.name !== 'message_todo' || call.result === undefined || call.isError === true)
     return null;
@@ -1713,6 +1740,10 @@ function collectChiefStream(
     }
     if (call?.name === REQUEST_CLOAK_LICENSE_TOOL) {
       items.push(cloakLicenseItemOf(call, m.id));
+      continue;
+    }
+    if (call?.name === INSTALL_PACKAGES_TOOL) {
+      items.push(packageInstallItemOf(call, m.id));
       continue;
     }
     if (call !== null) {

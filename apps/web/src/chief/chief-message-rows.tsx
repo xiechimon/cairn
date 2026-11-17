@@ -33,6 +33,7 @@ import { childRefsOf, type TaskRef } from './chief-task-refs.js';
 import { CloakLicenseCard } from './cloak-license-card.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
+import { PackageInstallCard } from './package-install-card.js';
 import { QuestionAnsweredLine, QuestionAsked } from './question-answered-line.js';
 import { answerLines } from './question-lifecycle.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
@@ -427,6 +428,7 @@ export function chiefStreamRowKey(
     case 'handoff':
     case 'takeover':
     case 'cloak-license':
+    case 'package-install':
     case 'task-card':
     case 'runner-offline':
     case 'stopped':
@@ -679,6 +681,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'cloak-license') return <CloakLicenseCard item={item} />;
+  if (item.kind === 'package-install') return <PackageInstallCard item={item} />;
   if (item.kind === 'task-card')
     return <TaskStartedRow todoId={item.todoId} seq={item.seq} title={item.title} />;
   if (item.kind === 'daily-report')
