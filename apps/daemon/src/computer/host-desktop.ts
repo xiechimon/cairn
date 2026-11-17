@@ -26,6 +26,13 @@ import { type ComputerProcessEvent, type ComputerProvider, ComputerRefusal } fro
 
 export const PINNED_AGENT_BROWSER_VERSION = '0.41.2';
 
+export function browserProxyArgs(env: NodeJS.ProcessEnv): string[] {
+  const pac = env.CAIRN_PROXY_PAC_URL;
+  if (pac) return [`--proxy-pac-url=${pac}`];
+  const proxy = env.https_proxy || env.HTTPS_PROXY || env.http_proxy || env.HTTP_PROXY;
+  return proxy ? [`--proxy-server=${proxy}`] : [];
+}
+
 export function computerMachineName(scopeKey: string): string {
   if (scopeKey === '') throw new Error('Computer scope key is empty');
   return `cairn-orb-computer-${createHash('sha256').update(scopeKey).digest('hex').slice(0, 40)}`;
@@ -459,7 +466,7 @@ export class HostDesktops implements ComputerDesktops {
     const directory = this.directory(scopeKey);
     const profile = join(directory, 'home', CLOAK_PROFILE);
     await this.profileReleased(profile);
-    await writeCloakLauncher(directory, profile, this.browser, this.proxy());
+    await writeCloakLauncher(directory, profile, this.browser, this.browserProxyArgs());
     await this.startManualBrowser(scopeKey, url);
   }
 
@@ -585,7 +592,7 @@ export class HostDesktops implements ComputerDesktops {
         directory,
         join(home, CLOAK_PROFILE),
         this.browser,
-        this.proxy(),
+        this.browserProxyArgs(),
       ).then(
         () => true,
         () => false,
@@ -718,10 +725,8 @@ export class HostDesktops implements ComputerDesktops {
     ].join('\n');
   }
 
-  private proxy(): string | undefined {
-    return (
-      this.env.https_proxy || this.env.HTTPS_PROXY || this.env.http_proxy || this.env.HTTP_PROXY
-    );
+  private browserProxyArgs(): string[] {
+    return browserProxyArgs(this.env);
   }
 
   private provider(home: string, display: string): HostComputerProvider {
@@ -736,7 +741,7 @@ export class HostDesktops implements ComputerDesktops {
         AGENT_BROWSER_SOCKET_DIR: '.agent-browser',
       },
       browserEnvironment: async (argv): Promise<Record<string, string>> => {
-        const proxy = this.proxy() ? [`--proxy-server=${this.proxy()}`] : [];
+        const proxy = this.browserProxyArgs();
         if (!argv.includes('--session')) return {};
         if (!isStealthBrowserCommand(argv)) {
           const chromium = this.chromium();

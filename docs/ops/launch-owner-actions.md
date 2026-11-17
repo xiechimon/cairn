@@ -1,0 +1,33 @@
+# Launch owner actions
+
+What launch needs, split by who can do it. The left column a lane can ship; the right column only the owner can do (accounts, payments, credentials, 2FA). Ordered by the roadmap board's Seq field.
+
+## Needs the owner
+
+| # | Action | Why it blocks | Where it lands |
+|---|--------|---------------|----------------|
+| 1 | Apple Developer Program membership ($99/yr) + Developer ID certificate | Windows/Linux run unsigned; macOS already signs — the Windows cert question stays open without the account | `docs/ops/desktop-signing.md` |
+| 2 | Back up the existing macOS signing certificate + notarization credentials off-machine | Losing them kills every future signed release | `docs/ops/desktop-signing.md` |
+| 3 | Windows code-signing certificate (EV or Azure Trusted Signing) | Windows installer shows SmartScreen without it | `desktop-release.yml` |
+| 4 | npm publish access for `@xiechimon/cairn` on the release runner | The `npx` install path must keep working alongside desktop apps | `scripts/ops/` |
+| 5 | Telegram bot token via @BotFather | IM entry cannot pair without it | secrets UI once the adapter lands |
+| 6 | WeChat iLink bot registration + QR pairing on the owner's account | The WeChat adapter needs a live bot token; personal WeChat ≥ 8.0.69, one bot per account | `docs/design/im-connections.md` |
+| 7 | Composio account + API key | The consumer-app catalog decision routes through Composio | connector settings |
+| 8 | Decide the tailnet policy: Funnel exposure on/off for remote phone reach | Phone reach without IM rides the tailnet; exposure is the owner's call | `docs/ops/self-deploy.md` |
+| 9 | GitHub repo secrets for desktop-release secrets (signing material) | Release workflow needs them once certs exist | repo settings |
+| 10 | First real-install smoke of each desktop artifact on a clean machine | The second-person criterion is measured, not assumed | `verify-cairn` evidence |
+
+## Lanes can ship (no owner needed)
+
+- The W0–W3 board items: specs, registries, adapters, gates, UI work behind review.
+- `desktop-release.yml` gating on the commit's green CI (already decided: direct publish stays, but release waits for `check`/`pack-smoke`/`e2e-gate` green).
+- Adapter code for Telegram and WeChat iLink behind feature wiring, testable with recorded fixtures — credentials slot in when the owner does rows 5–6.
+- Windows/Linux packaging and the daemon win32/Linux support work.
+- Per-site egress env wiring, per-thread browser profiles, action-registry send/submit classes.
+
+## Deferred by owner decision (do not start)
+
+- Telemetry collection endpoint (Backlog — self-operated Cloudflare Worker is the researched template).
+- Payment-action registration (no payment surface exists).
+- Engine breadth beyond the shipped set (W1 order unchanged).
+- Draft-release manual publish step (direct publish stays for now).

@@ -206,15 +206,11 @@ export async function writeCloakLauncher(
   directory: string,
   profile: string,
   engine: CloakBrowser,
-  proxy?: string,
+  proxyArgs: string[] = [],
 ): Promise<void> {
   const launch = await engine.launch(profile);
   const launcher = join(directory, 'cloak-browser');
-  const args = [
-    ...launch.args,
-    `--user-data-dir=${profile}`,
-    ...(proxy ? [`--proxy-server=${proxy}`] : []),
-  ];
+  const args = [...launch.args, `--user-data-dir=${profile}`, ...proxyArgs];
   await writeFile(
     launcher,
     [
