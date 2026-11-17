@@ -1,6 +1,6 @@
 # IM connections: Telegram and WeChat as entries
 
-Status: design material only — no code. Owner decisions recorded 2026-11-17: first adapters are **Telegram and personal WeChat (Tencent iLink)**; IM is the future "C class" entry pulled forward (spec 18 §3.5/§4); monetization deferred — users first, no paid surfaces.
+Status: first slice landed 2026-11-17 (pair → receive → text reply, Telegram + WeChat iLink; decision-card buttons are the next slice). Owner decisions recorded 2026-11-17: first adapters are **Telegram and personal WeChat (Tencent iLink)**; IM is the future "C class" entry pulled forward (spec 18 §3.5/§4); monetization deferred — users first, no paid surfaces.
 
 Unblocked by: #1607 (`docs/research/1607-acp-execution-surface.md`) concluded — ACP covers external-agent onboarding, so the IM entry is free to be designed on its own.
 

@@ -94,7 +94,7 @@ Origin: after comparing EverMind Raven (the chief draws a task-dependency graph 
 
 | Choice | Decided by | Values |
 |---|---|---|
-| entry and viewing surface | user | board; IM / command line (future, see §4 C class). All share the same Chief and the same gates; the board is the task graph's display surface, not a shape switch |
+| entry and viewing surface | user | board; IM (Telegram and WeChat iLink first slice, `docs/design/im-connections.md`; further platforms stay C class, see §4); command line (future). All share the same Chief and the same gates; the board is the task graph's display surface, not a shape switch |
 | output type | Chief judges per task | `code`: passes the two hard gates, AI review, verification; `info` (research, report, eval output): does not touch the repo, results handed directly to the downstream card (#1626) |
 | code landing mode | project shape | `githubRepo`: opens a PR, merges per ADR 0021; `localPath`: no PR, the same judgment merges locally (#1625) |
 
@@ -104,7 +104,7 @@ Constraints:
 - The gate is a phase-machine stopping point; the passer can be a human or a deterministic checker per project policy (ADR 0021's merge-readiness gate, #1623's decomposition checker); since ADR 0026 the default policy is autonomous, with protected paths requiring an independent review; in this repository ADR 0028's phase-1 routes send protected paths and ADRs to the owner. (Superseded wording, 2026-10-24: "the default is always a human, same caliber as ADR 0021 D1".)
 - Same-kind comparison (historical, 2026-10-24): Vibe Kanban, Conductor's local worktree shapes all ultimately land through PRs, Raven's coding specialist has no repo-level merge gate. At that date "local repo, no PR, gate before merge" had no existing implementation; cairn's own gated local landing has since landed (#2050: `apps/daemon/src/local-merge.ts` calls `decideLocalMerge`).
 
-Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (decomposition checker passes → auto-run) → #1625 (local-shape auto-merge) → #1626 (info-class fast lane); #1624 (sub-card injection pre-delivery summary) parallel with #1623. The IM entry and external-agent onboarding wait on the #1607 research conclusion.
+Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (decomposition checker passes → auto-run) → #1625 (local-shape auto-merge) → #1626 (info-class fast lane); #1624 (sub-card injection pre-delivery summary) parallel with #1623. The IM entry no longer waits: #1607 concluded, and the first slice (Telegram + WeChat iLink: pair → receive → text reply) landed per `docs/design/im-connections.md`; decision-card buttons and further adapters remain open. External-agent onboarding follows the ACP conclusion.
 
 ## 4. What Not to Do (#515 Out of scope fixed)
 
@@ -113,7 +113,7 @@ Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (
 - Chief autonomous dispatch — first want "shutdown without breaking the chain", not "still deciding on its own when shut down".
 - Team features (owner decision, 2026-11-14): channels shared by several people, team roles and permissions, team billing. Another person uses cairn by running their own copy.
 - Gantt view / multiple workspaces / third-party Git (Forgejo / Gitea / GitLab) — meaningless for one person, killed outright.
-- Directly chasing Multica's integration-surface breadth (IM five, desktop app) — recorded as "possible future C class". Phone access today is Tailscale; embedded tsnet with automatic LAN / tailnet / optional Funnel routing is planned, and a hosted relay may come later.
+- Directly chasing Multica's integration-surface breadth (IM five, desktop app) — still rejected; two IM adapters exist (Telegram, WeChat iLink) for phone reach, and further platforms stay "possible future C class". Phone access without IM is Tailscale; embedded tsnet with automatic LAN / tailnet / optional Funnel routing is planned, and a hosted relay may come later.
 - todos.dev baseline re-photography and pixel parity — volume 06 D1 released the parity obligation.
 
 (Multica's three philosophical tenets see §3.3, not entering this section.)
