@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 
 const scenario = process.argv[2] ?? 'complete';
+const devin = scenario.startsWith('devin');
 const sessionId = 'acp-session-2290';
 const send = (value) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...value })}\n`);
 const update = (value, id = sessionId) =>
@@ -21,11 +22,12 @@ for await (const line of createInterface({ input: process.stdin })) {
         protocolVersion: scenario === 'bad-version' ? 99 : params.protocolVersion,
         agentCapabilities: {
           mcpCapabilities: { http: true },
-          loadSession: scenario === 'load',
+          loadSession: scenario === 'load' || devin,
           sessionCapabilities: scenario === 'resume' ? { resume: {} } : {},
-          promptCapabilities: { image: scenario === 'image' },
+          promptCapabilities: { image: scenario === 'image' || devin },
         },
         authMethods: [],
+        ...(devin ? { _meta: { 'cognition.ai/midTurnPrompts': true } } : {}),
       },
     });
   } else if (['session/new', 'session/load', 'session/resume'].includes(method)) {
@@ -39,7 +41,9 @@ for await (const line of createInterface({ input: process.stdin })) {
         sessionId,
         modes: {
           currentModeId: 'read-only',
-          availableModes: [{ id: 'full-access', name: 'Full access' }],
+          availableModes: devin
+            ? [{ id: 'bypass', name: 'Bypass' }]
+            : [{ id: 'full-access', name: 'Full access' }],
         },
         configOptions:
           scenario === 'no-model'
@@ -57,7 +61,7 @@ for await (const line of createInterface({ input: process.stdin })) {
       },
     });
   } else if (method === 'session/set_mode') {
-    if (params.modeId !== 'full-access') throw new Error('Wrong mode');
+    if (params.modeId !== (devin ? 'bypass' : 'full-access')) throw new Error('Wrong mode');
     send({ id, result: {} });
   } else if (method === 'session/set_config_option') {
     if (params.value !== 'stub-model') throw new Error('Wrong model');
@@ -65,8 +69,86 @@ for await (const line of createInterface({ input: process.stdin })) {
     send({ id, result: { configOptions: [] } });
   } else if (method === 'session/prompt') {
     if (!configured) throw new Error('Model was not configured before prompting');
+    const text = params.prompt.find((block) => block.type === 'text')?.text ?? '';
+    if (scenario === 'devin-steer' && text.includes('steer-now')) {
+      send({ id: pending, result: { stopReason: 'interrupted' } });
+      update({
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: 'steered' },
+      });
+      send({ id, result: { stopReason: 'end_turn' } });
+      continue;
+    }
     if (!params.prompt.some((block) => block.type === 'text' && block.text.includes('Hello'))) {
       throw new Error('Prompt text was dropped');
+    }
+    if (scenario === 'devin-steer') {
+      pending = id;
+      update({
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: 'counting' },
+      });
+      continue;
+    }
+    if (scenario === 'devin') {
+      update({
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: 'Hello ' },
+      });
+      update({
+        sessionUpdate: 'agent_thought_chunk',
+        content: { type: 'text', text: 'child thinking' },
+        _meta: { 'cognition.ai/subagent_context': { parentAgentId: 'agent-7' } },
+      });
+      update({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'sub-1',
+        title: 'Tool',
+        kind: 'execute',
+        rawInput: {},
+        _meta: {
+          'cognition.ai/subagent_started': { title: 'Research', agentId: 'agent-7' },
+          'cognition.ai/subagent_context': { parentAgentId: 'root' },
+        },
+      });
+      update({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'child-1',
+        title: 'Tool',
+        kind: 'execute',
+        rawInput: { cmd: 'ls' },
+        _meta: {
+          'cognition.ai/subagent_context': { parentAgentId: 'agent-7' },
+          'cognition.ai/inferenceToolName': 'Bash',
+        },
+      });
+      update({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'child-1',
+        status: 'completed',
+        rawOutput: 'files',
+        _meta: { 'cognition.ai/subagent_context': { parentAgentId: 'agent-7' } },
+      });
+      update({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'sub-1',
+        _meta: {
+          'cognition.ai/subagent_completed': { success: true, summary: 'done research' },
+        },
+      });
+      update({
+        sessionUpdate: 'usage_update',
+        used: 50,
+        size: 1000,
+        _meta: {
+          'cognition.ai/inputTokens': 40,
+          'cognition.ai/outputTokens': 10,
+          'cognition.ai/cachedReadTokens': 3,
+          'cognition.ai/cachedWriteTokens': 2,
+        },
+      });
+      send({ id, result: { stopReason: 'end_turn' } });
+      continue;
     }
     if (scenario === 'host-tools') {
       const request = async (method, params = {}, authorized = true) => {

@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { SessionOpts } from '@cairn/shared';
 import { type SeatbeltPolicy, seatbeltCommand } from './confine-seatbelt.js';
 
-export type SessionHarness = 'claude-code' | 'codex' | 'gemini' | 'pi';
+export type SessionHarness = 'claude-code' | 'codex' | 'gemini' | 'pi' | 'devin';
 
 export interface Launch {
   command: string;
@@ -55,6 +55,17 @@ function ownState(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv)
     harness === 'claude-code' ? env.CLAUDE_CONFIG_DIR : harness === 'codex' ? env.CODEX_HOME : null;
   if (explicit !== undefined && explicit !== null && isAbsolute(explicit)) return [explicit];
   if (harness === 'pi') return [];
+  if (harness === 'devin') {
+    if (env.HOME === undefined || !isAbsolute(env.HOME) || realpathSync(env.HOME) === home)
+      return [];
+    const base = env.HOME;
+    return [
+      base,
+      join(base, '.local', 'share', 'devin'),
+      join(base, '.cache', 'devin'),
+      join(base, '.config', 'devin'),
+    ];
+  }
   const name = harness === 'claude-code' ? '.claude' : harness === 'codex' ? '.codex' : '.gemini';
   const defaults = [join(home, name)];
   if (harness === 'claude-code') defaults.push(join(home, '.claude.json'));

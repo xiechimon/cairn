@@ -22,7 +22,13 @@ import {
   osPlatformOf,
 } from '@cairn/shared';
 import { AgentReachProbe } from './agent-reach.js';
-import { configuredAcpBackends, createGeminiBackend } from './backend/acp.js';
+import {
+  configuredAcpBackends,
+  createAcpBackend,
+  createGeminiBackend,
+} from './backend/acp.js';
+import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
+import { createDevinManaged, type DevinManaged } from './backend/devin-managed.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { createSessionConfiner, type Launch } from './backend/confine-session.js';
@@ -91,6 +97,7 @@ export interface MachineLoopOpts {
   backend?: AgentBackend;
   claudeCodeBackend?: AgentBackend;
   geminiBackend?: AgentBackend;
+  devinManaged?: DevinManaged;
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
   readClaudeOauthExpiresAt?: () => number | null;
   capabilitiesProbe?: () => MachineCapabilities;
@@ -291,6 +298,13 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const orbComputer = opts.orbComputer ?? hostDesktops;
   const agentReach = new AgentReachProbe(undefined, undefined, () => agentReachEnabled(paths.home));
   const scrapling = new ScraplingProbe(() => readScrapling(paths.home));
+  const devinManaged =
+    opts.devinManaged ?? createDevinManaged({ log: (line) => logger.machine(line) });
+  void devinManaged.ensure().catch((error: unknown) => {
+    logger.machine(
+      `devin managed install failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
   const capabilitiesReport = (): MachineCapabilities => {
     const reach = agentReach.current();
     const scraper = scrapling.current();
@@ -304,6 +318,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         ? { confinementCause: availability.cause }
         : {}),
       codexLogin: readCodexLogin(paths.agentRuntimeDir),
+      devin: (() => {
+        const install = devinManaged.current();
+        return install === null
+          ? { installed: false }
+          : { installed: true, version: install.version };
+      })(),
       executor: orbProvider.kind,
       mcpConnectors: true,
       ...(orbComputer ? { computer: true as const } : {}),
@@ -324,6 +344,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
   let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
+  let devinBackend: AgentBackend | null = null;
   let claudeAnnounced = false;
   let geminiAnnounced = false;
   const backendFor = (
@@ -334,6 +355,26 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     if (acp) {
       logger.machine(`ACP adapter ${acp.capabilities.name} selected for agent ${agentId}`);
       return acp;
+    }
+    if (agentProviderId === 'devin') {
+      const install = devinManaged.current();
+      if (install === null) {
+        throw new Error(
+          'Devin managed binary is not installed yet: the ACP registry download is still in progress or failed; retry the step shortly',
+        );
+      }
+      devinBackend ??= createAcpBackend({
+        harness: 'devin',
+        command: install.binPath,
+        args: install.args,
+        steering: 'mid-turn',
+        sessionResume: true,
+        allowHostMcp: true,
+        usageEvents: true,
+        createUpdateNormalizer: createDevinUpdateNormalizer,
+        ...(confine !== null && confine !== undefined ? { confine } : {}),
+      });
+      return devinBackend;
     }
     if (agentProviderId === 'gemini') {
       if (!geminiAnnounced) {
@@ -926,6 +967,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       client,
       journal,
       backendFor,
+      devinHome: () => devinManaged.current()?.home,
       orbProxyUrl: capEnv.CAIRN_ORB_PROXY_URL,
       logger,
       paths,

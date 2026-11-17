@@ -8,11 +8,19 @@ import {
 import { claudeCodeSubscriptionMissingMessage } from './claude-code-auth.js';
 import { type AttachmentDownloader, resolveDeliveredPrompt } from './step-attachments.js';
 
+export function devinSubscriptionMissingMessage(): string {
+  return (
+    '团队还没有可用的 Devin 订阅：到「我的订阅」把已登录机器上 ' +
+    '~/.local/share/devin/credentials.toml 里的 windsurf_api_key 贴进来，然后重跑这个任务。'
+  );
+}
+
 export function agentStepRefusal(input: {
   stepKind: string;
   agentTools: readonly string[] | undefined;
   runtimeId: string | null;
   hasSubscriptionToken: boolean;
+  hasDevinToken?: boolean;
 }): string | null {
   const agentTools = input.agentTools;
   if (input.stepKind === 'merge' && agentTools !== undefined) {
@@ -23,6 +31,14 @@ export function agentStepRefusal(input: {
   }
   if (input.runtimeId === 'claude-code' && !input.hasSubscriptionToken) {
     return claudeCodeSubscriptionMissingMessage();
+  }
+  if (input.runtimeId === 'devin') {
+    if (!['build', 'session', 'plan', 'merge'].includes(input.stepKind)) {
+      return `Devin 运行时暂不支持「${input.stepKind}」步骤（支持 build/session/plan/merge），请改用其他运行时或拆分任务`;
+    }
+    if (input.hasDevinToken !== true) {
+      return devinSubscriptionMissingMessage();
+    }
   }
   return null;
 }

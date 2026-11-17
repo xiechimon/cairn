@@ -15,6 +15,8 @@ export interface StepEnvInput {
   appCredential: { env(): Record<string, string> } | null;
   readonlyGit: boolean;
   claudeSubscriptionToken: string | undefined;
+  devinToken?: string;
+  devinHome?: string;
 }
 
 export interface StepEnv {
@@ -51,6 +53,9 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
     env.CLAUDE_CODE_OAUTH_TOKEN = input.claudeSubscriptionToken;
     if (input.inherited?.CAIRN_ORB !== '1') env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
   }
+  delete env.WINDSURF_API_KEY;
+  if (input.devinToken !== undefined) env.WINDSURF_API_KEY = input.devinToken;
+  if (input.devinHome !== undefined) env.HOME = input.devinHome;
   return {
     env,
     dropGitCredentials: () => {

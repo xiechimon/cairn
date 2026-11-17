@@ -19,6 +19,7 @@ export const toolCallRecordSchema = z.object({
   isError: z.boolean().optional(),
   startedAt: epochMs.optional(),
   endedAt: epochMs.optional(),
+  parent: z.string().optional(),
   todo: z.array(agentTodoItemSchema).optional(),
 });
 export type ToolCallRecord = z.infer<typeof toolCallRecordSchema>;

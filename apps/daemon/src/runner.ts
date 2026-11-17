@@ -53,6 +53,7 @@ export interface RunStepDeps {
   client: MachineApi;
   journal: StepJournal;
   backendFor: (agentProviderId: string | null | undefined, agentId?: string) => AgentBackend;
+  devinHome?: () => string | undefined;
   logger: DaemonLogger;
   paths: StatePaths;
   workspacesDir: string;
@@ -228,6 +229,7 @@ async function runClaimedStep(
   stepCleanups.push(() => clearCredentials(creds));
   const credentialValues = [
     creds.claudeSubscriptionToken,
+    creds.devinToken,
     creds.git?.password,
     ...(tokenRes.mcpConnectors ?? []).flatMap((c) => mcpConnectorSecretValues(c.headers)),
   ];
@@ -284,6 +286,7 @@ async function runClaimedStep(
     agentTools: agent.tools,
     runtimeId,
     hasSubscriptionToken: creds.claudeSubscriptionToken !== undefined,
+    hasDevinToken: creds.devinToken !== undefined,
   });
   if (refusal !== null) {
     clearCredentials(creds);
@@ -408,6 +411,8 @@ async function runClaimedStep(
       readonlyGit: readonlyWorkspace || attachmentVerify,
       claudeSubscriptionToken:
         runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
+      devinToken: runtimeId === 'devin' ? creds.devinToken : undefined,
+      devinHome: runtimeId === 'devin' ? deps.devinHome?.() : undefined,
     },
     stepCleanups,
   );

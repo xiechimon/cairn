@@ -32,6 +32,7 @@ import { z } from 'zod';
 import { DAEMON_VERSION } from '../version.js';
 import { openAcpTools } from './acp-tools.js';
 import type { SessionConfiner } from './confine-session.js';
+import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { runtimeChildEnv } from './otel.js';
 import { withoutPinnedEnv } from './pinned-env.js';
@@ -135,6 +136,8 @@ class AcpSession implements AgentSessionHandle {
   private readonly calls = new Map<string, ToolCallRecord>();
   private readonly toolOutputs = new Map<string, unknown>();
   private cancelTimer: ReturnType<typeof setTimeout> | undefined;
+  private midTurnPrompt: Promise<{ stopReason?: string }> | null = null;
+  private readonly normalizer?: (update: SessionUpdate) => AcpUpdateNormalization;
 
   constructor(
     sessionId: string,
@@ -144,8 +147,10 @@ class AcpSession implements AgentSessionHandle {
     private readonly imageCapability: boolean,
     private readonly cleanup: () => void,
     private readonly adapter?: AcpBackendOptions,
+    private readonly modelId = 'unknown',
   ) {
     this.sessionId = sessionId;
+    this.normalizer = adapter?.createUpdateNormalizer?.();
     this.events = { [Symbol.asyncIterator]: () => this };
   }
 
@@ -176,30 +181,49 @@ class AcpSession implements AgentSessionHandle {
       return;
     }
     try {
-      const result = await this.connection.agent.request(methods.agent.session.prompt, {
-        sessionId: this.sessionId,
-        prompt: [{ type: 'text', text: this.prompt }, ...this.images],
-      });
-      if (this.text)
-        this.push({ type: 'message_end', message: { role: 'assistant', content: this.text } });
-      if (this.adapter && result.stopReason === 'cancelled' && !this.cancelled) {
-        throw new Error('ACP agent cancelled the prompt without a stop request');
-      }
-      if (this.cancelled || result.stopReason === 'cancelled') {
-        this.push({ type: 'message_stop', message: { role: 'assistant', content: this.text } });
-      } else if (result.stopReason === 'end_turn') {
-        if (this.adapter && [...this.calls.values()].some((call) => call.result === undefined)) {
-          throw new Error('ACP prompt completed with unfinished tool calls');
+      let wait: Promise<{ stopReason?: string }> = this.connection.agent.request(
+        methods.agent.session.prompt,
+        {
+          sessionId: this.sessionId,
+          prompt: [{ type: 'text', text: this.prompt }, ...this.images],
+        },
+      );
+      for (;;) {
+        const result = await wait;
+        if (result.stopReason === 'interrupted' && this.midTurnPrompt !== null) {
+          if (this.text) {
+            this.push({
+              type: 'message_end',
+              message: { role: 'assistant', content: this.text },
+            });
+            this.text = '';
+          }
+          wait = this.midTurnPrompt;
+          this.midTurnPrompt = null;
+          continue;
         }
-        this.push({ type: 'done', usage: [] });
-      } else
-        this.push({
-          type: 'error',
-          error: {
-            message: `${this.adapter?.harness ?? 'Gemini'} ACP stopped: ${result.stopReason}`,
-            retryable: false,
-          },
-        });
+        if (this.text)
+          this.push({ type: 'message_end', message: { role: 'assistant', content: this.text } });
+        if (this.adapter && result.stopReason === 'cancelled' && !this.cancelled) {
+          throw new Error('ACP agent cancelled the prompt without a stop request');
+        }
+        if (this.cancelled || result.stopReason === 'cancelled') {
+          this.push({ type: 'message_stop', message: { role: 'assistant', content: this.text } });
+        } else if (result.stopReason === 'end_turn') {
+          if (this.adapter && [...this.calls.values()].some((call) => call.result === undefined)) {
+            throw new Error('ACP prompt completed with unfinished tool calls');
+          }
+          this.push({ type: 'done', usage: this.usageRows });
+        } else
+          this.push({
+            type: 'error',
+            error: {
+              message: `${this.adapter?.harness ?? 'Gemini'} ACP stopped: ${result.stopReason}`,
+              retryable: false,
+            },
+          });
+        break;
+      }
     } catch (error) {
       const message = this.adapter
         ? error instanceof Error
@@ -222,10 +246,34 @@ class AcpSession implements AgentSessionHandle {
     for (const waiter of this.waiters.splice(0)) waiter({ done: true, value: undefined });
   }
 
-  onAcpUpdate(update: SessionUpdate): void {
+  onAcpUpdate(raw: SessionUpdate): void {
     if (this.stopped || (this.adapter && !this.promptStarted)) return;
+    let update = raw;
+    let parent: string | undefined;
+    if (this.normalizer !== undefined) {
+      const normalized = this.normalizer(update);
+      if (normalized.update === null) return;
+      update = normalized.update;
+      parent = normalized.parent;
+    }
     if (update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text')
       this.text += update.content.text;
+    if (update.sessionUpdate === 'usage_update' && this.adapter?.usageEvents === true) {
+      const meta = update._meta as Record<string, unknown> | undefined;
+      const num = (key: string) => {
+        const value = meta?.[`cognition.ai/${key}`];
+        return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : 0;
+      };
+      this.usageRows.splice(0, this.usageRows.length, {
+        model: this.modelId,
+        input: num('inputTokens') || update.used,
+        output: num('outputTokens'),
+        cacheRead: num('cachedReadTokens'),
+        cacheWrite: num('cachedWriteTokens'),
+        contextWindow: update.size,
+      });
+      return;
+    }
     if (update.sessionUpdate === 'agent_thought_chunk' && update.content.type === 'text') {
       this.push({ type: 'thinking_delta', text: update.content.text });
     } else if (
@@ -241,6 +289,9 @@ class AcpSession implements AgentSessionHandle {
         ...(update.content != null ? { result: update.content } : {}),
         ...(update.status === 'failed' || update.status === 'completed'
           ? { isError: update.status === 'failed' }
+          : {}),
+        ...(parent !== undefined || previous?.parent !== undefined
+          ? { parent: parent ?? previous?.parent }
           : {}),
       };
       if (this.adapter) {
@@ -282,17 +333,30 @@ class AcpSession implements AgentSessionHandle {
   }
 
   async steer(text: string, images: readonly DeliveredImage[] = []): Promise<void> {
-    if (this.adapter) throw new Error('ACP steer is unsupported during a step');
+    if (this.adapter && this.adapter.steering !== 'mid-turn')
+      throw new Error('ACP steer is unsupported during a step');
     if (images.length > 0 && !this.imageCapability) {
-      throw new Error('gemini ACP backend: image capability is not advertised');
+      throw new Error(
+        `${this.adapter?.harness ?? 'gemini'} ACP backend: image capability is not advertised`,
+      );
     }
-    await this.connection.agent.request(methods.agent.session.prompt, {
+    const prompt = {
       sessionId: this.sessionId,
       prompt: [
         { type: 'text', text },
         ...images.map((image) => ({ type: 'image' as const, ...image })),
       ],
-    });
+    };
+    if (this.adapter?.steering === 'mid-turn') {
+      const request = this.connection.agent.request<{ stopReason?: string }>(
+        methods.agent.session.prompt,
+        prompt,
+      );
+      request.catch(() => {});
+      this.midTurnPrompt = request;
+      return;
+    }
+    await this.connection.agent.request(methods.agent.session.prompt, prompt);
   }
 
   async stop(): Promise<void> {
@@ -338,10 +402,17 @@ class AcpBackend implements AgentBackend {
     private readonly options: GeminiBackendOptions & { adapter?: AcpBackendOptions } = {},
   ) {
     this.capabilities = options.adapter
-      ? { ...GEMINI_CAPABILITIES, name: `${options.adapter.harness}-acp`, steering: false }
+      ? {
+          ...GEMINI_CAPABILITIES,
+          name: `${options.adapter.harness}-acp`,
+          steering: options.adapter.steering === 'mid-turn',
+          sessionResume: options.adapter.sessionResume === true,
+        }
       : GEMINI_CAPABILITIES;
     if (!options.adapter) {
       this.brief = { backendId: 'gemini', composeBody: (_opts, base) => base ?? '' };
+    } else if (options.adapter.harness === 'devin') {
+      this.brief = { backendId: 'devin', composeBody: (_opts, base) => base ?? '' };
     }
   }
 
@@ -364,7 +435,7 @@ class AcpBackend implements AgentBackend {
 
   private async open(opts: SessionOpts, resumeId: string | undefined): Promise<AgentSessionHandle> {
     const adapter = this.options.adapter;
-    if (adapter && opts.mcpServers !== undefined)
+    if (adapter && opts.mcpServers !== undefined && adapter.allowHostMcp !== true)
       throw new Error(
         'ACP mcpServers policy is unsupported: adapter host MCP configuration is not isolated',
       );
@@ -419,9 +490,9 @@ class AcpBackend implements AgentBackend {
         adapter?.permissions === 'allow-once' &&
         session?.acceptingPermissions &&
         params.sessionId === session.sessionId;
-      const option = params.options.find(
-        (value) => value.kind === (allow ? 'allow_once' : 'reject_once'),
-      );
+      const option = params.options
+        .filter((value) => value.optionId !== 'plan_bypass')
+        .find((value) => value.kind === (allow ? 'allow_once' : 'reject_once'));
       return {
         outcome: option
           ? { outcome: 'selected', optionId: option.optionId }
@@ -505,19 +576,65 @@ class AcpBackend implements AgentBackend {
       if (adapter && resumeId && !caps?.sessionCapabilities?.resume && !caps?.loadSession) {
         throw new Error('ACP resume is unsupported by this adapter');
       }
-      const request = { cwd: opts.cwd, mcpServers: hostTools ? [hostTools.declaration] : [] };
-      const response = resumeId
-        ? caps?.sessionCapabilities?.resume
-          ? await connection.agent.request<ResumeSessionResponse>(methods.agent.session.resume, {
-              ...request,
-              sessionId: resumeId,
-            })
-          : caps?.loadSession
-            ? await connection.agent.request<LoadSessionResponse>(methods.agent.session.load, {
-                ...request,
-                sessionId: resumeId,
+      const request = {
+        cwd: opts.cwd,
+        mcpServers: [
+          ...(adapter?.allowHostMcp === true
+            ? (opts.mcpServers ?? []).flatMap((endpoint) => {
+                if (endpoint.transport === 'http' && endpoint.url !== undefined) {
+                  return [
+                    {
+                      type: 'http' as const,
+                      name: endpoint.slug,
+                      url: endpoint.url,
+                      headers: Object.entries(endpoint.headers ?? {}).map(([name, value]) => ({
+                        name,
+                        value,
+                      })),
+                    },
+                  ];
+                }
+                if (endpoint.transport === 'stdio' && endpoint.command !== undefined) {
+                  return [
+                    {
+                      type: 'stdio' as const,
+                      name: endpoint.slug,
+                      command: endpoint.command,
+                      args: endpoint.args ?? [],
+                      env: Object.entries(endpoint.env ?? {}).map(([name, value]) => ({
+                        name,
+                        value,
+                      })),
+                    },
+                  ];
+                }
+                return [];
               })
-            : await connection.agent.request<NewSessionResponse>(methods.agent.session.new, request)
+            : []),
+          ...(hostTools ? [hostTools.declaration] : []),
+        ],
+      };
+      const response = resumeId
+        ? await (async () => {
+            try {
+              if (caps?.sessionCapabilities?.resume)
+                return await connection.agent.request<ResumeSessionResponse>(
+                  methods.agent.session.resume,
+                  { ...request, sessionId: resumeId },
+                );
+              if (caps?.loadSession)
+                return await connection.agent.request<LoadSessionResponse>(
+                  methods.agent.session.load,
+                  { ...request, sessionId: resumeId },
+                );
+            } catch (error) {
+              throw new SessionNotResumableError(
+                resumeId,
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+            throw new SessionNotResumableError(resumeId);
+          })()
         : await connection.agent.request<NewSessionResponse>(methods.agent.session.new, request);
       const sessionId =
         'sessionId' in response && typeof response.sessionId === 'string'
@@ -547,6 +664,15 @@ class AcpBackend implements AgentBackend {
           modeId: 'full-access',
         });
       }
+      if (adapter?.harness === 'devin') {
+        const modes = 'modes' in response ? response.modes : null;
+        if (!modes?.availableModes.some((mode) => mode.id === 'bypass'))
+          throw new Error('Devin ACP did not offer bypass mode for unattended steps');
+        await connection.agent.request(methods.agent.session.setMode, {
+          sessionId,
+          modeId: 'bypass',
+        });
+      }
       session = new AcpSession(
         sessionId,
         connection,
@@ -557,6 +683,7 @@ class AcpBackend implements AgentBackend {
         caps?.promptCapabilities?.image === true,
         cleanup,
         adapter,
+        opts.modelId,
       );
       return session;
     } catch (error) {
@@ -580,12 +707,22 @@ export function createGeminiBackend(options?: GeminiBackendOptions): AgentBacken
   return new GeminiBackend(options);
 }
 
+export interface AcpUpdateNormalization {
+  update: SessionUpdate | null;
+  parent?: string;
+}
+
 export interface AcpBackendOptions {
   confine?: SessionConfiner;
-  harness: 'claude-code' | 'codex';
+  harness: 'claude-code' | 'codex' | 'devin';
   command: string;
   args?: string[];
   permissions?: 'deny' | 'allow-once';
+  steering?: 'mid-turn';
+  sessionResume?: boolean;
+  allowHostMcp?: boolean;
+  usageEvents?: boolean;
+  createUpdateNormalizer?: () => (update: SessionUpdate) => AcpUpdateNormalization;
   initializeTimeoutMs?: number;
   cancelTimeoutMs?: number;
   spawnProcess?: GeminiBackendOptions['spawnProcess'];
@@ -609,7 +746,7 @@ export function configuredAcpBackends(
       z.string().min(1),
       z
         .object({
-          harness: z.enum(['claude-code', 'codex']),
+          harness: z.enum(['claude-code', 'codex', 'devin']),
           command: z.string().min(1),
           args: z.array(z.string()).optional(),
           permissions: z.enum(['deny', 'allow-once']).optional(),
