@@ -187,6 +187,20 @@ export const EN: Record<string, string> = {
   '这一步已停止，不会自动重试': 'This step stopped and will not retry',
   'Coordinator 已暂停，不读取屏幕': 'The Coordinator is paused and not reading the screen',
   '还剩 {n} 分钟': '{n} min left',
+  'CloakBrowser 许可证': 'CloakBrowser license',
+  '需要 CloakBrowser 许可证': 'CloakBrowser license needed',
+  '已保存 CloakBrowser 许可证': 'CloakBrowser license saved',
+  '没有保存 CloakBrowser 许可证': 'CloakBrowser license not saved',
+  '隐身浏览器要用它打开拦截自动访问的网站。加密保存为团队密钥，保存后看不到原文。':
+    'The stealth browser needs it to open sites that block automation. It is saved encrypted as a team secret and cannot be viewed again.',
+  免费获取许可证: 'Get a free license',
+  粘贴许可证: 'Paste the license',
+  已存为团队密钥: 'Saved as team secret',
+  '，Coordinator 会重试刚才的操作。': '. The Coordinator retries what it was doing.',
+  '许可证不能为空，不能超过 512 个字符，也不能带换行。':
+    'The license cannot be empty, longer than 512 characters or contain line breaks.',
+  '只有这台 Cairn 的所有者能保存许可证。': 'Only the owner of this Cairn can save the license.',
+  '没能保存，请稍后重试。': 'Could not save. Try again later.',
   '这台设备没开推送，下次可能收不到提醒。':
     'Push is off on this device, so you may miss the next alert.',
   开启推送: 'Turn on push',

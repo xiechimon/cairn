@@ -589,6 +589,12 @@ export type ChiefStreamItem =
       outcome: 'waiting' | 'handed-back' | 'not-done';
     }
   | {
+      kind: 'cloak-license';
+      id: string;
+      reason: string;
+      outcome: 'waiting' | 'saved' | 'not-saved';
+    }
+  | {
       kind: 'task-card';
       todoId: string;
       id: string;

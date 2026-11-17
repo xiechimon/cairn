@@ -7,6 +7,8 @@ import type {
   CapabilitiesResponse,
   ChiefGetResponse,
   ChiefThread,
+  CloakLicenseBody,
+  CloakLicenseSaved,
   CodexDevicePollResponse,
   CodexDeviceStartResponse,
   ComputerCommandsResponse,
@@ -1259,6 +1261,11 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     deleteSecret: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/secrets/${id}`),
+      onSuccess: invalidateAll,
+    }),
+    saveCloakLicense: useMutation({
+      mutationFn: (body: CloakLicenseBody) =>
+        api.put<CloakLicenseSaved>(`/api/teams/${teamId}/cloak-license`, body),
       onSuccess: invalidateAll,
     }),
     createApiKey: useMutation({

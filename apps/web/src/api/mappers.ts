@@ -24,6 +24,7 @@ import {
   BRAND,
   BUILD_FAILURE_ROW_KIND,
   CHIEF_TURN_ERROR_KIND,
+  CLOAK_LICENSE_SAVED,
   CONFIRM_ANNOUNCEMENT,
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
@@ -46,6 +47,7 @@ import {
   orchestratePromptHeadOf,
   PLACEHOLDER_TITLE_FALLBACK,
   PLAN_SECTIONS,
+  REQUEST_CLOAK_LICENSE_TOOL,
   REVIEW_VERDICT_KIND,
   RUNNER_OS_LABELS,
   replyQuoteText,
@@ -1505,6 +1507,19 @@ function takeoverItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
   };
 }
 
+function cloakLicenseItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
+  const reason = (call.arguments as { reason?: unknown } | null)?.reason;
+  const finished = call.result !== undefined || call.endedAt !== undefined || call.isError === true;
+  const saved =
+    finished && call.isError !== true && toolResultText(call.result) === CLOAK_LICENSE_SAVED;
+  return {
+    kind: 'cloak-license',
+    id,
+    reason: typeof reason === 'string' ? reason : '',
+    outcome: !finished ? 'waiting' : saved ? 'saved' : 'not-saved',
+  };
+}
+
 function handoffTodoOf(call: ToolCallRecord): string | null {
   if (call.name !== 'message_todo' || call.result === undefined || call.isError === true)
     return null;
@@ -1694,6 +1709,10 @@ function collectChiefStream(
     if (call?.name === SUGGEST_REPLIES_TOOL_NAME) continue;
     if (call?.name === 'request_takeover') {
       items.push(takeoverItemOf(call, m.id));
+      continue;
+    }
+    if (call?.name === REQUEST_CLOAK_LICENSE_TOOL) {
+      items.push(cloakLicenseItemOf(call, m.id));
       continue;
     }
     if (call !== null) {
