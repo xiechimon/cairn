@@ -9,6 +9,7 @@ import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-
 import { coordinatorRoute } from '../src/services/coordinator-route.js';
 import { resolveChiefStepCredentials } from '../src/services/credentials.js';
 import { createProvider } from '../src/services/providers.js';
+import { coordinatorProfile } from '../src/services/routing-rules.js';
 import { bootServer, issueApiKey, postProject, seedRoute, type TestServer } from './helpers.js';
 
 const BYOK_KEY = 'sk-ant-api-test-byok';
@@ -368,6 +369,27 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
     expect(coordinatorRoute(w.s.db, w.teamId)?.modelId).toBe('team-model');
     expect((await setChoice('removed-provider')).status).toBe(200);
     expect(coordinatorRoute(w.s.db, w.teamId, projectId)?.modelId).toBe('team-model');
+    setCoordinatorServerContextEnabled(false);
+  });
+  test('a project Coordinator on Claude Code hands its turns to a Runner while the team Coordinator stays in the server', async () => {
+    const w = await world();
+    setCoordinatorServerContextEnabled(true);
+    addKeyless(w, 'local-llm', 'team-model');
+    const projectId = await postProject(w.s.app, 'runner-project');
+    const patched = await call(w.s.app, 'PATCH', `/api/projects/${projectId}`, {
+      body: {
+        modelOverrides: {
+          coordinator: { provider: 'claude-code', modelId: 'opus', thinkingLevel: null },
+        },
+      },
+    });
+    expect(patched.status).toBe(200);
+    expect(coordinatorRoute(w.s.db, w.teamId)?.modelId).toBe('team-model');
+    expect(coordinatorRoute(w.s.db, w.teamId, projectId)).toBeNull();
+    expect(coordinatorProfile(w.s.db, w.teamId, projectId)).toMatchObject({
+      provider: 'claude-code',
+      modelId: 'opus',
+    });
     setCoordinatorServerContextEnabled(false);
   });
   test('coordinatorRoute: a keyless custom endpoint drives the Coordinator with no key', async () => {

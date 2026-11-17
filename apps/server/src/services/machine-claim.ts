@@ -193,7 +193,17 @@ export function serverTakesTurn(
     coordinatorInServerEnabled() &&
     stepRow.kind === 'chief' &&
     !isChiefDigestStep(stepRow) &&
-    coordinatorRoute(db, teamId) !== null
+    coordinatorRoute(db, teamId, chiefThreadProject(db, stepRow.buildId)) !== null
+  );
+}
+
+function chiefThreadProject(db: MachineDeps['db'], threadId: string): string | null {
+  return (
+    db
+      .select({ projectId: chiefThread.projectId })
+      .from(chiefThread)
+      .where(eq(chiefThread.id, threadId))
+      .get()?.projectId ?? null
   );
 }
 

@@ -523,10 +523,9 @@ export function withProjectCoordinatorModel<T extends RoutingRuleRow>(
   projectId: string | null,
 ): T {
   const choice = projectModelChoice(db, rule.teamId, projectId, 'coordinator');
-  if (choice === null || stepRuntimeFor(choice.provider) !== stepRuntimeFor(rule.provider)) {
-    return rule;
-  }
+  if (choice === null) return rule;
   if (
+    stepRuntimeFor(choice.provider) === 'pi' &&
     choice.provider !== rule.provider &&
     providerRefusal(db, rule.teamId, choice.provider) !== null
   ) {

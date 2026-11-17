@@ -311,7 +311,7 @@ describe('the earlier conversation carried to a Runner claim', () => {
 });
 
 describe('a project Coordinator model on a Runner', () => {
-  test('a Claude Code project model replaces the team model in the claim; a model from another runtime is ignored', async () => {
+  test('a Claude Code project model replaces the team model in the claim; a provider the team never added falls back to the team model', async () => {
     const { s, machineId } = world();
     const choose = (provider: string, modelId: string) => {
       s.db

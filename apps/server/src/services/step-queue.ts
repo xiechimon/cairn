@@ -128,6 +128,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       holdReason: step.holdReason,
       holdUntil: step.holdUntil,
       chiefId: chiefThread.chiefId,
+      projectId: chiefThread.projectId,
     })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
@@ -139,7 +140,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     .all()
     .map((row) => ({
       ...row,
-      home: coordinatorProfile(db, teamId)?.machineId ?? null,
+      home: coordinatorProfile(db, teamId, row.projectId)?.machineId ?? null,
     }));
   const queue = [...workerQueue, ...chiefRows].sort(
     (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1),
@@ -169,7 +170,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
   const defaultMachineId = teamDefaultMachineId(db, teamId);
   function agentForRow(row: (typeof queue)[number]): RouteProfile | null {
     if ('todoRow' in row) return profileForStep(db, row.todoRow, row.kind, row.id);
-    return coordinatorProfile(db, teamId);
+    return coordinatorProfile(db, teamId, row.projectId);
   }
 
   const catalog = mergedCatalogModels();
@@ -246,7 +247,13 @@ export function stepQueueProjector(db: Db, teamId: string) {
     };
   }
 
-  let serverRoute: ReturnType<typeof coordinatorRouteVerdict> | undefined;
+  const serverRoutes = new Map<string | null, ReturnType<typeof coordinatorRouteVerdict>>();
+  const serverRouteOf = (projectId: string | null) => {
+    if (!serverRoutes.has(projectId)) {
+      serverRoutes.set(projectId, coordinatorRouteVerdict(db, teamId, projectId));
+    }
+    return serverRoutes.get(projectId) ?? null;
+  };
   function blockedFor(
     target: QueueTargetStep,
     row: (typeof queue)[number],
@@ -256,7 +263,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       coordinatorInServerEnabled() &&
       !isChiefDigestThreadId(row.threadId)
     ) {
-      if (serverRoute === undefined) serverRoute = coordinatorRouteVerdict(db, teamId);
+      const serverRoute = serverRouteOf(row.projectId);
       if (serverRoute !== null) {
         if (!('refusal' in serverRoute)) return undefined;
         if (target.homeMachineId === null) {
