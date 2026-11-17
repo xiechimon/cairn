@@ -1045,7 +1045,7 @@ describe('opening a page like a person', () => {
     const typed = log.findIndex((line) =>
       /^xdotool type --delay \d+ https:\/\/example\.com\/$/.test(line),
     );
-    const enter = log.findIndex((line) => line === 'xdotool key Return');
+    const enter = log.indexOf('xdotool key Return');
     expect(focus).toBeGreaterThan(-1);
     expect(typed).toBeGreaterThan(focus);
     expect(enter).toBeGreaterThan(typed);
