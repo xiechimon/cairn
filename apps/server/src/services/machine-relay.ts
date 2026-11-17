@@ -64,7 +64,7 @@ export async function machineAsk(
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
 ): Promise<MachineAskResponse> {
   const row = ownedStep(deps, machineId, stepId);
-  refuseRestrictedTurnTool(row.prompt, 'ask_user');
+  refuseRestrictedTurnTool(row.prompt, 'ask_user', {}, row.ownerMessageIds ?? []);
   if (row.kind === 'session') {
     return askWorkerQuestion(deps, row, body, opts);
   }
@@ -114,7 +114,7 @@ export async function executeRelayToolCall(
   signal?: AbortSignal,
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
-  refuseRestrictedTurnTool(row.prompt, name, params);
+  refuseRestrictedTurnTool(row.prompt, name, params, row.ownerMessageIds ?? []);
   if (isComputerBrowserTool(name) || name === 'request_takeover') {
     assertChiefDigestTool(row.buildId, name);
     if (row.kind !== 'chief') {

@@ -23,6 +23,7 @@ import {
   recoverGateWake,
 } from '../src/services/chief.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
+import { addTurnOwnerMessage } from '../src/services/chief-turns.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { executeRelayToolCall, machineAsk } from '../src/services/machine-relay.js';
 import { reconcileOwners } from '../src/services/owner.js';
@@ -327,6 +328,50 @@ describe('a delivered research report reaches the conversation once', () => {
     w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, w.task.todoId)).run();
     recoverGateWake(w.deps, { ...retry!, prompt: turn.prompt, status: 'failed' });
     expect(w.reportWakes()).toHaveLength(2);
+  });
+});
+
+describe('an owner message steered into a stale report turn', () => {
+  test.each([
+    ['the in-server runtime', null],
+    ['a daemon', 'machine-owner-steer'],
+  ])('is still handled through %s', async (_, machineId) => {
+    const w = openWorld();
+    const turn = w.deliver()!;
+    w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, w.task.todoId)).run();
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'claimed', machineId })
+      .where(eq(stepTable.id, turn.id))
+      .run();
+    const relay = (name: string, params: Record<string, unknown>) =>
+      executeRelayToolCall(w.toolDeps, machineId, turn.id, name, params);
+    await expect(relay('reopen_todos', { todoIds: [w.task.todoId] })).rejects.toThrow(
+      /report turn cannot call reopen_todos/,
+    );
+
+    const messageId = newRecordId();
+    w.s.db
+      .insert(chiefMessage)
+      .values({
+        id: messageId,
+        threadId: w.main.id,
+        role: 'user',
+        content: '重新派发一个',
+        createdAt: nowMs(),
+      })
+      .run();
+    addTurnOwnerMessage(w.s.db, w.main.id, messageId);
+
+    const stale = relay('message_thread', { todoId: w.task.todoId, content: '重新派发一个' });
+    await expect(stale).rejects.toThrow(/report-stale/);
+    await expect(stale).rejects.toThrow(/still do what they asked/);
+    await expect(stale).rejects.not.toThrow(/end the turn/);
+    const reopened = JSON.parse(await relay('reopen_todos', { todoIds: [w.task.todoId] }));
+    expect(reopened.transitioned).toEqual([w.task.todoId]);
+    expect(w.phaseOf(w.task.todoId)).not.toBe('closed');
+    await relay('close_todos', { todoIds: [w.other.todoId] });
+    expect(w.phaseOf(w.other.todoId)).toBe('closed');
   });
 });
 

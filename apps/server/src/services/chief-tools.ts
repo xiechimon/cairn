@@ -91,6 +91,7 @@ import {
   refuseRestrictedTurnTool,
   reportAcknowledged,
   reportNoticeId,
+  reportRefOfCall,
   reportRefOfPrompt,
   requireCurrentReportTurn,
 } from './report-turn.js';
@@ -310,9 +311,11 @@ export async function executeChiefTool(
   name: string,
   params: Params,
 ): Promise<string> {
-  refuseRestrictedTurnTool(ctx.turnPrompt ?? null, name, params);
+  const turnPrompt = ctx.turnPrompt ?? null;
+  const turnMessageIds = ctx.turnMessageIds ?? [];
+  refuseRestrictedTurnTool(turnPrompt, name, params, turnMessageIds);
   const { db } = deps;
-  requireCurrentReportTurn(db, ctx.turnPrompt ?? null, name);
+  requireCurrentReportTurn(db, turnPrompt, turnMessageIds, name, params);
   const svc = {
     db,
     hub: deps.hub,
@@ -757,7 +760,7 @@ export async function executeChiefTool(
     case 'complete_todos': {
       const complete = () =>
         transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor);
-      const report = reportRefOfPrompt(ctx.turnPrompt ?? null);
+      const report = reportRefOfCall(turnPrompt, turnMessageIds, name, params);
       if (report === null) return json(complete());
       const { result, ack } = acceptReport(
         db,

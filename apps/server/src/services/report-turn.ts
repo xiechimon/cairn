@@ -75,15 +75,27 @@ function reportTurnAllows(ref: ReportRef, name: string, params: Record<string, u
   return false;
 }
 
+export function reportRefOfCall(
+  prompt: string | null,
+  ownerMessageIds: readonly string[],
+  name: string,
+  params: Record<string, unknown>,
+): ReportRef | null {
+  const ref = reportRefOfPrompt(prompt);
+  if (ref === null) return null;
+  return ownerMessageIds.length === 0 || reportTurnAllows(ref, name, params) ? ref : null;
+}
+
 export function refuseRestrictedTurnTool(
   prompt: string | null,
   name: string,
   params: Record<string, unknown> = {},
+  ownerMessageIds: readonly string[] = [],
 ): void {
   if (turnProvenance(prompt)?.startsWith('mail:') === true) {
     throw new HttpError(403, `mail turn cannot call ${name}`);
   }
-  if (!isReportTurn(prompt)) return;
+  if (!isReportTurn(prompt) || ownerMessageIds.length > 0) return;
   const ref = reportRefOfPrompt(prompt);
   if (ref !== null && reportTurnAllows(ref, name, params)) return;
   throw new HttpError(403, `report turn cannot call ${name}`);
@@ -122,14 +134,20 @@ function reportOriginGone(db: Db, ref: ReportRef): boolean {
   return origin === undefined || origin.archivedAt !== null;
 }
 
-export function requireCurrentReportTurn(db: Db, prompt: string | null, name: string): void {
+export function requireCurrentReportTurn(
+  db: Db,
+  prompt: string | null,
+  ownerMessageIds: readonly string[],
+  name: string,
+  params: Record<string, unknown>,
+): void {
   if (!REPORT_REF_TOOLS.has(name)) return;
-  const ref = reportRefOfPrompt(prompt);
+  const ref = reportRefOfCall(prompt, ownerMessageIds, name, params);
   if (ref === null) return;
   if (!reportRefCurrent(db, ref)) {
     throw new HttpError(
       409,
-      'report-stale: this report is no longer the task’s current delivery; end the turn without writing',
+      'report-stale: this report is no longer the task’s current delivery, so skip it and say nothing about it. Only the report is skipped: if the owner wrote in this turn, still do what they asked.',
     );
   }
   if ((name === 'notify_user' || name === 'message_thread') && reportOriginGone(db, ref)) {
