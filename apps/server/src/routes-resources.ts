@@ -1,5 +1,6 @@
 import {
   capabilitiesResponseSchema,
+  cloakLicenseBodySchema,
   createClaudeSubscriptionSchema,
   createMcpConnectorBodySchema,
   createProviderBodySchema,
@@ -54,6 +55,7 @@ import {
   renameClaudeSubscription,
   verifySubscriptionConnection,
 } from './services/claude-subscriptions.js';
+import { saveCloakLicense } from './services/cloak-license.js';
 import { pollCodexDeviceLogin, startCodexDeviceLogin } from './services/codex-device-login.js';
 import { stepIdOfGitKey } from './services/credentials.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
@@ -155,12 +157,13 @@ import { pollXaiDeviceLogin, startXaiDeviceLogin } from './services/xai-device-l
 export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
 
+  const isOwnerSession = (c: Context): boolean =>
+    pairedDeviceIdOf(c) === null &&
+    (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
+    isOwner(ctx.db, ctx.user.id);
+
   const requireOwnerSession = (c: Context): void => {
-    const owned =
-      pairedDeviceIdOf(c) === null &&
-      (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
-      isOwner(ctx.db, ctx.user.id);
-    if (!owned) {
+    if (!isOwnerSession(c)) {
       throw new HttpError(403, 'Only the instance owner can manage Claude subscription tokens');
     }
   };
@@ -1016,6 +1019,16 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       throw notFound(`secret ${c.req.param('sid')}`);
     }
     return c.body(null, 204);
+  });
+
+  app.put('/api/teams/:id/cloak-license', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    if (!isOwnerSession(c))
+      throw new HttpError(403, 'Only the instance owner can save the CloakBrowser license');
+    const body = parseWith(cloakLicenseBodySchema, await jsonBody(c), 'body');
+    c.header('Cache-Control', 'no-store');
+    return c.json(saveCloakLicense(keysvc, teamId, body.value));
   });
 
   app.get('/api/teams/:id/api-keys', (c) => {

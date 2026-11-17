@@ -3,6 +3,7 @@ import {
   CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
   COMPUTER_DESKTOP_TOOLS,
+  COMPUTER_LICENSE_TOOLS,
   COMPUTER_REMOTE_TOOLS,
   type ComputerTool,
   type RemoteToolDef,
@@ -63,7 +64,7 @@ function actionToolDefs(): RemoteToolDef[] {
 }
 
 export function coordinatorToolDefs(
-  options: { routerTools?: boolean; desktopTools?: boolean } = {},
+  options: { routerTools?: boolean; desktopTools?: boolean; cloakLicense?: boolean } = {},
 ): RemoteToolDef[] {
   return [
     ...CHIEF_REMOTE_TOOLS,
@@ -71,6 +72,7 @@ export function coordinatorToolDefs(
     ...CHIEF_REPLY_TOOLS,
     ...COMPUTER_REMOTE_TOOLS,
     ...(options.desktopTools === true ? COMPUTER_DESKTOP_TOOLS : []),
+    ...(options.cloakLicense === true ? COMPUTER_LICENSE_TOOLS : []),
     ...actionToolDefs(),
   ];
 }

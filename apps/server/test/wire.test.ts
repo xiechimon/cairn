@@ -76,6 +76,7 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/secrets',
   'PATCH /api/teams/{id}/secrets/{sid}',
   'DELETE /api/teams/{id}/secrets/{sid}',
+  'PUT /api/teams/{id}/cloak-license',
   'GET /api/teams/{id}/api-keys',
   'POST /api/teams/{id}/api-keys',
   'GET /api/remote/identity',
@@ -184,6 +185,7 @@ const M2C_ROUTES = [
   'POST /api/teams/{id}/secrets',
   'PATCH /api/teams/{id}/secrets/{sid}',
   'DELETE /api/teams/{id}/secrets/{sid}',
+  'PUT /api/teams/{id}/cloak-license',
   'GET /api/teams/{id}/api-keys',
   'POST /api/teams/{id}/api-keys',
 ];

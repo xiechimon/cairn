@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import {
   COMPUTER_HANDOFF_TIMEOUT_MS,
   isComputerBrowserTool,
+  REQUEST_CLOAK_LICENSE_TOOL,
   type RemoteToolDef,
 } from '@cairn/shared';
 import { z } from 'zod';
@@ -45,16 +46,14 @@ export function stepRemoteToolExecutor(input: {
       });
     }
     const def = remoteTools.find((t) => t.name === name);
-    const computerCall = isComputerBrowserTool(name) || name === 'request_takeover';
+    const ownerWait = name === 'request_takeover' || name === REQUEST_CLOAK_LICENSE_TOOL;
+    const computerCall = isComputerBrowserTool(name) || ownerWait;
     return client.relayTool(stepId, name, params, {
       ...(def?.replaySafe ? { replaySafe: true } : {}),
       ...(computerCall
         ? {
             toolCallId: randomUUID(),
-            timeoutMs:
-              name === 'request_takeover'
-                ? TAKEOVER_RELAY_TIMEOUT_MS
-                : COMPUTER_TOOL_RELAY_TIMEOUT_MS,
+            timeoutMs: ownerWait ? TAKEOVER_RELAY_TIMEOUT_MS : COMPUTER_TOOL_RELAY_TIMEOUT_MS,
           }
         : {}),
     });

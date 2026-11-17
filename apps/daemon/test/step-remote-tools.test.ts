@@ -90,6 +90,13 @@ describe('stepRemoteToolExecutor', () => {
     expect(h.relayed.at(-1)?.opts).toEqual({});
   });
 
+  test('request_cloak_license waits as long as a handoff', async () => {
+    const h = harness({});
+    await h.execute('request_cloak_license', { reason: 'no license' });
+    expect(h.relayed[0]?.opts?.timeoutMs).toBe(TAKEOVER_RELAY_TIMEOUT_MS);
+    expect(h.relayed[0]?.opts?.toolCallId).toBeTruthy();
+  });
+
   test('attach_file uploads the file content when attachments are allowed', async () => {
     const h = harness({});
     writeFileSync(join(h.cwd, 'shot.txt'), 'hello');

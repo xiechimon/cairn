@@ -114,3 +114,23 @@ export const COMPUTER_DESKTOP_TOOLS: readonly RemoteToolDef[] = [
 export const COMPUTER_HANDOFF_TIMEOUT_MS = 15 * 60_000;
 export const TAKEOVER_HANDED_BACK =
   'The owner handed the computer back. Take a fresh browser_snapshot before acting.';
+
+export const REQUEST_CLOAK_LICENSE_TOOL = 'request_cloak_license';
+
+export const COMPUTER_LICENSE_TOOLS: readonly RemoteToolDef[] = [
+  {
+    name: REQUEST_CLOAK_LICENSE_TOOL,
+    description:
+      'Post a CloakBrowser license card in the chat so the owner can paste the key, which is saved as a team secret you never see. Waits until the owner saves it, then retry the stealth browser call that needed it.',
+    parameters: obj({
+      reason: str(
+        'Why the key is needed. When CloakBrowser rejected the saved key, its reason as the tool reported it.',
+      ),
+    }),
+  },
+];
+
+export const CLOAK_LICENSE_SAVED =
+  'The owner saved the CloakBrowser license. Retry the stealth browser call that needed it, unchanged.';
+export const CLOAK_LICENSE_NOT_SAVED =
+  'The owner did not save a CloakBrowser license. Stop and tell the owner the stealth browser needs it.';

@@ -9,6 +9,7 @@ import {
   isBuildStepKind,
   isComputerBrowserTool,
   parseGithubIssueSourceRef,
+  REQUEST_CLOAK_LICENSE_TOOL,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
@@ -32,6 +33,7 @@ import {
   transitionTodos,
 } from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
+import { holdCloakLicense } from './cloak-license.js';
 import {
   capturePreCallWorld,
   captureToolResult,
@@ -187,6 +189,8 @@ export async function executeRelayToolCall(
   if (!threadRow) throw new NotFoundError(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   if (!chiefRow) throw new NotFoundError(`chief ${threadRow.chiefId}`);
+  if (name === REQUEST_CLOAK_LICENSE_TOOL)
+    return holdCloakLicense(deps, { stepId }, signal !== undefined ? { signal } : {});
   const tool = isCaptureTool(name) ? name : undefined;
   const captured = tool !== undefined ? existingTurnCapture(stepId) : undefined;
   if (captured !== undefined && tool !== undefined)

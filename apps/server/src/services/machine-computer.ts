@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   browserSecretFillActionSchema,
+  CLOAK_LICENSE_SECRET,
   COMPUTER_FEED_TOOLS,
   COMPUTER_HANDOFF_TIMEOUT_MS,
   COMPUTER_REPLAY_SAFE_TOOLS,
@@ -77,7 +78,6 @@ export const COMPUTER_INTERRUPTED = 'interrupted, may have partially run; it was
 export const COMPUTER_CANCELLED = 'cancelled because the Coordinator turn was stopped';
 export const COMPUTER_BROWSER_DISABLED =
   'browser tools are off for this computer; enable 浏览器 in the Computers panel';
-export const CLOAK_LICENSE_SECRET = 'CLOAKBROWSER_LICENSE_KEY';
 export const COMPUTER_NO_CLOAK_LICENSE = `No CloakBrowser license; set team secret ${CLOAK_LICENSE_SECRET}`;
 export const COMPUTER_BROWSER_UNAVAILABLE =
   'this machine no longer reports browser capability; turn off 浏览器 or rebuild the computer image';

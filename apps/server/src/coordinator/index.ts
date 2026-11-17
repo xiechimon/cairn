@@ -28,6 +28,7 @@ import { blockedNow } from '../services/blockers.js';
 import { parseChiefTrigger } from '../services/chief.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
+import { teamHasVmComputer } from '../services/cloak-license.js';
 import { materializeCodexAccessToken } from '../services/codex-device-login.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
@@ -283,6 +284,10 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       desktopTools: (threadId) => {
         const teamId = threadTeam(threadId);
         return teamId !== null && teamOffersDesktop(db, teamId);
+      },
+      cloakLicense: (threadId) => {
+        const teamId = threadTeam(threadId);
+        return teamId !== null && teamHasVmComputer(db, teamId);
       },
       providersFor: (threadId) => {
         const teamId = threadTeam(threadId);
@@ -556,6 +561,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         remoteTools: coordinatorToolDefs({
           routerTools: options.routerTools ?? true,
           desktopTools: teamOffersDesktop(db, threadRow.teamId),
+          cloakLicense: teamHasVmComputer(db, threadRow.teamId),
         }),
       },
       volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
