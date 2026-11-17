@@ -1,10 +1,11 @@
 import { cn } from 'cn';
-import { KeyRound } from 'lucide-react';
+import { KeyRound, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiKeys, useApiMutations, useTodos } from '../api/hooks.js';
 import { mapApiKeys, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { EmptyState } from '../components/empty-state.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { CARD_RADIUS_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
@@ -62,6 +63,14 @@ export function ApiKeysPage() {
       fixture={live ? { ...fixture, todos: (todosQ.data ?? []).map(toDisplayTodo) } : fixture}
       selected="none"
       title={t('API 密钥')}
+      actions={
+        live && keys.length > 0 ? (
+          <Button className={TOPBAR_PRIMARY_BUTTON} onClick={() => setCreateOpen(true)}>
+            <Plus aria-hidden strokeWidth={1.75} className="size-5" />
+            {t('新建 API 密钥')}
+          </Button>
+        ) : null
+      }
     >
       <QueryBoundary
         query={live ? keysQ : undefined}
@@ -80,16 +89,6 @@ export function ApiKeysPage() {
           />
         }
       >
-        {live && (
-          <div className="mt-6 flex justify-end">
-            <Button
-              className={cn(DIALOG_PRIMARY_BUTTON, 'pointer-coarse:h-11')}
-              onClick={() => setCreateOpen(true)}
-            >
-              {t('新建 API 密钥')}
-            </Button>
-          </div>
-        )}
         {keys
           .filter((key) => key.plaintext != null)
           .map((key) => (
