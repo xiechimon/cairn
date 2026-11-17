@@ -200,19 +200,23 @@ test('a plan waiting for approval opens in full from the card and from the trans
 });
 
 const changesCard = (page: Page) => page.getByTestId('side-chat-changes');
+const changesToggle = (page: Page) => page.getByTestId('side-chat-changes-toggle');
+const changesBody = (page: Page) => page.getByTestId('side-chat-changes-body');
 
-test('a reviewed thread shows its changes as one card in the conversation, and the card swaps the transcript for the changes', async ({
+test('a reviewed thread shows its changes as one card that opens in place, with no done line and no view switch', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
   await expect(sideChat(page).getByTestId('side-chat-changes')).toHaveCount(0);
   const card = page.getByTestId('transcript-col').getByTestId('side-chat-changes');
   await expect(card).toHaveCount(1);
-  await expect(card).toHaveText('改动 1 个文件+1');
+  await expect(changesToggle(page)).toHaveText('改动 README.md+1');
+  await expect(changesToggle(page)).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('transcript-note').filter({ hasText: /^已完成$/ })).toHaveCount(0);
   const place = await card.evaluate((el) => {
     const box = el.getBoundingClientRect();
     const trace = [...document.querySelectorAll('.side-panel [data-trace-card]')]
-      .filter((node) => !node.contains(el))
+      .filter((node) => node !== el && !node.contains(el))
       .at(-1)!;
     const column = document.querySelector('.side-panel [data-testid="transcript-col"]')!;
     const style = getComputedStyle(column);
@@ -222,23 +226,23 @@ test('a reviewed thread shows its changes as one card in the conversation, and t
         box.left - column.getBoundingClientRect().left - Number.parseFloat(style.paddingLeft),
       ),
       height: Math.round(box.height),
-      compact: box.width < column.getBoundingClientRect().width / 2,
     };
   });
-  expect(place).toEqual({ afterWork: true, left: 0, height: 40, compact: true });
+  expect(place).toEqual({ afterWork: true, left: 0, height: 44 });
 
-  await card.click();
-  await expect(page.getByTestId('side-chat-changes-view').getByTestId('doc-pane')).toBeVisible();
-  await expect(page.getByTestId('side-chat-changes-view')).toContainText('README.md');
-  await expect(page.getByTestId('doc-pane').getByRole('button', { name: /^v\d/ })).toHaveCount(0);
-  await expect(page.getByTestId('transcript-col')).toHaveCount(0);
-  await expect(sideChat(page).getByTestId('side-chat-changes')).toHaveCount(0);
-
-  await sideChat(page).getByRole('button', { name: '返回对话' }).click();
-  await expect(sideChat(page)).toBeVisible();
+  await changesToggle(page).click();
+  await expect(changesToggle(page)).toHaveAttribute('aria-expanded', 'true');
+  await expect(changesBody(page).locator('[data-kind="add"]').first()).toBeVisible();
   await expect(page.getByTestId('transcript-col')).toBeVisible();
-  await expect(page.getByTestId('side-chat-changes-view')).toHaveCount(0);
-  await expect(changesCard(page)).toBeVisible();
+  await expect(page.getByTestId('pane-title')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="pane-view-"]')).toHaveCount(0);
+
+  await page.getByTestId('side-chat-full-file').click();
+  await expect(page.getByTestId('side-chat-full-file')).toHaveAttribute('aria-pressed', 'true');
+  await expect(changesBody(page).getByTestId('diff-full')).toBeVisible();
+
+  await changesToggle(page).click();
+  await expect(changesBody(page)).toHaveCount(0);
 });
 
 test('a thread without build changes has no changes card', async ({ page }) => {
@@ -249,55 +253,43 @@ test('a thread without build changes has no changes card', async ({ page }) => {
   }
 });
 
-test('Escape leaves the changes first and closes the panel on the second press', async ({
-  page,
-}) => {
+test('Escape closes the panel even with the changes open', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
-  await changesCard(page).click();
-  await expect(page.getByTestId('side-chat-changes-view')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByTestId('side-chat-changes-view')).toHaveCount(0);
-  await expect(sideChat(page)).toBeVisible();
-  await expect(page.getByTestId('transcript-col')).toBeVisible();
+  await changesToggle(page).click();
+  await expect(changesBody(page)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(sideChat(page)).toHaveCount(0);
 });
 
-test('the composer stays usable while the changes show, and switching threads returns to the conversation', async ({
+test('the composer stays usable with the changes open, and switching threads closes them', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
-  await changesCard(page).click();
+  await changesToggle(page).click();
   const input = page.locator('.side-panel textarea');
   await input.fill('looks good');
   await expect(input).toHaveValue('looks good');
-  await expect(page.getByTestId('side-chat-changes-view')).toBeVisible();
+  await expect(changesBody(page)).toBeVisible();
 
   await page.goto(`${HOME}&thread=home-c-working-a`);
   await expect(page.getByTestId('transcript-col')).toBeVisible();
-  await expect(page.getByTestId('side-chat-changes-view')).toHaveCount(0);
   await page.goto(`${HOME}&thread=home-c-review`);
-  await expect(page.getByTestId('transcript-col')).toBeVisible();
-  await expect(changesCard(page)).toBeVisible();
+  await expect(changesToggle(page)).toHaveAttribute('aria-expanded', 'false');
 });
 
 test.describe('phone width changes', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('the changes card is a touch target and the changes view fits the screen', async ({
-    page,
-  }) => {
+  test('the changes card is a touch target and its diff fits the screen', async ({ page }) => {
     await page.goto(`${HOME}&thread=home-c-review`);
-    const box = await changesCard(page).boundingBox();
-    expect(box?.height ?? 0).toBeGreaterThanOrEqual(40);
-    await changesCard(page).click();
-    await expect(page.getByTestId('side-chat-changes-view')).toBeVisible();
+    const box = await changesToggle(page).boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await changesToggle(page).click();
+    await expect(changesBody(page)).toBeVisible();
     const overflow = await page
       .locator('aside.side-panel')
       .evaluate((node) => node.scrollWidth - node.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
-    await sideChat(page).getByRole('button', { name: '返回对话' }).click();
-    await expect(page.getByTestId('transcript-col')).toBeVisible();
   });
 });
 

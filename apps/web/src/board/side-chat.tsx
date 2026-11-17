@@ -1,6 +1,13 @@
 import { RUNNER_OS_LABELS } from '@cairn/shared';
 import { cn } from 'cn';
-import { ChevronLeft, FileDiff, ListChecks, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  ListChecks,
+  UnfoldVertical,
+  X,
+} from 'lucide-react';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
@@ -17,7 +24,7 @@ import { DialogShell } from '../components/ui/dialog-shell.js';
 import { toastError } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { Composer } from '../detail/composer.js';
-import { DocPane } from '../detail/docpane.js';
+import { DiffFileBody, DocPane } from '../detail/docpane.js';
 import { taskStatusInk } from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { TranscriptColumn } from '../detail/transcript-column.js';
@@ -197,81 +204,190 @@ function SourceLine({
   );
 }
 
-type ThreadView = 'chat' | 'changes' | 'raw';
+type ThreadView = 'chat' | 'raw';
 
-function ChangesView({ chat, now }: { chat: ThreadChat; now: number }) {
-  const { t } = useI18n();
-  const { changes } = chat;
-  if (changes.status === 'loading' || changes.status === 'error') {
-    return (
-      <div
-        data-testid="side-chat-changes-view"
-        data-state={changes.status}
-        className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
-      >
-        <p
-          className={cn(
-            'm-0 text-ui',
-            changes.status === 'loading' ? 'text-content-tertiary' : 'text-foreground',
-          )}
-        >
-          {changes.status === 'loading' ? t('加载中…') : t('变更加载失败')}
-        </p>
-        {changes.status === 'error' && (
-          <Button size="sm" onClick={chat.retryChanges}>
-            {t('重试')}
-          </Button>
-        )}
-      </div>
-    );
-  }
+const CHANGES_ROW = 'flex min-h-11 items-center pointer-coarse:min-h-11';
+const CHANGES_HEAD_BUTTON =
+  'h-auto min-h-11 flex-1 justify-start gap-2 border-0 pr-2 pl-3 text-ui font-normal text-foreground hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-expanded:hover:bg-(--menu-hover) dark:aria-expanded:hover:bg-(--menu-hover)';
+const CHANGES_TOOL = 'mr-1.5 flex-none text-content-tertiary pointer-coarse:size-11';
+
+function ChangeCounts({ added, removed }: { added: number; removed: number }) {
   return (
-    <div
-      data-testid="side-chat-changes-view"
-      data-state="ready"
-      className="flex min-h-0 flex-1 flex-col"
-    >
-      <DocPane
-        mode="changes"
-        doc={undefined}
-        changes={changes.content}
-        now={now}
-        onDocView={() => undefined}
-        hideVersion
-        onToggleExpand={chat.toggleChangesExpanded}
-        buildId={chat.buildId}
-      />
-    </div>
+    <span className="flex flex-none gap-1.5 text-meta tabular-nums">
+      <span className="text-(--diff-add-fg)">+{added}</span>
+      {removed > 0 && <span className="text-destructive">−{removed}</span>}
+    </span>
   );
 }
 
-function ChangesCard({ changes, onOpen }: { changes: ThreadChanges; onOpen: () => void }) {
+function FullFileToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   const { t } = useI18n();
   return (
-    <TraceCard className="mt-5 w-fit max-w-full">
-      <Button
-        variant="ghost"
-        data-testid="side-chat-changes"
-        data-state={changes.status}
-        aria-description={t('查看变更')}
-        onClick={onOpen}
-        className="h-10 max-w-full justify-start gap-2 border-0 px-3 text-ui font-normal text-foreground hover:bg-(--menu-hover) pointer-coarse:h-11 dark:hover:bg-(--menu-hover)"
-      >
-        <FileDiff aria-hidden="true" className="size-5 flex-none text-content-secondary" />
-        <span className="min-w-0 truncate">
-          {changes.status === 'ready'
-            ? t('改动 {n} 个文件', { n: changes.fileCount })
-            : t('变更加载失败')}
-        </span>
-        {changes.status === 'ready' && (
-          <span className="flex flex-none gap-2 pl-2 text-meta tabular-nums">
-            <span className="text-(--diff-add-fg)">+{changes.added}</span>
-            {changes.removed > 0 && <span className="text-destructive">−{changes.removed}</span>}
+    <IconTooltip
+      label={t('显示完整文件')}
+      trigger={
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-pressed={on}
+          data-testid="side-chat-full-file"
+          onClick={onToggle}
+          className={cn(CHANGES_TOOL, on && 'bg-(--menu-hover) text-foreground')}
+        />
+      }
+    >
+      <UnfoldVertical aria-hidden="true" className="size-4" />
+    </IconTooltip>
+  );
+}
+
+function toggled(set: ReadonlySet<string>, key: string): ReadonlySet<string> {
+  const next = new Set(set);
+  if (!next.delete(key)) next.add(key);
+  return next;
+}
+
+function ChangesCard({
+  changes,
+  buildId,
+  open,
+  onOpenChange,
+  onRetry,
+}: {
+  changes: ThreadChanges;
+  buildId: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onRetry: () => void;
+}) {
+  const { t } = useI18n();
+  const [openFiles, setOpenFiles] = useState<ReadonlySet<string>>(new Set());
+  const [fullFiles, setFullFiles] = useState<ReadonlySet<string>>(new Set());
+  if (changes.status === 'error') {
+    return (
+      <TraceCard className="mt-5" data-testid="side-chat-changes" data-state="error">
+        <div className={cn(CHANGES_ROW, 'gap-2 pl-3 text-ui')}>
+          <CircleAlert aria-hidden="true" className="size-4 flex-none text-destructive" />
+          <span className="min-w-0 flex-1 truncate text-foreground">{t('改动没加载出来')}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRetry}
+            className="mr-1.5 pointer-coarse:h-11"
+          >
+            {t('重试')}
+          </Button>
+        </div>
+      </TraceCard>
+    );
+  }
+  const files = changes.content?.files ?? [];
+  const single = files.length === 1 ? files[0] : undefined;
+  const allOpen = files.every((file) => openFiles.has(file.path));
+  return (
+    <TraceCard className="mt-5" data-testid="side-chat-changes" data-state={changes.status}>
+      <div className={CHANGES_ROW}>
+        <Button
+          variant="ghost"
+          aria-expanded={open}
+          data-testid="side-chat-changes-toggle"
+          onClick={() => onOpenChange(!open)}
+          className={CHANGES_HEAD_BUTTON}
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={cn('size-4 flex-none text-content-tertiary', open && 'rotate-90')}
+          />
+          <span className="min-w-0 truncate">
+            {single !== undefined
+              ? t('改动 {name}', { name: baseName(single.path) })
+              : t('改动 {n} 个文件', { n: changes.fileCount })}
           </span>
-        )}
-      </Button>
+          <ChangeCounts added={changes.added} removed={changes.removed} />
+        </Button>
+        {open &&
+          (single !== undefined ? (
+            <FullFileToggle
+              on={fullFiles.has(single.path)}
+              onToggle={() => setFullFiles((set) => toggled(set, single.path))}
+            />
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setOpenFiles(allOpen ? new Set() : new Set(files.map((file) => file.path)))
+              }
+              className="mr-1.5 flex-none text-meta text-content-tertiary pointer-coarse:h-11"
+            >
+              {allOpen ? t('全部收起') : t('全部展开')}
+            </Button>
+          ))}
+      </div>
+      {open && (
+        <div data-testid="side-chat-changes-body">
+          {single !== undefined ? (
+            <DiffFileBody
+              file={single}
+              buildId={buildId}
+              showFull={fullFiles.has(single.path)}
+              wrap
+            />
+          ) : (
+            files.map((file) => {
+              const fileOpen = openFiles.has(file.path);
+              const dir = file.path.slice(0, Math.max(0, file.path.lastIndexOf('/')));
+              return (
+                <div key={file.path} className="border-t border-(--border) first:border-t-0">
+                  <div className="flex min-h-9 items-center pointer-coarse:min-h-11">
+                    <Button
+                      variant="ghost"
+                      aria-expanded={fileOpen}
+                      data-testid="side-chat-file"
+                      onClick={() => setOpenFiles((set) => toggled(set, file.path))}
+                      className="h-auto min-h-9 flex-1 justify-start gap-1.5 border-0 pr-2 pl-3 text-ui font-normal text-content-tertiary hover:bg-(--menu-hover) pointer-coarse:min-h-11 dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-expanded:hover:bg-(--menu-hover) dark:aria-expanded:hover:bg-(--menu-hover) aria-expanded:text-content-tertiary"
+                    >
+                      <ChevronRight
+                        aria-hidden="true"
+                        className={cn('size-4 flex-none', fileOpen && 'rotate-90')}
+                      />
+                      <span className="min-w-0 truncate">
+                        <span className="font-medium text-foreground">{baseName(file.path)}</span>
+                        {dir !== '' && <span className="ml-1.5">{dir}</span>}
+                      </span>
+                      <span className="ml-auto pl-2">
+                        <ChangeCounts added={file.added} removed={file.removed ?? 0} />
+                      </span>
+                    </Button>
+                    {fileOpen && (
+                      <FullFileToggle
+                        on={fullFiles.has(file.path)}
+                        onToggle={() => setFullFiles((set) => toggled(set, file.path))}
+                      />
+                    )}
+                  </div>
+                  {fileOpen && (
+                    <div className="border-t border-(--border)">
+                      <DiffFileBody
+                        file={file}
+                        buildId={buildId}
+                        showFull={fullFiles.has(file.path)}
+                        wrap
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </TraceCard>
   );
+}
+
+function baseName(path: string): string {
+  return path.slice(path.lastIndexOf('/') + 1);
 }
 
 function ThreadBody({
@@ -279,8 +395,8 @@ function ThreadBody({
   todo,
   actions,
   view,
-  onViewChanges,
-  now,
+  changesOpen,
+  onChangesOpen,
   origin,
   onJumpToOrigin,
   onOpenPlan,
@@ -292,8 +408,8 @@ function ThreadBody({
   todo: TodoRecord;
   actions: ThreadActions;
   view: ThreadView;
-  onViewChanges: () => void;
-  now: number;
+  changesOpen: boolean;
+  onChangesOpen: (open: boolean) => void;
   origin: ThreadOrigin | null;
   onJumpToOrigin: () => void;
   onOpenPlan: (() => void) | undefined;
@@ -317,8 +433,6 @@ function ThreadBody({
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
       {view === 'raw' && engine !== undefined ? (
         <EngineRawView run={engine.run} />
-      ) : view === 'changes' ? (
-        <ChangesView chat={chat} now={now} />
       ) : (
         <ReportThreadContext.Provider value={reportThread}>
           <TranscriptColumn
@@ -349,7 +463,14 @@ function ThreadBody({
                     </div>
                   )}
                   {(chat.changes.status === 'ready' || chat.changes.status === 'error') && (
-                    <ChangesCard changes={chat.changes} onOpen={onViewChanges} />
+                    <ChangesCard
+                      key={todo.id}
+                      changes={chat.changes}
+                      buildId={chat.buildId}
+                      open={changesOpen}
+                      onOpenChange={onChangesOpen}
+                      onRetry={chat.retryChanges}
+                    />
                   )}
                 </>
               ) : undefined
@@ -453,10 +574,10 @@ export function SideChat({
       },
       { replace: true },
     );
-  const [chosenView, setView] = useState<ThreadView>(
-    searchParams.get(VIEW_PARAM) === 'changes' ? 'changes' : 'chat',
+  const [view, setView] = useState<ThreadView>('chat');
+  const [changesOpenFor, setChangesOpenFor] = useState<string | null>(
+    searchParams.get(VIEW_PARAM) === 'changes' ? todoId : null,
   );
-  const view = chosenView === 'changes' && chat.changes.status === 'none' ? 'chat' : chosenView;
   const showsSubView = view !== 'chat';
   const Stage = chat.engineStage;
   const thread = (engine: EngineRunView | undefined) =>
@@ -470,6 +591,8 @@ export function SideChat({
         now={now}
         view={view}
         onView={setView}
+        changesOpen={changesOpenFor === todo.id}
+        onChangesOpen={(open) => setChangesOpenFor(open ? todo.id : null)}
         chatStream={chatStream}
         onClose={onClose}
         onCloseAll={closeAll}
@@ -537,6 +660,8 @@ function ReadyThread({
   now,
   view,
   onView,
+  changesOpen,
+  onChangesOpen,
   chatStream,
   onClose,
   onCloseAll,
@@ -547,6 +672,8 @@ function ReadyThread({
   now: number;
   view: ThreadView;
   onView: (view: ThreadView) => void;
+  changesOpen: boolean;
+  onChangesOpen: (open: boolean) => void;
   chatStream: ThreadChatStream | undefined;
   onClose: () => void;
   onCloseAll: () => void;
@@ -618,7 +745,19 @@ function ReadyThread({
       <ThreadPrPanel
         status={prs.status}
         rows={prRows}
-        onViewChanges={chat.changes.status !== 'none' ? () => onView('changes') : undefined}
+        onViewChanges={
+          chat.changes.status !== 'none'
+            ? () => {
+                onView('chat');
+                onChangesOpen(true);
+                requestAnimationFrame(() =>
+                  document
+                    .querySelector('.side-panel [data-testid="side-chat-changes"]')
+                    ?.scrollIntoView({ block: 'nearest' }),
+                );
+              }
+            : undefined
+        }
         onRetry={() => void prs.refetch()}
       />
       <ThreadBody
@@ -626,8 +765,8 @@ function ReadyThread({
         todo={todo}
         actions={actions}
         view={view}
-        onViewChanges={() => onView('changes')}
-        now={now}
+        changesOpen={changesOpen}
+        onChangesOpen={onChangesOpen}
         origin={origin}
         onJumpToOrigin={jumpToOrigin}
         onOpenPlan={openPlan}
@@ -673,7 +812,6 @@ function ReadyThread({
               doc={chat.planDoc}
               changes={undefined}
               now={now}
-              onDocView={() => undefined}
               planVersions={chat.planVersions}
             />
           )}

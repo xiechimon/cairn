@@ -2,10 +2,9 @@ import { expect, test } from '@playwright/test';
 
 test('thread review diffs remain available after project files retirement', async ({ page }) => {
   await page.goto('/app?scenario=home-c&thread=home-c-review');
-  await page.getByTestId('side-chat-changes').click();
-  const diff = page.getByTestId('side-chat-changes-view');
-  await expect(diff.locator('.doc-file-row')).toContainText('README.md');
-  await expect(diff.getByTestId('doc-pane')).toBeVisible();
+  await page.getByTestId('side-chat-changes-toggle').click();
+  await expect(page.getByTestId('side-chat-changes-toggle')).toContainText('README.md');
+  await expect(page.getByTestId('side-chat-changes-body').locator('[data-kind]').first()).toBeVisible();
 });
 
 for (const query of ['', '?tab=files', '?tab=tasks']) {

@@ -117,6 +117,8 @@ export const EN: Record<string, string> = {
   无输出: 'No output',
   '本步异常结束：{reason}': 'This step ended abnormally: {reason}',
   '改动 {n} 个文件': 'Changed {n#1 file|# files}',
+  '改动 {name}': 'Changed {name}',
+  改动没加载出来: 'The changes did not load',
   '提交 {shas}': 'Commit {shas}',
   'PR #{n}': 'PR #{n}',
   '未开 PR': 'No PR',
@@ -1458,7 +1460,6 @@ export const EN: Record<string, string> = {
     'The Coordinator is already orchestrating this task — wait for this round to finish.',
   '重复发起只会多排一轮编排，不会更快开始。':
     'Firing again only queues one more orchestration round; it will not start sooner.',
-  变更加载失败: 'Failed to load the changes',
   返回对话: 'Back to conversation',
   查看变更: 'Show changes',
   任务加载失败: 'Failed to load the task',

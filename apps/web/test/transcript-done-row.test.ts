@@ -25,10 +25,10 @@ function notesFor(verified: boolean | undefined): string[] {
     .map((item) => item.text);
 }
 
-test('F1: the done row reads the finished word and ignores a stored verify bit', () => {
-  expect(notesFor(undefined)).toEqual(['已完成']);
-  expect(notesFor(false)).toEqual(['已完成']);
-  expect(notesFor(true)).toEqual(['已完成']);
+test('F1: the done row adds no line to the thread, whose head already says done', () => {
+  expect(notesFor(undefined)).toEqual([]);
+  expect(notesFor(false)).toEqual([]);
+  expect(notesFor(true)).toEqual([]);
 });
 
 test('F3: the stored row text is unchanged so the trajectory outcome keeps matching it', () => {

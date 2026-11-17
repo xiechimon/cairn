@@ -31,7 +31,7 @@ interface DocPaneProps {
   doc: DocBlock[] | undefined;
   changes: ChangesContent | undefined;
   now: number;
-  onDocView: (view: DocView) => void;
+  onDocView?: (view: DocView) => void;
   sections?: ReactNode;
   planVersions?: PlanVersion[];
   versionMenu?: 'versions' | 'compare';
@@ -122,18 +122,10 @@ export function DiffFileBlock({
   allowFullFile?: boolean;
 }) {
   const { t } = useI18n();
-  const { live } = useLiveData();
   const [showFull, setShowFull] = useState(false);
-  const fetchLive = live && buildId != null;
-  const fullQ = useBuildChangeFile(buildId, showFull ? file.path : null, fetchLive);
-  const full = deriveFullFileView(fetchLive, showFull, file.fullContent ?? null, fullQ);
-  const wordDiffs = useMemo(
-    () => file.hunks.map((hunk) => computeHunkWordDiff(hunk.lines)),
-    [file.hunks],
-  );
   return (
     <div>
-      <div className="doc-file-row flex h-8.5 flex-none items-center gap-1.5 border-b border-(--border) pl-3 text-ui text-(--text-tertiary) [&_svg]:text-(--text-tertiary)">
+      <div className="flex h-8.5 flex-none items-center gap-1.5 border-b border-(--border) pl-3 text-ui text-(--text-tertiary) [&_svg]:text-(--text-tertiary)">
         {expanded ? (
           <ChevronDown width={10} height={10} />
         ) : (
@@ -152,92 +144,7 @@ export function DiffFileBlock({
       </div>
       {expanded && (
         <div>
-          {full.kind === 'hidden' &&
-            file.hunks.map((hunk, hi) => {
-              const wordDiff = wordDiffs[hi];
-              return (
-                <div key={hunk.header}>
-                  {unmodifiedBefore(file.hunks, hi) > 0 && (
-                    <div
-                      className="flex h-7 items-center pl-3 text-meta text-(--text-tertiary)"
-                      data-testid="diff-fold"
-                    >
-                      {t('{n} 行未改动', { n: unmodifiedBefore(file.hunks, hi) })}
-                    </div>
-                  )}
-                  <div className="bg-(--secondary) pl-18 font-mono text-code leading-6 text-(--text-tertiary) [font-variant-ligatures:none]">
-                    {hunk.header}
-                  </div>
-                  {hunk.lines.map((line, i) => {
-                    const segs = wordDiff?.segments.get(i);
-                    const isCapped = wordDiff?.capped.has(i) === true;
-                    return (
-                      <div
-                        key={i}
-                        className={`diff-line--${line.kind} ${DIFF_LINE} ${
-                          DIFF_KIND_SKIN[line.kind] ?? ''
-                        }`}
-                        data-kind={line.kind}
-                        data-word={isCapped ? 'capped' : undefined}
-                        title={isCapped ? t('行过长，已退回整行高亮') : undefined}
-                      >
-                        <span data-no="old" className={`${DIFF_NO} w-5`}>
-                          {line.oldNo ?? ''}
-                        </span>
-                        <span data-no="new" className={`${DIFF_NO} w-5`}>
-                          {line.newNo ?? ''}
-                        </span>
-                        <span className="sr-only">
-                          {line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ''}
-                        </span>
-                        <span className="pl-2 whitespace-pre">
-                          {segs == null
-                            ? line.text
-                            : segs.map((seg, si) =>
-                                seg.changed ? (
-                                  <span
-                                    key={si}
-                                    data-word={line.kind}
-                                    className={WORD_SKIN[line.kind]}
-                                  >
-                                    {seg.text}
-                                  </span>
-                                ) : (
-                                  seg.text
-                                ),
-                              )}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          {full.kind === 'text' && (
-            <div data-testid="diff-full">
-              {full.content
-                .replace(/\n$/, '')
-                .split('\n')
-                .map((text, i) => (
-                  <div key={i} className={`${DIFF_LINE}`} data-kind="context">
-                    <span data-no="old" className={`${DIFF_NO} w-5`} />
-                    <span data-no="new" className={`${DIFF_NO} w-5`}>
-                      {i + 1}
-                    </span>
-                    <span className="pl-2 whitespace-pre">{text}</span>
-                  </div>
-                ))}
-            </div>
-          )}
-          {(full.kind === 'loading' || full.kind === 'error' || full.kind === 'binary') && (
-            <div className="py-2 pr-3 pl-18 font-mono text-code leading-4 text-(--text-tertiary)">
-              {full.kind === 'loading'
-                ? t('加载中…')
-                : full.kind === 'error'
-                  ? t('文件加载失败')
-                  : t('二进制文件暂不支持预览')}
-            </div>
-          )}
+          <DiffFileBody file={file} buildId={buildId} showFull={showFull} />
           {allowFullFile && (
             <Button
               variant="ghost"
@@ -251,6 +158,123 @@ export function DiffFileBlock({
         </div>
       )}
     </div>
+  );
+}
+
+export function DiffFileBody({
+  file,
+  buildId,
+  showFull,
+  wrap = false,
+}: {
+  file: DiffFile;
+  buildId: string | null;
+  showFull: boolean;
+  wrap?: boolean;
+}) {
+  const { t } = useI18n();
+  const { live } = useLiveData();
+  const fetchLive = live && buildId != null;
+  const fullQ = useBuildChangeFile(buildId, showFull ? file.path : null, fetchLive);
+  const full = deriveFullFileView(fetchLive, showFull, file.fullContent ?? null, fullQ);
+  const wordDiffs = useMemo(
+    () => file.hunks.map((hunk) => computeHunkWordDiff(hunk.lines)),
+    [file.hunks],
+  );
+  const lineText = wrap
+    ? 'min-w-0 pl-2 whitespace-pre-wrap [overflow-wrap:anywhere]'
+    : 'pl-2 whitespace-pre';
+  const lineRow = wrap ? `${DIFF_LINE} items-start` : DIFF_LINE;
+  return (
+    <>
+      {full.kind === 'hidden' &&
+        file.hunks.map((hunk, hi) => {
+          const wordDiff = wordDiffs[hi];
+          return (
+            <div key={hunk.header}>
+              {unmodifiedBefore(file.hunks, hi) > 0 && (
+                <div
+                  className="flex h-7 items-center pl-3 text-meta text-(--text-tertiary)"
+                  data-testid="diff-fold"
+                >
+                  {t('{n} 行未改动', { n: unmodifiedBefore(file.hunks, hi) })}
+                </div>
+              )}
+              <div
+                className={cn(
+                  'bg-(--secondary) pl-18 font-mono text-code leading-6 text-(--text-tertiary) [font-variant-ligatures:none]',
+                  wrap && 'truncate pr-3',
+                )}
+              >
+                {hunk.header}
+              </div>
+              {hunk.lines.map((line, i) => {
+                const segs = wordDiff?.segments.get(i);
+                const isCapped = wordDiff?.capped.has(i) === true;
+                return (
+                  <div
+                    key={i}
+                    className={`diff-line--${line.kind} ${lineRow} ${
+                      DIFF_KIND_SKIN[line.kind] ?? ''
+                    }`}
+                    data-kind={line.kind}
+                    data-word={isCapped ? 'capped' : undefined}
+                    title={isCapped ? t('行过长，已退回整行高亮') : undefined}
+                  >
+                    <span data-no="old" className={`${DIFF_NO} w-5`}>
+                      {line.oldNo ?? ''}
+                    </span>
+                    <span data-no="new" className={`${DIFF_NO} w-5`}>
+                      {line.newNo ?? ''}
+                    </span>
+                    <span className="sr-only">
+                      {line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ''}
+                    </span>
+                    <span className={lineText}>
+                      {segs == null
+                        ? line.text
+                        : segs.map((seg, si) =>
+                            seg.changed ? (
+                              <span key={si} data-word={line.kind} className={WORD_SKIN[line.kind]}>
+                                {seg.text}
+                              </span>
+                            ) : (
+                              seg.text
+                            ),
+                          )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      {full.kind === 'text' && (
+        <div data-testid="diff-full">
+          {full.content
+            .replace(/\n$/, '')
+            .split('\n')
+            .map((text, i) => (
+              <div key={i} className={lineRow} data-kind="context">
+                <span data-no="old" className={`${DIFF_NO} w-5`} />
+                <span data-no="new" className={`${DIFF_NO} w-5`}>
+                  {i + 1}
+                </span>
+                <span className={lineText}>{text}</span>
+              </div>
+            ))}
+        </div>
+      )}
+      {(full.kind === 'loading' || full.kind === 'error' || full.kind === 'binary') && (
+        <div className="py-2 pr-3 pl-18 font-mono text-code leading-4 text-(--text-tertiary)">
+          {full.kind === 'loading'
+            ? t('加载中…')
+            : full.kind === 'error'
+              ? t('文件加载失败')
+              : t('二进制文件暂不支持预览')}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -394,14 +418,14 @@ export function DocPane({
     const latest = planVersions?.[0];
     return latest == null ? 'v1' : joinMeta([String(latest.v), relativeTime(latest.at, now, t)]);
   };
-  const headStart = (docLabel: DocTypeLabel) => (
-    <PaneTitle docLabel={docLabel} onDocView={onDocView} />
-  );
-  const headEnd = (docLabel: DocTypeLabel) => (
-    <div className="ml-auto">
-      <PaneViewButtons docLabel={docLabel} onDocView={onDocView} />
-    </div>
-  );
+  const headStart = (docLabel: DocTypeLabel) =>
+    onDocView !== undefined && <PaneTitle docLabel={docLabel} onDocView={onDocView} />;
+  const headEnd = (docLabel: DocTypeLabel) =>
+    onDocView !== undefined && (
+      <div className="ml-auto">
+        <PaneViewButtons docLabel={docLabel} onDocView={onDocView} />
+      </div>
+    );
   if (mode === 'changes' || mode === 'diff') {
     const hasData = mode === 'diff' ? planDiff != null : changes != null;
     const files = mode === 'diff' ? (planDiff?.files ?? []) : (changes?.files ?? []);

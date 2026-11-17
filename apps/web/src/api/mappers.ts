@@ -72,7 +72,6 @@ import {
   WORKSPACE_HOOK_ROW_KIND,
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
-import { STATUS_WORDS } from '../board/status-words.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import type {
   BranchInfoContent,
@@ -816,18 +815,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
           entries.push({ at: m.createdAt, item: { kind: 'note', text: note, id: m.id } });
         continue;
       }
-      if (isJsonPlumbing(text)) continue;
-      if (text === DONE_ROW) {
-        entries.push({
-          at: m.createdAt,
-          item: {
-            kind: 'note',
-            text: STATUS_WORDS.done,
-            id: m.id,
-          },
-        });
-        continue;
-      }
+      if (isJsonPlumbing(text) || text === DONE_ROW) continue;
       if (text !== '') entries.push({ at: m.createdAt, item: { kind: 'note', text, id: m.id } });
       continue;
     }

@@ -71,8 +71,6 @@ export interface ThreadChat {
   changes: ThreadChanges;
   engineRun?: EngineRun;
   engineStage?: EngineRunStage;
-  changesExpanded: boolean;
-  toggleChangesExpanded: () => void;
   retryChanges: () => void;
   wire: WireTodo | null;
   started: boolean;
@@ -131,7 +129,6 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const buildId = wire !== null ? wire.latestBuildId : (listed?.latestBuildId ?? null);
   const buildQ = useBuild(buildId, live);
   const changesQ = useBuildChanges(buildId, live);
-  const [changesExpanded, setChangesExpanded] = useState(true);
   const stepsQ = useSteps(buildId, live);
   const { query: messagesQ, messages, newest } = useConversationMessages(buildId, live);
   const plansQ = usePlans(buildId, live);
@@ -355,7 +352,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     buildId,
     query: { status: changesQ.status, data: changesQ.data },
     fixture: fixtureDetail?.changes,
-    expanded: changesExpanded,
+    expanded: true,
   });
 
   const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = messagesQ;
@@ -389,8 +386,6 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     ...(!live && fixtureDetail?.engineRun !== undefined
       ? { engineRun: fixtureDetail.engineRun, engineStage: fixtureDetail.engineStage }
       : {}),
-    changesExpanded,
-    toggleChangesExpanded: () => setChangesExpanded((value) => !value),
     retryChanges: () => {
       void changesQ.refetch();
     },
