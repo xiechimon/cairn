@@ -435,3 +435,20 @@ test('a task created with no reply after it hangs on an elbow over a short reply
   expect((row?.y ?? 0) + (row?.height ?? 0)).toBeLessThanOrEqual(said?.y ?? 0);
   expect(row?.x ?? 0).toBeGreaterThan(said?.x ?? 0);
 });
+
+test('an archived task keeps its elbow row instead of falling back to a title chip', async ({ page }) => {
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'ask', role: 'user', content: 'Create HELLO.md', createdAt: 10 },
+      createTodoRow('create', { ...TASK, title: 'Create HELLO.md' }, 20),
+    ],
+    todos: [],
+    archivedTodos: [{ ...TASK, title: 'Create HELLO.md', phase: 'done', archivedAt: 30 }],
+  });
+  await page.goto('/app');
+  const started = page.getByTestId('home-c').getByTestId('chief-task-started');
+  await expect(started.getByTestId('chief-task-ref')).toHaveText(/^Create HELLO\.md/);
+  await expect(started.locator('[data-slot="task-ref-elbow"]')).toHaveCount(1);
+  await expect(page.getByTestId('chief-task-created')).toHaveCount(0);
+});

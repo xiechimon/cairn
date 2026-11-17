@@ -143,6 +143,7 @@ export interface MockState {
   channels?: Record<string, Row[]>;
   rejectSend?: boolean;
   todos?: unknown[];
+  archivedTodos?: unknown[];
   tasks?: unknown[];
   projects?: unknown[];
   machines?: unknown[];
@@ -294,7 +295,10 @@ export async function mockLive(
     if (/^\/api\/conversations\/[^/]+\/messages$/.test(p)) {
       return json({ messages: [], nextCursor: null });
     }
-    if (p === '/api/todos') return json(state.todos ?? [TASK]);
+    if (p === '/api/todos') {
+      const archived = new URL(request.url()).searchParams.get('archived') === '1';
+      return json(archived ? (state.archivedTodos ?? []) : (state.todos ?? [TASK]));
+    }
     if (p === '/api/tasks') return json({ entries: [...(state.tasks ?? []), ...pendingQuestionEntries(state.messages)] });
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
     if (p === '/api/teams/t1/machines') return json(state.machines ?? [READY_MACHINE]);

@@ -20,7 +20,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useConnected } from '../api/connection-state.js';
-import { useMachines, useProjects, useSkills, useTodos } from '../api/hooks.js';
+import { useArchivedTodos, useMachines, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNarrow } from '../board/use-narrow.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
@@ -407,10 +407,14 @@ export function ChiefConversation({
     if (prefillKey == null || prefillText == null) return;
     restoreToThread(() => prefillText);
   }, [prefillKey, prefillText]);
-  const glances = useMemo(
-    () => todoGlances ?? new Map((todosQ.data ?? []).map((td) => [td.id, todoGlanceOf(td)])),
-    [todoGlances, todosQ.data],
-  );
+  const archivedQ = useArchivedTodos(teamId, live);
+  const glances = useMemo(() => {
+    const active =
+      todoGlances ?? new Map((todosQ.data ?? []).map((td) => [td.id, todoGlanceOf(td)]));
+    const archived = (archivedQ.data ?? []).filter((td) => !active.has(td.id));
+    if (archived.length === 0) return active;
+    return new Map([...active, ...archived.map((td) => [td.id, todoGlanceOf(td)] as const)]);
+  }, [todoGlances, todosQ.data, archivedQ.data]);
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = empty && !heroCollapsed && !questionPending;
   const viewportRef = useRef<HTMLDivElement | null>(null);
