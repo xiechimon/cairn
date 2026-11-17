@@ -116,8 +116,9 @@ export const TAKEOVER_HANDED_BACK =
   'The owner handed the computer back. Take a fresh browser_snapshot before acting.';
 
 export const REQUEST_CLOAK_LICENSE_TOOL = 'request_cloak_license';
+export const INSTALL_PACKAGES_TOOL = 'install_packages';
 
-export const COMPUTER_LICENSE_TOOLS: readonly RemoteToolDef[] = [
+export const COMPUTER_VM_TOOLS: readonly RemoteToolDef[] = [
   {
     name: REQUEST_CLOAK_LICENSE_TOOL,
     description:
@@ -128,7 +129,29 @@ export const COMPUTER_LICENSE_TOOLS: readonly RemoteToolDef[] = [
       ),
     }),
   },
+  {
+    name: INSTALL_PACKAGES_TOOL,
+    description:
+      'Install Debian system packages (apt) on the Coordinator computer. Posts an approval card naming the packages and waits for the owner; only after approval they are installed as root and kept across computer updates and recovery. Use exact Debian package names, at most 20. For Python or Node packages use pip install --user or npm i -g in the computer terminal instead; they need no approval.',
+    parameters: obj(
+      {
+        packages: arr(
+          { type: 'string' },
+          'Debian package names, for example ["ffmpeg"] or ["libpq-dev", "build-essential"].',
+        ),
+      },
+      ['packages'],
+    ),
+  },
 ];
+
+export const PACKAGES_INSTALLED_PREFIX = 'Installed with the owner approval:';
+export const PACKAGES_DECLINED =
+  'The owner declined installing these packages. Nothing was installed. Tell the owner and do not ask again unless they want it.';
+export const PACKAGES_NOT_ANSWERED =
+  'The owner did not answer the install request. Nothing was installed. Stop and tell the owner.';
+export const PACKAGES_NO_VM_COMPUTER =
+  'Only the Coordinator VM computer can install system packages, and this team has none connected. Nothing was installed.';
 
 export const CLOAK_LICENSE_SAVED =
   'The owner saved the CloakBrowser license. Retry the stealth browser call that needed it, unchanged.';

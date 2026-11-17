@@ -19,6 +19,7 @@ const computer = (online = true, state: 'running' | 'stopped' | 'failed' = 'runn
   controlHolder: 'none' as const,
   browserEnabled: false,
   handoffReason: null,
+  kind: 'host' as const,
   machine: { id: 'm1', name: 'omarchy', online },
 });
 

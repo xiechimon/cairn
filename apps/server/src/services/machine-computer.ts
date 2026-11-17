@@ -4,17 +4,28 @@ import {
   CLOAK_LICENSE_SECRET,
   COMPUTER_FEED_TOOLS,
   COMPUTER_HANDOFF_TIMEOUT_MS,
+  COMPUTER_MANAGE_OUTCOMES,
+  COMPUTER_MANAGE_TIMEOUT_MS,
   COMPUTER_REPLAY_SAFE_TOOLS,
   type ComputerCall,
   type ComputerCallState,
   type ComputerCommand,
   type ComputerFrame,
+  type ComputerManageAction,
+  type ComputerManageOutcome,
   type ComputerRelayResult,
   type ComputerTool,
+  chiefIdFormat,
+  INSTALL_PACKAGES_TIMEOUT_MS,
+  installPackagesParamsSchema,
   isComputerBrowserTool,
   type MachineComputerFramesResponse,
   type MachineComputerRelayBody,
   normalizeBrowserSecretOrigin,
+  PACKAGES_DECLINED,
+  PACKAGES_NO_VM_COMPUTER,
+  PACKAGES_NOT_ANSWERED,
+  type PackageInstallDecisionBody,
   redactSecrets,
   type SecretBox,
   TAKEOVER_HANDED_BACK,
@@ -38,7 +49,7 @@ import {
 } from './browser-passwords.js';
 import { NotFoundError } from './builds.js';
 import { announceQuestion } from './chief-questions.js';
-import { computerCallOwnerUserId } from './computer-access.js';
+import { computerCallOwnerUserId, ownedPrivateComputer } from './computer-access.js';
 import {
   COMPUTER_HANDOFF_POLL_MS,
   clearHandoff,
@@ -509,8 +520,10 @@ function expireComputerCall(db: Db, callId: string): void {
   settleComputerCall(db, callId);
 }
 
+type PendingDeps = Pick<MachineDeps, 'db' | 'hub' | 'machineHub'>;
+
 function openPending(
-  deps: MachineDeps,
+  deps: PendingDeps,
   call: { callId: string; stepId: string; deadlineAt: number },
 ): PendingCall {
   let resolve!: (result: ComputerRelayResult) => void;
@@ -844,6 +857,232 @@ async function holdTakeover(
   };
 }
 
+export const COMPUTER_MANAGE_PANEL_ONLY =
+  'computer_manage is started only by the owner from the Computers panel';
+export const COMPUTER_MANAGE_VM_ONLY =
+  'Only the Coordinator VM computer can be stopped, updated, recovered or reset';
+export const NO_PENDING_INSTALL = 'No install request is waiting for these packages';
+
+type PackageApproval = 'pending' | 'approved' | 'declined';
+
+function approvalOf(row: CallRow | undefined): PackageApproval | null {
+  const value = row?.params.approval;
+  return value === 'pending' || value === 'approved' || value === 'declined' ? value : null;
+}
+
+function finishInstallWait(db: Db, callId: string, approval: PackageApproval | null): string {
+  if (approval === 'declined') {
+    db.update(computerCall)
+      .set({ state: 'done', resultText: PACKAGES_DECLINED, finishedAt: nowMs() })
+      .where(and(eq(computerCall.id, callId), eq(computerCall.state, 'running')))
+      .run();
+    return PACKAGES_DECLINED;
+  }
+  db.update(computerCall)
+    .set({
+      state: 'error',
+      errorMessage: 'the owner did not answer',
+      errorDelivery: 'not_delivered',
+      finishedAt: nowMs(),
+    })
+    .where(and(eq(computerCall.id, callId), eq(computerCall.state, 'running')))
+    .run();
+  return PACKAGES_NOT_ANSWERED;
+}
+
+async function holdPackageInstall(
+  deps: MachineDeps,
+  thread: typeof chiefThread.$inferSelect,
+  stepId: string,
+  body: MachineComputerRelayBody,
+  opts: { signal?: AbortSignal; takeover?: { timeoutMs?: number; pollMs?: number } },
+): Promise<ComputerRelayResult> {
+  const { db } = deps;
+  const parsed = installPackagesParamsSchema.safeParse(body.params);
+  if (!parsed.success)
+    return {
+      text: `install_packages refused before anything ran: ${parsed.error.issues[0]?.message ?? 'invalid packages'}`,
+    };
+  const packages = parsed.data.packages;
+  let target: ReturnType<typeof selectTarget>;
+  try {
+    target = selectTarget(deps, thread.teamId, thread.chiefId, 'install_packages');
+  } catch (error) {
+    if (error instanceof HttpError) return { text: PACKAGES_NO_VM_COMPUTER };
+    throw error;
+  }
+  const host = db.select().from(machine).where(eq(machine.id, target.machineId)).get();
+  if (host?.capabilities?.computerKind !== 'vm' || target.computerId === null)
+    return { text: PACKAGES_NO_VM_COMPUTER };
+  const callId = computerCallId(stepId, body.toolCallId);
+  const existing = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  const now = nowMs();
+  const timeoutMs = opts.takeover?.timeoutMs ?? COMPUTER_HANDOFF_TIMEOUT_MS;
+  const pollMs = opts.takeover?.pollMs ?? COMPUTER_HANDOFF_POLL_MS;
+  if (existing === undefined) {
+    db.insert(computerCall)
+      .values({
+        id: callId,
+        teamId: thread.teamId,
+        stepId,
+        toolCallId: body.toolCallId,
+        machineId: target.machineId,
+        computerId: target.computerId,
+        tool: 'install_packages',
+        replaySafe: false,
+        params: { packages, approval: 'pending' },
+        state: 'running',
+        deadlineAt: now + timeoutMs,
+        createdAt: now,
+        startedAt: now,
+      })
+      .run();
+  }
+  let approval: PackageApproval | null = 'pending';
+  for (;;) {
+    const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+    const owner = db.select({ status: step.status }).from(step).where(eq(step.id, stepId)).get();
+    approval = approvalOf(row);
+    if (row?.state !== 'running' || approval !== 'pending') break;
+    if (owner?.status !== 'claimed' || opts.signal?.aborted || nowMs() >= row.deadlineAt) {
+      approval = null;
+      break;
+    }
+    await pause(pollMs, opts.signal);
+  }
+  if (approval !== 'approved') return { text: finishInstallWait(db, callId, approval) };
+  const deadlineAt = nowMs() + INSTALL_PACKAGES_TIMEOUT_MS + COMPUTER_SHELL_DEADLINE_SLACK_MS;
+  db.update(computerCall)
+    .set({ state: 'dispatched', deadlineAt, startedAt: null })
+    .where(eq(computerCall.id, callId))
+    .run();
+  const call: ComputerCall = {
+    callId,
+    stepId,
+    tool: 'install_packages',
+    params: { packages },
+    deadlineAt,
+    ...(target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
+  };
+  if (!deps.machineHub.pushComputer(target.machineId, call)) {
+    db.update(computerCall)
+      .set({
+        state: 'error',
+        errorMessage: COMPUTER_NOT_CONNECTED,
+        errorDelivery: 'not_delivered',
+        finishedAt: nowMs(),
+      })
+      .where(eq(computerCall.id, callId))
+      .run();
+    return { text: `computer error: ${COMPUTER_NOT_CONNECTED} (the action did not run)` };
+  }
+  return waitForCall(deps, openPending(deps, call), stepId, opts.signal);
+}
+
+export function decidePackageInstall(
+  db: Db,
+  teamId: string,
+  userId: string,
+  body: PackageInstallDecisionBody,
+): void {
+  const target = db
+    .select({ id: computer.id })
+    .from(computer)
+    .where(
+      and(
+        eq(computer.teamId, teamId),
+        eq(computer.scopeKey, `chief:${chiefIdFormat(userId, teamId)}`),
+      ),
+    )
+    .get();
+  if (target === undefined) throw new HttpError(409, NO_PENDING_INSTALL);
+  const asked = [...body.packages].sort().join(' ');
+  const waiting = db
+    .select()
+    .from(computerCall)
+    .where(
+      and(
+        eq(computerCall.computerId, target.id),
+        eq(computerCall.tool, 'install_packages'),
+        eq(computerCall.state, 'running'),
+      ),
+    )
+    .all()
+    .find((row) => {
+      const named = row.params.packages;
+      return (
+        approvalOf(row) === 'pending' &&
+        Array.isArray(named) &&
+        [...named].sort().join(' ') === asked
+      );
+    });
+  if (waiting === undefined) throw new HttpError(409, NO_PENDING_INSTALL);
+  db.update(computerCall)
+    .set({
+      params: {
+        ...waiting.params,
+        approval: body.decision === 'approve' ? 'approved' : 'declined',
+        decidedAt: nowMs(),
+      },
+    })
+    .where(eq(computerCall.id, waiting.id))
+    .run();
+}
+
+export async function manageComputer(
+  deps: PendingDeps,
+  teamId: string,
+  userId: string,
+  computerId: string,
+  action: ComputerManageAction,
+): Promise<ComputerManageOutcome> {
+  const { db } = deps;
+  const owned = ownedPrivateComputer(db, teamId, userId, computerId);
+  if (!owned) throw new NotFoundError(`computer ${computerId}`);
+  const host = db.select().from(machine).where(eq(machine.id, owned.machineId)).get();
+  if (host?.capabilities?.computerKind !== 'vm') throw new HttpError(409, COMPUTER_MANAGE_VM_ONLY);
+  if (!deps.machineHub.isConnected(owned.machineId))
+    throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+  const stepId = newRecordId();
+  const toolCallId = `owner-${action}`;
+  const callId = computerCallId(stepId, toolCallId);
+  const now = nowMs();
+  const deadlineAt = now + COMPUTER_MANAGE_TIMEOUT_MS;
+  db.insert(computerCall)
+    .values({
+      id: callId,
+      teamId,
+      stepId,
+      toolCallId,
+      machineId: owned.machineId,
+      computerId: owned.id,
+      tool: 'computer_manage',
+      replaySafe: false,
+      params: { action },
+      state: 'dispatched',
+      deadlineAt,
+      createdAt: now,
+    })
+    .run();
+  const call: ComputerCall = {
+    callId,
+    stepId,
+    tool: 'computer_manage',
+    params: { action },
+    deadlineAt,
+    scopeKey: owned.scopeKey,
+  };
+  if (!deps.machineHub.pushComputer(owned.machineId, call)) {
+    db.delete(computerCall).where(eq(computerCall.id, callId)).run();
+    throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+  }
+  await openPending(deps, call).result;
+  const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  const outcome = COMPUTER_MANAGE_OUTCOMES.find((known) => known === row?.resultText);
+  if (row?.state === 'done' && outcome !== undefined) return outcome;
+  throw new HttpError(409, row?.errorMessage ?? 'The computer action did not finish');
+}
+
 export async function forwardComputerCall(
   deps: MachineDeps,
   machineId: string | null,
@@ -867,6 +1106,7 @@ export async function forwardComputerCall(
   if (!thread) throw new NotFoundError(`chief thread ${stepRow.buildId}`);
 
   const tool = body.name;
+  if (tool === 'computer_manage') throw new HttpError(400, COMPUTER_MANAGE_PANEL_ONLY);
   if (tool.startsWith('user_computer_')) {
     (opts.ownComputerGate ?? refuseOwnComputerUntilGated)({ stepId, tool });
   }
@@ -884,6 +1124,8 @@ export async function forwardComputerCall(
   if (existing && existing.tool === 'request_takeover' && existing.state === 'running') {
     return holdTakeover(deps, thread, stepId, body, opts);
   }
+  if (tool === 'install_packages' && (existing === undefined || existing.state === 'running'))
+    return holdPackageInstall(deps, thread, stepId, body, opts);
 
   if (existing && !existing.replaySafe) {
     if (!isFinalState(existing.state)) {

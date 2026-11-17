@@ -164,6 +164,7 @@ describe('computer feed routes', () => {
           controlHolder: 'none',
           browserEnabled: false,
           handoffReason: null,
+          kind: 'host',
           machine: { id: 'm1', name: 'name-m1', online: false },
         },
       ],

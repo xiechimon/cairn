@@ -5,8 +5,8 @@ import {
   coordinatorToolDefs,
 } from '../src/services/coordinator-tool-defs.js';
 
-const computerNames = (desktopTools: boolean) =>
-  coordinatorToolDefs({ desktopTools })
+const computerNames = (desktopTools: boolean, vmComputer = desktopTools) =>
+  coordinatorToolDefs({ desktopTools, vmComputer })
     .map((def) => def.name)
     .filter((name) => (COMPUTER_TOOLS as readonly string[]).includes(name))
     .sort();
@@ -26,6 +26,12 @@ describe('Coordinator computer tool offers', () => {
       (name) => 'offered' in COORDINATOR_COMPUTER_TOOL_OFFERS[name],
     ).sort();
     expect(computerNames(true)).toEqual(offered);
+  });
+
+  test('install_packages is offered only with a VM computer', () => {
+    expect(computerNames(true, false)).not.toContain('install_packages');
+    expect(computerNames(true, true)).toContain('install_packages');
+    expect(computerNames(true, true)).not.toContain('computer_manage');
   });
 
   test('without a computer the desktop tools are not offered', () => {

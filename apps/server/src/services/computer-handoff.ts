@@ -101,6 +101,21 @@ export function sweepComputerHandoffs(db: Db, now: number): void {
       .where(eq(computer.executionStepId, call.stepId))
       .run();
   }
+  db.update(computerCall)
+    .set({
+      state: 'error',
+      errorMessage: 'the server restarted before it finished',
+      errorDelivery: 'unknown',
+      finishedAt: now,
+    })
+    .where(
+      and(
+        inArray(computerCall.tool, ['install_packages', 'computer_manage']),
+        inArray(computerCall.state, ['dispatched', 'running']),
+        lte(computerCall.deadlineAt, now),
+      ),
+    )
+    .run();
   db.update(computer)
     .set(HANDOFF_CLEARED)
     .where(

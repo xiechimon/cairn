@@ -285,7 +285,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         const teamId = threadTeam(threadId);
         return teamId !== null && teamOffersDesktop(db, teamId);
       },
-      cloakLicense: (threadId) => {
+      vmComputer: (threadId) => {
         const teamId = threadTeam(threadId);
         return teamId !== null && teamHasVmComputer(db, teamId);
       },
@@ -561,7 +561,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         remoteTools: coordinatorToolDefs({
           routerTools: options.routerTools ?? true,
           desktopTools: teamOffersDesktop(db, threadRow.teamId),
-          cloakLicense: teamHasVmComputer(db, threadRow.teamId),
+          vmComputer: teamHasVmComputer(db, threadRow.teamId),
         }),
       },
       volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),

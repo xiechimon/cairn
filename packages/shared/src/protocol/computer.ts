@@ -15,6 +15,8 @@ export const COMPUTER_TOOLS = [
   'browser_snapshot',
   'browser_act',
   'request_takeover',
+  'install_packages',
+  'computer_manage',
   'user_computer_shell',
   'user_computer_observe',
   'user_computer_act',
@@ -29,6 +31,55 @@ export const COMPUTER_REPLAY_SAFE_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'browser_snapshot',
   'user_computer_observe',
 ]);
+
+export const DEBIAN_PACKAGE_NAME = /^[a-z0-9][a-z0-9+.-]+$/;
+export const INSTALL_PACKAGES_MAX = 20;
+export const INSTALL_PACKAGES_TIMEOUT_MS = 10 * 60_000;
+
+export const debianPackageNamesSchema = z
+  .array(
+    z
+      .string()
+      .max(128, 'a package name is longer than 128 characters')
+      .regex(
+        DEBIAN_PACKAGE_NAME,
+        'each package must be a Debian package name such as ffmpeg or libpq-dev, not a path, URL or option',
+      ),
+  )
+  .min(1, 'name at least one package')
+  .max(INSTALL_PACKAGES_MAX, `name at most ${INSTALL_PACKAGES_MAX} packages`)
+  .refine((names) => new Set(names).size === names.length, 'a package is named twice');
+
+export const installPackagesParamsSchema = z.strictObject({ packages: debianPackageNamesSchema });
+export type InstallPackagesParams = z.infer<typeof installPackagesParamsSchema>;
+
+export const packageInstallDecisionBodySchema = z.strictObject({
+  packages: debianPackageNamesSchema,
+  decision: z.enum(['approve', 'decline']),
+});
+export type PackageInstallDecisionBody = z.infer<typeof packageInstallDecisionBodySchema>;
+
+export const COMPUTER_MANAGE_ACTIONS = ['stop', 'update', 'recover', 'reset'] as const;
+export type ComputerManageAction = (typeof COMPUTER_MANAGE_ACTIONS)[number];
+export const COMPUTER_MANAGE_OUTCOMES = [
+  'stopped',
+  'already_stopped',
+  'updated',
+  'current',
+  'recovered',
+  'reset',
+] as const;
+export type ComputerManageOutcome = (typeof COMPUTER_MANAGE_OUTCOMES)[number];
+export const COMPUTER_MANAGE_TIMEOUT_MS = 20 * 60_000;
+
+export const computerManageParamsSchema = z.strictObject({
+  action: z.enum(COMPUTER_MANAGE_ACTIONS),
+});
+export type ComputerManageParams = z.infer<typeof computerManageParamsSchema>;
+export const computerManageResultSchema = z.strictObject({
+  outcome: z.enum(COMPUTER_MANAGE_OUTCOMES),
+});
+export type ComputerManageResult = z.infer<typeof computerManageResultSchema>;
 
 export const computerCallIdSchema = z.string().regex(/^[0-9a-f]{64}$/);
 
@@ -182,6 +233,7 @@ export const computerRecordSchema = z.object({
   controlHolder: z.enum(COMPUTER_CONTROL_HOLDERS),
   browserEnabled: z.boolean(),
   handoffReason: z.enum(['login', 'model']).nullable(),
+  kind: z.enum(['host', 'vm']),
   machine: z.object({ id: z.string(), name: z.string(), online: z.boolean() }),
 });
 export type ComputerRecord = z.infer<typeof computerRecordSchema>;

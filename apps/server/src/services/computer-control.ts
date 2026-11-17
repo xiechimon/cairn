@@ -1,5 +1,5 @@
 import { COMPUTER_CONTROL_LEASE_MS, type ComputerControlLease } from '@cairn/shared';
-import { and, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { computer, computerCall } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -47,7 +47,11 @@ export function acquireComputerControl(
         and(
           eq(computerCall.computerId, row.id),
           eq(computerCall.replaySafe, false),
-          ne(computerCall.tool, 'request_takeover'),
+          notInArray(computerCall.tool, [
+            'request_takeover',
+            'install_packages',
+            'computer_manage',
+          ]),
           or(
             inArray(computerCall.state, ['dispatched', 'running']),
             and(

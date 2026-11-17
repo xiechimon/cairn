@@ -197,7 +197,7 @@ export function coordinatorToolsExtension(
   options: {
     routerTools?: boolean;
     desktopTools?: boolean;
-    cloakLicense?: boolean;
+    vmComputer?: boolean;
     shuttingDown?: () => boolean;
     beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>;
     storeId?: () => string | undefined;

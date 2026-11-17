@@ -6,6 +6,7 @@ import {
   computerToolSchema,
   createSkillBodySchema,
   derivePlaceholderTitle,
+  INSTALL_PACKAGES_TOOL,
   isBuildStepKind,
   isComputerBrowserTool,
   parseGithubIssueSourceRef,
@@ -111,6 +112,7 @@ export function isCoordinatorComputerTool(name: string): boolean {
   return (
     isComputerBrowserTool(name) ||
     name === 'request_takeover' ||
+    name === INSTALL_PACKAGES_TOOL ||
     name === 'computer_observe' ||
     name === 'computer_act'
   );

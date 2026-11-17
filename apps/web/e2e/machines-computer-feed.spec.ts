@@ -28,6 +28,7 @@ const computer = (patch: Record<string, unknown> = {}) => ({
   controlHolder: 'none',
   browserEnabled: false,
   handoffReason: null,
+  kind: 'host',
   machine: { id: 'm1', name: 'omarchy', online: true },
   ...patch,
 });

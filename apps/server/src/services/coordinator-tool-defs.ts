@@ -3,8 +3,8 @@ import {
   CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
   COMPUTER_DESKTOP_TOOLS,
-  COMPUTER_LICENSE_TOOLS,
   COMPUTER_REMOTE_TOOLS,
+  COMPUTER_VM_TOOLS,
   type ComputerTool,
   type RemoteToolDef,
   SLICE1_ACTIONS,
@@ -18,6 +18,7 @@ const ACTION_COPY: Record<string, string> = {
 export type CoordinatorComputerToolOffer =
   | { offered: 'always' }
   | { offered: 'when_machine_reports_computer' }
+  | { offered: 'when_machine_reports_vm_computer' }
   | { withheld: string };
 
 export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorComputerToolOffer> =
@@ -35,6 +36,11 @@ export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorC
     browser_snapshot: { offered: 'always' },
     browser_act: { offered: 'always' },
     request_takeover: { offered: 'always' },
+    install_packages: { offered: 'when_machine_reports_vm_computer' },
+    computer_manage: {
+      withheld:
+        'only the owner stops, updates, recovers or resets the computer from the Computers panel',
+    },
     user_computer_shell: { withheld: "the owner's own computer waits for its approval gate" },
     user_computer_observe: { withheld: "the owner's own computer waits for its approval gate" },
     user_computer_act: { withheld: "the owner's own computer waits for its approval gate" },
@@ -64,7 +70,7 @@ function actionToolDefs(): RemoteToolDef[] {
 }
 
 export function coordinatorToolDefs(
-  options: { routerTools?: boolean; desktopTools?: boolean; cloakLicense?: boolean } = {},
+  options: { routerTools?: boolean; desktopTools?: boolean; vmComputer?: boolean } = {},
 ): RemoteToolDef[] {
   return [
     ...CHIEF_REMOTE_TOOLS,
@@ -72,7 +78,7 @@ export function coordinatorToolDefs(
     ...CHIEF_REPLY_TOOLS,
     ...COMPUTER_REMOTE_TOOLS,
     ...(options.desktopTools === true ? COMPUTER_DESKTOP_TOOLS : []),
-    ...(options.cloakLicense === true ? COMPUTER_LICENSE_TOOLS : []),
+    ...(options.vmComputer === true ? COMPUTER_VM_TOOLS : []),
     ...actionToolDefs(),
   ];
 }

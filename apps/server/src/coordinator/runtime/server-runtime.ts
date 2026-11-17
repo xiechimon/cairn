@@ -44,7 +44,7 @@ export interface ServerRuntimeConfig {
   stopPollMs?: number;
   factsFor(threadId: string): ReconcileFacts;
   desktopTools?(threadId: string): boolean;
-  cloakLicense?(threadId: string): boolean;
+  vmComputer?(threadId: string): boolean;
   providersFor?(threadId: string): readonly ProviderBinding[];
   recordConversation?(threadId: string, conversationId: string, entryId: number): void;
   setConversation?(
@@ -119,7 +119,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       coordinatorToolsExtension(api, gate, {
         routerTools: config.routerTools,
         desktopTools: config.desktopTools?.(threadId) === true,
-        cloakLicense: config.cloakLicense?.(threadId) === true,
+        vmComputer: config.vmComputer?.(threadId) === true,
         shuttingDown: () => shuttingDown,
         ...(inputs === undefined
           ? {}

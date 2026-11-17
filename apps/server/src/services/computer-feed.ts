@@ -72,6 +72,7 @@ export function listComputers(db: Db, teamId: string, userId: string): ComputerR
       controlHolder: row.controlHolder,
       browserEnabled: compatibilityBrowserEnabled(host),
       handoffReason: row.handoffReason ?? null,
+      kind: host.capabilities?.computerKind ?? 'host',
       machine: { id: row.machineId, name: machineName, online: machineOnline },
     }));
 }

@@ -1815,6 +1815,11 @@ export function buildChiefSystemPrompt(
         ? '工具说没有 CloakBrowser 许可时，调 request_cloak_license 在对话里发许可证卡，不要让用户去设置页，也不要在对话里索取许可证；它返回已保存后，原样重试刚才那次调用。工具说 CloakBrowser 拒绝了许可证时，把 CloakBrowser 给的原因填进 reason，再调一次 request_cloak_license。隐身浏览器也被拦下，或者座位已满时，'
         : '隐身浏览器也被拦下，或者工具说没有 CloakBrowser 许可、座位已满时，') +
       '不要再重试，也不要设法绕过拦截：直接用 request_takeover 请用户自己操作，并说明是哪个网站拦下的。',
+    ...(cloakLicenseCard
+      ? [
+          '- 电脑缺系统软件（apt 包，例如 ffmpeg）时调 install_packages，只填 Debian 包名，最多 20 个。它会在对话里发审批卡，用户批准后才以 root 安装，电脑更新或恢复后自动重装；你自己没有 root，也不要用别的办法装系统包。用户拒绝或没回应时照实告诉用户，不要再试。Python 和 Node 包不用审批：在电脑终端里用 pip install --user 或 npm i -g，它们装在 home 里，电脑重建后还在。',
+        ]
+      : []),
     '- 发消息或邮件、付款、下单、改账号设置、删除这类不可撤销或对外的动作，执行前先用 ask_user 问用户。',
     '',
     '### 事件回合',

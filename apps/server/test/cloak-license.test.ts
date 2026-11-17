@@ -283,8 +283,7 @@ describe('request_cloak_license holds the turn until the owner saves', () => {
 });
 
 describe('request_cloak_license is offered only with a VM computer', () => {
-  const names = (cloakLicense: boolean) =>
-    coordinatorToolDefs({ cloakLicense }).map((def) => def.name);
+  const names = (vmComputer: boolean) => coordinatorToolDefs({ vmComputer }).map((def) => def.name);
 
   test('the tool list carries it only when asked', () => {
     expect(names(true)).toContain(REQUEST_CLOAK_LICENSE_TOOL);
