@@ -43,7 +43,9 @@ test('running Coordinator rejects repeated source bindings and accepts an explic
       const params = requests[next++];
       return params === undefined
         ? fauxAssistantMessage('Done.')
-        : fauxAssistantMessage([fauxToolCall('create_todo', params)], { stopReason: 'toolUse' });
+        : fauxAssistantMessage([fauxToolCall('create_todo', { title: 'bound task', ...params })], {
+            stopReason: 'toolUse',
+          });
     }),
   );
   const coordinator = boot(w, faux);

@@ -472,50 +472,53 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo. Pass title, a short summary of the outcome for the Tasks panel; without it the title is the owner's words cut at 50 characters. You add the title and routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
-    parameters: obj({
-      title: str(
-        'A short summary (at most 50 characters, in the owner\'s language) naming the outcome, e.g. "新建 HELLO.md 并提交". It only names the task; the owner\'s words stay the task text.',
-      ),
-      projectId: str(
-        'Project id. Omit it only for output "info" research that belongs to no project: the todo goes to the research project and its report comes back to this conversation.',
-      ),
-      messageIds: idArr(
-        'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Default: the owner messages of this turn. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
-      ),
-      sourceTodoId: str(
-        'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds. This explicitly declares a split of the same request.',
-      ),
-      quotes: arr(
-        { type: 'string' },
-        "Optional, only when splitting: the owner's exact sentences this todo covers, each an exact substring of the cited text.",
-      ),
-      dependsOn: idArr('Optional todo ids that must be done before this one starts.'),
-      priority: str('Optional "first" (top of the project queue) or "normal" (default).'),
-      difficulty: str(
-        'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
-      ),
-      output: str(
-        'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
-      ),
-      blockedBy: idArr(
-        'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
-      ),
-      research: obj(
-        {
-          reason: str(
-            "One line, in the owner's language, saying what the research must answer before this task is planned. Set research for a code task that designs a new mechanism, adds a dependency, fixes a performance problem or chooses a technology: a read-only research thread studies open-source implementations first and this thread waits for its report. Leave it out for small fixes, wording or style changes and info tasks.",
-          ),
-        },
-        ['reason'],
-      ),
-      platform: str(
-        `Optional "macos", "windows" or "linux": the operating system the task needs. ${PLATFORM_DOC}`,
-      ),
-      lane: str(
-        'Optional "quick", only in an owner turn whose words state the outcome and whose project has a basis the server can check: this channel\'s project, the composer\'s picked project, a project the owner named, or one the owner chose in ask_user. The todo still runs in a thread through a PR and the merge gate; its session skips tests for data or copy edits. A basis that does not check out returns 400 and writes nothing; create it again without lane. Never in event turns ([wake:…]).',
-      ),
-    }),
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo. Always pass title, a short summary of the outcome for the Tasks panel. You add the title and routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
+    parameters: obj(
+      {
+        title: str(
+          'A short summary (at most 50 characters, in the owner\'s language) naming the outcome, e.g. "新建 HELLO.md 并提交". It only names the task; the owner\'s words stay the task text.',
+        ),
+        projectId: str(
+          'Project id. Omit it only for output "info" research that belongs to no project: the todo goes to the research project and its report comes back to this conversation.',
+        ),
+        messageIds: idArr(
+          'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Default: the owner messages of this turn. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
+        ),
+        sourceTodoId: str(
+          'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds. This explicitly declares a split of the same request.',
+        ),
+        quotes: arr(
+          { type: 'string' },
+          "Optional, only when splitting: the owner's exact sentences this todo covers, each an exact substring of the cited text.",
+        ),
+        dependsOn: idArr('Optional todo ids that must be done before this one starts.'),
+        priority: str('Optional "first" (top of the project queue) or "normal" (default).'),
+        difficulty: str(
+          'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
+        ),
+        output: str(
+          'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
+        ),
+        blockedBy: idArr(
+          'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
+        ),
+        research: obj(
+          {
+            reason: str(
+              "One line, in the owner's language, saying what the research must answer before this task is planned. Set research for a code task that designs a new mechanism, adds a dependency, fixes a performance problem or chooses a technology: a read-only research thread studies open-source implementations first and this thread waits for its report. Leave it out for small fixes, wording or style changes and info tasks.",
+            ),
+          },
+          ['reason'],
+        ),
+        platform: str(
+          `Optional "macos", "windows" or "linux": the operating system the task needs. ${PLATFORM_DOC}`,
+        ),
+        lane: str(
+          'Optional "quick", only in an owner turn whose words state the outcome and whose project has a basis the server can check: this channel\'s project, the composer\'s picked project, a project the owner named, or one the owner chose in ask_user. The todo still runs in a thread through a PR and the merge gate; its session skips tests for data or copy edits. A basis that does not check out returns 400 and writes nothing; create it again without lane. Never in event turns ([wake:…]).',
+        ),
+      },
+      ['title'],
+    ),
   },
   {
     name: 'update_todo',

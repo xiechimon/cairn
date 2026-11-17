@@ -53,6 +53,7 @@ function toolThenCreateTodo(w: World, quote = 'create a task') {
       return fauxAssistantMessage(
         [
           fauxToolCall('create_todo', {
+            title: 'snapshot task',
             projectId: 'p0',
             quotes: [quote],
           }),
