@@ -448,6 +448,7 @@ interface ChiefStreamRowProps {
   onCopy: (text: string) => void;
   onRewindRequest: (index: number, id: string | null) => void;
   onReply?: ((draft: ReplyQuoteDraft) => void) | undefined;
+  onWithdraw?: ((messageId: string, text: string) => void) | undefined;
   entering?: boolean;
   onRetry?: (() => void) | undefined;
   joinsPrev?: boolean;
@@ -456,6 +457,8 @@ interface ChiefStreamRowProps {
   reports?: readonly string[];
 }
 
+const STEERING_BUBBLE_CLS =
+  'bg-transparent text-(--text-secondary) inset-ring-1 inset-ring-(--input)';
 const NO_TASK_REFS: readonly TaskRef[] = [];
 const NO_REPORTS: readonly string[] = [];
 
@@ -612,6 +615,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   onCopy,
   onRewindRequest,
   onReply,
+  onWithdraw,
   entering = false,
   onRetry,
   joinsPrev = false,
@@ -715,6 +719,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     const bubbleText = sentFiles.length > 0 ? split.text.trim() : split.text;
     const showBubble = bubbleText !== '' || reply != null || sentFiles.length === 0;
     const sending = item.delivery === 'sending';
+    const steering = item.pending === 'steering';
     const fade = sending ? 'opacity-55' : '';
     const userTools = (placement: 'left' | 'below-end', testId: string) => (
       <MessageToolbar
@@ -728,6 +733,11 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         }
         onCopy={() => onCopy(item.text)}
         onRewind={() => onRewindRequest(i, item.id ?? null)}
+        onWithdraw={
+          steering && onWithdraw !== undefined && item.id != null
+            ? () => onWithdraw(item.id ?? '', item.text)
+            : undefined
+        }
       />
     );
     return (
@@ -759,7 +769,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
                   {...highlight(item.id)}
                   {...(sending ? { 'data-delivery': 'sending' } : {})}
-                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''} ${fade}`}
+                  {...(steering ? { 'data-steering': '' } : {})}
+                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''} ${fade} ${steering ? STEERING_BUBBLE_CLS : ''}`}
                 >
                   {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
                   {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}

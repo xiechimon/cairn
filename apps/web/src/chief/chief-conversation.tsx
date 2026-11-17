@@ -2,6 +2,7 @@ import {
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_QUEUED,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
+  CHIEF_INPUT_PLACEHOLDER_STEERING_TOUCH,
   encodeReplyQuote,
   parseReplyQuote,
   replyQuoteText,
@@ -21,11 +22,11 @@ import {
 import { useConnected } from '../api/connection-state.js';
 import { useMachines, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { useNarrow } from '../board/use-narrow.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { machineSecondary } from '../components/machine-label.js';
-import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
@@ -45,7 +46,7 @@ import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
-import { ArrowDown } from '../icons/index.js';
+import { ArrowDown, Check } from '../icons/index.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useFileDrop } from '../overlay/file-drop.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
@@ -72,6 +73,7 @@ import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.
 import type { UnsentSends } from './outbox.js';
 import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
+import { type QueuedMessage, QueueTabs } from './queue-tabs.js';
 import { QuickReplies } from './quick-replies.js';
 import { ReaderFollowContext, useReaderFollow } from './reader-follow.js';
 import { ReplyingToBar } from './reply-quote-block.js';
@@ -201,6 +203,11 @@ export interface ChiefConversationProps {
   mentionGroups: MentionGroups;
   onSettings?: () => void;
   onSend?: (text: string) => void | Promise<void>;
+  onQueue?: (text: string) => void | Promise<void>;
+  onEditQueued?: (
+    messageId: string,
+    change: { content: string } | { editing: boolean },
+  ) => Promise<void>;
   onRewind?: (messageId: string) => void;
   onRetryGreeting?: () => void;
   onWithdraw?: (messageId: string) => Promise<void>;
@@ -229,6 +236,8 @@ export function ChiefConversation({
   mentionGroups,
   onSettings,
   onSend,
+  onQueue,
+  onEditQueued,
   onRewind,
   onRetryGreeting,
   onWithdraw,
@@ -254,6 +263,8 @@ export function ChiefConversation({
   const questionPending = useQuestionPending();
   const { t, locale } = useI18n();
   const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const narrowComposer = useNarrow();
   const [highlightedSource, setHighlightedSource] = useState<ReplyQuoteDraft | null>(null);
   const quickKey = (chief.quickReplies ?? []).join('\n');
   const [preview, setPreview] = useState<{ key: string; text: string } | null>(null);
@@ -267,7 +278,11 @@ export function ChiefConversation({
         : chief.waitingTurn !== undefined
           ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
           : chief.running === true
-            ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+            ? t(
+                narrowComposer
+                  ? CHIEF_INPUT_PLACEHOLDER_STEERING_TOUCH
+                  : CHIEF_INPUT_PLACEHOLDER_STEERING,
+              )
             : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerKey = useAnswerKey();
@@ -426,6 +441,12 @@ export function ChiefConversation({
             () => {},
           );
         };
+  const withdrawRef = useRef(withdraw);
+  withdrawRef.current = withdraw;
+  const withdrawSteer = useCallback(
+    (messageId: string, text: string) => withdrawRef.current?.(messageId, text),
+    [],
+  );
   const waitingTurn = chief.waitingTurn;
   const stopTurn =
     waitingTurn !== undefined && withdraw !== undefined
@@ -441,7 +462,11 @@ export function ChiefConversation({
     [chief.stream, questionPending],
   );
   const rows = useMemo(
-    () => allRows.filter(({ item }) => item.kind !== 'user' || item.pending !== 'held'),
+    () =>
+      allRows.filter(
+        ({ item }) =>
+          item.kind !== 'user' || (item.pending !== 'held' && item.pending !== 'queued'),
+      ),
     [allRows],
   );
   const latestUser = rows.findLast(({ item }) => item.kind === 'user');
@@ -467,35 +492,98 @@ export function ChiefConversation({
     reader.follow();
     scrollToEnd();
   }, [latestUserKey, keyAtSend, sentRowPosition, latestUserPosition, scrollToEnd, reader]);
-  const queuedCapsules = allRows.flatMap(({ item }) =>
-    item.kind === 'user' && item.pending === 'held' && item.id != null
+  const queuedMessages: QueuedMessage[] = allRows.flatMap(({ item }) =>
+    item.kind === 'user' && (item.pending === 'queued' || item.pending === 'held')
       ? [
           {
-            id: item.id,
-            content: item.text,
-            label: replyQuoteText(item.text),
-            note: t('已存下，Coordinator 恢复后会处理'),
-            held: true,
+            id: item.id ?? item.outboxKey ?? '',
+            text: replyQuoteText(item.text),
+            held: item.pending === 'held',
+            sending: item.id == null,
           },
         ]
       : [],
   );
-  const capsules = (
-    <>
-      {replyQuote !== null && (
-        <ReplyingToBar
-          quote={replyQuote.quote}
-          onRemove={() => setReplyQuote(null)}
-          onHighlight={(on) => setHighlightedSource(on ? replyQuote : null)}
-        />
-      )}
-      <QueuedCapsules
-        messages={queuedCapsules}
-        onSendNow={onSteer ? (id) => onSteer(id) : undefined}
-        onRemove={withdraw}
-        removeLabel={t('撤回')}
-      />
-    </>
+  const stashedDraftRef = useRef('');
+  const editingQueued = editingId !== null && queuedMessages.some((m) => m.id === editingId);
+  useEffect(() => {
+    if (editingId === null || onEditQueued == null) return;
+    const renew = window.setInterval(() => {
+      onEditQueued(editingId, { editing: true }).catch(() => {});
+    }, 60_000);
+    return () => window.clearInterval(renew);
+  }, [editingId, onEditQueued]);
+  const endEdit = (restore: boolean) => {
+    setEditingId(null);
+    if (restore) setLiveDraft(stashedDraftRef.current);
+    stashedDraftRef.current = '';
+  };
+  useEffect(() => {
+    if (editingId !== null && !editingQueued) {
+      setEditingId(null);
+      stashedDraftRef.current = '';
+    }
+  }, [editingId, editingQueued]);
+  const startEdit =
+    onEditQueued == null
+      ? undefined
+      : (message: QueuedMessage) => {
+          const raw = allRows.find(({ item }) => item.kind === 'user' && item.id === message.id);
+          const text = raw?.item.kind === 'user' ? raw.item.text : message.text;
+          if (editingId === null) stashedDraftRef.current = liveDraft;
+          setEditingId(message.id);
+          setLiveDraft(text);
+          surfaceRef.current?.focus({ preventScroll: true });
+          onEditQueued(message.id, { editing: true }).catch((error: unknown) => {
+            toastError(t('这条已经发出了'), error);
+            endEdit(true);
+          });
+        };
+  const cancelEdit =
+    editingId === null
+      ? undefined
+      : () => {
+          onEditQueued?.(editingId, { editing: false }).catch(() => {});
+          endEdit(true);
+        };
+  const saveEdit = (text: string) => {
+    if (editingId === null || onEditQueued == null) return;
+    onEditQueued(editingId, { content: text }).then(
+      () => endEdit(true),
+      (error: unknown) => {
+        endEdit(false);
+        setLiveDraft(text);
+        toastError(t('这条已经发出了，改动留在输入框里'), error);
+      },
+    );
+  };
+  const capsules = replyQuote !== null && (
+    <ReplyingToBar
+      quote={replyQuote.quote}
+      onRemove={() => setReplyQuote(null)}
+      onHighlight={(on) => setHighlightedSource(on ? replyQuote : null)}
+    />
+  );
+  const queueTab = (
+    <QueueTabs
+      messages={queuedMessages}
+      editingId={editingQueued ? editingId : null}
+      onEdit={startEdit}
+      onSteer={onSteer === undefined ? undefined : (message) => onSteer(message.id)}
+      onRemove={
+        onWithdraw === undefined
+          ? undefined
+          : (message) => {
+              if (message.held) {
+                withdraw?.(message.id, message.text);
+                return;
+              }
+              if (message.id === editingId) endEdit(true);
+              onWithdraw(message.id).catch(() => {});
+            }
+      }
+      onCancelEdit={() => cancelEdit?.()}
+    />
   );
   const lastUserText = latestUser?.item.kind === 'user' ? latestUser.item.text : null;
   const resend = useCallback(
@@ -556,6 +644,7 @@ export function ChiefConversation({
             : undefined
       }
       onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
+      onWithdraw={onWithdraw != null ? withdrawSteer : undefined}
       joinsPrev={run?.joinsPrev === true}
       joinsNext={run?.joinsNext === true}
       {...(taskRefs !== undefined ? { taskRefs } : {})}
@@ -713,7 +802,21 @@ export function ChiefConversation({
               handleRef={surfaceRef}
               binding={composerBinding}
               editable={onSend != null}
-              onSend={sendFromComposer}
+              onSend={editingQueued ? saveEdit : sendFromComposer}
+              onQueue={
+                chief.running === true && onQueue != null && !editingQueued ? onQueue : undefined
+              }
+              send={
+                editingQueued
+                  ? {
+                      label: t('保存'),
+                      text: t('保存'),
+                      icon: <Check width={16} height={16} />,
+                      testId: 'chief-queue-save',
+                      enabled: liveDraft.trim() !== '',
+                    }
+                  : undefined
+              }
               onAttachment={onAttachment}
               mentionGroups={mentionGroups}
               slash={{
@@ -727,8 +830,10 @@ export function ChiefConversation({
               }}
               onFocusLeave={leaveComposer}
               onCancelReply={replyQuote === null ? undefined : () => setReplyQuote(null)}
+              onCancelEdit={editingQueued ? cancelEdit : undefined}
               placeholder={composerPlaceholder}
               composerRef={answerActive ? undefined : composerRef}
+              tab={answerActive ? null : queueTab}
               above={answerActive ? null : capsules}
               tools={answerActive ? null : composerTools}
               context={chief.context}

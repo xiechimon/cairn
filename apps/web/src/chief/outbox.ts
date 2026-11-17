@@ -8,6 +8,7 @@ export interface OutboxEntry {
   threadId: string | null;
   projectId: string | null;
   text: string;
+  mode?: 'queue';
   state: OutboxState;
   messageId: string | null;
   createdAt: number;
@@ -20,6 +21,7 @@ export interface StoredOutboxEntry {
   threadId: string | null;
   projectId: string | null;
   text: string;
+  mode?: 'queue';
   state: 'sending' | 'failed' | 'returned';
   createdAt: number;
 }
@@ -58,6 +60,7 @@ export interface Outbox {
       globalThreadId: string | null;
       projectId: string | null;
       text: string;
+      mode?: 'queue';
     },
     deliver: Deliver,
   ): string;
@@ -182,6 +185,7 @@ export function createOutbox({
           threadId: entry.threadId,
           projectId: entry.projectId,
           text: entry.text,
+          ...(entry.mode !== undefined ? { mode: entry.mode } : {}),
           state,
           createdAt: entry.createdAt,
         };
@@ -327,6 +331,7 @@ export function createOutbox({
           threadId: row.threadId,
           projectId: row.projectId,
           text: row.text,
+          ...(row.mode !== undefined ? { mode: row.mode } : {}),
           state,
           messageId: null,
           createdAt: row.createdAt,
@@ -367,6 +372,7 @@ export function unlandedItems(
             createdAt: entry.createdAt,
             ...(entry.projectId !== null ? { projectId: entry.projectId } : {}),
             ...(entry.state === 'sending' ? { delivery: 'sending' as const } : {}),
+            ...(entry.mode === 'queue' ? { pending: 'queued' as const } : {}),
           },
         ],
   );

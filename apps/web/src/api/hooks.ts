@@ -1029,11 +1029,13 @@ export function useApiMutations(teamId: string | undefined) {
         content: string;
         projectId?: string | null;
         clientMessageId?: string;
+        mode?: 'queue';
       }) => {
         const body = {
           content: input.content,
           ...(input.projectId != null ? { projectId: input.projectId } : {}),
           ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
+          ...(input.mode !== undefined ? { mode: input.mode } : {}),
         };
         return input.threadId === null
           ? api.post<{ thread: ChiefThread; message: TranscriptRow }>(
@@ -1099,6 +1101,21 @@ export function useApiMutations(teamId: string | undefined) {
         api.del<{ ok: boolean }>(
           `/api/teams/${teamId}/chief/threads/${input.threadId}/messages/${input.messageId}`,
         ),
+      onSuccess: invalidateAll,
+    }),
+    chiefEditMessage: useMutation({
+      mutationFn: (
+        input: { threadId: string; messageId: string } & (
+          | { content: string }
+          | { editing: boolean }
+        ),
+      ) => {
+        const { threadId, messageId, ...body } = input;
+        return api.patch<{ ok: boolean }>(
+          `/api/teams/${teamId}/chief/threads/${threadId}/messages/${messageId}`,
+          body,
+        );
+      },
       onSuccess: invalidateAll,
     }),
     chiefSteer: useMutation({

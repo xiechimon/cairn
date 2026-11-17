@@ -35,7 +35,7 @@ export function hasInFlightWork(qc: QueryClient): boolean {
       if (head === 'chiefThreads' && Array.isArray(data))
         return data.some(
           (thread: ChiefThread) =>
-            thread.activeRun != null || thread.pending?.some((input) => input.state === 'queued'),
+            thread.activeRun != null || thread.pending?.some((input) => input.state !== 'held'),
         );
       if (
         head === 'messages' &&

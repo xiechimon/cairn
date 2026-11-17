@@ -639,7 +639,7 @@ export type ChiefStreamItem =
       text: string;
       id?: string;
       markdown?: string;
-      pending?: 'queued' | 'held';
+      pending?: 'steering' | 'queued' | 'held';
       delivery?: 'sending';
       outboxKey?: string;
       at?: string;

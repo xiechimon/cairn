@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { Ellipsis, Reply, X } from 'lucide-react';
+import { Ellipsis, Reply, Undo, X } from 'lucide-react';
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -13,7 +13,7 @@ import { Copy, Restore } from '../icons/index.js';
 export type ToolbarPlacement = 'right' | 'left' | 'below-start' | 'below-end';
 
 const TOOL_BTN_CLS =
-  "size-8 cursor-pointer rounded-(--radius-control) border-none bg-transparent text-(--foreground) transition-none hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
+  "size-8 cursor-pointer pointer-coarse:size-11 rounded-(--radius-control) border-none bg-transparent text-(--foreground) transition-none hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
 
 const PILL_CLS =
   'flex flex-none items-center rounded-(--radius-tile) bg-popover p-px shadow-(--e2)';
@@ -118,6 +118,7 @@ export function MessageToolbar({
   onCopy,
   onRewind,
   onDismiss,
+  onWithdraw,
   testId,
 }: {
   placement: ToolbarPlacement;
@@ -127,14 +128,33 @@ export function MessageToolbar({
   onCopy: () => void;
   onRewind?: (() => void) | undefined;
   onDismiss?: (() => void) | undefined;
+  onWithdraw?: (() => void) | undefined;
   testId: string;
 }) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
   const armed = useArmed(ref);
   useKeepInside(ref, placement);
+  const withdraw = onWithdraw !== undefined && (
+    <IconTooltip
+      label={t('撤回')}
+      trigger={
+        <Button
+          variant="ghost"
+          size="icon"
+          className={TOOL_BTN_CLS}
+          data-testid="chief-steer-withdraw"
+          data-tool="withdraw"
+          onClick={onWithdraw}
+        />
+      }
+    >
+      <Undo width={22} height={22} />
+    </IconTooltip>
+  );
   const pill = !armed ? (
     <div className={PILL_CLS} data-slot="message-toolbar-pill">
+      {withdraw}
       {onReply !== undefined && (
         <PlainButton
           variant="ghost"
@@ -162,6 +182,7 @@ export function MessageToolbar({
     </div>
   ) : (
     <div className={PILL_CLS} data-slot="message-toolbar-pill">
+      {withdraw}
       {onReply !== undefined && (
         <IconTooltip
           label={t('回复')}

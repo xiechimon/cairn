@@ -608,6 +608,12 @@ export function HomeC({
                         ? undefined
                         : () => Promise.resolve()
                 }
+                onQueue={
+                  archived === null && surface.onSend != null
+                    ? (text: string) => surface.onSend?.(text, projectId, 'queue')
+                    : undefined
+                }
+                onEditQueued={archived === null ? surface.onEditQueued : undefined}
                 onRewind={archived === null ? surface.onRewind : undefined}
                 onRetryGreeting={archived === null ? surface.onRetryGreeting : undefined}
                 onWithdraw={archived === null ? surface.onWithdraw : undefined}

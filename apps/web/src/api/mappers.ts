@@ -2,6 +2,7 @@ import type {
   AgentTodo,
   BuildRecord,
   ChiefGetResponse,
+  ChiefPendingMessage,
   ChiefThread,
   DocumentDiffFile,
   MachineRecord,
@@ -1585,7 +1586,7 @@ export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {
 
 function collectChiefStream(
   messages: MessageRow[],
-  pendingIds: ReadonlyMap<string, 'queued' | 'held'> = new Map(),
+  pendingIds: ReadonlyMap<string, ChiefPendingMessage['state']> = new Map(),
 ): {
   items: ChiefStreamItem[];
   itemsAt: number[];

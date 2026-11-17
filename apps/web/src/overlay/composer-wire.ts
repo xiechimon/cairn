@@ -81,6 +81,7 @@ export interface ComposerWire {
   tokens: string[];
   removeToken: (index: number) => void;
   send: () => void;
+  queue: () => void;
   handleChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   handleKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   handleCaretMoved: () => void;
@@ -356,6 +357,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   };
 
   const send = () => submit(onSend);
+  const queue = () => submit(onQueue);
 
   const openFilePicker = () => fileInputRef.current?.click();
 
@@ -721,6 +723,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     tokens,
     removeToken,
     send,
+    queue,
     handleChange,
     handleKeyDown,
     handleCaretMoved: reevaluate,

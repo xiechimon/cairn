@@ -51,7 +51,7 @@ const PROJECT = {
 };
 
 type Row = { id: string; role: string; content: unknown; createdAt: number };
-type Pending = { messageId: string; state: 'queued' | 'held' };
+type Pending = { messageId: string; state: 'steering' | 'queued' | 'held' };
 type Outage = { reason: 'quota'; model: string | null; retryAt: number | null } | null;
 
 interface State {
@@ -60,6 +60,7 @@ interface State {
   fallbackModel: string | null;
   outage: Outage;
   messages: Row[];
+  bodies?: unknown[];
   turnQueue?: {
     stepId?: string;
     position: number;
@@ -125,6 +126,10 @@ async function mockLive(page: Page, state: State) {
         }
         return json({ ok: true });
       }
+      if (withdrawn && request.method() === 'PATCH') {
+        state.bodies?.push(request.postDataJSON());
+        return json({ ok: true });
+      }
       if (p.endsWith('/steer')) return json({ steered: true });
       if (p.endsWith('/stop')) return json({ delegated: true });
     }
@@ -133,6 +138,7 @@ async function mockLive(page: Page, state: State) {
     if (p === '/api/teams/t1/notifications') return json({ unreadThreadIds: [] });
     if (p === '/api/conversations/chief-home/messages' && request.method() === 'POST') {
       calls.push('send');
+      state.bodies?.push(request.postDataJSON());
       return json({ thread: thread(state) }, 201);
     }
     if (p === '/api/teams/t1/chief/threads') return json([thread(state)]);
@@ -182,8 +188,8 @@ const outageState = (): State => ({
 const busyState = (): State => ({
   activeRun: { phase: 'chief' },
   pending: [
-    { messageId: 'm3', state: 'queued' },
-    { messageId: 'm4', state: 'queued' },
+    { messageId: 'm3', state: 'steering' },
+    { messageId: 'm4', state: 'steering' },
   ],
   fallbackModel: null,
   outage: null,
@@ -206,12 +212,12 @@ test.describe('chief unavailable (T4)', () => {
     await expect(banner).toContainText('relay-a/claude-opus');
     await expect(banner).toContainText('任务照常在跑');
     await expect(banner.getByRole('button', { name: '给 Coordinator 换模型' })).toBeVisible();
-    const held = home.getByTestId('queued-message');
+    const held = home.getByTestId('chief-queued-message');
     await expect(held).toHaveCount(2);
-    await expect(held.first()).toHaveAttribute('title', '已存下，Coordinator 恢复后会处理');
+    await expect(home.getByTestId('chief-queue')).toContainText('恢复后发出');
     await expect(held.first().getByRole('button', { name: '撤回' })).toBeVisible();
-    await expect(held.first().getByRole('button', { name: '现在插话' })).toHaveCount(0);
-    await expect(home.getByTestId('chief-stream').getByTestId('queued-message')).toHaveCount(0);
+    await expect(held.first().getByRole('button', { name: '插话' })).toHaveCount(0);
+    await expect(home.getByTestId('chief-stream').getByTestId('chief-queued-message')).toHaveCount(0);
     await expect(home.getByRole('button', { name: '停止 Coordinator 这次回复' })).toHaveCount(0);
     await expect(home.getByTestId('chief-composer-input')).toHaveAttribute(
       'placeholder',
@@ -228,10 +234,10 @@ test.describe('chief unavailable (T4)', () => {
     const calls = await mockLive(page, outageState());
     await page.goto('/app');
     const home = page.getByTestId('home-c');
-    await home.getByTestId('queued-message').nth(1).getByRole('button', { name: '撤回' }).click();
+    await home.getByTestId('chief-queued-message').nth(1).getByRole('button', { name: '撤回' }).click();
     await expect.poll(() => calls).toContain('DELETE /messages/m2');
     await expect(home.getByTestId('chief-composer-input')).toHaveValue('顺便把空列提示也改一下');
-    await expect(home.getByTestId('queued-message')).toHaveCount(1);
+    await expect(home.getByTestId('chief-queued-message')).toHaveCount(1);
   });
 
   test('phone width: the banner collapses to one line with `详情`', async ({ page }) => {
@@ -309,8 +315,77 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     const working = stream.getByTestId('chief-msg').last();
     await expect(working).not.toContainText('再顺便看下空列提示');
     expect(await verticalGap(page, second, working)).toBeGreaterThanOrEqual(0);
-    await expect(home.getByTestId('queued-message')).toHaveCount(0);
+    await expect(home.getByTestId('chief-queue')).toHaveCount(0);
+    await expect(stream.locator('[data-steering]')).toHaveCount(2);
     await evidenceShot(page, 'sent-mid-turn.png');
+  });
+
+  test('an unread steer can be withdrawn and its text returns to the composer', async ({
+    page,
+  }) => {
+    const calls = await mockLive(page, busyState());
+    await page.goto('/app');
+    const home = page.getByTestId('home-c');
+    const row = home.getByTestId('chief-msg').filter({ hasText: '再顺便看下空列提示' });
+    await row.getByTestId('chief-bubble').hover();
+    await row.locator('[data-placement="left"] [data-testid="chief-steer-withdraw"]').click();
+    await expect.poll(() => calls).toContain('DELETE /messages/m4');
+    await expect(home.getByTestId('chief-composer-input')).toHaveValue('再顺便看下空列提示');
+  });
+
+  test('Cmd+Enter during a running turn queues the message for after the turn', async ({
+    page,
+  }) => {
+    const state = { ...busyState(), pending: [], messages: [FIRST], bodies: [] as unknown[] };
+    await mockLive(page, state);
+    await page.goto('/app');
+    const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await input.fill('跑完再看下性能');
+    await input.press('ControlOrMeta+Enter');
+    await expect.poll(() => state.bodies).toContainEqual(
+      expect.objectContaining({ content: '跑完再看下性能', mode: 'queue' }),
+    );
+    await input.fill('顺便看下空列');
+    await input.press('Enter');
+    await expect.poll(() => state.bodies.length).toBe(2);
+    expect(state.bodies[1]).not.toHaveProperty('mode');
+  });
+
+  test('queued messages sit above the composer, and editing one saves through the composer', async ({
+    page,
+  }) => {
+    const state: State = {
+      ...busyState(),
+      pending: [
+        { messageId: 'm3', state: 'queued' },
+        { messageId: 'm4', state: 'queued' },
+      ],
+      bodies: [],
+    };
+    const calls = await mockLive(page, state);
+    await page.goto('/app');
+    const home = page.getByTestId('home-c');
+    const rows = home.getByTestId('chief-queued-message');
+    await expect(rows).toHaveCount(2);
+    await expect(home.getByTestId('chief-stream').getByText('只看 cairn 项目就行')).toHaveCount(0);
+    await expect(home.getByTestId('chief-queue')).toContainText('这一轮后发出');
+    const input = home.getByTestId('chief-composer-input');
+    await input.fill('还没写完的话');
+    await rows.first().getByTestId('chief-queued-message-text').click();
+    await expect(home.getByTestId('chief-queue')).toHaveAttribute('data-state', 'editing');
+    await expect(input).toHaveValue('只看 cairn 项目就行');
+    await expect.poll(() => state.bodies).toContainEqual({ editing: true });
+    await input.fill('只看 cairn 和 site 两个项目');
+    await home.getByTestId('chief-queue-save').click();
+    await expect.poll(() => state.bodies).toContainEqual({ content: '只看 cairn 和 site 两个项目' });
+    await expect(input).toHaveValue('还没写完的话');
+    await rows.first().getByTestId('chief-queued-message-text').click();
+    await input.press('Escape');
+    await expect(input).toHaveValue('还没写完的话');
+    await expect.poll(() => state.bodies).toContainEqual({ editing: false });
+    await rows.last().getByRole('button', { name: '删除' }).click();
+    await expect.poll(() => calls).toContain('DELETE /messages/m4');
+    await expect(input).toHaveValue('还没写完的话');
   });
 
   test('a busy Coordinator keeps the send button and never shows a stop square', async ({ page }) => {
@@ -406,9 +481,9 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-composer-input')).toHaveAttribute(
       'placeholder',
-      '补充的话会一起插进这一轮',
+      '插进这一轮 · ⌘↵ 排队',
     );
-    await expect(home.getByTestId('queued-message')).toHaveCount(0);
+    await expect(home.getByTestId('chief-queue')).toHaveCount(0);
   });
 
   test('a running turn leaves the answered turn above it alone: no tool names show anywhere', async ({
@@ -531,11 +606,11 @@ test.describe('held messages never push the input out of the composer', () => {
       });
       await page.goto(target.url);
       const root = page.getByTestId('home-c');
-      await expect(root.getByTestId('queued-message')).toHaveCount(10);
+      await expect(root.getByTestId('chief-queued-message')).toHaveCount(3);
+      await root.getByTestId('chief-queue-more').click();
+      await expect(root.getByTestId('chief-queued-message')).toHaveCount(10);
       await expect(root.getByTestId('chief-composer-input')).toBeInViewport({ ratio: 1 });
       await expect(root.getByRole('button', { name: '发送' })).toBeInViewport({ ratio: 1 });
-      const capsules = await root.getByTestId('queued-capsules').evaluate((node) => node.scrollHeight > node.clientHeight);
-      expect(capsules).toBe(true);
     });
   }
 });
