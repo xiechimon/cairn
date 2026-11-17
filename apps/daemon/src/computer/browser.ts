@@ -236,8 +236,13 @@ const CAIRN_PAGE_REFUSAL =
 export const STEALTH_SESSION_SUFFIX = '-stealth';
 
 export function browserSessionName(scopeKey: string | undefined, stealth = false): string {
-  const cleaned = (scopeKey ?? '').replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
-  const base = cleaned.length > 0 ? cleaned.slice(0, 64) : AGENT_BROWSER_SESSION;
+  const cleaned = (scopeKey ?? '')
+    .replace(/[^A-Za-z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64)
+    .replace(/(?:-stealth)+$/i, '')
+    .replace(/^[-_]+|[-_]+$/g, '');
+  const base = cleaned.length > 0 ? cleaned : AGENT_BROWSER_SESSION;
   return stealth ? `${base}${STEALTH_SESSION_SUFFIX}` : base;
 }
 

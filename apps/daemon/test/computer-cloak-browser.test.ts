@@ -177,6 +177,9 @@ test('computer-image scripts and Dockerfile configure stealth locale, non-stealt
   }
   const agentBrowserScript = readFileSync(join(imageDir, 'agent-browser.sh'), 'utf8');
   expect(agentBrowserScript).toContain('--disable-blink-features=AutomationControlled');
+  const browserScript = readFileSync(join(imageDir, 'browser.sh'), 'utf8');
+  expect(browserScript).not.toContain('windowquit');
+  expect(browserScript).toContain('WM_DELETE_WINDOW');
   expect(spawnSync('/bin/bash', ['-n', join(imageDir, 'agent-browser.sh')]).status).toBe(0);
   expect(spawnSync('/bin/bash', ['-n', join(imageDir, 'browser.sh')]).status).toBe(0);
 

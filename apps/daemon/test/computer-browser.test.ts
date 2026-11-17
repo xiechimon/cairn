@@ -42,6 +42,9 @@ describe('browserSessionName', () => {
     expect(browserSessionName('chief:c1')).toBe('chief_c1');
     expect(browserSessionName(undefined)).toBe('cairn');
     expect(browserSessionName('chief:c1', true)).toBe('chief_c1-stealth');
+    expect(browserSessionName('verify:mac-vm-stealth', false)).toBe('verify_mac-vm');
+    expect(browserSessionName('verify:mac-vm-stealth', true)).toBe('verify_mac-vm-stealth');
+    expect(browserSessionName('-stealth', false)).toBe('cairn');
   });
 
   test('only a session ending in the stealth suffix is a stealth command', () => {
