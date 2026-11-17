@@ -222,7 +222,7 @@ describe('worker reports in the chief conversation', () => {
     for (const report of reports) {
       const wake = H.s.db.select().from(step).where(eq(step.id, report.wakeStepId)).get();
       expect(wake).toMatchObject({ buildId: H.threadId, kind: 'chief', status: 'pending' });
-      expect(wake?.prompt).toContain(`任务 #${getTodo(deps, report.todoId)!.seqNum}`);
+      expect(wake?.prompt).toContain(`(todo:${report.todoId})`);
     }
   });
 

@@ -260,14 +260,15 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
     }
   }
 
-  test('W1: gate / settle / failed wakes all carry the title only inside the fence, instruction sentence writes only the #number', async () => {
+  test('W1: gate / settle / failed wakes all carry the title only inside the fence, instruction sentence links the task without its title', async () => {
     const todoId = await importIssue();
     const prompts = await wakePrompts(todoId);
-    const { seqNum } = getTodo(deps(), todoId)!;
     for (const prompt of prompts) {
       expectTitleOnlyFenced(prompt, ISSUE_TITLE);
       expect(prompt).toMatch(
-        new RegExp(`^\\[wake:\\w+\\] provenance=watch:${todoId}\\n任务 #${seqNum}（`),
+        new RegExp(
+          `^\\[wake:\\w+\\] provenance=watch:${todoId}\\n任务 \\[任务\\]\\(todo:${todoId}\\)（`,
+        ),
       );
     }
   });
@@ -285,9 +286,9 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
     const created = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       body: { title: '修登录按钮', spec: '要求：圆角 8px' },
     });
-    const { id, seqNum } = (await created.json()) as { id: string; seqNum: number };
+    const { id } = (await created.json()) as { id: string };
     const prompts = await wakePrompts(id);
-    const ref = `任务 #${seqNum}「修登录按钮」`;
+    const ref = `任务 [修登录按钮](todo:${id})`;
     const provenance = `provenance=watch:${id}\n`;
     expect(prompts).toContain(
       `[wake:settle] ${provenance}${ref} 已完成（done），不代表分支或 PR 已合并。对话里已记下这条，不用再告诉用户；该任务的关注已自动解除。`,

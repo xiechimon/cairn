@@ -739,7 +739,7 @@ function directThreadMessagesSinceLastTurn(db: Db, threadId: string): string | n
       );
       return parsed.success && (parsed.data.by ?? 'user') === 'user'
         ? [
-            `- #${parsed.data.seqNum}：${tidyText(redactSecrets(parsed.data.excerpt).value as string)}`,
+            `- ${taskLink(parsed.data.todoId, '任务')}：${tidyText(redactSecrets(parsed.data.excerpt).value as string)}`,
           ]
         : [];
     });
@@ -1523,6 +1523,10 @@ export function recoverGateWake(deps: ChiefDeps, failedStep: typeof step.$inferS
     });
 }
 
+function taskLink(todoId: string, title: string): string {
+  return `[${title.replace(/[\\[\]]/g, '\\$&')}](todo:${todoId})`;
+}
+
 type WakeFactKind = ChiefWakeKind | 'question' | 'blocked' | 'report';
 
 export function wakeFacts(
@@ -1531,9 +1535,9 @@ export function wakeFacts(
   errorMessage: string | null,
 ): string {
   if (titleAuthor(todo) !== 'third-party') {
-    return wakeFactText(kind, todo, `#${todo.seqNum}「${todo.title}」`, errorMessage);
+    return wakeFactText(kind, todo, taskLink(todo.id, todo.title), errorMessage);
   }
-  const ref = `#${todo.seqNum}（标题出自 GitHub issue，原文在下方围栏里）`;
+  const ref = `${taskLink(todo.id, '任务')}（标题出自 GitHub issue，原文在下方围栏里）`;
   const facts = wakeFactText(kind, todo, ref, errorMessage);
   return `${facts}\n${fencedTitle(todo.title, todo)}`;
 }
@@ -1770,8 +1774,8 @@ export function buildChiefSystemPrompt(
     '- 原话：你不写任务正文。服务端从引用的用户消息（默认本回合消息）或 sourceTodoId 指定的来源任务逐字拷贝正文。create_todo 必须带 title，写成不超过 50 字的摘要标题（含快速通道）；不复述、不总结、不扩写、不翻译正文，也不替用户加要求或步骤。什么时候问用户见下面的「决策边界」。',
     '- 快速通道：用户本回合自己说清了在哪个项目里要什么结果（比如在项目频道里说「加一个 node.txt，内容是 hello」），而且项目有依据：就是本频道的项目、输入框选定的项目、用户原话点名的项目，或用户在 ask_user 里选的项目，就给 create_todo 传 lane:"quick"。快速通道的任务也在 create_todo 里带 title，不再调 update_todo 改标题，回复只用一句话说放在哪个项目、结果会回到这里。服务端核对依据，不成立时返回 400，这时去掉 lane 按普通任务建。没有依据又有几个项目都可能时，照下面的「项目归属」只问一次。事件回合（[wake:…]）不传 lane。',
     '- 先找已有的：create_todo 前用 todos 的 query 按关键词（同一件事的几种说法各试一次）搜标题和正文，再用 threads 看同一件事是不是已经在做（已关闭的任务不算在做）；在做就用 message_thread 把新的话转给那条 thread，不再建任务。只是提问、没要求改动时只回答，不建任务。',
-    '- 拆分：按可独立验收的成果拆，不按执行步骤拆；同类小事合成一张卡。每张卡调用一次 create_todo，quotes 填这张卡覆盖的用户原句，逐字照抄；结果的 uncovered 是尚未覆盖的原文。兄弟任务的编号和彼此关系写在给用户的回复里，spec 不添加路由说明；先后顺序用 dependsOn 表达。',
-    '- 派活：create_todo 自动启动 thread，不需要 open_thread。用 priority 和 difficulty 路由，并行数由项目并发限制决定。thread 需要用户、做完或失败时会在对话里写一行「任务 #n …」，你不用等待、轮询或睡眠。',
+    '- 拆分：按可独立验收的成果拆，不按执行步骤拆；同类小事合成一张卡。每张卡调用一次 create_todo，quotes 填这张卡覆盖的用户原句，逐字照抄；结果的 uncovered 是尚未覆盖的原文。兄弟任务的彼此关系写在给用户的回复里，spec 不添加路由说明；先后顺序用 dependsOn 表达。',
+    '- 派活：create_todo 自动启动 thread，不需要 open_thread。用 priority 和 difficulty 路由，并行数由项目并发限制决定。thread 需要用户、做完或失败时会叫醒你，你不用等待、轮询或睡眠。',
     '- 跟进：threads 列出你开的 thread 和各自一行汇报，needs_you 列出谁在等人。',
     '- 转话：用户对某条 thread 的补充和纠正，用 message_thread 原话转给它；对它待答问题的回答，用 answer_question {todoId, requestId, answer} 原话转达（requestId 来自 needs_you 或问题唤醒），不改写，不替用户做决定。要它停下用 stop_thread。',
     '- 上报：thread 的问题只有你能替用户答时才自己答，否则用 ask_user 或 notify_user 带给用户，用户答了再用 answer_question 转回去。',
@@ -1793,7 +1797,8 @@ export function buildChiefSystemPrompt(
     '- 回答进度、合并或运行状态前，先用 todos、pull_requests、workflow_runs 或 machines 查当前状态，不凭记忆回答。',
     '- 「之前对话的摘要」只记对话，任务状态以工具查到的为准，两者对不上时信任务状态。用户问起以前的决定时，先从摘要里找，再用 todos 查任务现状，只回答，不建任务。',
     '- 插话：你回复途中用户补充的话会直接送进本回合。照插话调整，插话和原请求冲突时以插话为准，并在这次回复里用一句话说明因为插话改了什么。',
-    '- 提到任务时只写链接 [#n](todo:<id>)，界面会把它显示成带状态的任务标题，所以链接前后不再写一遍标题。本回合 create_todo 建的任务会显示在你这条回复的上方，回复里不用再说「已建任务 …」，直接讲放在哪、接下来会怎样。写不了链接的地方（比如 ask_user 的标题和选项）直接写任务标题，不写「#n」这样的编号。',
+    '- 提到任务时写成链接 [任务名](todo:<id>)，id 来自工具结果里的 id 或 todoId：界面把它显示成可点开的任务名，带当前状态。不写「#n」这样的编号，也不在链接前后再写一遍任务名。本回合 create_todo 建的任务会显示在你这条回复的上方，回复里不用再说「已建任务 …」，直接讲放在哪、接下来会怎样。写不了链接的地方（比如 ask_user 的标题和选项）直接写任务名。',
+    '- 一个意思写成一段话。界面里每个空行隔开的段落都是一个单独的气泡，所以同一件事的补充说明写进同一段，不另起一段、不加括号里的「提醒一句」；只有两件不相干的事才空行分段。',
     '- 建议回复：回合结束后服务端会另问一次，预测用户接下来最可能发的 1–3 句短话，有几个自然方向就给几句，不凑数。你自己不必调用 suggest_replies，除非这是新频道的问候、或你已经知道用户此刻最可能发的原话。删除、合并、关闭等不可撤销的确认一律用 ask_user，不用建议回复。',
     '- 合并：代码任务成功后就完成，分支和 PR 保留。只有用户在对话里明确要求合并时才用 merge_builds 合并当前交付；不主动问要不要合并，不自己决定合并，也不因任务完成、CI 通过或其他事件合并。',
     '',

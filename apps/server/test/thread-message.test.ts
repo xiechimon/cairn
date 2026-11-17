@@ -227,7 +227,7 @@ describe('Coordinator awareness of direct thread messages', () => {
     await send({ content: 'Use the cached index', clientMessageId: 'c-7' });
     await sayToCoordinator('How is it going?');
     const [first] = coordinatorPrompts();
-    expect(first).toContain('#7');
+    expect(first).toContain('[任务](todo:direct-todo)');
     expect(first).toContain('Use the cached index');
     expect(first?.endsWith('How is it going?')).toBe(true);
     const stored = H.s.db
@@ -252,7 +252,7 @@ describe('Coordinator awareness of direct thread messages', () => {
     expect(res.status).toBe(201);
     const prompt = coordinatorPrompts().at(-1) ?? '';
     expect(pickedProjectIdOf(prompt)).toBe(H.projectId);
-    expect(prompt).toContain('#7');
+    expect(prompt).toContain('[任务](todo:direct-todo)');
   });
 
   function insertMarker(id: string, over: Record<string, unknown>, createdAt: number) {

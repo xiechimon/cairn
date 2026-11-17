@@ -82,7 +82,7 @@ function bindTodoDelete(db: Db, input: TodoDeleteInput, teamId: string): BoundPr
     .sort((a, b) => a.seqNum - b.seqNum)
     .map(
       (row) =>
-        `#${row.seqNum}「${cardText(row.title, CARD_TITLE_MAX_CHARS)}」（项目 ${cardText(row.projectName, CARD_PROJECT_MAX_CHARS)}，${row.phase}）`,
+        `「${cardText(row.title, CARD_TITLE_MAX_CHARS)}」（项目 ${cardText(row.projectName, CARD_PROJECT_MAX_CHARS)}，${row.phase}）`,
     );
   return {
     input: {

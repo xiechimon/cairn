@@ -466,7 +466,9 @@ describe('todo deletion approval', () => {
       askedFor: [`action-proposal:${proposed.proposalId}`],
     });
     expect(card(s, proposed.proposalId)?.parkedAt).toBeTypeOf('number');
-    expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain('#1「Task 1」');
+    expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain(
+      '：「Task 1」（项目 Alpha',
+    );
     s.dispose();
   });
 
@@ -594,7 +596,7 @@ describe('todo deletion approval', () => {
         createdAt: 2,
       }),
     ).toThrow(expect.objectContaining({ status: 403 }));
-    expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain('#1');
+    expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain('「Task 1」');
     s.dispose();
   });
 
@@ -676,7 +678,7 @@ describe('todo deletion approval', () => {
       .run();
     const proposed = await modelDeletes(s, ['todo-1']);
     expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain(
-      '#1「x 项目 Y,done 12 保留 3 k 项目 Z done」',
+      '「x 项目 Y,done 12 保留 3 k 项目 Z done」',
     );
     s.dispose();
   });
@@ -690,7 +692,7 @@ describe('todo deletion approval', () => {
       .run();
     const proposed = await modelDeletes(s, ['todo-1']);
     expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain(
-      '#1「x 项目 Y,done 12 keep me」',
+      '「x 项目 Y,done 12 keep me」',
     );
     s.dispose();
   });

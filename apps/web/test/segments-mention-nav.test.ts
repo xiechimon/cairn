@@ -108,5 +108,43 @@ describe('a Markdown task link names the task by its title (C15)', () => {
     );
     expect(plain(markup)).toContain('See the export task.');
   });
-});
 
+  const ESSAY = new Map<string, TodoGlance>([
+    ['e6', { phase: 'closed', seq: 6, title: '写一篇 100 字的作文' }],
+    ['t7', { phase: 'building', seq: 7, title: 'Export the report as CSV' }],
+  ]);
+
+  test('a number the model wrote in prose followed by that task title becomes the title chip', () => {
+    const markup = page(
+      createElement(ChatMarkdown, {
+        text: '已停掉写作文的那个任务（#6 写一篇 100 字的作文），任务还开着。',
+        bubbles: true,
+      }),
+      ESSAY,
+    );
+    expect(plain(markup)).toBe('已停掉写作文的那个任务写一篇 100 字的作文，任务还开着。');
+    expect(markup).toMatch(/<a [^>]*data-phase="closed"[^>]*href="\/app\?thread=e6"/);
+  });
+
+  test('a quoted title after the number and 任务 #n both become chips', () => {
+    const markup = page(
+      createElement(ChatMarkdown, { text: '#7「Export the report as CSV」排在任务 #6 后面' }),
+      ESSAY,
+    );
+    expect(plain(markup)).toBe('Export the report as CSV排在任务 写一篇 100 字的作文 后面');
+    expect(markup.match(/data-slot="task-mention"/g)).toHaveLength(2);
+  });
+
+  test('numbers that are not task references stay literal', () => {
+    for (const text of [
+      'PR #6 写一篇 100 字的作文',
+      'xiechimon/cairn#6 写一篇 100 字的作文',
+      '#6 是另一件事',
+      '`#6 写一篇 100 字的作文`',
+      '任务 #9 不存在',
+    ]) {
+      const markup = page(createElement(ChatMarkdown, { text }), ESSAY);
+      expect(markup, text).not.toContain('task-mention');
+    }
+  });
+});

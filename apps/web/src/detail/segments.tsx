@@ -46,6 +46,51 @@ export interface TodoGlance {
 export const TodoGlanceContext = createContext<ReadonlyMap<string, TodoGlance> | null>(null);
 
 const TASK_NUMBER_LABEL = /^#\d+$/;
+const TASK_NUMBER = /(任务\s*)?#(\d+)/g;
+const NOT_A_TASK_NUMBER = /(?:[\w/]|\b(?:PR|issue|pull)\s*)$/i;
+const TITLE_QUOTES: Record<string, string> = { '「': '」', '“': '”', '"': '"', '《': '》' };
+const PAREN_CLOSE: Record<string, string> = { '（': '）', '(': ')' };
+
+function titleAfter(text: string, title: string): number | null {
+  const lead = /^\s*/.exec(text)?.[0].length ?? 0;
+  const open = text[lead] ?? '';
+  const close = TITLE_QUOTES[open];
+  const start = close === undefined ? lead : lead + 1;
+  if (!text.startsWith(title, start)) return null;
+  const end = start + title.length;
+  if (close === undefined) return end;
+  return text[end] === close ? end + 1 : null;
+}
+
+export function linkTaskNumbers(
+  text: string,
+  glances: ReadonlyMap<string, TodoGlance>,
+): DocSegment[] | null {
+  const bySeq = new Map<number, [string, TodoGlance]>();
+  for (const entry of glances) if (entry[1].seq !== undefined) bySeq.set(entry[1].seq, entry);
+  if (bySeq.size === 0) return null;
+  const out: DocSegment[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(TASK_NUMBER)) {
+    const known = bySeq.get(Number(match[2]));
+    const prefix = match[1] ?? '';
+    const at = match.index + prefix.length;
+    if (known === undefined || at < cursor || NOT_A_TASK_NUMBER.test(text.slice(cursor, at)))
+      continue;
+    const [todoId, glance] = known;
+    const end = at + 1 + (match[2] ?? '').length;
+    const titled = glance.title === undefined ? null : titleAfter(text.slice(end), glance.title);
+    if (titled === null && prefix === '') continue;
+    const after = end + (titled ?? 0);
+    const wrapped = PAREN_CLOSE[text[at - 1] ?? ''] === text[after] && prefix === '';
+    out.push({ text: text.slice(cursor, wrapped ? at - 1 : at) });
+    out.push({ text: `#${glance.seq}`, style: 'mention', mentionKind: 'todo', mentionId: todoId });
+    cursor = wrapped ? after + 1 : after;
+  }
+  if (out.length === 0) return null;
+  out.push({ text: text.slice(cursor) });
+  return out.filter((seg) => seg.text !== '');
+}
 
 type StatusTone = 'working' | 'wait' | 'quiet' | 'fail';
 
@@ -77,7 +122,10 @@ const TASK_CHIP_CLS =
   'mx-1 inline-flex cursor-pointer items-center gap-1.5 rounded-sm bg-popover px-1.5 py-0 align-top font-sans text-ui leading-[inherit] font-normal text-popover-foreground no-underline shadow-(--e1-lift)';
 
 export function taskChipClass(phase: Phase | undefined): string {
-  return cn(TASK_CHIP_CLS, phase !== undefined && TONE_CLASS[CONVERSATION_STATUS[phase].tone].chip);
+  return cn(
+    TASK_CHIP_CLS,
+    TONE_CLASS[phase === undefined ? 'quiet' : CONVERSATION_STATUS[phase].tone].chip,
+  );
 }
 
 export function taskStatusInk(phase: Phase): string {
@@ -160,6 +208,7 @@ function decorate(seg: DocSegment, key: number, node: ReactNode): ReactNode {
 
 export function Segments({ segments, codeClassName }: SegmentsProps) {
   const onPreview = useContext(AttachmentPreviewHandler);
+  const glances = useContext(TodoGlanceContext);
   return (
     <>
       {segments.map((seg, j) =>
@@ -205,7 +254,11 @@ export function Segments({ segments, codeClassName }: SegmentsProps) {
               {seg.text}
             </code>
           ) : (
-            <span key={j}>{seg.text}</span>
+            <span key={j}>
+              {(glances === null ? null : linkTaskNumbers(seg.text, glances))?.map((part, n) =>
+                part.style === 'mention' ? <MentionChip key={n} seg={part} /> : part.text,
+              ) ?? seg.text}
+            </span>
           ),
         ),
       )}
