@@ -214,8 +214,10 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
         const tops = readdirSync(staging).filter((entry) =>
           statSync(join(staging, entry)).isDirectory(),
         );
-        if (tops.length !== 1) throw new Error('devin archive layout unrecognized');
-        binPath = join(staging, tops[0], spec.binRelPath);
+        const top = tops[0];
+        if (tops.length !== 1 || top === undefined)
+          throw new Error('devin archive layout unrecognized');
+        binPath = join(staging, top, spec.binRelPath);
         if (!existsSync(binPath)) throw new Error('devin archive has no binary');
       }
       const marker: InstallMarker = {

@@ -23,6 +23,7 @@ import type {
   AgentTokenUsage,
   BriefChannel,
   DeliveredImage,
+  ModelUsage,
   ProviderConfig,
   SessionOpts,
   StepEvent,
@@ -129,7 +130,7 @@ class AcpSession implements AgentSessionHandle {
   private readonly queue: StepEvent[] = [];
   private readonly waiters: Array<(result: IteratorResult<StepEvent>) => void> = [];
   private stopped = false;
-  private readonly usageRows: AgentTokenUsage = [];
+  private readonly usageRows: ModelUsage[] = [];
   private promptStarted = false;
   private cancelled = false;
   private text = '';
@@ -580,7 +581,17 @@ class AcpBackend implements AgentBackend {
         cwd: opts.cwd,
         mcpServers: [
           ...(adapter?.allowHostMcp === true
-            ? (opts.mcpServers ?? []).flatMap((endpoint) => {
+            ? (opts.mcpServers ?? []).flatMap(
+                (endpoint): Array<
+                  | { type: 'http'; name: string; url: string; headers: { name: string; value: string }[] }
+                  | {
+                      type: 'stdio';
+                      name: string;
+                      command: string;
+                      args: string[];
+                      env: { name: string; value: string }[];
+                    }
+                > => {
                 if (endpoint.transport === 'http' && endpoint.url !== undefined) {
                   return [
                     {
@@ -609,7 +620,8 @@ class AcpBackend implements AgentBackend {
                   ];
                 }
                 return [];
-              })
+              },
+              )
             : []),
           ...(hostTools ? [hostTools.declaration] : []),
         ],
