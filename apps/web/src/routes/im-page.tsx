@@ -207,9 +207,9 @@ export function ImConnectionsPage() {
                 <RowTitle>
                   <span className="inline-flex items-center gap-2">
                     {conn.platform === 'wechat' ? (
-                      <MessageCircle className="size-3.5" aria-hidden="true" />
+                      <MessageCircle className="size-4" aria-hidden="true" />
                     ) : (
-                      <Send className="size-3.5" aria-hidden="true" />
+                      <Send className="size-4" aria-hidden="true" />
                     )}
                     {conn.accountLabel ??
                       (conn.platform === 'wechat' ? t('WeChat 账号') : t('Telegram 机器人'))}
