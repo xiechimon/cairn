@@ -690,7 +690,7 @@ test('Enlarge fills the window with the screen, and the bar shows only while the
   await expect.poll(async () => (await windowButtons())?.at(-1)).toBe(true);
 });
 
-test('the enlarged screen opens view-only, the pointer on it opens the control channel, and Shrink gives control back', async ({
+test('the pointer on the enlarged screen opens the control channel, and Shrink gives control back', async ({
   page,
 }) => {
   const screenOpens: unknown[] = [];
@@ -706,8 +706,6 @@ test('the enlarged screen opens view-only, the pointer on it opens the control c
   const cardSurface = await cardScreen.evaluateHandle((element) => element);
   await expect.poll(() => screenOpens).toEqual([{ kind: 'view' }, { kind: 'view' }]);
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
-  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-interactive', 'false');
-  expect(feed.controlCalls).toEqual([]);
   const viewport = page.viewportSize();
   if (!viewport) throw new Error('no viewport');
   await page.mouse.move(viewport.width / 2, viewport.height / 2);
@@ -736,7 +734,6 @@ test('keyboard focus in the enlarged view shows the bar with how to take control
   await page.keyboard.press('Tab');
   await expect(bar).toHaveAttribute('data-shown', 'true');
   await expect(bar).toContainText('鼠标移进画面就能操作');
-  expect(feed.controlCalls).toEqual([]);
 });
 
 test('opening the machine while a user lease exists elsewhere does not take control', async ({
@@ -826,7 +823,7 @@ test('a pending login handoff asks the owner to log in under the screen', async 
   expect(feed.controlCalls).toEqual([]);
 });
 
-test('the push link opens the machine with its screen enlarged and view-only', async ({
+test('the push link opens the machine with its screen enlarged', async ({
   page,
 }) => {
   const feed: Feed = {
@@ -842,11 +839,7 @@ test('the push link opens the machine with its screen enlarged and view-only', a
   );
   const enlarged = page.getByTestId('machine-screen-enlarged');
   await expect(enlarged).toBeVisible();
-  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
-    'data-interactive',
-    'false',
-  );
-  expect(feed.controlCalls).toEqual([]);
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
 });
 
 test.describe('on a touch phone', () => {
