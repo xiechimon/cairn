@@ -612,7 +612,7 @@ test('full screen only watches; Take control and Return control drive the lease'
   const dialog = page.getByRole('dialog', { name: 'omarchy' });
   await expect(dialog.getByRole('button', { name: '交还' })).toHaveCount(0);
   expect(feed.controlCalls).toEqual([]);
-  await dialog.getByRole('button', { name: '接管' }).click();
+  await dialog.getByRole('button', { name: '接管', exact: true }).click();
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
     'data-interactive',
     'true',
@@ -638,11 +638,44 @@ test('full screen only watches; Take control and Return control drive the lease'
     { kind: 'view' },
   ]);
   const openedWhileFull = screenOpens.length;
-  await dialog.getByRole('button', { name: '退出全屏' }).click();
+  await dialog.getByRole('button', { name: '缩小' }).click();
   await expect(enlarged).toHaveCount(0);
   await expect(cardScreen).toHaveAttribute('data-status', 'placeholder');
   expect(await cardSurface.evaluate((element) => element.isConnected)).toBe(true);
   expect(screenOpens.length).toBe(openedWhileFull);
+});
+
+test('a click on the card screen takes control in place, and Enlarge fills the window without browser full screen', async ({
+  page,
+}) => {
+  const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+  const panel = await open(page, feed, [
+    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
+  ]);
+  const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
+  await expect(cardScreen).toBeVisible();
+  await panel.getByRole('button', { name: '点一下接管' }).click();
+  await expect.poll(() => feed.controlCalls).toEqual(['POST']);
+  await expect(cardScreen).toHaveAttribute('data-interactive', 'true', { timeout: 15_000 });
+  await expect(page.getByTestId('machine-screen-enlarged')).toHaveCount(0);
+  await panel.getByRole('button', { name: '交还' }).click();
+  await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
+  await panel.getByTestId('machine-screen-expand').click();
+  const enlarged = page.getByTestId('machine-screen-enlarged');
+  await expect(enlarged).toBeVisible();
+  expect(await page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+  const box = await enlarged.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box?.width).toBe(viewport?.width);
+  expect(box?.height).toBe(viewport?.height);
+  await enlarged.getByRole('button', { name: '点一下接管' }).click();
+  await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE', 'POST']);
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-interactive', 'true', {
+    timeout: 15_000,
+  });
+  await expect(enlarged.getByRole('button', { name: '点一下接管' })).toHaveCount(0);
+  await enlarged.getByRole('button', { name: '缩小' }).click();
+  await expect(enlarged).toHaveCount(0);
 });
 
 test('opening the machine while a user lease exists elsewhere does not take control, and Return control releases it', async ({
@@ -735,7 +768,7 @@ test('a pending login handoff asks the owner to log in next to the screen', asyn
   const bar = panel.getByTestId('computer-control-bar');
   await expect(bar).toHaveAttribute('data-handoff', 'login');
   await expect(bar).toContainText('需要你登录');
-  await expect(bar.getByRole('button', { name: '接管' })).toBeVisible();
+  await expect(bar.getByRole('button', { name: '接管', exact: true })).toBeVisible();
   expect(feed.controlCalls).toEqual([]);
 });
 
@@ -816,7 +849,7 @@ test.describe('on a touch phone', () => {
       Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished)),
     );
     const giveBack = await dialog.getByRole('button', { name: '交还' }).boundingBox();
-    const close = await dialog.getByRole('button', { name: '退出全屏' }).boundingBox();
+    const close = await dialog.getByRole('button', { name: '缩小' }).boundingBox();
     expect(giveBack).not.toBeNull();
     expect(close).not.toBeNull();
     if (!giveBack || !close) return;
@@ -864,7 +897,7 @@ test.describe('on a touch phone', () => {
     const enlarged = page.getByTestId('machine-screen-enlarged');
     await expect(enlarged).toBeVisible();
     const dialog = page.getByRole('dialog', { name: 'omarchy' });
-    await dialog.getByRole('button', { name: '接管' }).tap();
+    await dialog.getByRole('button', { name: '接管', exact: true }).tap();
     await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
       'data-interactive',
       'true',

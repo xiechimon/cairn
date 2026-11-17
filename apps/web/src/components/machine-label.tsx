@@ -134,8 +134,13 @@ export function MachineName({
 }) {
   const secondary = machineSecondary(machine, all);
   return (
-    <span className="inline-flex max-w-full min-w-0 items-center gap-2 align-middle">
-      {showIcon && <MachineIcon machine={machine} className={compact ? 'size-4' : undefined} />}
+    <span
+      className={cn(
+        'inline-flex max-w-full min-w-0 items-center align-middle',
+        compact ? 'gap-1.5' : 'gap-2',
+      )}
+    >
+      {showIcon && <MachineIcon machine={machine} className={compact ? 'size-[1em]' : undefined} />}
       <span className="min-w-0 wrap-anywhere">
         {machine.name}
         {secondary !== null && (

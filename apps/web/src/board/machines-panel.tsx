@@ -198,10 +198,7 @@ function MachineCard({
     setScreenRequested(false);
   }, [screenRequested, screenLive]);
 
-  const takeOver = () => {
-    control.setHeld(true);
-    setFullscreen(true);
-  };
+  const takeOver = () => control.setHeld(true);
 
   return (
     <div data-testid="machine-card" className="flex flex-col divide-y divide-border">
@@ -241,8 +238,9 @@ function MachineCard({
             teamId={teamId}
             computer={computer}
             leaseId={control.leaseId}
-            interactive={false}
+            interactive={control.leaseId !== null && !fullscreen}
             onExpand={() => setFullscreen(true)}
+            onActivate={control.busy || fullscreen ? undefined : takeOver}
           />
           <ComputerControlBar
             held={control.controlHeld}

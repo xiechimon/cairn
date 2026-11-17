@@ -68,29 +68,6 @@ export function ComputerControlBar({
 
 const CHROME_IDLE_MS = 2_500;
 
-function useBrowserFullscreen(open: boolean, onExit: () => void) {
-  const exitRef = useRef(onExit);
-  exitRef.current = onExit;
-  useEffect(() => {
-    if (!open || document.fullscreenElement != null || !document.fullscreenEnabled) return;
-    let entered = false;
-    const onChange = () => {
-      if (document.fullscreenElement != null) {
-        entered = true;
-        return;
-      }
-      if (entered) exitRef.current();
-    };
-    document.addEventListener('fullscreenchange', onChange);
-    void document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
-    return () => {
-      document.removeEventListener('fullscreenchange', onChange);
-      if (entered && document.fullscreenElement != null)
-        void document.exitFullscreen().catch(() => {});
-    };
-  }, [open]);
-}
-
 function useIdleChrome(): [boolean, () => void] {
   const [idle, setIdle] = useState(false);
   const timer = useRef<number | undefined>(undefined);
@@ -126,7 +103,6 @@ export function ComputerScreenDialog({
   const { t } = useI18n();
   const { leaseId } = control;
   const [idle, wake] = useIdleChrome();
-  useBrowserFullscreen(open, onClose);
   return (
     <DialogShell
       open={open}
@@ -151,6 +127,7 @@ export function ComputerScreenDialog({
           interactive={leaseId !== null}
           fill
           autoFocus
+          onActivate={control.busy ? undefined : () => control.setHeld(true)}
         />
         <div
           data-testid="machine-screen-chrome"
@@ -175,7 +152,7 @@ export function ComputerScreenDialog({
             onGiveBack={() => control.setHeld(false)}
           />
           <IconTooltip
-            label={t('退出全屏')}
+            label={t('缩小')}
             side="bottom"
             trigger={
               <Button
@@ -184,7 +161,7 @@ export function ComputerScreenDialog({
                 size="icon-sm"
                 data-testid="machine-screen-exit"
                 className="flex-none text-content-tertiary hover:text-foreground pointer-coarse:size-11"
-                aria-label={t('退出全屏')}
+                aria-label={t('缩小')}
                 onClick={onClose}
               />
             }

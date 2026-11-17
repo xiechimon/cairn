@@ -35,6 +35,7 @@ export function MachineScreenSurface({
   interactive,
   fill = false,
   onExpand,
+  onActivate,
   autoFocus = false,
 }: {
   teamId: string;
@@ -43,6 +44,7 @@ export function MachineScreenSurface({
   interactive: boolean;
   fill?: boolean;
   onExpand?: () => void;
+  onActivate?: () => void;
   autoFocus?: boolean;
 }) {
   const { t } = useI18n();
@@ -156,13 +158,22 @@ export function MachineScreenSurface({
           </span>
         </div>
       )}
+      {onActivate != null && !interactive && (
+        <button
+          type="button"
+          aria-label={t('点一下接管')}
+          data-testid="machine-screen-activate"
+          className="absolute inset-0 cursor-pointer bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          onClick={onActivate}
+        />
+      )}
       {onExpand != null && (
         <Button
           type="button"
           variant="secondary"
           size="icon-sm"
           data-testid="machine-screen-expand"
-          aria-label={t('全屏查看')}
+          aria-label={t('放大')}
           className="absolute top-2 right-2 z-10 shadow-sm"
           onClick={(event) => {
             event.stopPropagation();
