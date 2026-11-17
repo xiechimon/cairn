@@ -107,6 +107,7 @@ export function degradedFreshPrompt(
       text,
       conversationBranch(convId),
       claimed.project?.repo?.baseBranch,
+      claimed.project?.repo?.kind === 'hosted',
     );
   }
   return text;
@@ -232,6 +233,7 @@ export function planStepPrompt(
           promptWithPlanNote,
           conversationBranch(convId),
           claimed.project?.repo?.baseBranch,
+          claimed.project?.repo?.kind === 'hosted',
         )
       : promptWithPlanNote;
   return {

@@ -512,21 +512,30 @@ const WORK_BRANCH_NOTE_SHAPES: readonly { head: string; tails: readonly string[]
   },
 ];
 
-export function buildWorkBranchNote(branch: string, baseBranch?: string | null): string {
+const CAIRN_PUSHES_NOTE =
+  '\nThis repository is hosted by Cairn: commit on this branch and do not push. Cairn pushes the work branch when the step ends; this session has no push credentials and must not look for any.\n';
+
+export function buildWorkBranchNote(
+  branch: string,
+  baseBranch?: string | null,
+  cairnPushes = false,
+): string {
   const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
   const base =
     baseBranch == null
       ? ''
       : `\nPR base branch: ${baseBranch}. When opening a PR, use gh pr create --base ${quote(baseBranch)} --head ${quote(branch)}. Keep this base even when the repository default differs.\n`;
-  return `${WORK_BRANCH_NOTE_HEAD}${branch}${base}${WORK_BRANCH_NOTE_TAIL}`;
+  const push = cairnPushes ? CAIRN_PUSHES_NOTE : '';
+  return `${WORK_BRANCH_NOTE_HEAD}${branch}${base}${push}${WORK_BRANCH_NOTE_TAIL}`;
 }
 
 export function appendWorkBranchNote(
   prompt: string,
   branch: string,
   baseBranch?: string | null,
+  cairnPushes = false,
 ): string {
-  const note = buildWorkBranchNote(branch, baseBranch);
+  const note = buildWorkBranchNote(branch, baseBranch, cairnPushes);
   for (const shape of WORK_BRANCH_NOTE_SHAPES) {
     const start = prompt.indexOf(shape.head);
     if (start === -1) continue;

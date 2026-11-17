@@ -22,6 +22,7 @@ function claimed(opts: {
   instruction?: string;
   output?: 'info';
   withRepo?: boolean;
+  repoKind?: 'hosted' | 'github';
 }): ClaimedStep {
   return {
     step: { id: 's1', buildId: 'conv-1', kind: opts.kind, machineId: 'm1', createdAt: 1 },
@@ -38,7 +39,14 @@ function claimed(opts: {
       ...(opts.output !== undefined ? { output: opts.output } : {}),
     },
     remoteTools: [],
-    project: { id: 'p1', name: 'demo', repo: opts.withRepo === true ? repo : null },
+    project: {
+      id: 'p1',
+      name: 'demo',
+      repo:
+        opts.withRepo === true
+          ? { ...repo, ...(opts.repoKind !== undefined ? { kind: opts.repoKind } : {}) }
+          : null,
+    },
   } as unknown as ClaimedStep;
 }
 
@@ -73,6 +81,23 @@ describe('planStepPrompt', () => {
     const unbound = planStepPrompt(claimed({ kind: 'build' }), undefined, paths);
     expect(bound.prompt.length).toBeGreaterThan(unbound.prompt.length);
     expect(bound.prompt.startsWith(unbound.prompt)).toBe(true);
+  });
+
+  test('a hosted repo build is told Cairn pushes its branch; a GitHub one is not', () => {
+    const hosted = claimed({ kind: 'build', withRepo: true, repoKind: 'hosted' });
+    const github = claimed({ kind: 'build', withRepo: true, repoKind: 'github' });
+    for (const prompt of [
+      planStepPrompt(hosted, undefined, paths).prompt,
+      degradedFreshPrompt(hosted, paths.plansDir, 'conv-1'),
+    ]) {
+      expect(prompt).toContain('do not push');
+    }
+    for (const prompt of [
+      planStepPrompt(github, undefined, paths).prompt,
+      degradedFreshPrompt(github, paths.plansDir, 'conv-1'),
+    ]) {
+      expect(prompt).not.toContain('do not push');
+    }
   });
 
   test('a resume prompt replaces the composed task prompt', () => {
