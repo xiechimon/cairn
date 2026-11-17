@@ -58,6 +58,7 @@ import type {
   PatchChiefBody,
   PatchMachineBody,
   PatchMcpConnectorBody,
+  PatchMemoryBody,
   PatchProjectBody,
   PatchProviderBody,
   PatchScheduleBody,
@@ -1458,6 +1459,19 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: (_data, input) => {
         qc.setQueryData<MemoryRecord[]>(['memories', teamId], (records) =>
           records?.filter((record) => record.id !== input.memoryId),
+        );
+        invalidateAll();
+      },
+    }),
+    updateMemory: useMutation({
+      mutationFn: (input: { memoryId: string; body: PatchMemoryBody }) =>
+        api.patch<MemoryRecord>(
+          `/api/teams/${teamId}/memories/${input.memoryId}`,
+          input.body,
+        ),
+      onSuccess: (record, input) => {
+        qc.setQueryData<MemoryRecord[]>(['memories', teamId], (records) =>
+          records?.map((existing) => (existing.id === input.memoryId ? record : existing)),
         );
         invalidateAll();
       },

@@ -38,6 +38,22 @@ export const MEMORY_UI_COPY = {
   sourceLink: '来源任务',
 } as const;
 
+export const patchMemoryBodySchema = z
+  .object({
+    content: z.string().optional(),
+    title: z
+      .string()
+      .min(1)
+      .max(1024)
+      .regex(/^[^\r\n\0]+$/)
+      .optional(),
+  })
+  .strict()
+  .refine((body) => body.content !== undefined || body.title !== undefined, {
+    message: 'no memory edit provided',
+  });
+export type PatchMemoryBody = z.infer<typeof patchMemoryBodySchema>;
+
 const memoryScopeParam = z
   .string()
   .min(1)

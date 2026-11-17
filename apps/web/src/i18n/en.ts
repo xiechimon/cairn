@@ -1432,6 +1432,12 @@ export const EN: Record<string, string> = {
   '没有删除成功，记忆保持原样，请重试。': 'The memory was not deleted and is unchanged. Try again.',
   '离线中。记忆只能查看，重新连接后才能删除。':
     'Offline. Memories are read-only until you reconnect.',
+  文件名: 'File name',
+  记忆内容: 'Memory content',
+  '没有保存成功，原内容保持不变，请重试。':
+    'The memory was not saved and is unchanged. Try again.',
+  '离线中。记忆只能查看，重新连接后才能编辑或删除。':
+    'Offline. Memories are read-only until you reconnect.',
   模型与执行机: 'Model & Runner',
 
   '搜索记忆…': 'Search memories…',

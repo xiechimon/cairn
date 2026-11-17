@@ -1,4 +1,4 @@
-import type { MemoryRecord, ProjectRecord } from '@cairn/shared';
+import type { MemoryRecord, PatchMemoryBody, ProjectRecord } from '@cairn/shared';
 import { cn } from 'cn';
 import { useRef, useState } from 'react';
 import { useConnected } from '../api/connection-state.js';
@@ -6,8 +6,10 @@ import { useApiMutations, useChiefMemoryUsage, useMemories } from '../api/hooks.
 import { ProjectInstructionsField } from '../board/project-instructions-field.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import { DialogFootRow, DialogShell } from '../components/ui/dialog-shell.js';
+import { Input } from '../components/ui/input.js';
 import { Skeleton } from '../components/ui/skeleton.js';
+import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { isAutoInjected, memoriesByLayer, splitMemoryContent } from './memory-list.js';
@@ -42,13 +44,16 @@ export function MemoryPanel({
   const mutations = useApiMutations(teamId);
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState<{ title: string; content: string } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const autoHeadingRef = useRef<HTMLHeadingElement>(null);
   const detailBodyRef = useRef<HTMLDListElement>(null);
+  const editContentRef = useRef<HTMLTextAreaElement>(null);
   const memories = memoriesQ.data ?? [];
   const { injected, lookup } = memoriesByLayer(memories, project?.id ?? null);
   const open = [...injected, ...lookup].find((memory) => memory.id === openId) ?? null;
   const deleting = mutations.deleteMemory;
+  const updating = mutations.updateMemory;
   const scopeLabel = project?.name ?? t('团队');
   const layerLabel = (memory: MemoryRecord) =>
     isAutoInjected(memory.layer) ? t('核心') : t('可检索 · 不自动注入');
@@ -65,6 +70,42 @@ export function MemoryPanel({
         onSuccess: () => {
           setConfirming(false);
           setOpenId(null);
+        },
+      },
+    );
+  };
+
+  const startEdit = () => {
+    if (open === null) return;
+    updating.reset();
+    setEditing({ title: open.title, content: open.content });
+  };
+  const cancelEdit = () => {
+    if (updating.isPending) return;
+    updating.reset();
+    setEditing(null);
+  };
+  const editUnchanged =
+    open !== null &&
+    editing !== null &&
+    editing.content === open.content &&
+    editing.title === open.title;
+  const saveEdit = () => {
+    if (open === null || editing === null || updating.isPending) return;
+    const body: PatchMemoryBody = {};
+    if (editing.content !== open.content) body.content = editing.content;
+    if (!isAutoInjected(open.layer) && editing.title !== open.title)
+      body.title = editing.title;
+    if (body.content === undefined && body.title === undefined) {
+      setEditing(null);
+      return;
+    }
+    updating.mutate(
+      { memoryId: open.id, body },
+      {
+        onSuccess: (record) => {
+          setEditing(null);
+          setOpenId(record.id);
         },
       },
     );
@@ -258,7 +299,7 @@ export function MemoryPanel({
         </p>
         {!connected && (
           <p className="mt-1 text-meta text-content-secondary">
-            {t('离线中。记忆只能查看，重新连接后才能删除。')}
+            {t('离线中。记忆只能查看，重新连接后才能编辑或删除。')}
           </p>
         )}
       </div>
@@ -267,17 +308,84 @@ export function MemoryPanel({
         open={open !== null && !confirming}
         title={open?.title ?? ''}
         subtitle={open === null ? undefined : `${scopeLabel} · ${layerLabel(open)}`}
-        initialFocus={detailBodyRef}
-        onClose={() => setOpenId(null)}
+        initialFocus={editing === null ? detailBodyRef : editContentRef}
+        onClose={() => {
+          if (updating.isPending) return;
+          setEditing(null);
+          setOpenId(null);
+        }}
         headerAction={
-          live && connected ? (
-            <Button variant="outline" size="sm" onClick={startDelete}>
-              {t('删除…')}
-            </Button>
+          live && connected && editing === null ? (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={startEdit}>
+                {t('编辑')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={startDelete}>
+                {t('删除…')}
+              </Button>
+            </div>
+          ) : undefined
+        }
+        footer={
+          editing !== null ? (
+            <DialogFootRow>
+              <Button variant="outline" disabled={updating.isPending} onClick={cancelEdit}>
+                {t('取消')}
+              </Button>
+              <Button
+                disabled={updating.isPending || editUnchanged}
+                onClick={saveEdit}
+              >
+                {updating.isPending ? t('保存中…') : t('保存')}
+              </Button>
+            </DialogFootRow>
           ) : undefined
         }
       >
-        {open !== null && content !== null && (
+        {open !== null && content !== null && editing !== null ? (
+          <div className="space-y-4">
+            {!isAutoInjected(open.layer) && (
+              <div>
+                <label
+                  htmlFor="memory-edit-title"
+                  className="text-meta text-content-tertiary"
+                >
+                  {t('文件名')}
+                </label>
+                <Input
+                  id="memory-edit-title"
+                  data-testid="memory-edit-title"
+                  className="mt-0.5"
+                  value={editing.title}
+                  disabled={updating.isPending}
+                  onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                />
+              </div>
+            )}
+            <div>
+              <label
+                htmlFor="memory-edit-content"
+                className="text-meta text-content-tertiary"
+              >
+                {t('记忆内容')}
+              </label>
+              <Textarea
+                id="memory-edit-content"
+                ref={editContentRef}
+                data-testid="memory-edit-content"
+                className="mt-0.5 min-h-40"
+                value={editing.content}
+                disabled={updating.isPending}
+                onChange={(e) => setEditing({ ...editing, content: e.target.value })}
+              />
+            </div>
+            {updating.isError && (
+              <p role="alert" className="text-ui text-destructive">
+                {t('没有保存成功，原内容保持不变，请重试。')}
+              </p>
+            )}
+          </div>
+        ) : open !== null && content !== null && (
           <dl ref={detailBodyRef} tabIndex={-1} className="space-y-4 outline-none">
             <div>
               <dt className="text-meta text-content-tertiary">{t('更新于')}</dt>

@@ -64,6 +64,7 @@ interface MockOptions {
   refreshFails?: boolean;
   refresh?: Promise<void>;
   deleteFails?: boolean;
+  updateFails?: boolean;
   memories?: typeof MEMORIES;
 }
 
@@ -71,6 +72,7 @@ async function mockMemory(page: Page, options: MockOptions = {}) {
   const memories = structuredClone(options.memories ?? MEMORIES);
   const deleted: string[] = [];
   const projectPatches: unknown[] = [];
+  const memoryPatches: { id: string; body: Record<string, string> }[] = [];
   let listReply = options.list ?? 'ok';
   let projectsReply = options.projects ?? 'ok';
   const projects = PROJECTS.map(project => ({ ...project, instructions: '保留已保存的项目说明。' as string | null, archivedAt: options.archived ? NOV_8 : null }));
@@ -104,6 +106,24 @@ async function mockMemory(page: Page, options: MockOptions = {}) {
         if (listReply === 'fail') return json({ error: 'boom' }, 500);
         return json(memories);
       }
+      if (p.startsWith('/api/teams/t1/memories/') && route.request().method() === 'PATCH') {
+        if (options.updateFails) return json({ error: 'boom' }, 500);
+        const id = p.split('/').pop() ?? '';
+        const body = route.request().postDataJSON() as Record<string, string>;
+        memoryPatches.push({ id, body });
+        const index = memories.findIndex((memory) => memory.id === id);
+        const prior = memories[index];
+        if (prior === undefined) return json({ error: 'missing memory' }, 404);
+        const successor = {
+          ...prior,
+          id: `${id}-s1`,
+          title: body.title ?? prior.title,
+          content: body.content ?? prior.content,
+          updatedAt: prior.updatedAt + 1,
+        };
+        memories[index] = successor;
+        return json(successor);
+      }
       if (p.startsWith('/api/teams/t1/memories/') && route.request().method() === 'DELETE') {
         if (options.deleteFails) return json({ error: 'boom' }, 500);
         const id = p.split('/').pop() ?? '';
@@ -120,6 +140,7 @@ async function mockMemory(page: Page, options: MockOptions = {}) {
   return {
     deleted,
     projectPatches,
+    memoryPatches,
     recover: () => {
       listReply = 'ok';
       projectsReply = 'ok';
@@ -303,6 +324,80 @@ test('a failed delete keeps the row and says so in the confirmation', async ({ p
   await expect(page.getByRole('dialog', { name: '代码风格' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(memoryRow(page, '代码风格')).toBeVisible();
+});
+
+test('edit a core memory inline: save PATCHes the changed text and follows the successor', async ({
+  page,
+}) => {
+  const { memoryPatches } = await openMemory(page);
+  await memoryRow(page, '验证命令').click();
+  const dialog = page.getByRole('dialog', { name: '验证命令' });
+  await dialog.getByRole('button', { name: '编辑' }).click();
+  const editor = dialog.getByTestId('memory-edit-content');
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveValue(
+    '推送代码前先跑受影响的测试。\n- 单测用 --changed\n- 界面改动再跑受影响的 e2e',
+  );
+  await expect(dialog.getByTestId('memory-edit-title')).toHaveCount(0);
+  const save = dialog.getByRole('button', { name: '保存' });
+  await expect(save).toBeDisabled();
+  await editor.fill('推送代码前先跑受影响的测试。\n- 单测用 --changed\n- 发布前再跑一次 e2e');
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect.poll(() => memoryPatches.length).toBe(1);
+  expect(memoryPatches[0]?.id).toBe('m-verify');
+  expect(memoryPatches[0]?.body).toEqual({
+    content: '推送代码前先跑受影响的测试。\n- 单测用 --changed\n- 发布前再跑一次 e2e',
+  });
+  const updated = page.getByRole('dialog', { name: '验证命令' });
+  await expect(updated.getByTestId('memory-edit-content')).toHaveCount(0);
+  await expect(updated).toContainText('发布前再跑一次 e2e');
+  await updated.getByRole('button', { name: '关闭' }).click();
+  await expect(updated).toBeHidden();
+  await expect(memoryRow(page, '验证命令')).toBeVisible();
+});
+
+test('edit a searchable memory shows the file name and PATCHes renames', async ({ page }) => {
+  const { memoryPatches } = await openMemory(page);
+  await memoryRow(page, '代码风格').click();
+  const dialog = page.getByRole('dialog', { name: '代码风格' });
+  await dialog.getByRole('button', { name: '编辑' }).click();
+  const title = dialog.getByTestId('memory-edit-title');
+  await expect(title).toBeVisible();
+  await expect(title).toHaveValue('代码风格');
+  await title.fill('code-style.md');
+  await dialog.getByRole('button', { name: '保存' }).click();
+  await expect.poll(() => memoryPatches.length).toBe(1);
+  expect(memoryPatches[0]?.body).toEqual({ title: 'code-style.md' });
+  await expect(page.getByRole('dialog', { name: 'code-style.md' })).toBeVisible();
+});
+
+test('cancel leaves the memory untouched and sends no write', async ({ page }) => {
+  const { memoryPatches } = await openMemory(page);
+  await memoryRow(page, '评审交接').click();
+  const dialog = page.getByRole('dialog', { name: '评审交接' });
+  await dialog.getByRole('button', { name: '编辑' }).click();
+  await dialog.getByTestId('memory-edit-content').fill('改动后的内容');
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(dialog.getByTestId('memory-edit-content')).toHaveCount(0);
+  await expect(dialog).toContainText('交给评审前写清验收证据。');
+  expect(memoryPatches).toEqual([]);
+});
+
+test('a failed save keeps the edit open and says so', async ({ page }) => {
+  const { memoryPatches } = await openMemory(page, { updateFails: true });
+  await memoryRow(page, '代码风格').click();
+  const dialog = page.getByRole('dialog', { name: '代码风格' });
+  await dialog.getByRole('button', { name: '编辑' }).click();
+  await dialog.getByTestId('memory-edit-content').fill('新的内容');
+  await dialog.getByRole('button', { name: '保存' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText(
+    '没有保存成功，原内容保持不变，请重试。',
+  );
+  expect(memoryPatches).toEqual([]);
+  await expect(dialog.getByTestId('memory-edit-content')).toHaveValue('新的内容');
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(dialog).toContainText('命名表达意图，不写注释。');
 });
 
 test('loading shows row-shaped skeletons, not an empty list', async ({ page }) => {
