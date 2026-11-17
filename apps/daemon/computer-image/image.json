@@ -1,5 +1,5 @@
 {
-  "image": "ghcr.io/xiechimon/cairn-computer@sha256:f3286dde34e48f5fd4b34a99acac563fd01f7ed8907abfadcd83e0938644c2ba",
+  "image": "ghcr.io/xiechimon/cairn-computer@sha256:5427fd59aa34f8b744d7012d106659c45c188221e4505814366988cf2a0a25f1",
   "runtime": {
     "version": "1.7.1",
     "minimumVersion": "1.7.0",
