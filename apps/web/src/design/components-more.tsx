@@ -313,16 +313,13 @@ export function StreamSection() {
       <Specimen
         id="status-mark"
         title="Status mark"
-        note="One brush line written straight on the page at the top of the Coordinator conversation, no disc; the old line erases along its path, the new one draws in; the label under it fades after a few seconds"
+        note="One brush line written straight on the page at the top of the Coordinator conversation, no disc; the old line erases along its path, the new one draws in; the label under it stays while it is not idle"
         code={`<ChiefStatusMark chief={chiefData} />`}
       >
         {STATUS_MARK_IDS.map((id) => (
           <Cell key={id} label={id}>
             <div className="w-36 pb-1">
-              <StatusMarkFloat
-                view={{ id, label: STATUS_MARK_LABELS[id], announce: false }}
-                pinned
-              />
+              <StatusMarkFloat view={{ id, label: STATUS_MARK_LABELS[id], announce: false }} />
             </div>
           </Cell>
         ))}

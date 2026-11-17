@@ -14,6 +14,16 @@ test('the working row is typing dots with no text label and no steps control', a
   await expect(page.getByTestId('chief-status-mark')).toHaveAttribute('data-state', 'run');
 });
 
+test('the state word stays under the mark for as long as the turn runs', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/app?scenario=chief-draft');
+  const word = page.getByTestId('chief-status-pill');
+  await expect(word).toHaveAttribute('data-visible', 'true');
+  await expect(word).toHaveText('Running a command');
+  await page.clock.runFor(10_000);
+  await expect(word).toHaveAttribute('data-visible', 'true');
+});
+
 test('the task reference row and its chip carry the spinner ring, with the state in the accessible name only', async ({
   page,
 }) => {

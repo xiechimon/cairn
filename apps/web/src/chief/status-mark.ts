@@ -42,7 +42,6 @@ export const MARK_ERASE_MS = 250;
 export const MARK_DRAW_MS = 350;
 export const MARK_DONE_MS = 2200;
 export const PILL_FADE_MS = 160;
-export const PILL_HOLD_MS = 4000;
 export const ANNOUNCE_SETTLE_MS = 600;
 
 const CONNECTION_LOST_LABEL = '连接断开，正在重连…';

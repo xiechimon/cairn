@@ -18,7 +18,6 @@ import {
   MARK_VIEWBOX,
   markPath,
   PILL_FADE_MS,
-  PILL_HOLD_MS,
   STATUS_MARK_LABELS,
   type StatusMarkId,
   type StatusMarkView,
@@ -94,13 +93,11 @@ export function StatusMarkGlyph({
 export function StatusMarkFloat({
   view,
   elapsed = null,
-  pinned = false,
   large = false,
   className,
 }: {
   view: StatusMarkView;
   elapsed?: number | null;
-  pinned?: boolean;
   large?: boolean;
   className?: string;
 }) {
@@ -121,19 +118,15 @@ export function StatusMarkFloat({
       },
       reduce ? 0 : PILL_FADE_MS,
     );
-    const hold = pinned ? 0 : window.setTimeout(() => setOut(true), PILL_HOLD_MS);
-    return () => {
-      window.clearTimeout(swap);
-      window.clearTimeout(hold);
-    };
-  }, [id, label, pinned]);
+    return () => window.clearTimeout(swap);
+  }, [label]);
 
   useEffect(() => {
     const settle = window.setTimeout(() => setAnnounced(announce ? label : ''), ANNOUNCE_SETTLE_MS);
     return () => window.clearTimeout(settle);
   }, [label, announce]);
 
-  const visible = pill !== '' && (!out || hover);
+  const visible = pill !== '' && !out;
   const live = (
     <span role="status" className="sr-only" data-testid="chief-status-live">
       {announced === '' ? '' : t(announced)}
