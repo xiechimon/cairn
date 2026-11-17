@@ -94,8 +94,7 @@ export function MemoryPanel({
     if (open === null || editing === null || updating.isPending) return;
     const body: PatchMemoryBody = {};
     if (editing.content !== open.content) body.content = editing.content;
-    if (!isAutoInjected(open.layer) && editing.title !== open.title)
-      body.title = editing.title;
+    if (!isAutoInjected(open.layer) && editing.title !== open.title) body.title = editing.title;
     if (body.content === undefined && body.title === undefined) {
       setEditing(null);
       return;
@@ -332,10 +331,7 @@ export function MemoryPanel({
               <Button variant="outline" disabled={updating.isPending} onClick={cancelEdit}>
                 {t('取消')}
               </Button>
-              <Button
-                disabled={updating.isPending || editUnchanged}
-                onClick={saveEdit}
-              >
+              <Button disabled={updating.isPending || editUnchanged} onClick={saveEdit}>
                 {updating.isPending ? t('保存中…') : t('保存')}
               </Button>
             </DialogFootRow>
@@ -346,10 +342,7 @@ export function MemoryPanel({
           <div className="space-y-4">
             {!isAutoInjected(open.layer) && (
               <div>
-                <label
-                  htmlFor="memory-edit-title"
-                  className="text-meta text-content-tertiary"
-                >
+                <label htmlFor="memory-edit-title" className="text-meta text-content-tertiary">
                   {t('文件名')}
                 </label>
                 <Input
@@ -363,10 +356,7 @@ export function MemoryPanel({
               </div>
             )}
             <div>
-              <label
-                htmlFor="memory-edit-content"
-                className="text-meta text-content-tertiary"
-              >
+              <label htmlFor="memory-edit-content" className="text-meta text-content-tertiary">
                 {t('记忆内容')}
               </label>
               <Textarea
@@ -385,29 +375,32 @@ export function MemoryPanel({
               </p>
             )}
           </div>
-        ) : open !== null && content !== null && (
-          <dl ref={detailBodyRef} tabIndex={-1} className="space-y-4 outline-none">
-            <div>
-              <dt className="text-meta text-content-tertiary">{t('更新于')}</dt>
-              <dd className="mt-0.5 text-ui">{updatedOn(open.updatedAt, t)}</dd>
-            </div>
-            <div>
-              <dt className="text-meta text-content-tertiary">{t('概要')}</dt>
-              <dd className="mt-0.5 text-ui break-words">{content.summary}</dd>
-            </div>
-            {content.details.length > 0 && (
+        ) : (
+          open !== null &&
+          content !== null && (
+            <dl ref={detailBodyRef} tabIndex={-1} className="space-y-4 outline-none">
               <div>
-                <dt className="text-meta text-content-tertiary">{t('详情')}</dt>
-                <dd className="mt-1">
-                  <ul className="list-disc space-y-1 pl-5 text-ui break-words marker:text-content-tertiary">
-                    {content.details.map((line, index) => (
-                      <li key={`${index}-${line}`}>{line}</li>
-                    ))}
-                  </ul>
-                </dd>
+                <dt className="text-meta text-content-tertiary">{t('更新于')}</dt>
+                <dd className="mt-0.5 text-ui">{updatedOn(open.updatedAt, t)}</dd>
               </div>
-            )}
-          </dl>
+              <div>
+                <dt className="text-meta text-content-tertiary">{t('概要')}</dt>
+                <dd className="mt-0.5 text-ui break-words">{content.summary}</dd>
+              </div>
+              {content.details.length > 0 && (
+                <div>
+                  <dt className="text-meta text-content-tertiary">{t('详情')}</dt>
+                  <dd className="mt-1">
+                    <ul className="list-disc space-y-1 pl-5 text-ui break-words marker:text-content-tertiary">
+                      {content.details.map((line, index) => (
+                        <li key={`${index}-${line}`}>{line}</li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              )}
+            </dl>
+          )
         )}
       </DialogShell>
       <AlertDialogShell

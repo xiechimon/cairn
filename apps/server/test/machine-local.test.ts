@@ -182,9 +182,7 @@ describe('machine record hostname', () => {
         await req(s.app, 'GET', `/api/teams/${s.team.id}/machines`)
       ).json()) as unknown[];
       const byName = (name: string) =>
-        machineRecordSchema.parse(
-          list.find((m) => (m as { name: string }).name === name),
-        );
+        machineRecordSchema.parse(list.find((m) => (m as { name: string }).name === name));
       expect(byName(HOST).hostname).toBe(HOST);
       expect(byName('office-runner').hostname).toBe('thinkbox-02');
       expect(byName('legacy-runner').hostname).toBeUndefined();

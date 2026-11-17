@@ -62,9 +62,9 @@ describe('GET / PATCH /api/projects/{id}/autonomy', () => {
     const body = (await res.json()) as { settings: { actionTier: string } };
     expect(body.settings.actionTier).toBe('full');
     const again = await req(s.app, 'GET', `/api/projects/${projectId}/autonomy`);
-    expect(
-      ((await again.json()) as { settings: { actionTier: string } }).settings.actionTier,
-    ).toBe('full');
+    expect(((await again.json()) as { settings: { actionTier: string } }).settings.actionTier).toBe(
+      'full',
+    );
   });
 
   test.each([

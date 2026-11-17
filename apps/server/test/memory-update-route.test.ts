@@ -45,15 +45,12 @@ describe('PATCH /api/teams/{id}/memories/{mid}', () => {
     expect(updated.content).toBe('ship monday');
     const prior = s.db.select().from(agentMemory).where(eq(agentMemory.id, id)).get();
     expect(prior?.supersededBy).toBe(updated.id);
-    const successor = s.db
-      .select()
-      .from(agentMemory)
-      .where(eq(agentMemory.id, updated.id))
-      .get();
+    const successor = s.db.select().from(agentMemory).where(eq(agentMemory.id, updated.id)).get();
     expect(successor?.history.at(-1)?.content).toBe('ship friday');
-    const list = (await (
-      await req(s.app, 'GET', `/api/teams/${s.team.id}/memories`)
-    ).json()) as { id: string; content: string }[];
+    const list = (await (await req(s.app, 'GET', `/api/teams/${s.team.id}/memories`)).json()) as {
+      id: string;
+      content: string;
+    }[];
     expect(list.some((m) => m.id === updated.id && m.content === 'ship monday')).toBe(true);
   });
 
@@ -70,7 +67,11 @@ describe('PATCH /api/teams/{id}/memories/{mid}', () => {
 
   test('edits the MEMORY.md index through the document path', async () => {
     const s = boot();
-    const index = ensureMemoryIndex(s.db, { agentId: s.team.id, teamId: s.team.id, projectId: null });
+    const index = ensureMemoryIndex(s.db, {
+      agentId: s.team.id,
+      teamId: s.team.id,
+      projectId: null,
+    });
     const res = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/memories/${index.id}`, {
       content: 'always run pnpm test',
     });
@@ -110,9 +111,9 @@ describe('PATCH /api/teams/{id}/memories/{mid}', () => {
       (await req(s.app, 'PATCH', `/api/teams/${s.team.id}/memories/nope`, { content: 'x' })).status,
     ).toBe(404);
     const id = seedDocument(s, 'a.md', 'x');
-    expect(
-      (await req(s.app, 'PATCH', `/api/teams/${s.team.id}/memories/${id}`, {})).status,
-    ).toBe(400);
+    expect((await req(s.app, 'PATCH', `/api/teams/${s.team.id}/memories/${id}`, {})).status).toBe(
+      400,
+    );
     expect(
       (
         await req(s.app, 'PATCH', `/api/teams/${s.team.id}/memories/${id}`, {

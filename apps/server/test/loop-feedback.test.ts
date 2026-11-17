@@ -59,7 +59,6 @@ async function world(prime = true) {
         quietMinutes: 0,
         cooldownMinutes: 0,
         dailyBudgetUsd: 0,
-        actionTier: 'guarded',
       },
     })
     .where(eq(project.id, projectId))

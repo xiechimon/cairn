@@ -1465,10 +1465,7 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     updateMemory: useMutation({
       mutationFn: (input: { memoryId: string; body: PatchMemoryBody }) =>
-        api.patch<MemoryRecord>(
-          `/api/teams/${teamId}/memories/${input.memoryId}`,
-          input.body,
-        ),
+        api.patch<MemoryRecord>(`/api/teams/${teamId}/memories/${input.memoryId}`, input.body),
       onSuccess: (record, input) => {
         qc.setQueryData<MemoryRecord[]>(['memories', teamId], (records) =>
           records?.map((existing) => (existing.id === input.memoryId ? record : existing)),
