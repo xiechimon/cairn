@@ -13,6 +13,7 @@ const todoRows = (page: Page) => panel(page).locator('[data-row-kind="todo"]');
 
 async function openPalette(page: Page, url = BOARD) {
   await page.goto(url);
+  await expect(page.getByTestId('home-c').first()).toBeVisible();
   await pressAndExpect(page, 'Meta+k', panel(page));
 }
 

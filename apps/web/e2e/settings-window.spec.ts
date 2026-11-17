@@ -146,8 +146,9 @@ test('typing opens the search, Escape clears it first and a second Escape closes
   page,
 }) => {
   await page.goto(`/app/settings/account?${FLEET}`);
-  await page.keyboard.type('key');
   const search = settings(page).getByLabel('搜索设置');
+  await expect(search).toBeVisible();
+  await page.keyboard.type('key');
   await expect(search).toBeFocused();
   await expect(search).toHaveValue('key');
   await search.press('Escape');

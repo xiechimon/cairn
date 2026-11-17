@@ -134,6 +134,7 @@ test.describe('phone width', () => {
 
   test('typing never lands in the Coordinator composer the side chat covers', async ({ page }) => {
     await page.goto(HOME);
+    await expect(page.getByTestId('home-c')).toBeVisible();
     await page.locator('body').click({ position: { x: 5, y: 400 } });
     await page.keyboard.type('h');
     await expect(page.getByTestId('chief-composer-input')).toBeFocused();

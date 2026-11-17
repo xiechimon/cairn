@@ -41,7 +41,7 @@ for (const { state, data, phase } of STATES) {
 
 test('a running run shows its plan and steps, with its time so far in the usage popover', async ({ page }) => {
   await open(page, 'running');
-  expect(await planStates(page)).toEqual(['done', 'done', 'doing', 'todo']);
+  await expect.poll(() => planStates(page)).toEqual(['done', 'done', 'doing', 'todo']);
   await expect(page.getByTestId('work-spinner')).toBeVisible();
   await page.getByTestId('thread-usage-ring').click();
   const usage = page.getByTestId('thread-usage');
@@ -54,7 +54,7 @@ test('a running run shows its plan and steps, with its time so far in the usage 
 
 test('a finished run keeps time and cost in the usage popover and offers no takeover', async ({ page }) => {
   await open(page, 'finished');
-  expect(await planStates(page)).toEqual(['done', 'done', 'done', 'done']);
+  await expect.poll(() => planStates(page)).toEqual(['done', 'done', 'done', 'done']);
   await expect(page.getByTestId('engine-question')).toHaveCount(0);
   await expect(transcript(page)).toContainText('已允许这一次');
   await page.getByTestId('thread-usage-ring').click();

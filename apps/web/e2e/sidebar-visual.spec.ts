@@ -43,6 +43,9 @@ for (const theme of ['light', 'dark'] as const) {
   test(`hover and selected rows share one height and corner (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
+    await expect(
+      page.locator('aside [data-slot="sidebar-project-row"]').first(),
+    ).toBeVisible();
 
     const geo = await page.evaluate(() => {
       const box = (el: Element) => {
@@ -67,6 +70,9 @@ for (const theme of ['light', 'dark'] as const) {
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
+    await expect(
+      page.locator('aside [data-slot="sidebar-project-row"]').first(),
+    ).toBeVisible();
 
     const sidebarBg = await page.evaluate(
       () => getComputedStyle(document.querySelector('aside')!).backgroundColor,
@@ -96,6 +102,7 @@ const REF = '/app?scenario=sidebar-ref';
 
 test('L9: the sidebar keeps the measured reference geometry', async ({ page }) => {
   await page.goto(REF);
+  await expect(page.locator('aside [data-slot="sidebar-project-row"]').first()).toBeVisible();
   const m = await page.evaluate(() => {
     const box = (el: Element | null) => {
       if (el === null) throw new Error('missing');
@@ -133,6 +140,7 @@ test('L9: the sidebar keeps the measured reference geometry', async ({ page }) =
 
 test('L8: child rows hang on one continuous rounded tree guide', async ({ page }) => {
   await page.goto(REF);
+  await expect(page.locator('aside [data-slot="sidebar-project-row"]').nth(3)).toBeVisible();
   const m = await page.evaluate(() =>
     [...document.querySelectorAll('aside [data-slot="sidebar-project-row"]')].map((row) => {
       const wrap = row.closest('.group\\/row');

@@ -2,10 +2,17 @@ import { expect, type Page, test } from '@playwright/test';
 
 const PANES = [
   { section: 'machines', endpoint: 'machines', empty: '[data-testid="resource-empty"]', ok: [] },
-  { section: 'routing', endpoint: 'providers', empty: '[data-testid="providers-empty"]', ok: { providers: [] } },
+  {
+    section: 'routing',
+    endpoint: 'providers',
+    errText: '模型服务没能加载',
+    empty: '[data-testid="providers-empty"]',
+    ok: { providers: [] },
+  },
   {
     section: 'routing',
     endpoint: 'model-routing',
+    errText: '模型路由没能加载',
     empty: '[data-testid="routing-section"]',
     ok: { edges: [], connections: [], quota: [] },
   },
@@ -53,14 +60,17 @@ for (const pane of PANES) {
     await stub(page, pane.endpoint, state);
     await page.goto(`/app/settings/${pane.section}`);
     const settings = page.getByRole('dialog', { name: '设置' });
-    await expect(settings.getByTestId('query-error')).toBeVisible();
-    await expect(settings.getByTestId('query-error')).toContainText('没能加载');
+    const err = 'errText' in pane
+      ? settings.getByTestId('query-error').filter({ hasText: pane.errText })
+      : settings.getByTestId('query-error');
+    await expect(err).toBeVisible();
+    await expect(err).toContainText('没能加载');
     await expect(settings.locator(pane.empty)).toHaveCount(0);
     await expect(settings.getByTestId('query-loading')).toHaveCount(0);
 
     state.fail = false;
-    await settings.getByTestId('query-error').getByRole('button', { name: '重试' }).click();
-    await expect(settings.getByTestId('query-error')).toHaveCount(0);
+    await err.getByRole('button', { name: '重试' }).click();
+    await expect(err).toHaveCount(0);
   });
 }
 
@@ -149,7 +159,9 @@ test('providers: a team whose only data is a failed subscriptions fetch sees an 
   );
   await page.goto('/app/settings/routing');
   const settings = page.getByRole('dialog', { name: '设置' });
-  await expect(settings.getByTestId('query-error')).toBeVisible();
+  await expect(
+    settings.getByTestId('query-error').filter({ hasText: '模型服务没能加载' }),
+  ).toBeVisible();
   await expect(settings.getByTestId('providers-empty')).toHaveCount(0);
 });
 

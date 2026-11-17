@@ -40,6 +40,7 @@ test('modifier chords, Space and Enter do not steal focus', async ({ page }) => 
 
 test('an open dialog keeps its keys', async ({ page }) => {
   await page.goto(HOME);
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await page.keyboard.press('Meta+k');
   const field = page.getByRole('dialog', { name: '搜索' }).getByRole('textbox');
   await expect(field).toBeFocused();

@@ -73,6 +73,9 @@ test('`Coordinator` opens the home view and keeps the scenario', async ({ page }
 
 test('active row = sidebar-active fill, no ring', async ({ page }) => {
   await page.goto('/app?scenario=01');
+  await expect(
+    page.locator('aside [data-slot="sidebar-nav-row"]').first(),
+  ).toBeVisible();
   const m = await page.evaluate(() => {
     const row = document.querySelector('aside [data-slot="sidebar-nav-row"][aria-current="page"]');
     const main = document.querySelector('.board-sheet');

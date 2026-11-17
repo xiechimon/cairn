@@ -30,6 +30,7 @@ async function pressesStayClosed(
 
 test('⌘C and the retired N and C do nothing away from the plain home', async ({ page }) => {
   await page.goto(SCHEDULES);
+  await page.waitForSelector('.board-sidebar', { state: 'attached' });
   await expect(tasksPanel(page)).toBeVisible();
   await page.keyboard.press('Meta+c');
   await expect(dialog(page)).toHaveCount(0);
@@ -43,6 +44,7 @@ test('Space no longer opens the Coordinator; ⌘J navigates home, composer focus
   page,
 }) => {
   await page.goto(SCHEDULES);
+  await page.waitForSelector('.board-sidebar', { state: 'attached' });
   await expect(tasksPanel(page)).toBeVisible();
   await page.keyboard.press('Space');
   await expect(page.getByTestId('chief-composer-input')).not.toBeFocused();
@@ -67,6 +69,7 @@ test('Space no longer opens the Coordinator; ⌘J navigates home, composer focus
 
 test('editable focus swallows C and ⌘J — the c lands IN the input', async ({ page }) => {
   await page.goto(SCHEDULES);
+  await page.waitForSelector('.board-sidebar', { state: 'attached' });
 
   await pressAndExpect(page, 'Meta+k', page.getByRole('dialog', { name: '搜索' }));
   const field = page.getByRole('dialog', { name: '搜索' }).getByRole('textbox');
@@ -81,6 +84,7 @@ test('editable focus swallows C and ⌘J — the c lands IN the input', async ({
 
 test('textarea focus (Coordinator composer) swallows C', async ({ page }) => {
   await page.goto(SCHEDULES);
+  await page.waitForSelector('.board-sidebar', { state: 'attached' });
   await pressAndExpect(page, 'Meta+j', tasksPanel(page), 'hidden');
   const composer = page.getByTestId('chief-composer-input');
   await expect(composer).toBeFocused();
@@ -93,6 +97,7 @@ test('Space on a focused button activates it natively; ⌘J fires past button fo
   page,
 }) => {
   await page.goto(SCHEDULES);
+  await page.waitForSelector('.board-sidebar', { state: 'attached' });
   await page.getByTestId('sidebar-reopen').click();
   await page.mouse.move(700, 400);
   const searchRow = page.getByRole('button', { name: '搜索' });
@@ -129,6 +134,7 @@ test('the collapsed sidebar peek search icon hovers the ⌘K hint', async ({ pag
 
 test('N stays retired — no dialog opens and the panel stays put', async ({ page }) => {
   await page.goto(SCHEDULES);
+  await page.waitForSelector('.board-sidebar', { state: 'attached' });
   await expect(tasksPanel(page)).toBeVisible();
   await pressesStayClosed(page, 'n', dialog(page));
   await expect(page).toHaveURL(/[?&]tab=scheduled/);
@@ -193,6 +199,7 @@ test('the Mac app menu opens search, settings and a new task in the Tasks panel'
   const settings = page.getByRole('dialog', { name: '设置' });
 
   await page.goto(SCHEDULES);
+  await page.waitForSelector('.board-sidebar', { state: 'attached' });
   await expect(tasksPanel(page)).toBeVisible();
   await send('search');
   await expect(search).toBeVisible();

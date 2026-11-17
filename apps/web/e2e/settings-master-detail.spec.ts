@@ -51,6 +51,7 @@ test('the slash key is no longer a shortcut: it types a slash into the search li
 }) => {
   await page.goto(MACHINES);
   const search = settings(page).getByLabel('搜索设置');
+  await expect(search).toBeVisible();
   await page.keyboard.press('/');
   await expect(search).toHaveValue('/');
 });
