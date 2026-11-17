@@ -874,7 +874,7 @@ export async function executeChiefTool(
         listSecrets(keysvc, ctx.teamId).some(
           (s) =>
             s.name === name &&
-            (s.delivery === 'http' || browser.has(s.id)) &&
+            (s.delivery === 'http' || s.kind === 'pair' || browser.has(s.id)) &&
             (s.projectId === null || projectId === null || s.projectId === projectId),
         )
       )
@@ -912,6 +912,8 @@ export async function executeChiefTool(
       const browser = browserPasswordIds(db, ctx.teamId);
       if (all.some((s) => browser.has(s.id) && (names.includes(s.name) || names.includes(s.id))))
         throw new HttpError(400, 'browser passwords can only be deleted in settings');
+      if (all.some((s) => s.kind === 'pair' && (names.includes(s.name) || names.includes(s.id))))
+        throw new HttpError(400, 'username+password pairs can only be deleted in settings');
       const deleted: string[] = [];
       for (const n of names) {
         const hit =

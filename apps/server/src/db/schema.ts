@@ -829,6 +829,7 @@ export const secret = sqliteTable(
     httpTemplate: text('httpTemplate'),
     policyRevision: integer('policyRevision').notNull().default(1),
     envSeal: text('envSeal'),
+    usernameCipher: text('usernameCipher'),
     updatedAt: epochMs('updatedAt'),
   },
   (t) => [
@@ -1659,6 +1660,7 @@ export const actionProposal = sqliteTable(
     createdAt: epochMs('createdAt').notNull(),
     decidedBy: text('decidedBy'),
     decidedAt: epochMs('decidedAt'),
+    revokedAt: epochMs('revokedAt'),
   },
   (t) => [
     uniqueIndex('action_proposal_pending_idx')

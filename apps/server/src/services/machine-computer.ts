@@ -293,7 +293,7 @@ export function receiveComputerFrames(
     const licenseValues = license !== null && box !== undefined ? [box.open(license)] : [];
     const secrets = isComputerBrowserTool(row.tool)
       ? tx
-          .select({ cipher: secret.valueCipher })
+          .select({ cipher: secret.valueCipher, usernameCipher: secret.usernameCipher })
           .from(secret)
           .where(
             and(
@@ -302,17 +302,19 @@ export function receiveComputerFrames(
             ),
           )
           .all()
-          .flatMap(({ cipher }) => {
-            if (cipher === null) return [];
-            if (box === undefined) throw new HttpError(503, 'browser redaction is unavailable');
-            const value = box.open(cipher);
-            return [
-              value,
-              encodeURIComponent(value),
-              new URLSearchParams({ v: value }).toString().slice(2),
-              JSON.stringify(value).slice(1, -1),
-            ];
-          })
+          .flatMap(({ cipher, usernameCipher }) =>
+            [cipher, usernameCipher].flatMap((fieldCipher) => {
+              if (fieldCipher === null) return [];
+              if (box === undefined) throw new HttpError(503, 'browser redaction is unavailable');
+              const value = box.open(fieldCipher);
+              return [
+                value,
+                encodeURIComponent(value),
+                new URLSearchParams({ v: value }).toString().slice(2),
+                JSON.stringify(value).slice(1, -1),
+              ];
+            }),
+          )
           .concat(licenseValues)
       : licenseValues;
     const { patch, pending } = applyFrames(row, fresh, nowMs(), secrets);
@@ -1340,6 +1342,7 @@ export async function forwardComputerCall(
         name: row.name,
         origin: row.browserOrigin,
         value: deps.box.open(row.valueCipher),
+        ...(row.usernameCipher !== null ? { username: deps.box.open(row.usernameCipher) } : {}),
       }));
     if (licenseCipher !== null) call.browserLicense = deps.box.open(licenseCipher);
     if (!deps.machineHub.pushComputer(target.machineId, call))

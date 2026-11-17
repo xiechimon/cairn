@@ -116,7 +116,14 @@ export const computerCallSchema = z.object({
   deadlineAt: epochMs,
   scopeKey: z.string().min(1).optional(),
   browserSecrets: z
-    .array(z.strictObject({ name: z.string(), origin: z.string(), value: z.string() }))
+    .array(
+      z.strictObject({
+        name: z.string(),
+        origin: z.string(),
+        value: z.string(),
+        username: z.string().optional(),
+      }),
+    )
     .optional(),
   browserLicense: z.string().min(1).max(4096).optional(),
   ownComputerGrant: ownComputerGrantStampSchema.optional(),

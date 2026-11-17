@@ -11,12 +11,21 @@ function page(
     action?: string;
     frame?: boolean;
     reveal?: boolean;
+    login?: { type?: string; autocomplete?: string } | null;
   } = {},
 ) {
+  const origin = options.origin ?? 'https://login.example.com';
+  const loginDecl =
+    options.login === undefined || options.login === null
+      ? 'var login = null;'
+      : `var login = new HTMLInputElement();
+    login.type = ${JSON.stringify(options.login.type ?? 'text')};
+    login.autocomplete = ${JSON.stringify(options.login.autocomplete ?? 'username')};
+    login.ownerDocument = document;`;
   const context = createContext({ URL });
   runInContext(
     `
-    var location = { origin: ${JSON.stringify(options.origin ?? 'https://login.example.com')}, href: ${JSON.stringify(`${options.origin ?? 'https://login.example.com'}/login`)} };
+    var location = { origin: ${JSON.stringify(origin)}, href: ${JSON.stringify(`${origin}/login`)} };
     var window = globalThis;
     window.top = ${options.frame ? '{}' : 'window'};
     class HTMLInputElement {
@@ -30,9 +39,17 @@ function page(
       dispatchEvent() {}
     }
     var input = new HTMLInputElement();
-    var document = { activeElement: input, querySelectorAll: () => [] };
+    var document = {
+      activeElement: input,
+      querySelectorAll: (selector) =>
+        selector === 'input' ? [login, input].filter((el) => el !== null) : [],
+    };
     input.ownerDocument = document;
-    input.form = { action: ${JSON.stringify(options.action ?? `${options.origin ?? 'https://login.example.com'}/session`)} };
+    ${loginDecl}
+    input.form = {
+      action: ${JSON.stringify(options.action ?? `${origin}/session`)},
+      elements: [login, input].filter((el) => el !== null),
+    };
     var getComputedStyle = () => ({ visibility: 'visible', display: 'block' });
     class Event {}
   `,
@@ -65,11 +82,22 @@ function page(
     },
     async killAll() {},
   };
-  return { provider, argv, stdin, value: () => runInContext('input.value', context) };
+  return {
+    provider,
+    argv,
+    stdin,
+    value: () => runInContext('input.value', context),
+    loginValue: () => runInContext('login === null ? null : login.value', context),
+  };
 }
 
 const value = 'synthetic "password" \\ +&';
-const run = (provider: ComputerProvider, extra: Record<string, unknown> = {}) =>
+const username = 'synthetic-user@example.com';
+const run = (
+  provider: ComputerProvider,
+  extra: Record<string, unknown> = {},
+  secrets?: { name: string; origin: string; value: string; username?: string }[],
+) =>
   runBrowserTool(
     provider,
     'browser_act',
@@ -88,7 +116,7 @@ const run = (provider: ComputerProvider, extra: Record<string, unknown> = {}) =>
       cairnOrigins: [],
       timeoutMs: 5000,
       signal: new AbortController().signal,
-      browserSecrets: [{ name: 'LOGIN', origin: 'https://login.example.com', value }],
+      browserSecrets: secrets ?? [{ name: 'LOGIN', origin: 'https://login.example.com', value }],
     },
   );
 
@@ -100,6 +128,42 @@ describe('saved browser password filling', () => {
     expect(target.argv.join(' ')).not.toContain(value);
     expect(target.stdin).toHaveLength(2);
     expect(target.stdin[0]).not.toContain(JSON.stringify(value));
+  });
+
+  test('a username+password pair fills both fields of the same form', async () => {
+    const target = page({ login: { type: 'text', autocomplete: 'username' } });
+    expect(
+      (
+        await run(target.provider, {}, [
+          { name: 'LOGIN', origin: 'https://login.example.com', value, username },
+        ])
+      ).text,
+    ).toBe('Saved browser password filled.');
+    expect(target.value()).toBe(value);
+    expect(target.loginValue()).toBe(username);
+    expect(target.argv.join(' ')).not.toContain(username);
+    expect(target.argv.join(' ')).not.toContain(value);
+    expect(target.stdin).toHaveLength(2);
+    expect(target.stdin[0]).not.toContain(JSON.stringify(username));
+    expect(target.stdin[0]).not.toContain(JSON.stringify(value));
+  });
+
+  test('a pair fill refuses the whole action when no login field exists', async () => {
+    const target = page();
+    await expect(
+      run(target.provider, {}, [
+        { name: 'LOGIN', origin: 'https://login.example.com', value, username },
+      ]),
+    ).rejects.toThrow('could not be confirmed');
+    expect(target.value()).toBe('');
+    expect(target.stdin).toHaveLength(1);
+    const stray = page({ login: { type: 'text', autocomplete: 'one-time-code' } });
+    await expect(
+      run(stray.provider, {}, [
+        { name: 'LOGIN', origin: 'https://login.example.com', value, username },
+      ]),
+    ).rejects.toThrow('could not be confirmed');
+    expect(stray.loginValue()).toBe('');
   });
 
   test.each([

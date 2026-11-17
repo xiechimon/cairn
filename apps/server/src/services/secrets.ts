@@ -48,7 +48,7 @@ function toSecretRecord(row: SecretRow, linked: ReadonlySet<string>): SecretReco
     delivery: row.delivery,
     http: httpPolicyOf(row),
     policyRevision: row.policyRevision,
-    kind: isEnvRow(row, linked) ? 'env' : 'secret',
+    kind: row.usernameCipher !== null ? 'pair' : isEnvRow(row, linked) ? 'env' : 'secret',
     updatedAt: row.updatedAt,
   };
 }
@@ -61,7 +61,10 @@ function sealValue(deps: SecretDeps, value: string, kind: SecretKind) {
 function assertStorable(kind: SecretKind, delivery: SecretDelivery, value: string): void {
   if (kind === 'env' && delivery === 'http')
     throw new HttpError(400, 'an environment variable cannot use http delivery');
-  if (kind === 'secret' && value === '') throw new HttpError(400, 'a secret value cannot be empty');
+  if (kind === 'pair' && delivery === 'http')
+    throw new HttpError(400, 'a username+password pair cannot use http delivery');
+  if ((kind === 'secret' || kind === 'pair') && value === '')
+    throw new HttpError(400, 'a secret value cannot be empty');
 }
 
 function httpPolicyOf(row: SecretRow): SecretHttpPolicy | null {
@@ -145,6 +148,17 @@ export function listSecretsWithEnvValues(deps: SecretDeps, teamId: string): Secr
   });
 }
 
+function pairUsername(deps: SecretDeps, kind: SecretKind, username: string | undefined) {
+  if (kind !== 'pair') {
+    if (username !== undefined)
+      throw new HttpError(400, 'only a username+password pair takes a username');
+    return { usernameCipher: null };
+  }
+  if (username === undefined || username === '')
+    throw new HttpError(400, 'a username+password pair needs a username');
+  return { usernameCipher: deps.box.seal(username) };
+}
+
 export function createSecret(
   deps: SecretDeps,
   input: {
@@ -152,6 +166,7 @@ export function createSecret(
     name: string;
     description?: string | null;
     value: string;
+    username?: string;
     projectId?: string | null;
     delivery?: SecretDelivery;
     http?: SecretHttpPolicy;
@@ -161,6 +176,7 @@ export function createSecret(
   const kind = input.kind ?? 'secret';
   const policy = policyColumns(input.delivery ?? 'plaintext', input.http);
   assertStorable(kind, policy.delivery, input.value);
+  const pair = pairUsername(deps, kind, input.username);
   if (policy.delivery === 'http') assertHttpDeliverable(input.name, input.value);
   const projectId = input.projectId ?? null;
   if (projectId !== null) {
@@ -182,6 +198,7 @@ export function createSecret(
       name: input.name,
       description: input.description ?? null,
       ...sealValue(deps, input.value, kind),
+      ...pair,
       ...policy,
       updatedAt: nowMs(),
     })
@@ -199,16 +216,31 @@ export function updateSecret(
     name?: string;
     description?: string | null;
     value?: string;
+    username?: string;
     delivery?: SecretDelivery;
     http?: SecretHttpPolicy;
-    kind?: 'secret';
+    kind?: 'secret' | 'pair';
   },
 ): SecretRecord {
   const row = getRow(deps, teamId, id);
   if (!row) throw notFound(`secret ${id}`);
   const linked = linkedMailSecretIds(deps.db, teamId);
   const wasEnv = isEnvRow(row, linked);
-  const kind: SecretKind = wasEnv && patch.kind === undefined ? 'env' : 'secret';
+  const kind: SecretKind =
+    patch.kind ?? (wasEnv ? 'env' : row.usernameCipher !== null ? 'pair' : 'secret');
+  if (patch.username !== undefined && kind !== 'pair')
+    throw new HttpError(400, 'only a username+password pair takes a username');
+  if (
+    kind === 'pair' &&
+    (patch.username === '' || (row.usernameCipher === null && patch.username === undefined))
+  )
+    throw new HttpError(400, 'a username+password pair needs a username');
+  const usernameCipher =
+    kind === 'pair'
+      ? patch.username !== undefined
+        ? deps.box.seal(patch.username)
+        : row.usernameCipher
+      : null;
   if (patch.name !== undefined && patch.name !== row.name) {
     assertNameFree(deps, teamId, row.projectId, patch.name, id);
   }
@@ -250,12 +282,13 @@ export function updateSecret(
       ...(patch.description !== undefined ? { description: patch.description } : {}),
       ...(patch.value !== undefined
         ? sealValue(deps, patch.value, kind)
-        : kind === 'secret'
-          ? { envSeal: null }
-          : {}),
+        : kind === 'env'
+          ? {}
+          : { envSeal: null }),
+      usernameCipher,
       ...policy,
       updatedAt: nowMs(),
-      ...(policyChanged || patch.value !== undefined
+      ...(policyChanged || patch.value !== undefined || usernameCipher !== row.usernameCipher
         ? { policyRevision: row.policyRevision + 1 }
         : {}),
     })
@@ -362,7 +395,13 @@ export function openSecretGrants(
     )
       continue;
     http.delete(row.name);
-    values[row.name] = deps.box.open(row.valueCipher);
+    values[row.name] =
+      row.usernameCipher === null
+        ? deps.box.open(row.valueCipher)
+        : JSON.stringify({
+            username: deps.box.open(row.usernameCipher),
+            password: deps.box.open(row.valueCipher),
+          });
   }
   return { values, http: [...http.values()] };
 }

@@ -1004,7 +1004,7 @@ Reach:
 - Research: [docs/research/1775-gateway-prior-art.md](../../../docs/research/1775-gateway-prior-art.md), [docs/research/browser-secret-fill-2026-11-16.md](../../../docs/research/browser-secret-fill-2026-11-16.md)
 - Frontend design: [docs/design/browser-secret-fill.md](../../../docs/design/browser-secret-fill.md)
 - Backend design: [docs/research/1775-secret-gateway-design.md](../../../docs/research/1775-secret-gateway-design.md), [docs/design/browser-secret-fill.md](../../../docs/design/browser-secret-fill.md)
-- Evidence: `apps/web/e2e/secret-add-dialog.spec.ts`, `apps/web/e2e/project-secrets.spec.ts`, `apps/server/test/project-secrets.test.ts`, `apps/server/test/secret-delivery-policy.test.ts`, `apps/server/test/computer-login-handoff.test.ts`, `apps/daemon/test/browser-secret-fill.test.ts`
+- Evidence: `apps/web/e2e/secret-add-dialog.spec.ts`, `apps/web/e2e/project-secrets.spec.ts`, `apps/server/test/project-secrets.test.ts`, `apps/server/test/secret-delivery-policy.test.ts`, `apps/server/test/computer-login-handoff.test.ts`, `apps/server/test/browser-password-vault.test.ts`, `apps/daemon/test/browser-secret-fill.test.ts`
 
 ### server-status
 

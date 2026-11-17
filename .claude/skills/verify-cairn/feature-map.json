@@ -2200,7 +2200,9 @@
           "settings:secrets"
         ],
         "server": [
-          "/api/teams/:id/secrets**"
+          "/api/teams/:id/secrets**",
+          "/api/teams/:id/browser-password-grants",
+          "/api/teams/:id/browser-password-grants/:grantId"
         ]
       },
       "reach": [
@@ -2225,6 +2227,7 @@
         "apps/server/test/project-secrets.test.ts",
         "apps/server/test/secret-delivery-policy.test.ts",
         "apps/server/test/computer-login-handoff.test.ts",
+        "apps/server/test/browser-password-vault.test.ts",
         "apps/daemon/test/browser-secret-fill.test.ts"
       ]
     },

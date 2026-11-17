@@ -48,6 +48,10 @@ import {
 } from './routes-helpers.js';
 import { createApiKey, listApiKeys } from './services/api-keys.js';
 import {
+  listBrowserPasswordGrants,
+  revokeBrowserPasswordGrant,
+} from './services/browser-passwords.js';
+import {
   createClaudeSubscription,
   deleteClaudeSubscription,
   disableClaudeSubscription,
@@ -1097,6 +1101,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       name: body.name,
       description: body.description ?? null,
       value: body.value,
+      ...(body.username !== undefined ? { username: body.username } : {}),
       projectId: body.projectId ?? null,
       ...(body.kind !== undefined ? { kind: body.kind } : {}),
       ...(body.delivery !== undefined ? { delivery: body.delivery } : {}),
@@ -1118,6 +1123,22 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     if (!deleteSecret(keysvc, teamId, c.req.param('sid'))) {
       throw notFound(`secret ${c.req.param('sid')}`);
     }
+    return c.body(null, 204);
+  });
+
+  app.get('/api/teams/:id/browser-password-grants', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
+    c.header('Cache-Control', 'no-store');
+    return c.json({ grants: listBrowserPasswordGrants(ctx.db, teamId) });
+  });
+
+  app.delete('/api/teams/:id/browser-password-grants/:grantId', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
+    revokeBrowserPasswordGrant(ctx.db, teamId, c.req.param('grantId'));
     return c.body(null, 204);
   });
 

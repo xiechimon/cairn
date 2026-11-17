@@ -415,7 +415,16 @@ function refuse(message: string, started: boolean): never {
   throw new ComputerRefusal(message, started ? 'unknown' : 'not_delivered');
 }
 
-export function browserSecretFillScript(origin: string, value?: string): string {
+const secretAssignLine = (target: string, value: string) =>
+  `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(${target}, ${JSON.stringify(value)});
+    ${target}.dispatchEvent(new Event('input', { bubbles: true }));
+    ${target}.dispatchEvent(new Event('change', { bubbles: true }));`;
+
+export function browserSecretFillScript(
+  origin: string,
+  value?: string,
+  username?: string | null,
+): string {
   return `(() => { 'use strict';
     if (window.top !== window || location.origin !== ${JSON.stringify(origin)}) return false;
     const input = document.activeElement;
@@ -431,12 +440,26 @@ export function browserSecretFillScript(origin: string, value?: string): string 
       if (submit.form === form && new URL(submit.formAction, location.href).origin !== location.origin) return false;
     }
     ${
-      value === undefined
+      username === undefined
         ? ''
-        : `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)});
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));`
+        : `let login = null;
+    const candidates = (input.form && input.form.elements) || document.querySelectorAll('input');
+    for (const el of candidates) {
+      if (!(el instanceof HTMLInputElement) || el === input || el.ownerDocument !== document || el.disabled || el.readOnly) continue;
+      const kind = (el.type || 'text').toLowerCase();
+      if (kind !== 'text' && kind !== 'email' && kind !== 'tel') continue;
+      const elBox = el.getBoundingClientRect();
+      const elStyle = getComputedStyle(el);
+      if (elBox.width <= 0 || elBox.height <= 0 || elStyle.visibility !== 'visible' || elStyle.display === 'none') continue;
+      const elTokens = String(el.autocomplete || '').toLowerCase().split(/\\s+/);
+      if (elTokens.includes('new-password') || elTokens.includes('one-time-code') || elTokens.includes('current-password')) continue;
+      if (elTokens.includes('username')) { login = el; break; }
+      if (login === null && input.form !== null) login = el;
     }
+    if (login === null) return false;
+    ${typeof username === 'string' ? secretAssignLine('login', username) : ''}`
+    }
+    ${value === undefined ? '' : secretAssignLine('input', value)}
     return true;
   })()`;
 }
@@ -806,13 +829,17 @@ export async function runBrowserTool(
         await refuseOffBoundTab('browser_act fill_secret');
         const focused = await execute([...prefix, 'focus', normalizeRef(action.ref)]);
         if (focused.code !== 0) refuse('The password field could not be focused.', started);
-        for (const value of [undefined, credential.value]) {
+        for (const fill of [false, true]) {
           const result = await collectExecute(
             provider,
             [...prefix, '--json', 'eval', '--stdin'],
             timed,
             started,
-            browserSecretFillScript(credential.origin, value),
+            browserSecretFillScript(
+              credential.origin,
+              fill ? credential.value : undefined,
+              credential.username === undefined ? undefined : fill ? credential.username : null,
+            ),
           );
           started = true;
           if (result.code !== 0 || JSON.parse(result.text).data?.result !== true)

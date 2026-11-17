@@ -54,9 +54,10 @@ export const patchTodoBodySchema = categoryFreeTaskInputSchema.pipe(
 
 export const patchSecretBodySchema = z.object({
   name: z.string().regex(SECRET_NAME_PATTERN, SECRET_NAME_RULE).optional(),
-  kind: z.literal('secret').optional(),
+  kind: z.enum(['secret', 'pair']).optional(),
   description: z.string().nullish(),
   value: z.string().optional(),
+  username: z.string().optional(),
   delivery: secretDeliverySchema.optional(),
   http: secretHttpPolicySchema.optional(),
 });

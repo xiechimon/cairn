@@ -7,7 +7,7 @@ export const SECRET_DELIVERIES = ['plaintext', 'http'] as const;
 export const secretDeliverySchema = z.enum(SECRET_DELIVERIES);
 export type SecretDelivery = z.infer<typeof secretDeliverySchema>;
 
-export const SECRET_KINDS = ['secret', 'env'] as const;
+export const SECRET_KINDS = ['secret', 'env', 'pair'] as const;
 export const secretKindSchema = z.enum(SECRET_KINDS);
 export type SecretKind = z.infer<typeof secretKindSchema>;
 
@@ -124,11 +124,32 @@ export const setSecretBodySchema = z.object({
   description: z.string().nullish(),
   value: z.string(),
   kind: secretKindSchema.optional(),
+  username: z.string().optional(),
   projectId: recordId.nullish(),
   delivery: secretDeliverySchema.optional(),
   http: secretHttpPolicySchema.optional(),
 });
 export type SetSecretBody = z.infer<typeof setSecretBodySchema>;
+
+export const BROWSER_PASSWORD_GRANT_STATES = ['active', 'stale', 'revoked'] as const;
+export const browserPasswordGrantSchema = z.object({
+  grantId: recordId,
+  secretId: recordId,
+  secretName: z.string().nullable(),
+  origin: z.string(),
+  machineId: z.string(),
+  machineName: z.string().nullable(),
+  state: z.enum(BROWSER_PASSWORD_GRANT_STATES),
+  createdAt: z.number().int(),
+  grantedAt: z.number().int().nullable(),
+  revokedAt: z.number().int().nullable(),
+});
+export type BrowserPasswordGrant = z.infer<typeof browserPasswordGrantSchema>;
+
+export const browserPasswordGrantsResponseSchema = z.object({
+  grants: z.array(browserPasswordGrantSchema),
+});
+export type BrowserPasswordGrantsResponse = z.infer<typeof browserPasswordGrantsResponseSchema>;
 
 export const CLOAK_LICENSE_SECRET = 'CLOAKBROWSER_LICENSE_KEY';
 export const CLOAK_LICENSE_MAX_CHARS = 512;
