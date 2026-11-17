@@ -7,6 +7,8 @@ import {
   browserSessionName,
   isStealthBrowserCommand,
   LOGIN_DETECTION_SCRIPT,
+  PAGE_TEXT_MAX_CHARS,
+  PAGE_TEXT_SCRIPT,
   runBrowserTool,
 } from '../src/computer/browser.js';
 import { isCairnPage } from '../src/computer/host-screen-self.js';
@@ -441,6 +443,24 @@ describe('login form detection', () => {
     expect(browserLog[0]).toContain(' open https://example.com');
     expect(browserLog[1]).toContain(' --json eval ');
     expect(result.loginForm).toEqual({ signals: ['challenge'] });
+  });
+
+  test('a snapshot carries the readable page text after the interactive refs, capped', async () => {
+    const description = `Job description\n\n  Build agents  \n${'x'.repeat(PAGE_TEXT_MAX_CHARS)}`;
+    const provider = detectingProvider([], evalResult([]));
+    const execute = provider.execute;
+    provider.execute = async (request) =>
+      request.argv.includes(PAGE_TEXT_SCRIPT)
+        ? (async function* () {
+            yield { kind: 'stdout' as const, ...evalResult(description) };
+            yield { kind: 'exit' as const, code: 0 };
+          })()
+        : execute(request);
+    const { text } = await run(provider, 'browser_snapshot');
+    expect(text.startsWith('- textbox "Password" [ref=e2]')).toBe(true);
+    expect(text).toContain('\n\n[page text]\nJob description\nBuild agents\nxxx');
+    expect(text.endsWith('[page text truncated]')).toBe(true);
+    expect(text.length).toBeLessThan(PAGE_TEXT_MAX_CHARS + 200);
   });
 
   test('a page without login signals adds nothing', async () => {

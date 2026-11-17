@@ -74,6 +74,31 @@ export interface BrowserToolResult {
 export const AUTO_STEALTH_NOTE =
   'The default browser got a blank anti-automation page here, so Cairn opened this address in the stealth browser. Pass stealth: true on the following browser calls for this site.';
 
+export const PAGE_TEXT_MAX_CHARS = 12_000;
+export const PAGE_TEXT_SCRIPT = "document.body ? document.body.innerText : ''";
+const PAGE_TEXT_TRUNCATED = '\n[page text truncated]';
+
+export function pageTextSection(output: string): string {
+  let result: unknown;
+  try {
+    result = (JSON.parse(output) as { data?: { result?: unknown } } | null)?.data?.result;
+  } catch {
+    return '';
+  }
+  if (typeof result !== 'string') return '';
+  const text = result
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .join('\n');
+  if (text === '') return '';
+  const capped =
+    text.length <= PAGE_TEXT_MAX_CHARS
+      ? text
+      : text.slice(0, PAGE_TEXT_MAX_CHARS - PAGE_TEXT_TRUNCATED.length) + PAGE_TEXT_TRUNCATED;
+  return `\n\n[page text]\n${capped}`;
+}
+
 export function isAutomationBlankSnapshot(text: string): boolean {
   return text.includes('(no interactive elements)') && !text.includes('[ref=');
 }
@@ -705,7 +730,12 @@ export async function runBrowserTool(
       refuse(result.text || `agent-browser snapshot failed with exit code ${result.code}`, started);
     }
     await refuseOffBoundTab('browser_snapshot');
-    return withDetection(result.text || '(empty snapshot)');
+    const detected = await withDetection(result.text || '(empty snapshot)');
+    const page = await read([...prefix, '--json', 'eval', PAGE_TEXT_SCRIPT]);
+    return {
+      ...detected,
+      text: detected.text + (page.code === 0 ? pageTextSection(page.text) : ''),
+    };
   }
 
   const parsed = actParams.safeParse(params);
