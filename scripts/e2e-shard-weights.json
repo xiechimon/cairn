@@ -77,7 +77,7 @@
   "project-settings-autonomy.spec.ts": 3995,
   "project-settings-base-branch.spec.ts": 1500,
   "project-settings-dead-buttons.spec.ts": 486,
-  "project-settings-delete.spec.ts": 5770,
+  "project-settings-archive.spec.ts": 5770,
   "project-settings-identity.spec.ts": 1991,
   "project-settings-local-path.spec.ts": 1606,
   "project-settings-repo.spec.ts": 1582,
