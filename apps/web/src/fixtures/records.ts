@@ -4,7 +4,7 @@ import {
   type ClaudeLogin,
   type ConfinementCause,
   type ConfinementReport,
-  type DailyUsageDay,
+  type DailyUsage,
   type GithubRepoSummary,
   type MachineExecutor,
   type MachineHardware,
@@ -258,7 +258,7 @@ export interface FixtureSet {
   unreadThreadIds?: string[];
   chiefBusy?: boolean;
   ui?: OverlayUi;
-  dailyUsage?: DailyUsageDay[];
+  dailyUsage?: DailyUsage;
   schedules?: ScheduleRecord[];
   project?: ProjectContent;
   team?: TeamContent;

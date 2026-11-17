@@ -1,46 +1,72 @@
+import type { DailyUsageDay } from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
-import { USAGE_WEEKS, usageGrid, usageWindowDays } from '../src/usage/usage-model.js';
+import { modelSeries, OTHER_MODELS, usageSummary } from '../src/usage/usage-model.js';
 
-describe('usageGrid', () => {
-  it('ends on the week holding today, hides the rest of that week and starts on a Monday', () => {
-    const grid = usageGrid([], '2026-11-19');
-    expect(usageWindowDays('2026-11-19')).toBe((USAGE_WEEKS - 1) * 7 + 4);
-    expect(grid.weeks).toHaveLength(USAGE_WEEKS);
-    const last = grid.weeks.at(-1) ?? [];
-    expect(last.map((cell) => [cell.date, cell.future])).toEqual([
-      ['2026-11-16', false],
-      ['2026-11-17', false],
-      ['2026-11-18', false],
-      ['2026-11-19', false],
-      ['2026-11-20', true],
-      ['2026-11-21', true],
-      ['2026-11-22', true],
-    ]);
-    expect(grid.weeks[0]?.[0]?.date).toBe('2026-05-25');
-  });
+const day = (date: string, over: Partial<DailyUsageDay> = {}): DailyUsageDay => ({
+  date,
+  coordinator: 0,
+  tasks: 0,
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  models: {},
+  projects: {},
+  todos: [],
+  cost: null,
+  ...over,
+});
 
-  it('sums the last 30 days including today and nothing older', () => {
-    const grid = usageGrid(
-      [
-        { date: '2026-10-20', coordinator: 7, tasks: 0 },
-        { date: '2026-10-21', coordinator: 10, tasks: 5 },
-        { date: '2026-11-19', coordinator: 1, tasks: 2 },
-      ],
-      '2026-11-19',
+describe('usageSummary', () => {
+  it('starts a new user at their first day, padded to a week, with no comparison', () => {
+    const summary = usageSummary(
+      [day('2026-11-16', { coordinator: 100 }), day('2026-11-17', { tasks: 50 })],
+      '2026-11-17',
+      30,
     );
-    expect(grid.recentTotal).toBe(18);
+    expect(summary.since).toBe('2026-11-16');
+    expect(summary.slots.map((slot) => slot.date)).toEqual([
+      '2026-11-11',
+      '2026-11-12',
+      '2026-11-13',
+      '2026-11-14',
+      '2026-11-15',
+      '2026-11-16',
+      '2026-11-17',
+    ]);
+    expect(summary.total).toBe(150);
+    expect(summary.change).toBeNull();
   });
 
-  it('spreads the used days over four shades and leaves unused days at zero', () => {
-    const days = [100, 200, 300, 400, 500, 600, 700, 800].map((tasks, i) => ({
-      date: `2026-11-0${i + 1}`,
-      coordinator: 0,
-      tasks,
-    }));
-    const levels = usageGrid(days, '2026-11-09')
-      .weeks.flat()
-      .filter((cell) => cell.date >= '2026-11-01' && cell.date <= '2026-11-09')
-      .map((cell) => cell.level);
-    expect(levels).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 0]);
+  it('shows the whole range and compares with the range before it once older usage exists', () => {
+    const summary = usageSummary(
+      [
+        day('2026-11-01', { tasks: 999 }),
+        day('2026-11-04', { coordinator: 200 }),
+        day('2026-11-11', { coordinator: 300, cacheRead: 90, input: 10, cost: 1 }),
+        day('2026-11-17', { tasks: 200, cost: null }),
+      ],
+      '2026-11-17',
+      7,
+    );
+    expect(summary.since).toBeNull();
+    expect(summary.slots[0]?.date).toBe('2026-11-11');
+    expect(summary.slots).toHaveLength(7);
+    expect(summary.total).toBe(500);
+    expect(summary.change).toBeCloseTo(1.5);
+    expect(summary.cacheHit).toBeCloseTo(0.9);
+    expect(summary.cost).toBeNull();
+  });
+
+  it('folds models past the top three into one series that still adds up to the day', () => {
+    const models = { a: 50, b: 40, c: 30, d: 20, e: 10 };
+    const summary = usageSummary(
+      [day('2026-11-17', { coordinator: 150, models })],
+      '2026-11-17',
+      7,
+    );
+    expect(summary.chartModels).toEqual(['a', 'b', 'c', OTHER_MODELS]);
+    const first = summary.slots.at(-1)?.day;
+    expect(first && modelSeries(first, summary.chartModels)).toEqual([50, 40, 30, 30]);
   });
 });

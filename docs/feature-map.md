@@ -448,7 +448,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### token-usage
 
-**Token usage** (shipped). The Usage dialog from the sidebar footer: tokens per local day as an ink heatmap, Coordinator and tasks apart.
+**Token usage** (shipped). The Usage dialog from the sidebar footer: a 7, 30 or 90 day range with totals, cache hit, the token-type bar, tokens per local day as stacked bars by source or by model, and models and projects ranked.
 
 - Research: **gap**: no note beyond GitHub's contribution calendar, which the owner named
 - Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar)

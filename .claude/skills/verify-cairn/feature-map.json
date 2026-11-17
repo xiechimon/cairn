@@ -1779,8 +1779,8 @@
     {
       "id": "token-usage",
       "name": "Token usage",
-      "summary": "The Usage dialog from the sidebar footer: tokens per local day as an ink heatmap, Coordinator and tasks apart.",
-      "states": "Loading, failed with retry, empty for a new team, and the heatmap with a 30-day total and a readout for the hovered or selected day; light and dark, desktop dialog and phone.",
+      "summary": "The Usage dialog from the sidebar footer: a 7, 30 or 90 day range with totals, cache hit, the token-type bar, tokens per local day as stacked bars by source or by model, and models and projects ranked.",
+      "states": "Loading, failed with retry, empty for a new team, a new user whose chart starts at the first used day, and a full range with the previous-range change and a readout for the hovered or keyboard-selected day; light and dark, desktop dialog and phone.",
       "centrality": 2,
       "status": "shipped",
       "code": {

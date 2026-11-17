@@ -5,6 +5,7 @@ import {
   build,
   chiefThread,
   chiefTurnUsage,
+  provider as providerTable,
   step as stepTable,
   stepUsage,
   todo,
@@ -95,7 +96,11 @@ function legacyOnly() {
 }
 
 const daily = (days: number, tz = SG, now = NOW) =>
-  dailyUsage(H.s.db, H.teamId, { days, tz, now }).days;
+  dailyUsage(H.s.db, H.teamId, { days, tz, now }).days.map(({ date, coordinator, tasks }) => ({
+    date,
+    coordinator,
+    tasks,
+  }));
 
 describe('recordStepUsage writes one step_usage row per step and model', () => {
   test('a task step records its team, build, kind and counts, with nothing mirrored', () => {
@@ -278,6 +283,78 @@ describe('dailyUsage groups tokens by local calendar day', () => {
       { date: '2026-11-14', coordinator: 0, tasks: 300 },
       { date: '2026-11-16', coordinator: 0, tasks: 25 },
     ]);
+  });
+
+  test('a day splits by model, project, task and token type, priced only when every model has rates', () => {
+    vi.setSystemTime(NOW);
+    H.s.db
+      .insert(providerTable)
+      .values({
+        id: 'prov-usage',
+        teamId: H.teamId,
+        providerId: 'gw',
+        label: 'Gateway',
+        baseUrl: 'http://127.0.0.1:9/v1',
+        api: 'openai-completions',
+        compat: {},
+        models: [
+          {
+            id: 'big',
+            name: 'Big Model',
+            cost: { input: 2, output: 10, cacheRead: 1, cacheWrite: 0 },
+          },
+        ],
+        createdBy: 'u',
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .run();
+    addBuild('build-1', NOW);
+    report(
+      's1',
+      'build-1',
+      [{ model: 'gw/big', input: 1e6, output: 1e5, cacheRead: 3e6, cacheWrite: 0 }],
+      'build',
+    );
+    report('c1', H.threadId, [
+      { model: 'gw/big', input: 2e5, output: 0, cacheRead: 0, cacheWrite: 5e4 },
+    ]);
+    vi.setSystemTime(YESTERDAY);
+    report('c0', H.threadId, [u('claude-code/claude-haiku-5-5', 700)]);
+    const usage = dailyUsage(H.s.db, H.teamId, { days: 7, tz: SG, now: NOW });
+    expect(usage.days).toEqual([
+      {
+        date: '2026-11-15',
+        coordinator: 700,
+        tasks: 0,
+        input: 700,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        models: { 'claude-code/claude-haiku-5-5': 700 },
+        projects: {},
+        todos: [],
+        cost: null,
+      },
+      {
+        date: '2026-11-16',
+        coordinator: 250_000,
+        tasks: 4_100_000,
+        input: 1_200_000,
+        output: 100_000,
+        cacheRead: 3_000_000,
+        cacheWrite: 50_000,
+        models: { 'gw/big': 4_350_000 },
+        projects: { [H.projectId]: 4_100_000 },
+        todos: ['todo-build-1'],
+        cost: 2.4 + 1 + 3,
+      },
+    ]);
+    expect(usage.models).toEqual([
+      { key: 'claude-code/claude-haiku-5-5', name: 'claude-haiku-5-5', provider: 'Claude Code' },
+      { key: 'gw/big', name: 'Big Model', provider: 'Gateway' },
+    ]);
+    expect(usage.projects).toEqual([{ id: H.projectId, name: 'demo' }]);
   });
 
   test('another team sees nothing', () => {

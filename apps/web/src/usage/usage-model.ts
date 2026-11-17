@@ -1,101 +1,135 @@
 import type { DailyUsageDay } from '@cairn/shared';
 
-export const USAGE_WEEKS = 26;
-export const USAGE_SUM_DAYS = 30;
+export const USAGE_RANGES = [7, 30, 90] as const;
+export type UsageRange = (typeof USAGE_RANGES)[number];
+export const USAGE_FETCH_DAYS = 2 * 90;
+const MIN_SLOTS = 7;
+const TOP_MODELS = 3;
+export const OTHER_MODELS = 'other';
 
-export interface UsageCell {
+export interface UsageSlot {
   date: string;
-  weekday: number;
-  future: boolean;
-  coordinator: number;
-  tasks: number;
-  total: number;
-  level: 0 | 1 | 2 | 3 | 4;
+  day: DailyUsageDay | null;
 }
 
-export interface UsageGrid {
-  today: string;
-  days: number;
-  weeks: UsageCell[][];
-  monthStarts: (number | null)[];
-  recentTotal: number;
+export interface UsageSummary {
+  from: string;
+  since: string | null;
+  slots: UsageSlot[];
+  usedDays: number;
+  total: number;
+  coordinator: number;
+  tasks: number;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cacheHit: number | null;
+  tasksRun: number;
+  cost: number | null;
+  change: number | null;
+  models: [string, number][];
+  projects: [string, number][];
+  chartModels: string[];
 }
 
 export function localDay(ms: number, tz: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(ms));
 }
 
-function parts(date: string): [number, number, number] {
-  const [y = 1970, m = 1, d = 1] = date.split('-').map(Number);
-  return [y, m, d];
-}
-
 export function shiftDay(date: string, by: number): string {
-  const [y, m, d] = parts(date);
+  const [y = 1970, m = 1, d = 1] = date.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d + by)).toISOString().slice(0, 10);
 }
 
-export function mondayIndex(date: string): number {
-  const [y, m, d] = parts(date);
-  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
+function ranked(days: readonly DailyUsageDay[], key: 'models' | 'projects'): [string, number][] {
+  const sums = new Map<string, number>();
+  for (const day of days)
+    for (const [id, tokens] of Object.entries(day[key])) sums.set(id, (sums.get(id) ?? 0) + tokens);
+  return [...sums].filter(([, tokens]) => tokens > 0).sort((a, b) => b[1] - a[1]);
 }
 
-export function usageWindowDays(today: string): number {
-  return (USAGE_WEEKS - 1) * 7 + mondayIndex(today) + 1;
-}
-
-function levelsFor(totals: number[]): (total: number) => UsageCell['level'] {
-  const used = totals.filter((total) => total > 0).sort((a, b) => a - b);
-  const cut = (p: number) => used[Math.floor(p * (used.length - 1))] ?? 0;
-  const [low, mid, high] = [cut(0.25), cut(0.5), cut(0.75)];
-  return (total) => (total <= 0 ? 0 : total <= low ? 1 : total <= mid ? 2 : total <= high ? 3 : 4);
-}
-
-export function usageGrid(
+export function usageSummary(
   days: readonly DailyUsageDay[],
   today: string,
-  shownWeeks: number = USAGE_WEEKS,
-): UsageGrid {
-  const byDate = new Map(days.map((day) => [day.date, day]));
-  const windowDays = (shownWeeks - 1) * 7 + mondayIndex(today) + 1;
-  const start = shiftDay(today, -(windowDays - 1));
-  const level = levelsFor(days.map((day) => day.coordinator + day.tasks));
-  const recentFrom = shiftDay(today, -(USAGE_SUM_DAYS - 1));
-  const weeks: UsageCell[][] = [];
-  const monthStarts: (number | null)[] = [];
-  let lastMonth = -1;
-  for (let w = 0; w < shownWeeks; w++) {
-    const week: UsageCell[] = [];
-    for (let d = 0; d < 7; d++) {
-      const date = shiftDay(start, w * 7 + d);
-      const day = byDate.get(date);
-      const coordinator = day?.coordinator ?? 0;
-      const tasks = day?.tasks ?? 0;
-      const total = coordinator + tasks;
-      week.push({
-        date,
-        weekday: d,
-        future: date > today,
-        coordinator,
-        tasks,
-        total,
-        level: level(total),
-      });
-    }
-    const [, month, dayOfMonth] = parts(shiftDay(start, w * 7));
-    const shows = month !== lastMonth && (w > 0 || dayOfMonth <= 7);
-    monthStarts.push(shows ? month : null);
-    if (shows || w > 0) lastMonth = month;
-    weeks.push(week);
-  }
-  const recentTotal = days
-    .filter((day) => day.date >= recentFrom && day.date <= today)
-    .reduce((sum, day) => sum + day.coordinator + day.tasks, 0);
-  return { today, days: windowDays, weeks, monthStarts, recentTotal };
+  range: UsageRange,
+): UsageSummary {
+  const from = shiftDay(today, -(range - 1));
+  const shown = days.filter((day) => day.date >= from && day.date <= today);
+  const first = shown[0]?.date;
+  const used = days.some((day) => day.date < from);
+  const since = !used && first !== undefined && first > from ? first : null;
+  const lastWeek = shiftDay(today, -(MIN_SLOTS - 1));
+  const start = (since ?? from) < lastWeek ? (since ?? from) : lastWeek;
+  const byDate = new Map(shown.map((day) => [day.date, day]));
+  const slots: UsageSlot[] = [];
+  for (let date = start; date <= today; date = shiftDay(date, 1))
+    slots.push({ date, day: byDate.get(date) ?? null });
+  const sum = (pick: (day: DailyUsageDay) => number) =>
+    shown.reduce((total, day) => total + pick(day), 0);
+  const coordinator = sum((day) => day.coordinator);
+  const tasks = sum((day) => day.tasks);
+  const input = sum((day) => day.input);
+  const cacheRead = sum((day) => day.cacheRead);
+  const before = days
+    .filter((day) => day.date >= shiftDay(from, -range) && day.date < from)
+    .reduce((total, day) => total + day.coordinator + day.tasks, 0);
+  const models = ranked(shown, 'models');
+  return {
+    from,
+    since,
+    slots,
+    usedDays: shown.length,
+    total: coordinator + tasks,
+    coordinator,
+    tasks,
+    input,
+    output: sum((day) => day.output),
+    cacheRead,
+    cacheWrite: sum((day) => day.cacheWrite),
+    cacheHit: input + cacheRead === 0 ? null : cacheRead / (input + cacheRead),
+    tasksRun: new Set(shown.flatMap((day) => day.todos)).size,
+    cost:
+      shown.length > 0 && shown.every((day) => day.cost !== null)
+        ? sum((day) => day.cost ?? 0)
+        : null,
+    change: before > 0 ? (coordinator + tasks) / before - 1 : null,
+    models,
+    projects: ranked(shown, 'projects'),
+    chartModels:
+      models.length > TOP_MODELS + 1
+        ? [...models.slice(0, TOP_MODELS).map(([key]) => key), OTHER_MODELS]
+        : models.map(([key]) => key),
+  };
+}
+
+export function modelSeries(day: DailyUsageDay, chartModels: readonly string[]): number[] {
+  const named = chartModels.filter((key) => key !== OTHER_MODELS);
+  return chartModels.map((key) =>
+    key === OTHER_MODELS
+      ? Object.entries(day.models)
+          .filter(([model]) => !named.includes(model))
+          .reduce((total, [, tokens]) => total + tokens, 0)
+      : (day.models[key] ?? 0),
+  );
+}
+
+export function axisMax(value: number): number {
+  if (value <= 0) return 1e6;
+  const power = 10 ** Math.floor(Math.log10(value));
+  const step = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((m) => m * power >= value) ?? 10;
+  return step * power;
 }
 
 export function formatTokens(n: number): string {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(n >= 1e10 ? 1 : 2)}B`;
   if (n >= 1e6) return `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)}M`;
   if (n >= 1e3) return `${Math.round(n / 1e3)}K`;
   return `${n}`;
+}
+
+export function formatAxis(n: number): string {
+  if (n >= 1e9) return `${+(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `${+(n / 1e6).toFixed(1)}M`;
+  return `${Math.round(n / 1e3)}K`;
 }

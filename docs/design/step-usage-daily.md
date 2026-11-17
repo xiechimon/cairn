@@ -38,7 +38,7 @@ Indexes: `(teamId, createdAt)` for the dated read, `(buildId, model)` and `(step
 
 ## Daily read
 
-`dailyUsage(db, teamId, { days, tz, now })` in a new `apps/server/src/services/usage-daily.ts`, served by `GET /api/teams/:id/usage/daily?days=<1..371>&tz=<IANA>` behind `requireTeam`. An unknown `tz` (rejected by `Intl.DateTimeFormat`) or `days` out of range is a 400. The response is `{ days: [{ date: 'YYYY-MM-DD', coordinator: number, tasks: number }] }`, ascending, only days with a non-zero total; the zod schema lives in `packages/shared`.
+`dailyUsage(db, teamId, { days, tz, now })` in a new `apps/server/src/services/usage-daily.ts`, served by `GET /api/teams/:id/usage/daily?days=<1..371>&tz=<IANA>` behind `requireTeam`. An unknown `tz` (rejected by `Intl.DateTimeFormat`) or `days` out of range is a 400. The response is `{ days, models, projects }`. Each day (ascending, only days with a non-zero total) carries `date`, `coordinator`, `tasks`, the four token types, tokens per model key and per project id, the ids of the todos that used tokens, and `cost` priced from the team's provider rates, or null when a model on that day has none. `models` names each model key with its provider label and `projects` names each project id. Every source keeps the four token types apart (a legacy Coordinator turn's mirrored share is removed in proportion), and a task row's project comes from its todo; Coordinator usage has no project. The zod schema lives in `packages/shared`.
 
 ### Window
 
