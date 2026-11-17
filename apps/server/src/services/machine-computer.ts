@@ -64,6 +64,7 @@ import {
 import type { TeamStreamHub } from './events.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { type GateResult, isOwnComputerTool, ownComputerGate } from './own-computer.js';
 import { sendMustReachAlert } from './push-alerts.js';
 
 export const COMPUTER_OUTPUT_HEAD_CHARS = 16 * 1024;
@@ -622,9 +623,8 @@ function selectTarget(
   tool: ComputerTool,
 ): { machineId: string; computerId: string | null; scopeKey?: string } {
   const { db, machineHub } = deps;
-  const wantsOwn = tool.startsWith('user_computer_');
   const capable = (row: typeof machine.$inferSelect): boolean =>
-    wantsOwn ? row.capabilities?.ownComputer === true : row.capabilities?.computer === true;
+    row.capabilities?.computer === true;
   const fleet = db
     .select()
     .from(machine)
@@ -634,17 +634,6 @@ function selectTarget(
     .filter(capable);
   const connected = fleet.filter((row) => machineHub.isConnected(row.id));
   const live = connected.filter((row) => machineAcceptsTool(row, tool));
-
-  if (wantsOwn) {
-    const chosen = connected[0];
-    if (chosen) return { machineId: chosen.id, computerId: null };
-    throw new HttpError(
-      409,
-      fleet.length === 0
-        ? 'no machine in this team offers its own computer'
-        : COMPUTER_NOT_CONNECTED,
-    );
-  }
 
   const scopeKey = `chief:${chiefId}`;
   const existing = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
@@ -733,15 +722,6 @@ async function waitForCall(
     signal.removeEventListener('abort', onAbort);
   }
 }
-
-export const OWN_COMPUTER_UNGATED_MESSAGE =
-  "ian's own computer tools stay off until their approval gate ships";
-
-export type OwnComputerGate = (input: { stepId: string; tool: ComputerTool }) => void;
-
-export const refuseOwnComputerUntilGated: OwnComputerGate = () => {
-  throw new HttpError(403, OWN_COMPUTER_UNGATED_MESSAGE);
-};
 
 type HandoffWait = 'handed_back' | 'not_done';
 
@@ -1090,7 +1070,7 @@ export async function forwardComputerCall(
   body: MachineComputerRelayBody,
   opts: {
     signal?: AbortSignal;
-    ownComputerGate?: OwnComputerGate;
+    ownComputer?: { timeoutMs?: number; pollMs?: number };
     takeover?: { timeoutMs?: number; pollMs?: number };
   } = {},
 ): Promise<ComputerRelayResult> {
@@ -1107,8 +1087,14 @@ export async function forwardComputerCall(
 
   const tool = body.name;
   if (tool === 'computer_manage') throw new HttpError(400, COMPUTER_MANAGE_PANEL_ONLY);
-  if (tool.startsWith('user_computer_')) {
-    (opts.ownComputerGate ?? refuseOwnComputerUntilGated)({ stepId, tool });
+  let own: Extract<GateResult, { kind: 'granted' }> | null = null;
+  if (isOwnComputerTool(tool)) {
+    const gate = await ownComputerGate(deps, stepRow, thread, tool, body.toolCallId, body.params, {
+      ...opts.ownComputer,
+      ...(opts.signal === undefined ? {} : { signal: opts.signal }),
+    });
+    if (gate.kind === 'refused') return { text: gate.text };
+    own = gate;
   }
   const safe = COMPUTER_REPLAY_SAFE_TOOLS.has(tool);
   const latest = latestComputerAttempt(db, stepId, body.toolCallId);
@@ -1157,7 +1143,10 @@ export async function forwardComputerCall(
   );
   if (refusal !== null) return { text: refusal };
 
-  const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
+  const target =
+    own === null
+      ? selectTarget(deps, thread.teamId, thread.chiefId, tool)
+      : { machineId: own.machineId, computerId: null };
   const secretActions =
     tool === 'browser_act' && Array.isArray(body.params.actions)
       ? body.params.actions
@@ -1312,7 +1301,8 @@ export async function forwardComputerCall(
     tool,
     params: body.params,
     deadlineAt,
-    ...(target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
+    ...('scopeKey' in target && target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
+    ...(own === null ? {} : { ownComputerGrant: own.stamp }),
   };
   try {
     if (browserRows.length > 0)

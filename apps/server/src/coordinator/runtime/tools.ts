@@ -198,6 +198,7 @@ export function coordinatorToolsExtension(
     routerTools?: boolean;
     desktopTools?: boolean;
     vmComputer?: boolean;
+    ownComputer?: boolean;
     shuttingDown?: () => boolean;
     beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>;
     storeId?: () => string | undefined;

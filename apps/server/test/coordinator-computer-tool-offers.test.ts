@@ -5,8 +5,12 @@ import {
   coordinatorToolDefs,
 } from '../src/services/coordinator-tool-defs.js';
 
-const computerNames = (desktopTools: boolean, vmComputer = desktopTools) =>
-  coordinatorToolDefs({ desktopTools, vmComputer })
+const computerNames = (
+  desktopTools: boolean,
+  vmComputer = desktopTools,
+  ownComputer = desktopTools,
+) =>
+  coordinatorToolDefs({ desktopTools, vmComputer, ownComputer })
     .map((def) => def.name)
     .filter((name) => (COMPUTER_TOOLS as readonly string[]).includes(name))
     .sort();
@@ -26,6 +30,23 @@ describe('Coordinator computer tool offers', () => {
       (name) => 'offered' in COORDINATOR_COMPUTER_TOOL_OFFERS[name],
     ).sort();
     expect(computerNames(true)).toEqual(offered);
+  });
+
+  test("the owner's Mac tools are offered only for an owner turn with the switch on, and keep the Mac prefix", () => {
+    expect(computerNames(true, true, false)).not.toContain('user_computer_observe');
+    const mac = ['user_computer_act', 'user_computer_observe', 'user_computer_shell'];
+    expect(computerNames(false, false, true).filter((name) => name.startsWith('user_'))).toEqual(
+      mac,
+    );
+    const defs = coordinatorToolDefs({ ownComputer: true, desktopTools: true });
+    for (const name of mac)
+      expect(defs.find((def) => def.name === name)?.description).toMatch(
+        /^The owner's own Mac, not your VM computer/,
+      );
+    for (const name of ['computer_observe', 'computer_act'])
+      expect(defs.find((def) => def.name === name)?.description).toMatch(
+        /^Your VM computer, not the owner's Mac/,
+      );
   });
 
   test('install_packages is offered only with a VM computer', () => {

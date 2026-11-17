@@ -4,6 +4,13 @@ import {
   ASK_USER_QUESTION_KIND,
   type AskUserQuestion,
   type AskUserQuestionContent,
+  OWN_COMPUTER_ACTIONS,
+  OWN_COMPUTER_ALLOW_COMMAND,
+  OWN_COMPUTER_ALLOW_CONVERSATION,
+  OWN_COMPUTER_ALLOW_ONCE,
+  OWN_COMPUTER_APP_ACTION,
+  OWN_COMPUTER_DENY,
+  OWN_COMPUTER_SHELL_ACTION,
   type UserRecord,
 } from '@cairn/shared';
 import { and, eq, inArray, lte } from 'drizzle-orm';
@@ -39,7 +46,7 @@ export const APPROVE_CHOICE = '批准执行';
 export const REFUSE_CHOICE = '不执行';
 
 type ProposalStatus = 'pending' | 'refused' | 'executed' | 'failed' | 'expired' | 'superseded';
-type Decision = 'refuse' | 'allow-once' | 'always';
+export type Decision = 'refuse' | 'allow-once' | 'always' | 'conversation';
 type ProposalRow = typeof actionProposal.$inferSelect;
 
 export interface ProposeInput {
@@ -50,6 +57,7 @@ export interface ProposeInput {
   threadId: string;
   scopeProjectId: string | null;
   card?: readonly AskUserQuestion[];
+  subscribe?: boolean;
   now?: number;
 }
 
@@ -187,9 +195,22 @@ function cardRow(tx: ProjectTx, proposalId: string) {
     .get();
 }
 
+const OWN_COMPUTER_CHOICES: Record<Decision, string> = {
+  'allow-once': OWN_COMPUTER_ALLOW_ONCE,
+  conversation: OWN_COMPUTER_ALLOW_CONVERSATION,
+  always: OWN_COMPUTER_ALLOW_COMMAND,
+  refuse: OWN_COMPUTER_DENY,
+};
+
+function choiceOf(actionId: string, decision: Decision): string {
+  if (OWN_COMPUTER_ACTIONS.includes(actionId)) return OWN_COMPUTER_CHOICES[decision];
+  return decision === 'allow-once' ? APPROVE_CHOICE : REFUSE_CHOICE;
+}
+
 function settleCard(
   tx: ProjectTx,
   proposalId: string,
+  actionId: string,
   status: ProposalStatus,
   decision: Decision | null,
   now: number,
@@ -205,7 +226,7 @@ function settleCard(
           status: 'answered',
           answers: content.questions.map((question) => ({
             header: question.header,
-            choices: [decision === 'allow-once' ? APPROVE_CHOICE : REFUSE_CHOICE],
+            choices: [choiceOf(actionId, decision)],
           })),
           answeredAt: now,
           answeredBy: 'person',
@@ -274,8 +295,27 @@ function closeProposal(
     .set({ status, decision, decidedBy, decidedAt: now })
     .where(eq(actionProposal.id, row.id))
     .run();
-  settleCard(tx, row.id, status, decision, now);
+  settleCard(tx, row.id, row.actionId, status, decision, now);
   writeWakes(tx, row.id, status);
+}
+
+export function endPendingProposal(
+  db: Pick<Db, 'transaction'>,
+  proposalId: string,
+  status: 'expired' | 'superseded',
+  now = nowMs(),
+): void {
+  db.transaction(
+    (tx) => {
+      const row = tx.select().from(actionProposal).where(eq(actionProposal.id, proposalId)).get();
+      if (row?.status === 'pending') closeProposal(tx, row, status, null, null, now);
+    },
+    { behavior: 'immediate' },
+  );
+}
+
+export function endPendingProposalIn(tx: ProjectTx, row: ProposalRow, status: 'superseded') {
+  if (row.status === 'pending') closeProposal(tx, row, status, null, null, nowMs());
 }
 
 export function settlePendingProposal(
@@ -304,7 +344,8 @@ export function proposeAction(
       const cardLost =
         pending !== undefined && input.card !== undefined && cardRow(tx, pending.id) === undefined;
       if (pending && pending.inputHash === inputHash && !cardLost) {
-        addSubscriber(tx, pending.id, input.threadId, input.scopeProjectId);
+        if (input.subscribe !== false)
+          addSubscriber(tx, pending.id, input.threadId, input.scopeProjectId);
         return { proposalId: pending.id, created: false };
       }
       if (pending) closeProposal(tx, pending, 'superseded', null, null, now);
@@ -325,7 +366,8 @@ export function proposeAction(
           decidedAt: null,
         })
         .run();
-      addSubscriber(tx, proposalId, input.threadId, input.scopeProjectId);
+      if (input.subscribe !== false)
+        addSubscriber(tx, proposalId, input.threadId, input.scopeProjectId);
       if (input.card !== undefined) {
         insertCard(tx, proposalId, input.threadId, input.scopeProjectId, input.card, now);
       }
@@ -374,6 +416,10 @@ function runTodoDelete(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: n
 }
 
 function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: number) {
+  if (OWN_COMPUTER_ACTIONS.includes(row.actionId)) {
+    journal(tx, row, 'run', now);
+    return;
+  }
   if (row.actionId === BROWSER_PASSWORD_ACTION) {
     validateBrowserPasswordApproval(tx, row.teamId, JSON.parse(row.inputJson));
     journal(tx, row, 'run', now);
@@ -417,6 +463,9 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
       if (row.actionId === BROWSER_PASSWORD_ACTION && !isOwner(deps.db, input.decidedBy)) {
         throw new HttpError(403, 'only the owner can authorize a browser password website');
       }
+      if (OWN_COMPUTER_ACTIONS.includes(row.actionId) && !isOwner(deps.db, input.decidedBy)) {
+        throw new HttpError(403, "only the owner can let the agent use the owner's Mac");
+      }
       const digest = storedCardDigest(row);
       if (digest !== null && input.viaCard !== true) {
         throw new HttpError(409, `proposal ${input.proposalId} is answered on its card`);
@@ -428,7 +477,11 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
         outcome.expired = true;
         return;
       }
-      if (input.decision === 'always') throw new HttpError(409, 'standing grant not offered');
+      const standing =
+        (input.decision === 'conversation' && row.actionId === OWN_COMPUTER_APP_ACTION) ||
+        (input.decision === 'always' && row.actionId === OWN_COMPUTER_SHELL_ACTION);
+      if ((input.decision === 'always' || input.decision === 'conversation') && !standing)
+        throw new HttpError(409, 'standing grant not offered');
       if (input.decision === 'refuse') {
         closeProposal(tx, row, 'refused', 'refuse', input.decidedBy, now);
         outcome.status = 'refused';
@@ -442,13 +495,14 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
       } catch {
         handlerFailed = true;
       }
+      const granted = standing ? input.decision : 'allow-once';
       if (handlerFailed) {
         journal(tx, row, 'error', now);
-        closeProposal(tx, row, 'failed', 'allow-once', input.decidedBy, now);
+        closeProposal(tx, row, 'failed', granted, input.decidedBy, now);
         outcome.status = 'failed';
         return;
       }
-      closeProposal(tx, row, 'executed', 'allow-once', input.decidedBy, now);
+      closeProposal(tx, row, 'executed', granted, input.decidedBy, now);
       outcome.status = 'executed';
     },
     { behavior: 'immediate' },

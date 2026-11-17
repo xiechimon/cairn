@@ -14,6 +14,7 @@ import {
 } from '../src/db/schema.js';
 import { TeamStreamHub } from '../src/services/events.js';
 import {
+  computerCallId,
   dropComputerWaiters,
   forwardComputerCall,
   receiveComputerFrames,
@@ -292,27 +293,33 @@ describe('private computer principal boundary with two server-bound AppContexts'
   });
 
   test('host-null feed resolves Bob through the step, even when MachineDeps.user is Alice', async () => {
-    const { s, bob, aliceApp, bobApp, calls, deps } = await world();
+    const { s, bob, aliceApp, bobApp } = await world();
     const a = await rawStream(aliceApp, s.team.id);
     const b = await rawStream(bobApp, s.team.id);
-    const result = forwardComputerCall(
-      deps,
-      'sidecar',
-      `step-${bob.id}`,
-      {
-        computer: true,
-        name: 'user_computer_shell',
+    const callId = computerCallId(`step-${bob.id}`, 'host-shell');
+    s.db
+      .insert(computerCall)
+      .values({
+        id: callId,
+        teamId: s.team.id,
+        stepId: `step-${bob.id}`,
         toolCallId: 'host-shell',
+        machineId: 'worker',
+        computerId: null,
+        tool: 'user_computer_shell',
+        replaySafe: false,
         params: { command: 'echo private-host-bob' },
-      },
-      { ownComputerGate: () => {} },
-    );
-    const call = calls.at(-1);
-    if (!call) throw new Error('machine did not receive host call');
-    receiveComputerFrames(s.db, s.hub, 'worker', call.callId, [
-      { kind: 'done', seq: 1, text: 'host-bob', exitCode: 0 },
+        state: 'dispatched',
+        deadlineAt: Date.now() + 60_000,
+        createdAt: 1,
+      })
+      .run();
+    receiveComputerFrames(s.db, s.hub, 'worker', callId, [
+      { kind: 'output', seq: 1, stream: 'stdout', text: 'host-bob ' },
     ]);
-    await result;
+    receiveComputerFrames(s.db, s.hub, 'worker', callId, [
+      { kind: 'done', seq: 2, text: 'host-bob', exitCode: 0 },
+    ]);
     s.hub.publish(s.team.id, (conn) => ({
       type: 'machine_presence',
       seq: conn.nextSeq(),

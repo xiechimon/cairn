@@ -4,6 +4,7 @@ import {
   chiefSendMessageBodySchema,
   coordinatorPageQuerySchema,
   coordinatorSendBodySchema,
+  OWN_COMPUTER_ACTIONS,
   patchChiefBodySchema,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
@@ -16,7 +17,9 @@ import { jsonBody, requireTeam, svcOf } from './routes-helpers.js';
 import {
   APPROVE_CHOICE,
   answerProposal,
+  type Decision,
   dispatchActionWakes,
+  proposalById,
   proposalCardId,
 } from './services/action-proposals.js';
 import { sendBuildSteer } from './services/builds.js';
@@ -42,6 +45,7 @@ import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './servic
 import { readCoordinatorPage } from './services/coordinator.js';
 import { isJobOwnerCaller, jobSubmitAnswerActor } from './services/job-applications.js';
 import { isChiefConversation } from './services/machines.js';
+import { ownComputerDecisionOf } from './services/own-computer.js';
 import {
   cancelQueuedMessage,
   deliverQueuedMessage,
@@ -57,7 +61,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     threadId: string,
     requestId: string,
     proposalId: string,
-    decision: 'allow-once' | 'refuse',
+    decision: Decision,
     c: Parameters<typeof pairedDeviceIdOf>[0],
   ) => {
     if (requestId !== proposalCardId(proposalId)) throw notFound(`question ${requestId}`);
@@ -208,8 +212,16 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const proposalId = card === null ? null : proposalIdOfCard(card);
     if (card !== null && proposalId !== null) {
       const choices = answers.length === 1 ? answers[0]?.choices : undefined;
-      const approved = choices?.length === 1 && choices[0] === APPROVE_CHOICE;
-      answerCard(teamId, threadId, requestId, proposalId, approved ? 'allow-once' : 'refuse', c);
+      const choice = choices?.length === 1 ? choices[0] : undefined;
+      const ownComputer = OWN_COMPUTER_ACTIONS.includes(
+        proposalById(ctx.db, proposalId)?.actionId ?? '',
+      );
+      const decision: Decision = ownComputer
+        ? ownComputerDecisionOf(choice)
+        : choice === APPROVE_CHOICE
+          ? 'allow-once'
+          : 'refuse';
+      answerCard(teamId, threadId, requestId, proposalId, decision, c);
       const settled = ctx.db
         .select()
         .from(chiefMessage)

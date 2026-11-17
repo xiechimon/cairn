@@ -6,6 +6,7 @@ import {
   COMPUTER_REMOTE_TOOLS,
   COMPUTER_VM_TOOLS,
   type ComputerTool,
+  OWN_COMPUTER_TOOLS,
   type RemoteToolDef,
   SLICE1_ACTIONS,
 } from '@cairn/shared';
@@ -19,6 +20,7 @@ export type CoordinatorComputerToolOffer =
   | { offered: 'always' }
   | { offered: 'when_machine_reports_computer' }
   | { offered: 'when_machine_reports_vm_computer' }
+  | { offered: 'when_owner_turn_and_own_computer_on' }
   | { withheld: string };
 
 export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorComputerToolOffer> =
@@ -41,9 +43,9 @@ export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorC
       withheld:
         'only the owner stops, updates, recovers or resets the computer from the Computers panel',
     },
-    user_computer_shell: { withheld: "the owner's own computer waits for its approval gate" },
-    user_computer_observe: { withheld: "the owner's own computer waits for its approval gate" },
-    user_computer_act: { withheld: "the owner's own computer waits for its approval gate" },
+    user_computer_shell: { offered: 'when_owner_turn_and_own_computer_on' },
+    user_computer_observe: { offered: 'when_owner_turn_and_own_computer_on' },
+    user_computer_act: { offered: 'when_owner_turn_and_own_computer_on' },
   };
 
 function actionToolDefs(): RemoteToolDef[] {
@@ -70,7 +72,12 @@ function actionToolDefs(): RemoteToolDef[] {
 }
 
 export function coordinatorToolDefs(
-  options: { routerTools?: boolean; desktopTools?: boolean; vmComputer?: boolean } = {},
+  options: {
+    routerTools?: boolean;
+    desktopTools?: boolean;
+    vmComputer?: boolean;
+    ownComputer?: boolean;
+  } = {},
 ): RemoteToolDef[] {
   return [
     ...CHIEF_REMOTE_TOOLS,
@@ -79,6 +86,7 @@ export function coordinatorToolDefs(
     ...COMPUTER_REMOTE_TOOLS,
     ...(options.desktopTools === true ? COMPUTER_DESKTOP_TOOLS : []),
     ...(options.vmComputer === true ? COMPUTER_VM_TOOLS : []),
+    ...(options.ownComputer === true ? OWN_COMPUTER_TOOLS : []),
     ...actionToolDefs(),
   ];
 }

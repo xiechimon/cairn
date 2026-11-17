@@ -45,6 +45,7 @@ export interface ServerRuntimeConfig {
   factsFor(threadId: string): ReconcileFacts;
   desktopTools?(threadId: string): boolean;
   vmComputer?(threadId: string): boolean;
+  ownComputer?(threadId: string, stepId: string): boolean;
   providersFor?(threadId: string): readonly ProviderBinding[];
   recordConversation?(threadId: string, conversationId: string, entryId: number): void;
   setConversation?(
@@ -78,6 +79,7 @@ interface ThreadState {
   gate: ConversationGate;
   volatile: VolatileContext;
   summary: { ref: ModelRef | null };
+  ownComputer: boolean;
 }
 
 export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi) {
@@ -98,7 +100,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
   const suggestionYields = new Map<string, AbortController>();
   const setup = createSetupTiming();
 
-  const stateOf = (threadId: string, forceReseed = false): ThreadState => {
+  const stateOf = (threadId: string, forceReseed = false, ownComputer = false): ThreadState => {
     const existing = open.get(threadId);
     if (existing !== undefined) return existing;
     const facts = config.factsFor(threadId);
@@ -120,6 +122,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         routerTools: config.routerTools,
         desktopTools: config.desktopTools?.(threadId) === true,
         vmComputer: config.vmComputer?.(threadId) === true,
+        ownComputer,
         shuttingDown: () => shuttingDown,
         ...(inputs === undefined
           ? {}
@@ -176,7 +179,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       config.onReconciled?.(threadId, result.outcome, result.stale);
       return result.harness;
     });
-    const state = { harness, models, gate, volatile, summary, inputs };
+    const state = { harness, models, gate, volatile, summary, inputs, ownComputer };
     open.set(threadId, state);
     harness.catch(() => open.delete(threadId));
     return state;
@@ -237,6 +240,10 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         model: claimed.agent?.modelId ?? '',
       });
       await settleClosing(threadId);
+      const ownComputer = config.ownComputer?.(threadId, claimed.step.id) === true;
+      const stale = open.get(threadId);
+      if (stale !== undefined && stale.ownComputer !== ownComputer && !busy.has(threadId))
+        await closeThread(threadId);
       const prepare = (target: ThreadState): ThreadState => {
         target.models.useProvider(turn.router.config, turn.router.resolveKey);
         target.models.useProvider(turn.summary.config, turn.summary.resolveKey);
@@ -246,7 +253,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         };
         return target;
       };
-      const state = prepare(stateOf(threadId));
+      const state = prepare(stateOf(threadId, false, ownComputer));
       busy.set(threadId, (busy.get(threadId) ?? 0) + 1);
       const suggestionYield = new AbortController();
       suggestionYields.set(threadId, suggestionYield);
@@ -259,7 +266,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         );
         if (synced.action === 'reseed') {
           await closeThread(threadId);
-          current = prepare(stateOf(threadId, true));
+          current = prepare(stateOf(threadId, true, ownComputer));
           await current.harness;
         } else if (synced.action === 'forked') {
           config.recordConversation?.(threadId, synced.conversationId, synced.entryId);

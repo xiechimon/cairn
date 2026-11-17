@@ -1,0 +1,1 @@
+ALTER TABLE `machine` ADD `ownComputerEnabled` integer DEFAULT false NOT NULL;

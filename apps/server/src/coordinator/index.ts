@@ -39,6 +39,7 @@ import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { serverTakesTurn } from '../services/machine-claim.js';
 import { teamOffersDesktop } from '../services/machine-computer.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
+import { ownComputerOffered } from '../services/own-computer.js';
 import { ownershipOf } from '../services/owner.js';
 import { listedProjects } from '../services/personal-space.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
@@ -289,6 +290,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         const teamId = threadTeam(threadId);
         return teamId !== null && teamHasVmComputer(db, teamId);
       },
+      ownComputer: (threadId, stepId) => ownComputerOffered(db, threadId, stepId),
       providersFor: (threadId) => {
         const teamId = threadTeam(threadId);
         const providers =
@@ -562,6 +564,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           routerTools: options.routerTools ?? true,
           desktopTools: teamOffersDesktop(db, threadRow.teamId),
           vmComputer: teamHasVmComputer(db, threadRow.teamId),
+          ownComputer: ownComputerOffered(db, row.buildId, row.id),
         }),
       },
       volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),

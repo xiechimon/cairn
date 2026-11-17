@@ -230,6 +230,17 @@ export class MachineWakeHub {
     }
   }
 
+  pushComputerCancel(machineId: string, callId: string): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send({ type: 'computer.cancel', callId });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   onStop(stepId: string, listener: () => void): () => void {
     let set = this.stopListeners.get(stepId);
     if (!set) {

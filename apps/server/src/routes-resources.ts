@@ -74,7 +74,7 @@ import {
 } from './services/github-connection-device.js';
 import { adoptGithubProfile } from './services/github-profile.js';
 import { isOwner } from './services/instance-owner.js';
-import { pendingComputerOutputRelease } from './services/machine-computer.js';
+import { pendingComputerOutputRelease, settleComputerCall } from './services/machine-computer.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
 import {
   machineConcurrencyPatch,
@@ -110,6 +110,11 @@ import {
   startMcpConnectorAuthorize,
   startOAuthAuthorize,
 } from './services/oauth.js';
+import {
+  listOwnComputerGrants,
+  revokeOwnComputerGrant,
+  setOwnComputerEnabled,
+} from './services/own-computer.js';
 import {
   listUpstreamModels,
   ProviderTestLimiter,
@@ -270,6 +275,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         'runtimes follow what the Runner detects; there is no runtime switch to change',
       );
     }
+    if (body.ownComputerEnabled !== undefined) {
+      if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
+      const cancelled = setOwnComputerEnabled(ctx, row, body.ownComputerEnabled);
+      for (const callId of cancelled) settleComputerCall(ctx.db, callId, ctx.hub);
+    }
     const patch = {
       ...(body.browserOverride !== undefined ? { browserOverride: body.browserOverride } : {}),
       ...(body.desktopOverride !== undefined ? { desktopOverride: body.desktopOverride } : {}),
@@ -285,6 +295,24 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const updated = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
     if (!updated) throw notFound(`machine ${id}`);
     return c.json(toMachineRecord(updated, machineRunningCount(ctx.db, id)));
+  });
+
+  const ownedMachine = (c: Context) => {
+    const id = c.req.param('id') ?? '';
+    const row = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
+    if (!row) throw notFound(`machine ${id}`);
+    requireTeam(ctx, row.teamId);
+    if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
+    return row;
+  };
+
+  app.get('/api/machines/:id/own-computer/grants', (c) =>
+    c.json({ grants: listOwnComputerGrants(ctx.db, ownedMachine(c)) }),
+  );
+
+  app.delete('/api/machines/:id/own-computer/grants/:proposalId', (c) => {
+    revokeOwnComputerGrant(ctx.db, ownedMachine(c), c.req.param('proposalId'));
+    return c.body(null, 204);
   });
 
   app.delete('/api/machines/:id', (c) => {
