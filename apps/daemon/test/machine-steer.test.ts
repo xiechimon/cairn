@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import type { AgentBackend, DeliveredImage, MachineSteerResponse, StepEvent } from '@cairn/shared';
 import { formatAttachmentToken } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { PI_CAPABILITIES, PI_DAEMON_SETTINGS } from '../src/backend/pi.js';
+import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { MachineClient } from '../src/machine-client.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 
@@ -527,9 +527,5 @@ describe('steer batches: interruptions sent while the model works are read toget
       await handle.stop();
       await handle.done;
     }
-  });
-
-  test('the daemon pi session reads every queued interruption at once, like the Coordinator runtime', () => {
-    expect(PI_DAEMON_SETTINGS.steeringMode).toBe('all');
   });
 });

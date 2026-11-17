@@ -53,11 +53,12 @@ describe('#925 D1 project trust: deny + protected resources observable', () => {
 });
 
 describe('#925 D2/D3 telemetry off + settings bypass declaration', () => {
-  test('PI_DAEMON_SETTINGS declaration surface: telemetry explicitly off, cache warmup explicitly off, compaction on', () => {
+  test('PI_DAEMON_SETTINGS declaration surface: telemetry explicitly off, cache warmup explicitly off, compaction on, every queued steer read at once', () => {
     expect(PI_DAEMON_SETTINGS).toEqual({
       compaction: { enabled: true },
       enableInstallTelemetry: false,
       cacheWarming: 'off',
+      steeringMode: 'all',
     });
   });
 
@@ -66,6 +67,7 @@ describe('#925 D2/D3 telemetry off + settings bypass declaration', () => {
     expect(settings.enableInstallTelemetry).toBe(false);
     expect(settings.cacheWarming).toBe('off');
     expect(settings.compaction?.enabled).toBe(true);
+    expect(settings.steeringMode).toBe('all');
   });
 
   test('PI_SETTINGS_BYPASS list covers the four families named on the ticket (trust/retry/modelOverrides/httpProxy)', () => {
