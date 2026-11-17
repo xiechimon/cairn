@@ -11,7 +11,11 @@ import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { step as stepTable } from '../src/db/schema.js';
-import { ATTACHMENT_ORPHAN_GRACE_MS, sweepStepSessions } from '../src/services/attachment-gc.js';
+import {
+  ATTACHMENT_ORPHAN_GRACE_MS,
+  STEP_SESSION_RETENTION_MS,
+  sweepStepSessions,
+} from '../src/services/attachment-gc.js';
 import { readStepSession, stepSessionPath } from '../src/services/machine-uploads.js';
 import { bootServer, issueApiKey, postProject, req, seedSessionRoute } from './helpers.js';
 
@@ -137,6 +141,26 @@ describe('session JSONL upload and per-step retrieval (#1512)', () => {
     const old = (now - ATTACHMENT_ORPHAN_GRACE_MS - 1000) / 1000;
     utimesSync(path, old, old);
     sweepStepSessions({ db: w.s.db, attachmentsDir: w.s.attachmentsDir, logger: log }, now);
+    expect(existsSync(path)).toBe(false);
+  });
+
+  test('a record of a live step is deleted once it is past the retention period', async () => {
+    const w = await setupWorld();
+    expect((await putSession(w, '{"kept":true}\n')).status).toBe(200);
+    const path = stepSessionPath(w.s.attachmentsDir, w.stepId);
+    const now = Date.now();
+    const log = { info() {}, debug() {} };
+    const recent = (now - STEP_SESSION_RETENTION_MS + 60_000) / 1000;
+    utimesSync(path, recent, recent);
+    sweepStepSessions({ db: w.s.db, attachmentsDir: w.s.attachmentsDir, logger: log }, now);
+    expect(existsSync(path)).toBe(true);
+    const old = (now - STEP_SESSION_RETENTION_MS - 1000) / 1000;
+    utimesSync(path, old, old);
+    const stats = sweepStepSessions(
+      { db: w.s.db, attachmentsDir: w.s.attachmentsDir, logger: log },
+      now,
+    );
+    expect(stats.expired).toBe(1);
     expect(existsSync(path)).toBe(false);
   });
 });

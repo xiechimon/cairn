@@ -1,5 +1,14 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { SESSION_JSONL_MAX_BYTES } from '@cairn/shared';
+import { redactSecrets, SESSION_JSONL_MAX_BYTES } from '@cairn/shared';
+
+export function redactSessionJsonl(content: string): string {
+  return content
+    .split('\n')
+    .map((line) =>
+      line.trim() === '' ? line : JSON.stringify(redactSecrets(JSON.parse(line) as unknown).value),
+    )
+    .join('\n');
+}
 
 export function readSessionJsonlForUpload(
   sessionFile: string | undefined,
@@ -17,7 +26,7 @@ export function readSessionJsonlForUpload(
       log(`session jsonl skipped: ${size}B over ${maxBytes}B cap`);
       return null;
     }
-    return readFileSync(sessionFile, 'utf8');
+    return redactSessionJsonl(readFileSync(sessionFile, 'utf8'));
   } catch (err) {
     log(`session jsonl read failed: ${err instanceof Error ? err.message : String(err)}`);
     return null;
