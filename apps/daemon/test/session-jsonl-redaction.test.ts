@@ -1,16 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { readSessionJsonlForUpload, redactSessionJsonl } from '../src/session-jsonl.js';
 
 const dirs: string[] = [];
 afterEach(() => {
-  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const dir of dirs.splice(0)) releaseTestTempDir(dir);
 });
 
 function sessionFile(content: string): string {
-  const dir = mkdtempSync(join(tmpdir(), 'session-jsonl-'));
+  const dir = makeTestTempDir('session-jsonl-');
   dirs.push(dir);
   const file = join(dir, 'session.jsonl');
   writeFileSync(file, content);
