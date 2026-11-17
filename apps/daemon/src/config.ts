@@ -91,3 +91,11 @@ export function loadDaemonConfig(
     hookTimeoutMs,
   });
 }
+
+export function isolateClaudeConfigDir(home: string, env: NodeJS.ProcessEnv = process.env): string {
+  const existing = env.CLAUDE_CONFIG_DIR;
+  if (existing !== undefined && existing !== '') return existing;
+  const dir = join(home, 'claude');
+  env.CLAUDE_CONFIG_DIR = dir;
+  return dir;
+}
