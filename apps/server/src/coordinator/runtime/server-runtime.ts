@@ -82,6 +82,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
   const context = BACKGROUND_CONTEXT;
   let shuttingDown = false;
   const settings = (models: CoordinatorModels) => () => ({
+    steeringMode: 'all' as const,
     compaction: coordinatorCompactionSettings(
       models.models
         .getModels()

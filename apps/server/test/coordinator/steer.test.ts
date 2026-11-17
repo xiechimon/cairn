@@ -36,10 +36,6 @@ describe('Coordinator steer', () => {
       },
       (c: { messages: unknown[] }) => {
         requests.push(JSON.stringify(c.messages));
-        return fauxAssistantMessage('adjusted');
-      },
-      (c: { messages: unknown[] }) => {
-        requests.push(JSON.stringify(c.messages));
         return fauxAssistantMessage([fauxToolCall('ask_user', QUESTION)], {
           stopReason: 'toolUse',
         });
@@ -123,19 +119,23 @@ describe('Coordinator steer', () => {
     restarted.wake(w.threadId);
     await restarted.idle();
 
-    expect(requests).toHaveLength(4);
-    expect(requests[1]?.split('switch to the cheaper plan')).toHaveLength(2);
+    expect(requests).toHaveLength(3);
+    expect(requests[1]?.split('switch to the cheaper plan')).toHaveLength(3);
     expect(requests[2]?.split('switch to the cheaper plan')).toHaveLength(3);
     expect(w.s.db.select().from(step).all()).toHaveLength(1);
   });
 
-  it('puts each reply to messages sent during a busy turn right under the message it answers', async () => {
+  it('reads every message sent during a busy turn together and answers them once, right under them', async () => {
     const w = await world('start the work');
     const { faux } = stub('unused');
+    const requests: string[] = [];
     faux.setResponses([
       () => fauxAssistantMessage([fauxToolCall('ask_user', QUESTION)], { stopReason: 'toolUse' }),
-      () => fauxAssistantMessage('reply to first'),
-      () => fauxAssistantMessage('reply to second'),
+      (c: { messages: unknown[] }) => {
+        requests.push(JSON.stringify(c.messages));
+        return fauxAssistantMessage('reply to both');
+      },
+      () => fauxAssistantMessage('a second reply that must not happen'),
     ]);
     const coordinator = boot(w, faux);
     coordinator.wake(w.threadId);
@@ -192,9 +192,11 @@ describe('Coordinator steer', () => {
     expect(texts).toEqual([
       'start the work',
       'first interruption',
-      'reply to first',
       'second interruption',
-      'reply to second',
+      'reply to both',
     ]);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toContain('first interruption');
+    expect(requests[0]).toContain('second interruption');
   });
 });
