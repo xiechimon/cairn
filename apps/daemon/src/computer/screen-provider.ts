@@ -2,6 +2,7 @@ import { connect, type Socket } from 'node:net';
 import { Duplex, PassThrough } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { openUserControlPty } from './control-pty.js';
+import type { ComputerHoldUse } from './desktops.js';
 import type { ComputerScreenConnection, ComputerScreenProvider } from './screen-channel.js';
 import { ReadOnlyViewGate } from './view-input.js';
 
@@ -43,7 +44,7 @@ export function openReadOnlyView(): ReadOnlyView {
 }
 
 export interface ComputerScreenProviderOptions {
-  holdComputer?: (scopeKey: string, kind: 'view' | 'control') => Promise<() => void>;
+  holdComputer?: (scopeKey: string, use: ComputerHoldUse) => Promise<() => void>;
   socketPath?: (scopeKey: string, kind: 'view' | 'control') => string;
   terminalCommand?: (scopeKey: string) => Promise<readonly string[]>;
   socketWaitMs?: number;
@@ -145,7 +146,10 @@ export function createComputerScreenProvider(
       }
       if (!options.socketPath) throw new Error('This machine has no computer screen');
       const release = options.holdComputer
-        ? await options.holdComputer(request.scopeKey, request.kind)
+        ? await options.holdComputer(
+            request.scopeKey,
+            request.kind === 'control' && request.handoff === true ? 'handoff' : request.kind,
+          )
         : () => {};
       try {
         const connection = await openUnixScreen(

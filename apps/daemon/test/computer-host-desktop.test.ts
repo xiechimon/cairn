@@ -323,7 +323,7 @@ describe('HostDesktops', () => {
           `host-${process.pid}`,
           join(scopeHome(root, 'chief:a'), '.cairn/cloak-profile/SingletonLock'),
         );
-      await expect(desktops.hold('chief:a', 'control')).rejects.toThrow('did not close');
+      await expect(desktops.hold('chief:a', 'handoff')).rejects.toThrow('did not close');
       expect(
         systemd.calls.some(
           (argv) =>
@@ -350,7 +350,7 @@ describe('HostDesktops', () => {
       },
     });
     await desktops.prepareBrowser();
-    (await desktops.hold('chief:a', 'control'))();
+    (await desktops.hold('chief:a', 'handoff'))();
     const request = {
       argv: ['agent-browser', '--session', 'chief_a-stealth', 'snapshot'],
       timeoutMs: 5_000,
@@ -476,7 +476,7 @@ describe('HostDesktops', () => {
     const systemd = fakeSystemd('96');
     const desktops = new HostDesktops({ root, toolsRoot: root, env, run: systemd.run });
     await desktops.prepareBrowser();
-    (await desktops.hold('chief:a', 'control'))();
+    (await desktops.hold('chief:a', 'handoff'))();
     const directory = join(scopeHome(root, 'chief:a'), '..');
     const starter = join(directory, 'cloak-manual');
     const entry = readFileSync(join(directory, 'cloak-browser.desktop'), 'utf8');
@@ -493,7 +493,7 @@ describe('HostDesktops', () => {
     await desktops.prepareBrowser();
     await desktops.ensure('chief:a');
     systemd.active.add(ownerUnit('chief:a'));
-    (await desktops.hold('chief:a', 'control'))();
+    (await desktops.hold('chief:a', 'handoff'))();
     expect(
       systemd.calls.filter((argv) => basename(argv[0] as string) === 'cloak-manual'),
     ).toHaveLength(1);
@@ -518,7 +518,7 @@ describe('HostDesktops', () => {
     await desktops.prepareBrowser();
     await desktops.ensure('chief:a');
     if (preActive) systemd.active.add(ownerUnit('chief:a'));
-    await expect(desktops.hold('chief:a', 'control')).rejects.toThrow('could not be started');
+    await expect(desktops.hold('chief:a', 'handoff')).rejects.toThrow('could not be started');
     expect(stops(systemd.calls)).toEqual([]);
     expect(quits(systemd.calls)).toEqual([]);
   });
@@ -640,7 +640,7 @@ describe('HostDesktops', () => {
         run: systemd.run,
         browser: prepared,
       });
-      const release = await desktops.hold('chief:a', 'control');
+      const release = await desktops.hold('chief:a', 'handoff');
       await desktops.forScope('chief:a').writeFile('note.txt', 'still here');
       expect(await desktops.forScope('chief:a').readFile('note.txt')).toBe('still here');
       await expect(desktops.forScope('chief:a').execute(request)).rejects.toThrow('taken over');
@@ -885,7 +885,7 @@ esac
     const owner = `cairn-desktop-${createHash('sha256').update('chief:a').digest('hex').slice(0, 16)}-browser.service`;
 
     await desktops.prepareBrowser();
-    const first = await desktops.hold('chief:a', 'control');
+    const first = await desktops.hold('chief:a', 'handoff');
     expect(agentLogAtOwnerStart).toEqual([
       '|--json session list',
       `${profile}|--session chief_a-stealth get url`,
@@ -915,7 +915,7 @@ esac
     };
     await expect(browser.execute(request)).rejects.toThrow('taken over');
 
-    const second = await desktops.hold('chief:a', 'control');
+    const second = await desktops.hold('chief:a', 'handoff');
     first();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(systemd.active.has(owner)).toBe(true);
@@ -924,7 +924,7 @@ esac
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(systemd.active.has(owner)).toBe(true);
 
-    const reconnected = await desktops.hold('chief:a', 'control');
+    const reconnected = await desktops.hold('chief:a', 'handoff');
     reconnected();
     expect(systemd.calls.filter((argv) => argv[0] === starter)).toHaveLength(2);
     expect(systemd.active.has(owner)).toBe(true);
@@ -949,7 +949,7 @@ esac
     const systemd = fakeSystemd('98');
     const desktops = new HostDesktops({ root, toolsRoot: root, env, run: systemd.run });
     await desktops.prepareBrowser();
-    (await desktops.hold('chief:a', 'control'))();
+    (await desktops.hold('chief:a', 'handoff'))();
     const directory = join(scopeHome(root, 'chief:a'), '..');
     expect(systemd.calls.some((argv) => argv[0] === join(directory, 'cloak-manual'))).toBe(false);
     expect(readFileSync(join(root, 'agent-browser.log'), 'utf8')).not.toContain('close');

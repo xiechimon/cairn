@@ -16,7 +16,7 @@ import {
 import { z } from 'zod';
 import { AGENT_BROWSER_BINARY, browserSessionName, isStealthBrowserCommand } from './browser.js';
 import { resolveHostBrowserLocaleAndTimezone } from './cloak-browser.js';
-import type { ComputerDesktops } from './desktops.js';
+import type { ComputerDesktops, ComputerHoldUse } from './desktops.js';
 import { AsyncEventQueue, HOST_MAX_FILE_BYTES } from './host.js';
 import { HOST_DESKTOP_IDLE_STOP_MS } from './host-desktop.js';
 import type { ComputerInputFence, ComputerInputLease } from './input-fence.js';
@@ -309,11 +309,11 @@ export class VmDesktops implements ComputerDesktops {
     return (await this.desktop(scopeKey)).address;
   }
 
-  async hold(scopeKey: string, kind: 'view' | 'control' = 'view'): Promise<() => void> {
+  async hold(scopeKey: string, use: ComputerHoldUse = 'view'): Promise<() => void> {
     this.enter(scopeKey);
     try {
       await this.desktop(scopeKey);
-      if (kind === 'control') await this.takeOver(scopeKey);
+      if (use === 'handoff') await this.takeOver(scopeKey);
     } catch (error) {
       this.leave(scopeKey);
       throw error;
@@ -322,7 +322,7 @@ export class VmDesktops implements ComputerDesktops {
     return () => {
       if (released) return;
       released = true;
-      if (kind === 'control') this.handBack(scopeKey);
+      if (use === 'handoff') this.handBack(scopeKey);
       this.leave(scopeKey);
     };
   }

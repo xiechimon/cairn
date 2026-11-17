@@ -453,17 +453,21 @@ describe('VmDesktops', () => {
     ).rejects.toThrow(message);
   });
 
-  test('takeover relaunches Cloak for the owner only after a stealth call and blocks the agent browser', async () => {
+  test('only a handoff hold relaunches Cloak for the owner, after a stealth call, and blocks the agent browser', async () => {
     const env = setup();
     const desktops = env.make();
     const ownerCalls = () =>
       env.calls().filter((argv) => argv.includes('cairn-browser') && argv.includes('owner'));
-    (await desktops.hold('chief:a', 'control'))();
+    (await desktops.hold('chief:a', 'handoff'))();
     expect(ownerCalls()).toEqual([]);
     const provider = desktops.forScope('chief:a', { browserLicense: 'cloak-test-key' });
     const stealth = ['agent-browser', '--session', 'chief_a-stealth', 'snapshot'];
     await provider.execute(request(stealth));
-    const release = await desktops.hold('chief:a', 'control');
+    const hover = await desktops.hold('chief:a', 'control');
+    await provider.execute(request(stealth));
+    hover();
+    expect(ownerCalls()).toEqual([]);
+    const release = await desktops.hold('chief:a', 'handoff');
     expect(ownerCalls().map((argv) => argv.at(-1))).toEqual(['chief_a-stealth']);
     await expect(provider.execute(request(stealth))).rejects.toThrow('taken over');
     await expect(

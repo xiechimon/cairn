@@ -26,6 +26,15 @@ Owner decision (2026-11-15, superseding the session persistence line above):
 
 The approved [CloakBrowser adapter design](cloakbrowser-computer.md) replaces system Chromium selection, not this handoff. Automation, the no-debugging owner process and the generated Cairn Dock launcher share the Cloak binary and the existing profile's strict fingerprint identity. Preparation requires a license file; failure removes browser capability without removing desktop or files. Owner transfer checks driver close and profile-lock release; the next agent call observes graceful manual-unit exit and lock release. Owner and Dock use one manual starter and visible-window readiness check. The final launcher refuses an agent-owned live profile rather than forwarding a human window into a debugging session. Native Chrome `--restore-last-session` preserves session cookies; it is not the removed agent-browser `--restore` state-file path. Desktop residency and production-profile cutover remain outside this change; target-site recognition effects require separate acceptance.
 
+## Hover control and the owner browser (2026-11-17)
+
+Owner decision: a pointer on the screen is a control lease, and hover happens all the time, so a plain control lease leaves the agent's browsers alone. Only a control screen opened while the computer has a pending handoff (`handoffReason` set by a login detection or by `request_takeover`) closes the agent's stealth session and opens the owner Cloak without a debugging port. The server marks that screen request `handoff: true`, and only for a daemon that reports the `screenHandoff` capability; an older daemon gets no flag and keeps its old behavior. VM and host desktops follow the same rule.
+
+- A control lease taken before the handoff began does not switch browsers; the owner can still log in through the agent's window, which uses the same profile.
+- Debian's xdotool has no `windowquit`, which is why every handback failed with "The owner browser did not close"; the guest now sends `WM_DELETE_WINDOW` itself (see `cairn-browser agent`).
+- The control VNC server releases every modifier key when a viewer disconnects, so a key held as the pointer left cannot turn the agent's later typing into shortcuts.
+- When a plain `browser_navigate` lands on a page with no interactive elements, the daemon opens the same address in the stealth session and says so in the result. Without a CloakBrowser license it returns the no-license refusal, so the Coordinator posts the license card.
+
 ## Goal
 
 When a page in the Coordinator browser needs a login or a human check, the agent stops driving it. The owner gets a card in the conversation and a push that opens it. While the owner holds control, the agent issues no browser action and no screen capture. When the owner gives control back, the agent continues from a fresh snapshot. Passwords, one-time codes and cookies never reach the model.

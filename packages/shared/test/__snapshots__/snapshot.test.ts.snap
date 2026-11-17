@@ -3476,6 +3476,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               "minimum": 0,
               "type": "integer",
             },
+            "handoff": {
+              "const": true,
+              "type": "boolean",
+            },
             "id": {
               "pattern": "^[a-f0-9]{64}$",
               "type": "string",
@@ -12091,6 +12095,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "version",
               ],
               "type": "object",
+            },
+            "screenHandoff": {
+              "const": true,
+              "type": "boolean",
             },
             "secretGateway": {
               "const": true,

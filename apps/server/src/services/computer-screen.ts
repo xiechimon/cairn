@@ -156,6 +156,14 @@ export class ComputerScreenGateway {
     )
       throw new HttpError(429, 'too many computer screen channels');
     const now = Date.now();
+    const handoff =
+      kind === 'control' &&
+      row.handoffReason !== null &&
+      this.deps.db
+        .select({ capabilities: machineTable.capabilities })
+        .from(machineTable)
+        .where(eq(machineTable.id, row.machineId))
+        .get()?.capabilities?.screenHandoff === true;
     const request: ComputerScreenRequest = computerScreenRequestSchema.parse({
       id: randomBytes(32).toString('hex'),
       computerId,
@@ -164,6 +172,7 @@ export class ComputerScreenGateway {
       generation: row.screenGeneration,
       controlLeaseId: kind === 'view' ? null : (leaseId ?? null),
       controlFence: row.controlFence,
+      ...(handoff ? { handoff: true } : {}),
       expiresAt: Math.min(
         now + COMPUTER_SCREEN_CAP_TTL_MS,
         kind === 'view' ? Number.POSITIVE_INFINITY : (row.controlLeaseExpiresAt ?? now),

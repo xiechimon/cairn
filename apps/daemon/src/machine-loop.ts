@@ -310,7 +310,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         ? { browser: true as const, browserSecretFill: true as const }
         : {}),
       ...(hostDesktops?.offersStealthBrowser() ? { stealthBrowser: true as const } : {}),
-      ...(hostDesktops ? { computerKind: hostDesktops.kind } : {}),
+      ...(hostDesktops ? { computerKind: hostDesktops.kind, screenHandoff: true as const } : {}),
       ...(hostComputer ? { ownComputerShell: true as const } : {}),
       ...(ownComputerHost ? { ownComputerHost: true as const } : {}),
       ...(agentDesktop?.current() ? { ownComputer: true as const } : {}),
@@ -441,7 +441,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     provider: createComputerScreenProvider(
       hostDesktops
         ? {
-            holdComputer: (scopeKey, kind) => hostDesktops.hold(scopeKey, kind),
+            holdComputer: (scopeKey, use) => hostDesktops.hold(scopeKey, use),
             socketPath: (scopeKey, kind) => hostDesktops.socketPath(scopeKey, kind),
             ...(hostDesktops instanceof VmDesktops
               ? { terminalCommand: (scopeKey: string) => hostDesktops.terminalCommand(scopeKey) }

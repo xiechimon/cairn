@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { AGENT_BROWSER_BINARY, browserSessionName, isStealthBrowserCommand } from './browser.js';
 import { CloakBrowser, shellQuote, writeCloakLauncher } from './cloak-browser.js';
 import { executableOnPath } from './contained-spawn.js';
-import type { ComputerDesktops } from './desktops.js';
+import type { ComputerDesktops, ComputerHoldUse } from './desktops.js';
 import { HostComputerProvider } from './host.js';
 import type { ComputerInputFence, ComputerInputLease } from './input-fence.js';
 import { type ComputerProcessEvent, type ComputerProvider, ComputerRefusal } from './provider.js';
@@ -338,11 +338,11 @@ export class HostDesktops implements ComputerDesktops {
     return (await this.desktop(scopeKey)).display;
   }
 
-  async hold(scopeKey: string, kind: 'view' | 'control' = 'view'): Promise<() => void> {
+  async hold(scopeKey: string, use: ComputerHoldUse = 'view'): Promise<() => void> {
     this.enter(scopeKey);
     try {
       await this.desktop(scopeKey);
-      if (kind === 'control') await this.takeOver(scopeKey);
+      if (use === 'handoff') await this.takeOver(scopeKey);
     } catch (error) {
       this.leave(scopeKey);
       throw error;
@@ -351,7 +351,7 @@ export class HostDesktops implements ComputerDesktops {
     return () => {
       if (released) return;
       released = true;
-      if (kind === 'control') this.handBack(scopeKey);
+      if (use === 'handoff') this.handBack(scopeKey);
       this.leave(scopeKey);
     };
   }

@@ -19,9 +19,11 @@ export const computerScreenRequestSchema = z
     expiresAt: epochMs,
     controlLeaseId: z.string().nullable(),
     controlFence: z.number().int().nonnegative(),
+    handoff: z.literal(true).optional(),
   })
   .strict()
-  .refine((request) => request.kind === 'view' || request.controlLeaseId !== null);
+  .refine((request) => request.kind === 'view' || request.controlLeaseId !== null)
+  .refine((request) => request.handoff === undefined || request.kind === 'control');
 export type ComputerScreenRequest = z.infer<typeof computerScreenRequestSchema>;
 
 export const openComputerScreenSchema = z

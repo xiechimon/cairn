@@ -188,6 +188,30 @@ describe('screen capabilities and control leases', () => {
     expect(row?.controlHolder).toBe('user');
   });
 
+  test('only a control screen opened during a takeover asks the daemon to hand the browser over', () => {
+    const requests = boot();
+    s.db
+      .update(machine)
+      .set({ capabilities: { mcpServers: [], skills: [], screenHandoff: true } })
+      .where(eq(machine.id, 'screen-machine'))
+      .run();
+    const lease = gateway.acquireControl(s.team.id, s.user.id, 'computer-screen');
+    const control = { kind: 'control' as const, leaseId: lease.leaseId };
+    gateway.open(s.team.id, s.user.id, 'computer-screen', control);
+    s.db
+      .update(computer)
+      .set({ handoffReason: 'login', handoffStepId: 'step', handoffRequestedAt: Date.now() })
+      .where(eq(computer.id, 'computer-screen'))
+      .run();
+    gateway.open(s.team.id, s.user.id, 'computer-screen', { kind: 'view' });
+    gateway.open(s.team.id, s.user.id, 'computer-screen', control);
+    expect(requests.map((request) => [request.kind, request.handoff])).toEqual([
+      ['control', undefined],
+      ['view', undefined],
+      ['control', true],
+    ]);
+  });
+
   test('renewal keeps its fence and release rejects a different lease', () => {
     boot();
     const lease = gateway.acquireControl(s.team.id, s.user.id, 'computer-screen');
