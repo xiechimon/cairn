@@ -1,8 +1,10 @@
 import type {
   DesktopMenuCommand,
   DesktopUpdateState,
+  HostPermissions,
   LocalProvider,
   LocalProviderImport,
+  OwnComputerInstallResult,
 } from '@cairn/shared';
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -20,6 +22,13 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     scan: (): Promise<LocalProvider[]> => ipcRenderer.invoke('local-providers:scan'),
     read: (providerIds: string[]): Promise<LocalProviderImport[]> =>
       ipcRenderer.invoke('local-providers:read', providerIds),
+  },
+  ownComputer: {
+    install: (): Promise<OwnComputerInstallResult | null> =>
+      ipcRenderer.invoke('own-computer:install'),
+    guide: (): Promise<boolean | null> => ipcRenderer.invoke('own-computer:guide'),
+    permissions: (): Promise<HostPermissions | null> =>
+      ipcRenderer.invoke('own-computer:permissions'),
   },
   localRunner: {
     reconnect: (): Promise<void> => ipcRenderer.invoke('local-runner:reconnect'),

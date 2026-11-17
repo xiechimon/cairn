@@ -3,12 +3,14 @@ import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import {
+  AGENT_DESKTOP_VERSION,
   ENV_VARS,
   type MachineJson,
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
 } from '@cairn/shared';
 import { type OtelEnv, withOtelEnv } from './otel-config.js';
+import { ownComputerRunnerEnv } from './own-computer.js';
 import { createRestartBudget } from './restart-budget.js';
 
 const PRIVATE_DIR_MODE = 0o700;
@@ -78,6 +80,7 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
       [ENV_VARS.skillsDir]: join(options.home, 'skills'),
       [ENV_VARS.mcpConfig]: join(options.home, 'mcp.json'),
       CLAUDE_CONFIG_DIR: join(options.home, 'claude'),
+      ...ownComputerRunnerEnv(options.home, process.platform, AGENT_DESKTOP_VERSION),
     },
     options.otelEnv,
   );

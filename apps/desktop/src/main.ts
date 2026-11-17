@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import { format } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
+  AGENT_DESKTOP_HELPER,
+  AGENT_DESKTOP_VERSION,
+  agentDesktopRelease,
   DESKTOP_SHELL_USER_AGENT,
   type DesktopUpdateState,
   ENV_VARS,
@@ -30,6 +33,13 @@ import { appMenuTemplate } from './app-menu.js';
 import { createKeepAwake } from './keep-awake.js';
 import { readLocalProviders, scanLocalProviders } from './local-providers.js';
 import { desktopOtelEnv, type OtelEnv, withOtelEnv } from './otel-config.js';
+import {
+  agentDesktopPath,
+  installAgentDesktop,
+  openPermissionGuide,
+  readPermissions,
+  registerOwnComputerIpc,
+} from './own-computer.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
 import { trayMenuTemplate } from './tray-menu.js';
@@ -72,6 +82,30 @@ function logSecrets(): string[] {
 
 function cairnHome(): string {
   return join(app.getPath('userData'), 'home');
+}
+
+function runnerHome(): string {
+  return join(app.getPath('userData'), 'runner');
+}
+
+function serveOwnComputer(origin: string): void {
+  const toolsRoot = join(runnerHome(), 'tools');
+  const binary = agentDesktopPath(toolsRoot, AGENT_DESKTOP_VERSION);
+  registerOwnComputerIpc(
+    ipcMain,
+    (event: IpcMainInvokeEvent) => event.senderFrame?.origin === origin,
+    {
+      install: () =>
+        installAgentDesktop({
+          toolsRoot,
+          release: agentDesktopRelease(process.arch),
+          version: AGENT_DESKTOP_VERSION,
+          helper: AGENT_DESKTOP_HELPER,
+        }),
+      guide: () => openPermissionGuide(binary),
+      permissions: () => readPermissions(binary),
+    },
+  );
 }
 
 function bundledRoot(name: string): string {
@@ -384,7 +418,7 @@ async function boot(): Promise<void> {
       }
       runnerStarting ??= startLocalRunner({
         root: bundledRoot('runner'),
-        home: join(app.getPath('userData'), 'runner'),
+        home: runnerHome(),
         serverHome: cairnHome(),
         origin,
         ownerToken,
@@ -409,6 +443,7 @@ async function boot(): Promise<void> {
     );
     void removeLeftoverUpdates();
     serveUpdates(server.origin);
+    serveOwnComputer(server.origin);
     openWindow(server.origin);
   } catch (error) {
     quitting = true;
