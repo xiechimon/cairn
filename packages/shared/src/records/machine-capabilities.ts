@@ -114,10 +114,17 @@ export type HostPermissions = z.infer<typeof hostPermissionsSchema>;
 export const VM_DOWNLOAD_PARTS = {
   runtime: 169_630_704,
   kernel: 676_287_269,
+  init: 69_438_946,
   image: 538_256_122,
 } as const;
-export const VM_DOWNLOAD_BYTES =
-  VM_DOWNLOAD_PARTS.runtime + VM_DOWNLOAD_PARTS.kernel + VM_DOWNLOAD_PARTS.image;
+export const VM_DISK_PARTS = {
+  runtime: 489_130_592,
+  kernel: 30_564_864,
+  init: 174_663_680,
+  image: 1_343_890_944,
+} as const;
+export const VM_DOWNLOAD_BYTES = Object.values(VM_DOWNLOAD_PARTS).reduce((a, b) => a + b, 0);
+export const VM_DISK_BYTES = Object.values(VM_DISK_PARTS).reduce((a, b) => a + b, 0);
 
 export const vmDownloadSchema = z
   .object({

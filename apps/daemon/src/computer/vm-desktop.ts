@@ -38,6 +38,7 @@ export const COMPUTER_IMAGE_ENV = 'CAIRN_COMPUTER_IMAGE';
 export const NO_CLOAK_LICENSE = 'No CloakBrowser license; set team secret CLOAKBROWSER_LICENSE_KEY';
 export const VM_DESKTOP_READY_MS = 30_000;
 export const VM_HOME = '/home/agent';
+export const VM_INIT_IMAGE = 'ghcr.io/apple/containerization/vminit:0.54.0';
 export const VM_CONTROL_PORT = 5900;
 export const VM_VIEW_PORT = 5901;
 const VM_USER = '1000';
@@ -731,10 +732,17 @@ export class VmDesktops implements ComputerDesktops {
     try {
       const binary = await this.options.runtime.install((bytes) => this.progress(bytes));
       this.progress(VM_DOWNLOAD_PARTS.runtime + VM_DOWNLOAD_PARTS.kernel);
-      const pulled = await this.run(
-        [binary, 'image', 'pull', '--progress', 'none', '--platform', 'linux/arm64', this.image],
-        { timeoutMs: 30 * 60_000 },
-      );
+      const pull = (image: string) =>
+        this.run(
+          [binary, 'image', 'pull', '--progress', 'none', '--platform', 'linux/arm64', image],
+          {
+            timeoutMs: 30 * 60_000,
+          },
+        );
+      if ((await pull(VM_INIT_IMAGE)).code !== 0)
+        throw new ComputerRefusal('The computer image could not be downloaded');
+      this.progress(VM_DOWNLOAD_PARTS.runtime + VM_DOWNLOAD_PARTS.kernel + VM_DOWNLOAD_PARTS.init);
+      const pulled = await pull(this.image);
       if (pulled.code !== 0)
         throw new ComputerRefusal('The computer image could not be downloaded');
       this.options.runtime.markDownloaded();

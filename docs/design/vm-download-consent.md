@@ -1,6 +1,6 @@
 # Download the Mac Linux VM only after the owner asks
 
-Status: approved (mon X, 2026-11-17). Prototype: the "Linux 虚拟机可选下载原型" artifact in the thread that built it. Builds on [`mac-vm-computer.md`](mac-vm-computer.md).
+Status: approved (mon X, 2026-11-17). Prototype: the optional Linux VM download prototype artifact in the thread that built it. Builds on [`mac-vm-computer.md`](mac-vm-computer.md).
 
 ## Problem
 
@@ -8,7 +8,7 @@ On an Apple-silicon Mac with macOS 26+, the first browser or computer tool call 
 
 ## Decision
 
-- Nothing is downloaded until the owner asks. Two places ask: a default-off `Linux 虚拟机` switch on the first-run confirm step (only when the Coordinator's machine reports a VM computer that is not downloaded), and a `下载` button in the Computers panel, where the VM screen would be.
+- Nothing is downloaded until the owner asks. Two places ask: a default-off Linux VM switch on the first-run confirm step (only when the Coordinator's machine reports a VM computer that is not downloaded), and a Download button in the Computers panel, where the VM screen would be.
 - A tool call before that is refused with a message the Coordinator turns into one sentence and a link to the Computers panel (`/app?pane=machines`). No card in the conversation.
 
 ## States
@@ -22,7 +22,7 @@ On an Apple-silicon Mac with macOS 26+, the first browser or computer tool call 
 | ready | Runtime started and the pinned image pulled once | Marker present, or a runtime expanded by an earlier version (existing installs stay usable) |
 | failed | The last install threw | In-memory, until the next install; the next daemon start shows `absent` |
 
-`doneBytes` counts the runtime package as it streams, adds the kernel when `container system start` returns and the image when `container image pull` returns; `totalBytes` is the sum of the three pinned sizes (`VM_DOWNLOAD_BYTES` in `@cairn/shared`). A runtime already present on the Mac (a running or system `container`) counts as done.
+`doneBytes` counts the runtime package as it streams, adds the kernel when `container system start` returns, then the init image and the desktop image as each `container image pull` returns; `totalBytes` is the sum of the pinned download sizes. Measured from the pinned sources: runtime package 169,630,704 bytes (489,130,592 expanded); kernel tarball 676,287,269 bytes, fully downloaded by `--enable-kernel-install` although only `vmlinux-6.18.56-208-debug` (30,564,864 bytes) is kept; vminit 0.54.0 69,438,946 bytes (174,663,680 unpacked); desktop image 538,256,122 bytes (1,343,890,944 unpacked). Download 1.45 GB, disk about 2.04 GB. `node scripts/vm-download-sizes.mjs --check` re-measures them and fails when a pin changes without the constants (`VM_DOWNLOAD_PARTS`, `VM_DISK_PARTS`) (`VM_DOWNLOAD_BYTES` in `@cairn/shared`). A runtime already present on the Mac (a running or system `container`) counts as done.
 
 ## Paths that read or write it
 
@@ -34,7 +34,7 @@ On an Apple-silicon Mac with macOS 26+, the first browser or computer tool call 
 
 ## Failures
 
-- Download, signature, expand, system start or image pull fails: the install throws, the state is `failed` with the action note, the panel shows `下载没完成` and `重试`. Partial files are removed by the existing provisioning cleanup.
+- Download, signature, expand, system start or image pull fails: the install throws, the state is `failed` with the action note, the panel shows that the download did not finish and offers Retry. Partial files are removed by the existing provisioning cleanup.
 - Daemon restarts mid-install: the call times out on the server (`COMPUTER_MANAGE_TIMEOUT_MS`), the next start reports `absent` and the owner retries; a fully expanded runtime counts as ready.
 - Two install requests: the second joins the first.
 - The Runner goes offline: the action route answers 409 as for every other action.

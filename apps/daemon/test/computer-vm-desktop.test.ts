@@ -278,6 +278,7 @@ describe('VmDesktops', () => {
       totalBytes: VM_DOWNLOAD_BYTES,
     });
     const pulls = env.calls().filter((argv) => argv[0] === 'image');
+    expect(pulls.at(-2)?.at(-1)).toBe('ghcr.io/apple/containerization/vminit:0.54.0');
     expect(pulls.at(-1)).toEqual([
       'image',
       'pull',

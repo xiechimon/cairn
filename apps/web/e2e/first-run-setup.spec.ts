@@ -97,7 +97,7 @@ async function open(page: Page, world: World, path = '/app') {
               browserEnabled: true,
               handoffReason: null,
               kind: 'vm',
-              download: { state: 'absent', doneBytes: 0, totalBytes: 1_384_173_095 },
+              download: { state: 'absent', doneBytes: 0, totalBytes: 1_453_613_041 },
               machine: { id: 'm1', name: 'mac', online: true },
             },
           ],
@@ -179,7 +179,7 @@ test('a Mac whose Linux VM is not downloaded offers it off by default, and downl
   await open(page, off);
   const row = page.getByTestId('first-run-vm');
   await expect(row).toContainText('Linux 虚拟机');
-  await expect(row).toContainText('1.4 GB');
+  await expect(row).toContainText('1.5 GB');
   await expect(row.getByRole('switch')).not.toBeChecked();
   await page.getByTestId('first-run-confirm').click();
   await expect(page.getByTestId('home-c')).toBeVisible();

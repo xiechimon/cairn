@@ -4,11 +4,15 @@ on:
   pull_request:
     paths:
       - apps/daemon/computer-image/**
+      - scripts/vm-download-sizes.mjs
+      - packages/shared/src/records/machine-capabilities.ts
       - .github/workflows/computer-image.yml
   push:
     branches: [main]
     paths:
       - apps/daemon/computer-image/**
+      - scripts/vm-download-sizes.mjs
+      - packages/shared/src/records/machine-capabilities.ts
       - .github/workflows/computer-image.yml
   workflow_dispatch:
 
@@ -31,6 +35,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends nftables
           sudo nft -c -f apps/daemon/computer-image/guard.nft
+
+      - name: Check the pinned Linux VM download sizes
+        run: node scripts/vm-download-sizes.mjs --check
 
   image:
     needs: guard

@@ -90,7 +90,6 @@ export function useFirstRunSetup() {
   const chiefQ = useChief(teamId, live);
   const settingsQ = useRoutingSettings(teamId, live);
   const sourcesQ = useModelSources(teamId, live);
-  const computersQ = useComputers(teamId, live);
   const connections = routingQ.data === undefined ? undefined : (routingQ.data.connections ?? []);
   const models = modelSides(
     coordinatorCanAnswer(chiefQ.data),
@@ -108,10 +107,6 @@ export function useFirstRunSetup() {
     progress,
     connections: connections ?? [],
     machines: machinesQ.data ?? [],
-    vm:
-      computersQ.data?.find(
-        (computer) => computer.kind === 'vm' && computer.download?.state === 'absent',
-      ) ?? null,
     settings,
     options: toModelOptions(sourcesQ.data?.sources ?? []),
     claudeCodeFound: (sourcesQ.data?.sources ?? []).some(
@@ -278,6 +273,11 @@ function ConfirmBody({ setup }: { setup: Setup }) {
   const { t } = useI18n();
   const { patchRule } = useRoutingSettingsMutations(setup.teamId);
   const { manageComputer } = useApiMutations(setup.teamId);
+  const computersQ = useComputers(setup.teamId, setup.live);
+  const vm =
+    computersQ.data?.find(
+      (computer) => computer.kind === 'vm' && computer.download?.state === 'absent',
+    ) ?? null;
   const [downloadVm, setDownloadVm] = useState(false);
   const [changed, setChanged] = useState<Partial<Record<Pick['use'], ModelOption>>>({});
   const suggested = picksOf(setup);
@@ -317,8 +317,8 @@ function ConfirmBody({ setup }: { setup: Setup }) {
         });
       }
       setChanged({});
-      if (downloadVm && setup.vm !== null)
-        manageComputer.mutate({ computerId: setup.vm.id, action: 'install' });
+      if (downloadVm && vm !== null)
+        manageComputer.mutate({ computerId: vm.id, action: 'install' });
     } catch (error) {
       toastError(t('保存失败，请重试。'), error);
     }
@@ -356,13 +356,13 @@ function ConfirmBody({ setup }: { setup: Setup }) {
             </span>
           </li>
         ))}
-        {setup.vm?.download != null && (
+        {vm?.download != null && (
           <li data-testid="first-run-vm" className="flex min-h-13 items-start gap-x-4 py-2">
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="font-title text-foreground">
                 {t('Linux 虚拟机')}
                 <span className="ml-2 font-normal text-meta text-content-tertiary tabular-nums">
-                  {formatDownloadBytes(setup.vm.download.totalBytes)}
+                  {formatDownloadBytes(vm.download.totalBytes)}
                 </span>
               </span>
               <span className="text-pretty text-meta text-content-tertiary">

@@ -5,7 +5,7 @@ import { evidencePanelShot } from './evidence';
 const MACHINE = { id: 'm1', name: 'Mac', online: true, kind: 'local', runningSteps: 0 };
 
 type Download = { state: string; doneBytes: number; totalBytes: number } | null;
-const TOTAL = 1_384_173_095;
+const TOTAL = 1_453_613_041;
 
 const computer = (kind: 'host' | 'vm', download: Download = null) => ({
   id: 'comp-1',
@@ -108,14 +108,14 @@ test.describe('Coordinator computer actions menu', () => {
     );
     const surface = panel.getByTestId('vm-download');
     await expect(surface).toHaveAttribute('data-state', 'absent');
-    await expect(surface).toContainText('1.4 GB');
+    await expect(surface).toContainText('1.5 GB');
     await expect(panel.getByTestId('machine-screen')).toHaveCount(0);
     await expect(panel.getByTestId('computer-actions')).toHaveCount(0);
     await surface.getByTestId('vm-download-start').click();
     await expect(surface).toHaveAttribute('data-state', 'downloading');
     await page.reload();
-    await expect(panel.getByTestId('vm-download')).toContainText('580 MB / 1.4 GB');
-    await expect(panel.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '42');
+    await expect(panel.getByTestId('vm-download')).toContainText('580 MB / 1.5 GB');
+    await expect(panel.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40');
     expect(actions).toEqual(['install']);
   });
 
