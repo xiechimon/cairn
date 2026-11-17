@@ -85,6 +85,32 @@ describe('assembleStepEnv', () => {
     );
     expect(env).toEqual({ CAIRN_ORB: '1', CLAUDE_CODE_OAUTH_TOKEN: 'step' });
   });
+
+  test('a managed devin step replaces HOME and the token', () => {
+    const { env } = assembleStepEnv(
+      input({
+        inherited: { WINDSURF_API_KEY: 'host', HOME: '/Users/real' },
+        devinToken: 'step-token',
+        devinHome: '/managed/devin/home',
+      }),
+    );
+    expect(env.HOME).toBe('/managed/devin/home');
+    expect(env.WINDSURF_API_KEY).toBe('step-token');
+  });
+
+  test('a managed devin step scrubs session vars a devin host shell leaks', () => {
+    const { env } = assembleStepEnv(
+      input({
+        inherited: {
+          CHISEL_SESSION_DB: '/Users/real/.local/share/devin/cli/sessions.db',
+          DEVIN_TRACEPARENT: '00-trace',
+          KEEP: '1',
+        },
+        devinHome: '/managed/devin/home',
+      }),
+    );
+    expect(env).toEqual({ HOME: '/managed/devin/home', KEEP: '1' });
+  });
 });
 
 describe('prepareStepEnv', () => {

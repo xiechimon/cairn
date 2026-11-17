@@ -469,11 +469,17 @@ class AcpBackend implements AgentBackend {
       };
       const confined =
         this.options.confine?.(opts, adapter ? adapter.harness : 'gemini', launch) ?? launch;
+      const childEnv: NodeJS.ProcessEnv = { ...withoutPinnedEnv(process.env), ...opts.env };
+      if (adapter?.harness === 'devin') {
+        for (const key of Object.keys(childEnv)) {
+          if (key.startsWith('CHISEL_') || key.startsWith('DEVIN_')) delete childEnv[key];
+        }
+      }
       child = spawnProcess(confined.command, confined.args, {
         cwd: opts.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
         ...(adapter && process.platform !== 'win32' ? { detached: true } : {}),
-        env: runtimeChildEnv({ ...withoutPinnedEnv(process.env), ...opts.env }),
+        env: runtimeChildEnv(childEnv),
       });
     } catch (error) {
       hostTools?.close();

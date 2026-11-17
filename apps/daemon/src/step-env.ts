@@ -55,7 +55,12 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
   }
   delete env.WINDSURF_API_KEY;
   if (input.devinToken !== undefined) env.WINDSURF_API_KEY = input.devinToken;
-  if (input.devinHome !== undefined) env.HOME = input.devinHome;
+  if (input.devinHome !== undefined) {
+    env.HOME = input.devinHome;
+    for (const key of Object.keys(env)) {
+      if (key.startsWith('CHISEL_') || key.startsWith('DEVIN_')) delete env[key];
+    }
+  }
   return {
     env,
     dropGitCredentials: () => {
