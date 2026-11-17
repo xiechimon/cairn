@@ -69,6 +69,7 @@ describe('Coordinator tools that write todo text take no task text', () => {
         'research',
         'platform',
         'lane',
+        'briefing',
       ].sort(),
     );
   });
