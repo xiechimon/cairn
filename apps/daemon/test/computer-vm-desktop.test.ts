@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { VM_DOWNLOAD_BYTES } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import type { ComputerProcessEvent } from '../src/computer/provider.js';
@@ -59,6 +60,7 @@ const args = process.argv.slice(2);
 fs.appendFileSync(path.join(dir, 'calls.jsonl'), JSON.stringify(args) + '\\n');
 const state = read();
 const [command, ...rest] = args;
+if (command === 'image' && rest[0] === 'pull') process.exit(flag('pull-fail') ? 1 : 0);
 if (command === 'list') {
   process.stdout.write(JSON.stringify(Object.entries(state.vms).map(([id, vm]) => ({
     configuration: { id, labels: vm.labels, image: { reference: vm.image } },
@@ -172,6 +174,15 @@ function setup(options: { unsupported?: string; resolveError?: Error } = {}) {
     },
     unsupported: () => options.unsupported,
     forget() {},
+    isDownloaded: true,
+    downloaded: () => runtime.isDownloaded,
+    async install(onBytes: (bytes: number) => void) {
+      onBytes(100_000_000);
+      return runtime.resolve();
+    },
+    markDownloaded() {
+      runtime.isDownloaded = true;
+    },
   };
   const open = { ports: true };
   const logs: string[] = [];
@@ -244,6 +255,41 @@ const installOptions = (output: string[] = []) => ({
 });
 
 describe('VmDesktops', () => {
+  test('download reports progress, pulls the pinned image and ends ready; a failed pull can be retried', async () => {
+    const env = setup();
+    env.runtime.isDownloaded = false;
+    const desktops = env.make();
+    expect(desktops.vmDownload()).toEqual({
+      state: 'absent',
+      doneBytes: 0,
+      totalBytes: VM_DOWNLOAD_BYTES,
+    });
+    writeFileSync(join(env.fake, 'pull-fail'), '');
+    await expect(desktops.manage('chief:a', 'install')).rejects.toThrow('could not be downloaded');
+    expect(desktops.vmDownload()?.state).toBe('failed');
+    expect(env.runtime.isDownloaded).toBe(false);
+    rmSync(join(env.fake, 'pull-fail'));
+    const done = desktops.manage('chief:a', 'install');
+    expect(desktops.vmDownload()?.state).toBe('downloading');
+    expect(await done).toBe('installed');
+    expect(desktops.vmDownload()).toEqual({
+      state: 'ready',
+      doneBytes: VM_DOWNLOAD_BYTES,
+      totalBytes: VM_DOWNLOAD_BYTES,
+    });
+    const pulls = env.calls().filter((argv) => argv[0] === 'image');
+    expect(pulls.at(-1)).toEqual([
+      'image',
+      'pull',
+      '--progress',
+      'none',
+      '--platform',
+      'linux/arm64',
+      COMPUTER_IMAGE_MANIFEST.image,
+    ]);
+    expect(env.calls().some((argv) => argv[0] === 'run')).toBe(false);
+  });
+
   test('an unsupported Mac reports the reason, offers nothing and runs no command', async () => {
     const env = setup({ unsupported: 'The agent computer needs macOS 26 or later' });
     const desktops = env.make();

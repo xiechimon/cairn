@@ -22,6 +22,7 @@ export function computerActionNoteText(note: ComputerActionNote, t: TFunc): stri
       update: t('正在更新电脑…'),
       recover: t('正在恢复电脑…'),
       reset: t('正在重置电脑…'),
+      install: t('正在下载 Linux 虚拟机…'),
     }[note.action];
   if (note.kind === 'failed')
     return {
@@ -29,6 +30,7 @@ export function computerActionNoteText(note: ComputerActionNote, t: TFunc): stri
       update: t('没能更新电脑，请稍后重试。'),
       recover: t('没能恢复电脑，请稍后重试。'),
       reset: t('没能重置电脑，请稍后重试。'),
+      install: t('没能下载 Linux 虚拟机，请稍后重试。'),
     }[note.action];
   return {
     stopped: t('电脑已停止，文件都还在，下次使用时会自动启动。'),
@@ -37,6 +39,7 @@ export function computerActionNoteText(note: ComputerActionNote, t: TFunc): stri
     current: t('电脑已经是最新版本。'),
     recovered: t('电脑已恢复，文件都还在。'),
     reset: t('电脑已重置，现在是一台全新的电脑。'),
+    installed: t('Linux 虚拟机已下载。'),
   }[note.outcome];
 }
 

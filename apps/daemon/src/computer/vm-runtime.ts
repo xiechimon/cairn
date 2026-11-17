@@ -1,6 +1,14 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { createWriteStream, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { release } from 'node:os';
 import { join } from 'node:path';
 import { Readable, Transform } from 'node:stream';
@@ -30,6 +38,8 @@ export const SYSTEM_CONTAINER_BINARY = '/usr/local/bin/container';
 export const VM_RUNTIME_START_MS = 10 * 60_000;
 const VM_COMMAND_MS = 30_000;
 const NOTARIZED = 'Notarization: trusted by the Apple notary service';
+export const VM_NOT_DOWNLOADED_MESSAGE =
+  'The Linux VM is not downloaded yet. Tell the owner in one sentence that this needs the Linux VM and that they can download it in the [电脑面板](/app?pane=machines); do not retry until they say it is ready';
 
 export interface VmCommandResult {
   code: number;
@@ -115,6 +125,8 @@ export class VmRuntime {
   private readonly manifest: VmRuntimeManifest;
   private readonly run: VmCommandRunner;
   private resolving: Promise<string> | undefined;
+  private permitted = false;
+  private onBytes: ((bytes: number) => void) | undefined;
   state: VmRuntimeState = 'absent';
   reason: string | undefined;
 
@@ -140,6 +152,32 @@ export class VmRuntime {
 
   private get ownBinary(): string {
     return join(this.runtimeDirectory, 'Payload', 'bin', 'container');
+  }
+
+  private get marker(): string {
+    return join(this.options.root, 'downloaded');
+  }
+
+  downloaded(): boolean {
+    return existsSync(this.marker) || existsSync(this.ownBinary);
+  }
+
+  markDownloaded(): void {
+    mkdirSync(this.options.root, { recursive: true, mode: 0o700 });
+    writeFileSync(this.marker, `${this.manifest.version}\n`, { mode: 0o600 });
+  }
+
+  async install(onBytes: (bytes: number) => void): Promise<string> {
+    this.permitted = true;
+    this.onBytes = onBytes;
+    try {
+      return await this.resolve();
+    } catch (error) {
+      this.permitted = false;
+      throw error;
+    } finally {
+      this.onBytes = undefined;
+    }
   }
 
   resolve(): Promise<string> {
@@ -169,6 +207,7 @@ export class VmRuntime {
   private async locate(): Promise<string> {
     const unsupported = this.unsupported();
     if (unsupported) throw new ComputerRefusal(unsupported);
+    if (!this.permitted && !this.downloaded()) throw new ComputerRefusal(VM_NOT_DOWNLOADED_MESSAGE);
     const systemBinary = this.options.systemBinary ?? SYSTEM_CONTAINER_BINARY;
     const candidates = [
       executableOnPath('container', this.options.env?.PATH ?? process.env.PATH),
@@ -249,6 +288,7 @@ export class VmRuntime {
       const hash = createHash('sha256');
       let bytes = 0;
       const limit = this.manifest.size;
+      const report = this.onBytes;
       await pipeline(
         Readable.fromWeb(response.body),
         new Transform({
@@ -259,6 +299,7 @@ export class VmRuntime {
               return;
             }
             hash.update(chunk);
+            report?.(bytes);
             callback(null, chunk);
           },
         }),

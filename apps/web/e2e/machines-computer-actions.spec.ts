@@ -4,7 +4,10 @@ import { evidencePanelShot } from './evidence';
 
 const MACHINE = { id: 'm1', name: 'Mac', online: true, kind: 'local', runningSteps: 0 };
 
-const computer = (kind: 'host' | 'vm') => ({
+type Download = { state: string; doneBytes: number; totalBytes: number } | null;
+const TOTAL = 1_384_173_095;
+
+const computer = (kind: 'host' | 'vm', download: Download = null) => ({
   id: 'comp-1',
   scopeKey: 'chief:u1',
   state: 'running',
@@ -12,17 +15,23 @@ const computer = (kind: 'host' | 'vm') => ({
   browserEnabled: true,
   handoffReason: null,
   kind,
+  download,
   machine: { id: 'm1', name: 'Mac', online: true },
 });
 
-async function open(page: Page, kind: 'host' | 'vm', answer: (action: string) => unknown) {
+async function open(
+  page: Page,
+  kind: 'host' | 'vm',
+  answer: (action: string) => unknown,
+  download: () => Download = () => null,
+) {
   const actions: string[] = [];
   await mockLive(
     page,
     { threads: [], messages: HISTORY, machines: [MACHINE] },
     (path, route, json) => {
       if (path === '/api/computers' && route.request().method() === 'GET')
-        return json({ computers: [computer(kind)] });
+        return json({ computers: [computer(kind, download())] });
       if (path === '/api/computers/comp-1/commands') return json({ commands: [] });
       if (path === '/api/teams/t1/computers/comp-1/screen')
         return json({ error: 'the computer is not connected' }, 409);
@@ -82,6 +91,44 @@ test.describe('Coordinator computer actions menu', () => {
       '电脑已重置，现在是一台全新的电脑。',
     );
     expect(actions).toEqual(['reset']);
+  });
+
+  test('a Linux VM not yet downloaded offers its download where the screen goes, then shows progress', async ({
+    page,
+  }) => {
+    let download: Download = { state: 'absent', doneBytes: 0, totalBytes: TOTAL };
+    const { panel, actions } = await open(
+      page,
+      'vm',
+      () => {
+        download = { state: 'downloading', doneBytes: 580_000_000, totalBytes: TOTAL };
+        return new Promise(() => {});
+      },
+      () => download,
+    );
+    const surface = panel.getByTestId('vm-download');
+    await expect(surface).toHaveAttribute('data-state', 'absent');
+    await expect(surface).toContainText('1.4 GB');
+    await expect(panel.getByTestId('machine-screen')).toHaveCount(0);
+    await expect(panel.getByTestId('computer-actions')).toHaveCount(0);
+    await surface.getByTestId('vm-download-start').click();
+    await expect(surface).toHaveAttribute('data-state', 'downloading');
+    await page.reload();
+    await expect(panel.getByTestId('vm-download')).toContainText('580 MB / 1.4 GB');
+    await expect(panel.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '42');
+    expect(actions).toEqual(['install']);
+  });
+
+  test('a failed Linux VM download says so in place and offers a retry', async ({ page }) => {
+    const { panel } = await open(
+      page,
+      'vm',
+      () => ({ outcome: 'installed' }),
+      () => ({ state: 'failed', doneBytes: 0, totalBytes: TOTAL }),
+    );
+    const surface = panel.getByTestId('vm-download');
+    await expect(surface).toContainText('下载没完成');
+    await expect(surface.getByTestId('vm-download-start')).toHaveText('重试');
   });
 
   test('a failed action shows a plain sentence, not the raw error', async ({ page }) => {

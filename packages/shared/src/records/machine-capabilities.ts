@@ -111,6 +111,23 @@ export const hostPermissionsSchema = z
   .strict();
 export type HostPermissions = z.infer<typeof hostPermissionsSchema>;
 
+export const VM_DOWNLOAD_PARTS = {
+  runtime: 169_630_704,
+  kernel: 676_287_269,
+  image: 538_256_122,
+} as const;
+export const VM_DOWNLOAD_BYTES =
+  VM_DOWNLOAD_PARTS.runtime + VM_DOWNLOAD_PARTS.kernel + VM_DOWNLOAD_PARTS.image;
+
+export const vmDownloadSchema = z
+  .object({
+    state: z.enum(['absent', 'downloading', 'ready', 'failed']),
+    doneBytes: z.number().int().nonnegative(),
+    totalBytes: z.number().int().positive(),
+  })
+  .strict();
+export type VmDownload = z.infer<typeof vmDownloadSchema>;
+
 export const machineCapabilitiesSchema = z.object({
   osPlatform: machineOsPlatformSchema.optional(),
   osDistribution: z
@@ -132,6 +149,7 @@ export const machineCapabilitiesSchema = z.object({
   stealthBrowser: z.literal(true).optional(),
   screenHandoff: z.literal(true).optional(),
   computerKind: z.enum(['host', 'vm']).optional(),
+  vmDownload: vmDownloadSchema.optional(),
   secretGateway: z.literal(true).optional(),
   mcpConnectors: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
@@ -165,6 +183,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const agentReach = agentReachReportSchema.safeParse(rec.agentReach);
   const scrapling = machineCapabilitiesSchema.shape.scrapling.safeParse(rec.scrapling);
   const hostPermissions = hostPermissionsSchema.safeParse(rec.hostPermissions);
+  const vmDownload = vmDownloadSchema.safeParse(rec.vmDownload);
   return {
     ...base.data,
     ...(osPlatform.success ? { osPlatform: osPlatform.data } : {}),
@@ -177,6 +196,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(agentReach.success ? { agentReach: agentReach.data } : {}),
     ...(scrapling.success && scrapling.data !== undefined ? { scrapling: scrapling.data } : {}),
     ...(hostPermissions.success ? { hostPermissions: hostPermissions.data } : {}),
+    ...(vmDownload.success ? { vmDownload: vmDownload.data } : {}),
     ...(hardware.success ? { hardware: hardware.data } : {}),
     ...(executor.success ? { executor: executor.data } : {}),
     ...(rec.computer === true ? { computer: true as const } : {}),

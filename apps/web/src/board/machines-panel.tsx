@@ -1,6 +1,6 @@
-import type { ComputerRecord } from '@cairn/shared';
+import type { ComputerRecord, VmDownload } from '@cairn/shared';
 import { cn } from 'cn';
-import { Laptop, Plus } from 'lucide-react';
+import { Laptop, Monitor, Plus } from 'lucide-react';
 import { type ReactElement, type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useAuth } from '../api/auth.js';
@@ -176,6 +176,77 @@ function LineRow({
   );
 }
 
+export function formatDownloadBytes(bytes: number): string {
+  const gb = bytes / 1e9;
+  return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`;
+}
+
+function VmDownloadSurface({
+  download,
+  starting,
+  onDownload,
+}: {
+  download: VmDownload;
+  starting: boolean;
+  onDownload: () => void;
+}) {
+  const { t } = useI18n();
+  const state = starting && download.state !== 'downloading' ? 'downloading' : download.state;
+  const total = formatDownloadBytes(download.totalBytes);
+  const percent = Math.round((download.doneBytes / download.totalBytes) * 100);
+  return (
+    <div
+      data-testid="vm-download"
+      data-state={state}
+      className="grid aspect-[16/10] place-items-center bg-(--surface-1) p-6"
+    >
+      <div className="flex w-full max-w-60 flex-col items-center gap-1 text-center">
+        <Monitor aria-hidden="true" className="mb-1 size-5.5 text-content-secondary" />
+        <span className="text-ui font-medium text-foreground">{t('Linux 虚拟机')}</span>
+        {state === 'downloading' ? (
+          <>
+            <span className="text-meta text-content-tertiary tabular-nums">
+              {`${formatDownloadBytes(download.doneBytes)} / ${total}`}
+            </span>
+            <div
+              role="progressbar"
+              aria-label={t('Linux 虚拟机')}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+              className="mt-3 h-1 w-full overflow-hidden rounded-full bg-border"
+            >
+              <div
+                className="h-full rounded-full bg-content-tertiary"
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <span
+              className={cn(
+                'text-meta tabular-nums',
+                state === 'failed' ? 'text-destructive' : 'text-content-tertiary',
+              )}
+            >
+              {state === 'failed' ? t('下载没完成') : total}
+            </span>
+            <Button
+              size="sm"
+              data-testid="vm-download-start"
+              className="mt-3 px-2.5 pointer-coarse:h-11 pointer-coarse:px-6"
+              onClick={onDownload}
+            >
+              {state === 'failed' ? t('重试') : t('下载')}
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MachineCard({
   machine,
   computer,
@@ -193,8 +264,13 @@ function MachineCard({
   const control = useComputerControl({ teamId, computer });
   const hover = useScreenHoverControl(control, computer?.handoffReason != null);
   const actions = useComputerActions(teamId, computer);
+  const download = computer?.download?.state === 'ready' ? null : (computer?.download ?? null);
   const screenLive =
-    computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
+    computer !== null &&
+    download === null &&
+    teamId !== undefined &&
+    desktopControlOnline(machine, computer);
+  const installing = actions.note?.kind === 'running' && actions.note.action === 'install';
 
   useEffect(() => {
     if (!screenLive) setFullscreen(false);
@@ -237,7 +313,7 @@ function MachineCard({
             {t('编辑')}
           </Button>
         )}
-        {computer?.kind === 'vm' && (
+        {computer?.kind === 'vm' && download === null && (
           <ComputerActionsMenu
             machineName={machine.name}
             disabled={actions.pending || machine.online !== true}
@@ -245,7 +321,7 @@ function MachineCard({
           />
         )}
       </div>
-      {actions.note !== null && (
+      {actions.note !== null && !(download !== null && 'action' in actions.note) && (
         <p
           role="status"
           data-testid="computer-action-note"
@@ -258,6 +334,13 @@ function MachineCard({
         >
           {computerActionNoteText(actions.note, t)}
         </p>
+      )}
+      {download !== null && machine.online === true && (
+        <VmDownloadSurface
+          download={download}
+          starting={installing}
+          onDownload={() => actions.run('install')}
+        />
       )}
       {screenLive && (
         <>

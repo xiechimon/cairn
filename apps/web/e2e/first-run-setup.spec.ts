@@ -13,6 +13,8 @@ interface World {
   existing?: string[];
   created?: { providerId: string; apiKey?: string }[];
   deleted?: string[];
+  vm?: boolean;
+  installs?: string[];
 }
 
 const MACHINE = { id: 'm1', name: 'mac', online: true, enabledRuntimes: ['pi', 'claude-code'] };
@@ -84,6 +86,28 @@ async function open(page: Page, world: World, path = '/app') {
         });
       }
       if (p === '/api/teams/t1/machines') return json(world.machines ?? [MACHINE]);
+      if (p === '/api/computers' && world.vm === true && route.request().method() === 'GET') {
+        return json({
+          computers: [
+            {
+              id: 'comp-1',
+              scopeKey: 'chief:u1',
+              state: 'stopped',
+              controlHolder: 'none',
+              browserEnabled: true,
+              handoffReason: null,
+              kind: 'vm',
+              download: { state: 'absent', doneBytes: 0, totalBytes: 1_384_173_095 },
+              machine: { id: 'm1', name: 'mac', online: true },
+            },
+          ],
+        });
+      }
+      if (p === '/api/computers/comp-1/actions') {
+        const { action } = route.request().postDataJSON() as { action: string };
+        world.installs = [...(world.installs ?? []), action];
+        return json({ outcome: 'installed' });
+      }
       if (p === '/api/teams/t1/model-sources') {
         return json({
           sources: [
@@ -142,11 +166,30 @@ test('a team with no projects lands on the setup page, and confirming saves both
   await expect(page.getByTestId('first-run-pick-coordinator')).toHaveText(/Claude Opus 5\.5/);
   await expect(page.getByTestId('first-run-pick-session')).toHaveText(/Claude Sonnet 5\.5/);
   await expect(setup).not.toContainText('因为');
+  await expect(page.getByTestId('first-run-vm')).toHaveCount(0);
   await page.getByTestId('first-run-confirm').click();
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-opus-5-5' });
   await expect(setup).toHaveCount(0);
   await expect(page.getByTestId('home-c')).toBeVisible();
+});
+
+test('a Mac whose Linux VM is not downloaded offers it off by default, and downloads only when switched on', async ({ page }) => {
+  const off = { ...fresh(), vm: true };
+  await open(page, off);
+  const row = page.getByTestId('first-run-vm');
+  await expect(row).toContainText('Linux 虚拟机');
+  await expect(row).toContainText('1.4 GB');
+  await expect(row.getByRole('switch')).not.toBeChecked();
+  await page.getByTestId('first-run-confirm').click();
+  await expect(page.getByTestId('home-c')).toBeVisible();
+  expect(off.installs).toBeUndefined();
+
+  const on = { ...fresh(), vm: true };
+  await open(page, on);
+  await page.getByTestId('first-run-vm').getByRole('switch').click();
+  await page.getByTestId('first-run-confirm').click();
+  await expect.poll(() => on.installs).toEqual(['install']);
 });
 
 test('the change control opens the model picker, and confirming saves the model picked there', async ({ page }) => {

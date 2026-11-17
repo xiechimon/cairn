@@ -117,8 +117,9 @@ esac
     runtime(
       manifest: VmRuntimeManifest,
       extra: Partial<ConstructorParameters<typeof VmRuntime>[0]> = {},
+      consented = true,
     ) {
-      return new VmRuntime({
+      const runtime = new VmRuntime({
         root,
         manifest,
         env: { PATH: bin },
@@ -129,6 +130,8 @@ esac
         pkgutil,
         ...extra,
       });
+      if (consented) runtime.markDownloaded();
+      return runtime;
     },
   };
 }
@@ -195,9 +198,15 @@ describe('VmRuntime', () => {
 
   test('without a runtime the pinned package is downloaded, verified, expanded and started', async () => {
     const env = setup();
-    const runtime = env.runtime(await env.manifest());
+    const manifest = await env.manifest();
+    const runtime = env.runtime(manifest, {}, false);
     const own = join(env.root, 'runtime', '1.7.1', 'Payload', 'bin', 'container');
-    expect(await runtime.resolve()).toBe(own);
+    await expect(runtime.resolve()).rejects.toThrow('not downloaded yet');
+    expect(env.served.requests).toBe(0);
+    expect(env.log()).toEqual([]);
+    const bytes: number[] = [];
+    expect(await runtime.install((done) => bytes.push(done))).toBe(own);
+    expect(bytes.at(-1)).toBe(manifest.size);
     expect(runtime.state).toBe('ready');
     const log = env.log();
     expect(log.some((line) => line.startsWith('pkgutil --check-signature'))).toBe(true);

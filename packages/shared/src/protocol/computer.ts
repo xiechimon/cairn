@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { epochMs, recordId } from '../records/common.js';
+import { vmDownloadSchema } from '../records/machine-capabilities.js';
 import { ownComputerGrantStampSchema } from './own-computer.js';
 
 export const COMPUTER_TOOLS = [
@@ -60,7 +61,7 @@ export const packageInstallDecisionBodySchema = z.strictObject({
 });
 export type PackageInstallDecisionBody = z.infer<typeof packageInstallDecisionBodySchema>;
 
-export const COMPUTER_MANAGE_ACTIONS = ['stop', 'update', 'recover', 'reset'] as const;
+export const COMPUTER_MANAGE_ACTIONS = ['stop', 'update', 'recover', 'reset', 'install'] as const;
 export type ComputerManageAction = (typeof COMPUTER_MANAGE_ACTIONS)[number];
 export const COMPUTER_MANAGE_OUTCOMES = [
   'stopped',
@@ -69,6 +70,7 @@ export const COMPUTER_MANAGE_OUTCOMES = [
   'current',
   'recovered',
   'reset',
+  'installed',
 ] as const;
 export type ComputerManageOutcome = (typeof COMPUTER_MANAGE_OUTCOMES)[number];
 export const COMPUTER_MANAGE_TIMEOUT_MS = 20 * 60_000;
@@ -236,6 +238,7 @@ export const computerRecordSchema = z.object({
   browserEnabled: z.boolean(),
   handoffReason: z.enum(['login', 'model']).nullable(),
   kind: z.enum(['host', 'vm']),
+  download: vmDownloadSchema.nullable(),
   machine: z.object({ id: z.string(), name: z.string(), online: z.boolean() }),
 });
 export type ComputerRecord = z.infer<typeof computerRecordSchema>;

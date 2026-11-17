@@ -2,7 +2,15 @@ import type { RoutingRuleRecord } from '@cairn/shared';
 import { cn } from 'cn';
 import { Check, KeyRound } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { useChief, useMachines, useModelSources, useProjects, useProviders } from '../api/hooks.js';
+import {
+  useApiMutations,
+  useChief,
+  useComputers,
+  useMachines,
+  useModelSources,
+  useProjects,
+  useProviders,
+} from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
@@ -12,6 +20,7 @@ import { InkSpiral, type SpiralHang } from '../components/ink-spiral.js';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { SettingsCard } from '../components/settings-list.js';
+import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -31,6 +40,7 @@ import {
   setupOpenStep,
 } from './first-run-checklist-model.js';
 import { LocalProviderImportCard } from './local-provider-import.js';
+import { formatDownloadBytes } from './machines-panel.js';
 
 export const SETUP_PARAM = 'setup';
 export const SETUP_HREF = `/app?${SETUP_PARAM}=1`;
@@ -80,6 +90,7 @@ export function useFirstRunSetup() {
   const chiefQ = useChief(teamId, live);
   const settingsQ = useRoutingSettings(teamId, live);
   const sourcesQ = useModelSources(teamId, live);
+  const computersQ = useComputers(teamId, live);
   const connections = routingQ.data === undefined ? undefined : (routingQ.data.connections ?? []);
   const models = modelSides(
     coordinatorCanAnswer(chiefQ.data),
@@ -97,6 +108,10 @@ export function useFirstRunSetup() {
     progress,
     connections: connections ?? [],
     machines: machinesQ.data ?? [],
+    vm:
+      computersQ.data?.find(
+        (computer) => computer.kind === 'vm' && computer.download?.state === 'absent',
+      ) ?? null,
     settings,
     options: toModelOptions(sourcesQ.data?.sources ?? []),
     claudeCodeFound: (sourcesQ.data?.sources ?? []).some(
@@ -262,6 +277,8 @@ function modelName(pick: Pick, options: readonly ModelOption[]): string {
 function ConfirmBody({ setup }: { setup: Setup }) {
   const { t } = useI18n();
   const { patchRule } = useRoutingSettingsMutations(setup.teamId);
+  const { manageComputer } = useApiMutations(setup.teamId);
+  const [downloadVm, setDownloadVm] = useState(false);
   const [changed, setChanged] = useState<Partial<Record<Pick['use'], ModelOption>>>({});
   const suggested = picksOf(setup);
   const picks = suggested.map((pick, i): Pick | null => {
@@ -300,6 +317,8 @@ function ConfirmBody({ setup }: { setup: Setup }) {
         });
       }
       setChanged({});
+      if (downloadVm && setup.vm !== null)
+        manageComputer.mutate({ computerId: setup.vm.id, action: 'install' });
     } catch (error) {
       toastError(t('保存失败，请重试。'), error);
     }
@@ -337,6 +356,27 @@ function ConfirmBody({ setup }: { setup: Setup }) {
             </span>
           </li>
         ))}
+        {setup.vm?.download != null && (
+          <li data-testid="first-run-vm" className="flex min-h-13 items-start gap-x-4 py-2">
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="font-title text-foreground">
+                {t('Linux 虚拟机')}
+                <span className="ml-2 font-normal text-meta text-content-tertiary tabular-nums">
+                  {formatDownloadBytes(setup.vm.download.totalBytes)}
+                </span>
+              </span>
+              <span className="text-pretty text-meta text-content-tertiary">
+                {t('不占用你的鼠标键盘，和你的文件、账号隔开，可以放心装软件')}
+              </span>
+            </span>
+            <ToggleSwitch
+              className="mt-0.5 flex-none"
+              aria-label={t('Linux 虚拟机')}
+              checked={downloadVm}
+              onCheckedChange={setDownloadVm}
+            />
+          </li>
+        )}
       </ul>
       <div className="mt-6">
         <Button

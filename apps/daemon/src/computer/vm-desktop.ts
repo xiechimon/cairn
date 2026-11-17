@@ -12,6 +12,9 @@ import {
   type ComputerPresence,
   debianPackageNamesSchema,
   INSTALL_PACKAGES_TIMEOUT_MS,
+  VM_DOWNLOAD_BYTES,
+  VM_DOWNLOAD_PARTS,
+  type VmDownload,
 } from '@cairn/shared';
 import { z } from 'zod';
 import { AGENT_BROWSER_BINARY, browserSessionName, isStealthBrowserCommand } from './browser.js';
@@ -196,7 +199,14 @@ const probeTcp: ScreenProbe = (host, port) =>
 
 export interface VmDesktopsOptions {
   root: string;
-  runtime: { resolve(): Promise<string>; unsupported(): string | undefined; forget(): void };
+  runtime: {
+    resolve(): Promise<string>;
+    unsupported(): string | undefined;
+    forget(): void;
+    downloaded(): boolean;
+    install(onBytes: (bytes: number) => void): Promise<string>;
+    markDownloaded(): void;
+  };
   env?: NodeJS.ProcessEnv;
   image?: string;
   run?: VmCommandRunner;
@@ -235,6 +245,10 @@ export class VmDesktops implements ComputerDesktops {
   private readonly licensed = new Map<string, string>();
   private readonly started = new Set<string>();
   private readonly running = new Set<() => Promise<void>>();
+  private installing: Promise<void> | undefined;
+  private installFailed = false;
+  private installedBytes = 0;
+  private reportedBytes = 0;
 
   constructor(private readonly options: VmDesktopsOptions) {
     this.hostRoot = options.root;
@@ -678,9 +692,71 @@ export class VmDesktops implements ComputerDesktops {
     });
   }
 
+  vmDownload(): VmDownload | undefined {
+    if (this.options.runtime.unsupported()) return undefined;
+    const state = this.installing
+      ? 'downloading'
+      : this.options.runtime.downloaded()
+        ? 'ready'
+        : this.installFailed
+          ? 'failed'
+          : 'absent';
+    return {
+      state,
+      doneBytes: state === 'ready' ? VM_DOWNLOAD_BYTES : this.installedBytes,
+      totalBytes: VM_DOWNLOAD_BYTES,
+    };
+  }
+
+  install(): Promise<void> {
+    this.installing ??= this.download().finally(() => {
+      this.installing = undefined;
+      this.notify();
+    });
+    return this.installing;
+  }
+
+  private progress(bytes: number): void {
+    this.installedBytes = bytes;
+    if (bytes - this.reportedBytes < VM_DOWNLOAD_BYTES / 20) return;
+    this.reportedBytes = bytes;
+    this.notify();
+  }
+
+  private async download(): Promise<void> {
+    this.installFailed = false;
+    this.installedBytes = 0;
+    this.reportedBytes = 0;
+    this.notify();
+    try {
+      const binary = await this.options.runtime.install((bytes) => this.progress(bytes));
+      this.progress(VM_DOWNLOAD_PARTS.runtime + VM_DOWNLOAD_PARTS.kernel);
+      const pulled = await this.run(
+        [binary, 'image', 'pull', '--progress', 'none', '--platform', 'linux/arm64', this.image],
+        { timeoutMs: 30 * 60_000 },
+      );
+      if (pulled.code !== 0)
+        throw new ComputerRefusal('The computer image could not be downloaded');
+      this.options.runtime.markDownloaded();
+      this.installedBytes = VM_DOWNLOAD_BYTES;
+    } catch (error) {
+      this.installFailed = true;
+      this.options.log?.(
+        `Linux VM download failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error instanceof ComputerRefusal
+        ? error
+        : new ComputerRefusal('The Linux VM could not be downloaded');
+    }
+  }
+
   async manage(scopeKey: string, action: ComputerManageAction): Promise<ComputerManageOutcome> {
     const unsupported = this.options.runtime.unsupported();
     if (unsupported) throw new ComputerRefusal(unsupported);
+    if (action === 'install') {
+      await this.install();
+      return 'installed';
+    }
     const binary = await this.options.runtime.resolve();
     const name = computerVmName(scopeKey);
     const outcome = await this.exclusive(scopeKey, async () => {

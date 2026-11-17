@@ -295,6 +295,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     const reach = agentReach.current();
     const scraper = scrapling.current();
     const hostPermissions = hostPermissionsProbe.current();
+    const vmDownload = hostDesktops instanceof VmDesktops ? hostDesktops.vmDownload() : undefined;
     return {
       ...capabilitiesProbe(),
       osPlatform: osPlatformOf(platform),
@@ -311,6 +312,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         : {}),
       ...(hostDesktops?.offersStealthBrowser() ? { stealthBrowser: true as const } : {}),
       ...(hostDesktops ? { computerKind: hostDesktops.kind, screenHandoff: true as const } : {}),
+      ...(vmDownload !== undefined ? { vmDownload } : {}),
       ...(hostComputer ? { ownComputerShell: true as const } : {}),
       ...(ownComputerHost ? { ownComputerHost: true as const } : {}),
       ...(agentDesktop?.current() ? { ownComputer: true as const } : {}),

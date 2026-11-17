@@ -20,6 +20,7 @@ const computer = (online = true, state: 'running' | 'stopped' | 'failed' = 'runn
   browserEnabled: false,
   handoffReason: null,
   kind: 'host' as const,
+  download: null,
   machine: { id: 'm1', name: 'omarchy', online },
 });
 

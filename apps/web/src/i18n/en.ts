@@ -232,6 +232,13 @@ export const EN: Record<string, string> = {
   '电脑已经是最新版本。': 'The computer is already on the latest version.',
   '电脑已恢复，文件都还在。': 'The computer is recovered. Its files are kept.',
   '电脑已重置，现在是一台全新的电脑。': 'The computer is reset and starts fresh.',
+  'Linux 虚拟机': 'Linux VM',
+  下载没完成: 'Download did not finish',
+  '正在下载 Linux 虚拟机…': 'Downloading the Linux VM…',
+  '没能下载 Linux 虚拟机，请稍后重试。': 'Could not download the Linux VM. Try again later.',
+  'Linux 虚拟机已下载。': 'The Linux VM is downloaded.',
+  '不占用你的鼠标键盘，和你的文件、账号隔开，可以放心装软件':
+    'Keeps off your mouse and keyboard, apart from your files and accounts, safe to install software',
   '{name} 的电脑操作': 'Computer actions for {name}',
   停止电脑: 'Stop computer',
   更新电脑: 'Update computer',
