@@ -61,7 +61,7 @@ const state = read();
 const [command, ...rest] = args;
 if (command === 'list') {
   process.stdout.write(JSON.stringify(Object.entries(state.vms).map(([id, vm]) => ({
-    configuration: { id, labels: vm.labels },
+    configuration: { id, labels: vm.labels, image: { reference: vm.image } },
     status: { state: vm.state, networks: vm.state === 'running' ? [{ ipv4Address: vm.address + '/24' }] : [] },
   }))));
   process.exit(0);
@@ -70,13 +70,14 @@ if (command === 'volume') {
   const [action, name] = rest;
   if (action === 'inspect') process.exit(state.volumes.includes(name) ? 0 : 1);
   if (action === 'create') { state.volumes.push(name); write(state); }
+  if (action === 'delete') { state.volumes = state.volumes.filter((volume) => volume !== name); write(state); }
   process.exit(0);
 }
 if (command === 'run') {
   if (flag('run-fails')) process.exit(1);
   const name = rest[rest.indexOf('--name') + 1];
   const label = rest[rest.indexOf('--label') + 1].split('=');
-  state.vms[name] = { state: flag('guard-fails') ? 'stopped' : 'running', address: '127.0.0.1', ready: !flag('never-ready'), labels: { [label[0]]: label[1] } };
+  state.vms[name] = { state: flag('guard-fails') ? 'stopped' : 'running', address: '127.0.0.1', ready: !flag('never-ready'), labels: { [label[0]]: label[1] }, image: rest.at(-1), installed: [] };
   write(state);
   process.exit(0);
 }
@@ -126,6 +127,18 @@ if (command === 'exec') {
     process.exit(0);
   }
   if (argv[0] === 'timeout') argv = argv.slice(3);
+  if (argv[0] === 'sh' && argv[2].includes('apt-get')) {
+    const packages = argv.slice(4);
+    process.stdout.write('Reading package lists...\\n');
+    if (flag('apt-code')) {
+      process.stderr.write('E: Unable to locate package ' + packages[0] + '\\n');
+      process.exit(Number(fs.readFileSync(path.join(dir, 'apt-code'), 'utf8')));
+    }
+    vm.installed = [...(vm.installed ?? []), ...packages];
+    write(state);
+    for (const name of packages) process.stdout.write('Setting up ' + name + ' ...\\n');
+    process.exit(0);
+  }
   env.HOME = process.env.FAKE_HOME;
   const result = spawnSync(argv[0], argv.slice(1), { cwd, env, stdio: 'inherit' });
   process.exit(result.status ?? 1);
@@ -183,7 +196,10 @@ function setup(options: { unsupported?: string; resolveError?: Error } = {}) {
       : [];
   const state = () =>
     JSON.parse(readFileSync(join(fake, 'state.json'), 'utf8')) as {
-      vms: Record<string, { state: string; labels: Record<string, string> }>;
+      vms: Record<
+        string,
+        { state: string; labels: Record<string, string>; image?: string; installed?: string[] }
+      >;
       volumes: string[];
     };
   return {
@@ -218,6 +234,14 @@ const request = (argv: string[], extra: Record<string, unknown> = {}) => ({
 });
 
 const NAME = computerVmName('chief:a');
+
+const installOptions = (output: string[] = []) => ({
+  timeoutMs: 60_000,
+  signal: new AbortController().signal,
+  output: (_stream: 'stdout' | 'stderr', text: string) => {
+    output.push(text);
+  },
+});
 
 describe('VmDesktops', () => {
   test('an unsupported Mac reports the reason, offers nothing and runs no command', async () => {
@@ -515,5 +539,128 @@ describe('VmDesktops', () => {
       'bash',
       '-l',
     ]);
+  });
+
+  test('approved packages install as root through apt and are recorded outside the guest', async () => {
+    const env = setup();
+    const desktops = env.make();
+    const output: string[] = [];
+    expect(
+      await desktops.installPackages('chief:a', ['ffmpeg', 'libpq-dev'], installOptions(output)),
+    ).toBe(0);
+    const apt = env.calls().find((argv) => argv.join(' ').includes('apt-get')) as string[];
+    expect(apt.slice(apt.indexOf('--uid'), apt.indexOf('--uid') + 4)).toEqual([
+      '--uid',
+      '0',
+      '--gid',
+      '0',
+    ]);
+    const script = apt[apt.indexOf('-c') + 1] as string;
+    expect(script).toContain('apt-get -o APT::Sandbox::User=root update');
+    expect(script).toContain(
+      'apt-get -o APT::Sandbox::User=root install -y --no-install-recommends -- "$@"',
+    );
+    expect(script).toContain('chmod a-s');
+    expect(apt.slice(-2)).toEqual(['ffmpeg', 'libpq-dev']);
+    expect(output.join('')).toContain('Setting up ffmpeg');
+    expect(env.state().vms[NAME]?.installed).toEqual(['ffmpeg', 'libpq-dev']);
+    expect(
+      JSON.parse(readFileSync(join(env.dir, 'vm', 'packages', `${NAME}.json`), 'utf8')),
+    ).toEqual(['ffmpeg', 'libpq-dev']);
+  });
+
+  test.each([
+    ['a path', '/tmp/evil.deb'],
+    ['a URL', 'https://example.com/x.deb'],
+    ['an option', '-oAPT::Get::AllowUnauthenticated=1'],
+    ['an upper-case name', 'FFmpeg'],
+  ])('%s is refused before anything runs', async (_label, name) => {
+    const env = setup();
+    await expect(
+      env.make().installPackages('chief:a', ['ffmpeg', name], installOptions()),
+    ).rejects.toThrow('Debian package name');
+    expect(env.calls()).toEqual([]);
+  });
+
+  test('a failed install returns apt exit code and records nothing', async () => {
+    const env = setup();
+    env.flag('apt-code', '100');
+    const output: string[] = [];
+    expect(
+      await env.make().installPackages('chief:a', ['nosuchpackage'], installOptions(output)),
+    ).toBe(100);
+    expect(output.join('')).toContain('Unable to locate package nosuchpackage');
+    expect(existsSync(join(env.dir, 'vm', 'packages', `${NAME}.json`))).toBe(false);
+  });
+
+  test('stop keeps the volume, reports a stopped VM and the next use starts it again', async () => {
+    const env = setup();
+    const desktops = env.make();
+    await desktops.ensure('chief:a');
+    expect(await desktops.manage('chief:a', 'stop')).toBe('stopped');
+    expect(env.state().vms[NAME]?.state).toBe('stopped');
+    expect(env.state().volumes).toEqual([NAME]);
+    expect(await desktops.presence()).toEqual([
+      { scopeKey: 'chief:a', providerRef: NAME, state: 'stopped' },
+    ]);
+    expect(await desktops.manage('chief:a', 'stop')).toBe('already_stopped');
+    await desktops.ensure('chief:a');
+    expect(env.state().vms[NAME]?.state).toBe('running');
+    expect(env.calls().filter((argv) => argv[0] === 'run')).toHaveLength(1);
+  });
+
+  test('update says current when the VM runs the pinned image', async () => {
+    const env = setup();
+    const desktops = env.make({ image: 'ghcr.io/example/computer@sha256:'.padEnd(97, 'a') });
+    await desktops.ensure('chief:a');
+    expect(await desktops.manage('chief:a', 'update')).toBe('current');
+    expect(env.calls().some((argv) => argv[0] === 'delete')).toBe(false);
+  });
+
+  test('update recreates the VM from a changed image, keeps the volume and reinstalls packages', async () => {
+    const env = setup();
+    const old = 'ghcr.io/example/computer@sha256:'.padEnd(97, 'a');
+    const pinned = 'ghcr.io/example/computer@sha256:'.padEnd(97, 'b');
+    const before = env.make({ image: old });
+    await before.installPackages('chief:a', ['ffmpeg'], installOptions());
+    const desktops = env.make({ image: pinned });
+    expect(await desktops.manage('chief:a', 'update')).toBe('updated');
+    expect(env.state().vms[NAME]?.image).toBe(pinned);
+    expect(env.state().vms[NAME]?.installed).toEqual(['ffmpeg']);
+    expect(env.state().volumes).toEqual([NAME]);
+    expect(env.calls()).toContainEqual(['delete', '--force', NAME]);
+    expect(env.logs.some((line) => line.includes('reinstalled ffmpeg'))).toBe(true);
+  });
+
+  test('recover recreates a broken VM with its volume and reinstalls approved packages as root', async () => {
+    const env = setup();
+    const desktops = env.make();
+    await desktops.installPackages('chief:a', ['ffmpeg'], installOptions());
+    const runsBefore = env.calls().filter((argv) => argv[0] === 'run').length;
+    expect(await desktops.manage('chief:a', 'recover')).toBe('recovered');
+    expect(env.calls().filter((argv) => argv[0] === 'run')).toHaveLength(runsBefore + 1);
+    expect(env.state().vms[NAME]?.state).toBe('running');
+    expect(env.state().vms[NAME]?.installed).toEqual(['ffmpeg']);
+    const reinstall = env
+      .calls()
+      .filter((argv) => argv.join(' ').includes('apt-get'))
+      .at(-1) as string[];
+    expect(reinstall[reinstall.indexOf('--uid') + 1]).toBe('0');
+    expect(env.state().volumes).toEqual([NAME]);
+    expect(env.calls().filter((argv) => argv[0] === 'volume' && argv[1] === 'delete')).toEqual([]);
+  });
+
+  test('reset deletes the VM, its home volume and the package record, then starts fresh', async () => {
+    const env = setup();
+    const desktops = env.make();
+    await desktops.installPackages('chief:a', ['ffmpeg'], installOptions());
+    expect(await desktops.manage('chief:a', 'reset')).toBe('reset');
+    expect(env.calls()).toContainEqual(['volume', 'delete', NAME]);
+    expect(env.calls().filter((argv) => argv[0] === 'volume' && argv[1] === 'create')).toHaveLength(
+      2,
+    );
+    expect(env.state().vms[NAME]?.state).toBe('running');
+    expect(env.state().vms[NAME]?.installed).toEqual([]);
+    expect(existsSync(join(env.dir, 'vm', 'packages', `${NAME}.json`))).toBe(false);
   });
 });

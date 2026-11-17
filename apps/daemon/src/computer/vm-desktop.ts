@@ -1,11 +1,18 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { totalmem } from 'node:os';
 import { join, posix } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
+import {
+  COMPUTER_PRESENCE_LIMIT,
+  type ComputerManageAction,
+  type ComputerManageOutcome,
+  type ComputerPresence,
+  debianPackageNamesSchema,
+  INSTALL_PACKAGES_TIMEOUT_MS,
+} from '@cairn/shared';
 import { z } from 'zod';
 import { AGENT_BROWSER_BINARY, browserSessionName, isStealthBrowserCommand } from './browser.js';
 import type { ComputerDesktops } from './desktops.js';
@@ -15,6 +22,7 @@ import type { ComputerInputFence, ComputerInputLease } from './input-fence.js';
 import {
   type ComputerExecuteRequest,
   type ComputerFileEntry,
+  type ComputerPackageInstallOptions,
   type ComputerProcessEvent,
   type ComputerProvider,
   ComputerRefusal,
@@ -39,6 +47,20 @@ export function vmMemoryFlag(hostBytes: number): string {
   return `${Math.min(VM_MEMORY_MAX_GIB, Math.max(VM_MEMORY_MIN_GIB, quarter))}g`;
 }
 const SCOPE_LABEL = 'cairn.scope';
+const VM_ROOT = '0';
+const VM_DELETE_MS = 60_000;
+const ROOT_KILL_GRACE_SECONDS = 5;
+
+export const PACKAGE_INSTALL_SCRIPT = [
+  'mkdir -p /var/lib/apt/lists/partial /var/cache/apt/archives/partial',
+  'chown 0:0 /var/lib/apt/lists/partial /var/cache/apt/archives/partial',
+  'chown -R 0:0 /var/lib/apt/lists /var/cache/apt/archives',
+  'apt-get -o APT::Sandbox::User=root update && apt-get -o APT::Sandbox::User=root install -y --no-install-recommends -- "$@"',
+]
+  .join(' && ')
+  .concat(
+    '; status=$?; find / -xdev -type f -perm /6000 -exec chmod a-s {} + 2>/dev/null; exit $status',
+  );
 const BROWSER_COMMAND_MS = 60_000;
 const KILL_GRACE_MS = 1_000;
 
@@ -121,6 +143,12 @@ const vmListSchema = z.array(
     configuration: z.object({
       id: z.string(),
       labels: z.record(z.string(), z.string()).optional(),
+      image: z
+        .object({
+          reference: z.string().optional(),
+          descriptor: z.object({ digest: z.string().optional() }).optional(),
+        })
+        .optional(),
     }),
     status: z.object({
       state: z.string(),
@@ -133,6 +161,13 @@ interface VmEntry {
   name: string;
   state: string;
   address: string | undefined;
+  image: { reference: string | undefined; digest: string | undefined };
+}
+
+export function runsImage(entry: VmEntry['image'], image: string): boolean {
+  const pinned = /@(sha256:[0-9a-f]{64})$/.exec(image)?.[1];
+  if (pinned !== undefined) return entry.digest === pinned || entry.reference === image;
+  return entry.reference === image || entry.reference?.endsWith(`/${image}`) === true;
 }
 
 export function computerVmName(scopeKey: string): string {
@@ -434,6 +469,10 @@ export class VmDesktops implements ComputerDesktops {
       address: entry.status.networks
         ?.map((network) => network.ipv4Address?.split('/')[0])
         .find((address) => address !== undefined && address !== ''),
+      image: {
+        reference: entry.configuration.image?.reference,
+        digest: entry.configuration.image?.descriptor?.digest,
+      },
     }));
   }
 
@@ -470,6 +509,7 @@ export class VmDesktops implements ComputerDesktops {
         entry = undefined;
       }
     }
+    const created = !entry;
     if (!entry) {
       const volume = await this.run([binary, 'volume', 'inspect', name]);
       if (volume.code !== 0) await this.run([binary, 'volume', 'create', name]);
@@ -516,8 +556,11 @@ export class VmDesktops implements ComputerDesktops {
     const deadline = this.now() + (this.options.readyMs ?? VM_DESKTOP_READY_MS);
     for (;;) {
       const vm = (await this.list(binary)).find((candidate) => candidate.name === name);
-      if (vm?.state === 'running' && vm.address && (await this.ready(binary, name, vm.address)))
-        return this.remember(scopeKey, { binary, name, address: vm.address });
+      if (vm?.state === 'running' && vm.address && (await this.ready(binary, name, vm.address))) {
+        const desktop = { binary, name, address: vm.address };
+        if (created) await this.reinstallPackages(desktop);
+        return this.remember(scopeKey, desktop);
+      }
       if (vm?.state !== 'running' || this.now() >= deadline) {
         await this.run([binary, 'delete', '--force', name]);
         this.started.delete(name);
@@ -525,6 +568,179 @@ export class VmDesktops implements ComputerDesktops {
       }
       await sleep(200);
     }
+  }
+
+  private packagesFile(name: string): string {
+    return join(this.options.root, 'packages', `${name}.json`);
+  }
+
+  private recordedPackages(name: string): string[] {
+    try {
+      const parsed = debianPackageNamesSchema.safeParse(
+        JSON.parse(readFileSync(this.packagesFile(name), 'utf8')),
+      );
+      return parsed.success ? parsed.data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private recordPackages(name: string, packages: readonly string[]): void {
+    mkdirSync(join(this.options.root, 'packages'), { recursive: true, mode: 0o700 });
+    const all = [...new Set([...this.recordedPackages(name), ...packages])].sort();
+    writeFileSync(this.packagesFile(name), JSON.stringify(all), { mode: 0o600 });
+  }
+
+  private async reinstallPackages(desktop: Desktop): Promise<void> {
+    const recorded = this.recordedPackages(desktop.name);
+    if (recorded.length === 0) return;
+    const code = await this.rootInstall(desktop, recorded, {
+      timeoutMs: INSTALL_PACKAGES_TIMEOUT_MS,
+      signal: new AbortController().signal,
+      output: () => {},
+    });
+    this.options.log?.(
+      code === 0
+        ? `computer packages reinstalled ${recorded.join(' ')}`
+        : `computer packages reinstall failed with exit ${code}: ${recorded.join(' ')}`,
+    );
+  }
+
+  private rootInstall(
+    desktop: Desktop,
+    packages: readonly string[],
+    options: ComputerPackageInstallOptions,
+  ): Promise<number> {
+    const seconds = Math.max(1, Math.ceil(options.timeoutMs / 1000));
+    return new Promise((resolve) => {
+      if (options.signal.aborted) {
+        resolve(130);
+        return;
+      }
+      const child = spawn(
+        desktop.binary,
+        [
+          'exec',
+          '--uid',
+          VM_ROOT,
+          '--gid',
+          VM_ROOT,
+          '--env',
+          'DEBIAN_FRONTEND=noninteractive',
+          desktop.name,
+          'timeout',
+          `--kill-after=${ROOT_KILL_GRACE_SECONDS}`,
+          String(seconds),
+          'sh',
+          '-c',
+          PACKAGE_INSTALL_SCRIPT,
+          'sh',
+          ...packages,
+        ],
+        { stdio: ['ignore', 'pipe', 'pipe'] },
+      );
+      const timer = setTimeout(
+        () => child.kill('SIGKILL'),
+        options.timeoutMs + (ROOT_KILL_GRACE_SECONDS + 5) * 1000,
+      );
+      timer.unref();
+      const abort = () => child.kill('SIGTERM');
+      options.signal.addEventListener('abort', abort, { once: true });
+      child.stdout.setEncoding('utf8').on('data', (text: string) => options.output('stdout', text));
+      child.stderr.setEncoding('utf8').on('data', (text: string) => options.output('stderr', text));
+      const finish = (code: number) => {
+        clearTimeout(timer);
+        options.signal.removeEventListener('abort', abort);
+        resolve(code);
+      };
+      child.once('error', () => finish(127));
+      child.once('close', (code) => finish(code ?? 1));
+    });
+  }
+
+  async installPackages(
+    scopeKey: string,
+    packages: readonly string[],
+    options: ComputerPackageInstallOptions,
+  ): Promise<number> {
+    const parsed = debianPackageNamesSchema.safeParse(packages);
+    if (!parsed.success)
+      throw new ComputerRefusal(parsed.error.issues[0]?.message ?? 'invalid package names');
+    return this.using(scopeKey, async () => {
+      const desktop = await this.desktop(scopeKey);
+      const code = await this.rootInstall(desktop, parsed.data, options);
+      if (code === 0) this.recordPackages(desktop.name, parsed.data);
+      return code;
+    });
+  }
+
+  async manage(scopeKey: string, action: ComputerManageAction): Promise<ComputerManageOutcome> {
+    const unsupported = this.options.runtime.unsupported();
+    if (unsupported) throw new ComputerRefusal(unsupported);
+    const binary = await this.options.runtime.resolve();
+    const name = computerVmName(scopeKey);
+    const outcome = await this.exclusive(scopeKey, async () => {
+      await this.pending.get(scopeKey)?.catch(() => {});
+      const entry = (await this.list(binary)).find((vm) => vm.name === name);
+      if (action === 'stop') {
+        if (entry?.state !== 'running') return 'already_stopped';
+        await this.stop(scopeKey, binary, name);
+        return 'stopped';
+      }
+      if (action === 'update' && (entry === undefined || runsImage(entry.image, this.image)))
+        return 'current';
+      if (entry?.state === 'running' && action !== 'recover')
+        await this.stop(scopeKey, binary, name).catch(() => {});
+      await this.discard(scopeKey, binary, name, entry !== undefined);
+      if (action === 'reset') {
+        const volume = await this.run([binary, 'volume', 'delete', name], {
+          timeoutMs: VM_DELETE_MS,
+        });
+        const kept = await this.run([binary, 'volume', 'inspect', name]);
+        if (volume.code !== 0 && kept.code === 0)
+          throw new ComputerRefusal('The computer home could not be deleted');
+        rmSync(this.packagesFile(name), { force: true });
+        return 'reset';
+      }
+      return action === 'update' ? 'updated' : 'recovered';
+    });
+    if (outcome !== 'stopped' && outcome !== 'already_stopped' && outcome !== 'current')
+      await this.desktop(scopeKey);
+    return outcome;
+  }
+
+  private async exclusive<T>(scopeKey: string, step: () => Promise<T>): Promise<T> {
+    const previous = this.stopping.get(scopeKey) ?? Promise.resolve();
+    const operation = previous.catch(() => {}).then(step);
+    const settled = operation.then(
+      () => {},
+      () => {},
+    );
+    this.stopping.set(scopeKey, settled);
+    try {
+      return await operation;
+    } finally {
+      if (this.stopping.get(scopeKey) === settled) this.stopping.delete(scopeKey);
+      this.notify();
+    }
+  }
+
+  private async discard(
+    scopeKey: string,
+    binary: string,
+    name: string,
+    exists: boolean,
+  ): Promise<void> {
+    await Promise.all([...this.running].map((stop) => stop()));
+    this.desktops.delete(scopeKey);
+    this.licensed.delete(scopeKey);
+    this.started.delete(name);
+    if (!exists) return;
+    const deleted = await this.run([binary, 'delete', '--force', name], {
+      timeoutMs: VM_DELETE_MS,
+    });
+    if (deleted.code !== 0 && (await this.list(binary)).some((vm) => vm.name === name))
+      throw new ComputerRefusal('The computer could not be removed');
   }
 
   private remember(scopeKey: string, desktop: Desktop): Desktop {

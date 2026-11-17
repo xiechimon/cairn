@@ -3,6 +3,10 @@ import {
   COMPUTER_REPLAY_SAFE_TOOLS,
   type ComputerCall,
   type ComputerTool,
+  computerManageParamsSchema,
+  INSTALL_PACKAGES_TIMEOUT_MS,
+  installPackagesParamsSchema,
+  PACKAGES_INSTALLED_PREFIX,
 } from '@cairn/shared';
 import { z } from 'zod';
 import type { DaemonLogger } from '../log.js';
@@ -28,6 +32,10 @@ import {
 
 export const NO_COMPUTER_PROVIDER_MESSAGE = 'This machine has no computer provider';
 export const NO_COMPUTER_SCOPE_MESSAGE = 'The call names no computer';
+export const NO_VM_COMPUTER_MESSAGE =
+  'Only the Coordinator VM computer can install system packages or be stopped, updated, recovered or reset';
+const INSTALL_SUMMARY_LINES = 12;
+const INSTALL_TAIL_CHARS = 16 * 1024;
 export const FILE_TRUNCATED_MARKER = '\n[file truncated]';
 export const BROWSER_TRUNCATED_MARKER = '\n[browser output truncated]';
 export const COMPUTER_FRAME_ERROR_MAX_CHARS = 4096;
@@ -104,6 +112,10 @@ export interface ComputerDispatcherOptions {
 export interface ComputerDispatcher {
   dispatch(call: ComputerCall): Promise<void>;
   close(): Promise<void>;
+}
+
+function lastLines(text: string, count: number): string {
+  return text.trimEnd().split('\n').slice(-count).join('\n');
 }
 
 function listingText(entries: ComputerFileEntry[]): string {
@@ -459,7 +471,97 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     });
   }
 
+  async function handleInstall(call: ComputerCall, controller: AbortController): Promise<void> {
+    const orb = options.orb;
+    if (!orb?.installPackages || !call.scopeKey) {
+      await refuse(call, NO_VM_COMPUTER_MESSAGE);
+      return;
+    }
+    const params = installPackagesParamsSchema.safeParse(call.params);
+    if (!params.success) {
+      await refuse(
+        call,
+        `install_packages refused: ${params.error.issues[0]?.message ?? 'invalid packages'}`,
+      );
+      return;
+    }
+    if (call.deadlineAt - now() <= FINAL_FRAME_MARGIN_MS) {
+      await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
+      return;
+    }
+    const poster = posterFor(call, controller);
+    let tail = '';
+    let code: number;
+    try {
+      code = await orb.installPackages(call.scopeKey, params.data.packages, {
+        timeoutMs: Math.min(
+          INSTALL_PACKAGES_TIMEOUT_MS,
+          call.deadlineAt - now() - FINAL_FRAME_MARGIN_MS,
+        ),
+        signal: controller.signal,
+        output: (stream, text) => {
+          poster.output(stream, text);
+          tail = (tail + text).slice(-INSTALL_TAIL_CHARS);
+        },
+      });
+    } catch (error) {
+      await poster.finish(
+        error instanceof ComputerRefusal
+          ? { kind: 'error', message: error.message, delivery: error.delivery }
+          : { kind: 'error', message: 'The package install failed', delivery: 'unknown' },
+      );
+      return;
+    }
+    if (poster.abandoned) return;
+    const summary = lastLines(tail, INSTALL_SUMMARY_LINES);
+    await poster.finish(
+      code === 0
+        ? {
+            kind: 'done',
+            text: `${PACKAGES_INSTALLED_PREFIX} ${params.data.packages.join(' ')}.\n${summary}`,
+            exitCode: 0,
+          }
+        : {
+            kind: 'error',
+            message: boundBrowserError(`apt-get exited with ${code}:\n${summary}`),
+            delivery: 'unknown',
+          },
+    );
+  }
+
+  async function handleManage(call: ComputerCall, controller: AbortController): Promise<void> {
+    const orb = options.orb;
+    if (!orb?.manage || !call.scopeKey) {
+      await refuse(call, NO_VM_COMPUTER_MESSAGE);
+      return;
+    }
+    const params = computerManageParamsSchema.safeParse(call.params);
+    if (!params.success) {
+      await refuse(call, 'The computer action is not one of stop, update, recover or reset');
+      return;
+    }
+    const poster = posterFor(call, controller);
+    try {
+      const outcome = await orb.manage(call.scopeKey, params.data.action);
+      await poster.finish({ kind: 'done', text: outcome });
+    } catch (error) {
+      await poster.finish(
+        error instanceof ComputerRefusal
+          ? { kind: 'error', message: error.message, delivery: error.delivery }
+          : { kind: 'error', message: 'The computer action failed', delivery: 'unknown' },
+      );
+    }
+  }
+
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
+    if (call.tool === 'install_packages') {
+      await handleInstall(call, controller);
+      return;
+    }
+    if (call.tool === 'computer_manage') {
+      await handleManage(call, controller);
+      return;
+    }
     if (call.tool === 'user_computer_observe' || call.tool === 'user_computer_act') {
       const screen = options.screen;
       if (screen)

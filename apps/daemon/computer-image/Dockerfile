@@ -48,6 +48,9 @@ RUN set -eu; \
     useradd -m -u 1000 -s /bin/bash agent; \
     find / -xdev -type f -perm /6000 -exec chmod a-s {} +
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm; \
+    ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 COPY --from=packages /opt/agent-browser /opt/agent-browser
 COPY --from=packages /opt/cloak /opt/cloak
 COPY guard.nft /etc/cairn/guard.nft

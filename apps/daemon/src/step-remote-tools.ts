@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import {
   COMPUTER_HANDOFF_TIMEOUT_MS,
+  INSTALL_PACKAGES_TIMEOUT_MS,
+  INSTALL_PACKAGES_TOOL,
   isComputerBrowserTool,
   REQUEST_CLOAK_LICENSE_TOOL,
   type RemoteToolDef,
@@ -13,6 +15,7 @@ import type { MachineApi } from './machine-client.js';
 
 export const COMPUTER_TOOL_RELAY_TIMEOUT_MS = 11 * 60_000;
 export const TAKEOVER_RELAY_TIMEOUT_MS = COMPUTER_HANDOFF_TIMEOUT_MS + 60_000;
+export const INSTALL_RELAY_TIMEOUT_MS = TAKEOVER_RELAY_TIMEOUT_MS + INSTALL_PACKAGES_TIMEOUT_MS;
 
 export interface VerifyEvidenceUploads {
   directory: string | undefined;
@@ -47,13 +50,18 @@ export function stepRemoteToolExecutor(input: {
     }
     const def = remoteTools.find((t) => t.name === name);
     const ownerWait = name === 'request_takeover' || name === REQUEST_CLOAK_LICENSE_TOOL;
-    const computerCall = isComputerBrowserTool(name) || ownerWait;
+    const install = name === INSTALL_PACKAGES_TOOL;
+    const computerCall = isComputerBrowserTool(name) || ownerWait || install;
     return client.relayTool(stepId, name, params, {
       ...(def?.replaySafe ? { replaySafe: true } : {}),
       ...(computerCall
         ? {
             toolCallId: randomUUID(),
-            timeoutMs: ownerWait ? TAKEOVER_RELAY_TIMEOUT_MS : COMPUTER_TOOL_RELAY_TIMEOUT_MS,
+            timeoutMs: install
+              ? INSTALL_RELAY_TIMEOUT_MS
+              : ownerWait
+                ? TAKEOVER_RELAY_TIMEOUT_MS
+                : COMPUTER_TOOL_RELAY_TIMEOUT_MS,
           }
         : {}),
     });
