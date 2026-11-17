@@ -204,7 +204,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 - Research: [docs/research/coordinator-computer.md](research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](research/user-computer-model-2026-11-08.md) (not on main), [docs/research/resident-cloakbrowser-2026-11-16.md](research/resident-cloakbrowser-2026-11-16.md)
 - Frontend design: **gap**: the computer feed, screen view and control handover have no design
-- Backend design: [docs/design/computer-login-handoff.md](design/computer-login-handoff.md), [docs/design/cloakbrowser-computer.md](design/cloakbrowser-computer.md)
+- Backend design: [docs/design/computer-login-handoff.md](design/computer-login-handoff.md), [docs/design/cloakbrowser-computer.md](design/cloakbrowser-computer.md), [docs/design/own-mac-computer.md](design/own-mac-computer.md)
 
 ### coordinator-chat
 

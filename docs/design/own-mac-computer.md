@@ -1,6 +1,6 @@
 # The agent uses the owner's own Mac
 
-Status: design for step 5 (E1–E6) of [`mac-vm-computer-acceptance.md`](mac-vm-computer-acceptance.md), waiting for ian's approval. Nothing here is built. Baseline `70d39fa29`. Reference: Rakazo `docs/computer.md` "Use your own computer" and `docs/approvals.md`. Related designs: [`machine-capability-defaults-and-folders.md`](machine-capability-defaults-and-folders.md) (grants live outside `capabilities`), [`host-permission-guidance.md`](host-permission-guidance.md) (the `hostPermissions` probe). Facts carry `实测` (read or run for this page), `推断` (follows from a measured fact) or `猜测` (unverified).
+Status: built for step 5 (E1–E6) of [`mac-vm-computer-acceptance.md`](mac-vm-computer-acceptance.md) with the owner decisions below; the live end-to-end check on a real Mac waits on the TCC grants. The "What exists" table describes the baseline before this work. Baseline `70d39fa29`. Reference: Rakazo `docs/computer.md` "Use your own computer" and `docs/approvals.md`. Related designs: [`machine-capability-defaults-and-folders.md`](machine-capability-defaults-and-folders.md) (grants live outside `capabilities`), [`host-permission-guidance.md`](host-permission-guidance.md) (the `hostPermissions` probe). Facts carry `实测` (read or run for this page), `推断` (follows from a measured fact) or `猜测` (unverified).
 
 ## What exists
 
@@ -128,3 +128,14 @@ One test per path; each is written to fail on the baseline first.
 1. The gate replacing `refuseOwnComputerUntilGated` is approved for E6; the replacing commit records this approval.
 2. "This conversation" grants do not expire by time or session: they last until the owner revokes them on the panel or turns the switch off. The panel lists every standing grant per Mac with a revoke control. This supersedes the 24 h and new-session ends in the grant table and transitions above.
 3. Host shell is in scope: `user_computer_shell` is offered behind the same switch and gate, and every command asks the owner first (allow once, or always allow this exact command line on this Mac, revocable on the panel). Gate row 1 changes from "refused" to "approval required". The command runs as the owner in the Runner's own working folder, with the existing host command guard.
+
+## As built (2026-11-17)
+
+Where the build differs from the sections above, this list wins.
+
+- The Mac app's Runner env carries `CAIRN_AGENT_DESKTOP` and also `CAIRN_OWN_COMPUTER=1`, because owner decision 3 offers the host shell; the server switch still gates both. The daemon reports `ownComputerShell` for the shell, `ownComputerHost` for the path and `ownComputer` for the verified binary. Check 6 for `user_computer_shell` reads `ownComputerShell`; checks 6 to 8 for observe and act read `ownComputer`, Accessibility and the app name.
+- A shell call that names `cwd` is refused; the command line the owner approves is the whole command. Command grants key on `sha256(command)` per Mac.
+- "This conversation" grants are keyed by thread only (decision 2); no session or time end. Revoking marks the grant `superseded`.
+- The daemon refuses an unstamped or mismatched call for all three own-Mac tools, not only observe and act.
+- The D9 prompt line lives in the own-Mac tool descriptions. The in-server runtime offers the tools per turn and reopens a thread when the offer changes between turns.
+- Owner-Mac cards create no wake subscribers: the held call is the answer's only reader.
