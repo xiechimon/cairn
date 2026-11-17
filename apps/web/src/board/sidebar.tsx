@@ -23,6 +23,7 @@ import {
   useState,
 } from 'react';
 import { Link, type NavigateFunction, type To, useLocation, useNavigate } from 'react-router';
+import { CoordinatorGlyph } from '../chief/chief-status-mark.js';
 import { ChiefMemoryDialog } from '../chief/memory-dialog.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
@@ -499,7 +500,7 @@ export function BoardSidebar({
         className={`flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pt-1 pb-1 ${scrollFadeClassName()}`}
       >
         <SidebarNavRow
-          icon={<BrandGlyph className="size-5" />}
+          icon={<CoordinatorGlyph />}
           label={t('Coordinator')}
           active={coordinatorActive}
           onClick={() => navigate(coordinatorTarget)}

@@ -315,6 +315,8 @@ const CHECKLIST = [
   stroke(-9, 15, 10, 8),
 ];
 
+const WORK_BOIL = 200;
+
 type Window = readonly [number, number];
 
 interface MarkShape {
@@ -333,48 +335,49 @@ function writeWindow(t: number, period: number): Window {
 export function markShape(id: StatusMarkId, t: number): MarkShape {
   switch (id) {
     case 'idle':
-      return { lines: [SPIRAL], boil: 520 };
+      return { lines: [SPIRAL] };
     case 'think': {
-      const k = Math.floor(t / 150);
-      const a = 0.8 + 0.3 * Math.sin(k * 2.3);
-      const tilt = k * 1.7;
+      const k = t / 700;
+      const a = 0.86 + 0.16 * Math.sin(k * 1.3);
+      const tilt = k * 0.8;
       return {
         lines: [
-          range(70, (u) => {
-            const th = u * Math.PI * 4.6 + tilt;
-            const r = 16 + 7 * Math.sin(th * 1.6 + k);
-            return [r * Math.cos(th) * a, r * Math.sin(th) * (1.95 - a)];
+          range(80, (u) => {
+            const th = u * Math.PI * 4.4 + tilt;
+            const r = 15 + 6 * Math.sin(th * 1.5 + k * 0.6);
+            return [r * Math.cos(th) * a, r * Math.sin(th) * (1.9 - a)];
           }),
         ],
+        boil: WORK_BOIL,
       };
     }
     case 'write':
-      return { lines: [CURSIVE], window: writeWindow(t, 2100), boil: 170 };
+      return { lines: [CURSIVE], window: writeWindow(t, 2600), boil: WORK_BOIL };
     case 'look':
-      return { lines: READ, window: writeWindow(t, 2400), boil: 170 };
+      return { lines: READ, window: writeWindow(t, 2800), boil: WORK_BOIL };
     case 'run':
       return {
         lines: [
           range(56, (u) => [
             -34 + 68 * u,
-            (8 + 3 * Math.sin(t / 310)) * Math.sin(u * Math.PI * 7 - t / 150),
+            (8 + 3 * Math.sin(t / 420)) * Math.sin(u * Math.PI * 5 - t / 240),
           ]),
         ],
-        boil: 140,
+        boil: WORK_BOIL,
       };
     case 'task':
-      return { lines: CHECKLIST, window: writeWindow(t, 2600), boil: 170 };
+      return { lines: CHECKLIST, window: writeWindow(t, 3000), boil: WORK_BOIL };
     case 'ask':
       return {
-        lines: [BUBBLE.map(([x, y]): MarkPoint => [x, y + 1.6 * Math.sin(t / 420)])],
-        boil: 260,
+        lines: [BUBBLE.map(([x, y]): MarkPoint => [x, y + 1.1 * Math.sin(t / 600)])],
+        boil: 600,
       };
     case 'done':
-      return { lines: [CHECK], boil: 600 };
+      return { lines: [CHECK] };
     case 'error':
-      return { lines: CROSS, boil: 170 };
+      return { lines: CROSS };
     case 'offline': {
-      const px = -60 + 150 * ((t / 2200) % 1);
+      const px = -60 + 150 * ((t / 2800) % 1);
       return {
         lines: [
           range(70, (v) => {
@@ -418,14 +421,69 @@ export function markPath(id: StatusMarkId, t: number, pen: Pen, still: boolean):
         b = Math.min(b, clamp01(shape.window[1] * total - li));
       }
       if (b - a <= 0.001) return '';
-      const points = cut(line, a, b).map(([x, y], i) => {
-        const jx = k === 0 ? 0 : 0.9 * Math.sin(i * 0.31 + k * 7.1);
-        const jy = k === 0 ? 0 : 0.9 * Math.cos(i * 0.27 + k * 3.3);
-        return `${(x + jx).toFixed(1)} ${(y + jy).toFixed(1)}`;
-      });
-      return `M${points.join('L')}`;
+      const points = cut(line, a, b).map(
+        ([x, y], i): MarkPoint =>
+          k === 0
+            ? [x, y]
+            : [x + 0.7 * Math.sin(i * 0.31 + k * 7.1), y + 0.7 * Math.cos(i * 0.27 + k * 3.3)],
+      );
+      return brushPath(points, BRUSH * (BRUSH_WEIGHT[id] ?? 1));
     })
     .join('');
+}
+
+const BRUSH = 6.6;
+const BRUSH_WEIGHT: Partial<Record<StatusMarkId, number>> = {
+  think: 0.82,
+  write: 0.58,
+  look: 0.92,
+  task: 0.78,
+  ask: 0.92,
+  offline: 0.9,
+};
+
+const smooth = (x: number) => x * x * (3 - 2 * x);
+const xy = ([x, y]: MarkPoint) => `${x.toFixed(1)} ${y.toFixed(1)}`;
+
+function brushPath(points: readonly MarkPoint[], width: number): string {
+  const n = points.length;
+  if (n < 2) return '';
+  const along = [0];
+  for (let i = 1; i < n; i++) {
+    const a = pick(points, i - 1);
+    const b = pick(points, i);
+    along.push(pick(along, i - 1) + Math.hypot(b[0] - a[0], b[1] - a[1]));
+  }
+  const total = pick(along, n - 1) || 1;
+  const landing = Math.min(total * 0.18, 9);
+  const lifting = Math.min(total * 0.32, 22);
+  const left: MarkPoint[] = [];
+  const right: MarkPoint[] = [];
+  const half: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = pick(points, Math.max(0, i - 1));
+    const b = pick(points, Math.min(n - 1, i + 1));
+    const p = pick(points, i);
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const tx = (b[0] - a[0]) / len;
+    const ty = (b[1] - a[1]) / len;
+    const s = pick(along, i);
+    const h =
+      (width / 2) *
+      (0.62 + 0.38 * smooth(clamp01(s / landing))) *
+      (0.42 + 0.58 * smooth(clamp01((total - s) / lifting))) *
+      (1 + 0.05 * Math.sin(i * 0.37));
+    half.push(h);
+    left.push([p[0] - ty * h, p[1] + tx * h]);
+    right.push([p[0] + ty * h, p[1] - tx * h]);
+  }
+  const end = pick(half, n - 1).toFixed(1);
+  const start = pick(half, 0).toFixed(1);
+  return `M${left.map(xy).join('L')}A${end} ${end} 0 0 0 ${xy(pick(right, n - 1))}L${right
+    .slice()
+    .reverse()
+    .map(xy)
+    .join('L')}A${start} ${start} 0 0 0 ${xy(pick(left, 0))}Z`;
 }
 
 const easeOut = (x: number) => 1 - (1 - x) ** 3;

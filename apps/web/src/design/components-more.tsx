@@ -313,7 +313,7 @@ export function StreamSection() {
       <Specimen
         id="status-mark"
         title="Status mark"
-        note="One hand-drawn line on a quiet disc at the top of the Coordinator conversation; the old line erases along its path, the new one draws in; the pill fades after a few seconds"
+        note="One brush line written straight on the page at the top of the Coordinator conversation, no disc; the old line erases along its path, the new one draws in; the label under it fades after a few seconds"
         code={`<ChiefStatusMark chief={chiefData} />`}
       >
         {STATUS_MARK_IDS.map((id) => (

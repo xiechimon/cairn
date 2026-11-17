@@ -28,7 +28,7 @@ for (const viewport of [
       expect(menu.width).toBe(46);
       expect(menu.height).toBe(46);
       expect(menu.x).toBe(16);
-      const mark = page.locator('[data-slot="narrow-top"] [data-slot="status-mark-circle"]');
+      const mark = page.locator('[data-slot="narrow-top"] [data-slot="status-mark-glyph"]');
       const markBox = await mark.boundingBox();
       expect(markBox!.width).toBe(62);
       expect(Math.abs(markBox!.x + markBox!.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(1);
@@ -78,7 +78,7 @@ for (const viewport of [
       await expect(page.getByTestId('tasks-toggle')).toHaveAccessibleName('任务，3 件等你');
     });
 
-    test('the status mark is a bare disc that carries its state in its name, with no label chip', async ({
+    test('the status mark is bare ink with no disc, carrying its state in its name, with no label chip', async ({
       page,
     }) => {
       await page.goto(HOME);
@@ -86,9 +86,12 @@ for (const viewport of [
       await expect(mark).toHaveAttribute('data-state', 'ask');
       await expect(page.getByTestId('chief-status-pill')).toHaveCount(0);
       await expect(mark.getByRole('img', { name: '等你确认' })).toBeVisible();
-      const disc = await mark.locator('[data-slot="status-mark-circle"]').boundingBox();
+      const glyph = mark.locator('[data-slot="status-mark-glyph"]');
+      await expect(glyph).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(glyph).toHaveCSS('box-shadow', 'none');
+      const area = await glyph.boundingBox();
       const menu = await box(page, 'narrow-menu');
-      expect(disc!.y + disc!.height).toBeLessThanOrEqual(menu.y + menu.height + 10);
+      expect(area!.y + area!.height).toBeLessThanOrEqual(menu.y + menu.height + 10);
     });
 
     test('the tab bar switches panes instantly and keeps the URL of the desktop pane', async ({

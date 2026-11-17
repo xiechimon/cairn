@@ -1,11 +1,13 @@
 import { cn } from 'cn';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useConnected } from '../api/connection-state.js';
+import { BrandGlyph } from '../components/brand-glyph.js';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useQuestionPending } from './chief-question.js';
+import { useOptionalChiefRoot } from './chief-root.js';
 import {
   ANNOUNCE_SETTLE_MS,
   FULL_PEN,
@@ -83,11 +85,7 @@ export function StatusMarkGlyph({
         ref={pathRef}
         d={initialPath}
         data-mark={state}
-        fill="none"
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="stroke-foreground data-[mark=error]:stroke-destructive data-[mark=offline]:opacity-75"
+        className="fill-foreground data-[mark=error]:fill-destructive data-[mark=offline]:opacity-55"
       />
     </svg>
   );
@@ -108,7 +106,7 @@ export function StatusMarkFloat({
 }) {
   const { t } = useI18n();
   const { id, label, announce } = view;
-  const [pill, setPill] = useState({ id, label });
+  const [pill, setPill] = useState(label);
   const [out, setOut] = useState(false);
   const [hover, setHover] = useState(false);
   const [announced, setAnnounced] = useState(announce ? label : '');
@@ -118,7 +116,7 @@ export function StatusMarkFloat({
     setOut(true);
     const swap = window.setTimeout(
       () => {
-        setPill({ id, label });
+        setPill(label);
         setOut(false);
       },
       reduce ? 0 : PILL_FADE_MS,
@@ -135,7 +133,7 @@ export function StatusMarkFloat({
     return () => window.clearTimeout(settle);
   }, [label, announce]);
 
-  const visible = pill.label !== '' && (!out || hover);
+  const visible = pill !== '' && (!out || hover);
   const live = (
     <span role="status" className="sr-only" data-testid="chief-status-live">
       {announced === '' ? '' : t(announced)}
@@ -155,8 +153,8 @@ export function StatusMarkFloat({
               <div
                 role="img"
                 aria-label={name}
-                data-slot="status-mark-circle"
-                className="pointer-events-auto grid size-15.5 place-items-center rounded-full bg-popover shadow-(--e2)"
+                data-slot="status-mark-glyph"
+                className="pointer-events-auto grid size-15.5 place-items-center"
               />
             }
           >
@@ -177,24 +175,23 @@ export function StatusMarkFloat({
       className={cn('pointer-events-none flex flex-col items-center', className)}
     >
       <div
-        data-slot="status-mark-circle"
-        className="pointer-events-auto grid size-11 place-items-center rounded-full bg-popover shadow-(--e2)"
+        data-slot="status-mark-glyph"
+        className="pointer-events-auto grid size-11 place-items-center"
         onPointerEnter={() => setHover(true)}
         onPointerLeave={() => setHover(false)}
       >
-        <StatusMarkGlyph state={id} className="size-8" />
+        <StatusMarkGlyph state={id} className="size-10" />
       </div>
       <div
         aria-hidden="true"
         data-testid="chief-status-pill"
         data-visible={visible}
         className={cn(
-          '-mt-1 flex items-center gap-2 rounded-full bg-popover px-3 py-1.75 text-meta leading-5 font-medium whitespace-nowrap text-foreground shadow-(--e2) transition-[opacity,transform] duration-(--dur-fast) ease-out motion-reduce:transition-none',
+          'flex items-center gap-2 text-meta leading-5 whitespace-nowrap text-(--text-secondary) transition-[opacity,transform] duration-(--dur-fast) ease-out motion-reduce:transition-none',
           !visible && '-translate-y-1 opacity-0',
         )}
       >
-        {pill.id === 'ask' && <span className="size-1.5 rounded-full bg-(--waiting-ink)" />}
-        {pill.label === '' ? '' : t(pill.label)}
+        {pill === '' ? '' : t(pill)}
         {hover && elapsed != null && (
           <span className="font-normal text-(--text-tertiary) tabular-nums">
             · {formatClock(elapsed)}
@@ -211,10 +208,12 @@ const DONE_VIEW: StatusMarkView = { id: 'done', label: STATUS_MARK_LABELS.done, 
 export function ChiefStatusMark({
   chief,
   large = false,
+  hiddenWhenIdle = false,
   className = 'absolute inset-x-0 top-2.5 z-10',
 }: {
   chief: ChiefContent;
   large?: boolean;
+  hiddenWhenIdle?: boolean;
   className?: string;
 }) {
   const connected = useConnected();
@@ -241,12 +240,40 @@ export function ChiefStatusMark({
   const live =
     chief.running === true ? stream.findLast((item) => item.kind === 'streaming') : undefined;
   const elapsed = useLiveSeconds(live?.kind === 'streaming' ? live.startedAt : null);
+  const view = done && base.id === 'idle' ? DONE_VIEW : base;
+  if (hiddenWhenIdle && view.id === 'idle') return null;
+  return <StatusMarkFloat view={view} elapsed={elapsed} large={large} className={className} />;
+}
+
+export function CoordinatorGlyph({ className = 'size-5' }: { className?: string }) {
+  const root = useOptionalChiefRoot();
+  const connected = useConnected();
+  const questionPending = useQuestionPending();
+  const id =
+    root == null
+      ? 'idle'
+      : statusMarkView({ chief: root.surface.chiefData, questionPending, connected }).id;
+  if (id === 'error')
+    return (
+      <svg aria-hidden="true" viewBox="0 0 16 16" className={className} data-mark={id}>
+        <path
+          d="M4.2 4.2 11.8 11.8M11.8 4.2 4.2 11.8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
   return (
-    <StatusMarkFloat
-      view={done && base.id === 'idle' ? DONE_VIEW : base}
-      elapsed={elapsed}
-      large={large}
-      className={className}
-    />
+    <span className={cn('relative inline-grid flex-none', className)} data-mark={id}>
+      <BrandGlyph
+        busy={isActiveMark(id)}
+        className={cn('size-full', id === 'offline' && 'opacity-55')}
+      />
+      {id === 'ask' && (
+        <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-(--waiting-ink)" />
+      )}
+    </span>
   );
 }

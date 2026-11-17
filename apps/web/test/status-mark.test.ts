@@ -208,6 +208,10 @@ describe('markPath', () => {
     expect(markPath('run', 0, FULL_PEN, true)).toBe(markPath('run', 900, FULL_PEN, true));
   });
 
+  it.each(['idle', 'done', 'error'] as const)('%s rests without re-inking', (id) => {
+    expect(markPath(id, 0, FULL_PEN, false)).toBe(markPath(id, 2000, FULL_PEN, false));
+  });
+
   it('keeps moving while a command runs', () => {
     expect(markPath('run', 0, FULL_PEN, false)).not.toBe(markPath('run', 400, FULL_PEN, false));
   });

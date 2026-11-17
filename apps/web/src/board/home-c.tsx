@@ -307,6 +307,7 @@ export function HomeC({
     if (at < 0 || full.slice(at).some((item) => item.kind === 'user')) return undefined;
     return full[at];
   }, [chiefData.stream]);
+  const homeSpiral = !narrow && fallbackOnly && projectId === null && archived === null;
   const quickReplies = fallbackOnly
     ? STARTERS.map((label) => t(label))
     : quickOwner !== undefined && stream.includes(quickOwner)
@@ -578,8 +579,10 @@ export function HomeC({
           className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
         >
           {paneButtons}
-          {!narrow && <ChiefStatusMark chief={{ ...chiefData, stream }} />}
-          {!narrow && fallbackOnly && projectId === null && archived === null && (
+          {!narrow && (
+            <ChiefStatusMark chief={{ ...chiefData, stream }} hiddenWhenIdle={homeSpiral} />
+          )}
+          {homeSpiral && (
             <HomeSpiral projects={fixtureProjects ?? activeProjects} waiting={waitingIds} />
           )}
           {banner != null && (
