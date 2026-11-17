@@ -1,7 +1,7 @@
 # Mac session confinement
 
 Date: 2026-11-17
-Status: proposal, awaiting ian's decision; no code until approved. Touches the `machineAndCommandBoundary` security surface (`apps/daemon/src/backend/command-gate.ts`, `machine-client.ts`) and adds a new launcher beside `confine.ts`.
+Status: approved by ian on 2026-11-17 (all seven decisions as recommended); segment 1 landed, wiring pending (see Implementation segments). Touches the `machineAndCommandBoundary` security surface (`apps/daemon/src/backend/command-gate.ts`, `machine-client.ts`) and adds a new launcher beside `confine.ts`.
 Research: [mac-session-confinement-2026-11-17](../research/mac-session-confinement-2026-11-17.md). Linux counterpart: [linux-harness-confinement](linux-harness-confinement.md).
 
 ## Problem
@@ -37,7 +37,7 @@ Paths use the packaged layout; `userData` is `~/Library/Application Support/@cai
 
 Network: deny outbound connections to the server's loopback port. The Runner already holds the machine token and talks to the server for the session (`machine-client.ts`); sessions get no server credentials and have no reason to reach it. Other loopback ports stay open so a session can run and test its own dev servers. This is defence in depth: with the token files unreadable, an unauthenticated call reaches no owner route. Internet access stays open.
 
-Also deny, in the profile: Apple Events send, so `osascript`/`open` cannot start an unsandboxed app (the research shows `osascript` to Finder works under a plain `(allow default)`), and writes to the profile's own parent directory.
+Apple Events are an open escape: `osascript` to Finder and `open -a` still work under `(deny appleevent-send)` and under `(deny mach-lookup ...)` for the appleevents and launchservicesd names (实测 2026-11-17, macOS 27.2). The profile does not claim to block them; finding the right Mach service names (srt's source) is an open item, and until then a session can start an unsandboxed app.
 
 Known gap, same as Linux: a deny list. A secret kept in a path nobody listed stays readable. The first mitigation is that Cairn's own state lives under two roots that are denied wholesale.
 
@@ -53,7 +53,6 @@ One module, `apps/daemon/src/backend/confine.ts` (seam stays inside `backend/`),
 (allow file-read* file-write* <this session's worktree> <git dirs> <own state>)   ; later rule wins
 (deny file-write* <.git/config> <.git/config.worktree> <.git/hooks>)
 (deny network-outbound (remote ip "localhost:<server port>"))
-(deny appleevent-send)
 ```
 
 Rule order matters in SBPL (last match wins); the generator emits denied roots first, then the narrow re-allows, then protected-file denies, and a unit test asserts that order, mirroring Linux's "denied-parent masks, narrowly re-exposed paths, protected-file masks".
@@ -98,14 +97,19 @@ Red first, in this order. Test file `apps/daemon/test/mac-session-confinement.te
 
 Verification evidence for the implementation: the red-then-green log of test 1, plus an end-to-end session in the packaged Mac app that tries to read the owner token and fails.
 
-## Decisions for ian
+## Decisions
 
-Listed with a recommendation in the report message that carries this file.
+Approved by ian on 2026-11-17, all as recommended: Seatbelt (not a separate user); fail closed; one platform-neutral adapter seam, Mac first, Linux bwrap plugs in later; deny only the server loopback port; Pi moves to a `pi-host` child; macOS CI job for the probe; enforce only when all runtimes are migrated.
 
-1. Mechanism: one Cairn-owned Seatbelt profile (recommended) versus a separate macOS user.
-2. Fail closed on macOS when the sandbox cannot start (recommended) versus allowing unsandboxed sessions with a warning.
-3. Scope: build the platform-neutral adapter seam for Claude, Codex, Gemini and Pi now, Mac first, with Linux bwrap plugging into the same seam later (recommended) versus Mac only with a parallel seam.
-4. Network: deny only the server's loopback port (recommended) versus all loopback, versus none.
-5. Pi: move the session to a `pi-host` child (recommended) versus profile only the Bash tool and accept readable Pi file tools.
-6. CI: add a macOS runner job for the probe test (recommended) versus run it manually on the Mac.
-7. Rollout: enforce only when all three runtimes are migrated (recommended) versus per runtime.
+## Implementation segments
+
+| Segment | Content | State |
+| --- | --- | --- |
+| 1 | `confine-seatbelt.ts` (`seatbeltProfile`, `seatbeltCommand`), golden/order/overlap tests, the Mac probe test with its unconfined negative control (`apps/daemon/test/confine-seatbelt.test.ts`) | landed |
+| 2 | Policy source: build `SeatbeltPolicy` per step from the Runner config (server home, runner home, worktree, git directories, own state, caches, server port); thread it to the adapters | pending |
+| 3 | Claude Code (`spawnClaudeCodeProcess` always installed), Codex and Gemini (`spawnProcess`) through the seam, with `full-access` and inner sandboxes off; structural test | pending |
+| 4 | `pi-host` child and JSONL protocol | pending |
+| 5 | macOS availability (`checking/ready/unavailable`, reasons, preflight probe), shared capability enum | pending |
+| 6 | macOS CI job; packaged-app end-to-end proof; enforcement switched on once 2 to 5 are in | pending |
+
+Segment 1 changes nothing at runtime: no adapter calls it yet, so Mac sessions stay unconfined until segments 2 to 5 land.

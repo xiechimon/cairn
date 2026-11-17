@@ -15,7 +15,7 @@ export interface ConfinementPolicy {
   caches: string[];
 }
 
-const DENIED_DIRECTORIES = [
+export const DENIED_DIRECTORIES = [
   '.ssh',
   '.gnupg',
   '.aws',
@@ -30,14 +30,14 @@ const DENIED_DIRECTORIES = [
   '.pi',
   '.gemini',
 ];
-const DENIED_FILES = ['.netrc', '.git-credentials', '.claude.json'];
+export const DENIED_FILES = ['.netrc', '.git-credentials', '.claude.json'];
 
-function contains(parent: string, child: string): boolean {
+export function contains(parent: string, child: string): boolean {
   const path = relative(parent, child);
   return path === '' || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path));
 }
 
-function canonical(path: string, required = false): string {
+export function canonical(path: string, required = false): string {
   if (!isAbsolute(path) || resolve(path) !== path) throw new Error('Unsafe confinement path');
   let cursor = path;
   const missing: string[] = [];
