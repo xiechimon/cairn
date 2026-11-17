@@ -591,8 +591,9 @@ export async function runBrowserTool(
       ]),
     ]);
     if (blocked.code !== 0) {
+      const cause = blocked.text.split('\n').at(-1)?.slice(0, 300) ?? '';
       refuse(
-        `${what} refused: Cairn's addresses could not be blocked in the agent browser`,
+        `${what} refused: Cairn's addresses could not be blocked in the agent browser${cause === '' ? '' : `: ${cause}`}`,
         started,
       );
     }

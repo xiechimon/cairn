@@ -1103,7 +1103,10 @@ describe('Cairn pages', () => {
         log.push(line);
         return (async function* () {
           if (line.includes(' batch --bail ')) {
-            yield { kind: 'stdout' as const, text: 'ok\n' };
+            yield {
+              kind: blockExit === 0 ? ('stdout' as const) : ('stderr' as const),
+              text: blockExit === 0 ? 'ok\n' : 'Chrome exited before providing DevTools URL\n',
+            };
             yield { kind: 'exit' as const, code: blockExit };
             return;
           }
@@ -1280,7 +1283,9 @@ describe('Cairn pages', () => {
       ),
     ).rejects.toMatchObject({
       delivery: 'not_delivered',
-      message: expect.stringMatching(/could not be blocked/),
+      message: expect.stringMatching(
+        /could not be blocked.*Chrome exited before providing DevTools URL/,
+      ),
     });
     expect(log).toHaveLength(1);
   });
