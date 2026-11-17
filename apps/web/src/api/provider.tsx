@@ -1,11 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { MachineIdentityContext } from '../components/machine-label.js';
 import { DemoBanner } from '../demo/demo-banner.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
-import { USER_NAME } from '../fixtures/fixtures.js';
-import { resolveScenario, SCENARIO_PARAM, SCENARIOS_ENABLED } from '../fixtures/scenario.js';
+import { USER_NAME } from '../fixtures/core.js';
+import {
+  loadScenarioFixtures,
+  resolveScenario,
+  SCENARIO_PARAM,
+  SCENARIOS_ENABLED,
+} from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { useMachines, useSession, useTeams } from './hooks.js';
 import { isFixtureMode } from './mode.js';
@@ -55,6 +60,17 @@ export function ApiProvider({ children }: { children: ReactNode }) {
 export function LiveDataBridge() {
   const { search } = useLocation();
   const live = useMemo(() => !isFixtureMode(new URLSearchParams(search)), [search]);
+  const [fixturesReady, setFixturesReady] = useState(false);
+  useEffect(() => {
+    if (live || fixturesReady) return;
+    let on = true;
+    void loadScenarioFixtures().then(() => {
+      if (on) setFixturesReady(true);
+    });
+    return () => {
+      on = false;
+    };
+  }, [live, fixturesReady]);
   const teams = useTeams(live);
   const session = useSession(live);
   const teamId = teams.data?.[0]?.id;
@@ -90,13 +106,13 @@ export function LiveDataBridge() {
           <div className="flex h-full flex-col">
             <DemoBanner />
             <div data-slot="demo-body" className="relative min-h-0 flex-1 contain-layout">
-              <Outlet />
+              {fixturesReady ? <Outlet /> : null}
             </div>
           </div>
         ) : (
           <>
             {scenarioId != null && <FixtureModeChip id={scenarioId} />}
-            <Outlet />
+            {live || fixturesReady ? <Outlet /> : null}
           </>
         )}
       </MachineIdentityContext.Provider>

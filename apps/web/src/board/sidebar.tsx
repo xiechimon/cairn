@@ -38,8 +38,8 @@ import {
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
+import { PROJECT_ID, PROJECT_NAME } from '../fixtures/core.js';
 import { isDeleted } from '../fixtures/deletions.js';
-import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteArchivedProjectsConfirm } from '../overlay/delete-archived-projects-confirm.js';

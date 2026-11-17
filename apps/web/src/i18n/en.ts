@@ -18,7 +18,7 @@
 // user/agent content (todo titles, bubbles, docs) never enters the dict
 // and falls back to the zh original, exactly like the real app would.
 
-import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
+import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/core.js';
 
 export const EN: Record<string, string> = {
   这里: 'this channel',

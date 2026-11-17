@@ -161,6 +161,13 @@ export const projectContent: ProjectContent = {
   defaultBranch: 'main',
   description: null,
 };
+export const PROBE_TOOL_PILLS = [
+  'edit README.md',
+  'bash cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" && tail -n 3 README.md && echo …',
+];
+
+export const PROBE_TOOL_CALL_LABEL = `调用工具：${PROBE_TOOL_PILLS[1]}`;
+
 export function localTodo(seqNum: number, spec: string, now: number): TodoRecord {
   return {
     id: `local-${seqNum}`,

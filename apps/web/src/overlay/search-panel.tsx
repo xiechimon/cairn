@@ -14,7 +14,7 @@ import { Button } from '../components/ui/button.js';
 import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { useDesktopMenu } from '../desktop-shell.js';
-import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
+import { PROJECT_ID, PROJECT_NAME } from '../fixtures/core.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Clock, Kanban, Search, Settings, X } from '../icons/index.js';

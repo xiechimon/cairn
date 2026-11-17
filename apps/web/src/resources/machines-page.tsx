@@ -8,7 +8,7 @@ import { EmptyState } from '../components/empty-state.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SettingsPanel } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import { TEAM_NAME } from '../fixtures/fixtures.js';
+import { TEAM_NAME } from '../fixtures/core.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';

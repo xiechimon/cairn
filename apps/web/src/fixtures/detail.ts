@@ -8,6 +8,8 @@ import {
   PROBE_ID,
   PROBE_RUN_HISTORY,
   PROBE_TOKEN_USAGE,
+  PROBE_TOOL_CALL_LABEL,
+  PROBE_TOOL_PILLS,
   probeTodo,
   R3_DAY,
   r7,
@@ -124,12 +126,7 @@ export const PROBE_BUILD_RESULT: TranscriptItem = {
   footer: {},
 };
 
-export const PROBE_TOOL_PILLS = [
-  'edit README.md',
-  'bash cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" && tail -n 3 README.md && echo …',
-];
-
-export const PROBE_TOOL_CALL_LABEL = `调用工具：${PROBE_TOOL_PILLS[1]}`;
+export { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from './core.js';
 
 function probeTools(expanded: boolean): TranscriptItem {
   return {

@@ -35,7 +35,7 @@ import { THREAD_PARAM } from '../board/thread-copy.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
-import { chiefDefault } from '../fixtures/fixtures.js';
+import { chiefDefault } from '../fixtures/chief.js';
 import type { ChiefContent, FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
