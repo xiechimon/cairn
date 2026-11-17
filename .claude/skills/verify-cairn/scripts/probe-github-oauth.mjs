@@ -129,38 +129,28 @@ try {
     .getByRole('menuitemradio', { name: 'GitHub 仓库' })
     .click();
 
-  const auth = page.locator('#prj-new-repo');
-  await expect
-    .poll(() => auth.textContent(), { timeout: 8000 })
-    .toBe('认证 GitHub');
-  const authVisible = await auth.isVisible();
-  const linkVisible = await page
-    .getByRole('button', { name: '手动输入 owner/repo' })
-    .isVisible();
-  check(
-    authVisible && linkVisible,
-    `UI:未认证点「GitHub 仓库」→ 认证钮(文案「认证 GitHub」)+ 手动兜底链接(实际 auth=${authVisible} link=${linkVisible})`,
-  );
-  await page.screenshot({ path: join(EVIDENCE, 'auth-face.png') });
-
-  if (!oauthConfigured) {
-    await auth.click();
-    const err = page.getByRole('alert');
-    await err.waitFor({ state: 'visible', timeout: 5000 });
-    const errText = (await err.textContent()) ?? '';
-    check(
-      errText.includes('CAIRN_GITHUB_OAUTH_CLIENT_ID'),
-      `UI:点认证(env 未配)→ authorize 400 原文落内联错误行(实际「${errText.slice(0, 80)}」)`,
-    );
-    await page.screenshot({ path: join(EVIDENCE, 'error-face.png') });
-  } else {
-    console.log('SKIP  UI 点认证(env 已配 = 会跳真 GitHub 授权页,自动化不跟人环;真回环证明归 server test)');
-  }
-
-  await page.getByRole('button', { name: '手动输入 owner/repo' }).click();
   const input = page.locator('#prj-new-repo');
+  if (!oauthConfigured) {
+    await expect.poll(() => input.getAttribute('placeholder'), { timeout: 8000 }).toBe('owner/repo');
+    const authCount = await page.getByRole('button', { name: '认证 GitHub' }).count();
+    const envLeak = await page.getByText('CAIRN_GITHUB_OAUTH').count();
+    check(
+      authCount === 0 && envLeak === 0,
+      `UI: no GitHub sign-in on the server → the GitHub row is the owner/repo input, no auth button, no env text (auth=${authCount} env=${envLeak})`,
+    );
+    await page.screenshot({ path: join(EVIDENCE, 'signin-off-face.png') });
+  } else {
+    await expect.poll(() => input.textContent(), { timeout: 8000 }).toBe('认证 GitHub');
+    await page.screenshot({ path: join(EVIDENCE, 'auth-face.png') });
+    console.log('SKIP  UI auth click (sign-in configured: it would jump to the real GitHub page; the round trip is proven by server tests)');
+    await page.getByRole('button', { name: '切换仓库来源' }).click();
+    await page
+      .getByRole('menu', { name: '仓库' })
+      .getByRole('menuitemradio', { name: '手动输入 owner/repo' })
+      .click();
+  }
   const inputOk = (await input.getAttribute('placeholder')) === 'owner/repo';
-  check(inputOk, `UI:手动兜底链接 → 现状 owner/repo input(placeholder 实际 ${await input.getAttribute('placeholder')})`);
+  check(inputOk, `UI: owner/repo input (placeholder ${await input.getAttribute('placeholder')})`);
   await page.locator('#prj-new-name').fill('verify-gh-manual');
   await input.fill('xiechimon/cairn');
   const submit = page.getByRole('button', { name: '创建项目' });

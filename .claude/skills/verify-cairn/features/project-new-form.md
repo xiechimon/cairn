@@ -32,7 +32,7 @@ Preconditions: `launch.mjs` already started the isolated stack (fresh DB; a work
 ## Gotchas
 
 - **The `-webkit-autofill` override cannot be live-driven** (the browser exposes no trigger face) - rely on the CSS-recipe review + the e2e computed-style pin of the focus face; do not claim the probe verified autofill.
-- The github face is auth-gated (#361): unauthenticated, the `owner/repo` input does not exist, you must first click the `手动输入 owner/repo` fallback link to reveal it - the probe clicks that link before every github-input fill (pick row -> click link -> fill), missing it is a 30s fill timeout; there are several spots, do not fix only the first one.
+- The github face is auth-gated (#361): when the server has GitHub sign-in and the team is not connected, the `owner/repo` input does not exist until you pick the `手动输入 owner/repo` row of the repo-source menu - the probe picks that row before every github-input fill; missing it is a 30s fill timeout.
 - The error-row classification consumes the structured `reason` code in the server 400 response (the vocabulary single source = shared `PROJECT_LOCAL_ERROR_REASONS`, since #386); the message copy is no longer the contract, the server changing error copy freely does not affect it - if the server validation throws a new code, the web classifies it as unclassified and passes the raw text through, the probe reds to remind alignment.
 - The none-form submit body carries no `kind`/`repoKind` - a repoKind of null/absent in the record both pass (`== null` judgment), do not tighten to strict undefined.
 - vite dev's first-load cold transform is slow, `gotoNew` waits up to 20s; if the page is not up, doctor first, do not rush to change assertions.

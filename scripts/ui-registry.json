@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "027952cb857383db231e26d194f209c8065b7d66",
-    "date": "2026-11-16"
+    "sha": "e5a3ccfdf52d573b4aafee7e3edcef3d2697a8fc",
+    "date": "2026-11-17"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -46,8 +46,8 @@
       "kind": "registry",
       "upstreamItem": "button",
       "status": "deviated",
-      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries. Owner hover policy: pressed buttons stay flat and color transitions exclude box-shadow. A disabled default button keeps the DESIGN.md Forms action-row look: a pale secondary fill with a dim, readable label instead of an opacity fade.",
-      "hash": "edd40785b4fe2ac57761dd54b3fcfeec018d01ba634b5d02d9148a3cbda226c7"
+      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries. Owner hover policy: pressed buttons stay flat and color transitions exclude box-shadow. A disabled default button keeps the DESIGN.md Forms action-row look: a pale secondary fill with a dim, readable label instead of an opacity fade, plus the border hairline in dark, where that fill nearly matches the dialog canvas.",
+      "hash": "beaa1a29dc211600e2988df96365e3eaec605a3ef019dc5947442d0e64b5e006"
     },
     "card.tsx": {
       "kind": "registry",

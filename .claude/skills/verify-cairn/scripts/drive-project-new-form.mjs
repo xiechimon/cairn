@@ -114,6 +114,11 @@ const selectRow = async (label) => {
   await menu().getByRole('menuitemradio', { name: label }).click();
   await menu().waitFor({ state: 'hidden', timeout: 5000 });
 };
+const selectGithubInput = async () => {
+  await selectRow('GitHub 仓库');
+  const input = page.locator('input[aria-label="GitHub 仓库"]');
+  if ((await input.count()) === 0) await selectRow('手动输入 owner/repo');
+};
 const waitProjectUrl = () =>
   page.waitForURL(
     (url) => /^\/app\/project\/[^/]+$/.test(url.pathname) && url.pathname !== '/app/project/new',
@@ -159,12 +164,11 @@ try {
     `清空名称后回填恢复(实际「${await nameValue()}」)`,
   );
 
-  await selectRow('GitHub 仓库');
+  await selectGithubInput();
   check(
     (await page.locator('input[aria-label="本地文件夹"]').count()) === 0,
     '切到 GitHub 形态:本地路径输入面退场(无陈旧态骑提交)',
   );
-  await page.getByRole('button', { name: '手动输入 owner/repo' }).click();
   const ghInput = page.locator('input[aria-label="GitHub 仓库"]');
   await ghInput.fill('xiechimon/cairn');
   check(
@@ -248,8 +252,7 @@ try {
   );
 
   await gotoNew();
-  await selectRow('GitHub 仓库');
-  await page.getByRole('button', { name: '手动输入 owner/repo' }).click();
+  await selectGithubInput();
   await page.locator('input[aria-label="GitHub 仓库"]').fill('xiechimon/cairn');
   await page.getByRole('button', { name: '创建项目' }).click();
   await waitProjectUrl();

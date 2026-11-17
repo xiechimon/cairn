@@ -11,6 +11,13 @@ async function selectGithub(page: Page) {
   await expect(menu).not.toBeVisible();
 }
 
+async function pickSource(page: Page, label: string) {
+  await page.getByRole('button', { name: '切换仓库来源' }).click();
+  const menu = page.getByRole('menu', { name: '仓库' });
+  await menu.getByRole('menuitemradio', { name: label }).click();
+  await expect(menu).not.toBeVisible();
+}
+
 async function openPicker(page: Page) {
   await page.locator('#prj-new-repo').click();
   const picker = page.getByTestId('github-picker');
@@ -18,14 +25,18 @@ async function openPicker(page: Page) {
   return picker;
 }
 
-test('1. unconnected click `GitHub 仓库` → auth button + manual fallback link, no picker', async ({ page }) => {
+test('1. unconnected click `GitHub 仓库` → auth button, manual entry only in the source menu, no picker', async ({ page }) => {
   await page.goto(NEW_PROJECT);
   await selectGithub(page);
 
   await expect(page.locator('#prj-new-repo')).toHaveText('认证 GitHub');
-  await expect(page.getByRole('button', { name: '手动输入 owner/repo' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '手动输入 owner/repo' })).toHaveCount(0);
   await expect(page.getByTestId('github-picker')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'GitHub 仓库' })).toHaveCount(0);
+  await page.getByRole('button', { name: '切换仓库来源' }).click();
+  await expect(
+    page.getByRole('menu', { name: '仓库' }).getByRole('menuitemradio', { name: '手动输入 owner/repo' }),
+  ).toBeVisible();
 });
 
 test('2. fixture accept law: clicking the auth button → connected face, trigger opens the picker (empty list face)', async ({
@@ -39,7 +50,7 @@ test('2. fixture accept law: clicking the auth button → connected face, trigge
   const picker = await openPicker(page);
 
   await expect(picker.getByText('没有匹配的仓库')).toBeVisible();
-  await expect(picker.getByRole('button', { name: '手动输入 owner/repo' })).toBeVisible();
+  await expect(picker.getByRole('button', { name: '手动输入 owner/repo' })).toHaveCount(0);
 });
 
 test('3. landing param connected → picker auto-opens + list of 3 rows + param cleared, no replay on reload', async ({
@@ -99,35 +110,27 @@ test('6. fill-back law: manual name edits are not overwritten; equal to the last
   await expect(page.locator('#prj-new-name')).toHaveValue('cairn');
 });
 
-test('7. manual fallback: picker footer and the unconnected-face link both switch back to the owner/repo input', async ({ page }) => {
-
+test('7. manual fallback: the source menu switches the connected face to the owner/repo input', async ({ page }) => {
   await page.goto(PICKER);
   await selectGithub(page);
-  const picker = await openPicker(page);
-  await picker.getByRole('button', { name: '手动输入 owner/repo' }).click();
-  await expect(picker).toHaveCount(0);
+  await pickSource(page, '手动输入 owner/repo');
+  await expect(page.getByTestId('github-picker')).toHaveCount(0);
   const input = page.locator('#prj-new-repo');
   await expect(input).toHaveAttribute('placeholder', 'owner/repo');
   await input.fill('octocat/hello-world');
   await expect(input).toHaveValue('octocat/hello-world');
 });
 
-test('7b. manual entry switches back to the auth button by the footer link and by the swap menu', async ({ page }) => {
+test('7b. manual entry and the auth button switch back and forth through the source menu', async ({ page }) => {
   await page.goto(NEW_PROJECT);
   await selectGithub(page);
   const field = page.locator('#prj-new-repo');
-  const manual = page.getByRole('button', { name: '手动输入 owner/repo' });
-  await manual.click();
-  await expect(field).toHaveAttribute('placeholder', 'owner/repo');
-  await page.getByRole('button', { name: '从 GitHub 选择' }).click();
-  await expect(field).toHaveText('认证 GitHub');
-
-  await manual.click();
-  await expect(field).toHaveAttribute('placeholder', 'owner/repo');
-  await page.getByRole('button', { name: '切换仓库来源' }).click();
-  const menu = page.getByRole('menu', { name: '仓库' });
-  await menu.getByRole('menuitemradio', { name: 'GitHub 仓库' }).click();
-  await expect(field).toHaveText('认证 GitHub');
+  for (let round = 0; round < 2; round += 1) {
+    await pickSource(page, '手动输入 owner/repo');
+    await expect(field).toHaveAttribute('placeholder', 'owner/repo');
+    await pickSource(page, 'GitHub 仓库');
+    await expect(field).toHaveText('认证 GitHub');
+  }
 });
 
 test('8. landing param error three translations → inline error row (denied/state/exchange)', async ({ page }) => {

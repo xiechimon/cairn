@@ -24,6 +24,7 @@ import { SETUP_HREF, useFirstRunSetup } from '../board/first-run-setup.js';
 import { PROJECT_ICON_COMPONENTS } from '../board/project-icon-map.js';
 import { ProjectIconPicker } from '../board/project-icon-picker.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -53,8 +54,6 @@ const PICKER_PLATE_CLS = 'w-[calc(var(--anchor-width)+40px)] min-w-[220px]';
 const GH_ROW_CLS =
   'h-auto w-full pointer-coarse:min-h-11 cursor-pointer justify-start px-2 py-1.5 text-left font-normal whitespace-normal outline-hidden focus:bg-accent focus:text-accent-foreground focus-visible:border-transparent focus-visible:ring-0';
 
-const GH_LINK_CLS = 'h-6 p-0 text-meta pointer-coarse:h-11';
-
 type RepoSel = 'none' | 'github' | 'local';
 
 function pathBasename(raw: string): string {
@@ -72,19 +71,23 @@ function RepoSwapButton({
   buttonRef?: Ref<HTMLButtonElement>;
 }) {
   return (
-    <DropdownMenuTrigger
-      render={
-        <Button
-          ref={buttonRef}
-          variant="outline"
-          size="icon"
-          className={`${FORM_CONTROL_CLS} ml-2 shrink-0 text-content-tertiary pointer-coarse:size-11`}
-          aria-label={label}
+    <IconTooltip
+      label={label}
+      trigger={
+        <DropdownMenuTrigger
+          render={
+            <Button
+              ref={buttonRef}
+              variant="outline"
+              size="icon"
+              className={`${FORM_CONTROL_CLS} ml-2 shrink-0 text-content-tertiary pointer-coarse:size-11`}
+            />
+          }
         />
       }
     >
       <ArrowUpDown width={16} height={16} />
-    </DropdownMenuTrigger>
+    </IconTooltip>
   );
 }
 
@@ -554,27 +557,35 @@ export function ProjectNewPage() {
                 )}
                 <KeyedMenuContent
                   anchor={repoFieldRef}
+                  align={repoSel === 'none' ? 'start' : 'end'}
                   sideOffset={6}
                   aria-label={t('仓库')}
                   className="w-auto min-w-[200px]"
                 >
                   <DropdownMenuRadioGroup
-                    value={repoSel === 'none' ? null : repoSel}
+                    value={
+                      repoSel === 'none'
+                        ? null
+                        : repoSel === 'github' && manualRepo && !signInOff
+                          ? 'manual'
+                          : repoSel
+                    }
                     onValueChange={(next) => {
-                      const sel = next as 'github' | 'local';
+                      const sel = next as 'github' | 'manual' | 'local';
                       pendingSwapFocus.current = true;
-                      setRepoSel(sel);
-                      if (sel === 'github') setPickerOpen(false);
+                      setRepoSel(sel === 'local' ? 'local' : 'github');
+                      setManualRepo(sel === 'manual');
+                      setPickerOpen(false);
                     }}
                   >
-                    <KeyedMenuRadioItem
-                      value="github"
-                      shortcut="G"
-                      closeOnClick
-                      onClick={() => setManualRepo(false)}
-                    >
+                    <KeyedMenuRadioItem value="github" shortcut="G" closeOnClick>
                       {t('GitHub 仓库')}
                     </KeyedMenuRadioItem>
+                    {!signInOff && (
+                      <KeyedMenuRadioItem value="manual" shortcut="M" closeOnClick>
+                        {t('手动输入 owner/repo')}
+                      </KeyedMenuRadioItem>
+                    )}
                     <KeyedMenuRadioItem value="local" shortcut="L" closeOnClick>
                       {t('本地文件夹')}
                     </KeyedMenuRadioItem>
@@ -644,16 +655,6 @@ export function ProjectNewPage() {
                       {(reposQ.error as Error).message}
                     </div>
                   ) : null}
-                  <Button
-                    variant="ghost"
-                    className={GH_ROW_CLS}
-                    onClick={() => {
-                      setPickerOpen(false);
-                      setManualRepo(true);
-                    }}
-                  >
-                    {t('手动输入 owner/repo')}
-                  </Button>
                 </PopoverContent>
               </div>
             </Popover>
@@ -687,19 +688,7 @@ export function ProjectNewPage() {
           )}
         </FormField>
         <FormActions
-          hint={
-            githubSelected && manualRepo && !signInOff ? (
-              <Button variant="link" className={GH_LINK_CLS} onClick={() => setManualRepo(false)}>
-                {t('从 GitHub 选择')}
-              </Button>
-            ) : showGithubField && !connected && !connectionPending ? (
-              <Button variant="link" className={GH_LINK_CLS} onClick={() => setManualRepo(true)}>
-                {t('手动输入 owner/repo')}
-              </Button>
-            ) : live ? undefined : (
-              t('演示数据不能新建项目。')
-            )
-          }
+          hint={live ? undefined : t('演示数据不能新建项目')}
           primary={{
             label: t('创建项目'),
             disabled: live ? name.trim() === '' || !formOk : true,

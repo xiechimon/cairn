@@ -773,7 +773,7 @@ export const EN: Record<string, string> = {
   '例如：我的应用': 'e.g. My App',
   切换仓库来源: 'Switch repository source',
   '图标没能保存，请在项目设置里重试。': 'The icon was not saved. Try again in project settings.',
-  '演示数据不能新建项目。': 'Projects cannot be created in the demo.',
+  演示数据不能新建项目: 'Projects cannot be created in the demo',
   项目名称: 'Project name',
   仓库: 'Repo',
   选择仓库: 'Select repo',
@@ -1165,7 +1165,6 @@ export const EN: Record<string, string> = {
   'GitHub 连接已断开': 'GitHub connection disconnected',
   已连接: 'Connected',
   '手动输入 owner/repo': 'Enter owner/repo manually',
-  '从 GitHub 选择': 'Pick from GitHub',
   // wayfinder #181 add-machine dialog family (r2 11b verbatim copy; the
   // command strings themselves stay untranslated — brand slots via BRAND)
   '让另一台电脑帮你跑任务。两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。':

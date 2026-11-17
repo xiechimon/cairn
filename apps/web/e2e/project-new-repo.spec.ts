@@ -20,9 +20,10 @@ async function selectRow(page: Page, label: string) {
 }
 
 async function revealManualRepoInput(page: Page) {
-  const link = page.getByRole('button', { name: '手动输入 owner/repo' });
-  await expect(link).toBeVisible();
-  await link.click();
+  await page.getByRole('button', { name: '切换仓库来源' }).click();
+  const menu = page.getByRole('menu', { name: '仓库' });
+  await menu.getByRole('menuitemradio', { name: '手动输入 owner/repo' }).click();
+  await expect(menu).not.toBeVisible();
   return page.locator('#prj-new-repo');
 }
 
@@ -97,20 +98,22 @@ async function selectLiveRow(page: Page, label: string) {
 
 // ——— menu face (fixture) ———
 
-test('the `选择仓库` trigger lists exactly `GitHub 仓库` and `本地文件夹`', async ({ page }) => {
+test('the `选择仓库` trigger lists exactly `GitHub 仓库`, `手动输入 owner/repo` and `本地文件夹`', async ({ page }) => {
   const menu = await openMenu(page);
   const rows = menu.getByRole('menuitemradio');
-  await expect(rows).toHaveCount(2);
+  await expect(rows).toHaveCount(3);
   await expect(rows.first()).toContainText('GitHub 仓库');
-  await expect(rows.nth(1)).toContainText('本地文件夹');
+  await expect(rows.nth(1)).toContainText('手动输入 owner/repo');
+  await expect(rows.nth(2)).toContainText('本地文件夹');
   await expect(menu.getByRole('menuitemradio', { name: '托管' })).toHaveCount(0);
   // untouched = no row selected (aria-checked ≡ indicator check rendering
   // mirrors the user's act; t-0070 menu radio item spelling)
   await expect(rows.first()).toHaveAttribute('aria-checked', 'false');
   await expect(rows.nth(1)).toHaveAttribute('aria-checked', 'false');
+  await expect(rows.nth(2)).toHaveAttribute('aria-checked', 'false');
 });
 
-test('the GitHub row swaps the trigger for the auth face; manual link reveals the input', async ({
+test('the GitHub row swaps the trigger for the auth face; the manual row reveals the input', async ({
   page,
 }) => {
   await selectRow(page, 'GitHub 仓库');
