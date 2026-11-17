@@ -17,7 +17,7 @@ test('AGENTS.md ships straight to main without force and keeps the deploy as the
     /deploys only main commits whose `check`, `pack-smoke` and `e2e-gate` runs are green/,
   );
   assert.match(agents, /stop and ask ian before pushing/);
-  assert.match(agents, /Watch CI on the commit you pushed/);
+  assert.match(agents, /watch CI on your commit/);
 });
 
 test('AGENTS.md keeps the safety rules the ship flow relies on', () => {
