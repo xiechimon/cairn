@@ -212,6 +212,35 @@ describe('per-step one-time git credential (02 section 5.4/8; relay tool name ma
     expect(rows3).toHaveLength(0);
   });
 
+  test('step git key stays out of the API key list and stops opening git once its step is no longer running', async () => {
+    const w = await setupGitWorld();
+    w.startBuild();
+    const claimed = await w.claim();
+    const token = machineTokenResponseSchema.parse(
+      await (
+        await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, { cred: w.token })
+      ).json(),
+    );
+    const listed = (await (
+      await call(w.s.app, 'GET', `/api/teams/${w.s.team.id}/api-keys`)
+    ).json()) as { name: string | null }[];
+    expect(listed.length).toBeGreaterThan(0);
+    expect(listed.map((key) => key.name)).not.toContain(`git-step-${claimed.step.id}`);
+    const infoRefs = () =>
+      w.s.app.request(`/git/${w.s.team.id}/m3b-lifecycle/info/refs?service=git-upload-pack`, {
+        headers: {
+          authorization: `Basic ${Buffer.from(`git:${token.git!.password}`).toString('base64')}`,
+        },
+      });
+    expect((await infoRefs()).status).toBe(200);
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'stopped' })
+      .where(eq(stepTable.id, claimed.step.id))
+      .run();
+    expect((await infoRefs()).status).toBe(401);
+  });
+
   test('repo-less project -> git null (M3a compatible shape)', async () => {
     const s = bootServer({ claimHoldMs: 200 });
     disposables.push(() => s.dispose());

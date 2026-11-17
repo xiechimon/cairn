@@ -21,6 +21,7 @@ import { sha256Hex } from './lib/crypto.js';
 import { notFound } from './lib/errors.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
+import { gitKeyUsable } from './services/credentials.js';
 import type { GithubIssueFaceDeps } from './services/github-issues.js';
 import { assertDeviceActive } from './services/paired-devices.js';
 import { isPersonalSpace } from './services/personal-space.js';
@@ -111,9 +112,10 @@ export function verifyGitBasicAuth(ctx: AppContext, header: string): string | un
   if (secret === '') return undefined;
   const hash = Buffer.from(sha256Hex(secret));
   const rows = ctx.db.select().from(apiKey).where(eq(apiKey.gitAccess, true)).all();
-  return rows.find(
+  const row = rows.find(
     (r) => r.keyHash.length === hash.byteLength && timingSafeEqual(Buffer.from(r.keyHash), hash),
-  )?.id;
+  );
+  return row && gitKeyUsable(ctx.db, row.name) ? row.id : undefined;
 }
 
 export function githubAppOf(ctx: AppContext) {

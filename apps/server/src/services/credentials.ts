@@ -55,6 +55,13 @@ export function stepIdOfGitKey(name: string | null): string | null {
     : null;
 }
 
+export function gitKeyUsable(db: Db, name: string | null): boolean {
+  const stepId = stepIdOfGitKey(name);
+  if (stepId === null) return true;
+  const row = db.select({ status: step.status }).from(step).where(eq(step.id, stepId)).get();
+  return row?.status === 'claimed';
+}
+
 export interface StepCredentialBundle {
   claudeSubscriptionToken?: string;
   provider: {

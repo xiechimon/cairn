@@ -55,6 +55,7 @@ import {
   verifySubscriptionConnection,
 } from './services/claude-subscriptions.js';
 import { pollCodexDeviceLogin, startCodexDeviceLogin } from './services/codex-device-login.js';
+import { stepIdOfGitKey } from './services/credentials.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
 import {
@@ -968,7 +969,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/api-keys', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(listApiKeys(svc, teamId));
+    return c.json(listApiKeys(svc, teamId).filter((key) => stepIdOfGitKey(key.name) === null));
   });
 
   app.post('/api/teams/:id/api-keys', async (c) => {
