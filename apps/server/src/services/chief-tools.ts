@@ -455,11 +455,20 @@ export async function executeChiefTool(
           name: m.name,
           online: m.online,
           latestCliVersion: m.latestCliVersion,
+          capabilities: m.capabilities,
         })),
       );
     }
     case 'skills': {
-      const scanned = scanLocalSkills(deps.skillsDir);
+      const reachEnabled = db
+        .select({ capabilities: machine.capabilities })
+        .from(machine)
+        .where(eq(machine.teamId, ctx.teamId))
+        .all()
+        .some((row) => row.capabilities?.agentReach !== undefined);
+      const scanned = scanLocalSkills(deps.skillsDir).filter(
+        (skill) => skill.id !== 'agent-reach' || reachEnabled,
+      );
       return json(scanned.map((s) => ({ id: s.id, name: s.name, description: s.description })));
     }
     case 'secrets': {

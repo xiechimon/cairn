@@ -801,6 +801,9 @@ describe('router tools', () => {
     test('the prompt tells the Coordinator to search todos by keyword before create_todo', () => {
       const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
       expect(text).toContain('create_todo 前用 todos 的 query 按关键词');
+      expect(text).toContain('scrapling extract get');
+      expect(text).toContain('Agent Reach is opt-in');
+      expect(text).toContain('服务端没有 shell');
     });
 
     test('the prompt has no GitHub overlap rule and asks for no overlap result in the reply', () => {

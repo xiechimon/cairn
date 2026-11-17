@@ -11150,6 +11150,20 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               "const": true,
               "type": "boolean",
             },
+            "scrapling": {
+              "additionalProperties": false,
+              "properties": {
+                "version": {
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "version",
+              ],
+              "type": "object",
+            },
             "secretGateway": {
               "const": true,
               "type": "boolean",

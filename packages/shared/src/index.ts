@@ -47,4 +47,5 @@ export * from './token-estimate.js';
 export * from './tool-result.js';
 export * from './trajectory-pack.js';
 export * from './turn-context.js';
+export * from './web-research.js';
 export * from './web-search.js';

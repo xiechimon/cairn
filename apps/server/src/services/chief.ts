@@ -41,6 +41,7 @@ import {
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   threadMessageContentSchema,
   titleAuthor,
+  WEB_RESEARCH_GUIDANCE,
 } from '@cairn/shared';
 import {
   and,
@@ -1714,7 +1715,15 @@ export function buildChiefSystemPrompt(
   const coordinator = coordinatorProfile(deps.db, teamId);
   const memoryOwner = coordinatorMemoryOwner(deps.db, teamId);
   const projects = deps.db.select().from(project).where(listedProjects(teamId)).all();
-  const skills = scanLocalSkills(deps.skillsDir);
+  const reachEnabled = deps.db
+    .select({ capabilities: machine.capabilities })
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .all()
+    .some((row) => row.capabilities?.agentReach !== undefined);
+  const skills = scanLocalSkills(deps.skillsDir).filter(
+    (skill) => skill.id !== 'agent-reach' || reachEnabled,
+  );
   const injected = memoryOwner
     ? injectMemoryDocuments(deps.db, {
         agentId: memoryOwner,
@@ -1811,6 +1820,10 @@ export function buildChiefSystemPrompt(
     '',
     '### 技能',
     '- 用户消息后面出现「技能路由提示」一节时，那是服务端按消息猜的候选：先用 skills 工具核对，切合才用，不切合就忽略；普通对话直接回答。',
+    '',
+    '### 网页调研',
+    WEB_RESEARCH_GUIDANCE,
+    '调研仍交给任务在执行机上做；服务端没有 shell，不要声称自己运行了 Scrapling。执行前可用 machines 核对 capabilities.scrapling；没有上报就先让执行机重试 cairn web-tools install。',
     '',
   ];
   const teamLines: string[] = [

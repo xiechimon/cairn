@@ -13,6 +13,7 @@ import {
   SettingsManager,
   type Skill,
 } from '@earendil-works/pi-coding-agent';
+import { agentReachEnabled } from '../web-tools.js';
 
 export const SKILLS_CATALOG_BUDGET_BYTES = 1 << 20;
 
@@ -47,12 +48,16 @@ function scanSessionSkills(
   if (worktreeSkillsDirs !== undefined && worktreeSkillsDirs.length > 0) {
     skillPaths.push(...worktreeSkillsDirs);
   }
-  return loadSkills({
+  const loaded = loadSkills({
     cwd: skills.cwd,
     agentDir: NO_PI_DEFAULT_AGENT_DIR,
     skillPaths,
     includeDefaults: false,
   });
+  return {
+    ...loaded,
+    skills: loaded.skills.filter((skill) => skill.name !== 'agent-reach' || agentReachEnabled()),
+  };
 }
 
 function isIdenticalMirror(winnerPath: string, loserPath: string): boolean {

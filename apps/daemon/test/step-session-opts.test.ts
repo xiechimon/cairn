@@ -1,4 +1,5 @@
 import type { ProviderConfig, RemoteToolDef } from '@cairn/shared';
+import { WEB_RESEARCH_GUIDANCE } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import type { MachineApi } from '../src/machine-client.js';
 import { composeStepSessionOpts, type StepSessionOptsInput } from '../src/step-session-opts.js';
@@ -45,7 +46,22 @@ describe('composeStepSessionOpts', () => {
   test('a bare build step carries only the required fields', () => {
     const { onSkillsResolved, ...rest } = opts();
     expect(typeof onSkillsResolved).toBe('function');
-    expect(rest).toEqual({ provider, modelId: 'm', cwd: '/w' });
+    expect(rest).toEqual({
+      provider,
+      modelId: 'm',
+      cwd: '/w',
+      systemPrompt: WEB_RESEARCH_GUIDANCE,
+    });
+  });
+
+  test('both worker runtimes receive web guidance without losing the agent prompt', () => {
+    for (const providerId of ['anthropic', 'claude-code']) {
+      const result = opts({
+        provider: { ...provider, providerId },
+        systemPrompt: 'Agent instructions',
+      });
+      expect(result.systemPrompt).toBe(`Agent instructions\n\n${WEB_RESEARCH_GUIDANCE}`);
+    }
   });
 
   test('a review step is read-only and locked down', () => {

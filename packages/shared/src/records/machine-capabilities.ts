@@ -125,6 +125,7 @@ export const machineCapabilitiesSchema = z.object({
   confinement: confinementReportSchema.optional(),
   confinementCause: confinementCauseSchema.optional().catch(undefined),
   agentReach: agentReachReportSchema.optional(),
+  scrapling: z.object({ version: z.string().min(1).max(32) }).optional(),
   hostPermissions: hostPermissionsSchema.optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
@@ -149,6 +150,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const executor = machineExecutorSchema.safeParse(rec.executor);
   const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
   const agentReach = agentReachReportSchema.safeParse(rec.agentReach);
+  const scrapling = machineCapabilitiesSchema.shape.scrapling.safeParse(rec.scrapling);
   const hostPermissions = hostPermissionsSchema.safeParse(rec.hostPermissions);
   return {
     ...base.data,
@@ -160,6 +162,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(confinementCause.success ? { confinementCause: confinementCause.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
     ...(agentReach.success ? { agentReach: agentReach.data } : {}),
+    ...(scrapling.success && scrapling.data !== undefined ? { scrapling: scrapling.data } : {}),
     ...(hostPermissions.success ? { hostPermissions: hostPermissions.data } : {}),
     ...(hardware.success ? { hardware: hardware.data } : {}),
     ...(executor.success ? { executor: executor.data } : {}),

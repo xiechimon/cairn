@@ -55,6 +55,7 @@ describe('AgentReachProbe', () => {
         return DOCTOR_1_6_1;
       },
       () => clock,
+      () => true,
     );
     expect(probe.current()).toBeUndefined();
     await probe.settled();
@@ -74,6 +75,7 @@ describe('AgentReachProbe', () => {
     const probe = new AgentReachProbe(
       async () => stdout,
       () => clock,
+      () => true,
     );
     probe.current();
     await probe.settled();
@@ -81,6 +83,32 @@ describe('AgentReachProbe', () => {
     stdout = null;
     clock = AGENT_REACH_REFRESH_MS;
     probe.current();
+    await probe.settled();
+    expect(probe.current()).toBeUndefined();
+  });
+
+  it('does not probe until opted in and drops a pending result when disabled', async () => {
+    let enabled = false;
+    let complete: (stdout: string) => void = () => {};
+    let runs = 0;
+    const probe = new AgentReachProbe(
+      () => {
+        runs++;
+        return new Promise((resolve) => {
+          complete = resolve;
+        });
+      },
+      Date.now,
+      () => enabled,
+    );
+    expect(probe.current()).toBeUndefined();
+    await probe.settled();
+    expect(runs).toBe(0);
+    enabled = true;
+    probe.current();
+    expect(runs).toBe(1);
+    enabled = false;
+    complete(DOCTOR_1_6_1);
     await probe.settled();
     expect(probe.current()).toBeUndefined();
   });

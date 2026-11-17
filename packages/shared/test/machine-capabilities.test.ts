@@ -443,6 +443,27 @@ it('keeps a valid agent-reach report and drops a malformed one without losing th
   ).toEqual(report);
 });
 
+it('keeps HTTP-ready Scrapling metadata without leaking extra fields, and accepts older reports', () => {
+  const base = { mcpServers: ['docs'], skills: [] };
+  expect(
+    parseReportedCapabilities({ ...base, scrapling: { version: '0.5.1', cookie: 'private' } }),
+  ).toEqual({ ...base, scrapling: { version: '0.5.1' } });
+  for (const scrapling of [
+    undefined,
+    null,
+    { version: '' },
+    { version: 123 },
+    { version: 'x'.repeat(33) },
+  ]) {
+    expect(parseReportedCapabilities({ ...base, scrapling })).toEqual(base);
+  }
+  expect(
+    machineCapabilitiesSchema
+      .omit({ scrapling: true })
+      .parse({ ...base, scrapling: { version: '0.5.1' } }),
+  ).toEqual(base);
+});
+
 it('keeps a valid host-permissions report and drops a malformed one without losing the rest', () => {
   const report = { mcpServers: ['figma'], skills: [] };
   const hostPermissions = {

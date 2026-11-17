@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { type AgentReachReport, agentReachReportSchema } from '@cairn/shared';
 import { z } from 'zod';
+import { agentReachEnabled } from './web-tools.js';
 
 export const AGENT_REACH_BINARY = 'agent-reach';
 export const AGENT_REACH_REFRESH_MS = 10 * 60_000;
@@ -50,13 +51,20 @@ export class AgentReachProbe {
   constructor(
     private readonly run: RunDoctor = runDoctor,
     private readonly now: () => number = Date.now,
+    private readonly enabled: () => boolean = agentReachEnabled,
   ) {}
 
   current(): AgentReachReport | undefined {
+    if (!this.enabled()) {
+      this.report = undefined;
+      this.checkedAt = Number.NEGATIVE_INFINITY;
+      return undefined;
+    }
     if (this.running === null && this.now() - this.checkedAt >= AGENT_REACH_REFRESH_MS) {
       this.checkedAt = this.now();
       this.running = this.run().then((stdout) => {
-        this.report = stdout === null ? undefined : parseAgentReachDoctor(stdout);
+        this.report =
+          stdout === null || !this.enabled() ? undefined : parseAgentReachDoctor(stdout);
         this.running = null;
       });
     }

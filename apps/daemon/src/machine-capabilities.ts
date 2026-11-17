@@ -9,6 +9,7 @@ import {
   osPlatformOf,
   parseClaudeMcpEntries,
 } from '@cairn/shared';
+import { agentReachEnabled } from './web-tools.js';
 
 export interface MachineCapabilitySources {
   mcpConfigPath: string;
@@ -95,7 +96,9 @@ export function probeMachineCapabilities(sources: MachineCapabilitySources): Mac
     osPlatform: osPlatformOf(process.platform),
     ...(osDistribution !== undefined ? { osDistribution } : {}),
     mcpServers: scanMcpSlugs(sources.mcpConfigPath),
-    skills: scanSkillNames(sources.skillsDir),
+    skills: scanSkillNames(sources.skillsDir).filter(
+      (name) => name !== 'agent-reach' || agentReachEnabled(),
+    ),
     ...(hardware !== undefined ? { hardware } : {}),
   };
 }
@@ -135,7 +138,7 @@ export function createMachineCapabilitiesProbe(
       osPlatform: osPlatformOf(process.platform),
       ...(osDistribution !== undefined ? { osDistribution } : {}),
       mcpServers: mcpCache.value,
-      skills: skillsCache.value,
+      skills: skillsCache.value.filter((name) => name !== 'agent-reach' || agentReachEnabled()),
       ...(hardware !== undefined ? { hardware } : {}),
     };
   };

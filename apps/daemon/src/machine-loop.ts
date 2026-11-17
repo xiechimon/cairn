@@ -72,6 +72,7 @@ import { resumePendingUpload } from './step-final-upload.js';
 import { StepStops } from './step-stops.js';
 import { performSync } from './sync.js';
 import { DAEMON_VERSION } from './version.js';
+import { agentReachEnabled, readScrapling, ScraplingProbe } from './web-tools.js';
 import { WorkspaceManager } from './workspace.js';
 
 export interface MachineLoopOpts {
@@ -248,10 +249,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     );
   }
   const orbComputer = opts.orbComputer ?? hostDesktops;
-  const agentReach = new AgentReachProbe();
+  const agentReach = new AgentReachProbe(undefined, undefined, () => agentReachEnabled(paths.home));
+  const scrapling = new ScraplingProbe(() => readScrapling(paths.home));
   const hostPermissionsProbe = opts.hostPermissionsProbe ?? new HostPermissionsProbe();
   const capabilitiesReport = (): MachineCapabilities => {
     const reach = agentReach.current();
+    const scraper = scrapling.current();
     const hostPermissions = hostPermissionsProbe.current();
     return {
       ...capabilitiesProbe(),
@@ -269,6 +272,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         : {}),
       ...(hostComputer ? { ownComputer: true as const } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
+      ...(scraper !== undefined ? { scrapling: scraper } : {}),
       ...(hostPermissions !== undefined ? { hostPermissions } : {}),
     };
   };

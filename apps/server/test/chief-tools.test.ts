@@ -1,8 +1,9 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { chiefMessage, message } from '../src/db/schema.js';
+import { chiefMessage, machine, message } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { nowMs } from '../src/lib/ids.js';
 import { H, registerChiefHarness, relay, seedMachineReport } from './chief-harness.js';
@@ -96,6 +97,37 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
       expect(def.replaySafe).toBe(true);
       expect(await relay(name, {})).toBeDefined();
     }
+  });
+
+  test('machines exposes HTTP readiness and the Coordinator only offers Agent Reach skills after opt-in reporting', async () => {
+    const directory = join(H.s.skillsDir, 'agent-reach');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, 'SKILL.md'),
+      '---\nname: agent-reach\ndescription: Optional platform channels\n---\nUse doctor.\n',
+    );
+    seedMachineReport('web', { installed: false, hostname: 'web', models: [] });
+    const capabilities = { mcpServers: [], skills: [], scrapling: { version: '0.5.1' } };
+    H.s.db.update(machine).set({ capabilities }).where(eq(machine.id, 'machine-web')).run();
+    expect(await relay('machines', {})).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'machine-web', capabilities })]),
+    );
+    expect(await relay('skills', {})).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'agent-reach' })]),
+    );
+    H.s.db
+      .update(machine)
+      .set({ capabilities: { ...capabilities, agentReach: { version: '1.6.1', channels: [] } } })
+      .where(eq(machine.id, 'machine-web'))
+      .run();
+    expect(await relay('skills', {})).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'agent-reach' })]),
+    );
+    H.s.db.update(machine).set({ capabilities }).where(eq(machine.id, 'machine-web')).run();
+    expect(await relay('skills', {})).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'agent-reach' })]),
+    );
+    expect(existsSync(join(directory, 'SKILL.md'))).toBe(true);
   });
 
   describe('conversation tool team scope', () => {

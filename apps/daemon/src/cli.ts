@@ -7,6 +7,7 @@ import {
   realpathSync,
   statSync,
 } from 'node:fs';
+import { join } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { BRAND, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
@@ -26,7 +27,7 @@ import { machineNameSuffix, pendingEnrollmentUrl } from './machine-enroll.js';
 import { runMachine } from './machine-loop.js';
 import { ORB_RELAY_TOKEN_ENV } from './orb/protocol.js';
 import { runOrbServicesEnsure } from './orb/services-runtime.js';
-import { runOrbWorker } from './orb/worker.js';
+import { orbAgentHome, runOrbWorker } from './orb/worker.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import {
   isAlive,
@@ -36,6 +37,13 @@ import {
   stopSupervisor,
 } from './supervisor.js';
 import { DAEMON_VERSION } from './version.js';
+import {
+  agentReachEnabled,
+  ensureWebTools,
+  readScrapling,
+  runAgentReach,
+  setAgentReachEnabled,
+} from './web-tools.js';
 
 interface StartOptions {
   foreground?: boolean;
@@ -99,6 +107,8 @@ export async function runForeground(opts: StartOptions): Promise<void> {
   isolateClaudeConfigDir(config.home);
   const paths = statePaths(config.home, config.workspacesDir);
   const logger = createDaemonLogger({ logFile: paths.daemonLog, stdout: true });
+  process.env.CAIRN_HOME = config.home;
+  await ensureWebTools(config.home, (message) => logger.raw(message));
   const handle = await runMachine({
     config,
     paths,
@@ -304,6 +314,10 @@ export function buildProgram(): Command {
     .option('--stdio', 'Carry the relay over stdin and stdout (remote sandbox orbs)')
     .action(async (opts: { socket?: string; stdio?: boolean }) => {
       if (process.env.CAIRN_ORB !== '1') throw new Error('Orb worker requires CAIRN_ORB=1');
+      process.env.CAIRN_HOME = join(orbAgentHome(), '.cairn');
+      await ensureWebTools(process.env.CAIRN_HOME, (message) =>
+        process.stderr.write(`${message}\n`),
+      );
       if (opts.stdio) {
         const token = process.env[ORB_RELAY_TOKEN_ENV];
         delete process.env[ORB_RELAY_TOKEN_ENV];
@@ -316,6 +330,42 @@ export function buildProgram(): Command {
       }
       if (!opts.socket) throw new Error('Orb worker requires --socket or --stdio');
       await runOrbWorker({ socketPath: opts.socket });
+    });
+
+  const webTools = program
+    .command('web-tools')
+    .description('Public-web tools and optional platform channels');
+  webTools
+    .command('install')
+    .description('Install or repair Scrapling HTTP fetching (no browsers)')
+    .action(async () => {
+      const { home } = loadDaemonConfig({});
+      await ensureWebTools(home, (message) => process.stdout.write(`${message}\n`));
+      if (!(await readScrapling(home))) process.exitCode = 1;
+    });
+  webTools
+    .command('agent-reach')
+    .description('Opt in to Agent Reach; leaves existing tools and logins untouched')
+    .argument('[args...]', 'Agent Reach command, such as doctor or add <channel>')
+    .option('--enable', 'install if missing and enable channel discovery')
+    .option('--disable', 'disable discovery without uninstalling')
+    .action(async (args: string[], opts: { enable?: boolean; disable?: boolean }) => {
+      const { home } = loadDaemonConfig({});
+      if (opts.enable && opts.disable) throw new Error('Choose --enable or --disable');
+      if (opts.enable || opts.disable) await setAgentReachEnabled(home, opts.enable === true);
+      if (args.length > 0) {
+        process.stdout.write(await runAgentReach(home, args));
+        return;
+      }
+      process.stdout.write(`Agent Reach: ${agentReachEnabled(home) ? 'enabled' : 'disabled'}\n`);
+      if (opts.enable)
+        process.stdout.write(
+          'Restart the Runner. Then run cairn web-tools agent-reach doctor; add only the channel you need with cairn web-tools agent-reach add <channel> and follow its setup/login instructions. No channel is logged in automatically.\n',
+        );
+      if (opts.disable)
+        process.stdout.write(
+          'Restart the Runner. Installed tools, skills and credentials were not removed.\n',
+        );
     });
 
   const orb = program.command('orb').description('Orb host helpers');

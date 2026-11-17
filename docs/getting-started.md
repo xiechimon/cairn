@@ -50,6 +50,35 @@ On a machine without a browser, create an API key in the web UI (API keys in Set
 
 Both packages install a `cairn` bin: installing both globally on the same machine means whichever came last wins the name. The clean split is running the server where you browse and `cairn-cli` where agents build.
 
+## Public webpages and optional platform channels
+
+The Mac app's Runner and the Linux CLI Runner install Scrapling 0.5.1 on first start, with a private Python 3.12 and uv when needed. No account, API key, system Python or administrator password is needed for public HTTP pages. First start needs access to GitHub and the Python package index. A failed download is logged and does not stop enrollment; retry with `cairn web-tools install` or restart the Runner.
+
+The installation lives beside the Runner's state directory: `${CAIRN_HOME}-web-tools` (normally `~/.cairn-web-tools`), not inside its private credentials directory. Agents receive its commands on PATH, including pi and Claude Code. They use `scrapling extract get "https://example.com" page.md` by default. The machine reports `capabilities.scrapling.version` only after the HTTP fetcher imports successfully; readiness refreshes at most every ten minutes.
+
+No Chromium browser is downloaded by default. The official HTTP extras still include browser-related Python packages: a Linux x64 installation measured about 367 MiB for packages, 112 MiB for Python and 37 MiB for uv, excluding shared download caches. Other platforms and dependency versions vary. Browser rendering is separate: run the private `scrapling install` only when needed, after approving its additional Chromium download and, on Linux, possible privileged OS dependency installation. Neither HTTP nor browser fetching bypasses a site's login requirements or access rules.
+
+Agent Reach is **off by default**. Older Cairn versions did not install it either, but automatically ran doctor when an existing installation was on PATH and discovered its local skill. To enable it on a CLI Runner:
+
+```sh
+cairn web-tools agent-reach --enable
+cairn restart
+cairn web-tools agent-reach doctor
+cairn web-tools agent-reach add <channel>
+```
+
+Enabling reuses an existing installation or installs the official GitHub release, never the unrelated `agent-reach` package on PyPI. It does not run global setup, log in, import cookies, or enable all channels. Follow the requested channel's doctor/add instructions: for example, GitHub may need `gh auth login`; social platforms may need their own browser login or explicitly supplied cookies, and some services need their own API key. There is no single Cairn login that authenticates every channel. Use `cairn web-tools agent-reach --disable` and restart to turn off its doctor reporting and agent skill discovery again. Existing tools, skills, settings and credentials are never uninstalled or deleted.
+
+For the Mac app, use its bundled Runner from Terminal, rather than installing a second CLI. With Cairn in `/Applications`, enable it with:
+
+```sh
+CAIRN_HOME="$HOME/Library/Application Support/@cairn/desktop/runner" \
+ELECTRON_RUN_AS_NODE=1 /Applications/Cairn.app/Contents/MacOS/Cairn \
+  /Applications/Cairn.app/Contents/Resources/runner/dist/cli.mjs web-tools agent-reach --enable
+```
+
+Quit and reopen the app. The same command prefix with `web-tools agent-reach doctor`, `web-tools agent-reach add <channel>` or `web-tools agent-reach --disable` manages that Runner. Adjust the app path if it is installed elsewhere. Agents use the private commands directly; terminal users can also prepend `${CAIRN_HOME}-web-tools/scrapling/bin` to their PATH to run Scrapling themselves.
+
 ## Use your Claude subscription on your machines
 
 Set the subscription up once on the server; every machine you enroll then runs Claude Code tasks with it, without a `claude` login on each machine. Cairn stores the token encrypted on your own server and hands it only to your own machines (and their orbs) for the official Claude Code to use.
