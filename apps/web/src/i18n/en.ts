@@ -37,8 +37,12 @@ export const EN: Record<string, string> = {
     'After removal, later steps no longer use this subscription.',
   '这个订阅的登录已失效。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
     'This subscription is no longer signed in. Remove it, then run `claude setup-token` in a terminal and add the new token.',
+  '这个订阅的登录已失效。先移除它，再重新添加新的 token。':
+    'This subscription is no longer signed in. Remove it, then add a new token.',
   '验证超时，请重试': 'Verification timed out. Try again.',
   '服务器上找不到 claude 命令': 'The claude command was not found on the server.',
+  '服务器上找不到 codex 命令': 'The codex command was not found on the server.',
+  '服务器上找不到可执行的 agent': 'No runnable agent was found on the server.',
   '验证没有通过，请重试': 'Verification did not pass. Try again.',
   '连接中断，服务器可能正在重启，请重试':
     'The connection dropped; the server may be restarting. Try again.',
@@ -46,6 +50,8 @@ export const EN: Record<string, string> = {
   验证失败: 'Verification failed',
   '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
     'This subscription has expired. Remove it, then run `claude setup-token` in a terminal and add the new token.',
+  '这个订阅已过期。先移除它，再重新添加新的 token。':
+    'This subscription has expired. Remove it, then add a new token.',
   使用: 'Usage',
   '24 小时步骤': 'Steps in 24 hours',
   '无法取消归档任务。': 'Could not unarchive the task.',
