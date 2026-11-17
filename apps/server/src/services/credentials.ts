@@ -1,14 +1,18 @@
+import { createHmac } from 'node:crypto';
 import {
+  BRAND,
   type ProviderApi,
   type ProviderCompat,
   type ProviderModel,
   type SecretBox,
   stepTakesSecrets,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { apiKey, build, chief, chiefThread, step, todo } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
+import { hashCredential } from '../lib/hash.js';
+import type { KeySecretBox } from '../lib/secret-box.js';
 import { createApiKey } from './api-keys.js';
 import { openClaudeSubscription } from './claude-subscriptions.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
@@ -20,20 +24,35 @@ export interface CredentialsDeps {
   box: SecretBox;
 }
 
+export interface StepGitScope {
+  projectId: string;
+  buildId: string;
+}
+
 export function issueStepGitCredential(
-  deps: { db: Db },
-  input: { teamId: string; stepId: string },
+  deps: { db: Db; box: Pick<KeySecretBox, 'keyBytes'> },
+  input: { teamId: string; stepId: string; claimedAt: number | null },
 ): { username: string; password: string } {
-  revokeStepGitCredential(deps, input.stepId);
-  const issued = createApiKey(deps, {
-    teamId: input.teamId,
-    name: stepGitKeyName(input.stepId),
-    gitAccess: true,
-    mcpAccess: false,
-    machineAccess: false,
-    toolGrants: { read: [], write: [] },
-  });
-  return { username: 'git', password: issued.plaintext };
+  const plaintext = `${BRAND.apiKeyPrefix}${createHmac('sha256', deps.box.keyBytes)
+    .update(`step-git-key-v1\0${input.stepId}\0${input.claimedAt ?? 0}`)
+    .digest('hex')
+    .slice(0, 48)}`;
+  const name = stepGitKeyName(input.stepId);
+  const hash = hashCredential(plaintext);
+  const existing = deps.db.select().from(apiKey).where(eq(apiKey.name, name)).all();
+  if (existing.length !== 1 || existing[0]?.keyHash !== hash) {
+    deps.db.delete(apiKey).where(eq(apiKey.name, name)).run();
+    createApiKey(deps, {
+      teamId: input.teamId,
+      name,
+      gitAccess: true,
+      mcpAccess: false,
+      machineAccess: false,
+      toolGrants: { read: [], write: [] },
+      plaintext,
+    });
+  }
+  return { username: 'git', password: plaintext };
 }
 
 export function revokeStepGitCredential(deps: { db: Db }, stepId: string): void {
@@ -55,11 +74,22 @@ export function stepIdOfGitKey(name: string | null): string | null {
     : null;
 }
 
-export function gitKeyUsable(db: Db, name: string | null): boolean {
+export function claimedStepGitScope(db: Db, name: string | null): StepGitScope | null {
   const stepId = stepIdOfGitKey(name);
-  if (stepId === null) return true;
-  const row = db.select({ status: step.status }).from(step).where(eq(step.id, stepId)).get();
-  return row?.status === 'claimed';
+  if (stepId === null) return null;
+  return (
+    db
+      .select({ projectId: todo.projectId, buildId: build.id })
+      .from(step)
+      .innerJoin(build, eq(build.id, step.buildId))
+      .innerJoin(todo, eq(todo.id, build.todoId))
+      .where(and(eq(step.id, stepId), eq(step.status, 'claimed')))
+      .get() ?? null
+  );
+}
+
+export function gitKeyUsable(db: Db, name: string | null): boolean {
+  return stepIdOfGitKey(name) === null || claimedStepGitScope(db, name) !== null;
 }
 
 export interface StepCredentialBundle {

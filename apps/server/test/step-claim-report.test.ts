@@ -156,7 +156,7 @@ describe('#1473 a report counts only for the current claim', () => {
   test('the card closed and the step stopped by the sweep: a late report changes nothing, the git credential is reclaimed', async () => {
     const w = makeWorld();
     await w.claim();
-    issueStepGitCredential(w.deps, { teamId: w.teamId, stepId: STEP });
+    issueStepGitCredential(w.deps, { teamId: w.teamId, stepId: STEP, claimedAt: null });
     expect(w.credentialCount()).toBe(1);
     w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, CARD_ID)).run();
     w.sweep();
@@ -175,7 +175,7 @@ describe('#1473 a report counts only for the current claim', () => {
   test('a step released back to pending: the original runner report gets ok without writing, the credential reclaimed; another team machine still 404', async () => {
     const w = makeWorld();
     await w.claim();
-    issueStepGitCredential(w.deps, { teamId: w.teamId, stepId: STEP });
+    issueStepGitCredential(w.deps, { teamId: w.teamId, stepId: STEP, claimedAt: null });
     w.sweep();
     expect(w.stepRow()).toMatchObject({ status: 'pending', machineId: null });
     expect(w.credentialCount()).toBe(0);

@@ -1,7 +1,6 @@
 import { ATTACHMENT_MAX_BYTES } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
-import type { Db } from '../db/client.js';
-import { apiKey, build, project, step, todo } from '../db/schema.js';
+import { project } from '../db/schema.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import {
   blobEntryAt,
@@ -16,7 +15,6 @@ import {
   systemGitOps,
   treeWithBlob,
 } from '../lib/git.js';
-import { stepIdOfGitKey } from './credentials.js';
 import {
   provisionHostedRepo,
   type RepoCtx,
@@ -224,18 +222,4 @@ export function spaceFileHistory(
 ): Promise<GitFileVersion[]> {
   if (!isSafeRepoPath(path)) throw notFound(`space file ${path}`);
   return fileHistory(spaceRepoDir(ctx, space), DEFAULT_HEAD_BRANCH, path);
-}
-
-export function spaceGitAllowed(db: Db, space: ProjectRow, apiKeyId: string): boolean {
-  const key = db.select({ name: apiKey.name }).from(apiKey).where(eq(apiKey.id, apiKeyId)).get();
-  const stepId = stepIdOfGitKey(key?.name ?? null);
-  if (stepId === null) return false;
-  const running = db
-    .select({ projectId: todo.projectId })
-    .from(step)
-    .innerJoin(build, eq(build.id, step.buildId))
-    .innerJoin(todo, eq(todo.id, build.todoId))
-    .where(and(eq(step.id, stepId), eq(step.status, 'claimed')))
-    .get();
-  return running?.projectId === space.id;
 }

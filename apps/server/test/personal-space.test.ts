@@ -102,7 +102,10 @@ function claimedStepKey(projectId: string): string {
   const machineId = insertMachine(s);
   const stepId = queueConnectorStep(s, projectId, machineId);
   s.db.update(step).set({ status: 'claimed', machineId }).where(eq(step.id, stepId)).run();
-  return issueStepGitCredential({ db: s.db }, { teamId: s.team.id, stepId }).password;
+  return issueStepGitCredential(
+    { db: s.db, box: s.secretBox },
+    { teamId: s.team.id, stepId, claimedAt: null },
+  ).password;
 }
 
 describe('personal space row and repository (docs/design/personal-space.md S1)', () => {

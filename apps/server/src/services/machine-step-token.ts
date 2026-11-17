@@ -57,7 +57,11 @@ export async function stepToken(
   const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
   let git: GitCredentials | null = null;
   if (projectRow?.repoKind === 'hosted' && todoRow && owned.status === 'claimed') {
-    git = issueStepGitCredential(deps, { teamId: todoRow.teamId, stepId });
+    git = issueStepGitCredential(deps, {
+      teamId: todoRow.teamId,
+      stepId,
+      claimedAt: owned.claimedAt,
+    });
   } else if (projectRow?.repoKind === 'github' && todoRow) {
     const ref = githubRepoOfProject(projectRow);
     const githubToken =

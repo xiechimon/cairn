@@ -1,9 +1,10 @@
-import type { GitIdentity, SecretBox, StepRecord, UserRecord } from '@cairn/shared';
+import type { GitIdentity, StepRecord, UserRecord } from '@cairn/shared';
 import { isChiefConversationId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, message, step, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
+import type { KeySecretBox } from '../lib/secret-box.js';
 import { NotFoundError } from './builds.js';
 import { upsertChiefMessage } from './chief.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -23,7 +24,7 @@ export interface MachineDeps {
   db: Db;
   hub: TeamStreamHub;
   machineHub: MachineWakeHub;
-  box: SecretBox;
+  box: KeySecretBox;
   user: UserRecord;
   vapidKeys?: VapidKeys | null;
   reposDir: string;

@@ -16,6 +16,10 @@ export function notFound(what: string): HttpError {
   return new HttpError(404, `${what} not found`);
 }
 
+export function forbidden(message: string): HttpError {
+  return new HttpError(403, message);
+}
+
 export function conflict(message: string): HttpError {
   return new HttpError(409, message);
 }

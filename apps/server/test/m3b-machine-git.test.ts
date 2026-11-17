@@ -173,7 +173,7 @@ describe('claim payload repo binding slot (M3b worktree contract wiring, 02 sect
 });
 
 describe('per-step one-time git credential (02 section 5.4/8; relay tool name matches push_credential r5 section 3.1)', () => {
-  test('token/{stepId} -> git {username,password}; revoked after done (revoke = row delete)', async () => {
+  test('token/{stepId} -> git {username,password}, the same credential on every call while claimed; revoked after done (revoke = row delete)', async () => {
     const w = await setupGitWorld();
     w.startBuild();
     const claimed = await w.claim();
@@ -197,7 +197,7 @@ describe('per-step one-time git credential (02 section 5.4/8; relay tool name ma
         await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, { cred: w.token })
       ).json(),
     );
-    expect(again.git?.password).not.toBe(token.git?.password);
+    expect(again.git?.password).toBe(token.git?.password);
     const rows2 = w.s.db
       .select()
       .from(apiKeyTable)
@@ -240,6 +240,81 @@ describe('per-step one-time git credential (02 section 5.4/8; relay tool name ma
       .where(eq(stepTable.id, claimed.step.id))
       .run();
     expect((await infoRefs()).status).toBe(401);
+  });
+
+  describe('step git key scope', () => {
+    const zero = '0'.repeat(40);
+    const oid = 'a'.repeat(40);
+    const pkt = (text: string) => `${(text.length + 4).toString(16).padStart(4, '0')}${text}`;
+    const pushBody = (ref: string, old = zero) =>
+      `${pkt(`${old} ${oid} ${ref}\0 report-status\n`)}0000`;
+
+    async function stepKeyWorld() {
+      const w = await setupGitWorld();
+      w.startBuild();
+      const claimed = await w.claim();
+      const token = machineTokenResponseSchema.parse(
+        await (
+          await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, { cred: w.token })
+        ).json(),
+      );
+      const auth = `Basic ${Buffer.from(`git:${token.git!.password}`).toString('base64')}`;
+      const buildId = w.s.db
+        .select({ buildId: stepTable.buildId })
+        .from(stepTable)
+        .where(eq(stepTable.id, claimed.step.id))
+        .get()!.buildId;
+      const push = (ref: string, old?: string) =>
+        w.s.app.request(`/git/${w.s.team.id}/m3b-lifecycle/git-receive-pack`, {
+          method: 'POST',
+          headers: {
+            authorization: auth,
+            'content-type': 'application/x-git-receive-pack-request',
+          },
+          body: pushBody(ref, old),
+        });
+      return { w, auth, buildId, push, claimed, token };
+    }
+
+    test('a step key cannot push the default branch or any branch but its own work branch', async () => {
+      const { push, buildId } = await stepKeyWorld();
+      expect((await push('refs/heads/main')).status).toBe(403);
+      expect((await push('refs/heads/other')).status).toBe(403);
+      expect((await push(`refs/heads/cairn/conv-${buildId}x`)).status).toBe(403);
+      expect((await push(`refs/heads/cairn/conv-${buildId}`, oid)).status).not.toBe(403);
+      expect((await push(`refs/heads/cairn/conv-${buildId}`)).status).not.toBe(403);
+      expect((await push('refs/tags/v1')).status).not.toBe(403);
+      expect((await push('refs/tags/v1', oid)).status).toBe(403);
+    });
+
+    test('a step key opens only its own project repo', async () => {
+      const { w, auth } = await stepKeyWorld();
+      const other = await call(w.s.app, 'POST', '/api/projects', {
+        body: { name: 'other-repo', repoKind: 'hosted' },
+      });
+      expect(other.status).toBe(201);
+      const refs = (name: string) =>
+        w.s.app.request(`/git/${w.s.team.id}/${name}/info/refs?service=git-upload-pack`, {
+          headers: { authorization: auth },
+        });
+      expect((await refs('m3b-lifecycle')).status).toBe(200);
+      expect((await refs('other-repo')).status).toBe(404);
+    });
+
+    test('asking for the token again keeps the credential the runner already holds working', async () => {
+      const { w, auth, claimed, token } = await stepKeyWorld();
+      const again = machineTokenResponseSchema.parse(
+        await (
+          await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, { cred: w.token })
+        ).json(),
+      );
+      expect(again.git?.password).toBe(token.git?.password);
+      const res = await w.s.app.request(
+        `/git/${w.s.team.id}/m3b-lifecycle/info/refs?service=git-upload-pack`,
+        { headers: { authorization: auth } },
+      );
+      expect(res.status).toBe(200);
+    });
   });
 
   async function claimWithStepKey(w: GitWorld): Promise<string> {

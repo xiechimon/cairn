@@ -51,9 +51,10 @@ export function createApiKey(
     mcpAccess: boolean;
     machineAccess?: boolean;
     toolGrants: { read: string[]; write: string[] };
+    plaintext?: string;
   },
 ): ApiKeyRowView & { plaintext: string } {
-  const plaintext = newApiKeyPlaintext();
+  const plaintext = input.plaintext ?? newApiKeyPlaintext();
   const id = newRecordId();
   const createdAt = nowMs();
   const machineAccess = input.machineAccess ?? false;
