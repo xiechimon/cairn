@@ -257,7 +257,7 @@ test.each(['create_todo', 'update_todo'])(
     const definition = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === name)!;
     const base: Record<string, string> =
       name === 'create_todo'
-        ? { projectId: H.projectId, sourceTodoId: tasks[0]!.id }
+        ? { projectId: H.projectId, sourceTodoId: tasks[0]!.id, title: 'Should not stick' }
         : { todoId: tasks[1]!.id, title: 'Should not stick' };
     for (const tagIds of [[], null, 'bug', ['retired']]) {
       const args = { ...base, tagIds };

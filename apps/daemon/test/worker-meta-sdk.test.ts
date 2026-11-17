@@ -24,7 +24,7 @@ test.each(['create_todo', 'update_todo'])(
       expect(listed.tools[0]!.inputSchema.properties).not.toHaveProperty('tagIds');
       const base =
         name === 'create_todo'
-          ? { projectId: 'fixture-project' }
+          ? { projectId: 'fixture-project', title: 'Summary' }
           : { todoId: 'fixture-task', title: 'Summary' };
       for (const tagIds of [[], null, 'bug', ['retired']]) {
         const args = { ...base, tagIds };
