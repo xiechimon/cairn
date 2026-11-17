@@ -1,14 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createDevinManaged } from '../src/backend/devin-managed.js';
 
 const roots: string[] = [];
 
 function workspace() {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-devin-managed-'));
+  const dir = makeTestTempDir('cairn-devin-managed-');
   roots.push(dir);
   const pkg = join(dir, 'pkg', 'bin');
   mkdirSync(pkg, { recursive: true });
@@ -37,7 +37,7 @@ const registry = (archive: string, version = '3000.0.1') =>
   });
 
 afterEach(() => {
-  for (const dir of roots.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const dir of roots.splice(0)) releaseTestTempDir(dir);
 });
 
 describe('devin managed install', () => {

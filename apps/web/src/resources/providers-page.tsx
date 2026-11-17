@@ -266,10 +266,7 @@ export function ProvidersSection() {
   };
 
   const subscriptionActionsFor = (account: SubscriptionAccount): SubscriptionActions => {
-    const rename =
-      account.vendor === 'devin'
-        ? renameDevinSubscription
-        : renameSubscription;
+    const rename = account.vendor === 'devin' ? renameDevinSubscription : renameSubscription;
     const apiIds = account.vendor === 'devin' ? devinApiIds : subscriptionApiIds;
     return {
       onRemove: () => setRemovingSubscription(account),

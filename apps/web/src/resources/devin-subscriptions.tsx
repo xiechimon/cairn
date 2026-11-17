@@ -53,9 +53,7 @@ export function AddDevinSubscriptionDialog({
             ),
           )}
         </p>
-        <p>
-          {t('任务会用这个订阅跑 Devin，不用再配 API key。Token 加密保存，保存后无法再查看。')}
-        </p>
+        <p>{t('任务会用这个订阅跑 Devin，不用再配 API key。Token 加密保存，保存后无法再查看。')}</p>
         <FormField label={t('名称')} htmlFor="devin-subscription-label">
           <Input
             className={FORM_CONTROL_CLS}

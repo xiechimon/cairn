@@ -31,7 +31,8 @@ export function createDevinUpdateNormalizer(): (update: SessionUpdate) => DevinN
     if (startedAgentId !== undefined && 'toolCallId' in update) {
       agentToolCalls.set(startedAgentId, update.toolCallId);
     }
-    const parent = rawParent !== undefined ? (agentToolCalls.get(rawParent) ?? rawParent) : undefined;
+    const parent =
+      rawParent !== undefined ? (agentToolCalls.get(rawParent) ?? rawParent) : undefined;
     const fields = { ...update } as Record<string, unknown>;
     const completed = record(meta?.['cognition.ai/subagent_completed']);
     const inference = meta?.['cognition.ai/inferenceToolName'];

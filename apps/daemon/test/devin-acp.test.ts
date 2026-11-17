@@ -1,6 +1,6 @@
+import { fileURLToPath } from 'node:url';
 import type { SessionUpdate } from '@agentclientprotocol/sdk';
 import type { SessionOpts, StepEvent } from '@cairn/shared';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { createAcpBackend } from '../src/backend/acp.js';
 import { createDevinUpdateNormalizer } from '../src/backend/devin-acp.js';
@@ -170,13 +170,15 @@ describe('devin credential delivery', () => {
       hasDevinToken: false,
     });
     expect(refusal).toBe(devinSubscriptionMissingMessage());
-    expect(agentStepRefusal({
-      stepKind: 'build',
-      agentTools: undefined,
-      runtimeId: 'devin',
-      hasSubscriptionToken: false,
-      hasDevinToken: true,
-    })).toBeNull();
+    expect(
+      agentStepRefusal({
+        stepKind: 'build',
+        agentTools: undefined,
+        runtimeId: 'devin',
+        hasSubscriptionToken: false,
+        hasDevinToken: true,
+      }),
+    ).toBeNull();
   });
 
   test('devin refuses step kinds outside build/session/plan/merge', () => {

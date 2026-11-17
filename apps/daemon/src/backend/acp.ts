@@ -582,8 +582,15 @@ class AcpBackend implements AgentBackend {
         mcpServers: [
           ...(adapter?.allowHostMcp === true
             ? (opts.mcpServers ?? []).flatMap(
-                (endpoint): Array<
-                  | { type: 'http'; name: string; url: string; headers: { name: string; value: string }[] }
+                (
+                  endpoint,
+                ): Array<
+                  | {
+                      type: 'http';
+                      name: string;
+                      url: string;
+                      headers: { name: string; value: string }[];
+                    }
                   | {
                       type: 'stdio';
                       name: string;
@@ -592,35 +599,35 @@ class AcpBackend implements AgentBackend {
                       env: { name: string; value: string }[];
                     }
                 > => {
-                if (endpoint.transport === 'http' && endpoint.url !== undefined) {
-                  return [
-                    {
-                      type: 'http' as const,
-                      name: endpoint.slug,
-                      url: endpoint.url,
-                      headers: Object.entries(endpoint.headers ?? {}).map(([name, value]) => ({
-                        name,
-                        value,
-                      })),
-                    },
-                  ];
-                }
-                if (endpoint.transport === 'stdio' && endpoint.command !== undefined) {
-                  return [
-                    {
-                      type: 'stdio' as const,
-                      name: endpoint.slug,
-                      command: endpoint.command,
-                      args: endpoint.args ?? [],
-                      env: Object.entries(endpoint.env ?? {}).map(([name, value]) => ({
-                        name,
-                        value,
-                      })),
-                    },
-                  ];
-                }
-                return [];
-              },
+                  if (endpoint.transport === 'http' && endpoint.url !== undefined) {
+                    return [
+                      {
+                        type: 'http' as const,
+                        name: endpoint.slug,
+                        url: endpoint.url,
+                        headers: Object.entries(endpoint.headers ?? {}).map(([name, value]) => ({
+                          name,
+                          value,
+                        })),
+                      },
+                    ];
+                  }
+                  if (endpoint.transport === 'stdio' && endpoint.command !== undefined) {
+                    return [
+                      {
+                        type: 'stdio' as const,
+                        name: endpoint.slug,
+                        command: endpoint.command,
+                        args: endpoint.args ?? [],
+                        env: Object.entries(endpoint.env ?? {}).map(([name, value]) => ({
+                          name,
+                          value,
+                        })),
+                      },
+                    ];
+                  }
+                  return [];
+                },
               )
             : []),
           ...(hostTools ? [hostTools.declaration] : []),

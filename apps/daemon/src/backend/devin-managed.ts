@@ -267,7 +267,6 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
     if (spec === null) return current();
     const done = await withLock(() => install(spec));
     if (done === null) {
-      // Another daemon may hold the lock; fall back to whatever is already installed.
       return installFor(join(root, 'versions', spec.version)) ?? current();
     }
     writeFileSync(join(root, 'current.json'), JSON.stringify({ version: spec.version }));

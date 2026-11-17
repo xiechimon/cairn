@@ -14,8 +14,8 @@ import {
   hasUsableClaudeSubscription,
   useClaudeSubscriptions,
 } from '../api/claude-subscriptions.js';
-import { hasUsableDevinSubscription, useDevinSubscriptions } from '../api/devin-subscriptions.js';
 import { ApiError } from '../api/client.js';
+import { hasUsableDevinSubscription, useDevinSubscriptions } from '../api/devin-subscriptions.js';
 import { useMachines, useModelSources } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { ROUTE_USE_LABELS } from '../api/model-routing.js';
@@ -294,8 +294,7 @@ function RuleRow({
               onSave({
                 provider: option.provider,
                 modelId: option.modelId,
-                thinkingLevel:
-                  option.runtime === 'devin' || level === 'off' ? null : level,
+                thinkingLevel: option.runtime === 'devin' || level === 'off' ? null : level,
               })
             }
           />

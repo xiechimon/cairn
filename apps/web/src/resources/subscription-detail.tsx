@@ -47,8 +47,7 @@ const AUTH_RENEWAL: Record<AccountVendor, string> = {
 };
 
 const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
-  claude:
-    '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。',
+  claude: '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。',
   codex: '这个订阅已过期。先移除它，再重新添加新的 token。',
   grok: '这个订阅已过期。先移除它，再重新添加新的 token。',
   devin:

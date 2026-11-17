@@ -1235,11 +1235,14 @@
       "code": {
         "web": [
           "apps/web/src/resources/providers-page.tsx",
-          "apps/web/src/resources/claude-subscriptions.tsx"
+          "apps/web/src/resources/claude-subscriptions.tsx",
+          "apps/web/src/resources/devin-subscriptions.tsx"
         ],
         "server": [
           "apps/server/src/services/providers.ts",
           "apps/server/src/services/claude-subscriptions.ts",
+          "apps/server/src/services/devin-subscriptions.ts",
+          "apps/server/src/services/devin-subscription-verification.ts",
           "apps/server/src/services/model-liveness.ts"
         ]
       },
@@ -1251,6 +1254,7 @@
         "server": [
           "/api/teams/:id/providers**",
           "/api/teams/:id/claude-subscriptions**",
+          "/api/teams/:id/devin-subscriptions**",
           "/api/teams/:id/models",
           "/api/teams/:id/model-sources",
           "/api/oauth/callback"
@@ -1267,7 +1271,8 @@
       ],
       "research": [
         "docs/research/r16-model-catalog-liveness.md",
-        "docs/research/2330-claude-entrypoint-and-setup-token-quota.md"
+        "docs/research/2330-claude-entrypoint-and-setup-token-quota.md",
+        "docs/design/devin-subscription-source.md"
       ],
       "frontendDesign": [
         "docs/design/references/settings",
@@ -1275,12 +1280,16 @@
       ],
       "backendDesign": [
         "docs/spec/11-model-service-and-machine-localization.md",
-        "docs/research/r16-model-catalog-liveness.md"
+        "docs/research/r16-model-catalog-liveness.md",
+        "docs/design/devin-subscription-source.md"
       ],
       "evidence": [
         "apps/web/e2e/providers-claude-subscription.spec.ts",
         "apps/web/e2e/provider-add-dialog.spec.ts",
-        "apps/server/test/claude-subscriptions.test.ts"
+        "apps/server/test/claude-subscriptions.test.ts",
+        "apps/server/test/devin-subscriptions.test.ts",
+        "apps/daemon/test/devin-acp.test.ts",
+        "apps/daemon/test/devin-managed.test.ts"
       ]
     },
     {

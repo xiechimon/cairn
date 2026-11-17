@@ -22,17 +22,13 @@ import {
   osPlatformOf,
 } from '@cairn/shared';
 import { AgentReachProbe } from './agent-reach.js';
-import {
-  configuredAcpBackends,
-  createAcpBackend,
-  createGeminiBackend,
-} from './backend/acp.js';
-import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
-import { createDevinManaged, type DevinManaged } from './backend/devin-managed.js';
+import { configuredAcpBackends, createAcpBackend, createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { createSessionConfiner, type Launch } from './backend/confine-session.js';
 import { ConfinementAvailability } from './backend/confinement-availability.js';
+import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
+import { createDevinManaged, type DevinManaged } from './backend/devin-managed.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import { backfillRepositoryCaches } from './backend/repo-cache-backfill.js';

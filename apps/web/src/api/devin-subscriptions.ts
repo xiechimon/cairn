@@ -114,7 +114,9 @@ export function useDevinSubscriptionSteps(
       queryKey: ['devin-subscription-steps', teamId, id],
       queryFn: () =>
         unlessMissing(
-          api.get<AccountStepsPage>(`/api/teams/${teamId}/devin-subscriptions/${id}/steps?limit=20`),
+          api.get<AccountStepsPage>(
+            `/api/teams/${teamId}/devin-subscriptions/${id}/steps?limit=20`,
+          ),
         ),
       enabled: live && teamId !== undefined,
     })),
