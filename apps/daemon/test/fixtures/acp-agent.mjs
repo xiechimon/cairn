@@ -37,6 +37,10 @@ for await (const line of createInterface({ input: process.stdin })) {
       id,
       result: {
         sessionId,
+        modes: {
+          currentModeId: 'read-only',
+          availableModes: [{ id: 'full-access', name: 'Full access' }],
+        },
         configOptions:
           scenario === 'no-model'
             ? []
@@ -52,6 +56,9 @@ for await (const line of createInterface({ input: process.stdin })) {
               ],
       },
     });
+  } else if (method === 'session/set_mode') {
+    if (params.modeId !== 'full-access') throw new Error('Wrong mode');
+    send({ id, result: {} });
   } else if (method === 'session/set_config_option') {
     if (params.value !== 'stub-model') throw new Error('Wrong model');
     configured = true;

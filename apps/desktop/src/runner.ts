@@ -21,6 +21,7 @@ const STABLE_RUN_MS = 60_000;
 export interface RunnerOptions {
   root: string;
   home: string;
+  serverHome: string;
   origin: string;
   ownerToken: string;
   otelEnv: OtelEnv;
@@ -72,6 +73,7 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
       [ENV_VARS.home]: options.home,
+      [ENV_VARS.confineDeniedRoots]: options.serverHome,
       [ENV_VARS.server]: options.origin,
       [ENV_VARS.skillsDir]: join(options.home, 'skills'),
       [ENV_VARS.mcpConfig]: join(options.home, 'mcp.json'),

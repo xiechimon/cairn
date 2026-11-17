@@ -379,6 +379,7 @@ async function boot(): Promise<void> {
       runnerStarting ??= startLocalRunner({
         root: bundledRoot('runner'),
         home: join(app.getPath('userData'), 'runner'),
+        serverHome: cairnHome(),
         origin,
         ownerToken,
         otelEnv,

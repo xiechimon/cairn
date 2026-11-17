@@ -45,6 +45,7 @@ import { credentialRedactor } from '../credential-output.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
 import { type ClaudeTelemetryCapture, captureClaudeTelemetry } from './claude-telemetry.js';
+import type { Launch, SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
 import { hostToolContent } from './host-tool-content.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
@@ -1133,6 +1134,7 @@ export interface ClaudeSdkOptionParts {
   lockedDown: boolean;
   mcpServers: Record<string, McpServerConfig>;
   strictMcpConfig?: boolean;
+  confine?: (launch: Launch) => Launch;
   effort?: EffortLevel;
   append?: string;
   skillDenyRules?: string[];
@@ -1159,9 +1161,13 @@ function approveUnlessDisallowed(disallowedTools: readonly string[]): CanUseTool
 
 const OAUTH_TOKEN_FD = 3;
 
-function spawnWithOAuthTokenOnFd(token: string): (options: SpawnOptions) => SpawnedProcess {
+function spawnClaudeProcess(
+  fdToken: string | undefined,
+  confine: ((launch: Launch) => Launch) | undefined,
+): (options: SpawnOptions) => SpawnedProcess {
   return ({ command, args, cwd, env, signal }) => {
-    const child = spawn(command, args, {
+    const launch = confine?.({ command, args }) ?? { command, args };
+    const child = spawn(launch.command, launch.args, {
       ...(cwd !== undefined ? { cwd } : {}),
       env,
       signal,
@@ -1169,9 +1175,9 @@ function spawnWithOAuthTokenOnFd(token: string): (options: SpawnOptions) => Spaw
       windowsHide: true,
     });
     const channel = child.stdio[OAUTH_TOKEN_FD];
-    if (channel !== null && channel !== undefined && 'end' in channel) {
+    if (fdToken !== undefined && channel !== null && channel !== undefined && 'end' in channel) {
       channel.on('error', () => {});
-      channel.end(token);
+      channel.end(fdToken);
     }
     const { stdin, stdout } = child;
     if (stdin === null || stdout === null)
@@ -1254,7 +1260,9 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       ? { pathToClaudeCodeExecutable: parts.executablePath }
       : {}),
     env,
-    ...(fdToken !== undefined ? { spawnClaudeCodeProcess: spawnWithOAuthTokenOnFd(fdToken) } : {}),
+    ...(fdToken !== undefined || parts.confine !== undefined
+      ? { spawnClaudeCodeProcess: spawnClaudeProcess(fdToken, parts.confine) }
+      : {}),
     ...(!locked && parts.plugins !== undefined && parts.plugins.length > 0
       ? { plugins: parts.plugins }
       : {}),
@@ -1273,6 +1281,7 @@ export interface ClaudeCodeBackendOpts {
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
   executablePath?: string;
+  confine?: SessionConfiner;
   teamSkillsCacheDir?: string;
   executableVersion?: string | null;
 }
@@ -1367,6 +1376,12 @@ export class ClaudeCodeBackend implements AgentBackend {
       ...(sessionEnv !== undefined ? { env: sessionEnv } : {}),
       ...(nativePluginDir !== null && opts.remoteToolsOnly !== true
         ? { plugins: [{ type: 'local' as const, path: nativePluginDir }] }
+        : {}),
+      ...(this.opts.confine !== undefined
+        ? {
+            confine: (launch: Launch) =>
+              (this.opts.confine as SessionConfiner)(opts, 'claude-code', launch),
+          }
         : {}),
       abortController: abort,
     });

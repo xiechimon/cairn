@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import type {
   AgentBackend,
@@ -25,6 +25,7 @@ import { AgentReachProbe } from './agent-reach.js';
 import { configuredAcpBackends, createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
+import { createSessionConfiner } from './backend/confine-session.js';
 import { ConfinementAvailability } from './backend/confinement-availability.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
@@ -158,8 +159,16 @@ export function portBaseForSlot(slot: number): number {
 
 export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> {
   const { config, paths, logger } = opts;
-  const acpBackends = configuredAcpBackends(process.env.CAIRN_ACP_AGENTS);
   ensureStateDirs(paths);
+  const confine = createSessionConfiner({
+    daemonHome: config.home,
+    extraDeniedRoots: (process.env[ENV_VARS.confineDeniedRoots] ?? '')
+      .split(delimiter)
+      .filter((path) => path !== ''),
+    readable: [config.skillsDir, paths.teamSkillsCacheDir],
+    serverUrl: config.serverUrl,
+  });
+  const acpBackends = configuredAcpBackends(process.env.CAIRN_ACP_AGENTS, confine ?? undefined);
   loadOrCreateDeviceJson(paths);
   const proxyHandle = setupProxy(logger, opts.proxyEnv ?? process.env, config.serverUrl);
 
@@ -295,7 +304,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         logger.raw('Loading gemini runtime…');
         geminiAnnounced = true;
       }
-      if (geminiBackend === null) geminiBackend = createGeminiBackend();
+      if (geminiBackend === null)
+        geminiBackend = createGeminiBackend(confine !== null ? { confine } : undefined);
       return geminiBackend;
     }
     if (!isBackendRuntimeId(agentProviderId)) {
@@ -330,6 +340,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         skills: { skillsDir: config.skillsDir, cwd: config.home },
         onSkillsLog: (msg) => logger.skills(msg),
         ...(claudeBin !== null ? { executablePath: claudeBin.path } : {}),
+        ...(confine !== null ? { confine } : {}),
         teamSkillsCacheDir: paths.teamSkillsCacheDir,
         ...(claudeBin !== null ? { executableVersion: claudeBin.version } : {}),
       });

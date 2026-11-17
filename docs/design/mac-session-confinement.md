@@ -106,10 +106,10 @@ Approved by ian on 2026-11-17, all as recommended: Seatbelt (not a separate user
 | Segment | Content | State |
 | --- | --- | --- |
 | 1 | `confine-seatbelt.ts` (`seatbeltProfile`, `seatbeltCommand`), golden/order/overlap tests, the Mac probe test with its unconfined negative control (`apps/daemon/test/confine-seatbelt.test.ts`) | landed |
-| 2 | Policy source: build `SeatbeltPolicy` per step from the Runner config (server home, runner home, worktree, git directories, own state, caches, server port); thread it to the adapters | pending |
-| 3 | Claude Code (`spawnClaudeCodeProcess` always installed), Codex and Gemini (`spawnProcess`) through the seam, with `full-access` and inner sandboxes off; structural test | pending |
+| 2 | Policy source: `createSessionConfiner` (`confine-session.ts`) builds `SeatbeltPolicy` per session on macOS from the Runner config: daemon home plus `CAIRN_CONFINE_DENIED_ROOTS` (the desktop app sets it to the server home), worktree, git common dir, own state (`CLAUDE_CONFIG_DIR`/`CODEX_HOME`), `$TMPDIR` and its parent, shared caches, read-only skills dirs, server loopback port | landed |
+| 3 | Claude Code (`spawnClaudeCodeProcess` installed whenever a confiner exists), Codex and Gemini (`spawnProcess`) through the seam; Codex must offer `full-access` mode and is switched to it, else the session fails. Tests: Claude seam probe, ACP argv. The structural "no unwrapped adapter spawn" test is not written yet | landed, structural test pending |
 | 4 | `pi-host` child and JSONL protocol | pending |
 | 5 | macOS availability (`checking/ready/unavailable`, reasons, preflight probe), shared capability enum | pending |
 | 6 | macOS CI job; packaged-app end-to-end proof; enforcement switched on once 2 to 5 are in | pending |
 
-Segment 1 changes nothing at runtime: no adapter calls it yet, so Mac sessions stay unconfined until segments 2 to 5 land.
+After segments 2 and 3, Claude Code, Codex and Gemini sessions on macOS run under the profile. Pi sessions still run in the Runner process and stay unconfined until segment 4, and there is no availability gate or fail-closed preflight until segment 5: if the profile cannot be applied the session fails to start, but the machine is not yet marked unavailable. Enforcement is therefore not complete.

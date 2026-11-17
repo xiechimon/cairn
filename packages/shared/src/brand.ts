@@ -73,6 +73,7 @@ export const ENV_VARS = {
   coordinatorMachineId: 'CAIRN_COORDINATOR_MACHINE_ID',
   coordinatorInServer: 'CAIRN_COORDINATOR_IN_SERVER',
   confinementPlatform: 'CAIRN_CONFINEMENT_PLATFORM',
+  confineDeniedRoots: 'CAIRN_CONFINE_DENIED_ROOTS',
   trajectoryOutcomeBackfill: 'CAIRN_TRAJ_OUTCOME_BACKFILL',
   trajectoryReflectCurate: 'CAIRN_TRAJ_REFLECT_CURATE',
   trajectoryReflectOpenGuardIssues: 'CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES',

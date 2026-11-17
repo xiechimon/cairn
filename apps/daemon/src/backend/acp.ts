@@ -31,6 +31,7 @@ import type {
 import { z } from 'zod';
 import { DAEMON_VERSION } from '../version.js';
 import { openAcpTools } from './acp-tools.js';
+import type { SessionConfiner } from './confine-session.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { runtimeChildEnv } from './otel.js';
 import { withoutPinnedEnv } from './pinned-env.js';
@@ -319,6 +320,7 @@ class AcpSession implements AgentSessionHandle {
 
 export interface GeminiBackendOptions {
   executablePath?: string;
+  confine?: SessionConfiner;
   spawnProcess?: (
     command: string,
     args: string[],
@@ -389,16 +391,18 @@ class AcpBackend implements AgentBackend {
     const spawnProcess = this.options.spawnProcess ?? spawn;
     let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
     try {
-      child = spawnProcess(
-        adapter?.command ?? this.options.executablePath ?? 'gemini',
-        adapter ? (adapter.args ?? []) : ['--acp'],
-        {
-          cwd: opts.cwd,
-          stdio: ['pipe', 'pipe', 'pipe'],
-          ...(adapter && process.platform !== 'win32' ? { detached: true } : {}),
-          env: runtimeChildEnv({ ...withoutPinnedEnv(process.env), ...opts.env }),
-        },
-      );
+      const launch = {
+        command: adapter?.command ?? this.options.executablePath ?? 'gemini',
+        args: adapter ? (adapter.args ?? []) : ['--acp'],
+      };
+      const confined =
+        this.options.confine?.(opts, adapter ? adapter.harness : 'gemini', launch) ?? launch;
+      child = spawnProcess(confined.command, confined.args, {
+        cwd: opts.cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        ...(adapter && process.platform !== 'win32' ? { detached: true } : {}),
+        env: runtimeChildEnv({ ...withoutPinnedEnv(process.env), ...opts.env }),
+      });
     } catch (error) {
       hostTools?.close();
       throw error;
@@ -534,6 +538,15 @@ class AcpBackend implements AgentBackend {
           `Gemini ACP: no model configuration advertised; using the CLI default instead of ${opts.modelId}\n`,
         );
       }
+      if (adapter?.harness === 'codex' && this.options.confine !== undefined) {
+        const modes = 'modes' in response ? response.modes : null;
+        if (!modes?.availableModes.some((mode) => mode.id === 'full-access'))
+          throw new Error('Codex ACP did not offer full-access mode under confinement');
+        await connection.agent.request(methods.agent.session.setMode, {
+          sessionId,
+          modeId: 'full-access',
+        });
+      }
       session = new AcpSession(
         sessionId,
         connection,
@@ -568,6 +581,7 @@ export function createGeminiBackend(options?: GeminiBackendOptions): AgentBacken
 }
 
 export interface AcpBackendOptions {
+  confine?: SessionConfiner;
   harness: 'claude-code' | 'codex';
   command: string;
   args?: string[];
@@ -580,11 +594,15 @@ export interface AcpBackendOptions {
 export function createAcpBackend(options: AcpBackendOptions): AgentBackend {
   return new AcpBackend({
     adapter: options,
+    ...(options.confine ? { confine: options.confine } : {}),
     ...(options.spawnProcess ? { spawnProcess: options.spawnProcess } : {}),
   });
 }
 
-export function configuredAcpBackends(raw: string | undefined): Map<string, AgentBackend> {
+export function configuredAcpBackends(
+  raw: string | undefined,
+  confine?: SessionConfiner,
+): Map<string, AgentBackend> {
   if (!raw) return new Map();
   const configuration = z
     .record(
@@ -600,6 +618,9 @@ export function configuredAcpBackends(raw: string | undefined): Map<string, Agen
     )
     .parse(JSON.parse(raw));
   return new Map(
-    Object.entries(configuration).map(([id, options]) => [id, createAcpBackend(options)]),
+    Object.entries(configuration).map(([id, options]) => [
+      id,
+      createAcpBackend(confine !== undefined ? { ...options, confine } : options),
+    ]),
   );
 }

@@ -24,6 +24,7 @@ export interface SeatbeltPolicy {
   taskTemp: string;
   state: string[];
   caches: string[];
+  readable?: string[];
   serverPort?: number;
 }
 
@@ -47,6 +48,7 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
   ];
   const deniedFiles = DENIED_FILES.map((path) => canonical(join(home, path)));
   const state = policy.state.map((path) => canonical(path, true));
+  const readable = (policy.readable ?? []).map((path) => canonical(path, true));
   const reexposed = [
     canonical(policy.workspace, true),
     ...policy.gitDirectories.map((path) => canonical(path, true)),
@@ -83,6 +85,7 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
     `(allow file-write* ${subpaths(writable)} ${DEVICE_WRITES.map((path) => `(literal ${quoted(path)})`).join(' ')} (regex #"^/dev/tty") (subpath "/dev/fd"))`,
     `(deny file-read* file-write* ${subpaths(deniedDirectories)} ${deniedFiles.map((path) => `(literal ${quoted(path)})`).join(' ')})`,
     `(allow file-read* file-write* ${subpaths(reexposed)})`,
+    ...(readable.length > 0 ? [`(allow file-read* ${subpaths(readable)})`] : []),
     `(deny file-write* ${subpaths(protectedGit)} (literal ${quoted(workspaceGit)}))`,
   ];
   if (policy.serverPort !== undefined) {
