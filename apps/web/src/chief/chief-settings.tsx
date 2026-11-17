@@ -12,7 +12,7 @@ import { toastError } from '../components/ui/toaster.js';
 import type { ChiefContent, ChiefSettingsTab } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
-import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
+import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { EditCharterDialog } from './edit-charter-dialog.js';
 import { MemoryPanel } from './memory-panel.js';
 

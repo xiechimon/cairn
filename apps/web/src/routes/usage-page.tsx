@@ -27,8 +27,6 @@ import {
   usageSummary,
 } from '../usage/usage-model.js';
 
-export const USAGE_PATH = '/app/usage';
-
 const INKS = ['bg-(--heat-4)', 'bg-(--heat-2)', 'bg-(--heat-3)', 'bg-(--heat-1)'] as const;
 const TYPE_INKS = ['bg-(--heat-4)', 'bg-(--heat-3)', 'bg-(--heat-2)', 'bg-(--heat-1)'] as const;
 

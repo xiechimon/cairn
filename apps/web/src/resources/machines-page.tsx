@@ -13,9 +13,8 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateMachineDialog } from './create-machine-dialog.js';
+import { MACHINES_HREF } from './hrefs.js';
 import { MachineRowView } from './machine-row.js';
-
-export const MACHINES_HREF = '/app/resources/machines';
 
 export function MachinesPage() {
   const { t } = useI18n();

@@ -1,4 +1,4 @@
-import { type ReactNode, useSyncExternalStore } from 'react';
+import { lazy, type ReactNode, useSyncExternalStore } from 'react';
 import {
   createBrowserRouter,
   Navigate,
@@ -16,21 +16,21 @@ import { Toaster } from './components/ui/toaster.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
 import { I18nProvider } from './i18n/provider.js';
 import { TokenGate } from './overlay/token-gate.js';
-import { ProjectNewPage } from './pages/project-new-page.js';
 import { ProjectHomeRedirect } from './pages/project-redirect.js';
-import { ProjectSettingsPage } from './pages/project-settings-page.js';
 import { PwaBridge } from './pwa/register.js';
-import { MODEL_ROUTING_HREF, PROVIDERS_HREF } from './resources/hrefs.js';
+import {
+  MACHINES_HREF,
+  MCP_HREF,
+  MODEL_ROUTING_HREF,
+  PROVIDERS_HREF,
+  ROUTING_SETTINGS_HREF,
+  SECRETS_HREF,
+  SKILLS_HREF,
+  USAGE_PATH,
+} from './resources/hrefs.js';
 import { MachineDetailRedirect } from './resources/machine-detail-page.js';
-import { MACHINES_HREF } from './resources/machines-page.js';
-import { MCP_HREF } from './resources/mcp-servers-page.js';
-import { ROUTING_SETTINGS_HREF } from './resources/routing-settings-page.js';
-import { SECRETS_HREF } from './resources/secrets-page.js';
-import { SKILLS_HREF } from './resources/skills-page.js';
 import { BoardPage } from './routes/board-page.js';
-import { MachineAuthorizePage } from './routes/machine-authorize-page.js';
 import { TodoRedirect } from './routes/todo-redirect.js';
-import { USAGE_PATH, UsagePage } from './routes/usage-page.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
 import { LegacyModelRoutingRedirect, SettingsRedirect } from './settings/settings-redirect.js';
 
@@ -45,6 +45,21 @@ function withBoundary(routes: RouteObject[]): RouteObject[] {
     element: route.element === null ? null : <RouteBoundary>{route.element}</RouteBoundary>,
   }));
 }
+
+const UsagePage = lazy(() =>
+  import('./routes/usage-page.js').then((m) => ({ default: m.UsagePage })),
+);
+const ProjectNewPage = lazy(() =>
+  import('./pages/project-new-page.js').then((m) => ({ default: m.ProjectNewPage })),
+);
+const ProjectSettingsPage = lazy(() =>
+  import('./pages/project-settings-page.js').then((m) => ({ default: m.ProjectSettingsPage })),
+);
+const MachineAuthorizePage = lazy(() =>
+  import('./routes/machine-authorize-page.js').then((m) => ({
+    default: m.MachineAuthorizePage,
+  })),
+);
 
 const DIALOG_ROUTES = withBoundary([
   { path: USAGE_PATH, element: <UsagePage /> },

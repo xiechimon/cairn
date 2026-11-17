@@ -1,4 +1,14 @@
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo } from 'react';
+import {
+  createContext,
+  lazy,
+  Suspense,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import { type RouteObject, useLocation, useNavigate, useRoutes } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { coordinatorSearch, useOpenComposer, useOpenNewTask } from '../board/open-composer.js';
@@ -7,7 +17,6 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { isEditableTarget } from '../overlay/hotkeys.js';
 import { RouteDialogCloseProvider } from '../overlay/route-dialog.js';
 import { SETTINGS_HREF, settingsSectionOf } from '../settings/settings-href.js';
-import { SettingsDialog } from '../settings/settings-page.js';
 import { useSettingsOverlay } from '../settings/use-settings-overlay.js';
 import { questionDockState } from './question-dock-state.js';
 import { questionDraftKey } from './question-drafts.js';
@@ -17,6 +26,22 @@ import { type ChiefSurface, useChiefSurface } from './use-chief-surface.js';
 export interface ChiefRootApi {
   surface: ChiefSurface;
   pendingQuestions: OriginChiefQuestion[];
+}
+
+const SettingsDialog = lazy(() =>
+  import('../settings/settings-page.js').then((m) => ({ default: m.SettingsDialog })),
+);
+
+function useOverlayFocusRestore(open: boolean): void {
+  const openerRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+  if (!wasOpenRef.current) openerRef.current = document.activeElement as HTMLElement | null;
+  useLayoutEffect(() => {
+    const justClosed = wasOpenRef.current && !open;
+    wasOpenRef.current = open;
+    const el = openerRef.current;
+    if (justClosed && el instanceof HTMLElement && document.contains(el)) el.focus();
+  }, [open]);
 }
 
 const ChiefRootContext = createContext<ChiefRootApi | null>(null);
@@ -95,6 +120,7 @@ export function ChiefRoot({
   );
   const { teamId } = useLiveData();
   const surface = useChiefSurface(fixture, deepLink);
+  useOverlayFocusRestore(settings.open);
   useOpenCoordinatorKey();
   useOpenSettingsMenu();
   const pendingQuestions = useMemo(
@@ -123,12 +149,16 @@ export function ChiefRoot({
   return (
     <ChiefRootContext.Provider value={api}>
       <div className="contents" inert={settings.open}>
-        {page}
+        <Suspense fallback={null}>{page}</Suspense>
       </div>
       {settings.section !== null ? (
-        <SettingsDialog section={settings.section} onClose={settings.close} />
+        <Suspense fallback={null}>
+          <SettingsDialog section={settings.section} onClose={settings.close} />
+        </Suspense>
       ) : (
-        <RouteDialogCloseProvider value={settings.close}>{dialog}</RouteDialogCloseProvider>
+        <RouteDialogCloseProvider value={settings.close}>
+          <Suspense fallback={null}>{dialog}</Suspense>
+        </RouteDialogCloseProvider>
       )}
     </ChiefRootContext.Provider>
   );

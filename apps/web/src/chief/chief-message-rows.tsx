@@ -25,7 +25,7 @@ import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
-import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
+import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { ChiefReportMessage } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';

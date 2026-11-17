@@ -27,6 +27,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { Ban, Plus } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
+import { MCP_HREF } from './hrefs.js';
 import {
   ConnectorStatus,
   McpConnectorDialog,
@@ -46,8 +47,6 @@ import {
   RowText,
   RowTitle,
 } from './parts.js';
-
-export const MCP_HREF = '/app/resources/mcp-servers';
 
 type FixtureDialog =
   | { kind: 'catalog'; catalogId: string }

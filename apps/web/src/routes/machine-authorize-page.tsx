@@ -14,7 +14,7 @@ import {
   startCommand,
   useRunnerServerAccess,
 } from '../resources/create-machine-dialog.js';
-import { MACHINES_HREF } from '../resources/machines-page.js';
+import { MACHINES_HREF } from '../resources/hrefs.js';
 
 type Phase = 'idle' | 'pending' | 'authorizing' | 'authorized' | 'expired';
 

@@ -23,10 +23,9 @@ import { Search } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { BulkSecretDialog } from './bulk-secret-dialog.js';
+import { SECRETS_HREF } from './hrefs.js';
 import { ResourceList, ResourceNewButton, ResourceRow } from './parts.js';
 import { SecretDialog, type SecretDraft } from './secret-dialog.js';
-
-export const SECRETS_HREF = '/app/resources/secrets';
 
 const COLUMNS_CLS =
   'grid w-full grid-cols-[minmax(0,2fr)_minmax(0,3fr)_minmax(0,1fr)_2rem] items-center gap-4 max-sm:grid-cols-[minmax(0,1fr)_2.75rem] max-sm:gap-x-2 max-sm:gap-y-0.5';

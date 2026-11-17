@@ -40,12 +40,7 @@ import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { settingsHref } from '../settings/settings-href.js';
 import { RuleIssueNotices } from './rule-issue-notices.js';
-
-export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
-export const COORDINATOR_ROUTE_ANCHOR = 'route-coordinator';
-export const COORDINATOR_ROUTING_HREF = `${settingsHref('routing')}#${COORDINATOR_ROUTE_ANCHOR}`;
 
 const AGENT_USES: readonly RouteUse[] = ['coordinator'];
 

@@ -20,6 +20,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, Download, Search } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
+import { SKILLS_HREF } from './hrefs.js';
 import {
   RES_SEARCH_ROW_CLS,
   ResourceList,
@@ -36,8 +37,6 @@ import { SkillImportDialog } from './skill-import-dialog.js';
 const SkillDialog = lazy(() =>
   import('./skill-dialog.js').then((m) => ({ default: m.SkillDialog })),
 );
-
-export const SKILLS_HREF = '/app/resources/skills';
 
 const SORT_OPTIONS = ['默认', '名称'] as const;
 const SORT_KEYS: Record<(typeof SORT_OPTIONS)[number], string> = { 默认: 'D', 名称: 'N' };

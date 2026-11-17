@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router';
 
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { ChiefContent } from '../fixtures/records.js';
-import { ROUTING_SETTINGS_HREF } from '../resources/routing-settings-page.js';
+import { ROUTING_SETTINGS_HREF } from '../resources/hrefs.js';
 import { AVATAR_IMG_CLS } from './recipes.js';
 
 const IDENTITY_CLS = 'inline-flex items-center gap-1.5 self-start text-inherit no-underline';

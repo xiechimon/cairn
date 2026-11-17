@@ -31,7 +31,7 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
-import { MACHINES_HREF } from '../resources/machines-page.js';
+import { MACHINES_HREF } from '../resources/hrefs.js';
 import {
   type EngineRunView,
   engineCanTakeOver,

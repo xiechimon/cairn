@@ -43,7 +43,7 @@ import { isDeleted } from '../fixtures/deletions.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteArchivedProjectsConfirm } from '../overlay/delete-archived-projects-confirm.js';
-import { USAGE_PATH } from '../routes/usage-page.js';
+import { USAGE_PATH } from '../resources/hrefs.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { SETTINGS_HREF } from '../settings/settings-href.js';
 import { DesktopUpdateButton } from './desktop-update.js';
