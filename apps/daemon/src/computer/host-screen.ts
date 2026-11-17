@@ -6,7 +6,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_IMAGE_MAX_BASE64_CHARS, type ComputerImage } from '@cairn/shared';
 import { z } from 'zod';
 import { hostCommandEnvironment } from './host.js';
-import { fitPng } from './host-screen-png.js';
+import { fitPngUnderCap } from './host-screen-png.js';
 import { type AccessibilityNode, accessibilityRows } from './host-screen-rows.js';
 import { isBrowserApp, isDaemonProcess, originHosts, showsCairn } from './host-screen-self.js';
 
@@ -501,7 +501,11 @@ export class AgentDesktopHostScreen implements HostScreen {
       }
       const data = read.data as { data?: string; format?: string } | null;
       if (!data?.data || data.format !== 'png') break;
-      const fitted = this.fit(Buffer.from(data.data, 'base64'));
+      const fitted = fitPngUnderCap(
+        Buffer.from(data.data, 'base64'),
+        SCREEN_IMAGE_EDGES,
+        this.imageMaxBase64Chars,
+      );
       if (!fitted) {
         return {
           note: 'screenshot: omitted because it could not be reduced under the size cap',
@@ -514,15 +518,6 @@ export class AgentDesktopHostScreen implements HostScreen {
       };
     }
     return { note: last, images: [] };
-  }
-
-  private fit(png: Buffer): { png: Buffer; width: number; height: number } | undefined {
-    for (const edge of SCREEN_IMAGE_EDGES) {
-      const fitted = fitPng(png, edge);
-      if (!fitted) return undefined;
-      if (Math.ceil(fitted.png.length / 3) * 4 <= this.imageMaxBase64Chars) return fitted;
-    }
-    return undefined;
   }
 
   private ref(target: Target, element: number): string {

@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$HOME"
 config=$HOME/.config
 rm -f /run/cairn/ready /tmp/.X1-lock /tmp/.X11-unix/X1
-mkdir -p "$config/gtk-3.0" "$config/openbox" "$config/plank/dock1/launchers" "$HOME/.cairn"
+mkdir -p "$config/gtk-3.0" "$config/openbox" "$config/plank/dock1/launchers" "$HOME/.cairn" "$HOME/.local/bin"
 printf '[Settings]\ngtk-application-prefer-dark-theme=1\ngtk-theme-name=Adwaita-dark\n' > "$config/gtk-3.0/settings.ini"
 sed 's#</applications>#<application class="*" type="normal"><maximized>yes</maximized></application></applications>#' /etc/xdg/openbox/rc.xml > "$config/openbox/rc.xml"
 rm -f "$config/plank/dock1/launchers/"*.dockitem

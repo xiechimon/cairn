@@ -20,13 +20,18 @@ RUN set -eu; \
 
 FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
 ARG TARGETARCH
-ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive \
+    PATH=/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    PIP_USER=1 \
+    PIP_BREAK_SYSTEM_PACKAGES=1 \
+    NPM_CONFIG_PREFIX=/home/agent/.local
 RUN set -eu; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
       xvfb x11vnc openbox picom hsetroot xdotool dbus-x11 libglib2.0-bin \
       chromium lxterminal fonts-noto-cjk fonts-noto-color-emoji adwaita-icon-theme gnome-themes-extra \
-      ca-certificates curl procps nftables util-linux; \
+      ca-certificates curl procps nftables util-linux x11-apps netpbm \
+      git python3 python3-pip python3-venv jq ripgrep fd-find unzip zip less; \
     case "$TARGETARCH" in \
       arm64) plank=bea8743bffbf924740240e4e59d578028b099cceba6b491f0689ccd24f689465 ;; \
       amd64) plank=aaa055faffda483b64f24e1f130fc039f99f18da87c6c3c30210c748e0c8d3e6 ;; \
@@ -38,12 +43,15 @@ RUN set -eu; \
       libdbusmenu-glib4 libdbusmenu-gtk3-4 libgee-0.8-2 libbamf3-2 bamfdaemon libwnck-3-0 \
       libgnome-menu-3-0 libcanberra0 libcanberra-gtk3-0 libgtk-3-0 libxml2; \
     rm -rf /var/lib/apt/lists/* /tmp/plank-reloaded.deb /usr/share/applications/chromium.desktop; \
+    ln -s /usr/bin/fdfind /usr/local/bin/fd; \
+    mkdir -p /etc/skel/.local/bin; \
     useradd -m -u 1000 -s /bin/bash agent; \
     find / -xdev -type f -perm /6000 -exec chmod a-s {} +
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=packages /opt/agent-browser /opt/agent-browser
 COPY --from=packages /opt/cloak /opt/cloak
 COPY guard.nft /etc/cairn/guard.nft
+COPY agent-env.sh /etc/profile.d/cairn-agent.sh
 COPY cloak.mjs /opt/cloak/cloak.mjs
 COPY cairn-browser.desktop cairn-chromium.desktop /usr/share/applications/
 COPY --chmod=755 entry.sh /usr/local/bin/cairn-entry

@@ -10,4 +10,5 @@ if [[ $(stat -c %u /home/agent) != 1000 ]]; then
   chown -R 1000:1000 /home/agent
 fi
 exec setpriv --reuid=1000 --regid=1000 --init-groups --inh-caps=-all --bounding-set=-all --no-new-privs \
-  env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/home/agent USER=agent LANG=C.UTF-8 /usr/local/bin/cairn-desktop
+  env -i PATH=/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin HOME=/home/agent USER=agent LANG=C.UTF-8 \
+  PIP_USER=1 PIP_BREAK_SYSTEM_PACKAGES=1 NPM_CONFIG_PREFIX=/home/agent/.local /usr/local/bin/cairn-desktop

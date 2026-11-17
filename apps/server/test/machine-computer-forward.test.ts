@@ -177,6 +177,8 @@ test('every dispatched Orb tool has a server grant regression case', () => {
     'list_files',
     'read_file',
     'write_file',
+    'computer_observe',
+    'computer_act',
     'browser_navigate',
     'browser_snapshot',
     'browser_act',

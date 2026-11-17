@@ -171,3 +171,16 @@ export function fitPng(png: Buffer, maxEdge: number): ScaledPng | undefined {
     height: targetHeight,
   };
 }
+
+export function fitPngUnderCap(
+  png: Buffer,
+  edges: readonly number[],
+  maxBase64Chars: number,
+): ScaledPng | undefined {
+  for (const edge of edges) {
+    const fitted = fitPng(png, edge);
+    if (!fitted) return undefined;
+    if (Math.ceil(fitted.png.length / 3) * 4 <= maxBase64Chars) return fitted;
+  }
+  return undefined;
+}

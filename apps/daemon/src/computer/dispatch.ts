@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { DaemonLogger } from '../log.js';
 import type { MachineApi } from '../machine-client.js';
 import { type BrowserToolName, type BrowserToolResult, runBrowserTool } from './browser.js';
+import { DesktopScreen } from './desktop-screen.js';
 import { FramePoster } from './frame-poster.js';
 import {
   desktopProtectionGuardMessage,
@@ -15,7 +16,7 @@ import {
   orbComputerProtectionRefusal,
   protectedComputerLifecycleRefusal,
 } from './guard.js';
-import type { HostScreen } from './host-screen.js';
+import type { HostScreen, ScreenCall, ScreenOutcome } from './host-screen.js';
 import {
   type ComputerFileEntry,
   type ComputerFileOptions,
@@ -54,6 +55,8 @@ const ORB_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'list_files',
   'read_file',
   'write_file',
+  'computer_observe',
+  'computer_act',
   'browser_navigate',
   'browser_snapshot',
   'browser_act',
@@ -124,6 +127,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
   const finishedUnsafe = new Set<string>();
   let closing = false;
   const postingLifetime = new AbortController();
+  const desktopScreen = new DesktopScreen({ now });
 
   function remember(callId: string): void {
     finishedUnsafe.add(callId);
@@ -135,7 +139,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
 
   async function handleScreen(
     call: ComputerCall,
-    screen: HostScreen,
+    run: (request: ScreenCall) => Promise<ScreenOutcome>,
     controller: AbortController,
   ): Promise<void> {
     if (call.deadlineAt - now() <= FINAL_FRAME_MARGIN_MS) {
@@ -144,11 +148,9 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     const poster = posterFor(call, controller);
     const request = { params: call.params, deadlineAt: call.deadlineAt, signal: controller.signal };
-    let outcome: Awaited<ReturnType<HostScreen['act']>>;
+    let outcome: ScreenOutcome;
     try {
-      outcome = await (call.tool === 'user_computer_act'
-        ? screen.act(request)
-        : screen.observe(request));
+      outcome = await run(request);
     } catch {
       await poster.finish({
         kind: 'error',
@@ -459,13 +461,32 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
 
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
     if (call.tool === 'user_computer_observe' || call.tool === 'user_computer_act') {
-      if (options.screen) await handleScreen(call, options.screen, controller);
+      const screen = options.screen;
+      if (screen)
+        await handleScreen(
+          call,
+          (request) =>
+            call.tool === 'user_computer_act' ? screen.act(request) : screen.observe(request),
+          controller,
+        );
       else await refuse(call, NO_COMPUTER_PROVIDER_MESSAGE);
       return;
     }
     const route = routeFor(call);
     if (typeof route === 'string') {
       await refuse(call, route);
+      return;
+    }
+    if (call.tool === 'computer_observe' || call.tool === 'computer_act') {
+      const scopeKey = call.scopeKey ?? '';
+      await handleScreen(
+        call,
+        (request) =>
+          call.tool === 'computer_act'
+            ? desktopScreen.act(route.provider, scopeKey, request)
+            : desktopScreen.observe(route.provider, scopeKey, request),
+        controller,
+      );
       return;
     }
     if (call.tool === 'shell' || call.tool === 'user_computer_shell') {

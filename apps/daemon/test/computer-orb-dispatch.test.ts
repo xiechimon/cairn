@@ -144,7 +144,7 @@ describe('orb routing', () => {
     expect(log).toEqual(['orb[chief:c1]:execute:ls', 'orb[chief:c2]:read:a', 'host:execute:pwd']);
   });
 
-  test('screen tools are still refused even with an Orb provider', async () => {
+  test('desktop screen tools go to the scope provider', async () => {
     const log: string[] = [];
     const fake = fakeClient();
     const dispatcher = createComputerDispatcher({
@@ -152,9 +152,11 @@ describe('orb routing', () => {
       orb: fakeOrb(log),
       ...FAST,
     });
-    await dispatcher.dispatch(call('computer_act', {}, { scopeKey: 'chief:c1' }));
-    expect(errorOf(fake.frames)).toMatchObject({ message: NO_COMPUTER_PROVIDER_MESSAGE });
-    expect(log).toEqual([]);
+    await dispatcher.dispatch(
+      call('computer_act', { actions: [{ kind: 'key', key: 'Return' }] }, { scopeKey: 'chief:c1' }),
+    );
+    expect(errorOf(fake.frames)?.message).not.toBe(NO_COMPUTER_PROVIDER_MESSAGE);
+    expect(log[0]).toBe('orb[chief:c1]:execute:Return');
   });
 
   test('browser_navigate runs agent-browser open on the Orb provider', async () => {
