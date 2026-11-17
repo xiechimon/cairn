@@ -59,6 +59,27 @@ test('a task the Coordinator quoted shows the quote once and leaves the jump to 
   await expect(page.getByTestId('thread-origin')).toHaveCount(0);
 });
 
+test("the owner's words under the head read as a Markdown quote", async ({ page }) => {
+  await page.goto(`${HOME}&thread=home-c-review`);
+  const quote = page.getByTestId('thread-purpose').getByTestId('md-quote');
+  await expect(quote).toHaveText('Fold finished turns before review.');
+  const style = await quote.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--text-secondary)';
+    node.append(probe);
+    const secondary = getComputedStyle(probe).color;
+    probe.remove();
+    const computed = getComputedStyle(node);
+    return {
+      rule: computed.borderInlineStartWidth,
+      color: computed.color,
+      secondary,
+    };
+  });
+  expect(style.rule).toBe('3px');
+  expect(style.color).toBe(style.secondary);
+});
+
 test('a thread with no originating message shows no origin line', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-working-a`);
   await expect(panel(page)).toBeVisible();
