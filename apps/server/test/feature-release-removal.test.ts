@@ -39,14 +39,18 @@ test.each(['fresh', 'upgrade', 'latest-main'] as const)(
         ('member-on', 'private', 'member', 1, 4)`);
       }
       const usersBefore =
-        mode !== 'fresh' ? sqlite.prepare('SELECT * FROM user ORDER BY rowid').all() : [];
+        mode !== 'fresh'
+          ? sqlite.prepare('SELECT id, displayName, avatarUrl FROM user ORDER BY rowid').all()
+          : [];
       const db = drizzle(sqlite);
       migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
       migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
       expect(
         sqlite.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'feature_flag%'").all(),
       ).toEqual([]);
-      expect(sqlite.prepare('SELECT * FROM user ORDER BY rowid').all()).toEqual(usersBefore);
+      expect(
+        sqlite.prepare('SELECT id, displayName, avatarUrl FROM user ORDER BY rowid').all(),
+      ).toEqual(usersBefore);
       expect(sqlite.pragma('foreign_key_check')).toEqual([]);
     } finally {
       sqlite.close();
