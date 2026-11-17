@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { SessionOpts } from '@cairn/shared';
 import { type SeatbeltPolicy, seatbeltCommand } from './confine-seatbelt.js';
 
-export type SessionHarness = 'claude-code' | 'codex' | 'gemini';
+export type SessionHarness = 'claude-code' | 'codex' | 'gemini' | 'pi';
 
 export interface Launch {
   command: string;
@@ -15,6 +15,7 @@ export type SessionConfiner = (
   opts: Pick<SessionOpts, 'cwd' | 'env'>,
   harness: SessionHarness,
   launch: Launch,
+  state?: readonly string[],
 ) => Launch;
 
 export interface SessionConfinerOptions {
@@ -53,6 +54,7 @@ function ownState(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv)
   const explicit =
     harness === 'claude-code' ? env.CLAUDE_CONFIG_DIR : harness === 'codex' ? env.CODEX_HOME : null;
   if (explicit !== undefined && explicit !== null && isAbsolute(explicit)) return [explicit];
+  if (harness === 'pi') return [];
   const name = harness === 'claude-code' ? '.claude' : harness === 'codex' ? '.codex' : '.gemini';
   const defaults = [join(home, name)];
   if (harness === 'claude-code') defaults.push(join(home, '.claude.json'));
@@ -64,7 +66,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
   const environment = options.environment ?? process.env;
   const home = realpathSync(options.home ?? homedir());
   const port = Number(new URL(options.serverUrl).port);
-  return (opts, harness, launch) => {
+  return (opts, harness, launch, extraState = []) => {
     const env = { ...environment, ...opts.env };
     const workspace = realpathSync(opts.cwd);
     const state = ownState(harness, home, env)
@@ -73,6 +75,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
         if (!path.endsWith('.claude.json')) mkdirSync(path, { recursive: true });
         return realpathSync(path);
       });
+    const explicitState = extraState.map((path) => realpathSync(path));
     const temp = realpathSync(env.TMPDIR ?? tmpdir());
     const userDirectory = dirname(temp);
     const policy: SeatbeltPolicy = {
@@ -83,7 +86,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       workspace,
       gitDirectories: gitDirectoriesOf(workspace),
       taskTemp: temp,
-      state,
+      state: [...state, ...explicitState],
       caches: [
         userDirectory,
         ...SHARED_CACHES.map((path) => join(home, path)).filter((path) => existsSync(path)),

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { canonical, contains, DENIED_DIRECTORIES, DENIED_FILES } from './confine.js';
 
@@ -39,6 +39,13 @@ export interface SeatbeltPolicy {
 function quoted(path: string): string {
   if (/["\\\n\r\0]/.test(path)) throw new Error('Unsafe seatbelt path');
   return `"${path}"`;
+}
+
+function ancestorsOf(path: string): string[] {
+  const found: string[] = [];
+  for (let cursor = dirname(path); cursor !== dirname(cursor); cursor = dirname(cursor))
+    found.push(cursor);
+  return found;
 }
 
 function subpaths(paths: string[]): string {
@@ -82,6 +89,13 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
     if (everythingDenied.some((secret) => contains(secret, path)) && !own && !insideRoot)
       throw new Error('Unsafe confinement state overlap');
   }
+  const traversable = [
+    ...new Set(
+      reexposed
+        .flatMap(ancestorsOf)
+        .filter((path) => deniedDirectories.some((secret) => contains(secret, path))),
+    ),
+  ];
   const protectedGit = policy.gitDirectories.flatMap((directory) =>
     ['config', 'config.worktree', 'hooks'].map((name) => canonical(join(directory, name))),
   );
@@ -93,6 +107,11 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
     `(allow file-write* ${subpaths(writable)} ${DEVICE_WRITES.map((path) => `(literal ${quoted(path)})`).join(' ')} (regex #"^/dev/tty") (subpath "/dev/fd"))`,
     `(deny file-read* file-write* ${subpaths(deniedDirectories)} ${deniedFiles.map((path) => `(literal ${quoted(path)})`).join(' ')})`,
     `(allow file-read* file-write* ${subpaths(reexposed)})`,
+    ...(traversable.length > 0
+      ? [
+          `(allow file-read-metadata ${traversable.map((path) => `(literal ${quoted(path)})`).join(' ')})`,
+        ]
+      : []),
     ...(readable.length > 0 ? [`(allow file-read* ${subpaths(readable)})`] : []),
     `(deny file-write* ${subpaths(protectedGit)} (literal ${quoted(workspaceGit)}))`,
     ...LAUNCH_SERVICE_DENIALS,

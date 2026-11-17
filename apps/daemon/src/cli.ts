@@ -14,6 +14,7 @@ import { BRAND, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
 import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
+import { runPiHost } from './backend/pi-host.js';
 import {
   type DaemonConfig,
   type DaemonConfigInput,
@@ -306,6 +307,13 @@ export function buildProgram(): Command {
     .description('Provider management notice')
     .action(() => {
       process.stdout.write(`${PROVIDER_COMMAND_NOTICE}\n`);
+    });
+
+  program
+    .command('pi-host', { hidden: true })
+    .description('Run one confined Pi session over the JSONL host protocol')
+    .action(async () => {
+      await runPiHost();
     });
 
   program

@@ -327,6 +327,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           onOtelLog: (msg) => logger.prefixed('otel', msg),
           onCompactionLog: (msg) => logger.step(msg),
           machineName: config.name,
+          ...(confine !== null ? { confine } : {}),
         });
         logger.machine(piSessionPolicyLine(process.env));
       }

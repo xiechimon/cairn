@@ -120,4 +120,23 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
     expect((await run(`cat '${join(skills, 'skill.md')}'`)).out).toContain('skill-body');
     expect((await run(`echo ok > '${join(worktree, 'f')}' && echo done`)).out).toContain('done');
   });
+
+  test('the pi profile exposes only its own state and keeps the same denied roots', () => {
+    const { confine, worktree, runnerHome, serverHome } = fixture();
+    const agentDir = join(runnerHome, 'agent-runtime');
+    const privateDirectory = join(runnerHome, 'chat-sessions', 'host-x');
+    mkdirSync(agentDir, { recursive: true });
+    mkdirSync(privateDirectory, { recursive: true });
+    const launch = confine({ cwd: worktree, env: {} }, 'pi', { command: '/bin/true', args: [] }, [
+      agentDir,
+      privateDirectory,
+    ]);
+    const profile = launch.args[1] as string;
+    expect(profile).toContain(`(subpath "${realpathSync(agentDir)}")`);
+    expect(profile).toContain(`(subpath "${realpathSync(privateDirectory)}")`);
+    expect(profile).toContain(`(subpath "${realpathSync(serverHome)}")`);
+    expect(profile).toContain(`(subpath "${realpathSync(runnerHome)}")`);
+    expect(profile).not.toContain(`(subpath "${realpathSync(join(runnerHome, 'chat-sessions'))}")`);
+    expect(profile).toContain('(allow file-read-metadata (literal');
+  });
 });

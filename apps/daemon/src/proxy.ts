@@ -43,7 +43,7 @@ export interface ProxyHandle {
 }
 
 export function setupProxy(
-  logger: DaemonLogger,
+  logger: Pick<DaemonLogger, 'raw'>,
   env: NodeJS.ProcessEnv = process.env,
   serverUrl?: string,
 ): ProxyHandle {

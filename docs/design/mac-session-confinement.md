@@ -108,8 +108,52 @@ Approved by ian on 2026-11-17, all as recommended: Seatbelt (not a separate user
 | 1 | `confine-seatbelt.ts` (`seatbeltProfile`, `seatbeltCommand`), golden/order/overlap tests, the Mac probe test with its unconfined negative control (`apps/daemon/test/confine-seatbelt.test.ts`) | landed |
 | 2 | Policy source: `createSessionConfiner` (`confine-session.ts`) builds `SeatbeltPolicy` per session on macOS from the Runner config: daemon home plus `CAIRN_CONFINE_DENIED_ROOTS` (the desktop app sets it to the server home), worktree, git common dir, own state (`CLAUDE_CONFIG_DIR`/`CODEX_HOME`), `$TMPDIR` and its parent, shared caches, read-only skills dirs, server loopback port | landed |
 | 3 | Claude Code (`spawnClaudeCodeProcess` installed whenever a confiner exists), Codex and Gemini (`spawnProcess`) through the seam; Codex must offer `full-access` mode and is switched to it, else the session fails. Tests: Claude seam probe, ACP argv. The structural "no unwrapped adapter spawn" test is not written yet | landed, structural test pending |
-| 4 | `pi-host` child and JSONL protocol | pending |
+| 4 | `pi-host` child and JSONL protocol (`pi-host.ts`, `pi-host-protocol.ts`, `PiBackend` with `confine`); design note below | landed |
 | 5 | macOS availability: startup probe (`runSeatbeltProbe`) applies the profile, checks a sentinel read fails and a scratch write works; `ready` or `unavailable` with cause `seatbelt-missing` or `seatbelt-probe-failed`; the server now treats darwin like Linux (`confinementEnforced`): no `ready` report, no dispatch; an old Mac daemon reporting `not-applicable` is refused until it updates | landed |
 | 6 | macOS CI job; packaged-app end-to-end proof; enforcement switched on once 2 to 5 are in | pending |
 
-After segments 2 and 3, Claude Code, Codex and Gemini sessions on macOS run under the profile. Pi sessions still run in the Runner process and stay unconfined until segment 4, and there is no availability gate or fail-closed preflight until segment 5: if the profile cannot be applied the session fails to start, but the machine is not yet marked unavailable. Enforcement is therefore not complete.
+After segments 2 and 3, Claude Code, Codex and Gemini sessions on macOS run under the profile. With segment 4, Pi sessions on macOS run in a confined `pi-host` child as well. The profile also allows `file-read-metadata` on the directories above a re-exposed path inside a denied root, so `realpath` on a worktree path works while listing and reading those directories stay denied.
+
+## Segment 4 design: the `pi-host` child
+
+Scope: macOS only for launching; the seam (`confine(opts, 'pi', launch)`) is platform-neutral, so Linux bwrap plugs in later without changing the protocol. With no confiner (every non-macOS platform today) `PiBackend` runs the session in-process exactly as before.
+
+### Roles
+
+- Parent (`PiBackend` with a confiner): owns the session index (`recordSession`, `resolveSessionFile`), provider materialization (`models.json`, including learned compat, which is process state), remote and local tool callbacks, skills brief composition (`brief`), logging channels and the step's `StepEvent` stream. It holds no file or command executor for the child.
+- Child (`cairn-daemon pi-host`, one per live session): runs the existing in-process session code (`PiBackend.openInProcess`), so Read, Edit, Write, Bash and local MCP stdio children all run inside the Seatbelt profile. It never touches the index, the daemon home or the server.
+
+### Launch and state
+
+Launch: the parent creates a private session directory under `sessionDir`, builds the policy through `confine(opts, 'pi', launch, state)` with `state = [agentDir, private session dir, resume file if any]`, and spawns the result detached (own process group) with stdio pipes and an environment of `withoutPinnedEnv(process.env)` plus the step env. If the confiner throws, or the spawn fails, `open` rejects: no handle, no in-process fallback, no second attempt.
+
+Frames are one JSON object per line, `v: 1`, Zod-validated on both sides, at most 32 MiB each. Parent to child: `initialize`, `steer`, `tool_reply`, `stop`. Child to parent: `ready`, `event`, `usage`, `log`, `tool_request`, `steer_reply`, `ended`, `fatal`. Writers queue at most 1024 frames and wait for `drain`; an overflow fails the session. The child redirects its own `stdout` writes to `stderr` so a stray print cannot corrupt the protocol; the parent keeps the last 4 KiB of `stderr`, redacted with the session's API key, for failure messages.
+
+| State | Entered by | Leaves by |
+| --- | --- | --- |
+| starting | parent spawns the child, sends `initialize` (SessionOpts without callbacks, serializable tool definitions, skills dirs, prompt, images, resume file) | `ready` (session id and file) goes to ready; `fatal`, EOF, invalid or oversized frame, or a 30 s timeout rejects the open and kills the group |
+| ready/running | `ready`; the prompt, if any, was sent by the child's open | `event` frames in order, `usage` snapshots, `log` frames to the parent's log callbacks; `ended` goes to closed |
+| stopping | parent `stop()` sends `stop`, rejects pending steers | `ended` or exit goes to closed; after 10 s the group is killed |
+| closed | `ended`, a `done` event, or exit | the queue ends, pipes close, the process group is killed, the private directory is removed if empty |
+| failed | child exit or EOF without `ended`, invalid frame, oversized frame, queue overflow, unknown tool id | one `error` StepEvent (`retryable: false`) with the redacted stderr tail, then the queue ends; success is never synthesized |
+
+### Every path that reads or writes session state
+
+1. Initialize: the parent resolves the resume file (missing transcript rejects with `SessionNotResumableError` before any child), materializes `models.json`, creates the private directory. The child validates the frame and opens the session. The API key travels in the initialize frame only (private pipe, never argv or env).
+2. Prompt and events: the child sends the prompt in open; the parent receives `ready` first, then the ordered events. `onSession` is called by the parent from `ready`, so only the parent writes the index; the parent rejects a session file outside the private directory or the resume file.
+3. Steer and images: parent `steer` sends a frame with correlation id; the child's `handle.steer` result returns as `steer_reply`. Steering after stopping or closed rejects locally; image bytes are checked by the existing `ensureImageInput`.
+4. Tool request and reply: the child's remote and local tool wrappers send `tool_request` with a correlation id and the declared tool name. The parent runs only tools declared in this session's initialize (`remoteTools`, `localTools`), replies `tool_reply`; an unknown name or id fails the session. No other callback exists, and there is no generic filesystem or command request.
+5. Usage and logs: `usage` snapshots after message ends and at `ended`; the parent returns the last one from `usage()`. `log` frames go to the named parent callbacks (`mcp`, `skills`, `gate`, `trust`, `otel`, `compaction`).
+6. Stop: `stop()` sends `stop`; the child aborts the session, flushes spans, sends `ended` and exits.
+7. Child crash or parent loss: the parent sees exit or EOF and fails as above; the child sees stdin EOF, stops the session and exits.
+8. Invalid or oversized frame: either side treats it as fatal; the child exits, the parent kills the group.
+
+### Failure behaviour
+
+An isolation failure (confiner throws, profile rejected, spawn error) rejects `open` with a scrubbed message and starts nothing. A crash mid-session produces the single error event. Descendants of the child inherit the profile; the group kill is best effort on macOS (a `setsid` descendant outlives the step but stays confined), the same accepted limit as the other harnesses.
+
+### Tests, one per path
+
+- Probe (macOS only, red first): a fake model endpoint scripts Read, Edit and Bash calls against the sentinel token in a denied root, then a Bash call that writes a script into the worktree and runs it; assert no request to the endpoint ever contained the sentinel, the escape file is absent, and a worktree write succeeded. On main the file-tool read succeeds; that run is the recorded negative control.
+- Protocol (any platform, a fake host script): initialize and ready, prompt ordering, steer round trip, tool request and reply (declared, undeclared, unknown id), stop, child crash, oversized frame, invalid frame, confiner throws means no handle and no spawn, stderr is redacted.
+- Policy: the `pi` profile has the same deny set as the other harnesses and own state `[agentDir, private dir, resume file]`.

@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { hostname } from 'node:os';
 import { delimiter, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import type {
   AgentBackend,
@@ -51,10 +53,13 @@ import {
 import { credentialRedactor } from '../credential-output.js';
 import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
 import { compactionCeilingFetch } from './compaction-ceiling.js';
+import type { Launch, SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
+import { EventQueue } from './event-queue.js';
 import { probeModelImageSupport, rememberNoVision } from './image-support.js';
 import { connectFailedLine } from './mcp-config.js';
 import { PiStepSpanSink, runtimeChildEnv } from './otel.js';
+import { openPiHostSession } from './pi-host-client.js';
 import { PI_RETRY_SETTINGS } from './pi-retry.js';
 import { pinProcessEnv, withoutPinnedEnv } from './pinned-env.js';
 import {
@@ -715,54 +720,7 @@ function settledUsage(state: MapState): ModelUsage[] {
   }));
 }
 
-class EventQueue {
-  private readonly items: StepEvent[] = [];
-  private waiter: ((r: IteratorResult<StepEvent>) => void) | null = null;
-  private ended = false;
-
-  push(ev: StepEvent): void {
-    if (this.ended) return;
-    if (this.waiter) {
-      const resolve = this.waiter;
-      this.waiter = null;
-      resolve({ value: ev, done: false });
-      return;
-    }
-    this.items.push(ev);
-  }
-
-  end(): void {
-    if (this.ended) return;
-    this.ended = true;
-    if (this.waiter) {
-      const resolve = this.waiter;
-      this.waiter = null;
-      resolve({ value: undefined as unknown as StepEvent, done: true });
-    }
-  }
-
-  next(): Promise<IteratorResult<StepEvent>> {
-    const item = this.items.shift();
-    if (item !== undefined) return Promise.resolve({ value: item, done: false });
-    if (this.ended) {
-      return Promise.resolve({ value: undefined as unknown as StepEvent, done: true });
-    }
-    return new Promise<IteratorResult<StepEvent>>((resolve) => {
-      this.waiter = resolve;
-    });
-  }
-
-  iterable(): AsyncIterable<StepEvent> {
-    const self = this;
-    return {
-      [Symbol.asyncIterator](): AsyncIterator<StepEvent> {
-        return { next: () => self.next() };
-      },
-    };
-  }
-}
-
-class PiSessionHandle implements AgentSessionHandle {
+export class PiSessionHandle implements AgentSessionHandle {
   readonly sessionId: string;
   readonly sessionFile: string | undefined;
   readonly events: AsyncIterable<StepEvent>;
@@ -777,6 +735,7 @@ class PiSessionHandle implements AgentSessionHandle {
   }[] = [];
   private closed = false;
   private stopping = false;
+  private closing: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly session: AgentSession,
@@ -817,10 +776,15 @@ class PiSessionHandle implements AgentSessionHandle {
     this.closed = true;
     this.rejectPendingSteers();
     this.queue.end();
-    if (this.spans !== undefined) void this.spans.flush();
-    void this.shutdownExtensions().finally(() => {
+    const flushed = this.spans !== undefined ? this.spans.flush() : Promise.resolve();
+    const disposed = this.shutdownExtensions().finally(() => {
       this.session.dispose();
     });
+    this.closing = Promise.allSettled([flushed, disposed]).then(() => undefined);
+  }
+
+  settled(): Promise<void> {
+    return this.closing;
   }
 
   private async shutdownExtensions(): Promise<void> {
@@ -923,6 +887,15 @@ export interface PiBackendOpts {
   onCompactionLog?: (msg: string) => void;
   gateRules?: readonly PermissionRule[];
   machineName?: string;
+  confine?: SessionConfiner;
+  hostLaunch?: () => Launch;
+}
+
+export function piHostLaunch(cliPath: string): Launch {
+  const loader = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href;
+  return cliPath.endsWith('.ts')
+    ? { command: process.execPath, args: ['--import', loader, cliPath, 'pi-host'] }
+    : { command: process.execPath, args: [cliPath, 'pi-host'] };
 }
 
 export class PiBackend implements AgentBackend {
@@ -984,8 +957,20 @@ export class PiBackend implements AgentBackend {
   }
 
   private async open(opts: SessionOpts, resumeFile: string | null): Promise<AgentSessionHandle> {
+    materializeProvider(join(this.opts.agentDir, 'models.json'), opts.provider);
+    const confine = this.opts.confine;
+    if (confine === undefined) return this.openInProcess(opts, resumeFile);
+    return openPiHostSession({
+      backend: this.opts,
+      confine,
+      launch: this.opts.hostLaunch?.() ?? piHostLaunch(process.argv[1] ?? ''),
+      opts,
+      resumeFile,
+    });
+  }
+
+  async openInProcess(opts: SessionOpts, resumeFile: string | null): Promise<PiSessionHandle> {
     const modelsPath = join(this.opts.agentDir, 'models.json');
-    materializeProvider(modelsPath, opts.provider);
     const authPath = join(this.opts.agentDir, 'auth.json');
     const runtime = await ModelRuntime.create({ authPath, modelsPath });
     if (opts.provider.apiKey) {
