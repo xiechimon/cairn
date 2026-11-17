@@ -123,6 +123,9 @@ export interface ChiefToolDeps {
   oauthClient?: OAuthClientConfig | null;
 }
 
+const PROJECT_CREATED_NEXT =
+  "The project exists; a task thread cannot create projects or call the Cairn API. The task text is the owner's words verbatim, so if the owner's message also asks for work inside this project, call create_todo with quotes that cover only that work, never the sentence asking you to create the project.";
+
 export interface ChiefToolCtx {
   teamId: string;
   userId: string;
@@ -763,7 +766,13 @@ export async function executeChiefTool(
         teamId: ctx.teamId,
         ...(optStr(params, 'repoKind') === 'hosted' ? { kind: 'hosted' as const } : {}),
       });
-      return json({ id: row.id, name: row.name, repoKind: row.repoKind, repoName: row.repoName });
+      return json({
+        id: row.id,
+        name: row.name,
+        repoKind: row.repoKind,
+        repoName: row.repoName,
+        next: PROJECT_CREATED_NEXT,
+      });
     }
     case 'update_project': {
       const projectId = str(params, 'projectId');

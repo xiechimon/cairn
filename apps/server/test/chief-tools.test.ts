@@ -201,6 +201,14 @@ describe('create_project', () => {
     expect(existsSync(join(H.s.reposDir, H.teamId, 'mac-otel-demo.git', 'HEAD'))).toBe(true);
   });
 
+  test('the result tells Coordinator to hand a task thread only the work inside the project', async () => {
+    const created = (await relay('create_project', { name: 'Demo', repoKind: 'hosted' })) as {
+      next?: string;
+    };
+    expect(created.next).toMatch(/create_todo with quotes/);
+    expect(created.next).toMatch(/cannot create projects/);
+  });
+
   test('a plain project has no repository', async () => {
     const created = (await relay('create_project', { name: 'Notes' })) as { id: string };
     const listed = await req(H.s.app, 'GET', '/api/projects');
