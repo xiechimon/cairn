@@ -93,6 +93,12 @@ beforeAll(async () => {
       },
     },
     { toolCall: { id: 'call-get-secret', name: 'get_secret', arguments: { name: 'EXA_API_KEY' } } },
+    {
+      toolCall: {
+        name: 'bash',
+        arguments: { command: 'printf "sharding notes\\n" >> NOTES.md' },
+      },
+    },
     { content: `report written. ${REPORT_MARK}` },
   ]);
   server = await bootRealServer({
@@ -176,7 +182,7 @@ describe('Phase 1b: a pi step uses web_search through the daemon tool', () => {
     expect(started.status).toBe(201);
     const buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    await waitFor(() => ['review', 'done'].includes(server.todoPhase(todoId) ?? ''), 120_000);
+    await waitFor(() => server.todoPhase(todoId) === 'done', 120_000);
 
     const messagesRes = await api(server.url, 'GET', `/api/conversations/${buildId}/messages`);
     expect(messagesRes.status).toBe(200);

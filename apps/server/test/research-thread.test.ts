@@ -106,7 +106,14 @@ describe('openResearchThread', () => {
           name: 'Research host',
           online: true,
           claudeCodeReport: { installed: true, hostname: 'Research host', models: [] },
-          capabilities: { mcpServers: [], skills: [], executor: 'host' },
+          capabilities: {
+            mcpServers: [],
+            skills: [],
+            executor: 'host',
+            computer: true,
+            browser: true,
+            computerKind: 'vm',
+          },
         }),
       )
       .run();
