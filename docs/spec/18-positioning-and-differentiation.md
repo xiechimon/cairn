@@ -114,7 +114,7 @@ Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (
 - Chief autonomous dispatch — first want "shutdown without breaking the chain", not "still deciding on its own when shut down".
 - Team features (owner decision, 2026-11-14): channels shared by several people, team roles and permissions, team billing. Another person uses cairn by running their own copy.
 - Gantt view / multiple workspaces / third-party Git (Forgejo / Gitea / GitLab) — meaningless for one person, killed outright.
-- Directly chasing Multica's integration-surface breadth — partially revised (owner decision, 2026-11-17): Electron desktop on all three OSes is decided (Windows and Linux join the shipped macOS app), and Telegram + WeChat iLink are the IM entries. Further IM platforms and further surfaces stay "possible future C class". Phone access without IM is Tailscale; embedded tsnet with automatic LAN / tailnet / optional Funnel routing is planned, and a hosted relay may come later.
+- Directly chasing Multica's integration-surface breadth — partially revised (owner decision, 2026-11-17): Electron desktop on all three OSes is decided (Windows and Linux join the shipped macOS app), and Telegram, Slack (DM-only) and WeChat iLink are the IM entries. Further IM platforms and further surfaces stay "possible future C class". Phone access without IM is Tailscale; embedded tsnet with automatic LAN / tailnet / optional Funnel routing is planned, and a hosted relay may come later.
 - todos.dev baseline re-photography and pixel parity — volume 06 D1 released the parity obligation.
 
 (Multica's three philosophical tenets see §3.3, not entering this section.)

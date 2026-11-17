@@ -12,6 +12,7 @@ What launch needs, split by who can do it. The left column a lane can ship; the 
 | 4 | npm publish access for `@xiechimon/cairn` on the release runner | The `npx` install path must keep working alongside desktop apps | `scripts/ops/` |
 | 5 | Telegram bot token via @BotFather | IM entry cannot pair without it | secrets UI once the adapter lands |
 | 6 | WeChat iLink bot registration + QR pairing on the owner's account | The WeChat adapter needs a live bot token; personal WeChat ≥ 8.0.69, one bot per account | `docs/design/im-connections.md` |
+| 6b | Slack app in the owner's workspace (xapp- + xoxb- tokens, Socket Mode + DM scope) | The Slack adapter pairs against a per-workspace app; each user creates their own | `docs/design/im-connections.md` |
 | 7 | Composio account + API key | The consumer-app catalog decision routes through Composio | connector settings |
 | 8 | Decide the tailnet policy: Funnel exposure on/off for remote phone reach | Phone reach without IM rides the tailnet; exposure is the owner's call | `docs/ops/self-deploy.md` |
 | 9 | GitHub repo secrets for desktop-release secrets (signing material) | Release workflow needs them once certs exist | repo settings |

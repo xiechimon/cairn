@@ -17,7 +17,7 @@ Lanes add an entry when they land or revise a ruling, keyed `area.topic`.
 - **positioning.eval-scope** (2026-11-16, §1) — Evaluation and harness self-improvement stay in scope; judged adoption and self-evolution are not built (the in-repo bench and adoption judge were removed on 2026-11-16).
 - **positioning.action-bound-approvals** (2026-11-17, §3.5) — Approvals bind the irreversible-action boundary, not a mandatory lifecycle stage: merge/send/submit-class actions gate at the moment of effect via the action registry; the phase machine stays as the work-lifecycle spine for code output.
 - **positioning.desktop-x3** (2026-11-17, §4) — Electron desktop on all three OSes is decided; Windows and Linux join the shipped macOS app.
-- **positioning.im-entry** (2026-11-17, §4) — Chat apps are entry points, not the residence: Telegram and WeChat iLink are the IM entries; further platforms stay C class.
+- **positioning.im-entry** (2026-11-17, §4) — Chat apps are entry points, not the residence: Telegram, Slack (DM-only) and WeChat iLink are the IM entries; further platforms stay C class.
 - **positioning.roadmap-board** (2026-11-17, §1) — Remaining direction work is tracked on the owner's roadmap board as the single checklist entry; no in-repo plan tracker.
 ## docs/spec/19-test-layering-and-blast-radius.md
 

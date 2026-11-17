@@ -39,7 +39,7 @@
     {
       "id": "positioning.im-entry",
       "date": "2026-11-17",
-      "ruling": "Chat apps are entry points, not the residence: Telegram and WeChat iLink are the IM entries; further platforms stay C class.",
+      "ruling": "Chat apps are entry points, not the residence: Telegram, Slack (DM-only) and WeChat iLink are the IM entries; further platforms stay C class.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
       "section": "§4"
     },
