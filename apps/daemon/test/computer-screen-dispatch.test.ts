@@ -9,6 +9,7 @@ const call = (tool: ComputerCall['tool']): ComputerCall => ({
   tool,
   params: { app: 'nautilus' },
   deadlineAt: Date.now() + 60_000,
+  ownComputerGrant: { proposalId: 'grant-1', key: 'nautilus' },
 });
 
 const finished: ScreenOutcome = { kind: 'done', text: 'observed', images: [] };

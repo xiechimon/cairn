@@ -193,19 +193,36 @@ describe('D75 own computer opt-in', () => {
       capEnv,
     });
     await waitFor(() => api.presenceBodies.length > 0 || api.enrollBodies.length > 0);
-    const caps = (api.enrollBodies[0] as { capabilities?: { ownComputer?: true } }).capabilities;
+    const caps = (
+      api.enrollBodies[0] as {
+        capabilities?: { ownComputer?: true; ownComputerHost?: true; ownComputerShell?: true };
+      }
+    ).capabilities;
     await handle.stop();
     await handle.done;
     return caps;
   };
 
-  test('CAIRN_OWN_COMPUTER=1 reports ownComputer', async () => {
-    expect((await report({ CAIRN_OWN_COMPUTER: '1' }))?.ownComputer).toBe(true);
+  test('CAIRN_OWN_COMPUTER=1 reports the host shell, not the verified screen', async () => {
+    const caps = await report({ CAIRN_OWN_COMPUTER: '1' });
+    expect(caps?.ownComputerShell).toBe(true);
+    expect(caps?.ownComputer).toBeUndefined();
   });
 
   test('without the switch the machine does not report ownComputer', async () => {
     expect((await report({}))?.ownComputer).toBeUndefined();
-    expect((await report({ CAIRN_OWN_COMPUTER: 'true' }))?.ownComputer).toBeUndefined();
+    expect((await report({ CAIRN_OWN_COMPUTER: 'true' }))?.ownComputerShell).toBeUndefined();
+  });
+
+  test('a set agent-desktop path reports the host; a binary off the pinned digest omits ownComputer', async () => {
+    const dir = testTempDir('tampered-agent-desktop-');
+    const binary = join(dir, 'agent-desktop');
+    writeFileSync(binary, '#!/bin/sh\necho \'{"ok":true,"data":{"version":"1.1.0"}}\'\n', {
+      mode: 0o755,
+    });
+    const caps = await report({ CAIRN_AGENT_DESKTOP: binary });
+    expect(caps?.ownComputerHost).toBe(true);
+    expect(caps?.ownComputer).toBeUndefined();
   });
 });
 

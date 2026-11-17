@@ -85,6 +85,9 @@ function call(
     tool,
     params,
     deadlineAt: Date.now() + 60_000,
+    ...(tool === 'user_computer_shell' && typeof params.command === 'string'
+      ? { ownComputerGrant: { proposalId: 'grant-1', key: params.command } }
+      : {}),
     ...extra,
   } satisfies ComputerCall;
 }

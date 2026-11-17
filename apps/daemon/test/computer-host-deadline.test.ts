@@ -50,6 +50,7 @@ test('shutdown after host start retains ambiguous delivery', async () => {
       stepId: 'step',
       tool: 'user_computer_shell',
       params: { command: 'true' },
+      ownComputerGrant: { proposalId: 'grant-1', key: 'true' },
       deadlineAt: Date.now() + 60000,
     });
     expect(existsSync(marker)).toBe(true);
@@ -79,6 +80,7 @@ test('a completed command keeps its result while output drains past the executio
       stepId: 'step',
       tool: 'user_computer_shell',
       params: { command: 'true' },
+      ownComputerGrant: { proposalId: 'grant-1', key: 'true' },
       deadlineAt: Date.now() + 60000,
     });
     expect(frames.at(-1)).toMatchObject({ kind: 'done', exitCode: 0 });
@@ -229,6 +231,10 @@ describe.each(['realpath', 'stat'] as const)('host preflight delayed at %s', (st
         stepId: 'step',
         tool: 'user_computer_shell',
         params: { command: `printf late > '${marker.replaceAll("'", "'\\''")}'` },
+        ownComputerGrant: {
+          proposalId: 'grant-1',
+          key: `printf late > '${marker.replaceAll("'", "'\\''")}'`,
+        },
         deadlineAt: Date.now() + 6100,
       });
       await gate.started;
@@ -300,6 +306,10 @@ describe.each(['realpath', 'stat'] as const)('host preflight delayed at %s', (st
         stepId: 'step',
         tool: 'user_computer_shell',
         params: { command: `printf late > '${marker.replaceAll("'", "'\\''")}'` },
+        ownComputerGrant: {
+          proposalId: 'grant-1',
+          key: `printf late > '${marker.replaceAll("'", "'\\''")}'`,
+        },
         deadlineAt: Date.now() + 6100,
       });
       await gate.started;

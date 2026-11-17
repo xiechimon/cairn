@@ -78,7 +78,7 @@ describe('HostPermissionsProbe', () => {
     const probe = new HostPermissionsProbe(
       async () => {
         runs++;
-        return STATUS_LINUX;
+        return STATUS_LINUX.replace('"unknown"', '"not_required"');
       },
       () => clock,
     );

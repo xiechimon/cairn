@@ -54,6 +54,7 @@ const running = dispatcher.dispatch({
   stepId: 'step',
   tool: 'user_computer_shell',
   params: { command: 'true' },
+  ownComputerGrant: { proposalId: 'grant-1', key: 'true' },
   deadlineAt: Date.now() + 60000,
 });
 await firstAttempt;

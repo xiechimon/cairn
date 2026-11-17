@@ -38,6 +38,20 @@ export async function isDaemonProcess(
   return false;
 }
 
+export async function isOwnFamily(
+  pid: number,
+  daemonPid: number = process.pid,
+  parentOf: ParentOf = parentOfProcess,
+): Promise<boolean> {
+  if (await isDaemonProcess(pid, daemonPid, parentOf)) return true;
+  let ancestor = await parentOf(daemonPid);
+  for (let depth = 0; depth < MAX_DEPTH && ancestor !== undefined && ancestor > 1; depth += 1) {
+    if (ancestor === pid) return true;
+    ancestor = await parentOf(ancestor);
+  }
+  return false;
+}
+
 export function isBrowserApp(appName: string): boolean {
   return BROWSER_NAME.test(appName);
 }

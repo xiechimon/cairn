@@ -19,6 +19,7 @@ import {
   COMPUTER_COMMAND_TIMEOUT_MS,
   createComputerDispatcher,
   NO_COMPUTER_PROVIDER_MESSAGE,
+  NO_OWNER_GRANT_MESSAGE,
 } from '../src/computer/dispatch.js';
 import { OUTPUT_TRUNCATED_MARKER } from '../src/computer/frame-poster.js';
 import { HostComputerProvider } from '../src/computer/host.js';
@@ -82,6 +83,7 @@ function call(
     tool: 'user_computer_shell',
     params: { command: command ?? 'echo hi', ...(cwd !== undefined ? { cwd } : {}) },
     deadlineAt: Date.now() + 60_000,
+    ownComputerGrant: { proposalId: 'grant-1', key: command ?? 'echo hi' },
     ...rest,
   };
 }
@@ -184,7 +186,13 @@ describe('computer dispatcher: refusals post one not-delivered error and run not
     );
     expect(provider.executed).toEqual([]);
     expect(api.frames).toEqual([
-      { kind: 'error', seq: 1, message: NO_COMPUTER_PROVIDER_MESSAGE, delivery: 'not_delivered' },
+      {
+        kind: 'error',
+        seq: 1,
+        message:
+          tool === 'user_computer_act' ? NO_OWNER_GRANT_MESSAGE : NO_COMPUTER_PROVIDER_MESSAGE,
+        delivery: 'not_delivered',
+      },
     ]);
   });
 

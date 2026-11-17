@@ -640,7 +640,7 @@ describe('failures', () => {
         fullShot(solidPng(8, 8)),
         { command: 'click', fixture: 'click-semantic-ok', delayMs: 10_000 },
       ],
-      { commandTimeoutMs: 300 },
+      { commandTimeoutMs: 2_000 },
     );
     done(await fake.screen.observe(call({ app: 'nautilus' })));
     const started = Date.now();

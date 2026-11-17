@@ -33,6 +33,7 @@ export const machineRecordSchema = z.object({
   capabilities: machineCapabilitiesSchema.nullish(),
   browserOverride: z.boolean().nullable().optional(),
   desktopOverride: z.boolean().nullable().optional(),
+  ownComputerEnabled: z.boolean().optional(),
   claudeLogin: claudeLoginSchema.optional(),
 });
 export type MachineRecord = z.infer<typeof machineRecordSchema>;
@@ -43,6 +44,7 @@ export const patchMachineBodySchema = z.object({
   enabledRuntimes: z.array(z.enum(MACHINE_RUNTIMES)).optional(),
   maxConcurrent: z.number().int().min(1).max(16).nullable().optional(),
   isDefault: z.literal(true).optional(),
+  ownComputerEnabled: z.boolean().optional(),
 });
 export type PatchMachineBody = z.infer<typeof patchMachineBodySchema>;
 

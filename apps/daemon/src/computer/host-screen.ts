@@ -1,16 +1,24 @@
 import { execFile } from 'node:child_process';
-import { chmodSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { chmodSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { COMPUTER_IMAGE_MAX_BASE64_CHARS, type ComputerImage } from '@cairn/shared';
+import {
+  AGENT_DESKTOP_VERSION,
+  agentDesktopRelease,
+  COMPUTER_IMAGE_MAX_BASE64_CHARS,
+  type ComputerImage,
+  OWN_COMPUTER_NO_ACCESSIBILITY,
+} from '@cairn/shared';
 import { z } from 'zod';
 import { hostCommandEnvironment } from './host.js';
 import { fitPngUnderCap } from './host-screen-png.js';
 import { type AccessibilityNode, accessibilityRows } from './host-screen-rows.js';
-import { isBrowserApp, isDaemonProcess, originHosts, showsCairn } from './host-screen-self.js';
+import { isBrowserApp, isOwnFamily, originHosts, showsCairn } from './host-screen-self.js';
 
-export const AGENT_DESKTOP_VERSION = '1.1.0';
+const PERM_DENIED = 'PERM_DENIED';
+const VERSION_TIMEOUT_MS = 15_000;
 export const SCREEN_MAX_ACTIONS = 24;
 export const SCREEN_MAX_WAIT_MS = 10_000;
 export const SCREEN_IMAGE_EDGES: readonly number[] = [1568, 1024, 640];
@@ -126,30 +134,118 @@ export interface AgentDesktopHostScreenOptions {
   env?: NodeJS.ProcessEnv;
   cairnOrigins?: readonly string[];
   isOwnProcess?: (pid: number) => Promise<boolean>;
+  onPermissionDenied?: () => void;
   commandTimeoutMs?: number;
   outputCapBytes?: number;
   imageMaxBase64Chars?: number;
   now?: () => number;
 }
 
-export function defaultAgentDesktopBinary(home: string = homedir()): string {
-  return path.join(
-    home,
-    '.cairn',
-    'tools',
-    'agent-desktop',
-    AGENT_DESKTOP_VERSION,
-    'agent-desktop',
+export function agentDesktopBinary(env: NodeJS.ProcessEnv): string {
+  return (
+    env.CAIRN_AGENT_DESKTOP ||
+    path.join(
+      env.HOME ?? homedir(),
+      '.cairn',
+      'tools',
+      'agent-desktop',
+      AGENT_DESKTOP_VERSION,
+      'agent-desktop',
+    )
   );
 }
 
-export function createHostScreenFromEnv(env: NodeJS.ProcessEnv): HostScreen | undefined {
-  if (env.CAIRN_OWN_COMPUTER !== '1') return undefined;
+export function createHostScreenFromEnv(
+  env: NodeJS.ProcessEnv,
+  options: Pick<AgentDesktopHostScreenOptions, 'isOwnProcess' | 'onPermissionDenied'> = {},
+): HostScreen | undefined {
+  if (!env.CAIRN_AGENT_DESKTOP) return undefined;
   return new AgentDesktopHostScreen({
     env,
-    ...(env.CAIRN_AGENT_DESKTOP ? { binary: env.CAIRN_AGENT_DESKTOP } : {}),
+    binary: agentDesktopBinary(env),
     cairnOrigins: (env.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
+    ...options,
   });
+}
+
+export type RunVersion = () => Promise<string | null>;
+
+export function runAgentDesktopVersion(binary: string): RunVersion {
+  return () =>
+    new Promise((resolve) => {
+      execFile(
+        binary,
+        ['version'],
+        { timeout: VERSION_TIMEOUT_MS, maxBuffer: 64 * 1024, encoding: 'utf8' },
+        (error, stdout) => {
+          if (error) return resolve(null);
+          try {
+            const version = (JSON.parse(stdout) as { data?: { version?: unknown } }).data?.version;
+            resolve(typeof version === 'string' ? version : null);
+          } catch {
+            resolve(null);
+          }
+        },
+      );
+    });
+}
+
+export class AgentDesktopVerifier {
+  private readonly binary: string;
+  private readonly expectedSha256: string | null;
+  private readonly runVersion: RunVersion;
+  private checkedMtime: number | null = null;
+  private verified = false;
+  private running: Promise<void> | null = null;
+
+  constructor(options: {
+    binary: string;
+    expectedSha256?: string | null;
+    runVersion?: RunVersion;
+  }) {
+    this.binary = options.binary;
+    this.expectedSha256 =
+      options.expectedSha256 === undefined
+        ? (agentDesktopRelease(process.arch)?.binarySha256 ?? null)
+        : options.expectedSha256;
+    this.runVersion = options.runVersion ?? runAgentDesktopVersion(options.binary);
+  }
+
+  current(): boolean {
+    let mtime: number;
+    try {
+      mtime = statSync(this.binary).mtimeMs;
+    } catch {
+      this.checkedMtime = null;
+      this.verified = false;
+      return false;
+    }
+    if (this.running === null && mtime !== this.checkedMtime) {
+      this.checkedMtime = mtime;
+      this.verified = false;
+      this.running = this.verify().then((verified) => {
+        this.verified = verified;
+        this.running = null;
+      });
+    }
+    return this.verified;
+  }
+
+  settled(): Promise<void> {
+    return this.running ?? Promise.resolve();
+  }
+
+  private async verify(): Promise<boolean> {
+    if (this.expectedSha256 === null) return false;
+    let digest: string;
+    try {
+      digest = createHash('sha256').update(readFileSync(this.binary)).digest('hex');
+    } catch {
+      return false;
+    }
+    if (digest !== this.expectedSha256) return false;
+    return (await this.runVersion()) === AGENT_DESKTOP_VERSION;
+  }
 }
 
 function refuse(message: string): Stop {
@@ -169,6 +265,7 @@ export class AgentDesktopHostScreen implements HostScreen {
   private readonly env: NodeJS.ProcessEnv;
   private readonly hosts: string[];
   private readonly isOwnProcess: (pid: number) => Promise<boolean>;
+  private readonly onPermissionDenied: (() => void) | undefined;
   private readonly commandTimeoutMs: number;
   private readonly outputCapBytes: number;
   private readonly imageMaxBase64Chars: number;
@@ -181,10 +278,11 @@ export class AgentDesktopHostScreen implements HostScreen {
   constructor(options: AgentDesktopHostScreenOptions = {}) {
     this.env = options.env ?? process.env;
     const home = this.env.HOME ?? homedir();
-    this.binary = options.binary ?? defaultAgentDesktopBinary(home);
+    this.binary = options.binary ?? agentDesktopBinary({ ...this.env, HOME: home });
     this.stateDir = options.stateDir ?? path.join(path.dirname(this.binary), 'state');
     this.hosts = originHosts(options.cairnOrigins ?? []);
-    this.isOwnProcess = options.isOwnProcess ?? ((pid) => isDaemonProcess(pid));
+    this.isOwnProcess = options.isOwnProcess ?? ((pid) => isOwnFamily(pid));
+    this.onPermissionDenied = options.onPermissionDenied;
     this.commandTimeoutMs = options.commandTimeoutMs ?? SCREEN_COMMAND_TIMEOUT_MS;
     this.outputCapBytes = options.outputCapBytes ?? SCREEN_OUTPUT_CAP_BYTES;
     this.imageMaxBase64Chars = options.imageMaxBase64Chars ?? COMPUTER_IMAGE_MAX_BASE64_CHARS;
@@ -344,6 +442,7 @@ export class AgentDesktopHostScreen implements HostScreen {
           try {
             const envelope = JSON.parse(stdout) as AgentDesktopEnvelope;
             if (typeof envelope?.ok === 'boolean') {
+              if (!envelope.ok && envelope.error?.code === PERM_DENIED) this.onPermissionDenied?.();
               return resolve({ kind: 'envelope', envelope, raw: stdout.trim() });
             }
           } catch {}
@@ -376,6 +475,12 @@ export class AgentDesktopHostScreen implements HostScreen {
   ): Promise<{ ok: true; data: unknown } | { ok: false; raw: string; code: string }> {
     const result = await this.run(args, call, budget);
     if (result.kind === 'failed') throw this.failure(result, 0, `agent-desktop ${args[0]}`);
+    if (
+      !result.envelope.ok &&
+      result.envelope.error?.code === PERM_DENIED &&
+      args[0] !== 'screenshot'
+    )
+      throw refuse(OWN_COMPUTER_NO_ACCESSIBILITY(hostname()));
     return result.envelope.ok
       ? { ok: true, data: result.envelope.data }
       : { ok: false, raw: result.raw, code: result.envelope.error?.code ?? 'INTERNAL' };
@@ -540,6 +645,12 @@ export class AgentDesktopHostScreen implements HostScreen {
     const label = `Action ${index + 1} (${action.kind})`;
     if (result.kind === 'failed') throw this.failure(result, ran, label);
     if (result.envelope.ok) return result.envelope.data;
+    if (result.envelope.error?.code === PERM_DENIED)
+      throw new Stop({
+        kind: 'error',
+        message: OWN_COMPUTER_NO_ACCESSIBILITY(hostname()),
+        delivery: ran === 0 ? 'not_delivered' : 'unknown',
+      });
     const retry = result.envelope.error?.disposition?.retry;
     const delivery = retry === 'safe' && ran === 0 ? 'not_delivered' : 'unknown';
     const completed = ran > 0 ? ` ${ran} earlier action(s) already ran.` : '';

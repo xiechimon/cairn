@@ -254,6 +254,7 @@ test.each(['direct', 'nested', 'heredoc'] as const)(
         stepId: 'step',
         tool: 'user_computer_shell',
         params: { command },
+        ownComputerGrant: { proposalId: 'grant-1', key: command },
         deadlineAt: Date.now() + 60000,
       });
       expect(executed).toBe(0);

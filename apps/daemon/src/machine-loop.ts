@@ -41,7 +41,12 @@ import type { ComputerDesktops } from './computer/desktops.js';
 import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
 import { HostDesktops } from './computer/host-desktop.js';
-import { createHostScreenFromEnv, type HostScreen } from './computer/host-screen.js';
+import {
+  AgentDesktopVerifier,
+  agentDesktopBinary,
+  createHostScreenFromEnv,
+  type HostScreen,
+} from './computer/host-screen.js';
 import { ComputerInputFence } from './computer/input-fence.js';
 import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
@@ -50,7 +55,7 @@ import { createComputerScreenProvider } from './computer/screen-provider.js';
 import { VmDesktops } from './computer/vm-desktop.js';
 import { VmRuntime } from './computer/vm-runtime.js';
 import type { DaemonConfig } from './config.js';
-import { HostPermissionsProbe } from './host-permissions.js';
+import { createHostPermissionsProbe, type HostPermissionsProbe } from './host-permissions.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
@@ -240,7 +245,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const hostComputer =
     opts.hostComputer ??
     (capEnv.CAIRN_OWN_COMPUTER === '1' ? new HostComputerProvider() : undefined);
-  const hostScreen = opts.hostScreen ?? createHostScreenFromEnv(capEnv);
+  const hostPermissionsProbe = opts.hostPermissionsProbe ?? createHostPermissionsProbe(capEnv);
+  const hostScreen =
+    opts.hostScreen ??
+    createHostScreenFromEnv(capEnv, {
+      onPermissionDenied: () => hostPermissionsProbe.refreshNow(),
+    });
+  const ownComputerHost = Boolean(capEnv.CAIRN_AGENT_DESKTOP);
+  const agentDesktop = ownComputerHost
+    ? new AgentDesktopVerifier({ binary: agentDesktopBinary(capEnv) })
+    : undefined;
   const enrolledIdentity = { machineId: '' };
   const computerInputLocks = join(paths.home, 'computer-input');
   const inputFence = new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId);
@@ -277,7 +291,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const orbComputer = opts.orbComputer ?? hostDesktops;
   const agentReach = new AgentReachProbe(undefined, undefined, () => agentReachEnabled(paths.home));
   const scrapling = new ScraplingProbe(() => readScrapling(paths.home));
-  const hostPermissionsProbe = opts.hostPermissionsProbe ?? new HostPermissionsProbe();
   const capabilitiesReport = (): MachineCapabilities => {
     const reach = agentReach.current();
     const scraper = scrapling.current();
@@ -298,7 +311,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         : {}),
       ...(hostDesktops?.offersStealthBrowser() ? { stealthBrowser: true as const } : {}),
       ...(hostDesktops ? { computerKind: hostDesktops.kind } : {}),
-      ...(hostComputer ? { ownComputer: true as const } : {}),
+      ...(hostComputer ? { ownComputerShell: true as const } : {}),
+      ...(ownComputerHost ? { ownComputerHost: true as const } : {}),
+      ...(agentDesktop?.current() ? { ownComputer: true as const } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(scraper !== undefined ? { scrapling: scraper } : {}),
       ...(hostPermissions !== undefined ? { hostPermissions } : {}),
@@ -848,6 +863,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'stop') void deliverStop(ev.stepId);
             if (ev.type === 'sync') void deliverSync(ev.sync);
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
+            if (ev.type === 'computer.cancel') computerDispatcher.cancel(ev.callId);
             if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
           },
           () => {

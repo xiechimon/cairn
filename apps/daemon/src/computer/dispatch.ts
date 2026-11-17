@@ -6,6 +6,7 @@ import {
   computerManageParamsSchema,
   INSTALL_PACKAGES_TIMEOUT_MS,
   installPackagesParamsSchema,
+  ownComputerGrantKey,
   PACKAGES_INSTALLED_PREFIX,
 } from '@cairn/shared';
 import { z } from 'zod';
@@ -32,6 +33,8 @@ import {
 
 export const NO_COMPUTER_PROVIDER_MESSAGE = 'This machine has no computer provider';
 export const NO_COMPUTER_SCOPE_MESSAGE = 'The call names no computer';
+export const NO_OWNER_GRANT_MESSAGE =
+  'The owner did not approve this call on their Mac, so it was not run; update the Cairn server';
 export const NO_VM_COMPUTER_MESSAGE =
   'Only the Coordinator VM computer can install system packages or be stopped, updated, recovered or reset';
 const INSTALL_SUMMARY_LINES = 12;
@@ -111,7 +114,19 @@ export interface ComputerDispatcherOptions {
 
 export interface ComputerDispatcher {
   dispatch(call: ComputerCall): Promise<void>;
+  cancel(callId: string): void;
   close(): Promise<void>;
+}
+
+function ownerGrantMissing(call: ComputerCall): boolean {
+  if (
+    call.tool !== 'user_computer_shell' &&
+    call.tool !== 'user_computer_observe' &&
+    call.tool !== 'user_computer_act'
+  )
+    return false;
+  const key = ownComputerGrantKey(call.tool, call.params);
+  return key === null || call.ownComputerGrant?.key !== key;
 }
 
 function lastLines(text: string, count: number): string {
@@ -554,6 +569,10 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
   }
 
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
+    if (ownerGrantMissing(call)) {
+      await refuse(call, NO_OWNER_GRANT_MESSAGE);
+      return;
+    }
     if (call.tool === 'install_packages') {
       await handleInstall(call, controller);
       return;
@@ -614,6 +633,9 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         .finally(() => inFlight.delete(call.callId));
       inFlight.set(call.callId, { controller, settled });
       await settled;
+    },
+    cancel(callId) {
+      inFlight.get(callId)?.controller.abort('cancelled');
     },
     async close() {
       closing = true;

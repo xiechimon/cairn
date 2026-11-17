@@ -1,10 +1,10 @@
 import { execFile } from 'node:child_process';
-import { homedir } from 'node:os';
 import { type HostPermissions, hostPermissionsSchema } from '@cairn/shared';
 import { z } from 'zod';
-import { defaultAgentDesktopBinary } from './computer/host-screen.js';
+import { agentDesktopBinary } from './computer/host-screen.js';
 
 export const HOST_PERMISSIONS_REFRESH_MS = 10 * 60_000;
+export const HOST_PERMISSIONS_DENIED_REFRESH_MS = 30_000;
 const STATUS_TIMEOUT_MS = 15_000;
 
 const statusOutputSchema = z.object({
@@ -49,25 +49,47 @@ const runStatus =
       );
     });
 
+const SETTLED = new Set(['granted', 'not_required']);
+
+function refreshAfter(report: HostPermissions | undefined): number {
+  return report !== undefined &&
+    SETTLED.has(report.accessibility) &&
+    SETTLED.has(report.screenRecording)
+    ? HOST_PERMISSIONS_REFRESH_MS
+    : HOST_PERMISSIONS_DENIED_REFRESH_MS;
+}
+
+export function createHostPermissionsProbe(env: NodeJS.ProcessEnv): HostPermissionsProbe {
+  return new HostPermissionsProbe(runStatus(agentDesktopBinary(env)));
+}
+
 export class HostPermissionsProbe {
   private report: HostPermissions | undefined;
   private checkedAt = Number.NEGATIVE_INFINITY;
   private running: Promise<void> | null = null;
 
   constructor(
-    private readonly run: RunStatus = runStatus(defaultAgentDesktopBinary(homedir())),
+    private readonly run: RunStatus,
     private readonly now: () => number = Date.now,
   ) {}
 
   current(): HostPermissions | undefined {
-    if (this.running === null && this.now() - this.checkedAt >= HOST_PERMISSIONS_REFRESH_MS) {
-      this.checkedAt = this.now();
-      this.running = this.run().then((stdout) => {
-        this.report = stdout === null ? undefined : parseAgentDesktopStatus(stdout);
-        this.running = null;
-      });
+    if (this.running === null && this.now() - this.checkedAt >= refreshAfter(this.report)) {
+      this.start();
     }
     return this.report;
+  }
+
+  refreshNow(): void {
+    if (this.running === null) this.start();
+  }
+
+  private start(): void {
+    this.checkedAt = this.now();
+    this.running = this.run().then((stdout) => {
+      this.report = stdout === null ? undefined : parseAgentDesktopStatus(stdout);
+      this.running = null;
+    });
   }
 
   settled(): Promise<void> {

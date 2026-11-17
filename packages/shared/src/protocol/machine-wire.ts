@@ -26,6 +26,7 @@ import {
   remoteToolDefSchema,
 } from './chief-tools.js';
 import {
+  computerCallIdSchema,
   computerCallSchema,
   machineComputerFramesBodySchema,
   machineComputerFramesResponseSchema,
@@ -321,6 +322,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('stop'), stepId: recordId }),
   z.object({ type: z.literal('sync'), sync: machineSyncCommandSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
+  z.object({ type: z.literal('computer.cancel'), callId: computerCallIdSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
 ]);
 export type MachineStreamEvent = z.infer<typeof machineStreamEventSchema>;

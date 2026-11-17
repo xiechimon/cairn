@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { epochMs, recordId } from '../records/common.js';
+import { ownComputerGrantStampSchema } from './own-computer.js';
 
 export const COMPUTER_TOOLS = [
   'shell',
@@ -116,6 +117,7 @@ export const computerCallSchema = z.object({
     .array(z.strictObject({ name: z.string(), origin: z.string(), value: z.string() }))
     .optional(),
   browserLicense: z.string().min(1).max(4096).optional(),
+  ownComputerGrant: ownComputerGrantStampSchema.optional(),
 });
 export type ComputerCall = z.infer<typeof computerCallSchema>;
 
