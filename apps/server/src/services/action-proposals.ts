@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
 import {
   ACTION_PROPOSAL_TTL_MS,
+  type ActionEntry,
   ASK_USER_QUESTION_KIND,
   type AskUserQuestion,
   type AskUserQuestionContent,
+  isExternalActionClass,
   OWN_COMPUTER_ACTIONS,
   OWN_COMPUTER_ALLOW_COMMAND,
   OWN_COMPUTER_ALLOW_CONVERSATION,
@@ -11,6 +13,7 @@ import {
   OWN_COMPUTER_APP_ACTION,
   OWN_COMPUTER_DENY,
   OWN_COMPUTER_SHELL_ACTION,
+  SLICE1_ACTIONS,
   type UserRecord,
 } from '@cairn/shared';
 import { and, eq, inArray, lte } from 'drizzle-orm';
@@ -44,6 +47,7 @@ import { deleteTodo } from './todos.js';
 
 export const APPROVE_CHOICE = '批准执行';
 export const REFUSE_CHOICE = '不执行';
+export const ALWAYS_CHOICE = '以后都允许';
 
 type ProposalStatus = 'pending' | 'refused' | 'executed' | 'failed' | 'expired' | 'superseded';
 export type Decision = 'refuse' | 'allow-once' | 'always' | 'conversation';
@@ -75,6 +79,11 @@ export interface AnswerDeps {
   reposDir: string;
   hub: TeamStreamHub;
   user: UserRecord;
+  registry?: readonly ActionEntry[];
+}
+
+function entryOf(deps: AnswerDeps, actionId: string): ActionEntry | undefined {
+  return (deps.registry ?? SLICE1_ACTIONS).find((entry) => entry.id === actionId);
 }
 
 export const proposalCardId = (proposalId: string) => `${APPROVAL_CARD_ID_PREFIX}${proposalId}`;
@@ -204,7 +213,9 @@ const OWN_COMPUTER_CHOICES: Record<Decision, string> = {
 
 function choiceOf(actionId: string, decision: Decision): string {
   if (OWN_COMPUTER_ACTIONS.includes(actionId)) return OWN_COMPUTER_CHOICES[decision];
-  return decision === 'allow-once' ? APPROVE_CHOICE : REFUSE_CHOICE;
+  if (decision === 'allow-once') return APPROVE_CHOICE;
+  if (decision === 'always') return ALWAYS_CHOICE;
+  return REFUSE_CHOICE;
 }
 
 function settleCard(
@@ -425,6 +436,8 @@ function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: numb
     journal(tx, row, 'run', now);
     return;
   }
+  const entry = entryOf(deps, row.actionId);
+  if (entry !== undefined && isExternalActionClass(entry.class)) return;
   if (row.actionId === 'todo.delete') {
     runTodoDelete(deps, tx, row, now);
     return;
@@ -479,7 +492,9 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
       }
       const standing =
         (input.decision === 'conversation' && row.actionId === OWN_COMPUTER_APP_ACTION) ||
-        (input.decision === 'always' && row.actionId === OWN_COMPUTER_SHELL_ACTION);
+        (input.decision === 'always' &&
+          (row.actionId === OWN_COMPUTER_SHELL_ACTION ||
+            entryOf(deps, row.actionId)?.standingGrant === true));
       if ((input.decision === 'always' || input.decision === 'conversation') && !standing)
         throw new HttpError(409, 'standing grant not offered');
       if (input.decision === 'refuse') {
@@ -530,7 +545,10 @@ function markWake(db: Db, id: string, state: 'delivered' | 'undeliverable') {
   db.update(actionWakeOutbox).set({ state }).where(eq(actionWakeOutbox.id, id)).run();
 }
 
-export function dispatchActionWakes(deps: ChiefDeps): { delivered: number; undeliverable: number } {
+export function dispatchActionWakes(deps: ChiefDeps & { registry?: readonly ActionEntry[] }): {
+  delivered: number;
+  undeliverable: number;
+} {
   let delivered = 0;
   let undeliverable = 0;
   for (const row of deps.db
@@ -553,13 +571,27 @@ export function dispatchActionWakes(deps: ChiefDeps): { delivered: number; undel
       undeliverable += 1;
       continue;
     }
+    const approved = row.outcome === 'executed';
+    const actionId = approved
+      ? deps.db
+          .select({ actionId: actionProposal.actionId })
+          .from(actionProposal)
+          .where(eq(actionProposal.id, row.proposalId))
+          .get()?.actionId
+      : undefined;
+    const entry =
+      actionId === undefined
+        ? undefined
+        : (deps.registry ?? SLICE1_ACTIONS).find((item) => item.id === actionId);
+    const prompt = approved
+      ? entry !== undefined && isExternalActionClass(entry.class)
+        ? `审批 ${row.proposalId} 已由用户批准：以已批准的输入重新发起该动作即会执行。`
+        : `审批 ${row.proposalId} 已由用户批准，服务端已执行。`
+      : `审批 ${row.proposalId} 的结果是 ${row.outcome}：没有执行。除非用户重新要求，不要再次发起同一动作。`;
     try {
       enqueueChiefStep(deps, subscriber.threadId, {
         id: subscriber.wakeStepId,
-        prompt:
-          row.outcome === 'executed'
-            ? `审批 ${row.proposalId} 已由用户批准，服务端已执行。`
-            : `审批 ${row.proposalId} 的结果是 ${row.outcome}：没有执行。除非用户重新要求，不要再次发起同一动作。`,
+        prompt,
         scopeProjectId: subscriber.scopeProjectId,
         ownerMessageIds: [],
         trigger: 'wake',

@@ -1,7 +1,16 @@
 import { z } from 'zod';
 
-export const ACTION_CLASSES = ['free', 'confirm-once', 'owner-only'] as const;
+export const ACTION_CLASSES = ['free', 'confirm-once', 'send', 'submit', 'owner-only'] as const;
 export type ActionClass = (typeof ACTION_CLASSES)[number];
+
+export const EXTERNAL_ACTION_CLASSES = ['send', 'submit'] as const;
+export type ExternalActionClass = (typeof EXTERNAL_ACTION_CLASSES)[number];
+
+export function isExternalActionClass(
+  actionClass: ActionClass,
+): actionClass is ExternalActionClass {
+  return (EXTERNAL_ACTION_CLASSES as readonly string[]).includes(actionClass);
+}
 
 export const ACTION_SCOPES = ['team', 'project'] as const;
 export type ActionScope = (typeof ACTION_SCOPES)[number];

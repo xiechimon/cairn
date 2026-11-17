@@ -18,8 +18,13 @@ import {
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import {
+  ALWAYS_CHOICE,
+  APPROVE_CHOICE,
+  answerProposal,
+  type Decision,
   dispatchActionWakes,
   proposalById,
+  REFUSE_CHOICE,
   sweepExpiredActionProposals,
 } from '../src/services/action-proposals.js';
 import { executeAction } from '../src/services/action-registry.js';
@@ -744,6 +749,186 @@ describe('todo deletion approval', () => {
     expect(proposalById(s.db, proposed.proposalId)?.status).toBe('expired');
     expect(card(s, proposed.proposalId)?.status).toBe('cancelled');
     expect(tasks(s)).toEqual(['todo-1', 'todo-2']);
+    s.dispose();
+  });
+});
+
+describe('send and submit action classes', () => {
+  const sendMessage: ActionEntry = {
+    id: 'send.message',
+    toolName: 'send_message',
+    inputSchema: z.object({ to: z.string().min(1), body: z.string().min(1) }).strict(),
+    outputSchema: z.object({ authorized: z.literal(true) }).strict(),
+    scope: 'team',
+    class: 'send',
+    standingGrant: true,
+    inverse: null,
+    surfaces: ['coordinator'],
+    targetOf: (input) => (input as { to: string }).to,
+  };
+  const submitForm: ActionEntry = {
+    id: 'submit.form',
+    toolName: 'submit_form',
+    inputSchema: z.object({ host: z.string().min(1), formId: z.string().min(1) }).strict(),
+    outputSchema: z.object({ authorized: z.literal(true) }).strict(),
+    scope: 'team',
+    class: 'submit',
+    standingGrant: true,
+    inverse: null,
+    surfaces: ['coordinator'],
+    targetOf: (input) => (input as { host: string }).host,
+  };
+  const registry = [sendMessage, submitForm];
+  const sendInput = { to: 'mailto:ian@example.com', body: 'hello' };
+
+  function call(
+    s: ReturnType<typeof world>,
+    entry: ActionEntry,
+    input: unknown,
+    scopeProjectId: string | null = 'project-a',
+  ) {
+    return executeAction(
+      { db: s.db, reposDir: s.reposDir },
+      {
+        id: entry.id,
+        input,
+        actor: 'coordinator',
+        surface: 'coordinator',
+        teamId: s.team.id,
+        threadId: 'thread-a',
+        scopeProjectId,
+        registry,
+      },
+    );
+  }
+
+  function answerDecision(s: ReturnType<typeof world>, proposalId: string, decision: Decision) {
+    return answerProposal(
+      { db: s.db, reposDir: s.reposDir, hub: s.hub, user: s.user, registry },
+      { proposalId, teamId: s.team.id, decision, decidedBy: s.user.id, viaCard: true },
+    );
+  }
+
+  const sendCard = (s: ReturnType<typeof world>, proposalId: string) =>
+    askQuestionContentOf(
+      s.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, `approval-${proposalId}`))
+        .get()?.content,
+    );
+
+  test('a send-class action asks with a parked card on the default tier and runs nothing', () => {
+    const s = world();
+    const proposed = call(s, sendMessage, sendInput);
+    expect(proposed.status).toBe('pending');
+    if (proposed.status !== 'pending') return;
+    expect(proposalById(s.db, proposed.proposalId)?.status).toBe('pending');
+    const questions = sendCard(s, proposed.proposalId)?.questions;
+    expect(questions?.[0]?.question).toContain('对外发送');
+    expect(questions?.[0]?.question).toContain('mailto:ian@example.com');
+    expect(questions?.[0]?.options.map((o) => o.label)).toEqual([
+      APPROVE_CHOICE,
+      ALWAYS_CHOICE,
+      REFUSE_CHOICE,
+    ]);
+    expect(s.db.select().from(actionJournal).all()).toEqual([]);
+    s.dispose();
+  });
+
+  test('a submit-class action asks on the default tier', () => {
+    const s = world();
+    const proposed = call(s, submitForm, { host: 'jobs.example.com', formId: 'apply' });
+    expect(proposed.status).toBe('pending');
+    s.dispose();
+  });
+
+  test('non-send actions pass without asking on the default tier', () => {
+    const s = world();
+    const archived = executeAction(
+      { db: s.db, reposDir: s.reposDir },
+      {
+        id: 'project.archive',
+        input: { projectId: 'project-a' },
+        actor: 'coordinator',
+        surface: 'coordinator',
+        teamId: s.team.id,
+        threadId: 'thread-a',
+        scopeProjectId: 'project-a',
+      },
+    );
+    expect(archived.status).toBe('executed');
+    s.db.update(projectTable).set({ archivedAt: null }).run();
+    const del = executeAction(
+      { db: s.db, reposDir: s.reposDir },
+      {
+        id: 'project.delete',
+        input: { projectId: 'project-a' },
+        actor: 'coordinator',
+        surface: 'coordinator',
+        teamId: s.team.id,
+        threadId: 'thread-a',
+        scopeProjectId: 'project-a',
+      },
+    );
+    expect(del.status).toBe('pending');
+    expect(s.db.select().from(projectTable).get()?.id).toBe('project-a');
+    s.dispose();
+  });
+
+  test('an allow-once answer covers exactly one retry of the approved input', () => {
+    const s = world();
+    const proposed = call(s, sendMessage, sendInput) as { proposalId: string };
+    expect(answerDecision(s, proposed.proposalId, 'allow-once')).toEqual({
+      status: 'executed',
+    });
+    const covered = call(s, sendMessage, sendInput);
+    expect(covered).toMatchObject({ status: 'executed' });
+    const again = call(s, sendMessage, sendInput);
+    expect(again.status).toBe('pending');
+    expect(
+      s.db
+        .select()
+        .from(actionJournal)
+        .all()
+        .map((row) => row.kind),
+    ).toEqual(['run']);
+    s.dispose();
+  });
+
+  test('a standing grant suppresses repeat asks for the target', () => {
+    const s = world();
+    const proposed = call(s, sendMessage, sendInput) as { proposalId: string };
+    expect(answerDecision(s, proposed.proposalId, 'always')).toEqual({ status: 'executed' });
+    expect(sendCard(s, proposed.proposalId)?.answers?.[0]?.choices).toEqual([ALWAYS_CHOICE]);
+    expect(call(s, sendMessage, sendInput)).toMatchObject({ status: 'executed' });
+    expect(call(s, sendMessage, { to: 'mailto:ian@example.com', body: 'different' })).toMatchObject(
+      { status: 'executed' },
+    );
+    expect(s.db.select().from(actionProposal).all()).toHaveLength(1);
+    expect(s.db.select().from(actionJournal).all()).toHaveLength(2);
+    dispatchActionWakes({ ...s, registry });
+    expect(
+      s.db
+        .select()
+        .from(step)
+        .all()
+        .some((row) => row.prompt?.includes('重新发起该动作')),
+    ).toBe(true);
+    s.dispose();
+  });
+
+  test('the full tier runs send-class actions without asking', async () => {
+    const s = world();
+    const patched = await req(s.app, 'PATCH', '/api/projects/project-a/autonomy', {
+      actionTier: 'full',
+    });
+    expect(patched.status).toBe(200);
+    expect(
+      ((await patched.json()) as { settings: { actionTier: string } }).settings.actionTier,
+    ).toBe('full');
+    expect(call(s, sendMessage, sendInput)).toMatchObject({ status: 'executed' });
+    expect(s.db.select().from(actionProposal).all()).toEqual([]);
     s.dispose();
   });
 });

@@ -16,11 +16,16 @@ export const AUTONOMY_GATE_REASONS = [
 export const autonomyGateReasonSchema = z.enum(AUTONOMY_GATE_REASONS);
 export type AutonomyGateReason = z.infer<typeof autonomyGateReasonSchema>;
 
+export const ACTION_TIERS = ['guarded', 'full'] as const;
+export const actionTierSchema = z.enum(ACTION_TIERS);
+export type ActionTier = z.infer<typeof actionTierSchema>;
+
 export const autonomySettingsSchema = z.object({
   enabled: z.boolean(),
   quietMinutes: z.number().int().min(0).max(1440),
   cooldownMinutes: z.number().int().min(0).max(1440),
   dailyBudgetUsd: z.number().min(0).max(10_000),
+  actionTier: actionTierSchema,
 });
 export type AutonomySettings = z.infer<typeof autonomySettingsSchema>;
 
@@ -29,6 +34,7 @@ export const DEFAULT_AUTONOMY_SETTINGS: AutonomySettings = {
   quietMinutes: 10,
   cooldownMinutes: 15,
   dailyBudgetUsd: 10,
+  actionTier: 'guarded',
 };
 
 export const patchAutonomyBodySchema = autonomySettingsSchema.partial().strict();

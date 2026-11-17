@@ -16,6 +16,7 @@ import { notFound, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireTeam, svcOf } from './routes-helpers.js';
 import {
+  ALWAYS_CHOICE,
   APPROVE_CHOICE,
   answerProposal,
   type Decision,
@@ -238,7 +239,9 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         ? ownComputerDecisionOf(choice)
         : choice === APPROVE_CHOICE
           ? 'allow-once'
-          : 'refuse';
+          : choice === ALWAYS_CHOICE
+            ? 'always'
+            : 'refuse';
       answerCard(teamId, threadId, requestId, proposalId, decision, c);
       const settled = ctx.db
         .select()

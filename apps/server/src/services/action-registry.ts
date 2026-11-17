@@ -3,6 +3,8 @@ import {
   type ActionEntry,
   type ActionSurface,
   type AskUserQuestion,
+  type ExternalActionClass,
+  isExternalActionClass,
   projectArchiveAction,
   projectDeleteAction,
   projectUnarchiveAction,
@@ -12,15 +14,18 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { actionJournal, project, todo } from '../db/schema.js';
+import { actionJournal, actionProposal, project, todo } from '../db/schema.js';
 import { HttpError, notFound, parseWith } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
+  ALWAYS_CHOICE,
   APPROVE_CHOICE,
   proposeAction,
   REFUSE_CHOICE,
   settlePendingProposal,
 } from './action-proposals.js';
+import { actionTierOf } from './autonomy-gates.js';
+import { isOwner } from './instance-owner.js';
 import { isPersonalSpace } from './personal-space.js';
 import { deleteProject } from './projects.js';
 
@@ -46,6 +51,12 @@ export type ExecuteActionResult =
 
 const CARD_TITLE_MAX_CHARS = 80;
 const CARD_PROJECT_MAX_CHARS = 40;
+const CARD_TARGET_MAX_CHARS = 60;
+
+const EXTERNAL_CLASS_VERBS: Record<ExternalActionClass, string> = {
+  send: '对外发送',
+  submit: '对外提交',
+};
 
 function cardText(raw: string, max: number): string {
   const plain = raw
@@ -99,9 +110,29 @@ function bindTodoDelete(db: Db, input: TodoDeleteInput, teamId: string): BoundPr
   };
 }
 
+function externalCard(entry: ActionEntry, targetId: string): AskUserQuestion[] {
+  const actionClass = entry.class;
+  const verb = isExternalActionClass(actionClass) ? EXTERNAL_CLASS_VERBS[actionClass] : actionClass;
+  const options = entry.standingGrant
+    ? [{ label: APPROVE_CHOICE }, { label: ALWAYS_CHOICE }, { label: REFUSE_CHOICE }]
+    : [{ label: APPROVE_CHOICE }, { label: REFUSE_CHOICE }];
+  return [
+    {
+      header: '审批',
+      question: `${verb}到「${cardText(targetId, CARD_TARGET_MAX_CHARS)}」，发出后无法收回。`,
+      options,
+    },
+  ];
+}
+
 function bindProposal(db: Db, entry: ActionEntry, input: unknown, teamId: string): BoundProposal {
   if (entry.id === todoDeleteAction.id) return bindTodoDelete(db, input as TodoDeleteInput, teamId);
-  requireOwnedProject(db, entry.targetOf(input), teamId);
+  const targetId = entry.targetOf(input);
+  if (isExternalActionClass(entry.class)) {
+    if (entry.scope === 'project') requireOwnedProject(db, targetId, teamId);
+    return { input, card: externalCard(entry, targetId) };
+  }
+  requireOwnedProject(db, targetId, teamId);
   return { input };
 }
 
@@ -138,6 +169,73 @@ function requireOwnedProject(db: Pick<Db, 'select'>, projectId: string, teamId: 
   return row;
 }
 
+type ProposalRow = typeof actionProposal.$inferSelect;
+
+function storedInputOf(row: ProposalRow): unknown {
+  const stored = JSON.parse(row.inputJson) as unknown;
+  if (stored !== null && typeof stored === 'object' && !Array.isArray(stored)) {
+    const { cardDigest: _, ...rest } = stored as Record<string, unknown>;
+    return rest;
+  }
+  return stored;
+}
+
+function grantConsumed(
+  db: Db,
+  teamId: string,
+  actionId: string,
+  targetId: string,
+  hash: string,
+  since: number,
+): boolean {
+  return db
+    .select({ createdAt: actionJournal.createdAt })
+    .from(actionJournal)
+    .where(
+      and(
+        eq(actionJournal.teamId, teamId),
+        eq(actionJournal.actionId, actionId),
+        eq(actionJournal.targetId, targetId),
+        eq(actionJournal.inputHash, hash),
+        eq(actionJournal.kind, 'run'),
+        eq(actionJournal.actor, 'coordinator'),
+      ),
+    )
+    .all()
+    .some((run) => run.createdAt >= since);
+}
+
+function coveringGrant(
+  db: Db,
+  teamId: string,
+  entry: ActionEntry,
+  targetId: string,
+  input: unknown,
+): ProposalRow | undefined {
+  const rows = db
+    .select()
+    .from(actionProposal)
+    .where(
+      and(
+        eq(actionProposal.teamId, teamId),
+        eq(actionProposal.actionId, entry.id),
+        eq(actionProposal.targetId, targetId),
+        eq(actionProposal.status, 'executed'),
+      ),
+    )
+    .all()
+    .filter((row) => row.decidedBy !== null && isOwner(db, row.decidedBy));
+  const standing = rows.find((row) => row.decision === 'always');
+  if (standing !== undefined) return standing;
+  const hash = inputHash(input);
+  const approved = rows
+    .filter((row) => row.decision === 'allow-once' && inputHash(storedInputOf(row)) === hash)
+    .sort((a, b) => (b.decidedAt ?? b.createdAt) - (a.decidedAt ?? a.createdAt));
+  return approved.find(
+    (row) => !grantConsumed(db, teamId, entry.id, targetId, hash, row.decidedAt ?? row.createdAt),
+  );
+}
+
 function archiveOn(
   tx: JournalTx,
   projectId: string,
@@ -166,25 +264,48 @@ export function executeAction(
     throw new HttpError(403, `action ${entry.id} is not on surface ${request.surface}`);
   }
   const targetId = entry.targetOf(input);
-  if (request.actor === 'coordinator' && entry.class === 'confirm-once') {
-    if (!request.threadId) throw new HttpError(400, 'coordinator confirm-once requires a threadId');
-    const bound = bindProposal(deps.db, entry, input, request.teamId);
-    const proposed = proposeAction(deps.db, {
-      teamId: request.teamId,
-      actionId: entry.id,
-      targetId,
-      input: bound.input,
-      threadId: request.threadId,
-      scopeProjectId: request.scopeProjectId ?? null,
-      ...(bound.card === undefined ? {} : { card: bound.card }),
-    });
-    return { status: 'pending', ...proposed };
+  const asks = entry.class === 'confirm-once' || isExternalActionClass(entry.class);
+  if (request.actor === 'coordinator' && asks) {
+    const covered =
+      isExternalActionClass(entry.class) &&
+      (actionTierOf(deps.db, request.teamId, request.scopeProjectId ?? null) === 'full' ||
+        coveringGrant(deps.db, request.teamId, entry, targetId, input) !== undefined);
+    if (!covered) {
+      if (!request.threadId)
+        throw new HttpError(400, 'coordinator confirm-once requires a threadId');
+      const bound = bindProposal(deps.db, entry, input, request.teamId);
+      const proposed = proposeAction(deps.db, {
+        teamId: request.teamId,
+        actionId: entry.id,
+        targetId,
+        input: bound.input,
+        threadId: request.threadId,
+        scopeProjectId: request.scopeProjectId ?? null,
+        ...(bound.card === undefined ? {} : { card: bound.card }),
+      });
+      return { status: 'pending', ...proposed };
+    }
   }
   if (entry.id === todoDeleteAction.id) {
     throw new HttpError(403, `action ${entry.id} runs only through an approved proposal`);
   }
-  requireOwnedProject(deps.db, targetId, request.teamId);
+  if (entry.scope === 'project') requireOwnedProject(deps.db, targetId, request.teamId);
   const hash = inputHash(input);
+  if (isExternalActionClass(entry.class)) {
+    const row = journalRow(request, entry.id, targetId, hash);
+    deps.db.transaction(
+      (tx) => {
+        tx.insert(actionJournal).values(row).run();
+        settlePendingProposal(tx, request.teamId, entry.id, targetId);
+      },
+      { behavior: 'immediate' },
+    );
+    return {
+      status: 'executed',
+      journalId: row.id,
+      output: entry.outputSchema.parse({ authorized: true }),
+    };
+  }
   if (entry.id === projectDeleteAction.id) {
     const output = projectDeleteAction.outputSchema.parse({ projectId: targetId, deleted: true });
     const row = journalRow(request, entry.id, targetId, hash);

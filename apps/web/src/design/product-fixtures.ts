@@ -413,7 +413,13 @@ export const QUESTION_CANCELLED: ChiefQuestionItem = {
 };
 
 export const AUTONOMY: AutonomyRecord = {
-  settings: { enabled: true, quietMinutes: 10, cooldownMinutes: 15, dailyBudgetUsd: 10 },
+  settings: {
+    enabled: true,
+    quietMinutes: 10,
+    cooldownMinutes: 15,
+    dailyBudgetUsd: 10,
+    actionTier: 'guarded',
+  },
   spentTodayUsd: 3.42,
   kinds: [
     {

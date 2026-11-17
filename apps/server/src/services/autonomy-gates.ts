@@ -1,4 +1,5 @@
 import {
+  type ActionTier,
   AUTONOMY_KINDS,
   type AutonomyGateReason,
   type AutonomyKind,
@@ -62,6 +63,17 @@ export function utcDayStart(now: number): number {
 
 export function autonomySettingsOf(row: { autonomy: AutonomySettings | null }): AutonomySettings {
   return { ...DEFAULT_AUTONOMY_SETTINGS, ...(row.autonomy ?? {}) };
+}
+
+export function actionTierOf(db: Db, teamId: string, projectId: string | null): ActionTier {
+  if (projectId === null) return DEFAULT_AUTONOMY_SETTINGS.actionTier;
+  const row = db
+    .select({ autonomy: project.autonomy, teamId: project.teamId })
+    .from(project)
+    .where(eq(project.id, projectId))
+    .get();
+  if (row === undefined || row.teamId !== teamId) return DEFAULT_AUTONOMY_SETTINGS.actionTier;
+  return autonomySettingsOf(row).actionTier;
 }
 
 export function spentForGate(
