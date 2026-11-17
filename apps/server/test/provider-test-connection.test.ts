@@ -79,6 +79,7 @@ async function result(s: TestServer, path: string, body: object = {}) {
     reason: string | null;
     failure: string | null;
     httpStatus: number | null;
+    detail: string | null;
     latencyMs: number | null;
   };
 }
@@ -164,7 +165,30 @@ describe('provider connection check', () => {
     expect(data.status).toBe('failed');
     expect(JSON.stringify(data).includes('abc.def.ghi')).toBe(false);
     expect(data.reason).toEqual(expect.any(String));
-    expect(JSON.stringify(data).includes('denied')).toBe(false);
+    expect(data.detail).toBe('denied [REDACTED] [REDACTED] [REDACTED]');
+  });
+
+  test.each([
+    [
+      503,
+      { error: { message: 'No available accounts: no available accounts', type: 'api_error' } },
+      'No available accounts: no available accounts',
+    ],
+    [404, { message: 'Model not found' }, 'Model not found'],
+    [
+      502,
+      '<html><body><h1>502 Bad Gateway</h1>\n<p>via https://ops:hunter2@gw.example/v1</p></body></html>',
+      '502 Bad Gateway via https://gw.example/v1',
+    ],
+    [500, { error: 'x'.repeat(400) }, `${'x'.repeat(159)}…`],
+  ])('shows a one-line upstream detail for HTTP %i', async (status, body, detail) => {
+    transport({ status, body });
+    const s = bootServer();
+    expect(await result(s, await addProvider(s))).toMatchObject({
+      status: 'failed',
+      httpStatus: status,
+      detail,
+    });
   });
 
   test('refuses a non-owner with 403 before outbound traffic', async () => {
@@ -189,6 +213,7 @@ describe('provider connection check', () => {
       reason: null,
       failure: null,
       httpStatus: null,
+      detail: null,
       latencyMs: expect.any(Number),
     });
   });
@@ -278,6 +303,7 @@ describe('provider connection check', () => {
       transport({ status: 401, body: { error: { message: `denied ${apiKey}` } } });
       const data = await result(s, path);
       expect(Object.keys(data).sort()).toEqual([
+        'detail',
         'failure',
         'httpStatus',
         'latencyMs',

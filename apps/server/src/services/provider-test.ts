@@ -16,6 +16,34 @@ import { openProviderKey, type ProviderDeps } from './providers.js';
 import { failureForStatus, fetchUpstreamModels } from './upstream-models.js';
 
 const MODEL_TEST_WINDOW_MS = 10_000;
+const DETAIL_MAX = 160;
+
+function upstreamMessage(text: string): string {
+  try {
+    const body = JSON.parse(text) as unknown;
+    if (typeof body === 'object' && body !== null) {
+      const { error, message, detail } = body as Record<string, unknown>;
+      const nested =
+        typeof error === 'object' && error !== null
+          ? (error as Record<string, unknown>).message
+          : error;
+      const picked = [nested, message, detail].find((v) => typeof v === 'string' && v !== '');
+      if (typeof picked === 'string') return picked;
+    }
+  } catch {}
+  return text.replace(/<[^>]*>/g, ' ');
+}
+
+function errorDetail(text: string, secrets: readonly string[]): string | null {
+  const scrubbed = redactSecrets(upstreamMessage(text), secrets).value as string;
+  const line = scrubbed
+    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const chars = Array.from(line);
+  if (chars.length === 0) return null;
+  return chars.length > DETAIL_MAX ? `${chars.slice(0, DETAIL_MAX - 1).join('')}…` : line;
+}
 
 export class ProviderTestLimiter {
   private readonly hits = new Map<string, number>();
@@ -88,6 +116,7 @@ export async function testProviderConnection(
   let reason: string | null = null;
   let failure: ProviderFailure | null = null;
   let httpStatus: number | null = null;
+  let errorBody: string | null = null;
   let latencyMs: number | null = null;
   try {
     apiKey = await accessKey(deps, input.teamId, row.providerId);
@@ -98,6 +127,13 @@ export async function testProviderConnection(
       const recording: typeof globalThis.fetch = async (url, init) => {
         const response = await deps.fetch(url, init);
         httpStatus = response.status;
+        errorBody =
+          response.status >= 400
+            ? await response
+                .clone()
+                .text()
+                .catch(() => null)
+            : null;
         return response;
       };
       const started = performance.now();
@@ -132,7 +168,8 @@ export async function testProviderConnection(
     failure = 'network';
     reason = 'The connection test could not finish. Check the connection settings and try again.';
   }
-  const scrubbedReason = redactSecrets(reason, apiKey === null ? [] : [apiKey]).value;
+  const secrets = apiKey === null ? [] : [apiKey];
+  const scrubbedReason = redactSecrets(reason, secrets).value;
   return providerTestResultSchema.parse({
     status: redactSecrets(reason === null ? 'ok' : 'failed').value,
     reason:
@@ -141,6 +178,7 @@ export async function testProviderConnection(
         : null,
     failure,
     httpStatus: failure === null ? null : httpStatus,
+    detail: failure === null || errorBody === null ? null : errorDetail(errorBody, secrets),
     latencyMs: failure === null ? latencyMs : null,
   });
 }

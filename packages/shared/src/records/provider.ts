@@ -88,6 +88,7 @@ export const providerTestResultSchema = z.strictObject({
   reason: z.string().nullable(),
   failure: providerFailureSchema.nullable(),
   httpStatus: z.number().int().nullable(),
+  detail: z.string().nullable(),
   latencyMs: z.number().int().nonnegative().nullable(),
 });
 export type ProviderTestResult = z.infer<typeof providerTestResultSchema>;
