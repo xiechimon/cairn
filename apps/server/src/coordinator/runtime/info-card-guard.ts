@@ -1,8 +1,7 @@
 import { GenerationTask, hook } from '@earendil-works/pi-durable';
+import { createCutOffRecovery } from './cut-off-recovery.js';
 
-const MAX_CUT_OFF_RETRIES = 4;
 const MAX_SUBMIT_NUDGES = 2;
-const CUT_OFF_PLACEHOLDER = '(output cut off at the length limit)';
 
 export const CUT_OFF_MESSAGE =
   'Your last output was cut off at the length limit, so its tool call never ran. Write long files in parts: call write_file with append: true for every part after the first, a few thousand characters each. Then call submit_report with the path.';
@@ -17,32 +16,19 @@ export interface InfoCardRunGuard {
 
 export function createInfoCardRunGuard(): InfoCardRunGuard {
   let submitted = false;
-  let cutOff = false;
-  let cutOffRetries = 0;
   let nudges = 0;
+  const cutOff = createCutOffRecovery(CUT_OFF_MESSAGE);
   return {
     reportSubmitted: () => {
       submitted = true;
     },
     hooks: [
+      cutOff.hook,
       hook(GenerationTask, {
-        afterResponse: (message) => {
-          cutOff = message.stopReason === 'length';
-          if (!cutOff) return;
-          const kept = message.content.filter((block) => block.type !== 'toolCall');
-          message.content = kept.length > 0 ? kept : [{ type: 'text', text: CUT_OFF_PLACEHOLDER }];
-        },
         onYield: () => {
-          if (submitted) return undefined;
-          if (cutOff && cutOffRetries < MAX_CUT_OFF_RETRIES) {
-            cutOffRetries += 1;
-            return { continue: CUT_OFF_MESSAGE };
-          }
-          if (nudges < MAX_SUBMIT_NUDGES) {
-            nudges += 1;
-            return { continue: SUBMIT_NUDGE_MESSAGE };
-          }
-          return undefined;
+          if (submitted || nudges >= MAX_SUBMIT_NUDGES) return undefined;
+          nudges += 1;
+          return { continue: SUBMIT_NUDGE_MESSAGE };
         },
       }),
     ],

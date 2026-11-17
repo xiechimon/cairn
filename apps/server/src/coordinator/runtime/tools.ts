@@ -13,6 +13,7 @@ import {
   type ToolRegistration,
 } from '@earendil-works/pi-durable';
 import { coordinatorToolDefs } from '../../services/coordinator-tool-defs.js';
+import { createCutOffRecovery } from './cut-off-recovery.js';
 import { boundCoordinatorImages, prepareCoordinatorImage } from './images.js';
 import type { MachineApi } from './machine-api.js';
 
@@ -22,6 +23,9 @@ export class ShutdownInterrupt extends Error {
     this.name = 'ShutdownInterrupt';
   }
 }
+
+export const COORDINATOR_CUT_OFF_MESSAGE =
+  'Your last output was cut off at the length limit, so its tool call never ran. Retry with a shorter output, or split the work into smaller steps.';
 
 export const COORDINATOR_TOOL_OUTPUT_MAX_BYTES = 32_768;
 
@@ -208,6 +212,7 @@ export function coordinatorToolsExtension(
   return defineExtension({
     name: 'cairn-coordinator-tools',
     hooks: [
+      createCutOffRecovery(COORDINATOR_CUT_OFF_MESSAGE).hook,
       hook(GenerationTask, {
         beforeRequest: async ({ messages }, _api, context) => {
           await options.beforeTool?.(context.abortSignal, String(_api.conversationId));
