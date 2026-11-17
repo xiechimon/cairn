@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
 import { z } from 'zod';
-import { AGENT_BROWSER_BINARY, browserSessionName } from './browser.js';
+import { AGENT_BROWSER_BINARY, browserSessionName, isStealthBrowserCommand } from './browser.js';
 import { CloakBrowser, shellQuote, writeCloakLauncher } from './cloak-browser.js';
 import { executableOnPath } from './contained-spawn.js';
 import { HostComputerProvider } from './host.js';
@@ -47,12 +47,26 @@ export const HOST_DESKTOP_PROGRAMS = [
   'x11vnc',
 ] as const;
 export const HOST_BROWSER_PROGRAMS = ['xdotool'] as const;
+export const HOST_CHROMIUM_PROGRAMS = ['chromium', 'chromium-browser'] as const;
+export const NO_CLOAK_LICENSE_ON_HOST =
+  'No CloakBrowser license on this machine; save the key in the CloakBrowser license file';
 export const HOST_DESKTOP_READY_MS = 20_000;
 export const HOST_BROWSER_READY_MS = 10_000;
 export const HOST_DESKTOP_IDLE_STOP_MS = 10 * 60_000;
 const BROWSER_COMMAND_TIMEOUT_MS = 30_000;
 const PROFILE_RELEASE_MS = 10_000;
 const BROWSER_PROFILE = join('.cairn', 'browser-profile');
+const CLOAK_PROFILE = join('.cairn', 'cloak-profile');
+const CLOAK_IDENTITY = '.cairn-cloak-identity.json';
+const CHROMIUM_ARGS = [
+  '--start-maximized',
+  '--ozone-platform=x11',
+  '--password-store=basic',
+  '--no-first-run',
+  '--no-default-browser-check',
+  '--hide-crash-restore-bubble',
+  '--restore-last-session',
+];
 export const OMARCHY_WALLPAPER = '.local/state/omarchy/current/background';
 const UNIT_PREFIX = 'cairn-desktop-';
 
@@ -248,7 +262,23 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     return this.browser.version ?? 'unknown';
   }
 
+  private chromium(): string | undefined {
+    for (const name of HOST_CHROMIUM_PROGRAMS) {
+      const found = executableOnPath(name, this.env.PATH);
+      if (found) return found;
+    }
+    return undefined;
+  }
+
   offersBrowser(): boolean {
+    return (
+      this.missingPrograms().length === 0 &&
+      this.chromium() !== undefined &&
+      executableOnPath('agent-browser', this.path) !== undefined
+    );
+  }
+
+  offersStealthBrowser(): boolean {
     return (
       this.missingPrograms().length === 0 &&
       this.missingBrowserPrograms().length === 0 &&
@@ -344,7 +374,7 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     try {
       await (count === 0
         ? this.handoff(scopeKey, async () => {
-            if (this.offersBrowser()) await this.openOwnerBrowser(scopeKey);
+            if (this.offersStealthBrowser()) await this.openOwnerBrowser(scopeKey);
           })
         : this.handoffs.get(scopeKey));
     } catch (error) {
@@ -401,7 +431,7 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
       if (this.now() >= deadline) throw refuse();
       await sleep(100);
     }
-    await this.profileReleased(join(directory, 'home', BROWSER_PROFILE));
+    await this.profileReleased(join(directory, 'home', CLOAK_PROFILE));
   }
 
   private async startManualBrowser(scopeKey: string, url?: string): Promise<void> {
@@ -416,22 +446,21 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     if (await this.manualActive(scopeKey)) return this.startManualBrowser(scopeKey);
     const desktop = await this.desktop(scopeKey);
     if (await this.manualActive(scopeKey)) return this.startManualBrowser(scopeKey);
-    const session = browserSessionName(scopeKey);
+    const session = browserSessionName(scopeKey, true);
     let url: string | undefined;
     const listed = await browserCommand(desktop.provider, ['--json', 'session', 'list'])
       .then(({ code, text }) => (code === 0 ? sessionList.safeParse(JSON.parse(text)) : undefined))
       .catch(() => undefined);
     if (!listed?.success)
       throw new ComputerRefusal('The agent browser session could not be checked');
-    if (listed.data.data.sessions.includes(session)) {
-      const current = await browserCommand(desktop.provider, ['--session', session, 'get', 'url']);
-      const last = current.text.split('\n').at(-1)?.trim() ?? '';
-      if (/^https?:\/\//i.test(last)) url = last;
-      const closed = await browserCommand(desktop.provider, ['--session', session, 'close']);
-      if (closed.code !== 0) throw new ComputerRefusal('The agent browser did not close');
-    }
+    if (!listed.data.data.sessions.includes(session)) return;
+    const current = await browserCommand(desktop.provider, ['--session', session, 'get', 'url']);
+    const last = current.text.split('\n').at(-1)?.trim() ?? '';
+    if (/^https?:\/\//i.test(last)) url = last;
+    const closed = await browserCommand(desktop.provider, ['--session', session, 'close']);
+    if (closed.code !== 0) throw new ComputerRefusal('The agent browser did not close');
     const directory = this.directory(scopeKey);
-    const profile = join(directory, 'home', BROWSER_PROFILE);
+    const profile = join(directory, 'home', CLOAK_PROFILE);
     await this.profileReleased(profile);
     await writeCloakLauncher(directory, profile, this.browser, this.proxy());
     await this.startManualBrowser(scopeKey, url);
@@ -554,10 +583,10 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     mkdirSync(dock, { recursive: true, mode: 0o700 });
     rmSync(join(dock, 'chromium.dockitem'), { force: true });
     const launcherReady =
-      this.offersBrowser() &&
+      this.offersStealthBrowser() &&
       (await writeCloakLauncher(
         directory,
-        join(home, BROWSER_PROFILE),
+        join(home, CLOAK_PROFILE),
         this.browser,
         this.proxy(),
       ).then(
@@ -634,6 +663,9 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
             'close',
           ]);
         await this.profileReleased(profile);
+        const cloakProfile = join(home, CLOAK_PROFILE);
+        if (existsSync(join(profile, CLOAK_IDENTITY)) && !existsSync(cloakProfile))
+          renameSync(profile, cloakProfile);
         const preferencesPath = join(profile, 'Default', 'Preferences');
         const preferences = existsSync(preferencesPath)
           ? (JSON.parse(readFileSync(preferencesPath, 'utf8')) as Record<string, unknown>)
@@ -706,18 +738,29 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
         PATH: this.path,
         AGENT_BROWSER_SOCKET_DIR: '.agent-browser',
       },
-      browserEnvironment: async () => {
-        const profile = join(home, BROWSER_PROFILE);
+      browserEnvironment: async (argv): Promise<Record<string, string>> => {
+        const proxy = this.proxy() ? [`--proxy-server=${this.proxy()}`] : [];
+        if (!argv.includes('--session')) return {};
+        if (!isStealthBrowserCommand(argv)) {
+          const chromium = this.chromium();
+          if (!chromium)
+            throw new ComputerRefusal('The browser needs Chromium installed on this machine');
+          return {
+            AGENT_BROWSER_EXECUTABLE_PATH: chromium,
+            AGENT_BROWSER_NO_VERSION_CHECK: '1',
+            AGENT_BROWSER_PROFILE: join(home, BROWSER_PROFILE),
+            AGENT_BROWSER_ARGS: [...CHROMIUM_ARGS, ...proxy].join(','),
+          };
+        }
+        if (!this.browser.ready) throw new ComputerRefusal(NO_CLOAK_LICENSE_ON_HOST);
+        const profile = join(home, CLOAK_PROFILE);
         const launch = await this.browser.launch(profile);
         return {
           ...launch.env,
           AGENT_BROWSER_EXECUTABLE_PATH: launch.executable,
           AGENT_BROWSER_NO_VERSION_CHECK: '1',
           AGENT_BROWSER_PROFILE: profile,
-          AGENT_BROWSER_ARGS: [
-            ...launch.args,
-            ...(this.proxy() ? [`--proxy-server=${this.proxy()}`] : []),
-          ].join(','),
+          AGENT_BROWSER_ARGS: [...launch.args, ...proxy].join(','),
         };
       },
     });
@@ -736,10 +779,10 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
         let events: AsyncIterable<ComputerProcessEvent>;
         try {
           const current = await provider();
-          if (request.argv[0] === AGENT_BROWSER_BINARY) {
-            await this.closeOwnerBrowser(scopeKey);
+          if (isStealthBrowserCommand(request.argv)) await this.closeOwnerBrowser(scopeKey);
+          else await this.handoffs.get(scopeKey);
+          if (request.argv[0] === AGENT_BROWSER_BINARY)
             await this.importSavedLogin(scopeKey, join(this.directory(scopeKey), 'home'), current);
-          } else await this.handoffs.get(scopeKey);
           events = await current.execute(request);
         } catch (error) {
           leave();
@@ -813,9 +856,12 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     const provider =
       this.desktops.get(scopeKey)?.provider ??
       this.provider(join(directory, 'home'), this.ready(directory) ?? '');
-    await browserCommand(provider, ['--session', browserSessionName(scopeKey), 'close']).catch(
-      () => {},
-    );
+    for (const stealth of [false, true])
+      await browserCommand(provider, [
+        '--session',
+        browserSessionName(scopeKey, stealth),
+        'close',
+      ]).catch(() => {});
     await provider.killAll();
     this.desktops.delete(scopeKey);
     this.lastUsed.delete(scopeKey);

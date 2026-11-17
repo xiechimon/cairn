@@ -233,10 +233,18 @@ export interface BrowserRunOptions {
 const CAIRN_PAGE_REFUSAL =
   'is Cairn itself; the agent browser never opens or operates Cairn, so approvals stay with the owner';
 
-export function browserSessionName(scopeKey: string | undefined): string {
-  if (scopeKey === undefined || scopeKey.length === 0) return AGENT_BROWSER_SESSION;
-  const cleaned = scopeKey.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
-  return cleaned.length > 0 ? cleaned.slice(0, 64) : AGENT_BROWSER_SESSION;
+export const STEALTH_SESSION_SUFFIX = '-stealth';
+
+export function browserSessionName(scopeKey: string | undefined, stealth = false): string {
+  const cleaned = (scopeKey ?? '').replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+  const base = cleaned.length > 0 ? cleaned.slice(0, 64) : AGENT_BROWSER_SESSION;
+  return stealth ? `${base}${STEALTH_SESSION_SUFFIX}` : base;
+}
+
+export function isStealthBrowserCommand(argv: readonly string[]): boolean {
+  if (argv[0] !== AGENT_BROWSER_BINARY) return false;
+  const index = argv.indexOf('--session');
+  return index > 0 && (argv[index + 1] ?? '').endsWith(STEALTH_SESSION_SUFFIX);
 }
 
 function sessionFlag(session: string): string[] {
@@ -383,7 +391,7 @@ export async function runBrowserTool(
   options: BrowserRunOptions,
 ): Promise<BrowserToolResult> {
   const binary = options.binary ?? AGENT_BROWSER_BINARY;
-  const session = browserSessionName(options.session);
+  const session = browserSessionName(options.session, params.stealth === true);
   const deadlineAt = browserDeadlineAt(options);
   const timed = { ...options, deadlineAt };
   const cursorScriptWritten = await provider

@@ -5,6 +5,7 @@ import {
   AGENT_CURSOR_INIT_SCRIPT,
   agentCursorScript,
   browserSessionName,
+  isStealthBrowserCommand,
   LOGIN_DETECTION_SCRIPT,
   runBrowserTool,
 } from '../src/computer/browser.js';
@@ -40,10 +41,38 @@ describe('browserSessionName', () => {
   test('maps chief scope keys to valid agent-browser session names', () => {
     expect(browserSessionName('chief:c1')).toBe('chief_c1');
     expect(browserSessionName(undefined)).toBe('cairn');
+    expect(browserSessionName('chief:c1', true)).toBe('chief_c1-stealth');
+  });
+
+  test('only a session ending in the stealth suffix is a stealth command', () => {
+    expect(
+      isStealthBrowserCommand(['agent-browser', '--session', 'chief_c1-stealth', 'open']),
+    ).toBe(true);
+    expect(isStealthBrowserCommand(['agent-browser', '--session', 'chief_c1', 'open'])).toBe(false);
+    expect(isStealthBrowserCommand(['bash', '--session', 'x-stealth'])).toBe(false);
   });
 });
 
 describe('runBrowserTool', () => {
+  test('stealth: true drives the separate stealth session', async () => {
+    const log: string[] = [];
+    await runBrowserTool(
+      recordingProvider(log),
+      'browser_snapshot',
+      { stealth: true },
+      {
+        timeoutMs: 5_000,
+        signal: new AbortController().signal,
+        cairnOrigins: [],
+        session: 'chief:1',
+      },
+    );
+    expect(log.some((line) => line.startsWith('agent-browser --session chief_1-stealth '))).toBe(
+      true,
+    );
+    expect(log.some((line) => line.startsWith('agent-browser --session chief_1 '))).toBe(false);
+  });
+
   test('navigates with headed agent-browser open', async () => {
     const log: string[] = [];
     const { text } = await runBrowserTool(

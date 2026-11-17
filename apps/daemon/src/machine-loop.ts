@@ -281,6 +281,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(hostDesktops?.offersBrowser()
         ? { browser: true as const, browserSecretFill: true as const }
         : {}),
+      ...(hostDesktops?.offersStealthBrowser() ? { stealthBrowser: true as const } : {}),
       ...(hostComputer ? { ownComputer: true as const } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(scraper !== undefined ? { scrapling: scraper } : {}),

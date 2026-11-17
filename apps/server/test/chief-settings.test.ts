@@ -257,6 +257,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).toContain(
       '不要再重试，也不要设法绕过拦截：直接用 request_takeover 请用户自己操作',
     );
+    expect(prompt).toContain('都传 stealth: true，改用隐身浏览器');
     expect(prompt).toContain('执行前先用 ask_user 问用户');
   });
 

@@ -71,7 +71,7 @@ export interface HostComputerOptions {
   killGraceMs?: number;
   streamDrainMs?: number;
   maxFileBytes?: number;
-  browserEnvironment?: () => Promise<Record<string, string>>;
+  browserEnvironment?: (argv: readonly string[]) => Promise<Record<string, string>>;
 }
 
 export function hostCommandEnvironment(
@@ -249,7 +249,7 @@ export class HostComputerProvider implements ComputerProvider {
       );
       if (!info?.isDirectory()) throw new ComputerRefusal('cwd is not an existing directory');
       if (request.argv[0] === AGENT_BROWSER_BINARY && this.options.browserEnvironment)
-        browserEnv = await awaitWithSignal(this.options.browserEnvironment(), signal);
+        browserEnv = await awaitWithSignal(this.options.browserEnvironment(request.argv), signal);
     } catch (error) {
       if (signal.aborted) return stoppedBeforeSpawn();
       clearTimeout(deadlineTimer);

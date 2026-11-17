@@ -7,19 +7,24 @@ const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   ...(required.length > 0 ? { required } : {}),
 });
 const arr = (items: unknown, description: string) => ({ type: 'array', items, description });
+const stealth = {
+  type: 'boolean',
+  description:
+    'Use the stealth browser (CloakBrowser, its own profile and session) instead of the default Chromium. Use it for sites that block automated browsers and for logging in to them; keep the same value for every call on that page.',
+};
 
 export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'browser_navigate',
     description:
       'Open a URL in the Coordinator computer browser. The page stays open for later browser_snapshot and browser_act calls.',
-    parameters: obj({ url: str('Absolute http(s) URL to open.') }, ['url']),
+    parameters: obj({ url: str('Absolute http(s) URL to open.'), stealth }, ['url']),
   },
   {
     name: 'browser_snapshot',
     description:
       'Read the current page as an accessibility tree with interactive refs (@e1, @e2, …). Prefer this before browser_act.',
-    parameters: obj({}),
+    parameters: obj({ stealth }),
     replaySafe: true,
   },
   {
@@ -48,6 +53,7 @@ export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           ),
           'Ordered actions to run on the page.',
         ),
+        stealth,
       },
       ['actions'],
     ),

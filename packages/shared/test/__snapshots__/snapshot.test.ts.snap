@@ -11179,6 +11179,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               },
               "type": "array",
             },
+            "stealthBrowser": {
+              "const": true,
+              "type": "boolean",
+            },
           },
           "required": [
             "mcpServers",

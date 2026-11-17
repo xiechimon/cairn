@@ -147,7 +147,7 @@ const stops = (calls: string[][], suffix = '-browser.service') =>
 const quits = (calls: string[][]) => calls.filter((argv) => argv[1] === 'windowquit');
 
 const PROGRAMS = [...HOST_DESKTOP_PROGRAMS];
-const BROWSER = [...PROGRAMS, 'xdotool', 'agent-browser'];
+const BROWSER = [...PROGRAMS, 'xdotool', 'agent-browser', 'chromium'];
 
 function fakeAgentBrowser(bin: string, log: string, script = '') {
   writeFileSync(
@@ -162,8 +162,8 @@ function scopeHome(root: string, scopeKey: string): string {
 }
 
 describe('HostDesktops', () => {
-  test('missing Cloak credentials never advertises a stock browser and leaves files usable', async () => {
-    const { root, env } = workspace([...BROWSER, 'chromium']);
+  test('without a Cloak license Chromium is offered, a stealth call is refused and files stay usable', async () => {
+    const { root, env } = workspace(BROWSER);
     const systemd = fakeSystemd('91');
     const desktops = new HostDesktops({
       root,
@@ -172,9 +172,66 @@ describe('HostDesktops', () => {
       run: systemd.run,
     });
     await expect(desktops.prepareBrowser()).rejects.toThrow('license file');
-    expect(desktops.offersBrowser()).toBe(false);
+    expect(desktops.offersBrowser()).toBe(true);
+    expect(desktops.offersStealthBrowser()).toBe(false);
+    await expect(
+      desktops.forScope('chief:a').execute({
+        argv: ['agent-browser', '--session', 'chief_a-stealth', 'snapshot'],
+        timeoutMs: 5_000,
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toThrow('No CloakBrowser license');
     await desktops.forScope('chief:a').writeFile('note.txt', 'available');
     expect(await desktops.forScope('chief:a').readFile('note.txt')).toBe('available');
+  });
+
+  test('without Chromium the default browser is not offered', async () => {
+    const { root, env } = workspace(BROWSER.filter((name) => name !== 'chromium'));
+    const desktops = new HostDesktops({ root, toolsRoot: root, env, run: fakeSystemd('91').run });
+    await desktops.prepareBrowser();
+    expect(desktops.offersBrowser()).toBe(false);
+    expect(desktops.offersStealthBrowser()).toBe(true);
+  });
+
+  test('a default browser call runs Chromium on its own profile without the Cloak key', async () => {
+    const { root, env } = workspace(BROWSER);
+    const log = join(root, 'environment.log');
+    fakeAgentBrowser(
+      env.PATH,
+      log,
+      `printf '%s|%s|%s' "$CLOAKBROWSER_LICENSE_KEY" "$AGENT_BROWSER_EXECUTABLE_PATH" "$AGENT_BROWSER_ARGS" > '${log}.env'`,
+    );
+    const desktops = new HostDesktops({ root, toolsRoot: root, env, run: fakeSystemd('90').run });
+    await desktops.prepareBrowser();
+    for await (const _ of await desktops.forScope('chief:a').execute({
+      argv: ['agent-browser', '--session', 'chief_a', 'snapshot'],
+      timeoutMs: 5_000,
+      signal: new AbortController().signal,
+    }));
+    const [key, executable, args] = readFileSync(`${log}.env`, 'utf8').split('|');
+    expect(key).toBe('');
+    expect(executable).toBe(join(env.PATH, 'chromium'));
+    expect(args).toContain('--restore-last-session');
+    expect(args).not.toContain('--fingerprint');
+    expect(readFileSync(log, 'utf8')).toContain(
+      `${join(scopeHome(root, 'chief:a'), '.cairn', 'browser-profile')}|--session chief_a snapshot`,
+    );
+  });
+
+  test('an old Cloak profile moves to the stealth profile and Chromium starts fresh', async () => {
+    const { root, env } = workspace(BROWSER);
+    const home = scopeHome(root, 'chief:a');
+    const old = join(home, '.cairn', 'browser-profile');
+    mkdirSync(join(old, 'Default'), { recursive: true });
+    writeFileSync(join(old, '.cairn-cloak-identity.json'), '{}');
+    writeFileSync(join(old, 'Default', 'Cookies'), 'login');
+    await new HostDesktops({ root, toolsRoot: root, env, run: fakeSystemd('90').run }).ensure(
+      'chief:a',
+    );
+    expect(readFileSync(join(home, '.cairn', 'cloak-profile', 'Default', 'Cookies'), 'utf8')).toBe(
+      'login',
+    );
+    expect(existsSync(join(old, '.cairn-cloak-identity.json'))).toBe(false);
   });
 
   test('the Dock never points to the system Chromium desktop entry', async () => {
@@ -203,12 +260,12 @@ describe('HostDesktops', () => {
     }))
       shellEvents.push(event);
     expect(shellEvents.at(-1)).toMatchObject({ kind: 'exit', code: 0 });
-    expect(desktops.offersBrowser()).toBe(false);
+    expect(desktops.offersStealthBrowser()).toBe(false);
     await desktops.prepareBrowser();
-    expect(desktops.offersBrowser()).toBe(true);
+    expect(desktops.offersStealthBrowser()).toBe(true);
     for await (const _ of await provider.execute({
       ...request,
-      argv: ['agent-browser', 'snapshot'],
+      argv: ['agent-browser', '--session', 'chief_a-stealth', 'snapshot'],
     }));
     const browserEnv = readFileSync(`${log}.env`, 'utf8');
     expect(browserEnv).toContain('fake-cloak-test-key|/fake/cloak|');
@@ -239,7 +296,7 @@ describe('HostDesktops', () => {
         env.PATH,
         join(root, 'browser.log'),
         `case "$*" in
-      "--json session list") echo '{"data":{"sessions":["chief_a"]}}' ;;
+      "--json session list") echo '{"data":{"sessions":["chief_a-stealth"]}}' ;;
       *close) exit ${failure === 'failed close' ? 1 : 0} ;;
     esac`,
       );
@@ -260,7 +317,7 @@ describe('HostDesktops', () => {
       if (failure === 'locked profile')
         symlinkSync(
           `host-${process.pid}`,
-          join(scopeHome(root, 'chief:a'), '.cairn/browser-profile/SingletonLock'),
+          join(scopeHome(root, 'chief:a'), '.cairn/cloak-profile/SingletonLock'),
         );
       await expect(desktops.hold('chief:a', 'control')).rejects.toThrow('did not close');
       expect(
@@ -275,7 +332,7 @@ describe('HostDesktops', () => {
   async function takenOver(fastClock: boolean) {
     const { root, env } = workspace(BROWSER);
     const log = join(root, 'browser.log');
-    fakeAgentBrowser(env.PATH, log, `echo '{"data":{"sessions":[]}}'`);
+    fakeAgentBrowser(env.PATH, log, `echo '{"data":{"sessions":["chief_a-stealth"]}}'`);
     const systemd = fakeSystemd('90');
     let now = 0;
     const desktops = new HostDesktops({
@@ -291,7 +348,7 @@ describe('HostDesktops', () => {
     await desktops.prepareBrowser();
     (await desktops.hold('chief:a', 'control'))();
     const request = {
-      argv: ['agent-browser', 'snapshot'],
+      argv: ['agent-browser', '--session', 'chief_a-stealth', 'snapshot'],
       timeoutMs: 5_000,
       signal: new AbortController().signal,
     };
@@ -327,7 +384,7 @@ describe('HostDesktops', () => {
 
   test('handback quits MainPID windows on the scope display and then waits for lock release', async () => {
     const { root, log, systemd, desktops, request, unit } = await takenOver(false);
-    const lock = join(scopeHome(root, 'chief:a'), '.cairn/browser-profile/SingletonLock');
+    const lock = join(scopeHome(root, 'chief:a'), '.cairn/cloak-profile/SingletonLock');
     symlinkSync(`host-${process.pid}`, lock);
     const releaseLock = setTimeout(() => unlinkSync(lock), 50);
     try {
@@ -352,7 +409,7 @@ describe('HostDesktops', () => {
     const { root, systemd, desktops, request } = await takenOver(true);
     symlinkSync(
       `host-${process.pid}`,
-      join(scopeHome(root, 'chief:a'), '.cairn/browser-profile/SingletonLock'),
+      join(scopeHome(root, 'chief:a'), '.cairn/cloak-profile/SingletonLock'),
     );
     await expect(desktops.forScope('chief:a').execute(request)).rejects.toThrow('did not close');
     expect(stops(systemd.calls)).toEqual([]);
@@ -364,7 +421,7 @@ describe('HostDesktops', () => {
     fakeAgentBrowser(env.PATH, log, `echo '{"data":{"sessions":[]}}'`);
     const systemd = fakeSystemd('90');
     const request = {
-      argv: ['agent-browser', 'snapshot'],
+      argv: ['agent-browser', '--session', 'chief_a-stealth', 'snapshot'],
       timeoutMs: 5_000,
       signal: new AbortController().signal,
     };
@@ -407,7 +464,11 @@ describe('HostDesktops', () => {
 
   test('the Dock entry and the owner API run one generated starter for one unit', async () => {
     const { root, env } = workspace(BROWSER);
-    fakeAgentBrowser(env.PATH, join(root, 'browser.log'), `echo '{"data":{"sessions":[]}}'`);
+    fakeAgentBrowser(
+      env.PATH,
+      join(root, 'browser.log'),
+      `echo '{"data":{"sessions":["chief_a-stealth"]}}'`,
+    );
     const systemd = fakeSystemd('96');
     const desktops = new HostDesktops({ root, toolsRoot: root, env, run: systemd.run });
     await desktops.prepareBrowser();
@@ -441,7 +502,11 @@ describe('HostDesktops', () => {
     ['a new unit never shows a window', 'ok', false],
   ] as const)('owner takeover is refused when %s', async (_name, start, preActive) => {
     const { root, env } = workspace(BROWSER);
-    fakeAgentBrowser(env.PATH, join(root, 'browser.log'), `echo '{"data":{"sessions":[]}}'`);
+    fakeAgentBrowser(
+      env.PATH,
+      join(root, 'browser.log'),
+      `echo '{"data":{"sessions":["chief_a-stealth"]}}'`,
+    );
     const systemd = fakeSystemd('90');
     systemd.behavior.start = start;
     systemd.behavior.windows = false;
@@ -577,7 +642,7 @@ describe('HostDesktops', () => {
       await expect(desktops.forScope('chief:a').execute(request)).rejects.toThrow('taken over');
       release();
       const directory = join(scopeHome(root, 'chief:a'), '..');
-      expect(desktops.offersBrowser()).toBe(false);
+      expect(desktops.offersStealthBrowser()).toBe(false);
       expect(existsSync(join(directory, 'cloak-manual'))).toBe(false);
       expect(existsSync(join(directory, 'cloak-browser.desktop'))).toBe(false);
       expect(systemd.calls.some((argv) => basename(argv[0] as string) === 'cloak-manual')).toBe(
@@ -794,7 +859,7 @@ describe('HostDesktops', () => {
       env.PATH,
       log,
       `case "$*" in
-  "--json session list") echo '{"success":true,"data":{"sessions":["chief_a"]}}' ;;
+  "--json session list") echo '{"success":true,"data":{"sessions":["chief_a","chief_a-stealth"]}}' ;;
   *"get url") echo 'https://www.zhipin.com/web/geek/job' ;;
 esac
 `,
@@ -812,15 +877,15 @@ esac
       env: { ...env, HTTPS_PROXY: 'http://127.0.0.1:7890' },
       run,
     });
-    const profile = join(scopeHome(root, 'chief:a'), '.cairn', 'browser-profile');
+    const profile = join(scopeHome(root, 'chief:a'), '.cairn', 'cloak-profile');
     const owner = `cairn-desktop-${createHash('sha256').update('chief:a').digest('hex').slice(0, 16)}-browser.service`;
 
     await desktops.prepareBrowser();
     const first = await desktops.hold('chief:a', 'control');
     expect(agentLogAtOwnerStart).toEqual([
-      `${profile}|--json session list`,
-      `${profile}|--session chief_a get url`,
-      `${profile}|--session chief_a close`,
+      '|--json session list',
+      `${profile}|--session chief_a-stealth get url`,
+      `${profile}|--session chief_a-stealth close`,
     ]);
     const starter = join(scopeHome(root, 'chief:a'), '..', 'cloak-manual');
     expect(systemd.calls.filter((argv) => argv[0] === starter)).toEqual([
@@ -840,7 +905,7 @@ esac
 
     const browser = desktops.forScope('chief:a');
     const request = {
-      argv: ['agent-browser', 'snapshot'],
+      argv: ['agent-browser', '--session', 'chief_a-stealth', 'snapshot'],
       timeoutMs: 5_000,
       signal: new AbortController().signal,
     };
@@ -864,27 +929,26 @@ esac
     const ownerActiveAtSnapshot = systemd.active.has(owner);
     for await (const _event of events);
     expect(ownerActiveAtSnapshot).toBe(false);
-    expect(lines().at(-1)).toBe(`${profile}|snapshot`);
+    expect(lines().at(-1)).toBe(`${profile}|--session chief_a-stealth snapshot`);
     expect(quits(systemd.calls).length).toBeGreaterThan(0);
     expect(stops(systemd.calls)).toEqual([]);
     expect(systemd.calls.filter((argv) => argv[0] === starter)).toHaveLength(2);
   });
 
-  test('taking control with no agent page restores the owner browser last session', async () => {
-    const { root, env } = workspace([...BROWSER, 'chromium']);
+  test('taking control with no stealth session hands over the open windows and starts no owner browser', async () => {
+    const { root, env } = workspace(BROWSER);
     fakeAgentBrowser(
       env.PATH,
       join(root, 'agent-browser.log'),
-      `echo '{"success":true,"data":{"sessions":[]}}'\n`,
+      `echo '{"success":true,"data":{"sessions":["chief_a"]}}'\n`,
     );
     const systemd = fakeSystemd('98');
     const desktops = new HostDesktops({ root, toolsRoot: root, env, run: systemd.run });
     await desktops.prepareBrowser();
     (await desktops.hold('chief:a', 'control'))();
     const directory = join(scopeHome(root, 'chief:a'), '..');
-    expect(systemd.calls.find((argv) => argv[0] === join(directory, 'cloak-manual'))).toEqual([
-      join(directory, 'cloak-manual'),
-    ]);
+    expect(systemd.calls.some((argv) => argv[0] === join(directory, 'cloak-manual'))).toBe(false);
+    expect(readFileSync(join(root, 'agent-browser.log'), 'utf8')).not.toContain('close');
     expect(
       readFileSync(join(directory, 'cloak-browser'), 'utf8').match(/--restore-last-session/g),
     ).toHaveLength(1);
