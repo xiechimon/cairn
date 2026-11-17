@@ -1,8 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { hostname } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import type {
   AgentBackend,
@@ -892,9 +890,11 @@ export interface PiBackendOpts {
 }
 
 export function piHostLaunch(cliPath: string): Launch {
-  const loader = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href;
   return cliPath.endsWith('.ts')
-    ? { command: process.execPath, args: ['--import', loader, cliPath, 'pi-host'] }
+    ? {
+        command: process.execPath,
+        args: ['--import', import.meta.resolve('tsx'), cliPath, 'pi-host'],
+      }
     : { command: process.execPath, args: [cliPath, 'pi-host'] };
 }
 
