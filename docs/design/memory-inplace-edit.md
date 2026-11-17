@@ -1,5 +1,7 @@
 # Memory in-place edit and the MEMORY.md shape
 
+Status: partially superseded (2026-11-18): the owner-facing inline edit shipped as a direct edit + save/cancel in the memory detail dialog (`PATCH /api/teams/:id/memories/:mid` over `update_memory`/`updateMemoryEntry`), not through the Coordinator composer this page prescribes. The composer-editing flow below stays as the still-unbuilt model-directed path; the owner edit is the canonical contract today.
+
 Status: approved for implementation, revision 3, for #3664 (plan decision D123). The owner approved the recommendations and the coordinator approved implementation on 2026-11-09. The PRs that touch the migration, `machine-claim.ts` or `machine-relay.ts` keep `coordinator-hold`. This page contains no product code.
 
 The owner decided on #3677 (2026-11-09):
