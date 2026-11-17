@@ -93,7 +93,7 @@ export const copy = {
       no: [
         { text: '给团队共用的工具，有共享频道、角色和账单', alt: 'Amp Spaces', href: 'https://ampcode.com/docs/spaces' },
         { text: '只是更好用的界面，自己驱动 Claude Code 或 Codex', alt: 'T3 Code', href: 'https://github.com/pingdotgg/t3code' },
-        { text: '住在聊天软件里的助理，比如 Telegram、WhatsApp', alt: 'OpenClaw', href: 'https://github.com/openclaw/openclaw' },
+        { text: '把家安在聊天软件里的助理，比如 Telegram、WhatsApp', alt: 'OpenClaw', href: 'https://github.com/openclaw/openclaw' },
         { text: '托管服务，什么都不用装、不用维护', alt: null, href: null },
       ],
       altPrefix: '可以看看',
@@ -216,7 +216,7 @@ export const copy = {
       no: [
         { text: 'a tool a team shares, with shared channels, roles and billing', alt: 'Amp Spaces', href: 'https://ampcode.com/docs/spaces' },
         { text: 'only a better interface for driving Claude Code or Codex yourself', alt: 'T3 Code', href: 'https://github.com/pingdotgg/t3code' },
-        { text: 'an assistant that lives in your chat apps, such as Telegram or WhatsApp', alt: 'OpenClaw', href: 'https://github.com/openclaw/openclaw' },
+        { text: 'an assistant whose home is a chat app, such as Telegram or WhatsApp', alt: 'OpenClaw', href: 'https://github.com/openclaw/openclaw' },
         { text: 'a hosted service with nothing to install or keep running', alt: null, href: null },
       ],
       altPrefix: 'Try',

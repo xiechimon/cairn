@@ -4,7 +4,7 @@
 
 > Canonical status: this volume = the pacman positioning source of truth (thesis / criterion / two axes / what not to do / honesty list),
 > revising volume 06 D1's positioning narrative (**revision does not replace** — D1's other components stay valid).
-> Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree). → D55 three-pillar thesis (#2489, PR #2490; owner accepted 2026-11-01). → general-assistant thesis (owner decision, 2026-11-11). → personal-assistant thesis and second-person criterion (owner decision, 2026-11-14; §1, §2).
+> Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree). → D55 three-pillar thesis (#2489, PR #2490; owner accepted 2026-11-01). → general-assistant thesis (owner decision, 2026-11-11). → personal-assistant thesis and second-person criterion (owner decision, 2026-11-14; §1, §2). → action-bound approvals and Electron-on-three-OSes form factor (owner decision, 2026-11-17; §0 P7, §3.5, §4).
 > Argument and trade-offs were in ADR 0008 (removed; see the git history at 608eabac0): **the ADR recorded why, this volume records what**.
 
 ## 0. Overview
@@ -17,7 +17,7 @@
 | P4 | Runtime axis | aligned with the Multica runtime model: runtime = one computer × one CLI tool |
 | P5 | Not aligned | Multica's three philosophical tenets: no hard gates / status-first / daemon not a sandbox boundary; plus workers as the operator's OS user (DSH super-agent, sig) and merge rules as prompt text (DSH) (§3.3) |
 | P6 | Chief | the gates' established consumer (withdrawn from the differentiation pillar), survival ruled by real closed-loop measurement, including the slow-path share once #2487 lands |
-| P7 | Shape | one chief; the entry chosen by the user; output that is code passes the gates; whether to open a PR is only how the code lands (§3.5) |
+| P7 | Shape | one chief; the entry chosen by the user; output that is code passes the gates; approvals bind irreversible actions rather than a mandatory lifecycle stage (owner decision, 2026-11-17); whether to open a PR is only how the code lands (§3.5) |
 
 ## 1. Thesis (owner decision, 2026-11-14)
 
@@ -25,7 +25,7 @@
 
 One product, two kinds of project, one loop. A code project has a repository and lands through the merge gate. A personal project has no repository and holds the owner's own affairs, such as mail, calendar and job search; agents read, sort and draft there, and outward actions go through the one approval mechanism (the confirm-once class in `docs/design/ai-native-actions.md`). Both use the same channels, threads and decision cards; there is no second inbox or second approval system.
 
-Who it is for: one person who writes code or works alongside code, has a machine that can stay on, already pays for Claude Code, Codex or Gemini or holds an API key, and wants code, mail and credentials to stay on their own machines. It is for one person, not a team: someone else who wants it runs their own copy. Not for: teams that share channels, roles and billing (Amp Spaces, Multica); people who only want a better interface for driving one coding agent themselves (T3 Code); an assistant that lives in chat apps (OpenClaw, Hermes Agent); people who want a hosted service with nothing to install. README's "Who it's for" section carries the same lists.
+Who it is for: one person who writes code or works alongside code, has a machine that can stay on, already pays for Claude Code, Codex or Gemini or holds an API key, and wants code, mail and credentials to stay on their own machines. It is for one person, not a team: someone else who wants it runs their own copy. Not for: teams that share channels, roles and billing (Amp Spaces, Multica); people who only want a better interface for driving one coding agent themselves (T3 Code); an assistant whose home is a chat app (OpenClaw, Hermes Agent) — chat apps are entry points here, not the residence; people who want a hosted service with nothing to install. README's "Who it's for" section carries the same lists.
 
 The review and merge machinery is one capability among others and is not the product's pitch. Evaluation and harness self-improvement stay in scope: they apply to a personal assistant as much as to coding work (owner, 2026-11-12). What is specific to coding is the bench content, not the ruler, the adoption judge or the trajectory capture. The remaining work this direction adds is tracked outside the repository on the owner's roadmap board (owner decision, 2026-11-17: one checklist entry; the in-repo tracker `docs/design/home-redesign-backend-todo.md` was deleted and its items migrated).
 
@@ -56,7 +56,7 @@ In-volume terms (do not enter `CONTEXT.md` — that only manages product-domain 
 
 ## 2. Criterion: A Second Person Can Run It (owner decision, 2026-11-14)
 
-Every trade-off first asks "can a second person run it": someone other than the owner, without the owner's help, installs cairn (`npx @xiechimon/cairn`), connects their own machine and their own subscription or API key, and gets a first result, such as a thread that merges a pull request or drafts a reply to a mail. Then it asks "is it differentiating".
+Every trade-off first asks "can a second person run it": someone other than the owner, without the owner's help, installs cairn (packaged desktop app, or `npx @xiechimon/cairn`), connects their own machine and their own subscription or API key, and gets a first result, such as a thread that merges a pull request or drafts a reply to a mail. Then it asks "is it differentiating".
 
 This replaces "self-use first" (#515, 2026-09-30), which asked "do I really use it myself" first. That question ranked last everything only a newcomer hits and the owner never does: unclear first-run guidance, errors only the owner can read, documents that assume the history, and settings that exist only on the owner's machine. The second person is still one person with their own copy; the criterion does not bring in team features (§4).
 
@@ -102,6 +102,7 @@ Constraints:
 
 - Output that is code passes the gates, independent of entry and whether a PR is opened. "No board means no gate" equals removing the gates for a subset of users, becoming a weaker Raven, not adopted.
 - The gate is a phase-machine stopping point; the passer can be a human or a deterministic checker per project policy (ADR 0021's merge-readiness gate, #1623's decomposition checker); since ADR 0026 the default policy is autonomous, with protected paths requiring an independent review; in this repository ADR 0028's phase-1 routes send protected paths and ADRs to the owner. (Superseded wording, 2026-10-24: "the default is always a human, same caliber as ADR 0021 D1".)
+- Approvals bind the irreversible-action boundary, not a mandatory lifecycle stage (owner decision, 2026-11-17): merge/send/submit-class actions gate at the moment of effect through the action registry's confirm-once/owner-only classes and standing grants; the phase machine stays as the work-lifecycle spine for code output, and the confirm/review phase gates remain the enforcement point until each action class re-derives its check (tracked on the owner's roadmap board).
 - Same-kind comparison (historical, 2026-10-24): Vibe Kanban, Conductor's local worktree shapes all ultimately land through PRs, Raven's coding specialist has no repo-level merge gate. At that date "local repo, no PR, gate before merge" had no existing implementation; cairn's own gated local landing has since landed (#2050: `apps/daemon/src/local-merge.ts` calls `decideLocalMerge`).
 
 Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (decomposition checker passes → auto-run) → #1625 (local-shape auto-merge) → #1626 (info-class fast lane); #1624 (sub-card injection pre-delivery summary) parallel with #1623. The IM entry no longer waits: #1607 concluded, and the first slice (Telegram + WeChat iLink: pair → receive → text reply) landed per `docs/design/im-connections.md`; decision-card buttons and further adapters remain open. External-agent onboarding follows the ACP conclusion.
@@ -113,7 +114,7 @@ Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (
 - Chief autonomous dispatch — first want "shutdown without breaking the chain", not "still deciding on its own when shut down".
 - Team features (owner decision, 2026-11-14): channels shared by several people, team roles and permissions, team billing. Another person uses cairn by running their own copy.
 - Gantt view / multiple workspaces / third-party Git (Forgejo / Gitea / GitLab) — meaningless for one person, killed outright.
-- Directly chasing Multica's integration-surface breadth (IM five, desktop app) — still rejected; two IM adapters exist (Telegram, WeChat iLink) for phone reach, and further platforms stay "possible future C class". Phone access without IM is Tailscale; embedded tsnet with automatic LAN / tailnet / optional Funnel routing is planned, and a hosted relay may come later.
+- Directly chasing Multica's integration-surface breadth — partially revised (owner decision, 2026-11-17): Electron desktop on all three OSes is decided (Windows and Linux join the shipped macOS app), and Telegram + WeChat iLink are the IM entries. Further IM platforms and further surfaces stay "possible future C class". Phone access without IM is Tailscale; embedded tsnet with automatic LAN / tailnet / optional Funnel routing is planned, and a hosted relay may come later.
 - todos.dev baseline re-photography and pixel parity — volume 06 D1 released the parity obligation.
 
 (Multica's three philosophical tenets see §3.3, not entering this section.)
