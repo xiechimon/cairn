@@ -187,7 +187,7 @@ for (const mask of MASK_CASES) {
               ];
             }),
           )
-          .toEqual(['80px', '32px']);
+          .toEqual(['96px', '32px']);
         const read = await scope.evaluate((root) => {
           const body = root.querySelector('[data-testid="chief-body"]') as HTMLElement;
           const style = getComputedStyle(body);
@@ -198,12 +198,14 @@ for (const mask of MASK_CASES) {
           const k = composer.getBoundingClientRect();
           return {
             mask: style.maskImage,
+            hiddenTop: style.getPropertyValue('--scroll-fade-inset-top').trim(),
             listToComposer: Math.round(k.top - body.getBoundingClientRect().bottom),
             left: Math.abs(c.left - k.left),
             right: Math.abs(c.right - k.right),
           };
         });
         expect(read.mask).toContain('linear-gradient');
+        expect(read.hiddenTop).toBe('24px');
         expect(read.listToComposer).toBe(0);
         expect(read.left).toBeLessThan(1);
         expect(read.right).toBeLessThan(1);
