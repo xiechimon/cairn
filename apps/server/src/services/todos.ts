@@ -20,13 +20,15 @@ import {
   derivePlaceholderTitle,
   githubIssueSourceRef,
   IN_PROGRESS_PHASES,
+  isBackendRuntimeId,
   isStartedTodo,
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
   renderTaskText,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNotNull, isNull, max, min, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, min, sql } from 'drizzle-orm';
+import { compactionWindow } from '../coordinator/runtime/compaction.js';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -36,6 +38,7 @@ import {
   schedule,
   steerPending,
   step,
+  stepUsage,
   stopPending,
   tag,
   taskIssueClose,
@@ -52,6 +55,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { checkBlockedBy, holdBlockedBuild, releaseBlockedSteps } from './blockers.js';
 import { triggerChiefWakes } from './chief.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
+import { contextWindowOf } from './coordinator-context.js';
 import { assertCorrectionDone } from './correction.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
@@ -233,6 +237,36 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
       .all()
       .map(({ todoId, ...sums }) => [todoId, sums]),
   );
+  const teamOf = new Map(rows.map((row) => [row.id, row.teamId]));
+  const contextByTodo = new Map<string, TodoRecord['context']>();
+  for (const row of db
+    .select({
+      todoId: build.todoId,
+      model: stepUsage.model,
+      contextTokens: stepUsage.contextTokens,
+      contextWindow: stepUsage.contextWindow,
+      compactAt: stepUsage.compactAt,
+    })
+    .from(stepUsage)
+    .innerJoin(build, eq(build.id, stepUsage.buildId))
+    .where(and(inArray(build.todoId, ids), gt(stepUsage.contextTokens, 0)))
+    .orderBy(desc(stepUsage.createdAt))
+    .all()) {
+    if (contextByTodo.has(row.todoId) || row.contextTokens === null) continue;
+    const teamId = teamOf.get(row.todoId);
+    if (teamId === undefined) continue;
+    const contextWindow = row.contextWindow ?? contextWindowOf(db, teamId, row.model);
+    const compactAt =
+      row.compactAt ??
+      (isBackendRuntimeId(row.model.slice(0, row.model.indexOf('/')))
+        ? undefined
+        : compactionWindow(contextWindow).backgroundAt);
+    contextByTodo.set(row.todoId, {
+      tokens: row.contextTokens,
+      contextWindow,
+      ...(compactAt !== undefined ? { compactAt } : {}),
+    });
+  }
   const deliverables = new Map(
     latestBuildIds.length === 0
       ? []
@@ -258,6 +292,7 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
     history: (history.get(row.id) ?? []).map(({ buildId, createdAt }) => ({ buildId, createdAt })),
     quotaWait: row.latestBuildId === null ? null : (quotaWaits.get(row.latestBuildId) ?? null),
     usage: usage.get(row.id),
+    context: contextByTodo.get(row.id),
   });
 }
 
@@ -289,6 +324,7 @@ function todoRecordOf(
     history,
     quotaWait,
     usage,
+    context,
   }: ReturnType<ReturnType<typeof todoRelations>>,
   now: number,
 ): TodoRecord & { section: TodoSection | null } {
@@ -340,6 +376,7 @@ function todoRecordOf(
           },
         }
       : {}),
+    ...(context !== undefined ? { context } : {}),
     ...(deliverables !== undefined ? { deliverables } : {}),
     ...(row.routeOverride != null ? { routeOverride: row.routeOverride } : {}),
     ...(row.request != null ? { request: row.request } : {}),

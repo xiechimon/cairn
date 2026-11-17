@@ -276,10 +276,16 @@ export function threadContextOf(source: unknown): ChiefContextUsage | null {
   if (source == null || typeof source !== 'object') return null;
   const context = (source as { context?: unknown }).context;
   if (context == null || typeof context !== 'object') return null;
-  const { tokens, contextWindow } = context as { tokens?: unknown; contextWindow?: unknown };
+  const { tokens, contextWindow, compactAt } = context as {
+    tokens?: unknown;
+    contextWindow?: unknown;
+    compactAt?: unknown;
+  };
   if (typeof tokens !== 'number' || typeof contextWindow !== 'number') return null;
   if (!Number.isFinite(tokens) || !Number.isFinite(contextWindow) || contextWindow <= 0)
     return null;
+  if (typeof compactAt === 'number' && Number.isFinite(compactAt) && compactAt > 0)
+    return { tokens, contextWindow, compactAt };
   return { tokens, contextWindow };
 }
 

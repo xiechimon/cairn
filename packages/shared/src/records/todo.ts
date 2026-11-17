@@ -135,6 +135,14 @@ export const todoRecordSchema = z.object({
     .optional(),
   quotaWait: quotaWaitSchema.nullable().optional(),
   usageCost: usageCostSchema.optional(),
+  context: z
+    .object({
+      tokens: z.number().int(),
+      contextWindow: z.number().int(),
+      compactAt: z.number().int().positive().optional(),
+    })
+    .nullable()
+    .optional(),
   deliverables: todoDeliverablesSchema.optional(),
   verified: z.boolean().optional(),
   decisions: z.array(taskDecisionSchema).optional(),

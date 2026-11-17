@@ -418,6 +418,9 @@ export function recordStepUsage(
             cacheRead: u.cacheRead,
             cacheWrite: u.cacheWrite,
             mirroredTokens: mirrored,
+            contextTokens: u.contextTokens ?? null,
+            contextWindow: u.contextWindow ?? null,
+            compactAt: u.compactAt ?? null,
             createdAt: nowMs(),
           })
           .onConflictDoUpdate({
@@ -428,6 +431,13 @@ export function recordStepUsage(
               cacheRead: sql`${stepUsage.cacheRead} + ${u.cacheRead}`,
               cacheWrite: sql`${stepUsage.cacheWrite} + ${u.cacheWrite}`,
               mirroredTokens: sql`${stepUsage.mirroredTokens} + ${mirrored}`,
+              ...(u.contextTokens !== undefined
+                ? {
+                    contextTokens: u.contextTokens,
+                    contextWindow: u.contextWindow ?? null,
+                    compactAt: u.compactAt ?? null,
+                  }
+                : {}),
             },
           })
           .run();

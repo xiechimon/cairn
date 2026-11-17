@@ -7211,6 +7211,38 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               },
               "type": "array",
             },
+            "context": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "compactAt": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "contextWindow": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "tokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "tokens",
+                    "contextWindow",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
             "createdBy": {
               "type": [
                 "string",
@@ -13255,6 +13287,38 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "type": "object",
       },
       "type": "array",
+    },
+    "context": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "compactAt": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer",
+            },
+            "contextWindow": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "tokens": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "tokens",
+            "contextWindow",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
     },
     "createdBy": {
       "type": [

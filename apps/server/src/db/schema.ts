@@ -1045,6 +1045,9 @@ export const stepUsage = sqliteTable(
     cacheRead: integer('cacheRead').notNull().default(0),
     cacheWrite: integer('cacheWrite').notNull().default(0),
     mirroredTokens: integer('mirroredTokens').notNull().default(0),
+    contextTokens: integer('contextTokens'),
+    contextWindow: integer('contextWindow'),
+    compactAt: integer('compactAt'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [

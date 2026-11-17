@@ -132,6 +132,15 @@ describe('thread context usage', () => {
     });
   });
 
+  test('a reported compact point comes through for the auto-compact hint', () => {
+    expect(
+      threadContextOf({ context: { tokens: 62_000, contextWindow: 200_000, compactAt: 91_808 } }),
+    ).toEqual({ tokens: 62_000, contextWindow: 200_000, compactAt: 91_808 });
+    expect(
+      threadContextOf({ context: { tokens: 62_000, contextWindow: 200_000, compactAt: -1 } }),
+    ).toEqual({ tokens: 62_000, contextWindow: 200_000 });
+  });
+
   test('a todo without the field, or with an unusable one, has no context', () => {
     expect(threadContextOf({})).toBeNull();
     expect(threadContextOf({ context: null })).toBeNull();

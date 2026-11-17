@@ -1,4 +1,9 @@
-import { chiefDigestThreadId, type ModelUsage, type StepKind } from '@cairn/shared';
+import {
+  chiefDigestThreadId,
+  type ModelUsage,
+  type StepKind,
+  todoRecordSchema,
+} from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
@@ -124,6 +129,9 @@ describe('recordStepUsage writes one step_usage row per step and model', () => {
         cacheRead: 30,
         cacheWrite: 4,
         mirroredTokens: 0,
+        contextTokens: null,
+        contextWindow: null,
+        compactAt: null,
         createdAt: NOW,
       },
     ]);
@@ -169,6 +177,82 @@ describe('recordStepUsage writes one step_usage row per step and model', () => {
     report('t1', H.threadId, [u('m', 100)]);
     H.s.db.delete(stepTable).where(eq(stepTable.id, 't1')).run();
     expect(daily(1)).toEqual([{ date: '2026-11-16', coordinator: 100, tasks: 0 }]);
+  });
+
+  test('a context reading is stored, overwritten by a later reading and kept by one without', () => {
+    addBuild('build-1', NOW);
+    report(
+      's1',
+      'build-1',
+      [{ ...u('m', 10), contextTokens: 50_000, contextWindow: 200_000, compactAt: 90_000 }],
+      'build',
+    );
+    expect(H.s.db.select().from(stepUsage).get()).toMatchObject({
+      contextTokens: 50_000,
+      contextWindow: 200_000,
+      compactAt: 90_000,
+    });
+    report('s1', 'build-1', [u('m', 5)], 'build');
+    expect(H.s.db.select().from(stepUsage).get()).toMatchObject({
+      contextTokens: 50_000,
+      contextWindow: 200_000,
+      compactAt: 90_000,
+    });
+    report('s1', 'build-1', [{ ...u('m', 5), contextTokens: 80_000 }], 'build');
+    expect(H.s.db.select().from(stepUsage).get()).toMatchObject({
+      contextTokens: 80_000,
+      contextWindow: null,
+      compactAt: null,
+    });
+  });
+});
+
+describe('thread context on the todo payload', () => {
+  const contextOf = async (todoId: string) => {
+    const res = await req(H.s.app, 'GET', `/api/todos/${todoId}`);
+    expect(res.status).toBe(200);
+    return todoRecordSchema.parse(await res.json()).context;
+  };
+
+  test('the latest context-bearing report wins, with catalog window and derived compact point', async () => {
+    addBuild('build-1', NOW);
+    vi.setSystemTime(YESTERDAY);
+    report('s-old', 'build-1', [{ ...u('m', 10), contextTokens: 20_000 }], 'build');
+    vi.setSystemTime(NOW);
+    report(
+      's-new',
+      'build-1',
+      [{ ...u('pi/m', 10), contextTokens: 62_000, contextWindow: 128_000 }],
+      'build',
+    );
+    expect(await contextOf('todo-build-1')).toEqual({
+      tokens: 62_000,
+      contextWindow: 128_000,
+      compactAt: 55_808,
+    });
+  });
+
+  test('a reading without a window falls back to the catalog window, a backend model keeps no compact point', async () => {
+    addBuild('build-1', NOW);
+    vi.setSystemTime(NOW);
+    report(
+      's1',
+      'build-1',
+      [{ ...u('claude-code/test-model', 10), contextTokens: 62_000 }],
+      'build',
+    );
+    expect(await contextOf('todo-build-1')).toEqual({
+      tokens: 62_000,
+      contextWindow: 200_000,
+    });
+  });
+
+  test('a thread with no context reading carries no field, and a zero reading is ignored', async () => {
+    addBuild('build-1', NOW);
+    expect(await contextOf('todo-build-1')).toBeUndefined();
+    vi.setSystemTime(NOW);
+    report('s1', 'build-1', [u('m', 10), { ...u('x', 4), contextTokens: 0 }], 'build');
+    expect(await contextOf('todo-build-1')).toBeUndefined();
   });
 });
 

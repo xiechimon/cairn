@@ -48,7 +48,7 @@ export function coordinatorRunsOnPi(): boolean {
   return serverContextOn || inServer;
 }
 
-function contextWindowOf(db: Db, teamId: string, usageModel: string): number {
+export function contextWindowOf(db: Db, teamId: string, usageModel: string): number {
   const slash = usageModel.indexOf('/');
   if (slash <= 0) return DEFAULT_CONTEXT_WINDOW;
   const providerId = usageModel.slice(0, slash);
