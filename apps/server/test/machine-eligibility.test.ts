@@ -30,6 +30,7 @@ function input(over: {
     localProject: false,
     claudeRateBlocked: false,
     claudeSubscriptionMissing: false,
+    devinSubscriptionMissing: false,
     ...over.rest,
   };
 }
@@ -180,6 +181,35 @@ describe('D71 machineEligibility: hard constraints for a worker step on a machin
     expect(machineEligibility(input({ rest: { claudeSubscriptionMissing: true } }))?.kind).toBe(
       'claude-login',
     );
+  });
+
+  test('a team without a usable Devin subscription does not take a devin step', () => {
+    expect(
+      machineEligibility(
+        input({
+          machine: {
+            claudeCodeReport: null,
+            capabilities: { mcpServers: [], skills: [], devin: { installed: true } },
+          },
+          model: { provider: 'devin', modelId: 'swe-2-high' },
+          rest: { devinSubscriptionMissing: true },
+        }),
+      )?.kind,
+    ).toBe('devin-subscription');
+  });
+
+  test('a devin step skips the per-runner model check on a static model list', () => {
+    expect(
+      machineEligibility(
+        input({
+          machine: {
+            claudeCodeReport: null,
+            capabilities: { mcpServers: [], skills: [], devin: { installed: true } },
+          },
+          model: { provider: 'devin', modelId: 'swe-2-high' },
+        }),
+      ),
+    ).toBeNull();
   });
 });
 

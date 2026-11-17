@@ -28,7 +28,7 @@ export type BuildStepRoute = {
   buildId: string;
   stepId: string;
   kind: StepKind;
-  harness: 'claude-code' | 'pi' | null;
+  harness: 'claude-code' | 'pi' | 'devin' | null;
   provider: string | null;
   modelId: string | null;
   machineId: string | null;
@@ -185,8 +185,9 @@ export function decideStepRoute(
   return routeWork({ kind, difficulty }, capabilityCandidates(db, todoRow.teamId, constraints));
 }
 
-function harnessOf(provider: string | null): 'claude-code' | 'pi' | null {
+function harnessOf(provider: string | null): 'claude-code' | 'pi' | 'devin' | null {
   if (provider === 'claude-code') return 'claude-code';
+  if (provider === 'devin') return 'devin';
   return provider === CODEX_MODEL.provider ? 'pi' : null;
 }
 

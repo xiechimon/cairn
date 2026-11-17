@@ -1,5 +1,6 @@
 import { hostname } from 'node:os';
 import {
+  DEFAULT_DEVIN_MODELS,
   type ModelSourcesEnvelope,
   PROVIDER_OAUTH_PRESET_IDS,
   PROVIDER_PRESET_IDS,
@@ -124,6 +125,28 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
     });
 }
 
+export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
+  return db
+    .select()
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .orderBy(asc(machine.name))
+    .all()
+    .flatMap((row) =>
+      row.online && row.capabilities?.devin?.installed === true
+        ? [
+            {
+              runtime: 'devin' as const,
+              installed: true,
+              hostname: row.name,
+              machineId: row.id,
+              models: [...DEFAULT_DEVIN_MODELS],
+            },
+          ]
+        : [],
+    );
+}
+
 export function getModelSources(deps: ProviderDeps, teamId: string): ModelSourcesEnvelope {
   const piSources: ModelSourcesEnvelope['sources'] = listProviders(deps, teamId).map((p) => {
     const stored = p.models.filter((m) => m.id !== '');
@@ -146,6 +169,7 @@ export function getModelSources(deps: ProviderDeps, teamId: string): ModelSource
         ? piSources
         : [{ runtime: 'pi' as const, installed: true, hostname: hostname(), models: [] }]),
       ...listClaudeCodeSources(deps.db, teamId),
+      ...listDevinSources(deps.db, teamId),
     ],
   };
 }

@@ -2,6 +2,7 @@ import {
   capabilitiesResponseSchema,
   cloakLicenseBodySchema,
   createClaudeSubscriptionSchema,
+  createDevinSubscriptionSchema,
   createMcpConnectorBodySchema,
   createProviderBodySchema,
   createScheduleBodySchema,
@@ -18,6 +19,7 @@ import {
   ROUTE_USES,
   redactSecrets,
   renameClaudeSubscriptionSchema,
+  renameDevinSubscriptionSchema,
   SKILL_ENTRY_FILE,
   setSecretBodySchema,
   skillRecordSchema,
@@ -58,6 +60,16 @@ import {
 import { saveCloakLicense } from './services/cloak-license.js';
 import { pollCodexDeviceLogin, startCodexDeviceLogin } from './services/codex-device-login.js';
 import { stepIdOfGitKey } from './services/credentials.js';
+import {
+  createDevinSubscription,
+  deleteDevinSubscription,
+  disableDevinSubscription,
+  enableDevinSubscription,
+  listDevinSubscriptionSteps,
+  listDevinSubscriptions,
+  renameDevinSubscription,
+  verifyDevinSubscriptionConnection,
+} from './services/devin-subscriptions.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
 import {
@@ -568,6 +580,66 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     return c.json(await verifySubscriptionConnection(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.get('/api/teams/:id/devin-subscriptions', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(listDevinSubscriptions(keysvc, teamId));
+  });
+
+  app.post('/api/teams/:id/devin-subscriptions', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const body = parseWith(createDevinSubscriptionSchema, await jsonBody(c), 'body');
+    return c.json(createDevinSubscription(keysvc, teamId, body), 201);
+  });
+
+  app.delete('/api/teams/:id/devin-subscriptions/:cid', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    if (!deleteDevinSubscription(keysvc, teamId, c.req.param('cid'))) {
+      throw notFound('Devin subscription connection');
+    }
+    return c.body(null, 204);
+  });
+
+  app.patch('/api/teams/:id/devin-subscriptions/:cid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const body = parseWith(renameDevinSubscriptionSchema, await jsonBody(c), 'body');
+    return c.json(renameDevinSubscription(keysvc, teamId, c.req.param('cid'), body.label));
+  });
+
+  app.post('/api/teams/:id/devin-subscriptions/:cid/enable', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(await enableDevinSubscription(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/devin-subscriptions/:cid/disable', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(disableDevinSubscription(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.get('/api/teams/:id/devin-subscriptions/:cid/steps', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const limit = Math.min(Math.max(Math.trunc(Number(c.req.query('limit') ?? 20)) || 20, 1), 100);
+    return c.json(listDevinSubscriptionSteps(keysvc, teamId, c.req.param('cid'), limit));
+  });
+
+  app.post('/api/teams/:id/devin-subscriptions/:cid/verify', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(await verifyDevinSubscriptionConnection(keysvc, teamId, c.req.param('cid')));
   });
 
   app.get('/api/teams/:id/providers', (c) => {

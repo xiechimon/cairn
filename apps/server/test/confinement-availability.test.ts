@@ -29,6 +29,7 @@ function eligibility(confinement: unknown, osPlatform = 'linux') {
     localProject: false,
     claudeRateBlocked: false,
     claudeSubscriptionMissing: false,
+    devinSubscriptionMissing: false,
   };
   return machineEligibility(input);
 }

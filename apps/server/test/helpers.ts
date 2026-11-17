@@ -35,6 +35,7 @@ import { newRecordId, newUuidv7 } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { enqueueStep } from '../src/services/builds.js';
 import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
+import { createDevinSubscription } from '../src/services/devin-subscriptions.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { teamAutonomyPaused } from '../src/services/github-autonomy-brake.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
@@ -412,12 +413,24 @@ export function insertClaudeSubscription(
   }).id;
 }
 
+export function insertDevinSubscription(
+  s: Pick<TestServer, 'db' | 'secretBox' | 'team'>,
+  opts: { label?: string; expiresAt?: number | null; token?: string } = {},
+): string {
+  return createDevinSubscription({ db: s.db, box: s.secretBox }, s.team.id, {
+    label: opts.label ?? 'Devin subscription',
+    token: opts.token ?? `wsk-test-subscription-${randomUUID()}`,
+    ...(opts.expiresAt !== undefined ? { expiresAt: opts.expiresAt } : {}),
+  }).id;
+}
+
 export function insertMachine(
   s: TestServer,
   opts: {
     name?: string;
     enabledRuntimes?: string[];
     claudeCodeReport?: import('@cairn/shared').ClaudeCodeReport | null;
+    capabilities?: import('@cairn/shared').MachineCapabilities | null;
   } = {},
 ): string {
   const id = opts.name
@@ -433,6 +446,7 @@ export function insertMachine(
         online: true,
         enabledRuntimes: opts.enabledRuntimes ?? ['pi', 'claude-code'],
         claudeCodeReport: opts.claudeCodeReport ?? null,
+        ...(opts.capabilities !== undefined ? { capabilities: opts.capabilities } : {}),
       }),
     )
     .run();

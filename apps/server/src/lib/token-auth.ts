@@ -15,7 +15,7 @@ const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const OWNER_ONLY_PATTERNS = [
   /^\/api\/computers(?:\/[^/]+)?$/,
   /^\/api\/job-applications(?:\/|$)/,
-  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|mcp-connectors)(?:\/|$)/,
+  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|devin-subscriptions|mcp-connectors)(?:\/|$)/,
   /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection)(?:\/|$)/,
   /^\/api\/machines\/[^/]+(?:\/|$)/,
 ];

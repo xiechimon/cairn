@@ -53,6 +53,7 @@ import { checkBlockedBy, holdBlockedBuild, releaseBlockedSteps } from './blocker
 import { triggerChiefWakes } from './chief.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { assertCorrectionDone } from './correction.js';
+import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
@@ -380,7 +381,10 @@ function waitingOnOf(
             priorSubscriptionId: null,
             freshSession: true,
           }
-        : priorSessionOf(deps.db, s, buildRow, enabledSubscriptionId(deps, row.teamId));
+        : priorSessionOf(deps.db, s, buildRow, {
+            claude: enabledSubscriptionId(deps, row.teamId),
+            devin: enabledDevinSubscriptionId(deps, row.teamId),
+          });
     const named =
       !prior.freshSession && prior.priorSessionId !== null
         ? prior.priorMachineId

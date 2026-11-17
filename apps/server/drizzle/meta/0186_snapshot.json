@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5f394d76-83d4-423f-96bc-19d4441960b1",
-  "prevId": "e5bc94cb-9ec8-4baf-a130-e2dba8199b6a",
+  "id": "1789ad05-f9cd-43b1-b2cf-a72813c4ebd9",
+  "prevId": "7ab06673-82e1-4303-a7be-ef75655dd533",
   "tables": {
     "action_journal": {
       "name": "action_journal",
@@ -1704,6 +1704,13 @@
         },
         "projectId": {
           "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "delivery": {
+          "name": "delivery",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -8890,6 +8897,88 @@
             "id"
           ],
           "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "devin_subscription": {
+      "name": "devin_subscription",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tokenCipher": {
+          "name": "tokenCipher",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "enabledAt": {
+          "name": "enabledAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "devin_subscription_one_enabled": {
+          "name": "devin_subscription_one_enabled",
+          "columns": [
+            "teamId"
+          ],
+          "isUnique": true,
+          "where": "\"devin_subscription\".\"enabledAt\" is not null"
+        }
+      },
+      "foreignKeys": {
+        "devin_subscription_teamId_team_id_fk": {
+          "name": "devin_subscription_teamId_team_id_fk",
+          "tableFrom": "devin_subscription",
+          "tableTo": "team",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

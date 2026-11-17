@@ -16,6 +16,7 @@ import { accountHeld } from './claude-account-hold.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { type CoordinatorRouteRefusal, coordinatorRouteVerdict } from './coordinator-route.js';
+import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import {
   type MachineIneligibility,
   missingCapabilities,
@@ -59,6 +60,8 @@ function ineligibleBlocked(gap: MachineIneligibility, runtime: string): StepQueu
       return { kind: 'claude-rate-limited', missing: [] };
     case 'claude-login':
       return { kind: 'claude-logged-out', missing: [] };
+    case 'devin-subscription':
+      return { kind: 'devin-subscription', missing: [] };
   }
 }
 
@@ -169,6 +172,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
 
   const catalog = mergedCatalogModels();
   const enabledId = enabledSubscriptionId({ db }, teamId);
+  const enabledDevinId = enabledDevinSubscriptionId({ db }, teamId);
 
   interface WorkerRouting {
     verdict: RouteVerdict;
@@ -190,7 +194,10 @@ export function stepQueueProjector(db: Db, teamId: string) {
     };
     const unavailable = (id: string) =>
       targetUnavailable(db, machineRowOf(id), teamId, facts, catalog, now);
-    const prior = priorSessionOf(db, row, row.buildRow, enabledId);
+    const prior = priorSessionOf(db, row, row.buildRow, {
+      claude: enabledId,
+      devin: enabledDevinId,
+    });
     const need = agentRow.requiredCapabilities?.os;
     const sole = platformFallbackMachineId(db, teamMachines, defaultMachineId, need);
     const verdict = routeVerdict({

@@ -18,6 +18,7 @@ import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { build, machine, provider, step, todo } from '../db/schema.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
@@ -65,6 +66,16 @@ export function claudeCodeUsable(db: Pick<Db, 'select'>, teamId: string): boolea
     .some((row) => machineRuntimeAvailable(row, 'claude-code'));
 }
 
+export function devinUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
+  if (!hasActiveDevinSubscription({ db }, teamId)) return false;
+  return db
+    .select({ claudeCodeReport: machine.claudeCodeReport, capabilities: machine.capabilities })
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
+    .all()
+    .some((row) => machineRuntimeAvailable(row, 'devin'));
+}
+
 export function codexProviderKeyed(db: Pick<Db, 'select'>, teamId: string): boolean {
   return (
     db
@@ -82,9 +93,13 @@ export function codexProviderKeyed(db: Pick<Db, 'select'>, teamId: string): bool
 }
 
 function runtimeMissingReason(name: string, runtime: MachineRuntime): string {
-  return runtime === 'gemini'
-    ? `执行机 ${name} 不能运行 Gemini：它的权限请求还没接入命令闸。`
-    : `执行机 ${name} 上没有检测到 ${MODEL_SOURCE_RUNTIME_LABELS[runtime]}：装好后重启执行机。`;
+  if (runtime === 'gemini') {
+    return `执行机 ${name} 不能运行 Gemini：它的权限请求还没接入命令闸。`;
+  }
+  if (runtime === 'devin') {
+    return `执行机 ${name} 还没装好 Devin（托管下载失败或未上线）：等它上线或重启执行机。`;
+  }
+  return `执行机 ${name} 上没有检测到 ${MODEL_SOURCE_RUNTIME_LABELS[runtime]}：装好后重启执行机。`;
 }
 
 export interface MachineCapabilityFacts {
@@ -133,7 +148,7 @@ export function unassignedStepReason(kind: StepKind): string {
   if (kind === 'review') {
     return 'review step has no review routing rule: add a `review` routing rule in routing settings, then rerun the task.';
   }
-  return `${kind} step has nothing to run it: add a model provider, or a Claude subscription and a Runner with Claude Code, in settings, then rerun the task.`;
+  return `${kind} step has nothing to run it: add a model provider, a Claude subscription and a Runner with Claude Code, or a Devin subscription and a Runner with Devin, in settings, then rerun the task.`;
 }
 
 export function machineRunningCount(db: Db, machineId: string): number {
@@ -207,11 +222,18 @@ export interface EligibilityInput {
   localProject: boolean;
   claudeRateBlocked: boolean;
   claudeSubscriptionMissing: boolean;
+  devinSubscriptionMissing: boolean;
 }
 
 export type MachineIneligibility =
   | {
-      kind: 'confinement' | 'runtime' | 'local-path' | 'claude-blocked' | 'claude-login';
+      kind:
+        | 'confinement'
+        | 'runtime'
+        | 'local-path'
+        | 'claude-blocked'
+        | 'claude-login'
+        | 'devin-subscription';
     }
   | { kind: 'model'; reason: string }
   | { kind: 'capability'; missing: string[] };
@@ -234,6 +256,9 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
   }
   if (runtime === 'claude-code' && input.claudeRateBlocked) return { kind: 'claude-blocked' };
   if (runtime === 'claude-code' && input.claudeSubscriptionMissing) return { kind: 'claude-login' };
+  if (runtime === 'devin' && input.devinSubscriptionMissing) {
+    return { kind: 'devin-subscription' };
+  }
   if (!confinementDispatchReady(machineRow.capabilities)) return { kind: 'confinement' };
   return null;
 }

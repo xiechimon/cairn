@@ -60,6 +60,7 @@ import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { readDeployLease } from './deploy-lease.js';
+import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import {
   capabilityGatePasses,
   machineRunningCount,
@@ -493,8 +494,13 @@ async function tryClaim(
         projectCap + (cand.stepRow.byPerson ? 1 : 0);
     if (projectFull(db)) continue;
     const claimRuntimeIsClaudeCode = stepRuntimeFor(model.provider) === 'claude-code';
+    const claimRuntimeIsDevin = stepRuntimeFor(model.provider) === 'devin';
     const enabledId = enabledSubscriptionId({ db }, teamId);
-    const prior = priorSessionOf(db, cand.stepRow, cand.buildRow, enabledId);
+    const enabledDevinId = enabledDevinSubscriptionId({ db }, teamId);
+    const prior = priorSessionOf(db, cand.stepRow, cand.buildRow, {
+      claude: enabledId,
+      devin: enabledDevinId,
+    });
     const { priorSessionId, priorMachineId, freshSession } = prior;
     if (claimRuntimeIsClaudeCode && accountHeld(cand.stepRow, prior, enabledId)) continue;
     const sessionOnOtherMachine =
@@ -539,11 +545,16 @@ async function tryClaim(
         if (!stillAuthorized()) return false;
         if (projectFull(tx)) return false;
         const boundId = enabledSubscriptionId({ db: tx }, teamId);
+        const boundDevinId = enabledDevinSubscriptionId({ db: tx }, teamId);
         if (claimRuntimeIsClaudeCode) {
           if (boundId !== enabledId) return false;
-          const fresh = priorSessionOf(tx, cand.stepRow, cand.buildRow, boundId);
+          const fresh = priorSessionOf(tx, cand.stepRow, cand.buildRow, {
+            claude: boundId,
+            devin: boundDevinId,
+          });
           if (accountHeld(cand.stepRow, fresh, boundId)) return false;
         }
+        if (claimRuntimeIsDevin && boundDevinId !== enabledDevinId) return false;
         const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
         if (latestTodo === undefined || quickLaneRefusal(db, latestTodo) !== null) return false;
         if (
@@ -576,6 +587,7 @@ async function tryClaim(
             skillInjection,
             blockerHandoff,
             claudeSubscriptionId: claimRuntimeIsClaudeCode ? boundId : null,
+            devinSubscriptionId: claimRuntimeIsDevin ? boundDevinId : null,
             holdReason: null,
             holdUntil: null,
           })

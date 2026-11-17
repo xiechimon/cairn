@@ -15,6 +15,7 @@ import { hashCredential } from '../lib/hash.js';
 import type { KeySecretBox } from '../lib/secret-box.js';
 import { createApiKey } from './api-keys.js';
 import { openClaudeSubscription } from './claude-subscriptions.js';
+import { openDevinSubscription } from './devin-subscriptions.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
 import { coordinatorProfile, profileForStep } from './routing-rules.js';
 import { type HttpSecretRow, openSecretGrants, type SecretDeps } from './secrets.js';
@@ -94,6 +95,7 @@ export function gitKeyUsable(db: Db, name: string | null): boolean {
 
 export interface StepCredentialBundle {
   claudeSubscriptionToken?: string;
+  devinToken?: string;
   provider: {
     providerId: string;
     label: string;
@@ -159,6 +161,12 @@ export function resolveStepCredentials(
       todoRow.teamId,
       stepRow.fallback?.model?.provider ?? agentRow?.provider,
       stepRow.claudeSubscriptionId,
+    ),
+    devinToken: openDevinSubscription(
+      deps,
+      todoRow.teamId,
+      stepRow.fallback?.model?.provider ?? agentRow?.provider,
+      stepRow.devinSubscriptionId,
     ),
   };
 }

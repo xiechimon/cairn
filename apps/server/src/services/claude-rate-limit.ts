@@ -16,6 +16,7 @@ import { nowMs } from '../lib/ids.js';
 import { holdBlockedBuild } from './blockers.js';
 import { accountHeld } from './claude-account-hold.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
+import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
 import {
@@ -112,6 +113,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   let changed = false;
   const defaultMachineId = teamDefaultMachineId(deps.db, teamId);
   const enabledId = enabledSubscriptionId(deps, teamId);
+  const enabledDevinId = enabledDevinSubscriptionId(deps, teamId);
   const consider = (
     stepRow: StepRow,
     agentRow: AgentRow,
@@ -126,7 +128,10 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
             priorSubscriptionId: null,
             freshSession: true,
           }
-        : priorSessionOf(deps.db, stepRow, buildRow, enabledId);
+        : priorSessionOf(deps.db, stepRow, buildRow, {
+            claude: enabledId,
+            devin: enabledDevinId,
+          });
     const sessionId =
       !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null;
     const namedId = routeTargets(sessionId, agentRow.machineId)[0]?.machineId ?? null;

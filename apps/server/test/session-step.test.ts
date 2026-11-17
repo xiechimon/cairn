@@ -173,7 +173,9 @@ describe('session steps share the build-step paths', () => {
       .where(eq(step.buildId, buildId))
       .all()
       .find((r) => r.status === 'pending')!;
-    expect(priorSessionOf(H.s.db, next, buildRow, null).priorSessionId).toBe('impl-session');
+    expect(
+      priorSessionOf(H.s.db, next, buildRow, { claude: null, devin: null }).priorSessionId,
+    ).toBe('impl-session');
   });
 
   test('a build step enqueued inside a session build resumes the session step', async () => {
@@ -190,7 +192,9 @@ describe('session steps share the build-step paths', () => {
     H.s.db.update(build).set({ prevPhase: 'review' }).where(eq(build.id, buildId)).run();
     const buildRow = H.s.db.select().from(build).where(eq(build.id, buildId)).get()!;
     const next = H.s.db.select().from(step).where(eq(step.id, 'fb-build')).get()!;
-    expect(priorSessionOf(H.s.db, next, buildRow, null).priorSessionId).toBe('impl-session');
+    expect(
+      priorSessionOf(H.s.db, next, buildRow, { claude: null, devin: null }).priorSessionId,
+    ).toBe('impl-session');
   });
 
   test('idle building continuation skips a later reviewer session', async () => {
@@ -224,6 +228,8 @@ describe('session steps share the build-step paths', () => {
     H.s.db.update(build).set({ prevPhase: 'building' }).where(eq(build.id, buildId)).run();
     const buildRow = H.s.db.select().from(build).where(eq(build.id, buildId)).get()!;
     const next = H.s.db.select().from(step).where(eq(step.id, 'idle-building-next')).get()!;
-    expect(priorSessionOf(H.s.db, next, buildRow, null).priorSessionId).toBe('impl-session');
+    expect(
+      priorSessionOf(H.s.db, next, buildRow, { claude: null, devin: null }).priorSessionId,
+    ).toBe('impl-session');
   });
 });

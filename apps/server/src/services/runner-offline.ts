@@ -12,6 +12,7 @@ import { conflict, notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { type ChiefDeps, coordinatorThreadRow, ensureChief } from './chief.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
+import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import { projectOfTodo } from './git.js';
 import {
   priorSessionOf,
@@ -72,12 +73,10 @@ function waitingByMachine(db: Db): Map<string, Map<string, PendingRow>> {
 }
 
 function sessionStarted(db: Db, row: PendingRow): boolean {
-  const prior = priorSessionOf(
-    db,
-    row.stepRow,
-    row.buildRow,
-    enabledSubscriptionId({ db }, row.todoRow.teamId),
-  );
+  const prior = priorSessionOf(db, row.stepRow, row.buildRow, {
+    claude: enabledSubscriptionId({ db }, row.todoRow.teamId),
+    devin: enabledDevinSubscriptionId({ db }, row.todoRow.teamId),
+  });
   return !prior.freshSession && prior.priorSessionId !== null;
 }
 

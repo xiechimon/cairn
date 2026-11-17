@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type build, type machine, step, team } from '../db/schema.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 import {
   type MachineIneligibility,
   machineEligibility,
@@ -27,7 +28,7 @@ export function workerIneligibility(
   catalog: ReadonlyArray<{ id: string; liveness?: 'alive' | 'dead' | 'unknown' }>,
   now: number,
 ): MachineIneligibility | null {
-  const claudeCode = stepRuntimeFor(facts.model.provider) === 'claude-code';
+  const runtime = stepRuntimeFor(facts.model.provider);
   const ineligible = machineEligibility({
     machine: machineRow,
     agent: facts.agentRow,
@@ -36,7 +37,9 @@ export function workerIneligibility(
     localProject: facts.localProject,
     claudeRateBlocked: claudeRateBlock(machineRow.claudeRateLimits ?? [], now) !== null,
     claudeSubscriptionMissing:
-      claudeCode && !hasActiveClaudeSubscription({ db }, machineRow.teamId),
+      runtime === 'claude-code' && !hasActiveClaudeSubscription({ db }, machineRow.teamId),
+    devinSubscriptionMissing:
+      runtime === 'devin' && !hasActiveDevinSubscription({ db }, machineRow.teamId),
   });
   return ineligible;
 }
@@ -64,7 +67,7 @@ export function priorSessionOf(
     'buildId' | 'kind' | 'fallback' | 'freshSession' | 'byPerson'
   >,
   buildRow: Pick<typeof build.$inferSelect, 'prevPhase' | 'withPlan' | 'planDocId'>,
-  enabledSubscriptionId: string | null,
+  enabledSubscriptionIds: { claude: string | null; devin: string | null },
 ): {
   priorSessionId: string | null;
   priorMachineId: string | null;
@@ -77,6 +80,7 @@ export function priorSessionOf(
       machineId: step.machineId,
       fallback: step.fallback,
       subscriptionId: step.claudeSubscriptionId,
+      devinSubscriptionId: step.devinSubscriptionId,
     })
     .from(step)
     .where(
@@ -102,10 +106,12 @@ export function priorSessionOf(
   const planHandoffMissing =
     stepRow.kind === 'build' && buildRow.withPlan && buildRow.planDocId === null;
   const priorSubscriptionId = priorRow?.subscriptionId ?? null;
+  const priorDevinSubscriptionId = priorRow?.devinSubscriptionId ?? null;
   const startsNewRun =
     (stepRow.byPerson || stepRow.kind === 'merge') &&
-    priorSubscriptionId !== null &&
-    priorSubscriptionId !== enabledSubscriptionId;
+    ((priorSubscriptionId !== null && priorSubscriptionId !== enabledSubscriptionIds.claude) ||
+      (priorDevinSubscriptionId !== null &&
+        priorDevinSubscriptionId !== enabledSubscriptionIds.devin));
   return {
     priorSessionId: startsNewRun ? null : (priorRow?.sessionId ?? null),
     priorMachineId: startsNewRun ? null : (priorRow?.machineId ?? null),

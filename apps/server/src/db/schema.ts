@@ -326,6 +326,7 @@ export const step = sqliteTable(
     ownerMessageIds: json<string[]>('ownerMessageIds'),
     byPerson: bool('byPerson').notNull().default(false),
     claudeSubscriptionId: text('claudeSubscriptionId'),
+    devinSubscriptionId: text('devinSubscriptionId'),
     freshSession: bool('freshSession').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),
     blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
@@ -630,7 +631,7 @@ export const stepRoute = sqliteTable(
       .references(() => team.id),
     kind: text('kind').$type<StepKind>().notNull(),
     difficulty: text('difficulty').$type<'easy' | 'standard' | 'hard'>().notNull(),
-    harness: text('harness').$type<'claude-code' | 'pi'>(),
+    harness: text('harness').$type<'claude-code' | 'pi' | 'devin'>(),
     provider: text('provider'),
     modelId: text('modelId'),
     machineId: text('machineId'),
@@ -1477,6 +1478,26 @@ export const claudeSubscription = sqliteTable(
   },
   (t) => [
     uniqueIndex('claude_subscription_one_enabled')
+      .on(t.teamId)
+      .where(sql`${t.enabledAt} is not null`),
+  ],
+);
+
+export const devinSubscription = sqliteTable(
+  'devin_subscription',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    tokenCipher: text('tokenCipher').notNull(),
+    expiresAt: epochMs('expiresAt'),
+    enabledAt: epochMs('enabledAt'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('devin_subscription_one_enabled')
       .on(t.teamId)
       .where(sql`${t.enabledAt} is not null`),
   ],

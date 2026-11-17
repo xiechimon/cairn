@@ -98,6 +98,9 @@ export async function stepToken(
     ...(owned.status === 'claimed' && bundle.claudeSubscriptionToken !== undefined
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
+    ...(owned.status === 'claimed' && bundle.devinToken !== undefined
+      ? { devinToken: bundle.devinToken }
+      : {}),
     ...(owned.status === 'claimed' && todoRow && agentRow
       ? await connectorFields(deps, owned, todoRow.teamId)
       : {}),
