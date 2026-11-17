@@ -54,6 +54,7 @@ Thirty-two notes that nothing outside this directory referenced, and their index
 | [xmon48-filter-panel-closure.md](xmon48-filter-panel-closure.md) | none | XMON-48 board filter interaction research, wrap-up and decision material |
 | [r15-agent-responsibility-default.md](r15-agent-responsibility-default.md) | none | Default responsibility text for the first agent: evidence from seven ecosystems' sources and the trade-off (t-0198; shares a number with r15-multica-run-rendering but is a different ticket) |
 | [research-loop-plan.md](research-loop-plan.md) | none | Design plan for agents that research outward (D63, on D60's thread model): research threads before a stuck build's last retry and before new mechanisms, a search tool for pi, sourced expiring memory; spikes, cost and open decisions |
+| [github-auth-two-surfaces-2026-11-17.md](github-auth-two-surfaces-2026-11-17.md) | none | Whether cairn's two GitHub grants (team connection vs MCP connector) should share: prior art across VS Code/Copilot, Claude Code, Cursor, Devin, Windsurf, Zed; separate is the norm, sharing exists only on first-party paths |
 | [review-gate-prior-art-2026-11-11.md](review-gate-prior-art-2026-11-11.md) | none | Why `review-gate` exists, how other teams gate on AI review, and what the 13 PRs on the night of 2026-11-11 actually cost. Recommendation only |
 
 ### Recovered research (2026-11-06 to 2026-11-09)
