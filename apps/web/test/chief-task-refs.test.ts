@@ -79,6 +79,12 @@ describe('foldTaskCards', () => {
     expect(folded.startedBy.size).toBe(0);
   });
 
+  test('an unknown card does not stop the next card from folding into the reply', () => {
+    const folded = foldTaskCards(rows(user, reply, card('zz'), card('a1')), glances);
+    expect(folded.rows.map((row) => row.item.kind)).toEqual(['user', 'robot', 'task-card']);
+    expect(folded.startedBy.get(reply)).toEqual(['a1']);
+  });
+
   test('an unchanged fold hands the reply the same list, so its row does not re-render', () => {
     const list = rows(user, reply, card('a1'));
     expect(foldTaskCards(list, glances).startedBy.get(reply)).toBe(

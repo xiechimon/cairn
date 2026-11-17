@@ -452,3 +452,52 @@ test('an archived task keeps its elbow row instead of falling back to a title ch
   await expect(started.locator('[data-slot="task-ref-elbow"]')).toHaveCount(1);
   await expect(page.getByTestId('chief-task-created')).toHaveCount(0);
 });
+
+test('a task archived in the same turn leaves no card and the next task folds into the reply', async ({
+  page,
+}) => {
+  const dropped = { ...TASK, id: 'todo-old', seqNum: 9, title: 'Draft the old brief' };
+  const kept = { ...TASK, id: 'todo-new', seqNum: 10, title: 'Draft the new brief' };
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'ask', role: 'user', content: 'Research the brief', createdAt: 10 },
+      createTodoRow('create-old', dropped, 20),
+      {
+        id: 'archive-old',
+        role: 'assistant',
+        content: {
+          kind: 'toolcall',
+          call: {
+            id: 'c-archive-old',
+            name: 'archive_todos',
+            arguments: { todoIds: ['todo-old'], supersededBy: 'todo-new' },
+            result: { transitioned: ['todo-old'], skipped: [], archived: ['todo-old'] },
+            startedAt: 30,
+            endedAt: 31,
+          },
+        },
+        createdAt: 30,
+      },
+      createTodoRow('create-new', kept, 40),
+      {
+        id: 'reply',
+        role: 'assistant',
+        content: 'The old brief was too broad, so I closed it.\n\nThe new one is running.',
+        createdAt: 50,
+      },
+    ],
+    todos: [{ ...kept, phase: 'building' }],
+    archivedTodos: [{ ...dropped, phase: 'closed', archivedAt: 31 }],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  await expect(stream.getByTestId('chief-task-started')).toHaveCount(0);
+  await expect(stream.getByTestId('chief-task-created')).toHaveCount(0);
+  const refs = stream.getByTestId('chief-task-refs');
+  await expect(refs.getByTestId('chief-task-ref')).toHaveCount(1);
+  await expect(refs.getByTestId('chief-task-ref')).toHaveText(/^Draft the new brief/);
+  const ref = await refs.getByTestId('chief-task-ref').boundingBox();
+  const bubble = await stream.getByTestId('chief-reply-bubble').first().boundingBox();
+  expect((ref?.y ?? 0) + (ref?.height ?? 0)).toBeLessThanOrEqual(bubble?.y ?? 0);
+});

@@ -1584,6 +1584,15 @@ function createdTodoOf(call: ToolCallRecord): {
   };
 }
 
+function archivedTodoIdsOf(call: ToolCallRecord): string[] {
+  if (call.name !== 'archive_todos' || call.result === undefined || call.isError === true)
+    return [];
+  const value = toolResultValue(call.result) as { archived?: unknown } | null;
+  return Array.isArray(value?.archived)
+    ? value.archived.filter((id): id is string => typeof id === 'string')
+    : [];
+}
+
 export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {
   return collectChiefStream(messages).items;
 }
@@ -1756,6 +1765,11 @@ function collectChiefStream(
       const created = createdTodoOf(call);
       if (created !== null)
         pendingCards.push({ kind: 'task-card', id: `${m.id}:task-card`, ...created });
+      const undone = new Set(archivedTodoIdsOf(call));
+      if (undone.size > 0)
+        pendingCards = pendingCards.filter(
+          (card) => card.kind !== 'task-card' || !undone.has(card.todoId),
+        );
       if (eventTurn) continue;
       pendingTools.push({
         label: pillOf(call),

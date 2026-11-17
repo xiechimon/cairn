@@ -121,12 +121,17 @@ export function foldTaskCards(
 ): FoldedTaskCards {
   const kept: GroupedRow[] = [];
   const started = new Map<GroupedRow['item'], string[]>();
+  let reply: GroupedRow['item'] | undefined;
   for (const row of rows) {
-    const reply = kept.at(-1)?.item;
-    if (row.item.kind === 'task-card' && reply?.kind === 'robot' && glances.has(row.item.todoId)) {
-      started.set(reply, [...(started.get(reply) ?? []), row.item.todoId]);
+    if (row.item.kind === 'task-card') {
+      if (reply !== undefined && glances.has(row.item.todoId)) {
+        started.set(reply, [...(started.get(reply) ?? []), row.item.todoId]);
+      } else {
+        kept.push(row);
+      }
       continue;
     }
+    reply = row.item.kind === 'robot' ? row.item : undefined;
     kept.push(row);
   }
   return {

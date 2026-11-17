@@ -78,6 +78,20 @@ describe('a task the Coordinator creates becomes a task card in the conversation
     });
   });
 
+  test('a create the same turn archives again leaves no card', () => {
+    const items = mapChiefStream([
+      said('u1', 'user', 'Summarize the requirements'),
+      call('m1', 'create_todo', CREATE, { id: 'todo-9' }),
+      call('m2', 'archive_todos', { todoIds: ['todo-9'] }, {
+        transitioned: ['todo-9'],
+        skipped: [],
+        archived: ['todo-9'],
+      }),
+      said('a1', 'assistant', 'Opened the research task instead.'),
+    ]);
+    expect(items.map((item) => item.kind)).toEqual(['user', 'robot']);
+  });
+
   test('a failed or unfinished create_todo shows no card', () => {
     const items = mapChiefStream([
       call('m1', 'create_todo', CREATE, { error: 'no project' }, true),
