@@ -10425,6 +10425,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "mail_event",
   "mail_rule",
   "mcp_connector",
+  "im_connection",
+  "im_pairing_request",
   "team_top_models",
 ]
 `;

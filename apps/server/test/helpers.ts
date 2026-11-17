@@ -93,6 +93,7 @@ export function bootServer(
     backupStatusPath?: string;
     deployRecordPath?: string;
     remote?: Partial<NonNullable<AppContext['remote']>>;
+    im?: AppContext['im'];
   } = {},
 ) {
   const db = opts.db ?? openMemoryDb();
@@ -151,6 +152,7 @@ export function bootServer(
         : {}),
       user,
       team,
+      ...(opts.im !== undefined ? { im: opts.im } : {}),
       pingIntervalMs: opts.pingIntervalMs ?? 3_600_000,
       claimHoldMs: opts.claimHoldMs ?? 250,
       uploads: new Map(),

@@ -1104,7 +1104,8 @@ export function enqueueChiefStep(
       scopeProjectId: threadRow.projectId ?? opts.scopeProjectId ?? null,
       ownerMessageIds: opts.ownerMessageIds,
       createdAt: nowMs(),
-      ...(opts.trigger !== 'user' && opts.provenance.startsWith('mail:')
+      ...(opts.trigger !== 'user' &&
+      (opts.provenance.startsWith('mail:') || opts.provenance.startsWith('im:'))
         ? { freshSession: true }
         : {}),
     })

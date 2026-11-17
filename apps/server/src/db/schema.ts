@@ -19,6 +19,10 @@ import type {
   ComputerTool,
   DocumentDiffFile,
   EvidenceStore,
+  ImConnectionStatus,
+  ImPairedSender,
+  ImPairingRequestStatus,
+  ImPlatform,
   INTAKE_SOURCE_KIND,
   MachineCapabilities,
   MailAccountStatus,
@@ -1831,3 +1835,56 @@ export const teamTopModels = sqliteTable('team_top_models', {
   models: text('models').notNull(),
   updatedAt: epochMs('updatedAt').notNull(),
 });
+
+export const imConnection = sqliteTable(
+  'im_connection',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id),
+    platform: text('platform').$type<ImPlatform>().notNull(),
+    accountLabel: text('accountLabel'),
+    secretCipher: text('secretCipher').notNull(),
+    pairedSenders: json<ImPairedSender[]>('pairedSenders').notNull().default(sql`'[]'`),
+    status: text('status').$type<ImConnectionStatus>().notNull(),
+    statusDetail: text('statusDetail'),
+    pollOffset: text('pollOffset'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    index('im_connection_team_idx').on(t.teamId),
+    check('im_connection_platform', sql`${t.platform} in ('telegram', 'wechat')`),
+    check(
+      'im_connection_status',
+      sql`${t.status} in ('connecting', 'ready', 'degraded', 'expired', 'error')`,
+    ),
+  ],
+);
+
+export const imPairingRequest = sqliteTable(
+  'im_pairing_request',
+  {
+    id: text('id').primaryKey(),
+    connId: text('connId')
+      .notNull()
+      .references(() => imConnection.id),
+    senderId: text('senderId').notNull(),
+    senderName: text('senderName'),
+    chatKey: text('chatKey').notNull(),
+    status: text('status').$type<ImPairingRequestStatus>().notNull(),
+    requestedAt: epochMs('requestedAt').notNull(),
+    decidedAt: epochMs('decidedAt'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    index('im_pairing_request_status_idx').on(t.status, t.createdAt),
+    uniqueIndex('im_pairing_request_conn_sender_unique').on(t.connId, t.senderId),
+    check('im_pairing_request_status', sql`${t.status} in ('pending', 'approved', 'rejected')`),
+  ],
+);

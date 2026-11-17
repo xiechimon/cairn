@@ -30,6 +30,7 @@ import { cancelPendingQuestions } from './chief-questions.js';
 import { QUEUED_HOLD, recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { openTurnCapture, sealCoordinatorTurnSnapshot } from './coordinator-turn-capture.js';
+import { imTurnFinished } from './im/runtime.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -219,8 +220,11 @@ export function finishCoordinatorTurn(
     const teamId = stepTeamId(deps, stepRow);
     if (teamId !== null) sealCoordinatorTurnSnapshot(db, stepRow, teamId, outcome.status, nowMs());
   } catch {}
+  const provenance = turnProvenance(stepRow.prompt);
   const reportedSessionId =
-    turnProvenance(stepRow.prompt)?.startsWith('mail:') === true ? undefined : outcome.sessionId;
+    provenance?.startsWith('mail:') === true || provenance?.startsWith('im:') === true
+      ? undefined
+      : outcome.sessionId;
   db.update(step)
     .set({
       ...(reportedSessionId !== undefined ? { sessionId: reportedSessionId } : {}),
@@ -260,6 +264,8 @@ export function finishCoordinatorTurn(
       createdAt: nowMs(),
     });
   }
+  const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
+  if (finished !== undefined) imTurnFinished(finished);
   emitRuntimeStepSpan(deps.db, stepRow.id, process.env, observation);
 }
 

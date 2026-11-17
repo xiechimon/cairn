@@ -21,6 +21,7 @@ export * from './failure-attribution.js';
 export * from './failure-review.js';
 export * from './genai-conventions.js';
 export * from './git-ops.js';
+export * from './im.js';
 export * from './local-providers.js';
 export * from './mail.js';
 export * from './model-routing.js';

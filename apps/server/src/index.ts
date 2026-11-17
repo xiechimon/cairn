@@ -42,6 +42,9 @@ import {
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
+import { createImService } from './services/im/core.js';
+import { setImRuntime } from './services/im/runtime.js';
+import { createTelegramAdapter, liveImEnv } from './services/im/telegram.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { newMcpOAuthState } from './services/mcp-servers.js';
@@ -178,6 +181,17 @@ const tailscale = createTailscaleServe({
   listenPort: config.port,
   recordPath: join(config.dataDir, 'tailscale-serve.json'),
 });
+const im = createImService({
+  db,
+  hub,
+  machineHub,
+  convHub,
+  box: secretBox,
+  user: seeded.user,
+  env: liveImEnv,
+  adapters: { telegram: createTelegramAdapter() },
+});
+setImRuntime(im.runtime);
 const app = createApp(
   {
     remote: {
@@ -195,6 +209,7 @@ const app = createApp(
     vapidKeys,
     user: seeded.user,
     team: seeded.team,
+    im,
     pingIntervalMs: config.pingIntervalMs,
     claimHoldMs: config.claimHoldMs,
     uploads: new Map(),
@@ -306,6 +321,9 @@ const coordinator = config.coordinatorInServer
   : null;
 if (coordinator !== null) setCoordinatorWake((threadId) => coordinator.wake(threadId));
 scheduler.start();
+void im.resume().catch((error: unknown) => {
+  logger.warn({ err: error }, 'im connections could not be resumed');
+});
 
 if (config.authToken === null) {
   await tailscale.withdraw().catch((error: unknown) => {
@@ -367,6 +385,8 @@ async function shutdown(): Promise<void> {
   ]);
   killInFlightPick();
   computerScreens.close();
+  await im.shutdown().catch(() => {});
+  setImRuntime(null);
   await drainHttp(shutdownRuntimeOtel);
   await (await tsnetStarting)?.stop();
   close();

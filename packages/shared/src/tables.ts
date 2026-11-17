@@ -87,6 +87,8 @@ export const DB_TABLES = [
   'mail_event',
   'mail_rule',
   'mcp_connector',
+  'im_connection',
+  'im_pairing_request',
   'team_top_models',
 ] as const;
 
@@ -104,6 +106,8 @@ export const INTERNAL_ONLY_TABLES = [
   'mail_account',
   'mail_event',
   'mail_rule',
+  'im_connection',
+  'im_pairing_request',
   'steer_pending',
   'autonomy_pause',
   'step_route',

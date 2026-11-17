@@ -10,6 +10,7 @@ import type { SidecarStatus } from './lib/tsnet-sidecar.js';
 import type { CodexDeviceState } from './services/codex-device-login.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import type { GithubConnectionDeviceAttempt } from './services/github-connection-device.js';
+import type { ImService } from './services/im/core.js';
 import type { PendingUpload } from './services/machine-uploads.js';
 import type { MachineWakeHub } from './services/machine-wake-hub.js';
 import type { GithubAppRegistration, McpOAuthState } from './services/mcp-servers.js';
@@ -41,6 +42,7 @@ export interface AppContext {
   pushEndpointHosts?: ReadonlySet<string>;
   user: UserRecord;
   team: TeamRecord;
+  im?: ImService;
   pingIntervalMs: number;
   claimHoldMs: number;
   uploads: Map<string, PendingUpload>;

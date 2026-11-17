@@ -5,6 +5,7 @@ import { chiefThread, notification, todo as todoTable } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
+import { imNotice } from './im/runtime.js';
 
 export interface NotificationDeps {
   db: Db;
@@ -216,7 +217,7 @@ export function notifyChiefMessage(
 ): NotificationRecord {
   const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, input.threadId)).get();
   if (!thread) throw notFound(`chief thread ${input.threadId}`);
-  return upsertAndPublish(deps, {
+  const record = upsertAndPublish(deps, {
     teamId: thread.teamId,
     type: 'chief_message',
     entityId: thread.id,
@@ -224,6 +225,8 @@ export function notifyChiefMessage(
     agent: input.agent,
     snippet: input.message,
   });
+  imNotice(input.threadId, input.message);
+  return record;
 }
 
 export const CHIEF_UNREAD_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
