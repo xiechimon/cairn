@@ -30,6 +30,7 @@ Product precedents for where the agent's computer runs:
 | ChatGPT / Codex desktop | Computer use on the user's desktop; OpenAI suggests a Windows VM for isolation; no virtualization entitlement in the app (`实测`) | [computer use](https://learn.chatgpt.com/docs/computer-use) |
 | Windows agent workspace | Separate agent account and desktop in parallel with the user, watch and take over (`实测`) | [agentic security](https://learn.microsoft.com/en-us/windows/security/book/operating-system-agentic-security) |
 | Podman Desktop, Rancher Desktop, Docker Desktop, OrbStack | Ship a Linux VM: libkrun or vfkit (Podman, 948 MB arm64 image), Virtualization.framework (Rancher, Docker), one shared VM (OrbStack); on Windows each ships its own WSL distro (Podman Fedora, Rancher Alpine, `docker-desktop`) (`实测`) | [podman-machine](https://github.com/containers/podman/blob/main/docs/source/markdown/podman-machine.1.md), [Rancher VM](https://docs.rancherdesktop.io/ui/preferences/virtual-machine/emulation/), [Docker VMM](https://docs.docker.com/desktop/features/vmm/), [OrbStack](https://docs.orbstack.dev/architecture), [Docker WSL](https://docs.docker.com/desktop/features/wsl/), [podman-machine-wsl-os](https://github.com/containers/podman-machine-wsl-os), [rancher-desktop-wsl-distro](https://github.com/rancher-sandbox/rancher-desktop-wsl-distro) |
+| Rakazo desktop (`elie222/rakazo`, `docs/desktop-mac-without-docker.md`) | On Apple-silicon Macs with macOS 26+, each bot computer is one VM through Apple's `container` 1.7.1, from the unchanged published computer image. Nothing is bundled: on first use the app downloads Apple's signed `container` pkg, checks it with `pkgutil --check-signature`, expands it **without installing** (no sudo) and runs `container system start` with its own roots under the app's data folder; it reuses a user's own `container` 1.7.0+ if one runs. An nftables table inside each VM blocks the Mac, the LAN and other computers. Measured there: runtime 47 s download, kernel ~45 s, image 1.58 GB, later VMs 2–3 s, ~970 MB host RSS with Chromium (`实测`, read the doc) | [desktop-mac-without-docker.md](https://github.com/elie222/rakazo/blob/main/docs/desktop-mac-without-docker.md) |
 | E2B desktop, Anthropic computer-use demo | Ubuntu 22.04 + XFCE/Xvfb + x11vnc + noVNC (`实测`) | [e2b-dev/desktop](https://github.com/e2b-dev/desktop), [computer-use-demo](https://github.com/anthropics/claude-quickstarts/tree/main/computer-use-demo) |
 
 ## 3. Is Arch the right guest?
@@ -78,3 +79,17 @@ Decided by ian on 2026-11-17: items 1, 2, 4 and 5 as recommended, and item 3 as 
 5. **Windows timing:** WSL2 distro only when Windows ships. Recommended: defer.
 
 Not covered: a real VM boot of a Debian desktop through Containerization or vfkit on this Mac (nothing was installed); remote sandbox latency from China; Alpine with Chromium.
+
+## 7. Hands-on trial (2026-11-17, ian's Mac, the Rakazo way)
+
+`container` 1.7.1's signed pkg was expanded with `pkgutil --expand-full` and started with `container system start --install-root/--app-root/--log-root` under a scratch folder: no installer, no password (`实测`). The image was `debian:bookworm-slim` plus the current host-desktop set (Xvfb, openbox, picom, plank, hsetroot, x11vnc, xdotool), Chromium, lxterminal, Noto CJK fonts and noVNC.
+
+| Step | Result (`实测`) |
+|---|---|
+| Runtime start including kernel download | 55 s |
+| First image build (builder VM, apt, export) | 170 s |
+| New VM from the built image until noVNC answers | 2.0–3.3 s |
+| Chromium opened from the dock, shown in noVNC | yes, in its own sandbox as uid 1000 |
+| Memory of the computer VM with Chromium on a new tab | 1.01 GiB of a 3 GiB cap (`container stats`) |
+
+Two Debian-specific fixes were needed: `libglib2.0-bin` for `gsettings`, and `dbus-update-activation-environment DISPLAY` so D-Bus can start bamf for Debian's plank 0.11.89; even then plank appeared only after its `dock-items` setting was written once after start (`实测`). omarchy uses `plank-reloaded` (`实测`, `pacman -Q`), so the guest dock differs from the host one.
