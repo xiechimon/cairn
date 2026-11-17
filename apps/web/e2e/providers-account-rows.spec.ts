@@ -11,7 +11,7 @@ for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(URL);
     const rows = page.locator('[data-testid="provider-instance"][data-instance-id^="subscription:"]');
-    await expect(rows).toHaveCount(3);
+    await expect(rows).toHaveCount(4);
     await expect(page.getByTestId('provider-list')).not.toContainText('—');
     const count = await rows.count();
     for (let i = 0; i < count; i += 1) {

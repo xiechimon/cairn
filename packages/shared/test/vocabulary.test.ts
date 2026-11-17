@@ -537,10 +537,10 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
   });
 });
 
-describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message)', () => {
+describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; +devin_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
     expect(INTERNAL_ONLY_TABLES).toContain('autonomy_pause');
-    expect(DB_TABLES).toHaveLength(88);
+    expect(DB_TABLES).toHaveLength(89);
     for (const table of [
       'action_journal',
       'action_proposal',
@@ -554,6 +554,7 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
       'mail_rule',
       'job_application',
       'mcp_connector',
+      'devin_subscription',
     ]) {
       expect(DB_TABLES).toContain(table);
       expect(INTERNAL_ONLY_TABLES).toContain(table);
@@ -650,8 +651,8 @@ describe('AgentBackend seam (01 §5, 00/D1 seam)', () => {
     expect(STEP_EVENT_TYPES).toEqual(PI_STREAM_EVENTS.slice(0, 15));
   });
 
-  it('BACKEND_RUNTIME_IDS accepts claude-code and gemini; pi is still not a backend identity', () => {
-    expect(BACKEND_RUNTIME_IDS).toEqual(['claude-code', 'gemini']);
+  it('BACKEND_RUNTIME_IDS accepts claude-code, gemini and devin; pi is still not a backend identity', () => {
+    expect(BACKEND_RUNTIME_IDS).toEqual(['claude-code', 'gemini', 'devin']);
     expect(BACKEND_RUNTIME_IDS).not.toContain('pi');
     for (const id of BACKEND_RUNTIME_IDS) {
       expect(MODEL_SOURCE_RUNTIMES).toContain(id);
@@ -661,6 +662,7 @@ describe('AgentBackend seam (01 §5, 00/D1 seam)', () => {
   it('isBackendRuntimeId: outside the vocabulary (custom provider id / pi / null / undefined) always false', () => {
     expect(isBackendRuntimeId('claude-code')).toBe(true);
     expect(isBackendRuntimeId('gemini')).toBe(true);
+    expect(isBackendRuntimeId('devin')).toBe(true);
     expect(isBackendRuntimeId('stub-gw')).toBe(false);
     expect(isBackendRuntimeId('pi')).toBe(false);
     expect(isBackendRuntimeId('anthropic')).toBe(false);

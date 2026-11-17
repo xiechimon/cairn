@@ -10,7 +10,7 @@ test('fixture: the routing page holds the provider list above the rule graph', a
   await page.goto('/app/settings/routing?scenario=model-routing');
   await expect(page.getByRole('tab')).toHaveCount(0);
   const rows = page.getByTestId('provider-instance');
-  await expect(rows.filter({ hasText: '订阅' })).toHaveCount(3);
+  await expect(rows.filter({ hasText: '订阅' })).toHaveCount(4);
   const work = page.locator('[data-instance-id^="subscription:"]', { hasText: '冷却至' });
   await expect(work).toHaveCount(1);
   await work.click();
@@ -22,9 +22,9 @@ test('fixture: the routing page holds the provider list above the rule graph', a
   await expect(detail.getByRole('progressbar')).toHaveCount(2);
 
   const graph = page.getByTestId('routing-section');
-  await expect(graph.locator('[data-routing-source]')).toHaveCount(4);
-  await expect(graph.locator('[data-routing-target]')).toHaveCount(6);
-  await expect(graph.locator('path[data-wire]')).toHaveCount(4);
+  await expect(graph.locator('[data-routing-source]')).toHaveCount(5);
+  await expect(graph.locator('[data-routing-target]')).toHaveCount(7);
+  await expect(graph.locator('path[data-wire]')).toHaveCount(5);
   await expect(graph.locator('path[data-wire][data-broken]')).toHaveCount(0);
   await expect(graph.locator('[data-routing-source="citation_check"]')).toHaveCount(0);
   await expect(graph.locator('[data-routing-source="coordinator"]')).not.toHaveAttribute('data-broken', '');
