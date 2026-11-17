@@ -179,6 +179,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       .split(delimiter)
       .filter((path) => path !== ''),
     readable: [config.skillsDir, paths.teamSkillsCacheDir],
+    handoffDirectories: [paths.reportsDir, paths.plansDir],
     serverUrl: config.serverUrl,
   });
   const acpBackends = configuredAcpBackends(process.env.CAIRN_ACP_AGENTS, confine ?? undefined);

@@ -1,7 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { SessionOpts } from '@cairn/shared';
+import { contains } from './confine.js';
 import { type SeatbeltPolicy, seatbeltCommand } from './confine-seatbelt.js';
 
 export type SessionHarness = 'claude-code' | 'codex' | 'gemini' | 'pi' | 'devin';
@@ -22,13 +24,27 @@ export interface SessionConfinerOptions {
   daemonHome: string;
   extraDeniedRoots: string[];
   readable: string[];
+  handoffDirectories: string[];
   serverUrl: string;
   platform?: string;
+  systemTempDirectory?: string | null;
   home?: string;
   environment?: NodeJS.ProcessEnv;
 }
 
 const SHARED_CACHES = ['.cache', '.npm', '.cargo/registry', 'go/pkg/mod', 'Library/pnpm'];
+
+function systemTempDirectory(): string | null {
+  try {
+    const output = execFileSync('/usr/bin/getconf', ['DARWIN_USER_TEMP_DIR'], {
+      encoding: 'utf8',
+      timeout: 2000,
+    }).trim();
+    return output === '' ? null : realpathSync(output);
+  } catch {
+    return null;
+  }
+}
 
 function gitDirectoriesOf(workspace: string): string[] {
   const dotGit = join(workspace, '.git');
@@ -86,20 +102,37 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
         if (!path.endsWith('.claude.json')) mkdirSync(path, { recursive: true });
         return realpathSync(path);
       });
-    const explicitState = extraState.map((path) => realpathSync(path));
+    const handoff = options.handoffDirectories.map((path) => {
+      mkdirSync(path, { recursive: true });
+      return realpathSync(path);
+    });
+    const explicitState = [...handoff, ...extraState.map((path) => realpathSync(path))];
     const temp = realpathSync(env.TMPDIR ?? tmpdir());
-    const userDirectory = dirname(temp);
+    const deniedRoots = [options.daemonHome, ...options.extraDeniedRoots]
+      .filter((path) => existsSync(path))
+      .map((path) => realpathSync(path));
+    const systemTemp =
+      options.systemTempDirectory === undefined
+        ? systemTempDirectory()
+        : options.systemTempDirectory === null
+          ? null
+          : realpathSync(options.systemTempDirectory);
+    const systemUserDirectory =
+      systemTemp === null || deniedRoots.some((root) => contains(dirname(systemTemp), root))
+        ? null
+        : dirname(systemTemp);
+    const userDirectories = [...new Set([dirname(temp), systemUserDirectory])].filter(
+      (path): path is string => path !== null,
+    );
     const policy: SeatbeltPolicy = {
       home,
-      deniedRoots: [options.daemonHome, ...options.extraDeniedRoots]
-        .filter((path) => existsSync(path))
-        .map((path) => realpathSync(path)),
+      deniedRoots,
       workspace,
       gitDirectories: gitDirectoriesOf(workspace),
       taskTemp: temp,
       state: [...state, ...explicitState],
       caches: [
-        userDirectory,
+        ...userDirectories,
         ...SHARED_CACHES.map((path) => join(home, path)).filter((path) => existsSync(path)),
       ],
       readable: options.readable.filter((path) => existsSync(path)),

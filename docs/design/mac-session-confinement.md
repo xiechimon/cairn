@@ -24,11 +24,12 @@ Paths use the packaged layout; `userData` is `~/Library/Application Support/@cai
 | Path | Read | Write | Why |
 | --- | --- | --- | --- |
 | `userData/home/` (server home: `token`, `server/server.db`, skills source, uploads) | deny | deny | owner token; server database |
-| `userData/runner/` (Runner home) except the entries below | deny | deny | `machine.json` machine token, `device.json`, `daemon.log`, outbox, reports, `chat-sessions`, `agent-runtime` |
+| `userData/runner/` (Runner home) except the entries below | deny | deny | `machine.json` machine token, `device.json`, `daemon.log`, outbox, `chat-sessions`, `agent-runtime` |
+| `runner/reports/` and `runner/plans/` (info-card report and plan handoff) | allow | allow | the agent writes `report.md`, deliverables and `plan.md` there; carved out of the denied Runner root, passed as `handoffDirectories`; nothing else under `runner/` is opened |
 | `runner/workspaces/<this session's worktree>` and the git common directory of its repository | allow | allow | the work; `.git/config`, `.git/config.worktree`, `.git/hooks` and any `.git` pointer file stay write-denied, as on Linux |
 | `runner/workspaces/` siblings (other conversations, project `repo/` caches) | deny | deny | other tasks' code and credentials in remotes |
 | The harness's own state: `runner/claude` (Claude config dir, `CLAUDE_CONFIG_DIR`), the Codex dir, pi `agentDir` | own only | own only | other harness state denied, as on Linux |
-| Per-session temp (`$TMPDIR` under `/private/var/folders/...`) | allow | allow | tools need it |
+| Per-session temp (`$TMPDIR` under `/private/var/folders/...`) and the system user temp (`getconf DARWIN_USER_TEMP_DIR`) with its user directory | allow | allow | tools, including the Claude shell tool logs, need it; the system user directory is skipped when a denied root lies inside it |
 | Shared caches (`~/.cache`, resolved pnpm store, `~/.npm`, Go modules, Cargo registry, `~/Library/Caches` subset needed by toolchains) | allow | allow | same list as Linux; none may contain a denied root |
 | `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config/gh`, `~/.docker`, `~/.kube`, `~/.password-store`, `~/.netrc`, `~/.git-credentials` | deny | deny | existing Linux list |
 | `~/.claude`, `~/.codex`, `~/.pi`, `~/.gemini`, `~/.claude.json` (user's own CLI logins) | deny except the harness's own state | same | existing Linux list |

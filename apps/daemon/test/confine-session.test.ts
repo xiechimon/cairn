@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -24,6 +25,7 @@ function fixture() {
     daemonHome: runnerHome,
     extraDeniedRoots: [serverHome],
     readable: [skills],
+    handoffDirectories: [],
     serverUrl: 'http://127.0.0.1:1',
     platform: 'darwin',
     home,
@@ -46,6 +48,7 @@ describe('session confiner', () => {
         daemonHome: '/x',
         extraDeniedRoots: [],
         readable: [],
+        handoffDirectories: [],
         serverUrl: 'http://127.0.0.1:1',
         platform: 'linux',
       }),
@@ -119,6 +122,31 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
     }
     expect((await run(`cat '${join(skills, 'skill.md')}'`)).out).toContain('skill-body');
     expect((await run(`echo ok > '${join(worktree, 'f')}' && echo done`)).out).toContain('done');
+  });
+
+  test('a sandboxed session can write the report handoff directory and the system temp directory', () => {
+    const { root, runnerHome, worktree } = fixture();
+    const reportsDir = join(runnerHome, 'reports');
+    const systemTemp = join(root, 'system-user', 'T');
+    mkdirSync(systemTemp, { recursive: true });
+    const confine = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [],
+      readable: [],
+      handoffDirectories: [reportsDir],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home: join(root, 'user'),
+      systemTempDirectory: systemTemp,
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    const reportFile = join(reportsDir, 'report.md');
+    const tempFile = join(systemTemp, 'shell.log');
+    const launch = confine({ cwd: worktree, env: {} }, 'claude-code', {
+      command: '/bin/sh',
+      args: ['-c', `echo a > '${reportFile}' && echo a > '${tempFile}'`],
+    });
+    expect(() => execFileSync(launch.command, launch.args, { stdio: 'pipe' })).not.toThrow();
   });
 
   test('the pi profile exposes only its own state and keeps the same denied roots', () => {
