@@ -62,6 +62,18 @@ test('a read-only view forwards framebuffer requests and drops keys, pointers an
   view.close();
 });
 
+test('a read-only view drops an extended clipboard message and keeps the framebuffer request after it', () => {
+  const gate = primedGate();
+  const caps = Buffer.alloc(8 + 8);
+  caps.writeUInt8(6, 0);
+  caps.writeInt32BE(-8, 4);
+  caps.writeUInt32BE(0x1f000001, 8);
+  caps.writeUInt32BE(1024, 12);
+  const request = Buffer.from([3, 1, 0, 0, 0, 0, 0, 100, 0, 80]);
+  expect(gate.accept(caps.subarray(0, 10))).toEqual(Buffer.alloc(0));
+  expect(gate.accept(Buffer.concat([caps.subarray(10), request]))).toEqual(request);
+});
+
 test('an unknown view message is refused instead of being forwarded', () => {
   const gate = primedGate();
   expect(() => gate.accept(Buffer.from([9, 0]))).toThrow('malicious computer view input');

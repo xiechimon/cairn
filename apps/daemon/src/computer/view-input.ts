@@ -5,6 +5,8 @@ const FIXED_MESSAGE_BYTES: Readonly<Record<number, number>> = {
   5: 6,
 };
 
+const MAX_CUT_TEXT_BYTES = 16 * 1024 * 1024;
+
 type GatePhase = 'version' | 'security' | 'clientInit' | 'messages';
 
 export class ReadOnlyViewGate {
@@ -59,8 +61,9 @@ export class ReadOnlyViewGate {
     if (type === 6) {
       if (this.pending.length < 8) return null;
       const length = this.pending.readInt32BE(4);
-      if (length < 0) return -1;
-      const size = 8 + length;
+      const payload = Math.abs(length);
+      if (payload > MAX_CUT_TEXT_BYTES) return -1;
+      const size = 8 + payload;
       return this.pending.length < size ? null : size;
     }
     return -1;
