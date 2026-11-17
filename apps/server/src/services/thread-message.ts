@@ -1,5 +1,6 @@
 import {
   redactSecrets,
+  type StepActionOrigin,
   THREAD_MESSAGE_EXCERPT_MAX,
   type ThreadMessageBody,
   type ThreadMessageContent,
@@ -50,8 +51,8 @@ function excerptOf(content: string): string {
 
 function stepActionAttribution(
   origin: ThreadMessageOrigin,
-): [actor: string | undefined, origin: 'person' | 'automatic'] {
-  return origin.origin === 'user' ? [undefined, 'person'] : [origin.actor, 'automatic'];
+): [actor: string | undefined, origin: StepActionOrigin] {
+  return origin.origin === 'user' ? [undefined, 'person'] : [origin.actor, 'coordinator'];
 }
 
 function hasClaimedStep(deps: BuildDeps, buildId: string): boolean {

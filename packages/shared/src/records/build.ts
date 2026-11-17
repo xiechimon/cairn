@@ -2,8 +2,10 @@ import { z } from 'zod';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { routeOverrideSchema } from './routing-rule.js';
 
-export const triggerSourceSchema = z.enum(['user', 'chief', 'schedule']);
+export const triggerSourceSchema = z.enum(['user', 'chief', 'schedule', 'retry']);
 export type TriggerSource = z.infer<typeof triggerSourceSchema>;
+
+export type StepActionOrigin = 'person' | 'coordinator' | 'retry';
 
 export const stopActorSchema = z.enum(['person', 'coordinator', 'mcp', 'system']);
 export type StopActor = z.infer<typeof stopActorSchema>;

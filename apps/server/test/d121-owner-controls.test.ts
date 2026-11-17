@@ -435,7 +435,7 @@ test.each(['pause', 'disabled'] as const)(
         : /disabled.*project.*explicit user approval/i;
     await expect(confirmBuild(w.deps, 'build')).rejects.toThrow(message);
     await expect(
-      applyBuildStepAction(w.deps, 'build', { action: 'confirm' }, 'Agent', 'automatic'),
+      applyBuildStepAction(w.deps, 'build', { action: 'confirm' }, 'Agent', 'coordinator'),
     ).rejects.toThrow(message);
     expect(w.phase()).toBe('confirm');
     expect(w.db.select().from(step).all()).toHaveLength(0);

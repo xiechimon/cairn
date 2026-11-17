@@ -1,4 +1,4 @@
-import type { TodoRecord } from '@cairn/shared';
+import type { StepActionOrigin, TodoRecord, TriggerSource } from '@cairn/shared';
 import {
   buildFailureRowContent,
   buildRestartPrompt,
@@ -31,13 +31,19 @@ import { assertAutomaticRetryAllowed } from './retry-parking.js';
 import { getTodo, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
+const RESTART_TRIGGER_SOURCE: Record<StepActionOrigin, TriggerSource> = {
+  person: 'user',
+  coordinator: 'chief',
+  retry: 'retry',
+};
+
 export async function restartFailedBuild(
   deps: BuildDeps,
   row: typeof build.$inferSelect,
   initialTodo: TodoRecord,
   body: { feedback: string; clientMessageId: string },
   actorName: string,
-  origin: 'person' | 'automatic',
+  origin: StepActionOrigin,
   beforeCommit: (() => void) | undefined,
 ): Promise<void> {
   const buildId = row.id;
@@ -95,7 +101,7 @@ export async function restartFailedBuild(
         'Task changed while restart was being prepared; retry from its current state.',
       );
     todoRecord = current;
-    if (origin === 'automatic') assertAutomaticRetryAllowed(deps, current.id);
+    if (origin !== 'person') assertAutomaticRetryAllowed(deps, current.id);
     rewatchCreatingThread(deps, current);
     if (reworkTarget !== null && prClosed === null) {
       const currentTarget = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
@@ -184,7 +190,7 @@ export async function restartFailedBuild(
         todoId: todoRecord.id,
         withPlan: false,
         prevPhase: todoRecord.phase,
-        triggerSource: 'user',
+        triggerSource: RESTART_TRIGGER_SOURCE[origin],
         planDocId: null,
         errorMessage: null,
         prUrl: null,

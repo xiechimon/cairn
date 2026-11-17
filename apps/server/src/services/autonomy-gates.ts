@@ -17,7 +17,7 @@ const DAY_MS = 86_400_000;
 
 const MEMBER_ACTIVITY_SCOPE = 'server';
 
-const AUTONOMOUS_TRIGGERS = ['chief', 'schedule'] as const;
+const AUTONOMOUS_TRIGGERS = ['chief', 'schedule', 'retry'] as const;
 
 export interface AutonomyGateInput {
   now: number;

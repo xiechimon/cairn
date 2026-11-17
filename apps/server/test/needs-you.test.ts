@@ -16,8 +16,10 @@ import {
   project as projectTable,
   step as stepTable,
   todo as todoTable,
+  tokenUsage,
 } from '../src/db/schema.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
+import { autonomySpentToday } from '../src/services/autonomy-gates.js';
 import {
   applyBuildStepAction,
   applyStepFailure,
@@ -42,6 +44,7 @@ import {
   queueTaskMessage,
   readQueuedMessages,
 } from '../src/services/task-message-queue.js';
+import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { bootServer, insertMachine, req, seedSessionRoute, type TestServer } from './helpers.js';
 
@@ -187,7 +190,7 @@ describe('needs you (#1800)', () => {
         w.buildId,
         { action: 'restart', feedback: '', clientMessageId: 'retry' },
         'cairn',
-        'automatic',
+        'retry',
       ),
     ).rejects.toThrow(/parked/i);
     expect(buildCount(w)).toBe(1);
@@ -786,5 +789,53 @@ describe('needs you (#1800)', () => {
     await new Promise((resolve) => setImmediate(resolve));
     expect(phaseOf(w)).toBe('queued');
     expect(buildCount(w)).toBe(2);
+  });
+
+  test('an automatic retry is recorded as a retry and its spend counts toward the autonomy budget', async () => {
+    const w = openWorld();
+    const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
+    if (step === undefined) throw new Error('missing step');
+    applyStepFailure(w.deps, step, 'connection reset by peer');
+
+    await sweepFailedRetries(w.deps);
+
+    const retryBuildId = getTodo(w.deps, w.todoId)?.latestBuildId;
+    expect(retryBuildId).not.toBe(w.buildId);
+    const retryBuild = w.s.db
+      .select()
+      .from(buildTable)
+      .where(eq(buildTable.id, retryBuildId ?? ''))
+      .get();
+    expect(retryBuild?.triggerSource).toBe('retry');
+    w.s.db
+      .insert(tokenUsage)
+      .values({ buildId: retryBuildId ?? '', model: 'm', costTotal: 1.5 })
+      .run();
+    expect(autonomySpentToday(w.s.db, w.projectId, nowMs())).toBe(1.5);
+  });
+
+  test('a Coordinator message on a failed thread restarts it as a Coordinator build', async () => {
+    const w = openWorld();
+    const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
+    if (step === undefined) throw new Error('missing step');
+    applyStepFailure(w.deps, step, 'Model refused the task');
+
+    await messageThreadAsUser(
+      w.deps,
+      w.s.team.id,
+      w.todoId,
+      { content: 'Try again with the fixture in place.', clientMessageId: newRecordId() },
+      { origin: 'coordinator', actor: 'Coordinator' },
+    );
+
+    const restartedId = getTodo(w.deps, w.todoId)?.latestBuildId;
+    expect(restartedId).not.toBe(w.buildId);
+    expect(
+      w.s.db
+        .select()
+        .from(buildTable)
+        .where(eq(buildTable.id, restartedId ?? ''))
+        .get()?.triggerSource,
+    ).toBe('chief');
   });
 });

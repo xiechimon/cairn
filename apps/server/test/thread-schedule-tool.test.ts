@@ -793,7 +793,7 @@ async function withNonHumanContinuation(path: 'auto-retry' | 'chief-message', co
   expect(continuation.step.buildId).not.toBe(lastScheduledId);
   expect(
     s.db.select().from(build).where(eq(build.id, continuation.step.buildId)).get()?.triggerSource,
-  ).toBe('user');
+  ).toBe(path === 'auto-retry' ? 'retry' : 'user');
   expect(
     s.db
       .select()

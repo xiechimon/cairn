@@ -1,4 +1,4 @@
-import type { ReviewGate } from '@cairn/shared';
+import type { ReviewGate, StepActionOrigin } from '@cairn/shared';
 import {
   buildReplanPrompt,
   buildReviewRejectPrompt,
@@ -42,7 +42,7 @@ export async function applyBuildStepAction(
     | { action: 'review'; focus?: string }
     | { action: 'restart'; feedback: string; clientMessageId: string },
   actor?: string,
-  origin: 'person' | 'automatic' = 'person',
+  origin: StepActionOrigin = 'person',
   beforeCommit?: () => void,
 ): Promise<void> {
   if (
@@ -58,7 +58,7 @@ export async function applyBuildStepAction(
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
   const actorName = actor ?? deps.user.displayName;
-  if (origin === 'automatic') assertAutomaticRetryAllowed(deps, row.todoId);
+  if (origin !== 'person') assertAutomaticRetryAllowed(deps, row.todoId);
   else assertParkedBuildIdle(deps, row);
 
   if (body.action === 'restart') {
@@ -67,7 +67,7 @@ export async function applyBuildStepAction(
   }
 
   if (body.action === 'confirm') {
-    if (origin === 'automatic' && todoRecord.phase === 'confirm') {
+    if (origin !== 'person' && todoRecord.phase === 'confirm') {
       const eligibility = planAutoConfirmation(deps, buildId);
       if (!eligibility.eligible) throw new HttpError(409, eligibility.reason);
     }
