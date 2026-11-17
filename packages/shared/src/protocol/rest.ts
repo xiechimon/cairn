@@ -23,6 +23,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'D75: enable or disable browser tools on a computer',
   },
   {
+    method: 'POST',
+    path: '/api/computers/package-install',
+    note: 'owner approves or declines a Coordinator install_packages request',
+  },
+  {
+    method: 'POST',
+    path: '/api/computers/{id}/actions',
+    note: 'owner stops, updates, recovers or resets a VM computer',
+  },
+  {
     method: 'GET',
     path: '/api/computers/{id}/commands',
     query: ['limit'],
