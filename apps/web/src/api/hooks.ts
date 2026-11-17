@@ -37,6 +37,8 @@ import type {
   ImConnectionRecord,
   ImPairingRequestRecord,
   ImportSkillBody,
+  ImWechatLoginPoll,
+  ImWechatLoginStart,
   MachineRecord,
   McpConnectorRecord,
   McpServerRecord,
@@ -701,6 +703,24 @@ export const useImPairingRequests = (teamId: string | undefined, enabled: boolea
     refetchInterval: IM_POLL_MS,
   });
 
+const IM_WECHAT_LOGIN_POLL_MS = 2_000;
+
+export const useImWechatLoginPoll = (
+  teamId: string | undefined,
+  loginId: string | null,
+  enabled: boolean,
+) =>
+  useQuery({
+    queryKey: ['imWechatLogin', teamId, loginId],
+    queryFn: () =>
+      api.get<ImWechatLoginPoll>(
+        `/api/teams/${teamId}/im/wechat/login/${encodeURIComponent(loginId ?? '')}`,
+      ),
+    enabled: enabled && teamId !== undefined && loginId !== null,
+    refetchInterval: IM_WECHAT_LOGIN_POLL_MS,
+    retry: false,
+  });
+
 export function useImMutations(teamId: string | undefined) {
   const queryClient = useQueryClient();
   const invalidate = () => {
@@ -714,6 +734,9 @@ export function useImMutations(teamId: string | undefined) {
           botToken,
         }),
       onSuccess: invalidate,
+    }),
+    startWechatLogin: useMutation({
+      mutationFn: () => api.post<ImWechatLoginStart>(`/api/teams/${teamId}/im/wechat/login`, {}),
     }),
     deleteConnection: useMutation({
       mutationFn: (id: string) =>

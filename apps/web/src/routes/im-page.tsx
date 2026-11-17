@@ -1,10 +1,16 @@
-import type { ImConnectionStatus } from '@cairn/shared';
+import type { ImConnectionStatus, ImPlatform, ImWechatLoginStart } from '@cairn/shared';
 import { MessageCircle, Send } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useImConnections, useImMutations, useImPairingRequests } from '../api/hooks.js';
+import {
+  useImConnections,
+  useImMutations,
+  useImPairingRequests,
+  useImWechatLoginPoll,
+} from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
+import { QrCode } from '../components/qr-code.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
@@ -32,6 +38,9 @@ const STATUS_LABEL: Record<ImConnectionStatus, string> = {
   expired: '凭证失效',
   error: '错误',
 };
+
+const platformLabel = (platform: ImPlatform, t: (key: string) => string): string =>
+  platform === 'wechat' ? t('微信') : 'Telegram';
 
 function ConnectDialog({
   onClose,
@@ -71,6 +80,70 @@ function ConnectDialog({
   );
 }
 
+function WechatLoginDialog({
+  teamId,
+  login,
+  restarting,
+  onClose,
+  onDone,
+  onRetry,
+}: {
+  teamId: string | undefined;
+  login: ImWechatLoginStart;
+  restarting: boolean;
+  onClose: () => void;
+  onDone: () => void;
+  onRetry: () => void;
+}) {
+  const { t } = useI18n();
+  const [expired, setExpired] = useState(false);
+  const failed = expired || login.qr === undefined;
+  const poll = useImWechatLoginPoll(teamId, login.loginId, !failed);
+  const failedText =
+    login.qr === undefined ? t('二维码获取失败，请重新扫码。') : t('二维码已过期，请重新扫码。');
+  useEffect(() => {
+    const data = poll.data;
+    if (data === undefined) return;
+    if (data.status === 'done') onDone();
+    else if (data.status === 'expired') setExpired(true);
+  }, [poll.data, onDone]);
+  return (
+    <DialogShell
+      title={t('连接 WeChat')}
+      subtitle={failed ? failedText : t('用微信扫描二维码，5 分钟内有效。')}
+      onClose={onClose}
+      footer={
+        failed ? (
+          <Button
+            className={DIALOG_PRIMARY_BUTTON}
+            disabled={restarting}
+            onClick={onRetry}
+            data-testid="im-wechat-retry"
+          >
+            {t('重新扫码')}
+          </Button>
+        ) : undefined
+      }
+    >
+      {failed ? (
+        <p
+          className="m-0 text-center text-meta text-content-secondary"
+          data-testid="im-wechat-expired"
+        >
+          {failedText}
+        </p>
+      ) : (
+        <div className="flex flex-col items-center gap-3">
+          <QrCode text={login.qr ?? ''} label={t('微信登录二维码')} />
+          <p className="m-0 max-w-full text-center text-meta text-content-tertiary">
+            {t('等待微信确认…')}
+          </p>
+        </div>
+      )}
+    </DialogShell>
+  );
+}
+
 export function ImConnectionsPage() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
@@ -80,8 +153,14 @@ export function ImConnectionsPage() {
   const requestsQ = useImPairingRequests(teamId, live);
   const mutations = useImMutations(teamId);
   const [connecting, setConnecting] = useState(false);
+  const [wechatLogin, setWechatLogin] = useState<ImWechatLoginStart | null>(null);
   const connections = connectionsQ.data?.connections ?? [];
   const requests = (requestsQ.data?.requests ?? []).filter((row) => row.status === 'pending');
+  const startWechatLogin = () =>
+    mutations.startWechatLogin.mutate(undefined, {
+      onSuccess: setWechatLogin,
+      onError: (error) => toastError(t('微信登录失败，请重试。'), error),
+    });
 
   return (
     <PageShell
@@ -91,13 +170,24 @@ export function ImConnectionsPage() {
       title={t('消息连接')}
       actions={
         live ? (
-          <Button
-            className={DIALOG_PRIMARY_BUTTON}
-            onClick={() => setConnecting(true)}
-            data-testid="im-connect-telegram"
-          >
-            {t('连接 Telegram')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className={DIALOG_PRIMARY_BUTTON}
+              disabled={mutations.startWechatLogin.isPending}
+              onClick={startWechatLogin}
+              data-testid="im-connect-wechat"
+            >
+              {t('连接 WeChat')}
+            </Button>
+            <Button
+              className={DIALOG_PRIMARY_BUTTON}
+              onClick={() => setConnecting(true)}
+              data-testid="im-connect-telegram"
+            >
+              {t('连接 Telegram')}
+            </Button>
+          </div>
         ) : null
       }
     >
@@ -107,7 +197,7 @@ export function ImConnectionsPage() {
           className="mt-6"
           icon={MessageCircle}
           title={t('还没有消息连接')}
-          description={t('连接 Telegram 机器人后，就能直接用手机和 Coordinator 对话。')}
+          description={t('连接 Telegram 机器人或微信后，就能直接用手机和 Coordinator 对话。')}
         />
       ) : (
         <ResourceList>
@@ -116,8 +206,13 @@ export function ImConnectionsPage() {
               <RowText>
                 <RowTitle>
                   <span className="inline-flex items-center gap-2">
-                    <Send className="size-3.5" aria-hidden="true" />
-                    {conn.accountLabel ?? t('Telegram 机器人')}
+                    {conn.platform === 'wechat' ? (
+                      <MessageCircle className="size-3.5" aria-hidden="true" />
+                    ) : (
+                      <Send className="size-3.5" aria-hidden="true" />
+                    )}
+                    {conn.accountLabel ??
+                      (conn.platform === 'wechat' ? t('WeChat 账号') : t('Telegram 机器人'))}
                     <StatusChip tone={STATUS_TONE[conn.status]}>
                       {t(STATUS_LABEL[conn.status])}
                     </StatusChip>
@@ -129,20 +224,32 @@ export function ImConnectionsPage() {
                     t('已配对 {count} 个联系人', { count: conn.pairedSenders.length })}
                 </RowDesc>
               </RowText>
-              {(conn.status === 'expired' || conn.status === 'error') && (
+              {conn.status === 'expired' && conn.platform === 'wechat' ? (
                 <Button
                   variant="ghost"
                   className={DIALOG_PRIMARY_BUTTON}
-                  disabled={mutations.reconnectConnection.isPending}
-                  onClick={() =>
-                    mutations.reconnectConnection.mutate(conn.id, {
-                      onError: (error) => toastError(t('重连失败，请重试。'), error),
-                    })
-                  }
-                  data-testid={`im-reconnect-${conn.id}`}
+                  disabled={mutations.startWechatLogin.isPending}
+                  onClick={startWechatLogin}
+                  data-testid={`im-rescan-${conn.id}`}
                 >
-                  {t('重连')}
+                  {t('重新扫码')}
                 </Button>
+              ) : (
+                (conn.status === 'expired' || conn.status === 'error') && (
+                  <Button
+                    variant="ghost"
+                    className={DIALOG_PRIMARY_BUTTON}
+                    disabled={mutations.reconnectConnection.isPending}
+                    onClick={() =>
+                      mutations.reconnectConnection.mutate(conn.id, {
+                        onError: (error) => toastError(t('重连失败，请重试。'), error),
+                      })
+                    }
+                    data-testid={`im-reconnect-${conn.id}`}
+                  >
+                    {t('重连')}
+                  </Button>
+                )
               )}
               <Button
                 variant="ghost"
@@ -167,7 +274,11 @@ export function ImConnectionsPage() {
             <ResourceRow key={request.id} data-testid={`im-pairing-${request.id}`}>
               <RowText>
                 <RowTitle>{request.senderName ?? request.senderId}</RowTitle>
-                <RowDesc>{t('请求配对 · {platform}', { platform: request.platform })}</RowDesc>
+                <RowDesc>
+                  {t('请求配对 · {platform}', {
+                    platform: platformLabel(request.platform, t),
+                  })}
+                </RowDesc>
               </RowText>
               <Button
                 variant="ghost"
@@ -211,6 +322,20 @@ export function ImConnectionsPage() {
               onError: (error) => toastError(t('连接失败，请重试。'), error),
             })
           }
+        />
+      )}
+      {wechatLogin !== null && (
+        <WechatLoginDialog
+          key={wechatLogin.loginId}
+          teamId={teamId}
+          login={wechatLogin}
+          restarting={mutations.startWechatLogin.isPending}
+          onClose={() => setWechatLogin(null)}
+          onDone={() => {
+            void connectionsQ.refetch();
+            setWechatLogin(null);
+          }}
+          onRetry={startWechatLogin}
         />
       )}
     </PageShell>

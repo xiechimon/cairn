@@ -2443,8 +2443,8 @@ export const EN: Record<string, string> = {
   '在 @BotFather 里创建机器人，把 bot token 粘到这里。':
     'Create a bot in @BotFather and paste the bot token here.',
   还没有消息连接: 'No chat connections yet',
-  '连接 Telegram 机器人后，就能直接用手机和 Coordinator 对话。':
-    'Connect a Telegram bot and you can talk to the Coordinator from your phone.',
+  '连接 Telegram 机器人或微信后，就能直接用手机和 Coordinator 对话。':
+    'Connect a Telegram bot or WeChat and talk to the Coordinator from your phone.',
   'Telegram 机器人': 'Telegram bot',
   连接中: 'Connecting',
   不稳定: 'Unstable',
@@ -2459,4 +2459,13 @@ export const EN: Record<string, string> = {
   '拒绝失败，请重试。': 'Could not reject. Try again.',
   聊天: 'Chat',
   微信: 'WeChat',
+  '连接 WeChat': 'Connect WeChat',
+  'WeChat 账号': 'WeChat account',
+  '用微信扫描二维码，5 分钟内有效。': 'Scan this QR code in WeChat. It stays valid for 5 minutes.',
+  '等待微信确认…': 'Waiting for WeChat to confirm…',
+  微信登录二维码: 'WeChat sign-in QR code',
+  '二维码已过期，请重新扫码。': 'The QR code expired. Scan a fresh one.',
+  '二维码获取失败，请重新扫码。': 'Could not get a QR code. Try again.',
+  重新扫码: 'Scan again',
+  '微信登录失败，请重试。': 'Could not start WeChat sign-in. Try again.',
 };
