@@ -5,6 +5,7 @@ import { ApiError } from '../api/client.js';
 import { computerScreenWsUrl, openComputerScreen } from '../api/computer-screen.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
+import type { ScreenPointerProps } from './screen-hover-control.js';
 
 type ScreenStatus = 'connecting' | 'connected' | 'placeholder' | 'failed';
 type NovncRfb = import('@novnc/novnc').default;
@@ -47,7 +48,7 @@ export function MachineScreenSurface({
   interactive,
   fill = false,
   onExpand,
-  onActivate,
+  pointer,
   autoFocus = false,
 }: {
   teamId: string;
@@ -56,7 +57,7 @@ export function MachineScreenSurface({
   interactive: boolean;
   fill?: boolean;
   onExpand?: () => void;
-  onActivate?: () => void;
+  pointer?: ScreenPointerProps;
   autoFocus?: boolean;
 }) {
   const { t } = useI18n();
@@ -152,6 +153,7 @@ export function MachineScreenSurface({
       data-status={status}
       data-interactive={interactive ? 'true' : 'false'}
       data-fill={fill ? 'true' : 'false'}
+      {...pointer}
       className={`relative overflow-hidden ${fill ? 'h-full w-full' : 'aspect-[16/10] bg-(--surface-1)'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
     >
       {status !== 'connected' && lastFrame !== null && (
@@ -175,15 +177,6 @@ export function MachineScreenSurface({
                 : t('桌面控制已上线，屏幕显示在这里')}
           </span>
         </div>
-      )}
-      {onActivate != null && !interactive && (
-        <button
-          type="button"
-          aria-label={t('点一下接管')}
-          data-testid="machine-screen-activate"
-          className="absolute inset-0 cursor-pointer bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-          onClick={onActivate}
-        />
       )}
       {onExpand != null && (
         <Button

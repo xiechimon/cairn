@@ -1,125 +1,156 @@
 import type { ComputerRecord } from '@cairn/shared';
 import { cn } from 'cn';
 import { Minimize2 } from 'lucide-react';
-import type { ReactNode } from 'react';
-import type { useComputerControl } from '../api/use-computer-control.js';
+import {
+  type FocusEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { MachineName } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
+import { setDesktopWindowControlsVisible } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import { MachineScreenSurface } from './computer-screen.js';
+import { joinMeta } from './rel-time.js';
+import {
+  type ComputerControl,
+  type ScreenHover,
+  screenControlStatus,
+} from './screen-hover-control.js';
 
-export type ComputerControl = ReturnType<typeof useComputerControl>;
+const BAR_ZONE_PX = 56;
+const BAR_HIDE_MS = 1_000;
+const COARSE_QUERY = '(pointer: coarse)';
 
-export function ComputerControlBar({
-  held,
-  busy,
-  handoff,
-  compact = false,
-  onTakeOver,
-  onGiveBack,
-}: {
-  compact?: boolean;
-  handoff: ComputerRecord['handoffReason'];
-  held: boolean;
-  busy: boolean;
-  onTakeOver: () => void;
-  onGiveBack: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div
-      data-testid="computer-control-bar"
-      data-held={held ? 'true' : 'false'}
-      data-handoff={handoff ?? 'none'}
-      className={cn(
-        'flex items-center gap-3',
-        compact ? 'flex-none' : 'justify-between px-2.5 py-2',
-      )}
-    >
-      {!compact && (
-        <span
-          className={cn(
-            'text-meta',
-            !held && handoff !== null ? 'text-foreground' : 'text-content-tertiary',
-          )}
-        >
-          {held
-            ? t('你在操作，Coordinator 已暂停')
-            : handoff !== null
-              ? t('需要你登录')
-              : t('只看，不能点')}
-        </span>
-      )}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="pointer-coarse:h-11 pointer-coarse:px-4"
-        disabled={busy}
-        onClick={held ? onGiveBack : onTakeOver}
-      >
-        {held ? t('交还') : t('接管')}
-      </Button>
-    </div>
-  );
+function useRevealBar() {
+  const bar = useRef<HTMLDivElement>(null);
+  const hideTimer = useRef<number | undefined>(undefined);
+  const [near, setNear] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const coarse = window.matchMedia(COARSE_QUERY).matches;
+
+  useEffect(() => () => window.clearTimeout(hideTimer.current), []);
+
+  const inBar = (target: EventTarget | null) =>
+    target instanceof Node && bar.current?.contains(target) === true;
+
+  const show = () => {
+    window.clearTimeout(hideTimer.current);
+    hideTimer.current = undefined;
+    setNear(true);
+  };
+  const hideSoon = () => {
+    if (hideTimer.current !== undefined) return;
+    hideTimer.current = window.setTimeout(() => {
+      hideTimer.current = undefined;
+      setNear(false);
+    }, BAR_HIDE_MS);
+  };
+
+  return {
+    bar,
+    shown: near || focused || coarse,
+    onPointerMove: (event: ReactPointerEvent<HTMLElement>) => {
+      if (event.pointerType === 'touch') return;
+      if (inBar(event.target) || event.clientY <= BAR_ZONE_PX) show();
+      else hideSoon();
+    },
+    onPointerLeave: hideSoon,
+    onFocus: (event: FocusEvent<HTMLElement>) =>
+      setFocused(inBar(event.target) && event.target.matches(':focus-visible')),
+    onBlur: (event: FocusEvent<HTMLElement>) => {
+      if (!inBar(event.relatedTarget)) setFocused(false);
+    },
+  };
 }
 
 export function ComputerScreenDialog({
-  open,
   onClose,
   title,
   teamId,
   computer,
   control,
-  status,
+  hover,
+  note,
 }: {
-  open: boolean;
   onClose: () => void;
   title: string;
   teamId: string;
   computer: ComputerRecord;
   control: ComputerControl;
-  status?: ReactNode;
+  hover: ScreenHover;
+  note?: string;
 }) {
   const { t } = useI18n();
+  const root = useRef<HTMLDivElement>(null);
+  const reveal = useRevealBar();
   const { leaseId } = control;
+
+  useEffect(() => {
+    setDesktopWindowControlsVisible(reveal.shown);
+  }, [reveal.shown]);
+
+  useEffect(
+    () => () => {
+      setDesktopWindowControlsVisible(true);
+      hover.leave();
+    },
+    [hover],
+  );
+
   return (
     <DialogShell
-      open={open}
       onClose={onClose}
       viewportRoot
+      initialFocus={root}
       backdropClassName="bg-(--screen-letterbox)"
       zIndex="var(--z-modal)"
     >
       <div
+        ref={root}
         role="dialog"
         aria-label={title}
+        tabIndex={-1}
         data-testid="machine-screen-enlarged"
-        className="fixed inset-0 z-(--z-modal) flex flex-col bg-(--screen-letterbox) pb-[env(safe-area-inset-bottom)]"
+        className="fixed inset-0 z-(--z-modal) bg-(--screen-letterbox) pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] outline-none"
+        onPointerMove={reveal.onPointerMove}
+        onPointerLeave={reveal.onPointerLeave}
+        onFocus={reveal.onFocus}
+        onBlur={reveal.onBlur}
       >
+        <MachineScreenSurface
+          teamId={teamId}
+          computer={computer}
+          leaseId={leaseId}
+          interactive={leaseId !== null}
+          fill
+          autoFocus
+          pointer={hover.pointer}
+        />
         <div
-          data-testid="machine-screen-chrome"
-          className="machine-screen-bar flex min-h-12 flex-none items-center gap-3 border-b border-border bg-background pt-[env(safe-area-inset-top)] pr-1.5 pl-4 text-foreground"
+          ref={reveal.bar}
+          data-testid="machine-screen-bar"
+          data-shown={reveal.shown ? 'true' : 'false'}
+          className={cn(
+            'absolute top-[calc(env(safe-area-inset-top)+0.5rem)] left-1/2 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-3 rounded-(--radius-popover) bg-popover py-1 pr-1 pl-4 text-popover-foreground shadow-(--e2) transition-opacity duration-(--dur-overlay) motion-reduce:transition-none',
+            reveal.shown ? 'opacity-100' : 'pointer-events-none opacity-0',
+          )}
         >
-          <div className="flex min-w-0 flex-1 items-baseline gap-2">
-            <span className="min-w-0 truncate text-ui text-foreground">
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-ui text-foreground">
               <MachineName machine={{ id: computer.machine.id, name: title }} compact />
             </span>
-            <span className="hidden min-w-0 truncate text-meta text-content-tertiary sm:block">
-              {status ??
-                (leaseId !== null ? t('你在操作，Coordinator 已暂停') : t('点画面就能接管'))}
+            <span
+              data-testid="machine-screen-status"
+              className="truncate text-meta text-content-tertiary"
+            >
+              {joinMeta([screenControlStatus(control, t), note])}
             </span>
           </div>
-          <ComputerControlBar
-            compact
-            held={control.controlHeld}
-            busy={control.busy}
-            handoff={computer.handoffReason}
-            onTakeOver={() => control.setHeld(true)}
-            onGiveBack={() => control.setHeld(false)}
-          />
           <IconTooltip
             label={t('缩小')}
             side="bottom"
@@ -137,17 +168,6 @@ export function ComputerScreenDialog({
           >
             <Minimize2 aria-hidden="true" className="size-5" />
           </IconTooltip>
-        </div>
-        <div className="min-h-0 flex-1">
-          <MachineScreenSurface
-            teamId={teamId}
-            computer={computer}
-            leaseId={leaseId}
-            interactive={leaseId !== null}
-            fill
-            autoFocus
-            onActivate={control.busy ? undefined : () => control.setHeld(true)}
-          />
         </div>
       </div>
     </DialogShell>

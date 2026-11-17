@@ -22,10 +22,11 @@ import type { TFunc } from '../i18n/translate.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface } from './computer-screen.js';
-import { ComputerControlBar, ComputerScreenDialog } from './computer-screen-dialog.js';
+import { ComputerScreenDialog } from './computer-screen-dialog.js';
 import { fleetStatus, fleetStatusLine, machineStateLabel } from './fleet-status.js';
 import { desktopControlOnline } from './machine-capabilities.js';
 import { joinMeta, relativeTime } from './rel-time.js';
+import { useScreenHoverControl } from './screen-hover-control.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
   return (
@@ -185,6 +186,7 @@ function MachineCard({
   const [fullscreen, setFullscreen] = useState(false);
   const [screenRequested, setScreenRequested] = useState(openScreen);
   const control = useComputerControl({ teamId, computer });
+  const hover = useScreenHoverControl(control);
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
@@ -197,8 +199,6 @@ function MachineCard({
     setFullscreen(true);
     setScreenRequested(false);
   }, [screenRequested, screenLive]);
-
-  const takeOver = () => control.setHeld(true);
 
   return (
     <div data-testid="machine-card" className="flex flex-col divide-y divide-border">
@@ -240,23 +240,27 @@ function MachineCard({
             leaseId={control.leaseId}
             interactive={control.leaseId !== null && !fullscreen}
             onExpand={() => setFullscreen(true)}
-            onActivate={control.busy || fullscreen ? undefined : takeOver}
+            pointer={fullscreen ? undefined : hover.pointer}
           />
-          <ComputerControlBar
-            held={control.controlHeld}
-            busy={control.busy}
-            handoff={computer.handoffReason}
-            onTakeOver={takeOver}
-            onGiveBack={() => control.setHeld(false)}
-          />
+          {(computer.handoffReason !== null || control.failed) && (
+            <p
+              data-testid="machine-screen-note"
+              className={cn(
+                'm-0 px-5 py-2 text-meta',
+                control.failed ? 'text-destructive' : 'text-foreground',
+              )}
+            >
+              {control.failed ? t('没能接管，电脑没有响应') : t('需要你登录')}
+            </p>
+          )}
           {fullscreen && (
             <ComputerScreenDialog
-              open
               onClose={() => setFullscreen(false)}
               title={machine.name}
               teamId={teamId}
               computer={computer}
               control={control}
+              hover={hover}
             />
           )}
         </>

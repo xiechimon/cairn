@@ -582,7 +582,114 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
   await expect(panel.getByTestId('machine-screen-hint')).toHaveCount(0);
 });
 
-test('full screen only watches; Take control and Return control drive the lease', async ({
+const SCREEN_MACHINE = { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 };
+
+async function screenCenter(locator: ReturnType<Page['getByTestId']>) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  return { x: (box?.x ?? 0) + (box?.width ?? 0) / 2, y: (box?.y ?? 0) + (box?.height ?? 0) / 2 };
+}
+
+const AWAY = { x: 4, y: 4 };
+
+test('the owner screen has no take-over or give-back buttons', async ({ page }) => {
+  const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+  const panel = await open(page, feed, [SCREEN_MACHINE]);
+  await expect(panel.getByTestId('machine-screen')).toBeVisible();
+  await expect(panel.getByRole('button', { name: /接管|交还/ })).toHaveCount(0);
+  await expect(page.getByTestId('machine-screen-activate')).toHaveCount(0);
+  await expect(page.getByTestId('computer-control-bar')).toHaveCount(0);
+  await expect(panel.getByTestId('machine-screen-note')).toHaveCount(0);
+});
+
+test('resting the pointer on the card screen takes control after a short dwell, and leaving gives it back after a delay', async ({
+  page,
+}) => {
+  const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+  await open(page, feed, [SCREEN_MACHINE]);
+  const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
+  await expect(cardScreen).toBeVisible();
+  const center = await screenCenter(cardScreen);
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.move(AWAY.x, AWAY.y);
+  await page.waitForTimeout(400);
+  expect(feed.controlCalls).toEqual([]);
+  await page.mouse.move(center.x, center.y);
+  await expect.poll(() => feed.controlCalls).toEqual(['POST']);
+  await expect(cardScreen).toHaveAttribute('data-interactive', 'true', { timeout: 15_000 });
+  await page.mouse.move(AWAY.x, AWAY.y);
+  await page.waitForTimeout(300);
+  expect(feed.controlCalls).toEqual(['POST']);
+  await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
+  await expect(cardScreen).toHaveAttribute('data-interactive', 'false');
+  await expect(page.getByTestId('machine-screen-enlarged')).toHaveCount(0);
+});
+
+test('coming back onto the screen before the release delay keeps the lease', async ({ page }) => {
+  const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+  await open(page, feed, [SCREEN_MACHINE]);
+  const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
+  const center = await screenCenter(cardScreen);
+  await page.mouse.move(center.x, center.y);
+  await expect.poll(() => feed.controlCalls).toEqual(['POST']);
+  await page.mouse.move(AWAY.x, AWAY.y);
+  await page.waitForTimeout(300);
+  await page.mouse.move(center.x, center.y);
+  await page.waitForTimeout(1_200);
+  expect(feed.controlCalls).toEqual(['POST']);
+  await expect(cardScreen).toHaveAttribute('data-interactive', 'true');
+});
+
+test('Enlarge fills the window with the screen, and the bar shows only while the pointer is at the top', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const shell = window as Window & { cairnDesktop?: unknown; __windowButtons?: boolean[] };
+    const calls: boolean[] = [];
+    shell.__windowButtons = calls;
+    shell.cairnDesktop = { windowControls: { setVisible: (visible: boolean) => calls.push(visible) } };
+  });
+  const windowButtons = () =>
+    page.evaluate(() => (window as Window & { __windowButtons?: boolean[] }).__windowButtons);
+  const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+  const panel = await open(page, feed, [SCREEN_MACHINE]);
+  await panel.getByTestId('machine-screen-expand').click();
+  const enlarged = page.getByTestId('machine-screen-enlarged');
+  await expect(enlarged).toBeVisible();
+  expect(await page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error('no viewport');
+  const box = await enlarged.boundingBox();
+  expect(box?.width).toBe(viewport.width);
+  expect(box?.height).toBe(viewport.height);
+  const shown = await enlarged.getByTestId('machine-screen').boundingBox();
+  expect(shown).toEqual({ x: 0, y: 0, width: viewport.width, height: viewport.height });
+  const bar = enlarged.getByTestId('machine-screen-bar');
+  const opacity = () => bar.evaluate((element) => getComputedStyle(element).opacity);
+  await page.mouse.move(viewport.width / 2, viewport.height / 2);
+  await expect(bar).toHaveAttribute('data-shown', 'false');
+  await expect.poll(opacity).toBe('0');
+  await expect.poll(windowButtons).toEqual([false]);
+  await shot(page, 'enlarged-bar-hidden');
+  await page.mouse.move(viewport.width / 2, 20);
+  await expect(bar).toHaveAttribute('data-shown', 'true');
+  await expect.poll(opacity).toBe('1');
+  await expect(bar).toContainText('omarchy');
+  await expect(bar).toContainText('你在操作，Coordinator 先等着');
+  await expect.poll(windowButtons).toEqual([false, true]);
+  await shot(page, 'enlarged-bar-shown');
+  await page.mouse.move(viewport.width / 2, viewport.height / 2);
+  await page.waitForTimeout(400);
+  await expect(bar).toHaveAttribute('data-shown', 'true');
+  await expect(bar).toHaveAttribute('data-shown', 'false', { timeout: 3_000 });
+  await expect.poll(windowButtons).toEqual([false, true, false]);
+  await page.mouse.move(viewport.width / 2, 20);
+  await bar.getByRole('button', { name: '缩小' }).click();
+  await expect(enlarged).toHaveCount(0);
+  await expect.poll(async () => (await windowButtons())?.at(-1)).toBe(true);
+});
+
+test('the enlarged screen opens view-only, the pointer on it opens the control channel, and Shrink gives control back', async ({
   page,
 }) => {
   const screenOpens: unknown[] = [];
@@ -591,101 +698,47 @@ test('full screen only watches; Take control and Return control drive the lease'
       screenOpens.push(request.postDataJSON());
   });
   const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
-  const panel = await open(page, feed, [
-    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
-  ]);
+  await open(page, feed, [SCREEN_MACHINE], '/app?pane=machines&machine=m1&screen=1');
+  const enlarged = page.getByTestId('machine-screen-enlarged');
+  await expect(enlarged).toBeVisible();
   const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
-  await expect.poll(() => screenOpens).toEqual([{ kind: 'view' }]);
-  await expect(cardScreen).toHaveAttribute('data-status', 'placeholder');
   const cardSurface = await cardScreen.evaluateHandle((element) => element);
-  await panel.getByTestId('machine-screen-expand').click();
-  const enlarged = page.getByTestId('machine-screen-enlarged');
-  await expect(enlarged).toBeVisible();
   await expect.poll(() => screenOpens).toEqual([{ kind: 'view' }, { kind: 'view' }]);
-  expect(await cardSurface.evaluate((element) => element.isConnected)).toBe(true);
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
-  await expect(cardScreen).toHaveAttribute('data-interactive', 'false');
-  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
-    'data-interactive',
-    'false',
-  );
-  const dialog = page.getByRole('dialog', { name: 'omarchy' });
-  await expect(dialog.getByRole('button', { name: '交还' })).toHaveCount(0);
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-interactive', 'false');
   expect(feed.controlCalls).toEqual([]);
-  await dialog.getByRole('button', { name: '接管', exact: true }).click();
-  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
-    'data-interactive',
-    'true',
-    { timeout: 15_000 },
-  );
-  await expect(dialog.getByText('你在操作，Coordinator 已暂停')).toBeVisible();
-  expect(feed.controlCalls).toEqual(['POST']);
-  await expect.poll(() => screenOpens).toEqual([
-    { kind: 'view' },
-    { kind: 'view' },
-    { kind: 'control', leaseId: 'lease-1' },
-  ]);
-  await dialog.getByRole('button', { name: '交还' }).click();
-  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
-    'data-interactive',
-    'false',
-  );
-  expect(feed.controlCalls).toEqual(['POST', 'DELETE']);
-  await expect.poll(() => screenOpens).toEqual([
-    { kind: 'view' },
-    { kind: 'view' },
-    { kind: 'control', leaseId: 'lease-1' },
-    { kind: 'view' },
-  ]);
-  const openedWhileFull = screenOpens.length;
-  await dialog.getByRole('button', { name: '缩小' }).click();
-  await expect(enlarged).toHaveCount(0);
-  await expect(cardScreen).toHaveAttribute('data-status', 'placeholder');
-  expect(await cardSurface.evaluate((element) => element.isConnected)).toBe(true);
-  expect(screenOpens.length).toBe(openedWhileFull);
-});
-
-test('a click on the card screen takes control in place, and Enlarge fills the window without browser full screen', async ({
-  page,
-}) => {
-  const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
-  const panel = await open(page, feed, [
-    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
-  ]);
-  const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
-  await expect(cardScreen).toBeVisible();
-  await panel.getByRole('button', { name: '点一下接管' }).click();
-  await expect.poll(() => feed.controlCalls).toEqual(['POST']);
-  await expect(cardScreen).toHaveAttribute('data-interactive', 'true', { timeout: 15_000 });
-  await expect(page.getByTestId('machine-screen-enlarged')).toHaveCount(0);
-  await panel.getByRole('button', { name: '交还' }).click();
-  await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
-  await panel.getByTestId('machine-screen-expand').click();
-  const enlarged = page.getByTestId('machine-screen-enlarged');
-  await expect(enlarged).toBeVisible();
-  expect(await page.evaluate(() => document.fullscreenElement === null)).toBe(true);
-  const box = await enlarged.boundingBox();
   const viewport = page.viewportSize();
-  expect(box?.width).toBe(viewport?.width);
-  expect(box?.height).toBe(viewport?.height);
-  const bar = await enlarged.getByTestId('machine-screen-chrome').boundingBox();
-  const shown = await enlarged.getByTestId('machine-screen').boundingBox();
-  expect(bar).not.toBeNull();
-  expect(shown).not.toBeNull();
-  if (!bar || !shown) return;
-  expect(bar.y + bar.height).toBeLessThanOrEqual(shown.y);
-  expect(shown.y + shown.height).toBeLessThanOrEqual(viewport?.height ?? 0);
-  await enlarged.getByRole('button', { name: '点一下接管' }).click();
-  await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE', 'POST']);
+  if (!viewport) throw new Error('no viewport');
+  await page.mouse.move(viewport.width / 2, viewport.height / 2);
+  await expect.poll(() => feed.controlCalls).toEqual(['POST']);
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-interactive', 'true', {
     timeout: 15_000,
   });
-  await expect(enlarged.getByRole('button', { name: '点一下接管' })).toHaveCount(0);
-  await enlarged.getByRole('button', { name: '缩小' }).click();
+  await expect(cardScreen).toHaveAttribute('data-interactive', 'false');
+  await expect.poll(() => screenOpens).toContainEqual({ kind: 'control', leaseId: 'lease-1' });
+  await page.mouse.move(viewport.width / 2, 20);
+  await enlarged.getByTestId('machine-screen-bar').getByRole('button', { name: '缩小' }).click();
   await expect(enlarged).toHaveCount(0);
+  await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
+  expect(await cardSurface.evaluate((element) => element.isConnected)).toBe(true);
+  await expect(cardScreen).toHaveAttribute('data-interactive', 'false');
 });
 
-test('opening the machine while a user lease exists elsewhere does not take control, and Return control releases it', async ({
+test('keyboard focus in the enlarged view shows the bar with how to take control', async ({
+  page,
+}) => {
+  const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+  await open(page, feed, [SCREEN_MACHINE], '/app?pane=machines&machine=m1&screen=1');
+  const bar = page.getByTestId('machine-screen-bar');
+  await expect(page.getByTestId('machine-screen-enlarged')).toBeVisible();
+  await expect(bar).toHaveAttribute('data-shown', 'false');
+  await page.keyboard.press('Tab');
+  await expect(bar).toHaveAttribute('data-shown', 'true');
+  await expect(bar).toContainText('鼠标移进画面就能操作');
+  expect(feed.controlCalls).toEqual([]);
+});
+
+test('opening the machine while a user lease exists elsewhere does not take control', async ({
   page,
 }) => {
   const feed: Feed = {
@@ -693,16 +746,12 @@ test('opening the machine while a user lease exists elsewhere does not take cont
     commands: [command(1)],
     controlCalls: [],
   };
-  const panel = await open(page, feed, [
-    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
-  ]);
+  const panel = await open(page, feed, [SCREEN_MACHINE]);
   await expect(panel.getByTestId('machine-screen-expand')).toBeVisible();
-  const giveBack = panel.getByRole('button', { name: '交还' });
-  await expect(giveBack).toBeVisible();
+  await expect(panel.getByRole('button', { name: /接管|交还/ })).toHaveCount(0);
   await expect(panel.getByTestId('machine-screen')).toHaveAttribute('data-interactive', 'false');
+  await page.waitForTimeout(400);
   expect(feed.controlCalls).toEqual([]);
-  await giveBack.click();
-  await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
 });
 
 test('without a computer row the machine card shows no screen and no turn-on hint', async ({
@@ -763,19 +812,16 @@ for (const theme of ['light', 'dark'] as const) {
   }
 }
 
-test('a pending login handoff asks the owner to log in next to the screen', async ({ page }) => {
+test('a pending login handoff asks the owner to log in under the screen', async ({ page }) => {
   const feed: Feed = {
     computers: [computer({ handoffReason: 'login' })],
     commands: [command(1)],
     controlCalls: [],
   };
-  const panel = await open(page, feed, [
-    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
-  ]);
-  const bar = panel.getByTestId('computer-control-bar');
-  await expect(bar).toHaveAttribute('data-handoff', 'login');
-  await expect(bar).toContainText('需要你登录');
-  await expect(bar.getByRole('button', { name: '接管', exact: true })).toBeVisible();
+  const panel = await open(page, feed, [SCREEN_MACHINE]);
+  await expect(panel.getByTestId('machine-screen-note')).toHaveText('需要你登录');
+  await shot(page, 'card-login-note');
+  await expect(panel.getByRole('button', { name: /接管|交还/ })).toHaveCount(0);
   expect(feed.controlCalls).toEqual([]);
 });
 
@@ -805,7 +851,7 @@ test('the push link opens the machine with its screen enlarged and view-only', a
 test.describe('on a touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test('the full-screen desktop and its bar stay inside the top and bottom safe areas', async ({
+  test('the enlarged screen and its bar stay inside the top and bottom safe areas', async ({
     page,
   }) => {
     const cdp = await page.context().newCDPSession(page);
@@ -817,55 +863,34 @@ test.describe('on a touch phone', () => {
       commands: [command(1)],
       controlCalls: [],
     };
-    await open(
-      page,
-      feed,
-      [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
-      '/app?pane=machines&machine=m1&screen=1',
-    );
+    await open(page, feed, [SCREEN_MACHINE], '/app?pane=machines&machine=m1&screen=1');
     const enlarged = page.getByTestId('machine-screen-enlarged');
     await expect(enlarged).toBeVisible();
     const screen = await enlarged.getByTestId('machine-screen').boundingBox();
-    const bar = await page.getByTestId('machine-screen-exit').boundingBox();
+    const exit = await page.getByTestId('machine-screen-exit').boundingBox();
     expect(screen).not.toBeNull();
-    expect(bar).not.toBeNull();
-    if (!screen || !bar) return;
+    expect(exit).not.toBeNull();
+    if (!screen || !exit) return;
     expect(screen.y).toBeGreaterThanOrEqual(59);
     expect(screen.y + screen.height).toBeLessThanOrEqual(844 - 34);
     expect(screen.width).toBe(390);
-    expect(bar.y).toBeGreaterThanOrEqual(59);
+    expect(exit.y).toBeGreaterThanOrEqual(59);
   });
 
-  test('the full-screen bar keeps Give back and exit as separate 44px touch targets', async ({
-    page,
-  }) => {
-    const feed: Feed = {
-      computers: [computer({ handoffReason: 'login', controlHolder: 'user' })],
-      commands: [command(1)],
-      controlCalls: [],
-    };
-    await open(
-      page,
-      feed,
-      [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
-      '/app?pane=machines&machine=m1&screen=1',
-    );
-    const dialog = page.getByRole('dialog', { name: 'omarchy' });
-    await expect(dialog.getByRole('button', { name: '交还' })).toBeVisible();
-    await dialog.evaluate((node) =>
-      Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished)),
-    );
-    const giveBack = await dialog.getByRole('button', { name: '交还' }).boundingBox();
-    const close = await dialog.getByRole('button', { name: '缩小' }).boundingBox();
-    expect(giveBack).not.toBeNull();
+  test('with no hover the bar stays shown and Shrink is a 44px touch target', async ({ page }) => {
+    const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+    await open(page, feed, [SCREEN_MACHINE], '/app?pane=machines&machine=m1&screen=1');
+    const bar = page.getByTestId('machine-screen-bar');
+    await expect(bar).toBeVisible();
+    await expect.poll(() => bar.evaluate((element) => getComputedStyle(element).opacity)).toBe('1');
+    await expect(bar).toContainText('点一下画面就能操作');
+    const close = await bar.getByRole('button', { name: '缩小' }).boundingBox();
     expect(close).not.toBeNull();
-    if (!giveBack || !close) return;
-    expect(giveBack.height).toBeGreaterThanOrEqual(44);
+    if (!close) return;
     expect(Math.min(close.width, close.height)).toBeGreaterThanOrEqual(44);
-    expect(close.x - (giveBack.x + giveBack.width)).toBeGreaterThanOrEqual(8);
   });
 
-  test('the control bar under the screen sits above the bottom navigation without scrolling', async ({
+  test('the login note under the card screen sits above the bottom navigation without scrolling', async ({
     page,
   }) => {
     const feed: Feed = {
@@ -873,13 +898,11 @@ test.describe('on a touch phone', () => {
       commands: [command(1)],
       controlCalls: [],
     };
-    const panel = await open(page, feed, [
-      { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
-    ]);
-    const bar = panel.getByTestId('computer-control-bar');
-    await expect(bar).toBeVisible();
+    const panel = await open(page, feed, [SCREEN_MACHINE]);
+    const note = panel.getByTestId('machine-screen-note');
+    await expect(note).toBeVisible();
     const tabs = await page.locator('[data-slot="phone-tabs"]').boundingBox();
-    const box = await bar.boundingBox();
+    const box = await note.boundingBox();
     expect(tabs).not.toBeNull();
     expect(box).not.toBeNull();
     if (!tabs || !box) return;
@@ -887,36 +910,42 @@ test.describe('on a touch phone', () => {
     expect(box.y + box.height).toBeLessThanOrEqual(tabs.y);
   });
 
-  test('Give back in the full-screen bar releases control and keeps the screen open', async ({
+  test('a tap on the card screen takes control and a tap outside gives it back', async ({
     page,
   }) => {
-    const feed: Feed = {
-      computers: [computer({ handoffReason: 'login' })],
-      commands: [command(1)],
-      controlCalls: [],
-    };
-    await open(
-      page,
-      feed,
-      [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
-      '/app?pane=machines&machine=m1&screen=1',
-    );
+    const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+    const panel = await open(page, feed, [SCREEN_MACHINE]);
+    const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
+    await expect(cardScreen).toBeVisible();
+    await cardScreen.tap();
+    await expect.poll(() => feed.controlCalls).toEqual(['POST']);
+    await expect(cardScreen).toHaveAttribute('data-interactive', 'true', { timeout: 15_000 });
+    await cardScreen.tap();
+    await page.waitForTimeout(1_200);
+    expect(feed.controlCalls).toEqual(['POST']);
+    await panel.getByRole('heading', { name: '你的电脑' }).tap();
+    await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
+    await expect(cardScreen).toHaveAttribute('data-interactive', 'false');
+  });
+
+  test('a tap on the enlarged screen takes control and a tap on the bar gives it back', async ({
+    page,
+  }) => {
+    const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+    await open(page, feed, [SCREEN_MACHINE], '/app?pane=machines&machine=m1&screen=1');
     const enlarged = page.getByTestId('machine-screen-enlarged');
     await expect(enlarged).toBeVisible();
-    const dialog = page.getByRole('dialog', { name: 'omarchy' });
-    await dialog.getByRole('button', { name: '接管', exact: true }).tap();
-    await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
-      'data-interactive',
-      'true',
-      { timeout: 15_000 },
+    await enlarged.getByTestId('machine-screen').tap({ position: { x: 195, y: 500 } });
+    await expect.poll(() => feed.controlCalls).toEqual(['POST']);
+    await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-interactive', 'true', {
+      timeout: 15_000,
+    });
+    await expect(enlarged.getByTestId('machine-screen-bar')).toContainText(
+      '你在操作，Coordinator 先等着',
     );
-    expect(feed.controlCalls).toEqual(['POST']);
-    await dialog.getByRole('button', { name: '交还' }).tap();
+    await enlarged.getByTestId('machine-screen-status').tap();
     await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
     await expect(enlarged).toBeVisible();
-    await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
-      'data-interactive',
-      'false',
-    );
+    await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-interactive', 'false');
   });
 });

@@ -6,6 +6,7 @@ import { clockTime } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useComputerControl } from '../api/use-computer-control.js';
 import { ComputerScreenDialog } from '../board/computer-screen-dialog.js';
+import { useScreenHoverControl } from '../board/screen-hover-control.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
@@ -67,21 +68,13 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
   const computersQ = useComputers(teamId, live && waiting, COMPUTERS_REFRESH_MS);
   const computer = computersQ.data?.[0] ?? null;
   const control = useComputerControl({ teamId, computer });
+  const hover = useScreenHoverControl(control);
   const [open, setOpen] = useState(false);
   const now = useNow(waiting);
   const push = useDevicePushOff(teamId, waiting);
   const left = minutesLeft(item.startedAt, now);
   const online = computer?.machine.online === true && computer.state !== 'failed';
   const held = waiting && control.controlHeld;
-
-  const takeOver = () => {
-    control.setHeld(true);
-    setOpen(true);
-  };
-
-  useEffect(() => {
-    if (control.failed) setOpen(false);
-  }, [control.failed]);
 
   const title = !waiting
     ? item.outcome === 'handed-back'
@@ -144,42 +137,16 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
         )}
         {waiting && (
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            {held ? (
-              <>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="pointer-coarse:h-11 pointer-coarse:px-4"
-                  disabled={control.busy}
-                  data-testid="chief-takeover-give-back"
-                  onClick={() => control.setHeld(false)}
-                >
-                  {t('交还')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  className="h-auto p-0 pointer-coarse:h-11"
-                  data-testid="chief-takeover-open"
-                  disabled={!online}
-                  onClick={() => setOpen(true)}
-                >
-                  {t('打开画面')}
-                </Button>
-              </>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                className="pointer-coarse:h-11 pointer-coarse:px-4"
-                disabled={!online || control.busy}
-                data-testid="chief-takeover-take"
-                onClick={takeOver}
-              >
-                {t('接管')}
-              </Button>
-            )}
+            <Button
+              type="button"
+              size="sm"
+              className="pointer-coarse:h-11 pointer-coarse:px-4"
+              disabled={!online}
+              data-testid="chief-takeover-open"
+              onClick={() => setOpen(true)}
+            >
+              {t('打开画面')}
+            </Button>
             {!online ? (
               <span className="text-meta text-content-tertiary">
                 {computer === null ? t('还没有连上电脑') : t('电脑离线')}
@@ -196,19 +163,13 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
       </section>
       {open && waiting && computer !== null && teamId !== undefined && (
         <ComputerScreenDialog
-          open={open}
           onClose={() => setOpen(false)}
           title={computer.machine.name}
           teamId={teamId}
           computer={computer}
           control={control}
-          status={
-            left !== null
-              ? held
-                ? t('你在控制 · 还剩 {n} 分钟', { n: left })
-                : t('接管后才能点击和键入')
-              : undefined
-          }
+          hover={hover}
+          note={timeLeft ?? undefined}
         />
       )}
     </MessageScrollerItem>

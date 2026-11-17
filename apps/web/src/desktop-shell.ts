@@ -26,3 +26,13 @@ export function useDesktopMenu(command: DesktopMenuCommand, run: () => void): vo
     });
   }, [command, run]);
 }
+
+interface DesktopWindowControlsBridge {
+  setVisible: (visible: boolean) => void;
+}
+
+export function setDesktopWindowControlsVisible(visible: boolean): void {
+  (
+    window as Window & { cairnDesktop?: { windowControls?: DesktopWindowControlsBridge } }
+  ).cairnDesktop?.windowControls?.setVisible(visible);
+}
