@@ -55,7 +55,7 @@ beforeEach(() => {
 
 interface PendingEntry {
   messageId: string;
-  state: 'queued' | 'held';
+  state: 'steering' | 'queued' | 'held';
 }
 interface ThreadView {
   id: string;
@@ -236,7 +236,7 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     const first = await w.claim();
     const second = await w.send('第二句');
     expect(await w.claim()).toBeNull();
-    expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'queued' }]);
+    expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'steering' }]);
     expect(await w.fetchSteer(first!.step.id)).toBe('第二句');
     await w.ackSteer(first!.step.id);
     expect((await w.thread()).pending).toEqual([]);
@@ -276,7 +276,7 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
       .where(eq(stepTable.id, first!.step.id))
       .run();
     const second = await w.send('第二句');
-    expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'queued' }]);
+    expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'steering' }]);
     expect(await w.fetchSteer(first!.step.id)).toBe('第二句');
   });
 
@@ -333,7 +333,11 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
       [firstSent, 'turn-z'],
       [secondSent, 'turn-a'],
     ] as const) {
-      w.s.db.update(stepTable).set({ id: to, createdAt: 1 }).where(eq(stepTable.id, from)).run();
+      w.s.db
+        .update(stepTable)
+        .set({ id: to, createdAt: 1, ownerMessageIds: [to] })
+        .where(eq(stepTable.id, from))
+        .run();
       w.s.db
         .update(chiefMessage)
         .set({ id: to, createdAt: 1 })
@@ -372,7 +376,7 @@ describe('steer (T5): `现在插话`', () => {
     expect(pending).toHaveLength(1);
     expect(pending[0]!.stepId).toBe(running!.step.id);
     expect(pending[0]!.content).toBe('改成只看 cairn 项目');
-    expect((await w.thread()).pending).toEqual([{ messageId: queued, state: 'queued' }]);
+    expect((await w.thread()).pending).toEqual([{ messageId: queued, state: 'steering' }]);
     expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
     expect(w.stepRow(queued)).toBeDefined();
     await w.ackSteer(running!.step.id);
@@ -411,15 +415,29 @@ describe('steer (T5): `现在插话`', () => {
     expect(next?.instruction).toBe('改成只看 cairn 项目');
   });
 
-  test('a steered message can no longer be withdrawn, so the daemon never gets withdrawn text', async () => {
+  test('a steer the daemon has not fetched can be withdrawn, and the daemon never gets its text', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const kept = w.queue('先看 web');
+    const withdrawn = w.queue('改成只看 cairn 项目');
+    expect((await w.steer(kept)).status).toBe(200);
+    expect((await w.steer(withdrawn)).status).toBe(200);
+    expect((await w.withdraw(withdrawn)).status).toBe(200);
+    expect(w.messages().some((m) => m.id === withdrawn)).toBe(false);
+    expect(w.stepRow(withdrawn)).toBeUndefined();
+    expect(await w.fetchSteer(running!.step.id)).toBe('先看 web');
+  });
+
+  test('withdrawing the only unfetched steer leaves the daemon nothing to fetch', async () => {
     const w = await setupWorld();
     await w.send('第一句');
     const running = await w.claim();
     const queued = w.queue('改成只看 cairn 项目');
     expect((await w.steer(queued)).status).toBe(200);
-    expect((await w.withdraw(queued)).status).toBe(409);
-    expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
-    expect(w.messages().some((m) => m.id === queued)).toBe(true);
+    expect((await w.withdraw(queued)).status).toBe(200);
+    expect(w.s.db.select().from(steerPending).all()).toHaveLength(0);
+    expect(await w.fetchSteer(running!.step.id)).toBeNull();
   });
 
   test('a turn that finishes after the daemon fetched a steer but before it delivered it keeps the message queued', async () => {
@@ -429,7 +447,7 @@ describe('steer (T5): `现在插话`', () => {
     const queued = w.queue('改成只看 cairn 项目');
     expect((await w.steer(queued)).status).toBe(200);
     expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
-    expect((await w.thread()).pending).toEqual([{ messageId: queued, state: 'queued' }]);
+    expect((await w.thread()).pending).toEqual([{ messageId: queued, state: 'steering' }]);
     expect((await w.withdraw(queued)).status).toBe(409);
     await w.done(running!.step.id, { status: 'success' });
     const next = await w.claim();
@@ -617,7 +635,7 @@ describe('stop (T5)', () => {
 });
 
 describe('chief unavailable (T4)', () => {
-  test('a quota failure parks the turn, reports an outage, and newer messages are held in order', async () => {
+  test('a quota failure parks the turn, reports an outage, and the held messages resume together', async () => {
     const w = await setupWorld();
     const first = await w.send('第一句');
     const running = await w.claim();
@@ -634,7 +652,8 @@ describe('chief unavailable (T4)', () => {
     expect(await w.claim()).toBeNull();
     w.s.db.update(stepTable).set({ holdUntil: 0 }).where(eq(stepTable.id, first)).run();
     const resumed = await w.claim();
-    expect(resumed?.instruction).toBe('第一句');
+    expect(resumed?.instruction).toBe('第一句\n\n第二句');
+    expect(w.stepRow(second)).toBeUndefined();
     expect((await w.envelope()).outage ?? null).toBeNull();
   });
 

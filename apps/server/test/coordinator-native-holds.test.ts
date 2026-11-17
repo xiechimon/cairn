@@ -40,15 +40,18 @@ function heldBatch() {
 test('native batch ownership blocks both claim platforms even if its hold tag is lost', () => {
   const b = heldBatch();
   H.s.db.update(step).set({ holdReason: null }).where(eq(step.id, b.id)).run();
-  expect(claimPendingChiefStep(H.s.db, row(b.id), null)).toBe(false);
-  expect(claimPendingChiefStep(H.s.db, row(b.id), 'daemon')).toBe(false);
+  expect(claimPendingChiefStep(H.s.db, row(b.id), null)).toBeNull();
+  expect(claimPendingChiefStep(H.s.db, row(b.id), 'daemon')).toBeNull();
 });
 
 test('legacy holds without a native batch keep their existing claim behavior', () => {
   const b = heldBatch();
   const legacy = { ...row(b.id), id: 'legacy-held' };
   H.s.db.insert(step).values(legacy).run();
-  expect(claimPendingChiefStep(H.s.db, row(legacy.id), 'daemon')).toBe(true);
+  expect(claimPendingChiefStep(H.s.db, row(legacy.id), 'daemon')).toMatchObject({
+    id: 'legacy-held',
+    status: 'claimed',
+  });
 });
 
 test('legacy pull and acknowledgment cannot attribute or retire a native batch', () => {
@@ -67,7 +70,7 @@ test('finishing a target retains uncertain native work for durable reconciliatio
   expect(row(b.id).holdReason).toBe('steer');
 });
 
-test('a released successor displays and withdraws under its authentic owner identity', () => {
+test('a released successor displays and withdraws under its authentic owner identity', async () => {
   const b = heldBatch();
   H.s.db
     .update(step)
@@ -80,7 +83,9 @@ test('a released successor displays and withdraws under its authentic owner iden
     messageId: b.id,
     state: 'held',
   });
-  expect(withdrawChiefMessage({ db: H.s.db }, H.teamId, H.threadId, b.id)).toEqual({ ok: true });
+  await expect(withdrawChiefMessage({ db: H.s.db }, H.teamId, H.threadId, b.id)).resolves.toEqual({
+    ok: true,
+  });
   expect(H.s.db.select().from(step).all()).toHaveLength(1);
 });
 

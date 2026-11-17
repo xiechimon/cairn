@@ -112,14 +112,13 @@ describe('claim-surface skill routing (#823)', () => {
       content: '明早 9 点提醒我开站会',
     });
     expect(hit.status).toBe(201);
+    const token = await claimToken();
+    const first = await claim(token);
+    s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, first.step.id)).run();
     const miss = await req(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
       content: '今天天气不错',
     });
     expect(miss.status).toBe(201);
-
-    const token = await claimToken();
-    const first = await claim(token);
-    s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, first.step.id)).run();
     const second = await claim(token);
     expect(first.chief?.systemPrompt).toBe(second.chief?.systemPrompt);
     expect((first as { instruction?: string }).instruction).not.toBe(

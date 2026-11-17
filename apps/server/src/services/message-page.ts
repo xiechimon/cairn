@@ -107,6 +107,7 @@ function chiefMessagesWithTurnBoundaries(
         content: '',
         createdAt: turn.claimedAt,
         projectId: scope,
+        delivery: null,
       },
     ];
   });

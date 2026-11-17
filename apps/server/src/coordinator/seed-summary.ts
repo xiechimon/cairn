@@ -84,6 +84,7 @@ export async function seedSummary(
       content: chiefMessage.content,
       createdAt: chiefMessage.createdAt,
       projectId: chiefMessage.projectId,
+      delivery: chiefMessage.delivery,
       rowid: sql<number>`rowid`,
     })
     .from(chiefMessage)

@@ -8,6 +8,7 @@ import {
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
 import { and, asc, eq, gt, inArray, lt, notInArray, sql } from 'drizzle-orm';
+import { steerWithdrawals } from '../coordinator/steer-withdrawals.js';
 import type { Db } from '../db/client.js';
 import {
   chief,
@@ -21,7 +22,7 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
-import { queueCoordinatorInput } from './coordinator-inputs.js';
+import { queueCoordinatorInput, STEER_WITHDRAW_HOLD } from './coordinator-inputs.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { stepScopeProjectId } from './picked-project.js';
@@ -33,7 +34,8 @@ type StepRow = typeof step.$inferSelect;
 
 const STEERED_HOLD = 'steer';
 const STEER_SENT_HOLD = 'steer_sent';
-const STEER_HOLDS = [STEERED_HOLD, STEER_SENT_HOLD];
+export const STEER_HOLDS = [STEERED_HOLD, STEER_SENT_HOLD, STEER_WITHDRAW_HOLD];
+export const QUEUED_HOLD = 'queued';
 
 export const CHIEF_ABANDONED_STEP_MS = 120_000;
 
@@ -83,20 +85,12 @@ export function chiefPendingMessages(db: Db, threadId: string): ChiefPendingMess
   const now = nowMs();
   const running = live.some((row) => row.status === 'claimed');
   const out: ChiefPendingMessage[] = [];
-  const successors = new Set(
-    db
-      .select({ id: coordinatorInput.successorStepId })
-      .from(coordinatorInput)
-      .where(and(eq(coordinatorInput.threadId, threadId), eq(coordinatorInput.state, 'released')))
-      .all()
-      .map((input) => input.id),
-  );
   let parked = false;
   live.forEach((row, index) => {
     if (row.status === 'claimed') return;
     const steered = STEER_HOLDS.includes(row.holdReason ?? '');
     if (!steered) parked = parked || isParked(row, now);
-    for (const messageId of successors.has(row.id) ? (row.ownerMessageIds ?? []) : [row.id]) {
+    for (const messageId of stepOwners(row)) {
       const userRow = db
         .select({ id: chiefMessage.id })
         .from(chiefMessage)
@@ -109,7 +103,7 @@ export function chiefPendingMessages(db: Db, threadId: string): ChiefPendingMess
         )
         .get();
       if (userRow === undefined) continue;
-      if (steered) out.push({ messageId, state: 'queued' });
+      if (steered) out.push({ messageId, state: 'steering' });
       else if (parked) out.push({ messageId, state: 'held' });
       else if (running || index > 0) out.push({ messageId, state: 'queued' });
     }
@@ -187,49 +181,164 @@ function requireUserMessage(db: Db, threadId: string, messageId: string) {
   return row;
 }
 
-function waitingStepOf(db: Db, threadId: string, messageId: string): StepRow {
-  const successors = new Set(
-    db
-      .select()
-      .from(coordinatorInput)
-      .where(and(eq(coordinatorInput.threadId, threadId), eq(coordinatorInput.state, 'released')))
-      .all()
-      .filter((input) => input.ownerMessageIds.includes(messageId))
-      .map((input) => input.successorStepId),
-  );
+export function stepOwners(row: StepRow): string[] {
+  return row.ownerMessageIds !== null && row.ownerMessageIds.length > 0
+    ? row.ownerMessageIds
+    : [row.id];
+}
+
+export function waitingStepOf(db: Db, threadId: string, messageId: string): StepRow {
   const row = liveChiefSteps(db, threadId).find(
     (candidate) =>
       (candidate.status === 'pending' || candidate.status === 'waiting_quota') &&
-      (candidate.id === messageId || successors.has(candidate.id)),
+      stepOwners(candidate).includes(messageId),
   );
-  if (row === undefined || (row.status !== 'pending' && row.status !== 'waiting_quota')) {
+  if (row === undefined) {
     throw new HttpError(409, 'chief turn already started (Coordinator 已经开始处理这条了)');
   }
   return row;
 }
 
-export function withdrawChiefMessage(
+const READ_ALREADY = 'message already read by the running turn (Coordinator 已经读到这条了)';
+
+function deleteWaitingMessage(
+  deps: ChiefTurnDeps,
+  threadId: string,
+  row: StepRow,
+  messageId: string,
+  extra: () => void = () => {},
+): void {
+  const message = requireUserMessage(deps.db, threadId, messageId);
+  deps.db.transaction(() => {
+    extra();
+    deps.db.delete(step).where(eq(step.id, row.id)).run();
+    deps.db.delete(chiefMessage).where(eq(chiefMessage.id, messageId)).run();
+  });
+  settleChiefActiveRun(deps.db, threadId);
+  publishStepRow(deps, row);
+  deps.convHub?.publishMessage(threadId, message);
+}
+
+export async function withdrawChiefMessage(
   deps: ChiefTurnDeps,
   teamId: string,
   threadId: string,
   messageId: string,
-): { ok: true } {
-  requireThread(deps.db, teamId, threadId);
+): Promise<{ ok: true }> {
+  const thread = requireThread(deps.db, teamId, threadId);
   requireUserMessage(deps.db, threadId, messageId);
   const row = waitingStepOf(deps.db, threadId, messageId);
-  if (STEER_HOLDS.includes(row.holdReason ?? '')) {
-    throw new HttpError(
-      409,
-      'message already steered into the running turn (已经插话送进本回合了)',
-    );
+  if (stepOwners(row).length > 1) {
+    throw new HttpError(409, 'message was merged with others (这条已经和其他消息合在一起了)');
   }
+  if (row.holdReason === STEER_SENT_HOLD) throw new HttpError(409, READ_ALREADY);
+  if (row.holdReason !== STEERED_HOLD && row.holdReason !== STEER_WITHDRAW_HOLD) {
+    deleteWaitingMessage(deps, threadId, row, messageId);
+    return { ok: true };
+  }
+  const input = deps.db
+    .select()
+    .from(coordinatorInput)
+    .where(and(eq(coordinatorInput.id, row.id), eq(coordinatorInput.state, 'pending')))
+    .get();
+  if (input === undefined) {
+    deleteWaitingMessage(deps, threadId, row, messageId, () =>
+      rebuildMachineSteer(deps, thread, row.id),
+    );
+    return { ok: true };
+  }
+  if (input.conversationId === null) {
+    deleteWaitingMessage(deps, threadId, row, messageId, () =>
+      deps.db.delete(coordinatorInput).where(eq(coordinatorInput.id, input.id)).run(),
+    );
+    return { ok: true };
+  }
+  const withdraw = steerWithdrawals.get(input.stepId);
+  if (withdraw === undefined) throw new HttpError(409, READ_ALREADY);
   const message = requireUserMessage(deps.db, threadId, messageId);
-  deps.db.delete(step).where(eq(step.id, row.id)).run();
-  deps.db.delete(chiefMessage).where(eq(chiefMessage.id, messageId)).run();
+  deps.db
+    .update(step)
+    .set({ holdReason: STEER_WITHDRAW_HOLD })
+    .where(and(eq(step.id, row.id), eq(step.holdReason, STEERED_HOLD)))
+    .run();
+  const result = await withdraw(input.id);
+  if (result !== 'aborted' && result !== 'not_found') {
+    deps.db
+      .update(step)
+      .set({ holdReason: STEERED_HOLD })
+      .where(and(eq(step.id, row.id), eq(step.holdReason, STEER_WITHDRAW_HOLD)))
+      .run();
+    throw new HttpError(409, READ_ALREADY);
+  }
+  deps.db.transaction(() => {
+    deps.db
+      .update(coordinatorInput)
+      .set({ state: 'released', successorStepId: null })
+      .where(and(eq(coordinatorInput.id, input.id), eq(coordinatorInput.state, 'pending')))
+      .run();
+    deps.db.delete(step).where(eq(step.id, row.id)).run();
+    deps.db.delete(chiefMessage).where(eq(chiefMessage.id, messageId)).run();
+  });
   settleChiefActiveRun(deps.db, threadId);
   publishStepRow(deps, row);
   deps.convHub?.publishMessage(threadId, message);
   return { ok: true };
+}
+
+function steerContent(
+  deps: ChiefTurnDeps,
+  thread: typeof chiefThread.$inferSelect,
+  running: StepRow,
+  waiting: StepRow,
+): string {
+  const message = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, waiting.id)).get();
+  const scope = stepScopeProjectId(waiting);
+  const projectSection =
+    scope !== null && scope !== stepScopeProjectId(running)
+      ? projectTurnContext(deps.db, {
+          teamId: thread.teamId,
+          agentId: coordinatorMemoryOwner(deps.db, thread.teamId) ?? null,
+          projectId: scope,
+          threadId: thread.id,
+        })
+      : null;
+  return [
+    waiting.prompt ?? (typeof message?.content === 'string' ? message.content : ''),
+    projectSection,
+  ]
+    .filter((part) => part)
+    .join('\n\n');
+}
+
+function rebuildMachineSteer(
+  deps: ChiefTurnDeps,
+  thread: typeof chiefThread.$inferSelect,
+  withdrawnId: string,
+): void {
+  const live = liveChiefSteps(deps.db, thread.id);
+  const running = live.find((row) => row.status === 'claimed');
+  const prior = deps.db
+    .select()
+    .from(steerPending)
+    .where(eq(steerPending.conversationId, thread.id))
+    .get();
+  if (running === undefined || prior?.stepId !== running.id) return;
+  const content = live
+    .filter(
+      (row) =>
+        row.status === 'pending' && row.holdReason === STEERED_HOLD && row.id !== withdrawnId,
+    )
+    .map((row) => steerContent(deps, thread, running, row))
+    .join('\n\n');
+  if (content === '') {
+    deps.db.delete(steerPending).where(eq(steerPending.conversationId, thread.id)).run();
+    return;
+  }
+  deps.db
+    .update(steerPending)
+    .set({ content })
+    .where(eq(steerPending.conversationId, thread.id))
+    .run();
 }
 
 export function steerChiefMessage(
@@ -239,29 +348,24 @@ export function steerChiefMessage(
   messageId: string,
 ): { steered: boolean } {
   const thread = requireThread(deps.db, teamId, threadId);
-  const message = requireUserMessage(deps.db, threadId, messageId);
+  requireUserMessage(deps.db, threadId, messageId);
   const waiting = waitingStepOf(deps.db, threadId, messageId);
   const running = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
   if (running === undefined) return { steered: false };
   if (STEER_HOLDS.includes(waiting.holdReason ?? '')) return { steered: true };
-  const scope = stepScopeProjectId(waiting);
-  const projectSection =
-    scope !== null && scope !== stepScopeProjectId(running)
-      ? projectTurnContext(deps.db, {
-          teamId: thread.teamId,
-          agentId: coordinatorMemoryOwner(deps.db, thread.teamId) ?? null,
-          projectId: scope,
-          threadId,
-        })
-      : null;
-  const content = [
-    waiting.prompt ?? (typeof message.content === 'string' ? message.content : ''),
-    projectSection,
-  ]
-    .filter((part) => part)
-    .join('\n\n');
+  const content = steerContent(deps, thread, running, waiting);
+  const markSteered = () =>
+    deps.db
+      .update(chiefMessage)
+      .set({ delivery: 'steer' })
+      .where(inArray(chiefMessage.id, stepOwners(waiting)))
+      .run();
   if (running.machineId === null) {
-    queueCoordinatorInput(deps.db, running, waiting, content);
+    deps.db.transaction(() => {
+      queueCoordinatorInput(deps.db, running, waiting, content);
+      deps.db.update(step).set({ holdUntil: null }).where(eq(step.id, waiting.id)).run();
+      markSteered();
+    });
     deps.machineHub?.steerSignal(thread.teamId, running.id);
     publishStepRow(deps, waiting);
     return { steered: true };
@@ -273,18 +377,42 @@ export function steerChiefMessage(
     .where(eq(steerPending.conversationId, threadId))
     .get();
   const merged = prior?.stepId === running.id ? `${prior.content}\n\n${content}` : content;
-  deps.db
-    .insert(steerPending)
-    .values({ conversationId: threadId, stepId: running.id, content: merged, createdAt: now })
-    .onConflictDoUpdate({
-      target: steerPending.conversationId,
-      set: { stepId: running.id, content: merged, createdAt: now },
-    })
-    .run();
-  deps.db.update(step).set({ holdReason: STEERED_HOLD }).where(eq(step.id, waiting.id)).run();
+  deps.db.transaction(() => {
+    deps.db
+      .insert(steerPending)
+      .values({ conversationId: threadId, stepId: running.id, content: merged, createdAt: now })
+      .onConflictDoUpdate({
+        target: steerPending.conversationId,
+        set: { stepId: running.id, content: merged, createdAt: now },
+      })
+      .run();
+    deps.db
+      .update(step)
+      .set({ holdReason: STEERED_HOLD, holdUntil: null })
+      .where(eq(step.id, waiting.id))
+      .run();
+    markSteered();
+  });
   deps.machineHub?.steerSignal(thread.teamId, running.id);
   publishStepRow(deps, waiting);
   return { steered: true };
+}
+
+export function queueChiefMessage(deps: ChiefTurnDeps, threadId: string, messageId: string): void {
+  const running = liveChiefSteps(deps.db, threadId).some((row) => row.status === 'claimed');
+  if (!running) return;
+  deps.db.transaction(() => {
+    deps.db
+      .update(step)
+      .set({ holdReason: QUEUED_HOLD })
+      .where(and(eq(step.id, messageId), eq(step.status, 'pending')))
+      .run();
+    deps.db
+      .update(chiefMessage)
+      .set({ delivery: 'queue' })
+      .where(eq(chiefMessage.id, messageId))
+      .run();
+  });
 }
 
 export function addTurnOwnerMessage(db: Db, threadId: string, messageId: string): void {
@@ -422,23 +550,25 @@ export function releaseUnconsumedSteer(db: Db, finished: StepRow): void {
       and(eq(steerPending.conversationId, finished.buildId), eq(steerPending.stepId, finished.id)),
     )
     .run();
-  db.update(step)
-    .set({ holdReason: null })
-    .where(
-      and(
-        eq(step.buildId, finished.buildId),
-        eq(step.status, 'pending'),
-        inArray(step.holdReason, STEER_HOLDS),
-        notInArray(
-          step.id,
-          db
-            .select({ id: coordinatorInput.id })
-            .from(coordinatorInput)
-            .where(eq(coordinatorInput.state, 'pending')),
-        ),
-      ),
-    )
-    .run();
+  const unread = and(
+    eq(step.buildId, finished.buildId),
+    eq(step.status, 'pending'),
+    inArray(step.holdReason, STEER_HOLDS),
+    notInArray(
+      step.id,
+      db
+        .select({ id: coordinatorInput.id })
+        .from(coordinatorInput)
+        .where(eq(coordinatorInput.state, 'pending')),
+    ),
+  );
+  const owners = db.select().from(step).where(unread).all().flatMap(stepOwners);
+  if (owners.length > 0)
+    db.update(chiefMessage)
+      .set({ delivery: 'steer_missed' })
+      .where(inArray(chiefMessage.id, owners))
+      .run();
+  db.update(step).set({ holdReason: null }).where(unread).run();
 }
 
 export function stopChiefTurn(

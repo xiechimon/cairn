@@ -19,6 +19,7 @@ import {
   type Harness,
   type SettledSubmissionRecord,
 } from '@earendil-works/pi-durable';
+import { steerWithdrawals } from '../steer-withdrawals.js';
 import { compactionWindow, type ModelRef } from './compaction.js';
 import { activeConversation, type Conversation } from './conversations.js';
 import { reportLiveCompactionFailure } from './failure-report.js';
@@ -202,6 +203,21 @@ export async function runCoordinatorTurn(
         await deps.inputs?.barrier();
       }
     };
+    if (!mailTurn && api.inputs !== undefined) {
+      steerWithdrawals.set(stepId, async (requestId) => {
+        await steerTask;
+        const record = await harness.commit(
+          (tx) => tx.submissionByRequest(root.id, requestId),
+          context,
+        );
+        const submission =
+          record === undefined ? undefined : await harness.submission(record.id, context);
+        if (submission === undefined) return 'not_found';
+        const result = await submission.abort(context);
+        if (result === 'aborted') admitted.delete(requestId);
+        return result;
+      });
+    }
     if (!mailTurn) {
       steerPoll = setInterval(() => {
         if (!inFlight || steerTask !== null || stopping !== null) return;
@@ -437,6 +453,7 @@ export async function runCoordinatorTurn(
   } finally {
     suggestionAbort.abort();
     void watch?.stop();
+    steerWithdrawals.delete(stepId);
     clearInterval(stopPoll);
     clearInterval(steerPoll);
     deps.gate?.set(null);

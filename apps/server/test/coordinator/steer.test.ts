@@ -162,8 +162,8 @@ describe('Coordinator steer', () => {
     const first = await interrupt('first interruption');
     const second = await interrupt('second interruption');
     expect(chiefPendingMessages(w.s.db, w.threadId)).toEqual([
-      { messageId: first, state: 'queued' },
-      { messageId: second, state: 'queued' },
+      { messageId: first, state: 'steering' },
+      { messageId: second, state: 'steering' },
     ]);
     const answered = await req(
       w.s.app,

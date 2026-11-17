@@ -699,7 +699,9 @@ describe('several stored subscriptions, one enabled', () => {
     const stepId = insertChief(s, machineId, 'claude-code');
     const pending = stepRow(s, stepId);
     expect(pending).toBeDefined();
-    expect(claimPendingChiefStep(s.db, pending as NonNullable<typeof pending>, null)).toBe(true);
+    expect(
+      claimPendingChiefStep(s.db, pending as NonNullable<typeof pending>, null),
+    ).not.toBeNull();
     expect(stepRow(s, stepId)).toMatchObject({ status: 'claimed', claudeSubscriptionId: null });
   });
 

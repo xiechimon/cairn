@@ -27,7 +27,7 @@ import { nowMs } from '../lib/ids.js';
 import { blockedNow } from '../services/blockers.js';
 import { parseChiefTrigger } from '../services/chief.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
-import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
+import { hasEarlierLiveChiefStep, STEER_HOLDS } from '../services/chief-turns.js';
 import { teamHasVmComputer } from '../services/cloak-license.js';
 import { materializeCodexAccessToken } from '../services/codex-device-login.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
@@ -378,15 +378,16 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     const head = liveSteps(threadId)[0];
     if (head === undefined) return null;
     if (head.status === 'claimed') return head.machineId === null ? head : null;
-    if (head.holdReason === 'steer' || head.holdReason === 'steer_sent') return null;
+    if (STEER_HOLDS.includes(head.holdReason ?? '')) return null;
     if (head.holdUntil !== null && head.holdUntil > nowMs()) return null;
     const teamId = threadTeam(threadId);
     if (teamId === null || !serverTakesTurn(db, teamId, head)) return null;
     if (hasEarlierLiveChiefStep(db, head)) return null;
-    if (!claimPendingChiefStep(db, head, null)) return null;
+    const claimed = claimPendingChiefStep(db, head, null);
+    if (claimed === null) return null;
     freshClaims.add(head.id);
     publishStepStatus(machine, head.id);
-    return db.select().from(step).where(eq(step.id, head.id)).get() ?? null;
+    return claimed;
   };
 
   const claimedPayload = (

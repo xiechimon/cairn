@@ -11503,6 +11503,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
           },
           "state": {
             "enum": [
+              "steering",
               "queued",
               "held",
             ],

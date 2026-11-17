@@ -1,5 +1,6 @@
 import {
   buildSteerBodySchema,
+  chiefMessageEditBodySchema,
   chiefRewindBodySchema,
   chiefSendMessageBodySchema,
   coordinatorPageQuerySchema,
@@ -25,6 +26,7 @@ import {
 import { sendBuildSteer } from './services/builds.js';
 import {
   answerChiefQuestion,
+  editChiefMessage,
   getChiefEnvelope,
   getChiefThread,
   listChiefThreads,
@@ -132,6 +134,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       content?: unknown;
       projectId?: unknown;
       clientMessageId?: unknown;
+      mode?: unknown;
     };
     const body = parseWith(
       chiefSendMessageBodySchema,
@@ -140,6 +143,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         content: raw?.content,
         projectId: raw?.projectId,
         clientMessageId: raw?.clientMessageId,
+        mode: raw?.mode,
       },
       'body',
     );
@@ -177,10 +181,17 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     return c.json(rewindChiefThread(svc, teamId, c.req.param('tid'), body));
   });
 
-  app.delete('/api/teams/:id/chief/threads/:tid/messages/:mid', (c) => {
+  app.delete('/api/teams/:id/chief/threads/:tid/messages/:mid', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(withdrawChiefMessage(svc, teamId, c.req.param('tid'), c.req.param('mid')));
+    return c.json(await withdrawChiefMessage(svc, teamId, c.req.param('tid'), c.req.param('mid')));
+  });
+
+  app.patch('/api/teams/:id/chief/threads/:tid/messages/:mid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(chiefMessageEditBodySchema, await jsonBody(c), 'body');
+    return c.json(editChiefMessage(svc, teamId, c.req.param('tid'), c.req.param('mid'), body));
   });
 
   app.post('/api/teams/:id/chief/threads/:tid/messages/:mid/steer', (c) => {
@@ -292,6 +303,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       content?: unknown;
       projectId?: unknown;
       clientMessageId?: unknown;
+      mode?: unknown;
     };
     const thread = getChiefThread(svc, conversationId);
     if (!thread) throw notFound(`conversation ${conversationId}`);
@@ -302,6 +314,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         content: raw?.content,
         projectId: raw?.projectId,
         clientMessageId: raw?.clientMessageId,
+        mode: raw?.mode,
       },
       'body',
     );

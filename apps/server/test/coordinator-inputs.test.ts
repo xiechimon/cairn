@@ -108,8 +108,8 @@ test('a steered message waits below the reply until read, then sits where the mo
   const first = queue('First.');
   const second = queue('Second.');
   expect(chiefPendingMessages(H.s.db, H.threadId)).toEqual([
-    { messageId: first, state: 'queued' },
-    { messageId: second, state: 'queued' },
+    { messageId: first, state: 'steering' },
+    { messageId: second, state: 'steering' },
   ]);
   pull();
   const readAt = sentAt(second) + 5_000;
@@ -119,7 +119,7 @@ test('a steered message waits below the reply until read, then sits where the mo
   expect(result.placed.map((message) => message.id)).toEqual([first]);
   expect(result.retired?.id).toBe(first);
   expect(chiefPendingMessages(H.s.db, H.threadId)).toEqual([
-    { messageId: second, state: 'queued' },
+    { messageId: second, state: 'steering' },
   ]);
   expect(consumeCoordinatorInput(H.s.db, first, 'conversation-1', '3', readAt + 1)).toEqual({
     placed: [],

@@ -1,10 +1,11 @@
 import type { MachineDoneBody, ModelUsage, OtelObservation } from '@cairn/shared';
 import {
+  ACTIVE_STEP_STATUSES,
   CHIEF_TURN_ERROR_KIND,
   formatSkillRouteSection,
   suggestSkillsForMessage,
 } from '@cairn/shared';
-import { and, eq, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import {
   type chiefThread,
   chiefTurnUsage,
@@ -26,7 +27,7 @@ import {
 } from './chief.js';
 import { CHIEF_DIGEST_SYSTEM_PROMPT, isChiefDigestStep } from './chief-digest.js';
 import { cancelPendingQuestions } from './chief-questions.js';
-import { recordChiefStop, steeredMessageScopes } from './chief-turns.js';
+import { QUEUED_HOLD, recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { openTurnCapture, sealCoordinatorTurnSnapshot } from './coordinator-turn-capture.js';
 import {
@@ -50,40 +51,103 @@ export function claimPendingChiefStep(
   stepRow: StepRow,
   machineId: string | null,
   bindTeamId: string | null = null,
-): boolean {
+): StepRow | null {
   const claimedAt = nowMs();
-  const res = db
-    .update(step)
-    .set({
-      status: 'claimed',
-      machineId,
-      claudeSubscriptionId:
-        bindTeamId === null
-          ? null
-          : sql<
-              string | null
-            >`(select ${claudeSubscription.id} from ${claudeSubscription} where ${claudeSubscription.teamId} = ${bindTeamId} and ${claudeSubscription.enabledAt} is not null and (${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${claimedAt}))`,
-      claimedAt,
-      lastHeartbeatAt: claimedAt,
-      holdReason: null,
-      holdUntil: null,
-    })
+  const claimed = db.transaction(() => {
+    const res = db
+      .update(step)
+      .set({
+        status: 'claimed',
+        machineId,
+        claudeSubscriptionId:
+          bindTeamId === null
+            ? null
+            : sql<
+                string | null
+              >`(select ${claudeSubscription.id} from ${claudeSubscription} where ${claudeSubscription.teamId} = ${bindTeamId} and ${claudeSubscription.enabledAt} is not null and (${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${claimedAt}))`,
+        claimedAt,
+        lastHeartbeatAt: claimedAt,
+        holdReason: null,
+        holdUntil: null,
+      })
+      .where(
+        and(
+          eq(step.id, stepRow.id),
+          eq(step.status, 'pending'),
+          notInArray(
+            step.id,
+            db
+              .select({ id: coordinatorInput.id })
+              .from(coordinatorInput)
+              .where(eq(coordinatorInput.state, 'pending')),
+          ),
+        ),
+      )
+      .run();
+    if (res.changes === 0) return null;
+    foldQueuedChiefSteps(db, stepRow, claimedAt);
+    return db.select().from(step).where(eq(step.id, stepRow.id)).get() ?? null;
+  });
+  if (claimed !== null) openTurnCapture(stepRow.id);
+  return claimed;
+}
+
+function foldQueuedChiefSteps(db: MachineDeps['db'], head: StepRow, now: number): void {
+  const owners = head.ownerMessageIds ?? [];
+  if (owners.length === 0 || head.prompt === null) return;
+  const nativeInputs = new Set(
+    db
+      .select({ id: coordinatorInput.id })
+      .from(coordinatorInput)
+      .where(eq(coordinatorInput.threadId, head.buildId))
+      .all()
+      .map((input) => input.id),
+  );
+  const later = db
+    .select()
+    .from(step)
     .where(
       and(
-        eq(step.id, stepRow.id),
-        eq(step.status, 'pending'),
-        notInArray(
-          step.id,
-          db
-            .select({ id: coordinatorInput.id })
-            .from(coordinatorInput)
-            .where(eq(coordinatorInput.state, 'pending')),
-        ),
+        eq(step.buildId, head.buildId),
+        eq(step.kind, 'chief'),
+        inArray(step.status, [...ACTIVE_STEP_STATUSES]),
+      ),
+    )
+    .orderBy(asc(step.createdAt), sql`rowid`)
+    .all()
+    .filter((row) => row.id !== head.id && row.status !== 'claimed');
+  const folded: StepRow[] = [];
+  for (const row of later) {
+    const foldable =
+      row.status === 'pending' &&
+      row.prompt !== null &&
+      (row.ownerMessageIds ?? []).length > 0 &&
+      (row.holdReason === null || row.holdReason === QUEUED_HOLD) &&
+      (row.holdUntil === null || row.holdUntil <= now) &&
+      row.scopeProjectId === head.scopeProjectId &&
+      row.freshSession !== true &&
+      !nativeInputs.has(row.id);
+    if (!foldable) break;
+    folded.push(row);
+  }
+  if (folded.length === 0) return;
+  db.update(step)
+    .set({
+      prompt: [head.prompt, ...folded.map((row) => row.prompt)].join('\n\n'),
+      ownerMessageIds: [
+        ...new Set([...owners, ...folded.flatMap((row) => row.ownerMessageIds ?? [])]),
+      ],
+    })
+    .where(eq(step.id, head.id))
+    .run();
+  db.delete(step)
+    .where(
+      inArray(
+        step.id,
+        folded.map((row) => row.id),
       ),
     )
     .run();
-  if (res.changes > 0) openTurnCapture(stepRow.id);
-  return res.changes > 0;
 }
 
 export function chiefTurnContext(

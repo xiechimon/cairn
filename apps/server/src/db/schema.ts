@@ -8,6 +8,7 @@ import type {
   BlockerHandoffRecord,
   BuildEvidence,
   BuildStop,
+  ChiefMessageDelivery,
   ChiefWatch,
   ClaudeCodeReport,
   ClaudeRateLimitWindow,
@@ -1180,6 +1181,7 @@ export const chiefMessage = sqliteTable('chief_message', {
   role: text('role').$type<'system' | 'user' | 'assistant'>().notNull(),
   content: json<unknown>('content').notNull(),
   projectId: text('projectId'),
+  delivery: text('delivery').$type<ChiefMessageDelivery>(),
   createdAt: epochMs('createdAt').notNull(),
 });
 

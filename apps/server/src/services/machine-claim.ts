@@ -260,8 +260,9 @@ function buildChiefClaim(
   if (claudeCodeSubscriptionMissing(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const bindTeamId = stepRuntimeFor(model.provider) === 'claude-code' ? threadRow.teamId : null;
-  if (!claimPendingChiefStep(deps.db, stepRow, machineId, bindTeamId)) return null;
-  return chiefClaimPayload(deps, machineId, stepRow, threadRow, agentRow, machineRow);
+  const claimed = claimPendingChiefStep(deps.db, stepRow, machineId, bindTeamId);
+  if (claimed === null) return null;
+  return chiefClaimPayload(deps, machineId, claimed, threadRow, agentRow, machineRow);
 }
 
 function chiefClaimPayload(

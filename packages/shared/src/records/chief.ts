@@ -82,9 +82,18 @@ export type ChiefOutage = z.infer<typeof chiefOutageSchema>;
 
 export const chiefPendingMessageSchema = z.object({
   messageId: z.string(),
-  state: z.enum(['queued', 'held']),
+  state: z.enum(['steering', 'queued', 'held']),
 });
 export type ChiefPendingMessage = z.infer<typeof chiefPendingMessageSchema>;
+
+export const chiefMessageDeliverySchema = z.enum(['steer', 'queue', 'steer_missed']);
+export type ChiefMessageDelivery = z.infer<typeof chiefMessageDeliverySchema>;
+
+export const chiefMessageEditBodySchema = z.union([
+  z.object({ content: z.string().refine((s) => s.trim() !== '', 'content is blank') }),
+  z.object({ editing: z.boolean() }),
+]);
+export type ChiefMessageEditBody = z.infer<typeof chiefMessageEditBodySchema>;
 
 export const chiefGetResponseSchema = z.object({
   chief: chiefRecordSchema,
@@ -184,6 +193,7 @@ export const chiefSendMessageBodySchema = z.object({
   content: z.string().min(1),
   projectId: z.string().min(1).nullish(),
   clientMessageId: z.string().min(1).max(200),
+  mode: z.literal('queue').optional(),
 });
 export type ChiefSendMessageBody = z.infer<typeof chiefSendMessageBodySchema>;
 
@@ -258,7 +268,8 @@ export const CHIEF_WATCHES_EMPTY_COPY =
   '暂无跟进事项。Coordinator 关注某个任务，或约定到点回头核实时，会按主题列在这里。';
 
 export const CHIEF_INPUT_PLACEHOLDER = '有什么可以帮你的？';
-export const CHIEF_INPUT_PLACEHOLDER_STEERING = '补充的话会一起插进这一轮';
+export const CHIEF_INPUT_PLACEHOLDER_STEERING = '插进这一轮 · ⌘↵ 排队';
+export const CHIEF_INPUT_PLACEHOLDER_STEERING_TOUCH = '插进这一轮 · 长按排队';
 export const CHIEF_INPUT_PLACEHOLDER_QUEUED = '还没开始，新消息会排在后面';
 
 export const COORDINATOR_SUMMARY_MAX_CHARS = 20_000;

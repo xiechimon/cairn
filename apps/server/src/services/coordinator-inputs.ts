@@ -11,6 +11,8 @@ import {
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
+export const STEER_WITHDRAW_HOLD = 'steer_withdraw';
+
 type StepRow = typeof step.$inferSelect;
 type ChiefMessageRow = typeof chiefMessage.$inferSelect;
 export type CoordinatorInput = typeof coordinatorInput.$inferSelect;
@@ -190,6 +192,10 @@ export function pullCoordinatorInput(
         admittedRequestIds.length === 0
           ? undefined
           : notInArray(coordinatorInput.id, [...admittedRequestIds]),
+        notInArray(
+          coordinatorInput.id,
+          db.select({ id: step.id }).from(step).where(eq(step.holdReason, STEER_WITHDRAW_HOLD)),
+        ),
       ),
     )
     .orderBy(asc(coordinatorInput.createdAt), sql`rowid`)
@@ -286,6 +292,23 @@ export function releaseCoordinatorInput(
       const waiting = db.select().from(step).where(eq(step.id, batch.id)).get();
       const waitingForExecution =
         waiting?.status === 'pending' || waiting?.status === 'waiting_quota';
+      if (waitingForExecution && waiting.holdReason === STEER_WITHDRAW_HOLD) {
+        db.delete(step).where(eq(step.id, waiting.id)).run();
+        if (batch.ownerMessageIds.length > 0)
+          db.delete(chiefMessage)
+            .where(
+              and(
+                eq(chiefMessage.threadId, batch.threadId),
+                inArray(chiefMessage.id, batch.ownerMessageIds),
+              ),
+            )
+            .run();
+        db.update(coordinatorInput)
+          .set({ state: 'released', successorStepId: null })
+          .where(eq(coordinatorInput.id, batch.id))
+          .run();
+        return;
+      }
       const surviving = batch.ownerMessageIds.filter(
         (id) =>
           db
@@ -295,6 +318,10 @@ export function releaseCoordinatorInput(
             .get() !== undefined,
       );
       if (waitingForExecution && surviving.length > 0) {
+        db.update(chiefMessage)
+          .set({ delivery: 'steer_missed' })
+          .where(inArray(chiefMessage.id, surviving))
+          .run();
         successorStepId = newRecordId();
         db.insert(step)
           .values({
