@@ -7,10 +7,11 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const read = (file) => readFileSync(join(ROOT, file), 'utf8');
 
-test('AGENTS.md ships straight to main without force and keeps the deploy as the safety net', () => {
+test('AGENTS.md lands work through queue/main without force and keeps the deploy as the safety net', () => {
   const agents = read('AGENTS.md');
   assert.match(agents, /^## Ship$/m);
-  assert.ok(agents.includes('`git push origin HEAD:main`'));
+  assert.ok(agents.includes('`git push origin HEAD:queue/main`'));
+  assert.match(agents, /green-main` ruleset/);
   assert.match(agents, /Push without force/);
   assert.match(
     agents,

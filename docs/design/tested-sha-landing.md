@@ -65,9 +65,12 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
 
 ## Rollout
 
-1. This change: `ci.yml` triggers on `queue/**` pushes; the promote script and
-  tests land; the queue is opt-in and `HEAD:main` still works.
-2. Flip: ruleset + AGENTS.md ship steps switch to `queue/main`.
+1. Done: `ci.yml` triggers on `queue/**` pushes; the promote script and tests
+   landed.
+2. Done (2026-11-18): the `green-main` ruleset requires `check`, `pack-smoke`
+   and `e2e-gate` green on the pushed commit — verified live: an untested
+   `HEAD:main` push is rejected with "3 of 3 required status checks are
+   expected". AGENTS.md ship steps switched to `queue/main` in the same change.
 3. Optional: an Actions-hosted promoter, batching policy, and prepush slimming
    once the queue is the real gate.
 

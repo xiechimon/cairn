@@ -1,6 +1,6 @@
 # Host development uses the owner's GitHub login
 
-Authorized agent work on this host commits as `xiechimon` and uses the owner's existing `gh` login for GitHub access. Use ordinary `git commit` and `git push origin HEAD:main`, following `AGENTS.md`. Do not mint an App installation token for development.
+Authorized agent work on this host commits as `xiechimon` and uses the owner's existing `gh` login for GitHub access. Use ordinary `git commit` and `git push origin HEAD:queue/main`, following `AGENTS.md`. Do not mint an App installation token for development.
 
 Use the owner's registered noreply identity, `xiechimon <157263579+xiechimon@users.noreply.github.com>`. New host commits and new Claude Code cloud session commits use owner author and committer identities (owner, 2026-11-16). The allowlist lives in `packages/shared/commit-identity.json`; no CI check enforces it. Commits already made as `Claude <noreply@anthropic.com>` stay accepted and are not rewritten.
 
