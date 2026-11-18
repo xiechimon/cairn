@@ -9,7 +9,13 @@ import {
 import { CopyCodeButton } from '../detail/chat-markdown.js';
 import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
-import { type EngineRun, type EngineRunActions, enginePendingQuestion } from './engine-run.js';
+import {
+  type EngineRun,
+  type EngineRunActions,
+  type EngineScreenView,
+  enginePendingQuestion,
+} from './engine-run.js';
+import { keyToBytes } from './engine-terminal.js';
 
 const END_SLACK = 24;
 const KEYBOARD_SCROLLABLE = { tabIndex: 0 } as const;
@@ -37,28 +43,42 @@ function useStickToEnd<T extends HTMLElement>() {
   return { ref, onScroll, ...KEYBOARD_SCROLLABLE };
 }
 
-export function EngineRawView({ run }: { run: EngineRun }) {
+export function EngineRawView({
+  run,
+  screen,
+}: {
+  run: EngineRun;
+  screen?: EngineScreenView | undefined;
+}) {
   const { t } = useI18n();
   const scroller = useStickToEnd<HTMLPreElement>();
+  const text = run.rawOutput;
+  const held = screen?.held === true;
   return (
     <div data-testid="engine-raw-view" className="flex min-h-0 flex-1 flex-col px-4 pt-3 pb-4">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-(--radius-code) border border-border bg-background">
         <div className="flex h-10 flex-none items-center border-b border-border pr-1.5 pl-5">
           <span className="min-w-0 flex-1 truncate font-sans text-code-lang text-content-secondary">
-            {t('原始输出')}
+            {held ? t('已接管 · 按键直接发送给引擎') : t('原始输出')}
           </span>
-          <CopyCodeButton text={run.rawOutput} testId="engine-raw-copy" />
+          <CopyCodeButton text={text} testId="engine-raw-copy" />
         </div>
         <pre
           {...scroller}
           role="log"
           aria-label={t('原始输出')}
           data-testid="engine-raw"
-          className="scroll-fade m-0 min-h-0 flex-1 overflow-auto px-5 py-3 font-prose-mono text-code whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere]"
+          data-held={held || undefined}
+          onKeyDown={(event) => {
+            if (!held || screen === undefined) return;
+            const bytes = keyToBytes(event);
+            if (bytes === null) return;
+            event.preventDefault();
+            screen.send(bytes);
+          }}
+          className="scroll-fade m-0 min-h-0 flex-1 overflow-auto px-5 py-3 font-prose-mono text-code whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere] focus:outline-none"
         >
-          <span className="block">
-            {run.rawOutput === '' ? t('引擎还没有输出') : run.rawOutput}
-          </span>
+          <span className="block">{text === '' ? t('引擎还没有输出') : text}</span>
         </pre>
       </div>
     </div>

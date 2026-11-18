@@ -33,6 +33,13 @@ export type EngineEvent =
   | { kind: 'question'; id: string; text: string; answer: EngineAnswer | null }
   | { kind: 'unknown'; id: string; type: string; payload: string };
 
+export interface EngineScreenView {
+  status: 'off' | 'connecting' | 'live' | 'ended' | 'failed';
+  held: boolean;
+  text: string;
+  send(bytes: string): void;
+}
+
 export interface EngineRun {
   engine: string;
   state: EngineRunState;
@@ -41,6 +48,7 @@ export interface EngineRun {
   plan: EnginePlanStep[];
   events: EngineEvent[];
   rawOutput: string;
+  stepId?: string;
 }
 
 export interface EngineRunActions {
@@ -52,6 +60,7 @@ export interface EngineRunActions {
 export interface EngineRunView {
   run: EngineRun;
   actions?: EngineRunActions;
+  screen?: EngineScreenView;
   controls?: ReactNode;
   phase?: TodoRecord['phase'];
   eventsInTranscript?: boolean;

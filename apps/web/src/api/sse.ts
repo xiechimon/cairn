@@ -33,6 +33,7 @@ import {
   resyncConversations,
   subscribeConversation,
 } from './conversation-subscriptions.js';
+import { noteEngineLease } from './engine-lease-store.js';
 import { invalidateConverged } from './invalidate.js';
 import { liveTextStore } from './live-text.js';
 import { liveThinkingStore } from './live-thinking.js';
@@ -104,6 +105,9 @@ export function startTeamStream(
       }
       if (ev.type === 'computer.state') {
         void invalidateConverged(qc, { queryKey: ['computers', teamId] });
+      }
+      if (ev.type === 'engine.lease') {
+        noteEngineLease(ev.stepId, ev.held);
       }
       if (ev.type === 'notification') {
         fireDesktopNotification(ev.notification as NotificationRecord);

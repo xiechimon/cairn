@@ -156,6 +156,7 @@ export function liveEngineRun({
   const engine = threadEngines(engineSteps).at(-1);
   if (engine === undefined) return null;
   const events = liveEvents(messages);
+  const claimed = engineSteps.find((step) => step.status === 'claimed');
   return {
     engine,
     state: liveState(engineSteps, build?.errorMessage ?? null),
@@ -167,5 +168,6 @@ export function liveEngineRun({
         : [],
     events,
     rawOutput: events.map(rawOf).join('\n'),
+    ...(claimed !== undefined ? { stepId: claimed.id } : {}),
   };
 }

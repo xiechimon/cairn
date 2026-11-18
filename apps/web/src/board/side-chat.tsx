@@ -63,6 +63,7 @@ import {
   type ThreadUsageView,
   threadUsageShown,
 } from './thread-usage-ring.js';
+import { useEngineScreen } from './use-engine-screen.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
 import { useThreadUsage } from './use-thread-usage.js';
@@ -429,7 +430,7 @@ function ThreadBody({
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
       {view === 'raw' && engine !== undefined ? (
-        <EngineRawView run={engine.run} />
+        <EngineRawView run={engine.run} screen={engine.screen} />
       ) : (
         <ReportThreadContext.Provider value={reportThread}>
           <TranscriptColumn
@@ -684,27 +685,65 @@ function ReadyThread({
     chat.planDoc !== undefined || updates !== null ? () => setPlanOpen(true) : undefined;
   const usage = useThreadUsage(todo);
   const [takingOver, setTakingOver] = useState(false);
-  const engineActions = engine?.actions;
+  const { live, teamId } = useLiveData();
+  const screen = useEngineScreen(
+    teamId,
+    live && engine !== undefined ? (engine.run.stepId ?? null) : null,
+    live &&
+      engine !== undefined &&
+      (view === 'raw' || takingOver || engine.run.state === 'taken_over'),
+  );
+  const engineView =
+    engine === undefined
+      ? undefined
+      : {
+          ...engine,
+          run: {
+            ...engine.run,
+            state: screen.held ? ('taken_over' as const) : engine.run.state,
+            rawOutput:
+              (screen.status === 'live' || screen.status === 'ended') && screen.text !== ''
+                ? screen.text
+                : engine.run.rawOutput,
+          },
+          screen: {
+            status: screen.status,
+            held: screen.held,
+            text: screen.text,
+            send: screen.send,
+          },
+          actions:
+            engine.run.stepId !== undefined && live
+              ? {
+                  answer: () => {},
+                  takeOver: () => {
+                    screen.takeOver();
+                    onView('raw');
+                  },
+                  handBack: screen.handBack,
+                }
+              : engine.actions,
+        };
+  const engineActions = engineView?.actions;
   const actions = useThreadActions({
     todo,
     chat,
     onGone: onClose,
     onViewPlan: openPlan,
     engine:
-      engine === undefined
+      engineView === undefined
         ? undefined
         : {
             onViewRaw: () => onView('raw'),
             ...(engineActions === undefined
               ? {}
-              : engine.run.state === 'taken_over'
+              : engineView.run.state === 'taken_over'
                 ? { takeOver: { label: t('交还'), onClick: engineActions.handBack } }
-                : engineCanTakeOver(engine.run.state)
+                : engineCanTakeOver(engineView.run.state)
                   ? { takeOver: { label: t('接管'), onClick: () => setTakingOver(true) } }
                   : {}),
           },
   });
-  const { live, teamId } = useLiveData();
   const prs = usePrs(teamId, todo.id, live);
   const prRows = prs.data ?? [];
   const origin = threadOrigin(todo.request, chatStream);
@@ -768,16 +807,16 @@ function ReadyThread({
         origin={origin}
         onJumpToOrigin={jumpToOrigin}
         onClose={onClose}
-        engine={engine}
+        engine={engineView}
         usage={
-          engine !== undefined ||
+          engineView !== undefined ||
           (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||
           contextPercentOf(todo.context) !== null
             ? {
                 summary:
-                  engine === undefined
+                  engineView === undefined
                     ? usage.summary
-                    : engineUsageSummary(usage.summary, engine.run),
+                    : engineUsageSummary(usage.summary, engineView.run),
                 state: usage.state,
                 onRetry: usage.retry,
                 context: todo.context,
