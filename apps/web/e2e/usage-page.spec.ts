@@ -49,9 +49,9 @@ test.describe('live', () => {
     await page.getByTestId('sidebar-usage').click();
     await expect(page).toHaveURL(/\/app\/usage/);
     await expect(page.getByRole('dialog', { name: 'Usage' })).toBeVisible();
+    await expect(page.getByTestId('usage-stats')).toContainText('Since 11/15');
     expect(asked.at(-1)?.get('tz')).toBe('Asia/Shanghai');
     expect(asked.at(-1)?.get('days')).toBe('180');
-    await expect(page.getByTestId('usage-stats')).toContainText('Since 11/15');
     await expect(page.getByTestId('usage-stats')).toContainText('864K token');
     await expect(page.getByTestId('usage-stats')).toContainText('1 task');
     await expect(page.getByTestId('usage-stats')).toContainText('80%');

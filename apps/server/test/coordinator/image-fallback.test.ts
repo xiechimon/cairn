@@ -1,9 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { afterEach, describe, expect, it } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
 import {
   createCoordinatorModels,
@@ -16,7 +15,7 @@ import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
 const ctx = BACKGROUND_CONTEXT;
 const dirs: string[] = [];
 afterEach(() => {
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  for (const d of dirs.splice(0)) releaseTestTempDir(d);
 });
 
 const imageContext = {
@@ -97,7 +96,7 @@ describe('model requests that carry images', () => {
       return { text: 'screen', images: [] };
     };
     const gate = createStepGate();
-    const dir = mkdtempSync(join(tmpdir(), 'coord-image-fallback-'));
+    const dir = makeTestTempDir('coord-image-fallback-');
     dirs.push(dir);
     const harness = await openCoordinatorHarness(join(dir, 'c.sqlite'), models.models, ctx, {
       extensions: [coordinatorToolsExtension(api, gate, { desktopTools: true })],
