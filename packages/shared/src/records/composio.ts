@@ -1,18 +1,8 @@
 import { z } from 'zod';
 import { mcpConnectorRecordSchema } from './mcp-connector.js';
 
-export const COMPOSIO_SECRET_PREFIX = 'composio.';
 export const COMPOSIO_API_KEY_SECRET = 'composio.api-key';
 export const COMPOSIO_CATALOG_ID = 'composio';
-
-export function isComposioSecretName(name: string): boolean {
-  const folded = name
-    .normalize('NFKC')
-    .replace(/\p{Cf}/gu, '')
-    .trim()
-    .toLowerCase();
-  return folded.startsWith(COMPOSIO_SECRET_PREFIX);
-}
 
 export const composioToolkitSlugSchema = z
   .string()

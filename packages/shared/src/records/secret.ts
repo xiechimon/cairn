@@ -2,7 +2,17 @@ import { z } from 'zod';
 import { isMailSecretName } from '../mail.js';
 import { WEB_BRAVE_KEY_SECRET, WEB_EXA_KEY_SECRET } from '../web-search.js';
 import { recordId } from './common.js';
-import { isComposioSecretName } from './composio.js';
+
+export const COMPOSIO_SECRET_PREFIX = 'composio.';
+
+export function isComposioSecretName(name: string): boolean {
+  const folded = name
+    .normalize('NFKC')
+    .replace(/\p{Cf}/gu, '')
+    .trim()
+    .toLowerCase();
+  return folded.startsWith(COMPOSIO_SECRET_PREFIX);
+}
 
 export const SECRET_DELIVERIES = ['plaintext', 'http'] as const;
 export const secretDeliverySchema = z.enum(SECRET_DELIVERIES);
