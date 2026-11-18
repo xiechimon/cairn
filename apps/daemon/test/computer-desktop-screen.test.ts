@@ -1,3 +1,6 @@
+import { execFileSync } from 'node:child_process';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   ComputerCall,
   ComputerFrame,
@@ -5,6 +8,7 @@ import type {
   MachineComputerFramesBody,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { DESKTOP_PASTE_SCRIPT, DESKTOP_SCREENSHOT_SCRIPT } from '../src/computer/desktop-screen.js';
 import { createComputerDispatcher } from '../src/computer/dispatch.js';
 import { encodePng, pngSize } from '../src/computer/host-screen-png.js';
@@ -289,4 +293,30 @@ describe('computer_act on a scope desktop', () => {
     const frame = await run('computer_act', { actions: [{ kind: 'key', key: 'Return' }] });
     expect(frame).toMatchObject({ kind: 'error', delivery: 'unknown' });
   });
+});
+
+describe('DESKTOP_PASTE_SCRIPT paste chord', () => {
+  function chordFor(wmClass: string) {
+    const bin = makeTestTempDir('paste-bin-');
+    const log = join(bin, 'chord.log');
+    const stub = (name: string, body: string) => {
+      writeFileSync(join(bin, name), `#!/bin/sh\n${body}\n`);
+      chmodSync(join(bin, name), 0o755);
+    };
+    stub('xclip', 'cat >/dev/null');
+    stub('xprop', `echo 'WM_CLASS(STRING) = ${wmClass}'`);
+    stub('xdotool', `if [ "$1" = key ]; then echo "$3" >>${log}; else echo 1; fi`);
+    execFileSync('sh', ['-c', DESKTOP_PASTE_SCRIPT], {
+      env: { PATH: `${bin}:/usr/bin:/bin` },
+      input: '前端工程师',
+    });
+    const chord = readFileSync(log, 'utf8').trim();
+    releaseTestTempDir(bin);
+    return chord;
+  }
+
+  test('pastes with ctrl+shift+v in a terminal and ctrl+v elsewhere', () => {
+    expect(chordFor('"lxterminal", "Lxterminal"')).toBe('ctrl+shift+v');
+    expect(chordFor('"chromium", "Chromium"')).toBe('ctrl+v');
+  }, 30_000);
 });
