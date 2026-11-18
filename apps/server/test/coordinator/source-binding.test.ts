@@ -57,10 +57,11 @@ test('running Coordinator rejects repeated source bindings and accepts an explic
   );
   const rows = w.s.db.select().from(todo).all();
   expect(rows.map((row) => row.spec)).toEqual([
-    'Please dispatch the caret alignment fix.\n\nResearch Markdown preview implementations, then propose a plan.',
+    'Research Markdown preview implementations, then propose a plan.',
+    'Please dispatch the caret alignment fix.',
     '> caret alignment fix.',
   ]);
-  expect(rows.map((row) => row.phase)).toEqual(['queued', 'queued']);
+  expect(rows.map((row) => row.phase)).toEqual(['queued', 'queued', 'queued']);
   const transcript = w.s.db.select().from(chiefMessage).all();
   const calls = transcript
     .map((row) => row.content)
@@ -70,7 +71,7 @@ test('running Coordinator rejects repeated source bindings and accepts an explic
       return parsed.success ? [parsed.data] : [];
     });
   expect(calls).toHaveLength(5);
-  expect(calls.map((content) => content.isError)).toEqual([false, true, true, true, false]);
+  expect(calls.map((content) => content.isError)).toEqual([true, false, false, true, false]);
   console.log(
     'Coordinator source replay:',
     JSON.stringify({

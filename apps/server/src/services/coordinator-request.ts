@@ -380,7 +380,7 @@ function defaultQuoteIds(db: Db, ctx: RequestCtx): string[] {
   );
   const answered = turn.filter((id) => !rows.some((row) => row.id === id));
   const ids = [...picked.map((row) => row.id), ...answered];
-  if (ids.length <= 1) return ids;
+  if (picked.length <= 1) return ids;
   const preview = (id: string) => {
     const content = picked.find((row) => row.id === id)?.content;
     const text = typeof content === 'string' ? content.replace(/\s+/g, ' ').trim() : '(answer)';
@@ -388,7 +388,7 @@ function defaultQuoteIds(db: Db, ctx: RequestCtx): string[] {
   };
   throw new HttpError(
     400,
-    `messageIds omitted, but ${ids.length} owner messages since the last task could be this task's request. Nothing was created. Pass messageIds with the ones that state this task's request:\n${ids.map(preview).join('\n')}`,
+    `messageIds omitted, but ${picked.length} owner messages since the last task could be this task's request. Nothing was created. Pass messageIds with the ones that state this task's request:\n${picked.map((row) => preview(row.id)).join('\n')}`,
   );
 }
 
