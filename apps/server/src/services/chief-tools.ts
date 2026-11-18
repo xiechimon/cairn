@@ -693,6 +693,7 @@ export async function executeChiefTool(
                 ? ctx.userId
                 : ctx.chiefAgentId,
             ownerId: ctx.userId,
+            withoutSelfIssue: untrustedTurn,
           },
         );
         db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, created.id)).run();

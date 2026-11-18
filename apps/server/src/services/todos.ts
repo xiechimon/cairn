@@ -532,6 +532,7 @@ export function createAutonomousTodo(
     ownerId: string | null;
     sourceKind?: TodoSourceKind;
     sourceRef?: string;
+    withoutSelfIssue?: boolean;
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
     userSpecAttachmentIds?: string[];
@@ -563,7 +564,9 @@ export function createAutonomousTodo(
   const title =
     input.title.trim() || derivePlaceholderTitle(input.spec) || PLACEHOLDER_TITLE_FALLBACK;
   const selfIssue =
-    input.sourceKind === undefined ? planSelfIssue(deps, input.teamId, input.projectId) : null;
+    input.sourceKind === undefined && input.withoutSelfIssue !== true
+      ? planSelfIssue(deps, input.teamId, input.projectId)
+      : null;
   db.transaction((tx) => {
     tx.insert(todo)
       .values({

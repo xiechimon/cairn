@@ -96,7 +96,7 @@ Which tools are outbound, from the registry:
 | Tool | In a mail turn |
 |---|---|
 | Read tools (`CHIEF_TOOL_CATEGORIES.read` except `secrets`), `browser_snapshot`, `computer_observe`, `desktop_snapshot` | run as in an owner turn |
-| `create_todo` | creates the task but starts no build and adds no Coordinator watch; the result says only the owner starts it (a started task is a worker with a shell and network, an outbound channel) |
+| `create_todo` | creates the task but starts no build, adds no Coordinator watch and opens no GitHub self-issue (that issue is a public write of whatever the turn read); the result says only the owner starts it (a started task is a worker with a shell and network, an outbound channel) |
 | Connector tools (`connector_<slug>__<tool>`) with `readOnlyHint: true` | run as in an owner turn |
 | Every other connector tool, whether Gmail send, reply, forward, Slack post or an IM message: an unknown action is outbound unless its tool says it is read-only | confirmation card, class `send` (`destructiveHint` is `submit`) |
 | `shell`, `browser_navigate`, `browser_act`, `computer_act`, `desktop_act`, `install_packages`: they reach the network or other people's sites, so a read-only claim cannot be proven | confirmation card, class `send` |
@@ -114,7 +114,7 @@ Paths:
 | Owner-started turn, same tool | unchanged: the team or project action tier decides (`full` sends without a card, `guarded` asks) |
 | Report turn | unchanged: the report allowlist already refuses every outbound tool |
 
-Residual risk, named: `create_todo` in a mail turn can put mail text into a task and its GitHub self-issue, and the owner approves only what he sees on a card. Prompt injection can still steer what the card says, so the card is the check, not the model.
+Residual risk, named: `create_todo` in a mail turn can put mail text into a local task, and the owner approves only what he sees on a card. Prompt injection can still steer what the card says, so the card is the check, not the model.
 
 ## Fence
 

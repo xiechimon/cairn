@@ -192,6 +192,44 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
     expect(row?.sourceRef).toBe(`github:${REPO}#5`);
   });
 
+  test('A2b a mail turn on a GitHub-connected project creates no GitHub issue', async () => {
+    const res = await req(s.app, 'POST', '/api/projects', {
+      name: 'gh-mail',
+      kind: 'github',
+      githubRepo: REPO,
+    });
+    const ghProject = ((await res.json()) as { id: string }).id;
+    upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      { teamId, login: 'octo', accessToken: 'ghp_orch_token', scope: 'repo' },
+    );
+    const posts: string[] = [];
+    const watching: FetchLike = async (input, init) => {
+      if ((init?.method ?? 'GET') === 'POST') posts.push(String(input));
+      return ghFetch(input, init);
+    };
+    const text = await executeChiefTool(
+      {
+        db: s.db,
+        hub: s.hub,
+        machineHub: s.machineHub,
+        box: s.secretBox,
+        user: s.user,
+        reposDir: s.reposDir,
+        attachmentsDir: s.attachmentsDir,
+        skillsDir: s.skillsDir,
+        githubFetch: watching,
+      },
+      { ...ctx(), turnPrompt: '[wake:wake] provenance=mail:evt-1\nreply to the sender' },
+      'create_todo',
+      ownerTodo('写贡献指南', ghProject),
+    );
+    const created = JSON.parse(text) as TodoWire;
+    await flushSelfIssueWrites();
+    expect(created.sourceKind).toBe('orchestration');
+    expect(posts).toEqual([]);
+  });
+
   test('A3 MCP create_todo -> no orchestration source stored', async () => {
     const keyRes = await s.app.request(`/api/teams/${teamId}/api-keys`, {
       method: 'POST',

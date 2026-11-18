@@ -433,7 +433,7 @@ export function createRequestTodo(
   deps: TodoDeps,
   ctx: RequestCtx,
   params: CoordinatorCreateTodoParams & { projectId: string },
-  provenance: { createdBy: string | null; ownerId: string },
+  provenance: { createdBy: string | null; ownerId: string; withoutSelfIssue?: boolean },
 ): TodoRecord & { uncovered?: string[] } {
   const { db } = deps;
   if (params.sourceTodoId !== undefined) {
@@ -493,6 +493,7 @@ export function createRequestTodo(
     createdBy: provenance.createdBy,
     ownerId: provenance.ownerId,
     orchestration: { threadId: ctx.threadId },
+    ...(provenance.withoutSelfIssue === true ? { withoutSelfIssue: true } : {}),
     request,
     userSpecAttachmentIds: ownerGrants(segments, ctx.teamId),
     ...(params.dependsOn !== undefined || params.blockedBy !== undefined
