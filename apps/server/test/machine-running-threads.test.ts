@@ -31,7 +31,7 @@ const MACHINE_NAME = 'running-mbp';
 interface MachineListRow {
   id: string;
   runningSteps?: number;
-  running?: { threadId: string; title: string; projectId: string; startedAt: number }[];
+  running?: { threadId: string; title: string; projectId: string; startedAt: number; lastProgressAt: number }[];
 }
 
 interface World {
@@ -175,7 +175,7 @@ describe('G3 running threads on a machine', () => {
       .get()!.claimedAt;
     const row = await rowFor(w.s, w.machineId);
     expect(row.running).toEqual([
-      { threadId: todoId, title: 'Running thread', projectId: w.projectId, startedAt: claimedAt },
+      { threadId: todoId, title: 'Running thread', projectId: w.projectId, startedAt: claimedAt, lastProgressAt: claimedAt },
     ]);
     expect(row.runningSteps).toBe(1);
   });
@@ -238,7 +238,7 @@ describe('G3 running threads on a machine', () => {
       .where(eq(stepTable.id, stepId))
       .get()!.createdAt;
     expect((await rowFor(w.s, w.machineId)).running).toEqual([
-      { threadId: todoId, title: 'Legacy thread', projectId: w.projectId, startedAt: createdAt },
+      { threadId: todoId, title: 'Legacy thread', projectId: w.projectId, startedAt: createdAt, lastProgressAt: createdAt },
     ]);
   });
 
