@@ -33,6 +33,7 @@ import { BoardPage } from './routes/board-page.js';
 import { TodoRedirect } from './routes/todo-redirect.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
 import { LegacyModelRoutingRedirect, SettingsRedirect } from './settings/settings-redirect.js';
+import { TrayPage } from './tray/tray-page.js';
 
 function RouteBoundary({ children }: { children: ReactNode }) {
   const { pathname, search } = useLocation();
@@ -94,6 +95,7 @@ export const router = createBrowserRouter([
   {
     element: <LiveDataBridge />,
     children: [
+      { path: '/tray', element: <TrayPage /> },
       {
         element: <PwaBridge />,
         children: [

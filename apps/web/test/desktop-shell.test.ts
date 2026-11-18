@@ -1,6 +1,6 @@
-import { DESKTOP_SHELL_USER_AGENT } from '@cairn/shared';
+import { DESKTOP_SHELL_USER_AGENT, DESKTOP_TRAY_PATH } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { MAC_DESKTOP_SHELL, markDesktopShell } from '../src/desktop-shell.js';
+import { MAC_DESKTOP_SHELL, MAC_TRAY_SHELL, markDesktopShell } from '../src/desktop-shell.js';
 
 interface FakeElement {
   className: string;
@@ -34,18 +34,30 @@ const BROWSER_UA = 'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/156.0 Safa
 describe('markDesktopShell', () => {
   test('the desktop app user agent marks the root and adds one hidden drag strip', () => {
     const { root, appended, element } = fakeRoot();
-    expect(markDesktopShell(element, `${BROWSER_UA} Electron/45.2.1 ${DESKTOP_SHELL_USER_AGENT}`)).toBe(
-      true,
-    );
+    expect(markDesktopShell(
+        element,
+        `${BROWSER_UA} Electron/45.2.1 ${DESKTOP_SHELL_USER_AGENT}`,
+        '/app',
+      ),
+    ).toBe(true);
     expect(root.dataset.shell).toBe(MAC_DESKTOP_SHELL);
     expect(appended).toHaveLength(1);
     expect(appended[0]?.className).toBe('desktop-drag-strip');
     expect(appended[0]?.attributes['aria-hidden']).toBe('true');
   });
 
+  test('the menu bar popover gets its own shell and no drag strip over its buttons', () => {
+    const { root, appended, element } = fakeRoot();
+    expect(
+      markDesktopShell(element, `${BROWSER_UA} ${DESKTOP_SHELL_USER_AGENT}`, DESKTOP_TRAY_PATH),
+    ).toBe(true);
+    expect(root.dataset.shell).toBe(MAC_TRAY_SHELL);
+    expect(appended).toHaveLength(0);
+  });
+
   test('a browser user agent leaves the page untouched', () => {
     const { root, appended, element } = fakeRoot();
-    expect(markDesktopShell(element, BROWSER_UA)).toBe(false);
+    expect(markDesktopShell(element, BROWSER_UA, '/app')).toBe(false);
     expect(root.dataset.shell).toBeUndefined();
     expect(appended).toHaveLength(0);
   });

@@ -9,6 +9,10 @@
 
     const boot = document.getElementById('boot');
     if (!boot) return;
+    if (location.pathname === '/tray') {
+      boot.remove();
+      return;
+    }
 
     const page = theme === 'light' ? '#e7e6e1' : '#1b1c1b';
     const ink = theme === 'light' ? '#343633' : '#bbbab7';

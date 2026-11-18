@@ -803,6 +803,11 @@ body:has([data-testid="chief-body"]),
   overscroll-behavior: none;
 }
 
+:root[data-shell="mac-tray"],
+:root[data-shell="mac-tray"] body {
+  background: transparent;
+}
+
 :root[data-shell="mac-desktop"] .sidebar-team-row {
   padding-left: 82px;
   -webkit-app-region: drag;

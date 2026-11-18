@@ -137,7 +137,7 @@ The phase 2 graduation path: a stranger installs the desktop app and gets a merg
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Desktop app](#desktop-app) | 2 | Frontend design: no design for the tray, window and install flow<br>Backend design: no design for packaging, process supervision, updates and data location |
+| [Desktop app](#desktop-app) | 2 | Frontend design: no design for the window and install flow<br>Backend design: no design for packaging, process supervision, updates and data location |
 | [First run](#first-run) | 2 | Backend design: no design for checklist state and the 10-minute path |
 | [Mobile web and PWA](#mobile-web) | 2 | Research: no note on how Amp, t3code and Claude handle mobile web and PWA install |
 
@@ -380,7 +380,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 **Desktop app** (planned). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
 
 - Research: [docs/research/desktop-app-stack-2026-11-08.md](research/desktop-app-stack-2026-11-08.md) (not on main)
-- Frontend design: **gap**: no design for the tray, window and install flow
+- Frontend design: **gap**: no design for the window and install flow
 - Backend design: **gap**: no design for packaging, process supervision, updates and data location
 
 ### first-run

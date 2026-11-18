@@ -1494,11 +1494,21 @@
       "summary": "A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.",
       "centrality": 2,
       "status": "planned",
+      "code": {
+        "web": [
+          "apps/web/src/tray"
+        ]
+      },
+      "routes": {
+        "web": [
+          "/tray"
+        ]
+      },
       "research": [
         "docs/research/desktop-app-stack-2026-11-08.md"
       ],
       "frontendDesign": {
-        "gap": "no design for the tray, window and install flow"
+        "gap": "no design for the window and install flow"
       },
       "backendDesign": {
         "gap": "no design for packaging, process supervision, updates and data location"

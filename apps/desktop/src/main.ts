@@ -8,14 +8,20 @@ import {
   AGENT_DESKTOP_VERSION,
   agentDesktopRelease,
   DESKTOP_SHELL_USER_AGENT,
+  DESKTOP_TRAY_PATH,
+  type DesktopMenuCommand,
+  type DesktopRunnerState,
+  type DesktopTrayState,
   type DesktopUpdateState,
   ENV_VARS,
+  isAppPath,
   parseAccessTokenFile,
 } from '@cairn/shared';
 import {
   app,
   BrowserWindow,
   dialog,
+  globalShortcut,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
   ipcMain,
@@ -23,6 +29,7 @@ import {
   nativeImage,
   powerMonitor,
   powerSaveBlocker,
+  screen,
   session,
   shell,
   Tray,
@@ -50,6 +57,7 @@ import {
 import { type LocalRunner, startLocalRunner } from './runner.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
 import { trayMenuTemplate } from './tray-menu.js';
+import { TRAY_POPOVER_WIDTH, trayPopoverBounds } from './tray-popover.js';
 import { createUpdater, removeLeftoverUpdates } from './updater.js';
 
 const LOOPBACK = '127.0.0.1';
@@ -59,6 +67,17 @@ const STOP_TIMEOUT_MS = 10_000;
 const UPDATE_FIRST_CHECK_MS = 10_000;
 const UPDATE_CHECK_EVERY_MS = 60 * 60 * 1000;
 const UPDATE_CHECK_ON_FOCUS_AFTER_MS = 10 * 60 * 1000;
+const NEW_TASK_SHORTCUT = 'Control+Alt+N';
+const NEW_TASK_SHORTCUT_LABEL = '⌃⌥N';
+const TRAY_FIRST_HEIGHT = 440;
+const TRAY_MAX_HEIGHT = 900;
+const TRAY_REFRESH_MS = 2_000;
+const TRAY_REOPEN_GUARD_MS = 250;
+const MENU_COMMANDS: ReadonlySet<string> = new Set<DesktopMenuCommand>([
+  'settings',
+  'new-task',
+  'search',
+]);
 
 interface RunningServer {
   process: UtilityProcess;
@@ -67,6 +86,7 @@ interface RunningServer {
 }
 
 let server: RunningServer | null = null;
+let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let runner: LocalRunner | null = null;
 let runnerStarting: Promise<void> | null = null;
@@ -258,12 +278,16 @@ function openWindow(origin: string): BrowserWindow {
     if (isWebUrl(url)) void shell.openExternal(url);
   });
   void window.loadURL(origin);
+  mainWindow = window;
+  window.on('closed', () => {
+    if (mainWindow === window) mainWindow = null;
+  });
   return window;
 }
 
 function focusWindow(): void {
-  const [window] = BrowserWindow.getAllWindows();
-  if (window === undefined) {
+  const window = mainWindow;
+  if (window === null) {
     if (server !== null) openWindow(server.origin);
     return;
   }
@@ -272,26 +296,162 @@ function focusWindow(): void {
   window.focus();
 }
 
-function showTray(origin: string): Tray {
+function sendToWindow(channel: string, payload: unknown): void {
+  focusWindow();
+  mainWindow?.webContents.send(channel, payload);
+}
+
+function openFromTray(target: unknown): void {
+  if (typeof target !== 'object' || target === null) return;
+  const { kind, path, command } = target as Partial<Record<string, unknown>>;
+  if (kind === 'path' && isAppPath(path)) sendToWindow('desktop-navigate', path);
+  else if (kind === 'command' && typeof command === 'string' && MENU_COMMANDS.has(command))
+    sendToWindow('desktop-menu', command);
+}
+
+interface TrayControls {
+  runner: () => DesktopRunnerState;
+  setRunner: (on: boolean) => Promise<void>;
+}
+
+function createTrayPopover(origin: string): BrowserWindow {
+  const popover = new BrowserWindow({
+    width: TRAY_POPOVER_WIDTH,
+    height: TRAY_FIRST_HEIGHT,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: true,
+    roundedCorners: true,
+    vibrancy: 'popover',
+    visualEffectState: 'active',
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      preload: join(app.getAppPath(), 'dist', 'preload.cjs'),
+    },
+  });
+  popover.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  popover.webContents.setUserAgent(
+    `${popover.webContents.getUserAgent()} ${DESKTOP_SHELL_USER_AGENT}`,
+  );
+  popover.on('close', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    popover.hide();
+  });
+  popover.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  popover.webContents.on('will-navigate', (event) => event.preventDefault());
+  void popover.loadURL(`${origin}${DESKTOP_TRAY_PATH}`);
+  return popover;
+}
+
+function showTray(origin: string, controls: TrayControls): Tray {
   const icon = nativeImage.createFromPath(join(app.getAppPath(), 'assets', 'trayTemplate.png'));
   icon.setTemplateImage(true);
   const created = new Tray(icon);
-  created.setToolTip('Cairn');
+  created.setToolTip(`Cairn · ${new URL(origin).host}`);
   const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
-  const showMenu = (): void =>
-    created.setContextMenu(
-      Menu.buildFromTemplate(
-        trayMenuTemplate(new URL(origin).host, keepAwake.isOn(), {
-          open: focusWindow,
-          setKeepAwake: (on) => {
-            keepAwake.set(on);
-            showMenu();
-          },
-          quit: () => app.quit(),
-        }),
-      ),
+  const newTaskKey = globalShortcut.register(NEW_TASK_SHORTCUT, () =>
+    sendToWindow('desktop-menu', 'new-task'),
+  )
+    ? NEW_TASK_SHORTCUT_LABEL
+    : null;
+  let popover: BrowserWindow | null = null;
+  let height = TRAY_FIRST_HEIGHT;
+  let hiddenAt = 0;
+  const state = (): DesktopTrayState => ({
+    runner: controls.runner(),
+    keepAwake: keepAwake.isOn(),
+    newTaskKey,
+  });
+  const publish = (): void => {
+    if (popover?.isVisible()) popover.webContents.send('desktop-tray:state', state());
+  };
+  const place = (): void => {
+    if (popover === null) return;
+    const iconBounds = created.getBounds();
+    popover.setBounds(
+      trayPopoverBounds(iconBounds, screen.getDisplayMatching(iconBounds).workArea, height),
     );
-  showMenu();
+  };
+  const hide = (): void => {
+    if (popover?.isVisible()) popover.hide();
+  };
+  const toggle = (): void => {
+    if (popover === null) {
+      const made = createTrayPopover(origin);
+      made.on('blur', () => {
+        hiddenAt = Date.now();
+        made.hide();
+      });
+      popover = made;
+    }
+    if (popover.isVisible() || Date.now() - hiddenAt < TRAY_REOPEN_GUARD_MS) {
+      hide();
+      return;
+    }
+    const shown = popover;
+    const show = (): void => {
+      place();
+      shown.show();
+      shown.focus();
+      publish();
+    };
+    if (shown.webContents.isLoading()) shown.once('ready-to-show', show);
+    else show();
+  };
+  const fallbackMenu = (): Menu =>
+    Menu.buildFromTemplate(
+      trayMenuTemplate(new URL(origin).host, keepAwake.isOn(), {
+        open: focusWindow,
+        setKeepAwake: (on) => keepAwake.set(on),
+        quit: () => app.quit(),
+      }),
+    );
+  created.on('click', toggle);
+  created.on('right-click', () => {
+    hide();
+    created.popUpContextMenu(fallbackMenu());
+  });
+  setInterval(publish, TRAY_REFRESH_MS);
+  const fromPopover = (event: IpcMainInvokeEvent | IpcMainEvent): boolean =>
+    popover !== null &&
+    event.sender === popover.webContents &&
+    event.senderFrame?.origin === origin;
+  ipcMain.handle('desktop-tray:state', (event) => (fromPopover(event) ? state() : null));
+  ipcMain.on('desktop-tray:open', (event, target: unknown) => {
+    if (!fromPopover(event)) return;
+    hide();
+    openFromTray(target);
+  });
+  ipcMain.handle('desktop-tray:runner', async (event, on: unknown) => {
+    if (!fromPopover(event)) return;
+    await controls.setRunner(on === true);
+    publish();
+  });
+  ipcMain.on('desktop-tray:keep-awake', (event, on: unknown) => {
+    if (!fromPopover(event)) return;
+    keepAwake.set(on === true);
+    publish();
+  });
+  ipcMain.on('desktop-tray:resize', (event, next: unknown) => {
+    if (!fromPopover(event) || typeof next !== 'number' || !Number.isFinite(next) || next <= 0)
+      return;
+    height = Math.min(next, TRAY_MAX_HEIGHT);
+    if (popover?.isVisible()) place();
+  });
+  ipcMain.on('desktop-tray:quit', (event) => {
+    if (fromPopover(event)) app.quit();
+  });
   return created;
 }
 
@@ -306,10 +466,7 @@ function serveUpdates(origin: string): void {
             install: () => void installFromMenu(),
           },
           {
-            send: (command) => {
-              focusWindow();
-              BrowserWindow.getAllWindows()[0]?.webContents.send('desktop-menu', command);
-            },
+            send: (command) => sendToWindow('desktop-menu', command),
             back: () => BrowserWindow.getFocusedWindow()?.webContents.navigationHistory.goBack(),
             forward: () =>
               BrowserWindow.getFocusedWindow()?.webContents.navigationHistory.goForward(),
@@ -428,8 +585,8 @@ async function boot(): Promise<void> {
     await waitUntilServing(server);
     const ownerToken = readOwnerToken();
     signOwnPagesIn(server.origin, ownerToken);
-    tray = showTray(server.origin);
     const origin = server.origin;
+    let runnerWanted = true;
     const bringRunnerUp = (): Promise<void> => {
       if (runner !== null) {
         runner.ensureRunning();
@@ -456,10 +613,26 @@ async function boot(): Promise<void> {
       return runnerStarting;
     };
     void bringRunnerUp();
-    powerMonitor.on('resume', () => void bringRunnerUp());
-    ipcMain.handle('local-runner:reconnect', (event) =>
-      event.senderFrame?.origin === origin ? bringRunnerUp() : undefined,
-    );
+    tray = showTray(origin, {
+      runner: () => {
+        if (runner === null) return runnerStarting !== null ? 'starting' : 'failed';
+        if (runner.isRunning()) return 'on';
+        return runnerWanted ? 'failed' : 'off';
+      },
+      setRunner: async (on) => {
+        runnerWanted = on;
+        if (on) await bringRunnerUp();
+        else await runner?.stop();
+      },
+    });
+    powerMonitor.on('resume', () => {
+      if (runnerWanted) void bringRunnerUp();
+    });
+    ipcMain.handle('local-runner:reconnect', (event) => {
+      if (event.senderFrame?.origin !== origin) return undefined;
+      runnerWanted = true;
+      return bringRunnerUp();
+    });
     void removeLeftoverUpdates();
     serveUpdates(server.origin);
     serveOwnComputer(server.origin);
@@ -495,6 +668,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', (event) => {
     if (quitting || server === null) return;
     quitting = true;
+    globalShortcut.unregisterAll();
     stopDevinLogin();
     event.preventDefault();
     const running = server;

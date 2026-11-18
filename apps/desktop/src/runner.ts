@@ -33,6 +33,7 @@ export interface RunnerOptions {
 export interface LocalRunner {
   ensureRunning: () => void;
   stop: () => Promise<void>;
+  isRunning: () => boolean;
 }
 
 async function postJson(
@@ -93,6 +94,7 @@ export async function startLocalRunner(options: RunnerOptions): Promise<LocalRun
   writeMachineJson(options.home, await enrollLocalMachine(options.origin, options.ownerToken));
   let child: ChildProcess | null = null;
   let pending: NodeJS.Timeout | null = null;
+  let halted = false;
   const budget = createRestartBudget(MAX_RESTARTS, STABLE_RUN_MS);
   const launch = (): void => {
     pending = null;
@@ -105,7 +107,7 @@ export async function startLocalRunner(options: RunnerOptions): Promise<LocalRun
     child = started;
     started.once('exit', (code, signal) => {
       child = null;
-      if (options.isQuitting()) return;
+      if (options.isQuitting() || halted) return;
       if (!budget.exited()) {
         console.error(`Cairn Runner exited (code ${code}, signal ${signal}); not restarting`);
         return;
@@ -117,12 +119,15 @@ export async function startLocalRunner(options: RunnerOptions): Promise<LocalRun
   launch();
   return {
     ensureRunning: () => {
+      halted = false;
       if (child !== null || options.isQuitting()) return;
       if (pending !== null) clearTimeout(pending);
       budget.reset();
       launch();
     },
+    isRunning: () => child !== null || pending !== null,
     stop: () => {
+      halted = true;
       if (pending !== null) clearTimeout(pending);
       pending = null;
       const running = child;

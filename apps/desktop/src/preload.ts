@@ -1,5 +1,7 @@
 import type {
   DesktopMenuCommand,
+  DesktopTrayOpen,
+  DesktopTrayState,
   DesktopUpdateState,
   DevinLocalStatus,
   DevinLoginOutcome,
@@ -19,6 +21,30 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
         ipcRenderer.removeListener('desktop-menu', relay);
       };
     },
+  },
+  navigate: {
+    subscribe: (listener: (path: string) => void): (() => void) => {
+      const relay = (_event: unknown, path: string) => listener(path);
+      ipcRenderer.on('desktop-navigate', relay);
+      return () => {
+        ipcRenderer.removeListener('desktop-navigate', relay);
+      };
+    },
+  },
+  tray: {
+    state: (): Promise<DesktopTrayState | null> => ipcRenderer.invoke('desktop-tray:state'),
+    subscribe: (listener: (state: DesktopTrayState) => void): (() => void) => {
+      const relay = (_event: unknown, state: DesktopTrayState) => listener(state);
+      ipcRenderer.on('desktop-tray:state', relay);
+      return () => {
+        ipcRenderer.removeListener('desktop-tray:state', relay);
+      };
+    },
+    open: (target: DesktopTrayOpen): void => ipcRenderer.send('desktop-tray:open', target),
+    setRunner: (on: boolean): Promise<void> => ipcRenderer.invoke('desktop-tray:runner', on),
+    setKeepAwake: (on: boolean): void => ipcRenderer.send('desktop-tray:keep-awake', on),
+    resize: (height: number): void => ipcRenderer.send('desktop-tray:resize', height),
+    quit: (): void => ipcRenderer.send('desktop-tray:quit'),
   },
   localProviders: {
     scan: (): Promise<LocalProvider[]> => ipcRenderer.invoke('local-providers:scan'),

@@ -2575,4 +2575,9 @@ export const EN: Record<string, string> = {
   跟随团队默认: 'Team default',
   名称和图标: 'Name and icon',
   归档项目: 'Archive project',
+  '打开 Cairn': 'Open Cairn',
+  正在启动: 'Starting',
+  已停止: 'Stopped',
+  '保持 Mac 唤醒': 'Keep the Mac awake',
+  '退出 Cairn': 'Quit Cairn',
 };
