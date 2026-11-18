@@ -3,30 +3,28 @@ import { GitPullRequest } from 'lucide-react';
 import { useState } from 'react';
 import { ListCard } from '../components/list-card.js';
 import { SegmentedRadio } from '../components/segmented.js';
-import { NextSteps } from '../components/thread/next-steps.js';
-import { PermissionCard, type PermissionChoice } from '../components/thread/permission-card.js';
-import { PlanApproval } from '../components/thread/plan-approval.js';
-import { PrBar } from '../components/thread/pr-bar.js';
 import { PrCard } from '../components/thread/pr-card.js';
 import type { PrCardModel } from '../components/thread/pr-card-model.js';
-import { PrList } from '../components/thread/pr-list.js';
-import { ProposalCard } from '../components/thread/proposal-card.js';
-import { ScheduledTaskRow } from '../components/thread/scheduled-task-row.js';
 import { TaskPrLine } from '../components/thread/task-pr-line.js';
 import { TaskRow } from '../components/thread/task-row.js';
-import { UsageStrip } from '../components/thread/usage-strip.js';
 import { Button } from '../components/ui/button.js';
 import { toastSuccess } from '../components/ui/toaster.js';
+import { NextSteps } from './prototypes/next-steps.js';
+import { PermissionCard, type PermissionChoice } from './prototypes/permission-card.js';
+import { PlanApproval } from './prototypes/plan-approval.js';
+import { PrBar } from './prototypes/pr-bar.js';
+import { PrList } from './prototypes/pr-list.js';
+import { ScheduledTaskRow } from './prototypes/scheduled-task-row.js';
+import { UsageStrip } from './prototypes/usage-strip.js';
 import { Section, Specimen } from './specimen.js';
 
 export function PermissionSection() {
   const [resolution, setResolution] = useState<PermissionChoice | null>(null);
-  const [proposal, setProposal] = useState<'proposed' | 'applied' | 'dismissed'>('proposed');
   return (
     <Section
       id="permission"
-      title="Permission and proposal cards"
-      lede="Two cards the agent puts in the stream when it needs a decision. The permission card is ochre-outlined until answered, then folds to one line; a proposal is dashed until you apply it."
+      title="Permission card"
+      lede="The card the agent puts in the stream when it needs a decision: ochre-outlined until answered, then folds to one line."
     >
       <Specimen
         id="permission-card"
@@ -73,35 +71,6 @@ export function PermissionSection() {
             resolvedAt="just now"
           />
         ))}
-      </Specimen>
-      <Specimen
-        id="proposal-card"
-        title="Proposal card"
-        note={proposal}
-        stage="canvas"
-        code={`<ProposalCard\n  status="proposed"\n  title="Proposed scheduled task: Weekly flaky-test sweep"\n  description="Every Friday at 18:00, re-run the e2e suite five times."\n  meta="Weekly · Fri 18:00 · Opus 5.5 · omarchy"\n  appliedTitle="Scheduled: Weekly flaky-test sweep"\n  openLabel="Open scheduled task"\n/>`}
-      >
-        <div className="flex w-full max-w-130 flex-col gap-4">
-          {proposal !== 'dismissed' && (
-            <ProposalCard
-              status={proposal}
-              title="Proposed scheduled task: Weekly flaky-test sweep"
-              description="Every Friday at 18:00, re-run the e2e suite five times on main and open one thread per flaky test."
-              meta="Weekly · Fri 18:00 · Opus 5.5 · omarchy"
-              appliedTitle="Scheduled: Weekly flaky-test sweep"
-              openLabel="Open scheduled task"
-              onApply={() => setProposal('applied')}
-              onDismiss={() => setProposal('dismissed')}
-              onEdit={() => toastSuccess('Editor opened')}
-              onOpen={() => toastSuccess('Scheduled task opened')}
-            />
-          )}
-          <div>
-            <Button size="sm" variant="outline" onClick={() => setProposal('proposed')}>
-              Reset
-            </Button>
-          </div>
-        </div>
       </Specimen>
     </Section>
   );

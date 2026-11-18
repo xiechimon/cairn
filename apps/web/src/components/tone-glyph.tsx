@@ -1,6 +1,6 @@
 import { cn } from 'cn';
-import { ACCENT_INK } from '../../phase.js';
-import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
+import { ACCENT_INK } from '../phase.js';
+import { type GlyphKind, StatusGlyph } from './status-glyph.js';
 import type { StoneTone } from './tone.js';
 
 const TONE_GLYPH: Record<Exclude<StoneTone, 'working'>, { kind: GlyphKind; ink: string }> = {

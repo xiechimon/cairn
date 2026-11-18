@@ -43,7 +43,7 @@ describe('the serif voice follows claude.ai (DESIGN.md Typography)', () => {
   });
 
   it('the Greeting component is the greeting voice at the greeting size', () => {
-    const greeting = read('components/stream/greeting.tsx');
+    const greeting = read('design/prototypes/greeting.tsx');
     expect(greeting).toContain('voice-greeting text-greeting');
     expect(greeting).not.toContain('font-heading');
     expect(greeting).not.toContain('font-semibold');

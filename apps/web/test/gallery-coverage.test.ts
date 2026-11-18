@@ -17,6 +17,8 @@ const NOT_IN_GALLERY: Record<string, string> = {
     'Labels and grouping helpers only; renders nothing.',
   'conversation-skeleton.tsx':
     'Gap: rendered only by src/board/home-c.tsx while the Coordinator data loads; no specimen yet.',
+  'ink-spiral.tsx':
+    'Ambient texture primitive rendered inside first-run setup and the home spiral; no standalone specimen.',
   'queued-capsules.tsx':
     'Rendered inside the Queued messages specimen through src/detail/composer.tsx.',
   'shortcut-hint.tsx':

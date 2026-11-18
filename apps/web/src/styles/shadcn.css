@@ -3,7 +3,6 @@
   --shadow-sm: var(--cds-shadow-sm);
   --shadow-md: var(--cds-shadow-md);
   --shadow-lg: var(--cds-shadow-lg);
-  --shadow-xl: var(--cds-shadow-lg);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -24,7 +23,6 @@
   --color-ring: var(--ring);
   --color-sidebar-hover: var(--sidebar-hover);
   --color-sidebar-ink: var(--sidebar-ink);
-  --color-spot-soft: var(--spot-soft);
   --color-danger-soft: var(--danger-soft);
   --color-canvas: var(--canvas);
   --color-running: var(--running);
@@ -35,18 +33,12 @@
   --color-pr-failed: var(--pr-failed);
   --color-pr-pending: var(--pr-pending);
   --color-tint-working: var(--tint-working);
-  --color-tint-working-soft: var(--tint-working-soft);
   --color-tint-working-ink: var(--tint-working-ink);
-  --color-tint-wait: var(--tint-wait);
-  --color-tint-wait-soft: var(--tint-wait-soft);
   --color-tint-wait-ink: var(--tint-wait-ink);
   --color-tint-quiet: var(--tint-quiet);
-  --color-tint-quiet-soft: var(--tint-quiet-soft);
   --color-tint-quiet-ink: var(--tint-quiet-ink);
   --color-tint-fail: var(--tint-fail);
-  --color-tint-fail-soft: var(--tint-fail-soft);
   --color-tint-fail-ink: var(--tint-fail-ink);
-  --color-accent-hover: var(--accent-hover);
   --color-dialog-surface: var(--dialog-surface);
   --color-menu-hover: var(--menu-hover);
   --color-pebble-waiting: var(--pebble-waiting);
@@ -69,7 +61,6 @@
 :root {
   --dur-fast: 150ms;
   --dur-overlay: 200ms;
-  --dur-reveal: 120ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -97,7 +88,6 @@
   --cds-radius-xs: 2px;
   --cds-radius-sm: 4px;
   --cds-radius-md: 6px;
-  --cds-radius-lg: 8px;
   --radius-card: 12px;
   --radius-sheet: 17px;
   --settings-w: min(1040px, calc(100vw - 2rem));
@@ -131,11 +121,9 @@
   --e1-lift: 0 0 0 1px var(--border), var(--shadow-lift);
   --e2: var(--shadow-floating), inset 0 0 0 1px var(--elevated-ring);
   --e3: var(--shadow-dialog), 0 0 0 1px var(--dialog-ring);
-  --panel-shadow: var(--e1);
   --shadow-popover: var(--e2);
   --dialog-shadow: var(--e3);
   --floating-shadow: var(--shadow-floating);
-  --card-lift: var(--panel-shadow-hover);
   --chief-launcher-size: 40px;
   --chief-launcher-inset: 8px;
   --chief-launcher-clearance: calc(var(--chief-launcher-size) + var(--chief-launcher-inset) * 2);
@@ -165,7 +153,6 @@
   --surface-1: var(--canvas);
   --hover-1: var(--sidebar-hover);
   --border-soft: color-mix(in oklab, var(--foreground) 9%, transparent);
-  --ring-inset-highlight: color-mix(in oklab, var(--foreground) 10%, transparent);
   color-scheme: dark light;
 
   --top: inset 0 1px 0 rgb(255 255 255 / 0.05);
@@ -179,13 +166,11 @@
   --shadow-floating: 0 2px 6px rgb(0 0 0 / 0.2), 0 8px 24px rgb(0 0 0 / 0.32);
   --shadow-dialog: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.24);
   --shadow-jump: 0 2px 4px rgb(0 0 0 / 0.07), 0 6px 16px rgb(0 0 0 / 0.24);
-  --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 6px 18px -2px rgb(0 0 0 / 0.35);
   --composer-fill: var(--reply-bubble-fill);
   --composer-ring: rgb(255 255 255 / 0.07);
   --composer-ring-focus: rgb(255 255 255 / 0.16);
   --composer-drop: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.24);
   --shadow-composer: var(--composer-drop), inset 0 0 0 1px var(--composer-ring);
-  --shadow-composer-hover: var(--shadow-composer);
   --shadow-composer-focus: var(--composer-drop), inset 0 0 0 1px var(--composer-ring-focus);
   --canvas: #1b1c1b;
   --background: #151615;
@@ -196,8 +181,6 @@
   --popover-foreground: #ecebe6;
   --primary: var(--foreground);
   --primary-foreground: var(--background);
-  --fab-surface: #2f5a2a;
-  --fab-mark: #f4f6f1;
   --secondary: #222322;
   --secondary-foreground: #ecebe6;
   --muted: #222322;
@@ -221,10 +204,8 @@
   --card-button: #ebb550;
   --card-button-hover: color-mix(in srgb, var(--card-button) 82%, var(--foreground));
   --focus-ring: var(--ring);
-  --col-dot-building: var(--running);
   --col-dot-done: #7fa3cc;
   --badge-attention: #e0a838;
-  --badge-idle: #848381;
   --waiting-ink: #ebb550;
   --seg-active: var(--popover);
   --diff-add-bg: #1f2b1f;
@@ -270,8 +251,6 @@
   --avatar-tint: 26%;
   --avatar-ink: 55%;
   --code-pill-bg: #262726;
-  --prose-code-surface: rgb(32 32 32 / 0.5);
-  --prose-code-line: rgb(255 255 255 / 0.04);
   --prose-code-fill: rgb(255 255 255 / 0.075);
   --code-token-plain: currentColor;
   --code-token-keyword: #cc7bf4;
@@ -336,13 +315,10 @@
   --shadow-floating: 0 2px 6px rgb(0 0 0 / 0.08), 0 8px 20px rgb(0 0 0 / 0.1);
   --shadow-dialog: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.1);
   --shadow-jump: 0 2px 4px rgb(0 0 0 / 0.04), 0 6px 16px rgb(0 0 0 / 0.1);
-  --panel-shadow-hover: 0 0 0 1px var(--input), 0 8px 20px -4px rgb(29 35 31 / 0.14);
   --composer-fill: var(--background);
   --composer-ring: rgb(0 0 0 / 0.13);
   --composer-ring-focus: rgb(0 0 0 / 0.24);
   --composer-drop: 0 1px 2px rgb(0 0 0 / 0.04), 0 3px 10px rgb(0 0 0 / 0.05);
-  --prose-code-surface: rgb(255 255 255 / 0.5);
-  --prose-code-line: rgb(0 0 0 / 0.08);
   --prose-code-fill: rgb(0 0 0 / 0.05);
   --code-token-keyword: #8100c2;
   --code-token-function: #0051c2;
@@ -384,10 +360,8 @@
   --card-button: #9a6500;
   --card-button-hover: color-mix(in srgb, var(--card-button) 82%, var(--foreground));
   --focus-ring: var(--ring);
-  --col-dot-building: var(--running);
   --col-dot-done: #5379a0;
   --badge-attention: #d49a1c;
-  --badge-idle: #6d6f6c;
   --waiting-ink: #7a5000;
   --seg-active: var(--popover);
   --diff-add-bg: #e8f0e2;
@@ -455,6 +429,4 @@
   --pebble-idle: var(--text-dim);
   --pebble-resolved: #b8b7b3;
   --danger-line: #d98c7d;
-  --fab-surface: #2f5a2a;
-  --fab-mark: #f4f6f1;
 }

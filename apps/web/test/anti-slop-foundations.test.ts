@@ -56,7 +56,6 @@ describe('V16 no texture or gradient surfaces', () => {
     expect(offenders(/<InkSpiral\b/).sort()).toEqual([
       'board/first-run-setup.tsx',
       'board/home-spiral.tsx',
-      'design/foundations-texture.tsx',
     ]);
     const publicJs = readdirSync(join(ROOT, 'public')).filter((name) => name.endsWith('.js'));
     expect(

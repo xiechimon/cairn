@@ -1,4 +1,4 @@
-import { StatStrip } from '../stat-strip.js';
+import { StatStrip } from '../../components/stat-strip.js';
 
 export interface UsageStripProps {
   cost: string;

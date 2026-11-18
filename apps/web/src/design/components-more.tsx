@@ -11,11 +11,6 @@ import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ProfileHeader } from '../components/profile-card.js';
 import { QrCode } from '../components/qr-code.js';
-import {
-  SETTINGS_SELECT_TRIGGER_CLS,
-  SettingsCard,
-  SettingsRow,
-} from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import {
   Card,
@@ -35,35 +30,9 @@ import {
 } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Separator } from '../components/ui/separator.js';
-import type { ModelOption } from '../fixtures/records.js';
 import { ArrowDown, Copy, Download, Settings, Trash2 } from '../icons/index.js';
-import { AgentModelSelect, AgentRuntimeSelect } from '../routes/agent-model-select.js';
 import { SEED_TRANSCRIPT } from './agent-transcript.js';
 import { Cell, Section, Specimen } from './specimen.js';
-
-const MODEL_OPTIONS: ModelOption[] = [
-  {
-    runtime: 'claude-code',
-    provider: 'claude-code',
-    providerLabel: 'Claude Code',
-    modelId: 'claude-opus-5-5',
-    modelName: 'Claude Opus 5.5',
-  },
-  {
-    runtime: 'claude-code',
-    provider: 'claude-code',
-    providerLabel: 'Claude Code',
-    modelId: 'claude-sonnet-5-5',
-    modelName: 'Claude Sonnet 5.5',
-  },
-  {
-    runtime: 'pi',
-    provider: 'openai-codex',
-    providerLabel: 'Codex',
-    modelId: 'gpt-6.1-sol',
-    modelName: 'GPT-6.1 Sol',
-  },
-];
 
 export function StructureSection() {
   const nameId = useId();
@@ -147,16 +116,11 @@ export function StructureSection() {
 }
 
 export function IdentitySection() {
-  const [runtime, setRuntime] = useState<string | null>('claude-code');
-  const [model, setModel] = useState<{ provider: string; modelId: string } | null>({
-    provider: 'claude-code',
-    modelId: 'claude-sonnet-5-5',
-  });
   return (
     <Section
       id="identity"
       title="Agents and models"
-      lede="How agents, runtimes and models show up: brand marks for the runtimes, the runtime and model pickers from the agent settings, and icon-only actions with a tooltip."
+      lede="How agents, runtimes and models show up: brand marks for the runtimes and icon-only actions with a tooltip."
     >
       <Specimen id="brand-marks" title="Brand marks" note="Runtime logos, drawn in currentColor">
         {[
@@ -171,41 +135,6 @@ export function IdentitySection() {
             <Mark width={16} height={16} className="text-content-secondary" />
           </Cell>
         ))}
-      </Specimen>
-      <Specimen
-        id="runtime-and-model-pickers"
-        title="Runtime and model pickers"
-        note="The same pickers the agent settings page uses; the model list follows the runtime"
-        stage="canvas"
-        className="block"
-      >
-        <div className="mx-auto max-w-160">
-          <SettingsCard>
-            <SettingsRow label="Runtime">
-              <AgentRuntimeSelect
-                value={runtime}
-                options={MODEL_OPTIONS}
-                onPick={(next) => {
-                  setRuntime(next);
-                  setModel(null);
-                }}
-                prefix="gallery-runtime"
-                triggerClassName={SETTINGS_SELECT_TRIGGER_CLS}
-              />
-            </SettingsRow>
-            <SettingsRow label="Model">
-              <AgentModelSelect
-                runtime={runtime}
-                provider={model?.provider ?? null}
-                modelId={model?.modelId ?? null}
-                options={MODEL_OPTIONS}
-                onPick={setModel}
-                prefix="gallery-model"
-                triggerClassName={SETTINGS_SELECT_TRIGGER_CLS}
-              />
-            </SettingsRow>
-          </SettingsCard>
-        </div>
       </Specimen>
       <Specimen
         id="icon-tooltip"

@@ -2,10 +2,10 @@ import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
 import { GitMerge, GitPullRequest, GitPullRequestClosed } from 'lucide-react';
 import { useState } from 'react';
+import { prChecksText, prCiUnread } from '../../components/thread/pr-panel-model.js';
+import { PrRowMenu } from '../../components/thread/pr-row-menu.js';
+import { Button } from '../../components/ui/button.js';
 import { useI18n } from '../../i18n/provider.js';
-import { Button } from '../ui/button.js';
-import { prChecksText, prCiUnread } from './pr-panel-model.js';
-import { PrRowMenu } from './pr-row-menu.js';
 
 const VISIBLE_ROWS = 5;
 

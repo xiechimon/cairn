@@ -1938,7 +1938,6 @@
       "code": {
         "web": [
           "apps/web/src/overlay/composer-attachments.tsx",
-          "apps/web/src/overlay/attachment-card.tsx",
           "apps/web/src/components/composer-attachment-tile.tsx",
           "apps/web/src/overlay/file-drop.ts",
           "apps/web/src/chief/sent-attachments.tsx",

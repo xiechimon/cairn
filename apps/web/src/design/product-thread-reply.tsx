@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ThreadCard } from '../components/thread/thread-card.js';
 import { ThreadReply, type ThreadReplyDelivery } from '../components/thread/thread-reply.js';
+import { ThreadCard } from './prototypes/thread-card.js';
 import { Labeled, Section, Specimen } from './specimen.js';
 
 const CARDS: readonly {

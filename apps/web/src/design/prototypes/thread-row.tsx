@@ -1,11 +1,11 @@
 import { cn } from 'cn';
 import { GitPullRequest } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { PrLink } from '../../components/thread/pr-link.js';
+import type { StoneTone } from '../../components/tone.js';
+import { Button } from '../../components/ui/button.js';
+import { Checkbox } from '../../components/ui/checkbox.js';
 import { useI18n } from '../../i18n/provider.js';
-import type { StoneTone } from '../stone/tone.js';
-import { Button } from '../ui/button.js';
-import { Checkbox } from '../ui/checkbox.js';
-import { PrLink } from './pr-link.js';
 
 const TONE_LABEL: Record<StoneTone, string> = {
   waiting: '等你处理',

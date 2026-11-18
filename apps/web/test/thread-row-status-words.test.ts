@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 
 const source = readFileSync(
-  new URL('../src/components/thread/thread-row.tsx', import.meta.url),
+  new URL('../src/design/prototypes/thread-row.tsx', import.meta.url),
   'utf8',
 );
 

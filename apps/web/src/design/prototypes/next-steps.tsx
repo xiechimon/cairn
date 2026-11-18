@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Button } from '../ui/button.js';
+import { Button } from '../../components/ui/button.js';
 
 export interface NextStep {
   label: string;

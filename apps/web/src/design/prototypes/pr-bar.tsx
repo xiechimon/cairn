@@ -1,10 +1,10 @@
 import { cn } from 'cn';
 import { Check, ChevronDown, GitPullRequest, LoaderCircle, X } from 'lucide-react';
 import { useId } from 'react';
-import { StatusGlyph } from '../status-glyph.js';
-import { ToggleSwitch } from '../toggle-switch.js';
-import { Button } from '../ui/button.js';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
+import { StatusGlyph } from '../../components/status-glyph.js';
+import { ToggleSwitch } from '../../components/toggle-switch.js';
+import { Button } from '../../components/ui/button.js';
+import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover.js';
 
 export type CiState = 'passed' | 'running' | 'failed';
 

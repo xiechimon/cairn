@@ -3,12 +3,12 @@ import { useState } from 'react';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
-import { StoneGroup, StoneTrail } from '../components/stone/stone-group.js';
-import { Greeting } from '../components/stream/greeting.js';
-import { ThreadRow } from '../components/thread/thread-row.js';
 import { TitleMenuTrigger } from '../components/title-menu-trigger.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
 import { toastSuccess } from '../components/ui/toaster.js';
+import { Greeting } from './prototypes/greeting.js';
+import { StoneGroup, StoneTrail } from './prototypes/stone-group.js';
+import { ThreadRow } from './prototypes/thread-row.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 export function PanelSection() {

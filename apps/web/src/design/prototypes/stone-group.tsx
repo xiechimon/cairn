@@ -1,9 +1,9 @@
 import { cn } from 'cn';
 import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Button } from '../ui/button.js';
-import type { StoneTone } from './tone.js';
-import { ToneGlyph } from './tone-glyph.js';
+import type { StoneTone } from '../../components/tone.js';
+import { ToneGlyph } from '../../components/tone-glyph.js';
+import { Button } from '../../components/ui/button.js';
 
 export function StoneTrail({ className, children }: { className?: string; children: ReactNode }) {
   return <div className={cn('flex flex-col gap-1 p-1.5', className)}>{children}</div>;

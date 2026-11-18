@@ -3,7 +3,7 @@ import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ProjectAvatar } from '../../board/project-avatar.js';
-import { ToneGlyph } from '../stone/tone-glyph.js';
+import { ToneGlyph } from '../tone-glyph.js';
 import { Button } from '../ui/button.js';
 import { StatusChip } from '../ui/status-chip.js';
 

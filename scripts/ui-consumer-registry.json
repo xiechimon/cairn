@@ -30,7 +30,7 @@
       "reason": "Coordinator memory list row: a full-width Button between hairline dividers with no card, as in the Claude Code project memory page. The hover fill must cover the whole row edge to edge (V21), and a radius would leave rounded fill corners against the square dividers, so the box stays square."
     },
     {
-      "file": "apps/web/src/components/thread/scheduled-task-row.tsx",
+      "file": "apps/web/src/design/prototypes/scheduled-task-row.tsx",
       "anchor": "rounded-none border-0 px-3.5 py-3",
       "kind": "deviation",
       "reason": "Divided list row inside a ListCard: the card owns the radius and clips the rows, and a per-row radius would break the full-width dividers between scheduled tasks (prototype A Scheduled screen)."

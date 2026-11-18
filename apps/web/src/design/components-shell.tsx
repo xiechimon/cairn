@@ -16,12 +16,9 @@ import {
   SidebarProjectGroupHeader,
   SidebarProjectRow,
 } from '../components/shell/sidebar-project.js';
-import { GoalLine } from '../components/stream/goal-line.js';
-import { Greeting } from '../components/stream/greeting.js';
-import { StreamDigest } from '../components/stream/stream-digest.js';
-import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { Button } from '../components/ui/button.js';
 import { toastSuccess } from '../components/ui/toaster.js';
+import { Greeting } from './prototypes/greeting.js';
 import { Section, Specimen } from './specimen.js';
 
 export function SidebarSection() {
@@ -199,39 +196,20 @@ export function ProjectsSection() {
 }
 
 export function CoordinatorStreamSection() {
-  const [chip, setChip] = useState<string | null>(null);
   return (
     <Section
       id="coordinator"
       title="Coordinator stream parts"
-      lede="The pieces around the thread cards: the goal line, the greeting, clickable status rows, quiet suggestions, and the archived banner that replaces the composer."
+      lede="The pieces around the thread cards: the greeting and the archived banner that replaces the composer."
     >
       <Specimen
         id="stream-header"
         title="Stream header"
-        note={chip == null ? 'Click a row or a suggestion' : `Picked: ${chip}`}
-        code={`<GoalLine onEdit={edit}>Bring p95 latency under 200 ms.</GoalLine>\n<Greeting since="Since last night">Morning, ian.</Greeting>\n<StreamDigest rows={[{ tone: 'waiting', count: 2, label: 'need you', onSelect }]} />\n<SuggestionChip>Make a plan</SuggestionChip>`}
+        note="The greeting line that opens the Coordinator home"
+        code={`<Greeting since="Since last night">Morning, ian.</Greeting>`}
       >
         <div className="flex w-full max-w-170 flex-col gap-3.5">
-          <GoalLine onEdit={() => toastSuccess('Edit goal')}>
-            Make Cairn a self-hostable agent team that brings back only what needs you.
-          </GoalLine>
           <Greeting since="Since last night">Morning, ian.</Greeting>
-          <StreamDigest
-            className="max-w-90"
-            rows={[
-              { tone: 'waiting', count: 2, label: 'need you', onSelect: () => setChip('need you') },
-              { tone: 'working', count: 2, label: 'running', onSelect: () => setChip('running') },
-              { tone: 'resolved', count: 3, label: 'merged', onSelect: () => setChip('merged') },
-            ]}
-          />
-          <div className="-mx-2.5 flex flex-wrap gap-1">
-            {['Make a plan', 'Add a repo', 'Pick up recent work', 'Use my tools'].map((label) => (
-              <SuggestionChip key={label} onClick={() => setChip(label)}>
-                {label}
-              </SuggestionChip>
-            ))}
-          </div>
         </div>
       </Specimen>
       <Specimen

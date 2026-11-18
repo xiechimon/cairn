@@ -5,7 +5,6 @@ import { DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { useI18n } from '../i18n/provider.js';
 import { EllipsisVertical, Search, Settings } from '../icons/index.js';
-import { AttachmentCard } from '../overlay/attachment-card.js';
 import { AttachmentPreview } from '../overlay/attachment-preview.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
@@ -14,7 +13,6 @@ import { MoreMenu } from '../overlay/more-menu.js';
 import { type SearchContext, SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { BUILTIN_SLASH_COMMANDS, type SlashRow } from '../overlay/slash-commands.js';
 import { SlashMenu } from '../overlay/slash-menu.js';
-import { StatusMenu } from '../overlay/status-menu.js';
 import { BOARD_FIXTURE, CARD_FACES, MENTION_GROUPS, PROJECT_TITLE } from './product-fixtures.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
@@ -193,43 +191,13 @@ function PickersSpecimen() {
 
 function AttachmentsSpecimen() {
   const [preview, setPreview] = useState<{ name: string; src: string } | null>(null);
-  const onPreview = (name: string, src: string) => setPreview({ name, src });
   return (
     <Specimen
       id="attachments-2"
       title="Attachments"
-      note="AttachmentCard states; click a done card for AttachmentPreview"
+      note="AttachmentPreview, opened from a done attachment"
       stage="canvas"
     >
-      <Cell label="Image, done">
-        <AttachmentCard
-          name="avatar-user.png"
-          source="/avatar-user.png"
-          isImage
-          state="done"
-          onPreview={onPreview}
-        />
-      </Cell>
-      <Cell label="Image, uploading">
-        <AttachmentCard name="logo.svg" source="/logo.svg" isImage state="uploading" />
-      </Cell>
-      <Cell label="File, done">
-        <AttachmentCard
-          name="build-log.txt"
-          source=""
-          isImage={false}
-          state="done"
-          onPreview={onPreview}
-        />
-      </Cell>
-      <Cell label="File, uploading">
-        <AttachmentCard
-          name="report-with-a-very-long-name.pdf"
-          source=""
-          isImage={false}
-          state="uploading"
-        />
-      </Cell>
       <Cell label="Preview, broken image">
         <Button
           variant="outline"
@@ -244,9 +212,6 @@ function AttachmentsSpecimen() {
     </Specimen>
   );
 }
-
-const MENU_STAGE =
-  'w-72 rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';
 
 function MenusSpecimen() {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -275,25 +240,6 @@ function MenusSpecimen() {
           onArchive={() => setLast('Archive')}
           onDiscard={() => setLast('Discard changes')}
         />
-      </Cell>
-      <Cell label="Status menu, Planning">
-        <div className={MENU_STAGE}>
-          <StatusMenu
-            phase="planning"
-            elapsed="12 minutes ago"
-            onMoveBack={() => setLast('Move back')}
-          />
-        </div>
-      </Cell>
-      <Cell label="Status menu, Review">
-        <div className={MENU_STAGE}>
-          <StatusMenu
-            phase="review"
-            elapsed="3 hours ago"
-            onMoveBack={() => setLast('Move back')}
-            onMarkDone={() => setLast('Mark done')}
-          />
-        </div>
       </Cell>
     </Specimen>
   );

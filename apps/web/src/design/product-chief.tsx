@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { ChiefIdentity } from '../chief/chief-identity.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
 import { QuestionAnsweredLine, QuestionAsked } from '../chief/question-answered-line.js';
 import { QuestionChips } from '../chief/question-chips.js';
@@ -11,9 +10,7 @@ import {
   QUESTION_CANCELLED,
   QUESTION_PENDING,
 } from './product-fixtures.js';
-import { Cell, Labeled, Section, Specimen } from './specimen.js';
-
-const CHIEF = { id: 'chief', displayName: 'Coordinator', avatarUrl: null };
+import { Labeled, Section, Specimen } from './specimen.js';
 
 export function ProductChiefSection() {
   const [last, setLast] = useState<string | null>(null);
@@ -21,7 +18,7 @@ export function ProductChiefSection() {
     <Section
       id="product-chief"
       title="Coordinator"
-      lede="The Coordinator's parts: questions it asks you, the home summary line, its identity, and outage banners."
+      lede="The Coordinator's parts: questions it asks you, the home summary line, and outage banners."
     >
       <Specimen
         id="question-chips"
@@ -61,14 +58,6 @@ export function ProductChiefSection() {
             <QuestionAnsweredLine item={QUESTION_CANCELLED} />
           </div>
         </Labeled>
-      </Specimen>
-      <Specimen id="identity" title="Identity" note="ChiefIdentity" stage="canvas">
-        <Cell label="Identity, idle">
-          <ChiefIdentity agent={CHIEF} />
-        </Cell>
-        <Cell label="Identity, not linked">
-          <ChiefIdentity agent={{ displayName: 'Coordinator', avatarUrl: null }} />
-        </Cell>
       </Specimen>
       <Specimen
         id="outage-banners"

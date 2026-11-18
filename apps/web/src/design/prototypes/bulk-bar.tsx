@@ -1,6 +1,6 @@
 import { cn } from 'cn';
 import { Archive, Check, X } from 'lucide-react';
-import { Button } from '../ui/button.js';
+import { Button } from '../../components/ui/button.js';
 
 export interface BulkBarProps {
   count: number;

@@ -1,6 +1,6 @@
-import { ToneGlyph } from '../stone/tone-glyph.js';
-import { Button } from '../ui/button.js';
-import { StatusChip } from '../ui/status-chip.js';
+import { ToneGlyph } from '../../components/tone-glyph.js';
+import { Button } from '../../components/ui/button.js';
+import { StatusChip } from '../../components/ui/status-chip.js';
 
 export type ScheduledState = 'active' | 'paused' | 'disabled';
 

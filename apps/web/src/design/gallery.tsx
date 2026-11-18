@@ -48,7 +48,6 @@ import {
   ShapeSection,
   TypeSection,
 } from './foundations.js';
-import { TextureSection } from './foundations-texture.js';
 import { ProvidersPattern } from './patterns.js';
 import { AccountsSection } from './product-accounts.js';
 import { ProductAddProviderSection } from './product-add-provider.js';
@@ -72,7 +71,6 @@ const NAV = [
       ['shape', 'Shape'],
       ['elevation', 'Elevation'],
       ['motion', 'Motion'],
-      ['texture', 'Texture'],
       ['doc-check', 'Doc check'],
     ],
   },
@@ -188,7 +186,6 @@ function GallerySections({ theme }: { theme: GalleryTheme }) {
         <ShapeSection />
         <ElevationSection />
         <MotionSection />
-        <TextureSection />
         {only == null && <DocCheckSection theme={theme} />}
       </div>
       <GroupTitle

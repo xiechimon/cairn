@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react';
-import { Button } from '../ui/button.js';
-import { Spinner } from '../ui/spinner.js';
+import { Button } from '../../components/ui/button.js';
+import { Spinner } from '../../components/ui/spinner.js';
 
 export interface PlanApprovalProps {
   approved: boolean;

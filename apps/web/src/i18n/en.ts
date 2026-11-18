@@ -440,8 +440,6 @@ export const EN: Record<string, string> = {
   '{n} 天前': '{n}d ago',
 
   // —— todo detail (r7 §3.3–§3.6) ——
-  运行历史: 'Run history',
-  打开方案: 'Open plan',
   添加附件: 'Add attachment',
   '上下文 {percent}%': 'Context {percent}%',
   上下文: 'Context',
@@ -482,7 +480,6 @@ export const EN: Record<string, string> = {
   '没有匹配"/{query}"的命令': 'No commands match "/{query}"',
   清空输入: 'Clear the input',
   已清空: 'Cleared',
-  '发起 AI 审核': 'Start an AI review',
   停止当前运行: 'Stop the current run',
   查看命令说明: 'Show command help',
   命令说明: 'Command help',
@@ -491,31 +488,16 @@ export const EN: Record<string, string> = {
   '任务回到排队前的状态。': 'The task goes back to where it was before it was queued.',
   '丢弃本轮修改——方案和代码回到上一个版本':
     'Discard this round’s changes — plan and code revert to the previous version',
-  '把任务重置回待开始？': 'Reset the task back to Todo?',
-  确认重置: 'Confirm reset',
-  '任务在你打开确认框后发生了变化，下面是最新状态，请重新确认。':
-    'The task changed while this dialog was open — this is the latest state. Confirm again.',
-  '以下内容将被清空，无法恢复：': 'The following will be cleared and cannot be recovered:',
-  '中断运行中的构建（在线的执行机即时中断；离线执行机的残留进程够不着）':
-    'Interrupt the running build (online executors stop immediately; offline leftovers are out of reach)',
-  清空对话记录: 'Clear the conversation',
-  清空方案版本: 'Clear the plan versions',
-  清空改动记录: 'Clear the change records',
-  '保留：标题、需求说明、标签与人员指派。运行历史保留，可供审计。执行机工作区文件不受影响。':
-    'Kept: title, spec, tags and assignment. Run history stays for audit. Executor workspace files are untouched.',
   '正在停止…': 'Stopping…',
   已取消: 'Canceled',
   发送: 'Send',
   暂无方案: 'No plan yet',
-  暂无可显示的变更: 'No changes to show',
-  '{n} 个文件改动': 'Files changed: {n}',
   全部展开: 'Expand all',
   全部收起: 'Collapse all',
   显示完整文件: 'Show full file',
   显示差异: 'Show diff',
   // #1101: capped fallback tooltip on oversized diff rows (word-diff.ts)
   '行过长，已退回整行高亮': 'Line too long — whole-line highlight only',
-  '完成 {elapsed}': 'Done in {elapsed}',
   运行在: 'Running on',
   ' 上': '',
   由定时发起: 'Started by schedule',
@@ -534,26 +516,10 @@ export const EN: Record<string, string> = {
     'Notify you in the system notification center when a task needs you',
 
   // —— chip popover / plan dropdown (r7 19/20/29) ——
-  确认方案: 'Confirm plan',
-  构建中: 'Building',
-  移回待开始: 'Move back to To start',
-  标记为已完成: 'Mark done',
-  '点击开始后，Agent 会先写方案。': 'The agent writes a plan first once you start.',
-  '排队中，轮到它时会自动开始。': 'Queued. It starts on its own when its turn comes.',
-  '方案写好后，Agent 会把它移到确认方案。':
-    'The agent moves it to Confirm plan when the plan is ready.',
-  '你确认方案后，Agent 开始构建。': 'The agent starts building once you confirm the plan.',
-  '构建完成后，Agent 会把它移到审核。': 'The agent moves it to Review when the build is done.',
-  '审核无误后，你可以把它标记为已完成。': 'Mark it done once the review looks right.',
-  '它在等一个问题的回答，回答后会在同一个会话里继续。':
-    'It is waiting for an answer to its question; once answered it continues in the same session.',
   待回答: 'Needs input',
   '回答它的问题…': 'Answer its question…',
   '任务已完成，发送消息即可继续。': 'The task is done. Send a message to continue.',
-  '这次运行失败了，可以重跑，或移回待开始。':
-    'This run failed. Rerun it, or move it back to To start.',
   '任务已归档。': 'The task is archived.',
-  面板视图: 'Pane view',
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
   '搜索任务、项目…': 'Search todos, projects…',
@@ -1009,8 +975,6 @@ export const EN: Record<string, string> = {
   '恢复到此处？该条之后的 {n} 条消息会移除，Coordinator 从这条重发开新回合。':
     'Restore to here? The {n## message after it is removed|# messages after it are removed} and the Coordinator resends from this one as a fresh turn.',
   // #822 在飞存在行展开面：行开关 aria + 正在调用的工具 + 空面 fallback。
-  展开实时步骤: 'Show live steps',
-  收起实时步骤: 'Hide live steps',
   正在调用: 'Calling',
   // #1257 板面挂起态：等机器 / 等额度 chip + 等额度 tooltip（下次尝试时刻）。
   // 等额度 chip 词复用 #1261 的同名键（上面等额度族）。
@@ -1020,8 +984,6 @@ export const EN: Record<string, string> = {
     'Waiting for quota: model quota exhausted, suspended until it recovers (next attempt {time})',
   // #873 详情活行披露面：在跑步两行（步类 + 执行机器）；行开关 aria 复用
   // #822 的「展开/收起实时步骤」——同一手势两面同词。
-  '本步：{n}': 'This step: {n}',
-  '执行机：{n}': 'Runner: {n}',
   // M7 #312 AI 审核模态文案（r8 §3.1 实测）：Agent 选择 + 关注点 textarea +
   // 提交按钮。dialog 选 Agent 走 dlg-form-* family 共用层,文案独立。
   // #1250（ADR 0018 层 1）review fan-out 三视角（ReviewDialog 勾选行）。
@@ -1128,8 +1090,6 @@ export const EN: Record<string, string> = {
   '等待模型响应...': 'Waiting for the model...',
   '最近信号：{n}s 前': 'Last signal {n}s ago',
   // #918 skill facts: live-panel entries (read / denied) + the detail summary.
-  '读取技能：{n}': 'skill: {n}',
-  '✕ 技能：{n}（已挡下）': '✕ skill: {n} (blocked)',
   '技能：{n}': 'Skills: {n}',
   '挡下：{n}': 'Blocked: {n}',
   // #1106 dispatch skill injection: detail-face lookup row (reasons ride as
@@ -1137,7 +1097,6 @@ export const EN: Record<string, string> = {
   // #1288：模型活性标注——dead 模型置灰 +「已下架」（不隐藏）。
   已下架: 'Delisted',
   [PROBE_TOOL_CALL_LABEL]: `Calling tool: ${PROBE_TOOL_PILLS[1]}`,
-  '方案 · v1': 'Plan · v1',
   '{name} 发起了合并': '{name} started a merge',
   '{name} 发起了 AI 审核': '{name} started an AI review',
   '{name} 通过了确认': '{name} approved the plan',
@@ -1183,9 +1142,6 @@ export const EN: Record<string, string> = {
   // —— #75 deep dynamic states: reject loop / failed / reuse plan ——
   '由 Coordinator 发起': 'Started by Coordinator',
   '运行在 {m} 上': 'Running on {m}',
-  上一版本: 'Previous version',
-  '与其他版本对比…': 'Compare with other versions…',
-  回到与基准版本对比: 'Back to comparison with base',
   // #1258 失败行原始错误弹窗面
   查看原始错误: 'View raw error',
   原始错误: 'Raw error',
@@ -1414,8 +1370,6 @@ export const EN: Record<string, string> = {
   创建技能: 'Create skills',
   更新技能: 'Update skills',
   运行时: 'Runtime',
-  '内置 (pi)': 'Built-in (pi)',
-  用你添加的服务商的模型: "runs your providers' models",
   '允许该 Agent 通过合并分支进行发布（例如将 develop 合并进 main）。':
     'Let this Agent publish by merging branches (for example develop into main).',
   '允许该 Agent 创建 git tag，这可能触发发布流程。':
@@ -2069,7 +2023,6 @@ export const EN: Record<string, string> = {
   已接入的执行机: 'Connected Runners',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
-  视图: 'View',
   '移除后，使用它的模型不再可选。': 'Once removed, its models can no longer be picked.',
   '{n} 分钟后恢复': 'Back in {n#1 minute|# minutes}',
   '{n} 小时后恢复': 'Back in {n#1 hour|# hours}',

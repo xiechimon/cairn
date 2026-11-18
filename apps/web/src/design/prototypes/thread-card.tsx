@@ -1,9 +1,9 @@
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
-import type { StoneTone } from '../stone/tone.js';
-import { ToneGlyph } from '../stone/tone-glyph.js';
-import { Button } from '../ui/button.js';
-import { PrLink } from './pr-link.js';
+import { PrLink } from '../../components/thread/pr-link.js';
+import type { StoneTone } from '../../components/tone.js';
+import { ToneGlyph } from '../../components/tone-glyph.js';
+import { Button } from '../../components/ui/button.js';
 
 export interface ThreadCardProps {
   title: string;

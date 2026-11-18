@@ -2,14 +2,14 @@ import { Inbox, Library, Settings2 } from 'lucide-react';
 import { useState } from 'react';
 import { HeaderIconButton } from '../components/shell/header-icon-button.js';
 import { WaitPill } from '../components/shell/wait-pill.js';
-import { StoneGroup, StoneTrail } from '../components/stone/stone-group.js';
-import { STONE_TONES, type StoneTone } from '../components/stone/tone.js';
-import { ToneGlyph } from '../components/stone/tone-glyph.js';
-import { BulkBar } from '../components/thread/bulk-bar.js';
-import { ThreadCard } from '../components/thread/thread-card.js';
-import { ThreadRow } from '../components/thread/thread-row.js';
+import { STONE_TONES, type StoneTone } from '../components/tone.js';
+import { ToneGlyph } from '../components/tone-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { toastSuccess } from '../components/ui/toaster.js';
+import { BulkBar } from './prototypes/bulk-bar.js';
+import { StoneGroup, StoneTrail } from './prototypes/stone-group.js';
+import { ThreadCard } from './prototypes/thread-card.js';
+import { ThreadRow } from './prototypes/thread-row.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 export function StoneSection() {

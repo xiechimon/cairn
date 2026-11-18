@@ -2,7 +2,6 @@ import { GitBranch, Terminal } from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { ProjectNotFound, ProjectsFailed } from '../board/project-not-found.js';
-import { ChiefIdentity } from '../chief/chief-identity.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { StatusLine } from '../components/chat/status-line.js';
@@ -281,7 +280,7 @@ export function ConversationSection() {
       <Specimen
         id="turns"
         title="Turns"
-        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <UserMessageBubble>…</UserMessageBubble>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … /><ChatMarkdown bubbles bubbleTools={…} /></MessageContent></Message>\n<StatusLine>Plan approved</StatusLine>`}
+        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <UserMessageBubble>…</UserMessageBubble>\n  </MessageContent>\n</Message>\n<Message><MessageContent><TraceGroup … /><ChatMarkdown bubbles bubbleTools={…} /></MessageContent></Message>\n<StatusLine>Plan approved</StatusLine>`}
       >
         <div className="mx-auto flex w-full max-w-170 flex-col gap-4">
           <Message className="justify-end">
@@ -317,9 +316,6 @@ export function ConversationSection() {
           </Message>
           <Message>
             <MessageContent className="gap-1.5">
-              <MemoryRouter>
-                <ChiefIdentity agent={{ displayName: 'r3-builder', avatarUrl: null }} />
-              </MemoryRouter>
               <TraceGroup
                 density="compact"
                 steps={[
