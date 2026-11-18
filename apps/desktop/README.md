@@ -1,4 +1,4 @@
-# Cairn desktop (macOS)
+# Cairn desktop
 
 An Electron shell for macOS. The main process starts the bundled Cairn server on Electron's own Node with `utilityProcess.fork`, bound to `127.0.0.1` on a free port with `CAIRN_HOME` under the app's `userData` directory, waits until it answers, and opens its web UI in a window. The server writes its owner token to `CAIRN_HOME/token`; the main process reads it and adds `Authorization: Bearer <token>` only to requests whose initiator is the app's own origin, so the window signs in as the owner on macOS, where the server's loopback owner check is Linux-only. `CAIRN_TOKEN` and `CAIRN_AUTH` are removed from the server's environment so the token file is always the one in use. Once the server answers, the main process enrolls this computer as the server's local Runner: it starts an enrollment and confirms it with the owner token (`/api/machine/enroll/start` and `/confirm`, the same pair the browser approval uses), writes the returned `machine.json` (mode 0600, in a 0700 directory) under `userData/runner`, and starts the bundled daemon with `cairn start --foreground --server <origin>`. The daemon runs on Electron's binary with `ELECTRON_RUN_AS_NODE=1`, so anything it starts through `process.execPath` is Node too; it is restarted up to five times if it exits, and the enrollment is repeated at every launch, which rotates the machine token. Links to other origins open in the default browser. A menu bar icon (`assets/trayTemplate*.png`, drawn from `apps/web/public/logo-mark.svg`) shows the server address and offers Open Cairn and Quit Cairn. Closing the window only hides it and the server keeps running; the Dock icon or Open Cairn brings it back. Quitting the app stops the Runner and then the server with SIGTERM and removes the icon.
 
@@ -8,7 +8,7 @@ The server's stdout and stderr (the main process pipes them instead of inheritin
 
 Export to an OTLP collector such as Langfuse is off unless `~/Library/Application Support/@cairn/desktop/otel.env` exists. It is dotenv text with `CAIRN_OTEL_ENDPOINT`, optional `CAIRN_OTEL_HEADERS` and optional `CAIRN_OTEL_ENVIRONMENT` (default `mac`), and must be mode `0600`; a file readable by others is ignored. The main process reads it once at launch and passes those three variables to the server and the Runner, replacing any it inherited; other keys are ignored. Quit and reopen Cairn after editing it. Design: `docs/design/desktop-otel-export.md`; reaching the deployment's Langfuse from a Mac: `docs/ops/langfuse.md`.
 
-Only the macOS package is maintained. The research behind the stack is `docs/research/desktop-app-stack-2026-11-08.md`.
+The macOS package is released automatically. Linux x64 can be packaged locally as a portable archive; Linux releases and automatic updates are not provided. The research behind the stack is `docs/research/desktop-app-stack-2026-11-08.md`.
 
 ## Build
 
@@ -27,6 +27,25 @@ pnpm --filter @cairn/desktop dist:mac
 `pnpm --filter @cairn/desktop smoke` launches `release/mac-arm64/Cairn.app` with Playwright, checks that the window is on the loopback server, that `/api/teams` answers 200 without a pairing step, that no pairing gate shows, and that a `local` machine comes online within 90 seconds, saves `release/smoke.png`, then checks that closing the window hides it while the server keeps answering and that quitting stops the server and the Runner. The `desktop-mac` workflow runs the same steps on a macOS runner for changes under `apps/desktop` and uploads `Cairn-<version>-arm64.dmg` and `smoke.png` as unzipped artifacts.
 
 The `electron` package's install script is disabled in `pnpm-workspace.yaml`, so `pnpm install` does not download Electron. To run `pnpm --filter @cairn/desktop start` locally, run `node apps/desktop/node_modules/electron/install.js` once.
+
+### Linux x64 archive
+
+Run the same web, server, Runner build and staging commands above, then replace `dist:mac` with:
+
+```bash
+pnpm --filter @cairn/desktop dist:linux
+mkdir -p "$HOME/.local/opt/cairn"
+tar -xzf apps/desktop/release/Cairn-0.0.0-linux-x64.tar.gz -C "$HOME/.local/opt/cairn" --strip-components=1
+"$HOME/.local/opt/cairn/cairn"
+```
+
+The archive bundles Electron, the server and Runner, so running it does not require Node.js. It needs a graphical Linux session, bubblewrap 0.11 or newer and a working systemd user session for task confinement, as described in `docs/getting-started.md`. It chooses a free loopback port and keeps its data under `$XDG_CONFIG_HOME/@cairn/desktop` (normally `~/.config/@cairn/desktop`). Use an independent `HOME` and `XDG_CONFIG_HOME` to test without importing existing model logins or app data. This command never publishes a release. Quit Cairn to stop its server and Runner.
+
+Extract the app outside `/tmp`, which the task sandbox deliberately hides. A source checkout and build output may still live in `/tmp`.
+
+On Linux the app runs the Runner in its own transient systemd user service and stops that service when the Runner is turned off or the app quits. It does not fall back to an unsandboxed Runner. See `docs/design/desktop-linux-runner.md` for ownership and failure behavior.
+
+Run `pnpm --filter @cairn/desktop smoke:linux /absolute/path/to/cairn-linux/cairn /absolute/path/to/smoke.png` to check an extracted archive. The single-process Playwright check creates a fresh HOME and app data directory, checks owner sign-in and the pi Runner's actual sandbox readiness, quits the app, checks that the server and Runner stopped, and removes its temporary data. It does not log in to a model or claim a first task result.
 
 ## Releases
 

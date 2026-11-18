@@ -233,8 +233,13 @@ export async function launchConfined(options: {
   options.signal?.throwIfAborted();
   const unit = `cairn-confine-${randomUUID()}.service`;
   const nonce = `${fields.InvocationID}:${randomUUID()}`;
-  const mounts = [...confinementArgs(options.policy), '--clearenv'];
-  const frame = `${JSON.stringify({ nonce, environment: options.environment })}\n`;
+  const runtimeEnvironment = process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {};
+  const mounts = [
+    ...confinementArgs(options.policy),
+    '--clearenv',
+    ...Object.entries(runtimeEnvironment).flatMap(([name, value]) => ['--setenv', name, value]),
+  ];
+  const frame = `${JSON.stringify({ nonce, environment: { ...options.environment, ...runtimeEnvironment } })}\n`;
   if (Buffer.byteLength(frame) > 65536) throw new Error('Confinement environment is too large');
   const managerGroup = (
     await control('show', '-p', 'ControlGroup', '--value', '--', '-.slice')

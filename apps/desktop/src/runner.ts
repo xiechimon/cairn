@@ -1,4 +1,5 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import { type ChildProcess, execFile, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
@@ -93,20 +94,60 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
 export async function startLocalRunner(options: RunnerOptions): Promise<LocalRunner> {
   writeMachineJson(options.home, await enrollLocalMachine(options.origin, options.ownerToken));
   let child: ChildProcess | null = null;
+  let unit: string | null = null;
   let pending: NodeJS.Timeout | null = null;
   let halted = false;
   const budget = createRestartBudget(MAX_RESTARTS, STABLE_RUN_MS);
   const launch = (): void => {
     pending = null;
     budget.started();
-    const started = spawn(
+    const env = runnerEnv(options);
+    const command = [
       process.execPath,
-      [join(options.root, 'dist', 'cli.mjs'), 'start', '--foreground', '--server', options.origin],
-      { cwd: options.home, env: runnerEnv(options), stdio: 'inherit' },
-    );
+      join(options.root, 'dist', 'cli.mjs'),
+      'start',
+      '--foreground',
+      '--server',
+      options.origin,
+    ];
+    unit = process.platform === 'linux' ? `cairn-desktop-runner-${randomUUID()}.service` : null;
+    const args =
+      unit === null
+        ? command.slice(1)
+        : [
+            '--user',
+            '--pipe',
+            '--wait',
+            '--collect',
+            '--quiet',
+            '--same-dir',
+            '--service-type=exec',
+            '--expand-environment=no',
+            `--unit=${unit}`,
+            '--property=KillMode=control-group',
+            '--property=TimeoutStopSec=5s',
+            ...Object.keys(env)
+              .filter(
+                (name) =>
+                  /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) &&
+                  !/^(INVOCATION_ID|JOURNAL_STREAM|SYSTEMD_EXEC_PID|MANAGERPID|NOTIFY_SOCKET|LISTEN_PID|LISTEN_FDS|LISTEN_FDNAMES|WATCHDOG_PID|WATCHDOG_USEC)$/.test(
+                    name,
+                  ),
+              )
+              .map((name) => `--setenv=${name}`),
+            '--',
+            ...command,
+          ];
+    const started = spawn(unit === null ? process.execPath : 'systemd-run', args, {
+      cwd: options.home,
+      env,
+      stdio: 'inherit',
+    });
     child = started;
-    started.once('exit', (code, signal) => {
+    started.once('error', (error) => console.error('Cairn Runner could not launch:', error));
+    started.once('close', (code, signal) => {
       child = null;
+      unit = null;
       if (options.isQuitting() || halted) return;
       if (!budget.exited()) {
         console.error(`Cairn Runner exited (code ${code}, signal ${signal}); not restarting`);
@@ -137,11 +178,16 @@ export async function startLocalRunner(options: RunnerOptions): Promise<LocalRun
           running.kill('SIGKILL');
           done();
         }, STOP_TIMEOUT_MS);
-        running.once('exit', () => {
+        running.once('close', () => {
           clearTimeout(timer);
           done();
         });
-        running.kill('SIGTERM');
+        if (unit === null) running.kill('SIGTERM');
+        else
+          execFile('systemctl', ['--user', 'stop', unit], { timeout: STOP_TIMEOUT_MS }, (error) => {
+            if (error !== null)
+              console.error('Cairn Runner service could not stop:', error.message);
+          });
       });
     },
   };

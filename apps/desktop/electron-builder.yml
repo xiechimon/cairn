@@ -16,6 +16,14 @@ extraResources:
 afterPack: scripts/after-pack.cjs
 npmRebuild: false
 publish: null
+linux:
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}
+  executableName: cairn
+  icon: ../web/public/icon-512.png
+  category: Development
+  target:
+    - target: tar.gz
+      arch: [x64]
 mac:
   artifactName: ${productName}-${version}-${arch}.${ext}
   icon: ../../assets/AppIcon.icns
