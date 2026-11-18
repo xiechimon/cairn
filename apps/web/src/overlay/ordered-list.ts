@@ -36,12 +36,12 @@ function sameIndentMarker(
   };
 }
 
-export interface OrderedListEnter {
+export interface ListEdit {
   value: string;
   caret: number;
 }
 
-export function applyOrderedListEnter(value: string, caret: number): OrderedListEnter | null {
+export function applyOrderedListEnter(value: string, caret: number): ListEdit | null {
   const marker = markerAtCaret(value, caret);
   if (marker === null) return null;
   const clamped = Math.max(0, Math.min(caret, value.length));
@@ -72,4 +72,22 @@ export function applyOrderedListEnter(value: string, caret: number): OrderedList
   tail = tailLines.join('\n');
 
   return { value: head + insert + tail, caret: nextCaret };
+}
+
+const LINE_MARKER = /^([ \t]*)(?:\d+[.)]|[-*+]) +/;
+
+export function applyListMarkerBackspace(value: string, caret: number): ListEdit | null {
+  const clamped = Math.max(0, Math.min(caret, value.length));
+  const lineStart = value.lastIndexOf('\n', clamped - 1) + 1;
+  const nl = value.indexOf('\n', clamped);
+  const lineEnd = nl === -1 ? value.length : nl;
+  const match = LINE_MARKER.exec(value.slice(lineStart, lineEnd));
+  if (match === null) return null;
+  const markerEnd = lineStart + match[0].length;
+  if (clamped !== markerEnd) return null;
+  const contentStart = lineStart + (match[1] ?? '').length;
+  return {
+    value: value.slice(0, contentStart) + value.slice(markerEnd),
+    caret: contentStart,
+  };
 }

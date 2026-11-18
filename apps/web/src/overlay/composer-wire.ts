@@ -40,7 +40,7 @@ import {
   type MentionGroups,
   type MentionToken,
 } from './mention-token.js';
-import { applyOrderedListEnter } from './ordered-list.js';
+import { applyListMarkerBackspace, applyOrderedListEnter } from './ordered-list.js';
 import { usePendingAttachments } from './pending-attachments.js';
 import {
   type BuiltinSlashName,
@@ -665,6 +665,18 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       }
     } else if (event.key !== 'Escape') {
       escapeAt.current = null;
+    }
+    if (event.key === 'Backspace' && !isComposing) {
+      const ta = textareaRef.current;
+      if (ta != null && ta.selectionStart === ta.selectionEnd) {
+        const lifted = applyListMarkerBackspace(ta.value, ta.selectionStart ?? ta.value.length);
+        if (lifted !== null) {
+          event.preventDefault();
+          pendingInsertRef.current = { value: lifted.value, caret: lifted.caret };
+          setDraft(lifted.value);
+          return;
+        }
+      }
     }
     if (event.key === 'Enter' && !isComposing) {
       if (

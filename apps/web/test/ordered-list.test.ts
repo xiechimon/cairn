@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { applyOrderedListEnter } from '../src/overlay/ordered-list.js';
+import {
+  applyListMarkerBackspace,
+  applyOrderedListEnter,
+} from '../src/overlay/ordered-list.js';
 
 // Ticket #814: ordered-list (`1. `) auto-continuation on Enter.
 // Only the half-width `N. ` marker is recognized; full-width forms
@@ -76,5 +79,76 @@ describe('applyOrderedListEnter', () => {
 
   it('returns null when the caret sits inside the marker span', () => {
     expect(applyOrderedListEnter('1. foo', 1)).toBeNull();
+  });
+});
+
+describe('applyListMarkerBackspace', () => {
+  it('removes an auto-continued empty marker in one step', () => {
+    expect(applyListMarkerBackspace('1. foo\n2. ', 10)).toEqual({
+      value: '1. foo\n',
+      caret: 7,
+    });
+  });
+
+  it('lifts the marker off a non-empty item and keeps its text', () => {
+    expect(applyListMarkerBackspace('1. a\n2. b', 8)).toEqual({
+      value: '1. a\nb',
+      caret: 5,
+    });
+  });
+
+  it('keeps the indent when un-listing a nested item', () => {
+    expect(applyListMarkerBackspace('  2. ', 5)).toEqual({ value: '  ', caret: 2 });
+  });
+
+  it('swallows a run of spaces after the marker', () => {
+    expect(applyListMarkerBackspace('2.   foo', 5)).toEqual({ value: 'foo', caret: 0 });
+  });
+
+  it('removes the first marker at the start of the draft', () => {
+    expect(applyListMarkerBackspace('1. ', 3)).toEqual({ value: '', caret: 0 });
+  });
+
+  it('removes unordered markers the same way', () => {
+    for (const bullet of ['-', '*', '+']) {
+      expect(applyListMarkerBackspace(`${bullet} foo`, 2)).toEqual({
+        value: 'foo',
+        caret: 0,
+      });
+    }
+  });
+
+  it('removes a `)` ordered marker', () => {
+    expect(applyListMarkerBackspace('1) foo', 3)).toEqual({ value: 'foo', caret: 0 });
+  });
+
+  it('clamps a caret past the end of the value', () => {
+    expect(applyListMarkerBackspace('1. ', 99)).toEqual({ value: '', caret: 0 });
+  });
+
+  it('returns null with the caret inside the marker', () => {
+    expect(applyListMarkerBackspace('1. foo', 2)).toBeNull();
+  });
+
+  it('returns null with the caret inside the content', () => {
+    expect(applyListMarkerBackspace('1. foo', 5)).toBeNull();
+  });
+
+  it('returns null on a plain line', () => {
+    expect(applyListMarkerBackspace('foo', 3)).toBeNull();
+  });
+
+  it('returns null on a mid-line marker', () => {
+    expect(applyListMarkerBackspace('foo 1. ', 7)).toBeNull();
+  });
+
+  it('returns null for full-width markers', () => {
+    expect(applyListMarkerBackspace('1、 foo', 4)).toBeNull();
+    expect(applyListMarkerBackspace('1． foo', 5)).toBeNull();
+  });
+
+  it('returns null at an empty caret position', () => {
+    expect(applyListMarkerBackspace('', 0)).toBeNull();
+    expect(applyListMarkerBackspace('1. a\n', 5)).toBeNull();
   });
 });

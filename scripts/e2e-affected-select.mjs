@@ -157,6 +157,7 @@ const OVERLAY = [
   'accent-typo',
   'attachment-strip',
   'composer-inline-mention',
+  'composer-ordered-list',
   'composer-paste',
   'composer-slash',
   'live-project-name',
