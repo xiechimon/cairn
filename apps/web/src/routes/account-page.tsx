@@ -1,4 +1,8 @@
-import type { ActionTier, DesktopNotifySound } from '@cairn/shared';
+import {
+  type ActionTier,
+  DESKTOP_NOTIFY_SOUND_FILES,
+  type DesktopNotifySound,
+} from '@cairn/shared';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useTeamAutonomy } from '../api/hooks.js';
@@ -18,6 +22,7 @@ import {
   SettingsRow,
 } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
+import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import {
   Select,
@@ -91,6 +96,8 @@ export function AccountPage() {
     readNotifySound(safeLocalStorage()),
   );
   const desktopSoundPickable = desktopNotify() !== null;
+  const soundPreviewable =
+    DESKTOP_NOTIFY_SOUND_FILES[notifySound] !== undefined && desktopNotify()?.preview !== undefined;
   const { permission, request } = useNotificationPermission(
     live ? null : (fixture.ui?.notificationPermission ?? 'granted'),
   );
@@ -217,6 +224,15 @@ export function AccountPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {soundPreviewable && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => desktopNotify()?.preview?.(notifySound)}
+                >
+                  {t('试听')}
+                </Button>
+              )}
             </SettingsRow>
           )}
           {devicePushLive && (

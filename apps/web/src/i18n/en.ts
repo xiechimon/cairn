@@ -618,6 +618,7 @@ export const EN: Record<string, string> = {
   推送通知: 'Push notifications',
   提醒声音: 'Notification sound',
   系统通知的提示音: 'The sound system notifications play',
+  试听: 'Preview',
   无声: 'Silent',
   在这台设备上接收推送: 'Push on this device',
   '需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到':

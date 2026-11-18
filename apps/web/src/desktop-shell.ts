@@ -3,6 +3,7 @@ import {
   DESKTOP_TRAY_PATH,
   type DesktopMenuCommand,
   type DesktopNotifyPayload,
+  type DesktopNotifySound,
   type DesktopTrayOpen,
   type DesktopTrayState,
 } from '@cairn/shared';
@@ -51,6 +52,7 @@ export function setDesktopWindowControlsVisible(visible: boolean): void {
 
 interface DesktopNotifyBridge {
   show: (payload: DesktopNotifyPayload) => void;
+  preview?: (sound: DesktopNotifySound) => void;
 }
 
 export function desktopNotify(): DesktopNotifyBridge | null {

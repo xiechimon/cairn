@@ -56,6 +56,12 @@ export function isDesktopNotifyPayload(value: unknown): value is DesktopNotifyPa
   );
 }
 
+export const DESKTOP_NOTIFY_SOUND_FILES: Partial<Record<DesktopNotifySound, string>> = {
+  Glass: 'Glass.aiff',
+  Ping: 'Ping.aiff',
+  Pop: 'Pop.aiff',
+};
+
 export interface DesktopNotificationOptions {
   title: string;
   body: string;

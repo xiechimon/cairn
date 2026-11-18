@@ -50,7 +50,10 @@ declare global {
     __swNotifs: { title: string; options: { body?: string; tag?: string; data?: unknown } }[];
     __pageNotifs: { title: string; options: unknown; onclick: (() => void) | null }[];
     __desktopNotifs: DesktopNotifyCall[];
-    cairnDesktop?: { notify?: { show?: (payload: DesktopNotifyCall) => void } };
+    __desktopPreviews: string[];
+    cairnDesktop?: {
+      notify?: { show?: (payload: DesktopNotifyCall) => void; preview?: (sound: string) => void };
+    };
     __stay?: string;
   }
 }
@@ -124,8 +127,12 @@ function spySwShowNotification(page: Page) {
 function stubDesktopNotify(page: Page) {
   return page.addInitScript(() => {
     window.__desktopNotifs = [];
+    window.__desktopPreviews = [];
     window.cairnDesktop = {
-      notify: { show: (payload) => window.__desktopNotifs.push(payload) },
+      notify: {
+        show: (payload) => window.__desktopNotifs.push(payload),
+        preview: (sound) => window.__desktopPreviews.push(sound),
+      },
     };
   });
 }
@@ -552,11 +559,22 @@ test.describe('push notification click loop (XMON-106)', () => {
 
     const picker = dialog.getByLabel('提醒声音');
     await expect(picker).toBeVisible();
+    await expect(dialog.getByRole('button', { name: '试听' })).toHaveCount(0);
+
     await picker.click();
     await page.getByRole('option', { name: 'Ping' }).click();
     await expect.poll(() => page.evaluate(() => localStorage.getItem('cairn.notifySound'))).toBe(
       'Ping',
     );
+
+    const preview = dialog.getByRole('button', { name: '试听' });
+    await expect(preview).toBeVisible();
+    await preview.click();
+    await expect.poll(() => page.evaluate(() => window.__desktopPreviews)).toEqual(['Ping']);
+
+    await picker.click();
+    await page.getByRole('option', { name: '无声' }).click();
+    await expect(dialog.getByRole('button', { name: '试听' })).toHaveCount(0);
   });
 
   test('T7b: the sound picker does not render without the desktop bridge', async ({ page }) => {
