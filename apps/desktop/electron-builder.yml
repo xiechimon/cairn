@@ -7,6 +7,8 @@ files:
   - dist/preload.cjs
   - assets/trayTemplate.png
   - assets/trayTemplate@2x.png
+  - assets/trayAwakeTemplate.png
+  - assets/trayAwakeTemplate@2x.png
   - package.json
 extraResources:
   - from: server

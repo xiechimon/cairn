@@ -26,6 +26,7 @@ import {
   type IpcMainInvokeEvent,
   ipcMain,
   Menu,
+  type NativeImage,
   nativeImage,
   powerMonitor,
   powerSaveBlocker,
@@ -355,16 +356,20 @@ function createTrayPopover(origin: string): BrowserWindow {
 }
 
 function showTray(origin: string, controls: TrayControls): Tray {
-  const icon = nativeImage.createFromPath(join(app.getAppPath(), 'assets', 'trayTemplate.png'));
-  icon.setTemplateImage(true);
-  const created = new Tray(icon);
-  created.setToolTip(`Cairn · ${new URL(origin).host}`);
+  const trayIcon = (name: string): NativeImage => {
+    const image = nativeImage.createFromPath(join(app.getAppPath(), 'assets', name));
+    image.setTemplateImage(true);
+    return image;
+  };
+  const idleIcon = trayIcon('trayTemplate.png');
+  const awakeIcon = trayIcon('trayAwakeTemplate.png');
   const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
+  const created = new Tray(keepAwake.isOn() ? awakeIcon : idleIcon);
+  created.setToolTip(`Cairn · ${new URL(origin).host}`);
   const setKeepAwake = (on: boolean): void => {
     keepAwake.set(on);
-    created.setTitle(on ? '唤醒中' : '');
+    created.setImage(on ? awakeIcon : idleIcon);
   };
-  created.setTitle(keepAwake.isOn() ? '唤醒中' : '');
   const newTaskKey = globalShortcut.register(NEW_TASK_SHORTCUT, () =>
     sendToWindow('desktop-menu', 'new-task'),
   )
