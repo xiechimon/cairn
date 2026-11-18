@@ -27,6 +27,7 @@ import { stepQueueProjector } from '../src/services/step-queue.js';
 import {
   bootServer,
   insertClaudeSubscription,
+  insertDevinSubscription,
   insertMachine,
   issueApiKey,
   req,
@@ -489,13 +490,22 @@ describe('info cards run in the agent computer', () => {
     expect(names).not.toContain('computer_observe');
   });
 
-  test('a devin route is not claimed and the queue says info cards cannot run on it', async () => {
+  test('a devin route is claimed by the Runner with the relay tools offered and its own tools left on', async () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());
-    const runner = insertMachine(s, { name: 'runner' });
+    insertDevinSubscription(s);
+    const runner = insertMachine(s, {
+      name: 'runner',
+      capabilities: { mcpServers: [], skills: [], devin: { installed: true } },
+    });
     insertMachine(s, { name: 'vm-host', capabilities: VM_CAPABILITIES });
-    seedRoute(s, 'session', { provider: 'devin', modelId: 'swe-2-high', machineId: runner });
-    const { todoId, buildId } = await infoCard(s);
+    seedRoute(s, 'session', {
+      provider: 'devin',
+      modelId: 'swe-2-high',
+      thinkingLevel: 'off',
+      machineId: runner,
+    });
+    await infoCard(s);
 
     const claimed = await claimStep(
       {
@@ -510,19 +520,15 @@ describe('info cards run in the agent computer', () => {
       10,
       'http://localhost',
     );
-    expect(claimed).toBeNull();
-    const pending = s.db.select().from(step).where(eq(step.buildId, buildId)).get();
-    const todoRow = s.db.select().from(todo).where(eq(todo.id, todoId)).get();
-    const queue = stepQueueProjector(s.db, s.team.id).project({
-      id: pending?.id ?? '',
-      createdAt: pending?.createdAt ?? 0,
-      homeMachineId:
-        todoRow === undefined || pending === undefined
-          ? null
-          : (profileForStep(s.db, todoRow, pending.kind, pending.id)?.machineId ?? null),
-    });
-    expect(queue?.blocked).toEqual({ kind: 'info-card-runtime', missing: ['devin'] });
-    expect(pending?.status).toBe('pending');
+    expect(claimed?.agent).toMatchObject({ provider: 'devin' });
+    expect(claimed?.remoteToolsOnly).toBeUndefined();
+    expect(claimed?.mcpServers).toEqual([]);
+    expect(claimed?.project?.repo ?? null).toBeNull();
+    const names = claimed?.remoteTools?.map((tool) => tool.name) ?? [];
+    expect(names).toEqual(
+      expect.arrayContaining(['shell', 'write_file', 'browser_navigate', 'submit_report']),
+    );
+    expect(claimed?.agent?.description).toContain('自带工具');
   });
 
   test('with no usable computer the card waits and says why', async () => {

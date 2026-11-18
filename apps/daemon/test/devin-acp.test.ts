@@ -187,8 +187,8 @@ describe('devin credential delivery', () => {
     ).toBeNull();
   });
 
-  test('devin refuses step kinds outside build/session/plan/merge', () => {
-    for (const stepKind of ['chief', 'review', 'verify']) {
+  test('devin refuses step kinds outside build/session/plan/merge/chief', () => {
+    for (const stepKind of ['review', 'verify']) {
       const refusal = agentStepRefusal({
         stepKind,
         agentTools: undefined,
@@ -198,7 +198,7 @@ describe('devin credential delivery', () => {
       });
       expect(refusal).toContain('暂不支持');
     }
-    for (const stepKind of ['build', 'session', 'plan', 'merge']) {
+    for (const stepKind of ['build', 'session', 'plan', 'merge', 'chief']) {
       expect(
         agentStepRefusal({
           stepKind,

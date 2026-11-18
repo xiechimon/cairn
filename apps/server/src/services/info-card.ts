@@ -17,7 +17,7 @@ import { profileForStep, providerRefusal, type RouteProfile } from './routing-ru
 
 export type InfoCardPlan =
   | { kind: 'pi'; profile: RouteProfile; provider: string; modelId: string; machineId: string }
-  | { kind: 'claude-code'; profile: RouteProfile; machineId: string }
+  | { kind: 'runner'; profile: RouteProfile; machineId: string; relayOnly: boolean }
   | { kind: 'wait'; blocked: StepQueueBlocked };
 
 export function infoComputerHosts(db: Pick<Db, 'select'>, teamId: string) {
@@ -56,12 +56,10 @@ export function infoCardPlan(
     return { kind: 'wait', blocked: { kind: 'model-unavailable', missing: [] } };
   }
   const runtime = stepRuntimeFor(model.provider);
-  if (runtime === 'claude-code') return { kind: 'claude-code', profile, machineId: host.id };
-  if (runtime === 'devin' || runtime === 'gemini') {
-    return { kind: 'wait', blocked: { kind: 'info-card-runtime', missing: [runtime] } };
+  if (runtime !== 'pi') {
+    return { kind: 'runner', profile, machineId: host.id, relayOnly: runtime === 'claude-code' };
   }
   if (
-    runtime !== 'pi' ||
     !coordinatorInServerEnabled() ||
     providerRefusal(db, todoRow.teamId, model.provider) !== null
   ) {

@@ -176,6 +176,7 @@ export function resolveChiefStepCredentials(
   threadId: string,
   providerId?: string | null,
   boundSubscriptionId?: string | null,
+  boundDevinSubscriptionId?: string | null,
 ): StepCredentialBundle {
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   if (!threadRow) throw notFound(`chief thread ${threadId}`);
@@ -212,6 +213,12 @@ export function resolveChiefStepCredentials(
       threadRow.teamId,
       providerId === undefined ? agentRow.provider : providerId,
       boundSubscriptionId,
+    ),
+    devinToken: openDevinSubscription(
+      deps,
+      threadRow.teamId,
+      providerId === undefined ? agentRow.provider : providerId,
+      boundDevinSubscriptionId,
     ),
   };
 }

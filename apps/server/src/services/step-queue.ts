@@ -310,7 +310,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       isInfoOutput(queueRow.todoRow.output)
         ? infoCardPlan(db, queueRow.todoRow, queueRow)
         : null;
-    if (infoPlan !== null && infoPlan.kind !== 'claude-code') {
+    if (infoPlan !== null && infoPlan.kind !== 'runner') {
       return {
         position,
         waitingFor: null,

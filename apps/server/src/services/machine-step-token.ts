@@ -250,6 +250,7 @@ async function chiefStepToken(
     threadId,
     stepRow?.fallback?.model?.provider,
     stepRow?.claudeSubscriptionId,
+    stepRow?.devinSubscriptionId,
   );
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   const agentRow = threadRow
@@ -261,6 +262,7 @@ async function chiefStepToken(
     ...(claimed && bundle.claudeSubscriptionToken !== undefined
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
+    ...(claimed && bundle.devinToken !== undefined ? { devinToken: bundle.devinToken } : {}),
     ...(claimed && stepRow && threadRow && agentRow
       ? await connectorFields(deps, stepRow, threadRow.teamId, chiefTurnLocked(stepRow))
       : {}),

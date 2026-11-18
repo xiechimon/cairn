@@ -459,10 +459,13 @@ class AcpBackend implements AgentBackend {
       throw new Error(
         'ACP mcpServers policy is unsupported: adapter host MCP configuration is not isolated',
       );
+    if (adapter && opts.remoteToolsOnly)
+      throw new Error(
+        `${adapter.harness} cannot switch off its built-in tools, so a turn that must run on relay tools only is unsupported on it (fail-closed): route this turn to Claude Code or an API model`,
+      );
     if (
       adapter &&
       (opts.readOnly ||
-        opts.remoteToolsOnly ||
         opts.skillsAllowlist !== undefined ||
         (opts.injectedSkills?.length ?? 0) > 0 ||
         (opts.tools?.length ?? 0) > 0 ||

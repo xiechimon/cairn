@@ -13,6 +13,7 @@ import {
   chiefTurnUsage,
   claudeSubscription,
   coordinatorInput,
+  devinSubscription,
   provider,
   step,
   stepUsage,
@@ -56,6 +57,7 @@ export function claimPendingChiefStep(
   stepRow: StepRow,
   machineId: string | null,
   bindTeamId: string | null = null,
+  bindDevinTeamId: string | null = null,
 ): StepRow | null {
   const claimedAt = nowMs();
   const claimed = db.transaction(() => {
@@ -70,6 +72,12 @@ export function claimPendingChiefStep(
             : sql<
                 string | null
               >`(select ${claudeSubscription.id} from ${claudeSubscription} where ${claudeSubscription.teamId} = ${bindTeamId} and ${claudeSubscription.enabledAt} is not null and (${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${claimedAt}))`,
+        devinSubscriptionId:
+          bindDevinTeamId === null
+            ? null
+            : sql<
+                string | null
+              >`(select ${devinSubscription.id} from ${devinSubscription} where ${devinSubscription.teamId} = ${bindDevinTeamId} and ${devinSubscription.enabledAt} is not null and (${devinSubscription.expiresAt} is null or ${devinSubscription.expiresAt} > ${claimedAt}))`,
         claimedAt,
         lastHeartbeatAt: claimedAt,
         holdReason: null,

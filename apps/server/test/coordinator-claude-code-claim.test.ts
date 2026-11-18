@@ -1,8 +1,15 @@
-import type { ClaudeCodeReport } from '@cairn/shared';
+import { createHash } from 'node:crypto';
+import {
+  CHIEF_THREAD_ID_PREFIX,
+  type ClaudeCodeReport,
+  machineTokenResponseSchema,
+} from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   chief as chiefTable,
   chiefThread as chiefThreadTable,
+  machine as machineTable,
   step as stepTable,
 } from '../src/db/schema.js';
 import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
@@ -11,6 +18,7 @@ import { claimStep } from '../src/services/machines.js';
 import {
   bootServer,
   insertClaudeSubscription,
+  insertDevinSubscription,
   insertMachine,
   seedRoute,
   type TestServer,
@@ -107,6 +115,86 @@ describe('Coordinator rule that selects Claude Code', () => {
         'browser_act',
         'request_takeover',
       ]),
+    );
+  });
+});
+
+describe('Coordinator rule that selects Devin', () => {
+  const DEVIN_THREAD = `${CHIEF_THREAD_ID_PREFIX}devin`;
+
+  function devinWorld(withSubscription: boolean) {
+    setCoordinatorInServer(true);
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const token = `wsk-coordinator-token-${'d'.repeat(48)}`;
+    if (withSubscription) insertDevinSubscription(s, { token });
+    const machineId = insertMachine(s, {
+      name: 'devin-runner',
+      capabilities: { mcpServers: [], skills: [], devin: { installed: true } },
+    });
+    seedRoute(s, 'coordinator', {
+      provider: 'devin',
+      modelId: 'swe-2-high',
+      thinkingLevel: 'off',
+      machineId,
+    });
+    s.db
+      .insert(chiefTable)
+      .values({ id: 'c1', userId: s.svc.user.id, teamId: s.team.id, charter: '', createdAt: 1 })
+      .run();
+    s.db
+      .insert(chiefThreadTable)
+      .values({
+        id: DEVIN_THREAD,
+        chiefId: 'c1',
+        userId: s.svc.user.id,
+        teamId: s.team.id,
+        title: 'x',
+        createdAt: 2,
+        updatedAt: 2,
+        sessionId: '',
+        sessionOpenedAt: 2,
+      })
+      .run();
+    return { s, machineId, token };
+  }
+
+  test('the Runner claims the chief step, binds the Devin account and serves its token', async () => {
+    const { s, machineId, token } = devinWorld(true);
+    s.db
+      .insert(stepTable)
+      .values({ id: 's1', buildId: DEVIN_THREAD, kind: 'chief', status: 'pending', createdAt: 3 })
+      .run();
+    const claimed = await claimAs(s, machineId);
+    expect(claimed?.step).toMatchObject({ id: 's1', machineId });
+    expect(claimed?.agent).toMatchObject({ provider: 'devin', modelId: 'swe-2-high' });
+    expect(claimed?.remoteToolsOnly).toBeUndefined();
+    expect(claimed?.remoteTools?.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(['browser_navigate', 'request_takeover']),
+    );
+    const machineToken = 'machine-devin-coordinator';
+    s.db
+      .update(machineTable)
+      .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    const response = await s.app.request('/api/machine/token/s1', {
+      headers: { authorization: `Bearer ${machineToken}` },
+    });
+    expect(machineTokenResponseSchema.parse(await response.json())).toMatchObject({
+      devinToken: token,
+    });
+  });
+
+  test('without a Devin subscription the chief step stays pending', async () => {
+    const { s, machineId } = devinWorld(false);
+    s.db
+      .insert(stepTable)
+      .values({ id: 's1', buildId: DEVIN_THREAD, kind: 'chief', status: 'pending', createdAt: 3 })
+      .run();
+    expect(await claimAs(s, machineId)).toBeNull();
+    expect(s.db.select().from(stepTable).where(eq(stepTable.id, 's1')).get()?.status).toBe(
+      'pending',
     );
   });
 });

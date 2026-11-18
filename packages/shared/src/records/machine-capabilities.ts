@@ -272,7 +272,6 @@ export const stepQueueBlockedSchema = z.object({
     'coordinator-provider-missing',
     'coordinator-provider-no-key',
     'no-computer',
-    'info-card-runtime',
   ]),
   missing: z.array(z.string()),
   platform: runnerOsSchema.optional(),

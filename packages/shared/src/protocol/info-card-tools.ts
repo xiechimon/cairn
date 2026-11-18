@@ -80,11 +80,17 @@ export const INFO_CARD_TOOLS: readonly RemoteToolDef[] = [
   INFO_SUBMIT_REPORT_DEF,
 ];
 
-export function infoCardBrief(conversationId: string, hasRepo: boolean): string {
+export function infoCardBrief(conversationId: string, hasRepo: boolean, relayOnly = true): string {
   const dir = infoTaskDir(conversationId);
   return [
     '## 信息卡工作方式',
-    `你在自己的电脑（一台 Debian 虚拟机）里工作，不是主人的 Mac。工作目录是 ${dir}/ ，所有文件放在这里。`,
+    ...(relayOnly
+      ? [
+          `你在自己的电脑（一台 Debian 虚拟机）里工作，不是主人的 Mac。工作目录是 ${dir}/ ，所有文件放在这里。`,
+        ]
+      : [
+          `你有两套工具。你自带的工具（读写文件、执行命令）作用在主人的 Mac 上的临时任务目录里，只用来读写草稿，不要碰这个目录以外的东西。名为 shell、list_files、read_file、write_file、browser_*、${INFO_SUBMIT_REPORT_TOOL} 的 Cairn 工具作用在你自己的电脑（一台 Debian 虚拟机）里。报告、网页和 PPT 必须用 Cairn 的 write_file 写进虚拟机的 ${dir}/ ，不能写在你自带工具的目录里，否则交不出去。`,
+        ]),
     ...(hasRepo ? [`项目默认分支的只读快照在 ${dir}/${INFO_REPO_DIR}/ ，只读它，不要改。`] : []),
     `本步的交付物是一份 markdown 报告：把完整报告写成 ${dir}/report.md （报告长时分段写：每次几千字，第一段用 write_file 写入，后面每段用 write_file 加 append: true 追加，一次写太长会被截断），然后调用 \`${INFO_SUBMIT_REPORT_TOOL}\` 工具并传入该路径。报告不超过 512 KiB。工具报错时按原因修正后再交。没有成功交出报告就结束，本步会失败。`,
     '报告只写主人要的内容：发现、来源、没查到的缺口。和这次运行本身有关的事（更正上一轮的结论、核对上一轮、记忆更新、归档或停掉别的任务、重试经过）一律写进你最后的回复，不要写进报告。任务正文里若有这类安排，照做，但只在最后的回复里说明。',

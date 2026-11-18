@@ -258,7 +258,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('a queued info card blocked on runtime shows no stage stepper and no typing bubble', async ({
+test('a queued info card waiting for a computer shows no stage stepper and no typing bubble', async ({
   page,
 }) => {
   await useTheme(page, 'light');
@@ -290,7 +290,7 @@ test('a queued info card blocked on runtime shows no stage stepper and no typing
           queue: {
             position: 1,
             waitingFor: null,
-            blocked: { kind: 'info-card-runtime', missing: ['devin'] },
+            blocked: { kind: 'no-computer', missing: [] },
           },
         },
       ],
@@ -306,7 +306,7 @@ test('a queued info card blocked on runtime shows no stage stepper and no typing
 
   const blocked = panel.getByTestId('queue-blocked');
   await expect(blocked).toBeVisible();
-  await expect(blocked).toContainText('排队中：信息卡暂时不能用 devin 跑');
+  await expect(blocked).toContainText('排队中：信息卡要在智能体的电脑里跑');
   await expect(panel.getByTestId('typing-dots')).toHaveCount(0);
   await expect(panel.getByTestId('typing-dot')).toHaveCount(0);
   await expect(panel.locator('[data-slot="reply-bubble"]')).toHaveCount(0);

@@ -132,8 +132,6 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
     '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）',
   'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
   'coordinator-provider-no-key': 'Coordinator 规则用的服务商「{name}」没有 API key',
-  'info-card-runtime':
-    '排队中：信息卡暂时不能用 {runtime} 跑——它没法只留下智能体电脑的工具。在工作路由里把「新任务默认用」换成别的模型，这张卡就会开始',
   'no-computer':
     '排队中：信息卡要在智能体的电脑里跑，团队里还没有可用的电脑（需要 macOS 26 以上的 Apple 芯片 Mac，并开启 Linux 虚拟机）',
 };
@@ -148,8 +146,6 @@ const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], st
     '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由（前面 {ahead} 个）',
   'devin-subscription':
     '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把输出整个添加到模型路由（前面 {ahead} 个）',
-  'info-card-runtime':
-    '排队中：信息卡暂时不能用 {runtime} 跑——它没法只留下智能体电脑的工具。在工作路由里把「新任务默认用」换成别的模型，这张卡就会开始',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {

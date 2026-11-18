@@ -58,7 +58,7 @@ import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { readDeployLease } from './deploy-lease.js';
-import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
+import { enabledDevinSubscriptionId, hasActiveDevinSubscription } from './devin-subscriptions.js';
 import {
   capabilityGatePasses,
   machineRunningCount,
@@ -269,8 +269,15 @@ function buildChiefClaim(
   if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
   if (claudeCodeSubscriptionMissing(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
-  const bindTeamId = stepRuntimeFor(model.provider) === 'claude-code' ? threadRow.teamId : null;
-  const claimed = claimPendingChiefStep(deps.db, stepRow, machineId, bindTeamId);
+  const runtime = stepRuntimeFor(model.provider);
+  if (runtime === 'devin' && !hasActiveDevinSubscription(deps, machineRow.teamId)) return null;
+  const claimed = claimPendingChiefStep(
+    deps.db,
+    stepRow,
+    machineId,
+    runtime === 'claude-code' ? threadRow.teamId : null,
+    runtime === 'devin' ? threadRow.teamId : null,
+  );
   if (claimed === null) return null;
   return chiefClaimPayload(deps, machineId, claimed, threadRow, agentRow, machineRow);
 }
@@ -478,7 +485,8 @@ async function tryClaim(
       }
     }
     const infoCard = isBuildStepKind(cand.stepRow.kind) && isInfoOutput(cand.todoRow.output);
-    if (infoCard && infoCardPlan(db, cand.todoRow, cand.stepRow).kind !== 'claude-code') continue;
+    const infoPlan = infoCard ? infoCardPlan(db, cand.todoRow, cand.stepRow) : null;
+    if (infoPlan !== null && infoPlan.kind !== 'runner') continue;
     const agentRow = profileForStep(deps, cand.todoRow, cand.stepRow.kind, cand.stepRow.id);
     if (agentRow === null) {
       failStepWithEvents(deps, cand.stepRow, unassignedStepReason(cand.stepRow.kind));
@@ -673,7 +681,7 @@ async function tryClaim(
       repoRef?.kind === 'hosted' && mergeTarget !== null
         ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
         : repoRef;
-    const workerMcp = stepMcpGrant(db, machineRow, infoCard);
+    const workerMcp = stepMcpGrant(db, machineRow, infoPlan !== null);
     const segmentsDaemon = cliVersionAtLeast(
       machineRow.latestCliVersion,
       TASK_SEGMENTS_MIN_CLI_VERSION,
@@ -747,7 +755,11 @@ async function tryClaim(
         description: infoCard
           ? [
               agentRow.description,
-              infoCardBrief(cand.stepRow.buildId, infoRepoOffered(deps, cand.todoRow)),
+              infoCardBrief(
+                cand.stepRow.buildId,
+                infoRepoOffered(deps, cand.todoRow),
+                infoPlan?.relayOnly === true,
+              ),
             ]
               .filter((part): part is string => part !== null && part !== '')
               .join('\n\n')
@@ -770,7 +782,7 @@ async function tryClaim(
       remoteTools: infoCard
         ? infoCardRemoteTools(cand.stepRow.kind)
         : workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
-      ...(infoCard ? { remoteToolsOnly: true as const } : {}),
+      ...(infoPlan?.relayOnly === true ? { remoteToolsOnly: true as const } : {}),
       localTools: infoCard ? [] : claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
