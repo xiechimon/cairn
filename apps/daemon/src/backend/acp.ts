@@ -14,6 +14,7 @@ import {
   ndJsonStream,
   PROTOCOL_VERSION,
   type ResumeSessionResponse,
+  type SessionConfigOption,
   type SessionUpdate,
 } from '@agentclientprotocol/sdk';
 import type {
@@ -23,6 +24,7 @@ import type {
   AgentTokenUsage,
   BriefChannel,
   DeliveredImage,
+  ModelSourceModel,
   ModelUsage,
   ProviderConfig,
   SessionOpts,
@@ -87,6 +89,24 @@ export function validateGeminiSession(opts: GeminiSessionValidation): {
     throw new Error('gemini ACP backend: image capability is not advertised');
   }
   return { prompt: opts.prompt, resumeId: opts.resumeId };
+}
+
+function advertisedDevinModels(option: SessionConfigOption): ModelSourceModel[] {
+  if (option.type !== 'select') return [];
+  const seen = new Set<string>();
+  const models: ModelSourceModel[] = [];
+  for (const entry of option.options) {
+    const candidates = 'value' in entry ? [entry] : entry.options;
+    for (const candidate of candidates) {
+      if (candidate.value === '' || seen.has(candidate.value)) continue;
+      seen.add(candidate.value);
+      models.push({
+        id: candidate.value,
+        name: candidate.name === '' ? candidate.value : candidate.name,
+      });
+    }
+  }
+  return models;
 }
 
 export function acpErrorMessage(error: unknown): string {
@@ -673,6 +693,10 @@ class AcpBackend implements AgentBackend {
           configId: modelOption.id,
           value: opts.modelId,
         });
+        if (adapter?.harness === 'devin') {
+          const models = advertisedDevinModels(modelOption);
+          if (models.length > 0) adapter.onDevinModels?.(models);
+        }
       } else if (adapter) {
         throw new Error('ACP adapter did not advertise model configuration');
       } else {
@@ -747,6 +771,7 @@ export interface AcpBackendOptions {
   sessionResume?: boolean;
   allowHostMcp?: boolean;
   usageEvents?: boolean;
+  onDevinModels?: (models: ModelSourceModel[]) => void;
   createUpdateNormalizer?: () => (update: SessionUpdate) => AcpUpdateNormalization;
   initializeTimeoutMs?: number;
   cancelTimeoutMs?: number;

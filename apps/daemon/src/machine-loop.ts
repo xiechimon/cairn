@@ -71,11 +71,13 @@ import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
 import {
   ensureStateDirs,
+  loadDevinModels,
   loadMachineJson,
   loadOrCreateDeviceJson,
   recordSession,
   resolveSessionFile,
   type StatePaths,
+  saveDevinModels,
   saveMachineJson,
 } from './state.js';
 import { resolveStepImages, sweepStepAttachments } from './step-attachments.js';
@@ -302,6 +304,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       `devin managed install failed: ${error instanceof Error ? error.message : String(error)}`,
     );
   });
+  let devinModels = loadDevinModels(paths);
   const capabilitiesReport = (): MachineCapabilities => {
     const reach = agentReach.current();
     const scraper = scrapling.current();
@@ -319,7 +322,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         const install = devinManaged.current();
         return install === null
           ? { installed: false }
-          : { installed: true, version: install.version };
+          : {
+              installed: true,
+              version: install.version,
+              ...(devinModels.length > 0 ? { models: devinModels } : {}),
+            };
       })(),
       executor: orbProvider.kind,
       mcpConnectors: true,
@@ -368,6 +375,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         sessionResume: true,
         allowHostMcp: true,
         usageEvents: true,
+        onDevinModels: (models) => {
+          devinModels = models;
+          try {
+            saveDevinModels(paths, models);
+          } catch (error) {
+            logger.machine(
+              `devin model catalog persist failed: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
+        },
         createUpdateNormalizer: createDevinUpdateNormalizer,
         ...(confine !== null && confine !== undefined ? { confine } : {}),
       });

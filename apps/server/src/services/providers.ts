@@ -132,19 +132,23 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
     .where(eq(machine.teamId, teamId))
     .orderBy(asc(machine.name))
     .all()
-    .flatMap((row) =>
-      row.online && row.capabilities?.devin?.installed === true
+    .flatMap((row) => {
+      const devin = row.capabilities?.devin;
+      return row.online && devin?.installed === true
         ? [
             {
               runtime: 'devin' as const,
               installed: true,
               hostname: row.name,
               machineId: row.id,
-              models: [...DEFAULT_DEVIN_MODELS],
+              models:
+                devin.models !== undefined && devin.models.length > 0
+                  ? [...devin.models]
+                  : [...DEFAULT_DEVIN_MODELS],
             },
           ]
-        : [],
-    );
+        : [];
+    });
 }
 
 export function getModelSources(deps: ProviderDeps, teamId: string): ModelSourcesEnvelope {

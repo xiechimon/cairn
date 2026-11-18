@@ -11735,6 +11735,38 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "installed": {
                   "type": "boolean",
                 },
+                "models": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "liveness": {
+                        "enum": [
+                          "alive",
+                          "dead",
+                          "unknown",
+                        ],
+                        "type": "string",
+                      },
+                      "name": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "slot": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
                 "version": {
                   "maxLength": 64,
                   "minLength": 1,

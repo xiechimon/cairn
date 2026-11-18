@@ -74,6 +74,7 @@ export class FakeMachineApi implements MachineApi {
   uploads: { url: string; body: TranscriptUpload }[] = [];
   toolCalls: { stepId: string; call: ToolCallRecord }[] = [];
   claudeSubscriptionToken: string | undefined;
+  devinToken: string | undefined;
   recoverSteps: {
     id: string;
     buildId: string;
@@ -180,6 +181,7 @@ export class FakeMachineApi implements MachineApi {
       ...(this.claudeSubscriptionToken !== undefined
         ? { claudeSubscriptionToken: this.claudeSubscriptionToken }
         : {}),
+      ...(this.devinToken !== undefined ? { devinToken: this.devinToken } : {}),
     };
   }
   async skillsManifest() {

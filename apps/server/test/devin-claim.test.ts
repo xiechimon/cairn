@@ -341,4 +341,57 @@ describe('model sources', () => {
       },
     ]);
   });
+
+  test('a machine reporting devin.models lists the advertised catalog verbatim', async () => {
+    const { s } = await world();
+    const machineId = insertMachine(s, {
+      name: 'devin-catalog',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        devin: {
+          installed: true,
+          models: [
+            { id: 'swe-3', name: 'SWE-3' },
+            { id: 'gpt-5.5', name: 'GPT-5.5' },
+            { id: 'swe-2-high', name: 'SWE-2' },
+          ],
+        },
+      },
+    });
+    expect(listDevinSources(s.db, s.team.id)).toEqual([
+      {
+        runtime: 'devin',
+        installed: true,
+        hostname: 'devin-catalog',
+        machineId,
+        models: [
+          { id: 'swe-3', name: 'SWE-3' },
+          { id: 'gpt-5.5', name: 'GPT-5.5' },
+          { id: 'swe-2-high', name: 'SWE-2' },
+        ],
+      },
+    ]);
+  });
+
+  test('an empty devin.models falls back to the static three', async () => {
+    const { s } = await world();
+    const machineId = insertMachine(s, {
+      name: 'devin-empty',
+      capabilities: { mcpServers: [], skills: [], devin: { installed: true, models: [] } },
+    });
+    expect(listDevinSources(s.db, s.team.id)).toEqual([
+      {
+        runtime: 'devin',
+        installed: true,
+        hostname: 'devin-empty',
+        machineId,
+        models: [
+          { id: 'swe-2-high', name: 'SWE-2', slot: 'builtin' },
+          { id: 'swe-2-flash-medium', name: 'SWE-2 Flash', slot: 'builtin' },
+          { id: 'adaptive', name: 'Adaptive', slot: 'builtin' },
+        ],
+      },
+    ]);
+  });
 });

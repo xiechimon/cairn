@@ -7,8 +7,11 @@ import {
   daemonJsonSchema,
   deviceJsonSchema,
   type MachineJson,
+  type ModelSourceModel,
   machineJsonSchema,
+  modelSourceModelSchema,
 } from '@cairn/shared';
+import { z } from 'zod';
 import { ensurePrivateDir, writePrivateFile } from './private-fs.js';
 
 export interface StatePaths {
@@ -17,6 +20,7 @@ export interface StatePaths {
   deviceJson: string;
   daemonJson: string;
   daemonLog: string;
+  devinModelsJson: string;
   outboxDir: string;
   chatSessionsDir: string;
   agentRuntimeDir: string;
@@ -33,6 +37,7 @@ export function statePaths(home: string, workspacesDir?: string): StatePaths {
     deviceJson: join(home, 'device.json'),
     daemonJson: join(home, 'daemon.json'),
     daemonLog: join(home, 'daemon.log'),
+    devinModelsJson: join(home, 'devin-models.json'),
     outboxDir: join(home, 'outbox'),
     chatSessionsDir: join(home, 'chat-sessions'),
     agentRuntimeDir: join(home, 'agent-runtime'),
@@ -112,6 +117,20 @@ export function loadDaemonJson(paths: StatePaths): DaemonJson | null {
 
 export function clearDaemonJson(paths: StatePaths): void {
   if (existsSync(paths.daemonJson)) rmSync(paths.daemonJson);
+}
+
+const devinModelsFileSchema = z.object({ models: z.array(modelSourceModelSchema) });
+
+export function loadDevinModels(paths: StatePaths): ModelSourceModel[] {
+  const raw = readJsonOr(paths.devinModelsJson);
+  if (raw === null) return [];
+  const parsed = devinModelsFileSchema.safeParse(raw);
+  return parsed.success ? parsed.data.models : [];
+}
+
+export function saveDevinModels(paths: StatePaths, models: ModelSourceModel[]): void {
+  const value = devinModelsFileSchema.parse({ models });
+  writePrivateFile(paths.devinModelsJson, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 export type SessionIndex = Record<string, string>;

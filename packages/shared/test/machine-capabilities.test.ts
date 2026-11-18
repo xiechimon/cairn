@@ -490,6 +490,31 @@ it('keeps a valid Linux VM download report and drops a malformed one without los
   }
 });
 
+it('keeps a devin report with an advertised model catalog and drops a malformed one without losing the rest', () => {
+  const base = { mcpServers: [], skills: [] };
+  const devin = {
+    installed: true,
+    version: '1.2.3',
+    models: [
+      { id: 'swe-3', name: 'SWE-3' },
+      { id: 'adaptive', name: 'Adaptive' },
+    ],
+  };
+  expect(parseReportedCapabilities({ ...base, devin })).toEqual({ ...base, devin });
+  expect(parseReportedCapabilities({ ...base, devin: { installed: true } })).toEqual({
+    ...base,
+    devin: { installed: true },
+  });
+  for (const bad of [
+    { installed: true, models: 'swe-3' },
+    { installed: true, models: [{ id: '', name: 'SWE-3' }] },
+    { installed: true, models: [{ value: 'swe-3', name: 'SWE-3' }] },
+    { installed: 'yes', models: [] },
+  ]) {
+    expect(parseReportedCapabilities({ ...base, devin: bad })).toEqual(base);
+  }
+});
+
 it('keeps a valid host-permissions report and drops a malformed one without losing the rest', () => {
   const report = { mcpServers: ['figma'], skills: [] };
   const hostPermissions = {

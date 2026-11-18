@@ -55,7 +55,26 @@ for await (const line of createInterface({ input: process.stdin })) {
                   category: 'model',
                   type: 'select',
                   currentValue: 'other',
-                  options: [{ value: 'stub-model', name: 'Stub' }],
+                  options: devin
+                    ? [
+                        { value: 'stub-model', name: 'Stub Model' },
+                        {
+                          value: 'swe-2-high',
+                          name: 'SWE-2',
+                          _meta: { 'cognition.ai/supportsImages': true },
+                        },
+                        { value: 'swe-2-flash-medium', name: 'SWE-2 Flash' },
+                        { value: 'swe-2-high', name: 'SWE-2 renamed' },
+                        {
+                          group: 'legacy',
+                          name: 'Legacy',
+                          options: [
+                            { value: 'adaptive', name: '' },
+                            { value: '', name: 'Empty value' },
+                          ],
+                        },
+                      ]
+                    : [{ value: 'stub-model', name: 'Stub' }],
                 },
               ],
       },
