@@ -167,6 +167,10 @@ const vmListSchema = z.array(
   }),
 );
 
+const imageListSchema = z.array(z.object({ reference: z.string().optional() }));
+
+const COMPUTER_IMAGE_REFERENCE = /^ghcr\.io\/xiechimon\/cairn-computer@sha256:[0-9a-f]{64}$/;
+
 interface VmEntry {
   name: string;
   state: string;
@@ -605,7 +609,10 @@ export class VmDesktops implements ComputerDesktops {
       const vm = (await this.list(binary)).find((candidate) => candidate.name === name);
       if (vm?.state === 'running' && vm.address && (await this.ready(binary, name, vm.address))) {
         const desktop = { binary, name, address: vm.address };
-        if (created) await this.reinstallPackages(desktop);
+        if (created) {
+          await this.reinstallPackages(desktop);
+          await this.removeStaleImages(binary);
+        }
         return this.remember(scopeKey, desktop);
       }
       if (vm?.state !== 'running' || this.now() >= deadline) {
@@ -785,6 +792,30 @@ export class VmDesktops implements ComputerDesktops {
       [binary, 'image', 'pull', '--progress', 'none', '--platform', 'linux/arm64', image],
       { timeoutMs: 30 * 60_000 },
     );
+  }
+
+  private async removeStaleImages(binary: string): Promise<void> {
+    try {
+      const listed = await this.run([binary, 'image', 'list', '--format', 'json']);
+      const parsed = imageListSchema.safeParse(JSON.parse(listed.stdout || '[]'));
+      if (listed.code !== 0 || !parsed.success) throw new Error('image list failed');
+      const inUse = new Set((await this.list(binary)).map((vm) => vm.image.reference));
+      const stale = parsed.data
+        .map((image) => image.reference)
+        .filter(
+          (reference): reference is string =>
+            reference !== undefined &&
+            COMPUTER_IMAGE_REFERENCE.test(reference) &&
+            reference !== this.image &&
+            !inUse.has(reference),
+        );
+      for (const reference of stale) await this.run([binary, 'image', 'delete', reference]);
+      if (stale.length > 0) await this.run([binary, 'image', 'prune']);
+    } catch (error) {
+      this.options.log?.(
+        `computer image cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private async pullImage(binary: string): Promise<boolean> {
