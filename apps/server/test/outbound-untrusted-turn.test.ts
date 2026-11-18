@@ -300,9 +300,23 @@ describe('outbound actions in turns that carry untrusted outside content', () =>
   });
 
   test('a mail turn may read and create tasks but not change anything else', () => {
+    const w = world();
     for (const name of ['todos', 'search_history', 'create_todo', 'browser_snapshot'])
-      expect(() => refuseRestrictedTurnTool(MAIL_PROMPT, name)).not.toThrow();
+      expect(() => refuseRestrictedTurnTool(w.s.db, MAIL_PROMPT, name)).not.toThrow();
     for (const name of ['set_secret', 'schedule_todo', 'save_memory', 'user_computer_shell'])
-      expect(() => refuseRestrictedTurnTool(MAIL_PROMPT, name)).toThrow(/mail turn cannot call/);
+      expect(() => refuseRestrictedTurnTool(w.s.db, MAIL_PROMPT, name)).toThrow(
+        /mail turn cannot call/,
+      );
+    w.s.dispose();
+  });
+
+  test('the wake after the owner answers keeps the mail turn tool limits, whether sent or declined', async () => {
+    const w = world();
+    const parked = JSON.parse(await w.call(w.turn(MAIL_PROMPT), DRAFT)) as { proposalId: string };
+    w.answer(parked.proposalId, 'refuse');
+    const wake = `[wake:wake] provenance=action-proposal:${parked.proposalId}\nrefused`;
+    expect(() => refuseRestrictedTurnTool(w.s.db, wake, 'set_wake')).toThrow(/cannot call/);
+    expect(() => refuseRestrictedTurnTool(w.s.db, wake, 'todos')).not.toThrow();
+    w.s.dispose();
   });
 });

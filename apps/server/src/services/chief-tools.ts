@@ -97,6 +97,7 @@ import {
   reportRefOfCall,
   reportRefOfPrompt,
   requireCurrentReportTurn,
+  turnForcesOutboundApproval,
 } from './report-turn.js';
 import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
@@ -314,7 +315,7 @@ export async function executeChiefTool(
 ): Promise<string> {
   const turnPrompt = ctx.turnPrompt ?? null;
   const turnMessageIds = ctx.turnMessageIds ?? [];
-  refuseRestrictedTurnTool(turnPrompt, name, params, turnMessageIds);
+  refuseRestrictedTurnTool(deps.db, turnPrompt, name, params, turnMessageIds);
   const { db } = deps;
   requireCurrentReportTurn(db, turnPrompt, turnMessageIds, name, params);
   const svc = {
@@ -676,6 +677,7 @@ export async function executeChiefTool(
     case 'create_todo': {
       const body = parseWith(coordinatorCreateTodoParamsSchema, params, 'params');
       assertNamedMachineForNewTask(svc, ctx.teamId);
+      const untrustedTurn = turnForcesOutboundApproval(db, turnPrompt);
       const record = db.transaction(() => {
         const projectRow =
           body.projectId === undefined
@@ -697,14 +699,23 @@ export async function executeChiefTool(
         if (body.platform !== undefined) {
           setTodoPlatform(db, requireTeamTodo(db, created.id, ctx.teamId), body.platform);
         }
-        addChiefWatch(deps, {
-          teamId: ctx.teamId,
-          todo: created,
-          projectName: projectRow.name,
-          threadId: ctx.threadId,
-        });
+        if (!untrustedTurn)
+          addChiefWatch(deps, {
+            teamId: ctx.teamId,
+            todo: created,
+            projectName: projectRow.name,
+            threadId: ctx.threadId,
+          });
         return created;
       });
+      if (untrustedTurn)
+        return json({
+          ...record,
+          ...getTodo(svc, record.id),
+          sourceBuildId: ctx.chiefId,
+          buildId: null,
+          note: 'Created but not started: this turn carries outside content, so only the owner starts the task. Tell the owner it is waiting for them.',
+        });
       const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
         origin: 'coordinator',
         actor: 'Coordinator',

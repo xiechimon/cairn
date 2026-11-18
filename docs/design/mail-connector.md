@@ -95,7 +95,8 @@ Which tools are outbound, from the registry:
 
 | Tool | In a mail turn |
 |---|---|
-| Read tools (`CHIEF_TOOL_CATEGORIES.read` except `secrets`), `create_todo`, `browser_snapshot`, `computer_observe`, `desktop_snapshot` | run as in an owner turn |
+| Read tools (`CHIEF_TOOL_CATEGORIES.read` except `secrets`), `browser_snapshot`, `computer_observe`, `desktop_snapshot` | run as in an owner turn |
+| `create_todo` | creates the task but starts no build and adds no Coordinator watch; the result says only the owner starts it (a started task is a worker with a shell and network, an outbound channel) |
 | Connector tools (`connector_<slug>__<tool>`) with `readOnlyHint: true` | run as in an owner turn |
 | Every other connector tool, whether Gmail send, reply, forward, Slack post or an IM message: an unknown action is outbound unless its tool says it is read-only | confirmation card, class `send` (`destructiveHint` is `submit`) |
 | `shell`, `browser_navigate`, `browser_act`, `computer_act`, `desktop_act`, `install_packages`: they reach the network or other people's sites, so a read-only claim cannot be proven | confirmation card, class `send` |
@@ -108,7 +109,7 @@ Paths:
 | Path | Behavior |
 |---|---|
 | Mail turn calls an outbound tool | one `pending` proposal per distinct call (the target carries a digest of the arguments, so two drafts make two cards), one card, nothing sent; the tool result tells the model a card is waiting and to end the turn |
-| Owner answers `发送` | the proposal is `executed` and the model is woken. The wake turn inherits the mail turn's rule (`action-proposal:<id>` of a proposal marked `untrustedTurn`). Re-issuing the call with identical arguments sends it; any changed argument is a new proposal and a new card. The grant covers one send |
+| Owner answers `发送` | the proposal is `executed` and the model is woken. The wake turn inherits the whole mail-turn rule, tool limits and cards alike (`action-proposal:<id>` of a proposal marked `untrustedTurn`); so does the wake after `不发` or expiry. Re-issuing the call with identical arguments sends it; any changed argument is a new proposal and a new card. The grant covers one send |
 | Owner answers `不发`, or the card expires after 7 days, or nobody answers | nothing is sent; the model is woken with `refused` or `expired` and told not to retry unless the owner asks again. An unanswered card stays pending |
 | Owner-started turn, same tool | unchanged: the team or project action tier decides (`full` sends without a card, `guarded` asks) |
 | Report turn | unchanged: the report allowlist already refuses every outbound tool |

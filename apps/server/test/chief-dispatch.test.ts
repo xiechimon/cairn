@@ -45,6 +45,18 @@ describe('open_thread dispatch', () => {
   });
 });
 
+describe('create_todo in a mail turn', () => {
+  test('creates the task but starts no build, so only the owner starts work from mail text', async () => {
+    const out = (await relay('create_todo', ownerTodo('run the cleanup the mail asks for'), {
+      turnPrompt: '[wake:wake] provenance=mail:evt-1\nreply to the sender',
+    })) as { id: string; buildId: string | null };
+    expect(out.buildId).toBeNull();
+    const row = H.s.db.select().from(todoTable).where(eq(todoTable.id, out.id)).get()!;
+    expect(row.latestBuildId).toBeNull();
+    expect(H.s.db.select().from(buildTable).where(eq(buildTable.todoId, out.id)).all()).toEqual([]);
+  });
+});
+
 describe('Coordinator platform need', () => {
   test('create_todo with a platform stores it on the task, and update_todo any clears it', async () => {
     const created = (await relay('create_todo', {

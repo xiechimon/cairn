@@ -80,7 +80,7 @@ export async function machineAsk(
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
 ): Promise<MachineAskResponse> {
   const row = ownedStep(deps, machineId, stepId);
-  refuseRestrictedTurnTool(row.prompt, 'ask_user', {}, row.ownerMessageIds ?? []);
+  refuseRestrictedTurnTool(deps.db, row.prompt, 'ask_user', {}, row.ownerMessageIds ?? []);
   if (row.kind === 'session') {
     return askWorkerQuestion(deps, row, body, opts);
   }
@@ -144,7 +144,7 @@ export async function relayComputerTool(
   signal?: AbortSignal,
 ): Promise<ComputerRelayResult> {
   const row = ownedStep(deps, machineId, stepId);
-  refuseRestrictedTurnTool(row.prompt, name, params, row.ownerMessageIds ?? []);
+  refuseRestrictedTurnTool(deps.db, row.prompt, name, params, row.ownerMessageIds ?? []);
   if (row.kind !== 'chief') {
     throw new HttpError(400, 'computer tools require a chief step');
   }
@@ -208,7 +208,7 @@ export async function executeRelayToolCall(
     return (await relayComputerTool(deps, machineId, stepId, name, params, toolCallId, signal))
       .text;
   }
-  refuseRestrictedTurnTool(row.prompt, name, params, row.ownerMessageIds ?? []);
+  refuseRestrictedTurnTool(deps.db, row.prompt, name, params, row.ownerMessageIds ?? []);
   if (isThreadScheduleTool(name)) {
     if (row.kind !== 'plan' && !isBuildStepKind(row.kind)) {
       throw new HttpError(400, 'schedule tools require a plan or build step');

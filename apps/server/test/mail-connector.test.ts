@@ -592,7 +592,7 @@ describe('mail connector slice 1', () => {
       /mail turn cannot call set_secret/,
     );
     expect(() =>
-      refuseRestrictedTurnTool('[wake:wake] provenance=watch:todo\n', 'schedule_todo'),
+      refuseRestrictedTurnTool(s.db, '[wake:wake] provenance=watch:todo\n', 'schedule_todo'),
     ).not.toThrow();
   });
 });

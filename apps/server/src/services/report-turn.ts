@@ -129,12 +129,13 @@ export function reportRefOfCall(
 }
 
 export function refuseRestrictedTurnTool(
+  db: Db,
   prompt: string | null,
   name: string,
   params: Record<string, unknown> = {},
   ownerMessageIds: readonly string[] = [],
 ): void {
-  if (turnProvenance(prompt)?.startsWith('mail:') === true) {
+  if (turnForcesOutboundApproval(db, prompt)) {
     if (mailTurnAllows(name)) return;
     throw new HttpError(403, `mail turn cannot call ${name}`);
   }
