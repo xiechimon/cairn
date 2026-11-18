@@ -43,6 +43,7 @@ import { ownComputerOffered } from '../services/own-computer.js';
 import { ownershipOf } from '../services/owner.js';
 import { listedProjects } from '../services/personal-space.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
+import { markProviderModelTextOnly } from '../services/providers.js';
 import {
   type CoordinatorProviders,
   coordinatorProviders,
@@ -316,6 +317,15 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             : coordinatorProviders({ db, box: machine.box }, teamId, threadProject(threadId));
         if (providers === null || teamId === null) return [];
         return [binding(teamId, providers.router), binding(teamId, providers.summary)];
+      },
+      onImagesRejected: (threadId, providerId, modelId) => {
+        const teamId = threadTeam(threadId);
+        if (teamId === null) return;
+        markProviderModelTextOnly({ db, box: machine.box }, teamId, providerId, modelId);
+        logger.warn(
+          { threadId, providerId, modelId },
+          'coordinator model rejected images, marked text-only',
+        );
       },
       onInputError: (threadId, error) =>
         logger.error(

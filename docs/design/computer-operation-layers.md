@@ -14,10 +14,22 @@ Order of use: layer 1 for anything in a browser, layer 2 for a native window, la
 
 ## How image capability is known
 
-The capability resolves in one place, `resolveModelInput` in `packages/shared`, used by the server and the provider editor: the saved model's `input`, else the `input` the preset catalog declares for the same model id (`PROVIDER_PRESET_DEFAULTS`, shared so the server reads the same table as the UI), else text-only. Saved models usually carry no `input`, so the catalog lookup is what keeps Claude and other known vision models image-capable.
+Whether a gateway accepts images is often unknowable in advance, so capability is a guess that the server corrects after a request has run. There is no owner override: the provider editor has no per-model image setting.
+
+The initial guess resolves in one place, `resolveModelInput` in `packages/shared`: the saved model's `input` (written only by the server, see below), else the `input` the preset catalog declares for the same model id (`PROVIDER_PRESET_DEFAULTS`, shared so the server reads the same table as the UI), else text-only. Saved models usually carry no `input`, so the catalog lookup is what keeps Claude and other known vision models image-capable.
 
 - A model id unknown to the catalog and without a saved `input` is text-only. The old default (`['text','image']`) made text-only gateway models receive full-screen base64 PNGs, and the gateway hung until it timed out.
-- The owner ticks the "supports images" checkbox of a custom model in the provider editor (Settings, Models, provider); that writes `input: ['text','image']` into the model record, unticking writes `['text']`; an explicit value always wins over the catalog.
+- Known gap: a catalog entry can be wrong for a given gateway (the owner's workbuddy deepseek-v4.1-flash hung about 200 s on images). The adaptive flow below turns that into one bounded failure, then a text-only model.
+
+### Adaptive flow for image-bearing requests
+
+Every in-server model request goes through the single `streamSimple` wrapper in `apps/server/src/coordinator/runtime/models.ts`. It acts only when the model is believed image-capable and the request context contains an image:
+
+1. The request runs with a bounded timeout (90 s, no SDK retries) unless the caller set one.
+2. If it fails before any content streamed (provider error or the timeout; not a caller abort, and not 401, 403, 429 or quota errors, which are not about images), the same request runs once more with every image replaced by the text `screenshot omitted: this model did not accept images`.
+3. If that retry succeeds, the server marks the model text-only: it sets `input: ['text']` on the provider's model record (`markProviderModelTextOnly`, the only writer of `input`) and on the model of every open conversation. Later turns and other threads skip images, and `computer_observe` and `computer_act` return the text-only error below.
+4. A request that succeeds with images records nothing. A retry that also fails records nothing and returns its own error.
+
 - At tool time the tool reads the current model of the conversation (`api.agent()` then `api.models.getModel`), so a model switch mid-thread takes effect on the next call.
 
 ## What a text-only model gets
@@ -37,4 +49,6 @@ Decided by ian on 2026-11-18: no separate vision "computer-use model" setting. L
 | Model not in the catalog (provider removed mid-turn) | treated as text-only |
 | `computer_observe` or `computer_act` from a text-only model | tool error, one line, no relay, nothing executed |
 | Image-capable model | unchanged: text plus bounded PNG |
+| Image request fails or times out, retry without images succeeds | the turn continues on the retry; the model is marked text-only, so the next screenshot call gets the text-only error |
+| Image request fails and the retry also fails | the retry's error is the turn's error; nothing is recorded |
 | Owner holds control | unchanged: `computer_observe` is refused by the handoff gate |

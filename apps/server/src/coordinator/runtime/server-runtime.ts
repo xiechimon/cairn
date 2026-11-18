@@ -49,6 +49,7 @@ export interface ServerRuntimeConfig {
   connectorTools?(threadId: string): RemoteToolDef[];
   ownComputer?(threadId: string, stepId: string): boolean;
   providersFor?(threadId: string): readonly ProviderBinding[];
+  onImagesRejected?(threadId: string, providerId: string, modelId: string): void;
   recordConversation?(threadId: string, conversationId: string, entryId: number): void;
   setConversation?(
     threadId: string,
@@ -106,7 +107,10 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     const existing = open.get(threadId);
     if (existing !== undefined) return existing;
     const facts = config.factsFor(threadId);
-    const models = createCoordinatorModels(config.fixedProviders);
+    const models = createCoordinatorModels(config.fixedProviders, (providerId, modelId) => {
+      for (const state of open.values()) state.models.markTextOnly(providerId, modelId);
+      config.onImagesRejected?.(threadId, providerId, modelId);
+    });
     for (const binding of config.providersFor?.(threadId) ?? []) {
       models.useProvider(binding.config, binding.resolveKey);
     }

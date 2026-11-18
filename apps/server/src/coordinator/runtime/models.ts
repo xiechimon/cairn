@@ -1,11 +1,49 @@
 import type { ProviderConfig } from '@cairn/shared';
 import {
   type AssistantMessage,
+  type AssistantMessageEvent,
+  type Context,
+  createAssistantMessageEventStream,
   InMemoryCredentialStore,
   type Provider,
 } from '@earendil-works/pi-ai';
 import { createModels, type MutableModels } from '@earendil-works/pi-ai/models';
 import { type KeyResolver, stepProvider } from './provider.js';
+
+export const IMAGE_REQUEST_TIMEOUT_MS = 90_000;
+export const IMAGE_OMITTED_NOTE = 'screenshot omitted: this model did not accept images';
+const NOT_AN_IMAGE_FAILURE = /\b(401|403|429)\b|unauthori[sz]ed|forbidden|rate.?limit|quota/i;
+
+type StreamArgs = Parameters<MutableModels['streamSimple']>;
+
+function hasImages(context: Context): boolean {
+  return context.messages.some(
+    (message) =>
+      message.role !== 'assistant' &&
+      typeof message.content !== 'string' &&
+      message.content.some((block) => block.type === 'image'),
+  );
+}
+
+function carriesContent(event: AssistantMessageEvent): boolean {
+  if (event.type === 'done' || event.type === 'toolcall_start') return true;
+  return 'delta' in event && event.delta.length > 0;
+}
+
+function withoutImages(context: Context): Context {
+  return {
+    ...context,
+    messages: context.messages.map((message) => {
+      if (message.role === 'assistant' || typeof message.content === 'string') return message;
+      return {
+        ...message,
+        content: message.content.map((block) =>
+          block.type === 'image' ? { type: 'text' as const, text: IMAGE_OMITTED_NOTE } : block,
+        ),
+      };
+    }) as Context['messages'],
+  };
+}
 
 interface ResponseTiming {
   at: number;
@@ -29,13 +67,88 @@ export interface CoordinatorModels {
   setApiKey(providerId: string, key: string): Promise<void>;
   useStepProvider(config: ProviderConfig): void;
   useProvider(config: ProviderConfig, resolveKey: KeyResolver): void;
+  markTextOnly(providerId: string, modelId: string): void;
 }
 
-export function createCoordinatorModels(providers: readonly Provider[] = []): CoordinatorModels {
+export function createCoordinatorModels(
+  providers: readonly Provider[] = [],
+  onImagesRejected?: (providerId: string, modelId: string) => void,
+): CoordinatorModels {
   const fixed = new Set(providers.map((p) => p.id));
   const credentials = new InMemoryCredentialStore();
   const models = createModels({ credentials });
-  const streamSimple = models.streamSimple.bind(models);
+  const baseStream = models.streamSimple.bind(models);
+  const markTextOnly = (providerId: string, modelId: string) => {
+    const model = models.getModel(providerId, modelId);
+    if (model !== undefined) model.input = ['text'];
+  };
+  const streamSimple = (...[model, context, options]: StreamArgs) => {
+    if (!model.input.includes('image') || !hasImages(context)) {
+      return baseStream(model, context, options);
+    }
+    const out = createAssistantMessageEventStream();
+    const run = async () => {
+      const first = baseStream(model, context, {
+        ...options,
+        timeoutMs: options?.timeoutMs ?? IMAGE_REQUEST_TIMEOUT_MS,
+        maxRetries: 0,
+      });
+      const held: AssistantMessageEvent[] = [];
+      let streaming = false;
+      for await (const event of first) {
+        if (event.type === 'error') {
+          const retriable =
+            !streaming &&
+            event.reason !== 'aborted' &&
+            options?.signal?.aborted !== true &&
+            !NOT_AN_IMAGE_FAILURE.test(event.error.errorMessage ?? '');
+          if (!retriable) {
+            for (const earlier of held) out.push(earlier);
+            out.push(event);
+            return;
+          }
+          const retry = baseStream(model, withoutImages(context), options);
+          let recovered = false;
+          for await (const next of retry) {
+            if (next.type === 'done') recovered = true;
+            out.push(next);
+          }
+          if (recovered) {
+            markTextOnly(model.provider, model.id);
+            onImagesRejected?.(model.provider, model.id);
+          }
+          return;
+        }
+        if (!streaming && carriesContent(event)) {
+          streaming = true;
+          for (const earlier of held.splice(0)) out.push(earlier);
+        }
+        if (streaming) out.push(event);
+        else held.push(event);
+      }
+    };
+    void run().catch((error) => {
+      out.end({
+        role: 'assistant',
+        content: [],
+        api: model.api,
+        provider: model.provider,
+        model: model.id,
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'error',
+        errorMessage: String(error),
+        timestamp: Date.now(),
+      });
+    });
+    return out;
+  };
   models.streamSimple = (...args) => {
     const at = Date.now();
     const started = performance.now();
@@ -84,6 +197,7 @@ export function createCoordinatorModels(providers: readonly Provider[] = []): Co
       const provider = stepProvider(config);
       if (provider !== null) models.setProvider(provider);
     },
+    markTextOnly,
     useProvider: (config, resolveKey) => {
       if (fixed.has(config.providerId)) return;
       const provider = stepProvider(config, resolveKey);

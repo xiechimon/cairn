@@ -246,6 +246,28 @@ export function updateProvider(
   return toProviderRecord(updated);
 }
 
+export function markProviderModelTextOnly(
+  deps: ProviderDeps,
+  teamId: string,
+  providerId: string,
+  modelId: string,
+): void {
+  const row = deps.db
+    .select()
+    .from(provider)
+    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
+    .get();
+  if (!row?.models.some((m) => m.id === modelId)) return;
+  deps.db
+    .update(provider)
+    .set({
+      models: row.models.map((m) => (m.id === modelId ? { ...m, input: ['text' as const] } : m)),
+      updatedAt: nowMs(),
+    })
+    .where(eq(provider.id, row.id))
+    .run();
+}
+
 export function deleteProvider(deps: ProviderDeps, teamId: string, id: string): boolean {
   const row = getRow(deps, teamId, id);
   if (!row) return false;
