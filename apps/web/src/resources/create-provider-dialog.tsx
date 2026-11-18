@@ -205,6 +205,7 @@ interface CreateProviderDialogProps {
   connectError?: string | null;
   onPickClaudeSubscription?: () => void;
   onPickDevinSubscription?: () => void;
+  onPickAntigravitySubscription?: () => void;
   onXaiSignIn?: () => void;
   xaiSignInPending?: boolean;
   xaiDevice?: { userCode: string; verificationUri: string } | null;
@@ -229,6 +230,7 @@ export function CreateProviderDialog({
   connectError,
   onPickClaudeSubscription,
   onPickDevinSubscription,
+  onPickAntigravitySubscription,
   onXaiSignIn,
   xaiSignInPending,
   xaiDevice,
@@ -367,7 +369,11 @@ export function CreateProviderDialog({
               group === '订阅登录' &&
               onPickDevinSubscription !== undefined &&
               matchesQuery(t('Devin 订阅').toLowerCase(), query);
-            if (groupRows.length === 0 && !claudeRow && !devinRow) return null;
+            const antigravityRow =
+              group === '订阅登录' &&
+              onPickAntigravitySubscription !== undefined &&
+              matchesQuery(t('Antigravity 订阅').toLowerCase(), query);
+            if (groupRows.length === 0 && !claudeRow && !devinRow && !antigravityRow) return null;
             return (
               <fieldset key={group} className={PICKER_GROUP_CLS}>
                 <legend className={inline ? 'sr-only' : PICKER_GROUP_HEAD_CLS}>{t(group)}</legend>
@@ -395,6 +401,19 @@ export function CreateProviderDialog({
                       <MonoMark mark={LOBEHUB_MONO.devin} />
                     </span>
                     <span className="min-w-0 truncate">{t('Devin 订阅')}</span>
+                  </Button>
+                )}
+                {antigravityRow && (
+                  <Button
+                    variant="ghost"
+                    data-preset-id="antigravity-subscription"
+                    className={PICKER_ROW_CLS}
+                    onClick={onPickAntigravitySubscription}
+                  >
+                    <span aria-hidden className={PICKER_TILE_CLS}>
+                      <MonoMark mark={LOBEHUB_MONO.antigravity} />
+                    </span>
+                    <span className="min-w-0 truncate">{t('Antigravity 订阅')}</span>
                   </Button>
                 )}
                 {groupRows.map((row) => (

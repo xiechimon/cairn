@@ -4,6 +4,7 @@ import {
   cloakLicenseBodySchema,
   composioConnectBodySchema,
   composioKeyBodySchema,
+  createAntigravitySubscriptionSchema,
   createClaudeSubscriptionSchema,
   createDevinSubscriptionSchema,
   createMcpConnectorBodySchema,
@@ -21,6 +22,7 @@ import {
   patchProviderBodySchema,
   patchScheduleBodySchema,
   redactSecrets,
+  renameAntigravitySubscriptionSchema,
   renameClaudeSubscriptionSchema,
   renameDevinSubscriptionSchema,
   SKILL_ENTRY_FILE,
@@ -49,6 +51,16 @@ import {
   requireTeam,
   svcOf,
 } from './routes-helpers.js';
+import {
+  createAntigravitySubscription,
+  deleteAntigravitySubscription,
+  disableAntigravitySubscription,
+  enableAntigravitySubscription,
+  listAntigravitySubscriptionSteps,
+  listAntigravitySubscriptions,
+  renameAntigravitySubscription,
+  verifyAntigravitySubscriptionConnection,
+} from './services/antigravity-subscriptions.js';
 import { createApiKey, listApiKeys } from './services/api-keys.js';
 import {
   listBrowserPasswordGrants,
@@ -627,6 +639,68 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     return c.json(await devinSubscriptionUpstreamModels(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.get('/api/teams/:id/antigravity-subscriptions', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(listAntigravitySubscriptions(keysvc, teamId));
+  });
+
+  app.post('/api/teams/:id/antigravity-subscriptions', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const body = parseWith(createAntigravitySubscriptionSchema, await jsonBody(c), 'body');
+    return c.json(createAntigravitySubscription(keysvc, teamId, body), 201);
+  });
+
+  app.delete('/api/teams/:id/antigravity-subscriptions/:cid', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    if (!deleteAntigravitySubscription(keysvc, teamId, c.req.param('cid'))) {
+      throw notFound('Antigravity subscription connection');
+    }
+    return c.body(null, 204);
+  });
+
+  app.patch('/api/teams/:id/antigravity-subscriptions/:cid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const body = parseWith(renameAntigravitySubscriptionSchema, await jsonBody(c), 'body');
+    return c.json(renameAntigravitySubscription(keysvc, teamId, c.req.param('cid'), body.label));
+  });
+
+  app.post('/api/teams/:id/antigravity-subscriptions/:cid/enable', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(await enableAntigravitySubscription(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/antigravity-subscriptions/:cid/disable', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(disableAntigravitySubscription(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.get('/api/teams/:id/antigravity-subscriptions/:cid/steps', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const limit = Math.min(Math.max(Math.trunc(Number(c.req.query('limit') ?? 20)) || 20, 1), 100);
+    return c.json(listAntigravitySubscriptionSteps(keysvc, teamId, c.req.param('cid'), limit));
+  });
+
+  app.post('/api/teams/:id/antigravity-subscriptions/:cid/verify', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(
+      await verifyAntigravitySubscriptionConnection(keysvc, teamId, c.req.param('cid')),
+    );
   });
 
   app.get('/api/teams/:id/providers', (c) => {

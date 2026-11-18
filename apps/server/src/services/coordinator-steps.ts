@@ -9,6 +9,7 @@ import {
 import { and, asc, desc, eq, inArray, isNotNull, notInArray, notLike, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
+  antigravitySubscription,
   chiefThread,
   chiefTurnUsage,
   claudeSubscription,
@@ -54,7 +55,7 @@ type StepRow = typeof step.$inferSelect;
 type ThreadRow = typeof chiefThread.$inferSelect;
 
 export interface ChiefSubscriptionBind {
-  runtime: 'claude-code' | 'devin';
+  runtime: 'claude-code' | 'devin' | 'antigravity';
   teamId: string;
 }
 
@@ -86,6 +87,12 @@ export function claimPendingChiefStep(
             ? sql<
                 string | null
               >`(select ${devinSubscription.id} from ${devinSubscription} where ${devinSubscription.teamId} = ${bind.teamId} and ${devinSubscription.enabledAt} is not null and (${devinSubscription.expiresAt} is null or ${devinSubscription.expiresAt} > ${claimedAt}))`
+            : null,
+        antigravitySubscriptionId:
+          bind?.runtime === 'antigravity'
+            ? sql<
+                string | null
+              >`(select ${antigravitySubscription.id} from ${antigravitySubscription} where ${antigravitySubscription.teamId} = ${bind.teamId} and ${antigravitySubscription.enabledAt} is not null and (${antigravitySubscription.expiresAt} is null or ${antigravitySubscription.expiresAt} > ${claimedAt}))`
             : null,
         claimedAt,
         lastHeartbeatAt: claimedAt,
@@ -444,6 +451,7 @@ export function recordStepUsage(
             output: u.output,
             cacheRead: u.cacheRead,
             cacheWrite: u.cacheWrite,
+            cacheWrite1h: u.cacheWrite1h ?? 0,
             ttftMs: u.ttftMs ?? null,
             contextTokens: u.contextTokens ?? null,
             contextWindow: u.contextWindow ?? null,
@@ -457,6 +465,7 @@ export function recordStepUsage(
               output: sql`${chiefTurnUsage.output} + ${u.output}`,
               cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
               cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
+              cacheWrite1h: sql`${chiefTurnUsage.cacheWrite1h} + ${u.cacheWrite1h ?? 0}`,
               ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
               ...(u.contextTokens !== undefined
                 ? {
@@ -482,6 +491,7 @@ export function recordStepUsage(
             output: u.output,
             cacheRead: u.cacheRead,
             cacheWrite: u.cacheWrite,
+            cacheWrite1h: u.cacheWrite1h ?? 0,
             mirroredTokens: mirrored,
             contextTokens: u.contextTokens ?? null,
             contextWindow: u.contextWindow ?? null,
@@ -495,6 +505,7 @@ export function recordStepUsage(
               output: sql`${stepUsage.output} + ${u.output}`,
               cacheRead: sql`${stepUsage.cacheRead} + ${u.cacheRead}`,
               cacheWrite: sql`${stepUsage.cacheWrite} + ${u.cacheWrite}`,
+              cacheWrite1h: sql`${stepUsage.cacheWrite1h} + ${u.cacheWrite1h ?? 0}`,
               mirroredTokens: sql`${stepUsage.mirroredTokens} + ${mirrored}`,
               ...(u.contextTokens !== undefined
                 ? {

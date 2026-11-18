@@ -101,6 +101,9 @@ export async function stepToken(
     ...(owned.status === 'claimed' && bundle.devinToken !== undefined
       ? { devinToken: bundle.devinToken }
       : {}),
+    ...(owned.status === 'claimed' && bundle.antigravityToken !== undefined
+      ? { antigravityToken: bundle.antigravityToken }
+      : {}),
     ...(owned.status === 'claimed' && todoRow && agentRow
       ? await connectorFields(deps, owned, todoRow.teamId)
       : {}),
@@ -252,6 +255,7 @@ async function chiefStepToken(
     {
       claudeSubscriptionId: stepRow?.claudeSubscriptionId ?? null,
       devinSubscriptionId: stepRow?.devinSubscriptionId ?? null,
+      antigravitySubscriptionId: stepRow?.antigravitySubscriptionId ?? null,
     },
   );
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
@@ -270,6 +274,9 @@ async function chiefStepToken(
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     ...(claimed && bundle.devinToken !== undefined ? { devinToken: bundle.devinToken } : {}),
+    ...(claimed && bundle.antigravityToken !== undefined
+      ? { antigravityToken: bundle.antigravityToken }
+      : {}),
     ...(claimed && stepRow && threadRow && agentRow
       ? await connectorFields(deps, stepRow, threadRow.teamId, chiefTurnLocked(stepRow))
       : {}),

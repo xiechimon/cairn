@@ -10,6 +10,7 @@ import type { Db } from '../db/client.js';
 import { build, chiefMessage, machine, step, todo } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
+import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
 import { type ChiefDeps, coordinatorThreadRow, ensureChief } from './chief.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
@@ -76,6 +77,7 @@ function sessionStarted(db: Db, row: PendingRow): boolean {
   const prior = priorSessionOf(db, row.stepRow, row.buildRow, {
     claude: enabledSubscriptionId({ db }, row.todoRow.teamId),
     devin: enabledDevinSubscriptionId({ db }, row.todoRow.teamId),
+    antigravity: enabledAntigravitySubscriptionId({ db }, row.todoRow.teamId),
   });
   return !prior.freshSession && prior.priorSessionId !== null;
 }

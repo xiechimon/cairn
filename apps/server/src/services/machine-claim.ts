@@ -43,6 +43,10 @@ import {
 } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
+import {
+  activeAntigravitySubscriptionMode,
+  enabledAntigravitySubscriptionId,
+} from './antigravity-subscriptions.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
@@ -257,6 +261,11 @@ function chiefSubscriptionMissing(
   const runtime = stepRuntimeFor(provider);
   if (runtime === 'claude-code') return !hasActiveClaudeSubscription(deps, machineRow.teamId);
   if (runtime === 'devin') return !hasActiveDevinSubscription(deps, machineRow.teamId);
+  if (runtime === 'antigravity') {
+    const mode = activeAntigravitySubscriptionMode(deps, machineRow.teamId);
+    if (mode === 'none') return true;
+    return mode === 'host' && machineRow.capabilities?.antigravity?.authenticated !== true;
+  }
   return false;
 }
 
@@ -275,7 +284,9 @@ function buildChiefClaim(
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const runtime = stepRuntimeFor(model.provider);
   const bindSubscription =
-    runtime === 'claude-code' || runtime === 'devin' ? { runtime, teamId: threadRow.teamId } : null;
+    runtime === 'claude-code' || runtime === 'devin' || runtime === 'antigravity'
+      ? { runtime, teamId: threadRow.teamId }
+      : null;
   const claimed = claimPendingChiefStep(deps.db, stepRow, machineId, bindSubscription);
   if (claimed === null) return null;
   return chiefClaimPayload(deps, machineId, claimed, threadRow, agentRow, machineRow);
@@ -311,11 +322,17 @@ function chiefClaimPayload(
             .from(step)
             .where(eq(step.id, stepRow.id))
             .get()?.id ?? null)
-        : null;
+        : runtime === 'antigravity'
+          ? (deps.db
+              .select({ id: step.antigravitySubscriptionId })
+              .from(step)
+              .where(eq(step.id, stepRow.id))
+              .get()?.id ?? null)
+          : null;
   const continuesSession =
     !stepRow.freshSession &&
     threadRow.sessionId !== '' &&
-    (runtime !== 'claude-code' && runtime !== 'devin'
+    (runtime !== 'claude-code' && runtime !== 'devin' && runtime !== 'antigravity'
       ? true
       : !chiefLastRanOnOtherAccount(
           deps.db,
@@ -535,11 +552,14 @@ async function tryClaim(
     if (projectFull(db)) continue;
     const claimRuntimeIsClaudeCode = stepRuntimeFor(model.provider) === 'claude-code';
     const claimRuntimeIsDevin = stepRuntimeFor(model.provider) === 'devin';
+    const claimRuntimeIsAntigravity = stepRuntimeFor(model.provider) === 'antigravity';
     const enabledId = enabledSubscriptionId({ db }, teamId);
     const enabledDevinId = enabledDevinSubscriptionId({ db }, teamId);
+    const enabledAntigravityId = enabledAntigravitySubscriptionId({ db }, teamId);
     const prior = priorSessionOf(db, cand.stepRow, cand.buildRow, {
       claude: enabledId,
       devin: enabledDevinId,
+      antigravity: enabledAntigravityId,
     });
     const { priorSessionId, priorMachineId, freshSession } = prior;
     if (claimRuntimeIsClaudeCode && accountHeld(cand.stepRow, prior, enabledId)) continue;
@@ -585,15 +605,18 @@ async function tryClaim(
         if (projectFull(tx)) return false;
         const boundId = enabledSubscriptionId({ db: tx }, teamId);
         const boundDevinId = enabledDevinSubscriptionId({ db: tx }, teamId);
+        const boundAntigravityId = enabledAntigravitySubscriptionId({ db: tx }, teamId);
         if (claimRuntimeIsClaudeCode) {
           if (boundId !== enabledId) return false;
           const fresh = priorSessionOf(tx, cand.stepRow, cand.buildRow, {
             claude: boundId,
             devin: boundDevinId,
+            antigravity: boundAntigravityId,
           });
           if (accountHeld(cand.stepRow, fresh, boundId)) return false;
         }
         if (claimRuntimeIsDevin && boundDevinId !== enabledDevinId) return false;
+        if (claimRuntimeIsAntigravity && boundAntigravityId !== enabledAntigravityId) return false;
         const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
         if (latestTodo === undefined || quickLaneRefusal(db, latestTodo) !== null) return false;
         if (
@@ -627,6 +650,7 @@ async function tryClaim(
             blockerHandoff,
             claudeSubscriptionId: claimRuntimeIsClaudeCode ? boundId : null,
             devinSubscriptionId: claimRuntimeIsDevin ? boundDevinId : null,
+            antigravitySubscriptionId: claimRuntimeIsAntigravity ? boundAntigravityId : null,
             holdReason: null,
             holdUntil: null,
           })

@@ -10,7 +10,7 @@ export type AccountState = (typeof ACCOUNT_STATES)[number];
 
 export type QuotaWindow = ClaudeSubscriptionQuotaWindow;
 
-export const ACCOUNT_VENDORS = ['claude', 'codex', 'grok', 'devin'] as const;
+export const ACCOUNT_VENDORS = ['claude', 'codex', 'grok', 'devin', 'antigravity'] as const;
 export type AccountVendor = (typeof ACCOUNT_VENDORS)[number];
 
 export type SubscriptionModel = DevinSubscriptionModel;
@@ -58,7 +58,7 @@ export interface AccountMachine {
   name: string;
 }
 
-export type ProviderRuntime = 'claude-code' | 'codex' | 'pi' | 'devin';
+export type ProviderRuntime = 'claude-code' | 'codex' | 'pi' | 'devin' | 'antigravity';
 export type ProviderLogin = 'logged-in' | 'logged-out' | 'unknown';
 
 export interface MachineProvider {

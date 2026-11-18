@@ -51,6 +51,8 @@ const AUTH_RENEWAL: Record<AccountVendor, string> = {
   grok: '这个订阅的登录已失效。先移除它，再重新添加新的 token。',
   devin:
     '这个订阅的登录已失效。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml` 把输出整个添加回来。',
+  antigravity:
+    '这个订阅的登录已失效。在执行机重新登录 Google 账号或更新 API Key 后，移除并重新添加。',
 };
 
 const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
@@ -59,6 +61,7 @@ const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
   grok: '这个订阅已过期。先移除它，再重新添加新的 token。',
   devin:
     '这个订阅已过期。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml` 把输出整个添加回来。',
+  antigravity: '这个订阅已过期。在执行机重新登录 Google 账号或更新 API Key 后，移除并重新添加。',
 };
 
 const UNAVAILABLE_COPY: Record<AccountVendor, string> = {
@@ -66,6 +69,7 @@ const UNAVAILABLE_COPY: Record<AccountVendor, string> = {
   codex: '服务器上找不到 codex 命令',
   grok: '服务器上找不到可执行的 agent',
   devin: '服务器上找不到 devin 命令',
+  antigravity: '服务器上找不到 agy 命令',
 };
 
 function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
@@ -76,6 +80,8 @@ function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
     failed: '验证没有通过，请重试',
     network: '连接中断，服务器可能正在重启，请重试',
     'rate-limited': '验证太频繁，请 10 秒后重试',
+    missing_local_login:
+      '执行机上还没有登录 Antigravity，请先运行 `agy acp --login` 或改用 API Key',
   };
 }
 
@@ -146,6 +152,7 @@ const leftPercent = (window: QuotaWindow) =>
 const SUBSCRIPTION_RUNTIME: Partial<Record<AccountVendor, ModelSourceRuntime>> = {
   claude: 'claude-code',
   devin: 'devin',
+  antigravity: 'antigravity',
 };
 
 export function subscriptionModels(
@@ -528,7 +535,7 @@ export function SubscriptionDetail({
             )}
           </section>
         )}
-        {account.vendor !== 'devin' && (
+        {account.vendor !== 'devin' && account.vendor !== 'antigravity' && (
           <SettingsSection title={t('额度')}>
             <SettingsCard>
               <QuotaRows windows={account.windows} now={now} />

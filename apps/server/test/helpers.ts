@@ -33,6 +33,7 @@ import { seed } from '../src/db/seed.js';
 import { sha256Hex } from '../src/lib/crypto.js';
 import { newRecordId, newUuidv7 } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
+import { createAntigravitySubscription } from '../src/services/antigravity-subscriptions.js';
 import { enqueueStep } from '../src/services/builds.js';
 import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { createDevinSubscription } from '../src/services/devin-subscriptions.js';
@@ -438,6 +439,17 @@ export function insertDevinSubscription(
   return createDevinSubscription({ db: s.db, box: s.secretBox }, s.team.id, {
     label: opts.label ?? 'Devin subscription',
     token: opts.token ?? `wsk-test-subscription-${randomUUID()}`,
+    ...(opts.expiresAt !== undefined ? { expiresAt: opts.expiresAt } : {}),
+  }).id;
+}
+
+export function insertAntigravitySubscription(
+  s: Pick<TestServer, 'db' | 'secretBox' | 'team'>,
+  opts: { label?: string; expiresAt?: number | null; token?: string | null } = {},
+): string {
+  return createAntigravitySubscription({ db: s.db, box: s.secretBox }, s.team.id, {
+    label: opts.label ?? 'Antigravity Host',
+    ...(opts.token !== undefined ? { token: opts.token } : {}),
     ...(opts.expiresAt !== undefined ? { expiresAt: opts.expiresAt } : {}),
   }).id;
 }

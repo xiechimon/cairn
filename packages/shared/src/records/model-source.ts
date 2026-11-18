@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { claudeLoginSchema } from './claude-login.js';
 
-export const MODEL_SOURCE_RUNTIMES = ['pi', 'claude-code', 'gemini', 'devin'] as const;
+export const MODEL_SOURCE_RUNTIMES = [
+  'pi',
+  'claude-code',
+  'gemini',
+  'devin',
+  'antigravity',
+] as const;
 export const modelSourceRuntimeSchema = z.enum(MODEL_SOURCE_RUNTIMES);
 export type ModelSourceRuntime = z.infer<typeof modelSourceRuntimeSchema>;
 
@@ -10,7 +16,20 @@ export const MODEL_SOURCE_RUNTIME_LABELS: Record<ModelSourceRuntime, string> = {
   'claude-code': 'Claude Code',
   gemini: 'Gemini',
   devin: 'Devin',
+  antigravity: 'Antigravity',
 };
+
+export const DEFAULT_ANTIGRAVITY_MODELS: readonly ModelSourceModel[] = [
+  { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', slot: 'builtin' },
+  { id: 'gemini-4-argon', name: 'Gemini 4 Argon', slot: 'builtin' },
+  { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', slot: 'builtin' },
+  { id: 'gemini-pro-orchestrator', name: 'Orchestrator (Carbon)', slot: 'builtin' },
+  { id: 'gemini-pro-orchestrator-argon', name: 'Orchestrator (Argon)', slot: 'builtin' },
+  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', slot: 'builtin' },
+  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)', slot: 'builtin' },
+  { id: 'claude-opus-4-6-thinking', name: 'Claude Opus 4.6 (Thinking)', slot: 'builtin' },
+  { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)', slot: 'builtin' },
+];
 
 export const DEFAULT_DEVIN_MODELS: readonly ModelSourceModel[] = [
   { id: 'swe-2-high', name: 'SWE-2', slot: 'builtin' },

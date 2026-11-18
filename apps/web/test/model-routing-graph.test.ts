@@ -1,5 +1,6 @@
 import type { ProviderRecord, RoutingRuleRecord, TeamRoutingSettings } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { toAntigravityAccount } from '../src/api/antigravity-subscriptions.js';
 import { toClaudeAccount } from '../src/api/claude-accounts.js';
 import { toDevinAccount } from '../src/api/devin-subscriptions.js';
 import { type ModelRouting, routingTargets, ruleGraphGroups } from '../src/api/model-routing.js';
@@ -180,5 +181,63 @@ describe('devin subscription targets', () => {
       { id: 'devin-models', name: '所有 Devin 模型', target: 'subscription:d-main' },
     ]);
     expect(groups.some((group) => group.label === 'Claude Code')).toBe(false);
+  });
+});
+
+describe('antigravity subscription targets', () => {
+  const expiredAntigravity = toAntigravityAccount(
+    {
+      id: 'a-old',
+      kind: 'antigravity-subscription',
+      label: 'Old Antigravity',
+      hasToken: false,
+      expiresAt: NOW - 1,
+      createdAt: 1,
+    },
+    NOW,
+  );
+  const liveAntigravity = toAntigravityAccount(
+    {
+      id: 'a-main',
+      kind: 'antigravity-subscription',
+      label: 'Antigravity',
+      hasToken: false,
+      expiresAt: null,
+      createdAt: 2,
+    },
+    NOW,
+  );
+  const targets = routingTargets({
+    subscriptions: [],
+    antigravitySubscriptions: [expiredAntigravity, liveAntigravity],
+    providers: [],
+    routing: { connections: [], quota: [], edges: [] },
+  });
+
+  test('antigravity accounts become antigravity targets with expiry reflected', () => {
+    expect(targets.map((target) => [target.id, target.runtime, target.unavailable])).toEqual([
+      ['subscription:a-old', 'antigravity', true],
+      ['subscription:a-main', 'antigravity', false],
+    ]);
+  });
+
+  test('an antigravity rule wires to the live antigravity subscription', () => {
+    const settings: TeamRoutingSettings = {
+      rules: [rule('coordinator', 'antigravity', 'gemini-4-carbon')],
+      policies: [],
+    };
+    const groups = ruleGraphGroups(settings, targets, [], t);
+    const agents = groups.find((group) => group.label === 'Coordinator 和其他 Agent');
+    const antigravity = groups.find((group) => group.label === 'Antigravity');
+    expect(
+      agents?.nodes.map((node) => [node.id, node.target ?? null, node.broken, node.tag]),
+    ).toEqual([['coordinator', 'subscription:a-main', false, 'gemini-4-carbon']]);
+    expect(antigravity?.nodes).toEqual([
+      {
+        id: 'antigravity-models',
+        name: '所有 Antigravity 模型',
+        target: 'subscription:a-main',
+      },
+    ]);
   });
 });

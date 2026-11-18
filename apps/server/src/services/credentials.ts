@@ -13,6 +13,7 @@ import { apiKey, build, chief, chiefThread, step, todo } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import type { KeySecretBox } from '../lib/secret-box.js';
+import { openAntigravitySubscription } from './antigravity-subscriptions.js';
 import { createApiKey } from './api-keys.js';
 import { openClaudeSubscription } from './claude-subscriptions.js';
 import { openDevinSubscription } from './devin-subscriptions.js';
@@ -96,6 +97,7 @@ export function gitKeyUsable(db: Db, name: string | null): boolean {
 export interface StepCredentialBundle {
   claudeSubscriptionToken?: string;
   devinToken?: string;
+  antigravityToken?: string;
   provider: {
     providerId: string;
     label: string;
@@ -168,12 +170,19 @@ export function resolveStepCredentials(
       stepRow.fallback?.model?.provider ?? agentRow?.provider,
       stepRow.devinSubscriptionId,
     ),
+    antigravityToken: openAntigravitySubscription(
+      deps,
+      todoRow.teamId,
+      stepRow.fallback?.model?.provider ?? agentRow?.provider,
+      stepRow.antigravitySubscriptionId,
+    ),
   };
 }
 
 export interface ChiefBoundSubscriptions {
   claudeSubscriptionId?: string | null;
   devinSubscriptionId?: string | null;
+  antigravitySubscriptionId?: string | null;
 }
 
 export function resolveChiefStepCredentials(
@@ -197,6 +206,10 @@ export function resolveChiefStepCredentials(
   const boundDevinId =
     typeof boundSubscriptionId === 'object' && boundSubscriptionId !== null
       ? boundSubscriptionId.devinSubscriptionId
+      : undefined;
+  const boundAntigravityId =
+    typeof boundSubscriptionId === 'object' && boundSubscriptionId !== null
+      ? boundSubscriptionId.antigravitySubscriptionId
       : undefined;
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
@@ -229,5 +242,11 @@ export function resolveChiefStepCredentials(
       boundClaudeId,
     ),
     devinToken: openDevinSubscription(deps, threadRow.teamId, effectiveProvider, boundDevinId),
+    antigravityToken: openAntigravitySubscription(
+      deps,
+      threadRow.teamId,
+      effectiveProvider,
+      boundAntigravityId,
+    ),
   };
 }

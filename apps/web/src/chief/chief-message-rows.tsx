@@ -435,6 +435,7 @@ const COORDINATOR_FIXES: Partial<
   Record<StepQueueBlocked['kind'], { label: string; href: string }[]>
 > = {
   'devin-subscription': [{ label: '添加 Devin 订阅', href: settingsHref('routing') }],
+  'antigravity-subscription': [{ label: '添加 Antigravity 订阅', href: settingsHref('routing') }],
   'coordinator-provider-missing': [
     { label: '添加服务商', href: settingsHref('routing') },
     { label: '改 Coordinator 规则', href: COORDINATOR_ROUTING_HREF },

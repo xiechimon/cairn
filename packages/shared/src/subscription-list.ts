@@ -1,3 +1,4 @@
+import type { AntigravitySubscription } from './antigravity-subscription.js';
 import type { ClaudeSubscription } from './claude-subscription.js';
 import type { DevinSubscription } from './devin-subscription.js';
 
@@ -17,6 +18,11 @@ export interface ClaudeSubscriptionListEntry extends ClaudeSubscription {
 }
 
 export interface DevinSubscriptionListEntry extends DevinSubscription {
+  lastUsedAt?: number | null;
+  stepsLast24h?: number | null;
+}
+
+export interface AntigravitySubscriptionListEntry extends AntigravitySubscription {
   lastUsedAt?: number | null;
   stepsLast24h?: number | null;
 }

@@ -1,6 +1,10 @@
 import type { TeamRoutingSettings } from '@cairn/shared';
 import { Plus } from 'lucide-react';
 import { Navigate, useSearchParams } from 'react-router';
+import {
+  toAntigravityAccount,
+  useAntigravitySubscriptions,
+} from '../api/antigravity-subscriptions.js';
 import { toClaudeAccount } from '../api/claude-accounts.js';
 import { useClaudeSubscriptions } from '../api/claude-subscriptions.js';
 import { toDevinAccount, useDevinSubscriptions } from '../api/devin-subscriptions.js';
@@ -14,7 +18,7 @@ import {
 } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
-import { ClaudeMark, DevinMark } from '../components/brand-marks.js';
+import { AntigravityMark, ClaudeMark, DevinMark } from '../components/brand-marks.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { Button } from '../components/ui/button.js';
@@ -30,6 +34,19 @@ import { ModelRulesSection } from './routing-settings-page.js';
 
 const EMPTY_SETTINGS: TeamRoutingSettings = { rules: [], policies: [] };
 
+const TARGET_RUNTIMES = {
+  'claude-code': 'Claude Code',
+  devin: 'Devin',
+  antigravity: 'Antigravity',
+  pi: 'pi',
+} as const;
+
+const SUBSCRIPTION_MARKS = {
+  'claude-code': ClaudeMark,
+  devin: DevinMark,
+  antigravity: AntigravityMark,
+} as const;
+
 function RoutingContent() {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -40,6 +57,7 @@ function RoutingContent() {
 
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
   const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
+  const antigravitySubscriptionsQ = useAntigravitySubscriptions(teamId, live);
   const providersQ = useProviders(teamId, live);
   const routingQ = useModelRouting(teamId, live);
   const settingsQ = useRoutingSettings(teamId, live);
@@ -58,6 +76,9 @@ function RoutingContent() {
     devinSubscriptions: live
       ? (devinSubscriptionsQ.data ?? []).map((wire) => toDevinAccount(wire, now))
       : (fixtureAccounts?.devinSubscriptions ?? []),
+    antigravitySubscriptions: live
+      ? (antigravitySubscriptionsQ.data ?? []).map((wire) => toAntigravityAccount(wire, now))
+      : (fixtureAccounts?.antigravitySubscriptions ?? []),
     providers: live ? (providersQ.data?.providers ?? []) : (fixture.resources?.providers ?? []),
     routing,
   });
@@ -131,17 +152,10 @@ function RoutingContent() {
                 targets={targets.map((target) => ({
                   id: target.id,
                   name: target.name,
-                  runtime:
-                    target.runtime === 'claude-code'
-                      ? 'Claude Code'
-                      : target.runtime === 'devin'
-                        ? 'Devin'
-                        : 'pi',
+                  runtime: TARGET_RUNTIMES[target.runtime],
                   Mark:
                     target.record === undefined
-                      ? target.runtime === 'devin'
-                        ? DevinMark
-                        : ClaudeMark
+                      ? SUBSCRIPTION_MARKS[target.runtime === 'pi' ? 'claude-code' : target.runtime]
                       : providerMark(target.record),
                   unavailable: target.unavailable,
                 }))}

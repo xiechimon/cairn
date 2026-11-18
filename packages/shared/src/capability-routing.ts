@@ -5,7 +5,7 @@ import type { TaskRequest } from './records/task-request.js';
 export const DIFFICULTIES = ['easy', 'standard', 'hard'] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
 
-export type CandidateHarness = 'claude-code' | 'pi' | 'devin';
+export type CandidateHarness = 'claude-code' | 'pi' | 'devin' | 'antigravity';
 export type CandidateRejection = 'harness-missing' | 'unavailable' | 'quota' | 'no-candidate';
 
 export interface CapabilityCandidate {

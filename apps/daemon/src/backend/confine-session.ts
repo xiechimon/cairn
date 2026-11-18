@@ -71,6 +71,10 @@ function ownState(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv)
     harness === 'claude-code' ? env.CLAUDE_CONFIG_DIR : harness === 'codex' ? env.CODEX_HOME : null;
   if (explicit !== undefined && explicit !== null && isAbsolute(explicit)) return [explicit];
   if (harness === 'pi') return [];
+  if (harness === 'antigravity') {
+    if (env.GEMINI_HOME !== undefined && isAbsolute(env.GEMINI_HOME)) return [env.GEMINI_HOME];
+    return [join(home, '.gemini')];
+  }
   if (harness === 'devin') {
     if (env.HOME === undefined || !isAbsolute(env.HOME) || realpathSync(env.HOME) === home)
       return [];
@@ -135,7 +139,12 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
         ...userDirectories,
         ...SHARED_CACHES.map((path) => join(home, path)).filter((path) => existsSync(path)),
       ],
-      readable: options.readable.filter((path) => existsSync(path)),
+      readable: [
+        ...options.readable,
+        ...(harness === 'antigravity' && env.GEMINI_HOME === undefined
+          ? [join(home, 'Library', 'Keychains')]
+          : []),
+      ].filter((path) => existsSync(path)),
       ...(Number.isInteger(port) && port > 0 ? { serverPort: port } : {}),
     };
     return seatbeltCommand(policy, launch.command, launch.args);
