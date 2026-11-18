@@ -1745,7 +1745,7 @@ export const externalEffect = sqliteTable(
       .notNull()
       .references(() => team.id, { onDelete: 'cascade' }),
     scopeKind: text('scopeKind')
-      .$type<'todo' | 'build' | 'step' | 'chiefThread' | 'mailEvent' | 'imConnection'>()
+      .$type<'todo' | 'build' | 'step' | 'chiefThread' | 'mailEvent' | 'imConnection' | 'team'>()
       .notNull(),
     scopeId: text('scopeId').notNull(),
     stepId: text('stepId'),

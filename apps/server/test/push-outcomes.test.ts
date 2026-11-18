@@ -5,8 +5,19 @@ import { afterEach, expect, test, vi } from 'vitest';
 import webpush from 'web-push';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
-import { pushDelivery, pushDigestItem, pushSubscription } from '../src/db/schema.js';
-import { queuePushDigest, sendPushToUser, sweepPushDigest } from '../src/services/push.js';
+import {
+  externalEffect,
+  pushDelivery,
+  pushDigestItem,
+  pushSubscription,
+} from '../src/db/schema.js';
+import { drainEffects, effectRegistry } from '../src/services/external-effects.js';
+import {
+  pushToUserSafely,
+  queuePushDigest,
+  sendPushToUser,
+  sweepPushDigest,
+} from '../src/services/push.js';
 import { sendMustReachAlert, sweepPendingPushAlerts } from '../src/services/push-alerts.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer, req } from './helpers.js';
@@ -273,6 +284,51 @@ test('ordinary pushes preserve declarative display without allocating receipt ro
     (await req(s.app, 'POST', `/api/teams/${s.team.id}/push/receipts`, { id: 'missing' })).status,
   ).toBe(404);
   expect(s.db.select().from(pushDelivery).all()).toEqual([]);
+});
+
+test('pushToUserSafely records a durable effect and drains it', async () => {
+  const s = setup();
+  const send = vi.spyOn(webpush, 'sendNotification').mockResolvedValue(accepted);
+  pushToUserSafely(s.db, s.keys, s.user.id, s.team.id, message);
+  const rows = s.db.select().from(externalEffect).all();
+  expect(rows).toHaveLength(1);
+  expect(rows[0]?.kind).toBe('web-push');
+  await vi.waitFor(() => {
+    expect(s.db.select().from(externalEffect).get()?.state).toBe('delivered');
+  });
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
+test('a delivered web-push effect makes a repeat call a no-op', async () => {
+  const s = setup();
+  const send = vi.spyOn(webpush, 'sendNotification').mockResolvedValue(accepted);
+  pushToUserSafely(s.db, s.keys, s.user.id, s.team.id, message);
+  await vi.waitFor(() => {
+    expect(s.db.select().from(externalEffect).get()?.state).toBe('delivered');
+  });
+  pushToUserSafely(s.db, s.keys, s.user.id, s.team.id, message);
+  await new Promise((resolve) => setImmediate(resolve));
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(s.db.select().from(externalEffect).all()).toHaveLength(1);
+});
+
+test('a failed web-push send stays pending and a stale claim reconciles for resend', async () => {
+  const s = setup();
+  const send = vi
+    .spyOn(webpush, 'sendNotification')
+    .mockRejectedValueOnce(new Error('network'))
+    .mockResolvedValue(accepted);
+  pushToUserSafely(s.db, s.keys, s.user.id, s.team.id, message);
+  await vi.waitFor(() => {
+    expect(s.db.select().from(externalEffect).get()?.attempts).toBe(1);
+  });
+  const row = s.db.select().from(externalEffect).get();
+  expect(row?.state).toBe('pending');
+  await drainEffects(s.db, effectRegistry, { now: Date.now() + 300_000 });
+  await vi.waitFor(() => {
+    expect(s.db.select().from(externalEffect).get()?.state).toBe('delivered');
+  });
+  expect(send).toHaveBeenCalledTimes(2);
 });
 
 test.each([true, false])(

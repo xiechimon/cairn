@@ -16,6 +16,15 @@ import type { Db } from '../db/client.js';
 import { apnsDevice, pushDelivery, pushDigestItem, pushSubscription, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type ApnsConfig, sendApns } from './apns.js';
+import {
+  drainEffects,
+  effectDedupeKey,
+  effectRegistry,
+  failEffect,
+  recordEffect,
+  retryEffect,
+  runEffectRow,
+} from './external-effects.js';
 import { isViewingThread } from './thread-presence.js';
 
 export interface VapidKeys {
@@ -252,6 +261,39 @@ export function isSilencedTodoPush(db: Db, teamId: string, href: string): boolea
   return row !== undefined && row.archivedAt !== null;
 }
 
+interface WebPushPayload {
+  userId: string;
+  teamId: string;
+  msg: PushMessage;
+  deliveryId?: string;
+}
+
+function webPushPayload(payload: unknown): WebPushPayload | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const p = payload as Partial<WebPushPayload>;
+  if (typeof p.userId !== 'string' || typeof p.teamId !== 'string') return null;
+  const msg = p.msg;
+  if (
+    typeof msg !== 'object' ||
+    msg === null ||
+    typeof msg.title !== 'string' ||
+    typeof msg.body !== 'string' ||
+    typeof msg.href !== 'string' ||
+    typeof msg.tag !== 'string'
+  )
+    return null;
+  return { userId: p.userId, teamId: p.teamId, msg, deliveryId: p.deliveryId };
+}
+
+function pushScopeOf(href: string): { kind: 'todo' | 'chiefThread'; id: string } | null {
+  const todoMatch = /^\/app\/todo\/([^/?#]+)/.exec(href);
+  if (todoMatch?.[1] !== undefined) return { kind: 'todo', id: todoMatch[1] };
+  const chiefMatch = /[?&]chief=([^&]+)/.exec(href);
+  if (chiefMatch?.[1] !== undefined)
+    return { kind: 'chiefThread', id: decodeURIComponent(chiefMatch[1]) };
+  return null;
+}
+
 export function pushToUserSafely(
   db: Db,
   vapid: VapidKeys | null,
@@ -266,14 +308,39 @@ export function pushToUserSafely(
     isViewingThread(db, userId, teamId, msg.href)
   )
     return;
-  void sendPushToUser(
-    db,
-    vapid,
-    userId,
+  const keys = vapid;
+  effectRegistry.set('web-push', {
+    policy: 'replay-safe',
+    scopeGone: (d, row) => {
+      const p = webPushPayload(row.payload);
+      return p !== null && isSilencedTodoPush(d, p.teamId, p.msg.href);
+    },
+    send: async (row) => {
+      const p = webPushPayload(row.payload);
+      if (p === null) throw failEffect('web-push payload is malformed');
+      const outcome = await sendPushToUser(db, keys, p.userId, p.teamId, p.msg, {
+        id: p.deliveryId ?? p.msg.tag,
+        required: false,
+      });
+      if (outcome.status === 'delivered') return outcome;
+      if (outcome.status === 'no-subscription' || outcome.status === 'all-expired')
+        throw failEffect(`web push ${outcome.status}`, false);
+      throw retryEffect(`web push ${outcome.status}`);
+    },
+  });
+  const scope = pushScopeOf(msg.href) ?? { kind: 'team' as const, id: teamId };
+  const { row } = recordEffect(db, {
     teamId,
-    msg,
-    deliveryId === undefined ? undefined : { id: deliveryId, required: false },
-  ).catch(() => {
+    scopeKind: scope.kind,
+    scopeId: scope.id,
+    kind: 'web-push',
+    dedupeKey: effectDedupeKey('web-push', userId, msg.tag),
+    payload: { userId, teamId, msg, deliveryId },
+  });
+  void runEffectRow(db, effectRegistry, row.id).catch(() => {
+    process.stderr.write('web push delivery failed\n');
+  });
+  void drainEffects(db, effectRegistry).catch(() => {
     process.stderr.write('web push delivery failed\n');
   });
 }

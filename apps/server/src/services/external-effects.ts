@@ -46,7 +46,13 @@ export class EffectWait extends Error {
   }
 }
 
-export class EffectFail extends Error {}
+export class EffectFail extends Error {
+  countHealth: boolean;
+  constructor(message: string, countHealth = true) {
+    super(message);
+    this.countHealth = countHealth;
+  }
+}
 
 export function retryEffect(message: string, retryAfterMs?: number): EffectRetry {
   return new EffectRetry(message, retryAfterMs);
@@ -56,8 +62,8 @@ export function waitEffect(message: string, retryAfterMs?: number): EffectWait {
   return new EffectWait(message, retryAfterMs);
 }
 
-export function failEffect(message: string): EffectFail {
-  return new EffectFail(message);
+export function failEffect(message: string, countHealth = true): EffectFail {
+  return new EffectFail(message, countHealth);
 }
 
 export function effectBackoffMs(attempts: number): number {
@@ -139,7 +145,7 @@ export function markEffectDelivered(db: Db, id: string, fence: number, receipt: 
 
 export type EffectAttemptOutcome =
   | { state: 'pending'; dueAt: number; lastError: string; countAttempt?: boolean }
-  | { state: 'failed' | 'interrupted'; lastError: string };
+  | { state: 'failed' | 'interrupted'; lastError: string; countHealth?: boolean };
 
 export function markEffectAttempt(
   db: Db,
@@ -184,6 +190,7 @@ function settleSendError(err: unknown, attempts: number, now: number): EffectAtt
     return {
       state: 'failed' as const,
       lastError: err instanceof Error ? err.message : String(err),
+      countHealth: !(err instanceof EffectFail) || err.countHealth,
     };
   }
   const retryAfter = err instanceof EffectRetry ? err.retryAfterMs : undefined;
@@ -218,7 +225,7 @@ export async function runEffectRow(
   } catch (err) {
     const next = settleSendError(err, claimed.attempts, nowMs());
     markEffectAttempt(db, id, claimed.claimFence ?? now, next);
-    if (next.state !== 'pending' || next.countAttempt !== false)
+    if ((next.state === 'pending' ? next.countAttempt : next.countHealth) !== false)
       noteEffectHealth(db, claimed.kind, false);
     return next.state === 'failed' ? 'failed' : 'pending';
   }
