@@ -6,12 +6,7 @@
 ~/.cairn/tools/governor/brake.sh
 ~/.cairn/tools/governor/lane-sentinel.sh
 ~/.cairn/tools/governor/lane-health.sh
-~/.cairn/tools/governor/block-governor.sh
-~/.cairn/tools/governor/aged-prs.sh
 ~/.cairn/tools/main-watch/model-health.sh
-~/.cairn/tools/merge-order/queue.sh
-~/.cairn/tools/merge-order/stale-prs.sh
-~/.cairn/tools/merge-order/lanes-retry.sh
 set -uo pipefail
 R=xiechimon/cairn ST=~/.local/state/main-watch; mkdir -p $ST
 log(){ echo "$(date -u +%FT%H:%MZ) $*"; }

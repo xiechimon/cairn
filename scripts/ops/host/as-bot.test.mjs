@@ -26,11 +26,6 @@ const entry = JSON.stringify({ argv, token: process.env.GH_TOKEN ?? null,
 fs.appendFileSync(process.env.CALLS, entry);
 `;
 
-const tokenStub = `import { appendFileSync } from 'node:fs';
-appendFileSync(process.env.TOKEN_MINTS, 'minted\\n');
-process.stdout.write('stub-installation-token');
-`;
-
 const HEAD = 'a'.repeat(40);
 const REPO = 'xiechimon/cairn';
 
@@ -47,20 +42,16 @@ function setup(t) {
     resolve('packages/shared/commit-identity.json'),
     join(tools, 'commit-identity.json'),
   );
-  writeFileSync(join(tools, 'token.mjs'), tokenStub);
   for (const name of ['gh', 'git', 'bash', 'curl']) {
     writeFileSync(join(bin, name), recorderStub);
     chmodSync(join(bin, name), 0o755);
   }
   const calls = join(root, 'calls');
-  const mints = join(root, 'mints');
   writeFileSync(calls, '');
-  writeFileSync(mints, '');
   const env = {
     HOME: root,
     PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
     CALLS: calls,
-    TOKEN_MINTS: mints,
     GH_TOKEN: 'stub-inherited-installation-token',
     GITHUB_TOKEN: 'stub-inherited-installation-token',
     GIT_AUTHOR_NAME: 'cairnwright[bot]',
@@ -80,7 +71,6 @@ function setup(t) {
         status: result.status,
         stderr: result.stderr,
         calls: recorded ? recorded.split('\n').map((line) => JSON.parse(line)) : [],
-        minted: readFileSync(mints, 'utf8').trim() !== '',
       };
     },
   };
@@ -151,7 +141,6 @@ for (const argv of allowed) {
         authHeader: '',
       },
     ]);
-    assert.equal(result.minted, false);
   });
 }
 
@@ -317,14 +306,12 @@ for (const [argv, message] of denied) {
     assert.match(result.stderr, /^as-bot: refused: /);
     assert.match(result.stderr, message);
     assert.deepEqual(result.calls, []);
-    assert.equal(result.minted, false);
   });
 }
 
 test('as-bot.sh refuses before any token is minted and exits 126', (t) => {
   const result = setup(t).run('gh', 'pr', 'merge', '1', '--admin');
   assert.equal(result.status, 126);
-  assert.equal(result.minted, false);
 });
 
 test('the policy file ships next to as-bot.sh', () => {

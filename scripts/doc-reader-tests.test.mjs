@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { docReaderTests } from './doc-reader-tests.mjs';
 
@@ -20,7 +19,6 @@ test('a doc change selects the tests that name it, split by runner', () => {
     docReaderTests(
       ['docs/ops/agent-bot-identity.md', 'docs/lessons/README.md', 'docs/unread.md'],
       grep,
-      ['apps/daemon/test/local-executor.test.ts'],
     ),
     {
       node: ['scripts/agent-rules.test.mjs'],
@@ -29,29 +27,20 @@ test('a doc change selects the tests that name it, split by runner', () => {
   );
 });
 
-test('root-level doc names, integration suites and known-red files are not selected', () => {
-  assert.deepEqual(docReaderTests(['README.md', 'AGENTS.md'], grep, []), { node: [], vitest: [] });
-  assert.deepEqual(
-    docReaderTests(['docs/lessons/README.md'], grep, ['apps/daemon/test/local-executor.test.ts'])
-      .vitest,
-    ['apps/server/test/codeowners.test.ts'],
-  );
+test('root-level doc names, integration suites and locally-red files are not selected', () => {
+  assert.deepEqual(docReaderTests(['README.md', 'AGENTS.md'], grep), { node: [], vitest: [] });
+  assert.deepEqual(docReaderTests(['docs/lessons/README.md'], grep).vitest, [
+    'apps/server/test/codeowners.test.ts',
+  ]);
 });
 
 test('the retired collector archive is excluded while current identity safeguards remain selected', () => {
-  const knownRed = JSON.parse(
-    readFileSync(new URL('./prepush-known-red.json', import.meta.url), 'utf8'),
-  ).map((entry) => entry.file);
   assert.deepEqual(
-    docReaderTests(
-      ['docs/ops/agent-bot-identity.md'],
-      () => [
-        'docs/research/assets/2136/review-check.test.mjs',
-        'scripts/commit-identity.test.mjs',
-        'apps/server/test/codeowners.test.ts',
-      ],
-      knownRed,
-    ),
+    docReaderTests(['docs/ops/agent-bot-identity.md'], () => [
+      'docs/research/assets/2136/review-check.test.mjs',
+      'scripts/commit-identity.test.mjs',
+      'apps/server/test/codeowners.test.ts',
+    ]),
     {
       node: ['scripts/commit-identity.test.mjs'],
       vitest: ['apps/server/test/codeowners.test.ts'],

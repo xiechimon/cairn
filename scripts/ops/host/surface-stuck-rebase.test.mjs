@@ -14,7 +14,6 @@ import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 
 const script = resolve('scripts/ops/host/tools/overnight/surface-stuck-rebase.sh');
-const driver = resolve('scripts/ops/host/tools/overnight/driver.sh');
 
 function write(root, path, content) {
   mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -123,18 +122,4 @@ test('a failed GitHub write is retried on the next pass', (t) => {
   const f = lane(t, { fails: 3, botFails: true });
   assert.equal(f.run('2441').status, 1);
   assert.equal(f.surfaced(), false);
-});
-
-test('the driver surfaces a stuck lane instead of skipping it silently', () => {
-  const text = readFileSync(driver, 'utf8');
-  assert.match(
-    text,
-    /\[ -e \$f \] && \{ ~\/\.cairn\/tools\/overnight\/surface-stuck-rebase\.sh \$n \$f \$pr 9>&-; continue; \}/,
-  );
-  const rebase = text.slice(
-    text.indexOf('f=$ST/rebase-$n-'),
-    text.indexOf('rebase conflict -> worker'),
-  );
-  assert.ok(rebase.length > 0);
-  assert.doesNotMatch(rebase, /&& continue; touch/);
 });

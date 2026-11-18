@@ -48,14 +48,14 @@ export const PATTERNS = [
     label: '`@ts-ignore` / `@ts-expect-error`',
     regex: String.raw`@ts-(ignore|expect-error)\b`,
     scope: SOURCE_TS,
-    gate: 'Biome suspicious/noTsIgnore, held at its warning cap by lint-warning-cap.mjs',
+    gate: 'Biome suspicious/noTsIgnore',
   },
   {
     id: 'explicit-any',
     label: 'explicit `any`',
     regex: String.raw`(:\s*any\b|\bas any\b|<any>)`,
     scope: SOURCE_TS,
-    gate: 'Biome suspicious/noExplicitAny, held at its warning cap by lint-warning-cap.mjs',
+    gate: 'Biome suspicious/noExplicitAny',
   },
 ];
 

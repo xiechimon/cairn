@@ -558,23 +558,17 @@ test('hourly recovery does not require current live rows or attachment files', (
 });
 
 for (const [table, field, value] of [
-  ['agent', 'persona', 'builder'],
-  ['agent', 'tools', '["wrong"]'],
-  ['agent', 'secrets', '["wrong"]'],
-  ['tag', 'name', 'Wrong tag'],
-  ['tag', 'color', '#000000'],
+  ['project', 'name', 'Wrong name'],
+  ['project', 'description', 'wrong'],
+  ['project', 'localPath', '/wrong'],
+  ['project', 'githubRepo', 'wrong/repo'],
+  ['project', 'icon', 'wrong-icon'],
 ])
   test(`undated ${table}.${field} corruption is rejected`, () => {
     const f = fixture();
     const team = sql(f.db, 'select id from team limit 1');
-    for (const db of [f.db, f.backupDb]) {
-      sql(
-        db,
-        table === 'agent'
-          ? `insert into agent(id,teamId,displayName) values('test-agent','${team}','Agent')`
-          : "insert into tag(id,projectId,name) values('test-tag','p','Tag')",
-      );
-    }
+    for (const db of [f.db, f.backupDb])
+      sql(db, `insert into project(id,teamId,name) values('test-proj','${team}','Proj')`);
     sql(f.backupDb, `update ${table} set ${field}='${value}'`);
     f.pack();
     fails(f, new RegExp(`content ${table}.*differing`));

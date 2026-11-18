@@ -8,7 +8,6 @@ import {
   readdirSync,
   readFileSync,
   statSync,
-  writeFileSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -16,7 +15,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
 
 const hostRoot = resolve('scripts/ops/host');
 const appToken = join(hostRoot, 'tools/app-token');
-const bot = {
+const _bot = {
   name: 'cairnwright[bot]',
   email: '347615582+cairnwright[bot]@users.noreply.github.com',
 };
@@ -24,11 +23,11 @@ const owner = {
   name: 'xiechimon',
   email: '157263579+xiechimon@users.noreply.github.com',
 };
-const retiredUser = {
+const _retiredUser = {
   name: 'Cairnwright',
   email: '348051526+cairnwright@users.noreply.github.com',
 };
-const session = { name: 'Session', email: 'kigv1zSwiHPke_Cl5Ci6D@cairn.local' };
+const _session = { name: 'Session', email: 'kigv1zSwiHPke_Cl5Ci6D@cairn.local' };
 const coAuthor = 'Co-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>';
 const cleanEnv = Object.fromEntries(
   Object.entries(process.env).filter(
@@ -61,11 +60,8 @@ function host(t) {
     resolve('packages/shared/commit-identity.json'),
     join(tools, 'commit-identity.json'),
   );
-  writeFileSync(join(tools, 'token.mjs'), "process.stdout.write('stub-token');\n");
   const lanes = join(home, 'lanes');
   mkdirSync(lanes);
-  copyFileSync(join(hostRoot, 'lanes/sign-commits.sh'), join(lanes, 'sign-commits.sh'));
-  chmodSync(join(lanes, 'sign-commits.sh'), 0o755);
   const bare = join(home, 'remote.git');
   sh(home, ['init', '-q', '--bare', '-b', 'main', bare]);
   const work = join(home, 'work');
@@ -129,20 +125,6 @@ test('as-bot.sh git push is a plain push that leaves no temporary refs', async (
   assert.equal(sh(h.bare, ['for-each-ref', 'refs/cairn']), '');
 });
 
-test('the retired sign-commits entry point preserves unpublished commits and their authors', async (t) => {
-  const h = host(t);
-  sh(h.work, ['commit', '-q', '--allow-empty', '-m', 'session: one'], as(session));
-  sh(h.work, ['commit', '-q', '--allow-empty', '-m', 'lane: work'], as(retiredUser, bot));
-  sh(h.work, ['fetch', '-q', 'origin']);
-  const before = sh(h.work, ['rev-parse', 'HEAD']);
-  const commits = h.log('origin/main..HEAD');
-  const result = await h.run('/bin/bash', [join(h.home, 'lanes/sign-commits.sh')]);
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(sh(h.work, ['rev-parse', 'HEAD']), before);
-  assert.equal(commits.length, 2);
-  assert.deepEqual(h.log('origin/main..HEAD'), commits);
-});
-
 const listFiles = (dir) =>
   readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -159,10 +141,4 @@ test('no host script keeps the retired user, the author-only wrapper, a rebase m
     assert.doesNotMatch(text, /348051526|Cairnwright|as-bot-author|bot-git|git sign/, file);
     assert.doesNotMatch(text, /--rebase|reset -q --soft/, file);
   }
-});
-
-test('merge-pr.sh squashes every PR, whoever opened it and however many commits it has', () => {
-  const source = readFileSync(join(hostRoot, 'tools/merge-pr.sh'), 'utf8');
-  assert.match(source, /run=\(gh pr merge "\$pr" -R "\$R" --squash --match-head-commit "\$head"\)/);
-  assert.doesNotMatch(source, /app\/cairnwright|commits\|length|ACCEPTED_BOT_AUTHORS/);
 });

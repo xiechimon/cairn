@@ -13,7 +13,7 @@ if [ $fixing = 0 ] && [ -z "${DISPATCH_FORCE:-}" ]; then
   if [ "$tier" != simple ]; then
     gh issue view $n -R xiechimon/cairn --json comments --jq '.comments[].body' 2>/dev/null | grep -q '<!-- acceptance-checklist v1' || { echo "#$n ($tier) has no acceptance checklist yet; not dispatching"; exit 3; }
   fi
-  dep=$(node ~/.cairn/tools/merge-order/deps-open.mjs $n 2>/dev/null) || { echo "#$n waits for open $dep"; exit 3; }
+  dep=$(node ~/.cairn/tools/deps-open.mjs $n 2>/dev/null) || { echo "#$n waits for open $dep"; exit 3; }
   red=$(gh api repos/xiechimon/cairn/commits/main/check-runs --jq '[.check_runs[]|select(.conclusion=="failure")]|length' 2>/dev/null)
   [ "${red:-0}" -gt 0 ] && { echo "#$n not dispatched: main is red"; exit 3; }
 fi

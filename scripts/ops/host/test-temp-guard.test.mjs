@@ -198,11 +198,7 @@ test('policy covers baseline allocation prefixes and the historical test familie
   const baseline = JSON.parse(
     readFileSync(new URL('../../test-tmp-baseline.json', import.meta.url), 'utf8'),
   );
-  for (const file of [
-    ...Object.keys(baseline),
-    'scripts/ops/host/host-fixture.mjs',
-    'scripts/prepush-vitest.mjs',
-  ]) {
+  for (const file of [...Object.keys(baseline), 'scripts/ops/host/host-fixture.mjs']) {
     const source = readFileSync(new URL(`../../../${file}`, import.meta.url), 'utf8');
     for (const site of rawAllocationSites(source, file)) {
       const tail = source

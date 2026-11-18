@@ -12,8 +12,7 @@ const daysAgo = (days) => new Date(Date.parse(NOW) - days * 86400000).toISOStrin
 
 const allowlist = (n) =>
   Array.from({ length: n }, (_, i) => ({ path: 'a.ts', line: `// ${i}`, reason: 'external' }));
-const baselineFiles = ({ warnings, controls, comments }) => ({
-  'scripts/lint-warning-baseline.json': { maxWarnings: warnings },
+const baselineFiles = ({ controls, comments }) => ({
   'scripts/ui-debt-baseline.json': {
     perFaceCss: { 'a.css': 10 },
     rawControls: { total: controls, files: {} },
@@ -72,12 +71,11 @@ test('ranks growth by the 7-day delta and stock by current count', () => {
 test('report lists every category with its 7-day change, sorted, and writes the summary file', () => {
   const { cwd, commit, run } = fixture();
   try {
-    commit(daysAgo(20), baselineFiles({ warnings: 0, controls: 3, comments: 2 }));
-    commit(daysAgo(3), baselineFiles({ warnings: 0, controls: 3, comments: 7 }));
+    commit(daysAgo(20), baselineFiles({ controls: 3, comments: 2 }));
+    commit(daysAgo(3), baselineFiles({ controls: 3, comments: 7 }));
     const result = run();
     assert.equal(result.status, 0, result.stderr);
     for (const id of [
-      'lint-warning/warnings',
       'ui-debt/per-face-css-lines',
       'ui-debt/bare-controls',
       'ui-debt/arbitrary-text',
@@ -102,7 +100,7 @@ test('a baseline file born inside the window reports its whole count as growth',
   const { cwd, commit, run } = fixture();
   try {
     commit(daysAgo(20), { 'README.md': 'x' });
-    commit(daysAgo(2), baselineFiles({ warnings: 0, controls: 3, comments: 2 }));
+    commit(daysAgo(2), baselineFiles({ controls: 3, comments: 2 }));
     const result = run();
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /ui-debt\/bare-controls\s*\|\s*3\s*\|\s*\+3/);
@@ -115,7 +113,7 @@ test('refuses a shallow clone, whose history would fake every delta as growth', 
   const { cwd, commit } = fixture();
   const clone = join(cwd, 'shallow');
   try {
-    commit(daysAgo(20), baselineFiles({ warnings: 0, controls: 3, comments: 2 }));
+    commit(daysAgo(20), baselineFiles({ controls: 3, comments: 2 }));
     commit(daysAgo(1), { 'README.md': 'x' });
     execFileSync('git', ['clone', '--depth', '1', `file://${cwd}`, clone], { stdio: 'pipe' });
     const result = spawnSync(process.execPath, [script, '--now', NOW], {

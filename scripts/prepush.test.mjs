@@ -31,11 +31,7 @@ import {
 import { scrubGateEnv } from './scrub-git-env.mjs';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
-const prepushFixtureFiles = [
-  ...prepushModules,
-  'scripts/doc-reader-tests.mjs',
-  'scripts/prepush-known-red.json',
-];
+const prepushFixtureFiles = [...prepushModules, 'scripts/doc-reader-tests.mjs'];
 
 test('scrubGateEnv drops every gate base SHA and the force-full switch', () => {
   const env = {
@@ -618,7 +614,6 @@ test('code changes keep suites in CI and out of local plans', () => {
   ]) {
     for (const forceFull of [false, true]) {
       const plan = prepushPlan(paths, 'local', forceFull);
-      assert.ok(!plan.some((step) => step[1] === 'scripts/prepush-vitest.mjs'));
       assert.ok(!plan.some((step) => step.join(' ') === 'pnpm --filter @cairn/web test'));
       assert.ok(!plan.some((step) => step.includes('e2e:affected')));
       assert.deepEqual(prepushPlan(paths, 'ci', forceFull), [
@@ -954,22 +949,6 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
   }
 });
 
-test('prepush vitest only forgives files listed as known local red', async () => {
-  const { unexpectedFailures } = await import('./prepush-vitest.mjs');
-  const known = [{ file: 'a/known.test.ts', reason: 'r' }];
-  const report = {
-    testResults: [
-      { name: '/r/a/known.test.ts', status: 'failed' },
-      { name: '/r/b/new.test.ts', status: 'failed' },
-      { name: '/r/c/ok.test.ts', status: 'passed' },
-    ],
-  };
-  assert.deepEqual(unexpectedFailures(report, known, '/r'), {
-    unexpected: ['b/new.test.ts'],
-    knownFailed: ['a/known.test.ts'],
-  });
-});
-
 test('plan children do not inherit the git hook repository binding', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-hook-env-'));
   const victim = join(directory, 'victim');
@@ -1075,15 +1054,12 @@ test('CI doc-reader checks select the real codeowners reader for identity docume
         prepushPlan(paths, mode).filter((step) => step[1] === 'scripts/doc-reader-tests.mjs'),
         [['node', 'scripts/doc-reader-tests.mjs', path]],
       );
-  const readers = docReaderTests(
-    [path],
-    (doc) =>
-      execFileSync('git', ['grep', '-l', '-F', '-e', doc, '--', '*.test.ts', '*.test.mjs'], {
-        encoding: 'utf8',
-      })
-        .trim()
-        .split('\n'),
-    JSON.parse(readFileSync('scripts/prepush-known-red.json', 'utf8')).map((entry) => entry.file),
+  const readers = docReaderTests([path], (doc) =>
+    execFileSync('git', ['grep', '-l', '-F', '-e', doc, '--', '*.test.ts', '*.test.mjs'], {
+      encoding: 'utf8',
+    })
+      .trim()
+      .split('\n'),
   );
   assert.ok(readers.vitest.includes('apps/server/test/codeowners.test.ts'));
 });

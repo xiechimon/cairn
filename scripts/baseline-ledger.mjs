@@ -2,12 +2,6 @@ const entryCount = (json) => json.length;
 
 export const METRICS = [
   {
-    id: 'lint-warning/warnings',
-    file: 'scripts/lint-warning-baseline.json',
-    ratchet: true,
-    count: (json) => json.maxWarnings,
-  },
-  {
     id: 'ui-debt/per-face-css-lines',
     file: 'scripts/ui-debt-baseline.json',
     ratchet: true,

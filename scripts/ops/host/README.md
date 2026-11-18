@@ -19,31 +19,21 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 | `tools/backup/db-backup.sh` | `cairn-db-backup.service` | Wraps `scripts/ops/backup-server-db.sh`, syncs attachments, pushes both to the rsync remote |
 | `tools/app-token/as-bot.sh` | legacy callers below | Runs an approved command with the owner's identity and user gh credential helper; never mints a token. New agent work uses ordinary git/gh |
 | `tools/app-token/bot-identity.mjs` | legacy `as-bot.sh` | Prints the owner's name, noreply email and optional co-author trailer from `commit-identity.json` |
-| `tools/app-token/token.mjs` | no longer called by `as-bot.sh` | Legacy minter retained only until its remaining consumers are retired and private-key removal is separately approved |
-| `tools/merge-pr.sh` | called by `overnight/driver.sh`, `rearm-automerge.sh` | Squash-merges a PR with the human login, pinned to the head it read, once the issues it closes have no open dependencies. It reads no check run, review verdict or hold label |
-| `tools/rearm-automerge.sh` | called by `overnight/driver.sh` | Disarms and re-arms auto-merge on bot PRs whose merge state changed |
-| `tools/overnight/driver.sh` | `cairn-overnight.service` | Per-lane loop: rebase, sign, push, open PRs, fix red CI, merge |
-| `tools/overnight/surface-stuck-rebase.sh` | called by `overnight/driver.sh` | When a lane's rebase worker has failed 3 times on one head, labels the PR `stale-pr` and comments the files `git merge-tree` reports as conflicting with main (the issue when there is no PR), once per head, instead of the driver skipping the lane silently |
-| `tools/overnight/lane-replaced.sh` | called by `overnight/driver.sh` | Exits 0 when the lane's issue is closed (prints `closed`) or another open PR closes it (prints that PR, a coordinator-prepared replacement), so the driver skips the lane instead of pushing a duplicate PR or surfacing a finished lane; an unreadable issue also skips |
+| `tools/overnight/surface-stuck-rebase.sh` | by hand | When a lane's rebase worker has failed 3 times on one head, labels the PR `stale-pr` and comments the files `git merge-tree` reports as conflicting with main (the issue when there is no PR), once per head, instead of the driver skipping the lane silently |
+| `tools/overnight/lane-replaced.sh` | by hand | Exits 0 when the lane's issue is closed (prints `closed`) or another open PR closes it (prints that PR, a coordinator-prepared replacement), so the driver skips the lane instead of pushing a duplicate PR or surfacing a finished lane; an unreadable issue also skips |
 | `tools/plan/plan-issues.sh` | `cairn-plan-issues.service` (under `flock`), called by `lanes/run-worker.sh` | Writes an implementation plan into issues that lack one |
-| `tools/reminders/resume-1727.sh` | `cairn-resume-1727.service` | One-off reminder that releases the held Web Push ticket |
 | `tools/schedule/issue-schedule.mjs` | `cairn-issue-schedule.service` | Rewrites the scheduling issue from `batch:*` labels |
 | `tools/ci-speed.sh` | by hand, coordinator check-ins | One line of PR and push CI wall time (median, p90, max over the last 60 completed `ci.yml` runs) |
 | `bin/cairn-heavy` | every lane, before a whole-repo check | Delegates to the current checkout's shared heavy-slot CLI (default 2, `CAIRN_HEAVY_SLOTS` override); defaults `CAIRN_TEST_TEMP_ROOT` to disk at `~/.cache/cairn-test-tmp` |
 | `tools/test-temp-guard.mjs`, `tools/test-temp-policy.json`, `units/test-temp-guard.{service,timer}` | every 15 min, also started by `main-watch/tmp-clean.sh` | Removes idle stale test entries from `/tmp`, `~/.cache/cairn-test-tmp` and `~/.cache/lane-tmp`; caps lane temp at 5 GiB and warns about pressure |
 | `tools/main-watch/main-watch.sh` | `cairn-main-watch.service` | Opens `main-red` issues for failing main checks and runs the scripts below each tick |
 | `tools/main-watch/{codex-watch,gh-health,model-health,tmp-clean}.sh` | `main-watch.sh` | Quota, GitHub API, model and temp-directory health |
-| `tools/governor/aged-prs.sh` | `main-watch.sh` | Pushes PRs open over 48h: lane PRs re-dispatch, `codex/`, `claude/` and `cursor/` branches get a `stale-pr` issue, other branches get a worktree worker |
-| `tools/governor/{block-governor,brake,lane-health,lane-sentinel}.sh` | `main-watch.sh` | Close blocked PRs after fix rounds, pause dispatch, report failing workers and red main |
-| `tools/governor/{selfcheck,split-issue,tier}.sh` | `driver.sh`, `block-governor.sh`, `dispatch-issue.sh` | Pre-push self-check, ticket splitting, ticket tier lookup |
-| `tools/governor/weekly-blocks.sh` | `cairn-weekly-blocks.service` | Weekly summary of review-gate block reasons |
+| `tools/governor/{brake,lane-health,lane-sentinel}.sh` | `main-watch.sh` | Pause dispatch, report failing workers and red main |
+| `tools/governor/{selfcheck,split-issue,tier}.sh` | `dispatch-issue.sh` | Pre-push self-check, ticket splitting, ticket tier lookup |
 | `tools/governor/orchestration-report.sh` | by hand | Orchestration report |
-| `tools/merge-order/{lanes-retry,queue,stale-prs}.sh` | `main-watch.sh` | Retry lanes with no commit, update queued PR branches, flag stale PRs; `lanes-retry.sh` also dispatches the `pending` list |
-| `tools/merge-order/deps-open.mjs` | called by `dispatch-issue.sh`, `lanes-retry.sh`, `merge-pr.sh` | Exits non-zero and names open dependencies of an issue |
-| `tools/weekly/evidence-prune.sh` | `cairn-evidence-prune.service` | Weekly evidence prune PR (ADR 0022) |
-| `lanes/dispatch-issue.sh` | called by the governor, `main-watch` and `merge-order` scripts | Starts a lane worker for an issue after the gates below |
+| `lanes/dispatch-issue.sh` | called by `main-watch` and the governor scripts | Starts a lane worker for an issue after the gates below |
 | `lanes/{build-prompt,run-worker,test-build-prompt}.sh` | `dispatch-issue.sh` | Render the worker prompt, run the worker, test the prompt renderer |
-| `lanes/{sign-commits,rebase-main,finish-branch,regen-migration}.sh` | `driver.sh`, `aged-prs.sh`, by hand | `sign-commits` is a compatibility no-op that preserves authors; remaining lane helpers rebase, push and regenerate migrations |
+| `lanes/{rebase-main,regen-migration}.sh` | by hand | Lane helpers rebase and regenerate migrations |
 | `lanes/{deploy-omarchy,wait-rr}.sh` | by hand | Deploy and wait helpers |
 
 ## Documented behavior covered by tests
@@ -51,8 +41,6 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 `node --test scripts/ops/host/*.test.mjs` drives the scripts with stub `gh`, `git`, `flock`, `setsid` and `nohup` on `PATH` and a scratch `HOME`.
 
 - `dispatch-issue.sh` exits 3 for a non-OPEN or unreadable issue state (a `main-red` note bypasses that check) and for an issue on the `never` list, before it reads the state. It does not look at `batch:*` labels today; a test pins that, and a later change that adds the refusal should replace it.
-- `aged-prs.sh` treats `codex/`, `claude/` and `cursor/` branches as foreign (a `stale-pr` issue, no worker), re-dispatches `lane/N` unless `N` is on `hold` or `never`, and handles each PR head once. Any other prefix is not foreign: it gets a worktree worker.
-- The `never` list wins over `pending`: `lanes-retry.sh` hands a pending ticket to `dispatch-issue.sh`, which refuses it, and the ticket stays pending.
 
 ## as-bot allowlist (#2379)
 
@@ -76,22 +64,14 @@ Measured with `grep -rn as-bot` over `~/.cairn/tools`, `~/lanes/*.sh` and `~/.co
 
 | Caller | Commands | Under the policy |
 |---|---|---|
-| `tools/overnight/driver.sh` | `git push -q --no-verify --force-with-lease origin HEAD:lane/N`, `gh pr create` | allowed |
-| `lanes/finish-branch.sh` | `git push -q --no-verify --force-with-lease origin HEAD:<branch>` | allowed |
 | `lanes/rebase-main.sh` | `git rebase -q origin/main`, `git rebase --continue` | allowed |
 | `lanes/regen-migration.sh` | `git rebase -q -X theirs origin/main`, `git commit -qm ... --no-verify` (both commits) | allowed |
 | `tools/governor/split-issue.sh` | `gh issue create`, `gh issue comment` | allowed |
-| `tools/governor/block-governor.sh` | `gh issue comment`, `gh pr close` | allowed |
 | `tools/plan/plan-issues.sh` | `gh issue edit --body-file -` | allowed |
-| `tools/merge-order/queue.sh` | `gh pr update-branch` for every armed PR that is behind | allowed |
-| `tools/reminders/resume-1727.sh` | `gh issue create`, `gh issue edit --remove-label`, `gh issue comment` | allowed |
 | `~/.cairn/tools/review-gate/retro-review.sh` (not mirrored) | `gh issue create` | allowed |
 | `tools/schedule/issue-schedule.mjs` | `gh issue create|edit|comment|pin` | allowed |
-| `tools/rearm-automerge.sh` | `gh pr merge --disable-auto` | allowed |
-| `tools/weekly/evidence-prune.sh` | `git fetch`, `git commit`, `git push -u origin <branch>`, `gh pr create`, `gh pr comment` (it arms `gh pr merge --squash --auto --match-head-commit <sha>` as the human login, not through `as-bot.sh`) | allowed |
-| `tools/merge-pr.sh` | none: it squash-merges PRs with `gh pr merge <n> --squash --match-head-commit <sha>` as the human login | not through `as-bot.sh` |
 
-Merge decision (C1 session, after the review gate found that a PASS comment can be forged through `gh pr comment`, which the bot may run): the bot never merges. Merge authorization uses the human login (`docs/ops/agent-bot-identity.md`): `merge-pr.sh` squash-merges PRs with plain `gh`, pinned to the head it read, and reads no review verdict (ian, 2026-11-12), and `evidence-prune.sh` arms its auto-merge with plain `gh`. `as-bot-callers.test.mjs` runs both scripts through the real `as-bot.sh` and policy. The policy has no override switch.
+Merge decision (C1 session, after the review gate found that a PASS comment can be forged through `gh pr comment`, which the bot may run): the bot never merges. Merge authorization uses the human login (`docs/ops/agent-bot-identity.md`; ian, 2026-11-12). The policy has no override switch.
 
 ## Test temp storage (#1954)
 

@@ -10,9 +10,9 @@ Before making another commit in an older active worktree, fetch and integrate cu
 
 Existing `cairnwright[bot]` commits remain accepted during migration. Preserve their authors and unpublished work rather than rewriting history. An old commit can still display the bot as its author even when a user pushes it: commit authorship and push authentication are different facts.
 
-The installed `~/.cairn/tools/app-token/as-bot.sh` path remains temporarily for older callers. After installation of this revision it retains the command allowlist, but uses the owner's noreply identity and local user `gh` credentials. It does not call `token.mjs`, read a private key, mint a token, or add an automatic self co-author trailer. It clears inherited `GH_TOKEN`/`GITHUB_TOKEN` and the GitHub authorization extraheader, and selects `gh auth git-credential` with the owner's normal `~/.config/gh` directory. Explicit `CAIRN_COAUTHOR` trailers are still honored.
+The installed `~/.cairn/tools/app-token/as-bot.sh` path remains temporarily for older callers. After installation of this revision it retains the command allowlist, but uses the owner's noreply identity and local user `gh` credentials. It does not mint a token, read a private key, or add an automatic self co-author trailer; the old `token.mjs` minter and `lanes/sign-commits.sh` compatibility entry are retired. It clears inherited `GH_TOKEN`/`GITHUB_TOKEN` and the GitHub authorization extraheader, and selects `gh auth git-credential` with the owner's normal `~/.config/gh` directory. Explicit `CAIRN_COAUTHOR` trailers are still honored.
 
-`bot-identity.mjs` is also a compatibility filename: its first two lines now identify the owner. `lanes/sign-commits.sh` is a compatibility no-op and never rewrites commits. New callers use ordinary git/gh, not these paths.
+`bot-identity.mjs` is also a compatibility filename: its first two lines now identify the owner. New callers use ordinary git/gh, not these paths.
 
 The compatibility allowlist retains the ship protections: ordinary fast-forward pushes to main are allowed; force, force-with-lease and delete pushes remain refused. GitHub's remote branch protection remains independent of local Git hooks and is unchanged.
 
