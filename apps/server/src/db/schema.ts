@@ -459,6 +459,7 @@ export const steerPending = sqliteTable('steer_pending', {
   conversationId: text('conversationId').primaryKey(),
   stepId: text('stepId').notNull(),
   content: text('content').notNull(),
+  sentAt: epochMs('sentAt'),
   createdAt: epochMs('createdAt').notNull(),
 });
 

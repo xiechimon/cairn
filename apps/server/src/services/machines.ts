@@ -43,7 +43,7 @@ import { markDelivered, receivesAnswers, undeliveredAnswers } from './answer-del
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import { NotFoundError } from './builds.js';
-import { ackChiefSteer, takeChiefSteer } from './chief-turns.js';
+import { ackChiefSteer, chiefSteerSentBatch, takeChiefSteer } from './chief-turns.js';
 import { availableRuntimes, recommendMachineConcurrency } from './dispatch-eligibility.js';
 import type { ConversationStreamHub } from './events.js';
 import { applyComputerPresence } from './machine-computer-presence.js';
@@ -74,6 +74,8 @@ export { finishStep } from './machine-finish-step.js';
 export { MERGE_NOT_LANDED_NOTE } from './machine-merge-landing.js';
 export { stepToken, toProviderConfig } from './machine-step-token.js';
 
+export const STEER_SENT_STALE_MS = 30_000;
+
 export function fetchSteer(
   deps: { db: Db },
   machine: { id: string | null },
@@ -97,18 +99,47 @@ export function fetchSteer(
     .where(eq(steerPending.conversationId, stepRow.buildId))
     .get();
   if (!pending) return withAnswers(null);
-  const batch =
-    pending.stepId === stepId && isChiefConversation(stepRow.buildId)
-      ? takeChiefSteer(db, stepRow.buildId, options)
-      : undefined;
-  if (batch === null) return { content: null };
-  db.delete(steerPending).where(eq(steerPending.conversationId, stepRow.buildId)).run();
+  const now = nowMs();
   if (pending.stepId !== stepId) {
+    const target = db
+      .select({ status: step.status })
+      .from(step)
+      .where(eq(step.id, pending.stepId))
+      .get();
+    if (target === undefined || !isActiveStepStatus(target.status)) {
+      db.delete(steerPending).where(eq(steerPending.conversationId, stepRow.buildId)).run();
+    }
     return withAnswers(null);
   }
-  return batch === undefined
-    ? withAnswers(pending.content)
-    : { content: pending.content, messageIds: batch };
+  const markSent = () => {
+    db.update(steerPending)
+      .set({ sentAt: now })
+      .where(eq(steerPending.conversationId, stepRow.buildId))
+      .run();
+  };
+  if (isChiefConversation(stepRow.buildId)) {
+    if (pending.sentAt !== null && now - pending.sentAt < STEER_SENT_STALE_MS) {
+      return { content: null };
+    }
+    if (pending.sentAt !== null) {
+      const sent = chiefSteerSentBatch(db, stepRow.buildId, stepRow);
+      if (sent.ids.length === 0) {
+        db.delete(steerPending).where(eq(steerPending.conversationId, stepRow.buildId)).run();
+        return { content: null };
+      }
+      markSent();
+      return { content: sent.content, messageIds: sent.ids, steerSentAt: now };
+    }
+    const batch = takeChiefSteer(db, stepRow.buildId, options);
+    if (batch === null) return { content: null };
+    markSent();
+    return { content: pending.content, messageIds: batch, steerSentAt: now };
+  }
+  if (pending.sentAt !== null && now - pending.sentAt < STEER_SENT_STALE_MS) {
+    return withAnswers(null);
+  }
+  markSent();
+  return { ...withAnswers(pending.content), steerSentAt: now };
 }
 
 export function ackSteer(
@@ -119,6 +150,24 @@ export function ackSteer(
 ): { ok: true } {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (stepRow === undefined || stepRow.machineId !== machine.id) return { ok: true };
+  const servedFence =
+    body.steerSentAt !== undefined
+      ? eq(steerPending.sentAt, body.steerSentAt)
+      : body.answerIds === undefined && body.messageIds === undefined
+        ? isNotNull(steerPending.sentAt)
+        : undefined;
+  if (servedFence !== undefined) {
+    deps.db
+      .delete(steerPending)
+      .where(
+        and(
+          eq(steerPending.conversationId, stepRow.buildId),
+          eq(steerPending.stepId, stepId),
+          servedFence,
+        ),
+      )
+      .run();
+  }
   if (isChiefConversation(stepRow.buildId)) {
     if (stepRow.status === 'claimed') ackChiefSteer(deps, machine.teamId, stepRow, body.messageIds);
   } else if (body.answerIds !== undefined && body.answerIds.length > 0) {
@@ -148,7 +197,7 @@ export function fetchStop(
       .from(step)
       .where(eq(step.id, pending.stepId))
       .get();
-    if (pending.stepId === stepId || target === undefined || !isActiveStepStatus(target.status)) {
+    if (target === undefined || !isActiveStepStatus(target.status)) {
       db.delete(stopPending).where(eq(stopPending.conversationId, pending.conversationId)).run();
     }
   }

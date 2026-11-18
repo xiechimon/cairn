@@ -286,18 +286,18 @@ export async function withdrawChiefMessage(
 }
 
 function steerContent(
-  deps: ChiefTurnDeps,
+  db: Db,
   thread: typeof chiefThread.$inferSelect,
   running: StepRow,
   waiting: StepRow,
 ): string {
-  const message = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, waiting.id)).get();
+  const message = db.select().from(chiefMessage).where(eq(chiefMessage.id, waiting.id)).get();
   const scope = stepScopeProjectId(waiting);
   const projectSection =
     scope !== null && scope !== stepScopeProjectId(running)
-      ? projectTurnContext(deps.db, {
+      ? projectTurnContext(db, {
           teamId: thread.teamId,
-          agentId: coordinatorMemoryOwner(deps.db, thread.teamId) ?? null,
+          agentId: coordinatorMemoryOwner(db, thread.teamId) ?? null,
           projectId: scope,
           threadId: thread.id,
         })
@@ -328,7 +328,7 @@ function rebuildMachineSteer(
       (row) =>
         row.status === 'pending' && row.holdReason === STEERED_HOLD && row.id !== withdrawnId,
     )
-    .map((row) => steerContent(deps, thread, running, row))
+    .map((row) => steerContent(deps.db, thread, running, row))
     .join('\n\n');
   if (content === '') {
     deps.db.delete(steerPending).where(eq(steerPending.conversationId, thread.id)).run();
@@ -336,7 +336,7 @@ function rebuildMachineSteer(
   }
   deps.db
     .update(steerPending)
-    .set({ content })
+    .set({ content, sentAt: null })
     .where(eq(steerPending.conversationId, thread.id))
     .run();
 }
@@ -353,7 +353,7 @@ export function steerChiefMessage(
   const running = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
   if (running === undefined) return { steered: false };
   if (STEER_HOLDS.includes(waiting.holdReason ?? '')) return { steered: true };
-  const content = steerContent(deps, thread, running, waiting);
+  const content = steerContent(deps.db, thread, running, waiting);
   const markSteered = () =>
     deps.db
       .update(chiefMessage)
@@ -376,14 +376,17 @@ export function steerChiefMessage(
     .from(steerPending)
     .where(eq(steerPending.conversationId, threadId))
     .get();
-  const merged = prior?.stepId === running.id ? `${prior.content}\n\n${content}` : content;
+  const merged =
+    prior?.stepId === running.id && prior.sentAt === null
+      ? `${prior.content}\n\n${content}`
+      : content;
   deps.db.transaction(() => {
     deps.db
       .insert(steerPending)
       .values({ conversationId: threadId, stepId: running.id, content: merged, createdAt: now })
       .onConflictDoUpdate({
         target: steerPending.conversationId,
-        set: { stepId: running.id, content: merged, createdAt: now },
+        set: { stepId: running.id, content: merged, createdAt: now, sentAt: null },
       })
       .run();
     deps.db
@@ -453,6 +456,22 @@ export function takeChiefSteer(
       .where(and(inArray(step.id, ids), eq(step.holdReason, STEERED_HOLD)))
       .run();
   return ids;
+}
+
+export function chiefSteerSentBatch(
+  db: Db,
+  threadId: string,
+  running: StepRow,
+): { ids: string[]; content: string } {
+  const thread = db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
+  if (thread === undefined) return { ids: [], content: '' };
+  const sent = liveChiefSteps(db, threadId).filter(
+    (row) => row.status === 'pending' && row.holdReason === STEER_SENT_HOLD,
+  );
+  return {
+    ids: sent.map((row) => row.id),
+    content: sent.map((row) => steerContent(db, thread, running, row)).join('\n\n'),
+  };
 }
 
 export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[] {

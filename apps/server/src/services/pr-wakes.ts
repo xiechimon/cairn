@@ -546,7 +546,11 @@ export function createPrWakes(deps: BuildDeps) {
             .get();
           const values = {
             stepId: claimed.id,
-            content: pending?.stepId === claimed.id ? `${pending.content}\n\n${content}` : content,
+            content:
+              pending?.stepId === claimed.id && pending.sentAt === null
+                ? `${pending.content}\n\n${content}`
+                : content,
+            sentAt: null,
             createdAt: now,
           };
           deps.db

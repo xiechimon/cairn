@@ -56,6 +56,111 @@ describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.st
     await handle.done;
   });
 
+  test('the fetch steerSentAt is echoed back in the ack so the server can settle its ledger row', async () => {
+    const api = new FakeMachineApi();
+    api.steerResponse = '顺便把测试也补上';
+    api.steerSentAt = 1234;
+    const steered: string[] = [];
+    const { backend, release } = gatedBackend(steered);
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => api.steerAckBodies.length === 1);
+    expect(steered).toEqual(['顺便把测试也补上']);
+    expect(api.steerAckBodies[0]).toEqual({ steerSentAt: 1234 });
+    release();
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a replayed fetch carrying the same steerSentAt re-acks without re-injecting the text', async () => {
+    const api = new FakeMachineApi();
+    api.steerResponse = '顺便把测试也补上';
+    api.steerSentAt = 1234;
+    const steered: string[] = [];
+    const { backend, release } = gatedBackend(steered);
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => api.steerAckBodies.length === 1);
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => api.steerAckBodies.length === 2);
+    expect(steered).toEqual(['顺便把测试也补上']);
+    expect(api.steerAckBodies[1]).toEqual({ steerSentAt: 1234 });
+    release();
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a push-channel reconnect re-fetches steer and stop for every live step', async () => {
+    const api = new FakeMachineApi();
+    api.steerResponse = '断线期间的插话';
+    api.steerSentAt = 77;
+    api.stopResponse = null;
+    const steered: string[] = [];
+    const { backend, release } = gatedBackend(steered);
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    api.failStream?.();
+    await waitFor(() => steered.length === 1, 10_000);
+    expect(steered).toEqual(['断线期间的插话']);
+    expect(api.calls).toContain('steer:s1');
+    expect(api.calls).toContain('stop:s1');
+    release();
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a repeated stop event stops the live session only once', async () => {
+    const api = new FakeMachineApi();
+    api.stopResponse = false;
+    let stopped = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'pi-sess-stop',
+          events: (async function* () {
+            yield { type: 'text_delta', text: '跑着' } as StepEvent;
+            await gate;
+            yield { type: 'done', usage: [] } as StepEvent;
+          })(),
+          async steer() {},
+          async stop() {
+            stopped += 1;
+          },
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new Error('unused in steer tests');
+      },
+    };
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
+    await waitFor(() => lines.some((line) => line.includes('stop delivered')));
+    api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
+    await waitFor(() => api.calls.filter((call) => call === 'stop:s1').length === 2);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stopped).toBe(1);
+    release();
+    await handle.stop();
+    await handle.done;
+  });
+
   test('the model consumption acknowledgment settles before the daemon reports done', async () => {
     const api = new FakeMachineApi();
     api.steerResponse = 'Read this supplement';

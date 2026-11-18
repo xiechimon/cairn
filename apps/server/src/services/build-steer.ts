@@ -264,11 +264,20 @@ export async function sendBuildSteer(
             : { conversationId, messageId: body.queuedMessageId },
         );
       if (running && !answered) {
+        const prior = db
+          .select()
+          .from(steerPending)
+          .where(eq(steerPending.conversationId, conversationId))
+          .get();
+        const merged =
+          prior?.stepId === running.id && prior.sentAt === null
+            ? `${prior.content}\n\n${body.content}`
+            : body.content;
         db.insert(steerPending)
-          .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
+          .values({ conversationId, stepId: running.id, content: merged, createdAt: now })
           .onConflictDoUpdate({
             target: steerPending.conversationId,
-            set: { stepId: running.id, content: body.content, createdAt: now },
+            set: { stepId: running.id, content: merged, createdAt: now, sentAt: null },
           })
           .run();
       }

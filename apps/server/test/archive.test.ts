@@ -595,6 +595,9 @@ test('a regular stop survives release and same-machine reclaim before its late p
     'step-archive',
   );
   expect(fetchStop(deps, { id: machineId }, 'step-archive')).toEqual({ discard: true });
+  expect(s.db.select().from(stopPending).all()).toHaveLength(1);
+  expect(fetchStop(deps, { id: machineId }, 'step-archive')).toEqual({ discard: true });
+  applyStoppedStep(deps, 'step-archive');
   expect(s.db.select().from(stopPending).all()).toEqual([]);
 });
 

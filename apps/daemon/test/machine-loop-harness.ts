@@ -86,6 +86,7 @@ export class FakeMachineApi implements MachineApi {
   failClaims = 0;
   steerResponse: string | null = null;
   steerAnswers: SteerAnswer[] = [];
+  steerSentAt: number | undefined;
   steerAckBodies: (MachineSteerAckBody | undefined)[] = [];
   attachments: Record<string, MachineAttachmentResponse | Error> = {};
   attachmentCalls: string[] = [];
@@ -212,18 +213,23 @@ export class FakeMachineApi implements MachineApi {
     this.doneBodies.push({ stepId, body });
     this.calls.push(`done:${stepId}:${body.status}`);
   }
+  failStream: (() => void) | null = null;
+
   async stream(signal: AbortSignal, onEvent: unknown, onConnected?: () => void) {
     this.onStreamEvent = onEvent as (ev: MachineStreamEvent) => void;
     onConnected?.();
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => {
+      this.failStream = () => reject(new Error('stream down'));
       signal.addEventListener('abort', () => resolve());
     });
   }
   async steer(stepId: string) {
     this.calls.push(`steer:${stepId}`);
-    return this.steerAnswers.length > 0
-      ? { content: this.steerResponse, answers: this.steerAnswers }
-      : { content: this.steerResponse };
+    return {
+      content: this.steerResponse,
+      ...(this.steerAnswers.length > 0 ? { answers: this.steerAnswers } : {}),
+      ...(this.steerSentAt !== undefined ? { steerSentAt: this.steerSentAt } : {}),
+    };
   }
   async steerAck(stepId: string, body?: MachineSteerAckBody) {
     this.calls.push(`steer-ack:${stepId}`);

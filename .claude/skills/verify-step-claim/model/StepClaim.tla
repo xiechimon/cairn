@@ -282,15 +282,15 @@ EnqueueAfterArchive ==
                  daemon, ex, ghosts, claims, partitions, crashes, rebinds>>
 
 DeliverStopFetch(m) ==
-  /\ stopEvt[m] /\ dm[m] = "up" /\ connected[m]
+  /\ dm[m] = "up" /\ connected[m]
+  /\ (stopEvt[m] \/ (st = "claimed" /\ sm = m /\ (stopPending \/ archiveStop = "requested")))
   /\ stopEvt' = [stopEvt EXCEPT ![m] = FALSE]
   /\ IF st = "claimed" /\ sm = m /\ (stopPending \/ archiveStop = "requested")
-       THEN /\ stopPending' = FALSE
-            /\ stopInHand' = [stopInHand EXCEPT ![m] = TRUE]
+       THEN /\ stopInHand' = [stopInHand EXCEPT ![m] = TRUE]
             /\ archiveStop' = IF archiveStop = "requested" THEN "acknowledged" ELSE archiveStop
-       ELSE UNCHANGED <<stopPending, stopInHand, archiveStop>>
-  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, archived, online, presenceFresh, home,
-                 connected, dm, journal, jout, jstop, ex, ghosts, budgets>>
+       ELSE UNCHANGED <<stopInHand, archiveStop>>
+  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, archived, online,
+                 presenceFresh, home, connected, dm, journal, jout, jstop, ex, ghosts, budgets>>
 
 DeliverStopToRun(m) ==
   /\ stopInHand[m]

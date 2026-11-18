@@ -340,6 +340,7 @@ export const machineSteerResponseSchema = z.object({
   content: z.string().nullable(),
   answers: z.array(steerAnswerSchema).optional(),
   messageIds: z.array(z.string()).optional(),
+  steerSentAt: z.number().optional(),
 });
 export type MachineSteerResponse = z.infer<typeof machineSteerResponseSchema>;
 
@@ -347,6 +348,7 @@ export const machineSteerAckBodySchema = z.object({
   answerIds: z.array(z.string().min(1)).max(100).optional(),
   via: answerDeliveryViaSchema.optional(),
   messageIds: z.array(z.string().min(1).max(128)).max(500).optional(),
+  steerSentAt: z.number().optional(),
 });
 export type MachineSteerAckBody = z.infer<typeof machineSteerAckBodySchema>;
 

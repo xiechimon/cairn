@@ -649,6 +649,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   await backfillRepositoryCaches(config.workspacesDir, (message) => logger.workspace(message));
   const sessionHandles = new Map<string, AgentSessionHandle>();
   const steerAcks = new Map<string, Set<Promise<void>>>();
+  const deliveredSteerSends = new Map<string, number>();
   const stepImageSupport = new Map<string, boolean | null>();
   const stepSteeringSupport = new Map<string, boolean>();
   const stepTranscripts = new Map<string, TranscriptBuffer>();
@@ -831,6 +832,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         return;
       }
       const fetched = await client.steer(stepId);
+      if (
+        fetched?.steerSentAt !== undefined &&
+        deliveredSteerSends.get(stepId) === fetched.steerSentAt
+      ) {
+        await client.steerAck?.(stepId, { steerSentAt: fetched.steerSentAt });
+        logger.step(`steer replay skipped (already delivered) step=${stepId}`);
+        return;
+      }
       const answers = fetched?.answers ?? [];
       const content = appendAnswers(fetched?.content ?? '', answers);
       if (content === '') return;
@@ -872,19 +881,24 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         logger.step(`steer dropped (no live session) step=${stepId}`);
         return;
       }
-      const delivery = live.steer(deliveryText, images).then(() =>
-        client.steerAck?.(
-          stepId,
-          answers.length > 0 || fetched?.messageIds !== undefined
-            ? {
-                ...(answers.length > 0
-                  ? { answerIds: answers.map((answer) => answer.requestId), via: 'steer' as const }
-                  : {}),
-                ...(fetched?.messageIds !== undefined ? { messageIds: fetched.messageIds } : {}),
-              }
-            : undefined,
-        ),
-      );
+      const ackBody =
+        answers.length > 0 ||
+        fetched?.messageIds !== undefined ||
+        fetched?.steerSentAt !== undefined
+          ? {
+              ...(answers.length > 0
+                ? { answerIds: answers.map((answer) => answer.requestId), via: 'steer' as const }
+                : {}),
+              ...(fetched?.messageIds !== undefined ? { messageIds: fetched.messageIds } : {}),
+              ...(fetched?.steerSentAt !== undefined ? { steerSentAt: fetched.steerSentAt } : {}),
+            }
+          : undefined;
+      const delivery = live.steer(deliveryText, images).then(() => {
+        if (fetched?.steerSentAt !== undefined) {
+          deliveredSteerSends.set(stepId, fetched.steerSentAt);
+        }
+        return client.steerAck?.(stepId, ackBody);
+      });
       const pending = steerAcks.get(stepId) ?? new Set<Promise<void>>();
       steerAcks.set(stepId, pending);
       pending.add(delivery);
@@ -899,16 +913,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.step(`steer delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
+  const deliveredStops = new Set<string>();
   const deliverStop = async (stepId: string): Promise<void> => {
     try {
       const discard = await client.stop(stepId);
-      if (discard === null) return;
+      if (discard === null || deliveredStops.has(stepId)) return;
       const run = stops.get(stepId);
       if (run === undefined) {
         logger.step(`stop dropped (no live session) step=${stepId}`);
         return;
       }
       await run.deliver({ discard });
+      deliveredStops.add(stepId);
       logger.step(`stop delivered step=${stepId}`);
     } catch (err) {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -950,6 +966,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
               announced = true;
               reportedDown = false;
               logger.wake('push channel connected');
+              for (const stepId of sessionHandles.keys()) {
+                void deliverSteer(stepId);
+                void deliverStop(stepId);
+              }
             }
           },
         );

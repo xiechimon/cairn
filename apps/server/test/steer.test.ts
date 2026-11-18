@@ -533,14 +533,14 @@ describe('the steer server write surface (W3 #278)', () => {
     expect(face.steerPending).toEqual(['顺便把测试也补上']);
   });
 
-  test('failure mode 3: a double-send race -> single-slot overwrite', async () => {
+  test('failure mode 3: a double-send race -> the single slot merges both steers', async () => {
     const { buildId } = await w.startBuild(true);
     await w.claim();
     await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, { content: '第一条' });
     await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, { content: '第二条' });
     const get = await req(w.s.app, 'GET', `/api/conversations/${buildId}/messages`);
     const face = (await get.json()) as { steerPending: string[] };
-    expect(face.steerPending).toEqual(['第二条']);
+    expect(face.steerPending).toEqual(['第一条\n\n第二条']);
   });
 
   test('failure modes 4/5: fetch-acknowledge; no credential 401', async () => {
@@ -553,11 +553,115 @@ describe('the steer server write surface (W3 #278)', () => {
     const first = await call(w.s.app, 'GET', `/api/machine/steer?stepId=${stepId}`, {
       cred: w.token,
     });
-    expect(await first.json()).toEqual({ content: '拉我' });
+    expect(await first.json()).toEqual({ content: '拉我', steerSentAt: expect.any(Number) });
     const second = await call(w.s.app, 'GET', `/api/machine/steer?stepId=${stepId}`, {
       cred: w.token,
     });
     expect(await second.json()).toEqual({ content: null });
+  });
+
+  test('a fetched steer stays durable until its ack: stale sends redeliver and a stale ack cannot delete a replacement', async () => {
+    const { buildId } = await w.startBuild(true);
+    const { step: claimed } = await w.claim();
+    const stepId = claimed?.step.id ?? '';
+    await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, { content: '拉我' });
+    const fetchSteer = () =>
+      call(w.s.app, 'GET', `/api/machine/steer?stepId=${stepId}`, { cred: w.token });
+    const first = (await (await fetchSteer()).json()) as {
+      content: string | null;
+      steerSentAt?: number;
+    };
+    expect(first.content).toBe('拉我');
+    expect(first.steerSentAt).toEqual(expect.any(Number));
+    expect(await (await fetchSteer()).json()).toEqual({ content: null });
+    w.s.db
+      .update(steerPending)
+      .set({ sentAt: first.steerSentAt! - 60_000 })
+      .run();
+    const second = (await (await fetchSteer()).json()) as {
+      content: string | null;
+      steerSentAt?: number;
+    };
+    expect(second.content).toBe('拉我');
+    expect(second.steerSentAt).not.toBe(first.steerSentAt);
+    await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, { content: '补充' });
+    const staleAck = await call(w.s.app, 'POST', `/api/machine/steer/ack?stepId=${stepId}`, {
+      cred: w.token,
+      body: { steerSentAt: second.steerSentAt },
+    });
+    expect(staleAck.status).toBe(200);
+    expect(w.s.db.select().from(steerPending).all()).toHaveLength(1);
+    const third = (await (await fetchSteer()).json()) as { content: string | null };
+    expect(third.content).toBe('补充');
+    const ack = await call(w.s.app, 'POST', `/api/machine/steer/ack?stepId=${stepId}`, {
+      cred: w.token,
+      body: { steerSentAt: (third as { steerSentAt?: number }).steerSentAt },
+    });
+    expect(ack.status).toBe(200);
+    expect(w.s.db.select().from(steerPending).all()).toHaveLength(0);
+    expect(await (await fetchSteer()).json()).toEqual({ content: null });
+  });
+
+  test('a steer written over a sent row replaces it instead of re-delivering sent content', async () => {
+    const { buildId } = await w.startBuild(true);
+    const { step: claimed } = await w.claim();
+    const stepId = claimed?.step.id ?? '';
+    await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, { content: '第一条' });
+    const fetched = await call(w.s.app, 'GET', `/api/machine/steer?stepId=${stepId}`, {
+      cred: w.token,
+    });
+    expect((await fetched.json()) as { steerSentAt?: number }).toEqual({
+      content: '第一条',
+      steerSentAt: expect.any(Number),
+    });
+    await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, { content: '第二条' });
+    const row = w.s.db.select().from(steerPending).all()[0];
+    expect(row?.content).toBe('第二条');
+    expect(row?.sentAt).toBeNull();
+  });
+
+  test('a legacy ack clears only a served row for the acked step', async () => {
+    const { buildId } = await w.startBuild(true);
+    const { step: claimed } = await w.claim();
+    const stepId = claimed?.step.id ?? '';
+    const ack = (body: object = {}) =>
+      call(w.s.app, 'POST', `/api/machine/steer/ack?stepId=${stepId}`, { cred: w.token, body });
+    await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, { content: '拉我' });
+    await ack();
+    expect(w.s.db.select().from(steerPending).all()).toHaveLength(1);
+    await call(w.s.app, 'GET', `/api/machine/steer?stepId=${stepId}`, { cred: w.token });
+    await ack({ answerIds: ['a1'] });
+    expect(w.s.db.select().from(steerPending).all()).toHaveLength(1);
+    await ack();
+    expect(w.s.db.select().from(steerPending).all()).toHaveLength(0);
+  });
+
+  test('an ack from another step of the same conversation cannot delete the row', async () => {
+    const { buildId } = await w.startBuild(true);
+    const { step: claimed } = await w.claim();
+    const oldStepId = claimed?.step.id ?? '';
+    await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, { content: '拉我' });
+    const fetched = (await (
+      await call(w.s.app, 'GET', `/api/machine/steer?stepId=${oldStepId}`, { cred: w.token })
+    ).json()) as { steerSentAt?: number };
+    await call(w.s.app, 'POST', `/api/machine/done/${oldStepId}`, {
+      cred: w.token,
+      body: { status: 'success' },
+    });
+    await req(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { action: 'confirm' });
+    const next = await w.claim();
+    const newStepId = next.step?.step.id ?? '';
+    expect(newStepId).not.toBe(oldStepId);
+    await call(w.s.app, 'POST', `/api/machine/steer/ack?stepId=${newStepId}`, {
+      cred: w.token,
+      body: { steerSentAt: fetched.steerSentAt },
+    });
+    expect(w.s.db.select().from(steerPending).all()).toHaveLength(1);
+    await call(w.s.app, 'POST', `/api/machine/steer/ack?stepId=${newStepId}`, {
+      cred: w.token,
+      body: {},
+    });
+    expect(w.s.db.select().from(steerPending).all()).toHaveLength(1);
   });
 
   test('failure mode 6: the old step pending -> the new step fetch gets empty + discard', async () => {

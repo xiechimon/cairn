@@ -235,7 +235,13 @@ describe('the stop server write surface (M7 #308)', () => {
     const second = await call(w.s.app, 'GET', `/api/machine/stop?stepId=${stepId}`, {
       cred: w.token,
     });
-    expect(await second.json()).toEqual({ discard: null });
+    expect(await second.json()).toEqual({ discard: false });
+    await w.done(stepId, { status: 'stopped' });
+    const third = await call(w.s.app, 'GET', `/api/machine/stop?stepId=${stepId}`, {
+      cred: w.token,
+    });
+    expect(await third.json()).toEqual({ discard: null });
+    expect(w.s.db.select().from(stopPendingTable).all()).toHaveLength(0);
   });
 
   test('failure mode 5: the old step pending -> the new step fetch gets null + discard', async () => {

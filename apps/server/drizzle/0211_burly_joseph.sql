@@ -1,0 +1,1 @@
+ALTER TABLE `steer_pending` ADD `sentAt` integer;

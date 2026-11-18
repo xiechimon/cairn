@@ -214,7 +214,11 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
         cred: token,
       });
       expect(res.status).toBe(200);
-      return (await res.json()) as { content: string | null; messageIds?: string[] };
+      return (await res.json()) as {
+        content: string | null;
+        messageIds?: string[];
+        steerSentAt?: number;
+      };
     },
     async ackBatch(stepId: string, messageIds: string[]) {
       const res = await call(s.app, 'POST', `/api/machine/steer/ack?stepId=${stepId}`, {
@@ -501,10 +505,10 @@ describe('steer (T5): `现在插话`', () => {
     const c = w.queue('插话 C');
     expect((await w.steer(a)).status).toBe(200);
     const first = await w.fetchBatch(running!.step.id);
-    expect(first).toEqual({ content: '插话 A', messageIds: [a] });
+    expect(first).toEqual({ content: '插话 A', messageIds: [a], steerSentAt: expect.any(Number) });
     expect((await w.steer(b)).status).toBe(200);
     const second = await w.fetchBatch(running!.step.id);
-    expect(second).toEqual({ content: '插话 B', messageIds: [b] });
+    expect(second).toEqual({ content: '插话 B', messageIds: [b], steerSentAt: expect.any(Number) });
     expect((await w.steer(c)).status).toBe(200);
     await w.ackBatch(running!.step.id, [...first.messageIds!, c, 'chief-msg-from-elsewhere']);
     expect(w.stepRow(a)).toBeUndefined();
@@ -517,6 +521,28 @@ describe('steer (T5): `现在插话`', () => {
     expect(w.stepRow(c)?.holdReason).toBeNull();
     const next = await w.claim();
     expect(next?.step.id).toBe(b);
+  });
+
+  test('a crashed fetch redelivers the same held batch once the send marker goes stale', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const a = w.queue('插话 A');
+    expect((await w.steer(a)).status).toBe(200);
+    const first = await w.fetchBatch(running!.step.id);
+    expect(first).toEqual({ content: '插话 A', messageIds: [a], steerSentAt: expect.any(Number) });
+    w.s.db
+      .update(steerPending)
+      .set({ sentAt: first.steerSentAt! - 60_000 })
+      .run();
+    const replay = await w.fetchBatch(running!.step.id);
+    expect(replay).toEqual({
+      content: '插话 A',
+      messageIds: [a],
+      steerSentAt: expect.any(Number),
+    });
+    await w.ackBatch(running!.step.id, replay.messageIds!);
+    expect(w.stepRow(a)).toBeUndefined();
   });
 
   test('steering the same message twice sends its text once', async () => {

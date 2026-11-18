@@ -73,6 +73,7 @@ describe('mcp message_todo', () => {
         conversationId: 'message-build',
         stepId: 'message-step',
         content: 'Include regression coverage',
+        sentAt: null,
         createdAt: expect.any(Number),
       },
     ]);
