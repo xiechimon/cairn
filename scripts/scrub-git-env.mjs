@@ -8,6 +8,12 @@ export function scrubGitEnv(env = process.env) {
 
 export function scrubGateEnv(env = process.env) {
   return Object.fromEntries(
-    Object.entries(env).filter(([key]) => !/_BASE_SHA$/.test(key) && key !== 'PREPUSH_FORCE_FULL'),
+    Object.entries(env).filter(
+      ([key]) =>
+        !/_BASE_SHA$/.test(key) &&
+        key !== 'PREPUSH_FORCE_FULL' &&
+        key !== 'GITHUB_REF' &&
+        key !== 'GITHUB_EVENT_NAME',
+    ),
   );
 }

@@ -33,13 +33,15 @@ import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const prepushFixtureFiles = [...prepushModules, 'scripts/doc-reader-tests.mjs'];
 
-test('scrubGateEnv drops every gate base SHA and the force-full switch', () => {
+test('scrubGateEnv drops every gate base SHA, the force-full switch and the Actions ref', () => {
   const env = {
     PATH: 'p',
     UI_REGISTRY_BASE_SHA: 'a',
     ENGLISH_ONLY_BASE_SHA: 'b',
     PREPUSH_BASE_SHA: 'c',
     PREPUSH_FORCE_FULL: 'true',
+    GITHUB_REF: 'refs/heads/queue/main',
+    GITHUB_EVENT_NAME: 'push',
     GIT_DIR: 'g',
   };
   assert.deepEqual(scrubGateEnv(env), { PATH: 'p', GIT_DIR: 'g' });
