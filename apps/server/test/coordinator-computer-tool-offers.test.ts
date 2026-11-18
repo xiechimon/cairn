@@ -4,6 +4,7 @@ import {
   COORDINATOR_COMPUTER_TOOL_OFFERS,
   coordinatorToolDefs,
 } from '../src/services/coordinator-tool-defs.js';
+import { isCoordinatorComputerTool } from '../src/services/machine-relay.js';
 
 const computerNames = (
   desktopTools: boolean,
@@ -65,6 +66,14 @@ describe('Coordinator computer tool offers', () => {
     expect(computerNames(true, false)).not.toContain('install_packages');
     expect(computerNames(true, true)).toContain('install_packages');
     expect(computerNames(true, true)).not.toContain('computer_manage');
+  });
+
+  test('every offered computer tool is routed to a machine computer', () => {
+    const unrouted = COMPUTER_TOOLS.filter(
+      (name) =>
+        'offered' in COORDINATOR_COMPUTER_TOOL_OFFERS[name] && !isCoordinatorComputerTool(name),
+    );
+    expect(unrouted).toEqual([]);
   });
 
   test('without a computer the desktop tools are not offered', () => {

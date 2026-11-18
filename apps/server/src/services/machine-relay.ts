@@ -54,6 +54,7 @@ import {
   newMcpOAuthState,
   publicOAuthFetch,
 } from './mcp-servers.js';
+import { isOwnComputerTool } from './own-computer.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { refuseRestrictedTurnTool } from './report-turn.js';
 import {
@@ -120,6 +121,7 @@ export async function machineAsk(
 export function isCoordinatorComputerTool(name: string): boolean {
   return (
     isComputerBrowserTool(name) ||
+    isOwnComputerTool(name) ||
     name === 'request_takeover' ||
     name === INSTALL_PACKAGES_TOOL ||
     name === 'shell' ||

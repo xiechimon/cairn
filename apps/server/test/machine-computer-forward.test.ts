@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { ComputerCall, ComputerFrame, ComputerTool, MachineStreamEvent } from '@cairn/shared';
+import { OWN_COMPUTER_NOT_ON } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { computerMachineName as daemonComputerMachineName } from '../../daemon/src/computer/host-desktop.js';
@@ -223,6 +224,21 @@ describe('Coordinator desktop tools', () => {
     ]);
     expect(await result).toEqual({ text: 'screen 1600x1000', images: [image] });
   });
+
+  test.each([
+    ['user_computer_shell', { command: 'ls' }],
+    ['user_computer_observe', { app: 'Finder' }],
+    ['user_computer_act', { app: 'Finder', actions: [{ kind: 'wait', ms: 1 }] }],
+  ] as const)(
+    'relayTool routes %s to the own-computer gate instead of unknown chief tool',
+    async (name, params) => {
+      const { s, deps } = boot();
+      s.db.update(stepTable).set({ machineId: null }).where(eq(stepTable.id, 'step-a')).run();
+      await expect(
+        createCoordinatorServerApi(deps).relayTool('step-a', name, params, 'tc-own'),
+      ).resolves.toBe(OWN_COMPUTER_NOT_ON);
+    },
+  );
 });
 
 describe('Coordinator shell and desktop start-up', () => {

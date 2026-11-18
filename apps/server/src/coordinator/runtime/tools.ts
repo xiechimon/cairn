@@ -3,6 +3,7 @@ import {
   COMPUTER_DESKTOP_TOOLS,
   coordinatorToolSourceId,
   type MachineAskBody,
+  OWN_COMPUTER_TOOLS,
   type RemoteToolDef,
 } from '@cairn/shared';
 import {
@@ -55,8 +56,8 @@ function imageReadMarker(fileName: string | undefined, read: AttachmentImageText
   }
 }
 
-const DESKTOP_TOOL_NAMES: ReadonlySet<string> = new Set(
-  COMPUTER_DESKTOP_TOOLS.map((def) => def.name),
+const RELAY_COMPUTER_TOOL_NAMES: ReadonlySet<string> = new Set(
+  [...COMPUTER_DESKTOP_TOOLS, ...OWN_COMPUTER_TOOLS].map((def) => def.name),
 );
 
 export const SCREENSHOT_UNAVAILABLE =
@@ -195,7 +196,7 @@ export function coordinatorTool(
         return { output: [{ type: 'text', text }] };
       }
       try {
-        if (DESKTOP_TOOL_NAMES.has(def.name)) {
+        if (RELAY_COMPUTER_TOOL_NAMES.has(def.name)) {
           const seesImages = (await drivingModel())?.input.includes('image') === true;
           if (!seesImages && (def.name === 'computer_observe' || def.name === 'computer_act')) {
             return { output: [{ type: 'text', text: SCREENSHOT_UNAVAILABLE }], isError: true };
@@ -207,11 +208,13 @@ export function coordinatorTool(
             callId,
             context.abortSignal,
           );
-          const images = await Promise.all(
-            (result.images ?? []).map((image) =>
-              prepareCoordinatorImage(image.data, image.mimeType),
-            ),
-          );
+          const images = seesImages
+            ? await Promise.all(
+                (result.images ?? []).map((image) =>
+                  prepareCoordinatorImage(image.data, image.mimeType),
+                ),
+              )
+            : [];
           return { output: [{ type: 'text', text: result.text }, ...images] };
         }
         const text = await channel.relayTool(stepId, def.name, params, callId, context.abortSignal);

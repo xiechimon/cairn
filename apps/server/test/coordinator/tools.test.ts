@@ -274,6 +274,51 @@ describe('coordinator tools', () => {
     }
   });
 
+  it("relays the owner's Mac tools through the computer channel and feeds their screenshot to the model", async () => {
+    const { coordinatorModels, seenResults } = toolThenAnswer('user_computer_observe', {
+      app: 'Finder',
+    });
+    const api = fakeMachineApi();
+    const relayed: string[] = [];
+    api.relayComputer = async (_stepId, name) => {
+      relayed.push(name);
+      return {
+        text: 'Finder window, 12 elements',
+        images: [{ data: validPng.toString('base64'), mimeType: 'image/png' }],
+      };
+    };
+    const gate = createStepGate();
+    const extension = coordinatorToolsExtension(api, gate, { ownComputer: true });
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+      extensions: [extension],
+    });
+    try {
+      await runCoordinatorTurn(
+        {
+          harness,
+          models: coordinatorModels,
+          api,
+          context: ctx,
+          heartbeatMs: 1000,
+          now: () => 1,
+          gate,
+        },
+        chiefStep('step-own-mac', 'Read the Finder window on my Mac'),
+      );
+      expect(relayed).toEqual(['user_computer_observe']);
+      expect(api.tools).toEqual([]);
+      const blocks = JSON.parse(seenResults[0]!) as {
+        type: string;
+        text?: string;
+        mimeType?: string;
+      }[];
+      expect(blocks.find((block) => block.type === 'text')?.text).toContain('Finder window');
+      expect(blocks.find((block) => block.type === 'image')?.mimeType).toBe('image/png');
+    } finally {
+      await harness.close(ctx);
+    }
+  });
+
   it.each([
     {
       label: 'oversized PNG',
