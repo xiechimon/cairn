@@ -1,12 +1,17 @@
 import type { ComputerManageAction, ComputerManageOutcome, ComputerRecord } from '@cairn/shared';
 import { Ellipsis } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
-import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
+import {
+  DropdownMenu,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 
@@ -18,27 +23,27 @@ export type ComputerActionNote =
 export function computerActionNoteText(note: ComputerActionNote, t: TFunc): string {
   if (note.kind === 'running')
     return {
-      stop: t('正在停止电脑…'),
-      update: t('正在更新电脑…'),
-      recover: t('正在恢复电脑…'),
-      reset: t('正在重置电脑…'),
+      stop: t('正在停止虚拟机…'),
+      update: t('正在更新虚拟机…'),
+      recover: t('正在恢复虚拟机…'),
+      reset: t('正在重置虚拟机…'),
       install: t('正在下载 Linux 虚拟机…'),
     }[note.action];
   if (note.kind === 'failed')
     return {
-      stop: t('没能停止电脑，请稍后重试。'),
-      update: t('没能更新电脑，请稍后重试。'),
-      recover: t('没能恢复电脑，请稍后重试。'),
-      reset: t('没能重置电脑，请稍后重试。'),
+      stop: t('没能停止虚拟机，请稍后重试。'),
+      update: t('没能更新虚拟机，请稍后重试。'),
+      recover: t('没能恢复虚拟机，请稍后重试。'),
+      reset: t('没能重置虚拟机，请稍后重试。'),
       install: t('没能下载 Linux 虚拟机，请稍后重试。'),
     }[note.action];
   return {
-    stopped: t('电脑已停止，文件都还在，下次使用时会自动启动。'),
-    already_stopped: t('电脑本来就是停止的。'),
-    updated: t('电脑已更新到最新版本，文件都还在。'),
-    current: t('电脑已经是最新版本。'),
-    recovered: t('电脑已恢复，文件都还在。'),
-    reset: t('电脑已重置，现在是一台全新的电脑。'),
+    stopped: t('虚拟机已停止，文件都还在，下次使用时会自动启动。'),
+    already_stopped: t('虚拟机本来就是停止的。'),
+    updated: t('虚拟机已更新到最新版本，文件都还在。'),
+    current: t('虚拟机已经是最新版本。'),
+    recovered: t('虚拟机已恢复，文件都还在。'),
+    reset: t('虚拟机已重置，现在是一台全新的虚拟机。'),
     installed: t('Linux 虚拟机已下载。'),
   }[note.outcome];
 }
@@ -65,29 +70,32 @@ export function useComputerActions(teamId: string | undefined, computer: Compute
   return { note, run, pending: manageComputer.isPending };
 }
 
-export function ComputerActionsMenu({
+export function MachineMenu({
   machineName,
-  disabled,
-  onAction,
+  settingsHref,
+  onRename,
+  vm,
 }: {
   machineName: string;
-  disabled: boolean;
-  onAction: (action: ComputerManageAction) => void;
+  settingsHref: string | null;
+  onRename: (() => void) | null;
+  vm: { disabled: boolean; onAction: (action: ComputerManageAction) => void } | null;
 }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [confirmReset, setConfirmReset] = useState(false);
   return (
     <>
       <DropdownMenu>
         <IconTooltip
-          label={t('{name} 的电脑操作', { name: machineName })}
+          label={t('{name} 的操作', { name: machineName })}
           trigger={
             <DropdownMenuTrigger
               render={
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  data-testid="computer-actions"
+                  data-testid="machine-menu"
                   className="flex-none pointer-coarse:size-11"
                 />
               }
@@ -97,45 +105,64 @@ export function ComputerActionsMenu({
           <Ellipsis aria-hidden strokeWidth={1.75} />
         </IconTooltip>
         <KeyedMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-40">
-          <KeyedMenuItem
-            shortcut="S"
-            data-testid="computer-action-stop"
-            disabled={disabled}
-            onClick={() => onAction('stop')}
-          >
-            {t('停止电脑')}
-          </KeyedMenuItem>
-          <KeyedMenuItem
-            shortcut="U"
-            data-testid="computer-action-update"
-            disabled={disabled}
-            onClick={() => onAction('update')}
-          >
-            {t('更新电脑')}
-          </KeyedMenuItem>
-          <KeyedMenuItem
-            shortcut="R"
-            data-testid="computer-action-recover"
-            disabled={disabled}
-            title={t('电脑卡住或黑屏时重建它，文件和浏览器登录都保留')}
-            onClick={() => onAction('recover')}
-          >
-            {t('恢复电脑')}
-          </KeyedMenuItem>
-          <KeyedMenuItem
-            shortcut="X"
-            confirms
-            data-testid="computer-action-reset"
-            disabled={disabled}
-            onClick={() => setConfirmReset(true)}
-          >
-            {t('重置电脑')}
-          </KeyedMenuItem>
+          {onRename !== null && (
+            <KeyedMenuItem shortcut="N" data-testid="machine-rename" onClick={onRename}>
+              {t('重命名')}
+            </KeyedMenuItem>
+          )}
+          {settingsHref !== null && (
+            <KeyedMenuItem
+              shortcut="E"
+              data-testid="machine-settings"
+              onClick={() => void navigate(settingsHref)}
+            >
+              {t('电脑设置')}
+            </KeyedMenuItem>
+          )}
+          {vm !== null && (
+            <>
+              <DropdownMenuSeparator />
+              <KeyedMenuItem
+                shortcut="S"
+                data-testid="computer-action-stop"
+                disabled={vm.disabled}
+                onClick={() => vm.onAction('stop')}
+              >
+                {t('停止虚拟机')}
+              </KeyedMenuItem>
+              <KeyedMenuItem
+                shortcut="U"
+                data-testid="computer-action-update"
+                disabled={vm.disabled}
+                onClick={() => vm.onAction('update')}
+              >
+                {t('更新虚拟机')}
+              </KeyedMenuItem>
+              <KeyedMenuItem
+                shortcut="R"
+                data-testid="computer-action-recover"
+                disabled={vm.disabled}
+                title={t('虚拟机卡住或黑屏时重建它，文件和浏览器登录都保留')}
+                onClick={() => vm.onAction('recover')}
+              >
+                {t('恢复虚拟机')}
+              </KeyedMenuItem>
+              <KeyedMenuItem
+                shortcut="X"
+                confirms
+                data-testid="computer-action-reset"
+                disabled={vm.disabled}
+                onClick={() => setConfirmReset(true)}
+              >
+                {t('重置虚拟机')}
+              </KeyedMenuItem>
+            </>
+          )}
         </KeyedMenuContent>
       </DropdownMenu>
       <AlertDialogShell
-        title={t('重置这台电脑？')}
-        ariaLabel={t('重置电脑')}
+        title={t('重置这台虚拟机？')}
+        ariaLabel={t('重置虚拟机')}
         open={confirmReset}
         onClose={() => setConfirmReset(false)}
         footer={
@@ -145,14 +172,14 @@ export function ComputerActionsMenu({
             onCancel={() => setConfirmReset(false)}
             onConfirm={() => {
               setConfirmReset(false);
-              onAction('reset');
+              vm?.onAction('reset');
             }}
           />
         }
       >
         <p className="m-0 text-ui text-foreground" data-testid="computer-reset-loss">
           {t(
-            '电脑里的文件和浏览器登录都会删除，装过的系统软件要重新批准。之后会启动一台全新的电脑。',
+            '虚拟机里的文件和浏览器登录都会删除，装过的系统软件要重新批准。之后会启动一台全新的虚拟机。',
           )}
         </p>
       </AlertDialogShell>

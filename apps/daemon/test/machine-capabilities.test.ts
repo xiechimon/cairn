@@ -6,6 +6,7 @@ import { machineHardwareSchema, osPlatformOf } from '@cairn/shared';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   createMachineCapabilitiesProbe,
+  probeDeviceName,
   probeMachineCapabilities,
   probeMachineHardware,
 } from '../src/machine-capabilities.js';
@@ -249,5 +250,27 @@ describe('Linux distribution identity', () => {
     readable = false;
     expect(probe().osDistribution).toBeUndefined();
     expect(probeMachineCapabilities(sources).osDistribution).toBeUndefined();
+  });
+});
+
+describe('probeDeviceName', () => {
+  test('a Mac reports its Computer Name next to the hostname, trimmed', () => {
+    const name = probeDeviceName('darwin', () => 'xmon 的 MacBook Pro\n');
+    expect(name.computerName).toBe('xmon 的 MacBook Pro');
+    expect(name.hostname).toBeTruthy();
+  });
+
+  test('a failed or blank scutil read and a Linux machine report only the hostname', () => {
+    const failing = () => {
+      throw new Error('scutil missing');
+    };
+    for (const name of [
+      probeDeviceName('darwin', failing),
+      probeDeviceName('darwin', () => '  \n'),
+      probeDeviceName('linux', () => 'never read'),
+    ]) {
+      expect(name).not.toHaveProperty('computerName');
+      expect(name.hostname).toBeTruthy();
+    }
   });
 });

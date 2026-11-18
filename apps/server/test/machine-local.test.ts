@@ -255,4 +255,25 @@ describe('PATCH /api/machines/{id} (runtimes follow detection)', () => {
       s.dispose();
     }
   });
+
+  test('a name renames the computer, trimmed, and an empty or control-character name is refused', async () => {
+    const s = bootServer();
+    try {
+      seedLocalMachine(s.db, s.team.id);
+      const id = localRows(s.db, s.team.id)[0]?.id ?? '';
+      const renamed = await req(s.app, 'PATCH', `/api/machines/${id}`, {
+        name: '  xmon 的 MacBook Pro ',
+      });
+      expect(renamed.status).toBe(200);
+      expect(machineRecordSchema.parse(await renamed.json()).name).toBe('xmon 的 MacBook Pro');
+      for (const name of ['   ', 'a\u0007b', 'x'.repeat(65)]) {
+        const bad = await req(s.app, 'PATCH', `/api/machines/${id}`, { name });
+        expect(bad.status).toBe(400);
+      }
+      const row = s.db.select().from(machineTable).where(eq(machineTable.id, id)).get();
+      expect(row?.name).toBe('xmon 的 MacBook Pro');
+    } finally {
+      s.dispose();
+    }
+  });
 });

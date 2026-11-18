@@ -317,6 +317,8 @@ export interface MachineRow {
     ownComputerHost?: true;
     ownComputerShell?: true;
     browser?: true;
+    computerName?: string;
+    hostname?: string;
     hostPermissions?: {
       accessibility: PermissionState;
       automation: PermissionState;

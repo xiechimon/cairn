@@ -11452,6 +11452,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               ],
               "type": "string",
             },
+            "computerName": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^\\P{C}+$",
+              "type": "string",
+            },
             "confinement": {
               "oneOf": [
                 {
@@ -11687,6 +11693,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "screenRecording",
               ],
               "type": "object",
+            },
+            "hostname": {
+              "maxLength": 253,
+              "minLength": 1,
+              "type": "string",
             },
             "mcpConnectors": {
               "const": true,

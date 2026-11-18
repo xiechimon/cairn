@@ -321,6 +321,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       folderGrantsPatch = { folderGrants: applyFolderPinOps(row.folderGrants, body.folderPins) };
     }
     const patch = {
+      ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.browserOverride !== undefined ? { browserOverride: body.browserOverride } : {}),
       ...(body.desktopOverride !== undefined ? { desktopOverride: body.desktopOverride } : {}),
       ...(body.maxConcurrent !== undefined ? machineConcurrencyPatch(row, body.maxConcurrent) : {}),

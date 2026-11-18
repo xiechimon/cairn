@@ -67,6 +67,13 @@ export const machineFolderPinOpSchema = z.object({
 export type MachineFolderPinOp = z.infer<typeof machineFolderPinOpSchema>;
 
 export const patchMachineBodySchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .regex(/^\P{C}+$/u)
+    .optional(),
   browserOverride: z.boolean().nullable().optional(),
   desktopOverride: z.boolean().nullable().optional(),
   enabledRuntimes: z.array(z.enum(MACHINE_RUNTIMES)).optional(),

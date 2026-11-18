@@ -61,7 +61,7 @@ async function shot(page: Page, name: string) {
 
 const minutesAgo = (n: number) => Date.now() - n * 60_000;
 
-test('one card per machine shows the task using it as a link, the state in the header, and no command list', async ({
+test('one card per machine names the task using it as a link under the name, with no state words or command list', async ({
   page,
 }) => {
   const panel = await open(page, {
@@ -80,29 +80,34 @@ test('one card per machine shows the task using it as a link, the state in the h
   await expect(panel.getByTestId('machine-card')).toHaveCount(1);
   await expect(panel.getByText('Coordinator 的电脑')).toHaveCount(0);
   await expect(panel.getByTestId('computer-feed')).toHaveCount(0);
-  await expect(panel.getByTestId('computer-state')).toHaveText('开着');
+  await expect(panel.getByTestId('machine-list-row')).not.toContainText(/在线|开着|正在开机/);
   const line = panel.getByTestId('machine-activity');
-  await expect(line).toHaveAttribute('data-activity', 'using');
-  await expect(line).toContainText('正在用');
+  await expect(line).toHaveText('BOSS 合肥 8 岗位全 JD 报告正在用');
   const link = line.getByRole('link', { name: 'BOSS 合肥 8 岗位全 JD 报告' });
   await expect(link).toHaveAttribute('href', /thread=todo-boss/);
   await shot(page, 'activity-using');
 });
 
-test('an idle computer reads idle and names the last user, and the Coordinator links to its view', async ({
+test('an idle computer shows only its name, and the Coordinator using it links to its view', async ({
   page,
 }) => {
-  const panel = await open(page, {
+  const feed: Feed = {
     computers: [
       computer({
         activity: { inUse: false, title: null, todoId: null, threadId: 'th-1', at: minutesAgo(20) },
       }),
     ],
-  });
+  };
+  const panel = await open(page, feed);
+  await expect(panel.getByTestId('machine-list-row')).toHaveText('omarchy');
+  await expect(panel.getByTestId('machine-line')).toHaveCount(0);
+  feed.computers = [
+    computer({
+      activity: { inUse: true, title: null, todoId: null, threadId: 'th-1', at: minutesAgo(1) },
+    }),
+  ];
   const line = panel.getByTestId('machine-activity');
-  await expect(line).toHaveAttribute('data-activity', 'idle');
-  await expect(line).toContainText('空闲 · 上次');
-  await expect(line).toContainText('20 分钟前');
+  await expect(line).toHaveText('Coordinator正在用', { timeout: 10_000 });
   await expect(line.getByRole('link', { name: 'Coordinator' })).toHaveAttribute('href', '/app');
 });
 
@@ -119,9 +124,12 @@ test('an offline machine shows only its header and no activity line', async ({ p
     },
     [{ ...FEED_MACHINE, online: false, lastSeenAt: minutesAgo(120) }],
   );
-  await expect(panel.getByTestId('machine-list-row')).toContainText('离线');
+  await expect(panel.getByTestId('machine-list-row')).toContainText('离线 · 2 小时前');
+  await expect(panel.getByTestId('machine-line')).toHaveAttribute(
+    'title',
+    '在这台电脑上打开 Cairn，它就会上线',
+  );
   await expect(panel.getByTestId('machine-activity')).toHaveCount(0);
-  await expect(panel.getByTestId('computer-state')).toHaveCount(0);
   await expect(panel.getByTestId('machine-screen')).toHaveCount(0);
 });
 
@@ -158,7 +166,7 @@ test('with a machine listed the panel still shows its card and the screen placeh
 
 test('with no machines the list is only the add row', async ({ page }) => {
   const panel = await open(page, { computers: [] }, []);
-  await expect(panel.getByRole('heading', { name: '你的电脑' })).toBeVisible();
+  await expect(panel.getByRole('heading', { name: '你的电脑' })).toHaveCount(0);
   await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(1);
   await expect(panel.getByTestId('machine-list-row')).toHaveCount(0);
   await expect(panel.getByTestId('machines-add').getByRole('link', { name: '添加电脑' })).toBeVisible();
@@ -346,16 +354,38 @@ test('without a computer row the machine card shows no screen and no turn-on hin
   await expect(card.getByRole('switch')).toHaveCount(0);
 });
 
-test('a pending login handoff asks the owner to log in under the screen', async ({ page }) => {
+test('a pending login handoff asks the owner to log in and labels the screen Take over', async ({
+  page,
+}) => {
   const feed: Feed = {
     computers: [computer({ handoffReason: 'login' })],
     controlCalls: [],
   };
   const panel = await open(page, feed, [SCREEN_MACHINE]);
-  await expect(panel.getByTestId('machine-screen-note')).toHaveText('需要你登录');
+  await expect(panel.getByTestId('machine-screen-note')).toHaveText('需要你登录，点屏幕接管');
   await shot(page, 'card-login-note');
-  await expect(panel.getByRole('button', { name: /接管|交还/ })).toHaveCount(0);
+  const takeOver = panel.getByTestId('machine-screen-expand');
+  await expect(takeOver).toHaveAccessibleName('接管');
+  await expect(takeOver).toContainText('接管');
   expect(feed.controlCalls).toEqual([]);
+  await takeOver.click();
+  await expect(page.getByTestId('machine-screen-enlarged')).toBeVisible();
+});
+
+test('a starting computer shows only a spinner on its screen and a stopped one stays asleep', async ({
+  page,
+}) => {
+  const feed: Feed = { computers: [computer({ state: 'starting' })], controlCalls: [] };
+  const panel = await open(page, feed, [SCREEN_MACHINE]);
+  await expect(panel.getByTestId('machine-screen-starting')).toBeVisible();
+  await expect(panel.getByTestId('machine-list-row')).toHaveText('omarchy');
+  feed.computers = [computer({ state: 'stopped' })];
+  await expect(panel.getByTestId('machine-screen-asleep')).toBeVisible({ timeout: 10_000 });
+  await expect(panel.getByTestId('machine-screen-expand')).toHaveAttribute(
+    'title',
+    '已休眠，用到时会自己启动',
+  );
+  await expect(panel.getByTestId('machine-list-row')).toHaveText('omarchy');
 });
 
 test('the push link opens the machine with its screen enlarged', async ({
@@ -421,7 +451,7 @@ test.describe('on a touch phone', () => {
     expect(Math.min(close.width, close.height)).toBeGreaterThanOrEqual(44);
   });
 
-  test('the login note under the card screen sits above the bottom navigation without scrolling', async ({
+  test('the login note on the card sits above the bottom navigation without scrolling', async ({
     page,
   }) => {
     const feed: Feed = {

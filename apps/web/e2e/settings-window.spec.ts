@@ -16,7 +16,7 @@ test('sidebar footer: settings and usage icons, no user chip and no computers li
   await expect(page.getByTestId('sidebar-user-menu')).toHaveCount(0);
   await expect(page.locator('[data-slot="sidebar-user"]')).toHaveCount(0);
   await expect(footer.getByTestId('sidebar-attention')).toHaveCount(0);
-  await expect(page.getByTestId('machines-button')).toHaveAccessibleName(/4 台在线 · 1 台离线（old-laptop）/);
+  await expect(page.getByTestId('machines-button')).toHaveAccessibleName(/· 1 台离线（old-laptop）$/);
   await expect(page.getByTestId('machines-button').locator('[data-slot="fleet-badge"]')).toHaveAttribute('data-fleet', 'offline');
 });
 

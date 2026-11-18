@@ -1,9 +1,10 @@
 import type { ComputerRecord } from '@cairn/shared';
-import { Maximize2, MonitorSmartphone } from 'lucide-react';
+import { Maximize2, MonitorSmartphone, Moon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { computerScreenWsUrl, openComputerScreen } from '../api/computer-screen.js';
 import { Button } from '../components/ui/button.js';
+import { Spinner } from '../components/ui/spinner.js';
 import { useI18n } from '../i18n/provider.js';
 import type { ScreenPointerProps } from './screen-hover-control.js';
 
@@ -50,6 +51,8 @@ export function MachineScreenSurface({
   onExpand,
   pointer,
   autoFocus = false,
+  power = 'on',
+  expandText,
 }: {
   teamId: string;
   computer: ComputerRecord;
@@ -59,6 +62,8 @@ export function MachineScreenSurface({
   onExpand?: () => void;
   pointer?: ScreenPointerProps;
   autoFocus?: boolean;
+  power?: 'on' | 'starting' | 'asleep';
+  expandText?: string;
 }) {
   const { t } = useI18n();
   const host = useRef<HTMLDivElement>(null);
@@ -154,8 +159,24 @@ export function MachineScreenSurface({
       data-interactive={interactive ? 'true' : 'false'}
       data-fill={fill ? 'true' : 'false'}
       {...pointer}
-      className={`relative overflow-hidden ${fill ? 'h-full w-full' : 'aspect-[16/10] max-h-36 bg-(--surface-1)'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
+      className={`relative overflow-hidden ${fill ? 'h-full w-full' : 'aspect-[16/10] w-full border-t border-border bg-(--surface-1)'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
     >
+      {power === 'starting' && (
+        <div
+          data-testid="machine-screen-starting"
+          className="absolute inset-0 z-1 grid place-items-center bg-(--surface-1)"
+        >
+          <Spinner aria-label={t('正在启动')} className="size-5 text-content-tertiary" />
+        </div>
+      )}
+      {power === 'asleep' && (
+        <div
+          data-testid="machine-screen-asleep"
+          className="absolute inset-0 z-1 grid place-items-center bg-(--surface-1)/70 text-content-secondary"
+        >
+          <Moon aria-hidden="true" className="size-5.5" />
+        </div>
+      )}
       {status !== 'connected' && lastFrame !== null && (
         <img
           alt=""
@@ -166,7 +187,7 @@ export function MachineScreenSurface({
         />
       )}
       <div ref={host} className="h-full w-full overflow-hidden [&_canvas]:outline-none" />
-      {status !== 'connected' && (lastFrame === null || status === 'failed') && (
+      {power === 'on' && status !== 'connected' && (lastFrame === null || status === 'failed') && (
         <div className="absolute inset-0 grid place-items-center px-6 text-center text-meta text-content-tertiary">
           <span className="flex flex-col items-center gap-2">
             <MonitorSmartphone aria-hidden="true" className="size-5.5 opacity-60" />
@@ -183,12 +204,15 @@ export function MachineScreenSurface({
           type="button"
           variant="ghost"
           data-testid="machine-screen-expand"
-          aria-label={t('放大')}
+          aria-label={expandText ?? t('放大')}
+          title={power === 'asleep' ? t('已休眠，用到时会自己启动') : undefined}
           className="group absolute inset-0 z-10 h-auto cursor-pointer rounded-none p-0 outline-none hover:text-inherit transition-colors duration-(--dur-overlay) hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset motion-reduce:transition-none"
           onClick={onExpand}
         >
-          <span className="absolute top-2 right-2 grid size-7 place-items-center rounded-(--radius-control) bg-secondary text-secondary-foreground opacity-0 shadow-sm transition-opacity duration-(--dur-overlay) group-hover:opacity-100 group-focus-visible:opacity-100 pointer-coarse:opacity-100 motion-reduce:transition-none">
-            <Maximize2 aria-hidden="true" className="size-4" />
+          <span
+            className={`absolute top-2 right-2 grid h-7 place-items-center rounded-(--radius-control) bg-popover text-foreground shadow-(--e2) transition-opacity duration-(--dur-overlay) group-hover:opacity-100 group-focus-visible:opacity-100 pointer-coarse:opacity-100 motion-reduce:transition-none ${expandText === undefined ? 'w-7 opacity-0' : 'px-2.5 text-meta opacity-100'}`}
+          >
+            {expandText ?? <Maximize2 aria-hidden="true" className="size-4" />}
           </span>
         </Button>
       )}

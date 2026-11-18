@@ -153,6 +153,14 @@ export const machineCapabilitiesSchema = z.object({
     .max(64)
     .regex(/^[a-z0-9._-]+$/)
     .optional(),
+  computerName: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .regex(/^\P{C}+$/u)
+    .optional(),
+  hostname: z.string().min(1).max(253).optional(),
   mcpServers: z.array(z.string()),
   skills: z.array(z.string()),
   hardware: machineHardwareSchema.optional(),
@@ -203,11 +211,19 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const scrapling = machineCapabilitiesSchema.shape.scrapling.safeParse(rec.scrapling);
   const hostPermissions = hostPermissionsSchema.safeParse(rec.hostPermissions);
   const vmDownload = vmDownloadSchema.safeParse(rec.vmDownload);
+  const computerName = machineCapabilitiesSchema.shape.computerName.safeParse(rec.computerName);
+  const reportedHostname = machineCapabilitiesSchema.shape.hostname.safeParse(rec.hostname);
   return {
     ...base.data,
     ...(osPlatform.success ? { osPlatform: osPlatform.data } : {}),
     ...(osDistribution.success && osDistribution.data !== undefined
       ? { osDistribution: osDistribution.data }
+      : {}),
+    ...(computerName.success && computerName.data !== undefined
+      ? { computerName: computerName.data }
+      : {}),
+    ...(reportedHostname.success && reportedHostname.data !== undefined
+      ? { hostname: reportedHostname.data }
       : {}),
     ...(confinement.success ? { confinement: confinement.data } : {}),
     ...(confinementCause.success ? { confinementCause: confinementCause.data } : {}),

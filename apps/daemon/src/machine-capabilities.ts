@@ -1,5 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statfsSync, statSync } from 'node:fs';
-import { cpus, freemem, loadavg, totalmem } from 'node:os';
+import { cpus, freemem, hostname, loadavg, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { parseEnv } from 'node:util';
 import {
@@ -28,6 +29,28 @@ function probeOsDistribution(): string | undefined {
     }
   }
   return undefined;
+}
+
+export function probeDeviceName(
+  platform: NodeJS.Platform = process.platform,
+  readComputerName: () => string = () =>
+    execFileSync('scutil', ['--get', 'ComputerName'], { encoding: 'utf8', timeout: 2_000 }),
+): Pick<MachineCapabilities, 'computerName' | 'hostname'> {
+  const reportedHostname = machineCapabilitiesSchema.shape.hostname.safeParse(hostname());
+  const host = reportedHostname.success ? reportedHostname.data : undefined;
+  let computerName: string | undefined;
+  if (platform === 'darwin') {
+    try {
+      const parsed = machineCapabilitiesSchema.shape.computerName.safeParse(readComputerName());
+      computerName = parsed.success ? parsed.data : undefined;
+    } catch {
+      computerName = undefined;
+    }
+  }
+  return {
+    ...(computerName !== undefined ? { computerName } : {}),
+    ...(host !== undefined ? { hostname: host } : {}),
+  };
 }
 
 function scanMcpSlugs(mcpConfigPath: string): string[] {
@@ -95,6 +118,7 @@ export function probeMachineCapabilities(sources: MachineCapabilitySources): Mac
   return {
     osPlatform: osPlatformOf(process.platform),
     ...(osDistribution !== undefined ? { osDistribution } : {}),
+    ...probeDeviceName(),
     mcpServers: scanMcpSlugs(sources.mcpConfigPath),
     skills: scanSkillNames(sources.skillsDir).filter(
       (name) => name !== 'agent-reach' || agentReachEnabled(),
@@ -108,6 +132,7 @@ export function createMachineCapabilitiesProbe(
 ): () => MachineCapabilities {
   let mcpCache: { mtimeMs: number; value: string[] } | null = null;
   let skillsCache: { mtimeMs: number; value: string[] } | null = null;
+  const deviceName = probeDeviceName();
 
   const mtimeOf = (path: string): number | null => {
     try {
@@ -137,6 +162,7 @@ export function createMachineCapabilitiesProbe(
     return {
       osPlatform: osPlatformOf(process.platform),
       ...(osDistribution !== undefined ? { osDistribution } : {}),
+      ...deviceName,
       mcpServers: mcpCache.value,
       skills: skillsCache.value.filter((name) => name !== 'agent-reach' || agentReachEnabled()),
       ...(hardware !== undefined ? { hardware } : {}),

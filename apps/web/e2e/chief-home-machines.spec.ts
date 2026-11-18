@@ -11,7 +11,7 @@ test('the computer chip names the Coordinator machine, its state and any offline
 }) => {
   await page.goto(HOME);
   await expect(chip(page)).toHaveAccessibleName(/xmonsMac/);
-  await expect(chip(page)).toHaveAccessibleName(/xmonsMac · 在线 ·/);
+  await expect(chip(page)).not.toHaveAccessibleName(/在线/);
   await expect(chip(page)).not.toHaveAccessibleName(/在跑/);
   await expect(chip(page)).not.toHaveAccessibleName(/\+1/);
   await expect(chip(page)).toHaveText('');
@@ -29,18 +29,18 @@ test('the chip opens a list with one row per computer, the Coordinator machine f
   await expect(page).toHaveURL(/[?&]pane=machines/);
   await expect(chip(page)).toHaveAttribute('aria-pressed', 'true');
 
-  await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toBeVisible();
+  await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toHaveCount(0);
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText('xmonsMac');
-  await expect(rows.nth(0)).toHaveText('xmonsMac在线');
+  await expect(rows.nth(0)).toHaveText('xmonsMac');
   await expect(rows.nth(0)).not.toContainText('Coordinator');
   await expect(rows.nth(1)).toContainText('omarchy');
   await expect(rows.nth(1)).toContainText('离线');
   await expect(panel(page).getByRole('switch')).toHaveCount(0);
   await expect(panel(page).getByRole('button', { name: /新会话|新任务|新建/ })).toHaveCount(0);
-  await expect(panel(page)).toContainText('检查过');
-  await expect(panel(page).getByRole('button', { name: '再检查一次' })).toBeEnabled();
+  await expect(panel(page)).not.toContainText('检查过');
+  await expect(panel(page).getByRole('button', { name: '再检查一次' })).toHaveCount(0);
 
   await panel(page).getByRole('link', { name: '添加电脑' }).click();
   await expect(page).toHaveURL(/\/app\/settings\/machines/);
@@ -52,7 +52,7 @@ test('each computer is one card in the list with no detail page, tabs or back co
   await page.goto(`${HOME}&pane=machines`);
   await expect(panel(page).getByTestId('machine-card')).toHaveCount(2);
   await expect(panel(page).getByRole('tab')).toHaveCount(0);
-  await expect(panel(page).getByRole('button', { name: /xmonsMac|omarchy/ })).toHaveCount(0);
+  await expect(panel(page).getByRole('button', { name: /^(xmonsMac|omarchy)$/ })).toHaveCount(0);
   await expect(panel(page).getByRole('button', { name: '所有电脑' })).toHaveCount(0);
   await expect(panel(page).getByText('Agent 的权限')).toHaveCount(0);
   await expect(panel(page).getByRole('switch')).toHaveCount(0);
@@ -77,16 +77,9 @@ test('the chip badge is green when every computer is online and the sidebar has 
   await expect(page.getByTestId('sidebar-footer').getByRole('link', { name: /在线/ })).toHaveCount(0);
 });
 
-test('re-checking refreshes the checked time without leaving the list', async ({ page }) => {
-  await page.goto(`${HOME}&pane=machines`);
-  await panel(page).getByRole('button', { name: '再检查一次' }).click();
-  await expect(panel(page).getByRole('button', { name: '再检查一次' })).toBeEnabled();
-  await expect(panel(page)).toContainText(/\d\d:\d\d 检查过/);
-});
-
 test('the chip name carries the Coordinator machine and its state', async ({ page }) => {
   await page.goto(HOME);
-  await expect(chip(page)).toHaveAccessibleName('电脑 · xmonsMac · 在线 · 1 台在线 · 1 台离线（omarchy）');
+  await expect(chip(page)).toHaveAccessibleName('电脑 · xmonsMac · 1 台离线（omarchy）');
 });
 
 test('at phone width the chip stays an icon and the title stays for screen readers', async ({ page }) => {
@@ -106,7 +99,7 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
   for (const [name, tip] of [
     ['任务', '任务，3 件等你'],
     ['成果', '成果'],
-    ['电脑', '电脑 · xmonsMac · 在线 · 1 台在线 · 1 台离线（omarchy）'],
+    ['电脑', '电脑 · xmonsMac · 1 台离线（omarchy）'],
   ] as const) {
     const button = page.getByTestId('home-c-pane-buttons').getByRole('button', { name });
     await button.hover();
@@ -145,23 +138,12 @@ test('each computer is its own outlined card with its status dot, and the add ro
   );
 });
 
-test('Edit on a computer card opens that computer in settings', async ({ page }) => {
+test('Computer settings in a card menu opens that computer in settings', async ({ page }) => {
   await page.goto('/app?scenario=home-c-machines&pane=machines');
   const card = panel(page).getByTestId('machine-card').filter({ hasText: 'Office Mac mini' });
-  await card.getByRole('link', { name: '编辑 Office Mac mini' }).click();
+  await card.getByTestId('machine-menu').click();
+  await page.getByTestId('machine-settings').click();
   await expect(page).toHaveURL(/\/app\/settings\/machines\?machine=home-c-office/);
-});
-
-test('re-checking shows a spinner in place of the label and keeps the button name', async ({
-  page,
-}) => {
-  await page.goto(`${HOME}&pane=machines`);
-  const recheck = panel(page).getByTestId('machines-recheck');
-  await expect(recheck).toHaveAccessibleName('再检查一次');
-  await expect(recheck).toHaveAttribute('aria-busy', 'false');
-  await recheck.click();
-  await expect(recheck).toHaveAttribute('aria-busy', 'false');
-  await expect(recheck).toHaveText('再检查一次');
 });
 
 const REF = '/app?scenario=sessions-ref&pane=machines';
@@ -173,7 +155,7 @@ test('the reference list says what runs on an online computer and how long an of
   await page.goto(REF);
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air在线');
+  await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air');
   await expect(rows.nth(1)).toHaveText(/^办公室 Mac mini离线 · \d+ (分钟|小时)前$/);
   await expect(panel(page).getByRole('button', { name: /云|cloud/i })).toHaveCount(0);
 });

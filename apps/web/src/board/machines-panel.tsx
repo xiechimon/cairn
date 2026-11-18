@@ -1,33 +1,37 @@
-import type { ComputerRecord, ComputerState, VmDownload } from '@cairn/shared';
+import type { ComputerRecord, VmDownload } from '@cairn/shared';
 import { cn } from 'cn';
 import { Laptop, Monitor, Plus } from 'lucide-react';
-import { type ReactElement, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, type ReactElement, type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useAuth } from '../api/auth.js';
 import { useConnected } from '../api/connection-state.js';
-import { useComputers } from '../api/hooks.js';
-import { clockTime } from '../api/mappers.js';
+import { useApiMutations, useComputers } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useComputerControl } from '../api/use-computer-control.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ListCard } from '../components/list-card.js';
-import { MachineIcon, MachineName } from '../components/machine-label.js';
+import { MachineIcon, machineDisplayName } from '../components/machine-label.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { Button } from '../components/ui/button.js';
-import { Spinner } from '../components/ui/spinner.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
+import { Input } from '../components/ui/input.js';
+import { toastError } from '../components/ui/toaster.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import type { TFunc } from '../i18n/translate.js';
 import { settingsHref } from '../settings/settings-href.js';
 import {
-  ComputerActionsMenu,
   computerActionNoteText,
+  MachineMenu,
   useComputerActions,
 } from './computer-actions-menu.js';
 import { MachineScreenSurface } from './computer-screen.js';
 import { ComputerScreenDialog } from './computer-screen-dialog.js';
-import { fleetStatus, fleetStatusLine, machineStateLabel } from './fleet-status.js';
+import { fleetStatus, fleetStatusLine } from './fleet-status.js';
 import { desktopControlOnline } from './machine-capabilities.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { useScreenHoverControl } from './screen-hover-control.js';
@@ -71,41 +75,6 @@ function MachineGlyph({ machine }: { machine: MachineRow }) {
 
 const COMPUTERS_PANEL_REFRESH_MS = 5_000;
 
-const COMPUTER_STATE_LABEL: Record<ComputerState, string> = {
-  stopped: '关着',
-  starting: '正在开机',
-  running: '开着',
-  failed: '出错',
-};
-
-function machineMeta(machine: MachineRow, now: number, t: TFunc): string {
-  if (machine.online !== true) {
-    const seen = machine.lastSeenAt ?? 0;
-    return seen > 0 ? joinMeta([t('离线'), relativeTime(seen, now, t)]) : t('离线');
-  }
-  return machineStateLabel(machine, t);
-}
-
-function MachineMeta({
-  machine,
-  computer,
-}: {
-  machine: MachineRow;
-  computer: ComputerRecord | null;
-}) {
-  const { t } = useI18n();
-  const base = machineMeta(machine, Date.now(), t);
-  if (computer === null || machine.online !== true) return <>{base}</>;
-  return (
-    <>
-      {`${base} · `}
-      <span data-testid="computer-state" data-state={computer.state}>
-        {t(COMPUTER_STATE_LABEL[computer.state])}
-      </span>
-    </>
-  );
-}
-
 export function MachineChip({
   machines,
   open,
@@ -123,8 +92,8 @@ export function MachineChip({
   const fleet = fleetStatus(machines);
   const label = joinMeta([
     t('电脑'),
-    host?.name,
-    host === null ? null : connected ? machineStateLabel(host, t) : t('连接断开，正在重连…'),
+    host === null ? null : machineDisplayName(host),
+    connected ? null : t('连接断开，正在重连…'),
     fleetStatusLine(fleet, t),
   ]);
   return (
@@ -171,14 +140,6 @@ export function MachineChip({
   );
 }
 
-function SectionLabel({ className, children }: { className?: string; children: ReactNode }) {
-  return (
-    <h3 className={cn('m-0 px-2.5 pb-1 text-ui font-normal text-foreground', className)}>
-      {children}
-    </h3>
-  );
-}
-
 const ROW_CLS =
   'h-auto w-full justify-start gap-5 rounded-none py-2 pr-4 pl-5 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
@@ -208,7 +169,7 @@ export function formatDownloadBytes(bytes: number): string {
   return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`;
 }
 
-function VmDownloadSurface({
+function VmDownloadRow({
   download,
   starting,
   onDownload,
@@ -225,102 +186,180 @@ function VmDownloadSurface({
     <div
       data-testid="vm-download"
       data-state={state}
-      className="grid aspect-[16/10] place-items-center bg-(--surface-1) p-6"
+      className="relative flex min-h-14 items-center gap-3 py-2 pr-3 pl-4"
     >
-      <div className="flex w-full max-w-60 flex-col items-center gap-1 text-center">
-        <Monitor aria-hidden="true" className="mb-1 size-5.5 text-content-secondary" />
-        <span className="text-ui font-medium text-foreground">{t('Linux 虚拟机')}</span>
-        {state === 'downloading' ? (
-          <>
-            <span className="text-meta text-content-tertiary tabular-nums">
-              {`${formatDownloadBytes(download.doneBytes)} / ${total}`}
-            </span>
-            <div
-              role="progressbar"
-              aria-label={t('Linux 虚拟机')}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={percent}
-              className="mt-3 h-1 w-full overflow-hidden rounded-full bg-border"
-            >
-              <div
-                className="h-full rounded-full bg-content-tertiary"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <span
-              className={cn(
-                'text-meta tabular-nums',
-                state === 'failed' ? 'text-destructive' : 'text-content-tertiary',
-              )}
-            >
-              {state === 'failed' ? t('下载没完成') : total}
-            </span>
-            <Button
-              size="sm"
-              data-testid="vm-download-start"
-              className="mt-3 px-2.5 pointer-coarse:h-11 pointer-coarse:px-6"
-              onClick={onDownload}
-            >
-              {state === 'failed' ? t('重试') : t('下载')}
-            </Button>
-          </>
-        )}
-      </div>
+      <Monitor aria-hidden="true" className="size-5.5 flex-none text-content-secondary" />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-ui text-foreground">{t('Linux 虚拟机')}</span>
+        <span
+          className={cn(
+            'truncate text-meta tabular-nums',
+            state === 'failed' ? 'text-destructive' : 'text-content-tertiary',
+          )}
+        >
+          {state === 'downloading'
+            ? `${formatDownloadBytes(download.doneBytes)} / ${total}`
+            : state === 'failed'
+              ? t('下载没完成')
+              : t('{size}，Coordinator 用它上网和操作软件', { size: total })}
+        </span>
+      </span>
+      {state !== 'downloading' && (
+        <Button
+          size="sm"
+          variant={state === 'failed' ? 'outline' : 'default'}
+          data-testid="vm-download-start"
+          className="flex-none px-3 pointer-coarse:h-11 pointer-coarse:px-6"
+          onClick={onDownload}
+        >
+          {state === 'failed' ? t('重试') : t('下载')}
+        </Button>
+      )}
+      {state === 'downloading' && (
+        <div
+          role="progressbar"
+          aria-label={t('Linux 虚拟机')}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          className="absolute inset-x-0 bottom-0 h-0.5 bg-border"
+        >
+          <div className="h-full bg-content-tertiary" style={{ width: `${percent}%` }} />
+        </div>
+      )}
     </div>
   );
 }
 
-function MachineActivity({
+const RENAME_FORM = 'machine-rename-form';
+
+function RenameMachineDialog({
+  machineId,
+  name,
+  onClose,
+}: {
+  machineId: string;
+  name: string;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const { teamId } = useLiveData();
+  const { patchMachine } = useApiMutations(teamId);
+  const [draft, setDraft] = useState(name);
+  const trimmed = draft.trim();
+  const unchanged = trimmed === '' || trimmed === name;
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (unchanged) return;
+    patchMachine.mutate(
+      { id: machineId, body: { name: trimmed } },
+      { onSuccess: onClose, onError: (error) => toastError(t('重命名失败，请重试。'), error) },
+    );
+  };
+  return (
+    <DialogShell
+      title={t('重命名电脑')}
+      open
+      onClose={onClose}
+      size="s"
+      footer={
+        <>
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
+            {t('取消')}
+          </Button>
+          <Button
+            type="submit"
+            form={RENAME_FORM}
+            className={DIALOG_PRIMARY_BUTTON}
+            disabled={unchanged || patchMachine.isPending}
+          >
+            {t('保存')}
+          </Button>
+        </>
+      }
+    >
+      <form id={RENAME_FORM} onSubmit={submit}>
+        <Input
+          autoFocus
+          maxLength={64}
+          data-testid="machine-rename-input"
+          aria-label={t('电脑名称')}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+      </form>
+    </DialogShell>
+  );
+}
+
+type CardLine = { kind: 'busy' | 'wait' | 'fail' | 'quiet'; node: ReactNode; title?: string };
+
+function useCardLine({
   machine,
   computer,
+  controlFailed,
+  note,
 }: {
   machine: MachineRow;
   computer: ComputerRecord | null;
-}) {
+  controlFailed: boolean;
+  note: ReturnType<typeof useComputerActions>['note'];
+}): CardLine | null {
   const { t } = useI18n();
+  if (machine.online !== true) {
+    const seen = machine.lastSeenAt ?? 0;
+    return {
+      kind: 'quiet',
+      node: seen > 0 ? joinMeta([t('离线'), relativeTime(seen, Date.now(), t)]) : t('离线'),
+      title: t('在这台电脑上打开 Cairn，它就会上线'),
+    };
+  }
+  if (note !== null)
+    return {
+      kind: note.kind === 'failed' ? 'fail' : 'quiet',
+      node: (
+        <span role="status" data-testid="computer-action-note" data-note={note.kind}>
+          {computerActionNoteText(note, t)}
+        </span>
+      ),
+      ...(note.kind === 'failed' ? { title: note.detail } : {}),
+    };
+  if (controlFailed) return { kind: 'fail', node: t('没能接管，电脑没有响应') };
+  if (computer?.state === 'failed') return { kind: 'fail', node: t('电脑卡住了，文件都还在') };
+  if (computer?.handoffReason != null)
+    return {
+      kind: 'wait',
+      node: <span data-testid="machine-screen-note">{t('需要你登录，点屏幕接管')}</span>,
+    };
   const activity = computer?.activity ?? null;
-  if (machine.online !== true || activity === null) return null;
-  const time = relativeTime(activity.at, Date.now(), t);
+  if (activity === null || !activity.inUse) return null;
   const linkCls =
     'min-w-0 truncate rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50';
-  const subject =
-    activity.todoId === null ? (
-      <Link to="/app" className={linkCls}>
-        {t('Coordinator')}
-      </Link>
-    ) : (
-      <ThreadLink todoId={activity.todoId} className={linkCls}>
-        {activity.title}
-      </ThreadLink>
-    );
-  return (
-    <p
-      data-testid="machine-activity"
-      data-activity={activity.inUse ? 'using' : 'idle'}
-      className={cn(
-        'm-0 flex min-w-0 items-baseline gap-1 px-5 py-2.5 text-meta',
-        activity.inUse ? 'text-content-secondary' : 'text-content-tertiary',
-      )}
-    >
-      {activity.inUse ? (
-        <>
-          {subject}
-          <span className="flex-none">{t('· 正在用 · {time}', { time })}</span>
-        </>
-      ) : (
-        <>
-          <span className="flex-none">{t('空闲 · 上次')}</span>
-          {subject}
-          <span className="flex-none">{t('· {time}', { time })}</span>
-        </>
-      )}
-    </p>
-  );
+  return {
+    kind: 'busy',
+    node: (
+      <span data-testid="machine-activity" className="flex min-w-0 gap-1">
+        {activity.todoId === null ? (
+          <Link to="/app" className={linkCls}>
+            {t('Coordinator')}
+          </Link>
+        ) : (
+          <ThreadLink todoId={activity.todoId} className={linkCls}>
+            {activity.title}
+          </ThreadLink>
+        )}
+        <span className="flex-none">{t('正在用')}</span>
+      </span>
+    ),
+  };
 }
+
+const LINE_INK: Record<CardLine['kind'], string> = {
+  busy: 'text-content-secondary',
+  wait: 'text-(--waiting-ink)',
+  fail: 'text-destructive',
+  quiet: 'text-content-tertiary',
+};
 
 function MachineCard({
   machine,
@@ -335,6 +374,7 @@ function MachineCard({
 }) {
   const { t } = useI18n();
   const [fullscreen, setFullscreen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const [screenRequested, setScreenRequested] = useState(openScreen);
   const control = useComputerControl({ teamId, computer });
   const hover = useScreenHoverControl(control, computer?.handoffReason != null);
@@ -346,6 +386,15 @@ function MachineCard({
     teamId !== undefined &&
     desktopControlOnline(machine, computer);
   const installing = actions.note?.kind === 'running' && actions.note.action === 'install';
+  const vm = computer?.kind === 'vm' && download === null;
+  const name = machineDisplayName(machine);
+  const line = useCardLine({
+    machine,
+    computer,
+    controlFailed: control.failed,
+    note:
+      download !== null && actions.note !== null && 'action' in actions.note ? null : actions.note,
+  });
 
   useEffect(() => {
     if (!screenLive) setFullscreen(false);
@@ -358,64 +407,59 @@ function MachineCard({
   }, [screenRequested, screenLive]);
 
   return (
-    <div data-testid="machine-card" className="flex flex-col divide-y divide-border">
-      <div className="flex min-h-13 items-center gap-5 py-2 pr-2 pl-5">
+    <div data-testid="machine-card" className="flex flex-col">
+      <div className="flex min-h-14 items-center gap-3 py-2 pr-3 pl-4">
         <MachineGlyph machine={machine} />
         <span data-testid="machine-list-row" className="flex min-w-0 flex-1 flex-col">
-          <span className="min-w-0 text-ui text-foreground">
-            <MachineName machine={machine} showIcon={false} />
+          <span className="truncate text-ui text-foreground" title={name}>
+            {name}
           </span>
-          <span className="truncate text-meta text-content-tertiary">
-            <MachineMeta machine={machine} computer={computer} />
-          </span>
+          {line !== null && (
+            <span
+              data-testid="machine-line"
+              data-line={line.kind}
+              title={line.title}
+              className={cn('flex min-w-0 truncate text-meta', LINE_INK[line.kind])}
+            >
+              {line.node}
+            </span>
+          )}
         </span>
-        {machine.id !== undefined && (
+        {vm && computer?.state === 'failed' && machine.online === true && (
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            data-testid="machine-edit"
-            aria-label={`${t('编辑')} ${machine.name}`}
-            render={
-              <Link
-                to={{
-                  pathname: settingsHref('machines'),
-                  search: new URLSearchParams({ machine: machine.id }).toString(),
-                }}
-              />
-            }
-            className="h-7 flex-none px-2 text-ui font-normal text-foreground pointer-coarse:h-11"
+            data-testid="computer-recover"
+            disabled={actions.pending}
+            className="flex-none px-3 pointer-coarse:h-11"
+            onClick={() => actions.run('recover')}
           >
-            {t('编辑')}
+            {t('恢复')}
           </Button>
         )}
-        {computer?.kind === 'vm' && download === null && (
-          <ComputerActionsMenu
-            machineName={machine.name}
-            disabled={actions.pending || machine.online !== true}
-            onAction={actions.run}
-          />
-        )}
-      </div>
-      {actions.note !== null && !(download !== null && 'action' in actions.note) && (
-        <p
-          role="status"
-          data-testid="computer-action-note"
-          data-note={actions.note.kind}
-          title={actions.note.kind === 'failed' ? actions.note.detail : undefined}
-          className={cn(
-            'm-0 px-5 py-2 text-meta',
-            actions.note.kind === 'failed' ? 'text-destructive' : 'text-content-secondary',
-          )}
-        >
-          {computerActionNoteText(actions.note, t)}
-        </p>
-      )}
-      {download !== null && machine.online === true && (
-        <VmDownloadSurface
-          download={download}
-          starting={installing}
-          onDownload={() => actions.run('install')}
+        <MachineMenu
+          machineName={name}
+          settingsHref={
+            machine.id === undefined
+              ? null
+              : `${settingsHref('machines')}?${new URLSearchParams({ machine: machine.id })}`
+          }
+          onRename={machine.id === undefined ? null : () => setRenaming(true)}
+          vm={
+            vm
+              ? { disabled: actions.pending || machine.online !== true, onAction: actions.run }
+              : null
+          }
         />
+      </div>
+      {download !== null && machine.online === true && (
+        <div className="border-t border-border">
+          <VmDownloadRow
+            download={download}
+            starting={installing}
+            onDownload={() => actions.run('install')}
+          />
+        </div>
       )}
       {screenLive && (
         <>
@@ -424,23 +468,20 @@ function MachineCard({
             computer={computer}
             leaseId={control.leaseId}
             interactive={false}
+            power={
+              computer.state === 'starting'
+                ? 'starting'
+                : computer.state === 'stopped'
+                  ? 'asleep'
+                  : 'on'
+            }
+            {...(computer.handoffReason !== null ? { expandText: t('接管') } : {})}
             onExpand={() => setFullscreen(true)}
           />
-          {(computer.handoffReason !== null || control.failed) && (
-            <p
-              data-testid="machine-screen-note"
-              className={cn(
-                'm-0 px-5 py-2 text-meta',
-                control.failed ? 'text-destructive' : 'text-foreground',
-              )}
-            >
-              {control.failed ? t('没能接管，电脑没有响应') : t('需要你登录')}
-            </p>
-          )}
           {fullscreen && (
             <ComputerScreenDialog
               onClose={() => setFullscreen(false)}
-              title={machine.name}
+              title={name}
               teamId={teamId}
               computer={computer}
               control={control}
@@ -449,7 +490,13 @@ function MachineCard({
           )}
         </>
       )}
-      <MachineActivity machine={machine} computer={computer} />
+      {renaming && machine.id !== undefined && (
+        <RenameMachineDialog
+          machineId={machine.id}
+          name={name}
+          onClose={() => setRenaming(false)}
+        />
+      )}
     </div>
   );
 }
@@ -475,25 +522,14 @@ export function MachinesPanel({
   const ordered = host === null ? machines : [host, ...machines.filter((m) => m !== host)];
   const computerFor = (machine: MachineRow): ComputerRecord | null =>
     computers.find((computer) => computer.machine.id === machine.id) ?? null;
-  const [checkedAt, setCheckedAt] = useState(() => Date.now());
-  const [checking, setChecking] = useState(false);
   const keyOf = (machine: MachineRow) => machine.id ?? machine.name;
-
-  const recheck = () => {
-    setChecking(true);
-    void Promise.all([query?.refetch(), computersQ.refetch()]).finally(() => {
-      setCheckedAt(Date.now());
-      setChecking(false);
-    });
-  };
 
   return (
     <SidePanel label={t('电脑')} onDismiss={onClose}>
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
         <SidePanelTitle>{t('电脑')}</SidePanelTitle>
       </SidePanelHead>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-1 pb-6">
-        <SectionLabel>{t('你的电脑')}</SectionLabel>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pt-1 pb-6">
         <QueryBoundary
           query={query}
           isEmpty={machines.length === 0}
@@ -514,30 +550,7 @@ export function MachinesPanel({
             ))}
           </div>
         </QueryBoundary>
-        <div className="flex h-11 flex-none items-center justify-between pr-2 pl-2.5 text-meta text-content-tertiary">
-          <span>{t('{time} 检查过', { time: clockTime(checkedAt) })}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid="machines-recheck"
-            aria-label={t('再检查一次')}
-            aria-busy={checking}
-            disabled={checking}
-            onClick={recheck}
-            className="h-7 min-w-16 px-2 text-ui font-normal text-foreground pointer-coarse:h-11 disabled:opacity-100"
-          >
-            {checking ? (
-              <Spinner
-                role="presentation"
-                aria-hidden="true"
-                className="size-4 text-content-tertiary"
-              />
-            ) : (
-              t('再检查一次')
-            )}
-          </Button>
-        </div>
-        <div data-testid="machines-add" className="mt-1">
+        <div data-testid="machines-add">
           <LineRow
             icon={<Plus aria-hidden="true" className="size-5.5" />}
             label={t('添加电脑')}

@@ -54,21 +54,23 @@ async function open(
 test.describe('Coordinator computer actions menu', () => {
   test.use({ viewport: { width: 1280, height: 900 } });
 
-  test('a host computer has no actions menu', async ({ page }) => {
+  test('a host computer menu has rename and settings but no VM actions', async ({ page }) => {
     const { panel } = await open(page, 'host', () => ({ outcome: 'stopped' }));
-    await expect(panel.getByTestId('machine-card')).toBeVisible();
-    await expect(panel.getByTestId('computer-actions')).toHaveCount(0);
+    await panel.getByTestId('machine-menu').click();
+    await expect(page.getByTestId('machine-rename')).toBeVisible();
+    await expect(page.getByTestId('machine-settings')).toBeVisible();
+    await expect(page.getByTestId('computer-action-stop')).toHaveCount(0);
   });
 
   for (const [action, outcome, text] of [
-    ['stop', 'stopped', '电脑已停止，文件都还在，下次使用时会自动启动。'],
-    ['update', 'current', '电脑已经是最新版本。'],
-    ['update', 'updated', '电脑已更新到最新版本，文件都还在。'],
-    ['recover', 'recovered', '电脑已恢复，文件都还在。'],
+    ['stop', 'stopped', '虚拟机已停止，文件都还在，下次使用时会自动启动。'],
+    ['update', 'current', '虚拟机已经是最新版本。'],
+    ['update', 'updated', '虚拟机已更新到最新版本，文件都还在。'],
+    ['recover', 'recovered', '虚拟机已恢复，文件都还在。'],
   ] as const)
     test(`${action} answering ${outcome} says so under the computer`, async ({ page }) => {
       const { panel, actions } = await open(page, 'vm', () => ({ outcome }));
-      await panel.getByTestId('computer-actions').click();
+      await panel.getByTestId('machine-menu').click();
       await page.getByTestId(`computer-action-${action}`).click();
       await expect(panel.getByTestId('computer-action-note')).toHaveText(text);
       expect(actions).toEqual([action]);
@@ -76,7 +78,7 @@ test.describe('Coordinator computer actions menu', () => {
 
   test('reset asks first, names what is lost, and runs only after confirming', async ({ page }) => {
     const { panel, actions } = await open(page, 'vm', () => ({ outcome: 'reset' }));
-    await panel.getByTestId('computer-actions').click();
+    await panel.getByTestId('machine-menu').click();
     await evidencePanelShot(page, 'computer-actions-menu.png', panel);
     await page.getByTestId('computer-action-reset').click();
     const dialog = page.getByRole('alertdialog');
@@ -84,11 +86,11 @@ test.describe('Coordinator computer actions menu', () => {
     await evidencePanelShot(page, 'computer-reset-confirm.png', dialog);
     await dialog.getByRole('button', { name: '取消' }).click();
     expect(actions).toEqual([]);
-    await panel.getByTestId('computer-actions').click();
+    await panel.getByTestId('machine-menu').click();
     await page.getByTestId('computer-action-reset').click();
     await page.getByRole('alertdialog').getByRole('button', { name: '重置' }).click();
     await expect(panel.getByTestId('computer-action-note')).toHaveText(
-      '电脑已重置，现在是一台全新的电脑。',
+      '虚拟机已重置，现在是一台全新的虚拟机。',
     );
     expect(actions).toEqual(['reset']);
   });
@@ -110,11 +112,13 @@ test.describe('Coordinator computer actions menu', () => {
     await expect(surface).toHaveAttribute('data-state', 'absent');
     await expect(surface).toContainText('1.5 GB');
     await expect(panel.getByTestId('machine-screen')).toHaveCount(0);
-    await expect(panel.getByTestId('computer-actions')).toHaveCount(0);
     await surface.getByTestId('vm-download-start').click();
     await expect(surface).toHaveAttribute('data-state', 'downloading');
     await page.reload();
     await expect(panel.getByTestId('vm-download')).toContainText('580 MB / 1.5 GB');
+    await panel.getByTestId('machine-menu').click();
+    await expect(page.getByTestId('machine-rename')).toBeVisible();
+    await expect(page.getByTestId('computer-action-stop')).toHaveCount(0);
     await expect(panel.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '39');
     expect(actions).toEqual(['install']);
   });
@@ -131,12 +135,30 @@ test.describe('Coordinator computer actions menu', () => {
     await expect(surface.getByTestId('vm-download-start')).toHaveText('重试');
   });
 
+  test('rename sends the trimmed name and closes', async ({ page }) => {
+    const { panel } = await open(page, 'host', () => ({ outcome: 'stopped' }));
+    const patches: unknown[] = [];
+    await page.route('**/api/machines/m1', async (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback();
+      patches.push(route.request().postDataJSON());
+      await route.fulfill({ json: { ...MACHINE, name: '工作室的 Mac', teamId: 't1' } });
+    });
+    await panel.getByTestId('machine-menu').click();
+    await page.getByTestId('machine-rename').click();
+    const input = page.getByTestId('machine-rename-input');
+    await expect(input).toHaveValue('Mac');
+    await input.fill('  工作室的 Mac ');
+    await page.getByRole('button', { name: '保存' }).click();
+    await expect.poll(() => patches).toEqual([{ name: '工作室的 Mac' }]);
+    await expect(input).toHaveCount(0);
+  });
+
   test('a failed action shows a plain sentence, not the raw error', async ({ page }) => {
     const { panel } = await open(page, 'vm', () => 409);
-    await panel.getByTestId('computer-actions').click();
+    await panel.getByTestId('machine-menu').click();
     await page.getByTestId('computer-action-recover').click();
     const note = panel.getByTestId('computer-action-note');
-    await expect(note).toHaveText('没能恢复电脑，请稍后重试。');
+    await expect(note).toHaveText('没能恢复虚拟机，请稍后重试。');
     await expect(note).toHaveAttribute('data-note', 'failed');
   });
 });

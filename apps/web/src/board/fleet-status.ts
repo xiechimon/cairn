@@ -18,13 +18,8 @@ export function fleetStatus(machines: readonly Pick<MachineRow, 'name' | 'online
 
 export function fleetStatusLine(status: FleetStatus, t: Translate): string | null {
   if (status.offline === 0) return null;
-  return t('{online} 台在线 · {offline} 台离线（{names}）', {
-    online: status.online,
+  return t('{offline} 台离线（{names}）', {
     offline: status.offline,
     names: status.offlineNames.join('、'),
   });
-}
-
-export function machineStateLabel(machine: MachineRow, t: Translate): string {
-  return machine.online === true ? t('在线') : t('离线');
 }

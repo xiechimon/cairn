@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fleetStatus, fleetStatusLine, machineStateLabel } from '../src/board/fleet-status.js';
+import { fleetStatus, fleetStatusLine } from '../src/board/fleet-status.js';
 import type { MachineRow } from '../src/fixtures/records.js';
 import type { TFunc, TVars } from '../src/i18n/translate.js';
 
@@ -37,31 +37,19 @@ describe('fleetStatus', () => {
 });
 
 describe('fleetStatusLine', () => {
-  it('writes both counts and the offline machine names', () => {
+  it('writes the offline count and names, with no online count', () => {
     expect(fleetStatusLine({ online: 2, offline: 1, offlineNames: ['xmonsMac'] }, t)).toBe(
-      '2 台在线 · 1 台离线（xmonsMac）',
+      '1 台离线（xmonsMac）',
     );
   });
 
   it('joins several offline names', () => {
     expect(fleetStatusLine({ online: 0, offline: 2, offlineNames: ['a', 'b'] }, t)).toBe(
-      '0 台在线 · 2 台离线（a、b）',
+      '2 台离线（a、b）',
     );
   });
 
   it('is empty when nothing is offline', () => {
     expect(fleetStatusLine({ online: 3, offline: 0, offlineNames: [] }, t)).toBeNull();
-  });
-});
-
-describe('machineStateLabel', () => {
-  it('reads offline for an offline machine whatever it was running', () => {
-    expect(machineStateLabel(machine({ online: false, runningSteps: 3 }), t)).toBe('离线');
-  });
-
-  it('reads online without a running count, busy or idle', () => {
-    expect(machineStateLabel(machine({ runningSteps: 0 }), t)).toBe('在线');
-    expect(machineStateLabel(machine({ runningSteps: 2, maxConcurrent: 8 }), t)).toBe('在线');
-    expect(machineStateLabel(machine({ runningSteps: 2 }), t)).toBe('在线');
   });
 });

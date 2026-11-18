@@ -295,6 +295,30 @@ describe('D71 executor kind (Orb sandbox vs plain host)', () => {
     });
   });
 
+  it('the server keeps a reported computer name and hostname and drops a malformed name alone', () => {
+    expect(
+      parseReportedCapabilities({
+        mcpServers: [],
+        skills: [],
+        computerName: 'xmon 的 MacBook Pro',
+        hostname: 'xmonsMac-3574.local',
+      }),
+    ).toEqual({
+      mcpServers: [],
+      skills: [],
+      computerName: 'xmon 的 MacBook Pro',
+      hostname: 'xmonsMac-3574.local',
+    });
+    expect(
+      parseReportedCapabilities({
+        mcpServers: [],
+        skills: [],
+        computerName: 'bad\u0000name',
+        hostname: 'omarchy',
+      }),
+    ).toEqual({ mcpServers: [], skills: [], hostname: 'omarchy' });
+  });
+
   it('an old daemon that reports no executor stays unreported, never defaulted to host', () => {
     expect(parseReportedCapabilities({ mcpServers: [], skills: [] })?.executor).toBeUndefined();
   });
