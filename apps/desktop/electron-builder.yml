@@ -30,6 +30,12 @@ mac:
   artifactName: ${productName}-${version}-${arch}.${ext}
   icon: ../../assets/AppIcon.icns
   category: public.app-category.developer-tools
+  extraResources:
+    - from: node_modules/electron-liquid-glass/prebuilds
+      to: liquid-glass
+      filter: ['darwin-*/*.node']
+    - from: node_modules/electron-liquid-glass/LICENSE
+      to: liquid-glass/LICENSE
   identity: '-'
   sign: scripts/sign-mac.cjs
   timestamp: none

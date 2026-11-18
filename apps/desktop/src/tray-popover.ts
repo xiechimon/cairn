@@ -7,7 +7,13 @@ export interface Box {
 
 export const TRAY_POPOVER_WIDTH = 320;
 export const TRAY_POPOVER_GAP = 4;
+export const TRAY_POPOVER_RADIUS = 16;
 const EDGE = 8;
+const FIRST_LIQUID_GLASS_DARWIN = 25;
+
+export function hasLiquidGlass(platform: string, osRelease: string): boolean {
+  return platform === 'darwin' && Number.parseInt(osRelease, 10) >= FIRST_LIQUID_GLASS_DARWIN;
+}
 
 export function trayPopoverBounds(icon: Box, workArea: Box, height: number): Box {
   const centred = Math.round(icon.x + icon.width / 2 - TRAY_POPOVER_WIDTH / 2);

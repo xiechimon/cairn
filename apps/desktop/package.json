@@ -22,7 +22,7 @@
     "dist:mac": "node build.mjs && electron-builder --mac",
     "dist:linux": "node build.mjs && electron-builder --linux --publish never",
     "typecheck": "tsc --noEmit",
-    "smoke": "node scripts/smoke-mac.mjs release/mac-arm64/Cairn.app release/smoke.png",
+    "smoke": "node scripts/smoke-mac.mjs release/mac-arm64/Cairn.app release/smoke.png release/tray.png",
     "smoke:linux": "node scripts/smoke-linux.mjs"
   },
   "devDependencies": {
@@ -31,6 +31,7 @@
     "@playwright/test": "catalog:",
     "electron": "45.2.1",
     "electron-builder": "26.18.1",
+    "electron-liquid-glass": "1.1.1",
     "esbuild": "0.28.2",
     "typescript": "catalog:"
   }

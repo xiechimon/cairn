@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     setRunner: (on: boolean): Promise<void> => ipcRenderer.invoke('desktop-tray:runner', on),
     setKeepAwake: (on: boolean): void => ipcRenderer.send('desktop-tray:keep-awake', on),
     resize: (height: number): void => ipcRenderer.send('desktop-tray:resize', height),
+    hide: (): void => ipcRenderer.send('desktop-tray:hide'),
     quit: (): void => ipcRenderer.send('desktop-tray:quit'),
   },
   localProviders: {

@@ -1,26 +1,27 @@
 import type { DesktopRunnerState, DesktopTrayOpen, DesktopTrayState } from '@cairn/shared';
 import { cn } from 'cn';
 import { Coffee, Laptop, Search, Settings, SquarePen } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTasks } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { isWaiting, tasksFromQuery } from '../board/tasks-sections.js';
-import { threadHref } from '../board/thread-copy.js';
+import { tasksFromQuery } from '../board/tasks-sections.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
+import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { desktopTray } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
+import { type TrayGroup, trayGroups } from './tray-groups.js';
 
-const MAX_ROWS = 9;
-
-interface TrayRow {
-  key: string;
-  title: string;
-  waiting: boolean;
-  at: number;
-  path: string;
-}
+const ON_MAC = typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh');
 
 const RUNNER_WORD: Record<DesktopRunnerState, string> = {
   starting: '正在启动',
@@ -29,65 +30,52 @@ const RUNNER_WORD: Record<DesktopRunnerState, string> = {
   failed: '已停止',
 };
 
-const ROUND =
-  'flex items-center justify-center rounded-full bg-(--menu-hover) shadow-(--e1) transition-colors hover:bg-(--hover-1) focus-visible:outline-(--focus-ring)';
-
-function channelPath(projectId: string | null): string {
-  return projectId === null ? '/app' : `/app?project=${projectId}&chat=1`;
-}
-
-function useTrayRows(): TrayRow[] {
+function useTrayGroups(): TrayGroup[] {
   const { live, teamId } = useLiveData();
   const tasksQ = useTasks(teamId, live);
-  return useMemo(() => {
-    const view = tasksFromQuery(tasksQ.data);
-    const rows: TrayRow[] = [
-      ...view.questions.map((question) => ({
-        key: question.requestId,
-        title: question.header,
-        waiting: true,
-        at: question.createdAt,
-        path: channelPath(question.projectId),
-      })),
-      ...view.entries
-        .filter((entry) => isWaiting(entry.section) || entry.section === 'working')
-        .map((entry) => ({
-          key: entry.todo.id,
-          title: entry.todo.title,
-          waiting: isWaiting(entry.section),
-          at: entry.todo.phaseAt,
-          path: threadHref(entry.todo.id, ''),
-        })),
-    ];
-    return rows
-      .sort((a, b) => Number(b.waiting) - Number(a.waiting) || b.at - a.at)
-      .slice(0, MAX_ROWS);
-  }, [tasksQ.data]);
+  return useMemo(() => trayGroups(tasksFromQuery(tasksQ.data)), [tasksQ.data]);
 }
 
-function TrayButton({
+function moveFocus(event: KeyboardEvent<HTMLDivElement>, hide: () => void) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    hide();
+    return;
+  }
+  const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+  if (step === 0) return;
+  event.preventDefault();
+  const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:enabled')];
+  const at = items.indexOf(document.activeElement as HTMLButtonElement);
+  const next = at === -1 ? (step === 1 ? 0 : items.length - 1) : at + step;
+  items[(next + items.length) % items.length]?.focus();
+}
+
+function TrayItem({
+  glyph,
   label,
-  className,
+  hint,
+  testId,
   onClick,
-  pressed,
-  children,
 }: {
+  glyph?: ReactNode;
   label: string;
-  className?: string;
-  onClick: () => void;
-  pressed?: boolean;
-  children: ReactNode;
+  hint?: string;
+  testId?: string;
+  onClick?: () => void;
 }) {
   return (
     <Button
       variant="ghost"
-      title={label}
-      aria-label={label}
-      aria-pressed={pressed}
+      role="menuitem"
+      data-testid={testId}
+      className="tray-item"
+      disabled={onClick === undefined}
       onClick={onClick}
-      className={cn(ROUND, className)}
     >
-      {children}
+      <span className="tray-item-glyph">{glyph}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {hint !== undefined && <span className="tray-item-hint">{hint}</span>}
     </Button>
   );
 }
@@ -97,7 +85,7 @@ export function TrayPage() {
   const { user } = useLiveData();
   const bridge = useMemo(desktopTray, []);
   const [state, setState] = useState<DesktopTrayState | null>(null);
-  const rows = useTrayRows();
+  const groups = useTrayGroups();
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -116,74 +104,84 @@ export function TrayPage() {
     return () => observer.disconnect();
   }, [bridge]);
 
+  useEffect(() => {
+    const forget = () => (document.activeElement as HTMLElement | null)?.blur();
+    window.addEventListener('blur', forget);
+    return () => window.removeEventListener('blur', forget);
+  }, []);
+
   const open = (target: DesktopTrayOpen) => bridge?.open(target);
   const runner = state?.runner ?? 'starting';
   const runnerOn = runner === 'on' || runner === 'starting';
   const keepAwake = state?.keepAwake ?? false;
+  const accent = state?.accent == null ? {} : { '--tray-accent': state.accent };
 
   return (
     <div
       ref={rootRef}
+      role="menu"
+      aria-label="Cairn"
       data-testid="tray-popover"
-      className="flex select-none flex-col gap-3 p-3 text-ui text-foreground"
+      className={cn('tray-pop', !ON_MAC && 'tray-pop-opaque')}
+      style={accent as CSSProperties}
+      onKeyDown={(event) => moveFocus(event, () => bridge?.hide())}
     >
-      <div className="flex items-center gap-3">
+      <div className="tray-row">
         <Button
           variant="ghost"
           data-testid="tray-new-task"
+          className="tray-tile"
           onClick={() => open({ kind: 'command', command: 'new-task' })}
-          className={cn(ROUND, 'h-16 flex-1 justify-start gap-3 px-5 text-left font-normal')}
         >
-          <SquarePen className="size-5.5" aria-hidden="true" />
-          <span className="flex flex-col">
-            <span className="font-title">{t('新任务')}</span>
-            {state?.newTaskKey != null && (
-              <span className="text-caption text-content-tertiary">{state.newTaskKey}</span>
-            )}
+          <SquarePen className="size-5" aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="tray-tile-title">{t('新任务')}</span>
+            {state?.newTaskKey != null && <span className="tray-tile-sub">{state.newTaskKey}</span>}
           </span>
         </Button>
-        <TrayButton
-          label={t('打开 Cairn')}
-          className="size-16"
+        <Button
+          variant="ghost"
+          className="tray-disc"
+          title={t('打开 Cairn')}
+          aria-label={t('打开 Cairn')}
           onClick={() => open({ kind: 'path', path: '/app' })}
         >
-          <BrandGlyph className="size-5.5" />
-        </TrayButton>
-        <TrayButton
-          label={t('搜索')}
-          className="size-16"
+          <BrandGlyph className="size-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          className="tray-disc"
+          title={t('搜索')}
+          aria-label={t('搜索')}
           onClick={() => open({ kind: 'command', command: 'search' })}
         >
-          <Search className="size-5.5" aria-hidden="true" />
-        </TrayButton>
+          <Search className="size-5" aria-hidden="true" />
+        </Button>
       </div>
 
-      <ul
-        data-testid="tray-rows"
-        className="m-0 flex list-none flex-col rounded-(--radius-card) bg-(--menu-hover) p-1"
-      >
-        <li>
-          <TrayRowButton
-            title="Coordinator"
-            waiting={false}
-            onClick={() => open({ kind: 'path', path: '/app' })}
-          />
-        </li>
-        {rows.map((row) => (
-          <li key={row.key}>
-            <TrayRowButton
-              title={row.title}
-              waiting={row.waiting}
-              onClick={() => open({ kind: 'path', path: row.path })}
-            />
-          </li>
+      <div data-testid="tray-rows" className="flex flex-col">
+        <TrayItem
+          glyph={<BrandGlyph className="size-4" />}
+          label="Coordinator"
+          onClick={() => open({ kind: 'path', path: '/app' })}
+        />
+        {groups.map((group) => (
+          <section key={group.key} aria-label={t(group.label)} className="flex flex-col">
+            <h2 className="tray-head">{t(group.label)}</h2>
+            {group.rows.map((row) => (
+              <TrayItem
+                key={row.key}
+                glyph={<StatusGlyph kind={row.glyph} />}
+                label={row.title}
+                onClick={() => open({ kind: 'path', path: row.path })}
+              />
+            ))}
+          </section>
         ))}
-        {rows.length === 0 && (
-          <li className="px-3 py-2 pl-8 text-meta text-content-tertiary">{t('没有等你的事')}</li>
-        )}
-      </ul>
+        {groups.length === 0 && <TrayItem label={t('没有等你的事')} />}
+      </div>
 
-      <div className="flex items-center gap-3">
+      <div className="tray-row">
         <Button
           variant="ghost"
           role="switch"
@@ -191,105 +189,59 @@ export function TrayPage() {
           data-testid="tray-runner"
           data-state={runner}
           disabled={bridge === null || runner === 'starting'}
+          className="tray-tile"
           onClick={() => void bridge?.setRunner(!runnerOn)}
-          className={cn(ROUND, 'h-16 flex-1 justify-start gap-3 pr-5 pl-2 text-left font-normal')}
         >
-          <span
-            className={cn(
-              'relative flex size-12 items-center justify-center rounded-full bg-(--hover-1)',
-              runnerOn ? 'text-foreground' : 'text-content-secondary',
-            )}
-          >
-            <Laptop className="size-5.5" aria-hidden="true" />
-            <span
-              aria-hidden="true"
-              className={cn(
-                'absolute right-1 bottom-1 size-2 rounded-full',
-                runner === 'on' && 'bg-running',
-                runner === 'failed' && 'bg-destructive',
-                (runner === 'off' || runner === 'starting') && 'border border-content-tertiary',
-              )}
-            />
+          <span className="tray-badge">
+            <Laptop className="size-4" aria-hidden="true" />
           </span>
-          <span className="flex flex-col">
-            <span className="font-title">Runner</span>
-            <span
-              className={cn(
-                'text-meta',
-                runner === 'failed' ? 'text-destructive' : 'text-content-tertiary',
-              )}
-            >
-              {t(RUNNER_WORD[runner])}
-            </span>
+          <span className="min-w-0">
+            <span className="tray-tile-title">Runner</span>
+            <span className="tray-tile-sub">{t(RUNNER_WORD[runner])}</span>
           </span>
         </Button>
-        <TrayButton
-          label={keepAwake ? t('保持 Mac 唤醒，已开启') : t('保持 Mac 唤醒')}
-          pressed={keepAwake}
-          className={cn(
-            'size-16',
-            keepAwake &&
-              'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button-hover)',
-          )}
-          onClick={() => bridge?.setKeepAwake(!keepAwake)}
-        >
-          <Coffee className="size-5.5" aria-hidden="true" />
-        </TrayButton>
-        <TrayButton
-          label={t('设置')}
-          className="size-16"
-          onClick={() => open({ kind: 'command', command: 'settings' })}
-        >
-          <Settings className="size-5.5" aria-hidden="true" />
-        </TrayButton>
-      </div>
-
-      <div className="flex items-center gap-2 px-1">
-        <SeededAvatar
-          name={user.displayName}
-          src={user.avatarUrl}
-          fallback={user.displayName.slice(0, 1)}
-          className="size-7"
-        />
-        <span className="min-w-0 flex-1 truncate text-meta font-title">{user.displayName}</span>
         <Button
           variant="ghost"
-          data-testid="tray-quit"
-          onClick={() => bridge?.quit()}
-          className="h-8 rounded-full px-4 text-meta shadow-(--e1) transition-colors hover:bg-(--hover-1)"
+          role="switch"
+          aria-checked={keepAwake}
+          className="tray-disc"
+          title={t('保持 Mac 唤醒')}
+          aria-label={t('保持 Mac 唤醒')}
+          onClick={() => bridge?.setKeepAwake(!keepAwake)}
         >
-          {t('退出 Cairn')}
+          <Coffee className="size-5" aria-hidden="true" />
+        </Button>
+        <Button
+          variant="ghost"
+          className="tray-disc"
+          title={t('设置')}
+          aria-label={t('设置')}
+          onClick={() => open({ kind: 'command', command: 'settings' })}
+        >
+          <Settings className="size-5" aria-hidden="true" />
         </Button>
       </div>
-    </div>
-  );
-}
 
-function TrayRowButton({
-  title,
-  waiting,
-  onClick,
-}: {
-  title: string;
-  waiting: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      onClick={onClick}
-      className="flex h-10 w-full items-center justify-start gap-3 rounded-(--radius-menu-item) px-3 text-left text-ui font-normal transition-colors hover:bg-(--hover-1)"
-    >
-      <span className="flex w-2 flex-none justify-center">
-        {waiting && (
-          <span
-            aria-hidden="true"
-            data-slot="needs-you-dot"
-            className="size-1.5 rounded-full bg-(--card-button)"
-          />
-        )}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{title}</span>
-    </Button>
+      <div className="tray-rule" />
+      <div className="flex flex-col">
+        <TrayItem
+          glyph={
+            <SeededAvatar
+              name={user.displayName}
+              src={user.avatarUrl}
+              fallback={user.displayName.slice(0, 1)}
+              className="size-4"
+            />
+          }
+          label={user.displayName}
+        />
+        <TrayItem
+          label={t('退出 Cairn')}
+          testId="tray-quit"
+          hint={ON_MAC ? '⌘Q' : undefined}
+          onClick={() => bridge?.quit()}
+        />
+      </div>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { release } from 'node:os';
 import { join } from 'node:path';
 import { format } from 'node:util';
 import {
@@ -31,11 +32,13 @@ import {
   type NativeImage,
   Notification,
   nativeImage,
+  nativeTheme,
   powerMonitor,
   powerSaveBlocker,
   screen,
   session,
   shell,
+  systemPreferences,
   Tray,
   type UtilityProcess,
   utilityProcess,
@@ -60,8 +63,14 @@ import {
 } from './own-computer.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
+import { addLiquidGlass } from './tray-glass.js';
 import { trayMenuTemplate } from './tray-menu.js';
-import { TRAY_POPOVER_WIDTH, trayPopoverBounds } from './tray-popover.js';
+import {
+  hasLiquidGlass,
+  TRAY_POPOVER_RADIUS,
+  TRAY_POPOVER_WIDTH,
+  trayPopoverBounds,
+} from './tray-popover.js';
 import { createUpdater, removeLeftoverUpdates } from './updater.js';
 
 const LOOPBACK = '127.0.0.1';
@@ -77,6 +86,9 @@ const TRAY_FIRST_HEIGHT = 440;
 const TRAY_MAX_HEIGHT = 900;
 const TRAY_REFRESH_MS = 2_000;
 const TRAY_REOPEN_GUARD_MS = 250;
+const TRAY_LIGHT_FILL = '#f6f6f6';
+const TRAY_DARK_FILL = '#2b2b2b';
+const IS_MAC = process.platform === 'darwin';
 const MENU_COMMANDS: ReadonlySet<string> = new Set<DesktopMenuCommand>([
   'settings',
   'new-task',
@@ -324,7 +336,6 @@ function createTrayPopover(origin: string): BrowserWindow {
     height: TRAY_FIRST_HEIGHT,
     show: false,
     frame: false,
-    transparent: true,
     resizable: false,
     movable: false,
     minimizable: false,
@@ -333,9 +344,9 @@ function createTrayPopover(origin: string): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     hasShadow: true,
-    roundedCorners: true,
-    vibrancy: 'popover',
-    visualEffectState: 'active',
+    ...(IS_MAC
+      ? { type: 'panel', transparent: true, roundedCorners: true }
+      : { backgroundColor: nativeTheme.shouldUseDarkColors ? TRAY_DARK_FILL : TRAY_LIGHT_FILL }),
     webPreferences: {
       contextIsolation: true,
       sandbox: true,
@@ -343,7 +354,15 @@ function createTrayPopover(origin: string): BrowserWindow {
       preload: join(app.getAppPath(), 'dist', 'preload.cjs'),
     },
   });
-  popover.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  if (IS_MAC) {
+    const glass =
+      hasLiquidGlass(process.platform, release()) && addLiquidGlass(popover, TRAY_POPOVER_RADIUS);
+    if (!glass) popover.setVibrancy('menu');
+  }
+  popover.setVisibleOnAllWorkspaces(true, {
+    visibleOnFullScreen: true,
+    skipTransformProcessType: true,
+  });
   popover.webContents.setUserAgent(
     `${popover.webContents.getUserAgent()} ${DESKTOP_SHELL_USER_AGENT}`,
   );
@@ -358,6 +377,11 @@ function createTrayPopover(origin: string): BrowserWindow {
   return popover;
 }
 
+function systemAccent(): string | null {
+  if (!IS_MAC) return null;
+  return `#${systemPreferences.getAccentColor().slice(0, 6)}`;
+}
+
 function showTray(origin: string, controls: TrayControls): Tray {
   const trayIcon = (name: string): NativeImage => {
     const image = nativeImage.createFromPath(join(app.getAppPath(), 'assets', name));
@@ -368,10 +392,19 @@ function showTray(origin: string, controls: TrayControls): Tray {
   const awakeIcon = trayIcon('trayAwakeTemplate.png');
   const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
   const created = new Tray(keepAwake.isOn() ? awakeIcon : idleIcon);
+  const fallbackMenu = (): Menu =>
+    Menu.buildFromTemplate(
+      trayMenuTemplate(new URL(origin).host, keepAwake.isOn(), {
+        open: focusWindow,
+        setKeepAwake,
+        quit: () => app.quit(),
+      }),
+    );
   created.setToolTip(`Cairn · ${new URL(origin).host}`);
   const setKeepAwake = (on: boolean): void => {
     keepAwake.set(on);
     created.setImage(on ? awakeIcon : idleIcon);
+    if (!IS_MAC) created.setContextMenu(fallbackMenu());
   };
   const newTaskKey = globalShortcut.register(NEW_TASK_SHORTCUT, () =>
     sendToWindow('desktop-menu', 'new-task'),
@@ -385,6 +418,7 @@ function showTray(origin: string, controls: TrayControls): Tray {
     runner: controls.runner(),
     keepAwake: keepAwake.isOn(),
     newTaskKey,
+    accent: systemAccent(),
   });
   const publish = (): void => {
     if (popover?.isVisible()) popover.webContents.send('desktop-tray:state', state());
@@ -416,25 +450,16 @@ function showTray(origin: string, controls: TrayControls): Tray {
     const show = (): void => {
       place();
       shown.show();
-      shown.focus();
+      if (!IS_MAC) shown.focus();
       publish();
     };
     if (shown.webContents.isLoading()) shown.once('ready-to-show', show);
     else show();
   };
-  const fallbackMenu = (): Menu =>
-    Menu.buildFromTemplate(
-      trayMenuTemplate(new URL(origin).host, keepAwake.isOn(), {
-        open: focusWindow,
-        setKeepAwake,
-        quit: () => app.quit(),
-      }),
-    );
   created.on('click', toggle);
-  created.on('right-click', () => {
-    hide();
-    created.popUpContextMenu(fallbackMenu());
-  });
+  (app as NodeJS.EventEmitter).on('cairn-tray-toggle', toggle);
+  if (IS_MAC) created.on('right-click', toggle);
+  else created.setContextMenu(fallbackMenu());
   setInterval(publish, TRAY_REFRESH_MS);
   const fromPopover = (event: IpcMainInvokeEvent | IpcMainEvent): boolean =>
     popover !== null &&
@@ -461,6 +486,9 @@ function showTray(origin: string, controls: TrayControls): Tray {
       return;
     height = Math.min(next, TRAY_MAX_HEIGHT);
     if (popover?.isVisible()) place();
+  });
+  ipcMain.on('desktop-tray:hide', (event) => {
+    if (fromPopover(event)) hide();
   });
   ipcMain.on('desktop-tray:quit', (event) => {
     if (fromPopover(event)) app.quit();

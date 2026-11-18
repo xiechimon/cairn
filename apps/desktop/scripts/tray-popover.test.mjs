@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { TRAY_POPOVER_WIDTH, trayPopoverBounds } from '../src/tray-popover.ts';
+import { hasLiquidGlass, TRAY_POPOVER_WIDTH, trayPopoverBounds } from '../src/tray-popover.ts';
 
 const screen = { x: 0, y: 0, width: 1512, height: 982 };
 const workArea = { x: 0, y: 24, width: 1512, height: 958 };
@@ -30,4 +30,10 @@ test('an icon at the left edge of a display left of the main one stays on that d
 test('a popover taller than the room left is cut to fit above the Dock', () => {
   const bounds = trayPopoverBounds({ x: 700, y: 0, width: 24, height: 24 }, workArea, 2000);
   assert.equal(bounds.y + bounds.height, workArea.y + workArea.height - 8);
+});
+
+test('Liquid Glass loads only from macOS 26, whose Darwin kernel is 25', () => {
+  assert.equal(hasLiquidGlass('darwin', '25.0.0'), true);
+  assert.equal(hasLiquidGlass('darwin', '24.6.0'), false);
+  assert.equal(hasLiquidGlass('linux', '25.0.0'), false);
 });

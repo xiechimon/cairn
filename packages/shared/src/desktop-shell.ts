@@ -17,6 +17,7 @@ export interface DesktopTrayState {
   runner: DesktopRunnerState;
   keepAwake: boolean;
   newTaskKey: string | null;
+  accent: string | null;
 }
 
 export type DesktopTrayOpen =

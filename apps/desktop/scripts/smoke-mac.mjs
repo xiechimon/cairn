@@ -20,7 +20,7 @@ function runnerProcesses() {
   }
 }
 
-const [appPath, screenshotPath] = process.argv.slice(2);
+const [appPath, screenshotPath, trayShotPath] = process.argv.slice(2);
 if (appPath === undefined || screenshotPath === undefined) {
   console.error('usage: node scripts/smoke-mac.mjs <Cairn.app> <screenshot.png>');
   process.exit(2);
@@ -83,12 +83,52 @@ try {
   console.log(`local Runner: ${JSON.stringify(runner)}`);
 
   await window.screenshot({ path: screenshotPath });
+
+  await app.evaluate(({ app: electronApp }) => electronApp.emit('cairn-tray-toggle'));
+  const tray = await app.waitForEvent('window', {
+    predicate: (page) => page.url().endsWith('/tray'),
+    timeout: GATE_SETTLE_MS * 4,
+  });
+  await tray.locator('[data-testid="tray-popover"]').waitFor({ timeout: GATE_SETTLE_MS * 4 });
+  await tray.waitForTimeout(1_000);
+  const opened = await app.evaluate(({ BrowserWindow }) => {
+    const popover = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().endsWith('/tray'),
+    );
+    return {
+      visible: popover?.isVisible() ?? false,
+      focused: popover?.isFocused() ?? false,
+      bounds: popover?.getBounds() ?? null,
+    };
+  });
+  assert.equal(opened.visible, true, 'the tray popover did not open');
+  console.log(`tray popover: ${JSON.stringify(opened)}`);
+  if (trayShotPath !== undefined) {
+    const { x, y, width, height } = opened.bounds;
+    const pad = 40;
+    execFileSync('screencapture', [
+      '-x',
+      `-R${x - pad},${Math.max(0, y - pad)},${width + pad * 2},${height + pad * 2}`,
+      trayShotPath,
+    ]);
+  }
+  await tray.locator('[data-testid="tray-new-task"]').focus();
+  await tray.keyboard.press('Escape');
+  await tray.waitForTimeout(500);
+  const afterEscape = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((w) => w.webContents.getURL().endsWith('/tray'))
+      ?.isVisible(),
+  );
+  assert.equal(afterEscape, false, 'Escape did not close the tray popover');
   const origin = new URL(window.url()).origin;
 
   const closed = await app.evaluate(({ BrowserWindow }) => {
-    const [shown] = BrowserWindow.getAllWindows();
+    const main = () =>
+      BrowserWindow.getAllWindows().filter((w) => !w.webContents.getURL().endsWith('/tray'));
+    const [shown] = main();
     shown?.close();
-    return { windows: BrowserWindow.getAllWindows().length, visible: shown?.isVisible() ?? false };
+    return { windows: main().length, visible: shown?.isVisible() ?? false };
   });
   assert.deepEqual(closed, { windows: 1, visible: false }, 'closing the window did not hide it');
   assert.equal((await fetch(origin)).status, 200, 'the server stopped when the window closed');

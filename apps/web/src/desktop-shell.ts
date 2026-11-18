@@ -78,6 +78,7 @@ export interface DesktopTrayBridge {
   setRunner: (on: boolean) => Promise<void>;
   setKeepAwake: (on: boolean) => void;
   resize: (height: number) => void;
+  hide: () => void;
   quit: () => void;
 }
 
