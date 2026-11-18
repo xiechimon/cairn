@@ -216,7 +216,7 @@ test('a reviewed thread shows its changes as one card that opens in place, with 
   await expect(page.getByTestId('transcript-note').filter({ hasText: /^已完成$/ })).toHaveCount(0);
   const place = await card.evaluate((el) => {
     const box = el.getBoundingClientRect();
-    const trace = [...document.querySelectorAll('.side-panel [data-trace-card]')]
+    const trace = [...document.querySelectorAll('.side-panel [data-testid="work-block"]')]
       .filter((node) => node !== el && !node.contains(el))
       .at(-1)!;
     const column = document.querySelector('.side-panel [data-testid="transcript-col"]')!;

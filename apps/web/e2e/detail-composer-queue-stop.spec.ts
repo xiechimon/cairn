@@ -343,6 +343,9 @@ test('Stop preserves changes without a dialog and cancelled tools show cancelled
   await expect(page.getByTestId('transcript-col').getByTestId('queued-message')).toHaveCount(0);
   await capsule.getByRole('button', { name: '移除' }).click();
   await expect(capsule).toHaveCount(0);
+  const workSummary = page.getByTestId('work-summary');
+  await expect(workSummary).toHaveAttribute('aria-expanded', 'false');
+  await workSummary.click();
   await expect(page.getByTestId('work-cancelled')).toBeVisible();
   await expect(page.getByTestId('work-cancelled')).toHaveText('已取消');
   await expect(page.getByTestId('work-spinner')).toHaveCount(0);
