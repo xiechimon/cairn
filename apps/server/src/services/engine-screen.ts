@@ -20,6 +20,7 @@ import { build, chiefThread, machine as machineTable, step, todo } from '../db/s
 import { HttpError } from '../lib/errors.js';
 import { forwardedOrigin } from '../lib/forwarded-origin.js';
 import { newRecordId } from '../lib/ids.js';
+import { readStepEnginePtyLog } from './machine-uploads.js';
 import { findMachineByToken } from './machines.js';
 import { assertDeviceActive, deviceStreams } from './paired-devices.js';
 
@@ -44,7 +45,10 @@ interface UpgradeServer {
   ): unknown;
 }
 
-type ScreenDependencies = Pick<AppContext, 'db' | 'machineHub' | 'secretBox' | 'hub'>;
+type ScreenDependencies = Pick<
+  AppContext,
+  'db' | 'machineHub' | 'secretBox' | 'hub' | 'attachmentsDir'
+>;
 
 interface EngineStepRow {
   id: string;
@@ -148,6 +152,13 @@ export class EngineScreenGateway {
         this.revoke(channel, 'takeover lease lost');
     }
     return { leaseId: lease.leaseId, fence: lease.fence, expiresAt: lease.expiresAt };
+  }
+
+  ptyLog(teamId: string, userId: string, stepId: string): Buffer {
+    this.ownedStep(teamId, userId, stepId);
+    const log = readStepEnginePtyLog(this.deps.attachmentsDir, stepId);
+    if (log === null) throw new HttpError(404, 'engine pty log not found');
+    return log;
   }
 
   private assertPtyMachine(machineId: string): void {

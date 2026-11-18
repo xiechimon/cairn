@@ -4,6 +4,7 @@ import { ApiError } from '../api/client.js';
 import {
   acquireEngineTakeover,
   engineScreenWsUrl,
+  fetchEnginePtyLog,
   openEngineScreen,
   releaseEngineTakeover,
   renewEngineTakeover,
@@ -54,6 +55,24 @@ export function useEngineScreen(
     }
   }, []);
 
+  const hydrateLog = useCallback(async () => {
+    if (teamId === undefined || stepId === null) return;
+    const gen = generation.current;
+    for (let attempt = 0; attempt < 2 && terminal.current.text() === ''; attempt += 1) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 2500));
+      try {
+        const log = await fetchEnginePtyLog(teamId, stepId);
+        if (!mounted.current || generation.current !== gen) return;
+        if (log === null) continue;
+        if (terminal.current.text() === '') {
+          terminal.current.feed(new TextDecoder().decode(log));
+          tick();
+        }
+        return;
+      } catch {}
+    }
+  }, [teamId, stepId, tick]);
+
   const connect = useCallback(
     async (want: EngineScreenKind) => {
       if (teamId === undefined || stepId === null) return;
@@ -92,6 +111,7 @@ export function useEngineScreen(
             lease.current = null;
           }
           setStatus('ended');
+          void hydrateLog();
           if (want === 'takeover') void connect('view');
         };
         socket.onerror = () => {};
@@ -104,9 +124,10 @@ export function useEngineScreen(
           return;
         }
         setStatus(error instanceof ApiError ? 'ended' : 'failed');
+        if (error instanceof ApiError) void hydrateLog();
       }
     },
-    [teamId, stepId, tick],
+    [teamId, stepId, tick, hydrateLog],
   );
 
   useEffect(() => {

@@ -365,7 +365,7 @@ void reconcileEffects(db, effectRegistry)
     logger.warn({ err: error }, 'external effects could not be reconciled');
   });
 computerScreens.attach(server);
-const engineScreens = engineScreensOf({ db, machineHub, secretBox, hub });
+const engineScreens = engineScreensOf({ db, machineHub, secretBox, hub, attachmentsDir });
 engineScreens.attach(server);
 
 if (config.authToken !== null) {

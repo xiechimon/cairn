@@ -70,6 +70,7 @@ function boot(opts: { pty?: boolean; status?: 'pending' | 'claimed' | 'done' } =
     machineHub: s.machineHub,
     secretBox: s.secretBox,
     hub: s.hub,
+    attachmentsDir: s.attachmentsDir,
   });
   const requests: EngineScreenRequest[] = [];
   disconnect = s.machineHub.subscribeMachine(
@@ -352,5 +353,59 @@ describe('paired engine screen channel', () => {
     expect(() => gateway.renewTakeover(s.team.id, s.user.id, 'engine-step', lease.leaseId)).toThrow(
       /takeover lease/,
     );
+  });
+});
+
+describe('engine pty log upload and fetch', () => {
+  async function uploadPtyLog(content: Uint8Array): Promise<Response> {
+    const urlsRes = await s.app.request('/api/machine/upload-urls/engine-step', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${MACHINE_TOKEN}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ files: [{ name: 'engine-pty.log' }] }),
+    });
+    expect(urlsRes.status).toBe(200);
+    const { uploads } = (await urlsRes.json()) as { uploads: { url: string }[] };
+    const uploadId = uploads[0]?.url.split('/').pop();
+    return s.app.request(`/api/machine/upload/${uploadId}`, {
+      method: 'PUT',
+      headers: { authorization: `Bearer ${MACHINE_TOKEN}` },
+      body: content,
+    });
+  }
+
+  test('the machine uploads engine-pty.log and the owner fetches the bytes', async () => {
+    boot();
+    const bytes = new TextEncoder().encode('\x1b[31mred scrollback\x1b[0m\n');
+    const put = await uploadPtyLog(bytes);
+    expect(put.status).toBe(200);
+    const res = await s.app.request(`/api/teams/${s.team.id}/engine-runs/engine-step/pty-log`);
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
+  });
+
+  test('pty-log is 404 before any upload and the upload is 413 past the cap', async () => {
+    boot();
+    const missing = await s.app.request(`/api/teams/${s.team.id}/engine-runs/engine-step/pty-log`);
+    expect(missing.status).toBe(404);
+    const oversized = await uploadPtyLog(new Uint8Array(4 * 1024 * 1024 + 1));
+    expect(oversized.status).toBe(413);
+  });
+
+  test('a foreign step has no pty log and upload-urls for it is rejected', async () => {
+    boot();
+    const res = await s.app.request(`/api/teams/${s.team.id}/engine-runs/missing-step/pty-log`);
+    expect(res.status).toBe(404);
+    const urlsRes = await s.app.request('/api/machine/upload-urls/missing-step', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${MACHINE_TOKEN}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ files: [{ name: 'engine-pty.log' }] }),
+    });
+    expect(urlsRes.status).toBe(404);
   });
 });

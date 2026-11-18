@@ -661,7 +661,8 @@
       "routes": {
         "server": [
           "/api/teams/:teamId/engine-runs/:stepId/takeover",
-          "/api/teams/:teamId/engine-runs/:stepId/screen"
+          "/api/teams/:teamId/engine-runs/:stepId/screen",
+          "/api/teams/:teamId/engine-runs/:stepId/pty-log"
         ]
       },
       "reach": [

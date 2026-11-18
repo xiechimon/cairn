@@ -1,5 +1,5 @@
 import type { EngineScreenKind, EngineTakeoverLease } from '@cairn/shared';
-import { api } from './client.js';
+import { ApiError, api } from './client.js';
 
 export interface OpenedEngineScreen {
   path: string;
@@ -42,6 +42,18 @@ export function openEngineScreen(
   body: { kind: EngineScreenKind; leaseId?: string; fromSeq?: number },
 ): Promise<OpenedEngineScreen> {
   return api.post<OpenedEngineScreen>(`/api/teams/${teamId}/engine-runs/${stepId}/screen`, body);
+}
+
+export async function fetchEnginePtyLog(
+  teamId: string,
+  stepId: string,
+): Promise<Uint8Array | null> {
+  const res = await fetch(`/api/teams/${teamId}/engine-runs/${stepId}/pty-log`, {
+    credentials: 'same-origin',
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new ApiError(res.status, res.statusText);
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 export function engineScreenWsUrl(path: string): string {

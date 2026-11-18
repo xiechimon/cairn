@@ -8,6 +8,7 @@ export const ENGINE_SCREEN_MAX_FRAME_BYTES = 256 * 1024;
 export const ENGINE_SCROLLBACK_BYTES = 1024 * 1024;
 export const ENGINE_SCROLLBACK_CHUNK_BYTES = 64 * 1024;
 export const ENGINE_PTY_LOG_FILE_NAME = 'engine-pty.log';
+export const ENGINE_PTY_LOG_MAX_BYTES = 4 * 1024 * 1024;
 export const engineScreenKindSchema = z.enum(['view', 'takeover']);
 export type EngineScreenKind = z.infer<typeof engineScreenKindSchema>;
 export const engineScreenChannelIdSchema = z.string().regex(/^[a-f0-9]{64}$/);

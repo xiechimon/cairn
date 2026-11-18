@@ -168,6 +168,6 @@ export function liveEngineRun({
         : [],
     events,
     rawOutput: events.map(rawOf).join('\n'),
-    ...(claimed !== undefined ? { stepId: claimed.id } : {}),
+    stepId: claimed?.id ?? engineSteps.at(-1)?.id,
   };
 }

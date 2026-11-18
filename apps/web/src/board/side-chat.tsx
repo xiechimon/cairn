@@ -713,7 +713,7 @@ function ReadyThread({
             send: screen.send,
           },
           actions:
-            engine.run.stepId !== undefined && live
+            engine.run.stepId !== undefined && live && engineCanTakeOver(engine.run.state)
               ? {
                   answer: () => {},
                   takeOver: () => {

@@ -81,4 +81,11 @@ export function registerEngineScreenRoutes(app: Hono, ctx: AppContext): void {
       201,
     );
   });
+  app.get('/api/teams/:teamId/engine-runs/:stepId/pty-log', (c) => {
+    const teamId = checkedTeam(c);
+    requireOwnerSession(c);
+    const log = engineScreensOf(ctx).ptyLog(teamId, ctx.user.id, c.req.param('stepId'));
+    c.header('content-type', 'application/octet-stream');
+    return c.body(new Uint8Array(log));
+  });
 }
