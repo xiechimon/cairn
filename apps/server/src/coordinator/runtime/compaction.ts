@@ -27,6 +27,17 @@ const TOOL_ARGS_CHARS = 200;
 const SUMMARY_MEMO = 'cairn-c2-summary';
 const FLUSH_MEMO = 'cairn-c4-memory-flush';
 const SUMMARY_SYSTEM_PROMPT = "You are Cairn's Coordinator summarization step.";
+const SUMMARY_LENGTH_RETRY_MAX_CHARS = 6_000;
+const SUMMARY_LENGTH_RETRY_NOTE = `The previous attempt ran into the model's output length limit. Give the same answer in at most ${SUMMARY_LENGTH_RETRY_MAX_CHARS} characters.`;
+
+class SummaryEndedError extends Error {
+  constructor(
+    readonly stopReason: string,
+    reply: AssistantMessage,
+  ) {
+    super(`summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`);
+  }
+}
 
 export interface ModelRef {
   provider: string;
@@ -175,7 +186,7 @@ export function summarizerFor(
   if (model === undefined) {
     throw new Error(`summary model ${ref?.provider}/${ref?.modelId} is not available`);
   }
-  return async (prompt) => {
+  const callOnce = async (prompt: string): Promise<string> => {
     const report = startSummaryCall(scope, scope.stage ?? 'summary-fold', model);
     let reply: AssistantMessage | undefined;
     let failure: unknown;
@@ -195,7 +206,7 @@ export function summarizerFor(
         },
       );
       if (reply.stopReason !== 'stop') {
-        throw new Error(`summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`);
+        throw new SummaryEndedError(reply.stopReason, reply);
       }
       return textOf(reply.content);
     } catch (error) {
@@ -204,6 +215,14 @@ export function summarizerFor(
     } finally {
       report(reply, failure, httpStatus);
     }
+  };
+  return async (prompt) => {
+    try {
+      return await callOnce(prompt);
+    } catch (error) {
+      if (!(error instanceof SummaryEndedError) || error.stopReason !== 'length') throw error;
+    }
+    return callOnce(`${prompt}\n\n${SUMMARY_LENGTH_RETRY_NOTE}`);
   };
 }
 
