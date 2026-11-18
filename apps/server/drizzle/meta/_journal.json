@@ -1366,6 +1366,13 @@
       "when": 1794989572009,
       "tag": "0199_third_the_order",
       "breakpoints": true
+    },
+    {
+      "idx": 200,
+      "version": "6",
+      "when": 1794990940488,
+      "tag": "0200_retire_merge_policy",
+      "breakpoints": true
     }
   ]
 }

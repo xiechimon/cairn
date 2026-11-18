@@ -45,7 +45,6 @@ export * from './memory.js';
 export * from './merge-gate.js';
 export * from './message.js';
 export * from './model-source.js';
-export * from './named-prompts.js';
 export * from './needs-you.js';
 export * from './notification.js';
 export * from './permission-rules.js';

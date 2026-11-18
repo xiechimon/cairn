@@ -14,8 +14,6 @@ describe('slice 1 action registry', () => {
       'set_secret',
       'delete_secrets',
       'merge_builds',
-      'rest.merge-policy',
-      'rest.ship-route',
       'rest.eval-ruler',
     ]);
     expect(SLICE1_ACTIONS.filter((entry) => entry.class === 'owner-only')).toEqual([]);

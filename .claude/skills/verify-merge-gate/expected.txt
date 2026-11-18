@@ -16,30 +16,25 @@ P1H_UnboundReviewHead FAIL PushEvidence,RecordVerdict,RecordVerdict,RecordVerdic
 # (builds.ts) has neither the re-check nor the evaluation: F1 and F3 in SKILL.md.
 P4_MergeRechecksDigest FAIL RecordVerdict,RecordVerdict,RecordVerdict,Evaluate,BaseMoveInteracting,ExecuteMergeGithub
 
-# P1S / P2S: the same properties with policy.requireUpToDate off (the project default,
-# readiness.ts:339): a PR behind its base can be ready without UpdateBranch.
-P1S_NotRequireUpToDate PASS
-P2S_NotRequireUpToDate PASS
-
-# Base move then UpdateBranch (#2525). Pushes are disabled in these controls so the only
-# way to a ready evaluation on the moved base is BaseMove*, UpdateBranch, fresh verdicts.
+# Base move then UpdateBranch (#2525). Pushes are disabled in these controls; with
+# requireUpToDate retired (#5337) a ready evaluation on the moved base needs only
+# BaseMove* and fresh verdicts — UpdateBranch stays reachable but is not required.
 # P2U / P1U drop the digest binding: a verdict recorded on d1 before the interacting
-# base move still satisfies the gate on d2 after the branch update.
-P2U_UnboundAfterBaseUpdate FAIL RecordVerdict,BaseMoveInteracting,UpdateBranch,RecordVerdict,RecordVerdict,Evaluate
-P1U_UnboundAfterBaseUpdate FAIL RecordVerdict,BaseMoveInteracting,UpdateBranch,RecordVerdict,RecordVerdict,Evaluate,ExecuteMergeGithub
+# base move still satisfies the gate on d2.
+P2U_UnboundAfterBaseUpdate FAIL RecordVerdict,BaseMoveInteracting,RecordVerdict,RecordVerdict,Evaluate
+P1U_UnboundAfterBaseUpdate FAIL RecordVerdict,BaseMoveInteracting,RecordVerdict,RecordVerdict,Evaluate,ExecuteMergeGithub
 # P1HU drops only the review-head binding: the update moves the head, an independent
 # review recorded at the old head must not satisfy a protected-path patch.
 P1HU_UnboundReviewHeadAfterUpdate FAIL BaseMoveBenign,UpdateBranch,RecordVerdict,RecordVerdict,RecordVerdict,Evaluate,ExecuteMergeGithub
 
-# R1-R6: reachability witnesses, expected FAIL. Each invariant says "this state is never
+# R1-R5: reachability witnesses, expected FAIL. Each invariant says "this state is never
 # reached"; the counterexample is the witness that it is. A witness turning into PASS
 # means the model can no longer reach readiness or a merge on a moved base (vacuity).
-R1_ReadyOnMovedBase FAIL BaseMoveBenign,UpdateBranch,RecordVerdict,RecordVerdict,RecordVerdict,Evaluate
+R1_ReadyOnMovedBase FAIL BaseMoveBenign,RecordVerdict,RecordVerdict,RecordVerdict,Evaluate
 R2_ReadyOnInteractingUpdate FAIL BaseMoveInteracting,UpdateBranch,RecordVerdict,RecordVerdict,RecordVerdict,Evaluate
 R3_ReadyOnBenignUpdate FAIL BaseMoveBenign,UpdateBranch,RecordVerdict,RecordVerdict,RecordVerdict,Evaluate
-R4_ProtectedReadyOnUpdatedHead FAIL BaseMoveBenign,UpdateBranch,RecordVerdict,RecordVerdict,RecordVerdict,Evaluate
+R4_ProtectedReadyOnUpdatedHead FAIL BaseMoveBenign,RecordVerdict,RecordVerdict,RecordVerdict,Evaluate
 R5_MergedAfterUpdate FAIL BaseMoveBenign,UpdateBranch,RecordVerdict,RecordVerdict,RecordVerdict,Evaluate,ExecuteMergeGithub
-R6_ReadyOnMovedBaseNotRequired FAIL BaseMoveBenign,RecordVerdict,RecordVerdict,RecordVerdict,Evaluate
 
 # P3: the local landing path (LocalLanding.tla)
 P3_LocalLandingBindsJudgedPatch PASS

@@ -7,10 +7,6 @@ import {
   recordingRequirements,
 } from './recording-trigger.js';
 
-export const MERGE_POLICIES = ['human', 'shadow', 'autonomous'] as const;
-export const mergePolicySchema = z.enum(MERGE_POLICIES);
-export type MergePolicy = z.infer<typeof mergePolicySchema>;
-
 export const MERGE_GATE_STATUS_CONTEXT = 'cairn/merge-gate';
 
 export const GATE_LIMITS = {
@@ -89,7 +85,6 @@ export const BLOCKER_CLASSES = ['policy', 'transient', 'human'] as const;
 export type BlockerClass = (typeof BLOCKER_CLASSES)[number];
 
 export const MERGE_BLOCKERS = [
-  { code: 'policy-human', class: 'policy', label: '项目策略为人工合并' },
   { code: 'autonomy-paused', class: 'policy', label: '自治合并已暂停' },
   { code: 'daily-cap', class: 'policy', label: '当日自治合并数已达上限' },
   { code: 'not-applicable', class: 'policy', label: '不是 GitHub PR 形态的构建' },
@@ -103,7 +98,6 @@ export const MERGE_BLOCKERS = [
   },
   { code: 'pr-not-open', class: 'human', label: 'PR 已合并或已关闭' },
   { code: 'pr-draft', class: 'transient', label: 'PR 是草稿' },
-  { code: 'pr-behind-base', class: 'transient', label: 'PR 落后于目标分支或落后数未知' },
   { code: 'pr-from-fork', class: 'human', label: 'PR 来自 fork' },
   { code: 'base-not-default', class: 'human', label: 'PR 的目标分支不是默认分支' },
   { code: 'mergeable-state', class: 'transient', label: 'GitHub 判定暂不可合并' },
@@ -189,13 +183,11 @@ export const mergeReadinessSchema = z.object({
   ready: z.boolean(),
   headSha: z.string().nullable(),
   patchDigest: z.string().nullable(),
-  policy: mergePolicySchema,
   blockers: z.array(mergeBlockerSchema),
 });
 export type MergeReadiness = z.infer<typeof mergeReadinessSchema>;
 
 for (const value of [
-  MERGE_POLICIES,
   MOTION_TOKEN_PATHS,
   GATE_LIMITS,
   EVIDENCE_EXECUTABLE_EXTENSIONS,

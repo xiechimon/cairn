@@ -87,7 +87,6 @@ export interface GateGithubFacts {
   checks: GateInputs['checks'];
   compare: GateInputs['compare'];
   evidence: GateEvidencePresence[];
-  baseBehindBy: number | null;
   ownStatus: { state: string; description: string | null } | null | 'unreadable';
   rateLimited: { retryAt: number | null } | null;
   notes: string[];
@@ -95,7 +94,6 @@ export interface GateGithubFacts {
 
 export interface GateCompareRead {
   compare: GateInputs['compare'];
-  behindBy: number | null;
   failure: GateRawFailure | null;
 }
 
@@ -199,7 +197,6 @@ function projectPull(
       headRepoFullName: isObj(head.repo) ? (head.repo.full_name as string) : null,
       body: body.body ?? '',
       changedFiles: body.changed_files,
-      baseBehindBy: null,
     },
     defaultBranch: typeof base.repo.default_branch === 'string' ? base.repo.default_branch : null,
   };
@@ -296,10 +293,9 @@ async function readCompare(r: Reader, baseSha: string, headSha: string): Promise
   r.failure = null;
   const unreadable = (): GateCompareRead => ({
     compare: 'unreadable',
-    behindBy: null,
     failure: r.failure,
   });
-  const malformed: GateCompareRead = { compare: 'malformed', behindBy: null, failure: null };
+  const malformed: GateCompareRead = { compare: 'malformed', failure: null };
   if (!isSha(baseSha) || !isSha(headSha)) return unreadable();
   const page = (n: number) =>
     readBody(r, null, always, () =>
@@ -325,7 +321,6 @@ async function readCompare(r: Reader, baseSha: string, headSha: string): Promise
   }
   return {
     compare: { headSha, files, commits, totalCommits: total },
-    behindBy: isCount(body.behind_by) ? body.behind_by : null,
     failure: null,
   };
 }
@@ -606,7 +601,6 @@ export async function readGateGithubFacts(
     checks: null,
     compare: 'unreadable',
     evidence: [],
-    baseBehindBy: null,
     ownStatus: 'unreadable',
     rateLimited: null,
     notes: [],
@@ -655,8 +649,6 @@ export async function readGateGithubFacts(
   } else {
     const c = await readCompare(r, projectedBranch.tip, head);
     facts.compare = c.compare;
-    facts.baseBehindBy = c.behindBy;
-    pr.baseBehindBy = c.behindBy;
   }
 
   Object.assign(facts, await readCheckState(r, repoKey, head, bindings, required));

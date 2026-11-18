@@ -275,9 +275,9 @@ describe('the steer server write surface (W3 #278)', () => {
     },
   );
 
-  test.each(['autonomous', 'human'] as const)(
-    'a locally merged %s build continues on a new branch',
-    async (policy) => {
+  test.each(['admission', 'merge step'] as const)(
+    'a build landed via a %s record continues on a new branch',
+    async (landing) => {
       const buildId = await finishBuild(w);
       const task = w.s.db.select().from(todo).where(eq(todo.id, w.todoId)).get()!;
       w.s.db
@@ -285,11 +285,11 @@ describe('the steer server write surface (W3 #278)', () => {
         .set({
           repoKind: 'local',
           localPath: '/tmp/continue-local',
-          autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: policy },
+          autonomy: DEFAULT_AUTONOMY_SETTINGS,
         })
         .where(eq(project.id, task.projectId))
         .run();
-      if (policy === 'autonomous') {
+      if (landing === 'admission') {
         w.s.db
           .insert(autonomousMergeAdmission)
           .values({ buildId, teamId: w.s.team.id, state: 'merged', createdAt: 1, landedAt: 2 })

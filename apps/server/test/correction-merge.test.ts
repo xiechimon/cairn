@@ -19,7 +19,7 @@ function input(path: string, additions = 1): GateInputs {
   const patchDigest = computePatchDigest(files).patchDigest;
   return {
     correction: true,
-    policy: { mergePolicy: 'autonomous', autonomyPaused: false, dailyCapReached: false },
+    policy: { autonomyPaused: false, dailyCapReached: false },
     build: {
       isGithubPr: false,
       repoKind: 'local',

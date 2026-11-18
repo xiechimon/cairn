@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { thinkingLevelSchema } from '../agent-backend.js';
 import { epochMs, recordId } from './common.js';
-import { mergePolicySchema } from './merge-gate.js';
 import { workerBriefTextSchema } from './worker-brief-text.js';
 
 export const PROJECT_REPO_KINDS = ['hosted', 'github', 'local'] as const;
@@ -89,31 +88,16 @@ export const projectRecordSchema = z.object({
   color: projectColorSchema.nullable().optional(),
   archivedAt: epochMs.nullable().optional(),
   modelOverrides: projectModelOverridesSchema.optional(),
-  mergePolicy: mergePolicySchema.optional(),
   localChecks: z.array(z.string().min(1)).optional(),
-  requireUpToDate: z.boolean().optional(),
   cloneUrl: z.string().optional(),
 });
 export type ProjectRecord = z.infer<typeof projectRecordSchema>;
 
 export const projectMergeConfigSchema = z.object({
   planAutoApproveEnabled: z.boolean().default(true),
-  mergePolicy: mergePolicySchema.default('autonomous'),
   localChecks: z.array(z.string().min(1)).default([]),
-  requireUpToDate: z.boolean().default(false),
 });
 export type ProjectMergeConfig = z.infer<typeof projectMergeConfigSchema>;
-export const patchProjectMergeConfigSchema = z
-  .object({
-    planAutoApproveEnabled: projectMergeConfigSchema.shape.planAutoApproveEnabled
-      .unwrap()
-      .optional(),
-    mergePolicy: projectMergeConfigSchema.shape.mergePolicy.unwrap().optional(),
-    localChecks: projectMergeConfigSchema.shape.localChecks.unwrap().optional(),
-    requireUpToDate: projectMergeConfigSchema.shape.requireUpToDate.unwrap().optional(),
-  })
-  .strict();
-export type PatchProjectMergeConfig = z.infer<typeof patchProjectMergeConfigSchema>;
 export const githubRepoRefSchema = z.object({
   owner: z.string(),
   repo: z.string(),

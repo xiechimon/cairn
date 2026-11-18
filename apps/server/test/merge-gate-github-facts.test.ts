@@ -178,7 +178,6 @@ const GREEN_PR = {
   headRepoFullName: 'xiechimon/cairn',
   body: `evidence: ${link(HEAD)}`,
   changedFiles: 3,
-  baseBehindBy: 0,
 };
 
 describe('readGateGithubFacts: the honest read', () => {
@@ -207,7 +206,6 @@ describe('readGateGithubFacts: the honest read', () => {
       complete: true,
     });
     expect(f.evidence).toEqual([{ sha: HEAD, path: SHOT, present: true }]);
-    expect(f.baseBehindBy).toBe(0);
     expect(f.ownStatus).toBeNull();
     expect(f.rateLimited).toBeNull();
     expect(f.log).toEqual([
@@ -444,17 +442,15 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
     const r = await readCompareAt(p.port, BASE, OTHER);
     expect(p.log).toEqual([['compare', BASE, OTHER, { page: 1, perPage: 100 }]]);
     expect(r.compare).toMatchObject({ headSha: OTHER, totalCommits: 2 });
-    expect(r.behindBy).toBe(0);
     expect(r.failure).toBeNull();
     const failed = await readCompareAt(fakeGithub({ compare: () => NOT_FOUND }).port, BASE, OTHER);
     expect(failed).toEqual({
       compare: 'unreadable',
-      behindBy: null,
       failure: { kind: 'status', status: 404, message: 'Not Found' },
     });
   });
 
-  test('F8 total_commits, commits, files and behind_by: malformed values never pass', async () => {
+  test('F8 total_commits, commits and files: malformed values never pass', async () => {
     const page1 = (extra: Record<string, unknown>) =>
       comparePages(chain(EARLIER, HEAD), FILES, extra);
     for (const total of [1.5, -1, '2', null, Number.NaN]) {
@@ -486,13 +482,6 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
       compare: comparePages(chain(EARLIER, HEAD), [ghFile('x', { status: 'weird' })]),
     });
     expect(badFile.compare).toBe('malformed');
-    expect((await read({ compare: page1({ behind_by: 3 }) })).baseBehindBy).toBe(3);
-    for (const behind of [1.5, -1, '3', undefined]) {
-      expect(
-        (await read({ compare: page1({ behind_by: behind }) })).baseBehindBy,
-        String(behind),
-      ).toBeNull();
-    }
     const commits = chain(
       ...Array.from({ length: 120 }, (_, k) => k.toString(16).padStart(40, '0')),
     );
@@ -937,7 +926,7 @@ describe('readGateGithubFacts: rate limits, throws, concurrency (F18)', () => {
     const f = await readGateGithubFacts(throwing, REQ, newGateReadCache());
     expect(f.checks).toBeNull();
     expect(f.compare).toBe('unreadable');
-    expect(f.pr).toEqual({ ...GREEN_PR, baseBehindBy: null });
+    expect(f.pr).toEqual(GREEN_PR);
   });
 });
 
@@ -951,7 +940,7 @@ describe('readGateGithubFacts into mergeReadiness: a truncated compare (pr-gate 
     expect((f.compare as { files: unknown[] }).files).toHaveLength(300);
     expect(f.pr?.changedFiles).toBe(301);
     const r = mergeReadiness({
-      policy: { mergePolicy: 'autonomous', autonomyPaused: false, dailyCapReached: false },
+      policy: { autonomyPaused: false, dailyCapReached: false },
       build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
       repo: { owner: REQ.owner, name: REQ.repo, defaultBranch: f.defaultBranch },
       ticketRef: REQ.ticketRef,
@@ -973,15 +962,6 @@ describe('readGateGithubFacts into mergeReadiness: a truncated compare (pr-gate 
   });
 });
 
-describe('readGateGithubFacts P4-0 base freshness', () => {
-  test.each([0, 3, null, -1, '0'])('projects behind_by %s into the PR', async (behind) => {
-    const f = await read({
-      compare: comparePages(chain(EARLIER, HEAD), FILES, { behind_by: behind }),
-    });
-    expect(f.pr?.baseBehindBy).toBe(behind === 0 || behind === 3 ? behind : null);
-  });
-});
-
 describe('readGateGithubFacts into mergeReadiness and gateStatusFor: an unusable compare names its own cause', () => {
   const MANY = chain(
     ...Array.from({ length: 119 }, (_, k) => k.toString(16).padStart(40, '0')),
@@ -995,12 +975,7 @@ describe('readGateGithubFacts into mergeReadiness and gateStatusFor: an unusable
   const statusOf = async (over: Partial<GateAnswers>) => {
     const f = await read(over);
     const r = mergeReadiness({
-      policy: {
-        mergePolicy: 'autonomous',
-        autonomyPaused: false,
-        dailyCapReached: false,
-        requireUpToDate: true,
-      },
+      policy: { autonomyPaused: false, dailyCapReached: false },
       build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
       repo: { owner: REQ.owner, name: REQ.repo, defaultBranch: f.defaultBranch },
       ticketRef: REQ.ticketRef,
@@ -1027,41 +1002,23 @@ describe('readGateGithubFacts into mergeReadiness and gateStatusFor: an unusable
       (b: string, h: string, o: { page: number; perPage: number }) =>
         comparePages(MANY, FILES, { total_commits: '120' })(b, h, o),
     ],
-  ] as const)(
-    '%s: status leads with %s, no pr-behind-base',
-    async (_name, code, shape, compare) => {
-      const { f, codes, status } = await statusOf({ compare });
-      expect(f.compare).toBe(shape);
-      expect(f.baseBehindBy).toBeNull();
-      expect(codes).toContain(code);
-      expect(codes).not.toContain('pr-behind-base');
-      expect(status.description.startsWith(`${labelOf(code)} (${code})`)).toBe(true);
-    },
-  );
+  ] as const)('%s: status leads with %s', async (_name, code, shape, compare) => {
+    const { f, codes, status } = await statusOf({ compare });
+    expect(f.compare).toBe(shape);
+    expect(codes).toContain(code);
+    expect(status.description.startsWith(`${labelOf(code)} (${code})`)).toBe(true);
+  });
 
-  test('page 2 lists no commits: patch-unavailable leads, behind_by 0 stays a pass', async () => {
-    const { f, codes, status } = await statusOf({
+  test('page 2 lists no commits: patch-unavailable leads', async () => {
+    const { codes, status } = await statusOf({
       compare: pageTwo(() =>
         ok({ status: 'ahead', behind_by: 0, total_commits: 120, commits: [] }),
       ),
     });
-    expect(f.baseBehindBy).toBe(0);
-    expect(codes).not.toContain('pr-behind-base');
+    expect(codes).toContain('patch-unavailable');
     expect(
       status.description.startsWith(`${labelOf('patch-unavailable')} (patch-unavailable)`),
     ).toBe(true);
-  });
-
-  test('a readable compare without behind_by: pr-behind-base still blocks (fail closed)', async () => {
-    const { f, codes, status } = await statusOf({
-      compare: comparePages(chain(EARLIER, HEAD), FILES, { behind_by: undefined }),
-    });
-    expect(typeof f.compare).toBe('object');
-    expect(f.baseBehindBy).toBeNull();
-    expect(codes).toContain('pr-behind-base');
-    expect(status.description.startsWith(`${labelOf('pr-behind-base')} (pr-behind-base)`)).toBe(
-      true,
-    );
   });
 });
 

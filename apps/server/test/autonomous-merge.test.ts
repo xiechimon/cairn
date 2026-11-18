@@ -1,9 +1,4 @@
-import {
-  conversationBranch,
-  DEFAULT_AUTONOMY_SETTINGS,
-  patchProjectMergeConfigSchema,
-  patchTeamBodySchema,
-} from '@cairn/shared';
+import { conversationBranch, DEFAULT_AUTONOMY_SETTINGS, patchTeamBodySchema } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
@@ -24,7 +19,6 @@ import {
 import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
 import { applyStoppedStep, failStepWithEvents } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
-import { projectMergeConfigOf, updateProjectMergeConfig } from '../src/services/projects.js';
 import { bootServer, pauseTeamForTest } from './helpers.js';
 
 const disposals: (() => void)[] = [];
@@ -62,9 +56,7 @@ function fixture() {
       .values({ id, todoId: id, withPlan: false, triggerSource: 'user', createdAt: 0 })
       .run();
   }
-  const row = s.db.select().from(project).where(eq(project.id, 'p')).get();
-  if (!row) throw new Error('missing project');
-  return { s, config: projectMergeConfigOf(row) };
+  return { s };
 }
 
 test('team cap schema rejects negative, fractional and infinite limits', () => {
@@ -73,12 +65,11 @@ test('team cap schema rejects negative, fractional and infinite limits', () => {
 });
 
 test('SQLite admission persists its claim and holds an unknown response across midnight', () => {
-  const { s, config } = fixture();
+  const { s } = fixture();
   claimAutonomousMerge(s.db, 'a');
   expect(() => claimAutonomousMerge(s.db, 'b')).toThrow('daily-cap');
   expect(
-    autonomousMergePolicy(s.db, s.team.id, config, Date.parse('2030-01-01T00:00:00Z'))
-      .dailyCapReached,
+    autonomousMergePolicy(s.db, s.team.id, Date.parse('2030-01-01T00:00:00Z')).dailyCapReached,
   ).toBe(true);
   expect(() => claimAutonomousMerge(s.db, 'a')).toThrow('already admitted');
   expect(JSON.parse(String(s.db.select().from(message).get()?.content))).toMatchObject({
@@ -88,38 +79,21 @@ test('SQLite admission persists its claim and holds an unknown response across m
 });
 
 test('landed time rather than admission time determines the UTC day and refused requests release capacity', () => {
-  const { s, config } = fixture();
+  const { s } = fixture();
   claimAutonomousMerge(s.db, 'a');
   settleAutonomousMerge(s.db, 'a', 'refused');
   claimAutonomousMerge(s.db, 'b');
   settleAutonomousMerge(s.db, 'b', 'merged', Date.parse('2030-01-01T23:59:59.999Z'));
   expect(
-    autonomousMergePolicy(s.db, s.team.id, config, Date.parse('2030-01-01T23:59:59.999Z'))
-      .dailyCapReached,
+    autonomousMergePolicy(s.db, s.team.id, Date.parse('2030-01-01T23:59:59.999Z')).dailyCapReached,
   ).toBe(true);
   expect(
-    autonomousMergePolicy(s.db, s.team.id, config, Date.parse('2030-01-02T00:00:00Z'))
-      .dailyCapReached,
+    autonomousMergePolicy(s.db, s.team.id, Date.parse('2030-01-02T00:00:00Z')).dailyCapReached,
   ).toBe(false);
 });
 
-test('human policy creates no autonomous record and does not spend capacity', () => {
-  const { s, config } = fixture();
-  s.db
-    .update(project)
-    .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'human' } })
-    .run();
-  pauseTeamForTest(s.db, s.team.id);
-  claimAutonomousMerge(s.db, 'a');
-  expect(s.db.select().from(message).all()).toHaveLength(0);
-  expect(autonomousMergePolicy(s.db, s.team.id, { ...config, mergePolicy: 'human' })).toEqual({
-    autonomyPaused: false,
-    dailyCapReached: false,
-  });
-});
-
 test('a completed admission and its legacy success message count once', () => {
-  const { s, config } = fixture();
+  const { s } = fixture();
   claimAutonomousMerge(s.db, 'a');
   settleAutonomousMerge(s.db, 'a', 'merged');
   s.db
@@ -133,17 +107,15 @@ test('a completed admission and its legacy success message count once', () => {
     })
     .run();
   s.db.update(team).set({ maxAutonomousMergesPerDay: 2 }).run();
-  expect(autonomousMergePolicy(s.db, s.team.id, config).dailyCapReached).toBe(false);
+  expect(autonomousMergePolicy(s.db, s.team.id).dailyCapReached).toBe(false);
 });
 
 test('a queued local reservation is rechecked without counting its own slot twice', () => {
-  const { s, config } = fixture();
+  const { s } = fixture();
   claimAutonomousMerge(s.db, 'a');
-  expect(autonomousMergePolicy(s.db, s.team.id, config, Date.now(), 'a').dailyCapReached).toBe(
-    false,
-  );
+  expect(autonomousMergePolicy(s.db, s.team.id, Date.now(), 'a').dailyCapReached).toBe(false);
   pauseTeamForTest(s.db, s.team.id);
-  expect(autonomousMergePolicy(s.db, s.team.id, config, Date.now(), 'a').autonomyPaused).toBe(true);
+  expect(autonomousMergePolicy(s.db, s.team.id, Date.now(), 'a').autonomyPaused).toBe(true);
 });
 
 test('admission transcript records use the existing JSON string envelope', () => {
@@ -153,54 +125,8 @@ test('admission transcript records use the existing JSON string envelope', () =>
   expect(typeof row?.content).toBe('string');
 });
 
-test('merge configuration patches do not synthesize omitted defaulted fields', () => {
-  expect(patchProjectMergeConfigSchema.parse({ mergePolicy: 'human' })).toEqual({
-    mergePolicy: 'human',
-  });
-  expect(patchProjectMergeConfigSchema.safeParse({ maxAutonomousMergesPerDay: 0 }).success).toBe(
-    false,
-  );
-});
-
-test('updating checks preserves an existing human policy and zero cap', () => {
-  const { s } = fixture();
-  s.db
-    .update(project)
-    .set({
-      autonomy: {
-        ...DEFAULT_AUTONOMY_SETTINGS,
-        mergePolicy: 'human',
-        localChecks: ['old'],
-      },
-    })
-    .run();
-  const row = s.db.select().from(project).where(eq(project.id, 'p')).get();
-  if (!row) throw new Error('missing project');
-  expect(updateProjectMergeConfig(s.db, row, { localChecks: ['new'] })).toEqual({
-    mergePolicy: 'human',
-    planAutoApproveEnabled: true,
-    localChecks: ['new'],
-    requireUpToDate: false,
-  });
-});
-
-test('requireUpToDate defaults off, is stored by the merge config patch, and survives a checks patch', () => {
-  const { s } = fixture();
-  const read = () => {
-    const row = s.db.select().from(project).where(eq(project.id, 'p')).get();
-    if (!row) throw new Error('missing project');
-    return row;
-  };
-  expect(projectMergeConfigOf(read()).requireUpToDate).toBe(false);
-  expect(updateProjectMergeConfig(s.db, read(), { requireUpToDate: true }).requireUpToDate).toBe(
-    true,
-  );
-  expect(projectMergeConfigOf(read()).requireUpToDate).toBe(true);
-  expect(updateProjectMergeConfig(s.db, read(), { localChecks: ['x'] }).requireUpToDate).toBe(true);
-});
-
 test('team cap is stored and returned by the team settings API', async () => {
-  const { s, config } = fixture();
+  const { s } = fixture();
   const response = await s.app.request(`/api/teams/${s.team.id}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
@@ -208,7 +134,7 @@ test('team cap is stored and returned by the team settings API', async () => {
   });
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ maxAutonomousMergesPerDay: 0 });
-  expect(autonomousMergePolicy(s.db, s.team.id, config).dailyCapReached).toBe(true);
+  expect(autonomousMergePolicy(s.db, s.team.id).dailyCapReached).toBe(true);
 });
 
 for (const state of ['open', 'closed', 'merged', 'unreadable'] as const) {
@@ -285,27 +211,8 @@ for (const action of ['failed', 'cancelled'] as const) {
   });
 }
 
-test('legacy human-policy merge messages do not consume autonomous capacity', () => {
-  const { s, config } = fixture();
-  s.db
-    .update(project)
-    .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'human' } })
-    .run();
-  s.db
-    .insert(message)
-    .values({
-      id: 'legacy',
-      conversationId: 'a',
-      role: 'system',
-      content: 'PR #1 已由 cairn 经 GitHub 合并',
-      createdAt: Date.now(),
-    })
-    .run();
-  expect(autonomousMergePolicy(s.db, s.team.id, config).dailyCapReached).toBe(false);
-});
-
 test('evaluation SQL bounds transcript and step history with a large unrelated message table', () => {
-  const { s, config } = fixture();
+  const { s } = fixture();
   for (let i = 0; i < 2000; i++)
     s.db
       .insert(message)
@@ -335,7 +242,7 @@ test('evaluation SQL bounds transcript and step history with a large unrelated m
       });
       return query;
     });
-  autonomousMergePolicy(s.db, s.team.id, config);
+  autonomousMergePolicy(s.db, s.team.id);
   spy.mockRestore();
   expect(
     queries
@@ -365,20 +272,16 @@ test('team settings reject negative and fractional caps without changing the sto
 });
 
 test.each([
-  ['autonomous', 'current', 'claimed'],
-  ['human', 'current', 'claimed'],
-  ['human', 'closed', 'stopped'],
-  ['human', 'archived', 'stopped'],
-  ['human', 'superseded', 'stopped'],
-  ['human', 'stop-requested', 'stopped'],
+  ['current', 'claimed'],
+  ['closed', 'stopped'],
+  ['archived', 'stopped'],
+  ['superseded', 'stopped'],
+  ['stop-requested', 'stopped'],
 ] as const)(
-  'abandoned %s local command on a %s task is %s without being reissued',
-  (policy, state, status) => {
+  'abandoned local command on a %s task is %s without being reissued',
+  (state, status) => {
     const { s } = fixture();
-    s.db
-      .update(project)
-      .set({ repoKind: 'local', autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: policy } })
-      .run();
+    s.db.update(project).set({ repoKind: 'local', autonomy: DEFAULT_AUTONOMY_SETTINGS }).run();
     s.db
       .update(todo)
       .set({
@@ -413,7 +316,7 @@ test.each([
 );
 
 test('a previous-day admission suppresses a delayed legacy success row on the next day', () => {
-  const { s, config } = fixture();
+  const { s } = fixture();
   claimAutonomousMerge(s.db, 'a');
   settleAutonomousMerge(s.db, 'a', 'merged', Date.parse('2030-01-01T23:59:59Z'));
   s.db
@@ -427,19 +330,18 @@ test('a previous-day admission suppresses a delayed legacy success row on the ne
     })
     .run();
   expect(
-    autonomousMergePolicy(s.db, s.team.id, config, Date.parse('2030-01-02T00:00:02Z'))
-      .dailyCapReached,
+    autonomousMergePolicy(s.db, s.team.id, Date.parse('2030-01-02T00:00:02Z')).dailyCapReached,
   ).toBe(false);
 });
 
 test('late landing after refused settlement is counted exactly once', () => {
-  const { s, config } = fixture();
+  const { s } = fixture();
   claimAutonomousMerge(s.db, 'a');
   settleAutonomousMerge(s.db, 'a', 'refused');
   settleAutonomousMerge(s.db, 'a', 'merged');
   settleAutonomousMerge(s.db, 'a', 'merged');
   expect(s.db.select().from(autonomousMergeAdmission).all()).toHaveLength(1);
-  expect(autonomousMergePolicy(s.db, s.team.id, config).dailyCapReached).toBe(true);
+  expect(autonomousMergePolicy(s.db, s.team.id).dailyCapReached).toBe(true);
 });
 
 test('recovery cannot release an admission inside the request timeout even with a shorter caller window', async () => {

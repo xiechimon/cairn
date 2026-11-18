@@ -2,7 +2,7 @@
 EXTENDS Naturals
 
 CONSTANTS Protected, BindingBound, ReviewHeadBound, MergeRechecksDigest,
-          RequireUpToDate, AllowCodePush, AllowEvidencePush, MaxVerdicts
+          AllowCodePush, AllowEvidencePush, MaxVerdicts
 
 VARIABLES head, base, dgst, used, carriers, updates,
           verdictRows,
@@ -99,7 +99,6 @@ FreshHead == IF "h2" \notin used THEN "h2" ELSE "h3"
 Synced == base = "b1" \/ updates = 1
 
 ReadyAt(h, d) ==
-  /\ (~RequireUpToDate \/ Synced)
   /\ VerifyOk(d) /\ DecisionOk(d) /\ ReviewOk(d)
   /\ (~Protected \/ IndependentOk(h, d))
 

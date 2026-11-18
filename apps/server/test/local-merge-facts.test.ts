@@ -52,7 +52,6 @@ function depsOf(s: TestServer) {
 }
 
 interface Seed {
-  policy?: 'human' | 'shadow' | 'autonomous';
   localChecks?: string[];
   phase?: 'review' | 'building';
   latestBuild?: string;
@@ -80,7 +79,6 @@ function world(seed: Seed = {}): World {
       localPath: '/repo',
       autonomy: {
         ...DEFAULT_AUTONOMY_SETTINGS,
-        mergePolicy: seed.policy ?? 'autonomous',
         localChecks: seed.localChecks ?? ['true'],
       },
     })
@@ -156,7 +154,6 @@ function world(seed: Seed = {}): World {
         ready: true,
         headSha: seed.state?.sha ?? HEAD,
         patchDigest: seed.state?.digest ?? DIGEST,
-        policy: seed.policy ?? 'autonomous',
         blockers: [],
         evaluatedAt: Date.now(),
       })
@@ -169,7 +166,7 @@ const codes = async (w: World) =>
   (await localGateFacts(w.deps, 'build', 'main'))?.readiness.blockers.map((b) => b.code) ?? [];
 
 describe('localGateFacts: persisted rows become the gate inputs a local project is judged on', () => {
-  test('the build boundary and the project configuration fill the policy, repo, checks and compare fields', async () => {
+  test('the build boundary and the project configuration fill the repo, checks and compare fields', async () => {
     const w = world();
     const facts = await localGateFacts(w.deps, 'build', 'main');
     expect(facts).not.toBeNull();
@@ -180,7 +177,7 @@ describe('localGateFacts: persisted rows become the gate inputs a local project 
       pr: null,
       issueNumber: null,
       repo: { name: 'Local', defaultBranch: 'main' },
-      policy: { mergePolicy: 'autonomous', autonomyPaused: false, dailyCapReached: false },
+      policy: { autonomyPaused: false, dailyCapReached: false },
       build: {
         isGithubPr: false,
         repoKind: 'local',
@@ -213,10 +210,6 @@ describe('localGateFacts: persisted rows become the gate inputs a local project 
 
   test('a project with no configured command is not landed unchecked', async () => {
     expect(await codes(world({ localChecks: [] }))).toContain('required-checks-none');
-  });
-
-  test('an explicit human policy blocks through the shared policy blocker', async () => {
-    expect(await codes(world({ policy: 'human' }))).toContain('policy-human');
   });
 
   test('a build that is no longer current, or no longer in review, is not ready', async () => {

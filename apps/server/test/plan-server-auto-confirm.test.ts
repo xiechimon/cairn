@@ -85,7 +85,7 @@ async function setupWorld() {
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
   seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model' });
   const { token } = (await enrollRes.json()) as { token: string };
-  const projectId = await postProject(s.app, 'demo', { mergePolicy: 'autonomous' });
+  const projectId = await postProject(s.app, 'demo');
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: 'Auto-confirm probe', spec: 'Probe README' },
   });
@@ -134,10 +134,10 @@ async function setupWorld() {
       return s.db.select().from(messageTable).where(eq(messageTable.conversationId, buildId)).all();
     },
 
-    setMergePolicy(mergePolicy: 'human' | 'autonomous') {
+    setPlanAutoApprove(planAutoApproveEnabled: boolean) {
       s.db
         .update(projectTable)
-        .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy } })
+        .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, planAutoApproveEnabled } })
         .where(eq(projectTable.id, projectId))
         .run();
     },
@@ -369,10 +369,10 @@ describe('#1791 server auto-confirm after plan step', () => {
     }
   });
 
-  test('human mergePolicy and user plan revision stay at confirm', async () => {
+  test('a disabled plan auto-approve and a user plan revision stay at confirm', async () => {
     const w = await setupWorld();
     try {
-      w.setMergePolicy('human');
+      w.setPlanAutoApprove(false);
       const buildId = w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, GOOD_PLAN);
@@ -391,7 +391,7 @@ describe('#1791 server auto-confirm after plan step', () => {
       });
       expect(revisionRes.status).toBe(202);
       expect(w.todoRow().phase).toBe('planning');
-      w.setMergePolicy('autonomous');
+      w.setPlanAutoApprove(true);
       const replan = await w.claim();
       await w.uploadPlan(replan.step.id, GOOD_PLAN.replace('Context: x', 'Context: y'));
       await w.done(replan.step.id, { status: 'success', sessionId: 'psac-2b' });

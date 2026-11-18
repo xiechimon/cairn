@@ -1,6 +1,5 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { projectMergeConfigSchema } from '@cairn/shared';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
@@ -81,12 +80,7 @@ function teamMarkersWorld() {
     s,
     deps,
     issues,
-    paused: () =>
-      autonomousMergePolicy(
-        s.db,
-        s.team.id,
-        projectMergeConfigSchema.parse({ mergePolicy: 'autonomous' }),
-      ).autonomyPaused,
+    paused: () => autonomousMergePolicy(s.db, s.team.id).autonomyPaused,
     closeAll: () => {
       for (const issue of issues.values()) issue.open = false;
     },

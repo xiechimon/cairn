@@ -36,8 +36,6 @@ afterAll(() => {
   for (const dispose of disposables) dispose();
 });
 
-type Policy = 'human' | 'autonomous';
-
 const AUTO_PLAN =
   'Kind: fix\n## Context\nA task\n## Changes\nA change\n## Edge cases\nNone\n## Verification\n- `pnpm test` passes\n';
 type Failure = 'owed-retry' | 'repeated' | 'parked';
@@ -55,13 +53,11 @@ interface World {
 function openWorld(
   opts: {
     phase?: Phase;
-    policy?: Policy;
     output?: 'code' | 'info';
     failure?: Failure;
     prNumber?: number;
     repo?: 'github' | 'local' | 'hosted';
     hasChanges?: boolean;
-    shipRoute?: 'merge-gate' | 'local-merge' | 'custom';
   } = {},
 ): World {
   const s = bootServer();
@@ -78,11 +74,7 @@ function openWorld(
       id: projectId,
       name: `owner-${suffix}`,
       teamId: s.team.id,
-      autonomy: {
-        ...DEFAULT_AUTONOMY_SETTINGS,
-        mergePolicy: opts.policy ?? 'autonomous',
-        ...(opts.shipRoute !== undefined ? { shipRoute: opts.shipRoute } : {}),
-      },
+      autonomy: DEFAULT_AUTONOMY_SETTINGS,
       ...(opts.prNumber !== undefined || opts.repo === 'github'
         ? { repoKind: 'github', githubRepo: 'acme/app' }
         : {}),
@@ -178,7 +170,6 @@ describe('ownerOf (#3512)', () => {
   const cases: {
     name: string;
     phase: Phase;
-    policy?: Policy;
     output?: 'code' | 'info';
     failure?: Failure;
     question?: boolean;
@@ -186,7 +177,6 @@ describe('ownerOf (#3512)', () => {
     prNumber?: number;
     repo?: 'github' | 'local' | 'hosted';
     hasChanges?: boolean;
-    shipRoute?: 'merge-gate' | 'local-merge' | 'custom';
     archived?: boolean;
     owner: TodoOwner;
   }[] = [
@@ -196,20 +186,11 @@ describe('ownerOf (#3512)', () => {
     { name: 'done', phase: 'done', owner: null },
     { name: 'closed', phase: 'closed', owner: null },
     { name: 'confirm', phase: 'confirm', owner: 'owner' },
-    { name: 'confirm, human policy', phase: 'confirm', policy: 'human', owner: 'owner' },
     { name: 'archived confirm', phase: 'confirm', archived: true, owner: null },
     { name: 'code review, autonomous, no repository', phase: 'review', owner: 'owner' },
     {
       name: 'code review, autonomous, GitHub project without a PR',
       phase: 'review',
-      repo: 'github',
-      hasChanges: true,
-      owner: 'owner',
-    },
-    {
-      name: 'code review, human, GitHub project without a PR',
-      phase: 'review',
-      policy: 'human',
       repo: 'github',
       hasChanges: true,
       owner: 'owner',
@@ -229,20 +210,11 @@ describe('ownerOf (#3512)', () => {
       owner: 'owner',
     },
     {
-      name: 'code review, autonomous, local repository, custom ship route without a PR',
-      phase: 'review',
-      repo: 'local',
-      hasChanges: true,
-      shipRoute: 'custom',
-      owner: 'owner',
-    },
-    {
       name: 'code review, autonomous, local repository without changes',
       phase: 'review',
       repo: 'local',
       owner: 'owner',
     },
-    { name: 'code review, human', phase: 'review', policy: 'human', owner: 'owner' },
     {
       name: 'code review, autonomous, human blocker',
       phase: 'review',
@@ -251,75 +223,49 @@ describe('ownerOf (#3512)', () => {
       owner: 'owner',
     },
     {
-      name: 'code review, human, PR not evaluated yet',
+      name: 'code review, PR not evaluated yet',
       phase: 'review',
-      policy: 'human',
       prNumber: 7,
       owner: 'owner',
     },
     {
-      name: 'code review, human, checks still running',
+      name: 'code review, checks still running',
       phase: 'review',
-      policy: 'human',
       prNumber: 7,
       gate: 'transient',
       owner: 'owner',
     },
     {
-      name: 'code review, human, evaluated',
+      name: 'code review, evaluated',
       phase: 'review',
-      policy: 'human',
       prNumber: 7,
       gate: 'ready',
       owner: 'owner',
     },
     {
-      name: 'code review, human, evaluated before this review entry',
+      name: 'code review, evaluated before this review entry',
       phase: 'review',
-      policy: 'human',
       prNumber: 7,
       gate: 'stale',
       owner: 'owner',
     },
-    {
-      name: 'info review, human',
-      phase: 'review',
-      policy: 'human',
-      output: 'info',
-      owner: 'coordinator',
-    },
-    { name: 'info review, autonomous', phase: 'review', output: 'info', owner: 'coordinator' },
+    { name: 'info review', phase: 'review', output: 'info', owner: 'coordinator' },
     { name: 'failure owed a retry', phase: 'failed', failure: 'owed-retry', owner: null },
     { name: 'repeated failure', phase: 'failed', failure: 'repeated', owner: 'coordinator' },
     { name: 'parked failure', phase: 'failed', failure: 'parked', owner: 'coordinator' },
-    {
-      name: 'parked failure, human policy',
-      phase: 'failed',
-      policy: 'human',
-      failure: 'parked',
-      owner: 'coordinator',
-    },
     { name: 'question while building', phase: 'building', question: true, owner: 'coordinator' },
     { name: 'question while planning', phase: 'planning', question: true, owner: 'coordinator' },
-    {
-      name: 'question in human review',
-      phase: 'review',
-      policy: 'human',
-      question: true,
-      owner: 'coordinator',
-    },
+    { name: 'question in review', phase: 'review', question: true, owner: 'coordinator' },
   ];
 
   test.each(cases)('$name -> $owner', async (c) => {
     const w = openWorld({
       phase: c.question ? 'building' : c.phase,
-      ...(c.policy !== undefined ? { policy: c.policy } : {}),
       ...(c.output !== undefined ? { output: c.output } : {}),
       ...(c.failure !== undefined ? { failure: c.failure } : {}),
       ...(c.prNumber !== undefined ? { prNumber: c.prNumber } : {}),
       ...(c.repo !== undefined ? { repo: c.repo } : {}),
       ...(c.hasChanges !== undefined ? { hasChanges: c.hasChanges } : {}),
-      ...(c.shipRoute !== undefined ? { shipRoute: c.shipRoute } : {}),
     });
     if (c.question) {
       await ask(w, 'ask-0000000a');
@@ -333,7 +279,6 @@ describe('ownerOf (#3512)', () => {
         .values({
           buildId: w.buildId,
           ready: c.gate === 'ready' || c.gate === 'stale',
-          policy: c.policy === 'human' ? 'human' : 'autonomous',
           blockers:
             c.gate === 'ready' || c.gate === 'stale'
               ? []
@@ -369,8 +314,8 @@ describe('pending questions and the inbox read ownerOf (#3512)', () => {
 
   test('/api/needs-you takes each reason from ownerOf, not from the phase', async () => {
     const confirm = openWorld({ phase: 'confirm' });
-    const review = openWorld({ phase: 'review', policy: 'human' });
-    const asking = openWorld({ phase: 'building', policy: 'human' });
+    const review = openWorld({ phase: 'review' });
+    const asking = openWorld({ phase: 'building' });
     await ask(asking, 'ask-0000000f');
     asking.s.db
       .update(todoTable)
@@ -839,7 +784,7 @@ describe('a Coordinator turn that changes nothing hands the task to the owner (t
   });
 
   test('the Coordinator can still accept a review it handed over', () => {
-    const w = openWorld({ phase: 'building', policy: 'human', output: 'info' });
+    const w = openWorld({ phase: 'building', output: 'info' });
     setTodoPhase(w.deps, w.todoId, 'review');
     reconcileOwners(w.deps);
     endTurn(w);
@@ -892,7 +837,7 @@ describe('the Coordinator can act on what it owns (#3512)', () => {
   });
 
   test('a code review that is Coordinator-owned only through a question still needs the person', async () => {
-    const w = openWorld({ phase: 'building', policy: 'human' });
+    const w = openWorld({ phase: 'building' });
     await ask(w, 'ask-0000000d');
     w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
     expect(ownerNow(w)).toBe('coordinator');

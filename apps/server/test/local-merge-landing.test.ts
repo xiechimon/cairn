@@ -28,7 +28,7 @@ const base = 'b'.repeat(40);
 const head = 'a'.repeat(40);
 const tools = ['合并分支', '推送分支'];
 
-function fixture(policy: 'human' | 'shadow' | 'autonomous' = 'human', localChecks = ['true']) {
+function fixture(localChecks = ['true']) {
   const s = bootServer();
   disposals.push(() => s.dispose());
   s.db
@@ -39,7 +39,7 @@ function fixture(policy: 'human' | 'shadow' | 'autonomous' = 'human', localCheck
       name: 'Local',
       repoKind: 'local',
       localPath: '/repo',
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: policy, localChecks },
+      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, localChecks },
     })
     .run();
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub', tools });
@@ -109,38 +109,35 @@ function fixture(policy: 'human' | 'shadow' | 'autonomous' = 'human', localCheck
   return { s, deps, merge };
 }
 
-test.each(['human', 'shadow', 'autonomous'] as const)(
-  'explicit local merge ignores retired %s policy, verdicts, pause and cap; pins the delivery',
-  async (policy) => {
-    const f = fixture(policy);
-    pauseTeamForTest(f.s.db, f.s.team.id);
-    f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
-    expect(await requestMerge(f.deps, 'build')).toEqual({ delegated: true });
-    const command = parseLocalMergeInstruction(f.merge().prompt);
-    expect(command).toMatchObject({
-      projectId: 'project',
-      buildId: 'build',
-      defaultBranch: 'main',
-      judgedBase: base,
-      judgedHead: head,
-      localChecks: ['true'],
-      identity: { name: f.s.user.displayName, email: 'cairn@localhost' },
-    });
-    expect(command?.judgedPatchDigest).toMatch(/^pd2:[a-f0-9]{64}$/);
-    expect(f.s.db.select().from(todo).get()?.phase).toBe('done');
-    await expect(requestMerge(f.deps, 'build')).rejects.toThrow('合并步');
-    expect(
-      f.s.db
-        .select()
-        .from(step)
-        .all()
-        .filter((row) => row.kind === 'merge'),
-    ).toHaveLength(1);
-  },
-);
+test('explicit local merge ignores retired policy, verdicts, pause and cap; pins the delivery', async () => {
+  const f = fixture();
+  pauseTeamForTest(f.s.db, f.s.team.id);
+  f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
+  expect(await requestMerge(f.deps, 'build')).toEqual({ delegated: true });
+  const command = parseLocalMergeInstruction(f.merge().prompt);
+  expect(command).toMatchObject({
+    projectId: 'project',
+    buildId: 'build',
+    defaultBranch: 'main',
+    judgedBase: base,
+    judgedHead: head,
+    localChecks: ['true'],
+    identity: { name: f.s.user.displayName, email: 'cairn@localhost' },
+  });
+  expect(command?.judgedPatchDigest).toMatch(/^pd2:[a-f0-9]{64}$/);
+  expect(f.s.db.select().from(todo).get()?.phase).toBe('done');
+  await expect(requestMerge(f.deps, 'build')).rejects.toThrow('合并步');
+  expect(
+    f.s.db
+      .select()
+      .from(step)
+      .all()
+      .filter((row) => row.kind === 'merge'),
+  ).toHaveLength(1);
+});
 
 test('a fresh local project needs no mandatory check list or second model', async () => {
-  const f = fixture('human', []);
+  const f = fixture([]);
   const bot = { name: 'cairn-bot', email: 'bot@example.invalid' };
   await requestMerge({ ...f.deps, githubAppIdentity: bot }, 'build');
   expect(parseLocalMergeInstruction(f.merge().prompt)).toMatchObject({
@@ -199,7 +196,7 @@ test.each(['delivery', 'archive', 'base', 'path', 'checks'] as const)(
 );
 
 test('completed delivery merge remains claimable despite old autonomy controls', async () => {
-  const f = fixture('autonomous');
+  const f = fixture();
   f.s.db
     .insert(machine)
     .values(
@@ -301,7 +298,7 @@ test.each(['merged', 'held', 'recheck', 'checks-failed'] as const)(
 );
 
 test('abandoned completed-task merge keeps its pinned command claimed without replay; superseded work stops', async () => {
-  const f = fixture('autonomous');
+  const f = fixture();
   await requestMerge(f.deps, 'build');
   const row = f.merge();
   f.s.db
@@ -317,7 +314,7 @@ test('abandoned completed-task merge keeps its pinned command claimed without re
 });
 
 test('a late actual landing is recorded once without reviving the failed command', async () => {
-  const f = fixture('autonomous');
+  const f = fixture();
   await requestMerge(f.deps, 'build');
   const row = f.merge();
   f.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, row.id)).run();

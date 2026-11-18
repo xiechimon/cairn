@@ -3,7 +3,6 @@ import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   conversationBranch,
-  DEFAULT_AUTONOMY_SETTINGS,
   type DocumentDiffFile,
   needsYouQuerySchema,
   type Phase,
@@ -457,11 +456,6 @@ test.each(['confirm', 'review', 'failed'] as const)(
   'archived %s tasks are excluded from attention and team progress',
   async (phase) => {
     const { s } = world(phase, 'done');
-    s.db
-      .update(project)
-      .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'human' } })
-      .where(eq(project.id, 'project-archive'))
-      .run();
     s.db
       .update(build)
       .set({ errorMessage: 'invalid api key' })

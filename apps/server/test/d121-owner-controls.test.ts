@@ -74,7 +74,7 @@ function world() {
       id: 'project',
       name: 'D121',
       teamId: team.id,
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'autonomous' },
+      autonomy: DEFAULT_AUTONOMY_SETTINGS,
     })
     .run();
   db.insert(routingRule)
@@ -154,6 +154,13 @@ function world() {
     },
     phase() {
       return opened.db.select().from(todo).where(eq(todo.id, 'todo')).get()!.phase;
+    },
+    setPlanAutoApprove(enabled: boolean) {
+      opened.db
+        .update(project)
+        .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, planAutoApproveEnabled: enabled } })
+        .where(eq(project.id, 'project'))
+        .run();
     },
   };
 }
@@ -274,18 +281,19 @@ test('pause only targets the current plan of the current build at confirmation',
 
 test('project disable survives restart, preserves other settings, and leaves manual approval available', async () => {
   const w = world();
-  const response = await req(w.app, 'PATCH', '/api/projects/project/merge-policy', {
-    planAutoApproveEnabled: false,
-  });
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({
-    mergePolicy: 'autonomous',
-    planAutoApproveEnabled: false,
-  });
+  w.db
+    .update(project)
+    .set({
+      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, planAutoApproveEnabled: false },
+    })
+    .where(eq(project.id, 'project'))
+    .run();
   w.restart();
   expect((await w.plans())[0]?.autoApproveAt).toBeNull();
-  const config = await req(w.app, 'GET', '/api/projects/project/merge-policy');
-  expect(await config.json()).toMatchObject({ planAutoApproveEnabled: false });
+  const list = (await (await req(w.app, 'GET', '/api/projects')).json()) as {
+    planAutoApproveEnabled?: boolean;
+  }[];
+  expect(list.find((item) => item.planAutoApproveEnabled === false)).toBeDefined();
   sweepPlanAutoConfirm(w.deps);
   expect(w.phase()).toBe('confirm');
   expect((await req(w.app, 'POST', '/api/builds/build/steps', { action: 'confirm' })).status).toBe(
@@ -295,9 +303,13 @@ test('project disable survives restart, preserves other settings, and leaves man
 
 test('project list reports the stored plan auto-approve toggle', async () => {
   const w = world();
-  await req(w.app, 'PATCH', '/api/projects/project/merge-policy', {
-    planAutoApproveEnabled: false,
-  });
+  w.db
+    .update(project)
+    .set({
+      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, planAutoApproveEnabled: false },
+    })
+    .where(eq(project.id, 'project'))
+    .run();
   const list = (await (await req(w.app, 'GET', '/api/projects')).json()) as {
     id: string;
     planAutoApproveEnabled?: boolean;
@@ -305,65 +317,54 @@ test('project list reports the stored plan auto-approve toggle', async () => {
   expect(list.find((item) => item.id === 'project')?.planAutoApproveEnabled).toBe(false);
 });
 
-test.each([
-  'human',
-  'questions',
-  'invalid',
-  'archived',
-  'busy',
-  'stale',
-  'split',
-  'revision',
-] as const)('no deadline when blocked by %s', async (reason) => {
-  const w = world();
-  if (reason === 'human')
-    w.db
-      .update(project)
-      .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'human' } })
-      .run();
-  if (reason === 'questions')
-    w.db
-      .update(plan)
-      .set({ content: `${GOOD_PLAN}\n## Open questions\nChoose storage` })
-      .run();
-  if (reason === 'split') {
-    const parent = w.db.select().from(todo).get()!;
-    w.db
-      .insert(todo)
-      .values({ ...parent, id: 'child', seqNum: 2, sourceTodo: 'todo', latestBuildId: null })
-      .run();
-  }
-  if (reason === 'revision')
-    w.db
-      .insert(buildFeedback)
-      .values({
-        id: 'revision',
-        buildId: 'build',
-        kind: 'revision',
-        side: 'plan',
-        feedback: 'Revise scope',
-        actor: 'Owner',
-        createdAt: READY_AT,
-      })
-      .run();
-  if (reason === 'invalid') w.db.update(plan).set({ content: 'no verification' }).run();
-  if (reason === 'archived') w.db.update(todo).set({ archivedAt: READY_AT }).run();
-  if (reason === 'busy')
-    w.db
-      .insert(step)
-      .values({
-        id: 'busy',
-        buildId: 'build',
-        kind: 'plan',
-        status: 'pending',
-        createdAt: READY_AT,
-      })
-      .run();
-  if (reason === 'stale') w.db.update(todo).set({ latestBuildId: null }).run();
-  expect((await w.plans())[0]?.autoApproveAt).toBeNull();
-  sweepPlanAutoConfirm(w.deps);
-  expect(w.phase()).toBe('confirm');
-});
+test.each(['questions', 'invalid', 'archived', 'busy', 'stale', 'split', 'revision'] as const)(
+  'no deadline when blocked by %s',
+  async (reason) => {
+    const w = world();
+    if (reason === 'questions')
+      w.db
+        .update(plan)
+        .set({ content: `${GOOD_PLAN}\n## Open questions\nChoose storage` })
+        .run();
+    if (reason === 'split') {
+      const parent = w.db.select().from(todo).get()!;
+      w.db
+        .insert(todo)
+        .values({ ...parent, id: 'child', seqNum: 2, sourceTodo: 'todo', latestBuildId: null })
+        .run();
+    }
+    if (reason === 'revision')
+      w.db
+        .insert(buildFeedback)
+        .values({
+          id: 'revision',
+          buildId: 'build',
+          kind: 'revision',
+          side: 'plan',
+          feedback: 'Revise scope',
+          actor: 'Owner',
+          createdAt: READY_AT,
+        })
+        .run();
+    if (reason === 'invalid') w.db.update(plan).set({ content: 'no verification' }).run();
+    if (reason === 'archived') w.db.update(todo).set({ archivedAt: READY_AT }).run();
+    if (reason === 'busy')
+      w.db
+        .insert(step)
+        .values({
+          id: 'busy',
+          buildId: 'build',
+          kind: 'plan',
+          status: 'pending',
+          createdAt: READY_AT,
+        })
+        .run();
+    if (reason === 'stale') w.db.update(todo).set({ latestBuildId: null }).run();
+    expect((await w.plans())[0]?.autoApproveAt).toBeNull();
+    sweepPlanAutoConfirm(w.deps);
+    expect(w.phase()).toBe('confirm');
+  },
+);
 
 test('pausing one version does not pause its replacement or another build', async () => {
   const w = world();
@@ -401,15 +402,13 @@ test('pausing one version does not pause its replacement or another build', asyn
   expect((await w.plans()).every((p) => p.autoApproveAt === null)).toBe(true);
 });
 
-test('project toggle rejects non-booleans and re-enabling does not clear a plan pause', async () => {
+test('re-enabling project auto-approve does not clear a plan pause', async () => {
   const w = world();
-  const path = '/api/projects/project/merge-policy';
-  expect((await req(w.app, 'PATCH', path, { planAutoApproveEnabled: 'false' })).status).toBe(400);
   expect(
     (await req(w.app, 'POST', '/api/builds/build/plans/plan/pause-auto-approve', {})).status,
   ).toBe(200);
-  expect((await req(w.app, 'PATCH', path, { planAutoApproveEnabled: false })).status).toBe(200);
-  expect((await req(w.app, 'PATCH', path, { planAutoApproveEnabled: true })).status).toBe(200);
+  w.setPlanAutoApprove(false);
+  w.setPlanAutoApprove(true);
   expect((await w.plans())[0]?.autoApproveAt).toBeNull();
 });
 
@@ -421,14 +420,7 @@ test.each(['pause', 'disabled'] as const)(
       expect(
         (await req(w.app, 'POST', '/api/builds/build/plans/plan/pause-auto-approve', {})).status,
       ).toBe(200);
-    else
-      expect(
-        (
-          await req(w.app, 'PATCH', '/api/projects/project/merge-policy', {
-            planAutoApproveEnabled: false,
-          })
-        ).status,
-      ).toBe(200);
+    else w.setPlanAutoApprove(false);
     const message =
       reason === 'pause'
         ? /paused.*explicit user approval/i

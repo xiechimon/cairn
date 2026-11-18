@@ -40,7 +40,7 @@ Local landing path, `LocalLanding.tla`:
 - **P3 `LocalLandingBindsJudgedPatch`**: the base ref only moves to a patch that was judged, at the base the judgement was made against. The judgement can be redone (`Rejudge`) and the commit rebuilt (`Rebuild`) after drift, and the landing still carries the latest judgement.
 - **P3E `DriftHasWayOut`**: after drift past a judgement or a built commit, a `Rejudge` or `Rebuild` is still available within the bound.
 
-Base movement on the GitHub path: `MergeGate.tla` has an `UpdateBranch` action and a `RequireUpToDate` constant mirroring `policy.requireUpToDate` (default off in `packages/shared/src/records/project.ts`). P1 and P2 run with it on; `P1S` and `P2S` run them with it off.
+Base movement on the GitHub path: `MergeGate.tla` has an `UpdateBranch` action. `requireUpToDate` was retired (#5337) — the `pr-behind-base` blocker no longer exists, so `Synced` is not a readiness requirement; `UpdateBranch` remains in the model as an external event that moves the head and clears the stored evaluation.
 
 ## Prove the check can fail
 
@@ -79,7 +79,7 @@ The server is single-process with synchronous SQLite writes, so code between two
 - `RecordVerdict(k, outcome, head)`: a verdict row bound to `(head, dgst)`. Write side: `persistGateVerdict` (`build-gate-verdict.ts`) binds it through `bindGateVerdict` (`merge-gate/verdict.ts`) and fills its `patchDigest` from a compare read in `builds.ts`. Read side: the `at()` filter in `mergeReadiness` keeps verdicts whose `patchDigest` equals the evaluated digest; the independent-review filter also requires `headSha === head`. Recording invalidates a stored evaluation. An earlier block is never overwritten by a later pass.
 - `PushCode`: head and digest both move; earlier verdicts stay in the table but no longer match.
 - `PushEvidence`: an evidence-only commit moves the head but not the digest, which is why the review-head rule needs its own binding.
-- `UpdateBranch`: the PR branch takes the moved base, getting a fresh head and clearing the stored evaluation. With `RequireUpToDate` on, readiness needs the branch synced, which is the `pr-behind-base` blocker in `mergeReadiness`.
+- `UpdateBranch`: the PR branch takes the moved base, getting a fresh head and clearing the stored evaluation. The branch does not need to be synced for readiness — the `pr-behind-base` blocker was retired with `requireUpToDate` (#5337).
 - `BaseMoveBenign` / `BaseMoveInteracting`: the default branch moves; the compare base changes, so the recomputed digest can change while the PR head stays put. A stored gate status is not rewritten by a base move.
 - `Evaluate`: `mergeReadiness` computing which digests the gate accepted. Its other blockers (required checks, evidence links, the recording requirement, rounds, availability) are per-read predicates assumed satisfied. `planGateStatusWrite` (`merge-gate/gate-status.ts`) turns the result into a status on `readiness.headSha` and refuses when `checksHeadSha !== readiness.headSha`, which the model folds into `ReadyAt`.
 - `ExecuteMergeGithub`: `mergeThroughGithub` with its `sha: checkpoint` pin. `MergeRechecksDigest` says whether this action also re-derives the digest; on this path the code does not (F1).
@@ -99,7 +99,7 @@ The server is single-process with synchronous SQLite writes, so code between two
 
 - Three heads, two digests, two bases. GitHub path: at most one push (code or evidence), one base move, one `UpdateBranch`, `MaxVerdicts` verdict records. Local path: one patch change, one base move, `MaxRejudges` (2) `Rejudge` and `Rebuild`, one landing. Pass means all orderings within these bounds satisfy the properties, not that the whole system is correct.
 - Assumed satisfied and outside the model: required checks, `pr-evidence`, mergeable state, size caps, evidence links, the recording requirement, round limits, availability. `base-not-default` is not modelled.
-- Digest assumption, not checked against the code: the model lets an interacting base move change the patch digest. The code reads `compare/${base}...${head}` (three dots, `lib/github.ts`), which diffs the head against the merge base, so a default-branch move that does not touch the PR's files leaves the digest unchanged even when it changes the merged result. If so, the only guard is `requireUpToDate` (off by default) and the checks. Left for the owner as a design question.
+- Digest assumption, not checked against the code: the model lets an interacting base move change the patch digest. The code reads `compare/${base}...${head}` (three dots, `lib/github.ts`), which diffs the head against the merge base, so a default-branch move that does not touch the PR's files leaves the digest unchanged even when it changes the merged result. If so, the only guards are the checks and verdict bindings. Left for the owner as a design question.
 - A review verdict names a head from `carriers` (heads whose patch equals the current digest). Identical verdict rows collapse in the set; a pass and a block on one kind and digest coexist, and any block keeps that kind blocked.
 - `LandLocal` treats the fast-forward check and the ref update as atomic; that holds for `landGitSquash` but not for hosted `applyMergeLanding` (F6).
 - Dirty-worktree and unknown-checkout holds are not modelled; they end an attempt without landing, which no property forbids.

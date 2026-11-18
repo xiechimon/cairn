@@ -335,7 +335,7 @@ test('pure recording readiness binds attachments to a passing current digest and
   );
   const inputs: GateInputs & { evidenceStore: 'attachments' | 'repository' | null } = {
     evidenceStore: 'attachments',
-    policy: { mergePolicy: 'autonomous', autonomyPaused: false, dailyCapReached: false },
+    policy: { autonomyPaused: false, dailyCapReached: false },
     build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
     repo: { owner: 'xiechimon', name: 'cairn', defaultBranch: 'main' },
     ticketRef: '3803',

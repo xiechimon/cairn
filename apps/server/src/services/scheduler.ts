@@ -27,7 +27,7 @@ import {
   sweepUploadParts,
 } from './attachment-gc.js';
 import { releaseBlockedSteps } from './blockers.js';
-import { sweepAbandonedBuildSteps, sweepAbandonedShipSteps } from './build-abandoned-sweep.js';
+import { sweepAbandonedBuildSteps } from './build-abandoned-sweep.js';
 import {
   BuildContinuationPhaseError,
   type BuildDeps,
@@ -521,7 +521,6 @@ export function createScheduler(
     sweepAbandonedChiefSteps(deps, now);
     sweepOverlongChiefTurns(deps, now);
     sweepAbandonedBuildSteps(deps, now);
-    void sweepAbandonedShipSteps(deps, now).catch(() => {});
     sweepZombieQueuedTodos(deps, now);
     sweepPlanAutoConfirm(deps);
     sweepQuotaWaitSteps(deps, now);

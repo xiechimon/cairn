@@ -17,7 +17,6 @@ import { createApiKey } from '../src/services/api-keys.js';
 import { routeVerdict } from '../src/services/machine-routing.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { seedLocalMachine } from '../src/services/machines.js';
-import * as shipGate from '../src/services/ship-gate.js';
 import { bootServer, postProject, seedSessionRoute, type TestServer } from './helpers.js';
 
 function issueKey(s: TestServer, name: string): string {
@@ -360,61 +359,6 @@ describe('machine token revocation (#2494)', () => {
       w.s.dispose();
     }
   });
-
-  test.each(['valid', 'revoke', 'rotate'] as const)(
-    'a %s credential is checked after claim preparation and before commitment',
-    async (change) => {
-      const w = await setupWorld();
-      let resume = () => {};
-      const prepared = new Promise<void>((resolve) => {
-        resume = resolve;
-      });
-      let preparing = false;
-      const gate = vi.spyOn(shipGate, 'reverifyShip').mockImplementation(async () => {
-        preparing = true;
-        await prepared;
-        return null;
-      });
-      let waiting: Promise<Response> | undefined;
-      try {
-        const projectId = await postProject(w.s.app);
-        const todoRes = await call(w.s.app, 'POST', `/api/projects/${projectId}/todos`, {
-          body: { title: 'prepared claim', spec: 'claim preparation can wait' },
-        });
-        const todo = (await todoRes.json()) as { id: string };
-        expect(
-          (
-            await call(w.s.app, 'POST', `/api/projects/${projectId}/builds`, {
-              body: {
-                todoIds: [todo.id],
-                withPlan: true,
-              },
-            })
-          ).status,
-        ).toBe(201);
-        waiting = call(w.s.app, 'POST', '/api/machine/tasks/claim', { cred: w.a.token, body: {} });
-        await vi.waitFor(() => expect(preparing).toBe(true));
-        if (change === 'revoke') {
-          expect(
-            (await call(w.s.app, 'POST', `/api/machines/${w.a.machineId}/revoke`)).status,
-          ).toBe(204);
-        } else if (change === 'rotate') {
-          const rotated = await enroll(w.s, w.apiKey, 'host-a');
-          expect(rotated.token).not.toBe(w.a.token);
-        }
-        resume();
-        expect((await waiting).status).toBe(change === 'valid' ? 200 : 401);
-        const rows = w.s.db.select().from(stepTable).all();
-        expect(rows.some((row) => row.status === 'claimed')).toBe(change === 'valid');
-        if (change !== 'valid') expect(rows.every((row) => row.machineId === null)).toBe(true);
-      } finally {
-        resume();
-        await waiting;
-        gate.mockRestore();
-        w.s.dispose();
-      }
-    },
-  );
 
   test('revoking machine A leaves machine B stream and token working', async () => {
     const w = await setupWorld();

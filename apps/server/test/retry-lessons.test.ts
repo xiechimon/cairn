@@ -599,7 +599,6 @@ function insertCurrentDigest(w: World, at: number, digest: string) {
       ready: false,
       headSha: 'c'.repeat(40),
       patchDigest: digest,
-      policy: 'autonomous',
       blockers: [],
       evaluatedAt: at,
     })

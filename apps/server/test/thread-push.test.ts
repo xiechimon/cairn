@@ -1,7 +1,6 @@
 import {
   ASK_USER_QUESTION_KIND,
   DEFAULT_AUTONOMY_SETTINGS,
-  type MergePolicy,
   type TodoSourceKind,
   type TriggerSource,
 } from '@cairn/shared';
@@ -31,12 +30,7 @@ import { createTodo, setTodoPhase } from '../src/services/todos.js';
 import { bootServer, req } from './helpers.js';
 
 function world(
-  input: {
-    triggerSource?: TriggerSource;
-    sourceKind?: TodoSourceKind;
-    userStarted?: boolean;
-    policy?: MergePolicy;
-  } = {},
+  input: { triggerSource?: TriggerSource; sourceKind?: TodoSourceKind; userStarted?: boolean } = {},
 ) {
   const s = bootServer();
   s.db
@@ -45,7 +39,7 @@ function world(
       id: 'project',
       name: 'Push tests',
       teamId: s.team.id,
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: input.policy ?? 'human' },
+      autonomy: DEFAULT_AUTONOMY_SETTINGS,
     })
     .run();
   const record = createTodo(s.svc, {
@@ -257,17 +251,14 @@ describe('human attention push', () => {
     );
   });
 
-  test.each(['shadow', 'autonomous'] as const)(
-    '%s legacy policy still pushes delivery to the user',
-    (policy) => {
-      const s = world({ policy });
-      const send = vi
-        .spyOn(webpush, 'sendNotification')
-        .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
-      setTodoPhase(s.svc, s.record.id, 'review');
-      expect(send).toHaveBeenCalledTimes(1);
-    },
-  );
+  test('delivery pushes to the user', () => {
+    const s = world();
+    const send = vi
+      .spyOn(webpush, 'sendNotification')
+      .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
+    setTodoPhase(s.svc, s.record.id, 'review');
+    expect(send).toHaveBeenCalledTimes(1);
+  });
 
   test.each([['phase-not-review'], ['work-in-flight'], ['phase-not-review', 'work-in-flight']])(
     'delivery ignores obsolete building-era blockers %j and pushes once',
@@ -285,11 +276,10 @@ describe('human attention push', () => {
         .values({
           buildId: 'build',
           ready: false,
-          policy: 'human',
           headSha: null,
           patchDigest: null,
           blockers: [
-            { code: 'policy-human', class: 'policy', label: 'Human review required', detail: [] },
+            { code: 'round-limit', class: 'human', label: 'Human review required', detail: [] },
             ...codes.map((code) => ({
               code,
               class: 'transient' as const,
@@ -320,7 +310,6 @@ describe('human attention push', () => {
         .values({
           buildId: 'build',
           ready: false,
-          policy: 'human',
           headSha: null,
           patchDigest: null,
           blockers: [{ code, class: 'transient', label: 'Machine work pending', detail: [] }],
@@ -336,13 +325,12 @@ describe('human attention push', () => {
   );
 
   test('an autonomous review with a human blocker handoff pushes once', () => {
-    const s = world({ policy: 'autonomous' });
+    const s = world();
     s.db
       .insert(gateState)
       .values({
         buildId: 'build',
         ready: false,
-        policy: 'autonomous',
         headSha: null,
         patchDigest: null,
         blockers: [
@@ -359,8 +347,8 @@ describe('human attention push', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  test('an open plan decision pushes even under autonomous policy', () => {
-    const s = world({ policy: 'autonomous' });
+  test('an open plan decision pushes', () => {
+    const s = world();
     s.db.update(todo).set({ phase: 'planning' }).where(eq(todo.id, s.record.id)).run();
     s.db
       .insert(plan)
@@ -380,7 +368,7 @@ describe('human attention push', () => {
   });
 
   test('auto-confirmable plan does not push', () => {
-    const s = world({ policy: 'autonomous' });
+    const s = world();
     s.db.update(todo).set({ phase: 'planning' }).where(eq(todo.id, s.record.id)).run();
     s.db
       .insert(plan)
@@ -401,7 +389,7 @@ describe('human attention push', () => {
   });
 
   test('a worker question does not push to the person: the Coordinator owns it', () => {
-    const s = world({ policy: 'autonomous' });
+    const s = world();
     const send = vi
       .spyOn(webpush, 'sendNotification')
       .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
@@ -426,7 +414,7 @@ describe('human attention push', () => {
   });
 
   test('an unattended failure whose error requests a human goes to the Coordinator, not a push', () => {
-    const s = world({ triggerSource: 'schedule', userStarted: false, policy: 'autonomous' });
+    const s = world({ triggerSource: 'schedule', userStarted: false });
     s.db
       .insert(step)
       .values({

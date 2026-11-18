@@ -24,7 +24,6 @@ function readiness(over: Partial<MergeReadiness> = {}): MergeReadiness {
     ready: true,
     headSha: HEAD,
     patchDigest: 'pd2:x',
-    policy: 'autonomous',
     blockers: [],
     ...over,
   };
@@ -55,7 +54,7 @@ describe('prCardModel', () => {
         ready: false,
         blockers: [
           blocker('outside-auto-merge', 'human', 'outside the auto-merge set'),
-          blocker('policy-human', 'policy'),
+          blocker('daily-cap', 'policy'),
         ],
       }),
     );

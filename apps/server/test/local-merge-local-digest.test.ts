@@ -52,7 +52,7 @@ function seededWorld(s: TestServer, localPath: string, base: string, head: strin
       name: 'Local',
       repoKind: 'local',
       localPath,
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'autonomous', localChecks: ['true'] },
+      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, localChecks: ['true'] },
     })
     .run();
   seedSessionRoute(s, { provider: 'anthropic', modelId: 'claude-x', tools: ['merge', 'push'] });
@@ -139,7 +139,6 @@ test('the judged digest of a local build is the real diff digest the daemon reco
       ready: true,
       headSha: repo.head,
       patchDigest: daemon.patchDigest,
-      policy: 'autonomous',
       blockers: [],
       evaluatedAt: Date.now(),
     })

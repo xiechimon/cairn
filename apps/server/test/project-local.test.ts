@@ -1,10 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import {
-  DEFAULT_AUTONOMY_SETTINGS,
-  type LocalErrorReason,
-  PROJECT_LOCAL_ERROR_REASONS,
-} from '@cairn/shared';
+import { type LocalErrorReason, PROJECT_LOCAL_ERROR_REASONS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -40,7 +36,6 @@ interface CreateReply {
   repoName?: string;
   githubRepo?: string;
   localPath?: string;
-  mergePolicy?: string;
   localChecks?: string[];
   cloneUrl?: string;
   error?: string;
@@ -53,45 +48,6 @@ async function postCreate(body: unknown): Promise<{ status: number; body: Create
 }
 
 describe('POST /api/projects kind=local -- the localPath three-state validation (#359 AC)', () => {
-  test('a local project defaults to mergePolicy autonomous and accepts configurable local check commands', async () => {
-    const repo = await makeGitRepo();
-    const created = await postCreate({ name: 'p-merge-policy', kind: 'local', localPath: repo });
-    expect(created.status).toBe(201);
-    expect(created.body.mergePolicy).toBe('autonomous');
-
-    const configured = await req(s.app, 'PATCH', `/api/projects/${created.body.id}/merge-policy`, {
-      mergePolicy: 'autonomous',
-      localChecks: ['pnpm test'],
-    });
-    expect(configured.status).toBe(200);
-    expect(await configured.json()).toMatchObject({
-      mergePolicy: 'autonomous',
-      localChecks: ['pnpm test'],
-    });
-  });
-
-  test('legacy projects without a stored policy use autonomous while explicit policies survive', async () => {
-    const created = await postCreate({ name: 'legacy-policy' });
-    const id = String(created.body.id);
-    for (const autonomy of [null, { ...DEFAULT_AUTONOMY_SETTINGS }]) {
-      s.db.update(project).set({ autonomy }).where(eq(project.id, id)).run();
-      const rows = (await (
-        await req(s.app, 'GET', `/api/projects?teamId=${s.team.id}`)
-      ).json()) as CreateReply[];
-      expect(rows.find((row) => row.id === id)?.mergePolicy).toBe('autonomous');
-    }
-    for (const mergePolicy of ['human', 'shadow'] as const) {
-      const configured = await req(s.app, 'PATCH', `/api/projects/${id}/merge-policy`, {
-        mergePolicy,
-      });
-      expect(configured.status).toBe(200);
-      const rows = (await (
-        await req(s.app, 'GET', `/api/projects?teamId=${s.team.id}`)
-      ).json()) as CreateReply[];
-      expect(rows.find((row) => row.id === id)?.mergePolicy).toBe(mergePolicy);
-    }
-  });
-
   test('missing localPath -> 400 (the error position names localPath)', async () => {
     const r = await postCreate({ name: 'p-missing', kind: 'local' });
     expect(r.status).toBe(400);

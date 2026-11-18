@@ -135,7 +135,6 @@ describe('worker reports in the chief conversation', () => {
         .values({
           buildId: 'build-v',
           ready: true,
-          policy: 'autonomous',
           headSha: 'head-1',
           patchDigest: 'patch-1',
           blockers: [],
@@ -182,7 +181,6 @@ describe('worker reports in the chief conversation', () => {
           .values({
             buildId: 'build-u',
             ready: true,
-            policy: 'autonomous',
             headSha: judgedHead,
             patchDigest: null,
             blockers: [],

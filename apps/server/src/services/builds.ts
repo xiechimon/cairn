@@ -40,7 +40,6 @@ import type { QuestionAnswer } from './worker-questions.js';
 export {
   githubPrOf,
   INFO_CARD_MERGE_REFUSAL,
-  reviewInstructionOf,
   STEP_KIND_TEXT,
 } from './build-lookups.js';
 export {

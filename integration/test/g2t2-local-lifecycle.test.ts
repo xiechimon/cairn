@@ -11,6 +11,7 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import {
   build as buildTable,
+  project as projectTable,
   step as stepTable,
   todo as todoTable,
 } from '../../apps/server/src/db/schema.js';
@@ -154,7 +155,6 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
         repoKind: 'local',
         localPath: userRepo,
         projectName: 'g2t2-local',
-        mergePolicy: 'human',
       },
     );
     projectId = world.projectId;
@@ -223,7 +223,6 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
         repoKind: 'local',
         localPath: dirtyRepo,
         projectName: 'g2t2-dirty',
-        mergePolicy: 'human',
       },
     );
     const dirtyBuildId = startLegacyBuild(server, world.todoId, { withPlan: true });
@@ -292,19 +291,17 @@ for (const checkout of ['default', 'other', 'dirty', 'configured-base'] as const
         title: 'Land completed local delivery',
         spec: 'Merge the delivered commit only when explicitly requested.',
       },
-      { repoKind: 'local', localPath: repo, mergePolicy: 'autonomous' },
+      { repoKind: 'local', localPath: repo },
     );
     expect(
       (await api(server.url, 'PATCH', `/api/projects/${world.projectId}`, { baseBranch })).status,
     ).toBe(200);
     const checks = ['test -f apps/web/src/local.ts'];
-    expect(
-      (
-        await api(server.url, 'PATCH', `/api/projects/${world.projectId}/merge-policy`, {
-          localChecks: checks,
-        })
-      ).status,
-    ).toBe(200);
+    server.db
+      .update(projectTable)
+      .set({ autonomy: { localChecks: checks } })
+      .where(eq(projectTable.id, world.projectId))
+      .run();
     const buildId = randomUUID();
     await git(['checkout', '-b', conversationBranch(buildId)]);
     mkdirSync(join(repo, 'apps/web/src'), { recursive: true });

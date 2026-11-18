@@ -38,7 +38,6 @@ import type {
   MemoryCandidateStatus,
   MemoryLayer,
   ModelRef,
-  NamedPromptOverrides,
   NotificationType,
   Phase,
   PrMergeState,
@@ -57,7 +56,6 @@ import type {
   ScheduleKind,
   ScheduleReport,
   SecretDelivery,
-  ShipRoute,
   SkillInjectionRecord,
   SplitPolicy,
   StepKind,
@@ -105,7 +103,6 @@ export const team = sqliteTable('team', {
   firstPrReportPromptDismissedAt: epochMs('firstPrReportPromptDismissedAt'),
   firstPrReportPromptFirstPrAt: epochMs('firstPrReportPromptFirstPrAt'),
   firstPrReportPromptFirstPrNumber: integer('firstPrReportPromptFirstPrNumber'),
-  namedPrompts: json<NamedPromptOverrides | null>('namedPrompts'),
   defaultMachineId: text('defaultMachineId'),
   actionTier: text('actionTier').$type<ActionTier>().notNull().default('full'),
 });
@@ -153,9 +150,7 @@ export const project = sqliteTable('project', {
   color: text('color').$type<ProjectColor>(),
   archivedAt: epochMs('archivedAt'),
   modelOverrides: json<ProjectModelOverrides>('modelOverrides'),
-  autonomy: json<
-    (StoredAutonomySettings & Partial<ProjectMergeConfig> & { shipRoute?: ShipRoute }) | null
-  >('autonomy'),
+  autonomy: json<(StoredAutonomySettings & Partial<ProjectMergeConfig>) | null>('autonomy'),
   personalOwnerId: text('personalOwnerId').references(() => user.id),
 });
 
@@ -1305,7 +1300,6 @@ type GateVerdictOutcome =
   | 'tampered'
   | 'unbound'
   | 'evidence_invalid';
-type GatePolicy = 'human' | 'shadow' | 'autonomous';
 interface GateBlockerRow {
   code: string;
   class: 'policy' | 'transient' | 'human';
@@ -1382,7 +1376,6 @@ export const gateState = sqliteTable('gate_state', {
   ready: bool('ready').notNull(),
   headSha: text('headSha'),
   patchDigest: text('patchDigest'),
-  policy: text('policy').$type<GatePolicy>().notNull(),
   blockers: json<GateBlockerRow[]>('blockers').notNull(),
   evaluatedAt: epochMs('evaluatedAt').notNull(),
 });

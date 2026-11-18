@@ -1,17 +1,6 @@
-import type { GithubRepoRef, ReviewGate, StepKind } from '@cairn/shared';
+import type { GithubRepoRef, StepKind } from '@cairn/shared';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { resolveNamedPrompt } from './named-prompts.js';
-
-export function reviewInstructionOf(
-  deps: BuildDeps,
-  teamId: string,
-  gate: ReviewGate,
-): string | undefined {
-  if (gate !== 'review') return undefined;
-  const prompt = resolveNamedPrompt(deps.db, teamId, 'review');
-  return prompt.overridden ? prompt.text : undefined;
-}
 
 export const INFO_CARD_MERGE_REFUSAL =
   '信息卡的产出是报告附件，不进合并：要把内容落进仓库，请建下游代码卡走正常流程';

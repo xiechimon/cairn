@@ -115,7 +115,7 @@ test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
     };
     const s = bootServer({ githubFetch: fetchImpl });
     try {
-      const projectId = await postProject(s.app, 'github', { mergePolicy: 'autonomous' });
+      const projectId = await postProject(s.app, 'github');
       s.db
         .update(project)
         .set({ repoKind: 'github', githubRepo: 'owner/repo' })

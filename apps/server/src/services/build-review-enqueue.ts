@@ -13,14 +13,7 @@ import {
 import { and, eq, gte, inArray, isNull, or } from 'drizzle-orm';
 import { build, step, type todo } from '../db/schema.js';
 import { ticketRefOf } from './build-gate-verdict.js';
-import {
-  type BuildDeps,
-  dispatchHeadSha,
-  enqueueStep,
-  githubPrOf,
-  reviewInstructionOf,
-  roundStart,
-} from './builds.js';
+import { type BuildDeps, dispatchHeadSha, enqueueStep, githubPrOf, roundStart } from './builds.js';
 import { hasRepoBinding, projectOfTodo } from './git.js';
 import { isCodexReviewModel } from './merge-gate/model-identity.js';
 import { effectiveModel } from './model-fallback.js';
@@ -134,7 +127,6 @@ export function maybeEnqueueIndependentReview(
   if (authorModel === null || !isCodexReviewModel(reviewRoute.modelId)) return;
   const agentId = reviewRoute.id;
   const plan = latestPlanRow(deps, buildId);
-  const reviewInstruction = reviewInstructionOf(deps, todoRow.teamId, 'review');
   const prompt = buildReviewStepPrompt({
     agentId,
     gate: 'review',
@@ -142,7 +134,6 @@ export function maybeEnqueueIndependentReview(
     changes: [],
     checkout: hasRepoBinding(projectOfTodo(deps.db, todoRow)),
     expectedHeadSha: head,
-    ...(reviewInstruction !== undefined ? { instruction: reviewInstruction } : {}),
   });
   insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, deps.user.displayName);
   enqueueStep(deps, buildId, 'review', todoRow.teamId, prompt);

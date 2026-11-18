@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
-  MergePolicy,
   ModelRef,
   PolicyUse,
   ProjectRepoKind,
@@ -306,7 +305,7 @@ export function req(app: Hono, method: string, path: string, body?: unknown): Pr
 export async function postProject(
   app: Hono,
   name = 'demo',
-  opts: { mergePolicy?: MergePolicy; repoKind?: ProjectRepoKind } = {},
+  opts: { repoKind?: ProjectRepoKind } = {},
 ): Promise<string> {
   const res = await req(app, 'POST', '/api/projects', {
     name,
@@ -314,9 +313,6 @@ export async function postProject(
   });
   if (res.status !== 201) throw new Error(`postProject: ${res.status}`);
   const body = (await res.json()) as { id: string };
-  const mergePolicy = opts.mergePolicy ?? 'human';
-  const patched = await req(app, 'PATCH', `/api/projects/${body.id}/merge-policy`, { mergePolicy });
-  if (patched.status !== 200) throw new Error(`postProject merge-policy: ${patched.status}`);
   return body.id;
 }
 

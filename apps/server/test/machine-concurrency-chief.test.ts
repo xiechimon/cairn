@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
@@ -22,20 +22,6 @@ import {
   seedSessionRoute,
   type TestServer,
 } from './helpers.js';
-
-const shipGate = vi.hoisted(() => ({ duringReverify: null as (() => void) | null }));
-vi.mock('../src/services/ship-gate.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/services/ship-gate.js')>();
-  return {
-    ...actual,
-    reverifyShip: async (...args: Parameters<typeof actual.reverifyShip>) => {
-      const hook = shipGate.duringReverify;
-      shipGate.duringReverify = null;
-      hook?.();
-      return actual.reverifyShip(...args);
-    },
-  };
-});
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -435,92 +421,6 @@ describe('chief turns never wait behind a worker step another machine owns', () 
     const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerAt + 5 });
     expect((await claimAs(w))?.step.id).toBe(worker);
     expect((await claimAs(w))?.step.id).toBe(chiefStepId);
-  });
-});
-
-describe('a chief turn claimed after the worker loop respects capacity filled meanwhile', () => {
-  test('capacity filled while the worker loop awaited leaves the newer chief turn pending', async () => {
-    const w = await setupWorld();
-    setCap(w, 1);
-    const worker = insertPendingBuildStep(w.s, w);
-    const workerRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, worker)).get()!;
-    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerRow.createdAt + 5 });
-    shipGate.duringReverify = () => {
-      w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
-      insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() });
-    };
-    expect(await claimAs(w)).toBeNull();
-    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
-      'pending',
-    );
-  });
-});
-
-describe('the late chief claim reads the machine as it is after the worker loop', () => {
-  test('a capability the machine drops while the worker loop awaited blocks the newer chief turn', async () => {
-    const w = await setupWorld();
-    setCap(w, 8);
-    seedRoute(w.s, 'coordinator', {
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      machineId: w.machineAId,
-      requiredCapabilities: { mcpServers: ['linear'] },
-    });
-    w.s.db
-      .update(machineTable)
-      .set({ capabilities: { mcpServers: ['linear'], skills: [] } })
-      .where(eq(machineTable.id, w.machineAId))
-      .run();
-    const worker = insertPendingBuildStep(w.s, w);
-    const workerRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, worker)).get()!;
-    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerRow.createdAt + 5 });
-    shipGate.duringReverify = () => {
-      w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
-      w.s.db
-        .update(machineTable)
-        .set({ capabilities: { mcpServers: [], skills: [] } })
-        .where(eq(machineTable.id, w.machineAId))
-        .run();
-    };
-    expect(await claimAs(w)).toBeNull();
-    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
-      'pending',
-    );
-  });
-});
-
-describe('the late chief claim sees routing changes made while the worker loop awaited', () => {
-  test('a coordinator route moved to another machine meanwhile is not claimed here', async () => {
-    const w = await setupWorld();
-    setCap(w, 8);
-    const key = await issueApiKey(w.s);
-    await w.s.app.request('/api/machine/enroll', {
-      method: 'POST',
-      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify(
-        readyMachine({ teamId: w.s.team.id, name: 'other-box', cliVersion: '0.1.0' }),
-      ),
-    });
-    const otherId = w.s.db
-      .select()
-      .from(machineTable)
-      .where(eq(machineTable.name, 'other-box'))
-      .get()!.id;
-    const worker = insertPendingBuildStep(w.s, w);
-    const workerRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, worker)).get()!;
-    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: workerRow.createdAt + 5 });
-    shipGate.duringReverify = () => {
-      w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
-      w.s.db
-        .update(routingRuleTable)
-        .set({ machineId: otherId })
-        .where(eq(routingRuleTable.use, 'coordinator'))
-        .run();
-    };
-    expect(await claimAs(w)).toBeNull();
-    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
-      'pending',
-    );
   });
 });
 

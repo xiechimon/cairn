@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { ConfinementReport } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, chief, chiefThread, machine, step, todo } from '../src/db/schema.js';
 import { claimStep } from '../src/services/machines.js';
-import * as shipGate from '../src/services/ship-gate.js';
 import { bootServer, issueApiKey, postProject, seedRoute, seedSessionRoute } from './helpers.js';
 
 async function world(osPlatform: string | null = 'linux', capabilities?: unknown) {
@@ -167,24 +166,6 @@ test('worker waits remain pending across recheck and refuse an older invocation 
   w.s.machineHub.wake(w.s.team.id);
   expect(await waiting).toBeNull();
   expect(w.s.db.select().from(step).get()?.status).toBe('pending');
-});
-
-test('worker rechecks readiness after asynchronous ship verification before any claim mutation', async () => {
-  const w = await world();
-  await w.presence(w.report);
-  await w.presence({ ...w.report, state: 'ready', revision: 2 });
-  w.enqueue();
-  const spy = vi.spyOn(shipGate, 'reverifyShip').mockImplementationOnce(async () => {
-    await w.presence({ ...w.report, state: 'unavailable', reason: 'startup-failed', revision: 3 });
-    return null;
-  });
-  try {
-    expect(await w.claim()).toBeNull();
-    expect(spy).toHaveBeenCalled();
-    expect(w.s.db.select().from(step).get()?.status).toBe('pending');
-  } finally {
-    spy.mockRestore();
-  }
 });
 
 test.each([

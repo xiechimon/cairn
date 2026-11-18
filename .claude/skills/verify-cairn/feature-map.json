@@ -771,8 +771,7 @@
           "apps/server/src/services/merge-gate",
           "apps/server/src/services/merge-gate-run.ts",
           "apps/server/src/services/autonomous-merge.ts",
-          "apps/server/src/services/local-merge.ts",
-          "apps/server/src/services/ship-gate.ts"
+          "apps/server/src/services/local-merge.ts"
         ],
         "daemon": [
           "apps/daemon/src/merge-decision.ts"
@@ -782,9 +781,7 @@
         "server": [
           "/api/builds/:id/gate",
           "/api/builds/:id/merge",
-          "/api/builds/:id/merge-permission",
-          "/api/projects/:id/merge-policy",
-          "/api/projects/:id/ship-route"
+          "/api/builds/:id/merge-permission"
         ]
       },
       "reach": [
@@ -1903,15 +1900,12 @@
         ],
         "server": [
           "apps/server/src/routes-drafts.ts",
-          "apps/server/src/services/composer-drafts.ts",
-          "apps/server/src/services/named-prompts.ts"
+          "apps/server/src/services/composer-drafts.ts"
         ]
       },
       "routes": {
         "server": [
-          "/api/teams/:id/drafts/:scope",
-          "/api/prompts",
-          "/api/prompts/:id"
+          "/api/teams/:id/drafts/:scope"
         ]
       },
       "reach": [

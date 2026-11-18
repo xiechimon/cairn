@@ -46,7 +46,6 @@ import { type FinalVerdictLine, parseFinalVerdictLine } from './merge-gate/verdi
 import { githubGatePort } from './merge-gate-github.js';
 import { effectiveModel } from './model-fallback.js';
 import { reconcileOwners } from './owner.js';
-import { projectMergeConfigOf } from './projects.js';
 import { coordinatorProfile, profileForStep, routeForStep } from './routing-rules.js';
 import { insertMessageRow } from './transcript.js';
 import { publishVerifyPrComment } from './verify-pr-comment.js';
@@ -80,7 +79,6 @@ export function readMergeGateState(
     ready: row.ready,
     headSha: row.headSha,
     patchDigest: row.patchDigest,
-    policy: row.policy,
     blockers: row.blockers,
   });
   return parsed.success ? { ...parsed.data, evaluatedAt: row.evaluatedAt } : null;
@@ -269,12 +267,7 @@ export async function evaluateMergeGate(
       ? profileForStep(deps.db, todoRow, authorStep.kind, authorStep.id)
       : null;
   const verifier = routeForStep(deps.db, todoRow, 'session') !== null;
-  const policy = autonomousMergePolicy(
-    deps.db,
-    todoRow.teamId,
-    projectMergeConfigOf(projectRow),
-    opts.now ?? nowMs(),
-  );
+  const policy = autonomousMergePolicy(deps.db, todoRow.teamId, opts.now ?? nowMs());
   const readiness = mergeReadiness({
     evidenceStore: buildRow.evidenceStore,
     correction: isCorrectionTask(deps.db, todoRow.id),
@@ -283,8 +276,6 @@ export async function evaluateMergeGate(
         ? { id: authorAgent.id, model: effectiveModel(authorAgent, authorStep).modelId ?? '' }
         : null,
     policy: {
-      mergePolicy: projectMergeConfigOf(projectRow).mergePolicy,
-      requireUpToDate: projectMergeConfigOf(projectRow).requireUpToDate,
       ...policy,
       autonomyPaused: policy.autonomyPaused || githubPaused,
     },
@@ -395,7 +386,6 @@ export async function evaluateMergeGate(
       ready: readiness.ready,
       headSha: readiness.headSha,
       patchDigest: readiness.patchDigest,
-      policy: readiness.policy,
       blockers: readiness.blockers,
       evaluatedAt,
     })
@@ -405,7 +395,6 @@ export async function evaluateMergeGate(
         ready: readiness.ready,
         headSha: readiness.headSha,
         patchDigest: readiness.patchDigest,
-        policy: readiness.policy,
         blockers: readiness.blockers,
         evaluatedAt,
       },
@@ -413,7 +402,6 @@ export async function evaluateMergeGate(
     .run();
   reconcileOwners(deps, [todoRow.id]);
   const plan = planGateStatusWrite({
-    policy: readiness.policy,
     readiness,
     checksHeadSha: facts.checks?.headSha ?? null,
     current: facts.ownStatus,

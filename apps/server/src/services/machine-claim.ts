@@ -106,7 +106,6 @@ import {
   memoryOwnerOf,
   type RouteProfile,
 } from './routing-rules.js';
-import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { recordStepRoute, routedModelRunsOn } from './step-route.js';
 import { stepNamesTask } from './task-naming.js';
@@ -459,12 +458,7 @@ async function tryClaim(
       !supportsAttachmentVerify
     )
       continue;
-    const shipRefusal = await reverifyShip(deps, cand.stepRow);
     if (!stillAuthorized()) return null;
-    if (shipRefusal !== null) {
-      failStepWithEvents(deps, cand.stepRow, `Ship refused: ${shipRefusal}`);
-      continue;
-    }
     const laneRefusal = quickLaneRefusal(db, cand.todoRow);
     if (laneRefusal !== null) {
       failStepWithEvents(deps, cand.stepRow, laneRefusal);

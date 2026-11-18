@@ -21,7 +21,6 @@ import {
   enqueueStep,
   NotFoundError,
   restoreFailedReview,
-  reviewInstructionOf,
 } from './builds.js';
 import { claimClientMessage, findClientMessage } from './client-message.js';
 import { hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
@@ -115,11 +114,9 @@ export async function applyBuildStepAction(
     }
     insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
     const expectedHeadSha = gate === 'review' ? dispatchHeadSha(deps, buildId) : null;
-    const reviewInstruction = reviewInstructionOf(deps, todoRecord.teamId, gate);
     const promptArgs = {
       gate,
       planText,
-      ...(reviewInstruction !== undefined ? { instruction: reviewInstruction } : {}),
       ...(changes !== undefined ? { changes } : {}),
       checkout,
       ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),

@@ -30,7 +30,7 @@ function seedGate() {
     .run();
   H.s.db
     .update(project)
-    .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'human' } })
+    .set({ autonomy: DEFAULT_AUTONOMY_SETTINGS })
     .where(eq(project.id, H.projectId))
     .run();
   H.s.db

@@ -1,9 +1,4 @@
-import {
-  ACTIVE_STEP_STATUSES,
-  DEFAULT_SHIP_ROUTE,
-  isInfoOutput,
-  MERGE_ANNOUNCEMENT,
-} from '@cairn/shared';
+import { ACTIVE_STEP_STATUSES, isInfoOutput, MERGE_ANNOUNCEMENT } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import { build, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -23,10 +18,7 @@ import { quickLaneRefusal } from './coordinator-request.js';
 import { projectOfTodo, repoDirFor } from './git.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { enqueueLocalMerge } from './local-merge.js';
-import { resolveNamedPrompt } from './named-prompts.js';
 import { assertPhaseTransition } from './phase.js';
-import { projectShipRouteOf } from './projects.js';
-import { appendShipGateInstruction, CUSTOM_NEEDS_PR, hasGithubPr, judgeShip } from './ship-gate.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 export async function requestMerge(
@@ -49,18 +41,11 @@ export async function requestMerge(
   if (laneRefusal !== null) throw new HttpError(409, laneRefusal);
   assertNoMergeStepInFlight(deps, buildId);
   const projectRow = projectOfTodo(deps.db, todoRow);
-  const shipRoute = projectRow === undefined ? DEFAULT_SHIP_ROUTE : projectShipRouteOf(projectRow);
-  if (shipRoute === 'local-merge' && projectRow?.repoKind !== 'local') {
-    throw new HttpError(409, 'local-merge requires a local repository project');
-  }
-  if (shipRoute === 'custom' && !hasGithubPr(deps, buildId))
-    throw new HttpError(409, CUSTOM_NEEDS_PR);
-  const judged = shipRoute === 'custom' ? await judgeShip(deps, buildId) : null;
-  const pr = shipRoute === 'custom' ? null : githubPrOf(deps, todoRow, row.prNumber);
+  const pr = githubPrOf(deps, todoRow, row.prNumber);
   if (pr !== null) {
     return mergeThroughGithub(deps, row, pr.prNumber, pr.repoRef, actor ?? deps.user.displayName);
   }
-  if (projectRow?.repoKind === 'local' && shipRoute !== 'custom') {
+  if (projectRow?.repoKind === 'local') {
     if (todoRow.phase === 'failed') assertDeliveredBuild(deps, row);
     else if (todoRow.phase !== 'done') assertPhaseTransition(todoRow.phase, 'done');
     assertMergeTools(deps, todoRow);
@@ -87,12 +72,7 @@ export async function requestMerge(
   assertMergeTools(deps, todoRow);
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   let prompt: string | undefined;
-  if (shipRoute === 'custom' && judged !== null) {
-    prompt = appendShipGateInstruction(resolveNamedPrompt(deps.db, todoRow.teamId, 'ship').text, {
-      buildId,
-      judgedHead: judged.headSha,
-    });
-  } else if (projectRow?.repoKind === 'hosted' && projectRow.repoName !== null) {
+  if (projectRow?.repoKind === 'hosted' && projectRow.repoName !== null) {
     if (deps.reposDir === undefined) throw new HttpError(409, 'Hosted repository unavailable');
     const dir = repoDirFor(deps.reposDir, todoRow.teamId, projectRow.repoName);
     const { defaultBranch } = await systemGitOps.listBranches(dir);

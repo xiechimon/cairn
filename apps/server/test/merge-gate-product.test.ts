@@ -160,7 +160,7 @@ async function world(
 }> {
   const s = bootServer();
   servers.push(s);
-  const projectId = await postProject(s.app, 'gate', { mergePolicy: 'autonomous' });
+  const projectId = await postProject(s.app, 'gate');
   s.db
     .update(project)
     .set({ repoKind: 'github', githubRepo: `${OWNER}/${REPO}` })
@@ -291,7 +291,6 @@ describe('in-product merge gate', () => {
       const missing = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort(statuses) });
       expect(missing?.ready).toBe(false);
       expect(missing?.blockers.map((b) => b.code)).toContain('independent-review-missing');
-      expect(missing?.blockers.some((b) => b.code === 'policy-human')).toBe(false);
       expect(s.db.select().from(gateState).where(eq(gateState.buildId, buildId)).get()?.ready).toBe(
         false,
       );
@@ -1010,13 +1009,9 @@ test('closing the GitHub marker lifts autonomy-paused from server readiness', as
   expect(resumed?.blockers.map((blocker) => blocker.code)).not.toContain('autonomy-paused');
 });
 
-async function reviewPushWorld(policy: 'human' | 'autonomous') {
+async function reviewPushWorld() {
   const w = await world();
   const { s, buildId, stepId } = w;
-  s.db
-    .update(project)
-    .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: policy } })
-    .run();
   completeStep(s.svc, stepId, { hasChanges: true });
   const review = s.db
     .select()
@@ -1079,7 +1074,6 @@ async function reviewPushWorld(policy: 'human' | 'autonomous') {
     .values({
       buildId,
       ready: false,
-      policy,
       headSha: HEAD,
       patchDigest: digest,
       evaluatedAt: 1,
@@ -1094,7 +1088,7 @@ async function reviewPushWorld(policy: 'human' | 'autonomous') {
 }
 
 test('delivery notifies the user once per entry without waiting for a gate evaluation', async () => {
-  const { s, buildId } = await reviewPushWorld('human');
+  const { s, buildId } = await reviewPushWorld();
   let clock = Date.now();
   vi.spyOn(Date, 'now').mockImplementation(() => clock++);
   const send = vi
@@ -1103,7 +1097,7 @@ test('delivery notifies the user once per entry without waiting for a gate evalu
   setTodoPhase(s.svc, 'todo-1794', 'review');
   expect(send).toHaveBeenCalledTimes(1);
   const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
-  expect(readiness?.blockers.map((blocker) => blocker.code)).toEqual(['policy-human']);
+  expect(readiness?.ready).toBe(true);
   expect(send).toHaveBeenCalledTimes(1);
   expect(s.db.select().from(pushDigestItem).all()).toHaveLength(0);
   await Promise.all([
@@ -1123,7 +1117,7 @@ test('delivery notifies the user once per entry without waiting for a gate evalu
 });
 
 test('pending checks do not delay the delivery notification', async () => {
-  const { s, buildId } = await reviewPushWorld('human');
+  const { s, buildId } = await reviewPushWorld();
   const send = vi
     .spyOn(webpush, 'sendNotification')
     .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
@@ -1137,8 +1131,8 @@ test('pending checks do not delay the delivery notification', async () => {
   expect(send).toHaveBeenCalledTimes(1);
 });
 
-test('old autonomous policy notifies on delivery, not on later gate blockers', async () => {
-  const { s, buildId } = await reviewPushWorld('autonomous');
+test('a green gate notifies on delivery, not on later gate blockers', async () => {
+  const { s, buildId } = await reviewPushWorld();
   const send = vi
     .spyOn(webpush, 'sendNotification')
     .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
@@ -1156,7 +1150,7 @@ test('old autonomous policy notifies on delivery, not on later gate blockers', a
 });
 
 test('mixed historical blockers do not delay delivery notification', async () => {
-  const { s, buildId } = await reviewPushWorld('autonomous');
+  const { s, buildId } = await reviewPushWorld();
   const send = vi
     .spyOn(webpush, 'sendNotification')
     .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
@@ -1172,7 +1166,7 @@ test('mixed historical blockers do not delay delivery notification', async () =>
 });
 
 test('an evaluation that lands after a new review entry notifies that entry exactly once', async () => {
-  const { s, buildId } = await reviewPushWorld('human');
+  const { s, buildId } = await reviewPushWorld();
   vi.spyOn(Date, 'now').mockReturnValue(Date.now());
   const send = vi
     .spyOn(webpush, 'sendNotification')
@@ -1206,7 +1200,7 @@ test('an evaluation that lands after a new review entry notifies that entry exac
 test.each(['before evaluation', 'during evaluation'] as const)(
   'archiving a review %s suppresses its deferred push without changing phase',
   async (when) => {
-    const { s, buildId } = await reviewPushWorld('human');
+    const { s, buildId } = await reviewPushWorld();
     const send = vi
       .spyOn(webpush, 'sendNotification')
       .mockResolvedValue({ statusCode: 201, body: '', headers: {} });
@@ -1239,7 +1233,7 @@ test.each(['before evaluation', 'during evaluation'] as const)(
       release?.();
     }
     const readiness = await evaluation;
-    expect(readiness?.blockers.map((blocker) => blocker.code)).toEqual(['policy-human']);
+    expect(readiness?.ready).toBe(true);
     expect(send).not.toHaveBeenCalled();
     expect(s.db.select().from(todo).where(eq(todo.id, 'todo-1794')).get()).toMatchObject({
       phase: 'review',

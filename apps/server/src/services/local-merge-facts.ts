@@ -148,10 +148,7 @@ export async function localGateFacts(
   const built: GateInputs = {
     correction: isCorrectionTask(deps.db, todoRow.id),
     author: null,
-    policy: {
-      mergePolicy: config.mergePolicy,
-      ...autonomousMergePolicy(deps.db, todoRow.teamId, config),
-    },
+    policy: autonomousMergePolicy(deps.db, todoRow.teamId),
     build: {
       isGithubPr: false,
       repoKind: 'local',

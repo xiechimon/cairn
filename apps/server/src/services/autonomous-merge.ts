@@ -1,4 +1,3 @@
-import type { ProjectMergeConfig } from '@cairn/shared';
 import { and, eq, gte, isNull, lt, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
@@ -17,7 +16,6 @@ import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject } from './git.js';
 import { teamAutonomyPaused } from './github-autonomy-brake.js';
 import { userTokenOrNull } from './github-connection.js';
-import { projectMergeConfigOf } from './projects.js';
 
 type Store = Pick<Db, 'select' | 'insert' | 'update' | 'delete'>;
 const KIND = 'autonomous-merge-admission';
@@ -25,11 +23,9 @@ const KIND = 'autonomous-merge-admission';
 export function autonomousMergePolicy(
   db: Store,
   teamId: string,
-  config: ProjectMergeConfig,
   now = nowMs(),
   excludeBuildId?: string,
 ): { autonomyPaused: boolean; dailyCapReached: boolean } {
-  if (config.mergePolicy !== 'autonomous') return { autonomyPaused: false, dailyCapReached: false };
   const start = Date.parse(`${new Date(now).toISOString().slice(0, 10)}T00:00:00Z`);
   const end = start + 86_400_000;
   const admissions = db
@@ -71,14 +67,8 @@ export function autonomousMergePolicy(
     )
     .all();
   const localRecorded = new Set<string>();
-  for (const { message: row, project: projectRow } of all) {
-    if (
-      projectMergeConfigOf(projectRow).mergePolicy !== 'autonomous' ||
-      recorded.has(row.conversationId) ||
-      row.createdAt < start ||
-      row.createdAt >= end
-    )
-      continue;
+  for (const { message: row } of all) {
+    if (recorded.has(row.conversationId) || row.createdAt < start || row.createdAt >= end) continue;
     let raw = row.content;
     if (typeof raw === 'string') {
       if (/^PR #\d+ 已由 cairn 经 GitHub 合并/.test(raw)) {
@@ -116,9 +106,8 @@ export function autonomousMergePolicy(
       ),
     )
     .all();
-  for (const { step: row, project: projectRow } of legacySteps) {
+  for (const { step: row } of legacySteps) {
     if (
-      projectMergeConfigOf(projectRow).mergePolicy === 'autonomous' &&
       !recorded.has(row.buildId) &&
       !localRecorded.has(row.buildId) &&
       row.checkpointCommit !== null &&
@@ -144,11 +133,9 @@ export function claimAutonomousMerge(db: Db, buildId: string, explicit = false):
         .where(eq(build.id, buildId))
         .get();
       if (!context) throw conflict('Merge context is missing');
-      const config = projectMergeConfigOf(context.project);
-      if (!explicit && config.mergePolicy !== 'autonomous') return;
       const brake = explicit
         ? { autonomyPaused: false, dailyCapReached: false }
-        : autonomousMergePolicy(tx, context.todo.teamId, config);
+        : autonomousMergePolicy(tx, context.todo.teamId);
       if (brake.autonomyPaused) throw conflict('autonomy-paused: autonomous merging is paused');
       const id = `autonomous-merge-${buildId}`;
       if (
@@ -219,11 +206,7 @@ export function settleAutonomousMerge(
       .innerJoin(project, eq(todo.projectId, project.id))
       .where(eq(build.id, buildId))
       .get();
-    if (
-      !admission &&
-      (!context || projectMergeConfigOf(context.project).mergePolicy !== 'autonomous')
-    )
-      return;
+    if (!admission && !context) return;
     const teamId = admission?.teamId ?? context?.todo.teamId;
     if (!teamId) return;
     tx.insert(autonomousMergeAdmission)

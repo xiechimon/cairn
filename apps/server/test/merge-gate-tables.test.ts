@@ -121,19 +121,23 @@ const stateRow = (buildId: string, over: Row = {}): Row => ({
   ready: 0,
   headSha: H1,
   patchDigest: D1,
-  policy: 'human',
   blockers: JSON.stringify([
-    { code: 'policy-human', class: 'policy', label: '项目策略为人工合并', detail: [] },
+    { code: 'autonomy-paused', class: 'policy', label: '自治合并已暂停', detail: [] },
   ]),
   evaluatedAt: 10,
   ...over,
 });
 
-function seedGateRows(sqlite: Database.Database, buildId: string, stepId: string): void {
+function seedGateRows(
+  sqlite: Database.Database,
+  buildId: string,
+  stepId: string,
+  stateOver: Row = {},
+): void {
   insert(sqlite, 'gate_digest', digestRow(buildId, H1, D1));
   insert(sqlite, 'gate_round', roundRow(`r-${buildId}`, buildId, D1, 1));
   insert(sqlite, 'gate_verdict', verdictRow(stepId, buildId));
-  insert(sqlite, 'gate_state', stateRow(buildId));
+  insert(sqlite, 'gate_state', stateRow(buildId, stateOver));
 }
 
 function memory(): { db: Db; sqlite: Database.Database; teamId: string } {
@@ -403,7 +407,6 @@ describe('gate_state: one latest snapshot per build', () => {
         ready: true,
         headSha: H2,
         patchDigest: D2,
-        policy: 'autonomous',
         blockers: [],
         evaluatedAt: 20,
       })
@@ -445,7 +448,6 @@ describe('gate_state: one latest snapshot per build', () => {
         ready: false,
         headSha: null,
         patchDigest: null,
-        policy: 'shadow',
         blockers,
         evaluatedAt: 30,
       })
@@ -560,7 +562,6 @@ describe('F7 the existing delete paths succeed with gate rows present', () => {
         ready: false,
         headSha: H1,
         patchDigest: D1,
-        policy: 'human',
         blockers: [],
         evaluatedAt: 10,
       })
@@ -685,7 +686,7 @@ describe('F17 / F18 / F19 gate rows are deleted only with the build', () => {
     const db = drizzle(sqlite);
     migrate(db, { migrationsFolder: migrationsUpTo(journal, index + 1) });
     const a = seedBuild(sqlite, seedTeam(sqlite), 'a');
-    seedGateRows(sqlite, a.build, a.step);
+    seedGateRows(sqlite, a.build, a.step, { policy: '{}' });
     migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
     expect(
       sqlite.prepare('SELECT count(*) AS n FROM __drizzle_migrations').get(),

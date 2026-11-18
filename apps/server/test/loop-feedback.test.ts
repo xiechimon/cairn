@@ -256,7 +256,6 @@ describe('PR feedback backflow', () => {
         ready: true,
         headSha: 'a'.repeat(40),
         patchDigest: 'old-digest',
-        policy: 'human',
         blockers: [],
         evaluatedAt: 1,
       })
@@ -692,7 +691,6 @@ describe('correction loop', () => {
           ready: true,
           headSha: head,
           patchDigest: 'pd2:guard',
-          policy: 'autonomous',
           blockers: [],
           evaluatedAt: 1,
         })

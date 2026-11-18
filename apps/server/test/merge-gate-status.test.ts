@@ -29,7 +29,6 @@ const readiness = (
   ready: blockers.length === 0,
   headSha: HEAD,
   patchDigest: DIGEST,
-  policy: 'autonomous',
   blockers,
   ...over,
 });
@@ -122,29 +121,10 @@ describe('gateStatusFor (S3: state, description, context)', () => {
 
 describe('planGateStatusWrite (S1, S2)', () => {
   const base = {
-    policy: 'autonomous' as const,
     readiness: WAITING,
     checksHeadSha: HEAD,
     current: null,
   };
-
-  test('S1 never under the human policy, from either the project or the readiness result', () => {
-    expect(planGateStatusWrite({ ...base, policy: 'human' })).toEqual({
-      write: false,
-      reason: 'policy-human',
-    });
-    expect(planGateStatusWrite({ ...base, readiness: { ...WAITING, policy: 'human' } })).toEqual({
-      write: false,
-      reason: 'policy-human',
-    });
-    expect(
-      planGateStatusWrite({
-        ...base,
-        policy: 'shadow',
-        readiness: { ...WAITING, policy: 'shadow' },
-      }).write,
-    ).toBe(true);
-  });
 
   test('S1 no head, checks read at another commit, or the current status unreadable: no write', () => {
     expect(planGateStatusWrite({ ...base, readiness: { ...WAITING, headSha: null } })).toEqual({

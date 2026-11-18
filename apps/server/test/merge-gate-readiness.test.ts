@@ -93,7 +93,7 @@ const v = (
 
 function green(): GateInputs {
   return {
-    policy: { mergePolicy: 'autonomous', autonomyPaused: false, dailyCapReached: false },
+    policy: { autonomyPaused: false, dailyCapReached: false },
     build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
     repo: { owner: 'xiechimon', name: 'cairn', defaultBranch: 'main' },
     ticketRef: '1404',
@@ -103,7 +103,6 @@ function green(): GateInputs {
       merged: false,
       draft: false,
       mergeableState: 'clean',
-      baseBehindBy: 0,
       headSha: HEAD,
       baseRef: 'main',
       baseRepoFullName: 'xiechimon/cairn',
@@ -155,7 +154,6 @@ const setFiles = (i: GateInputs, files: CompareFile[]) => {
 };
 
 const CLASS: Record<MergeBlockerCode, BlockerClass> = {
-  'policy-human': 'policy',
   'autonomy-paused': 'policy',
   'daily-cap': 'policy',
   'not-applicable': 'policy',
@@ -165,7 +163,6 @@ const CLASS: Record<MergeBlockerCode, BlockerClass> = {
   'pr-unreadable': 'transient',
   'pr-not-open': 'human',
   'pr-draft': 'transient',
-  'pr-behind-base': 'transient',
   'pr-from-fork': 'human',
   'base-not-default': 'human',
   'mergeable-state': 'transient',
@@ -219,19 +216,6 @@ const ROWS: Row[] = [
     'daily-cap',
     (i) => {
       i.policy.dailyCapReached = true;
-    },
-  ],
-  [
-    'pr-behind-base',
-    (i) => {
-      i.policy.requireUpToDate = true;
-      pr(i).baseBehindBy = 1;
-    },
-  ],
-  [
-    'policy-human',
-    (i) => {
-      i.policy.mergePolicy = 'human';
     },
   ],
   [
@@ -500,14 +484,12 @@ const classesOf = (i: GateInputs) =>
   mergeReadiness(i).blockers.map((b) => [b.code, b.class, ...b.detail]);
 
 describe('mergeReadiness: one true and one false leg per blocker', () => {
-  test('a local project reuses the same gate logic and the explicit human policy still blocks the autonomous path', () => {
+  test('a local project reuses the same gate logic without a not-applicable block', () => {
     const input = green();
     input.build = { ...input.build, isGithubPr: false, repoKind: 'local' };
     input.pr = null;
     input.evidence = [];
-    input.policy = { ...input.policy, mergePolicy: 'human' };
     const result = mergeReadiness(input);
-    expect(result.blockers.map((blocker) => blocker.code)).toContain('policy-human');
     expect(result.blockers.map((blocker) => blocker.code)).not.toContain('not-applicable');
     expect(result.headSha).toBe(HEAD);
   });
@@ -647,11 +629,11 @@ describe('mergeReadiness: combinations the design names', () => {
 
   test('blocker order is fixed: the same input twice gives the same result, in vocabulary order', () => {
     const i = green();
-    i.policy.mergePolicy = 'human';
+    i.policy.autonomyPaused = true;
     i.issueNumber = null;
     pr(i).draft = true;
     const a = codesOf(i);
-    expect(a).toEqual(['policy-human', 'pr-draft', 'issue-ref-missing']);
+    expect(a).toEqual(['autonomy-paused', 'pr-draft', 'issue-ref-missing']);
     expect(codesOf(i)).toEqual(a);
   });
 
@@ -686,9 +668,13 @@ describe('mergeReadiness: combinations the design names', () => {
 
   test('every blocker carries a class and fixed copy', () => {
     const i = green();
-    i.policy.mergePolicy = 'human';
+    i.policy.autonomyPaused = true;
     const [b] = mergeReadiness(i).blockers;
-    expect(b).toMatchObject({ code: 'policy-human', class: 'policy', label: '项目策略为人工合并' });
+    expect(b).toMatchObject({
+      code: 'autonomy-paused',
+      class: 'policy',
+      label: '自治合并已暂停',
+    });
   });
 
   test('does not throw: empty body, empty file list, empty verdicts', () => {
@@ -878,34 +864,30 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
   });
 });
 
-describe('mergeReadiness: a docs-only patch (#1621) is a go under shadow; a protected doc mixed in stays with the user', () => {
+describe('mergeReadiness: a docs-only patch (#1621) is a go; a protected doc mixed in stays with the user', () => {
   const docsOnly = [
     file('docs/ops/langfuse.md'),
     file('docs/research/r9.md', { status: 'added', additions: 40, deletions: 0 }),
   ];
 
-  test('only Markdown under docs/ changed under shadow: ready, no blockers', () => {
+  test('only Markdown under docs/ changed: ready, no blockers', () => {
     const i = green();
-    i.policy.mergePolicy = 'shadow';
     setFiles(i, docsOnly);
     const r = mergeReadiness(i);
     expect(r.blockers).toEqual([]);
     expect(r.ready).toBe(true);
-    expect(r.policy).toBe('shadow');
   });
 
-  test('docs/spec or a case variant of it mixed into the docs patch under shadow: an independent review is required', () => {
+  test('docs/spec or a case variant of it mixed into the docs patch: an independent review is required', () => {
     for (const name of ['docs/spec/28-x.md', 'docs/SPEC/28-y.md', 'docs/\u{17F}pec/28-x.md']) {
       const i = green();
-      i.policy.mergePolicy = 'shadow';
       setFiles(i, [...docsOnly, file(name)]);
       expect(codesOf(i), name).toEqual(['independent-review-missing']);
     }
   });
 
-  test('a non-Markdown file under docs mixed into the patch under shadow: outside-auto-merge stays with the user', () => {
+  test('a non-Markdown file under docs mixed into the patch: outside-auto-merge stays with the user', () => {
     const i = green();
-    i.policy.mergePolicy = 'shadow';
     setFiles(i, [...docsOnly, file('docs/research/assets/r1/sw.js')]);
     expect(classesOf(i)).toEqual([
       ['outside-auto-merge', 'human', '"docs/research/assets/r1/sw.js"'],
@@ -914,7 +896,6 @@ describe('mergeReadiness: a docs-only patch (#1621) is a go under shadow; a prot
 
   test('a deleted test needs an independent review: a docs patch carrying a deleted test file', () => {
     const i = green();
-    i.policy.mergePolicy = 'shadow';
     setFiles(i, [...docsOnly, file('apps/server/test/old.test.ts', { status: 'removed' })]);
     expect(codesOf(i)).toEqual(['independent-review-missing']);
   });
@@ -1584,63 +1565,6 @@ describe('mergeReadiness: compare and checks are read at the PR head, verdicts c
   });
 });
 
-describe('mergeReadiness P4-0 base freshness', () => {
-  test.each([0, 1, 3, null])('baseBehindBy %s', (behind) => {
-    const i = green();
-    i.policy.requireUpToDate = true;
-    pr(i).baseBehindBy = behind;
-    const r = mergeReadiness(i);
-    expect(r.ready).toBe(behind === 0);
-    expect(r.blockers.map((b) => [b.code, b.class])).toEqual(
-      behind === 0 ? [] : [['pr-behind-base', 'transient']],
-    );
-  });
-
-  test.each([
-    ['unreadable', 'patch-unavailable'],
-    ['malformed', 'compare-malformed'],
-  ] as const)('compare %s and baseBehindBy null: only %s, no pr-behind-base', (state, code) => {
-    const i = green();
-    i.policy.requireUpToDate = true;
-    pr(i).baseBehindBy = null;
-    i.compare = state;
-    const codes = codesOf(i);
-    expect(codes).toContain(code);
-    expect(codes).not.toContain('pr-behind-base');
-  });
-
-  test('compare rejected by the gate (SHA malformed, commits incomplete, read elsewhere) and baseBehindBy null: no pr-behind-base', () => {
-    const badSha = green();
-    compare(badSha).headSha = 'HEAD';
-    const incomplete = green();
-    compare(incomplete).totalCommits += 1;
-    const elsewhere = green();
-    compare(elsewhere).headSha = OTHER;
-    for (const [i, code] of [
-      [badSha, 'compare-malformed'],
-      [incomplete, 'patch-unavailable'],
-      [elsewhere, 'patch-unavailable'],
-    ] as const) {
-      i.policy.requireUpToDate = true;
-      pr(i).baseBehindBy = null;
-      const codes = codesOf(i);
-      expect(codes).toContain(code);
-      expect(codes).not.toContain('pr-behind-base');
-    }
-  });
-
-  test.each(['unreadable', 'malformed'] as const)(
-    'compare %s and baseBehindBy positive: pr-behind-base still',
-    (state) => {
-      const i = green();
-      i.policy.requireUpToDate = true;
-      pr(i).baseBehindBy = 2;
-      i.compare = state;
-      expect(codesOf(i)).toContain('pr-behind-base');
-    },
-  );
-});
-
 describe('ADR 0026 independent protected-path review', () => {
   function protectedInput() {
     const i = green();
@@ -1671,8 +1595,6 @@ describe('ADR 0026 independent protected-path review', () => {
     expect(codesOf(i)).toEqual(['independent-review-missing']);
     i.verdicts.push(independent(i));
     expect(mergeReadiness(i).ready).toBe(true);
-    i.policy.mergePolicy = 'human';
-    expect(codesOf(i)).toEqual(['policy-human']);
   });
 
   test.each([
@@ -1864,36 +1786,23 @@ describe('recording evidence (#1783)', () => {
 });
 
 describe('mergeReadiness strict=false alignment', () => {
-  const behindWithRedAdvisory = () => {
+  const unstableWithRedAdvisory = () => {
     const i = green();
-    pr(i).baseBehindBy = 4;
     pr(i).mergeableState = 'unstable';
     checks(i).runs.push(run('Cursor Security Agent', 'completed', 'failure'));
     return i;
   };
 
-  test('behind main with a red advisory check and green required checks: ready', () => {
-    const i = behindWithRedAdvisory();
+  test('an unstable PR with a red advisory check and green required checks: ready', () => {
+    const i = unstableWithRedAdvisory();
     expect(codesOf(i)).toEqual([]);
     expect(mergeReadiness(i).ready).toBe(true);
   });
 
   test('the same PR with a red required check: blocked', () => {
-    const i = behindWithRedAdvisory();
+    const i = unstableWithRedAdvisory();
     checks(i).runs[0] = run('check', 'completed', 'failure');
     expect(codesOf(i)).toEqual(['mergeable-state', 'required-check-failed']);
-  });
-
-  test('behind main with requireUpToDate on: pr-behind-base', () => {
-    const i = behindWithRedAdvisory();
-    i.policy.requireUpToDate = true;
-    expect(codesOf(i)).toEqual(['pr-behind-base']);
-  });
-
-  test('requireUpToDate on and not behind: ready', () => {
-    const i = green();
-    i.policy.requireUpToDate = true;
-    expect(codesOf(i)).toEqual([]);
   });
 
   test('a red advisory commit status on a clean PR: not blocked', () => {

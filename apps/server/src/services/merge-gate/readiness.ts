@@ -6,7 +6,6 @@ import {
   MERGE_GATE_STATUS_CONTEXT,
   type MergeBlocker,
   type MergeBlockerCode,
-  type MergePolicy,
   type MergeReadiness,
   RECORDING_EXTENSION,
 } from '@cairn/shared/merge-gate';
@@ -58,10 +57,8 @@ export interface GateInputs {
   correction?: boolean;
   author?: { id: string; model: string } | null;
   policy: {
-    mergePolicy: MergePolicy;
     autonomyPaused: boolean;
     dailyCapReached: boolean;
-    requireUpToDate?: boolean;
   };
   build: {
     isGithubPr: boolean;
@@ -84,7 +81,6 @@ export interface GateInputs {
     headRepoFullName: string | null;
     body: string;
     changedFiles: number;
-    baseBehindBy: number | null;
   } | null;
   checks: {
     headSha: string;
@@ -214,7 +210,6 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
 
   const isLocal = i.build.repoKind === 'local';
 
-  if (i.policy.mergePolicy === 'human') block('policy-human');
   if (i.policy.autonomyPaused) block('autonomy-paused');
   if (i.policy.dailyCapReached) block('daily-cap');
   if (!i.build.isGithubPr && !isLocal) block('not-applicable');
@@ -330,13 +325,6 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   ) {
     block('patch-unavailable', 'compare not read at the PR head');
     compare = null;
-  }
-  if (
-    i.policy.requireUpToDate === true &&
-    pr !== null &&
-    (pr.baseBehindBy === null ? compare !== null : pr.baseBehindBy !== 0)
-  ) {
-    block('pr-behind-base');
   }
   if (
     i.correction &&
@@ -531,7 +519,6 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     ready: blockers.length === 0,
     headSha: head,
     patchDigest: head === null ? null : D,
-    policy: i.policy.mergePolicy,
     blockers,
   };
 }

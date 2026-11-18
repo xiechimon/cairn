@@ -98,9 +98,6 @@ export function planAutoConfirmation(
       eligible: false,
       reason: 'Plan auto-approve is disabled for this project; explicit user approval is required',
     };
-  const mergePolicy = config.mergePolicy;
-  if (mergePolicy === 'human')
-    return { eligible: false, reason: 'Project requires explicit user approval' };
   if (childrenOfTodo(deps.db, todoRow.id).length > 0)
     return { eligible: false, reason: 'Split plans require explicit user approval' };
   const latestFeedback = deps.db

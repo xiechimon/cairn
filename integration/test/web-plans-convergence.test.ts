@@ -179,7 +179,7 @@ test('an autonomous project starts the work when the plan is delivered, with no 
     server.url,
     server.teamId,
     { title: '直接开工探针', spec: '在 plan.md 落一版方案。' },
-    { repoKind: 'hosted', projectName: 'direct-start', mergePolicy: 'autonomous' },
+    { repoKind: 'hosted', projectName: 'direct-start' },
   );
   const buildId = startLegacyBuild(server, todoId, { withPlan: true });
   const phases: string[] = [];

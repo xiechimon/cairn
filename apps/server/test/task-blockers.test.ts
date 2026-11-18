@@ -14,7 +14,6 @@ import { claimStep, heartbeatStep } from '../src/services/machines.js';
 import { reconcileOwners } from '../src/services/owner.js';
 import { applyQuotaWaitStep, sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import { RETRY_PARKED_MARK } from '../src/services/retry-parking.js';
-import * as shipGate from '../src/services/ship-gate.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { H, ownerTodo, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { req, seedRoute, seedSessionRoute } from './helpers.js';
@@ -378,75 +377,6 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     expect(sessions(id)[0]?.status).toBe('pending');
     expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
   });
-
-  test.each(TASK_WORK_KINDS)(
-    'an edge added during asynchronous %s claim prevents it',
-    async (kind) => {
-      const blocker = await create();
-      const id = await create();
-      finish(blocker, 'done');
-      H.s.db
-        .update(step)
-        .set({ status: 'done' })
-        .where(eq(step.buildId, row(blocker).latestBuildId!))
-        .run();
-      const machineId = 'blocker-race-machine';
-      H.s.db
-        .insert(machine)
-        .values(
-          readyMachine({
-            id: machineId,
-            teamId: H.teamId,
-            name: 'Blocker race',
-            online: true,
-            enabledRuntimes: ['pi'],
-          }),
-        )
-        .run();
-      seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
-      seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
-      retarget(id, machineId);
-      H.s.db
-        .update(step)
-        .set({ kind })
-        .where(eq(step.id, sessions(id)[0]!.id))
-        .run();
-      if (kind === 'merge') finish(id, 'done');
-      let resume = () => {};
-      const prepared = new Promise<void>((resolve) => {
-        resume = resolve;
-      });
-      const gate = vi.spyOn(shipGate, 'reverifyShip').mockImplementation(async () => {
-        await prepared;
-        return null;
-      });
-      const result = claimStep(
-        {
-          ...H.s.svc,
-          box: H.s.secretBox,
-          reposDir: H.s.reposDir,
-          attachmentsDir: H.s.attachmentsDir,
-        },
-        machineId,
-        H.teamId,
-        0,
-        'http://localhost',
-      );
-      try {
-        expect(gate).toHaveBeenCalledOnce();
-        await relay('update_todo', { todoId: id, blockedBy: [blocker] });
-        finish(blocker, 'failed');
-        await relay('update_todo', { todoId: id, blockedBy: [blocker] });
-        resume();
-        expect(await result).toBeNull();
-        expect(sessions(id)[0]).toMatchObject({ status: 'pending', holdReason: BLOCKED_BY_HOLD });
-      } finally {
-        resume();
-        await result;
-        gate.mockRestore();
-      }
-    },
-  );
 
   test.each(TASK_WORK_KINDS)(
     'claim rechecks an unheld %s against current blockers',

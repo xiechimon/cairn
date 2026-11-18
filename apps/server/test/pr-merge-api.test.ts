@@ -53,7 +53,6 @@ interface WorldOpts {
   connected?: boolean;
   source?: { kind: 'github-issue' | 'github-issue-self' | 'orchestration'; ref: string } | null;
   pendingVerify?: boolean;
-  mergePolicy?: 'human' | 'shadow' | 'autonomous';
   pull?: Partial<PullFake>;
 }
 
@@ -97,9 +96,7 @@ function makeWorld(opts: WorldOpts = {}): World {
       teamId: s.team.id,
       repoKind,
       githubRepo: repoKind === 'github' ? (opts.githubRepo ?? 'octo/demo') : null,
-      ...(opts.mergePolicy === undefined
-        ? {}
-        : { autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: opts.mergePolicy } }),
+      autonomy: DEFAULT_AUTONOMY_SETTINGS,
     })
     .run();
   seedSessionRoute(s, {
@@ -1258,14 +1255,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(w.fake.requests).toEqual([]);
   });
 
-  test('a local repository under human without a stored path refuses an unpinned merge', async () => {
-    const w = makeWorld({ repoKind: 'local', prNumber: null, mergePolicy: 'human' });
-    await expect(requestMerge(w.deps, w.buildId)).rejects.toMatchObject({ status: 409 });
-    expect(w.fake.requests).toEqual([]);
-    expectUntouched(w);
-  });
-
-  test('[2b-D23b] local repository under autonomous without a stored path → refused, no ungated merge', async () => {
+  test('[2b-D23b] local repository without a stored path → refused, no ungated merge', async () => {
     const w = makeWorld({ repoKind: 'local', prNumber: null });
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.status).toBe(409);
@@ -1517,18 +1507,9 @@ describe('explicit user merges do not require autonomy permission', () => {
     expect(w.phase()).toBe('done');
   });
 
-  test('human policy remains available while paused and at a zero autonomous cap', async () => {
-    const w = makeWorld({ mergePolicy: 'human' });
+  test('explicit merge remains available while paused and at a zero autonomous cap', async () => {
+    const w = makeWorld();
     pauseTeamForTest(w.s.db, w.s.team.id);
-    w.s.db
-      .update(projectTable)
-      .set({
-        autonomy: {
-          ...DEFAULT_AUTONOMY_SETTINGS,
-          mergePolicy: 'human',
-        },
-      })
-      .run();
     await requestMerge(w.deps, w.buildId);
     expect(w.fake.puts()).toHaveLength(1);
     expect(w.phase()).toBe('done');
@@ -1547,15 +1528,6 @@ describe('explicit user merges do not require autonomy permission', () => {
   test('explicit merges of different deliveries are independent of the retired daily cap', async () => {
     const w = makeWorld();
     w.s.db.update(teamTable).set({ maxAutonomousMergesPerDay: 1 }).run();
-    w.s.db
-      .update(projectTable)
-      .set({
-        autonomy: {
-          ...DEFAULT_AUTONOMY_SETTINGS,
-          mergePolicy: 'autonomous',
-        },
-      })
-      .run();
     const original = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
     if (!original) throw new Error('missing todo');
     w.s.db

@@ -116,7 +116,7 @@ async function register(s: ReturnType<typeof bootServer>, token: string) {
 }
 
 async function needsYou(s: ReturnType<typeof bootServer>) {
-  const projectId = await postProject(s.app, 'demo', { mergePolicy: 'human' });
+  const projectId = await postProject(s.app, 'demo');
   const created = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: 'Stream the order export',
     spec: '',

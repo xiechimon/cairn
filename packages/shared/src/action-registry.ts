@@ -24,8 +24,6 @@ export const OWNER_ONLY_EXCEPTION_IDS = [
   'set_secret',
   'delete_secrets',
   'merge_builds',
-  'rest.merge-policy',
-  'rest.ship-route',
   'rest.eval-ruler',
 ] as const;
 

@@ -6,7 +6,6 @@ import { retireMergeGateSteps } from './build-gate-steps.js';
 import { applyStoppedStep, stopStepKeepPhase } from './build-stop.js';
 import { applyStepFailure, type BuildDeps } from './builds.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
-import { parseShipGateInstruction, settleAbandonedShip } from './ship-gate.js';
 
 export const BUILD_ABANDONED_STEP_MS = 120_000;
 export const ABANDONED_CLAIM_QUARANTINE_LIMIT = 3;
@@ -47,7 +46,7 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
     if (!todoRow) continue;
     const ending = abandonedEnding(deps, row, todoRow, now);
-    if (ending === null || parseShipGateInstruction(row.prompt) !== null) continue;
+    if (ending === null) continue;
     applyAbandonedEnding(deps, row, todoRow, ending);
   }
 }
@@ -85,42 +84,6 @@ function applyAbandonedEnding(
 ): void {
   if (ending === 'stop') stopStepKeepPhase(deps, row.id);
   else releaseClaimedStep(deps, row, todoRow);
-}
-
-export async function sweepAbandonedShipSteps(
-  deps: BuildDeps,
-  now: number = nowMs(),
-): Promise<void> {
-  const candidates = deps.db
-    .select()
-    .from(step)
-    .where(and(eq(step.kind, 'merge'), eq(step.status, 'claimed')))
-    .all()
-    .filter((row) => parseShipGateInstruction(row.prompt) !== null);
-  for (const row of candidates) {
-    const todoRow = todoOfBuild(deps, row.buildId);
-    if (todoRow === undefined || abandonedEnding(deps, row, todoRow, now) === null) continue;
-    const violation = await settleAbandonedShip(deps, row);
-    const current = deps.db.select().from(step).where(eq(step.id, row.id)).get();
-    const currentTodo = todoOfBuild(deps, row.buildId);
-    if (
-      current?.status !== 'claimed' ||
-      current.claimedAt !== row.claimedAt ||
-      currentTodo === undefined
-    )
-      continue;
-    if (violation !== null) {
-      applyStepFailure(deps, current, violation);
-      continue;
-    }
-    const ending = abandonedEnding(deps, current, currentTodo, now);
-    if (ending !== null) applyAbandonedEnding(deps, current, currentTodo, ending);
-  }
-}
-
-function todoOfBuild(deps: BuildDeps, buildId: string): typeof todo.$inferSelect | undefined {
-  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-  return buildRow && deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
 }
 
 function releaseClaimedStep(

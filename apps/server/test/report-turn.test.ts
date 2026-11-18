@@ -50,7 +50,7 @@ function openWorld(opts: { origin?: 'none' | 'live' | 'archived' } = {}) {
       id: projectId,
       name: 'research',
       teamId: s.team.id,
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'autonomous' },
+      autonomy: DEFAULT_AUTONOMY_SETTINGS,
     })
     .run();
   const addTodo = (seqNum: number) => {

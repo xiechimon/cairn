@@ -151,11 +151,8 @@ async function subscribe(
   if (res.status !== 201) throw new Error(`subscribe: ${res.status}`);
 }
 
-async function makeTodo(
-  s: ReturnType<typeof bootServer>,
-  mergePolicy: 'human' | 'autonomous' = 'human',
-) {
-  const projectId = await postProject(s.app, 'demo', { mergePolicy });
+async function makeTodo(s: ReturnType<typeof bootServer>) {
+  const projectId = await postProject(s.app, 'demo');
   const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: '写周报',
     spec: '',
@@ -822,12 +819,12 @@ describe('phase pushes reach only needs-human events (#1784); 410 prunes', () =>
     }
   });
 
-  test('a delivered build notifies the person even with a legacy autonomous policy', async () => {
+  test('a delivered build notifies the person', async () => {
     const fake = await fakePushServer();
     const s = bootServer({ pushEndpointHosts: TEST_PUSH_HOSTS });
     try {
       await subscribe(s.app, s.team.id, fake.endpoint('/review'), 'https://cairn.example');
-      const todo = await makeTodo(s, 'autonomous');
+      const todo = await makeTodo(s);
       s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, todo.id)).run();
       setTodoPhase(s.svc, todo.id, 'review');
       await expect.poll(() => fake.requests.length, { timeout: 1500 }).toBe(1);

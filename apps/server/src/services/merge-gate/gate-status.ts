@@ -1,8 +1,4 @@
-import {
-  MERGE_GATE_STATUS_CONTEXT,
-  type MergePolicy,
-  type MergeReadiness,
-} from '@cairn/shared/merge-gate';
+import { MERGE_GATE_STATUS_CONTEXT, type MergeReadiness } from '@cairn/shared/merge-gate';
 import type { GateGithubPort, GateRaw, GateStatusState } from './github-port.js';
 
 export const GATE_STATUS_DESCRIPTION_MAX = 140;
@@ -15,7 +11,7 @@ export interface GateStatusValue {
 export type GateStatusPlan =
   | {
       write: false;
-      reason: 'policy-human' | 'no-head' | 'checks-elsewhere' | 'current-unreadable' | 'unchanged';
+      reason: 'no-head' | 'checks-elsewhere' | 'current-unreadable' | 'unchanged';
     }
   | { write: true; sha: string; payload: GateStatusValue & { context: string } };
 
@@ -41,15 +37,11 @@ export function gateStatusFor(r: MergeReadiness): GateStatusValue {
 }
 
 export function planGateStatusWrite(input: {
-  policy: MergePolicy;
   readiness: MergeReadiness;
   checksHeadSha: string | null;
   current: { state: string; description: string | null } | null | 'unreadable';
 }): GateStatusPlan {
   const { readiness } = input;
-  if (input.policy === 'human' || readiness.policy === 'human') {
-    return { write: false, reason: 'policy-human' };
-  }
   if (readiness.headSha === null) return { write: false, reason: 'no-head' };
   if (input.checksHeadSha !== readiness.headSha)
     return { write: false, reason: 'checks-elsewhere' };

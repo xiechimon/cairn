@@ -1,8 +1,4 @@
-import {
-  chiefNoticeContentSchema,
-  DEFAULT_AUTONOMY_SETTINGS,
-  needsYouQuerySchema,
-} from '@cairn/shared';
+import { chiefNoticeContentSchema, needsYouQuerySchema } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -718,20 +714,13 @@ describe('needs you (#1800)', () => {
     expect(getTodo(w.deps, w.todoId)?.owner).toBe(needsHuman ? 'coordinator' : null);
   });
 
-  test('plan confirmations and delivered work enter needs you regardless of the old policy', () => {
+  test('plan confirmations and delivered work enter needs you', () => {
     const confirm = openWorld('confirm');
-    const humanReview = openWorld('review');
-    humanReview.s.db
-      .update(projectTable)
-      .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'human' } })
-      .where(eq(projectTable.id, humanReview.projectId))
-      .run();
-    const autonomousReview = openWorld('review');
+    const review = openWorld('review');
 
     expect(groups(confirm).current.map((entry) => entry.reason)).toEqual(['confirm']);
-    expect(groups(humanReview).current.map((entry) => entry.reason)).toEqual(['review']);
-    expect(groups(autonomousReview).current.map((entry) => entry.reason)).toEqual(['review']);
-    expect(groups(autonomousReview).stale).toEqual([]);
+    expect(groups(review).current.map((entry) => entry.reason)).toEqual(['review']);
+    expect(groups(review).stale).toEqual([]);
   });
 
   test('an item older than 7 days moves to the stale group', () => {
