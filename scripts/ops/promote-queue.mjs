@@ -59,6 +59,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     if (verdict.action === 'reject' || !wait || Date.now() > deadline) {
       process.exit(verdict.action === 'wait' ? 2 : 1);
     }
-    spawnSync('sleep', [String(POLL_SECONDS)]);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, POLL_SECONDS * 1000);
   }
 }
