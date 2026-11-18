@@ -5,6 +5,8 @@ import {
   ASK_USER_QUESTION_KIND,
   type AskUserQuestion,
   type AskUserQuestionContent,
+  connectorActionForId,
+  isConnectorActionId,
   isExternalActionClass,
   OWN_COMPUTER_ACTIONS,
   OWN_COMPUTER_ALLOW_COMMAND,
@@ -438,6 +440,7 @@ function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: numb
   }
   const entry = entryOf(deps, row.actionId);
   if (entry !== undefined && isExternalActionClass(entry.class)) return;
+  if (isConnectorActionId(row.actionId)) return;
   if (row.actionId === 'todo.delete') {
     runTodoDelete(deps, tx, row, now);
     return;
@@ -582,7 +585,8 @@ export function dispatchActionWakes(deps: ChiefDeps & { registry?: readonly Acti
     const entry =
       actionId === undefined
         ? undefined
-        : (deps.registry ?? SLICE1_ACTIONS).find((item) => item.id === actionId);
+        : ((deps.registry ?? SLICE1_ACTIONS).find((item) => item.id === actionId) ??
+          connectorActionForId(actionId));
     const prompt = approved
       ? entry !== undefined && isExternalActionClass(entry.class)
         ? `审批 ${row.proposalId} 已由用户批准：以已批准的输入重新发起该动作即会执行。`

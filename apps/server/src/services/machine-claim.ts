@@ -56,6 +56,7 @@ import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { connectorToolDefsForTeam } from './connector-broker.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { quickLaneRefusal } from './coordinator-request.js';
 import { coordinatorRoute } from './coordinator-route.js';
@@ -345,7 +346,13 @@ function chiefClaimPayload(
       trigger,
       ...(history !== null ? { history } : {}),
     },
-    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : mailTurn ? [] : coordinatorToolDefs())],
+    remoteTools: [
+      ...(digest
+        ? CHIEF_DIGEST_REMOTE_TOOLS
+        : mailTurn
+          ? []
+          : [...coordinatorToolDefs(), ...connectorToolDefsForTeam(deps.db, threadRow.teamId)]),
+    ],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(locked ? { remoteToolsOnly: true as const } : {}),
   };

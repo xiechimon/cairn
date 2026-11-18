@@ -3,6 +3,7 @@ import {
   isMailWakeText,
   type MachineDoneBody,
   type ProviderConfig,
+  type RemoteToolDef,
 } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import type { Provider } from '@earendil-works/pi-ai';
@@ -45,6 +46,7 @@ export interface ServerRuntimeConfig {
   factsFor(threadId: string): ReconcileFacts;
   desktopTools?(threadId: string): boolean;
   vmComputer?(threadId: string): boolean;
+  connectorTools?(threadId: string): RemoteToolDef[];
   ownComputer?(threadId: string, stepId: string): boolean;
   providersFor?(threadId: string): readonly ProviderBinding[];
   recordConversation?(threadId: string, conversationId: string, entryId: number): void;
@@ -122,6 +124,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         routerTools: config.routerTools,
         desktopTools: config.desktopTools?.(threadId) === true,
         vmComputer: config.vmComputer?.(threadId) === true,
+        connectorTools: config.connectorTools?.(threadId) ?? [],
         ownComputer,
         shuttingDown: () => shuttingDown,
         ...(inputs === undefined

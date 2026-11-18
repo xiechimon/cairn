@@ -128,3 +128,50 @@ export function actionById(id: string): (typeof SLICE1_ACTIONS)[number] | undefi
 export function actionByToolName(name: string): (typeof SLICE1_ACTIONS)[number] | undefined {
   return SLICE1_ACTIONS.find((entry) => entry.toolName === name);
 }
+
+export const CONNECTOR_ACTION_PREFIX = 'connector.';
+
+export function isConnectorActionId(id: string): boolean {
+  return id.startsWith(CONNECTOR_ACTION_PREFIX);
+}
+
+export function connectorActionId(slug: string, tool: string): string {
+  return `${CONNECTOR_ACTION_PREFIX}${slug}.${tool}`;
+}
+
+export interface ConnectorToolHints {
+  readOnlyHint?: boolean | undefined;
+  destructiveHint?: boolean | undefined;
+}
+
+const connectorInputSchema = z.record(z.string(), z.unknown());
+const connectorOutputSchema = z.unknown();
+
+export function connectorActionEntry(
+  slug: string,
+  tool: string,
+  hints: ConnectorToolHints | undefined,
+): ActionEntry<Record<string, unknown>, unknown> {
+  const actionClass: ActionClass =
+    hints?.readOnlyHint === true ? 'free' : hints?.destructiveHint === true ? 'submit' : 'send';
+  return {
+    id: connectorActionId(slug, tool),
+    toolName: `connector_${slug}__${tool}`,
+    inputSchema: connectorInputSchema,
+    outputSchema: connectorOutputSchema,
+    scope: 'team',
+    class: actionClass,
+    standingGrant: false,
+    inverse: null,
+    surfaces: ['coordinator'],
+    targetOf: () => slug,
+  };
+}
+
+export function connectorActionForId(actionId: string): ActionEntry | undefined {
+  if (!isConnectorActionId(actionId)) return undefined;
+  const rest = actionId.slice(CONNECTOR_ACTION_PREFIX.length);
+  const split = rest.indexOf('.');
+  if (split <= 0 || split + 1 >= rest.length) return undefined;
+  return connectorActionEntry(rest.slice(0, split), rest.slice(split + 1), undefined);
+}

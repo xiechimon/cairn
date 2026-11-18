@@ -29,6 +29,7 @@ import { parseChiefTrigger } from '../services/chief.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep, STEER_HOLDS } from '../services/chief-turns.js';
 import { teamHasVmComputer } from '../services/cloak-license.js';
+import { connectorToolDefsForTeam } from '../services/connector-broker.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
 import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
@@ -302,6 +303,10 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         const teamId = threadTeam(threadId);
         return teamId !== null && teamHasVmComputer(db, teamId);
       },
+      connectorTools: (threadId) => {
+        const teamId = threadTeam(threadId);
+        return teamId === null ? [] : connectorToolDefsForTeam(db, teamId);
+      },
       ownComputer: (threadId, stepId) => ownComputerOffered(db, threadId, stepId),
       providersFor: (threadId) => {
         const teamId = threadTeam(threadId);
@@ -570,12 +575,15 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           systemPrompt: context.systemPrompt,
           trigger: context.trigger,
         },
-        remoteTools: coordinatorToolDefs({
-          routerTools: options.routerTools ?? true,
-          desktopTools: teamOffersDesktop(db, threadRow.teamId),
-          vmComputer: teamHasVmComputer(db, threadRow.teamId),
-          ownComputer: ownComputerOffered(db, row.buildId, row.id),
-        }),
+        remoteTools: [
+          ...coordinatorToolDefs({
+            routerTools: options.routerTools ?? true,
+            desktopTools: teamOffersDesktop(db, threadRow.teamId),
+            vmComputer: teamHasVmComputer(db, threadRow.teamId),
+            ownComputer: ownComputerOffered(db, row.buildId, row.id),
+          }),
+          ...connectorToolDefsForTeam(db, threadRow.teamId),
+        ],
       },
       volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
     };

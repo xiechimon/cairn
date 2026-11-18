@@ -173,13 +173,62 @@ export const mcpConnectorUrlSchema = z.string().refine((value) => {
   return url.protocol === 'https:' && url.username === '' && url.password === '' && url.hash === '';
 }, 'url must be https without credentials or fragment');
 
-export const MCP_CONNECTOR_STATUSES = ['unchecked', 'connected', 'needs_auth', 'error'] as const;
+export const MCP_CONNECTOR_STATUSES = [
+  'unchecked',
+  'connected',
+  'needs_auth',
+  'error',
+  'revoked',
+] as const;
 export const mcpConnectorStatusSchema = z.enum(MCP_CONNECTOR_STATUSES);
 export type McpConnectorStatus = z.infer<typeof mcpConnectorStatusSchema>;
 
-export const MCP_CONNECTOR_AUTH_KINDS = ['none', 'static', 'oauth', 'github-app'] as const;
+export const MCP_CONNECTOR_AUTH_KINDS = [
+  'none',
+  'static',
+  'oauth',
+  'github-app',
+  'composio',
+] as const;
 export const mcpConnectorAuthKindSchema = z.enum(MCP_CONNECTOR_AUTH_KINDS);
 export type McpConnectorAuthKind = z.infer<typeof mcpConnectorAuthKindSchema>;
+
+export const mcpConnectorToolSchema = z
+  .object({
+    name: z.string(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    inputSchema: z.unknown().optional(),
+    annotations: z
+      .object({
+        title: z.string().optional(),
+        readOnlyHint: z.boolean().optional(),
+        destructiveHint: z.boolean().optional(),
+        idempotentHint: z.boolean().optional(),
+        openWorldHint: z.boolean().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+export type McpConnectorTool = z.infer<typeof mcpConnectorToolSchema>;
+
+export const cachedConnectorToolsSchema = z.array(mcpConnectorToolSchema);
+
+export const CONNECTOR_TOOL_PREFIX = 'connector_';
+export const CONNECTOR_TOOL_NAME_MAX = 64;
+
+export function connectorToolName(slug: string, tool: string): string {
+  return `${CONNECTOR_TOOL_PREFIX}${slug}__${tool}`;
+}
+
+export function parseConnectorToolName(name: string): { slug: string; tool: string } | null {
+  if (!name.startsWith(CONNECTOR_TOOL_PREFIX)) return null;
+  const rest = name.slice(CONNECTOR_TOOL_PREFIX.length);
+  const split = rest.indexOf('__');
+  if (split <= 0 || split + 2 >= rest.length) return null;
+  return { slug: rest.slice(0, split), tool: rest.slice(split + 2) };
+}
 
 export interface McpConnectorOAuthMeta {
   issuer: string;

@@ -522,6 +522,109 @@ export const resourcesMcpOAuthDenied: FixtureSet = {
   ui: { mcpDialog: { kind: 'landing', reason: 'denied', name: 'Linear' } },
 };
 
+const composioConnector = (
+  id: string,
+  slug: string,
+  label: string,
+  fields: Partial<McpConnectorRecord> = {},
+): McpConnectorRecord =>
+  connector(id, {
+    slug,
+    label,
+    catalogId: 'composio',
+    url: 'https://mcp.composio.dev',
+    headerNames: ['x-api-key'],
+    authKind: 'composio',
+    status: 'needs_auth',
+    ...fields,
+  });
+
+const COMPOSIO_APPS: NonNullable<ResourcesContent['composioApps']> = {
+  configured: true,
+  apps: [
+    {
+      slug: 'gmail',
+      name: 'Gmail',
+      description: 'Read, search and send mail',
+      logoUrl: null,
+      noAuth: false,
+      toolsCount: 24,
+      connector: composioConnector('cx-gmail', 'gmail', 'Gmail', {
+        status: 'connected',
+        toolCount: 24,
+      }),
+    },
+    {
+      slug: 'linear',
+      name: 'Linear',
+      description: 'Issues and project tracking',
+      logoUrl: null,
+      noAuth: false,
+      toolsCount: 31,
+      connector: composioConnector('cx-linear', 'linear', 'Linear', {
+        status: 'needs_auth',
+        statusReason: 'authorizing',
+      }),
+    },
+    {
+      slug: 'notion',
+      name: 'Notion',
+      description: 'Docs and wikis',
+      logoUrl: null,
+      noAuth: false,
+      toolsCount: 19,
+      connector: composioConnector('cx-notion', 'notion', 'Notion', {
+        status: 'needs_auth',
+        statusReason: 'no connected account',
+      }),
+    },
+    {
+      slug: 'slack',
+      name: 'Slack',
+      description: 'Channels and messages',
+      logoUrl: null,
+      noAuth: false,
+      toolsCount: 47,
+      connector: null,
+    },
+    {
+      slug: 'googledrive',
+      name: 'Google Drive',
+      description: 'Files and folders',
+      logoUrl: null,
+      noAuth: false,
+      toolsCount: 12,
+      connector: composioConnector('cx-drive', 'googledrive', 'Google Drive', {
+        status: 'revoked',
+        statusReason: 'revoked',
+      }),
+    },
+    {
+      slug: 'calculator',
+      name: 'Calculator',
+      description: null,
+      logoUrl: null,
+      noAuth: true,
+      toolsCount: 3,
+      connector: null,
+    },
+  ],
+};
+
+export const resourcesComposioApps: FixtureSet = {
+  ...resourcesMcpConnectors,
+  resources: { ...RESOURCES, mcpConnectors: MCP_CONNECTORS, composioApps: COMPOSIO_APPS },
+};
+
+export const resourcesComposioNoKey: FixtureSet = {
+  ...resourcesMcpConnectors,
+  resources: {
+    ...RESOURCES,
+    mcpConnectors: MCP_CONNECTORS,
+    composioApps: { configured: false, apps: [] },
+  },
+};
+
 const GITHUB_APP_CONNECTOR = connector('mcp-github-app', {
   slug: 'github',
   label: 'GitHub',

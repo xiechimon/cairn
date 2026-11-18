@@ -30,6 +30,7 @@ export * from './chief.js';
 export * from './claude-login.js';
 export * from './claude-rate-limit.js';
 export * from './common.js';
+export * from './composio.js';
 export * from './daily-usage.js';
 export * from './deploy-status.js';
 export * from './document-diff.js';

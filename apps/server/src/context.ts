@@ -80,6 +80,7 @@ export interface AppContext {
   accessVerifier?: AccessVerifier | null;
   mcpConfigPath: string;
   mcpFetch?: typeof fetch;
+  composioFetch?: typeof fetch;
   mcpOAuthState: McpOAuthState;
   mcpGithubApp?: GithubAppRegistration;
   logger?: Logger;

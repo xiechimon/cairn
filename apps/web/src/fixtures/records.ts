@@ -347,6 +347,7 @@ export interface ResourcesContent {
   skills: SkillRow[];
   mcpServers: McpRow[];
   mcpConnectors?: import('@cairn/shared').McpConnectorRecord[];
+  composioApps?: import('@cairn/shared').ComposioApps;
   githubConnector?: import('@cairn/shared').GithubConnectorAvailability;
   machines: MachineRow[];
   providerSources: ModelSource[];

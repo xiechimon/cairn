@@ -14,6 +14,7 @@ import {
   type McpConnectorOAuthMeta,
   type McpConnectorRecord,
   type McpConnectorStatus,
+  type McpConnectorTool,
   type McpServerRecord,
   mcpCatalogEntry,
   type PatchMcpConnectorBody,
@@ -47,7 +48,12 @@ import type {
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { checkResourceAllowed } from '@modelcontextprotocol/sdk/shared/auth-utils.js';
-import { ErrorCode, ListToolsResultSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolResultSchema,
+  ErrorCode,
+  ListToolsResultSchema,
+  McpError,
+} from '@modelcontextprotocol/sdk/types.js';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { Agent, EnvHttpProxyAgent, fetch as undiciFetch } from 'undici';
 import type { Db } from '../db/client.js';
@@ -56,6 +62,7 @@ import { envProxyOf } from '../lib/env-proxy.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { readComposioKey } from './composio.js';
 import { githubAppRegistration } from './github-app-registration.js';
 import { connectionToken, readGithubConnectionStatus } from './github-connection.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -194,6 +201,14 @@ function publicUrl(raw: string): string {
   return `${url.origin}${url.pathname}`;
 }
 
+function composioPublicUrl(raw: string): string {
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return '';
+  }
+}
+
 function connectorRows(db: Db, teamId: string): ConnectorRow[] {
   return db
     .select()
@@ -221,7 +236,7 @@ export function toConnectorRecord(
     slug: row.slug,
     label: row.label,
     catalogId: row.catalogId,
-    url: publicUrl(row.url),
+    url: row.authKind === 'composio' ? composioPublicUrl(row.url) : publicUrl(row.url),
     headerNames: row.headerNames,
     authKind: row.authKind,
     account: row.authKind === 'github-app' ? githubAccountOf(deps, row.teamId) : null,
@@ -249,6 +264,10 @@ export function connectorRow(
 }
 
 function openHeaders(deps: McpConnectorDeps, row: ConnectorRow): Record<string, string> {
+  if (row.authKind === 'composio') {
+    const key = readComposioKey(deps, row.teamId);
+    return key === null ? {} : { 'x-api-key': key };
+  }
   return row.valuesCipher === null
     ? {}
     : (JSON.parse(deps.box.open(row.valuesCipher)) as Record<string, string>);
@@ -403,6 +422,14 @@ export function updateMcpConnector(
       patch.url !== undefined)
   )
     throw new HttpError(400, 'this connector signs in with GitHub; reconnect it instead');
+  if (
+    row.authKind === 'composio' &&
+    (patch.token !== undefined ||
+      patch.headers !== undefined ||
+      patch.options !== undefined ||
+      patch.url !== undefined)
+  )
+    throw new HttpError(400, 'this connector is managed by Composio; reconnect it instead');
   let target: ConnectorTarget | null = null;
   let dropTokens = false;
   const entry = row.catalogId === null ? undefined : mcpCatalogEntry(row.catalogId);
@@ -482,18 +509,20 @@ interface ProbeResult {
   status: Exclude<McpConnectorStatus, 'unchecked'>;
   statusReason: string | null;
   toolCount: number | null;
+  tools: McpConnectorTool[] | null;
 }
 
 function probeFailure(err: unknown): ProbeResult {
   const code = err instanceof StreamableHTTPError ? err.code : undefined;
   if (err instanceof UnauthorizedError || code === 401)
-    return { status: 'needs_auth', statusReason: 'unauthorized', toolCount: null };
-  if (code === 403) return { status: 'needs_auth', statusReason: 'forbidden', toolCount: null };
+    return { status: 'needs_auth', statusReason: 'unauthorized', toolCount: null, tools: null };
+  if (code === 403)
+    return { status: 'needs_auth', statusReason: 'forbidden', toolCount: null, tools: null };
   if (err instanceof McpError && err.code === ErrorCode.RequestTimeout)
-    return { status: 'error', statusReason: 'timeout', toolCount: null };
+    return { status: 'error', statusReason: 'timeout', toolCount: null, tools: null };
   if (typeof code === 'number' && code > 0)
-    return { status: 'error', statusReason: `http_${code}`, toolCount: null };
-  return { status: 'error', statusReason: 'unreachable', toolCount: null };
+    return { status: 'error', statusReason: `http_${code}`, toolCount: null, tools: null };
+  return { status: 'error', statusReason: 'unreachable', toolCount: null, tools: null };
 }
 
 async function probeMcpServer(
@@ -515,7 +544,7 @@ async function probeMcpServer(
   });
   try {
     await client.connect(transport, { timeout });
-    let toolCount = 0;
+    const tools: McpConnectorTool[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < MAX_TOOL_PAGES; page += 1) {
       const result = await client.request(
@@ -523,13 +552,14 @@ async function probeMcpServer(
         ListToolsResultSchema,
         { timeout },
       );
-      toolCount += result.tools.length;
+      for (const tool of result.tools) tools.push(tool as McpConnectorTool);
       cursor = result.nextCursor;
       if (cursor === undefined) break;
     }
-    return { status: 'connected', statusReason: null, toolCount };
+    return { status: 'connected', statusReason: null, toolCount: tools.length, tools };
   } catch (err) {
-    if (deadline.aborted) return { status: 'error', statusReason: 'timeout', toolCount: null };
+    if (deadline.aborted)
+      return { status: 'error', statusReason: 'timeout', toolCount: null, tools: null };
     return probeFailure(err);
   } finally {
     await client.close().catch(() => {});
@@ -604,6 +634,7 @@ export async function checkMcpConnector(
   id: string,
 ): Promise<McpConnectorRecord> {
   let row = connectorRow(deps, teamId, id);
+  if (row.status === 'revoked') return toConnectorRecord(deps, row);
   let result: ProbeResult;
   if (signsIn(row)) {
     if (row.authKind !== 'github-app') {
@@ -615,7 +646,12 @@ export async function checkMcpConnector(
     }
     const secrets = await signInBearer(deps, row);
     if (secrets === null) {
-      result = { status: 'needs_auth', statusReason: 'reconnect', toolCount: null };
+      result = {
+        status: 'needs_auth',
+        statusReason: 'reconnect',
+        toolCount: null,
+        tools: null,
+      };
     } else if (secrets.expiresAt !== null && secrets.expiresAt <= nowMs()) {
       return toConnectorRecord(deps, row);
     } else {
@@ -631,7 +667,13 @@ export async function checkMcpConnector(
   }
   deps.db
     .update(mcpConnector)
-    .set({ ...result, checkedAt: nowMs() })
+    .set({
+      status: result.status,
+      statusReason: result.statusReason,
+      toolCount: result.toolCount,
+      ...(result.tools === null ? {} : { toolsJson: result.tools }),
+      checkedAt: nowMs(),
+    })
     .where(
       and(
         eq(mcpConnector.id, row.id),
@@ -1082,7 +1124,7 @@ async function deliverableConnector(
   teamId: string,
   row: ConnectorRow,
 ): Promise<McpConnectorEndpoint | null> {
-  if (row.status === 'needs_auth') return null;
+  if (row.status === 'needs_auth' || row.status === 'revoked') return null;
   const headers = openHeaders(deps, row);
   if (!signsIn(row)) return { slug: row.slug, transport: 'http', url: row.url, headers };
   if (row.authKind !== 'github-app') {
@@ -1127,6 +1169,60 @@ export async function stepConnectorEndpoints(
     ...(mcpConnectors.length > 0 ? { mcpConnectors } : {}),
     ...(withheldMcp.length > 0 ? { withheldMcp } : {}),
   };
+}
+
+export async function connectorEndpointBySlug(
+  deps: McpConnectorDeps,
+  teamId: string,
+  slug: string,
+): Promise<McpConnectorEndpoint | null> {
+  const row = deps.db
+    .select()
+    .from(mcpConnector)
+    .where(and(eq(mcpConnector.teamId, teamId), eq(mcpConnector.slug, slug)))
+    .get();
+  return row === undefined ? null : deliverableConnector(deps, teamId, row);
+}
+
+export async function callConnectorTool(
+  deps: McpConnectorDeps,
+  endpoint: McpConnectorEndpoint,
+  name: string,
+  args: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<string> {
+  const timeout = deps.checkTimeoutMs ?? CHECK_TIMEOUT_MS;
+  const deadline = signal ?? AbortSignal.timeout(timeout);
+  const client = new Client({ name: BRAND.cliCommandName, version: '0.1.0' });
+  const transport = new StreamableHTTPClientTransport(new URL(endpoint.url), {
+    requestInit: { headers: endpoint.headers },
+    fetch: (input, init) =>
+      deps.fetch(input, {
+        ...init,
+        redirect: 'manual',
+        signal: init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline,
+      }),
+  });
+  try {
+    await client.connect(transport, { timeout });
+    const result = await client.request(
+      { method: 'tools/call', params: { name, arguments: args } },
+      CallToolResultSchema,
+      { timeout },
+    );
+    const text = result.content
+      .map((part) => (part.type === 'text' ? part.text : ''))
+      .filter((part) => part !== '')
+      .join('\n');
+    if (result.isError === true)
+      throw new HttpError(502, text === '' ? 'connector tool failed' : text);
+    if (text !== '') return text;
+    return result.structuredContent === undefined
+      ? 'connector tool answered without content'
+      : JSON.stringify(result.structuredContent);
+  } finally {
+    await client.close().catch(() => {});
+  }
 }
 
 export function refreshMcpConnectorToken(

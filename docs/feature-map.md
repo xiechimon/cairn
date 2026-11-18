@@ -548,8 +548,8 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 **MCP servers** (shipped). Connect remote MCP servers from a catalog or by URL and see the local servers each machine configures; every task and review uses what is connected.
 
 - Research: [docs/research/mcp-connectors-2026-11-15.md](research/mcp-connectors-2026-11-15.md)
-- Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md)
-- Backend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md)
+- Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md), [docs/design/connector-fabric.md](design/connector-fabric.md)
+- Backend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md), [docs/design/connector-fabric.md](design/connector-fabric.md)
 
 ### projects
 

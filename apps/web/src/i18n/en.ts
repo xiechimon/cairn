@@ -1845,7 +1845,7 @@ export const EN: Record<string, string> = {
   添加服务商: 'Add provider',
   '移除 {name}': 'Remove {name}',
   支持图片: 'Sees images',
-  '{name} 支持图片': '{name} sees images',
+  '{name} 支持图片': '{name} can see images',
   '新的 API key': 'New API key',
   测试: 'Test',
   '测试没能跑完，请重试。': 'The test could not finish. Try again.',
@@ -2389,6 +2389,29 @@ export const EN: Record<string, string> = {
     'The connection changed during sign-in, so this sign-in was not saved.',
   '没能连上 {name}': 'Could not connect {name}',
   '没能开始登录，稍后再试。': 'Could not start the sign-in. Try again later.',
+  应用: 'Apps',
+  '通过 Composio 把 Gmail、Linear 这类外部应用的工具交给 Coordinator 用。授权在 Composio 的页面里完成，Cairn 不保存各应用的令牌。':
+    'Give the Coordinator tools from external apps like Gmail and Linear through Composio. Authorization happens on Composio pages; Cairn stores no per-app tokens.',
+  'Composio API key': 'Composio API key',
+  '已保存，加密存储，不会再显示。': 'Saved, encrypted, and never shown again.',
+  '在 Composio 控制台创建一把 API key 粘贴到这里，用它接入各应用。':
+    'Create an API key in the Composio console and paste it here to connect apps.',
+  '粘贴 API key': 'Paste an API key',
+  '这把 key 没有通过检查，确认完整复制后再保存。':
+    'That key failed validation. Copy it in full and save again.',
+  '没能移除，稍后重试。': 'Could not remove it. Try again later.',
+  还没接入: 'Not connected',
+  '等待授权，完成后这里自动更新。': 'Waiting for authorization; this updates when done.',
+  需要授权: 'Needs authorization',
+  继续授权: 'Continue authorization',
+  授权: 'Authorize',
+  'Composio 上的授权已收回，重新连接才能再用。':
+    'The Composio authorization was taken back; reconnect to use it again.',
+  '没能接入 {name}，稍后重试。': 'Could not connect {name}. Try again later.',
+  '没能开始 {name} 的授权，稍后重试。':
+    'Could not start authorization for {name}. Try again later.',
+  '没能移除 {name}，稍后重试。': 'Could not remove {name}. Try again later.',
+  'Composio 没有返回可接入的应用。': 'Composio returned no apps to connect.',
   '这个标识已经被占用，先删掉旧的连接或换个名字。':
     'This identifier is taken. Delete the old connection or pick another name.',
   '{name} 不支持浏览器登录，改用令牌或请求头连接。':

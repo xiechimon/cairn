@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isMailSecretName } from '../mail.js';
 import { WEB_BRAVE_KEY_SECRET, WEB_EXA_KEY_SECRET } from '../web-search.js';
 import { recordId } from './common.js';
+import { isComposioSecretName } from './composio.js';
 
 export const SECRET_DELIVERIES = ['plaintext', 'http'] as const;
 export const secretDeliverySchema = z.enum(SECRET_DELIVERIES);
@@ -82,7 +83,12 @@ export function isHttpSecretValue(value: string): boolean {
 }
 
 export function isDaemonReadSecretName(name: string): boolean {
-  return name === WEB_EXA_KEY_SECRET || name === WEB_BRAVE_KEY_SECRET || isMailSecretName(name);
+  return (
+    name === WEB_EXA_KEY_SECRET ||
+    name === WEB_BRAVE_KEY_SECRET ||
+    isMailSecretName(name) ||
+    isComposioSecretName(name)
+  );
 }
 
 export const secretHttpPolicySchema = z.strictObject({

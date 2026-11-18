@@ -3,6 +3,7 @@ import type { ComputerRelayResult, MachineAskBody, MachineAskResponse } from '@c
 import {
   AGENT_TOOL_SKILL_CREATE,
   AGENT_TOOL_SKILL_UPDATE,
+  CONNECTOR_TOOL_PREFIX,
   computerToolSchema,
   createSkillBodySchema,
   derivePlaceholderTitle,
@@ -36,6 +37,7 @@ import {
 import { steeredMessageScopes } from './chief-turns.js';
 import { holdCloakLicense } from './cloak-license.js';
 import { infoCardTodoOf } from './computer-thread.js';
+import { executeConnectorToolCall } from './connector-broker.js';
 import {
   capturePreCallWorld,
   captureToolResult,
@@ -47,6 +49,12 @@ import { resolveProjectGithubLabelIds } from './github-labels.js';
 import { executeInfoCardTool } from './info-card-tools.js';
 import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
+import {
+  defaultMcpConfigPath,
+  type McpConnectorDeps,
+  newMcpOAuthState,
+  publicOAuthFetch,
+} from './mcp-servers.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { refuseRestrictedTurnTool } from './report-turn.js';
 import {
@@ -198,6 +206,37 @@ export async function executeRelayToolCall(
   if (!threadRow) throw new NotFoundError(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   if (!chiefRow) throw new NotFoundError(`chief ${threadRow.chiefId}`);
+  if (name.startsWith(CONNECTOR_TOOL_PREFIX)) {
+    const mcp: McpConnectorDeps = {
+      db: deps.db,
+      box: deps.box,
+      mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath(),
+      fetch: deps.mcpFetch ?? globalThis.fetch,
+      oauthFetch: deps.mcpFetch ?? publicOAuthFetch,
+      oauthState: deps.mcpOAuthState ?? newMcpOAuthState(),
+      ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
+      ...(deps.oauthClient !== undefined ? { oauthClient: deps.oauthClient } : {}),
+    };
+    return executeConnectorToolCall(
+      {
+        db: deps.db,
+        mcp,
+        hub: deps.hub,
+        user: deps.user,
+        vapidKeys: deps.vapidKeys,
+        reposDir: deps.reposDir,
+        ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
+      },
+      {
+        teamId: threadRow.teamId,
+        threadId,
+        scopeProjectId: stepScopeProjectId(row),
+      },
+      name,
+      params,
+      signal,
+    );
+  }
   if (name === REQUEST_CLOAK_LICENSE_TOOL)
     return holdCloakLicense(deps, { stepId }, signal !== undefined ? { signal } : {});
   const tool = isCaptureTool(name) ? name : undefined;

@@ -13,6 +13,11 @@ import type {
   CloakLicenseSaved,
   CodexDevicePollResponse,
   CodexDeviceStartResponse,
+  ComposioApps,
+  ComposioAuthorizeResponse,
+  ComposioConfigured,
+  ComposioConnectBody,
+  ComposioKeyBody,
   ComputerManageAction,
   ComputerManageResult,
   ComputerRecord,
@@ -806,6 +811,13 @@ export const useGithubConnector = (teamId: string | undefined, enabled: boolean)
     enabled: enabled && teamId !== undefined,
   });
 
+export const useComposioApps = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['composioApps', teamId],
+    queryFn: () => api.get<ComposioApps>(`/api/teams/${teamId}/mcp-connectors/composio`),
+    enabled: enabled && teamId !== undefined,
+  });
+
 export const useSkills = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['skills', teamId],
@@ -1426,6 +1438,52 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     deleteMcpConnector: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/mcp-connectors/${id}`),
+      onSuccess: invalidateAll,
+    }),
+    saveComposioKey: useMutation({
+      mutationFn: (body: ComposioKeyBody) =>
+        api.put<ComposioConfigured>(`/api/teams/${teamId}/mcp-connectors/composio/key`, body),
+      onSuccess: invalidateAll,
+    }),
+    deleteComposioKey: useMutation({
+      mutationFn: () => api.del<void>(`/api/teams/${teamId}/mcp-connectors/composio/key`),
+      onSuccess: invalidateAll,
+    }),
+    connectComposioApp: useMutation({
+      mutationFn: (body: ComposioConnectBody) =>
+        api.post<McpConnectorRecord>(`/api/teams/${teamId}/mcp-connectors/composio/toolkits`, body),
+      onSuccess: invalidateAll,
+    }),
+    authorizeComposioApp: useMutation({
+      mutationFn: (connectorId: string) =>
+        api.post<ComposioAuthorizeResponse>(
+          `/api/teams/${teamId}/mcp-connectors/composio/${connectorId}/authorize`,
+          {},
+        ),
+      onSuccess: invalidateAll,
+    }),
+    reconnectComposioApp: useMutation({
+      mutationFn: (connectorId: string) =>
+        api.post<ComposioAuthorizeResponse>(
+          `/api/teams/${teamId}/mcp-connectors/composio/${connectorId}/reconnect`,
+          {},
+        ),
+      onSuccess: invalidateAll,
+    }),
+    pollComposioApp: useMutation({
+      mutationFn: (connectorId: string) =>
+        api.post<McpConnectorRecord>(
+          `/api/teams/${teamId}/mcp-connectors/composio/${connectorId}/poll`,
+          {},
+        ),
+      onSuccess: invalidateAll,
+    }),
+    revokeComposioApp: useMutation({
+      mutationFn: (connectorId: string) =>
+        api.post<McpConnectorRecord>(
+          `/api/teams/${teamId}/mcp-connectors/composio/${connectorId}/revoke`,
+          {},
+        ),
       onSuccess: invalidateAll,
     }),
     createSecret: useMutation({

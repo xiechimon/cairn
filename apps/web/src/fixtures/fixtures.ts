@@ -129,6 +129,8 @@ export {
   resourcesCcLoggedOut,
   resourcesCcMissing,
   resourcesCcNoConfig,
+  resourcesComposioApps,
+  resourcesComposioNoKey,
   resourcesDefault,
   resourcesMcpAddServer,
   resourcesMcpAuthorizing,

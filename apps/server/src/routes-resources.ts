@@ -2,6 +2,8 @@ import {
   bindGithubConnectorBodySchema,
   capabilitiesResponseSchema,
   cloakLicenseBodySchema,
+  composioConnectBodySchema,
+  composioKeyBodySchema,
   createClaudeSubscriptionSchema,
   createDevinSubscriptionSchema,
   createMcpConnectorBodySchema,
@@ -63,6 +65,17 @@ import {
 } from './services/claude-subscriptions.js';
 import { saveCloakLicense } from './services/cloak-license.js';
 import { pollCodexDeviceLogin, startCodexDeviceLogin } from './services/codex-device-login.js';
+import { deleteComposioKey, saveComposioKey } from './services/composio.js';
+import {
+  authorizeComposioApp,
+  type ComposioConnectorDeps,
+  connectComposioApp,
+  listComposioApps,
+  pollComposioApp,
+  reconnectComposioApp,
+  removeComposioApp,
+  revokeComposioApp,
+} from './services/composio-connectors.js';
 import { stepIdOfGitKey } from './services/credentials.js';
 import {
   createDevinSubscription,
@@ -986,9 +999,90 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.json(targetChanged ? await checkMcpConnector(mcpDeps(), teamId, record.id) : record);
   });
 
-  app.delete('/api/teams/:id/mcp-connectors/:cid', (c) => {
+  const composioDeps = (): ComposioConnectorDeps => ({
+    composio: {
+      db: ctx.db,
+      box: ctx.secretBox,
+      fetch: ctx.composioFetch ?? ctx.mcpFetch ?? globalThis.fetch,
+    },
+    mcp: mcpDeps(),
+  });
+
+  const requireConnectorOwner = (c: Context): void => {
+    if (!isOwnerSession(c)) {
+      throw new HttpError(403, 'only the instance owner can manage connector apps');
+    }
+  };
+
+  app.put('/api/teams/:id/mcp-connectors/composio/key', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
+    requireConnectorOwner(c);
+    const body = parseWith(composioKeyBodySchema, (await jsonBody(c)) ?? {}, 'body');
+    saveComposioKey(composioDeps().composio, teamId, body.key);
+    return c.json({ configured: true });
+  });
+
+  app.delete('/api/teams/:id/mcp-connectors/composio/key', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireConnectorOwner(c);
+    deleteComposioKey(composioDeps().composio, teamId);
+    return c.body(null, 204);
+  });
+
+  app.get('/api/teams/:id/mcp-connectors/composio', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(await listComposioApps(composioDeps(), teamId));
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/composio/toolkits', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireConnectorOwner(c);
+    const body = parseWith(composioConnectBodySchema, (await jsonBody(c)) ?? {}, 'body');
+    return c.json(await connectComposioApp(composioDeps(), teamId, body.slug), 201);
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/composio/:cid/authorize', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireConnectorOwner(c);
+    return c.json(await authorizeComposioApp(composioDeps(), teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/composio/:cid/poll', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireConnectorOwner(c);
+    return c.json(await pollComposioApp(composioDeps(), teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/composio/:cid/reconnect', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireConnectorOwner(c);
+    return c.json(await reconnectComposioApp(composioDeps(), teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/composio/:cid/revoke', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireConnectorOwner(c);
+    return c.json(await revokeComposioApp(composioDeps(), teamId, c.req.param('cid')));
+  });
+
+  app.delete('/api/teams/:id/mcp-connectors/:cid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const row = connectorRow(mcpDeps(), teamId, c.req.param('cid'));
+    if (row.authKind === 'composio') {
+      requireConnectorOwner(c);
+      if (!(await removeComposioApp(composioDeps(), teamId, c.req.param('cid'))))
+        throw notFound(`mcp connector ${c.req.param('cid')}`);
+      return c.body(null, 204);
+    }
     if (!deleteMcpConnector(mcpDeps(), teamId, c.req.param('cid')))
       throw notFound(`mcp connector ${c.req.param('cid')}`);
     return c.body(null, 204);

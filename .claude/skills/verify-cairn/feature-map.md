@@ -878,12 +878,12 @@ Reach:
 - Web routes: `/app/resources/mcp-servers`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `MCP`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `mcp-add-server`, `mcp-catalog`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
+- Test ids in its code: `composio-authorize-*`, `composio-connect-*`, `composio-key-change`, `composio-key-input`, `composio-key-remove`, `composio-key-save`, `composio-reconnect-*`, `composio-remove-*`, `mcp-add-server`, `mcp-catalog`, `mcp-composio`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
 - Verify recipes: [.claude/skills/verify-cairn/features/mcp-servers.md](features/mcp-servers.md)
 - Research: [docs/research/mcp-connectors-2026-11-15.md](../../../docs/research/mcp-connectors-2026-11-15.md)
-- Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md)
-- Backend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md)
-- Evidence: `apps/server/test/mcp-servers.test.ts`, `apps/daemon/test/mcp-config.test.ts`
+- Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md), [docs/design/connector-fabric.md](../../../docs/design/connector-fabric.md)
+- Backend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md), [docs/design/connector-fabric.md](../../../docs/design/connector-fabric.md)
+- Evidence: `apps/server/test/mcp-servers.test.ts`, `apps/server/test/composio.test.ts`, `apps/server/test/connector-broker.test.ts`, `apps/server/test/composio-migration.test.ts`, `apps/daemon/test/mcp-config.test.ts`
 
 ### projects
 

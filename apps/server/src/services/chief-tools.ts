@@ -15,6 +15,7 @@ import {
   fenceReportText,
   IN_PROGRESS_PHASES,
   isChiefConversationId,
+  isComposioSecretName,
   isMailSecretName,
   isWaitingPhase,
   MODEL_SOURCE_RUNTIME_LABELS,
@@ -877,7 +878,8 @@ export async function executeChiefTool(
     case 'set_secret': {
       const keysvc = { db, box: deps.box };
       const name = str(params, 'name');
-      if (isMailSecretName(name)) throw new HttpError(400, SECRET_NAME_RULE);
+      if (isMailSecretName(name) || isComposioSecretName(name))
+        throw new HttpError(400, SECRET_NAME_RULE);
       const projectId = optStr(params, 'projectId') ?? null;
       const existing = listSecrets(keysvc, ctx.teamId).find(
         (s) => s.name === name && s.projectId === projectId,
@@ -927,6 +929,12 @@ export async function executeChiefTool(
         throw new HttpError(400, 'browser passwords can only be deleted in settings');
       if (all.some((s) => s.kind === 'pair' && (names.includes(s.name) || names.includes(s.id))))
         throw new HttpError(400, 'username+password pairs can only be deleted in settings');
+      if (
+        all.some(
+          (s) => isComposioSecretName(s.name) && (names.includes(s.name) || names.includes(s.id)),
+        )
+      )
+        throw new HttpError(400, 'connector keys can only be deleted in settings');
       const deleted: string[] = [];
       for (const n of names) {
         const hit =

@@ -34,6 +34,7 @@ import type {
   McpConnectorAuthKind,
   McpConnectorOAuthMeta,
   McpConnectorStatus,
+  McpConnectorTool,
   MemoryCandidateStatus,
   MemoryLayer,
   ModelRef,
@@ -1515,6 +1516,9 @@ export const mcpConnector = sqliteTable(
     status: text('status').$type<McpConnectorStatus>().notNull(),
     statusReason: text('statusReason'),
     toolCount: integer('toolCount'),
+    toolsJson: json<McpConnectorTool[]>('toolsJson'),
+    composioSession: text('composioSession'),
+    composioAccount: text('composioAccount'),
     checkedAt: epochMs('checkedAt'),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
@@ -1523,11 +1527,11 @@ export const mcpConnector = sqliteTable(
     uniqueIndex('mcp_connector_team_slug_idx').on(t.teamId, t.slug),
     check(
       'mcp_connector_status',
-      sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error')`,
+      sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error', 'revoked')`,
     ),
     check(
       'mcp_connector_auth_kind',
-      sql`${t.authKind} in ('none', 'static', 'oauth', 'github-app')`,
+      sql`${t.authKind} in ('none', 'static', 'oauth', 'github-app', 'composio')`,
     ),
   ],
 );

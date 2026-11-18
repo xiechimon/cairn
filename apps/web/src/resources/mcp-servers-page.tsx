@@ -10,6 +10,7 @@ import { useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
 import {
   useApiMutations,
+  useComposioApps,
   useGithubConnector,
   useMcpConnectors,
   useMcpServers,
@@ -27,6 +28,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { Ban, Plus } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
+import { ComposioSection } from './composio-section.js';
 import { MCP_HREF } from './hrefs.js';
 import {
   ConnectorStatus,
@@ -151,7 +153,11 @@ export function McpServersPage() {
         Date.now(),
       )
     : (fixture.resources?.mcpServers ?? []);
-  const connectors = live ? (connectorsQ.data ?? []) : (fixture.resources?.mcpConnectors ?? []);
+  const composioQ = useComposioApps(teamId, live);
+  const composioApps = live ? composioQ.data : fixture.resources?.composioApps;
+  const connectors = (
+    live ? (connectorsQ.data ?? []) : (fixture.resources?.mcpConnectors ?? [])
+  ).filter((record) => record.authKind !== 'composio');
   const githubQ = useGithubConnector(teamId, live);
   const githubApp = live ? githubQ.data : fixture.resources?.githubConnector;
   const fixtureDialog = fixture.ui?.mcpDialog;
@@ -300,7 +306,7 @@ export function McpServersPage() {
       fixture={fixture}
     >
       <QueryBoundary
-        query={live ? mergeQueries(connectorsQ, mcpQ) : undefined}
+        query={live ? mergeQueries(connectorsQ, mcpQ, composioQ) : undefined}
         isEmpty={false}
         errorWins
         loadingLabel={t('正在加载 MCP 服务器')}
@@ -397,6 +403,7 @@ export function McpServersPage() {
                 </CardGrid>
               </SettingsSection>
             )}
+            <ComposioSection live={live} teamId={teamId} data={composioApps} />
           </SettingsFlat>
           {local.length > 0 && (
             <SettingsSection

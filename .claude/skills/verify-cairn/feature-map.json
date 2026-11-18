@@ -2063,11 +2063,15 @@
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/resources/mcp-servers-page.tsx"
+          "apps/web/src/resources/mcp-servers-page.tsx",
+          "apps/web/src/resources/composio-section.tsx"
         ],
         "server": [
           "apps/server/src/services/mcp-servers.ts",
-          "apps/server/src/services/mcp-github-connector.ts"
+          "apps/server/src/services/mcp-github-connector.ts",
+          "apps/server/src/services/composio.ts",
+          "apps/server/src/services/composio-connectors.ts",
+          "apps/server/src/services/connector-broker.ts"
         ]
       },
       "routes": {
@@ -2081,6 +2085,7 @@
           "/api/teams/:id/mcp-connectors/:cid",
           "/api/teams/:id/mcp-connectors/:cid/check",
           "/api/teams/:id/mcp-connectors/oauth/start",
+          "/api/teams/:id/mcp-connectors/composio**",
           "/api/teams/:id/mcp-connectors/github",
           "/api/teams/:id/mcp-connectors/github/bind",
           "/api/teams/:id/mcp-connectors/github/device",
@@ -2100,14 +2105,19 @@
       ],
       "frontendDesign": [
         "docs/spec/13-resources-view-localization.md",
-        "docs/design/mcp-connectors.md"
+        "docs/design/mcp-connectors.md",
+        "docs/design/connector-fabric.md"
       ],
       "backendDesign": [
         "docs/spec/13-resources-view-localization.md",
-        "docs/design/mcp-connectors.md"
+        "docs/design/mcp-connectors.md",
+        "docs/design/connector-fabric.md"
       ],
       "evidence": [
         "apps/server/test/mcp-servers.test.ts",
+        "apps/server/test/composio.test.ts",
+        "apps/server/test/connector-broker.test.ts",
+        "apps/server/test/composio-migration.test.ts",
         "apps/daemon/test/mcp-config.test.ts"
       ]
     },

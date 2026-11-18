@@ -7,6 +7,7 @@ import type {
   SecretRecord,
 } from '@cairn/shared';
 import {
+  isComposioSecretName,
   isDaemonReadSecretName,
   isHttpSecretValue,
   isMailSecretName,
@@ -346,6 +347,7 @@ export function openSecretGrants(
       (row) =>
         (row.projectId === null || row.projectId === projectId) &&
         !isMailSecretName(row.name) &&
+        !isComposioSecretName(row.name) &&
         !linked.has(row.id) &&
         !browser.has(row.id),
     );
@@ -390,6 +392,7 @@ export function openSecretGrants(
       row.delivery !== 'plaintext' ||
       row.valueCipher === null ||
       isMailSecretName(row.name) ||
+      isComposioSecretName(row.name) ||
       linked.has(row.id) ||
       browser.has(row.id)
     )

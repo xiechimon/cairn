@@ -93,7 +93,7 @@ describe('AGENTS.md security surfaces match the JSON', () => {
     const dropped = guide.replace('`apps/server/src/services/machine*.ts`, ', '');
     expect(dropped).not.toBe(guide);
     expect(listedSecurityPaths(dropped)).not.toEqual(jsonSecurity);
-    const added = guide.replace('{mcp-face,mcp-servers}', '{mcp-face,mcp-servers,extra}');
+    const added = guide.replace('connector-broker}', 'connector-broker,extra}');
     expect(added).not.toBe(guide);
     expect(listedSecurityPaths(added)).not.toEqual(jsonSecurity);
   });

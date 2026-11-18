@@ -215,12 +215,13 @@ export function coordinatorToolsExtension(
     desktopTools?: boolean;
     vmComputer?: boolean;
     ownComputer?: boolean;
+    connectorTools?: RemoteToolDef[];
     shuttingDown?: () => boolean;
     beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>;
     storeId?: () => string | undefined;
   } = {},
 ) {
-  const defs = coordinatorToolDefs(options);
+  const defs = [...coordinatorToolDefs(options), ...(options.connectorTools ?? [])];
   return defineExtension({
     name: 'cairn-coordinator-tools',
     hooks: [
