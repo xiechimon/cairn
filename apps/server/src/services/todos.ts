@@ -791,15 +791,14 @@ export function updateAutonomousTodo(
         tx.insert(todoGithubLabel).values({ todoId: id, labelId }).run();
       }
     }
+    if (
+      sets.phase === 'done' &&
+      (row.phase === 'confirm' || row.phase === 'review') &&
+      row.latestBuildId !== null
+    ) {
+      insertGateAnnouncement(deps, row.latestBuildId, DONE_ANNOUNCEMENT, deps.user.displayName);
+    }
   });
-
-  if (
-    sets.phase === 'done' &&
-    (row.phase === 'confirm' || row.phase === 'review') &&
-    row.latestBuildId !== null
-  ) {
-    insertGateAnnouncement(deps, row.latestBuildId, DONE_ANNOUNCEMENT, deps.user.displayName);
-  }
 
   if (sets.blockedBy !== undefined && row.latestBuildId !== null)
     holdBlockedBuild(db, row.latestBuildId);
@@ -968,10 +967,12 @@ export function settleSplitOnDone(deps: TodoDeps, childId: string): void {
   const children = childrenOfTodo(db, parent.id);
   if (children.length === 0) return;
   if (!children.every((c) => c.phase === 'done')) return;
-  setTodoPhase(deps, parent.id, 'done', { lastRunAt: nowMs() });
-  if (parent.latestBuildId !== null) {
-    insertGateAnnouncement(deps, parent.latestBuildId, DONE_ANNOUNCEMENT, 'Coordinator');
-  }
+  db.transaction(() => {
+    setTodoPhase(deps, parent.id, 'done', { lastRunAt: nowMs() });
+    if (parent.latestBuildId !== null) {
+      insertGateAnnouncement(deps, parent.latestBuildId, DONE_ANNOUNCEMENT, 'Coordinator');
+    }
+  });
 }
 
 export function deleteTodo(deps: TodoDeps, id: string): boolean {
