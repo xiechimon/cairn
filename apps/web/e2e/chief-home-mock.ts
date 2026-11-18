@@ -304,6 +304,7 @@ export async function mockLive(
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
     if (p === '/api/teams/t1/machines') return json(state.machines ?? [READY_MACHINE]);
     if (p === '/api/teams/t1/providers') return json({ presets: [], providers: [READY_PROVIDER] });
+    if (p === '/api/teams/t1/usage/daily') return json({ days: [], models: [], projects: [] });
     if (p === '/api/server/backup') return json(state.backup ?? { state: 'none' });
     if (p === '/api/teams/t1/members' || p === '/api/skills') return json([]);
     return json([]);
