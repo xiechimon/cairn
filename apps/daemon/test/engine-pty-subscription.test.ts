@@ -1,9 +1,7 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import type { AgentBackend, AgentSessionHandle, SessionOpts } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createClaudePtyBackend } from '../src/engine/claude-tui.js';
 import { openEnginePtyProcess } from '../src/engine/pty.js';
 import { assembleStepEnv } from '../src/step-env.js';
@@ -56,7 +54,7 @@ let dir: string;
 let scrubSaved: string | undefined;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'engine-pty-sub-'));
+  dir = makeTestTempDir('engine-pty-sub-');
   spawn.mockReset();
   spawn.mockImplementation(() => fakePtyProc());
   scrubSaved = process.env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB;

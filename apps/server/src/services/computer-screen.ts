@@ -28,6 +28,7 @@ import {
 import { browserScopeFor, computerThreadOf } from './computer-thread.js';
 import { findMachineByToken } from './machines.js';
 import { assertDeviceActive, deviceStreams } from './paired-devices.js';
+import { screenUpgradePath } from './screen-upgrade-paths.js';
 
 const MAX_CHANNELS = 128;
 const MAX_COMPUTER_CHANNELS = 8;
@@ -286,13 +287,13 @@ export class ComputerScreenGateway {
         socket.destroy();
         return;
       }
-      const viewer = /^\/api\/computer-screen\/([a-f0-9]{64})$/.exec(url.pathname);
-      const machine = /^\/api\/machine\/computer-screen\/([a-f0-9]{64})$/.exec(url.pathname);
-      if (!viewer && !machine) {
-        socket.destroy();
+      const path = screenUpgradePath(url.pathname);
+      if (path === null || path.gateway !== 'computer') {
+        if (path === null) socket.destroy();
         return;
       }
-      const channel = this.channels.get((viewer ?? machine)?.[1] ?? '');
+      const viewer = path.side === 'viewer';
+      const channel = this.channels.get(path.channelId);
       let authorized =
         url.search === '' && channel !== undefined && this.invalidReason(channel) === undefined;
       if (authorized && channel) {

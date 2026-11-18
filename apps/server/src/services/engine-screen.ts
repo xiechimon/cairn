@@ -23,6 +23,7 @@ import { newRecordId } from '../lib/ids.js';
 import { readStepEnginePtyLog } from './machine-uploads.js';
 import { findMachineByToken } from './machines.js';
 import { assertDeviceActive, deviceStreams } from './paired-devices.js';
+import { screenUpgradePath } from './screen-upgrade-paths.js';
 
 const MAX_CHANNELS = 128;
 const MAX_STEP_CHANNELS = 8;
@@ -306,13 +307,13 @@ export class EngineScreenGateway {
         socket.destroy();
         return;
       }
-      const viewer = /^\/api\/engine-screen\/([a-f0-9]{64})$/.exec(url.pathname);
-      const machine = /^\/api\/machine\/engine-screen\/([a-f0-9]{64})$/.exec(url.pathname);
-      if (!viewer && !machine) {
-        socket.destroy();
+      const path = screenUpgradePath(url.pathname);
+      if (path === null || path.gateway !== 'engine') {
+        if (path === null) socket.destroy();
         return;
       }
-      const channel = this.channels.get((viewer ?? machine)?.[1] ?? '');
+      const viewer = path.side === 'viewer';
+      const channel = this.channels.get(path.channelId);
       let authorized =
         url.search === '' && channel !== undefined && this.invalidReason(channel) === undefined;
       if (authorized && channel) {

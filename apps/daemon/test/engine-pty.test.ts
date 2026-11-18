@@ -61,8 +61,8 @@ describe('PtyRedactor', () => {
     const redactor = new PtyRedactor(() => [secret]);
     const out: string[] = [];
     const pushes = [
-      Buffer.from('prompt> ' + secret.slice(0, 10)),
-      Buffer.from(secret.slice(10) + ' done\n'),
+      Buffer.from(`prompt> ${secret.slice(0, 10)}`),
+      Buffer.from(`${secret.slice(10)} done\n`),
     ];
     for (const push of pushes) {
       const chunk = redactor.push(push);
