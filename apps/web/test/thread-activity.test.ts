@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import { mapChiefStream, type MessageRow } from '../src/api/mappers.js';
-import { foldTaskCards, placeReportCards, todoGlanceOf } from '../src/chief/chief-task-refs.js';
+import {
+  foldTaskCards,
+  placeReportCards,
+  placeTaskRefs,
+  todoGlanceOf,
+} from '../src/chief/chief-task-refs.js';
 import { groupThreadEvents } from '../src/chief/thread-activity.js';
 import type { TodoGlance } from '../src/detail/segments.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
@@ -73,18 +78,47 @@ describe('a report mirrored from a project channel', () => {
   });
 });
 
-describe('todoGlanceOf', () => {
-  test('only research opened before planning names a parent', () => {
-    expect(glances.get('research')?.parentId).toBe('code');
-    expect(glances.get('other')?.parentId).toBeUndefined();
-    expect(
-      todoGlanceOf({
-        phase: 'queued',
-        title: 'x',
-        sourceKind: 'research',
-        sourceRef: 'before-plan:code',
-      }).parentId,
-    ).toBeUndefined();
+describe('research a stuck retry opened', () => {
+  const stuck = todoGlanceOf({
+    phase: 'review',
+    title: 'Research: export keeps failing',
+    output: 'info',
+    latestBuildId: 'b-stuck',
+    sourceKind: 'research-stuck',
+    sourceRef: 'build-1:1',
+  });
+  const code = todoGlanceOf({ phase: 'building', title: 'Export the board' });
+  const legacy = todoGlanceOf({
+    phase: 'done',
+    title: 'Research: Export the board',
+    output: 'info',
+    sourceKind: 'research-before-plan',
+    sourceRef: 'before-plan:code',
+  });
+  const map = new Map<string, TodoGlance>([
+    ['stuck', stuck],
+    ['code', code],
+    ['legacy', legacy],
+  ]);
+  const reply = mapChiefStream([
+    {
+      id: 'a-1',
+      role: 'assistant',
+      content: JSON.stringify([{ type: 'text', text: 'Started both.' }]),
+      createdAt: 90,
+    },
+  ])[0]!;
+  const rows = [{ item: reply, i: 0 }];
+  const startedBy = new Map([[reply, ['code', 'stuck', 'legacy']]]);
+
+  test('adds no task row, while the code task and an old research card stand as flat rows', () => {
+    const refs = placeTaskRefs(rows, startedBy, map, new Set()).get(reply) ?? [];
+    expect(refs.map((ref) => ref.todoId)).toEqual(['code', 'legacy']);
+  });
+
+  test('adds no report line to the reply', () => {
+    const reports = placeReportCards(rows, startedBy, map, new Set()).get(reply) ?? [];
+    expect(reports).not.toContain('stuck');
   });
 });
 

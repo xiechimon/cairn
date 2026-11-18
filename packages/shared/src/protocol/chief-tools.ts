@@ -193,10 +193,6 @@ export const coordinatorCreateTodoParamsSchema = z
     priority: z.enum(TASK_REQUEST_PRIORITIES).optional(),
     difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).optional(),
     output: todoOutputSchema.optional(),
-    research: z
-      .object({ reason: z.string().trim().min(1).max(200) })
-      .strict()
-      .optional(),
     platform: runnerOsSchema.optional(),
     lane: z.enum(TASK_REQUEST_LANES).optional(),
     briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
@@ -489,7 +485,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (pass messageIds when more than one owner message is open) or from a source todo. Always pass title, a short summary of the outcome for the Tasks panel. You add the title and routing only, except that an info card (output 'info', 'report', 'dataset' or 'link') also takes a briefing: an info card runs alone in its own computer and sees only the owner's cited words and the briefing, so put every link, name, id and finding you already have into the briefing instead of assuming the card can see this conversation. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. When you already did part of the request yourself, such as create_project, pass quotes covering only the rest: a task thread cannot do your part and must never receive it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (pass messageIds when more than one owner message is open) or from a source todo. Always pass title, a short summary of the outcome for the Tasks panel. You add the title and routing only, except that an info card (output 'info', 'report', 'dataset' or 'link') also takes a briefing: an info card runs alone in its own computer and sees only the owner's cited words and the briefing, so put every link, name, id and finding you already have into the briefing instead of assuming the card can see this conversation. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. When you already did part of the request yourself, such as create_project, pass quotes covering only the rest: a task thread cannot do your part and must never receive it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). Studying how others solved it (open-source code, another product, docs) is the thread's own first step, not a separate todo: the owner's words reach the thread verbatim and it researches before planning. Open a separate research todo (an info output, with the code todo blockedBy it) only when the owner explicitly wants to read a report before any code changes, or when the research and the change are accepted separately. When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
     parameters: obj(
       {
         title: str(
@@ -518,14 +514,6 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         ),
         blockedBy: idArr(
           'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
-        ),
-        research: obj(
-          {
-            reason: str(
-              "One line, in the owner's language, saying what the research must answer before this task is planned. Set research for a code task that designs a new mechanism, adds a dependency, fixes a performance problem or chooses a technology: a read-only research thread studies open-source implementations first and this thread waits for its report. Leave it out for small fixes, wording or style changes and info tasks.",
-            ),
-          },
-          ['reason'],
         ),
         platform: str(
           `Optional "macos", "windows" or "linux": the operating system the task needs. ${PLATFORM_DOC}`,

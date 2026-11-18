@@ -37,7 +37,8 @@ export interface TodoGlance {
   phase: Phase;
   seq?: number;
   title?: string;
-  parentId?: string;
+  internal?: boolean;
+  blockedBy?: readonly string[];
   report?: boolean;
   buildId?: string;
   projectId?: string;

@@ -323,6 +323,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     hasPlan: w.hasPlan,
     buildHistory: w.buildHistory,
     sourceTodo: w.sourceTodo,
+    ...(w.blockedBy != null && w.blockedBy.length > 0 ? { blockedBy: w.blockedBy } : {}),
     v: w.v,
     chiefCreated: w.sourceBuildId !== null,
     waitingOn: w.waitingOn ?? undefined,

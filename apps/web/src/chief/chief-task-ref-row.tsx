@@ -94,18 +94,30 @@ export function TaskRefRow({
 function TaskRefPlace({ taskRef }: { taskRef: TaskRef }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
-  const glance = useContext(TodoGlanceContext)?.get(taskRef.todoId);
+  const glances = useContext(TodoGlanceContext);
+  const glance = glances?.get(taskRef.todoId);
   const project = useProjects(teamId, live).data?.find((p) => p.id === glance?.projectId);
   const steps = useSteps(glance?.buildId, live).data ?? [];
   const machineId = steps.findLast((step) => step.machineId != null)?.machineId;
   const machine = useMachines(teamId, live).data?.find((m) => m.id === machineId)?.name;
   const folder = project?.repoKind === 'local' ? project.localPath : undefined;
+  const waitingFor = (glance?.blockedBy ?? []).filter((id) => glances?.get(id)?.phase !== 'done');
+  const firstBlocker = glances?.get(waitingFor[0] ?? '')?.title;
+  const startsAfter =
+    waitingFor.length === 0
+      ? undefined
+      : waitingFor.length === 1
+        ? t('等「{title}」', { title: firstBlocker ?? t('任务') })
+        : t('等 {n} 个任务', { n: waitingFor.length });
   const rows: [string, string, string][] = [
     ...(project !== undefined
       ? [['project', t('项目'), project.name] as [string, string, string]]
       : []),
     ['machine', t('运行机器'), machine ?? t('还没分配机器')],
     ...(folder !== undefined ? [['folder', t('目录'), folder] as [string, string, string]] : []),
+    ...(startsAfter !== undefined
+      ? [['starts-after', t('开始条件'), startsAfter] as [string, string, string]]
+      : []),
   ];
   return (
     <>

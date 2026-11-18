@@ -197,7 +197,7 @@ describe('router tools', () => {
       expect(chiefRow?.watches).toEqual([]);
     });
 
-    test('a faster task opens research and holds the session until that research finishes', async () => {
+    test('a task stored with the retired research flag opens no research and is not held', async () => {
       seedSessionRoute(H.s);
       const id = seedTodo({
         ...RESEARCHED,
@@ -205,20 +205,23 @@ describe('router tools', () => {
         spec: 'The board export is slow.',
       });
       const out = (await relay('open_thread', { todoId: id })) as { buildId: string };
-      const research = H.s.db
-        .select()
-        .from(todo)
-        .where(eq(todo.sourceKind, 'research-before-plan'))
-        .all();
-      expect(research).toHaveLength(1);
-      expect(research[0]?.title).toContain('make the export faster');
-      const code = H.s.db.select().from(todo).where(eq(todo.id, id)).get();
-      expect(code?.blockedBy).toEqual([research[0]?.id]);
+      expect(
+        H.s.db.select().from(todo).where(eq(todo.sourceKind, 'research-before-plan')).all(),
+      ).toHaveLength(0);
+      expect(H.s.db.select().from(todo).where(eq(todo.id, id)).get()?.blockedBy ?? []).toEqual([]);
       const session = H.s.db.select().from(step).where(eq(step.buildId, out.buildId)).get();
-      expect(session?.kind).toBe('session');
+      expect(session?.holdReason).toBeNull();
+    });
+
+    test('a code task blocked by a research card waits for its report and then reads it', async () => {
+      seedSessionRoute(H.s);
+      const researchId = seedTodo({ title: 'Research export formats', output: 'info' });
+      const research = (await relay('open_thread', { todoId: researchId })) as { buildId: string };
+      const codeId = seedTodo({ title: 'make the export faster', blockedBy: [researchId] });
+      const out = (await relay('open_thread', { todoId: codeId })) as { buildId: string };
+      const session = H.s.db.select().from(step).where(eq(step.buildId, out.buildId)).get();
       expect(session?.holdReason).toBe(BLOCKED_BY_HOLD);
-      expect(session?.holdUntil ?? 0).toBeGreaterThan(Date.now() + 24 * 60 * 60_000);
-      H.s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, research[0]!.id)).run();
+      H.s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, researchId)).run();
       releaseBlockedSteps(toolDeps());
       expect(H.s.db.select().from(step).where(eq(step.id, session!.id)).get()?.holdReason).toBe(
         BLOCKED_BY_HOLD,
@@ -226,97 +229,27 @@ describe('router tools', () => {
       storeInfoReport(
         { db: H.s.db, attachmentsDir: H.s.attachmentsDir },
         {
-          buildId: research[0]!.latestBuildId as string,
-          teamId: H.teamId,
-          createdBy: toolDeps().user.id,
-          report: 'Use a streaming export.\nhttps://example.com/export',
-        },
-      );
-      releaseBlockedSteps(toolDeps());
-      const released = H.s.db.select().from(step).where(eq(step.id, session!.id)).get();
-      expect(released?.holdUntil).toBeNull();
-      expect(released?.holdReason).toBeNull();
-      expect(released?.prompt ?? '').toContain('Use a streaming export.');
-    });
-
-    test('a faster title without the Coordinator research flag opens no research', async () => {
-      seedSessionRoute(H.s);
-      const id = seedTodo({ title: 'make the export faster', spec: 'The board export is slow.' });
-      await relay('open_thread', { todoId: id });
-      expect(
-        H.s.db.select().from(todo).where(eq(todo.sourceKind, 'research-before-plan')).all(),
-      ).toHaveLength(0);
-      expect(H.s.db.select().from(todo).where(eq(todo.id, id)).get()?.blockedBy ?? []).toEqual([]);
-    });
-
-    test('create_todo with research stores the flag and opens one research thread carrying the reason', async () => {
-      seedSessionRoute(H.s);
-      const created = (await relay('create_todo', {
-        ...ownerTodo('队列选型'),
-        research: { reason: '比较几种消息队列的投递语义' },
-      })) as { id: string };
-      const row = H.s.db.select().from(todo).where(eq(todo.id, created.id)).get();
-      expect(row?.request?.research).toEqual({ reason: '比较几种消息队列的投递语义' });
-      const research = H.s.db
-        .select()
-        .from(todo)
-        .where(eq(todo.sourceKind, 'research-before-plan'))
-        .all();
-      expect(research).toHaveLength(1);
-      expect(research[0]?.spec).toContain('比较几种消息队列的投递语义');
-      expect(row?.blockedBy).toEqual([research[0]?.id]);
-    });
-
-    test('a delivered tier-2 report in review releases the hold', async () => {
-      seedSessionRoute(H.s);
-      const id = seedTodo({
-        ...RESEARCHED,
-        title: 'make the export faster',
-        spec: `The board export is slow. ${'detail '.repeat(800)}`,
-      });
-      const out = (await relay('open_thread', { todoId: id })) as { buildId: string };
-      const research = H.s.db
-        .select()
-        .from(todo)
-        .where(eq(todo.sourceKind, 'research-before-plan'))
-        .get();
-      if (!research?.latestBuildId) throw new Error('research build missing');
-      expect(research.spec).toContain('多路研究');
-      H.s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, research.id)).run();
-      storeInfoReport(
-        { db: H.s.db, attachmentsDir: H.s.attachmentsDir },
-        {
-          buildId: research.latestBuildId,
+          buildId: research.buildId,
           teamId: H.teamId,
           createdBy: toolDeps().user.id,
           report: 'Stream the rows.\nhttps://example.com/export',
         },
       );
       releaseBlockedSteps(toolDeps());
-      const session = H.s.db.select().from(step).where(eq(step.buildId, out.buildId)).get();
-      expect(session?.holdReason).toBeNull();
-      expect(session?.prompt ?? '').toContain('Stream the rows.');
+      const released = H.s.db.select().from(step).where(eq(step.id, session!.id)).get();
+      expect(released?.holdReason).toBeNull();
+      expect(released?.prompt ?? '').toContain('Stream the rows.');
     });
 
-    test('resuming a stopped faster thread holds the replacement session', async () => {
+    test('create_todo refuses the retired research field and creates nothing', async () => {
       seedSessionRoute(H.s);
-      const id = seedTodo({
-        ...RESEARCHED,
-        title: 'make the export faster',
-        spec: 'The board export is slow.',
-      });
-      const opened = (await relay('open_thread', { todoId: id })) as { buildId: string };
-      await relay('stop_thread', { todoId: id, reason: 'test stop' });
-      await relay('message_thread', { todoId: id, content: 'Try a smaller export.' });
-      const resumed = H.s.db.select().from(todo).where(eq(todo.id, id)).get();
-      expect(resumed?.latestBuildId).not.toBe(opened.buildId);
-      const session = H.s.db
-        .select()
-        .from(step)
-        .where(eq(step.buildId, resumed?.latestBuildId as string))
-        .get();
-      expect(session?.holdReason).toBe(BLOCKED_BY_HOLD);
-      expect(session?.status).toBe('pending');
+      await expect(
+        relay('create_todo', {
+          ...ownerTodo('输入框有序列表退格需整块删掉标记'),
+          research: { reason: '先看 t3-code 怎么做' },
+        }),
+      ).rejects.toThrow(/research/);
+      expect(H.s.db.select().from(todo).all()).toHaveLength(0);
     });
 
     test('a second open on the same todo points at message_thread', async () => {

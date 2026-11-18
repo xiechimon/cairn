@@ -1,5 +1,5 @@
 import { parseReplyQuote, type RunnerOfflineContent, type StepQueueBlocked } from '@cairn/shared';
-import { type CSSProperties, Fragment, memo, type ReactNode, useContext, useState } from 'react';
+import { type CSSProperties, memo, type ReactNode, useContext, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -17,7 +17,7 @@ import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
-import { Segments as DocSegments, type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
+import { Segments as DocSegments, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
@@ -27,7 +27,7 @@ import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { ChiefReportMessage } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
-import { childRefsOf, type TaskRef } from './chief-task-refs.js';
+import type { TaskRef } from './chief-task-refs.js';
 import { CloakLicenseCard } from './cloak-license-card.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
@@ -85,8 +85,6 @@ function runAttr(joinsPrev: boolean, joinsNext: boolean): string | undefined {
   if (joinsNext) return 'first';
   return undefined;
 }
-
-const NO_GLANCES: ReadonlyMap<string, TodoGlance> = new Map();
 
 const MSG_COL_CLS = `relative min-w-0 flex-1 ${CHAT_BODY_CLS} text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!`;
 const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
@@ -153,7 +151,7 @@ function TaskRefRows({ refs }: { refs: readonly TaskRef[] }) {
   return (
     <div className="mb-1.5 flex flex-col" data-testid="chief-task-refs">
       {refs.map((ref, index) => (
-        <TaskRefWithChildren key={ref.todoId} taskRef={ref} first={index === 0} />
+        <TaskRefLine key={ref.todoId} taskRef={ref} first={index === 0} />
       ))}
     </div>
   );
@@ -171,7 +169,6 @@ function BubbleReports({ todoIds }: { todoIds: readonly string[] }) {
 }
 
 const TOP_X = 18.75;
-const NESTED_X = 42.75;
 const ROW_MID = 14;
 const ROW_H = 28;
 const BEND = 6;
@@ -228,7 +225,7 @@ function GuidedRow({
   );
 }
 
-function TaskRefWithChildren({
+function TaskRefLine({
   taskRef,
   elbow = true,
   first = true,
@@ -239,9 +236,6 @@ function TaskRefWithChildren({
   first?: boolean;
   reportsBelow?: boolean;
 }) {
-  const glances = useContext(TodoGlanceContext);
-  const children = childRefsOf(taskRef.todoId, glances ?? NO_GLANCES);
-  const rails = elbow ? [TOP_X] : [];
   return (
     <>
       <GuidedRow
@@ -251,25 +245,10 @@ function TaskRefWithChildren({
         <TaskRefRow taskRef={taskRef} elbow={elbow} guide={false} />
       </GuidedRow>
       {reportsBelow && (
-        <GuidedRow rails={rails}>
+        <GuidedRow rails={elbow ? [TOP_X] : []}>
           <ResearchReportRow todoId={taskRef.todoId} indent={elbow ? 'ml-8' : 'ml-0'} />
         </GuidedRow>
       )}
-      {children.map((child, index) => {
-        const lastChild = index === children.length - 1;
-        return (
-          <Fragment key={child.todoId}>
-            <GuidedRow rails={rails} branch={{ x: NESTED_X, end: lastChild, to: 52 }}>
-              <TaskRefRow taskRef={child} nested guide={false} />
-            </GuidedRow>
-            {reportsBelow && (
-              <GuidedRow rails={lastChild ? rails : [...rails, NESTED_X]}>
-                <ResearchReportRow todoId={child.todoId} indent="ml-14" />
-              </GuidedRow>
-            )}
-          </Fragment>
-        );
-      })}
     </>
   );
 }
@@ -353,7 +332,7 @@ function TaskStartedRow({
         className={EVENT_ROW_CLS}
       >
         <div className="mb-1.5 flex flex-col">
-          <TaskRefWithChildren
+          <TaskRefLine
             reportsBelow
             taskRef={{
               todoId,

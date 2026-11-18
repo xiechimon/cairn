@@ -1,4 +1,4 @@
-import { isInfoOutput, RESEARCH_BEFORE_PLAN_SOURCE_KIND } from '@cairn/shared';
+import { isInfoOutput, RESEARCH_STUCK_SOURCE_KIND } from '@cairn/shared';
 import type { TodoGlance } from '../detail/segments.js';
 import type { ChiefSegment } from '../fixtures/records.js';
 import { parseMentionSegments } from '../overlay/mention-token.js';
@@ -13,45 +13,29 @@ export interface TaskRef {
 
 export const MAX_TASK_REFS = 3;
 
-const BEFORE_PLAN_REF = 'before-plan:';
-
 interface GlanceSource {
   phase: string;
   seqNum?: number;
   title: string;
   sourceKind?: string | null;
   sourceRef?: string | null;
+  blockedBy?: readonly string[] | null;
   output?: string;
   latestBuildId?: string | null;
   projectId?: string;
 }
 
 export function todoGlanceOf(todo: GlanceSource): TodoGlance {
-  const parentId =
-    todo.sourceKind === RESEARCH_BEFORE_PLAN_SOURCE_KIND &&
-    todo.sourceRef?.startsWith(BEFORE_PLAN_REF) === true
-      ? todo.sourceRef.slice(BEFORE_PLAN_REF.length)
-      : undefined;
   return {
     phase: todo.phase as TodoGlance['phase'],
     ...(todo.seqNum !== undefined ? { seq: todo.seqNum } : {}),
     title: todo.title,
-    ...(parentId !== undefined ? { parentId } : {}),
+    ...(todo.sourceKind === RESEARCH_STUCK_SOURCE_KIND ? { internal: true } : {}),
+    ...(todo.blockedBy != null && todo.blockedBy.length > 0 ? { blockedBy: todo.blockedBy } : {}),
     ...(isInfoOutput(todo.output) ? { report: true } : {}),
     ...(todo.latestBuildId != null ? { buildId: todo.latestBuildId } : {}),
     ...(todo.projectId !== undefined ? { projectId: todo.projectId } : {}),
   };
-}
-
-export function childRefsOf(todoId: string, glances: ReadonlyMap<string, TodoGlance>): TaskRef[] {
-  return [...glances]
-    .filter(([, glance]) => glance.parentId === todoId)
-    .map(([id, glance]) => ({
-      todoId: id,
-      seq: glance.seq ?? null,
-      title: glance.title ?? null,
-      phase: glance.phase,
-    }));
 }
 
 interface RefSource {
@@ -156,21 +140,14 @@ export function placeTaskRefs(
   glances: ReadonlyMap<string, TodoGlance>,
   seen: Set<string>,
 ): ReadonlyMap<GroupedRow['item'], readonly TaskRef[]> {
-  const show = (todoId: string) => {
-    seen.add(todoId);
-    for (const child of childRefsOf(todoId, glances)) seen.add(child.todoId);
-  };
   const placed = new Map<GroupedRow['item'], readonly TaskRef[]>();
   for (const { item } of rows) {
-    if (item.kind === 'task-card') show(item.todoId);
+    if (item.kind === 'task-card') seen.add(item.todoId);
     if (item.kind !== 'robot' || item.typing === true) continue;
-    const all = taskRefsOf({}, glances, startedBy.get(item) ?? []);
-    const listed = new Set(all.map((ref) => ref.todoId));
-    const refs = all.filter((ref) => {
-      const parentId = glances.get(ref.todoId)?.parentId;
-      return !seen.has(ref.todoId) && (parentId === undefined || !listed.has(parentId));
-    });
-    for (const ref of refs) show(ref.todoId);
+    const refs = taskRefsOf({}, glances, startedBy.get(item) ?? []).filter(
+      (ref) => !seen.has(ref.todoId) && glances.get(ref.todoId)?.internal !== true,
+    );
+    for (const ref of refs) seen.add(ref.todoId);
     if (refs.length > 0) placed.set(item, stableRefs(item, refs));
   }
   return placed;
@@ -184,10 +161,6 @@ export function placeReportCards(
   glances: ReadonlyMap<string, TodoGlance>,
   seen: Set<string>,
 ): ReadonlyMap<GroupedRow['item'], readonly string[]> {
-  const withChildren = (todoId: string) => [
-    todoId,
-    ...childRefsOf(todoId, glances).map((child) => child.todoId),
-  ];
   const deliveredIn = (item: GroupedRow['item']) =>
     item.kind === 'robot' &&
     item.report !== undefined &&
@@ -198,11 +171,10 @@ export function placeReportCards(
   const placed = new Map<GroupedRow['item'], readonly string[]>();
   for (const { item } of rows) {
     if (item.kind !== 'robot' || item.typing === true) continue;
-    const started = (startedBy.get(item) ?? [])
-      .flatMap(withChildren)
-      .filter((id) => !noticed.has(id));
+    const started = (startedBy.get(item) ?? []).filter((id) => !noticed.has(id));
     const ids = [...new Set([...deliveredIn(item), ...started])].filter(
-      (id) => glances.get(id)?.report === true && !seen.has(id),
+      (id) =>
+        glances.get(id)?.report === true && glances.get(id)?.internal !== true && !seen.has(id),
     );
     for (const id of ids) seen.add(id);
     if (ids.length === 0) continue;

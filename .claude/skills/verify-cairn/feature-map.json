@@ -1187,7 +1187,6 @@
       "code": {
         "server": [
           "apps/server/src/services/research-trigger.ts",
-          "apps/server/src/services/research-before-plan.ts",
           "apps/server/src/services/research-stuck.ts"
         ],
         "daemon": [

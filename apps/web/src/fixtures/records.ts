@@ -85,6 +85,7 @@ export interface TodoRecord {
   hasPlan: boolean;
   buildHistory: BuildRef[];
   sourceTodo: string | null;
+  blockedBy?: string[];
   v: number;
   chiefCreated?: boolean;
   waitingOn?: { on: 'machine' | 'quota'; retryAt: number | null };

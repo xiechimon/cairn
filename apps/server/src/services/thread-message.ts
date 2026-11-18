@@ -28,7 +28,6 @@ import {
   replayAfterConflict,
 } from './client-message.js';
 import { assertProjectWritable } from './project-writable.js';
-import { holdCodeThreadForPriorResearch } from './research-before-plan.js';
 import { pendingWorkerQuestionIds, pendingWorkerQuestions } from './worker-question-store.js';
 import { settleQuestionAnswers } from './worker-questions.js';
 
@@ -96,7 +95,6 @@ export function startThreadBuild(
     prompt,
   });
   if (!started) throw new Error('build missing after start');
-  holdCodeThreadForPriorResearch(deps, row.id);
   return started.id;
 }
 

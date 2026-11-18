@@ -301,7 +301,7 @@ test('a thread already shown under the reply that started it adds no row for its
   await expect(first.getByTestId('chief-task-ref')).toHaveCount(1);
 });
 
-test('research opened before planning hangs under its code task as a nested row', async ({
+test('a split request shows research and code as flat sibling rows; the code row says what it waits for', async ({
   page,
 }) => {
   const research = {
@@ -311,33 +311,32 @@ test('research opened before planning hangs under its code task as a nested row'
     title: 'Research export formats',
     phase: 'building',
     output: 'info',
-    sourceKind: 'research-before-plan',
-    sourceRef: `before-plan:${TASK.id}`,
   };
   await mockLive(page, {
     threads: [THREAD],
     messages: [
-      { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+      { id: 'request', role: 'user', content: 'Research export formats first, then add an export', createdAt: 10 },
+      createTodoRow('create-research', research, 14),
       createTodoRow('create', TASK, 15),
       {
         id: 'started',
         role: 'assistant',
-        content: `Started [#${TASK.seqNum}](todo:${TASK.id}); it researches first.`,
+        content: 'Split in two: the research first, then the export.',
         createdAt: 20,
       },
     ],
-    todos: [{ ...TASK, phase: 'queued' }, research],
+    todos: [research, { ...TASK, phase: 'queued', blockedBy: [research.id] }],
   });
   await page.goto('/app');
   const refs = page.getByTestId('home-c').getByTestId('chief-task-refs');
-  await expect(refs.getByTestId('chief-task-ref')).toHaveText([
-    new RegExp(`^${TASK.title}`),
-    /^Research export formats/,
-  ]);
-  const [parent, child] = await refs
-    .getByTestId('chief-task-ref')
-    .evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().left));
-  expect(child! - parent!).toBe(24);
+  const rows = refs.getByTestId('chief-task-ref');
+  await expect(rows).toHaveText([/^Research export formats/, new RegExp(`^${TASK.title}`)]);
+  const lefts = await rows.evaluateAll((all) => all.map((row) => row.getBoundingClientRect().left));
+  expect(lefts[1]).toBe(lefts[0]);
+  await rows.nth(1).hover();
+  await expect(
+    page.getByTestId('chief-task-ref-hover').locator('[data-slot="task-ref-starts-after"]'),
+  ).toContainText('Research export formats');
 });
 
 test('a research report is one card under its research row; hover shows a summary and a click opens the document', async ({
@@ -351,8 +350,6 @@ test('a research report is one card under its research row; hover shows a summar
     phase: 'needs_input',
     output: 'info',
     latestBuildId: 'build-research',
-    sourceKind: 'research-before-plan',
-    sourceRef: `before-plan:${TASK.id}`,
   };
   const report = {
     id: 'info-report-build-research',
@@ -369,15 +366,16 @@ test('a research report is one card under its research row; hover shows a summar
     threads: [THREAD],
     messages: [
       { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+      createTodoRow('create-research', research, 14),
       createTodoRow('create', TASK, 15),
       {
         id: 'started',
         role: 'assistant',
-        content: `Started [#${TASK.seqNum}](todo:${TASK.id}); it researches first.`,
+        content: 'Started both; the export waits for the research.',
         createdAt: 20,
       },
     ],
-    todos: [{ ...TASK, phase: 'queued' }, research],
+    todos: [{ ...TASK, phase: 'queued', blockedBy: [research.id] }, research],
   };
   await mockLive(page, state, (path, _route, json) =>
     path === '/api/conversations/build-research/messages'
