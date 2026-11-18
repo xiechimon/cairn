@@ -4,6 +4,7 @@ import {
   COMPUTER_DIRECT_TOOLS,
   COMPUTER_OBSERVE_TOOLS,
   CONNECTOR_TOOL_PREFIX,
+  INSTALL_PACKAGES_TOOL,
   REPORT_ACK_KIND,
   type ReportAckContent,
 } from '@cairn/shared';
@@ -47,6 +48,7 @@ const MAIL_TURN_OPEN_TOOLS: ReadonlySet<string> = new Set([
   'create_todo',
   ...COMPUTER_OBSERVE_TOOLS,
   ...COMPUTER_DIRECT_TOOLS,
+  INSTALL_PACKAGES_TOOL,
 ]);
 const ACTION_WAKE_PROVENANCE_PREFIX = 'action-proposal:';
 

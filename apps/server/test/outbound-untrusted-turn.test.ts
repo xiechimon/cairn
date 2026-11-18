@@ -3,13 +3,16 @@ import type { McpConnectorTool } from '@cairn/shared';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { and, eq } from 'drizzle-orm';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import {
   actionProposal,
   chief,
   chiefMessage,
   chiefThread,
+  computer,
+  computerCall,
+  machine,
   mcpConnector,
   step,
 } from '../src/db/schema.js';
@@ -300,6 +303,53 @@ describe('outbound actions in turns that carry untrusted outside content', () =>
     w.s.dispose();
   });
 
+  test('a mail turn install_packages parks its normal approval card', async () => {
+    const w = world();
+    w.s.db
+      .insert(machine)
+      .values({
+        id: 'mac',
+        teamId: w.s.team.id,
+        name: 'mac',
+        online: true,
+        lastSeenAt: 1,
+        capabilities: { mcpServers: [], skills: [], computer: true, computerKind: 'vm' },
+      })
+      .run();
+    w.s.db
+      .insert(computer)
+      .values({
+        id: 'computer-a',
+        teamId: w.s.team.id,
+        scopeKey: 'chief:chief-agent-a',
+        machineId: 'mac',
+        providerRef: 'p',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    w.s.machineHub.subscribeMachine(w.s.team.id, 'mac', () => undefined);
+    const abort = new AbortController();
+    const held = relayComputerTool(
+      w.deps,
+      null,
+      w.turn(MAIL_PROMPT),
+      'install_packages',
+      { packages: ['ffmpeg'] },
+      'install-1',
+      abort.signal,
+    );
+    await vi.waitFor(() => {
+      const rows = w.s.db.select().from(computerCall).all();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.params).toEqual({ packages: ['ffmpeg'], approval: 'pending' });
+    });
+    abort.abort();
+    await held;
+    expect(w.s.db.select().from(actionProposal).all()).toEqual([]);
+    w.s.dispose();
+  });
+
   test('a mail turn may read and create tasks but not change anything else', () => {
     const w = world();
     for (const name of [
@@ -312,15 +362,10 @@ describe('outbound actions in turns that carry untrusted outside content', () =>
       'browser_act',
       'computer_act',
       'desktop_act',
-    ])
-      expect(() => refuseRestrictedTurnTool(w.s.db, MAIL_PROMPT, name)).not.toThrow();
-    for (const name of [
-      'set_secret',
-      'schedule_todo',
-      'save_memory',
-      'user_computer_shell',
       'install_packages',
     ])
+      expect(() => refuseRestrictedTurnTool(w.s.db, MAIL_PROMPT, name)).not.toThrow();
+    for (const name of ['set_secret', 'schedule_todo', 'save_memory', 'user_computer_shell'])
       expect(() => refuseRestrictedTurnTool(w.s.db, MAIL_PROMPT, name)).toThrow(
         /mail turn cannot call/,
       );
