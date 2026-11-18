@@ -125,6 +125,15 @@ describe('a Runner-claimed chief turn offers the computer tools the grants allow
     const names = await toolNames(s);
     for (const name of [...DESKTOP_TOOLS, ...VM_TOOLS]) expect(names).not.toContain(name);
     expect(names).toContain('browser_navigate');
+    expect(names).toContain('request_cloak_license');
+  });
+
+  test('the license card is withheld when the browser grant is also off', async () => {
+    const s = boot();
+    const id = addVm(s, { desktopOff: true });
+    s.db.update(machineTable).set({ browserOverride: false }).where(eq(machineTable.id, id)).run();
+    const names = await toolNames(s);
+    expect(names).not.toContain('request_cloak_license');
   });
 
   test('a host-kind computer offers the desktop tools but not the VM tools', async () => {

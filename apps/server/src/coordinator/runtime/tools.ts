@@ -279,6 +279,7 @@ export function coordinatorToolsExtension(
     routerTools?: boolean;
     desktopTools?: boolean;
     vmComputer?: boolean;
+    vmBrowser?: boolean;
     ownComputer?: boolean;
     connectorTools?: RemoteToolDef[];
     remoteTools?: readonly RemoteToolDef[];

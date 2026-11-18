@@ -107,7 +107,7 @@ import {
   findClientMessage,
   replayAfterConflict,
 } from './client-message.js';
-import { teamHasVmComputer } from './cloak-license.js';
+import { teamHasVmBrowser, teamHasVmComputer } from './cloak-license.js';
 import { coordinatorRunsOnPi, lastTurnContext, wakeCoordinator } from './coordinator-context.js';
 import { runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -1915,7 +1915,8 @@ export function buildChiefSystemPrompt(
     .where(eq(machine.teamId, teamId))
     .all()
     .some((row) => row.capabilities?.agentReach !== undefined);
-  const cloakLicenseCard = teamHasVmComputer(deps.db, teamId);
+  const vmComputerTools = teamHasVmComputer(deps.db, teamId);
+  const cloakLicenseCard = vmComputerTools || teamHasVmBrowser(deps.db, teamId);
   const skills = scanLocalSkills(deps.skillsDir).filter(
     (skill) => skill.id !== 'agent-reach' || reachEnabled,
   );
@@ -1982,7 +1983,7 @@ export function buildChiefSystemPrompt(
         ? '工具说没有 CloakBrowser 许可时，调 request_cloak_license 在对话里发许可证卡，不要让用户去设置页，也不要在对话里索取许可证；它返回已保存后，原样重试刚才那次调用。工具说 CloakBrowser 拒绝了许可证时，把 CloakBrowser 给的原因填进 reason，再调一次 request_cloak_license。隐身浏览器也被拦下，或者座位已满时，'
         : '隐身浏览器也被拦下，或者工具说没有 CloakBrowser 许可、座位已满时，') +
       '不要再重试，也不要设法绕过拦截：直接用 request_takeover 请用户自己操作，并说明是哪个网站拦下的。',
-    ...(cloakLicenseCard
+    ...(vmComputerTools
       ? [
           '- 你自己的电脑（虚拟机）里有 shell 工具：跑命令、脚本、下载、查文件都直接用它，不必右键菜单去开终端，也不要把「只有 Mac 的 shell」当成限制；user_computer_shell 才是主人的 Mac。输出只保留开头和结尾，长输出自己重定向到文件再读需要的部分。',
           '- 电脑缺系统软件（apt 包，例如 ffmpeg）时调 install_packages，只填 Debian 包名，最多 20 个。它会在对话里发审批卡，用户批准后才以 root 安装，电脑更新或恢复后自动重装；你自己没有 root，也不要用别的办法装系统包。用户拒绝或没回应时照实告诉用户，不要再试。Python 和 Node 包不用审批：在电脑终端里用 pip install --user 或 npm i -g，它们装在 home 里，电脑重建后还在。',

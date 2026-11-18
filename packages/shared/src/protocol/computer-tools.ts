@@ -175,6 +175,17 @@ export const SHELL_TOOL_PARAMETERS = obj(
   ['command'],
 );
 
+export const CLOAK_LICENSE_TOOL: RemoteToolDef = {
+  name: REQUEST_CLOAK_LICENSE_TOOL,
+  description:
+    'Post a CloakBrowser license card in the chat so the owner can paste the key, which is saved as a team secret you never see. Waits until the owner saves it, then retry the stealth browser call that needed it.',
+  parameters: obj({
+    reason: str(
+      'Why the key is needed. When CloakBrowser rejected the saved key, its reason as the tool reported it.',
+    ),
+  }),
+};
+
 export const COMPUTER_VM_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'shell',
@@ -182,16 +193,7 @@ export const COMPUTER_VM_TOOLS: readonly RemoteToolDef[] = [
       "Your VM computer, not the owner's Mac (user_computer_shell is the Mac). Run a shell command in the Coordinator computer: scripts, downloads, checking files, starting apps. Output is bounded: the first 16 KiB and last 48 KiB are kept. For apps with a window, desktop_snapshot reads them afterwards.",
     parameters: SHELL_TOOL_PARAMETERS,
   },
-  {
-    name: REQUEST_CLOAK_LICENSE_TOOL,
-    description:
-      'Post a CloakBrowser license card in the chat so the owner can paste the key, which is saved as a team secret you never see. Waits until the owner saves it, then retry the stealth browser call that needed it.',
-    parameters: obj({
-      reason: str(
-        'Why the key is needed. When CloakBrowser rejected the saved key, its reason as the tool reported it.',
-      ),
-    }),
-  },
+  CLOAK_LICENSE_TOOL,
   {
     name: INSTALL_PACKAGES_TOOL,
     description:

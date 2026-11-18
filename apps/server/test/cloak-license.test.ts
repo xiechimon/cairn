@@ -17,7 +17,11 @@ import {
 } from '../src/db/schema.js';
 import { issueBrowserSession } from '../src/services/browser-session.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
-import { holdCloakLicense, teamHasVmComputer } from '../src/services/cloak-license.js';
+import {
+  holdCloakLicense,
+  teamHasVmBrowser,
+  teamHasVmComputer,
+} from '../src/services/cloak-license.js';
 import { coordinatorToolDefs } from '../src/services/coordinator-tool-defs.js';
 import type { MachineDeps } from '../src/services/machine-deps.js';
 import { executeRelayToolCall } from '../src/services/machine-relay.js';
@@ -347,5 +351,65 @@ describe('request_cloak_license is offered only with a VM computer', () => {
     expect(withVm).toContain('不要让用户去设置页');
     expect(withVm).toContain('原样重试刚才那次调用');
     expect(withVm).toContain('把 CloakBrowser 给的原因填进 reason');
+  });
+
+  test('the license tool is offered for a browser-usable VM even with the desktop grant off', () => {
+    expect(
+      coordinatorToolDefs({ vmBrowser: true }).map((def) => def.name),
+    ).toContain(REQUEST_CLOAK_LICENSE_TOOL);
+    const names = coordinatorToolDefs({ vmBrowser: true }).map((def) => def.name);
+    expect(names).not.toContain('shell');
+    expect(names).not.toContain('install_packages');
+
+    const { s, deps } = boot();
+    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(false);
+    addVmMachine(s, 'host');
+    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(false);
+    addVmMachine(s, 'vm');
+    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(true);
+    s.db
+      .update(machineTable)
+      .set({ desktopOverride: false })
+      .where(eq(machineTable.id, 'mac-vm'))
+      .run();
+    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(true);
+    s.db
+      .update(machineTable)
+      .set({ browserOverride: false })
+      .where(eq(machineTable.id, 'mac-vm'))
+      .run();
+    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(false);
+    s.db
+      .update(machineTable)
+      .set({ browserOverride: null })
+      .where(eq(machineTable.id, 'mac-vm'))
+      .run();
+    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(true);
+    s.db
+      .update(machineTable)
+      .set({ capabilities: { mcpServers: [], skills: [], computer: true, computerKind: 'vm' } })
+      .where(eq(machineTable.id, 'mac-vm'))
+      .run();
+    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(false);
+
+    const prompt = composeChiefSystemPrompt(deps, s.team.id, THREAD);
+    expect(prompt).not.toContain(REQUEST_CLOAK_LICENSE_TOOL);
+    s.db
+      .update(machineTable)
+      .set({
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          computer: true,
+          browser: true,
+          stealthBrowser: true,
+          computerKind: 'vm',
+        },
+      })
+      .where(eq(machineTable.id, 'mac-vm'))
+      .run();
+    const on = composeChiefSystemPrompt(deps, s.team.id, THREAD);
+    expect(on).toContain('调 request_cloak_license 在对话里发许可证卡');
+    expect(on).not.toContain('install_packages，只填 Debian 包名');
   });
 });

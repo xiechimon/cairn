@@ -26,7 +26,7 @@ import { nowMs } from '../lib/ids.js';
 import { blockedNow } from '../services/blockers.js';
 import { parseChiefTrigger } from '../services/chief.js';
 import { hasEarlierLiveChiefStep, STEER_HOLDS } from '../services/chief-turns.js';
-import { teamHasVmComputer } from '../services/cloak-license.js';
+import { teamHasVmBrowser, teamHasVmComputer } from '../services/cloak-license.js';
 import { connectorToolDefsForTeam } from '../services/connector-broker.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
@@ -287,6 +287,10 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       vmComputer: (threadId) => {
         const teamId = threadTeam(threadId);
         return teamId !== null && teamHasVmComputer(db, teamId);
+      },
+      vmBrowser: (threadId) => {
+        const teamId = threadTeam(threadId);
+        return teamId !== null && teamHasVmBrowser(db, teamId);
       },
       connectorTools: (threadId) => {
         const teamId = threadTeam(threadId);
@@ -571,6 +575,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             routerTools: options.routerTools ?? true,
             desktopTools: teamOffersDesktop(db, threadRow.teamId),
             vmComputer: teamHasVmComputer(db, threadRow.teamId),
+            vmBrowser: teamHasVmBrowser(db, threadRow.teamId),
             ownComputer: ownComputerOffered(db, row.buildId, row.id),
           }),
           ...connectorToolDefsForTeam(db, threadRow.teamId),

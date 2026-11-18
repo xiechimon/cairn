@@ -26,6 +26,21 @@ export function teamHasVmComputer(db: Db, teamId: string): boolean {
     );
 }
 
+export function teamHasVmBrowser(db: Db, teamId: string): boolean {
+  return db
+    .select({ capabilities: machine.capabilities, browserOverride: machine.browserOverride })
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .all()
+    .some(
+      (row) =>
+        row.browserOverride !== false &&
+        row.capabilities?.computer === true &&
+        row.capabilities.computerKind === 'vm' &&
+        row.capabilities.browser === true,
+    );
+}
+
 function licenseRow(db: Db, teamId: string) {
   return db
     .select({ id: secret.id, revision: secret.policyRevision, updatedAt: secret.updatedAt })

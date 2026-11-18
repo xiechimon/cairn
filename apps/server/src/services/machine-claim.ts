@@ -55,7 +55,7 @@ import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
-import { teamHasVmComputer } from './cloak-license.js';
+import { teamHasVmBrowser, teamHasVmComputer } from './cloak-license.js';
 import { connectorToolDefsForTeam } from './connector-broker.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { quickLaneRefusal } from './coordinator-request.js';
@@ -391,6 +391,7 @@ function chiefClaimPayload(
               ...coordinatorToolDefs({
                 desktopTools: teamOffersDesktop(deps.db, threadRow.teamId),
                 vmComputer: teamHasVmComputer(deps.db, threadRow.teamId),
+                vmBrowser: teamHasVmBrowser(deps.db, threadRow.teamId),
                 ownComputer: ownComputerOffered(deps.db, stepRow.buildId, stepRow.id),
               }),
               ...connectorToolDefsForTeam(deps.db, threadRow.teamId),

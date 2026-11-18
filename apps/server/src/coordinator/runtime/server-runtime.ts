@@ -48,6 +48,7 @@ export interface ServerRuntimeConfig {
   factsFor(threadId: string): ReconcileFacts;
   desktopTools?(threadId: string): boolean;
   vmComputer?(threadId: string): boolean;
+  vmBrowser?(threadId: string): boolean;
   connectorTools?(threadId: string): RemoteToolDef[];
   ownComputer?(threadId: string, stepId: string): boolean;
   providersFor?(threadId: string): readonly ProviderBinding[];
@@ -130,6 +131,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         routerTools: config.routerTools,
         desktopTools: config.desktopTools?.(threadId) === true,
         vmComputer: config.vmComputer?.(threadId) === true,
+        vmBrowser: config.vmBrowser?.(threadId) === true,
         connectorTools: config.connectorTools?.(threadId) ?? [],
         ...(isChiefMemoryThreadId(threadId) ? { remoteTools: WORKER_MEMORY_REMOTE_TOOLS } : {}),
         ownComputer,

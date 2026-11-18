@@ -1,4 +1,5 @@
 import {
+  COMPUTER_BROWSER_TOOLS,
   COMPUTER_FRAME_TEXT_MAX_CHARS,
   COMPUTER_REPLAY_SAFE_TOOLS,
   type ComputerCall,
@@ -84,11 +85,7 @@ const ORB_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'browser_act',
 ]);
 
-const BROWSER_TOOLS: ReadonlySet<ComputerTool> = new Set([
-  'browser_navigate',
-  'browser_snapshot',
-  'browser_act',
-]);
+const BROWSER_TOOLS: ReadonlySet<ComputerTool> = new Set(COMPUTER_BROWSER_TOOLS);
 
 interface Route {
   provider: ComputerProvider;

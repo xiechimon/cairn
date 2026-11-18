@@ -2,6 +2,7 @@ import {
   CHIEF_REMOTE_TOOLS,
   CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
+  CLOAK_LICENSE_TOOL,
   COMPUTER_DESKTOP_TOOLS,
   COMPUTER_REMOTE_TOOLS,
   COMPUTER_VM_TOOLS,
@@ -80,6 +81,7 @@ export function coordinatorToolDefs(
     routerTools?: boolean;
     desktopTools?: boolean;
     vmComputer?: boolean;
+    vmBrowser?: boolean;
     ownComputer?: boolean;
   } = {},
 ): RemoteToolDef[] {
@@ -89,7 +91,11 @@ export function coordinatorToolDefs(
     ...CHIEF_REPLY_TOOLS,
     ...COMPUTER_REMOTE_TOOLS,
     ...(options.desktopTools === true ? COMPUTER_DESKTOP_TOOLS : []),
-    ...(options.vmComputer === true ? COMPUTER_VM_TOOLS : []),
+    ...(options.vmComputer === true
+      ? COMPUTER_VM_TOOLS
+      : options.vmBrowser === true
+        ? [CLOAK_LICENSE_TOOL]
+        : []),
     ...(options.ownComputer === true ? OWN_COMPUTER_TOOLS : []),
     ...actionToolDefs(),
   ];
