@@ -5,13 +5,19 @@ import type {
   ScheduleRecord,
   UserRecord,
 } from '@cairn/shared';
-import { classifyStepFailure, isProviderOutage, SCHEDULE_MINUTE_STEPS } from '@cairn/shared';
+import {
+  ACTIVE_STEP_STATUSES,
+  classifyStepFailure,
+  isProviderOutage,
+  SCHEDULE_MINUTE_STEPS,
+} from '@cairn/shared';
 import { CronExpressionParser } from 'cron-parser';
-import { and, desc, eq, isNotNull, isNull, like, lte, max, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, like, lte, max, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, message, project, schedule, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { newScheduleWebhookToken, scheduleWebhookSecretOf } from '../lib/webhook-token.js';
 import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
 import { notifyScheduleRun } from './notifications.js';
@@ -61,8 +67,14 @@ export function assertMinuteStep(atMs: number, tz: string): void {
   }
 }
 
-export function isRecurring(kind: ScheduleKind): kind is Exclude<ScheduleKind, 'once'> {
-  return kind !== 'once';
+export function isTriggerKind(kind: ScheduleKind): kind is 'event' | 'webhook' {
+  return kind === 'event' || kind === 'webhook';
+}
+
+export function isRecurring(
+  kind: ScheduleKind,
+): kind is Exclude<ScheduleKind, 'once' | 'event' | 'webhook'> {
+  return kind !== 'once' && !isTriggerKind(kind);
 }
 
 export function cronExpressionFor(
@@ -127,6 +139,11 @@ export function toScheduleRecord(deps: ScheduleDeps, row: ScheduleRow): Schedule
     lastRunStatus: row.lastRunStatus,
     lastRunError: row.lastRunError,
     pausedReason: row.pausedReason,
+    triggerSpec: row.triggerSpec,
+    webhookMasked: row.webhookMasked,
+    webhookLastUsedAt: row.webhookLastUsedAt,
+    missedRunWindowMs: row.missedRunWindowMs,
+    createdAt: row.createdAt,
     createdBy: row.createdBy,
     todo: {
       seqNum: todoRow.seqNum,
@@ -151,7 +168,7 @@ export function listSchedules(deps: ScheduleDeps, teamId: string): ScheduleRecor
 export function createSchedule(
   deps: ScheduleDeps,
   input: CreateScheduleBody & { teamId: string; createdBy: string },
-  options: { allowAnyMinute?: boolean } = {},
+  options: { allowAnyMinute?: boolean; webhookToken?: string } = {},
 ): ScheduleRecord {
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, input.todoId)).get();
   if (!todoRow || todoRow.teamId !== input.teamId) {
@@ -172,7 +189,13 @@ export function createSchedule(
   const id = newRecordId();
   const at = input.at ?? null;
   const cron = cronExpressionFor(input.kind, at, tz, input.cron ?? null);
-  const nextRunAt = computeNextRunAt(input.kind, at, tz, now, cron);
+  const webhook =
+    input.kind === 'webhook'
+      ? scheduleWebhookSecretOf(options.webhookToken ?? newScheduleWebhookToken().token)
+      : null;
+  const nextRunAt = isTriggerKind(input.kind)
+    ? null
+    : computeNextRunAt(input.kind, at, tz, now, cron);
   const values = {
     id,
     teamId: input.teamId,
@@ -184,6 +207,13 @@ export function createSchedule(
     prompt: input.prompt ?? '',
     enabled: input.enabled ?? true,
     tz,
+    triggerSpec: input.kind === 'event' ? input.triggerSpec : null,
+    webhookTokenHash: webhook?.hash ?? null,
+    webhookMasked: webhook?.masked ?? null,
+    webhookDeliveries: input.kind === 'webhook' ? [] : null,
+    webhookLastUsedAt: null,
+    missedRunWindowMs: input.missedRunWindowMs ?? null,
+    createdAt: now,
     nextRunAt,
     lastRunAt: null,
     lastRunStatus: null,
@@ -225,7 +255,9 @@ export function setScheduleEnabled(
       const now = nowMs();
       const nextRunAt = isRecurring(row.kind)
         ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
-        : Math.max(row.at ?? now, now);
+        : isTriggerKind(row.kind)
+          ? null
+          : Math.max(row.at ?? now, now);
       deps.db
         .update(schedule)
         .set({ enabled: true, nextRunAt, pausedReason: null, retryNotBefore: null })
@@ -454,6 +486,77 @@ export function recordScheduleFailure(
   if (!scheduleFailureIsTransient(reason)) pauseSchedule(deps, id, reason);
 }
 
+export const MISSED_RUN_WINDOW_MS = 12 * 60 * 60_000;
+
+export function applyMissedRunWindow(deps: ScheduleDeps, row: ScheduleRow, now: number): boolean {
+  if (row.nextRunAt === null) return false;
+  const armedAt = Math.max(row.nextRunAt, row.createdAt ?? row.nextRunAt);
+  if (now - armedAt <= (row.missedRunWindowMs ?? MISSED_RUN_WINDOW_MS)) return false;
+  let nextRunAt: number | null = null;
+  if (isRecurring(row.kind)) {
+    try {
+      nextRunAt = computeNextRunAt(row.kind, row.at, row.tz, now, row.cron);
+    } catch (err) {
+      pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
+      return true;
+    }
+  }
+  deps.db
+    .update(schedule)
+    .set({
+      lastRunStatus: 'skipped',
+      lastRunError: 'missed the run window',
+      retryNotBefore: null,
+    })
+    .where(eq(schedule.id, row.id))
+    .run();
+  updateNextRunAt(deps, row.id, nextRunAt);
+  return true;
+}
+
+function dispatchEventScheduleClaims(deps: ScheduleDeps, stepRow: typeof step.$inferSelect): void {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  if (buildRow === undefined) return;
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (todoRow === undefined || todoRow.archivedAt !== null) return;
+  if (todoRow.latestBuildId !== buildRow.id) return;
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  if (projectRow === undefined || projectRow.archivedAt !== null) return;
+  const stillActive = deps.db
+    .select({ id: step.id })
+    .from(step)
+    .where(and(eq(step.buildId, buildRow.id), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
+    .get();
+  if (stillActive !== undefined) return;
+  const candidates = deps.db
+    .select()
+    .from(schedule)
+    .where(
+      and(
+        eq(schedule.todoId, todoRow.id),
+        eq(schedule.kind, 'event'),
+        eq(schedule.enabled, true),
+        isNull(schedule.nextRunAt),
+      ),
+    )
+    .all();
+  if (candidates.length === 0) return;
+  const routineStep = deps.db
+    .select({ scheduleId: step.scheduleId })
+    .from(step)
+    .where(and(eq(step.buildId, buildRow.id), isNotNull(step.scheduleId)))
+    .all();
+  const ownRunIds = new Set(
+    routineStep.map((r) => r.scheduleId).filter((id): id is string => id !== null),
+  );
+  const now = nowMs();
+  for (const row of candidates) {
+    if (row.triggerSpec?.topic !== 'todo.build.completed') continue;
+    if (ownRunIds.has(row.id)) continue;
+    updateNextRunAt(deps, row.id, now);
+  }
+}
+
 export function finishScheduledStep(
   deps: ScheduleDeps & { user: UserRecord },
   stepRow: typeof step.$inferSelect,
@@ -461,6 +564,7 @@ export function finishScheduledStep(
     status: 'completed',
   },
 ): void {
+  dispatchEventScheduleClaims(deps, stepRow);
   if (stepRow.scheduleId === null) return;
   const row = deps.db
     .select()

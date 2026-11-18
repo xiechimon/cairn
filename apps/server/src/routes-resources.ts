@@ -42,6 +42,7 @@ import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubAppUserRepos, githubUserRepos, isGithubAppUserToken } from './lib/github.js';
 import { nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
+import { newScheduleWebhookToken } from './lib/webhook-token.js';
 import {
   createApiKeyBodySchema,
   githubAppOf,
@@ -255,12 +256,25 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/schedules', async (c) => {
     const body = parseWith(createScheduleBodySchema, await jsonBody(c), 'body');
-    const record = createSchedule(svc, {
-      ...body,
-      teamId: ctx.team.id,
-      createdBy: ctx.user.id,
-    });
-    return c.json(record, 201);
+    const webhookToken = body.kind === 'webhook' ? newScheduleWebhookToken() : null;
+    const record = createSchedule(
+      svc,
+      {
+        ...body,
+        teamId: ctx.team.id,
+        createdBy: ctx.user.id,
+      },
+      webhookToken === null ? {} : { webhookToken: webhookToken.token },
+    );
+    if (webhookToken === null) return c.json(record, 201);
+    return c.json(
+      {
+        ...record,
+        webhookToken: webhookToken.token,
+        webhookUrl: `${new URL(c.req.url).origin}/api/webhook/schedule/${webhookToken.token}`,
+      },
+      201,
+    );
   });
 
   app.patch('/api/schedules/:id', async (c) => {

@@ -17,10 +17,12 @@ describe('retired zero-use features (#1796)', () => {
     expect(DB_TABLES).not.toContain('shell_command');
   });
 
-  it('drops the whats-new route and every webhook route from the web vocabulary', () => {
+  it('drops the whats-new route and every retired webhook route from the web vocabulary', () => {
     const paths = WEB_REST_ENDPOINTS.map((endpoint) => endpoint.path);
     expect(paths).not.toContain('/api/whats-new');
-    expect(paths.some((path) => path.includes('webhook'))).toBe(false);
+    expect(
+      paths.some((path) => path.includes('webhook') && path !== '/api/webhook/schedule/{token}'),
+    ).toBe(false);
   });
 
   it('drops remote shell from agent switches, chief tools, machine wire, and custom tools', () => {

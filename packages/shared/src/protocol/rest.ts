@@ -173,6 +173,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'plan.md unified diff（02 §4.2/r5 §4）',
   },
   { method: 'GET', path: '/api/schedules', query: ['team'] },
+  { method: 'POST', path: '/api/webhook/schedule/{token}' },
   {
     method: 'GET',
     path: '/api/skills',

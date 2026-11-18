@@ -55,6 +55,7 @@ import type {
   RouteUse,
   ScheduleKind,
   ScheduleReport,
+  ScheduleTriggerSpec,
   SecretDelivery,
   SkillInjectionRecord,
   SplitPolicy,
@@ -499,6 +500,13 @@ export const schedule = sqliteTable(
     enabled: bool('enabled').notNull().default(true),
     at: epochMs('at'),
     tz: text('tz').notNull(),
+    triggerSpec: json<ScheduleTriggerSpec>('triggerSpec'),
+    webhookTokenHash: text('webhookTokenHash'),
+    webhookMasked: text('webhookMasked'),
+    webhookDeliveries: json<string[]>('webhookDeliveries'),
+    webhookLastUsedAt: epochMs('webhookLastUsedAt'),
+    missedRunWindowMs: integer('missedRunWindowMs'),
+    createdAt: epochMs('createdAt'),
     nextRunAt: epochMs('nextRunAt'),
     lastRunAt: epochMs('lastRunAt'),
     lastRunStatus: text('lastRunStatus'),
@@ -511,6 +519,7 @@ export const schedule = sqliteTable(
   (t) => [
     index('schedule_nextRunAt_idx').on(t.nextRunAt),
     uniqueIndex('schedule_todoId_unique').on(t.todoId),
+    uniqueIndex('schedule_webhookTokenHash_unique').on(t.webhookTokenHash),
   ],
 );
 

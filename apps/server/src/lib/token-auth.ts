@@ -48,6 +48,7 @@ function isExempt(pathname: string): boolean {
   if (pathname === '/api/oauth/callback') return true;
   if (pathname === '/api/auth/bootstrap') return true;
   if (pathname === '/api/auth/access') return true;
+  if (pathname.startsWith('/api/webhook/schedule/')) return true;
   if (isOpenRemotePath(pathname)) return true;
   return false;
 }

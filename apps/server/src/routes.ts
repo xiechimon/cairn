@@ -16,6 +16,7 @@ import { registerMemoryRoutes } from './routes-memories.js';
 import { registerProjectRoutes } from './routes-projects.js';
 import { registerPushRoutes } from './routes-push.js';
 import { registerResourceRoutes } from './routes-resources.js';
+import { registerScheduleWebhookRoutes } from './routes-schedule-webhook.js';
 import { registerTodoRoutes } from './routes-todos.js';
 import { registerUploadRoutes } from './routes-uploads.js';
 import { handleMcpRequest } from './services/mcp-face.js';
@@ -38,6 +39,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerPushRoutes(app, ctx);
   registerImRoutes(app, ctx);
   registerMailRoutes(app, ctx);
+  registerScheduleWebhookRoutes(app, ctx);
 
   app.all('/api/mcp', (c) =>
     handleMcpRequest(

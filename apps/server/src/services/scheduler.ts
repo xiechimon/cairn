@@ -70,10 +70,12 @@ import { releaseResearchReworkHolds } from './research-stuck.js';
 import { sweepOfflineRunners } from './runner-offline.js';
 import {
   ARCHIVED_SCHEDULE_PAUSE_REASON,
+  applyMissedRunWindow,
   assertWorkerScheduleInterval,
   computeNextRunAt,
   dueSchedules,
   isRecurring,
+  isTriggerKind,
   isWorkerSchedule,
   pauseSchedule,
   recordScheduleFailure,
@@ -309,16 +311,17 @@ export function createScheduler(
       return;
     }
     const workerCreated = isWorkerSchedule(row.createdBy);
-    if (workerCreated) {
-      const history = workerScheduleRunHistory(deps, row.todoId);
-      if (history.consecutive >= WORKER_SCHEDULE_RUN_LIMIT) {
-        pauseSchedule(
-          deps,
-          row.id,
-          'Paused after 10 consecutive scheduled runs without a human message',
-        );
-        return;
-      }
+    const runLimited = workerCreated || isTriggerKind(row.kind);
+    const history = runLimited ? workerScheduleRunHistory(deps, row.todoId) : null;
+    if (history !== null && history.consecutive >= WORKER_SCHEDULE_RUN_LIMIT) {
+      pauseSchedule(
+        deps,
+        row.id,
+        'Paused after 10 consecutive scheduled runs without a human message',
+      );
+      return;
+    }
+    if (workerCreated && history !== null) {
       if (SCHEDULE_GATE_PHASES.has(todoRow.phase)) {
         try {
           const next = isRecurring(row.kind)
@@ -432,6 +435,7 @@ export function createScheduler(
 
   function runSchedule(row: ReturnType<typeof dueSchedules>[number], now: number): Promise<void> {
     if (firing.has(row.id)) return Promise.resolve();
+    if (applyMissedRunWindow(deps, row, now)) return Promise.resolve();
     firing.add(row.id);
     return fireSchedule(row, now)
       .catch((err: unknown) => {
@@ -467,7 +471,7 @@ export function createScheduler(
               row.id,
               computeNextRunAt(row.kind, row.at, row.tz, now, row.cron),
             );
-          else
+          else if (!isTriggerKind(row.kind))
             deps.db
               .update(schedule)
               .set({
