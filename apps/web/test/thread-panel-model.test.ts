@@ -46,6 +46,10 @@ describe('threadUpdates', () => {
 describe('threadOrigin', () => {
   test('resolves matching owner chat segment and timestamp from the stream', () => {
     const request: TaskRequest = {
+      siblings: [],
+      difficulty: null,
+      titleSource: 'owner',
+      titleSourceRef: null,
       segments: [
         {
           text: 'Inspect login traces',
@@ -54,10 +58,6 @@ describe('threadOrigin', () => {
           source: { kind: 'chat', threadId: 'chief-1', messageId: 'msg-1', span: 'whole' },
         },
       ],
-      siblings: [],
-      difficulty: null,
-      titleSource: 'owner',
-      titleSourceRef: null,
     };
     const origin = threadOrigin(request, {
       items: [{ kind: 'user', id: 'msg-1', text: 'Inspect login traces', createdAt: 555 }],
@@ -68,6 +68,10 @@ describe('threadOrigin', () => {
 
   test('returns null timestamp when originating message is not loaded in stream', () => {
     const request: TaskRequest = {
+      siblings: [],
+      difficulty: null,
+      titleSource: 'owner',
+      titleSourceRef: null,
       segments: [
         {
           text: 'Inspect login traces',
@@ -76,10 +80,6 @@ describe('threadOrigin', () => {
           source: { kind: 'chat', threadId: 'chief-1', messageId: 'msg-missing', span: 'whole' },
         },
       ],
-      siblings: [],
-      difficulty: null,
-      titleSource: 'owner',
-      titleSourceRef: null,
     };
     expect(threadOrigin(request, { items: [], at: [] })).toEqual({
       messageId: 'msg-missing',
