@@ -44,7 +44,6 @@ function demoFixtureOf(): FixtureSet {
       phaseAt: input.phaseAt,
       seqNum: input.seqNum,
       orderIndex: input.orderIndex,
-      tagIds: [],
       assignment: input.agent != null ? { agentId: input.agent.id } : null,
       agent: input.agent ?? null,
       latestBuildId: input.latestBuildId ?? null,

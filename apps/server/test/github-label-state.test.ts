@@ -9,7 +9,6 @@ import {
   updateAutonomousTodo,
 } from '../src/services/todos.js';
 import { bootServer, postProject, req } from './helpers.js';
-import { insertLegacyMembership } from './legacy-category-fixtures.js';
 
 async function labelWorld() {
   const s = bootServer();
@@ -21,8 +20,6 @@ async function labelWorld() {
   const projectId = ((await created.json()) as { id: string }).id;
   s.db.run(sql`INSERT INTO github_label (id, projectId, name, color)
     VALUES ('correction-label', ${projectId}, 'CoRrEcTiOn', '#112233')`);
-  s.db.run(sql`INSERT INTO tag (id, projectId, name, color)
-    VALUES ('ordinary-category', ${projectId}, 'regular', '#445566')`);
   const task = createAutonomousTodo(s.svc, {
     teamId: s.team.id,
     projectId,
@@ -41,7 +38,6 @@ function state(s: ReturnType<typeof bootServer>, taskId: string) {
     labels: s.db.all(
       sql`SELECT * FROM todo_github_label WHERE todoId = ${taskId} ORDER BY labelId`,
     ),
-    categories: s.db.all(sql`SELECT * FROM todo_tag WHERE todoId = ${taskId} ORDER BY tagId`),
     schedules: s.db.all(sql`SELECT * FROM schedule WHERE todoId = ${taskId}`),
   };
 }
@@ -50,35 +46,23 @@ describe('dedicated GitHub-label state', () => {
   test('projection and retired category inputs do not conflate labels or weaken correction', async () => {
     const { s, taskId } = await labelWorld();
     expect(getTodo(s.svc, taskId)).toMatchObject({
-      tagIds: [],
       githubLabelIds: ['correction-label'],
     });
-    const before = state(s, taskId);
-    const rejected = await req(s.app, 'PATCH', `/api/todos/${taskId}`, {
-      title: 'Must not persist',
-      tagIds: ['ordinary-category'],
-      githubLabelIds: [],
-    });
-    expect(rejected.status).toBe(400);
-    expect(state(s, taskId)).toEqual(before);
     const patched = await req(s.app, 'PATCH', `/api/todos/${taskId}`, {
       title: 'Public edit',
+      tagIds: ['ordinary-category'],
       githubLabelIds: [],
     });
     expect(patched.status).toBe(200);
     expect(getTodo(s.svc, taskId)).toMatchObject({
       title: 'Public edit',
-      tagIds: [],
       githubLabelIds: ['correction-label'],
     });
     expect(isCorrectionTask(s.db, taskId)).toBe(true);
     expect((await req(s.app, 'PATCH', `/api/todos/${taskId}`, { phase: 'done' })).status).toBe(409);
     updateAutonomousTodo(s.svc, taskId, { githubLabelIds: [] });
     expect(isCorrectionTask(s.db, taskId)).toBe(false);
-    s.db.run("UPDATE tag SET name = 'correction' WHERE id = 'ordinary-category'");
-    insertLegacyMembership(s.db, taskId, ['ordinary-category'], true);
     updateAutonomousTodo(s.svc, taskId, { githubLabelIds: ['correction-label'] });
-    updateAutonomousTodo(s.svc, taskId, { githubLabelIds: [] });
     expect(isCorrectionTask(s.db, taskId)).toBe(true);
   });
 

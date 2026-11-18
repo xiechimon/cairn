@@ -51,7 +51,6 @@ const todo = (over: Record<string, unknown>) => ({
   spec: '',
   phaseAt: Date.now(),
   orderIndex: 0,
-  tagIds: [],
   assignment: null,
   agent: null,
   latestBuildId: null,

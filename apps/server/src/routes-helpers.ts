@@ -2,7 +2,6 @@ import { timingSafeEqual } from 'node:crypto';
 import {
   apiKeyRecordSchema,
   BRAND,
-  categoryFreeTaskInputSchema,
   KEY_NAME_PATTERN,
   type MemoryRecord,
   phaseSchema,
@@ -40,17 +39,15 @@ export function requireProject(ctx: AppContext, id: string): typeof project.$inf
   return row;
 }
 
-export const patchTodoBodySchema = categoryFreeTaskInputSchema.pipe(
-  z.object({
-    title: z.string().optional(),
-    spec: z.string().optional(),
-    phase: phaseSchema.optional(),
-    orderIndex: z.number().optional(),
-    projectId: z.string().min(1).optional(),
-    assignment: z.unknown().optional(),
-    routeOverride: routeOverrideSchema.nullable().optional(),
-  }),
-);
+export const patchTodoBodySchema = z.object({
+  title: z.string().optional(),
+  spec: z.string().optional(),
+  phase: phaseSchema.optional(),
+  orderIndex: z.number().optional(),
+  projectId: z.string().min(1).optional(),
+  assignment: z.unknown().optional(),
+  routeOverride: routeOverrideSchema.nullable().optional(),
+});
 
 export const patchSecretBodySchema = z.object({
   name: z.string().regex(SECRET_NAME_PATTERN, SECRET_NAME_RULE).optional(),

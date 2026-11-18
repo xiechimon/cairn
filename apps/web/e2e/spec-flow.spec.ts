@@ -28,7 +28,6 @@ function wireTodo() {
     phaseAt: 0,
     seqNum: 18,
     orderIndex: 0,
-    tagIds: [],
     assignment: null,
     agent: null,
     latestBuildId: BUILD_ID,

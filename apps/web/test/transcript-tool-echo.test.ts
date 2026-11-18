@@ -22,7 +22,7 @@ import { mapTranscript, type MessageRow } from '../src/api/mappers.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';
 import { NOW, todo } from './helpers.js';
 
-const META_JSON = '{"todoId":"t1","title":"测试消息，确认链路可用","tagIds":[]}';
+const META_JSON = '{"todoId":"t1","title":"测试消息，确认链路可用"}';
 
 function toolCall(name: string, resultText: string | null): ToolCallRecord {
   return {

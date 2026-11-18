@@ -45,7 +45,6 @@ test('a final assistant reply renders two loaded screenshots and opens each in a
     phaseAt: 1,
     seqNum: 43,
     orderIndex: 0,
-    tagIds: [],
     assignment: null,
     agent: null,
     latestBuildId: 'completed-build',

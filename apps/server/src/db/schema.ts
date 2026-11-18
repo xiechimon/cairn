@@ -211,30 +211,6 @@ export const taskIssueClose = sqliteTable('task_issue_close', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
-export const tag = sqliteTable('tag', {
-  id: text('id').primaryKey(),
-  projectId: text('projectId')
-    .notNull()
-    .references(() => project.id),
-  name: text('name').notNull(),
-  color: text('color').notNull().default('#6366f1'),
-  createdAt: epochMs('createdAt').notNull().default(0),
-  v: integer('v').notNull().default(1),
-});
-
-export const todoTag = sqliteTable(
-  'todo_tag',
-  {
-    todoId: text('todoId')
-      .notNull()
-      .references(() => todo.id, { onDelete: 'cascade' }),
-    tagId: text('tagId')
-      .notNull()
-      .references(() => tag.id, { onDelete: 'cascade' }),
-  },
-  (t) => [primaryKey({ columns: [t.todoId, t.tagId] })],
-);
-
 export const githubLabel = sqliteTable('github_label', {
   id: text('id').primaryKey(),
   projectId: text('projectId')

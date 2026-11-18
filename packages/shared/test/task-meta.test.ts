@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { derivePlaceholderTitle, FIXED_TAGS } from '../src/task-meta.js';
+import { derivePlaceholderTitle } from '../src/task-meta.js';
 import { REPLY_TASK_172 } from './fixtures/reply-todo-172.js';
 
 describe('derivePlaceholderTitle', () => {
@@ -98,27 +98,5 @@ describe('derivePlaceholderTitle', () => {
 
   it('reply marker alone falls through to empty for the caller fallback', () => {
     expect(derivePlaceholderTitle('<!-- reply source=m -->')).toBe('');
-  });
-});
-
-describe('FIXED_TAGS', () => {
-  it('fixed 6-item vocabulary', () => {
-    expect(FIXED_TAGS.map((t) => t.name)).toEqual([
-      'bug',
-      'feature',
-      'improvement',
-      'refactor',
-      'docs',
-      'chore',
-    ]);
-  });
-
-  it('name unique, color a valid hex, description non-empty', () => {
-    const names = new Set(FIXED_TAGS.map((t) => t.name));
-    expect(names.size).toBe(FIXED_TAGS.length);
-    for (const tag of FIXED_TAGS) {
-      expect(tag.color).toMatch(/^#[0-9a-f]{6}$/);
-      expect(tag.description.length).toBeGreaterThan(0);
-    }
   });
 });

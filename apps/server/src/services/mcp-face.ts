@@ -1,7 +1,6 @@
 import {
   BRAND,
   CHIEF_REMOTE_TOOLS,
-  categoryFreeTaskInputSchema,
   githubReadToolParamsSchemas,
   MCP_TOOL_REGISTRY,
   RUNNER_OS,
@@ -235,7 +234,6 @@ export async function executeMcpTool(
       return json(await executeGithubReadTool(deps, ctx.teamId, name, args));
 
     case 'create_todo': {
-      parseWith(categoryFreeTaskInputSchema, args, 'arguments');
       const projectId = str(args, 'projectId');
       const platform = parseWith(runnerOsSchema.optional(), args.platform, 'platform');
       requireProjectRow(db, projectId, ctx.teamId);
@@ -252,7 +250,6 @@ export async function executeMcpTool(
       return json(getTodo(svc, record.id));
     }
     case 'update_todo': {
-      parseWith(categoryFreeTaskInputSchema, args, 'arguments');
       const todoId = str(args, 'todoId');
       const platform = parseWith(updatePlatform.optional(), args.platform, 'platform');
       const os = platform === undefined ? undefined : platform === 'any' ? null : platform;

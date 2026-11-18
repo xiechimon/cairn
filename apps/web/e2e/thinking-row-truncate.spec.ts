@@ -24,7 +24,6 @@ const WIRE_CARD = {
   phaseAt: 0,
   seqNum: 9,
   orderIndex: 0,
-  tagIds: [],
   assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
   agent: { id: AGENT_ID, displayName: 'live-builder', avatarUrl: null },
   latestBuildId: BUILD_ID,

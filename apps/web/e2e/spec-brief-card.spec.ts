@@ -38,7 +38,6 @@ function wireTodo(id: string, title: string, spec: string, seqNum: number) {
     phaseAt: 0,
     seqNum,
     orderIndex: 0,
-    tagIds: [],
     assignment: null,
     agent: null,
     latestBuildId: null,

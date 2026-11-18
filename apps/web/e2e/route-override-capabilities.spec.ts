@@ -23,7 +23,6 @@ function liveTodo(routeOverride: Record<string, unknown>) {
     archivedAt: null,
     seqNum: 1,
     orderIndex: 0,
-    tagIds: [],
     assignment: null,
     agent: null,
     latestBuildId: null,

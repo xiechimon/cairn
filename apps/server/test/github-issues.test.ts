@@ -12,10 +12,8 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import {
   githubLabel,
   project as projectTable,
-  tag as tagTable,
   todoGithubLabel,
   todo as todoTable,
-  todoTag,
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import type { FetchLike } from '../src/lib/github.js';
@@ -30,7 +28,6 @@ import {
   seedSessionRoute,
   type TestServer,
 } from './helpers.js';
-import { insertLegacyCategory } from './legacy-category-fixtures.js';
 
 const TOKEN = 'ghp_issue_face_token';
 const REPO = 'octo/alpha';
@@ -170,19 +167,12 @@ function projectLabels(s: TestServer, projectId: string) {
 }
 
 describe('github project label vocabulary = repo label mirror (C12-C16)', () => {
-  test('GitHub and ordinary project creation do not seed category vocabulary', async () => {
+  test('GitHub and ordinary project creation do not seed label vocabulary', async () => {
     const s = bootServer();
     const ghId = await postGithubProject(s.app);
     expect(projectLabels(s, ghId)).toHaveLength(0);
     const plainId = await postProject(s.app);
-    expect(
-      s.db
-        .select()
-        .from(tagTable)
-        .where(eq(tagTable.projectId, plainId))
-        .all()
-        .map((t) => t.name),
-    ).toEqual([]);
+    expect(projectLabels(s, plainId)).toHaveLength(0);
     s.dispose();
   });
 
@@ -225,16 +215,12 @@ describe('github project label vocabulary = repo label mirror (C12-C16)', () => 
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     syncGithubLabels(s.db, projectId, [{ name: 'bug', color: '6366f1' }]);
-    insertLegacyCategory(s.db, projectId, 'bug', '#6366f1');
     await call(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
       body: { number: 9 },
     });
     const bug = projectLabels(s, projectId).find((t) => t.name === 'bug')!;
     expect(bug.color).toBe('#fbca04');
     expect(projectLabels(s, projectId).filter((t) => t.name === 'bug')).toHaveLength(1);
-    expect(
-      s.db.select().from(tagTable).where(eq(tagTable.projectId, projectId)).all(),
-    ).toMatchObject([{ name: 'bug', color: '#6366f1' }]);
     s.dispose();
   });
 
@@ -251,7 +237,6 @@ describe('github project label vocabulary = repo label mirror (C12-C16)', () => 
       ).json(),
     );
     expect(first.githubLabelIds).toHaveLength(2);
-    expect(first.tagIds).toEqual([]);
     mock.set(LABELS_PATH, { body: [{ name: 'bug', color: 'd73a4a' }] });
     await call(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
       body: { number: 9 },
@@ -268,7 +253,6 @@ describe('github project label vocabulary = repo label mirror (C12-C16)', () => 
       .where(eq(todoGithubLabel.todoId, first.id))
       .all();
     expect(links).toHaveLength(2);
-    expect(s.db.select().from(todoTag).where(eq(todoTag.todoId, first.id)).all()).toEqual([]);
     s.dispose();
   });
 });
@@ -370,7 +354,6 @@ describe('POST /api/projects/{id}/github/issues/import (D17-D22)', () => {
     expect(record.sourceRef).toBe(`github:${REPO}#7`);
     expect(record.projectId).toBe(projectId);
     expect(record.phase).toBe('todo');
-    expect(record.tagIds).toEqual([]);
     const labelNames = projectLabels(s, projectId)
       .filter((t) => (record.githubLabelIds ?? []).includes(t.id))
       .map((t) => t.name)
@@ -528,7 +511,6 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
       });
       todoId = ((await todoRes.json()) as { id: string }).id;
     }
-    if (kind === 'github') insertLegacyCategory(s.db, projectId, 'generic-only', '#000000');
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       body: { todoIds: [todoId] },
     });
@@ -615,7 +597,6 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
       await (await call(s.app, 'GET', `/api/todos/${todoId}`)).json(),
     );
     expect(one.githubLabelIds).toHaveLength(1);
-    expect(one.tagIds).toEqual([]);
     s.dispose();
   });
 
@@ -641,8 +622,7 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
   });
 
   test('ordinary relay rejects both fixed and custom category names', async () => {
-    const { s, token, step, projectId } = await world('plain', false);
-    insertLegacyCategory(s.db, projectId, 'urgent', '#ef4444');
+    const { s, token, step } = await world('plain', false);
     const bad = await relay(s.app, token, step.step.id, { title: 'x', tag: 'urgent' });
     expect(bad.status).toBe(400);
     const fixed = await relay(s.app, token, step.step.id, { title: 'x', tag: 'feature' });

@@ -15,7 +15,7 @@ export const createdTodoMessage = {
       "result": [
         {
           "type": "text",
-          "text": "{\"id\":\"todo-1\",\"teamId\":\"t1\",\"projectId\":\"proj-1\",\"title\":\"Enforce public-content checks\",\"spec\":\"Block internal addresses in hooks and CI\",\"phase\":\"todo\",\"phaseAt\":10,\"archivedAt\":null,\"seqNum\":9,\"orderIndex\":16,\"tagIds\":[],\"latestBuildId\":null,\"lastRunAt\":null,\"hasChanges\":false,\"hasPlan\":false,\"buildHistory\":[],\"sourceTodo\":null,\"blockedBy\":null,\"v\":1,\"createdBy\":\"fixture-createdBy\",\"ownerId\":\"fixture-ownerId\",\"sourceBuildId\":\"fixture-sourceBuildId\",\"sourceKind\":\"fixture-sourceKind\",\"sourceRef\":null,\"output\":\"fixture-output\",\"owner\":null,\"quotaWait\":null}"
+          "text": "{\"id\":\"todo-1\",\"teamId\":\"t1\",\"projectId\":\"proj-1\",\"title\":\"Enforce public-content checks\",\"spec\":\"Block internal addresses in hooks and CI\",\"phase\":\"todo\",\"phaseAt\":10,\"archivedAt\":null,\"seqNum\":9,\"orderIndex\":16,\"latestBuildId\":null,\"lastRunAt\":null,\"hasChanges\":false,\"hasPlan\":false,\"buildHistory\":[],\"sourceTodo\":null,\"blockedBy\":null,\"v\":1,\"createdBy\":\"fixture-createdBy\",\"ownerId\":\"fixture-ownerId\",\"sourceBuildId\":\"fixture-sourceBuildId\",\"sourceKind\":\"fixture-sourceKind\",\"sourceRef\":null,\"output\":\"fixture-output\",\"owner\":null,\"quotaWait\":null}"
         }
       ],
       "isError": false,

@@ -19,7 +19,6 @@ function todo(over: Partial<Record<keyof TodoRecord, unknown>> = {}): TodoRecord
     hasChanges: false,
     hasPlan: false,
     sourceTodo: null,
-    tagIds: [],
     v: 1,
     createdBy: null,
     ownerId: 'u1',

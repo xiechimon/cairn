@@ -2,7 +2,6 @@ import {
   type CitedSegment,
   type CoordinatorCreateTodoParams,
   type CoordinatorUpdateTodoParams,
-  categoryFreeTaskInputSchema,
   derivePlaceholderTitle,
   isInfoOutput,
   isIssueSourcedTask,
@@ -24,7 +23,7 @@ import {
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, chiefThread, project, todo } from '../db/schema.js';
-import { HttpError, parseWith } from '../lib/errors.js';
+import { HttpError } from '../lib/errors.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
 import { parseChiefTrigger } from './chief.js';
 import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
@@ -436,7 +435,6 @@ export function createRequestTodo(
   params: CoordinatorCreateTodoParams & { projectId: string },
   provenance: { createdBy: string | null; ownerId: string },
 ): TodoRecord & { uncovered?: string[] } {
-  parseWith(categoryFreeTaskInputSchema, params, 'params');
   const { db } = deps;
   if (params.sourceTodoId !== undefined) {
     refuseInfoCardReplacedByCode(
@@ -546,7 +544,6 @@ export function updateRequestTodo(
   ctx: RequestCtx,
   params: CoordinatorUpdateTodoParams,
 ): TodoRecord | null {
-  parseWith(categoryFreeTaskInputSchema, params, 'params');
   const { db } = deps;
   const citedIds = params.replaceMessageIds ?? params.addMessageIds;
   const added =

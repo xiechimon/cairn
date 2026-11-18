@@ -16,7 +16,6 @@ const WIRE_CARD = {
   phaseAt: 0,
   seqNum: 9,
   orderIndex: 0,
-  tagIds: [],
   assignment: null,
   agent: null,
   latestBuildId: 'build-1',

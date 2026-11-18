@@ -85,7 +85,6 @@ test('results panel shows loaded todos while the schedules query is still pendin
             phaseAt: 1,
             seqNum: 1,
             orderIndex: 0,
-            tagIds: [],
             assignment: null,
             agent: null,
             latestBuildId: null,

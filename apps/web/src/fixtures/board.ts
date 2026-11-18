@@ -1,4 +1,3 @@
-import { FIXED_TAGS } from '@cairn/shared';
 import { localDay } from '../usage/usage-model.js';
 import {
   at,
@@ -79,31 +78,23 @@ export const boardGithubPicker: FixtureSet = {
   },
 };
 
-const tagFilterRows = FIXED_TAGS.map((t) => ({
-  id: `tag-${t.name}`,
-  name: t.name,
-  color: t.color,
-}));
-
 function tagFilterProbe(
   id: string,
   seqNum: number,
   title: string,
   phase: TodoRecord['phase'],
-  tagIds: string[],
 ): TodoRecord {
-  return { ...probeTodo(phase, r7(13, 40)), id, seqNum, title, spec: title, tagIds };
+  return { ...probeTodo(phase, r7(13, 40)), id, seqNum, title, spec: title };
 }
 
 export const boardTagFilter: FixtureSet = {
   ...boardDefault,
   todos: [
-    tagFilterProbe('tagfilter-bug', 41, 'tagfilter 探针（bug）', 'todo', ['tag-bug']),
-    tagFilterProbe('tagfilter-docs', 42, 'tagfilter 探针（docs）', 'building', ['tag-docs']),
-    tagFilterProbe('tagfilter-plain', 43, 'tagfilter 探针（无标签）', 'review', []),
+    tagFilterProbe('tagfilter-bug', 41, 'tagfilter 探针（bug）', 'todo'),
+    tagFilterProbe('tagfilter-docs', 42, 'tagfilter 探针（docs）', 'building'),
+    tagFilterProbe('tagfilter-plain', 43, 'tagfilter 探针（无标签）', 'review'),
   ],
   now: r7(13, 55),
-  tags: tagFilterRows,
 };
 
 function repoFilterProbe(
@@ -112,9 +103,8 @@ function repoFilterProbe(
   title: string,
   phase: TodoRecord['phase'],
   projectId: string,
-  tagIds: string[],
 ): TodoRecord {
-  return { ...probeTodo(phase, r7(13, 40)), id, seqNum, title, spec: title, projectId, tagIds };
+  return { ...probeTodo(phase, r7(13, 40)), id, seqNum, title, spec: title, projectId };
 }
 
 const SIDEBAR_PROJECT_B = 'sidebar-project-b';
@@ -123,15 +113,8 @@ export const sidebarThreads: FixtureSet = {
   ...boardDefault,
   projectNames: { [PROJECT_ID]: 'P1', [SIDEBAR_PROJECT_B]: 'P2' },
   todos: [
-    repoFilterProbe('sidebar-thread-p1', 61, 'P1 running thread', 'building', PROJECT_ID, []),
-    repoFilterProbe(
-      'sidebar-thread-p2',
-      62,
-      'P2 running thread',
-      'building',
-      SIDEBAR_PROJECT_B,
-      [],
-    ),
+    repoFilterProbe('sidebar-thread-p1', 61, 'P1 running thread', 'building', PROJECT_ID),
+    repoFilterProbe('sidebar-thread-p2', 62, 'P2 running thread', 'building', SIDEBAR_PROJECT_B),
   ],
   now: r7(13, 55),
 };
@@ -140,8 +123,8 @@ export const sidebarUnread: FixtureSet = {
   ...boardDefault,
   projectNames: { [PROJECT_ID]: 'P1' },
   todos: [
-    repoFilterProbe('sidebar-unread-a', 81, 'unread thread A', 'done', PROJECT_ID, []),
-    repoFilterProbe('sidebar-unread-b', 82, 'read thread B', 'done', PROJECT_ID, []),
+    repoFilterProbe('sidebar-unread-a', 81, 'unread thread A', 'done', PROJECT_ID),
+    repoFilterProbe('sidebar-unread-b', 82, 'read thread B', 'done', PROJECT_ID),
   ],
   unreadThreadIds: ['sidebar-unread-a'],
   now: r7(13, 55),
@@ -151,15 +134,15 @@ export const sidebarGroups: FixtureSet = {
   ...boardDefault,
   projectNames: { [PROJECT_ID]: 'P1' },
   todos: [
-    repoFilterProbe('sidebar-groups-a', 101, 'active thread A', 'building', PROJECT_ID, []),
-    repoFilterProbe('sidebar-groups-b', 102, 'active thread B', 'done', PROJECT_ID, []),
-    repoFilterProbe('sidebar-groups-s', 103, 'sleeping thread S', 'done', PROJECT_ID, []),
+    repoFilterProbe('sidebar-groups-a', 101, 'active thread A', 'building', PROJECT_ID),
+    repoFilterProbe('sidebar-groups-b', 102, 'active thread B', 'done', PROJECT_ID),
+    repoFilterProbe('sidebar-groups-s', 103, 'sleeping thread S', 'done', PROJECT_ID),
     {
-      ...repoFilterProbe('sidebar-groups-c', 104, 'archived thread C', 'done', PROJECT_ID, []),
+      ...repoFilterProbe('sidebar-groups-c', 104, 'archived thread C', 'done', PROJECT_ID),
       archivedAt: r7(13, 0),
     },
     {
-      ...repoFilterProbe('sidebar-groups-d', 105, 'archived thread D', 'done', PROJECT_ID, []),
+      ...repoFilterProbe('sidebar-groups-d', 105, 'archived thread D', 'done', PROJECT_ID),
       archivedAt: r7(13, 10),
     },
   ],
@@ -170,11 +153,11 @@ export const sidebarThreadStatuses: FixtureSet = {
   ...boardDefault,
   projectNames: { [PROJECT_ID]: 'P1' },
   todos: [
-    repoFilterProbe('sidebar-status-running', 71, 'status running', 'building', PROJECT_ID, []),
-    repoFilterProbe('sidebar-status-review', 72, 'status review', 'review', PROJECT_ID, []),
-    repoFilterProbe('sidebar-status-failed', 73, 'status failed', 'failed', PROJECT_ID, []),
-    repoFilterProbe('sidebar-status-done', 74, 'status done', 'done', PROJECT_ID, []),
-    repoFilterProbe('sidebar-status-todo', 75, 'status todo', 'todo', PROJECT_ID, []),
+    repoFilterProbe('sidebar-status-running', 71, 'status running', 'building', PROJECT_ID),
+    repoFilterProbe('sidebar-status-review', 72, 'status review', 'review', PROJECT_ID),
+    repoFilterProbe('sidebar-status-failed', 73, 'status failed', 'failed', PROJECT_ID),
+    repoFilterProbe('sidebar-status-done', 74, 'status done', 'done', PROJECT_ID),
+    repoFilterProbe('sidebar-status-todo', 75, 'status todo', 'todo', PROJECT_ID),
   ],
   now: r7(13, 55),
 };
@@ -202,21 +185,11 @@ export const boardRepoFilter: FixtureSet = {
     'r4-quiet': 'r4-quiet',
   },
   todos: [
-    repoFilterProbe('repofilter-a', 46, 'repofilter 探针 A（r3·bug）', 'todo', PROJECT_ID, [
-      'tag-bug',
-    ]),
-    repoFilterProbe(
-      'repofilter-b',
-      47,
-      'repofilter 探针 B（r2·docs）',
-      'building',
-      'r2-inventory',
-      ['tag-docs'],
-    ),
-    repoFilterProbe('repofilter-c', 48, 'repofilter 探针 C（r3·无标签）', 'review', PROJECT_ID, []),
+    repoFilterProbe('repofilter-a', 46, 'repofilter 探针 A（r3·bug）', 'todo', PROJECT_ID),
+    repoFilterProbe('repofilter-b', 47, 'repofilter 探针 B（r2·docs）', 'building', 'r2-inventory'),
+    repoFilterProbe('repofilter-c', 48, 'repofilter 探针 C（r3·无标签）', 'review', PROJECT_ID),
   ],
   now: r7(13, 55),
-  tags: tagFilterRows,
 };
 
 export const boardQuotaWait: FixtureSet = {
@@ -282,7 +255,6 @@ function chiefProbe(
     phaseAt,
     seqNum,
     orderIndex: 0,
-    tagIds: [],
     assignment: { agentId: R3_BUILDER.id },
     agent: R3_BUILDER,
     latestBuildId: `chief-conv-${seqNum}`,
@@ -339,7 +311,6 @@ function inboxProbe(
     seqNum,
     title,
     spec: title,
-    tagIds: [],
     ...over,
   };
 }

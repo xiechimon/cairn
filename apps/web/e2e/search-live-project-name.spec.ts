@@ -29,7 +29,6 @@ function wireTodo(i: number, projectId: string, title: string) {
     phaseAt: 0,
     seqNum: i + 1,
     orderIndex: i,
-    tagIds: [],
     assignment: null,
     agent: null,
     latestBuildId: null,

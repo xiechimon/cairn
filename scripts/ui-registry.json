@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "efcd49cf760107aced467aa17994c0976a086696",
-    "date": "2026-11-17"
+    "sha": "014dead033a2ae58b70b8aab78c9fb08ca6f0fc2",
+    "date": "2026-11-18"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -198,11 +198,6 @@
       "status": "deviated",
       "reason": "#644 TabsIndicator zero-chrome pass-through (Base UI writes active-tab geometry into inline custom properties; pill shape carried by consumer CSS) — retention deferred to #1009 chief-face construction (#982 verdict). Segmented/bare handwritten skin variants retired per #991; default/line = the upstream native data-[variant] mechanism.",
       "hash": "9eb43914b674c514dae090a3e6ffa89bd2a2366b5edccd40ccee8a4658fd0ffe"
-    },
-    "tag-chip.tsx": {
-      "kind": "adapter",
-      "reason": "XMON-14 / #983 verdict (rewritten as zero-skin adapter): tag pill = registry Badge default geometry with the runtime data color kept as an inline background (TagRecord.color is a record field, not a design token — board-filter.spec pins the contract) + max-w-40 truncate layout + --text-on-accent foreground. The 11px font-rewrite tier (text-[11px]/leading-5/py-0) is retired per #983 — font size/line height/padding converge on Badge defaults (#1006); the todo-card row-flush consumer override is folded into the same default per the R5 prototype-review ruling.",
-      "hash": "52f7384a45318ee09d0efc5ddbeb5e63adbba281bd8de10c3e53e995d154a01f"
     },
     "textarea.tsx": {
       "kind": "registry",

@@ -640,7 +640,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### thread-tags
 
-**Thread tags** (shipped). Category UI, vocabulary, seeding and assignment writers are retired; only legacy read/storage compatibility remains.
+**Thread tags** (shipped). Category UI, vocabulary, seeding, assignment writers and legacy storage are fully removed; the tag/todo_tag tables and tagIds wire fields are gone.
 
 - Research: [docs/research/thread-category-runtime-cutover-3481.md](research/thread-category-runtime-cutover-3481.md)
 - Frontend design: [docs/spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md](spec/15-untitled-new-task-view-and-fixed-tag-vocabulary.md)

@@ -12,7 +12,6 @@ import {
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
-import { insertLegacyCategory, insertLegacyMembership } from './legacy-category-fixtures.js';
 
 registerChiefHarness();
 
@@ -162,17 +161,14 @@ describe('composer project chip reaches the chief (#2009)', () => {
 });
 
 describe('moving an unstarted todo to another project (#2009)', () => {
-  test('PATCH projectId moves the todo to the end of the target column and drops the old tags', async () => {
+  test('PATCH projectId moves the todo to the end of the target column', async () => {
     const site = await postProject(H.s.app, 'cairn-site');
     await postTodo(site, { title: '已有任务' });
-    const tag = insertLegacyCategory(H.s.db, H.projectId, 'docs', '#6366f1');
     const created = await postTodo(H.projectId);
-    insertLegacyMembership(H.s.db, created.id, [tag.id], false);
     const res = await req(H.s.app, 'PATCH', `/api/todos/${created.id}`, { projectId: site });
     expect(res.status).toBe(200);
-    const moved = (await res.json()) as { projectId: string; tagIds: string[]; orderIndex: number };
+    const moved = (await res.json()) as { projectId: string; orderIndex: number };
     expect(moved.projectId).toBe(site);
-    expect(moved.tagIds).toEqual([]);
     expect(moved.orderIndex).toBe(1);
   });
 
@@ -189,23 +185,16 @@ describe('moving an unstarted todo to another project (#2009)', () => {
     expect(rows.map((r) => r.projectId)).toEqual([site]);
   });
 
-  test('retired category inputs cannot accompany a project move', async () => {
+  test('retired category inputs are ignored on a project move', async () => {
     const site = await postProject(H.s.app, 'cairn-site');
-    const oldTag = insertLegacyCategory(H.s.db, H.projectId, 'docs', '#6366f1');
-    const newTag = insertLegacyCategory(H.s.db, site, 'site', '#6366f1');
     const created = await postTodo(H.projectId);
-    insertLegacyMembership(H.s.db, created.id, [oldTag.id], false);
-    const before = H.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get();
-    for (const tagIds of [[oldTag.id], [newTag.id]]) {
-      const response = await req(H.s.app, 'PATCH', `/api/todos/${created.id}`, {
-        projectId: site,
-        tagIds,
-      });
-      expect(response.status).toBe(400);
-      expect(H.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()).toEqual(
-        before,
-      );
-    }
+    const response = await req(H.s.app, 'PATCH', `/api/todos/${created.id}`, {
+      projectId: site,
+      tagIds: ['retired-tag'],
+    });
+    expect(response.status).toBe(200);
+    const moved = H.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get();
+    expect(moved?.projectId).toBe(site);
   });
 
   test('a started todo cannot move', async () => {

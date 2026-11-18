@@ -23,7 +23,6 @@ import {
   steerPending,
   step,
   stopPending,
-  tag,
   todo,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -254,7 +253,6 @@ export function deleteProject(
     }
     retireTodoDeliverables(deps.db, todoIds);
     tx.delete(schedule).where(eq(schedule.projectId, id)).run();
-    tx.delete(tag).where(eq(tag.projectId, id)).run();
     tx.delete(secret).where(eq(secret.projectId, id)).run();
     if (todoIds.length > 0) tx.delete(todo).where(inArray(todo.id, todoIds)).run();
     for (const chiefRow of tx.select().from(chief).where(eq(chief.teamId, row.teamId)).all()) {

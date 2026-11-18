@@ -32,7 +32,6 @@ test('a completed task accepts a follow-up and shows its user bubble and running
     phaseAt: 1,
     seqNum: 43,
     orderIndex: 0,
-    tagIds: [],
     assignment: null,
     agent: null,
     latestBuildId: 'completed-build',

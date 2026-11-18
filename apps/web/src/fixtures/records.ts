@@ -29,7 +29,6 @@ import {
   type SkillFact,
   type StepPromptOrigin,
   type StepQueueBlocked,
-  type TagRecord,
   type TaskRequest,
   type ThreadMessageContent,
   type ThreadReportContent,
@@ -75,7 +74,6 @@ export interface TodoRecord {
   archivedAt?: number | null;
   seqNum: number;
   orderIndex: number;
-  tagIds: string[];
   githubLabelIds?: string[];
   assignment: AssignmentRecord | null;
   agent: AgentRef | null;
@@ -272,7 +270,6 @@ export interface FixtureSet {
   chief?: ChiefContent;
   chiefChannels?: Record<string, ChiefContent>;
   github?: GithubFixture;
-  tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
   attachments?: Record<string, { text?: string; src?: string }>;
 }
 

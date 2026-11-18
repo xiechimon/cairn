@@ -29,7 +29,6 @@ async function runningTask(page: Page, readDelay = 0) {
     phaseAt: 1,
     seqNum: 43,
     orderIndex: 0,
-    tagIds: [],
     assignment: null,
     agent: null,
     latestBuildId: 'completed-build',

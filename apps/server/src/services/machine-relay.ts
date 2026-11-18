@@ -469,7 +469,6 @@ async function setTaskMeta(
       .object({
         tag: z.never().optional(),
         tags: z.never().optional(),
-        tagIds: z.never().optional(),
       })
       .passthrough(),
     params,
@@ -490,7 +489,7 @@ async function setTaskMeta(
     },
   );
   if (!record) throw new NotFoundError(`todo ${todoRow.id}`);
-  return JSON.stringify({ todoId: record.id, title: record.title, tagIds: record.tagIds });
+  return JSON.stringify({ todoId: record.id, title: record.title });
 }
 
 function normalizedMetaTitle(raw: unknown): string {

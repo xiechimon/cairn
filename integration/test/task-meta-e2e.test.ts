@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { tag as tagTable } from '../../apps/server/src/db/schema.js';
+import { githubLabel } from '../../apps/server/src/db/schema.js';
 import { api, bootRealServer, openPanelTask, projectTasksUrl, type RealServer } from './helpers.js';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
@@ -47,7 +47,11 @@ afterAll(async () => {
 
 describe('spec 15 untitled tasks without category vocabulary (live UI → wire → SQLite)', () => {
   test('project creation seeds no categories and the vocabulary endpoints are retired', async () => {
-    const rows = server.db.select().from(tagTable).where(eq(tagTable.projectId, projectId)).all();
+    const rows = server.db
+      .select()
+      .from(githubLabel)
+      .where(eq(githubLabel.projectId, projectId))
+      .all();
     expect(rows).toEqual([]);
     for (const method of ['GET', 'POST']) {
       const response = await api(
@@ -69,14 +73,5 @@ describe('spec 15 untitled tasks without category vocabulary (live UI → wire �
     await openPanelTask(page, '394 占位标题探针');
     await pexpect(page.getByTestId('side-chat')).toBeVisible({ timeout: 15_000 });
     await pexpect(page.locator('.fresh-tags')).toHaveCount(0);
-
-    const todos = (await api(server.url, 'GET', '/api/todos')).body as {
-      id: string;
-      title: string;
-      tagIds: string[];
-    }[];
-    const probe = todos.find((t) => t.title === '394 占位标题探针');
-    expect(probe).toBeTruthy();
-    expect(probe!.tagIds).toEqual([]);
   }, 180_000);
 });

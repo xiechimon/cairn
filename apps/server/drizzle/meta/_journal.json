@@ -1380,6 +1380,13 @@
       "when": 1794991478051,
       "tag": "0201_retire_job_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 202,
+      "version": "6",
+      "when": 1794991999938,
+      "tag": "0202_retire_tag_tables",
+      "breakpoints": true
     }
   ]
 }

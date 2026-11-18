@@ -268,30 +268,27 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
     expect(row?.phase).toBe('todo');
   });
 
-  test.each([false, true])(
-    'D2 bug routing requires dedicated GitHub labels: %s',
-    async (dedicated) => {
-      s.db.run(sql`INSERT INTO ${sql.identifier(dedicated ? 'github_label' : 'tag')}
+  test('D2 bug routing follows dedicated GitHub labels', async () => {
+    s.db.run(sql`INSERT INTO github_label
       (id, projectId, name, color) VALUES ('bug-label', ${projectId}, 'BuG', '#b60205')`);
-      const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
-        title: 'Save failure',
-        spec: 'Open settings and save.',
-      });
-      expect(res.status).toBe(201);
-      const todoId = ((await res.json()) as { id: string }).id;
-      s.db.run(sql`INSERT INTO ${sql.identifier(dedicated ? 'todo_github_label' : 'todo_tag')}
-      (todoId, ${sql.identifier(dedicated ? 'labelId' : 'tagId')}) VALUES (${todoId}, 'bug-label')`);
-      s.db
-        .update(todoTable)
-        .set({ sourceKind: 'github-issue', sourceRef: 'github:octo/alpha#8' })
-        .where(eq(todoTable.id, todoId))
-        .run();
-      const orchestrated = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
-      expect(orchestrated.status).toBe(201);
-      const body = (await orchestrated.json()) as { message: { content: string } };
-      expect(body.message.content.includes('先完成复现步骤，再开始实现')).toBe(dedicated);
-    },
-  );
+    const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+      title: 'Save failure',
+      spec: 'Open settings and save.',
+    });
+    expect(res.status).toBe(201);
+    const todoId = ((await res.json()) as { id: string }).id;
+    s.db.run(sql`INSERT INTO todo_github_label
+      (todoId, labelId) VALUES (${todoId}, 'bug-label')`);
+    s.db
+      .update(todoTable)
+      .set({ sourceKind: 'github-issue', sourceRef: 'github:octo/alpha#8' })
+      .where(eq(todoTable.id, todoId))
+      .run();
+    const orchestrated = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
+    expect(orchestrated.status).toBe(201);
+    const body = (await orchestrated.json()) as { message: { content: string } };
+    expect(body.message.content.includes('先完成复现步骤，再开始实现')).toBe(true);
+  });
 
   test('Coordinator generic updates cannot replace dedicated correction labels', async () => {
     const todoId = await makeTodo();
@@ -305,7 +302,7 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
       status: 400,
     });
     const edited = await relay('update_todo', { todoId, blockedBy: [] });
-    expect(edited).toMatchObject({ tagIds: [], githubLabelIds: ['correction-label'] });
+    expect(edited).toMatchObject({ githubLabelIds: ['correction-label'] });
     expect(s.db.get(sql`SELECT correctionRequired FROM todo WHERE id = ${todoId}`)).toEqual({
       correctionRequired: 1,
     });

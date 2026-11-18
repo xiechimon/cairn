@@ -23,7 +23,6 @@ function row(seq: number, phase: WireTodo['phase'], extra: Partial<WireTodo> = {
     phaseAt: 1,
     seqNum: seq,
     orderIndex: 0,
-    tagIds: [],
     latestBuildId: null,
     lastRunAt: null,
     hasChanges: false,

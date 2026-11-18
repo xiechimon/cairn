@@ -32,7 +32,6 @@ test('a fixture scheduled run shows its wake marker, folded turn and completion'
     phaseAt: 1,
     seqNum: 43,
     orderIndex: 0,
-    tagIds: [],
     assignment: null,
     agent: null,
     latestBuildId: 'completed-build',

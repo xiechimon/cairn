@@ -25,7 +25,6 @@ import {
 } from '../components/ui/select.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { StatusChip, type StatusTone } from '../components/ui/status-chip.js';
-import { TagChip } from '../components/ui/tag-chip.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import {
@@ -53,13 +52,6 @@ const TONES: { tone: StatusTone; label: string }[] = [
   { tone: 'confirm', label: 'Awaiting confirmation' },
   { tone: 'done', label: 'Done' },
   { tone: 'failed', label: 'Failed' },
-];
-
-const TAGS = [
-  { id: 't1', name: 'frontend', color: 'var(--text-tertiary)' },
-  { id: 't2', name: 'infra', color: 'var(--text-secondary)' },
-  { id: 't3', name: 'research', color: 'var(--text-dim)' },
-  { id: 't4', name: 'a very long tag name that truncates', color: 'var(--text-tertiary)' },
 ];
 
 const MODELS = [
@@ -193,11 +185,6 @@ export function BadgeSection() {
           <Cell key={tone} label={tone}>
             <StatusChip tone={tone}>{label}</StatusChip>
           </Cell>
-        ))}
-      </Specimen>
-      <Specimen id="tag-chip" title="Tag chip" note="Truncates past 160px">
-        {TAGS.map((tag) => (
-          <TagChip key={tag.id} tag={tag} />
         ))}
       </Specimen>
     </Section>

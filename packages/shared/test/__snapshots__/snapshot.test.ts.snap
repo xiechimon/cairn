@@ -8028,12 +8028,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
             "spec": {
               "type": "string",
             },
-            "tagIds": {
-              "items": {
-                "type": "string",
-              },
-              "type": "array",
-            },
             "teamId": {
               "type": "string",
             },
@@ -8119,7 +8113,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
             "phaseAt",
             "seqNum",
             "orderIndex",
-            "tagIds",
             "latestBuildId",
             "lastRunAt",
             "hasChanges",
@@ -10009,8 +10002,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "team",
   "project",
   "todo",
-  "tag",
-  "todo_tag",
   "github_label",
   "todo_github_label",
   "build",
@@ -12995,46 +12986,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > ste
 }
 `;
 
-exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tag > tag.json 1`] = `
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "color": {
-      "type": "string",
-    },
-    "createdAt": {
-      "maximum": 9007199254740991,
-      "minimum": -9007199254740991,
-      "type": "integer",
-    },
-    "id": {
-      "type": "string",
-    },
-    "name": {
-      "type": "string",
-    },
-    "projectId": {
-      "type": "string",
-    },
-    "v": {
-      "maximum": 9007199254740991,
-      "minimum": -9007199254740991,
-      "type": "integer",
-    },
-  },
-  "required": [
-    "id",
-    "projectId",
-    "name",
-    "color",
-    "createdAt",
-    "v",
-  ],
-  "type": "object",
-}
-`;
-
 exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > team > team.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -13932,12 +13883,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
     "spec": {
       "type": "string",
     },
-    "tagIds": {
-      "items": {
-        "type": "string",
-      },
-      "type": "array",
-    },
     "teamId": {
       "type": "string",
     },
@@ -14023,7 +13968,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
     "phaseAt",
     "seqNum",
     "orderIndex",
-    "tagIds",
     "latestBuildId",
     "lastRunAt",
     "hasChanges",

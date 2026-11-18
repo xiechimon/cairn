@@ -13,7 +13,6 @@ import { providerRecordSchema } from './provider.js';
 import { scheduleRecordSchema } from './schedule.js';
 import { secretRecordSchema } from './secret.js';
 import { stepRecordSchema } from './step.js';
-import { tagRecordSchema } from './tag.js';
 import { teamRecordSchema } from './team.js';
 import { todoRecordSchema } from './todo.js';
 import { tokenUsageSchema } from './token-usage.js';
@@ -68,7 +67,6 @@ export * from './secret.js';
 export * from './skill.js';
 export * from './step.js';
 export * from './system-row.js';
-export * from './tag.js';
 export * from './task-request.js';
 export * from './tasks.js';
 export * from './team.js';
@@ -88,7 +86,6 @@ export const RECORD_SCHEMAS = {
   team: teamRecordSchema,
   project: projectRecordSchema,
   todo: todoRecordSchema,
-  tag: tagRecordSchema,
   github_label: githubLabelRecordSchema,
   build: buildRecordSchema,
   step: stepRecordSchema,

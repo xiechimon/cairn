@@ -28,7 +28,6 @@ const WIRE: WireTodo = {
   phaseAt: NOW - 90_000,
   seqNum: 7,
   orderIndex: 0,
-  tagIds: [],
   latestBuildId: 'build-1',
   lastRunAt: NOW - 90_000,
   hasChanges: false,

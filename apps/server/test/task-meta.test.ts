@@ -3,9 +3,8 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import { step as stepTable, todo as todoTable, todoTag } from '../src/db/schema.js';
+import { step as stepTable, todo as todoTable } from '../src/db/schema.js';
 import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
-import { insertLegacyCategory, insertLegacyMembership } from './legacy-category-fixtures.js';
 
 async function call(
   app: Hono,
@@ -114,7 +113,6 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
       await (await call(s.app, 'GET', `/api/todos/${todoId}`)).json(),
     );
     expect(one.title).toBe('登录页加图形验证码');
-    expect(one.tagIds).toEqual([]);
     expect(one.v).toBeGreaterThan(1);
     s.dispose();
   });
@@ -127,7 +125,6 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
       await (await call(s.app, 'GET', `/api/todos/${todoId}`)).json(),
     );
     expect(one.title).toBe('只回填标题');
-    expect(one.tagIds).toEqual([]);
     const bad = await relay(s.app, token, step.step.id, { title: 'x', tag: 'urgent' });
     expect(bad.status).toBe(400);
     const empty = await relay(s.app, token, step.step.id, { title: '   ' });
@@ -138,10 +135,13 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
   test.each([false, true])(
     'sealed owner request = %s: stale categories fail atomically',
     async (sealed) => {
-      const { s, token, step, todoId, projectId } = await world();
+      const { s, token, step, todoId } = await world();
       try {
-        const { id } = insertLegacyCategory(s.db, projectId, 'correction');
-        insertLegacyMembership(s.db, todoId, [id], true);
+        s.db
+          .update(todoTable)
+          .set({ correctionRequired: true })
+          .where(eq(todoTable.id, todoId))
+          .run();
         const taskText = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.spec;
         if (taskText === undefined) throw new Error('task missing');
         if (sealed) {
@@ -167,9 +167,7 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
             .run();
         }
         const before = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
-        const links = s.db.select().from(todoTag).where(eq(todoTag.todoId, todoId)).all();
-        expect(before?.correctionRequired).toBe(true);
-        for (const key of ['tag', 'tags', 'tagIds']) {
+        for (const key of ['tag', 'tags']) {
           for (const value of [null, [], 'bug', ['bug']]) {
             expect(
               (await relay(s.app, token, step.step.id, { title: 'Must not land', [key]: value }))
@@ -178,9 +176,6 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
             ).toBe(400);
             expect(s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()).toEqual(
               before,
-            );
-            expect(s.db.select().from(todoTag).where(eq(todoTag.todoId, todoId)).all()).toEqual(
-              links,
             );
           }
         }
@@ -191,7 +186,6 @@ describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the tod
         expect(after?.spec).toBe(before?.spec);
         expect(after?.request).toEqual(before?.request);
         expect(after?.correctionRequired).toBe(true);
-        expect(s.db.select().from(todoTag).where(eq(todoTag.todoId, todoId)).all()).toEqual(links);
       } finally {
         s.dispose();
       }

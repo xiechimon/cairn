@@ -1,14 +1,12 @@
-import {
-  type AutonomyRecord,
-  FIXED_TAGS,
-  type FsListResult,
-  type GithubIssueEcho,
-  type ProjectRecord,
-  type TodoRecord as SharedTodoRecord,
-  type TeamAutonomy,
+import type {
+  AutonomyRecord,
+  FsListResult,
+  GithubIssueEcho,
+  ProjectRecord,
+  TodoRecord as SharedTodoRecord,
+  TeamAutonomy,
 } from '@cairn/shared';
 import type { ChiefQuestionItem } from '../chief/question-chips.js';
-import type { TagChipData } from '../components/ui/tag-chip.js';
 import type {
   ChangesContent,
   DocBlock,
@@ -26,15 +24,6 @@ export const TEAM = 'gallery-team';
 export const PROJECT = 'gallery-project';
 export const PROJECT_TITLE = 'cairn';
 
-export const TAGS: TagChipData[] = FIXED_TAGS.map((tag) => ({
-  id: `tag-${tag.name}`,
-  name: tag.name,
-  color: tag.color,
-}));
-
-const tagById = new Map(TAGS.map((tag) => [tag.id, tag]));
-export const tagOf = (id: string): TagChipData | null => tagById.get(id) ?? null;
-
 const BUILDER = { id: 'builder', displayName: 'builder' };
 
 let seq = 40;
@@ -50,7 +39,6 @@ export function todo(patch: Partial<TodoRecord> & Pick<TodoRecord, 'title' | 'ph
     phaseAt: NOW - 12 * MIN,
     seqNum: seq,
     orderIndex: seq,
-    tagIds: [],
     assignment: started ? { agentId: BUILDER.id } : null,
     agent: started ? BUILDER : null,
     latestBuildId: started ? `build-${seq}` : null,
@@ -174,7 +162,6 @@ export const CARD_FACES: { label: string; todo: TodoRecord }[] = [
     todo: todo({
       title: 'Fix the composer losing the draft on reload',
       phase: 'review',
-      tagIds: ['tag-bug'],
       usageCost: { input: 0.42, output: 0.81, cacheRead: 0.12, cacheWrite: 0.06, total: 1.41 },
     }),
   },
@@ -184,7 +171,6 @@ export const CARD_FACES: { label: string; todo: TodoRecord }[] = [
       title:
         'Make the board remember which column was scrolled and restore it after a reload, including the done column',
       phase: 'building',
-      tagIds: ['tag-feature'],
       usageCost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, priced: false },
     }),
   },
@@ -198,7 +184,6 @@ export const BOARD_FIXTURE: FixtureSet = {
       title: 'Document the release checklist',
       phase: 'todo',
       orderIndex: 2,
-      tagIds: ['tag-docs'],
     }),
     todo({ title: 'Fix the stale branch badge on cards', phase: 'building', phaseAt: NOW - MIN }),
     todo({ title: 'Upgrade the test runner', phase: 'queued', phaseAt: NOW - 2 * MIN }),

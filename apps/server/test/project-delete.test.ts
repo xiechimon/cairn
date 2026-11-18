@@ -15,7 +15,6 @@ import {
   plan as planTable,
   project as projectTable,
   step as stepTable,
-  tag as tagTable,
   team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
@@ -52,7 +51,7 @@ describe('DELETE /api/projects/{id} (#189)', () => {
     s.dispose();
   });
 
-  test('cascade: todo/build/step/plan/tag/schedule rows cleared; watch detached; memories kept with project set to null', async () => {
+  test('cascade: todo/build/step/plan/schedule rows cleared; watch detached; memories kept with project set to null', async () => {
     const s = bootServer();
     insertMachine(s);
     seedSessionRoute(s);
@@ -78,7 +77,6 @@ describe('DELETE /api/projects/{id} (#189)', () => {
         createdAt: Date.now(),
       })
       .run();
-    s.db.insert(tagTable).values({ id: 'tag-del-1', projectId, name: 'x' }).run();
     const sched = await req(s.app, 'POST', '/api/schedules', {
       todoId: todoDoc.id,
       kind: 'daily',
@@ -141,7 +139,6 @@ describe('DELETE /api/projects/{id} (#189)', () => {
     expect(s.db.select().from(buildTable).all()).toHaveLength(0);
     expect(s.db.select().from(stepTable).all()).toHaveLength(0);
     expect(s.db.select().from(planTable).all()).toHaveLength(0);
-    expect(s.db.select().from(tagTable).all()).toHaveLength(0);
     expect(s.db.select().from(projectTable).all()).toHaveLength(0);
     const chiefRow = s.db.select().from(chief).all()[0];
     expect(chiefRow?.watches).toHaveLength(0);

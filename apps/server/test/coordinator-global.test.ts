@@ -552,7 +552,7 @@ describe('archived projects stay read-only for the Coordinator', () => {
     await archive(H.projectId);
     await expect(relay('create_todo', ownerTodo('new'))).rejects.toThrow(/archived/);
     await expect(relay('archive_todos', { todoIds: [created.id] })).rejects.toThrow(/archived/);
-    await expect(relay('update_todo', { todoId: created.id, tagIds: [] })).rejects.toThrow(
+    await expect(relay('update_todo', { todoId: created.id, title: 'x' })).rejects.toThrow(
       /archived/,
     );
     await expect(

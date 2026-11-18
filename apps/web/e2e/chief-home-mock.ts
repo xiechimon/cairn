@@ -49,7 +49,6 @@ export const TASK = {
   phaseAt: Date.now() - 12 * 60_000,
   seqNum: 9,
   orderIndex: 0,
-  tagIds: [],
   assignment: null,
   agent: null,
   latestBuildId: 'build-1',

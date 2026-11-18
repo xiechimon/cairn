@@ -8,8 +8,6 @@ export const DB_TABLES = [
   'team',
   'project',
   'todo',
-  'tag',
-  'todo_tag',
   'github_label',
   'todo_github_label',
   'build',
@@ -92,7 +90,7 @@ export const DB_TABLES = [
 
 export type DbTable = (typeof DB_TABLES)[number];
 
-export const JOIN_ONLY_TABLES = ['todo_tag', 'todo_github_label'] as const;
+export const JOIN_ONLY_TABLES = ['todo_github_label'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
   'team_top_models',

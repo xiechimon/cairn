@@ -14,7 +14,7 @@ const failed: ChiefThread = {
 const todo: TodoRecord = {
   id: 'todo-1586', seqNum: 1586, title: '修复编排', phase: 'todo', phaseAt: 0,
   hasPlan: false, hasChanges: false,
-  teamId: 't', projectId: 'p', spec: '', orderIndex: 0, tagIds: [], assignment: null,
+  teamId: 't', projectId: 'p', spec: '', orderIndex: 0, assignment: null,
   agent: null, latestBuildId: null, lastRunAt: null, buildHistory: [], sourceTodo: null, v: 1,
 };
 

@@ -21,7 +21,6 @@ import { plan as planTable, step as stepTable } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, insertMachine, postProject, req, startLegacyBuild } from './helpers.js';
-import { insertLegacyCategory, insertLegacyMembership } from './legacy-category-fixtures.js';
 
 const INFERRED_ROUTES = [
   'GET /api/server/deploy/lease',
@@ -459,67 +458,6 @@ describe('todo CRUD (the demo surface: curl create/read/update/delete)', () => {
     );
     await expectErrorShape(
       await req(s.app, 'POST', `/api/projects/${s.projectId}/todos`, null),
-      400,
-    );
-  });
-});
-
-describe('legacy categories are read-only during staged retirement', () => {
-  async function setup() {
-    const s = bootServer();
-    const projectId = await postProject(s.app);
-    return { ...s, projectId };
-  }
-
-  test('creation rejects tagIds while historical membership remains readable', async () => {
-    const s = await setup();
-    const a = insertLegacyCategory(s.db, s.projectId, 'a', '#6366f1');
-    const b = insertLegacyCategory(s.db, s.projectId, 'b', '#6366f1');
-    const body: unknown = { title: 'Legacy task', spec: '', tagIds: [a.id, b.id] };
-    expect(createTodoBodySchema.safeParse(body).success).toBe(false);
-    await expectErrorShape(
-      await req(s.app, 'POST', `/api/projects/${s.projectId}/todos`, body),
-      400,
-    );
-    const res = await req(s.app, 'POST', `/api/projects/${s.projectId}/todos`, {
-      title: 'Legacy task',
-      spec: '',
-    });
-    expect(res.status).toBe(201);
-    const created = todoRecordSchema.parse(await res.json());
-    expect(created.tagIds).toEqual([]);
-    insertLegacyMembership(s.db, created.id, [a.id, b.id], false);
-    const one = todoRecordSchema.parse(
-      await (await req(s.app, 'GET', `/api/todos/${created.id}`)).json(),
-    );
-    expect([...one.tagIds].sort()).toEqual([a.id, b.id].sort());
-    const plain = todoRecordSchema.parse(
-      await (
-        await req(s.app, 'POST', `/api/projects/${s.projectId}/todos`, { title: 'p', spec: '' })
-      ).json(),
-    );
-    expect(plain.tagIds).toEqual([]);
-  });
-
-  test('retired creation assignments return 400 for foreign and missing categories', async () => {
-    const s = bootServer();
-    const projectA = await postProject(s.app, 'a');
-    const projectB = await postProject(s.app, 'b');
-    const foreign = insertLegacyCategory(s.db, projectB, 'x', '#6366f1');
-    await expectErrorShape(
-      await req(s.app, 'POST', `/api/projects/${projectA}/todos`, {
-        title: 't',
-        spec: '',
-        tagIds: [foreign.id],
-      }),
-      400,
-    );
-    await expectErrorShape(
-      await req(s.app, 'POST', `/api/projects/${projectA}/todos`, {
-        title: 't',
-        spec: '',
-        tagIds: ['no-such-tag'],
-      }),
       400,
     );
   });

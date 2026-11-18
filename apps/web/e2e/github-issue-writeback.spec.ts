@@ -13,7 +13,6 @@ function selfRecord(sourceRef: string | null) {
     phaseAt: 0,
     seqNum: 1,
     orderIndex: 0,
-    tagIds: [],
     assignment: null,
     agent: null,
     latestBuildId: null,

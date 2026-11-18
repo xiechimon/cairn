@@ -1,11 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { tag, todo, todoTag } from '../src/db/schema.js';
+import { todo } from '../src/db/schema.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { bootServer, postProject, req } from './helpers.js';
-import { insertLegacyCategory, insertLegacyMembership } from './legacy-category-fixtures.js';
 
 test.each(['plain', 'local', 'hosted', 'github'] as const)(
   '%s project creation has no category seeds or vocabulary routes',
@@ -22,10 +21,8 @@ test.each(['plain', 'local', 'hosted', 'github'] as const)(
       });
       expect(response.status).toBe(201);
       const { id } = (await response.json()) as { id: string };
-      expect(s.db.select().from(tag).where(eq(tag.projectId, id)).all()).toEqual([]);
       for (const projectId of [id, 'missing-project']) {
         for (const method of ['GET', 'POST']) {
-          const before = s.db.select().from(tag).all();
           const result = await req(
             s.app,
             method,
@@ -33,7 +30,6 @@ test.each(['plain', 'local', 'hosted', 'github'] as const)(
             method === 'POST' ? { name: 'retired', color: '#123456' } : undefined,
           );
           expect(result.status).toBe(404);
-          expect(s.db.select().from(tag).all()).toEqual(before);
         }
       }
     } finally {
@@ -43,25 +39,20 @@ test.each(['plain', 'local', 'hosted', 'github'] as const)(
   },
 );
 
-test('retired vocabulary requests preserve legacy correction tasks and associations', async () => {
+test('retired vocabulary requests preserve correction tasks', async () => {
   const s = bootServer();
   try {
     const projectId = await postProject(s.app);
-    const category = insertLegacyCategory(s.db, projectId, 'CoRrEcTiOn');
     const created = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       title: 'Existing task',
       spec: 'Keep this body.',
     });
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
-    insertLegacyMembership(s.db, id, [category.id], true);
-    const snapshot = () => ({
-      categories: s.db.select().from(tag).all(),
-      tasks: s.db.select().from(todo).all(),
-      links: s.db.select().from(todoTag).all(),
-    });
-    const before = snapshot();
-    expect(before.tasks[0]?.correctionRequired).toBe(true);
+    s.db.run(sql`UPDATE todo SET correctionRequired = 1 WHERE id = ${id}`);
+    const tasks = () => s.db.select().from(todo).all();
+    const before = tasks();
+    expect(before[0]?.correctionRequired).toBe(true);
     for (const method of ['GET', 'POST']) {
       const response = await req(
         s.app,
@@ -70,10 +61,10 @@ test('retired vocabulary requests preserve legacy correction tasks and associati
         method === 'POST' ? { name: 'new', color: '#000000' } : undefined,
       );
       expect(response.status).toBe(404);
-      expect(snapshot()).toEqual(before);
+      expect(tasks()).toEqual(before);
     }
     expect((await req(s.app, 'PATCH', `/api/todos/${id}`, { phase: 'done' })).status).toBe(409);
-    expect(snapshot()).toEqual(before);
+    expect(tasks()).toEqual(before);
   } finally {
     s.dispose();
   }
@@ -104,7 +95,7 @@ test.each(['plain', 'hosted'])(
         { name: 'Coordinator project', ...(kind === 'hosted' ? { repoKind: 'hosted' } : {}) },
       );
       const { id } = JSON.parse(result) as { id: string };
-      expect(s.db.select().from(tag).where(eq(tag.projectId, id)).all()).toEqual([]);
+      expect(typeof id).toBe('string');
     } finally {
       s.dispose();
     }

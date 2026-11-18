@@ -12,7 +12,6 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
     archivedAt,
     seqNum: 1,
     orderIndex: 0,
-    tagIds: [],
     assignment: null,
     agent: null,
     latestBuildId: 'build-archive',

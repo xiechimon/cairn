@@ -74,10 +74,11 @@ test('cutover preserves exact label identities and metadata, moved origins and s
       { todoId: 'moved', labelId: 'shared' },
       { todoId: 'self', labelId: 'self-label' },
     ]);
-    expect(opened.db.all('SELECT * FROM todo_tag ORDER BY todoId, tagId')).toEqual([
-      { todoId: 'ordinary', tagId: 'local-only' },
-      { todoId: 'ordinary', tagId: 'shared' },
-    ]);
+    expect(
+      opened.db.all(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('tag', 'todo_tag')",
+      ),
+    ).toEqual([]);
     expect(opened.db.all('SELECT * FROM todo ORDER BY id')).toEqual(
       original.tasks.map((row) => {
         const {
@@ -91,7 +92,6 @@ test('cutover preserves exact label identities and metadata, moved origins and s
     expect(opened.db.all('SELECT * FROM build ORDER BY id')).toEqual(
       original.builds.map((row) => ({ ...(row as object), afterStopPhase: null })),
     );
-    expect(opened.db.all('SELECT * FROM tag ORDER BY id')).toEqual(original.vocabulary);
     expect(opened.db.all('PRAGMA foreign_key_check')).toEqual([]);
   } finally {
     opened.close();
@@ -100,7 +100,6 @@ test('cutover preserves exact label identities and metadata, moved origins and s
   try {
     expect(restarted.db.all('SELECT * FROM github_label')).toHaveLength(5);
     expect(restarted.db.all('SELECT * FROM todo_github_label')).toHaveLength(4);
-    expect(restarted.db.all('SELECT * FROM todo_tag')).toHaveLength(2);
     expect(restarted.db.all('PRAGMA foreign_key_check')).toEqual([]);
   } finally {
     restarted.close();

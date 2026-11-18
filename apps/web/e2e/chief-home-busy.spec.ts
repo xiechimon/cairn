@@ -29,7 +29,6 @@ const TASK = {
   phaseAt: 0,
   seqNum: 9,
   orderIndex: 0,
-  tagIds: [],
   assignment: null,
   agent: null,
   latestBuildId: null,
