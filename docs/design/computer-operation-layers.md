@@ -22,25 +22,19 @@ The capability resolves in one place, `resolveModelInput` in `packages/shared`, 
 
 ## What a text-only model gets
 
-- `computer_observe`: no relay to the computer at all. The result is one line: this model cannot see screenshots; use `browser_snapshot` and other text tools first; if only a screenshot would help, call `request_takeover`.
-- `computer_act`: the actions still run (keys and typing do not need coordinates), the result text carries a line saying no screenshot is attached and pointing to text tools or `request_takeover`. No image block.
+- `computer_observe` and `computer_act`: no relay to the computer, so nothing is clicked or typed blind. The result is a tool error (`isError`) with one plain line: the current model cannot see screenshots, use `browser_*` or `desktop_*` tools, and if they cannot do it, report that the step needs an image-capable model. No image block.
 - Screenshot-only actions are never the first choice for any model: the prompt orders browser and text tools first.
 - pi-ai also replaces images with "(see attached image)" for text-only models; with the correct capability that protection now applies, and the tool no longer produces the image in the first place.
 
-## Owner takeover fallback
-
-When only a screenshot would help and the model cannot see images, the model calls the existing `request_takeover` (the handoff path: the owner gets control, hands it back, the model continues from a fresh `browser_snapshot`). The tool result names this explicitly so the model never retries silently.
-
 ## No separate computer-use model
 
-Decided by ian on 2026-11-18: no separate vision "computer-use model" setting. Layers 1 and 2 (agent-browser, agent-desktop) carry the work in text. When only layer 3 would help, a main model that can see images uses it; a text-only main model asks the owner to take over. Revisit only if real runs show text-only models blocked on screenshot-only steps often.
+Decided by ian on 2026-11-18: no separate vision "computer-use model" setting. Layers 1 and 2 (agent-browser, agent-desktop) carry the work in text. When only layer 3 would help, a main model that can see images uses it; a text-only main model gets an error from the screenshot tools and reports that the step needs an image-capable model (owner decision, ian, 2026-11-18). `request_takeover` stays for logins and 2FA only. Revisit only if real runs show text-only models blocked on screenshot-only steps often.
 
 ## Failure paths
 
 | Case | Behavior |
 |---|---|
 | Model not in the catalog (provider removed mid-turn) | treated as text-only |
-| `computer_observe` from a text-only model | one-line message, no relay, no image |
-| `computer_act` from a text-only model | actions run, text result, no image |
+| `computer_observe` or `computer_act` from a text-only model | tool error, one line, no relay, nothing executed |
 | Image-capable model | unchanged: text plus bounded PNG |
 | Owner holds control | unchanged: `computer_observe` is refused by the handoff gate |

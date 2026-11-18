@@ -175,59 +175,47 @@ describe('coordinator tools', () => {
     }
   });
 
-  it.each([
-    {
-      tool: 'computer_observe',
-      args: {} as Record<string, never>,
-      relayed: [] as string[],
-      text: 'cannot see screenshots',
-    },
-    {
-      tool: 'computer_act',
-      args: { actions: [{ kind: 'key', key: 'Return' }] },
-      relayed: ['computer_act'],
-      text: 'screen 1600x1000',
-    },
-  ])(
-    'gives a model without image input no screenshot from $tool and points it at takeover',
-    async ({ tool, args, relayed: expectedRelayed, text }) => {
-      const { coordinatorModels, seenResults } = toolThenAnswer(tool, args, ['text']);
-      const api = fakeMachineApi();
-      const relayed: string[] = [];
-      api.relayComputer = async (_stepId, name) => {
-        relayed.push(name);
-        return {
-          text: 'screen 1600x1000, image 1568x980',
-          images: [{ data: validPng.toString('base64'), mimeType: 'image/png' }],
-        };
-      };
-      const gate = createStepGate();
-      const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
-        extensions: [coordinatorToolsExtension(api, gate, { desktopTools: true })],
-      });
-      try {
-        await runCoordinatorTurn(
-          {
-            harness,
-            models: coordinatorModels,
-            api,
-            context: ctx,
-            heartbeatMs: 1000,
-            now: () => 1,
-            gate,
-          },
-          chiefStep('step-text-only', 'Look at the desktop'),
-        );
-        expect(relayed).toEqual(expectedRelayed);
-        const blocks = JSON.parse(seenResults[0]!) as { type: string; text?: string }[];
-        expect(blocks.some((block) => block.type === 'image')).toBe(false);
-        expect(blocks.map((block) => block.text).join('\n')).toContain(text);
-        expect(blocks.map((block) => block.text).join('\n')).toContain('request_takeover');
-      } finally {
-        await harness.close(ctx);
-      }
-    },
-  );
+  it('returns an error and sends nothing to the computer when a text-only model calls computer_act', async () => {
+    const { coordinatorModels, seenResults, seenMessages } = toolThenAnswer(
+      'computer_act',
+      { actions: [{ kind: 'key', key: 'Return' }] },
+      ['text'],
+    );
+    const api = fakeMachineApi();
+    const relayed: string[] = [];
+    api.relayComputer = async (_stepId, name) => {
+      relayed.push(name);
+      return { text: 'screen 1600x1000', images: [] };
+    };
+    const gate = createStepGate();
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+      extensions: [coordinatorToolsExtension(api, gate, { desktopTools: true })],
+    });
+    try {
+      await runCoordinatorTurn(
+        {
+          harness,
+          models: coordinatorModels,
+          api,
+          context: ctx,
+          heartbeatMs: 1000,
+          now: () => 1,
+          gate,
+        },
+        chiefStep('step-text-only', 'Look at the desktop'),
+      );
+      expect(relayed).toEqual([]);
+      const result = seenMessages.at(-1)?.messages.at(-1) as { isError?: boolean } | undefined;
+      expect(result?.isError).toBe(true);
+      const text = (JSON.parse(seenResults[0]!) as { text?: string }[])
+        .map((block) => block.text)
+        .join('\n');
+      expect(text).toContain('cannot see screenshots');
+      expect(text).not.toContain('request_takeover');
+    } finally {
+      await harness.close(ctx);
+    }
+  });
 
   it('offers the desktop tools only when asked and feeds their screenshot to the model as an image', async () => {
     const without = coordinatorToolsExtension(fakeMachineApi(), createStepGate()).tools ?? [];
