@@ -8,7 +8,6 @@ import {
   createProviderBodySchema,
   createScheduleBodySchema,
   createSkillBodySchema,
-  evacuateMachineBodySchema,
   githubReposResponseSchema,
   importSkillBodySchema,
   type MachineFolderGrants,
@@ -18,7 +17,6 @@ import {
   patchMcpConnectorBodySchema,
   patchProviderBodySchema,
   patchScheduleBodySchema,
-  ROUTE_USES,
   redactSecrets,
   renameClaudeSubscriptionSchema,
   renameDevinSubscriptionSchema,
@@ -77,7 +75,6 @@ import {
   updateDevinSubscription,
   verifyDevinSubscriptionConnection,
 } from './services/devin-subscriptions.js';
-import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
 import {
   deleteGithubConnection,
@@ -124,7 +121,7 @@ import {
   toConnectorRecord,
   updateMcpConnector,
 } from './services/mcp-servers.js';
-import { mergedCatalogModels, refreshAllRelayCatalogs } from './services/model-liveness.js';
+import { refreshAllRelayCatalogs } from './services/model-liveness.js';
 import {
   abortOAuthCallback,
   completeOAuthCallback,
@@ -371,45 +368,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, row.teamId);
     revokeMachineToken(ctx, id);
     return c.body(null, 204);
-  });
-
-  app.post('/api/machines/:id/evacuate', async (c) => {
-    const id = c.req.param('id');
-    const src = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
-    if (!src) throw notFound(`machine ${id}`);
-    requireTeam(ctx, src.teamId);
-    const body = parseWith(evacuateMachineBodySchema, await jsonBody(c), 'body');
-    if (body.targetMachineId === id) {
-      throw new HttpError(400, '源执行机与目标执行机相同——无操作不是迁移。');
-    }
-    const dst = ctx.db
-      .select()
-      .from(machine)
-      .where(and(eq(machine.id, body.targetMachineId), eq(machine.teamId, src.teamId)))
-      .get();
-    if (!dst) throw notFound(`machine ${body.targetMachineId}`);
-    const holders = ctx.db
-      .select()
-      .from(routingRule)
-      .where(eq(routingRule.machineId, id))
-      .all()
-      .filter((rule) => ROUTE_USES.includes(rule.use));
-    const moved: string[] = [];
-    const rejected: { agentId: string; reason: string }[] = [];
-    for (const rule of holders) {
-      const reject = homeMachineRejectReason(dst, rule, mergedCatalogModels());
-      if (reject !== null) {
-        rejected.push({ agentId: rule.id, reason: reject });
-        continue;
-      }
-      ctx.db
-        .update(routingRule)
-        .set({ machineId: dst.id, updatedAt: nowMs() })
-        .where(eq(routingRule.id, rule.id))
-        .run();
-      moved.push(rule.id);
-    }
-    return c.json({ moved, rejected });
   });
 
   app.get('/api/capabilities', (c) => {

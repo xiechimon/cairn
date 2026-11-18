@@ -511,7 +511,7 @@ Reach:
 
 ### machines
 
-**Machines** (shipped, centrality 2). A compact machine list with names, default marker, system, online state and a menu for default, delete and evacuate.
+**Machines** (shipped, centrality 2). A compact machine list with names, default marker, system, online state and a menu for default and delete.
 
 States: Empty, loading and error states; online and offline rows; default machine; long names; row menu and confirmation dialogs. No expandable details or capability controls.
 

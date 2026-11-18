@@ -14,17 +14,12 @@ test('machine names are plain text and do not expand a detail', async ({ page })
   await expect(row(page).getByTestId('machine-item-status')).toHaveText('在线');
 });
 
-test('menu gate: deletable; whole-machine migrate is disabled until a target is picked', async ({ page }) => {
+test('menu gate: deletable; evacuate entry is retired', async ({ page }) => {
   await page.goto(DETAIL);
 
   await row(page).getByTestId('machine-menu').click();
   await expect(page.getByTestId('machine-menu-delete')).toBeEnabled();
-  await page.getByTestId('machine-menu-evacuate').click();
-  await expect(page.getByTestId('machine-evacuate-btn')).toBeDisabled();
-
-  await page.locator('.machine-evacuate-select').click();
-  await expect(page.locator('.machine-evacuate-row', { hasText: 'xmonsMac-3574.local' })).toBeVisible();
-  await expect(page.locator('.machine-evacuate-row', { hasText: 'mea-wsl' })).toHaveCount(0);
+  await expect(page.getByTestId('machine-menu-evacuate')).toHaveCount(0);
 });
 
 test('menu delete opens a confirm layer first, cancel does not delete', async ({ page }) => {

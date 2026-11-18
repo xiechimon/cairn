@@ -1001,7 +1001,6 @@ describe('F-C1 credentials and grants are owner-only', () => {
     ['PATCH', '/api/machines/any', { name: 'm' }],
     ['DELETE', '/api/machines/any', undefined],
     ['POST', '/api/machines/any/revoke', {}],
-    ['POST', '/api/machines/any/evacuate', {}],
     ['POST', '/api/remote/pairing', {}],
     ['DELETE', '/api/remote/devices/any', undefined],
   ];

@@ -1100,6 +1100,14 @@ export function useApiMutations(teamId: string | undefined) {
         qc.setQueryData<MachineRecord[]>(['machines', teamId], context?.previous ?? []);
       },
     }),
+    deleteMachine: useMutation({
+      mutationFn: (id: string) => api.del<void>(`/api/machines/${encodeURIComponent(id)}`),
+      onSuccess: () => {
+        void qc.invalidateQueries({ queryKey: ['machines', teamId] });
+        void qc.invalidateQueries({ queryKey: ['routing-settings', teamId] });
+        void qc.invalidateQueries({ queryKey: ['model-routing', teamId] });
+      },
+    }),
     createProject: useMutation({
       mutationFn: (body: CreateProjectBody) =>
         api.post<ProjectRecord>('/api/projects', { ...body, ...(teamId ? { teamId } : {}) }),

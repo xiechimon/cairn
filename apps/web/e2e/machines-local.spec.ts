@@ -35,14 +35,14 @@ test('managed facade row removed (spec 11 A8 negative)', async ({ page }) => {
   await expect(page.getByTestId('settings-content')).not.toContainText('Cairn 托管执行机');
 });
 
-test('local machine can be migrated or deleted only through its menu, and the row has no switch', async ({ page }) => {
+test('local machine can be deleted only through its menu, and the row has no switch or evacuate entry', async ({ page }) => {
   await page.goto(MACHINES);
   const local = page.locator(`${ITEM}[data-kind="local"]`);
   await expect(local).toBeVisible();
   await expect(local.getByRole('switch')).toHaveCount(0);
   await local.getByTestId('machine-menu').click();
-  await expect(page.getByTestId('machine-menu-evacuate')).toBeVisible();
   await expect(page.getByTestId('machine-menu-delete')).toBeVisible();
+  await expect(page.getByTestId('machine-menu-evacuate')).toHaveCount(0);
 });
 
 test('machine rows keep one density: every item the same height', async ({ page }) => {

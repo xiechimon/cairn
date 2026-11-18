@@ -135,7 +135,6 @@ const INFERRED_ROUTES = [
   'POST /api/todos/{id}/unarchive',
   'GET /api/needs-you',
   'DELETE /api/machines/{id}',
-  'POST /api/machines/{id}/evacuate',
   'POST /api/machines/{id}/revoke',
   'GET /api/machines/{id}/own-computer/grants',
   'DELETE /api/machines/{id}/own-computer/grants/{proposalId}',

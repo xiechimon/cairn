@@ -76,8 +76,3 @@ export const patchMachineBodySchema = z.object({
   folderPins: z.array(machineFolderPinOpSchema).min(1).max(MACHINE_FOLDER_PINS_LIMIT).optional(),
 });
 export type PatchMachineBody = z.infer<typeof patchMachineBodySchema>;
-
-export const evacuateMachineBodySchema = z.object({
-  targetMachineId: recordId,
-});
-export type EvacuateMachineBody = z.infer<typeof evacuateMachineBodySchema>;

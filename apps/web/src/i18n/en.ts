@@ -849,9 +849,6 @@ export const EN: Record<string, string> = {
   模型: 'Model',
   接入执行机: 'Connect a Runner',
   在线: 'Online',
-  '迁移到…': 'Migrate to…',
-  迁移到: 'Migrate to',
-  整机迁移: 'Migrate all agents',
   状态: 'Status',
   删除执行机: 'Delete Runner',
   '删除后，这台执行机要重新注册才能再接任务':
@@ -860,7 +857,6 @@ export const EN: Record<string, string> = {
   尚无执行机: 'No Runners yet',
   '在要执行任务的执行机上运行注册命令，它就会出现在这里。':
     'Run the enroll command on the Runner that should run tasks and it appears here.',
-  '整机迁移失败，请重试。': 'Migration failed. Try again.',
   '删除执行机失败，请重试。': 'Could not delete the Runner. Try again.',
   // 桌面通知标题（M5 SSE notification 事件面，02 §9.1 三事件；api/sse.ts
   // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
@@ -1847,10 +1843,6 @@ export const EN: Record<string, string> = {
   不填则沿用规则的执行机: 'Leave empty to keep the rule Runner',
   '跟随 Coordinator 路由规则，在路由设置里调整。':
     'Follows the coordinator routing rules; adjust them in routing settings.',
-  '{n} 条路由规则未过校验留在原机':
-    '{n#1 routing rule|# routing rules} failed validation and stayed put',
-  '把固定在这台执行机上的路由规则一起迁到另一台执行机。':
-    'Move the routing rules pinned to this Runner to another Runner.',
   首选执行机: 'Preferred Runner',
   不固定: 'Any machine',
   '当前默认：Claude Code（因为团队有 Claude 订阅，执行机也装了 Claude Code）':
