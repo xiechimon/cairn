@@ -29,6 +29,7 @@ interface GrantState {
   userId: number;
   refreshToken: string;
   revoked: boolean;
+  accessRevoked: boolean;
 }
 
 export interface AuthCall {
@@ -52,7 +53,7 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
   users.set(defaultUser.id, defaultUser);
   const devices = new Map<string, DeviceState>();
   const grants = new Map<string, GrantState>();
-  const authCodes = new Map<string, number>();
+  const pathFaults: { includes: string; status: number; body: unknown }[] = [];
   const calls: AuthCall[] = [];
   const repos: FakeRepo[] = options.repos ?? [
     {
@@ -62,7 +63,7 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
       owner: { login: defaultUser.login },
     },
   ];
-  const installed = options.installed ?? true;
+  let installations = options.installed === false ? 0 : 1;
   let seq = 0;
   let fault: { status: number; body: unknown } | null = null;
   let onRequest: ((call: AuthCall) => void | Promise<void>) | null = null;
@@ -93,19 +94,43 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
     device.slowDownInterval = intervalSeconds;
   };
 
+  const expireDevice = (userCode: string): void => {
+    const device = [...devices.values()].find((d) => d.userCode === userCode);
+    if (device === undefined) throw new Error(`no fake device code for ${userCode}`);
+    device.expiresAt = 0;
+  };
+
   const knowGrant = (
     accessToken: string,
     refreshToken: string,
     login = defaultUser.login,
   ): void => {
     const user = [...users.values()].find((u) => u.login === login);
-    grants.set(accessToken, { userId: user?.id ?? defaultUser.id, refreshToken, revoked: false });
+    grants.set(accessToken, {
+      userId: user?.id ?? defaultUser.id,
+      refreshToken,
+      revoked: false,
+      accessRevoked: false,
+    });
   };
 
-  const issueAuthCode = (login = defaultUser.login): string => {
+  const authCodeState = new Map<string, { userId: number; expires: boolean; scope: string }>();
+
+  const issueAuthCode = (
+    userOrLogin: FakeAuthUser | string = defaultUser,
+    opts: { expires?: boolean; scope?: string } = {},
+  ): string => {
     const code = nextId();
-    const user = [...users.values()].find((u) => u.login === login);
-    authCodes.set(code, user?.id ?? defaultUser.id);
+    const user =
+      typeof userOrLogin === 'object'
+        ? userOrLogin
+        : ([...users.values()].find((u) => u.login === userOrLogin) ?? defaultUser);
+    users.set(user.id, user);
+    authCodeState.set(code, {
+      userId: user.id,
+      expires: opts.expires ?? true,
+      scope: opts.scope ?? '',
+    });
     return code;
   };
 
@@ -115,10 +140,15 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
     for (const g of grants.values()) if (g.refreshToken === token) g.revoked = true;
   };
 
+  const revokeAccess = (token: string): void => {
+    const grant = grants.get(token);
+    if (grant !== undefined) grant.accessRevoked = true;
+  };
+
   function mintGrant(userId: number) {
     const accessToken = `ghu_${nextId()}`;
     const refreshToken = `ghr_${nextId()}`;
-    grants.set(accessToken, { userId, refreshToken, revoked: false });
+    grants.set(accessToken, { userId, refreshToken, revoked: false, accessRevoked: false });
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -132,7 +162,7 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
   function bearerUser(auth: string | undefined) {
     const token = auth?.startsWith('Bearer ') ? auth.slice(7) : undefined;
     const grant = token === undefined ? undefined : grants.get(token);
-    if (grant === undefined || grant.revoked) return null;
+    if (grant === undefined || grant.revoked || grant.accessRevoked) return null;
     return userOf(grant.userId);
   }
 
@@ -154,7 +184,9 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
     }
     if (grantType === 'refresh_token') {
       const refreshToken = form.get('refresh_token') ?? '';
-      const entry = [...grants.entries()].find(([, g]) => g.refreshToken === refreshToken);
+      const entry = [...grants.entries()].find(
+        ([, g]) => g.refreshToken !== '' && g.refreshToken === refreshToken,
+      );
       if (entry === undefined || entry[1].revoked) {
         return { status: 200, body: { error: 'bad_refresh_token' } };
       }
@@ -163,14 +195,31 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
     }
     if (grantType === 'authorization_code' || (grantType === null && form.has('code'))) {
       const code = form.get('code') ?? '';
-      const userId = authCodes.get(code);
-      if (userId === undefined) return { status: 200, body: { error: 'bad_verification_code' } };
-      authCodes.delete(code);
+      const auth = authCodeState.get(code);
+      if (auth === undefined) return { status: 200, body: { error: 'bad_verification_code' } };
+      authCodeState.delete(code);
       const accessToken = `gho_${nextId()}`;
-      grants.set(accessToken, { userId, refreshToken: '', revoked: false });
+      const refreshToken = auth.expires ? `ghr_${nextId()}` : '';
+      grants.set(accessToken, {
+        userId: auth.userId,
+        refreshToken,
+        revoked: false,
+        accessRevoked: false,
+      });
       return {
         status: 200,
-        body: { access_token: accessToken, expires_in: 28_800, scope: '', token_type: 'bearer' },
+        body: {
+          access_token: accessToken,
+          ...(auth.expires
+            ? {
+                expires_in: 28_800,
+                refresh_token: refreshToken,
+                refresh_token_expires_in: 15_552_000,
+              }
+            : {}),
+          scope: auth.scope,
+          token_type: 'bearer',
+        },
       };
     }
     return { status: 400, body: { error: 'unsupported_grant_type' } };
@@ -185,6 +234,9 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
   function route(url: URL, form: URLSearchParams, method: string, auth: string | undefined) {
     const path = url.pathname;
     if (fault !== null) return { status: fault.status, body: fault.body, headers: {} };
+    for (const f of pathFaults) {
+      if (path.includes(f.includes)) return { status: f.status, body: f.body, headers: {} };
+    }
     if (method === 'POST' && path.endsWith('/login/device/code')) {
       const prefix = path.slice(0, -'/login/device/code'.length);
       const deviceCode = nextId();
@@ -237,9 +289,14 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
       };
     }
     if (method === 'GET' && path.endsWith('/user/installations')) {
+      if (bearerUser(auth) === null)
+        return { status: 401, body: { message: 'Bad credentials' }, headers: {} };
       return {
         status: 200,
-        body: { total_count: installed ? 1 : 0, installations: installed ? [{ id: 1 }] : [] },
+        body: {
+          total_count: installations,
+          installations: installations > 0 ? [{ id: 1 }] : [],
+        },
         headers: {},
       };
     }
@@ -323,12 +380,24 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
     approveDevice,
     denyDevice,
     slowDownDevice,
+    expireDevice,
+    setInstallations: (count: number) => {
+      installations = count;
+    },
     knowGrant,
     issueAuthCode,
     revoke,
+    revokeAccess,
     serve,
     setFault: (status: number | null, body: unknown = {}) => {
       fault = status === null ? null : { status, body };
+    },
+    setPathFault: (includes: string, status: number | null, body: unknown = {}) => {
+      pathFaults.splice(
+        0,
+        pathFaults.length,
+        ...(status === null ? [] : [{ includes, status, body }]),
+      );
     },
     setOnRequest: (fn: ((call: AuthCall) => void | Promise<void>) | null) => {
       onRequest = fn;

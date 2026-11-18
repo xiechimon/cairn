@@ -1,60 +1,22 @@
 import { describe, expect, test } from 'vitest';
 import type { AppContext } from '../src/context.js';
 import { githubConnection } from '../src/db/schema.js';
-import type { FetchLike } from '../src/lib/github.js';
 import { openGithubToken } from '../src/services/github-connection.js';
+import { type GithubAuthFake, githubAuthFake } from './fakes/github-auth.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
-const TOKEN = 'ghu_connection_token_value';
-const SECOND_TOKEN = 'ghu_second_connection_token';
 const CLIENT = { clientId: 'cid-test', clientSecret: 'cs-test' };
 const ORIGIN = 'http://127.0.0.1:8787';
-const TOKEN_URL = 'https://github.com/login/oauth/access_token';
-const USER_URL = 'https://api.github.com/user';
+const OCTO = { id: 1, login: 'octocat', name: null };
 
-interface UpstreamScript {
-  token?: { status?: number; json?: unknown };
-  user?: { status?: number; json?: unknown };
-  throwUrls?: string[];
-}
-
-function mockUpstream(script: UpstreamScript) {
-  const calls: { url: string; headers: Record<string, string>; body: string }[] = [];
-  const fetchImpl: FetchLike = async (input, init) => {
-    const url = String(input);
-    calls.push({
-      url,
-      headers: { ...(init?.headers ?? {}) },
-      body: init?.body ?? '',
-    });
-    if (script.throwUrls?.some((prefix) => url.startsWith(prefix))) {
-      throw new Error('network down');
-    }
-    const entry = url.startsWith(TOKEN_URL) ? script.token : script.user;
-    const status = entry?.status ?? 200;
-    return {
-      ok: status >= 200 && status < 300,
-      status,
-      headers: { get: () => null },
-      json: async () => entry?.json,
-      text: async () => JSON.stringify(entry?.json ?? null),
-    };
-  };
-  return { calls, fetchImpl };
-}
-
-const HAPPY: UpstreamScript = {
-  token: { json: { access_token: TOKEN, scope: 'read:user,repo', token_type: 'bearer' } },
-  user: { json: { login: 'octocat', id: 1 } },
-};
-
-function boot(script: UpstreamScript, opts: { client?: AppContext['oauthClient'] } = {}) {
-  const mock = mockUpstream(script);
+function boot(opts: { client?: AppContext['oauthClient'] } = {}) {
+  const gh = githubAuthFake({ user: OCTO });
   const s = bootServer({
     oauthClient: opts.client === undefined ? CLIENT : opts.client,
-    oauthFetch: mock.fetchImpl as AppContext['oauthFetch'],
+    oauthFetch: gh.fetch as AppContext['oauthFetch'],
+    githubFetch: gh.fetch,
   });
-  return { s, mock };
+  return { s, gh };
 }
 
 async function authorizeConnection(s: TestServer) {
@@ -71,6 +33,17 @@ function callback(s: TestServer, query: string) {
   return s.app.request(`/api/oauth/callback?${query}`, { redirect: 'manual' });
 }
 
+async function connect(
+  s: TestServer,
+  gh: GithubAuthFake,
+  opts: Parameters<GithubAuthFake['issueAuthCode']>[1] = {},
+) {
+  const { state } = await authorizeConnection(s);
+  const code = gh.issueAuthCode(undefined, { scope: 'read:user,repo', ...opts });
+  const res = await callback(s, `code=${encodeURIComponent(code)}&state=${state}`);
+  return { res, grant: [...gh.grants.keys()].at(-1) };
+}
+
 function ageState(s: TestServer, state: string | null, minutesAgo: number) {
   if (state === null) throw new Error('state missing');
   const entry = s.oauthStates.get(state);
@@ -84,7 +57,7 @@ function statusOf(s: TestServer) {
 
 describe('POST /api/teams/:id/github/oauth/authorize (connection family issuance)', () => {
   test('1. oauth not configured -> 400 (not-configured family carried over, env slot name in the message)', async () => {
-    const { s } = boot(HAPPY, { client: null });
+    const { s } = boot({ client: null });
     try {
       const { res, body } = await authorizeConnection(s);
       expect(res.status).toBe(400);
@@ -95,7 +68,7 @@ describe('POST /api/teams/:id/github/oauth/authorize (connection family issuance
   });
 
   test('2. happy: authorization URL carries all four params (scope = read:user repo) + state registered', async () => {
-    const { s } = boot(HAPPY);
+    const { s } = boot();
     try {
       const { res, url, state } = await authorizeConnection(s);
       expect(res.status).toBe(200);
@@ -114,7 +87,7 @@ describe('POST /api/teams/:id/github/oauth/authorize (connection family issuance
 
 describe('GET /api/teams/:id/github/connection (auth state read surface)', () => {
   test('3a. not connected -> {connected:false}, no login/scope slots', async () => {
-    const { s } = boot(HAPPY);
+    const { s } = boot();
     try {
       const res = await statusOf(s);
       expect(res.status).toBe(200);
@@ -125,10 +98,9 @@ describe('GET /api/teams/:id/github/connection (auth state read surface)', () =>
   });
 
   test('3b. connected -> {connected:true,login,scope}; unknown team -> 404', async () => {
-    const { s } = boot(HAPPY);
+    const { s, gh } = boot();
     try {
-      const { state } = await authorizeConnection(s);
-      await callback(s, `code=c&state=${state}`);
+      await connect(s, gh);
       const res = await statusOf(s);
       const body = (await res.json()) as Record<string, unknown>;
       expect(body).toEqual({ connected: true, login: 'octocat', scope: 'read:user,repo' });
@@ -142,21 +114,20 @@ describe('GET /api/teams/:id/github/connection (auth state read surface)', () =>
 
 describe('GET /api/oauth/callback (github-connection family branch)', () => {
   test('4. happy full chain: 302 to the new-project page + row established + granted scope persisted + token only in the header', async () => {
-    const { s, mock } = boot(HAPPY);
+    const { s, gh } = boot();
     try {
-      const { state } = await authorizeConnection(s);
-      const res = await callback(s, `code=mockcode&state=${state}`);
+      const { res, grant } = await connect(s, gh);
       expect(res.status).toBe(302);
       expect(res.headers.get('location')).toBe(
         `${ORIGIN}/app/project/new?oauth=connected&github=connection`,
       );
-      const tokenCall = mock.calls.find((c) => c.url === TOKEN_URL);
-      expect(tokenCall?.body).toContain('code=mockcode');
-      expect(tokenCall?.body).toContain(`client_id=${CLIENT.clientId}`);
-      const userCall = mock.calls.find((c) => c.url === USER_URL);
-      expect(userCall?.headers.authorization).toBe(`Bearer ${TOKEN}`);
-      expect(userCall?.url).not.toContain(TOKEN);
-      expect(openGithubToken({ db: s.db, box: s.secretBox }, s.team.id)).toBe(TOKEN);
+      const tokenCall = gh.calls.find((c) => c.url.endsWith('/login/oauth/access_token'));
+      expect(tokenCall?.form.get('code')).not.toBeNull();
+      expect(tokenCall?.form.get('client_id')).toBe(CLIENT.clientId);
+      const userCall = gh.calls.find((c) => c.url.endsWith('/user'));
+      expect(userCall?.auth).toBe(`Bearer ${grant}`);
+      expect(userCall?.url).not.toContain(String(grant));
+      expect(openGithubToken({ db: s.db, box: s.secretBox }, s.team.id)).toBe(grant);
       const status = (await (await statusOf(s)).json()) as Record<string, unknown>;
       expect(status.login).toBe('octocat');
       expect(status.scope).toBe('read:user,repo');
@@ -171,10 +142,10 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
   });
 
   test('5. exchange succeeded but GET /user failed -> 302 reason=exchange', async () => {
-    const { s } = boot({ ...HAPPY, user: { status: 500, json: { message: 'boom' } } });
+    const { s, gh } = boot();
+    gh.setPathFault('/user', 500, { message: 'boom' });
     try {
-      const { state } = await authorizeConnection(s);
-      const res = await callback(s, `code=c&state=${state}`);
+      const { res } = await connect(s, gh);
       expect(res.status).toBe(302);
       expect(res.headers.get('location')).toBe(
         `${ORIGIN}/app/project/new?oauth=error&reason=exchange&github=connection`,
@@ -185,7 +156,7 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
   });
 
   test('6. user declined -> 302 reason=denied&github=connection + state consumed + token endpoint not called', async () => {
-    const { s, mock } = boot(HAPPY);
+    const { s, gh } = boot();
     try {
       const { state } = await authorizeConnection(s);
       const res = await callback(s, `error=access_denied&state=${state}`);
@@ -194,14 +165,28 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
         `${ORIGIN}/app/project/new?oauth=error&reason=denied&github=connection`,
       );
       expect(s.oauthStates.has(state as string)).toBe(false);
-      expect(mock.calls).toHaveLength(0);
+      expect(gh.calls).toHaveLength(0);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('6b. an unknown code is rejected by GitHub -> 302 reason=exchange', async () => {
+    const { s } = boot();
+    try {
+      const { state } = await authorizeConnection(s);
+      const res = await callback(s, `code=not-issued&state=${state}`);
+      expect(res.status).toBe(302);
+      expect(res.headers.get('location')).toBe(
+        `${ORIGIN}/app/project/new?oauth=error&reason=exchange&github=connection`,
+      );
     } finally {
       s.dispose();
     }
   });
 
   test('7. connection state expired -> 302 reason=state&github=connection', async () => {
-    const { s } = boot(HAPPY);
+    const { s } = boot();
     try {
       const { state } = await authorizeConnection(s);
       ageState(s, state, 31);
@@ -216,7 +201,7 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
   });
 
   test('8. state not registered (kind undecidable) -> 302 lands on the providers page (existing default unchanged)', async () => {
-    const { s } = boot(HAPPY);
+    const { s } = boot();
     try {
       const res = await callback(s, 'code=c&state=bogus');
       expect(res.status).toBe(302);
@@ -227,7 +212,7 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
   });
 
   test('9. provider family regression: provider state still lands on the providers page (two families do not cross)', async () => {
-    const { s } = boot(HAPPY);
+    const { s, gh } = boot();
     try {
       const res = await s.app.request(
         `/api/teams/${s.team.id}/providers/oauth/github-copilot/authorize`,
@@ -235,7 +220,8 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
       );
       const body = (await res.json()) as { authorizationUrl: string };
       const state = new URL(body.authorizationUrl).searchParams.get('state');
-      const landed = await callback(s, `code=c&state=${state}`);
+      const code = gh.issueAuthCode();
+      const landed = await callback(s, `code=${encodeURIComponent(code)}&state=${state}`);
       expect(landed.status).toBe(302);
       expect(landed.headers.get('location')).toBe(
         `${ORIGIN}/app/resources/providers?oauth=connected&provider=github-copilot`,
@@ -247,20 +233,15 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
   });
 
   test('10. reauth = overwrite: second happy new token/login -> single row new value effective', async () => {
-    const script: UpstreamScript = {
-      token: { json: { access_token: TOKEN, scope: 'read:user,repo' } },
-      user: { json: { login: 'octocat', id: 1 } },
-    };
-    const { s } = boot(script);
+    const { s, gh } = boot();
     try {
-      const a1 = await authorizeConnection(s);
-      await callback(s, `code=c1&state=${a1.state}`);
-      script.token = { json: { access_token: SECOND_TOKEN, scope: 'repo' } };
-      script.user = { json: { login: 'octocat2', id: 2 } };
-      const a2 = await authorizeConnection(s);
-      const res = await callback(s, `code=c2&state=${a2.state}`);
+      await connect(s, gh);
+      const { state } = await authorizeConnection(s);
+      const code = gh.issueAuthCode({ id: 2, login: 'octocat2', name: null }, { scope: 'repo' });
+      const res = await callback(s, `code=${encodeURIComponent(code)}&state=${state}`);
       expect(res.status).toBe(302);
-      expect(openGithubToken({ db: s.db, box: s.secretBox }, s.team.id)).toBe(SECOND_TOKEN);
+      const second = [...gh.grants.keys()].at(-1);
+      expect(openGithubToken({ db: s.db, box: s.secretBox }, s.team.id)).toBe(second);
       const status = (await (await statusOf(s)).json()) as Record<string, unknown>;
       expect(status).toEqual({ connected: true, login: 'octocat2', scope: 'repo' });
     } finally {
@@ -269,14 +250,13 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
   });
 
   test('12. token never enters the wire: status JSON and 302 Location both contain no plaintext', async () => {
-    const { s } = boot(HAPPY);
+    const { s, gh } = boot();
     try {
-      const { state } = await authorizeConnection(s);
-      const res = await callback(s, `code=c&state=${state}`);
-      expect(res.headers.get('location') ?? '').not.toContain(TOKEN);
+      const { res, grant } = await connect(s, gh);
+      expect(res.headers.get('location') ?? '').not.toContain(String(grant));
       const statusRes = await statusOf(s);
       const raw = await statusRes.text();
-      expect(raw).not.toContain(TOKEN);
+      expect(raw).not.toContain(String(grant));
       expect(raw).not.toContain('v1:');
     } finally {
       s.dispose();
@@ -286,10 +266,9 @@ describe('GET /api/oauth/callback (github-connection family branch)', () => {
 
 describe('DELETE /api/teams/:id/github/connection (disconnect)', () => {
   test('11a. row present -> 204 + status back to connected:false + token read-out point null', async () => {
-    const { s } = boot(HAPPY);
+    const { s, gh } = boot();
     try {
-      const { state } = await authorizeConnection(s);
-      await callback(s, `code=c&state=${state}`);
+      await connect(s, gh);
       const res = await req(s.app, 'DELETE', `/api/teams/${s.team.id}/github/connection`);
       expect(res.status).toBe(204);
       expect(await (await statusOf(s)).json()).toEqual({ connected: false });
@@ -300,7 +279,7 @@ describe('DELETE /api/teams/:id/github/connection (disconnect)', () => {
   });
 
   test('11b. no row -> 204 idempotent; unknown team -> 404', async () => {
-    const { s } = boot(HAPPY);
+    const { s } = boot();
     try {
       const res = await req(s.app, 'DELETE', `/api/teams/${s.team.id}/github/connection`);
       expect(res.status).toBe(204);
