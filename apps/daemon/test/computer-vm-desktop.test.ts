@@ -62,7 +62,7 @@ const state = read();
 const [command, ...rest] = args;
 if (command === 'image' && rest[0] === 'pull') process.exit(flag('pull-fail') ? 1 : 0);
 if (command === 'image' && rest[0] === 'list') {
-  process.stdout.write(JSON.stringify((state.images || []).map((reference) => ({ reference }))));
+  process.stdout.write(JSON.stringify((state.images || []).map((name) => ({ id: name, configuration: { creationDate: '2026-11-18T00:00:00Z', name, descriptor: { digest: name.slice(name.indexOf('@') + 1), mediaType: 'application/vnd.oci.image.index.v1+json', size: 1 } } }))));
   process.exit(0);
 }
 if (command === 'image' && rest[0] === 'delete') {

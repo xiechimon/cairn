@@ -167,7 +167,14 @@ const vmListSchema = z.array(
   }),
 );
 
-const imageListSchema = z.array(z.object({ reference: z.string().optional() }));
+const imageListSchema = z.array(
+  z.object({
+    configuration: z.object({
+      name: z.string(),
+      descriptor: z.object({ digest: z.string().optional() }).optional(),
+    }),
+  }),
+);
 
 const COMPUTER_IMAGE_REFERENCE = /^ghcr\.io\/xiechimon\/cairn-computer@sha256:[0-9a-f]{64}$/;
 
@@ -801,7 +808,7 @@ export class VmDesktops implements ComputerDesktops {
       if (listed.code !== 0 || !parsed.success) throw new Error('image list failed');
       const inUse = new Set((await this.list(binary)).map((vm) => vm.image.reference));
       const stale = parsed.data
-        .map((image) => image.reference)
+        .map((image) => image.configuration.name)
         .filter(
           (reference): reference is string =>
             reference !== undefined &&
