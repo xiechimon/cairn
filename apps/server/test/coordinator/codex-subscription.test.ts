@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { zstdDecompressSync } from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { coordinatorApiKey, coordinatorProviders } from '../../src/coordinator/credentials.js';
@@ -55,6 +56,57 @@ describe('Codex subscription credential for the in-server Coordinator', () => {
       reasoning: true,
     });
   });
+
+  it.each([
+    { modelId: 'gpt-6.1-sol', reasoning: undefined, expected: undefined },
+    { modelId: 'gpt-6.1-sol', reasoning: 'minimal' as const, expected: 'low' },
+    { modelId: 'gpt-6.1-sol', reasoning: 'high' as const, expected: 'high' },
+    { modelId: 'gpt-6-sol', reasoning: undefined, expected: 'none' },
+  ])(
+    'sends supported reasoning for $modelId at $reasoning',
+    async ({ modelId, reasoning, expected }) => {
+      const models = createCoordinatorModels();
+      models.useStepProvider({
+        kind: 'http',
+        providerId: 'openai-codex',
+        api: 'openai-responses',
+        models: [{ id: modelId, name: modelId }],
+      });
+      const payload = Buffer.from(
+        JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'test' } }),
+      ).toString('base64url');
+      await models.setApiKey('openai-codex', `test.${payload}.test`);
+      let requestBody: { reasoning?: { effort?: string } } | undefined;
+      await models.models
+        .streamSimple(
+          models.models.getModel('openai-codex', modelId)!,
+          { messages: [{ role: 'user', content: 'Hello', timestamp: 1 }] },
+          {
+            reasoning,
+            transport: 'sse',
+            maxRetries: 0,
+            fetch: async (url, init) => {
+              const request = new Request(url, init);
+              const bytes = Buffer.from(await request.arrayBuffer());
+              requestBody = JSON.parse(
+                (request.headers.get('content-encoding') === 'zstd'
+                  ? zstdDecompressSync(bytes)
+                  : bytes
+                ).toString('utf8'),
+              );
+              return Response.json(
+                { error: { message: 'Captured by test transport' } },
+                { status: 400 },
+              );
+            },
+          },
+        )
+        .result();
+      expect(requestBody).toBeDefined();
+      if (expected === undefined) expect(requestBody).not.toHaveProperty('reasoning');
+      else expect(requestBody?.reasoning?.effort).toBe(expected);
+    },
+  );
 
   it('passes subscription credentials as the API key required by the Codex stream', async () => {
     const models = createCoordinatorModels();

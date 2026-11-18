@@ -60,6 +60,9 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
     input: resolveModelInput(m),
     cost: m.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     reasoning: subscription,
+    thinkingLevelMap: subscription
+      ? getBuiltinModels(CODEX_PROVIDER_ID).find((model) => model.id === m.id)?.thinkingLevelMap
+      : undefined,
     contextWindow: m.contextWindow ?? catalogContextWindow(config.providerId, m.id),
     maxTokens: m.maxTokens ?? DEFAULT_MAX_TOKENS,
     ...(config.compat === undefined ? {} : { compat: config.compat }),
