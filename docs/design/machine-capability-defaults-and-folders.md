@@ -1,82 +1,98 @@
 # Machine capability defaults and folder grants
 
-Status: the G2 folder slice is implemented (`machine.folderGrants`, presence pin round-trip, owner `PATCH` ops, the pi command-gate predicate and the Runner-row display). Enable of an extra root stays 409 until step launch confinement can bind it, exactly as below; the browser, desktop and own-computer parts of this page are still proposals. Baseline `7299c658e` on `origin/main`. Does not edit #3924. Prior art already in this repo: `docs/research/user-computer-model-2026-11-08.md`, `docs/design/linux-harness-confinement.md`, and class three in `docs/design/ai-native-actions.md` (the agent does not change its own boundary). No new research file: this page is the ask, checked against that baseline.
+Status: implemented. Browser and desktop grants ship as nullable machine overrides that default on when the matching capability is reported; the G2 folder slice ships as `machine.folderGrants`; the owner-Mac path ships behind `ownComputerEnabled` plus per-call approval stamps. This pass (seq 18) finishes the default-on contract: the VM-computer offer and the Runner-claimed chief tool surface now read the same grant as dispatch, the daemon refuses orb calls the server did not stamp, and the settings machine row exposes the two grants. Baseline `f5f30e7f` on `origin/main`.
 
 ## Problem
 
-The home redesign drops the computers-panel switches `桌面控制` and `浏览器`. The owner wants agent browser and desktop use on by default, a place to turn each off, and a daemon check. G2 also needs the folders an agent may use on a machine reported, stored and enforced, including in `apps/daemon/src/backend/command-gate.ts`.
+Computer control is on by default for capable machines and explicit owner overrides win. The capability report, the nullable grants, the dispatch gate and the owner-Mac approval stamps were already in place; four gaps let parts of the system disagree about whether the computer is usable:
 
-## What the baseline does
+1. `teamHasVmComputer` checked only `capabilities.computerKind === 'vm'`, so with `desktopOverride: false` the Coordinator was still offered `shell`, `install_packages` and `request_cloak_license`, and each call then failed inside the turn.
+2. The owner-claimed (in-server) Coordinator turn built its tool list with the grant-aware options, while the Runner-claimed chief payload called `coordinatorToolDefs()` with no options, so the same turn offered different computer tools depending on who ran it.
+3. Owner-Mac calls carry an `ownComputerGrant` stamp the daemon verifies, but orb calls (shell, files, desktop, browser, `install_packages`) carried nothing the daemon could check, so the grant decision lived only in the server.
+4. The two grants were writable only through `PATCH /api/machines/:id` and the compatibility `POST`/`PATCH /api/computers` routes; the settings machine row showed no computer grant controls.
 
-These are three mechanisms, not one switch.
+## Mechanisms
 
-| Mechanism | Today | Where |
+These are separate mechanisms, not one switch.
+
+| Mechanism | Behavior | Where |
 |---|---|---|
-| Capability report | Enroll and presence replace `machine.capabilities`. `browser` is set only when an orb computer exists and the image marker contains the pinned agent-browser version. `ownComputer` is set only when `CAIRN_OWN_COMPUTER=1`. `computer` means an orb computer provider exists. | `apps/daemon/src/machine-loop.ts` (`capabilitiesReport`), `apps/daemon/src/orb/computer.ts` (`computerImageOffersBrowser`), `apps/server/src/services/machines.ts` (`markPresence`, `mergeReportedCapabilities`) |
-| Browser grant | `computer.browserEnabled` defaults false. Agent `browser_*` calls return 403 unless that row is true and the machine still reports `capabilities.browser`. The daemon does not re-check. | `apps/server/src/db/schema.ts`, `apps/server/drizzle/0132_computer_browser_enabled.sql`, `apps/server/src/services/machine-computer.ts` (`forwardComputerCall`), `apps/daemon/src/computer/dispatch.ts` (`handleBrowser`) |
-| Desktop switch | The panel switch acquires a user control lease (`controlHolder=user`, 30 minutes). A live user lease makes agent mutation return 409. It does not grant the desktop. Host tools `user_computer_*` stay refused until a separate approval gate. | `apps/web/src/board/machines-panel.tsx`, `apps/server/src/services/computer-control.ts`, `apps/server/src/services/machine-computer.ts` (`refuseOwnComputerUntilGated`, `acquireExecutionLease`) |
+| Capability report | Enroll and presence replace `machine.capabilities`. `computer` is set when an orb/host-desktop provider exists; `browser` when the desktop image offers agent-browser; `computerKind` is `vm` or `host`; `ownComputer*` flags mark the owner's Mac. A parsable report replaces these flags; an absent one keeps them. Owner grants are not in the blob. | `apps/daemon/src/machine-loop.ts` (capability report), `apps/server/src/services/machines.ts` (`markPresence`, `mergeReportedCapabilities`) |
+| Browser grant | `machine.browserOverride`: `null` follows `capabilities.browser`, `false` is off, `true` is explicit on (still needs the capability). | `apps/server/src/db/schema.ts`, `apps/server/src/services/machine-computer.ts` (`machineAcceptsTool`, `assertMachineGrant`) |
+| Desktop grant | `machine.desktopOverride`: `null` follows `capabilities.computer`, `false` is off, `true` is explicit on. | Same, plus `teamOffersDesktop`, `teamHasVmComputer`, `ensureCoordinatorComputer`, `infoComputerHosts` |
+| Browser mirror | `computer.browserEnabled` mirrors the machine grant for the compatibility routes; a mirror write cannot undo an explicit machine off (409). | `apps/server/src/services/computer-feed.ts` (`compatibilityBrowserEnabled`, `setComputerBrowserEnabled`, `ensureComputerBrowserEnabled`) |
+| User control lease | `controlHolder`/`controlLeaseExpiresAt` on `computer`: the owner taking the screen blocks agent mutation calls (409), read-only calls still run. Unrelated to the grants. | `apps/server/src/services/computer-control.ts`, `machine-computer.ts` (`acquireExecutionLease`, `acquireBrowserLease`, `handoffRefusal`) |
+| Owner-Mac switch and stamps | `machine.ownComputerEnabled` plus `capabilities.ownComputer*` gate the `user_computer_*` offer and route; every forwarded call carries `ownComputerGrant` (`proposalId`, `key`) which the daemon re-verifies against `ownComputerGrantKey(tool, params)`. | `apps/server/src/services/own-computer.ts`, `packages/shared/src/protocol/own-computer.ts`, `apps/daemon/src/computer/dispatch.ts` (`ownerGrantMissing`) |
+| Orb call stamp | Every call the server pushes to a scope computer carries `computerGrant: 'browser' \| 'desktop'`, computed from the same branch `machineAcceptsTool` used at selection time. The daemon refuses an orb tool whose stamp is missing or mismatched with `not_delivered`. | `computerCallSchema.computerGrant`, `machine-computer.ts` (`forwardComputerCall`, `holdPackageInstall`), `dispatch.ts` (`orbGrantNeeded`) |
+| Folder grants | `machine.folderGrants`: `workspacesDir` always on; extra pins pending → confirmed → enabled only while step launch can bind them (enable stays 409 otherwise); absent roots disable and must be re-confirmed. | `machine-loop.ts`, `apps/server/src/services/machine-folders.ts`, `apps/daemon/src/backend/command-gate.ts`, `apps/web/src/resources/folder-grants-panel.tsx` |
 
-No folder list is stored. A step cwd is the prepared worktree or `join(workspacesDir, convId)` (`apps/daemon/src/runner.ts`, `apps/daemon/src/config.ts`). `command-gate.ts` is wired only into the pi backend and matches bash text plus permission-rule slots. It does not see file-tool paths. Claude Code and ACP do not call it. `launchConfined` runs the availability preflight only (`apps/daemon/src/backend/confinement-availability.ts`); it does not wrap a step. macOS confinement is `not-applicable`.
+## Tool surface
 
-A parsable presence report that omits `browser: true` clears a stored `browser` flag, because `mergeReportedCapabilities` keeps hardware, platform and confinement, not `browser`, `computer` or `ownComputer`. An omitted or unparsable `capabilities` field does not clear those flags. Owner grants must not live in that blob.
+`coordinatorToolDefs(options)` is the single definition. `COMPUTER_REMOTE_TOOLS` (browser + `request_takeover`) is always offered; `COMPUTER_DESKTOP_TOOLS` needs `desktopTools`, `COMPUTER_VM_TOOLS` needs `vmComputer`, `OWN_COMPUTER_TOOLS` needs `ownComputer`. Both chief-turn constructors compute the same three options:
 
-## Recommendation
+- In-server turn (`apps/server/src/coordinator/index.ts`, `claimedPayload`) and Runner claim (`apps/server/src/services/machine-claim.ts`, `chiefClaimPayload`): `desktopTools: teamOffersDesktop(db, teamId)`, `vmComputer: teamHasVmComputer(db, teamId)`, `ownComputer: ownComputerOffered(db, threadId, stepId)`.
+- `teamHasVmComputer` means a machine reports `capabilities.computer === true` and `capabilities.computerKind === 'vm'` and has not `desktopOverride === false`, so the VM tools are offered exactly when their calls can run.
+- `chiefRemoteTools` in `routing-rules.ts` keeps the bare `coordinatorToolDefs()` list on purpose: it feeds `toolDefHashes`, which must name every tool a thread could ever see, not the subset of this turn.
 
-**Browser.** Add a nullable machine override. Do not give `browserEnabled` a new meaning. Null means on when `capabilities.browser` is true, and off otherwise. Explicit off stays off after the capability returns. Map an existing `browserEnabled=true` row to explicit on for that machine. Treat existing false as unset: false is the column default and cannot be told from an intentional off. Capable machines therefore turn on. That behavior change is an open decision below.
+Mail turns and memory-edit turns are locked and keep their own tool sets unchanged.
 
-**Desktop.** On by default means the agent may use the orb desktop without the user holding a lease. Add a nullable machine override, default on when `capabilities.computer` is true, so the owner can turn it off. Do not hold the user lease by default: that lease blocks the agent (`COMPUTER_USER_CONTROL`). Do not lift `refuseOwnComputerUntilGated`, and do not start the host provider without `CAIRN_OWN_COMPUTER=1`. The panel label promised host app control; the code took a user lease. This page follows the code, and it does not pretend `computer_observe` and `computer_act` already run. `ORB_TOOLS` in `apps/daemon/src/computer/dispatch.ts` is shell, file, and browser tools only. `handle()` sends screen calls only for `user_computer_observe` and `user_computer_act`. The two orb names return `NO_COMPUTER_PROVIDER_MESSAGE`. The implementation adds an orb route for them, not a host-screen fallback, and tests that a granted call is delivered and an off grant never reaches the daemon.
+## Grant checks and stamps
 
-**Off switch.** Owner session only. Durable home is the settings machine page (`apps/web/src/resources/machine-detail-pane.tsx`), through new fields on `PATCH /api/machines/:id` (`apps/server/src/routes-resources.ts`). That path is already owner-only (`OWNER_ONLY_PATTERNS` in `apps/server/src/lib/token-auth.ts`). No Coordinator tool. The current panel switches, while they still exist on main, write the same grant through `POST` and `PATCH /api/computers`. Those routes are not owner-only today, so a paired-device session can call them. The compatibility writers must require the owner the same way, and a paired-device call returns 403 and writes nothing. After #3924 merges, the access tab `Agent 的权限` binds those endpoints. This page does not edit that panel. An implementation branches from main and must not be based on #3924.
+Server side, before any dispatch:
 
-**Server and daemon.** `forwardComputerCall` rejects a newly submitted browser call, or an orb desktop call (`shell`, `list_files`, `read_file`, `write_file`, and `computer_observe` or `computer_act` once that route exists), when that grant is off or the capability is absent, before any dispatch. A call already in flight may finish. The server also stamps the grants on the `computer` stream call (`packages/shared/src/protocol/computer.ts`, `packages/shared/src/protocol/machine-wire.ts`). `apps/daemon/src/computer/dispatch.ts` refuses when the stamp is missing or off, with `delivery: not_delivered`. Zod strips unknown fields, so an old daemon would still run a call the server had forwarded. The server rejection is what makes off take effect during a rolling upgrade. A new daemon against an unstamped server fails closed.
+- `selectTarget` filters the fleet by `capabilities.computer === true` and the connected machines by `machineAcceptsTool(row, tool)` (browser tools read the browser grant, everything else the desktop grant), then `assertMachineGrant` rejects 403 on explicit off or missing capability.
+- `forwardComputerCall` rejects `computer_manage` and `browser_close_tab` (panel- and server-owned), gates `user_computer_*` through `ownComputerGate`, routes `request_takeover` and `install_packages` to their hold loops, and applies the browser-secret and license extras. Every call that reaches `pushComputer` for a scope computer is stamped `computerGrant`; `holdPackageInstall` stamps `desktop` on the approved install call.
+- `manageComputer` and `closeInfoCardTab` push `computer_manage` and `browser_close_tab` without a stamp: owner lifecycle and server-initiated cleanup are not grant decisions. Revoking the desktop grant must not strand the VM so it cannot be stopped or deleted.
+- `POST /api/machines/:id` writes the grants owner-session-only; `browserOverride`/`desktopOverride: true` returns 409 without the matching capability and writes nothing. Paired devices and agent credentials cannot write.
+- `GET /api/computers` runs `ensureCoordinatorComputer`, materializing the Coordinator computer row on a capable, granted, connected machine — this is what makes default-on visible in the Computers panel.
 
-**Folders.** New `machine.folderGrants` column, not a capabilities field. The daemon reports `workspacesDir`. It does not scan the home directory. Fixture paths such as `~/Code` are examples, not a discovery list. An extra path starts as an owner pin: `PATCH` stores it pending and not enabled. Presence today answers `{ ok: true }` (`machineOkResponseSchema`). That response carries all pending and confirmed pins on every presence, including after daemon restart. The daemon re-stats each pin and reports its canonical path and status on the next presence, separate from capabilities. A confirmed root that disappears or can no longer be resolved becomes absent and is disabled; if it returns, it must be re-confirmed and explicitly enabled by the owner. An old daemon that ignores the list leaves the pin pending, so it cannot be enabled. Store canonical absolute paths. `~` is display only. `workspacesDir` is always enabled and cannot be turned off, because the step cwd falls back under it. A project's `localPath` stays a per-step source, not a machine-wide grant.
+Daemon side, `handle()` in `apps/daemon/src/computer/dispatch.ts`:
 
-**Enforce.** `command-gate.ts` is a required pi call site and is not the boundary. A script under an allowed root can read any other path without putting that path in a tool argument. A folder is enforced only when every enabled runtime is inside a filesystem boundary that can express the grant. On Linux that boundary is a step launch through `confine.ts`, which today runs only the availability preflight. macOS confinement is `not-applicable`, and Seatbelt is out of scope, so an extra root cannot be enabled there. Until that boundary exists, enable of a path outside `workspacesDir` returns 409, the row stays disabled, and the panel must not show `已开放`. Once the boundary exists, the predicate still denies an unresolvable path, a symlink whose real path leaves the grant, or substitution in a path operand. Orb computer files are a container filesystem, not a host folder grant. Host computer tools stay on the existing refuse.
+1. `ownerGrantMissing` — a `user_computer_*` call without a stamp matching `ownComputerGrantKey` is refused `not_delivered` (`NO_OWNER_GRANT_MESSAGE`).
+2. `orbGrantNeeded` — `install_packages` and every `ORB_TOOLS` member needs a stamp: `browser_*` tools need `'browser'`, the rest need `'desktop'`. Missing or mismatched is refused `not_delivered` (`NO_COMPUTER_GRANT_MESSAGE`). `computer_manage`, `browser_close_tab`, `request_takeover`, `attach_file`, `open_path` and `launch_app` need no stamp; the last five still fail routing without a provider.
+3. Provider/scope, guard, params and deadline checks run as before.
+
+Zod strips unknown fields, so an old daemon ignores `computerGrant` and runs as before; the server rejection is what makes off take effect during a rolling upgrade. A new daemon against a server that does not stamp fails closed: unstamped orb calls are refused `not_delivered`, matching the `ownComputerGrant` rollout.
 
 ## States and transitions
 
 | State | Values | Transitions |
 |---|---|---|
-| Capability | reported or absent | Daemon report only. A parsable report replaces `browser`, `computer` and `ownComputer`. The owner cannot write it. |
-| Browser grant | null, on, off | Null follows capability. Owner sets on or off. Off wins over a later report. |
-| Desktop grant | null, on, off | Same, against `capabilities.computer`. Does not change `controlHolder`. |
-| User lease | none, user, bot | Unchanged. Acquire, renew, release, or expiry returns to none. A live user lease still blocks agent mutation. |
-| Folder pin | pending, confirmed, rejected, absent | Owner `PATCH` creates pending. Every presence response carries pending and confirmed pins. Daemon confirmation moves pending to confirmed or rejected. A later failed stat moves confirmed to absent and disables it; a returning path must be re-confirmed and explicitly enabled. |
+| Capability | reported or absent | Daemon enroll/presence report only. A parsable report replaces the flag; absence keeps it. The owner cannot write it. |
+| Browser grant | `null`, `true`, `false` | `null` follows `capabilities.browser`. Owner session sets `true`/`false`/`null`; `true` needs the capability at write time. `false` wins over a later report. Compatibility mirror writes set `true`/`false`, and cannot clear an explicit `false`. |
+| Desktop grant | `null`, `true`, `false` | Same, against `capabilities.computer`. Does not change `controlHolder`. |
+| Computer row | absent or `stopped`/`starting`/`running`/`failed` | `GET /api/computers` or first dispatch creates it only while the desktop grant resolves on; the row persists through grant-off so the grant stays visible and reversible. |
+| User lease | `none`, `user`, `bot` | Acquire, renew, release, expiry. A live user lease still blocks agent mutation (409), independent of the grants. |
+| Owner-Mac switch | `ownComputerEnabled` | Owner toggle; off withholds the offer and refuses the gate. |
+| Owner-Mac call stamp | `{proposalId, key}` | Created by `ownComputerGate` from an approval proposal; daemon re-derives `key` from the call and refuses a mismatch. |
+| Folder pin | `pending`, `confirmed`, `rejected`, `absent` | Owner `PATCH` creates pending; presence round-trip confirms/rejects; a vanished root becomes absent and disabled; reappearance needs re-confirmation and explicit enable. |
 
-## Paths, failures, and the first test
+## Paths and failures
 
-The table is the implementation contract. It is not a list of endpoints that exist today.
+| Path | Reads or writes | On failure |
+|---|---|---|
+| Daemon capability report (enroll, presence) | Writes `machine.capabilities` | Probe error omits the flag; a parsable report without `browser: true` clears it |
+| `markPresence` | Writes capabilities; never writes grants | Unparsable `capabilities` leaves grants and flags untouched |
+| `PATCH /api/machines/:id` | Writes grants | 404 unknown/other-team machine; 403 paired device or agent credential; 409 explicit `true` without the capability, writes nothing |
+| `POST`, `PATCH /api/computers` | Writes the machine grant plus the `browserEnabled` mirror | Owner session required; mirror on cannot undo explicit `false` (409); `browserEnabled: true` without `capabilities.browser` is 404/409 |
+| `teamOffersDesktop`, `teamHasVmComputer` | Read grants + capabilities | Return false; the tool surface withholds the offer |
+| `chiefClaimPayload` (Runner claim) | Reads grants via the same helpers | Same options as the in-server path; locked turns unchanged |
+| `selectTarget` / `assertMachineGrant` | Reads grants + capabilities + connectivity | Grant off or capability absent: 403 before any dispatch; no connected candidate: 409; no capable machine: error text |
+| `forwardComputerCall` / `holdPackageInstall` | Stamps `computerGrant` on every pushed orb call | Grant off at call time throws before the push; the call row is not created |
+| `dispatch.ts handle` | Reads `computerGrant` / `ownComputerGrant` | Missing/mismatched stamp: error frame `not_delivered`, nothing ran, provider untouched |
+| `ownComputerGate` + daemon `ownerGrantMissing` | Creates and re-verifies owner-Mac stamps | Missing, wrong-app or wrong-command stamp: refused `not_delivered` |
+| `GET /api/computers` → `ensureCoordinatorComputer` | Reads grant + capability + connectivity | No eligible host: no row, panel shows nothing |
+| Settings machine row grant switches | Writes `browserOverride`/`desktopOverride` via `PATCH` | PATCH failure toasts and the switch rolls back with the query refresh |
+| Control lease | Writes lease columns | Unchanged 409s; desktop grant on still 409s mutation while the user lease is live |
 
-| Path | Reads or writes | On failure | First test |
-|---|---|---|---|
-| Daemon `capabilitiesReport` on enroll and presence | Writes the capability report | Probe error omits the flag; a parsable report without `browser: true` clears it | presence report without `browser` clears a stored `browser` flag |
-| `markPresence` | Writes capabilities; must not write grants | Unparsable capabilities leave grants and browser flags untouched | a folder toggle survives the next presence |
-| `forwardComputerCall` for browser and orb desktop tools | Reads the matching grant and capability | 403, no dispatched call | null grant on a capable machine proceeds; explicit desktop off or missing capability rejects each of `shell`, `list_files`, `read_file`, `write_file`, `computer_observe`, and `computer_act` before dispatch, including with an old daemon |
-| `dispatch.ts` browser, shell, file, and the new orb observe and act route | Reads the call stamp | Missing or off stamp: error frame, nothing ran | daemon refuses a desktop call with no stamp; `computer_act` is not `NO_COMPUTER_PROVIDER_MESSAGE` when the grant is on |
-| `POST` and `PATCH /api/computers` | Writes the machine grant and mirrors `browserEnabled` for one release | Paired-device session 403 and writes nothing; a mirror write cannot override an explicit machine off | paired-device off-to-on is 403 and the grant stays off |
-| Settings `PATCH /api/machines/:id` | Writes grants | Unknown or other-team machine 404; agent credential rejected; on while capability is absent returns 409 and writes nothing | agent credential cannot patch the grant |
-| Control lease acquire, renew, release, expiry | Writes lease columns | Unchanged 409s | desktop grant on still 409s while the user lease is live |
-| `refuseOwnComputerUntilGated` | Reads no new grant | Still 403 | `user_computer_*` stays 403 with desktop grant on |
-| Presence response pin list | Server writes pending and confirmed pins on every presence; daemon reads them | An old daemon ignores the optional list; the pin stays pending and enable returns 409 | adding the optional list still parses as `{ ok: true }` for a daemon that does not know the field; confirmed pins remain in the list after restart |
-| Daemon folder report | Writes confirmed, rejected, or absent and disables absent pins | Non-canonical, unstatable, or symlink-escaping path is not confirmed; a previously confirmed root becomes absent and disabled | `..` and a symlink escape are not confirmed; a confirmed root removed after restart becomes absent and disabled on the next report |
-| Owner folder enable | Writes `enabled` | 409 unless the path is confirmed and step launch can bind it; row stays disabled | enable outside `workspacesDir` is 409 while step launch does not call `launchConfined` |
-| `command-gate.ts` on pi `tool_call` | Reads grants and the step cwd | Unresolvable path or realpath outside an enabled root: block | `cat` beside `workspacesDir` is blocked; the step cwd is not |
-| Step cwd in `runner.ts` | Reads `workspacesDir` and `localPath` | Prepare failure fails the step as today | folder grants do not move the step cwd |
-| `launchConfined` preflight | Does not read folder grants | Unchanged | a grant does not mark confinement ready |
+## Settings UI
 
-The server and daemon gate inventories must cover every `ORB_TOOLS` member: browser entries use the browser grant; shell and all file entries use the desktop grant. Implementation first adds an inventory test that fails if a dispatched Orb tool has no server gate, plus the rejection cases above. This is a review safeguard until implementation; this docs-only PR cannot add executable gates. Replay-safe file reads are still grant-gated.
+The settings machine row (`apps/web/src/resources/machine-row.tsx`) renders capability affordances through meta chips and drawers (`ownComputer`, folder grants). The computer grants follow the same pattern in `apps/web/src/resources/computer-grants-panel.tsx`: a `电脑授权` chip appears when the machine reports `capabilities.computer === true` or `capabilities.browser === true`, expanding to one switch per reported capability — desktop grant (`桌面与文件`: screen, shell and file tools) and browser grant (`浏览器`). A switch reads `override !== false`; turning it on writes `true` (explicit on), off writes `false`. Machines that never report the capability show nothing — no placeholder for a feature that does not exist (C2).
 
 ## Risks
 
-Treating existing `browserEnabled=false` as unset turns the browser on for every capable computer left at the default. An intentional off, if any, is indistinguishable and would be lost. An old daemon still runs a desktop call the server forwards, which is why the server rejects before dispatch. A `已开放` row before step launch is confined would be a false grant. A Coordinator tool for these grants would let the agent widen its own boundary.
-
-## Open decisions for the owner
-
-1. Accept treating existing `browserEnabled=false` as unset, so capable machines turn on. Keeping them off misses the default.
-2. Confirm desktop-on means orb desktop tools, not host `user_computer_*` and not a standing user lease.
-3. Confirm extra-folder enable stays 409 until step launch confinement can bind the root for every enabled runtime. A command-gate check alone is rejected here.
+A new daemon fails closed against an unstamped server for the rollout window; the same trade was accepted for `ownComputerGrant`, and the error frame names the fix (update the server). `computerGrant` asserts the server evaluated the grant at push time — it is not a signature; a stamped call replayed within the unsafe-call dedupe window behaves exactly as before. Grant-off does not interrupt a call already in flight. The settings switches write the same nullable fields the API exposes, so a grant set elsewhere shows correctly.
 
 ## Out of scope
 
-The host-computer approval gate, Seatbelt, edits to #3924, ticking the to-do list, and any change to the user takeover lease protocol.
+The user takeover lease protocol, `computer_manage`/host-screen semantics, Seatbelt, and the pi command-gate predicate (already shipped with folder grants).
