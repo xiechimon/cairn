@@ -1,16 +1,20 @@
 import { cn } from 'cn';
-import { ContextMeterGlyph, contextPercentOf, METER_BTN_CLS } from '../chief/context-meter-ring.js';
+import {
+  ContextMeterGlyph,
+  ContextMeterPanel,
+  contextGlyphProps,
+  contextMeterLines,
+  contextPercentOf,
+  METER_BTN_CLS,
+  useContextClock,
+} from '../chief/context-meter-ring.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ChiefContextUsage } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import {
-  type ThreadUsageSummary,
-  threadContextReading,
-  threadUsageCaption,
-} from './thread-usage-model.js';
+import { type ThreadUsageSummary, threadUsageCaption } from './thread-usage-model.js';
 
 export type ThreadUsageState = 'ready' | 'loading' | 'error';
 
@@ -48,11 +52,13 @@ export function ThreadUsageDetails({
   state,
   onRetry,
   context,
+  running = false,
   className,
-}: ThreadUsageView & { className?: string }) {
+}: ThreadUsageView & { running?: boolean; className?: string }) {
   const { t } = useI18n();
+  const reading = context ?? null;
+  const now = useContextClock(reading);
   const rows = [
-    { label: t('上下文'), value: threadContextReading(context) },
     { label: t('引擎'), value: summary.engines.join(' · ') },
     { label: t('时长'), value: summary.duration },
     { label: t('花费'), value: summary.cost },
@@ -68,6 +74,14 @@ export function ThreadUsageDetails({
       aria-label={t('对话用量')}
       className={cn('flex min-w-0 flex-col gap-2', className)}
     >
+      {reading !== null && contextPercentOf(reading) !== null && (
+        <ContextMeterPanel
+          context={reading}
+          running={running}
+          now={now}
+          className="mb-1 border-b border-border pb-3"
+        />
+      )}
       <div className="flex min-h-6 items-center justify-between gap-2">
         <h3 className="m-0 text-ui font-medium text-foreground">{t('用量')}</h3>
         {state === 'error' && (
@@ -105,12 +119,18 @@ export function ThreadUsageDetails({
   );
 }
 
-export function ThreadUsageRing(view: ThreadUsageView) {
+export function ThreadUsageRing(view: ThreadUsageView & { running?: boolean }) {
   const { t } = useI18n();
   const { summary, state } = view;
-  const percent = contextPercentOf(view.context);
-  const reading = percent === null ? null : t('上下文 {percent}%', { percent });
+  const context = view.context ?? null;
+  const now = useContextClock(context);
+  const percent = contextPercentOf(context);
+  const lines =
+    context === null || percent === null
+      ? []
+      : contextMeterLines(t, context, { running: view.running ?? false, now });
   const usage = threadUsageShown(summary, state) ? usageStatus(summary, state, t) : null;
+  const reading = lines.length === 0 ? null : lines.join(', ');
   return (
     <Popover>
       <Tooltip>
@@ -133,11 +153,15 @@ export function ThreadUsageRing(view: ThreadUsageView) {
             />
           }
         >
-          <ContextMeterGlyph filled={percent ?? 0} />
+          <ContextMeterGlyph {...contextGlyphProps(context, percent ?? 0)} />
           {percent !== null && <span aria-hidden="true">{`${percent}%`}</span>}
         </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={8}>
-          {[reading, usage].filter((part) => part !== null).join(' · ')}
+        <TooltipContent side="top" sideOffset={8} className="flex-col items-start gap-0.5">
+          {[...lines, ...(usage === null ? [] : [usage])].map((line, index) => (
+            <span key={line} className={index === 0 ? undefined : 'opacity-80'}>
+              {line}
+            </span>
+          ))}
         </TooltipContent>
       </Tooltip>
       <PopoverContent side="top" align="end" sideOffset={8} className="w-80 p-3.5">

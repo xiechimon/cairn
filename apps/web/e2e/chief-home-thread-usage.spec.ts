@@ -138,7 +138,7 @@ test(`usage opens from the ring in the composer tool row (${theme})`, async ({ p
   await expect(tokens(page)).toHaveText('2.5k');
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
   await expect(ring(page)).toHaveAttribute('aria-expanded', 'true');
-  await expect(usage(page)).toContainText('90%');
+  await expect(usage(page)).toContainText('85.7%');
   await expect(usage(page).locator('dt')).toHaveText(['Cost', 'Tokens', 'Cache hit', 'Models', 'Runners']);
   await expect(usage(page)).toContainText('provider/model-a');
   await expect(usage(page)).toContainText('provider/model-b');
@@ -170,7 +170,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/app?thread=todo-1');
     await expect(page.getByTestId('side-chat')).toBeVisible();
     await expect(ring(page)).toHaveAttribute('data-state', 'ready');
-    await expect(ring(page)).toHaveAccessibleName('Context 31%');
+    await expect(ring(page)).toHaveAccessibleName('Context 62K / 200K');
     await expect(ring(page)).toHaveAccessibleDescription('Thread usage');
     expect(await ringFace(page)).toEqual({ label: '31%', arcs: 1, tracks: 1, percent: '31' });
     const type = await ring(page).evaluate((button) => {
@@ -180,12 +180,14 @@ for (const theme of ['light', 'dark'] as const) {
     });
     expect(type).toEqual({ size: '12px', height: 28, glyph: 14 });
     await ring(page).hover();
-    await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('Context 31% · $4.00 · Tokens: 2.5k');
+    const tip = page.locator('[data-slot="tooltip-content"]');
+    await expect(tip).toContainText('Context 62K / 200K');
+    await expect(tip).toContainText('$4.00 · Tokens: 2.5k');
     await openUsage(page);
-    await expect(usage(page).locator('dt')).toHaveText(['Context', 'Cost', 'Tokens', 'Cache hit', 'Models', 'Runners']);
-    await expect(stat(page, 0)).toHaveText('31% · 62k / 200k');
-    await expect(stat(page, 1)).toHaveText('$4.00');
-    await expect(stat(page, 2)).toHaveText('2.5k');
+    await expect(usage(page).getByTestId('context-panel-reading')).toHaveText('62K / 200K');
+    await expect(usage(page).getByTestId('thread-usage-stats').locator('dt')).toHaveText(['Cost', 'Tokens', 'Cache hit', 'Models', 'Runners']);
+    await expect(stat(page, 0)).toHaveText('$4.00');
+    await expect(stat(page, 1)).toHaveText('2.5k');
     await expect(ring(page)).not.toContainText('2.5k');
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await evidencePanelShot(page, `thread-usage-context-${theme}.png`, usage(page));

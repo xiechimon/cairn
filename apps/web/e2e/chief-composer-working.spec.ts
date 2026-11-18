@@ -1,25 +1,36 @@
 import { expect, test } from '@playwright/test';
 import { mockLive, THREAD } from './chief-home-mock.js';
 
-test('the line under the composer shows context usage, not a turn timer', async ({ page }) => {
+test('the ring under the composer stays still while a turn runs and reads in K', async ({ page }) => {
   await page.goto('/app?scenario=chief-draft');
   const line = page.getByTestId('home-c');
   const meter = line.getByTestId('composer-context-meter');
   await expect(meter).toBeVisible();
   await expect(meter).toHaveText('');
-  await expect(meter).toHaveAttribute('aria-busy', 'true');
-  await expect
-    .poll(() => meter.evaluate((el) => el.getAnimations({ subtree: true }).some((a) => a.playState === 'running')))
-    .toBe(true);
-  await expect(meter).toHaveAttribute('aria-label', '已用 2.4万 / 20万, 7万时自动压缩');
+  await expect(meter).toHaveAttribute('aria-busy', 'false');
+  expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
+  await expect(meter.locator('path')).toBeVisible();
+  await expect(meter.locator('[data-compact-tick]')).toHaveCount(1);
+  await expect(meter).toHaveAttribute('aria-label', 'Context 24K / 200K, 70K 时 auto-compact');
   await expect(line.getByText(/工作中 ·|Working ·/)).toHaveCount(0);
   await meter.hover();
   const tip = page.locator('[data-slot="tooltip-content"]');
-  await expect(tip).toContainText('已用 2.4万 / 20万');
-  await expect(tip).toContainText('7万时自动压缩');
+  await expect(tip).toContainText('Context 24K / 200K');
+  await expect(tip).toContainText('70K 时 auto-compact');
 });
 
-test('an idle coordinator shows the same context line and still no timer', async ({ page }) => {
+test('clicking the ring opens the context panel with only the rows it can read', async ({ page }) => {
+  await page.goto('/app?scenario=chief-draft');
+  await page.getByTestId('home-c').getByTestId('composer-context-meter').click();
+  const panel = page.getByTestId('context-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel.getByTestId('context-panel-reading')).toHaveText('24K / 200K');
+  await expect(panel.getByTestId('context-panel-compact')).toContainText('70K');
+  await expect(panel.getByTestId('context-panel-cache')).toHaveCount(0);
+  await expect(panel.getByTestId('context-panel-hit')).toHaveText(/Hit rate\s*90%/);
+});
+
+test('an idle coordinator shows the same still ring and no timer', async ({ page }) => {
   await page.goto('/app?scenario=111');
   await expect(page.getByTestId('chief-composer-input')).toBeVisible();
   const meter = page.getByTestId('home-c').getByTestId('composer-context-meter');
@@ -29,27 +40,15 @@ test('an idle coordinator shows the same context line and still no timer', async
   await expect(page.getByText(/工作中 ·|Working ·/)).toHaveCount(0);
 });
 
-test('the narrow menu animates the same running context ring', async ({ page }) => {
+test('the narrow menu shows the context panel without animation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app?scenario=chief-draft');
   await page.getByTestId('composer-plus').click();
   const meter = page.getByTestId('composer-context-meter');
-  await expect(meter).toHaveAttribute('aria-busy', 'true');
-  await expect(meter).not.toContainText('%');
-  await expect
-    .poll(() => meter.evaluate((el) => el.getAnimations({ subtree: true }).some((a) => a.playState === 'running')))
-    .toBe(true);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-});
-
-test('reduced motion keeps the busy ring still and draws only its track', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/app?scenario=chief-draft');
-  const meter = page.getByTestId('home-c').getByTestId('composer-context-meter');
-  await expect(meter).toHaveAttribute('aria-busy', 'true');
+  await expect(meter).toHaveAttribute('aria-busy', 'false');
+  await expect(meter.getByTestId('context-panel-reading')).toHaveText('24K / 200K');
   expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
-  await expect(meter.locator('circle')).toBeVisible();
-  await expect(meter.locator('path')).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test('usage loading draws a still bare ring until the request settles', async ({ page }) => {

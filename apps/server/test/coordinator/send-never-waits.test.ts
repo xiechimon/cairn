@@ -1,7 +1,7 @@
 import { createAssistantMessageEventStream, fauxAssistantMessage } from '@earendil-works/pi-ai';
 import { eq, ne } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { SHORT_RETENTION_MS } from '../../src/coordinator/runtime/cold-slim.js';
+import { ANTHROPIC_SHORT_TTL_MS } from '../../src/coordinator/runtime/cold-slim.js';
 import { SUGGEST_REPLIES_ASK } from '../../src/coordinator/runtime/suggest-replies.js';
 import { chiefMessage, chiefTurnUsage, step } from '../../src/db/schema.js';
 import { setCoordinatorWake } from '../../src/services/coordinator-context.js';
@@ -37,7 +37,7 @@ function priorTurnOn(w: World, model: string): void {
       cacheRead: 0,
       cacheWrite: 0,
       contextTokens: 5_000,
-      createdAt: Date.now() - SHORT_RETENTION_MS - 60_000,
+      createdAt: Date.now() - ANTHROPIC_SHORT_TTL_MS - 60_000,
     })
     .run();
 }

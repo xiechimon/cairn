@@ -1,4 +1,5 @@
 import type { DailyUsageDay } from '@cairn/shared';
+import { cacheHitShare } from '../api/mappers.js';
 
 export const USAGE_RANGES = [7, 30, 90] as const;
 export type UsageRange = (typeof USAGE_RANGES)[number];
@@ -71,6 +72,7 @@ export function usageSummary(
   const tasks = sum((day) => day.tasks);
   const input = sum((day) => day.input);
   const cacheRead = sum((day) => day.cacheRead);
+  const cacheWrite = sum((day) => day.cacheWrite);
   const before = days
     .filter((day) => day.date >= shiftDay(from, -range) && day.date < from)
     .reduce((total, day) => total + day.coordinator + day.tasks, 0);
@@ -86,8 +88,8 @@ export function usageSummary(
     input,
     output: sum((day) => day.output),
     cacheRead,
-    cacheWrite: sum((day) => day.cacheWrite),
-    cacheHit: input + cacheRead === 0 ? null : cacheRead / (input + cacheRead),
+    cacheWrite,
+    cacheHit: cacheHitShare({ input, cacheRead, cacheWrite }),
     tasksRun: new Set(shown.flatMap((day) => day.todos)).size,
     cost:
       shown.length > 0 && shown.every((day) => day.cost !== null)

@@ -15,3 +15,10 @@ export const tokenUsageSchema = z.object({
   costTotal: z.number().nullable(),
 });
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
+
+export const contextCacheSchema = z.object({
+  read: z.number().int().nonnegative(),
+  write: z.number().int().nonnegative(),
+  input: z.number().int().nonnegative(),
+});
+export type ContextCache = z.infer<typeof contextCacheSchema>;

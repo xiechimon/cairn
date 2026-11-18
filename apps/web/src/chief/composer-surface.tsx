@@ -266,7 +266,7 @@ export function ComposerSurface({
         {narrow && showMeter && (
           <>
             <DropdownMenuSeparator />
-            <ContextMeterLine context={meterContext} busy={running} loading={contextLoading} />
+            <ContextMeterLine context={meterContext} running={running} loading={contextLoading} />
           </>
         )}
       </KeyedMenuContent>
@@ -526,7 +526,7 @@ export function ComposerSurface({
           {tools}
           {showMeter && (
             <span className="ml-auto flex">
-              <ContextMeterRing context={meterContext} busy={running} loading={contextLoading} />
+              <ContextMeterRing context={meterContext} running={running} loading={contextLoading} />
             </span>
           )}
         </div>

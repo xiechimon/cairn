@@ -524,8 +524,10 @@ function ThreadBody({
           onEditQueued={chat.editQueued}
           {...(usage !== null
             ? {
-                meter: <ThreadUsageRing key={todo.id} {...usage} />,
-                menuMeter: <ThreadUsageDetails {...usage} className="px-2.5 py-2" />,
+                meter: <ThreadUsageRing key={todo.id} {...usage} running={chat.running} />,
+                menuMeter: (
+                  <ThreadUsageDetails {...usage} running={chat.running} className="px-2.5 py-2" />
+                ),
               }
             : {})}
         />

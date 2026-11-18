@@ -165,12 +165,14 @@ function toUsageRows(
         mu.costBasis === 'unknown' || typeof mu.costUSD !== 'number' || mu.costUSD === 0
           ? undefined
           : { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: mu.costUSD };
+      const cacheWrite1h = entries.length === 1 ? nested?.ephemeral_1h_input_tokens : undefined;
       return {
         model: `${USAGE_MODEL_PREFIX}/${key}`,
         input: mu.inputTokens,
         output: mu.outputTokens,
         cacheRead: mu.cacheReadInputTokens,
         cacheWrite,
+        ...(cacheWrite1h !== undefined ? { cacheWrite1h } : {}),
         ...(cost !== undefined ? { cost } : {}),
       };
     });
@@ -188,6 +190,9 @@ function toUsageRows(
           flat > 0
             ? flat
             : (nested?.ephemeral_5m_input_tokens ?? 0) + (nested?.ephemeral_1h_input_tokens ?? 0),
+        ...(nested?.ephemeral_1h_input_tokens !== undefined
+          ? { cacheWrite1h: nested.ephemeral_1h_input_tokens }
+          : {}),
       },
     ];
   }

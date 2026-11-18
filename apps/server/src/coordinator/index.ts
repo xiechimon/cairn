@@ -51,7 +51,7 @@ import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
 import { settleInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
 import { providerBinding } from './provider-binding.js';
-import { isColdResume, resolveCacheRetentionTier, retentionMsFor } from './runtime/cold-slim.js';
+import { cacheTtlMsFor, isColdResume, resolveCacheRetentionTier } from './runtime/cold-slim.js';
 import { setFailureSink } from './runtime/failure-report.js';
 import { startInfoCardRunner } from './runtime/info-card-runner.js';
 import type { MachineApi } from './runtime/machine-api.js';
@@ -422,10 +422,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     const volatileParts = context.sections;
     const lastUsage = lastTurnUsageForColdResume(db, row.buildId);
     const routerModel = `${providers.router.provider}/${providers.router.modelId}`;
-    const retentionMs = retentionMsFor(
-      resolveCacheRetentionTier(),
-      lastUsage?.model ?? routerModel,
-    );
+    const retentionMs = cacheTtlMsFor(resolveCacheRetentionTier(), lastUsage?.model ?? routerModel);
     const cold = isColdResume({
       lastUsage:
         lastUsage === null

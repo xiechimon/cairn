@@ -420,6 +420,7 @@ export function recordStepUsage(
             output: u.output,
             cacheRead: u.cacheRead,
             cacheWrite: u.cacheWrite,
+            cacheWrite1h: u.cacheWrite1h ?? 0,
             ttftMs: u.ttftMs ?? null,
             contextTokens: u.contextTokens ?? null,
             contextWindow: u.contextWindow ?? null,
@@ -433,6 +434,7 @@ export function recordStepUsage(
               output: sql`${chiefTurnUsage.output} + ${u.output}`,
               cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
               cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
+              cacheWrite1h: sql`${chiefTurnUsage.cacheWrite1h} + ${u.cacheWrite1h ?? 0}`,
               ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
               ...(u.contextTokens !== undefined
                 ? {
@@ -458,6 +460,7 @@ export function recordStepUsage(
             output: u.output,
             cacheRead: u.cacheRead,
             cacheWrite: u.cacheWrite,
+            cacheWrite1h: u.cacheWrite1h ?? 0,
             mirroredTokens: mirrored,
             contextTokens: u.contextTokens ?? null,
             contextWindow: u.contextWindow ?? null,
@@ -471,6 +474,7 @@ export function recordStepUsage(
               output: sql`${stepUsage.output} + ${u.output}`,
               cacheRead: sql`${stepUsage.cacheRead} + ${u.cacheRead}`,
               cacheWrite: sql`${stepUsage.cacheWrite} + ${u.cacheWrite}`,
+              cacheWrite1h: sql`${stepUsage.cacheWrite1h} + ${u.cacheWrite1h ?? 0}`,
               mirroredTokens: sql`${stepUsage.mirroredTokens} + ${mirrored}`,
               ...(u.contextTokens !== undefined
                 ? {

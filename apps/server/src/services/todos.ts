@@ -26,6 +26,7 @@ import {
   renderTaskText,
 } from '@cairn/shared';
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, min, sql } from 'drizzle-orm';
+import { cacheTtlMsFor, resolveCacheRetentionTier } from '../coordinator/runtime/cold-slim.js';
 import { compactionWindow } from '../coordinator/runtime/compaction.js';
 import type { Db } from '../db/client.js';
 import {
@@ -238,9 +239,16 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
       contextTokens: stepUsage.contextTokens,
       contextWindow: stepUsage.contextWindow,
       compactAt: stepUsage.compactAt,
+      cacheRead: stepUsage.cacheRead,
+      cacheWrite: stepUsage.cacheWrite,
+      cacheWrite1h: stepUsage.cacheWrite1h,
+      input: stepUsage.input,
+      createdAt: stepUsage.createdAt,
+      finishedAt: step.finishedAt,
     })
     .from(stepUsage)
     .innerJoin(build, eq(build.id, stepUsage.buildId))
+    .leftJoin(step, eq(step.id, stepUsage.stepId))
     .where(and(inArray(build.todoId, ids), gt(stepUsage.contextTokens, 0)))
     .orderBy(desc(stepUsage.createdAt))
     .all()) {
@@ -253,10 +261,16 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
       (isBackendRuntimeId(row.model.slice(0, row.model.indexOf('/')))
         ? undefined
         : compactionWindow(contextWindow).backgroundAt);
+    const ttl = cacheTtlMsFor(resolveCacheRetentionTier(), row.model, {
+      total: row.cacheWrite,
+      oneHour: row.cacheWrite1h,
+    });
     contextByTodo.set(row.todoId, {
       tokens: row.contextTokens,
       contextWindow,
       ...(compactAt !== undefined ? { compactAt } : {}),
+      ...(ttl !== null ? { resumeExpiresAt: (row.finishedAt ?? row.createdAt) + ttl } : {}),
+      cache: { read: row.cacheRead, write: row.cacheWrite, input: row.input },
     });
   }
   const deliverables = new Map(

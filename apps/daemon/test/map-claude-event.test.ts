@@ -377,6 +377,7 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
           output: 20,
           cacheRead: 5,
           cacheWrite: 7,
+          cacheWrite1h: 4,
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.01 },
         },
       ],

@@ -128,6 +128,7 @@ describe('recordStepUsage writes one step_usage row per step and model', () => {
         output: 2,
         cacheRead: 30,
         cacheWrite: 4,
+        cacheWrite1h: 0,
         mirroredTokens: 0,
         contextTokens: null,
         contextWindow: null,
@@ -229,6 +230,7 @@ describe('thread context on the todo payload', () => {
       tokens: 62_000,
       contextWindow: 128_000,
       compactAt: 55_808,
+      cache: { read: 0, write: 0, input: 10 },
     });
   });
 
@@ -238,12 +240,21 @@ describe('thread context on the todo payload', () => {
     report(
       's1',
       'build-1',
-      [{ ...u('claude-code/test-model', 10), contextTokens: 62_000 }],
+      [
+        {
+          ...u('claude-code/test-model', 10),
+          contextTokens: 62_000,
+          cacheWrite: 3,
+          cacheWrite1h: 1,
+        },
+      ],
       'build',
     );
     expect(await contextOf('todo-build-1')).toEqual({
       tokens: 62_000,
       contextWindow: 200_000,
+      resumeExpiresAt: NOW + 60 * 60_000,
+      cache: { read: 0, write: 3, input: 10 },
     });
   });
 

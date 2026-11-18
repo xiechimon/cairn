@@ -39,6 +39,7 @@ export const modelUsageSchema = z.object({
   output: z.number().int(),
   cacheRead: z.number().int(),
   cacheWrite: z.number().int(),
+  cacheWrite1h: z.number().int().nonnegative().optional(),
   cost: modelCostSchema.optional(),
   ttftMs: z.number().int().nonnegative().optional(),
   contextTokens: z.number().int().nonnegative().optional(),

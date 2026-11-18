@@ -4,6 +4,7 @@ import { replyQuoteText } from '../reply-quote.js';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { stepQueueBlockedSchema } from './machine-capabilities.js';
+import { contextCacheSchema } from './token-usage.js';
 import { workerBriefTextSchema } from './worker-brief-text.js';
 
 export const chiefIdFormat = (userId: string, teamId: string) => `chief-${userId}-${teamId}`;
@@ -106,6 +107,7 @@ export const chiefGetResponseSchema = z.object({
       resume: z.enum(['warm', 'cold', 'compacted', 'idle']).optional(),
       resumeExpiresAt: epochMs.optional(),
       resumeExpiresInMs: z.number().int().nonnegative().optional(),
+      cache: contextCacheSchema.optional(),
     })
     .nullable(),
   watches: z.array(chiefWatchSchema),

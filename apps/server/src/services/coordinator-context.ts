@@ -1,11 +1,12 @@
+import type { ContextCache } from '@cairn/shared';
 import { isBackendRuntimeId } from '@cairn/shared';
 import { and, desc, eq, gt, inArray, type SQL } from 'drizzle-orm';
 import {
   type ContextResume,
+  cacheTtlMsFor,
   contextResumeOf,
   resolveCacheRetentionTier,
   resumeExpiresAtOf,
-  retentionMsFor,
 } from '../coordinator/runtime/cold-slim.js';
 import { compactionWindow } from '../coordinator/runtime/compaction.js';
 import { catalogContextWindow, DEFAULT_CONTEXT_WINDOW } from '../coordinator/runtime/provider.js';
@@ -69,6 +70,8 @@ export type ContextBearingTurnUsage = {
   model: string;
   createdAt: number;
   cacheRead: number;
+  cacheWrite: number;
+  cacheWrite1h: number;
   input: number;
   contextTokens: number;
   contextWindow: number | null;
@@ -107,6 +110,8 @@ function lastContextBearingTurnUsageWhere(db: Db, scope: SQL): ContextBearingTur
       model: chiefTurnUsage.model,
       createdAt: chiefTurnUsage.createdAt,
       cacheRead: chiefTurnUsage.cacheRead,
+      cacheWrite: chiefTurnUsage.cacheWrite,
+      cacheWrite1h: chiefTurnUsage.cacheWrite1h,
       input: chiefTurnUsage.input,
       threadId: chiefTurnUsage.threadId,
       stepId: chiefTurnUsage.stepId,
@@ -122,6 +127,8 @@ function lastContextBearingTurnUsageWhere(db: Db, scope: SQL): ContextBearingTur
     model: last.model,
     createdAt: last.createdAt,
     cacheRead: last.cacheRead,
+    cacheWrite: last.cacheWrite,
+    cacheWrite1h: last.cacheWrite1h,
     input: last.input,
     contextTokens: last.contextTokens,
     contextWindow: last.contextWindow,
@@ -182,6 +189,7 @@ export function lastTurnContext(
   resume: ContextResume;
   resumeExpiresAt?: number;
   resumeExpiresInMs?: number;
+  cache: ContextCache;
 } | null {
   if (threadId !== undefined) {
     const owned = db
@@ -203,7 +211,10 @@ export function lastTurnContext(
         );
   const last = lastContextBearingTurnUsageWhere(db, scope);
   if (last == null) return null;
-  const retentionMs = retentionMsFor(resolveCacheRetentionTier(), last.model);
+  const retentionMs = cacheTtlMsFor(resolveCacheRetentionTier(), last.model, {
+    total: last.cacheWrite,
+    oneHour: last.cacheWrite1h,
+  });
   const now = nowMs();
   const resume = contextResumeOf({
     lastUsage: {
@@ -237,5 +248,6 @@ export function lastTurnContext(
           resumeExpiresInMs: Math.max(0, resumeExpiresAt - now),
         }
       : {}),
+    cache: { read: last.cacheRead, write: last.cacheWrite, input: last.input },
   };
 }

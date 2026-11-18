@@ -714,6 +714,8 @@ export interface ChiefContextUsage {
   contextWindow: number;
   compactAt?: number;
   resume?: 'warm' | 'cold' | 'compacted' | 'idle';
+  resumeExpiresAt?: number;
+  cache?: { read: number; write: number; input: number };
 }
 
 export interface ChiefContent {

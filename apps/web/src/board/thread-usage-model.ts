@@ -1,8 +1,7 @@
 import type { StepJournalRow, TokenUsage } from '@cairn/shared';
-import { formatTokens, formatUsd, mapTokenUsage } from '../api/mappers.js';
-import { contextPercentOf } from '../chief/context-meter-ring.js';
+import { formatUsd, mapTokenUsage } from '../api/mappers.js';
 import { formatWorkDuration } from '../detail/work-trace.js';
-import type { ChiefContextUsage, TodoRecord } from '../fixtures/records.js';
+import type { TodoRecord } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
 
 export interface ThreadUsageSummary {
@@ -76,10 +75,4 @@ export function threadUsageCaption(summary: ThreadUsageSummary, t: TFunc): strin
     summary.tokens === UNKNOWN ? null : t('Token 数：{tokens}', { tokens: summary.tokens }),
   ].filter((part) => part !== null);
   return parts.length === 0 ? t('用量暂不可用') : parts.join(' · ');
-}
-
-export function threadContextReading(context: ChiefContextUsage | null | undefined): string {
-  const percent = contextPercentOf(context);
-  if (context == null || percent === null) return '';
-  return `${percent}% · ${formatTokens(context.tokens)} / ${formatTokens(context.contextWindow)}`;
 }

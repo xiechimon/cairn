@@ -1,12 +1,12 @@
 import type { Message, ToolResultMessage } from '@earendil-works/pi-ai';
 import { describe, expect, it } from 'vitest';
 import {
+  ANTHROPIC_SHORT_TTL_MS,
+  cacheTtlMsFor,
   contextResumeOf,
   imageOmissionNote,
   isColdResume,
   resumeExpiresAtOf,
-  retentionMsFor,
-  SHORT_RETENTION_MS,
   stripConsumedImages,
   truncateOldToolResults,
 } from '../../src/coordinator/runtime/cold-slim.js';
@@ -50,17 +50,34 @@ describe('isColdResume', () => {
   });
 });
 
-describe('retentionMsFor', () => {
-  it('uses five minutes for the short tier', () => {
-    expect(retentionMsFor('short', 'anthropic/claude')).toBe(SHORT_RETENTION_MS);
+describe('cacheTtlMsFor', () => {
+  it('uses five minutes, or one hour on the long tier, for Anthropic', () => {
+    expect(cacheTtlMsFor('short', 'anthropic/claude-sonnet-5-5')).toBe(5 * 60_000);
+    expect(cacheTtlMsFor('long', 'anthropic/claude-opus-5')).toBe(60 * 60_000);
   });
 
-  it('uses one hour for Anthropic long retention', () => {
-    expect(retentionMsFor('long', 'anthropic/claude-opus')).toBe(60 * 60_000);
+  it('uses thirty minutes for OpenAI models from GPT-5.6 on and nothing for older ones', () => {
+    expect(cacheTtlMsFor('short', 'openai/gpt-6.1-sol')).toBe(30 * 60_000);
+    expect(cacheTtlMsFor('short', 'openai/gpt-5.6-terra')).toBe(30 * 60_000);
+    expect(cacheTtlMsFor('short', 'openai/gpt-5.5')).toBeNull();
+    expect(cacheTtlMsFor('short', 'openai/gpt-4o')).toBeNull();
   });
 
-  it('uses twenty-four hours for OpenAI long retention', () => {
-    expect(retentionMsFor('long', 'openai/gpt-5')).toBe(24 * 60 * 60_000);
+  it('reports no lifetime for providers that do not guarantee one', () => {
+    expect(cacheTtlMsFor('short', 'openai-codex/gpt-6.1-sol')).toBeNull();
+    expect(cacheTtlMsFor('short', 'deepseek/deepseek-v4.1-flash')).toBeNull();
+    expect(cacheTtlMsFor('short', 'google/gemini-4-carbon')).toBeNull();
+    expect(cacheTtlMsFor('long', 'openai/gpt-6.1-sol')).toBeNull();
+  });
+
+  it('reads the Claude Code tier from its one-hour cache writes', () => {
+    expect(
+      cacheTtlMsFor('short', 'claude-code/claude-sonnet-5-5', { total: 900, oneHour: 400 }),
+    ).toBe(60 * 60_000);
+    expect(cacheTtlMsFor('long', 'claude-code/claude-sonnet-5-5', { total: 900, oneHour: 0 })).toBe(
+      5 * 60_000,
+    );
+    expect(cacheTtlMsFor('short', 'claude-code/claude-sonnet-5-5')).toBeNull();
   });
 });
 
@@ -188,14 +205,14 @@ describe('resumeExpiresAtOf', () => {
     expect(
       resumeExpiresAtOf({
         resume: 'warm',
-        retentionMs: SHORT_RETENTION_MS,
+        retentionMs: ANTHROPIC_SHORT_TTL_MS,
         lastUsageCreatedAt: 1_000,
       }),
-    ).toBe(1_000 + SHORT_RETENTION_MS);
+    ).toBe(1_000 + ANTHROPIC_SHORT_TTL_MS);
     expect(
       resumeExpiresAtOf({
         resume: 'cold',
-        retentionMs: SHORT_RETENTION_MS,
+        retentionMs: ANTHROPIC_SHORT_TTL_MS,
         lastUsageCreatedAt: 1_000,
       }),
     ).toBeNull();

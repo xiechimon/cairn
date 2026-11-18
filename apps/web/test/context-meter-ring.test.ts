@@ -5,7 +5,10 @@ import {
   clampContextPercent,
   ContextMeterRing,
   type ContextMeterRingProps,
+  contextCacheState,
   contextMeterArcPath,
+  contextMeterLines,
+  formatContextTokens,
   contextPercentOf,
   MOCK_CONTEXT_PERCENT,
 } from '../src/chief/context-meter-ring.js';
@@ -67,19 +70,21 @@ describe('ContextMeterRing', () => {
     expect(html).toContain('<path ');
   });
 
-  test('fills the ring against the model window and names used, window and the compaction point', () => {
+  test('fills the ring against the model window and names used, window and the compaction point in K', () => {
     const html = renderRing({
       context: { tokens: 49_376, contextWindow: 500_000, compactAt: 150_000 },
     });
     expect(html).toContain('data-percent="10"');
     expect(html).not.toContain('data-mock');
-    expect(html).toContain('aria-label="已用 4.9万 / 50万, 15万时自动压缩"');
+    expect(html).toContain('aria-label="Context 49K / 500K, 150K 时 auto-compact"');
+    expect(html).toContain('data-compact-tick');
     expect(html).not.toContain('%');
   });
 
-  test('omits the compaction line when the server sends no compaction point', () => {
+  test('omits the compaction line and tick when the server sends no compaction point', () => {
     const html = renderRing({ context: { tokens: 18_885, contextWindow: 1_000_000 } });
-    expect(html).toContain('aria-label="已用 1.9万 / 100万"');
+    expect(html).toContain('aria-label="Context 19K / 1M"');
+    expect(html).not.toContain('data-compact-tick');
   });
 
   test('names the initial usage fetch instead of claiming a mock reading', () => {
@@ -87,28 +92,56 @@ describe('ContextMeterRing', () => {
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('aria-label="正在加载用量…"');
     expect(html).not.toContain('上下文（示意）');
-    expect(html).not.toContain('%');
-  });
-
-  test('keeps the ring still while the reading loads', () => {
-    const html = renderRing({ loading: true });
-    expect(html).not.toContain('animate-spin');
     expect(html).not.toContain('<path ');
   });
 
-  test('keeps the ring still while a run has no reading yet', () => {
-    const html = renderRing({ busy: true, loading: true });
-    expect(html).toContain('aria-busy="true"');
-    expect(html).not.toContain('animate-spin');
-    expect(html).not.toContain('<path ');
-  });
-
-  test('spins while a turn runs with a reading', () => {
+  test('stays still with its reading while a turn runs', () => {
     const html = renderRing({
-      busy: true,
-      context: { tokens: 24_000, contextWindow: 200_000 },
+      running: true,
+      context: { tokens: 24_000, contextWindow: 200_000, resumeExpiresAt: Date.now() + 60_000 },
     });
-    expect(html).toContain('aria-busy="true"');
-    expect(html).toContain('animate-spin');
+    expect(html).toContain('aria-busy="false"');
+    expect(html).not.toContain('animate-spin');
+    expect(html).toContain('<path ');
+    expect(html).toContain('Cache 回复中保持有效');
+  });
+});
+
+describe('formatContextTokens', () => {
+  test('writes thousands as K and keeps one decimal only under ten thousand', () => {
+    expect(formatContextTokens(640)).toBe('640');
+    expect(formatContextTokens(3_640)).toBe('3.6K');
+    expect(formatContextTokens(76_000)).toBe('76K');
+    expect(formatContextTokens(92_499)).toBe('92K');
+    expect(formatContextTokens(1_000_000)).toBe('1M');
+  });
+});
+
+describe('contextCacheState and the tooltip cache line', () => {
+  const t = (source: string, vars?: Record<string, string | number>) =>
+    source.replace(/\{(\w+)\}/g, (_, name: string) => String(vars?.[name] ?? ''));
+  const base = { tokens: 76_000, contextWindow: 200_000, compactAt: 92_000 };
+  const now = 1_000_000;
+
+  test('counts down from the server expiry and flips to expired at it', () => {
+    const at = { ...base, resumeExpiresAt: now + 180_000 };
+    expect(contextCacheState(at, false, now)).toEqual({ kind: 'warm', leftMs: 180_000 });
+    expect(contextMeterLines(t, at, { now })).toContain('Cache {n} 分钟后失效'.replace('{n}', '3'));
+    expect(contextMeterLines(t, at, { now: now + 179_001 })).toContain('Cache 不到 1 分钟后失效');
+    expect(contextCacheState(at, false, now + 180_000)).toEqual({ kind: 'expired' });
+  });
+
+  test('shows no cache line when the provider guarantees no lifetime', () => {
+    expect(contextCacheState(base, false, now)).toBeNull();
+    expect(contextMeterLines(t, base, { now })).toEqual(['Context 76K / 200K', '92K 时 auto-compact']);
+  });
+
+  test('a model switch is a miss whatever the lifetime', () => {
+    expect(contextCacheState({ ...base, resume: 'cold' }, false, now)).toEqual({ kind: 'cold' });
+  });
+
+  test('names the room left once usage is within a tenth of the compaction point', () => {
+    const near = { ...base, tokens: 88_400 };
+    expect(contextMeterLines(t, near, { now })[1]).toBe('再用 3.6K 就 auto-compact');
   });
 });

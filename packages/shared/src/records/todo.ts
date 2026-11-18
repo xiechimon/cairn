@@ -6,6 +6,7 @@ import { deliverablesMessageSchema } from './report.js';
 import { routeOverrideSchema } from './routing-rule.js';
 import { quotaWaitSchema } from './step.js';
 import { taskRequestSchema } from './task-request.js';
+import { contextCacheSchema } from './token-usage.js';
 
 export const buildHistoryEntrySchema = z.object({
   buildId: recordId,
@@ -139,6 +140,8 @@ export const todoRecordSchema = z.object({
       tokens: z.number().int(),
       contextWindow: z.number().int(),
       compactAt: z.number().int().positive().optional(),
+      resumeExpiresAt: epochMs.optional(),
+      cache: contextCacheSchema.optional(),
     })
     .nullable()
     .optional(),

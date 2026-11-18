@@ -3,7 +3,6 @@ import { describe, expect, test } from 'vitest';
 import { threadContextOf } from '../src/api/mappers.js';
 import {
   type ThreadUsageSummary,
-  threadContextReading,
   threadEngines,
   threadRunSeconds,
   threadUsageBuildIds,
@@ -53,7 +52,7 @@ describe('threadUsageSummary', () => {
       usage({ buildId: 'build-2', model: 'provider/model-b', costTotal: 2.5 }),
       usage({ buildId: 'build-3', costTotal: 0.25 }),
     ], ['omarchy', 'Mac', 'omarchy']);
-    expect(result).toMatchObject({ cost: '$4.00', tokens: '3.8k', cached: '90%' });
+    expect(result).toMatchObject({ cost: '$4.00', tokens: '3.8k', cached: '85.7%' });
     expect(result.models).toEqual(['provider/model-a', 'provider/model-b']);
     expect(result.machines).toEqual(['omarchy', 'Mac']);
   });
@@ -89,7 +88,11 @@ describe('threadUsageSummary', () => {
   });
 
   test('zero input tokens has no invented cache hit percentage', () => {
-    expect(threadUsageSummary([usage({ input: 0, cacheRead: 0 })], []).cached).toBe('—');
+    expect(threadUsageSummary([usage({ input: 0, cacheRead: 0, cacheWrite: 0 })], []).cached).toBe('—');
+  });
+
+  test('cache writes count against the hit rate', () => {
+    expect(threadUsageSummary([usage({ input: 0, cacheRead: 0 })], []).cached).toBe('0%');
   });
 });
 
@@ -147,17 +150,6 @@ describe('thread context usage', () => {
     expect(threadContextOf({ context: { tokens: 10 } })).toBeNull();
     expect(threadContextOf({ context: { tokens: 10, contextWindow: 0 } })).toBeNull();
     expect(threadContextOf({ context: { tokens: '10', contextWindow: 200_000 } })).toBeNull();
-  });
-
-  test('the popover row reads the share, then the tokens over the window', () => {
-    expect(threadContextReading({ tokens: 62_000, contextWindow: 200_000 })).toBe('31% · 62k / 200k');
-    expect(threadContextReading({ tokens: 500, contextWindow: 200_000 })).toBe('0% · 500 / 200k');
-  });
-
-  test('no context leaves the row out instead of printing a placeholder', () => {
-    expect(threadContextReading(null)).toBe('');
-    expect(threadContextReading(undefined)).toBe('');
-    expect(threadContextReading({ tokens: 10, contextWindow: 0 })).toBe('');
   });
 });
 

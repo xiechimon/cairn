@@ -2,7 +2,7 @@ import type { MachineDoneBody } from '@cairn/shared';
 import { machineDoneBodySchema } from '@cairn/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { isColdResume, SHORT_RETENTION_MS } from '../src/coordinator/runtime/cold-slim.js';
+import { isColdResume } from '../src/coordinator/runtime/cold-slim.js';
 import { compactionWindow } from '../src/coordinator/runtime/compaction.js';
 import {
   build,
@@ -417,13 +417,9 @@ describe('the context meter under the in-server Coordinator', () => {
       contextWindow: DEFAULT_CONTEXT_WINDOW,
       resume: 'warm',
     });
-    const turnB = turnRows().find((r) => r.stepId === 'turn-b');
-    expect(turnB).toBeDefined();
-    expect(context?.resumeExpiresAt).toBe((turnB?.createdAt ?? 0) + SHORT_RETENTION_MS);
-    expect(context?.resumeExpiresInMs).toBeGreaterThan(0);
-    expect((context?.resumeExpiresAt ?? 0) - (context?.resumeExpiresInMs ?? 0)).toBeLessThanOrEqual(
-      Date.now() + 100,
-    );
+    expect(context?.cache).toEqual({ read: 50000, write: 3, input: 6000 });
+    expect(context?.resumeExpiresAt).toBeUndefined();
+    expect(context?.resumeExpiresInMs).toBeUndefined();
   });
 
   test('flag on: a coordinator model-route change reports cold resume', async () => {

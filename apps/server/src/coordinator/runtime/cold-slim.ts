@@ -3,9 +3,11 @@ import type { ImageContent, Message, TextContent, ToolResultMessage } from '@ear
 
 export const TOOL_RESULT_KEEP_FULL = 3;
 export const TOOL_RESULT_MAX_CHARS = 1024;
-export const SHORT_RETENTION_MS = 5 * 60_000;
-export const LONG_RETENTION_ANTHROPIC_MS = 60 * 60_000;
-export const LONG_RETENTION_OPENAI_MS = 24 * 60 * 60_000;
+export const ANTHROPIC_SHORT_TTL_MS = 5 * 60_000;
+export const ANTHROPIC_LONG_TTL_MS = 60 * 60_000;
+export const OPENAI_DEFAULT_TTL_MS = 30 * 60_000;
+
+const OPENAI_30M_MODEL = /^gpt-(5\.([6-9]|\d{2,})|([6-9]|\d{2,}))([.-]|$)/;
 
 const TOOL_RESULT_EXEMPT = new Set(['read_history', 'search_history']);
 
@@ -25,16 +27,26 @@ export function resolveCacheRetentionTier(
   return env[ENV_VARS.piCacheRetention] === 'long' ? 'long' : 'short';
 }
 
-export function retentionMsFor(
-  tiers: CacheRetentionTier,
+export function cacheTtlMsFor(
+  tier: CacheRetentionTier,
   model: string | null | undefined,
-): number {
-  if (tiers !== 'long') return SHORT_RETENTION_MS;
-  const id = (model ?? '').toLowerCase();
-  if (id.includes('anthropic') || id.startsWith('claude') || id.includes('/claude')) {
-    return LONG_RETENTION_ANTHROPIC_MS;
+  cacheWrite: { total: number; oneHour: number } = { total: 0, oneHour: 0 },
+): number | null {
+  const id = model ?? '';
+  const slash = id.indexOf('/');
+  const providerId = slash > 0 ? id.slice(0, slash) : '';
+  const modelId = id.slice(slash + 1);
+  if (providerId === 'anthropic') {
+    return tier === 'long' ? ANTHROPIC_LONG_TTL_MS : ANTHROPIC_SHORT_TTL_MS;
   }
-  return LONG_RETENTION_OPENAI_MS;
+  if (providerId === 'openai') {
+    return tier === 'short' && OPENAI_30M_MODEL.test(modelId) ? OPENAI_DEFAULT_TTL_MS : null;
+  }
+  if (providerId === 'claude-code') {
+    if (cacheWrite.oneHour > 0) return ANTHROPIC_LONG_TTL_MS;
+    return cacheWrite.total > 0 ? ANTHROPIC_SHORT_TTL_MS : null;
+  }
+  return null;
 }
 
 export type ContextResume = 'warm' | 'cold' | 'idle';
@@ -49,10 +61,12 @@ export function contextResumeOf(args: {
 
 export function resumeExpiresAtOf(args: {
   resume: ContextResume;
-  retentionMs: number;
+  retentionMs: number | null;
   lastUsageCreatedAt: number;
 }): number | null {
-  return args.resume === 'warm' ? args.lastUsageCreatedAt + args.retentionMs : null;
+  return args.resume === 'warm' && args.retentionMs !== null
+    ? args.lastUsageCreatedAt + args.retentionMs
+    : null;
 }
 
 export function isColdResume(args: {

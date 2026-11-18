@@ -277,17 +277,27 @@ export function threadContextOf(source: unknown): ChiefContextUsage | null {
   if (source == null || typeof source !== 'object') return null;
   const context = (source as { context?: unknown }).context;
   if (context == null || typeof context !== 'object') return null;
-  const { tokens, contextWindow, compactAt } = context as {
+  const { tokens, contextWindow, compactAt, resumeExpiresAt, cache } = context as {
     tokens?: unknown;
     contextWindow?: unknown;
     compactAt?: unknown;
+    resumeExpiresAt?: unknown;
+    cache?: ChiefContextUsage['cache'];
   };
   if (typeof tokens !== 'number' || typeof contextWindow !== 'number') return null;
   if (!Number.isFinite(tokens) || !Number.isFinite(contextWindow) || contextWindow <= 0)
     return null;
-  if (typeof compactAt === 'number' && Number.isFinite(compactAt) && compactAt > 0)
-    return { tokens, contextWindow, compactAt };
-  return { tokens, contextWindow };
+  return {
+    tokens,
+    contextWindow,
+    ...(typeof compactAt === 'number' && Number.isFinite(compactAt) && compactAt > 0
+      ? { compactAt }
+      : {}),
+    ...(typeof resumeExpiresAt === 'number' && Number.isFinite(resumeExpiresAt)
+      ? { resumeExpiresAt }
+      : {}),
+    ...(cache != null ? { cache } : {}),
+  };
 }
 
 export function toDisplayTodo(w: WireTodo): DisplayTodo {
@@ -339,6 +349,15 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
       : {}),
     ...(w.routeOverride !== undefined ? { routeOverride: w.routeOverride } : {}),
   };
+}
+
+export function cacheHitShare(usage: {
+  input: number;
+  cacheRead: number;
+  cacheWrite: number;
+}): number | null {
+  const total = usage.input + usage.cacheRead + usage.cacheWrite;
+  return total === 0 ? null : usage.cacheRead / total;
 }
 
 export function formatTokens(n: number): string {
@@ -1254,9 +1273,8 @@ export function mapTokenUsage(usage: TokenUsage[]): TokenUsageContent {
   );
   const total = totals.input + totals.output + totals.cacheRead + totals.cacheWrite;
   const model = usage[0]?.model ?? 'n/a';
-  const hitBase = totals.input + totals.cacheRead;
-  const cacheHitRate =
-    hitBase === 0 ? '—' : `${((totals.cacheRead / hitBase) * 100).toFixed(1).replace(/\.0$/, '')}%`;
+  const hit = cacheHitShare(totals);
+  const cacheHitRate = hit === null ? '—' : `${(hit * 100).toFixed(1).replace(/\.0$/, '')}%`;
   return {
     total: formatTokens(total),
     model,
