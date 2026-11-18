@@ -8,7 +8,7 @@ export const COMPUTER_HANDOFF_POLL_MS = 500;
 export const HANDOFF_NAVIGATE_REFUSED =
   'A login or human check is waiting on this computer. browser_navigate is refused. Call request_takeover so the owner can handle it.';
 export const HANDOFF_OWNER_CONTROL_REFUSED =
-  'The owner has control of this computer, so browser_snapshot and computer_observe are refused. Wait for request_takeover to return.';
+  'The owner has control of this computer, so browser_snapshot, computer_observe and desktop_snapshot are refused. Wait for request_takeover to return.';
 export const TAKEOVER_NOT_DONE =
   'The owner did not finish. This step is not done. Stop and tell the owner.';
 export const TAKEOVER_NO_COMPUTER = 'There is no Coordinator computer to hand over.';
