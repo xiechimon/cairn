@@ -496,7 +496,7 @@ describe('info cards run in the agent computer', () => {
     insertDevinSubscription(s);
     const runner = insertMachine(s, {
       name: 'runner',
-      capabilities: { mcpServers: [], skills: [], devin: { installed: true } },
+      capabilities: { mcpServers: [], skills: [], devin: { installed: true, version: '0.1.0' } },
     });
     insertMachine(s, { name: 'vm-host', capabilities: VM_CAPABILITIES });
     seedRoute(s, 'session', {
@@ -529,6 +529,45 @@ describe('info cards run in the agent computer', () => {
       expect.arrayContaining(['shell', 'write_file', 'browser_navigate', 'submit_report']),
     );
     expect(claimed?.agent?.description).toContain('自带工具');
+  });
+
+  test('a devin route waits with devin-subscription when subscription is absent', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const runner = insertMachine(s, {
+      name: 'runner',
+      capabilities: { mcpServers: [], skills: [], devin: { installed: true, version: '0.1.0' } },
+    });
+    insertMachine(s, { name: 'vm-host', capabilities: VM_CAPABILITIES });
+    seedRoute(s, 'session', { provider: 'devin', modelId: 'swe-2-high', machineId: runner });
+    const { todoId, buildId } = await infoCard(s);
+
+    const claimed = await claimStep(
+      {
+        ...s.svc,
+        box: s.secretBox,
+        reposDir: s.reposDir,
+        attachmentsDir: s.attachmentsDir,
+        skillsDir: s.skillsDir,
+      },
+      runner,
+      s.team.id,
+      10,
+      'http://localhost',
+    );
+    expect(claimed).toBeNull();
+    const pending = s.db.select().from(step).where(eq(step.buildId, buildId)).get();
+    const todoRow = s.db.select().from(todo).where(eq(todo.id, todoId)).get();
+    const queue = stepQueueProjector(s.db, s.team.id).project({
+      id: pending?.id ?? '',
+      createdAt: pending?.createdAt ?? 0,
+      homeMachineId:
+        todoRow === undefined || pending === undefined
+          ? null
+          : (profileForStep(s.db, todoRow, pending.kind, pending.id)?.machineId ?? null),
+    });
+    expect(queue?.blocked).toEqual({ kind: 'devin-subscription', missing: [] });
+    expect(pending?.status).toBe('pending');
   });
 
   test('with no usable computer the card waits and says why', async () => {

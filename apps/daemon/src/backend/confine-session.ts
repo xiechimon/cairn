@@ -6,7 +6,7 @@ import type { SessionOpts } from '@cairn/shared';
 import { contains } from './confine.js';
 import { type SeatbeltPolicy, seatbeltCommand } from './confine-seatbelt.js';
 
-export type SessionHarness = 'claude-code' | 'codex' | 'gemini' | 'pi' | 'devin';
+export type SessionHarness = 'claude-code' | 'codex' | 'gemini' | 'pi' | 'devin' | 'antigravity';
 
 export interface Launch {
   command: string;

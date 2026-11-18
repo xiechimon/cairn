@@ -171,12 +171,16 @@ export function resolveStepCredentials(
   };
 }
 
+export interface ChiefBoundSubscriptions {
+  claudeSubscriptionId?: string | null;
+  devinSubscriptionId?: string | null;
+}
+
 export function resolveChiefStepCredentials(
   deps: CredentialsDeps,
   threadId: string,
   providerId?: string | null,
-  boundSubscriptionId?: string | null,
-  boundDevinSubscriptionId?: string | null,
+  boundSubscriptionId?: string | null | ChiefBoundSubscriptions,
 ): StepCredentialBundle {
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   if (!threadRow) throw notFound(`chief thread ${threadId}`);
@@ -185,10 +189,20 @@ export function resolveChiefStepCredentials(
   const agentRow = coordinatorProfile(deps.db, threadRow.teamId, threadRow.projectId);
   if (!agentRow) throw notFound(`coordinator routing rule for ${threadId}`);
 
+  const effectiveProvider = providerId === undefined ? agentRow.provider : providerId;
+  const boundClaudeId =
+    typeof boundSubscriptionId === 'object' && boundSubscriptionId !== null
+      ? boundSubscriptionId.claudeSubscriptionId
+      : boundSubscriptionId;
+  const boundDevinId =
+    typeof boundSubscriptionId === 'object' && boundSubscriptionId !== null
+      ? boundSubscriptionId.devinSubscriptionId
+      : undefined;
+
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;
-  if (agentRow.provider) {
-    const opened = openProviderKey(boxDeps, threadRow.teamId, agentRow.provider);
+  if (effectiveProvider) {
+    const opened = openProviderKey(boxDeps, threadRow.teamId, effectiveProvider);
     if (opened) {
       provider = {
         providerId: opened.row.providerId,
@@ -211,14 +225,9 @@ export function resolveChiefStepCredentials(
     claudeSubscriptionToken: openClaudeSubscription(
       deps,
       threadRow.teamId,
-      providerId === undefined ? agentRow.provider : providerId,
-      boundSubscriptionId,
+      effectiveProvider,
+      boundClaudeId,
     ),
-    devinToken: openDevinSubscription(
-      deps,
-      threadRow.teamId,
-      providerId === undefined ? agentRow.provider : providerId,
-      boundDevinSubscriptionId,
-    ),
+    devinToken: openDevinSubscription(deps, threadRow.teamId, effectiveProvider, boundDevinId),
   };
 }

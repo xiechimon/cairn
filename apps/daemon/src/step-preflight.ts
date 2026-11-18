@@ -32,10 +32,8 @@ export function agentStepRefusal(input: {
   if (input.runtimeId === 'claude-code' && !input.hasSubscriptionToken) {
     return claudeCodeSubscriptionMissingMessage();
   }
-  if (input.runtimeId === 'devin') {
-    if (input.hasDevinToken !== true) {
-      return devinSubscriptionMissingMessage();
-    }
+  if (input.runtimeId === 'devin' && input.hasDevinToken !== true) {
+    return devinSubscriptionMissingMessage();
   }
   return null;
 }
@@ -96,13 +94,10 @@ export async function prepareStepPromptDelivery(input: {
     materializeDir: input.materializeDir,
     log,
     imageSupport,
-    ...(input.backend.describeImage === undefined
-      ? {}
-      : { describeImage: input.backend.describeImage.bind(input.backend, input.provider) }),
   });
   if (resolved.skippedNoVision > 0) {
     log(
-      `image attachment not delivered inline: model ${input.modelKey} does not support images (${resolved.skippedNoVision} image(s) delivered as text or file instead)`,
+      `image attachment skipped: model ${input.modelKey} does not support images (${resolved.skippedNoVision} image(s) not delivered)`,
     );
   }
   return {

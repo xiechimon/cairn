@@ -22,18 +22,20 @@ export function chiefLastRanOnOtherAccount(
   threadId: string,
   stepId: string,
   boundSubscriptionId: string | null,
+  runtime: 'claude-code' | 'devin' = 'claude-code',
 ): boolean {
+  const column = runtime === 'devin' ? step.devinSubscriptionId : step.claudeSubscriptionId;
   const chiefSteps = and(eq(step.buildId, threadId), eq(step.kind, 'chief'), ne(step.id, stepId));
   const last =
     db
-      .select({ subscriptionId: step.claudeSubscriptionId })
+      .select({ subscriptionId: column })
       .from(step)
       .where(and(chiefSteps, isNotNull(step.sessionId)))
       .orderBy(desc(step.createdAt))
       .limit(1)
       .get() ??
     db
-      .select({ subscriptionId: step.claudeSubscriptionId })
+      .select({ subscriptionId: column })
       .from(step)
       .where(and(chiefSteps, isNotNull(step.claimedAt)))
       .orderBy(desc(step.claimedAt))

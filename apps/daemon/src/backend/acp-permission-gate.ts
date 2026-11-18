@@ -63,10 +63,10 @@ const CLAUDE_BUILTIN_WRITE_TOOLS = [
 const CLAUDE_BUILTIN_READ_TOOLS = ['Read', 'Grep', 'Glob', 'LS'];
 
 export function acpTurnPolicy(
-  opts: Pick<SessionOpts, 'remoteToolsOnly' | 'readOnly'>,
+  opts: Pick<SessionOpts, 'remoteToolsOnly' | 'readOnly' | 'lockedDown'>,
 ): AcpTurnPolicy {
   if (opts.remoteToolsOnly === true) return 'relay-only';
-  if (opts.readOnly === true) return 'read-only';
+  if (opts.readOnly === true || opts.lockedDown === true) return 'read-only';
   return 'normal';
 }
 

@@ -14,8 +14,142 @@ const update = (value, id = sessionId) =>
   send({ method: 'session/update', params: { sessionId: id, update: value } });
 let pending;
 let host;
-let configured = false;
+let sessionMcpServers = [];
+let configuredModel = false;
+let configuredThinking = null;
+const permOutcomes = {};
 if (['ignore-term', 'descendant'].includes(scenario)) process.on('SIGTERM', () => {});
+
+async function callStdioMcp(server, expectedTools) {
+  if (server.url !== undefined || typeof server.command !== 'string') {
+    throw new Error('Expected stdio MCP server declaration');
+  }
+  const child = spawn(server.command, server.args, { stdio: ['pipe', 'pipe', 'pipe'] });
+  const responses = new Map();
+  const waiters = new Map();
+  const lines = createInterface({ input: child.stdout });
+  lines.on('line', (text) => {
+    if (!text.trim()) return;
+    const msg = JSON.parse(text);
+    const waiter = waiters.get(msg.id);
+    if (waiter) {
+      waiters.delete(msg.id);
+      waiter(msg);
+    } else {
+      responses.set(msg.id, msg);
+    }
+  });
+  let nextId = 1;
+  const rpc = (method, params) => {
+    const id = nextId++;
+    const wait = new Promise((resolve, reject) => {
+      const existing = responses.get(id);
+      if (existing) {
+        responses.delete(id);
+        resolve(existing);
+        return;
+      }
+      const timer = setTimeout(() => reject(new Error(`MCP timeout on ${method}`)), 5000);
+      waiters.set(id, (msg) => {
+        clearTimeout(timer);
+        resolve(msg);
+      });
+    });
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+    return wait;
+  };
+  try {
+    await rpc('initialize', {
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'fake-acp', version: '1' },
+    });
+    const listed = await rpc('tools/list', {});
+    if (listed.result.tools.length !== expectedTools.length) {
+      throw new Error(`Expected ${expectedTools.length} tools, got ${listed.result.tools.length}`);
+    }
+    for (const name of expectedTools) {
+      const called = await rpc('tools/call', { name, arguments: { text: 'input' } });
+      if (called.result.content[0].text !== `${name} output`) {
+        throw new Error(`MCP tool result lost for ${name}`);
+      }
+    }
+    if (expectedTools.includes('remote')) {
+      const unknown = await rpc('tools/call', { name: 'unknown' });
+      if (!unknown.error) throw new Error('Undeclared tool was allowed');
+    }
+  } finally {
+    child.stdin.end();
+    child.kill('SIGTERM');
+  }
+}
+
+async function callHostTool(server, name) {
+  if (server.url !== undefined) {
+    const rpc = (method, params = {}) =>
+      fetch(server.url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          ...Object.fromEntries(server.headers.map(({ name: h, value }) => [h, value])),
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 'host', method, params }),
+      }).then((response) => response.json());
+    await rpc('initialize', {
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'fake-acp', version: '1' },
+    });
+    const called = await rpc('tools/call', { name, arguments: {} });
+    return called.result.content[0].text;
+  }
+  const child = spawn(server.command, server.args, { stdio: ['pipe', 'pipe', 'pipe'] });
+  const responses = new Map();
+  const waiters = new Map();
+  createInterface({ input: child.stdout }).on('line', (text) => {
+    if (!text.trim()) return;
+    const msg = JSON.parse(text);
+    const waiter = waiters.get(msg.id);
+    if (waiter) {
+      waiters.delete(msg.id);
+      waiter(msg);
+    } else {
+      responses.set(msg.id, msg);
+    }
+  });
+  let nextId = 1;
+  const rpc = (method, params) => {
+    const rpcId = nextId++;
+    const wait = new Promise((resolve, reject) => {
+      const existing = responses.get(rpcId);
+      if (existing) {
+        responses.delete(rpcId);
+        resolve(existing);
+        return;
+      }
+      const timer = setTimeout(() => reject(new Error(`MCP timeout on ${method}`)), 5000);
+      waiters.set(rpcId, (msg) => {
+        clearTimeout(timer);
+        resolve(msg);
+      });
+    });
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: rpcId, method, params })}\n`);
+    return wait;
+  };
+  try {
+    await rpc('initialize', {
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'fake-acp', version: '1' },
+    });
+    const called = await rpc('tools/call', { name, arguments: {} });
+    return called.result.content[0].text;
+  } finally {
+    child.stdin.end();
+    child.kill('SIGTERM');
+  }
+}
 
 for await (const line of createInterface({ input: process.stdin })) {
   const { id, method, params, result } = JSON.parse(line);
@@ -31,7 +165,7 @@ for await (const line of createInterface({ input: process.stdin })) {
       result: {
         protocolVersion: scenario === 'bad-version' ? 99 : params.protocolVersion,
         agentCapabilities: {
-          mcpCapabilities: { http: true },
+          mcpCapabilities: { http: scenario !== 'no-http-mcp' },
           loadSession: scenario === 'load' || devin,
           sessionCapabilities: scenario === 'resume' ? { resume: {} } : {},
           promptCapabilities: { image: scenario === 'image' || devin },
@@ -44,7 +178,8 @@ for await (const line of createInterface({ input: process.stdin })) {
     if (method !== 'session/new') {
       update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'history' } });
     }
-    host = params.mcpServers[0];
+    sessionMcpServers = params.mcpServers ?? [];
+    host = sessionMcpServers[0];
     sessionMeta = params._meta ?? null;
     send({
       id,
@@ -99,6 +234,21 @@ for await (const line of createInterface({ input: process.stdin })) {
                       ]
                     : [{ value: 'stub-model', name: 'Stub' }],
                 },
+                ...(scenario === 'thinking'
+                  ? [
+                      {
+                        id: 'thought_level',
+                        name: 'Thinking',
+                        category: 'thought_level',
+                        type: 'select',
+                        currentValue: 'low',
+                        options: [
+                          { value: 'low', name: 'Low' },
+                          { value: 'high', name: 'High' },
+                        ],
+                      },
+                    ]
+                  : []),
               ],
       },
     });
@@ -107,11 +257,18 @@ for await (const line of createInterface({ input: process.stdin })) {
     mode = params.modeId;
     send({ id, result: {} });
   } else if (method === 'session/set_config_option') {
-    if (params.value !== 'stub-model') throw new Error('Wrong model');
-    configured = true;
+    if (params.configId === 'model') {
+      if (params.value !== 'stub-model') throw new Error('Wrong model');
+      configuredModel = true;
+    } else if (params.configId === 'thought_level') {
+      configuredThinking = params.value;
+    }
     send({ id, result: { configOptions: [] } });
   } else if (method === 'session/prompt') {
-    if (!configured) throw new Error('Model was not configured before prompting');
+    if (!configuredModel) throw new Error('Model was not configured before prompting');
+    if (scenario === 'thinking' && configuredThinking !== 'high') {
+      throw new Error(`Expected thinking high, got ${configuredThinking}`);
+    }
     const text = params.prompt.find((block) => block.type === 'text')?.text ?? '';
     if (scenario === 'devin-steer' && text.includes('steer-now')) {
       send({ id: pending, result: { stopReason: 'interrupted' } });
@@ -235,23 +392,8 @@ for await (const line of createInterface({ input: process.stdin })) {
           if (picked !== 'allow') continue;
           if (exec) executed.push(call.toolCallId);
           if (hostTool) {
-            const rpc = (method, params = {}) =>
-              fetch(host.url, {
-                method: 'POST',
-                headers: {
-                  'content-type': 'application/json',
-                  accept: 'application/json, text/event-stream',
-                  ...Object.fromEntries(host.headers.map(({ name, value }) => [name, value])),
-                },
-                body: JSON.stringify({ jsonrpc: '2.0', id: 'host', method, params }),
-              }).then((response) => response.json());
-            await rpc('initialize', {
-              protocolVersion: '2025-11-25',
-              capabilities: {},
-              clientInfo: { name: 'fake-acp', version: '1' },
-            });
-            const called = await rpc('tools/call', { name: hostTool, arguments: {} });
-            outcomes[`${call.toolCallId}:tool`] = called.result.content[0].text;
+            const called = await callHostTool(host, hostTool);
+            outcomes[`${call.toolCallId}:tool`] = called;
           }
           update({ sessionUpdate: 'tool_call_update', toolCallId: call.toolCallId, status: 'completed', rawOutput: 'ok' });
         }
@@ -262,39 +404,31 @@ for await (const line of createInterface({ input: process.stdin })) {
       continue;
     }
     if (scenario === 'host-tools') {
-      const request = async (method, params = {}, authorized = true) => {
-        const response = await fetch(host.url, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            accept: 'application/json, text/event-stream',
-            ...(authorized
-              ? Object.fromEntries(host.headers.map(({ name, value }) => [name, value]))
-              : {}),
-          },
-          body: JSON.stringify({ jsonrpc: '2.0', id: 'host', method, params }),
-        });
-        if (!authorized) {
-          if (response.status !== 401) throw new Error('MCP accepts unauthenticated requests');
-          return;
-        }
-        return response.json();
-      };
-      await request('tools/list', {}, false);
-      await request('initialize', {
-        protocolVersion: '2025-11-25',
-        capabilities: {},
-        clientInfo: { name: 'fake-acp', version: '1' },
-      });
-      const listed = await request('tools/list');
-      if (listed.result.tools.length !== 2) throw new Error('Host tools missing');
-      for (const name of ['remote', 'local']) {
-        const called = await request('tools/call', { name, arguments: { text: 'input' } });
-        if (called.result.content[0].text !== `${name} output`)
-          throw new Error('Host tool result lost');
+      await callStdioMcp(host, ['remote', 'local']);
+    }
+    if (scenario === 'no-http-mcp') {
+      const ext = sessionMcpServers.find((server) => server.name === 'ext');
+      if (!ext) throw new Error('Bridged external HTTP MCP server missing');
+      await callStdioMcp(ext, ['ext_ping']);
+    }
+    if (['policy-readonly', 'policy-remote-tools-only'].includes(scenario)) {
+      if (sessionMcpServers.some((server) => server.name !== 'cairn')) {
+        throw new Error('External MCP server leaked into restricted session');
       }
-      const unknown = await request('tools/call', { name: 'unknown' });
-      if (!unknown.error) throw new Error('Undeclared tool was allowed');
+      pending = id;
+      send({
+        id: 'perm-1',
+        method: 'session/request_permission',
+        params: {
+          sessionId,
+          toolCall: { toolCallId: 'c1', title: 'mcp__cairn__remote', kind: 'other' },
+          options: [
+            { optionId: 'allow', name: 'Allow', kind: 'allow_once' },
+            { optionId: 'deny', name: 'Deny', kind: 'reject_once' },
+          ],
+        },
+      });
+      continue;
     }
     if (scenario === 'descendant') {
       const descendant = spawn(
@@ -400,5 +534,44 @@ for await (const line of createInterface({ input: process.stdin })) {
             : 'refusal',
       },
     });
+  } else if (id === 'perm-1') {
+    permOutcomes.cairn = result.outcome.optionId;
+    send({
+      id: 'perm-2',
+      method: 'session/request_permission',
+      params: {
+        sessionId,
+        toolCall: { toolCallId: 'r1', title: 'Read', kind: 'read' },
+        options: [
+          { optionId: 'allow', name: 'Allow', kind: 'allow_once' },
+          { optionId: 'deny', name: 'Deny', kind: 'reject_once' },
+        ],
+      },
+    });
+  } else if (id === 'perm-2') {
+    permOutcomes.read = result.outcome.optionId;
+    send({
+      id: 'perm-3',
+      method: 'session/request_permission',
+      params: {
+        sessionId,
+        toolCall: { toolCallId: 'e1', title: 'Edit', kind: 'edit' },
+        options: [
+          { optionId: 'allow', name: 'Allow', kind: 'allow_once' },
+          { optionId: 'deny', name: 'Deny', kind: 'reject_once' },
+        ],
+      },
+    });
+  } else if (id === 'perm-3') {
+    permOutcomes.edit = result.outcome.optionId;
+    const ok =
+      scenario === 'policy-readonly'
+        ? permOutcomes.cairn === 'allow' &&
+          permOutcomes.read === 'allow' &&
+          permOutcomes.edit === 'deny'
+        : permOutcomes.cairn === 'allow' &&
+          permOutcomes.read === 'deny' &&
+          permOutcomes.edit === 'deny';
+    send({ id: pending, result: { stopReason: ok ? 'end_turn' : 'refusal' } });
   }
 }

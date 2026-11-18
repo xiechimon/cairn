@@ -53,13 +53,21 @@ import { turnProvenance } from './turn-provenance.js';
 type StepRow = typeof step.$inferSelect;
 type ThreadRow = typeof chiefThread.$inferSelect;
 
+export interface ChiefSubscriptionBind {
+  runtime: 'claude-code' | 'devin';
+  teamId: string;
+}
+
 export function claimPendingChiefStep(
   db: MachineDeps['db'],
   stepRow: StepRow,
   machineId: string | null,
-  bindTeamId: string | null = null,
-  bindDevinTeamId: string | null = null,
+  bindSubscription: ChiefSubscriptionBind | string | null = null,
 ): StepRow | null {
+  const bind =
+    typeof bindSubscription === 'string'
+      ? { runtime: 'claude-code' as const, teamId: bindSubscription }
+      : bindSubscription;
   const claimedAt = nowMs();
   const claimed = db.transaction(() => {
     const res = db
@@ -68,17 +76,17 @@ export function claimPendingChiefStep(
         status: 'claimed',
         machineId,
         claudeSubscriptionId:
-          bindTeamId === null
-            ? null
-            : sql<
+          bind?.runtime === 'claude-code'
+            ? sql<
                 string | null
-              >`(select ${claudeSubscription.id} from ${claudeSubscription} where ${claudeSubscription.teamId} = ${bindTeamId} and ${claudeSubscription.enabledAt} is not null and (${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${claimedAt}))`,
+              >`(select ${claudeSubscription.id} from ${claudeSubscription} where ${claudeSubscription.teamId} = ${bind.teamId} and ${claudeSubscription.enabledAt} is not null and (${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${claimedAt}))`
+            : null,
         devinSubscriptionId:
-          bindDevinTeamId === null
-            ? null
-            : sql<
+          bind?.runtime === 'devin'
+            ? sql<
                 string | null
-              >`(select ${devinSubscription.id} from ${devinSubscription} where ${devinSubscription.teamId} = ${bindDevinTeamId} and ${devinSubscription.enabledAt} is not null and (${devinSubscription.expiresAt} is null or ${devinSubscription.expiresAt} > ${claimedAt}))`,
+              >`(select ${devinSubscription.id} from ${devinSubscription} where ${devinSubscription.teamId} = ${bind.teamId} and ${devinSubscription.enabledAt} is not null and (${devinSubscription.expiresAt} is null or ${devinSubscription.expiresAt} > ${claimedAt}))`
+            : null,
         claimedAt,
         lastHeartbeatAt: claimedAt,
         holdReason: null,
@@ -376,7 +384,9 @@ export function recordStepUsage(
   const { db } = deps;
   const usageTeamId = stepTeamId(deps, stepRow);
   const mirrorsTurnUsage =
-    coordinatorRunsOnPi() && stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId);
+    coordinatorRunsOnPi() &&
+    stepRow.kind === 'chief' &&
+    isChiefConversation(stepRow.buildId);
   db.transaction((tx) => {
     for (const u of usage) {
       const prior = db
@@ -434,7 +444,6 @@ export function recordStepUsage(
             output: u.output,
             cacheRead: u.cacheRead,
             cacheWrite: u.cacheWrite,
-            cacheWrite1h: u.cacheWrite1h ?? 0,
             ttftMs: u.ttftMs ?? null,
             contextTokens: u.contextTokens ?? null,
             contextWindow: u.contextWindow ?? null,
@@ -448,7 +457,6 @@ export function recordStepUsage(
               output: sql`${chiefTurnUsage.output} + ${u.output}`,
               cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
               cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
-              cacheWrite1h: sql`${chiefTurnUsage.cacheWrite1h} + ${u.cacheWrite1h ?? 0}`,
               ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
               ...(u.contextTokens !== undefined
                 ? {
@@ -474,7 +482,6 @@ export function recordStepUsage(
             output: u.output,
             cacheRead: u.cacheRead,
             cacheWrite: u.cacheWrite,
-            cacheWrite1h: u.cacheWrite1h ?? 0,
             mirroredTokens: mirrored,
             contextTokens: u.contextTokens ?? null,
             contextWindow: u.contextWindow ?? null,
@@ -488,7 +495,6 @@ export function recordStepUsage(
               output: sql`${stepUsage.output} + ${u.output}`,
               cacheRead: sql`${stepUsage.cacheRead} + ${u.cacheRead}`,
               cacheWrite: sql`${stepUsage.cacheWrite} + ${u.cacheWrite}`,
-              cacheWrite1h: sql`${stepUsage.cacheWrite1h} + ${u.cacheWrite1h ?? 0}`,
               mirroredTokens: sql`${stepUsage.mirroredTokens} + ${mirrored}`,
               ...(u.contextTokens !== undefined
                 ? {

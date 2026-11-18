@@ -249,15 +249,22 @@ async function chiefStepToken(
     { db: deps.db, box: deps.box },
     threadId,
     stepRow?.fallback?.model?.provider,
-    stepRow?.claudeSubscriptionId,
-    stepRow?.devinSubscriptionId,
+    {
+      claudeSubscriptionId: stepRow?.claudeSubscriptionId ?? null,
+      devinSubscriptionId: stepRow?.devinSubscriptionId ?? null,
+    },
   );
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   const agentRow = threadRow
     ? coordinatorProfile(deps.db, threadRow.teamId, threadRow.projectId)
     : null;
   return {
-    provider: await dispatchProvider(deps, threadRow?.teamId, bundle.provider, agentRow?.provider),
+    provider: await dispatchProvider(
+      deps,
+      threadRow?.teamId,
+      bundle.provider,
+      stepRow?.fallback?.model?.provider ?? agentRow?.provider,
+    ),
     secrets: bundle.secrets,
     ...(claimed && bundle.claudeSubscriptionToken !== undefined
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
