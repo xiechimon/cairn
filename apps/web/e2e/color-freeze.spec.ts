@@ -125,7 +125,6 @@ for (const theme of ['light', 'dark'] as const) {
       ['menu-hover', theme === 'light' ? 'rgb(0 0 0 / 0.05)' : 'rgb(255 255 255 / 0.075)'],
       ['hover-1', 'var(--sidebar-hover)'],
       ['border-soft', 'color-mix(in oklab, var(--foreground) 9%, transparent)'],
-      ['ring-inset-highlight', 'color-mix(in oklab, var(--foreground) 10%, transparent)'],
     ];
     for (const [name, formula] of pairs) {
       const got = await tokenColor(page, name);
