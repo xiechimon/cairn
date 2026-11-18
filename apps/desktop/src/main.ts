@@ -360,6 +360,11 @@ function showTray(origin: string, controls: TrayControls): Tray {
   const created = new Tray(icon);
   created.setToolTip(`Cairn · ${new URL(origin).host}`);
   const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
+  const setKeepAwake = (on: boolean): void => {
+    keepAwake.set(on);
+    created.setTitle(on ? '唤醒中' : '');
+  };
+  created.setTitle(keepAwake.isOn() ? '唤醒中' : '');
   const newTaskKey = globalShortcut.register(NEW_TASK_SHORTCUT, () =>
     sendToWindow('desktop-menu', 'new-task'),
   )
@@ -413,7 +418,7 @@ function showTray(origin: string, controls: TrayControls): Tray {
     Menu.buildFromTemplate(
       trayMenuTemplate(new URL(origin).host, keepAwake.isOn(), {
         open: focusWindow,
-        setKeepAwake: (on) => keepAwake.set(on),
+        setKeepAwake,
         quit: () => app.quit(),
       }),
     );
@@ -440,7 +445,7 @@ function showTray(origin: string, controls: TrayControls): Tray {
   });
   ipcMain.on('desktop-tray:keep-awake', (event, on: unknown) => {
     if (!fromPopover(event)) return;
-    keepAwake.set(on === true);
+    setKeepAwake(on === true);
     publish();
   });
   ipcMain.on('desktop-tray:resize', (event, next: unknown) => {

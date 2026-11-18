@@ -2644,5 +2644,6 @@ export const EN: Record<string, string> = {
   正在启动: 'Starting',
   已停止: 'Stopped',
   '保持 Mac 唤醒': 'Keep the Mac awake',
+  '保持 Mac 唤醒，已开启': 'Keeping the Mac awake',
   '退出 Cairn': 'Quit Cairn',
 };

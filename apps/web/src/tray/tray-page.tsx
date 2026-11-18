@@ -1,6 +1,6 @@
 import type { DesktopRunnerState, DesktopTrayOpen, DesktopTrayState } from '@cairn/shared';
 import { cn } from 'cn';
-import { Coffee, Monitor, Search, Settings, SquarePen } from 'lucide-react';
+import { Coffee, Laptop, Search, Settings, SquarePen } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTasks } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -134,7 +134,7 @@ export function TrayPage() {
           onClick={() => open({ kind: 'command', command: 'new-task' })}
           className={cn(ROUND, 'h-16 flex-1 justify-start gap-3 px-5 text-left font-normal')}
         >
-          <SquarePen width={22} height={22} aria-hidden="true" />
+          <SquarePen className="size-5.5" aria-hidden="true" />
           <span className="flex flex-col">
             <span className="font-title">{t('新任务')}</span>
             {state?.newTaskKey != null && (
@@ -196,11 +196,20 @@ export function TrayPage() {
         >
           <span
             className={cn(
-              'flex size-12 items-center justify-center rounded-full',
-              runnerOn ? 'bg-foreground text-background' : 'bg-(--hover-1) text-content-secondary',
+              'relative flex size-12 items-center justify-center rounded-full bg-(--hover-1)',
+              runnerOn ? 'text-foreground' : 'text-content-secondary',
             )}
           >
-            <Monitor className="size-5.5" aria-hidden="true" />
+            <Laptop className="size-5.5" aria-hidden="true" />
+            <span
+              aria-hidden="true"
+              className={cn(
+                'absolute right-1 bottom-1 size-2 rounded-full',
+                runner === 'on' && 'bg-running',
+                runner === 'failed' && 'bg-destructive',
+                (runner === 'off' || runner === 'starting') && 'border border-content-tertiary',
+              )}
+            />
           </span>
           <span className="flex flex-col">
             <span className="font-title">Runner</span>
@@ -215,11 +224,12 @@ export function TrayPage() {
           </span>
         </Button>
         <TrayButton
-          label={t('保持 Mac 唤醒')}
+          label={keepAwake ? t('保持 Mac 唤醒，已开启') : t('保持 Mac 唤醒')}
           pressed={keepAwake}
           className={cn(
             'size-16',
-            keepAwake && 'bg-foreground text-background hover:bg-foreground',
+            keepAwake &&
+              'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button-hover)',
           )}
           onClick={() => bridge?.setKeepAwake(!keepAwake)}
         >

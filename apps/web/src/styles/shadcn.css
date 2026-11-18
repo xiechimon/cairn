@@ -219,6 +219,7 @@
   --text-dim: #8c8b88;
   --icon: var(--text-secondary);
   --card-button: #ebb550;
+  --card-button-hover: color-mix(in srgb, var(--card-button) 82%, var(--foreground));
   --focus-ring: var(--ring);
   --col-dot-building: var(--running);
   --col-dot-done: #7fa3cc;
@@ -381,6 +382,7 @@
   --text-dim: #5d5f5c;
   --icon: var(--text-secondary);
   --card-button: #9a6500;
+  --card-button-hover: color-mix(in srgb, var(--card-button) 82%, var(--foreground));
   --focus-ring: var(--ring);
   --col-dot-building: var(--running);
   --col-dot-done: #5379a0;
