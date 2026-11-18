@@ -302,7 +302,7 @@ function MachineActivity({
       data-testid="machine-activity"
       data-activity={activity.inUse ? 'using' : 'idle'}
       className={cn(
-        'm-0 flex min-w-0 items-baseline gap-1.5 px-5 py-2.5 text-meta',
+        'm-0 flex min-w-0 items-baseline gap-1 px-5 py-2.5 text-meta',
         activity.inUse ? 'text-content-secondary' : 'text-content-tertiary',
       )}
     >

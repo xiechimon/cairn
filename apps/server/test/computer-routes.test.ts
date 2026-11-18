@@ -136,10 +136,47 @@ async function activityOf(s: TestServer) {
 }
 
 describe('computer feed routes', () => {
-  test('activity names the claimed task on the machine, else the Coordinator thread, else the last user', async () => {
+  test('activity comes only from calls on the computer: a code step on the host machine is neither using nor last using it', async () => {
     const s = boot();
     addMachine(s, s.team.id, 'm1');
     addComputer(s, s.team.id, 'c1', 'm1');
+    expect(await activityOf(s)).toBeNull();
+    const projectId = 'p1';
+    s.db.insert(projectTable).values({ id: projectId, name: 'demo', teamId: s.team.id }).run();
+    const task = (id: string, title: string) => {
+      const row = createTodo(s.svc, {
+        teamId: s.team.id,
+        projectId,
+        title,
+        spec: '',
+        createdBy: s.user.id,
+        ownerId: s.user.id,
+      });
+      s.db
+        .insert(buildTable)
+        .values({
+          id: `b-${id}`,
+          todoId: row.id,
+          triggerSource: 'user',
+          withPlan: false,
+          createdAt: 1,
+        })
+        .run();
+      s.db
+        .insert(stepTable)
+        .values({
+          id: `step-${id}`,
+          buildId: `b-${id}`,
+          kind: 'build',
+          status: 'claimed',
+          machineId: 'm1',
+          claimedAt: 50,
+          createdAt: 1,
+        })
+        .run();
+      return row;
+    };
+    task('code', 'code task on the host');
     expect(await activityOf(s)).toBeNull();
     addCall(s, s.team.id, 'c1', 'm1', 5, { state: 'running', finishedAt: null });
     expect(await activityOf(s)).toEqual({
@@ -151,38 +188,14 @@ describe('computer feed routes', () => {
     });
     s.db.update(computerCallTable).set({ state: 'done', finishedAt: 9 }).run();
     expect(await activityOf(s)).toMatchObject({ inUse: false, threadId: 'chief-thread-c1', at: 9 });
-    const projectId = 'p1';
-    s.db.insert(projectTable).values({ id: projectId, name: 'demo', teamId: s.team.id }).run();
-    const task = createTodo(s.svc, {
-      teamId: s.team.id,
-      projectId,
-      title: 'BOSS report',
-      spec: '',
-      createdBy: s.user.id,
-      ownerId: s.user.id,
-    });
-    s.db
-      .insert(buildTable)
-      .values({ id: 'b1', todoId: task.id, triggerSource: 'user', withPlan: false, createdAt: 1 })
-      .run();
-    s.db
-      .insert(stepTable)
-      .values({
-        id: 'task-step',
-        buildId: 'b1',
-        kind: 'build',
-        status: 'claimed',
-        machineId: 'm1',
-        claimedAt: 50,
-        createdAt: 1,
-      })
-      .run();
+    const card = task('card', 'info card');
+    addCall(s, s.team.id, 'c1', 'm1', 7, { stepId: 'step-card', finishedAt: 20 });
     expect(await activityOf(s)).toEqual({
-      inUse: true,
-      title: 'BOSS report',
-      todoId: task.id,
+      inUse: false,
+      title: 'info card',
+      todoId: card.id,
       threadId: null,
-      at: 50,
+      at: 20,
     });
   });
 

@@ -1,71 +1,42 @@
 import { type ComputerActivity, isBuildStepKind, isChiefConversationId } from '@cairn/shared';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, computerCall, step, todo } from '../db/schema.js';
-import { computerCallOwnerUserId } from './computer-access.js';
+import { build, chiefThread, type computer, computerCall, step, todo } from '../db/schema.js';
+import { nowMs } from '../lib/ids.js';
 
-const ROWS_SCANNED = 20;
+const CALLS_SCANNED = 20;
 const IN_FLIGHT_CALL_STATES: readonly string[] = ['dispatched', 'running'];
 
-function taskActivity(
+function userOfStep(
   db: Db,
-  stepRow: typeof step.$inferSelect,
+  userId: string,
+  stepId: string,
   inUse: boolean,
   at: number,
 ): ComputerActivity | null {
-  if (!isBuildStepKind(stepRow.kind)) return null;
+  const owner = db.select().from(step).where(eq(step.id, stepId)).get();
+  if (owner === undefined) return null;
+  if (owner.kind === 'chief') {
+    if (!isChiefConversationId(owner.buildId)) return null;
+    const thread = db
+      .select({ userId: chiefThread.userId })
+      .from(chiefThread)
+      .where(eq(chiefThread.id, owner.buildId))
+      .get();
+    return thread?.userId === userId
+      ? { inUse, title: null, todoId: null, threadId: owner.buildId, at }
+      : null;
+  }
+  if (!isBuildStepKind(owner.kind)) return null;
   const task = db
     .select({ id: todo.id, title: todo.title })
     .from(build)
     .innerJoin(todo, eq(todo.id, build.todoId))
-    .where(eq(build.id, stepRow.buildId))
+    .where(eq(build.id, owner.buildId))
     .get();
   return task === undefined
     ? null
     : { inUse, title: task.title, todoId: task.id, threadId: null, at };
-}
-
-function taskActivities(db: Db, machineId: string): ComputerActivity[] {
-  const claimed = db
-    .select()
-    .from(step)
-    .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed')))
-    .orderBy(desc(step.claimedAt))
-    .limit(ROWS_SCANNED)
-    .all()
-    .map((row) => taskActivity(db, row, true, row.claimedAt ?? row.createdAt));
-  const finished = db
-    .select()
-    .from(step)
-    .where(and(eq(step.machineId, machineId), inArray(step.status, ['done', 'failed', 'stopped'])))
-    .orderBy(desc(step.finishedAt))
-    .limit(ROWS_SCANNED)
-    .all()
-    .map((row) => taskActivity(db, row, false, row.finishedAt ?? row.createdAt));
-  return [...claimed, ...finished].filter((row): row is ComputerActivity => row !== null);
-}
-
-function coordinatorActivities(
-  db: Db,
-  teamId: string,
-  userId: string,
-  computerId: string,
-): ComputerActivity[] {
-  return db
-    .select()
-    .from(computerCall)
-    .where(and(eq(computerCall.teamId, teamId), eq(computerCall.computerId, computerId)))
-    .orderBy(desc(computerCall.createdAt), desc(computerCall.id))
-    .limit(ROWS_SCANNED)
-    .all()
-    .filter((call) => computerCallOwnerUserId(db, call) === userId)
-    .flatMap((call) => {
-      const owner = db.select().from(step).where(eq(step.id, call.stepId)).get();
-      if (owner === undefined || !isChiefConversationId(owner.buildId)) return [];
-      const inUse = IN_FLIGHT_CALL_STATES.includes(call.state);
-      const at = inUse ? (call.startedAt ?? call.createdAt) : (call.finishedAt ?? call.createdAt);
-      return [{ inUse, title: null, todoId: null, threadId: owner.buildId, at }];
-    });
 }
 
 function newest(rows: ComputerActivity[]): ComputerActivity | null {
@@ -77,16 +48,29 @@ function newest(rows: ComputerActivity[]): ComputerActivity | null {
 
 export function computerActivity(
   db: Db,
-  teamId: string,
   userId: string,
-  computerId: string,
-  machineId: string,
+  row: Pick<
+    typeof computer.$inferSelect,
+    'id' | 'teamId' | 'executionStepId' | 'executionLeaseExpiresAt' | 'runningSince' | 'updatedAt'
+  >,
 ): ComputerActivity | null {
-  const candidates = [
-    ...taskActivities(db, machineId),
-    ...coordinatorActivities(db, teamId, userId, computerId),
-  ];
-  return (
-    newest(candidates.filter((row) => row.inUse)) ?? newest(candidates.filter((row) => !row.inUse))
-  );
+  const fromCalls = db
+    .select()
+    .from(computerCall)
+    .where(and(eq(computerCall.teamId, row.teamId), eq(computerCall.computerId, row.id)))
+    .orderBy(desc(computerCall.createdAt), desc(computerCall.id))
+    .limit(CALLS_SCANNED)
+    .all()
+    .flatMap((call) => {
+      const inUse = IN_FLIGHT_CALL_STATES.includes(call.state);
+      const at = inUse ? (call.startedAt ?? call.createdAt) : (call.finishedAt ?? call.createdAt);
+      const found = userOfStep(db, userId, call.stepId, inUse, at);
+      return found === null ? [] : [found];
+    });
+  const leased =
+    row.executionStepId !== null && (row.executionLeaseExpiresAt ?? 0) > nowMs()
+      ? userOfStep(db, userId, row.executionStepId, true, row.runningSince ?? row.updatedAt)
+      : null;
+  const candidates = leased === null ? fromCalls : [...fromCalls, leased];
+  return newest(candidates.filter((c) => c.inUse)) ?? newest(candidates.filter((c) => !c.inUse));
 }
