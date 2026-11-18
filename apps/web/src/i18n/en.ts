@@ -1817,7 +1817,6 @@ export const EN: Record<string, string> = {
   '{runtime} · 不可用': '{runtime} · unavailable',
   '{use} 的模型': '{use} model',
   '{use} 的思考强度': '{use} thinking level',
-  对话摘要: 'Conversation summaries',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
   '先给 Coordinator 选模型，它才能回答你的消息。':
     'Pick a model for the Coordinator so it can answer your messages.',

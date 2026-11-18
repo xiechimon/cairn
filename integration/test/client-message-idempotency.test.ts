@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 
 const send = (body: Record<string, unknown>) =>
-  api(server.url, 'POST', `/api/teams/${server.teamId}/coordinator/messages`, body);
+  api(server.url, 'POST', `/api/teams/${server.teamId}/chief/threads`, body);
 
 const userMessages = () =>
   server.db.select().from(chiefMessage).where(eq(chiefMessage.role, 'user')).all();
