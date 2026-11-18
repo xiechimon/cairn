@@ -1,7 +1,7 @@
 import { PassThrough } from 'node:stream';
 import type { AgentBackend, AgentSessionHandle, SessionOpts } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createClaudePtyBackend } from '../src/engine/claude-tui.js';
 import { openEnginePtyProcess } from '../src/engine/pty.js';
 import { assembleStepEnv } from '../src/step-env.js';
@@ -64,6 +64,7 @@ beforeEach(() => {
 afterEach(() => {
   if (scrubSaved === undefined) delete process.env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB;
   else process.env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = scrubSaved;
+  releaseTestTempDir(dir);
 });
 
 function session(env: Record<string, string>): SessionOpts {

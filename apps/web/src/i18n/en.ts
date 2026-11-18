@@ -2296,6 +2296,7 @@ export const EN: Record<string, string> = {
   允许这一次: 'Allow once',
   拒绝: 'Refuse',
   原始输出: 'Raw output',
+  '已接管 · 按键直接发送给引擎': 'Taken over · keys go straight to the engine',
   引擎还没有输出: 'The engine has not produced output yet',
   接管这次运行: 'Take over this run',
   '终端接入后，接管会让引擎停下，把它的终端交给你直接操作；交还后它从你停下的地方继续。':
