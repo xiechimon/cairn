@@ -459,7 +459,7 @@ describe('mapChief queue projection (#1108 Q6)', () => {
     });
   });
 
-  test('Q7: a blocked turn queue keeps its actionable reason as the label', () => {
+  test('Q7: an offline Runner projects its notice kind and machine', () => {
     expect(
       chiefOfThread({
         ...THREAD_Q,
@@ -471,7 +471,8 @@ describe('mapChief queue projection (#1108 Q6)', () => {
       }).stream?.at(-1),
     ).toMatchObject({
       kind: 'streaming',
-      label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
+      label: '排队中：等执行机上线',
+      queueWait: { kind: 'machine-offline', machine: 'xmonsMac' },
     });
   });
 
