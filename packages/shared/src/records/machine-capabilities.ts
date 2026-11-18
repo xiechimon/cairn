@@ -150,7 +150,7 @@ export const VM_DOWNLOAD_PARTS = {
   runtime: 169_630_704,
   kernel: 676_287_269,
   init: 69_438_946,
-  image: 569_817_850,
+  image: 569_818_183,
 } as const;
 export const VM_DISK_PARTS = {
   runtime: 489_130_592,
