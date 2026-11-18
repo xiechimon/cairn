@@ -81,8 +81,12 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
    and `e2e-gate` green on the pushed commit — verified live: an untested
    `HEAD:main` push is rejected with "3 of 3 required status checks are
    expected". AGENTS.md ship steps switched to `queue/main` in the same change.
-3. Optional: an Actions-hosted promoter, batching policy, and prepush slimming
-   once the queue is the real gate.
+3. Done (2026-11-19): `.github/workflows/promote.yml` listens on
+   `workflow_run` for completed `ci` runs on `queue/**` and runs the same
+   promote predicate, so lanes do not need a local watcher. It pushes with
+   the `cairn-release` app token — GITHUB_TOKEN pushes cannot carry commits
+   that touch `.github/workflows` and would not re-trigger `desktop-release`.
+   Remaining optional work: batching policy and prepush slimming.
 
 ## Tests
 

@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 export const QUEUE_REF = 'refs/heads/queue/main';
 export const REQUIRED_CHECKS = ['check', 'pack-smoke', 'e2e-gate'];
 const POLL_SECONDS = 30;
-const WAIT_SECONDS = 40 * 60;
+const WAIT_SECONDS = Number(process.env.PROMOTE_WAIT_SECONDS ?? 40 * 60);
 
 export function evaluate({ queueHead, ciRuns, checkRuns, mainTip, candidateContainsMain }) {
   if (!queueHead) return { action: 'reject', reason: 'queue/main does not exist' };

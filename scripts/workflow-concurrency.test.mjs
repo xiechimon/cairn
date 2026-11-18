@@ -96,3 +96,14 @@ test('queue cancellation does not leak into main or other branches', () => {
   assert.equal(other.group, 'ci-push-refs/heads/feature-x-bbbbbbb');
   assert.equal(other.cancel, false);
 });
+
+test('promote listens for completed ci runs on queue refs and serializes promotions', () => {
+  const text = readFileSync(join(WORKFLOWS, 'promote.yml'), 'utf8');
+  assert.match(
+    text,
+    /workflow_run:\s*\n\s*workflows: \[ci\]\s*\n\s*types: \[completed\]\s*\n\s*branches: \['queue\/\*\*'\]/,
+  );
+  const { group, cancel } = concurrencyOf('promote');
+  assert.equal(group, 'promote-main');
+  assert.equal(cancel, 'false');
+});

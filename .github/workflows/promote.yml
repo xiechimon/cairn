@@ -1,0 +1,57 @@
+name: promote
+
+# Auto-promotes the queue/main head once its ci run is green. The workflow_run
+# trigger only fires for workflow files on the default branch, so this file is
+# trusted code; the queue ruleset still decides what may land on main.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: ['queue/**']
+
+concurrency:
+  group: promote-main
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Reuses the cairn-release app identity: GITHUB_TOKEN pushes cannot carry
+    # commits that touch .github/workflows and do not re-trigger downstream
+    # workflows (desktop-release), so the app token does the write while the
+    # job token only reads run and check state.
+    environment: desktop-release
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+
+      - name: Promote the queue head if its checks are green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROMOTE_WAIT_SECONDS: 180
+        run: |
+          set +e
+          node scripts/ops/promote-queue.mjs --wait
+          code=$?
+          set -e
+          # 2 = verdict wait: an older SHA finished while the head still runs;
+          # the head's own completion event will evaluate it again.
+          if [ "$code" -eq 2 ]; then exit 0; fi
+          exit "$code"
