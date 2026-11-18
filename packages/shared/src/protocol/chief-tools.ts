@@ -204,6 +204,7 @@ export const coordinatorCreateTodoParamsSchema = z
     platform: runnerOsSchema.optional(),
     lane: z.enum(TASK_REQUEST_LANES).optional(),
     briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
+    codeChangeQuote: z.string().trim().min(1).optional(),
   })
   .strict()
   .refine((params) => params.briefing === undefined || isInfoOutput(params.output), {
@@ -536,6 +537,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         briefing: str(
           'Only with a non-code output ("info", "report", "dataset", "link"). The concrete inputs you already have that the card needs and cannot get from the owner\'s words: links, names, ids, figures, what you found earlier in this conversation or with your own tools. Plain facts, copied exactly, no instructions and no plan. Inputs and facts for the work only: never housekeeping (correcting earlier runs, updating memory, archiving, stopping other tasks), which the card must not put in its report. An info card runs alone in its own computer and sees only the owner\'s cited words plus this briefing, so anything you leave out is lost to it.',
         ),
+        codeChangeQuote: str(
+          "Only when sourceTodoId is an info card and output is not an info kind: the owner's exact words in this turn that explicitly ask for a code change. Without them the call is refused; research and report work stays an info card.",
+        ),
         lane: str(
           'Optional "quick", only in an owner turn whose words state the outcome and whose project has a basis the server can check: this channel\'s project, the composer\'s picked project, a project the owner named, or one the owner chose in ask_user. The todo still runs in a thread through a PR and the merge gate; its session skips tests for data or copy edits. A basis that does not check out returns 400 and writes nothing; create it again without lane. Never in event turns ([wake:…]).',
         ),
@@ -579,11 +583,14 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'archive_todos',
     description:
-      'Archive todos: stop their running work, pause their schedules and put them away from the task lists. This is the only way to end a todo the user no longer wants: use it when the user says archive, close, drop or delete it. Set supersededBy when another todo replaces them. Reversible with unarchive_todos.',
+      'Archive todos: stop their running work, pause their schedules and put them away from the task lists. This is the only way to end a todo the user no longer wants: use it when the user says archive, close, drop or delete it. Set supersededBy when another todo replaces them; an info card is never superseded by a non-info todo unless the owner asked for a code change this turn. Reversible with unarchive_todos.',
     parameters: obj(
       {
         todoIds: idArr('Todo ids to archive.'),
         supersededBy: str('Optional id of the todo that replaces the archived ones.'),
+        codeChangeQuote: str(
+          "Only when archiving an info card in favour of a non-info todo: the owner's exact words in this turn that explicitly ask for a code change. Without them the call is refused; a failed info card is retried with message_thread, or ask the owner.",
+        ),
       },
       ['todoIds'],
     ),

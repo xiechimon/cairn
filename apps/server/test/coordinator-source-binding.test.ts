@@ -197,4 +197,31 @@ describe('Coordinator source bindings', () => {
       relay('create_todo', { projectId: H.projectId, messageIds: [id] }),
     ).rejects.toMatchObject({ status: 409 });
   });
+
+  test('superseding an info card with a code task is refused unless the owner asked for code', async () => {
+    const id = message('Survey the job listings in my signed-in browser.');
+    const card = (await relay('create_todo', {
+      projectId: H.projectId,
+      messageIds: [id],
+      output: 'info',
+    })) as { id: string };
+    const code = unstarted([message('Write REPORT.md')]);
+    await expect(
+      relay('archive_todos', { todoIds: [card.id], supersededBy: code.id }),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('stays an info card'),
+    });
+    await expect(
+      relay('create_todo', { projectId: H.projectId, sourceTodoId: card.id }),
+    ).rejects.toMatchObject({ status: 409 });
+    const ask = message('Please change the code to add a report exporter.');
+    await expect(
+      relay(
+        'archive_todos',
+        { todoIds: [card.id], supersededBy: code.id, codeChangeQuote: 'change the code' },
+        { turnMessageIds: [ask] },
+      ),
+    ).resolves.toBeDefined();
+  });
 });

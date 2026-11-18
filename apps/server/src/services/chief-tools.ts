@@ -71,7 +71,11 @@ import {
 import { suggestQuickReplies } from './chief-quick-replies.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
-import { createRequestTodo, updateRequestTodo } from './coordinator-request.js';
+import {
+  createRequestTodo,
+  refuseInfoCardReplacedByCode,
+  updateRequestTodo,
+} from './coordinator-request.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
@@ -726,6 +730,16 @@ export async function executeChiefTool(
     case 'archive_todos': {
       const supersededBy = optStr(params, 'supersededBy');
       const ids = strArr(params, 'todoIds');
+      if (supersededBy !== undefined) {
+        const replacement = requireTeamTodo(db, supersededBy, ctx.teamId);
+        refuseInfoCardReplacedByCode(
+          db,
+          { teamId: ctx.teamId, threadId: ctx.threadId, turnMessageIds: ctx.turnMessageIds },
+          ids,
+          replacement.output,
+          optStr(params, 'codeChangeQuote'),
+        );
+      }
       const finished = new Set(
         db
           .select({ id: todo.id })

@@ -4,6 +4,7 @@ import {
   type CoordinatorUpdateTodoParams,
   categoryFreeTaskInputSchema,
   derivePlaceholderTitle,
+  isInfoOutput,
   isIssueSourcedTask,
   orchestratedTodoIdOf,
   PLACEHOLDER_TITLE_FALLBACK,
@@ -139,6 +140,43 @@ function quickLaneBasis(
   throw new HttpError(
     400,
     `lane quick needs a checkable destination for project ${target.id}: create it in that project's channel, or have the owner name it or pick it; otherwise ask_user which project`,
+  );
+}
+
+export function refuseInfoCardReplacedByCode(
+  db: Db,
+  ctx: RequestCtx,
+  infoCandidateIds: readonly string[],
+  replacementOutput: string | null | undefined,
+  codeChangeQuote: string | undefined,
+): void {
+  if (isInfoOutput(replacementOutput ?? 'code') || infoCandidateIds.length === 0) return;
+  const infoCards = db
+    .select({ id: todo.id, output: todo.output })
+    .from(todo)
+    .where(and(eq(todo.teamId, ctx.teamId), inArray(todo.id, [...infoCandidateIds])))
+    .all()
+    .filter((row) => isInfoOutput(row.output));
+  if (infoCards.length === 0) return;
+  const turnWords = (ctx.turnMessageIds ?? []).length
+    ? db
+        .select()
+        .from(chiefMessage)
+        .where(
+          and(
+            eq(chiefMessage.threadId, ctx.threadId),
+            eq(chiefMessage.role, 'user'),
+            inArray(chiefMessage.id, [...(ctx.turnMessageIds ?? [])]),
+          ),
+        )
+        .all()
+        .flatMap((row) => (typeof row.content === 'string' ? [row.content.normalize('NFC')] : []))
+    : [];
+  const quote = codeChangeQuote?.normalize('NFC').trim();
+  if (quote && turnWords.some((words) => words.includes(quote))) return;
+  throw new HttpError(
+    409,
+    `Refused: info card ${infoCards.map((row) => row.id).join(', ')} cannot be replaced by a todo whose output is not info. Research, survey and report work stays an info card, even when a run failed or the card must reach a signed-in browser on another machine: a failed info card is retried with message_thread, or ask the owner with ask_user. A code task runs on the owner's own machine and cannot do the card's work. Nothing was changed. Only when the owner's own words in this turn explicitly ask for a code change, pass codeChangeQuote with those exact words.`,
   );
 }
 
@@ -400,6 +438,15 @@ export function createRequestTodo(
 ): TodoRecord & { uncovered?: string[] } {
   parseWith(categoryFreeTaskInputSchema, params, 'params');
   const { db } = deps;
+  if (params.sourceTodoId !== undefined) {
+    refuseInfoCardReplacedByCode(
+      db,
+      ctx,
+      [params.sourceTodoId],
+      params.output,
+      params.codeChangeQuote,
+    );
+  }
   const messageIds = params.messageIds ?? defaultQuoteIds(db, ctx);
   if (params.sourceTodoId === undefined && messageIds.length === 0) {
     throw new HttpError(400, NO_OWNER_WORDS);
