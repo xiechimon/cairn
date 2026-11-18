@@ -98,7 +98,7 @@ try {
   const teams = await teamsRes.json();
   const teamId = teams[0]?.id;
   if (!teamId) throw new Error('无 team');
-  const session = await (await fetch(`${SERVER}/api/auth/session`)).json();
+  const session = await (await fetch(`${SERVER}/api/user/me`)).json();
   saveJson('00-session.json', session);
 
   const prov = await sendJson(`${SERVER}/api/teams/${teamId}/providers`, {

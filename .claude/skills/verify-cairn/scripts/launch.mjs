@@ -138,7 +138,7 @@ async function main() {
     }
   };
 
-  await waitReady(`http://127.0.0.1:${SERVER_PORT}/api/auth/session`, 'server', 45_000);
+  await waitReady(`http://127.0.0.1:${SERVER_PORT}/api/user/me`, 'server', 240_000);
   await waitReady(`http://127.0.0.1:${WEB_PORT}/app`, 'vite dev', 60_000);
 
   writeFileSync(

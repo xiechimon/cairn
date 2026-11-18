@@ -67,9 +67,9 @@ const plainDir = tempDir('verify-plain-dir-');
 
 try {
 
-  const session = await api('GET', '/api/auth/session');
+  const session = await api('GET', '/api/user/me');
   payloads.session = session;
-  check(session.status === 200, `GET /api/auth/session → 200(实际 ${session.status})`);
+  check(session.status === 200, `GET /api/user/me → 200(实际 ${session.status})`);
 
   const missing = join(tempDir('verify-missing-base-'), 'no-such-dir');
   const rMissing = await api('POST', '/api/projects', {
