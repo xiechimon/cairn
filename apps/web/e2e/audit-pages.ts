@@ -18,6 +18,7 @@ export const PAGES: AuditPage[] = [
     name: 'search',
     url: '/app?scenario=01&pane=tasks&tab=scheduled',
     open: async (page) => {
+      await page.waitForSelector('.board-sidebar', { state: 'attached' });
       await pressAndExpect(page, 'Meta+k', searchDialog(page));
       await page.keyboard.type('probe');
     },
