@@ -7463,6 +7463,11 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
             "id": {
               "type": "string",
             },
+            "lastProgressAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
             "lastRunAt": {
               "anyOf": [
                 {
@@ -8115,6 +8120,8 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                   "enum": [
                     "machine",
                     "quota",
+                    "capacity",
+                    "strained",
                   ],
                   "type": "string",
                 },
@@ -11681,6 +11688,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                   "minimum": 0,
                   "type": "number",
                 },
+                "loadAvg5": {
+                  "minimum": 0,
+                  "type": "number",
+                },
                 "memoryAvailableMb": {
                   "maximum": 9007199254740991,
                   "minimum": 0,
@@ -12022,6 +12033,52 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
     "ownComputerEnabled": {
       "type": "boolean",
     },
+    "queued": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string",
+          },
+          "reason": {
+            "enum": [
+              "capacity",
+              "strained",
+              "quota",
+              "waiting",
+            ],
+            "type": "string",
+          },
+          "retryAt": {
+            "anyOf": [
+              {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+          "threadId": {
+            "type": "string",
+          },
+          "title": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "threadId",
+          "title",
+          "projectId",
+          "reason",
+          "retryAt",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "recommendedConcurrent": {
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
@@ -12031,6 +12088,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "items": {
         "additionalProperties": false,
         "properties": {
+          "lastProgressAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
           "projectId": {
             "type": "string",
           },
@@ -12060,6 +12122,17 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
       "type": "integer",
+    },
+    "strain": {
+      "items": {
+        "enum": [
+          "memory",
+          "load",
+          "disk",
+        ],
+        "type": "string",
+      },
+      "type": "array",
     },
     "teamId": {
       "type": "string",
@@ -13366,6 +13439,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
     "id": {
       "type": "string",
     },
+    "lastProgressAt": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
+    },
     "lastRunAt": {
       "anyOf": [
         {
@@ -14018,6 +14096,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
           "enum": [
             "machine",
             "quota",
+            "capacity",
+            "strained",
           ],
           "type": "string",
         },

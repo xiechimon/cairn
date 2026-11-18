@@ -292,6 +292,7 @@ export const step = sqliteTable(
     checkpointCommit: text('checkpointCommit'),
     claimedAt: epochMs('claimedAt'),
     lastHeartbeatAt: epochMs('lastHeartbeatAt'),
+    lastProgressAt: epochMs('lastProgressAt'),
     finishedAt: epochMs('finishedAt'),
     prompt: text('prompt'),
     promptOrigin: json<StepPromptOrigin>('promptOrigin'),

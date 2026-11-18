@@ -152,6 +152,19 @@ export const STEP_ACTIVITY_PHASES = [
 export const stepActivityPhaseSchema = z.enum(STEP_ACTIVITY_PHASES);
 export type StepActivityPhase = z.infer<typeof stepActivityPhaseSchema>;
 
+export const PROGRESS_ACTIVITY_PHASES: readonly StepActivityPhase[] = [
+  'thinking',
+  'responding',
+  'tool',
+  'compacting',
+];
+
+export const STALL_AFTER_MS = 15 * 60_000;
+
+export function isStalled(lastProgressAt: number, now: number): boolean {
+  return now - lastProgressAt >= STALL_AFTER_MS;
+}
+
 export const stepActivityReportSchema = z.object({
   phase: stepActivityPhaseSchema,
   tool: z.string().optional(),

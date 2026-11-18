@@ -92,19 +92,45 @@ function diskFreeMb(path: string): number | undefined {
   return read(path) ?? read('/');
 }
 
-export function probeMachineHardware(diskPath: string): MachineHardware | undefined {
+function availableMemoryMb(
+  totalMb: number,
+  platform: NodeJS.Platform,
+  readMemoryLevel: () => string,
+): number {
+  const freeMb = Math.max(0, Math.floor(freemem() / (1024 * 1024)));
+  if (platform !== 'darwin') return freeMb;
+  try {
+    const level = Number(readMemoryLevel().trim());
+    if (!Number.isInteger(level) || level < 0 || level > 100) return freeMb;
+    return Math.floor((totalMb * level) / 100);
+  } catch {
+    return freeMb;
+  }
+}
+
+export function probeMachineHardware(
+  diskPath: string,
+  platform: NodeJS.Platform = process.platform,
+  readMemoryLevel: () => string = () =>
+    execFileSync('sysctl', ['-n', 'kern.memorystatus_level'], {
+      encoding: 'utf8',
+      timeout: 2_000,
+    }),
+): MachineHardware | undefined {
   try {
     const cpuCores = cpus().length;
     if (!Number.isInteger(cpuCores) || cpuCores < 1) return undefined;
     const free = diskFreeMb(diskPath);
     if (free === undefined) return undefined;
-    const load = loadavg()[0];
+    const [load, load5] = loadavg();
     if (load === undefined || !Number.isFinite(load) || load < 0) return undefined;
+    const memoryTotalMb = Math.max(0, Math.floor(totalmem() / (1024 * 1024)));
     return {
       cpuCores,
-      memoryTotalMb: Math.max(0, Math.floor(totalmem() / (1024 * 1024))),
-      memoryAvailableMb: Math.max(0, Math.floor(freemem() / (1024 * 1024))),
+      memoryTotalMb,
+      memoryAvailableMb: availableMemoryMb(memoryTotalMb, platform, readMemoryLevel),
       loadAvg1: load,
+      ...(load5 !== undefined && Number.isFinite(load5) && load5 >= 0 ? { loadAvg5: load5 } : {}),
       diskFreeMb: free,
     };
   } catch {

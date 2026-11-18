@@ -35,6 +35,7 @@ import {
   type TodoOutputKind,
   type TodoOwner,
   type TodoSection,
+  type TodoWaitingOn,
   type TokenUsage,
   type UsageCost,
 } from '@cairn/shared';
@@ -85,7 +86,7 @@ export interface TodoRecord {
   blockedBy?: string[];
   v: number;
   chiefCreated?: boolean;
-  waitingOn?: { on: 'machine' | 'quota'; retryAt: number | null };
+  waitingOn?: TodoWaitingOn;
   quotaWait?: QuotaWait | null;
   sourceKind?: string | null;
   sourceRef?: string | null;

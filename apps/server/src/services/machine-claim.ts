@@ -61,6 +61,7 @@ import { readDeployLease } from './deploy-lease.js';
 import { enabledDevinSubscriptionId, hasActiveDevinSubscription } from './devin-subscriptions.js';
 import {
   capabilityGatePasses,
+  machineQueueReason,
   machineRunningCount,
   projectRunningCount,
   runtimeGatePasses,
@@ -441,7 +442,12 @@ async function tryClaim(
   if (!machineRow) return null;
   refreshClaudeRateParks(deps, teamId);
   const catalog = mergedCatalogModels();
-  const full = machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers);
+  const full =
+    machineQueueReason(
+      machineRow,
+      machineRunningCount(db, machineId),
+      workerCapOf(machineRow, maxWorkers),
+    ) !== null;
   const queued = full ? [] : claimCandidates(deps, machineId, teamId);
   const earliestWorker = queued[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
   const workerCands = [

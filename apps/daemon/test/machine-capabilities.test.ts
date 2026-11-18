@@ -186,6 +186,31 @@ describe('probeMachineHardware (#1241 capability fingerprint)', () => {
     );
   });
 
+  test('H5 macOS available memory is the kernel memory level share of total, not free pages', () => {
+    const hw = probeMachineHardware(tmpRoot(), 'darwin', () => '37\n')!;
+    expect(hw.memoryAvailableMb).toBe(Math.floor((hw.memoryTotalMb! * 37) / 100));
+  });
+
+  test('H5 macOS falls back to free memory when the memory level cannot be read', () => {
+    const failing = probeMachineHardware(tmpRoot(), 'darwin', () => {
+      throw new Error('sysctl missing');
+    })!;
+    const garbled = probeMachineHardware(tmpRoot(), 'darwin', () => 'n/a')!;
+    const total = failing.memoryTotalMb!;
+    expect(failing.memoryAvailableMb).toBeLessThanOrEqual(total);
+    expect(garbled.memoryAvailableMb).toBeLessThanOrEqual(total);
+  });
+
+  test('H5 Linux keeps os.freemem (MemAvailable) and never reads the macOS memory level', () => {
+    const readLevel = vi.fn(() => '1');
+    expect(probeMachineHardware(tmpRoot(), 'linux', readLevel)).toBeDefined();
+    expect(readLevel).not.toHaveBeenCalled();
+  });
+
+  test('H6 reports the 5-minute load average beside the 1-minute one', () => {
+    expect(probeMachineHardware(tmpRoot())!.loadAvg5).toBeGreaterThanOrEqual(0);
+  });
+
   test('H4 capability package merged into the fingerprint; one-shot probe and beat probe share the shape', () => {
     const root = tmpRoot();
     const once = probeMachineCapabilities({

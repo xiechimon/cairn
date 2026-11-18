@@ -10,6 +10,7 @@ import type {
   TodoRecord,
   TodoSection,
   TodoSourceKind,
+  TodoWaitingOn,
   UserRecord,
 } from '@cairn/shared';
 import {
@@ -53,7 +54,13 @@ import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { contextWindowOf } from './coordinator-context.js';
 import { assertCorrectionDone } from './correction.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
-import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
+import {
+  capabilityGatePasses,
+  type MachineQueueReason,
+  machineQueueReason,
+  machineRunningCount,
+  runtimeGatePasses,
+} from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import {
   claimEffect,
@@ -347,6 +354,7 @@ function todoRecordOf(
   now: number,
 ): TodoRecord & { section: TodoSection | null } {
   const waitingOn = waitingOnOf(deps, row);
+  const lastProgressAt = lastProgressOf(deps, row);
   const ownership = ownershipOf(deps.db, row);
   return {
     id: row.id,
@@ -379,6 +387,7 @@ function todoRecordOf(
     section: sectionOf(row, ownership, now),
     ...(waitingOn !== undefined ? { waitingOn } : {}),
     quotaWait,
+    ...(lastProgressAt !== undefined ? { lastProgressAt } : {}),
     ...(usage !== undefined && usage.rows > 0
       ? {
           usageCost: {
@@ -398,10 +407,21 @@ function todoRecordOf(
   };
 }
 
-function waitingOnOf(
-  deps: Pick<TodoDeps, 'db'>,
-  row: TodoRow,
-): { on: 'machine' | 'quota'; retryAt: number | null } | undefined {
+function lastProgressOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): number | undefined {
+  if (row.latestBuildId === null) return undefined;
+  const claimed = deps.db
+    .select({ lastProgressAt: step.lastProgressAt, claimedAt: step.claimedAt })
+    .from(step)
+    .where(and(eq(step.buildId, row.latestBuildId), eq(step.status, 'claimed')))
+    .all();
+  const times = claimed.flatMap((s) => {
+    const at = s.lastProgressAt ?? s.claimedAt;
+    return at === null ? [] : [at];
+  });
+  return times.length === 0 ? undefined : Math.max(...times);
+}
+
+function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | undefined {
   if (!(IN_PROGRESS_PHASES as readonly string[]).includes(row.phase) || row.latestBuildId === null)
     return undefined;
   const pendingSteps = deps.db
@@ -422,6 +442,7 @@ function waitingOnOf(
   const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
   const sole =
     teamDefaultMachineId(deps.db, row.teamId) ?? soleOnlineMachineId(online.map((m) => m.id));
+  let queueReason: MachineQueueReason | null = null;
   for (const s of pendingSteps) {
     const agentRow = profileForStep(deps.db, row, s.kind, s.id);
     if (agentRow === null) continue;
@@ -442,18 +463,16 @@ function waitingOnOf(
         ? prior.priorMachineId
         : (agentRow.machineId ?? sole);
     const provider = s.fallback?.model?.provider ?? agentRow.provider;
-    const runnable =
-      named !== null &&
-      online.some(
-        (m) =>
-          m.id === named && runtimeGatePasses(m, provider) && capabilityGatePasses(m, agentRow),
-      );
-    if (!runnable) return { on: 'machine', retryAt: null };
+    const target = online.find(
+      (m) => m.id === named && runtimeGatePasses(m, provider) && capabilityGatePasses(m, agentRow),
+    );
+    if (target === undefined) return { on: 'machine', retryAt: null };
+    queueReason ??= machineQueueReason(target, machineRunningCount(deps.db, target.id));
   }
   if (online.length === 0) {
     return { on: 'machine', retryAt: null };
   }
-  return undefined;
+  return queueReason === null ? undefined : { on: queueReason, retryAt: null };
 }
 
 function archiveWithPhase(

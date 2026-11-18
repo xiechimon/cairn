@@ -14,6 +14,7 @@ import {
   importSkillBodySchema,
   type MachineFolderGrants,
   type MachineRunningThread,
+  machineStrain,
   PHASE_VALUES,
   patchMachineBodySchema,
   patchMcpConnectorBodySchema,
@@ -190,6 +191,7 @@ import {
   scanLocalSkills,
   updateLocalSkill,
 } from './services/skills.js';
+import { queuedThreadsByMachine } from './services/step-queue.js';
 import { pollXaiDeviceLogin, startXaiDeviceLogin } from './services/xai-device-login.js';
 
 export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
@@ -275,10 +277,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, id);
     const rows = ctx.db.select().from(machine).where(eq(machine.teamId, id)).all();
     const running = runningThreadsByMachine(ctx.db, id);
+    const queued = queuedThreadsByMachine(ctx.db, id);
     return c.json(
       rows.map((r) => ({
         ...toMachineRecord(r, machineRunningCount(ctx.db, r.id)),
         running: running.get(r.id) ?? [],
+        queued: queued.get(r.id) ?? [],
+        strain: machineStrain(r.capabilities?.hardware),
       })),
     );
   });
@@ -1262,6 +1267,7 @@ function runningThreadsByMachine(db: Db, teamId: string): Map<string, MachineRun
       title: todo.title,
       projectId: todo.projectId,
       claimedAt: step.claimedAt,
+      lastProgressAt: step.lastProgressAt,
       createdAt: step.createdAt,
     })
     .from(step)
@@ -1280,6 +1286,7 @@ function runningThreadsByMachine(db: Db, teamId: string): Map<string, MachineRun
   const grouped = new Map<string, MachineRunningThread[]>();
   for (const row of rows) {
     const startedAt = row.claimedAt ?? row.createdAt;
+    const lastProgressAt = row.lastProgressAt ?? startedAt;
     const threads = grouped.get(row.machineId) ?? [];
     const listed = threads.find((thread) => thread.threadId === row.threadId);
     if (listed === undefined) {
@@ -1288,10 +1295,12 @@ function runningThreadsByMachine(db: Db, teamId: string): Map<string, MachineRun
         title: row.title,
         projectId: row.projectId,
         startedAt,
+        lastProgressAt,
       });
       grouped.set(row.machineId, threads);
-    } else if (startedAt < listed.startedAt) {
-      listed.startedAt = startedAt;
+    } else {
+      listed.startedAt = Math.min(listed.startedAt, startedAt);
+      listed.lastProgressAt = Math.max(listed.lastProgressAt ?? 0, lastProgressAt);
     }
   }
   for (const threads of grouped.values()) threads.sort((a, b) => a.startedAt - b.startedAt);

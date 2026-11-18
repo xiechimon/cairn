@@ -129,11 +129,12 @@ export const todoRecordSchema = z.object({
   section: todoSectionSchema.nullable().optional(),
   waitingOn: z
     .object({
-      on: z.enum(['machine', 'quota']),
+      on: z.enum(['machine', 'quota', 'capacity', 'strained']),
       retryAt: epochMs.nullable(),
     })
     .optional(),
   quotaWait: quotaWaitSchema.nullable().optional(),
+  lastProgressAt: epochMs.optional(),
   usageCost: usageCostSchema.optional(),
   context: z
     .object({

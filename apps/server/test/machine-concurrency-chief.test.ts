@@ -271,6 +271,39 @@ describe('#1260 chief steps occupy concurrency slots (capacity gate)', () => {
   });
 });
 
+describe('runner strain does not hold Coordinator turns (docs/design/runner-strain-and-progress.md)', () => {
+  test('a strained busy computer still claims a Coordinator turn but not a task', async () => {
+    const w = await setupWorld();
+    setCap(w, 4);
+    const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineAId)).get()!;
+    w.s.db
+      .update(machineTable)
+      .set({
+        capabilities: {
+          ...row.capabilities!,
+          hardware: {
+            cpuCores: 8,
+            memoryTotalMb: 16_384,
+            memoryAvailableMb: 300,
+            loadAvg1: 1,
+            loadAvg5: 1,
+            diskFreeMb: 100_000,
+          },
+        },
+      })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
+    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
+    const worker = insertPendingBuildStep(w.s, w);
+    const chiefStepId = insertPendingChiefStep(w.s, { createdAt: Date.now() });
+    expect((await claimAs(w))?.step.id).toBe(chiefStepId);
+    expect(await claimAs(w)).toBeNull();
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, worker)).get()!.status).toBe(
+      'pending',
+    );
+  });
+});
+
 describe('#1260 read-surface semantics (runningSteps includes running chiefs)', () => {
   test('failure mode 3: me / machine list runningSteps includes chief', async () => {
     const w = await setupWorld();

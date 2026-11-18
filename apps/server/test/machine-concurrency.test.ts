@@ -1,4 +1,4 @@
-import { machineRecordSchema } from '@cairn/shared';
+import { type MachineHardware, type MachineStrainReason, machineRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -12,8 +12,9 @@ import {
 } from '../src/db/schema.js';
 import { listSteps } from '../src/services/builds.js';
 import { listChiefThreads } from '../src/services/chief.js';
-import { claimStep } from '../src/services/machines.js';
+import { claimStep, markPresence, reportActivity, reportTool } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
+import { toTodoRecord } from '../src/services/todos.js';
 import {
   bootServer,
   issueApiKey,
@@ -393,5 +394,220 @@ describe('#1108 write surface and wire contract (PATCH validation / record proje
     expect(res.status).toBe(200);
     expect(wake).toHaveBeenCalledWith(w.s.team.id);
     wake.mockRestore();
+  });
+});
+
+const CALM: MachineHardware = {
+  cpuCores: 8,
+  memoryTotalMb: 16_384,
+  memoryAvailableMb: 8_000,
+  loadAvg1: 2,
+  loadAvg5: 2,
+  diskFreeMb: 100_000,
+};
+
+function setHardware(w: World, hardware: MachineHardware): void {
+  const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineAId)).get()!;
+  w.s.db
+    .update(machineTable)
+    .set({ capabilities: { ...row.capabilities!, hardware } })
+    .where(eq(machineTable.id, w.machineAId))
+    .run();
+}
+
+function pendingTask(w: World) {
+  const ids = insertPendingBuildStep(w.s, w);
+  w.s.db
+    .update(todoTable)
+    .set({ latestBuildId: ids.buildId })
+    .where(eq(todoTable.id, ids.todoId))
+    .run();
+  return ids;
+}
+
+function todoRowOf(w: World, todoId: string) {
+  return w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!;
+}
+
+async function machineListRow(w: World) {
+  const res = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/machines`);
+  const rows = machineRecordSchema.array().parse(await res.json());
+  return rows.find((r) => r.id === w.machineAId)!;
+}
+
+describe('runner strain gate and queue reasons (docs/design/runner-strain-and-progress.md)', () => {
+  const strained: [string, Partial<MachineHardware>, MachineStrainReason][] = [
+    ['memory below 10% available', { memoryAvailableMb: 1_500 }, 'memory'],
+    ['5-minute load above the core count', { loadAvg5: 9.5 }, 'load'],
+    ['disk below 5 GB free', { diskFreeMb: 4_000 }, 'disk'],
+  ];
+  for (const [label, patch, reason] of strained) {
+    test(`${label}: a busy computer under its cap holds the next task and says strained`, async () => {
+      const w = await setupWorld();
+      setCap(w, 4);
+      setHardware(w, { ...CALM, ...patch });
+      insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
+      const { stepId, todoId } = pendingTask(w);
+      expect(await claimAs(w)).toBeNull();
+      expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!.status).toBe(
+        'pending',
+      );
+      expect(toTodoRecord(w.s.svc, todoRowOf(w, todoId)).waitingOn).toEqual({
+        on: 'strained',
+        retryAt: null,
+      });
+      const listed = await machineListRow(w);
+      expect(listed.strain).toEqual([reason]);
+      expect(listed.queued).toEqual([
+        expect.objectContaining({ threadId: todoId, reason: 'strained', retryAt: null }),
+      ]);
+    });
+  }
+
+  test('memory at exactly the threshold edge: 10% available is not strained', async () => {
+    const w = await setupWorld();
+    setCap(w, 4);
+    setHardware(w, { ...CALM, memoryAvailableMb: 1_639 });
+    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
+    const { stepId } = pendingTask(w);
+    expect((await claimAs(w))?.step.id).toBe(stepId);
+  });
+
+  test('a strained computer running nothing still starts one task', async () => {
+    const w = await setupWorld();
+    setCap(w, 4);
+    setHardware(w, { ...CALM, memoryAvailableMb: 200 });
+    const { stepId } = pendingTask(w);
+    pendingTask(w);
+    expect((await claimAs(w))?.step.id).toBe(stepId);
+    expect(await claimAs(w)).toBeNull();
+  });
+
+  test('an old Runner without the 5-minute load is never load-strained', async () => {
+    const w = await setupWorld();
+    setCap(w, 4);
+    const { loadAvg5: _omitted, ...legacy } = CALM;
+    setHardware(w, { ...legacy, loadAvg1: 40 });
+    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
+    const { stepId } = pendingTask(w);
+    expect((await claimAs(w))?.step.id).toBe(stepId);
+  });
+
+  test('a full computer says capacity, before strain', async () => {
+    const w = await setupWorld();
+    setCap(w, 1);
+    setHardware(w, { ...CALM, memoryAvailableMb: 200 });
+    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
+    const { todoId } = pendingTask(w);
+    expect(toTodoRecord(w.s.svc, todoRowOf(w, todoId)).waitingOn).toEqual({
+      on: 'capacity',
+      retryAt: null,
+    });
+    expect((await machineListRow(w)).queued).toEqual([
+      expect.objectContaining({ threadId: todoId, reason: 'capacity' }),
+    ]);
+  });
+
+  test('a calm computer with a free slot reports no queue reason', async () => {
+    const w = await setupWorld();
+    setCap(w, 3);
+    setHardware(w, CALM);
+    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
+    const { todoId } = pendingTask(w);
+    expect(toTodoRecord(w.s.svc, todoRowOf(w, todoId)).waitingOn).toBeUndefined();
+    const listed = await machineListRow(w);
+    expect(listed.strain).toEqual([]);
+    expect(listed.queued).toEqual([
+      expect.objectContaining({ threadId: todoId, reason: 'waiting' }),
+    ]);
+  });
+});
+
+describe('step last progress (docs/design/runner-strain-and-progress.md)', () => {
+  async function running(w: World) {
+    setCap(w, 3);
+    const { stepId, todoId } = pendingTask(w);
+    expect((await claimAs(w))?.step.id).toBe(stepId);
+    const read = () => w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+    const setProgress = (at: number | null) =>
+      w.s.db.update(stepTable).set({ lastProgressAt: at }).where(eq(stepTable.id, stepId)).run();
+    return { stepId, todoId, read, setProgress };
+  }
+
+  test('a running task counts from its claim until it reports progress', async () => {
+    const w = await setupWorld();
+    const r = await running(w);
+    expect(r.read().lastProgressAt).toBeNull();
+    const record = toTodoRecord(w.s.svc, todoRowOf(w, r.todoId));
+    expect(record.lastProgressAt).toBe(r.read().claimedAt);
+    expect((await machineListRow(w)).running?.[0]?.lastProgressAt).toBe(r.read().claimedAt);
+  });
+
+  test('waiting on the model or retrying is not progress; thinking and tool calls are', async () => {
+    const w = await setupWorld();
+    const r = await running(w);
+    const deps = machineDepsOf(w);
+    reportActivity(deps, w.machineAId, r.stepId, { phase: 'awaiting_model' });
+    reportActivity(deps, w.machineAId, r.stepId, { phase: 'retrying', attempt: 2 });
+    expect(r.read().lastProgressAt).toBeNull();
+    const before = Date.now();
+    reportActivity(deps, w.machineAId, r.stepId, { phase: 'thinking' });
+    expect(r.read().lastProgressAt).toBeGreaterThanOrEqual(before);
+    r.setProgress(1_000);
+    reportTool(deps, w.machineAId, r.stepId, {
+      id: `call-${r.stepId}`,
+      name: 'bash',
+      arguments: { command: 'ls' },
+      startedAt: before,
+      endedAt: before + 10,
+    });
+    expect(r.read().lastProgressAt).toBeGreaterThanOrEqual(before);
+    expect(toTodoRecord(w.s.svc, todoRowOf(w, r.todoId)).lastProgressAt).toBe(
+      r.read().lastProgressAt,
+    );
+  });
+
+  test('progress writes at most once per 30 seconds per step', async () => {
+    const w = await setupWorld();
+    const r = await running(w);
+    const deps = machineDepsOf(w);
+    const recent = Date.now() - 10_000;
+    r.setProgress(recent);
+    reportActivity(deps, w.machineAId, r.stepId, { phase: 'responding' });
+    expect(r.read().lastProgressAt).toBe(recent);
+    const stale = Date.now() - 31_000;
+    r.setProgress(stale);
+    reportActivity(deps, w.machineAId, r.stepId, { phase: 'responding' });
+    expect(r.read().lastProgressAt).toBeGreaterThan(stale);
+  });
+});
+
+describe('strain changes reach subscribed clients', () => {
+  test('presence publishes machine_presence when strain starts and clears, not on an unchanged report', async () => {
+    const w = await setupWorld();
+    setHardware(w, CALM);
+    const events: object[] = [];
+    w.s.hub.subscribe(w.s.team.id, {
+      nextSeq: () => 1,
+      send: async (event: object) => {
+        events.push(event);
+      },
+    });
+    const capabilities = w.s.db
+      .select()
+      .from(machineTable)
+      .where(eq(machineTable.id, w.machineAId))
+      .get()!.capabilities!;
+    const report = (hardware: MachineHardware) =>
+      markPresence(machineDepsOf(w), w.machineAId, { capabilities: { ...capabilities, hardware } });
+    report({ ...CALM, memoryAvailableMb: 7_000 });
+    expect(events).toEqual([]);
+    report({ ...CALM, memoryAvailableMb: 900 });
+    report({ ...CALM, memoryAvailableMb: 800 });
+    report(CALM);
+    expect(events).toEqual([
+      { type: 'machine_presence', machineId: w.machineAId, online: true },
+      { type: 'machine_presence', machineId: w.machineAId, online: true },
+    ]);
   });
 });

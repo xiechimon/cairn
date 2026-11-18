@@ -19,6 +19,8 @@ import {
   confinementEnforced,
   isActiveStepStatus,
   machineRecordSchema,
+  machineStrain,
+  PROGRESS_ACTIVITY_PHASES,
   parseReportedCapabilities,
 } from '@cairn/shared';
 import { and, asc, eq, isNotNull, isNull, lt, ne } from 'drizzle-orm';
@@ -507,19 +509,25 @@ export function markPresence(
     (row.capabilities?.confinement ? { ...row.capabilities, confinement: undefined } : undefined);
   const folderGrants =
     body.folders !== undefined ? applyFolderReport(row.folderGrants, body.folders) : undefined;
+  const concurrency =
+    capabilities !== undefined ? reportedConcurrencyPatch(row, capabilities) : undefined;
   db.update(machine)
     .set({
       ...(admitOnline ? { online: true } : {}),
       lastSeenAt: nowMs(),
       ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
-      ...(capabilities !== undefined ? reportedConcurrencyPatch(row, capabilities) : {}),
+      ...(concurrency !== undefined ? concurrency : {}),
       ...(folderGrants !== undefined ? { folderGrants } : {}),
     })
     .where(eq(machine.id, machineId))
     .run();
+  const strainChanged =
+    concurrency !== undefined &&
+    machineStrain(row.capabilities?.hardware).join() !==
+      machineStrain(concurrency.capabilities.hardware).join();
   const computerChanged = applyComputerPresence(db, machineId, row.teamId, body.computers, nowMs());
-  if (becameOnline || loginChanged || computerChanged) {
+  if (becameOnline || loginChanged || computerChanged || strainChanged) {
     const online = admitOnline || row.online;
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online }));
   }
@@ -598,6 +606,18 @@ export function heartbeatStep(deps: MachineDeps, machineId: string | null, stepI
   deps.db.update(step).set({ lastHeartbeatAt: nowMs() }).where(eq(step.id, row.id)).run();
 }
 
+const PROGRESS_WRITE_INTERVAL_MS = 30_000;
+
+function markProgress(
+  deps: Pick<MachineDeps, 'db'>,
+  row: Pick<typeof step.$inferSelect, 'id' | 'status' | 'lastProgressAt'>,
+): void {
+  const now = nowMs();
+  if (row.status !== 'claimed') return;
+  if (row.lastProgressAt !== null && now - row.lastProgressAt < PROGRESS_WRITE_INTERVAL_MS) return;
+  deps.db.update(step).set({ lastProgressAt: now }).where(eq(step.id, row.id)).run();
+}
+
 export function reportTool(
   deps: MachineDeps,
   machineId: string,
@@ -605,6 +625,7 @@ export function reportTool(
   call: ToolCallRecord,
 ): void {
   const row = ownedStep(deps, machineId, stepId);
+  markProgress(deps, row);
   const messageRow = {
     id: call.id,
     role: 'assistant' as const,
@@ -626,6 +647,7 @@ export function reportTranscriptDelta(
 ): void {
   const row = ownedStep(deps, machineId, stepId);
   if (text === '') return;
+  markProgress(deps, row);
   deps.convHub?.publishTextDelta(row.buildId, text);
 }
 
@@ -637,6 +659,7 @@ export function reportThinkingDelta(
 ): void {
   const row = ownedStep(deps, machineId, stepId);
   if (text === '') return;
+  markProgress(deps, row);
   deps.convHub?.publishThinkingDelta(row.buildId, text);
 }
 
@@ -647,6 +670,7 @@ export function reportTranscriptRow(
   row: TranscriptRow,
 ): void {
   const owned = ownedStep(deps, machineId, stepId);
+  markProgress(deps, owned);
   if (isChiefConversation(owned.buildId)) {
     upsertChiefRow(deps, {
       id: row.id,
@@ -673,6 +697,7 @@ export function reportActivity(
   report: StepActivityReport,
 ): void {
   const row = ownedStep(deps, machineId, stepId);
+  if (PROGRESS_ACTIVITY_PHASES.includes(report.phase)) markProgress(deps, row);
   deps.convHub?.publishActivity(row.buildId, { ...report, stepId, at: nowMs() });
 }
 

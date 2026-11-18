@@ -6,9 +6,34 @@ export const machineHardwareSchema = z.object({
   memoryTotalMb: z.number().int().nonnegative().optional(),
   memoryAvailableMb: z.number().int().nonnegative(),
   loadAvg1: z.number().nonnegative(),
+  loadAvg5: z.number().nonnegative().optional(),
   diskFreeMb: z.number().int().nonnegative(),
 });
 export type MachineHardware = z.infer<typeof machineHardwareSchema>;
+
+export const MACHINE_STRAIN_REASONS = ['memory', 'load', 'disk'] as const;
+export const machineStrainReasonSchema = z.enum(MACHINE_STRAIN_REASONS);
+export type MachineStrainReason = z.infer<typeof machineStrainReasonSchema>;
+
+export const STRAIN_MEMORY_AVAILABLE_RATIO = 0.1;
+export const STRAIN_DISK_FREE_MB = 5 * 1024;
+
+export function machineStrain(hardware: MachineHardware | null | undefined): MachineStrainReason[] {
+  if (hardware == null) return [];
+  const reasons: MachineStrainReason[] = [];
+  if (
+    hardware.memoryTotalMb !== undefined &&
+    hardware.memoryTotalMb > 0 &&
+    hardware.memoryAvailableMb < hardware.memoryTotalMb * STRAIN_MEMORY_AVAILABLE_RATIO
+  ) {
+    reasons.push('memory');
+  }
+  if (hardware.loadAvg5 !== undefined && hardware.loadAvg5 > hardware.cpuCores) {
+    reasons.push('load');
+  }
+  if (hardware.diskFreeMb < STRAIN_DISK_FREE_MB) reasons.push('disk');
+  return reasons;
+}
 
 export const machineExecutorSchema = z.enum(['orb', 'host']);
 export type MachineExecutor = z.infer<typeof machineExecutorSchema>;

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { claudeLoginSchema } from './claude-login.js';
 import { epochMs, recordId } from './common.js';
-import { machineCapabilitiesSchema } from './machine-capabilities.js';
+import { machineCapabilitiesSchema, machineStrainReasonSchema } from './machine-capabilities.js';
 
 export const MACHINE_RUNTIMES = ['pi', 'claude-code', 'gemini', 'devin'] as const;
 export type MachineRuntime = (typeof MACHINE_RUNTIMES)[number];
@@ -11,8 +11,18 @@ export const machineRunningThreadSchema = z.object({
   title: z.string(),
   projectId: recordId,
   startedAt: epochMs,
+  lastProgressAt: epochMs.optional(),
 });
 export type MachineRunningThread = z.infer<typeof machineRunningThreadSchema>;
+
+export const machineQueuedThreadSchema = z.object({
+  threadId: recordId,
+  title: z.string(),
+  projectId: recordId,
+  reason: z.enum(['capacity', 'strained', 'quota', 'waiting']),
+  retryAt: epochMs.nullable(),
+});
+export type MachineQueuedThread = z.infer<typeof machineQueuedThreadSchema>;
 
 export const MACHINE_FOLDER_PATH_MAX = 4096;
 export const MACHINE_FOLDER_PINS_LIMIT = 64;
@@ -51,6 +61,8 @@ export const machineRecordSchema = z.object({
   concurrencySource: z.enum(['measured', 'estimate', 'manual']).optional(),
   runningSteps: z.number().int().optional(),
   running: z.array(machineRunningThreadSchema).optional(),
+  queued: z.array(machineQueuedThreadSchema).optional(),
+  strain: z.array(machineStrainReasonSchema).optional(),
   capabilities: machineCapabilitiesSchema.nullish(),
   browserOverride: z.boolean().nullable().optional(),
   desktopOverride: z.boolean().nullable().optional(),

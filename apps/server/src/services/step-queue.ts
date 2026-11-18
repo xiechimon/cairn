@@ -4,13 +4,14 @@ import {
   isBuildStepKind,
   isChiefDigestThreadId,
   isInfoOutput,
+  type MachineQueuedThread,
   MODEL_SOURCE_RUNTIME_LABELS,
   parseLocalMergeInstruction,
   RUNNER_OS_LABELS,
   type StepQueueBlocked,
   type StepQueueInfo,
 } from '@cairn/shared';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, routingRule, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
@@ -21,6 +22,7 @@ import { type CoordinatorRouteRefusal, coordinatorRouteVerdict } from './coordin
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import {
   type MachineIneligibility,
+  machineQueueReason,
   missingCapabilities,
   runtimeGatePasses,
   stepRuntimeFor,
@@ -392,4 +394,51 @@ export function stepQueueProjector(db: Db, teamId: string) {
   }
 
   return { project, pendingChiefOf, chiefTurnQueueOf };
+}
+
+export function queuedThreadsByMachine(db: Db, teamId: string): Map<string, MachineQueuedThread[]> {
+  const rows = db
+    .select({ stepRow: step, todoRow: todo })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .innerJoin(todo, eq(build.todoId, todo.id))
+    .where(and(eq(step.status, 'pending'), eq(todo.teamId, teamId), isNull(todo.archivedAt)))
+    .orderBy(asc(step.createdAt), sql`${step}.rowid`)
+    .all();
+  const machines = new Map(
+    db
+      .select()
+      .from(machine)
+      .where(eq(machine.teamId, teamId))
+      .all()
+      .map((row) => [row.id, row]),
+  );
+  const projector = stepQueueProjector(db, teamId);
+  const grouped = new Map<string, MachineQueuedThread[]>();
+  for (const { stepRow, todoRow } of rows) {
+    const queue = projector.project({
+      id: stepRow.id,
+      createdAt: stepRow.createdAt,
+      homeMachineId: profileForStep(db, todoRow, stepRow.kind, stepRow.id)?.machineId ?? null,
+      holdReason: stepRow.holdReason,
+      holdUntil: stepRow.holdUntil,
+    });
+    const waitingFor = queue?.waitingFor;
+    const machineRow = waitingFor == null ? undefined : machines.get(waitingFor.machineId);
+    if (waitingFor == null || machineRow === undefined) continue;
+    const threads = grouped.get(machineRow.id) ?? [];
+    if (threads.some((thread) => thread.threadId === todoRow.id)) continue;
+    threads.push({
+      threadId: todoRow.id,
+      title: todoRow.title,
+      projectId: todoRow.projectId,
+      reason:
+        queue?.hold !== undefined
+          ? 'quota'
+          : (machineQueueReason(machineRow, waitingFor.running, waitingFor.capacity) ?? 'waiting'),
+      retryAt: queue?.hold?.retryAt ?? null,
+    });
+    grouped.set(machineRow.id, threads);
+  }
+  return grouped;
 }
