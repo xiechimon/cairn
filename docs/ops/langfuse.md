@@ -2,22 +2,22 @@
 
 OTel is the outward data format. Self-hosted Langfuse is only responsible for viewing and annotating (traces, scores, the annotation queue, experiment comparisons). The local sqlite + trajectory packs remain the only source of truth; replay, grading statistics, CI gates, and the harness self-improvement loop do not go through here.
 
-This is an optional developer-side component; the compose lives in `ops/langfuse/` and **does not enter the product install path**. Cairn itself does not depend on this stack, and behavior is unchanged when it is not configured. Langfuse Cloud is not used.
+This is an optional developer-side component; the compose lives in `ops/langfuse/` and **does not enter the product install path**. Cairn itself does not depend on this stack, and behavior is unchanged when it is not configured. The OTLP endpoint accepts any Langfuse target: this compose is the self-hosted path, and Langfuse Cloud works too — ian's dev environment currently sends to a Cloud project (2026-11-18).
 
-The default deployment machine is **omarchy** (always on). Any other always-on machine follows the same steps.
+ian's previous deployment lived on **omarchy**; it was torn down on 2026-11-18. Any always-on machine follows the same steps.
 
 Comparison: the official compose uses floating tags (`langfuse:4`, `clickhouse-server:25.12`, `redis:7`). This repo pins exact versions; see "Pinned images" at the end.
 
 ## Environment prerequisites
 
 - Docker Engine + the Compose v2 plugin.
-- Recommended: 4 cores, 8 GiB of memory, and about 15 GiB of free disk dedicated to this stack (the official public-VM sizing is 16 GiB RAM / 100 GiB disk, which targets high traffic; omarchy local development does not need that).
+- Recommended: 4 cores, 8 GiB of memory, and about 15 GiB of free disk dedicated to this stack (the official public-VM sizing is 16 GiB RAM / 100 GiB disk, which targets high traffic; local development does not need that).
 - Host ports `3000` (UI + OTLP) and `9090` (MinIO, only used when the browser uploads media) must be free. On conflict, change `LANGFUSE_WEB_PORT` / `MINIO_API_PORT` in `.env`, and update `NEXTAUTH_URL` and `LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT` accordingly.
 - All published ports bind to `BIND_ADDRESS` (default `127.0.0.1`). Postgres / ClickHouse / Redis / the worker are not published; they only talk on the compose network.
 
-## Starting the stack (omarchy)
+## Starting the stack
 
-On omarchy, from the repo root:
+On the deployment host, from the repo root:
 
 ```sh
 cd ops/langfuse
@@ -180,7 +180,7 @@ pnpm traj:shadow --since-hours 2 --settle-minutes 30
 
 It looks at units that ended between `since-hours + settle-minutes` and `settle-minutes` ago, skips units that already have a digest, and prints `units= digests= skipped_already_digested= cost_scores= question_units=`. `--dry-run` writes nothing. Run it at least as often as `--since-hours`; overlapping windows are safe.
 
-On omarchy the systemd user timer `cairn-langfuse-shadow.timer` runs it hourly from the deployed checkout `~/Code/AgentProjects/cairn-exec` with `--since-hours 2 --settle-minutes 30`. The service reads its variables from `~/.config/cairn/langfuse-shadow.env` (mode 600) and appends to `~/.local/state/cairn-langfuse/shadow.log`.
+ian's omarchy deployment ran the `cairn-langfuse-shadow.timer` systemd user timer hourly from the deployed checkout `~/Code/AgentProjects/cairn-exec` with `--since-hours 2 --settle-minutes 30`; the unit read its variables from `~/.config/cairn/langfuse-shadow.env` (mode 600) and appended to `~/.local/state/cairn-langfuse/shadow.log`. Install the same unit on the next deployment host to resume it.
 
 The digest is the input of the `step digest` observation, at most 6,000 characters (about 1.5k tokens; generation inputs average 119k tokens, so the judges never see a raw trace). It holds the task title, the outcome and error, the last 12 phase transitions of the trace, idle minutes after the unit or the gap to the next one, counts computed in code (tool calls, tool errors, edits, the largest number of identical calls and identical failures, cost), the last 15 tool calls with errors, and the text of `ask_user` questions. It passes through `redactSecrets`. Its metadata carries `unit` and `has_owner_question`.
 
@@ -191,7 +191,7 @@ Scores written by the job (source `API`, attached to the unit's span):
 | `step_error` | 1 when the unit span ended in `ERROR`, else 0. Its daily mean is the error rate. |
 | `cost_z` | (unit cost − mean) / sd over units of the same kind on the same model that ended in the 7 days before it. Units without priced generations are skipped; fewer than 5 baseline units or a flat baseline writes nothing. The comment names cost, mean, sd and n. |
 
-Langfuse configuration on omarchy (project `cairn-local`), all created through the public API:
+Langfuse configuration on ian's former omarchy deployment (project `cairn-local`, torn down 2026-11-18), all created through the public API:
 
 | Object | Setting |
 |---|---|
@@ -336,20 +336,20 @@ The evaluator can write only to its 16 MiB `/tmp`. The environment it can read h
 
 ## Binding to this machine or the LAN
 
-By default `BIND_ADDRESS=127.0.0.1`, so only processes on omarchy itself can reach the UI and OTLP.
+By default `BIND_ADDRESS=127.0.0.1`, so only processes on the deployment host itself can reach the UI and OTLP.
 
-When another dev machine needs to view it over the LAN, set `BIND_ADDRESS` to omarchy's LAN address (for example `10.0.0.12`) and also change:
+When another dev machine needs to view it over the LAN, set `BIND_ADDRESS` to the host's LAN address (for example `10.0.0.12`) and also change:
 
 ```
 NEXTAUTH_URL=http://10.0.0.12:3000
 LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT=http://10.0.0.12:9090
 ```
 
-`NEXTAUTH_URL` must equal the origin you open in the browser, otherwise the login callback breaks. Do not bind `0.0.0.0` to the public internet; do not use Langfuse Cloud. After rebinding, run `docker compose up -d` to recreate the port mappings for web / minio.
+`NEXTAUTH_URL` must equal the origin you open in the browser, otherwise the login callback breaks. Do not bind `0.0.0.0` to the public internet. After rebinding, run `docker compose up -d` to recreate the port mappings for web / minio.
 
 ## Exporting from the Mac desktop app
 
-The packaged Mac app reads its export settings from `~/Library/Application Support/@cairn/desktop/otel.env` (mode `0600`, the same three `CAIRN_OTEL_*` keys; see `apps/desktop/README.md`). Langfuse stays bound to loopback on omarchy; Tailscale Serve publishes it to the tailnet only, so the Mac's endpoint is `https://<omarchy tailnet name>:8443/api/public/otel` with the same ingestion header as the server. Leave `CAIRN_OTEL_ENVIRONMENT` unset or `mac` so Mac traces filter apart from the deployment's. Check reachability with `curl https://<omarchy tailnet name>:8443/api/public/health`. Without Tailscale, an SSH local forward of port 3000 kept up by launchd works too; the research note `docs/research/desktop-otel-export-2026-11-16.md` compares the options.
+The packaged Mac app reads its export settings from `~/Library/Application Support/@cairn/desktop/otel.env` (mode `0600`, the same three `CAIRN_OTEL_*` keys; see `apps/desktop/README.md`). With a self-hosted stack bound to loopback, Tailscale Serve can publish it to the tailnet only, so the Mac's endpoint is `https://<host tailnet name>:8443/api/public/otel` with the same ingestion header as the server; check reachability with `curl https://<host tailnet name>:8443/api/public/health`. ian's Mac currently points at Langfuse Cloud: `CAIRN_OTEL_ENDPOINT=https://cloud.langfuse.com/api/public/otel` with the project's `pk:sk` basic-auth header. Leave `CAIRN_OTEL_ENVIRONMENT` unset or `mac` so Mac traces filter apart from any deployment's. Without Tailscale, an SSH local forward of port 3000 kept up by launchd works too; the research note `docs/research/desktop-otel-export-2026-11-16.md` compares the options.
 
 ## Backup
 
@@ -383,7 +383,7 @@ docker compose start minio
 
 Volume names carry the project prefix `cairn-langfuse_`; verify with `docker volume ls | grep cairn-langfuse`. ClickHouse must be stopped from writing before the tar, otherwise files are captured half-written. Postgres goes through `pg_dump` and needs no stop.
 
-Recovery: bring up an empty stack with `docker compose up -d` and wait until healthy → stop web/worker → load postgres (`gunzip -c postgres.sql.gz | docker compose exec -T postgres psql -U langfuse langfuse`) → stop clickhouse/minio and untar the archives into the corresponding volumes → start the whole stack again. Practice on a copy first; do not overwrite omarchy's live database directly.
+Recovery: bring up an empty stack with `docker compose up -d` and wait until healthy → stop web/worker → load postgres (`gunzip -c postgres.sql.gz | docker compose exec -T postgres psql -U langfuse langfuse`) → stop clickhouse/minio and untar the archives into the corresponding volumes → start the whole stack again. Practice on a copy first; do not overwrite the live database directly.
 
 ## Cleanup
 

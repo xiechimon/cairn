@@ -1,5 +1,7 @@
 # Moving the control plane from the Mac to omarchy
 
+Status: the omarchy deployment this document moved to was torn down on 2026-11-18. The Mac desktop runs the embedded server. Kept as the reference for the move procedure.
+
 The control plane is the server: database, secret-box key, push keys and attachments. It moves from the Mac (launchd agents, `127.0.0.1:8787` behind `tailscale serve`) to omarchy (systemd user units from `scripts/ops/systemd/`, the same loopback bind behind `tailscale serve`). Both machines keep running daemons as executors. The service is reachable only inside the tailnet, never through Funnel.
 
 Host-specific names (tailnet hostnames, launchd labels, machine ids) live in the operator's host notes, not here. Below, `<mac>` and `<omarchy>` are the MagicDNS names, `$MAC_DATA` is `~/.cairn` on the Mac and `$OM` is `ssh -o BatchMode=yes -o ConnectTimeout=5 omarchy`. Copies use a shell function, so the quoted `-e` command reaches rsync as one argument:
