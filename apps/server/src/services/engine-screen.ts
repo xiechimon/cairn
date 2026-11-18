@@ -127,12 +127,7 @@ export class EngineScreenGateway {
       throw new HttpError(409, 'the engine run is not live');
     if (!this.deps.machineHub.isConnected(row.machineId))
       throw new HttpError(409, 'the machine is not connected');
-    const capabilities = this.deps.db
-      .select({ capabilities: machineTable.capabilities })
-      .from(machineTable)
-      .where(eq(machineTable.id, row.machineId))
-      .get()?.capabilities?.enginePty;
-    if (capabilities !== true) throw new HttpError(409, 'the engine run cannot be taken over');
+    this.assertPtyMachine(row.machineId);
     const now = Date.now();
     const lease: EngineLease = {
       leaseId: newRecordId(),
@@ -153,6 +148,15 @@ export class EngineScreenGateway {
         this.revoke(channel, 'takeover lease lost');
     }
     return { leaseId: lease.leaseId, fence: lease.fence, expiresAt: lease.expiresAt };
+  }
+
+  private assertPtyMachine(machineId: string): void {
+    const pty = this.deps.db
+      .select({ capabilities: machineTable.capabilities })
+      .from(machineTable)
+      .where(eq(machineTable.id, machineId))
+      .get()?.capabilities?.enginePty;
+    if (pty !== true) throw new HttpError(409, 'the engine run cannot be taken over');
   }
 
   renewTakeover(
@@ -196,6 +200,7 @@ export class EngineScreenGateway {
       throw new HttpError(409, 'the engine run is not live');
     if (!this.deps.machineHub.isConnected(row.machineId))
       throw new HttpError(409, 'the machine is not connected');
+    this.assertPtyMachine(row.machineId);
     const lease = this.leases.get(stepId);
     if (
       kind === 'takeover' &&
