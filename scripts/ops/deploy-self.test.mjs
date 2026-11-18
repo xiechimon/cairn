@@ -1397,7 +1397,7 @@ test('a change that leaves the daemon build identical deploys without restarting
   writeFileSync(join(f.fake, 'lease-unsupported'), '');
   const target = pushTarget(f, 'paths the old allowlist sent to a daemon restart', {
     files: {
-      'scripts/ops/connect-relay/ledger.ts': 'export {};\n',
+      'scripts/ops/retired-probe.ts': 'export {};\n',
       'apps/desktop/build.mjs': 'export {};\n',
       'packages/shared/src/records/report.ts': 'export {};\n',
       'marker.txt': 'previous\n',

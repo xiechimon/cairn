@@ -22,8 +22,6 @@ jobs:
       has-sidecar: ${{ steps.classify.outputs.has-sidecar }}
       gates-needed: ${{ steps.classify.outputs.gates-needed }}
       ops-selftests: ${{ steps.classify.outputs.ops-selftests }}
-      connect-do: ${{ steps.classify.outputs.connect-do }}
-      connect-relay: ${{ steps.classify.outputs.connect-relay }}
       e2e-tier: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft) && 'none' || steps.classify.outputs.e2e-tier }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -42,20 +40,12 @@ jobs:
           has_sidecar=true
           gates_needed=true
           ops_selftests=true
-          connect_do=true
-          connect_relay=true
           e2e_tier=full
           if [ -n "${PREPUSH_BASE_SHA:-}" ] && ! printf '%s\n' "$PREPUSH_BASE_SHA" | grep -qE '^0+$' && git cat-file -e "${PREPUSH_BASE_SHA}^{commit}" 2>/dev/null; then
             base_ref=$(git merge-base "$PREPUSH_BASE_SHA" HEAD 2>/dev/null || printf '%s' "$PREPUSH_BASE_SHA")
             changed=$(git diff --name-only "$base_ref" HEAD)
             if ! printf '%s\n' "$changed" | grep -qE '^(scripts/|\.github/|\.claude/skills/verify-cairn/scripts/|ops/langfuse/|packages/shared/|package\.json$|pnpm-lock\.yaml$)'; then
               ops_selftests=false
-            fi
-            if ! printf '%s\n' "$changed" | grep -q '^scripts/ops/connect-do-prototype/'; then
-              connect_do=false
-            fi
-            if ! printf '%s\n' "$changed" | grep -q '^scripts/ops/connect-relay/'; then
-              connect_relay=false
             fi
             has_code=$(node scripts/prepush.mjs --has-code) || has_code=true
             has_sidecar=$(node scripts/prepush.mjs --has-sidecar) || has_sidecar=true
@@ -74,8 +64,6 @@ jobs:
           echo "has-sidecar=$has_sidecar" >> "$GITHUB_OUTPUT"
           echo "gates-needed=$gates_needed" >> "$GITHUB_OUTPUT"
           echo "ops-selftests=$ops_selftests" >> "$GITHUB_OUTPUT"
-          echo "connect-do=$connect_do" >> "$GITHUB_OUTPUT"
-          echo "connect-relay=$connect_relay" >> "$GITHUB_OUTPUT"
           echo "e2e-tier=$e2e_tier" >> "$GITHUB_OUTPUT"
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
@@ -132,23 +120,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Local Durable Object transport experiment
-        if: needs.changes.outputs.connect-do == 'true'
-        working-directory: scripts/ops/connect-do-prototype
-        run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm run typecheck
-          npm test
-          npm run smoke
-
-      - name: Personal relay ledger in local workerd
-        if: needs.changes.outputs.connect-relay == 'true'
-        working-directory: scripts/ops/connect-relay
-        run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm run typecheck
-          npm test
 
       - name: Prepush checks (#1533)
         env:

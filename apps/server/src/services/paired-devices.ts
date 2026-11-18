@@ -169,20 +169,7 @@ export interface PairingGrantView {
   createdAt: number;
 }
 
-export interface RelayPairingScope {
-  installationId: string;
-  generation: number;
-}
-
-function grantScope(scope: RelayPairingScope | null): string | null {
-  return scope === null ? null : `${scope.installationId}:${scope.generation}`;
-}
-
-export function issuePairingGrant(
-  db: Db,
-  now = nowMs(),
-  relayScope: RelayPairingScope | null = null,
-): IssuedPairingGrant {
+export function issuePairingGrant(db: Db, now = nowMs()): IssuedPairingGrant {
   db.delete(pairingGrant)
     .where(
       or(
@@ -211,7 +198,6 @@ export function issuePairingGrant(
     .values({
       id,
       codeHash: hashCredential(code),
-      relayScope: grantScope(relayScope),
       expiresAt,
       createdAt: now,
     })
@@ -223,13 +209,7 @@ export function listPairingGrants(db: Db, now = nowMs()): PairingGrantView[] {
   return db
     .select()
     .from(pairingGrant)
-    .where(
-      and(
-        isNull(pairingGrant.relayScope),
-        isNull(pairingGrant.revokedAt),
-        isNull(pairingGrant.redeemedAt),
-      ),
-    )
+    .where(and(isNull(pairingGrant.revokedAt), isNull(pairingGrant.redeemedAt)))
     .all()
     .filter((row) => row.expiresAt > now)
     .map((row) => ({ id: row.id, expiresAt: row.expiresAt, createdAt: row.createdAt }));
@@ -244,22 +224,15 @@ export function revokePairingGrant(db: Db, id: string, now = nowMs()): boolean {
 
 export function pairFromGrant(
   db: Db,
-  input: { code: string; teamId: string; name: string; relayScope?: RelayPairingScope },
+  input: { code: string; teamId: string; name: string },
 ): { device: PairedDevice; token: string; sessionToken: string; sessionExpiresAt: number } | null {
   return db.transaction((tx) => {
     if (!hasRoomForDevice(tx)) {
       throw new HttpError(409, 'too many paired devices; revoke one first');
     }
-    if (!redeemPairingGrant(tx, input.code, undefined, input.relayScope)) return null;
+    if (!redeemPairingGrant(tx, input.code)) return null;
     const created = createPairedDevice(tx, { teamId: input.teamId, name: input.name });
-    const session = issueBrowserSession(
-      tx,
-      'device',
-      created.device.id,
-      undefined,
-      undefined,
-      input.relayScope?.installationId ?? null,
-    );
+    const session = issueBrowserSession(tx, 'device', created.device.id);
     return {
       device: created.device,
       token: created.token,
@@ -269,13 +242,7 @@ export function pairFromGrant(
   });
 }
 
-export function redeemPairingGrant(
-  db: Db,
-  code: string,
-  now = nowMs(),
-  relayScope: RelayPairingScope | null = null,
-): boolean {
-  const scope = grantScope(relayScope);
+export function redeemPairingGrant(db: Db, code: string, now = nowMs()): boolean {
   return (
     db
       .update(pairingGrant)
@@ -283,7 +250,6 @@ export function redeemPairingGrant(
       .where(
         and(
           eq(pairingGrant.codeHash, hashCredential(code)),
-          scope === null ? isNull(pairingGrant.relayScope) : eq(pairingGrant.relayScope, scope),
           isNull(pairingGrant.revokedAt),
           isNull(pairingGrant.redeemedAt),
           gt(pairingGrant.expiresAt, now),
@@ -291,21 +257,6 @@ export function redeemPairingGrant(
       )
       .run().changes === 1
   );
-}
-
-export function revokeRelayPairingGrants(db: Db, installationId: string, now = nowMs()): void {
-  db.transaction((tx) => {
-    const pending = tx
-      .select()
-      .from(pairingGrant)
-      .where(and(isNull(pairingGrant.revokedAt), isNull(pairingGrant.redeemedAt)))
-      .all();
-    for (const row of pending) {
-      if (row.relayScope?.startsWith(`${installationId}:`)) {
-        tx.update(pairingGrant).set({ revokedAt: now }).where(eq(pairingGrant.id, row.id)).run();
-      }
-    }
-  });
 }
 
 export function revokePairedDevice(db: Db, teamId: string, id: string): boolean {

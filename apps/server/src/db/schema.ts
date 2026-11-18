@@ -804,7 +804,6 @@ export const pairingGrant = sqliteTable(
   {
     id: text('id').primaryKey(),
     codeHash: text('codeHash').notNull(),
-    relayScope: text('relayScope'),
     expiresAt: epochMs('expiresAt').notNull(),
     createdAt: epochMs('createdAt').notNull(),
     revokedAt: epochMs('revokedAt'),
@@ -820,7 +819,6 @@ export const browserSession = sqliteTable(
     tokenHash: text('tokenHash').notNull(),
     kind: text('kind').notNull(),
     deviceId: text('deviceId').references(() => pairedDevice.id, { onDelete: 'cascade' }),
-    relayScope: text('relayScope'),
     expiresAt: epochMs('expiresAt').notNull(),
     createdAt: epochMs('createdAt').notNull(),
   },

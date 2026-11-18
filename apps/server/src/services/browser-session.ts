@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, gt, isNull, lte } from 'drizzle-orm';
+import { eq, lte } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { setCookie } from 'hono/cookie';
 import type { Db } from '../db/client.js';
-import { browserSession, pairedDevice } from '../db/schema.js';
+import { browserSession } from '../db/schema.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { tailnetListenerOf } from '../lib/tailnet-listener.js';
@@ -26,7 +26,6 @@ export function issueBrowserSession(
   deviceId: string | null = null,
   now = nowMs(),
   notAfter = Number.POSITIVE_INFINITY,
-  relayScope: string | null = null,
 ): { token: string; expiresAt: number } {
   const token = randomBytes(TOKEN_BYTES).toString('hex');
   const expiresAt = Math.min(now + SESSION_TTL_MS, notAfter);
@@ -37,7 +36,6 @@ export function issueBrowserSession(
       tokenHash: hashCredential(token),
       kind,
       deviceId,
-      relayScope,
       expiresAt,
       createdAt: now,
     })
@@ -53,44 +51,11 @@ export function resolveBrowserSession(
   const row = db
     .select()
     .from(browserSession)
-    .where(
-      and(eq(browserSession.tokenHash, hashCredential(token)), isNull(browserSession.relayScope)),
-    )
+    .where(eq(browserSession.tokenHash, hashCredential(token)))
     .get();
   if (row === undefined || row.expiresAt <= now) return null;
   if (row.kind !== 'owner' && row.kind !== 'device') return null;
   return { kind: row.kind, deviceId: row.deviceId };
-}
-
-export function resolveRelayBrowserSession(
-  db: Db,
-  binding: { tokenHash: string; installationId: string; teamId: string },
-  now = nowMs(),
-): { id: string; deviceId: string; expiresAt: number } | null {
-  return (
-    db
-      .select({
-        id: browserSession.id,
-        deviceId: pairedDevice.id,
-        expiresAt: browserSession.expiresAt,
-      })
-      .from(browserSession)
-      .innerJoin(pairedDevice, eq(browserSession.deviceId, pairedDevice.id))
-      .where(
-        and(
-          eq(browserSession.tokenHash, binding.tokenHash),
-          eq(browserSession.relayScope, binding.installationId),
-          eq(browserSession.kind, 'device'),
-          eq(pairedDevice.teamId, binding.teamId),
-          gt(browserSession.expiresAt, now),
-        ),
-      )
-      .get() ?? null
-  );
-}
-
-export function revokeRelayBrowserSessions(db: Db, installationId: string): void {
-  db.delete(browserSession).where(eq(browserSession.relayScope, installationId)).run();
 }
 
 export function setAuthCookie(

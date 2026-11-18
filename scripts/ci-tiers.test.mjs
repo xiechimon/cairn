@@ -315,8 +315,6 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'false',
       'ops-selftests': 'false',
-      'connect-do': 'false',
-      'connect-relay': 'false',
       'e2e-tier': 'none',
     });
 
@@ -325,8 +323,6 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'true',
       'ops-selftests': 'false',
-      'connect-do': 'false',
-      'connect-relay': 'false',
       'e2e-tier': 'none',
     });
 
@@ -335,8 +331,6 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'true',
       'ops-selftests': 'false',
-      'connect-do': 'false',
-      'connect-relay': 'false',
       'e2e-tier': 'none',
     });
 
@@ -345,8 +339,6 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'true',
       'ops-selftests': 'false',
-      'connect-do': 'false',
-      'connect-relay': 'false',
       'e2e-tier': 'affected',
     });
 
@@ -355,8 +347,6 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'true',
       'ops-selftests': 'false',
-      'connect-do': 'false',
-      'connect-relay': 'false',
       'e2e-tier': 'affected',
     });
 
@@ -367,8 +357,6 @@ test('changes classify script sets outputs across push and pull_request diffs in
         'has-sidecar': 'false',
         'gates-needed': 'true',
         'ops-selftests': 'false',
-        'connect-do': 'false',
-        'connect-relay': 'false',
         'e2e-tier': 'full',
       },
     );
@@ -378,8 +366,6 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'true',
       'ops-selftests': 'true',
-      'connect-do': 'false',
-      'connect-relay': 'false',
       'e2e-tier': 'full',
     });
 
@@ -388,18 +374,6 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'true',
       'gates-needed': 'true',
       'ops-selftests': 'false',
-      'connect-do': 'false',
-      'connect-relay': 'false',
-      'e2e-tier': 'none',
-    });
-
-    assert.deepEqual(runClassify({ 'scripts/ops/connect-relay/index.ts': 'export {}\n' }), {
-      'has-code': 'true',
-      'has-sidecar': 'false',
-      'gates-needed': 'true',
-      'ops-selftests': 'true',
-      'connect-do': 'false',
-      'connect-relay': 'true',
       'e2e-tier': 'none',
     });
 
@@ -410,8 +384,6 @@ test('changes classify script sets outputs across push and pull_request diffs in
         'has-sidecar': 'true',
         'gates-needed': 'true',
         'ops-selftests': 'true',
-        'connect-do': 'true',
-        'connect-relay': 'true',
         'e2e-tier': 'full',
       },
     );
