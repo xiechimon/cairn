@@ -14,7 +14,7 @@ test('AGENTS.md ships straight to main without force and keeps the deploy as the
   assert.match(agents, /Push without force/);
   assert.match(
     agents,
-    /deploys only main commits whose `check`, `pack-smoke` and `e2e-gate` runs are green/,
+    /published by the `desktop-release` workflow on every push whose app sources moved/,
   );
   assert.match(agents, /stop and ask ian before pushing/);
   assert.match(agents, /watch CI on your commit/);
