@@ -22,6 +22,7 @@ import {
 } from './image-text.js';
 import { boundCoordinatorImages, prepareCoordinatorImage } from './images.js';
 import type { MachineApi } from './machine-api.js';
+import { createToolArgsRepair } from './tool-args-repair.js';
 
 export class ShutdownInterrupt extends Error {
   constructor() {
@@ -289,6 +290,7 @@ export function coordinatorToolsExtension(
     name: 'cairn-coordinator-tools',
     hooks: [
       createCutOffRecovery(COORDINATOR_CUT_OFF_MESSAGE).hook,
+      createToolArgsRepair(),
       hook(GenerationTask, {
         beforeRequest: async ({ messages }, _api, context) => {
           await options.beforeTool?.(context.abortSignal, String(_api.conversationId));
