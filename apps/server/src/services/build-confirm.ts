@@ -23,14 +23,16 @@ export function applyBuildConfirm(
   if (todoRecord.phase !== 'confirm') {
     throw new HttpError(409, `确认仅适用于待确认（confirm）关口，当前相位 ${todoRecord.phase}`);
   }
-  insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);
-  if (childrenOfTodo(deps.db, todoRecord.id).length > 0) {
-    dispatchSplitChildren(deps, todoRecord.id);
+  deps.db.transaction(() => {
+    insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);
+    if (childrenOfTodo(deps.db, todoRecord.id).length > 0) {
+      dispatchSplitChildren(deps, todoRecord.id);
+      setTodoPhase(deps, todoRecord.id, 'building');
+      return;
+    }
     setTodoPhase(deps, todoRecord.id, 'building');
-    return;
-  }
-  setTodoPhase(deps, todoRecord.id, 'building');
-  enqueueStep(deps, buildId, 'build', todoRecord.teamId, undefined, false, byPerson);
+    enqueueStep(deps, buildId, 'build', todoRecord.teamId, undefined, false, byPerson);
+  });
 }
 
 export function confirmPlanAutomatically(deps: BuildDeps, buildId: string): void {

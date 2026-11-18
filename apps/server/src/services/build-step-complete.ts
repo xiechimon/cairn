@@ -132,6 +132,10 @@ export function completeStep(
   stepId: string,
   outcome: CompleteStepOutcome = {},
 ): void {
+  deps.db.transaction(() => completeStepSettled(deps, stepId, outcome));
+}
+
+function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteStepOutcome): void {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
   if (settleRetiredGateStep(deps, stepRow, outcome)) return;
