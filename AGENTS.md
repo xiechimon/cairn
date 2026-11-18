@@ -47,6 +47,7 @@ Work happens in worktrees, never in the primary checkout at `~/Code/AgentProject
 - When you fix a defect, name its bug class, search every path the change touches for other instances, and fix them together.
 - Design first for a change to persisted state, a wire or step protocol, or concurrency: write a one-page design (states, transitions, every path that reads or writes the state, the behavior on each failure) before code, with one test per path.
 - Decide by your own recommendation and say in chat what you chose and why. Ask ian for payments, credentials, intended-behavior or design changes, and decisions explicitly routed to him.
+- Explain problems, designs, trade-offs and outcomes to the user through concrete scenarios, not internal symbol or protocol dumps. For each point give: a real user scenario ("when you do X..."), why it breaks or blocks in plain words, how the fix works, and what happens in that scenario afterwards; link files for reference instead of reciting field names. Skip this for one-line answers or trivial status updates.
 - Keep each change small and self-contained.
 - Do not commit verification evidence (logs, screenshots, probe output).
 
