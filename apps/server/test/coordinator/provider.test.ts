@@ -32,11 +32,11 @@ describe('the provider of a claimed Coordinator step', () => {
   });
 
   it.each([
-    { input: undefined, expected: ['text', 'image'] },
+    { input: undefined, expected: ['text'] },
     { input: ['text'] as ('text' | 'image')[], expected: ['text'] },
     { input: ['text', 'image'] as ('text' | 'image')[], expected: ['text', 'image'] },
   ])(
-    'preserves declared input capabilities and allows images when unspecified: $input',
+    'preserves declared input capabilities and treats an unspecified model as text-only: $input',
     ({ input, expected }) => {
       const models = createCoordinatorModels();
       models.useStepProvider({ ...config, models: [{ ...config.models[0]!, input }] });

@@ -77,14 +77,14 @@ export const COMPUTER_DESKTOP_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'computer_observe',
     description:
-      "Your VM computer, not the owner's Mac. Take a screenshot of the whole Coordinator computer desktop (terminal, dock, every window). Returns the image and its size; computer_act x and y are pixels in the latest screenshot.",
+      "Your VM computer, not the owner's Mac. Last resort, after page and text tools (browser_snapshot) cannot do the job. Take a screenshot of the whole Coordinator computer desktop (terminal, dock, every window). Returns the image and its size; computer_act x and y are pixels in the latest screenshot. A model that cannot see images gets no screenshot and should call request_takeover instead.",
     parameters: obj({}),
     replaySafe: true,
   },
   {
     name: 'computer_act',
     description:
-      "Your VM computer, not the owner's Mac. Drive the Coordinator computer desktop with the mouse and keyboard, then return a fresh screenshot. Call computer_observe first; x and y are pixels in its latest screenshot. Prefer browser_* tools for web pages.",
+      "Your VM computer, not the owner's Mac. Last resort, after page and text tools (browser_snapshot, browser_act) cannot do the job. Drive the Coordinator computer desktop with the mouse and keyboard, then return a fresh screenshot. Call computer_observe first; x and y are pixels in its latest screenshot. Never use it for web pages. A model that cannot see images gets no screenshot and should call request_takeover when the step needs eyes on the screen.",
     parameters: obj(
       {
         actions: arr(

@@ -35,6 +35,12 @@ const DESKTOP_TOOL_NAMES: ReadonlySet<string> = new Set(
   COMPUTER_DESKTOP_TOOLS.map((def) => def.name),
 );
 
+export const SCREENSHOT_UNAVAILABLE_OBSERVE =
+  'This model cannot see screenshots, so computer_observe returns no image. Read pages with browser_snapshot and other text tools first. If only a screenshot of the desktop would help, call request_takeover so the owner operates it.';
+
+export const SCREENSHOT_UNAVAILABLE_NOTE =
+  'No screenshot is attached because this model cannot see images. Check the result with text tools (browser_snapshot), or call request_takeover if the step needs eyes on the screen.';
+
 export function askRequestId(stepId: string, callId: string): string {
   return `ask-${createHash('sha256').update(`${stepId}\0${callId}`).digest('hex').slice(0, 32)}`;
 }
@@ -158,6 +164,15 @@ export function coordinatorTool(
       }
       try {
         if (DESKTOP_TOOL_NAMES.has(def.name)) {
+          const agent = await api.agent(context);
+          const model =
+            agent.model === undefined
+              ? undefined
+              : api.models.getModel(agent.model.provider, agent.model.modelId);
+          const seesImages = model?.input.includes('image') === true;
+          if (!seesImages && def.name === 'computer_observe') {
+            return { output: [{ type: 'text', text: SCREENSHOT_UNAVAILABLE_OBSERVE }] };
+          }
           const result = await channel.relayComputer(
             stepId,
             def.name,
@@ -165,6 +180,11 @@ export function coordinatorTool(
             callId,
             context.abortSignal,
           );
+          if (!seesImages) {
+            return {
+              output: [{ type: 'text', text: `${result.text}\n${SCREENSHOT_UNAVAILABLE_NOTE}` }],
+            };
+          }
           const images = await Promise.all(
             (result.images ?? []).map((image) =>
               prepareCoordinatorImage(image.data, image.mimeType),

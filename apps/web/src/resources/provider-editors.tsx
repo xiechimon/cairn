@@ -17,6 +17,7 @@ import { ProviderEditorHead, type ProviderMark } from '../components/providers/p
 import { SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
+import { Checkbox } from '../components/ui/checkbox.js';
 import { Input } from '../components/ui/input.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { useI18n } from '../i18n/provider.js';
@@ -190,6 +191,8 @@ function ModelChip({
   dead,
   check,
   busy,
+  seesImages,
+  onSeesImagesChange,
   onTest,
   onRemove,
 }: {
@@ -197,6 +200,8 @@ function ModelChip({
   dead: boolean;
   check: ModelCheck | undefined;
   busy: boolean;
+  seesImages: boolean;
+  onSeesImagesChange?: (next: boolean) => void;
   onTest?: () => void;
   onRemove?: () => void;
 }) {
@@ -252,6 +257,22 @@ function ModelChip({
               ? t('没测完')
               : t(FAILURE_SHORT[failure])}
         </span>
+      )}
+      {onSeesImagesChange !== undefined && (
+        <label
+          htmlFor={`provider-model-images-${id}`}
+          data-testid="provider-model-images"
+          className="inline-flex flex-none cursor-pointer items-center gap-1.5 text-meta text-content-secondary"
+        >
+          <Checkbox
+            id={`provider-model-images-${id}`}
+            checked={seesImages}
+            disabled={busy}
+            aria-label={t('{name} 支持图片', { name: id })}
+            onCheckedChange={onSeesImagesChange}
+          />
+          {t('支持图片')}
+        </label>
       )}
       {onTest !== undefined && (
         <IconTooltip
@@ -363,6 +384,13 @@ export function TeamProviderEditor({
       }
     };
     await Promise.all(Array.from({ length: Math.min(TEST_CONCURRENCY, ids.length) }, worker));
+  };
+  const setSeesImages = (id: string, seesImages: boolean) => {
+    void saveModels(
+      models.map((m) =>
+        m.id === id ? { ...m, input: seesImages ? ['text', 'image'] : ['text'] } : m,
+      ),
+    );
   };
   const removeModel = (id: string) => {
     void saveModels(models.filter((m) => m.id !== id));
@@ -478,6 +506,10 @@ export function TeamProviderEditor({
                 dead={deadModels.has(model.id)}
                 check={checks[model.id]}
                 busy={savingModels}
+                seesImages={model.input?.includes('image') === true}
+                {...(actions.patch === undefined
+                  ? {}
+                  : { onSeesImagesChange: (next: boolean) => setSeesImages(model.id, next) })}
                 {...(test === undefined ? {} : { onTest: () => void runTests([model.id]) })}
                 {...(actions.patch === undefined ? {} : { onRemove: () => removeModel(model.id) })}
               />

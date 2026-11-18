@@ -57,7 +57,7 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
     api,
     provider: config.providerId,
     baseUrl,
-    input: m.input ?? ['text', 'image'],
+    input: m.input ?? ['text'],
     cost: m.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     reasoning: subscription,
     contextWindow: m.contextWindow ?? catalogContextWindow(config.providerId, m.id),

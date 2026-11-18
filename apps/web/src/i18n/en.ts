@@ -1794,6 +1794,8 @@ export const EN: Record<string, string> = {
   回复这个任务: 'Reply to this task',
   添加服务商: 'Add provider',
   '移除 {name}': 'Remove {name}',
+  支持图片: 'Sees images',
+  '{name} 支持图片': '{name} sees images',
   '新的 API key': 'New API key',
   测试: 'Test',
   '测试没能跑完，请重试。': 'The test could not finish. Try again.',
