@@ -314,9 +314,49 @@ export function GithubDeviceDialog({
   );
 }
 
-export function DeviceCode({ code }: { code: string }) {
+export function DeviceCode({
+  code,
+  cells = false,
+  expired = false,
+}: {
+  code: string;
+  cells?: boolean;
+  expired?: boolean;
+}) {
   const { t } = useI18n();
   const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+  if (cells) {
+    return (
+      <div
+        data-testid="mcp-github-code"
+        className={cn('flex items-center justify-center gap-1.5', expired && 'opacity-40')}
+      >
+        <span className="sr-only">{code}</span>
+        {code.split('').map((char, i) =>
+          /[A-Za-z0-9]/.test(char) ? (
+            <span
+              key={i}
+              aria-hidden="true"
+              className={cn(
+                'flex h-12 w-9 items-center justify-center rounded-(--radius-control) border border-input bg-card font-mono text-brand text-foreground',
+                expired && 'line-through',
+              )}
+            >
+              {char}
+            </span>
+          ) : (
+            <span
+              key={i}
+              aria-hidden="true"
+              className="flex h-12 w-2 items-center justify-center font-mono text-heading text-content-tertiary"
+            >
+              {char}
+            </span>
+          ),
+        )}
+      </div>
+    );
+  }
   return (
     <div className="flex items-center gap-3 rounded-(--radius-control) bg-muted px-4 py-3">
       <code

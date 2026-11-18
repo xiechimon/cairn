@@ -1338,6 +1338,8 @@ export const EN: Record<string, string> = {
   未使用的配对码: 'Unused pairing codes',
   作废配对码: 'Revoke code',
   进入: 'Continue',
+  '服务器地址 {host} · 令牌只发一次，存在这台设备的浏览器里':
+    'Server {host} · the token is issued once and stays in this browser on this device',
   // W4 #285 浏览器授权页（02 §5.2 路径一；/app/machines/authorize）
   授权执行机: 'Authorize Runner',
   '在要接入的电脑上依次运行这两条命令。终端会给出授权链接，打开它就能确认。':
@@ -2272,6 +2274,12 @@ export const EN: Record<string, string> = {
   '打开 GitHub': 'Open GitHub',
   '打开 GitHub，输入下面的代码，然后点授权。': 'Open GitHub, enter the code below, then authorize.',
   授权后自动继续: 'Continues once you authorize',
+  '授权后自动继续 · 代码 15 分钟内有效':
+    'Continues once you authorize · the code is valid for 15 minutes',
+  '1 · 打开': '1 · Open',
+  '2 · 输入': '2 · Enter',
+  右边这个码: 'the code below',
+  复制验证码: 'Copy code',
   重新开始: 'Start again',
   '选择 Cairn 能用的仓库': 'Choose the repositories Cairn can use',
   仍然完成: 'Finish anyway',

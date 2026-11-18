@@ -13,14 +13,19 @@ import { DeviceCode } from '../resources/mcp-github-device-dialog.js';
 
 type Translate = (text: string, vars?: Record<string, string | number>) => string;
 
-function ended(t: Translate, reason: 'expired' | 'denied' | 'failed' | 'start'): Step {
+function ended(
+  t: Translate,
+  reason: 'expired' | 'denied' | 'failed' | 'start',
+  userCode?: string,
+): Step {
   if (reason === 'expired')
-    return { kind: 'ended', title: t('代码已过期'), body: t('重新开始拿一个新代码。') };
+    return { kind: 'ended', title: t('代码已过期'), body: t('重新开始拿一个新代码。'), userCode };
   if (reason === 'denied')
     return {
       kind: 'ended',
       title: t('已取消授权'),
       body: t('你在 GitHub 上取消了授权，这次什么都没有保存。'),
+      userCode,
     };
   if (reason === 'start')
     return {
@@ -32,6 +37,7 @@ function ended(t: Translate, reason: 'expired' | 'denied' | 'failed' | 'start'):
     kind: 'ended',
     title: t('连接失败'),
     body: t('GitHub 没有完成授权，稍后重新开始一次。'),
+    userCode,
   };
 }
 
@@ -44,7 +50,7 @@ type Step =
       verificationUri: string;
       intervalSeconds: number;
     }
-  | { kind: 'ended'; title: string; body: string }
+  | { kind: 'ended'; title: string; body: string; userCode?: string }
   | { kind: 'install'; opened: boolean };
 
 export function GithubConnectionDeviceDialog({
@@ -64,7 +70,15 @@ export function GithubConnectionDeviceDialog({
   const poll = mutations.pollGithubConnectionDevice.mutateAsync;
   const cancel = mutations.cancelGithubConnectionDevice.mutate;
   const [step, setStep] = useState<Step>({ kind: 'starting' });
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const primaryRef = useRef<HTMLButtonElement>(null);
+  const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
+  useEffect(() => {
+    setCopied(false);
+  }, [step]);
 
   useEffect(() => {
     if (step.kind !== 'starting') return;
@@ -91,12 +105,16 @@ export function GithubConnectionDeviceDialog({
           if (result.status === 'pending')
             setStep({ ...step, intervalSeconds: result.intervalSeconds });
           else if (result.status === 'complete') setStep({ kind: 'install', opened: false });
-          else setStep(ended(t, result.status));
+          else setStep(ended(t, result.status, step.userCode));
         })
         .catch((error: unknown) => {
           if (cancelled) return;
           setStep(
-            ended(t, error instanceof ApiError && error.status === 404 ? 'expired' : 'failed'),
+            ended(
+              t,
+              error instanceof ApiError && error.status === 404 ? 'expired' : 'failed',
+              step.userCode,
+            ),
           );
         });
     }, step.intervalSeconds * 1000);
@@ -111,6 +129,14 @@ export function GithubConnectionDeviceDialog({
     onClose();
   };
   const openGithub = (url: string) => window.open(url, '_blank', 'noopener,noreferrer');
+  const copyCode = () => {
+    if (step.kind !== 'code' || clipboard === undefined) return;
+    void clipboard.writeText(step.userCode).then(() => {
+      setCopied(true);
+      clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 1600);
+    });
+  };
 
   let title = t('在 GitHub 上授权 Cairn');
   let body: ReactNode;
@@ -125,17 +151,35 @@ export function GithubConnectionDeviceDialog({
   } else if (step.kind === 'code') {
     body = (
       <>
-        <p className="m-0 text-pretty text-ui text-foreground">
-          {t('打开 GitHub，输入下面的代码，然后点授权。')}
+        <div className="grid grid-cols-[1.25fr_1fr] gap-2">
+          <div className="rounded-(--radius-control) bg-card px-3 py-2.5">
+            <div className="text-ui font-medium text-foreground">{t('1 · 打开')}</div>
+            <div className="mt-0.5 break-all font-mono text-caption text-content-tertiary">
+              {step.verificationUri.replace(/^https?:\/\//, '')}
+            </div>
+          </div>
+          <div className="rounded-(--radius-control) bg-card px-3 py-2.5">
+            <div className="text-ui font-medium text-foreground">{t('2 · 输入')}</div>
+            <div className="mt-0.5 text-meta text-content-tertiary">{t('右边这个码')}</div>
+          </div>
+        </div>
+        <DeviceCode code={step.userCode} cells />
+        <p className="m-0 text-center text-meta text-content-tertiary">
+          {t('授权后自动继续 · 代码 15 分钟内有效')}
         </p>
-        <DeviceCode code={step.userCode} />
       </>
     );
-    hint = t('授权后自动继续');
+    if (clipboard !== undefined)
+      secondary = { label: copied ? t('已复制') : t('复制验证码'), onClick: copyCode };
     primary = { label: t('打开 GitHub'), onClick: () => openGithub(step.verificationUri) };
   } else if (step.kind === 'ended') {
     title = step.title;
-    body = <p className="m-0 text-pretty text-ui text-foreground">{step.body}</p>;
+    body = (
+      <>
+        {step.userCode !== undefined && <DeviceCode code={step.userCode} cells expired />}
+        <p className="m-0 text-pretty text-ui text-foreground">{step.body}</p>
+      </>
+    );
     primary = { label: t('重新开始'), onClick: () => setStep({ kind: 'starting' }) };
   } else {
     title = t('选择 Cairn 能用的仓库');
