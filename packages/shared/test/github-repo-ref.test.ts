@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isGithubRepoRef, parseGithubRepoRef } from '../src/records/project.js';
+import {
+  githubRepoInputToRef,
+  isGithubRepoRef,
+  parseGithubRepoInput,
+  parseGithubRepoRef,
+} from '../src/records/project.js';
 import { githubIssueSourceRef, parseGithubIssueSourceRef } from '../src/records/todo.js';
 
 const DOT_SEGMENT_REFS = ['../user', './x', 'owner/..', 'owner/.', '../..', './.', '../.'];
@@ -44,6 +49,42 @@ describe('parseGithubRepoRef (#1466 failure mode 2)', () => {
     for (const value of ['', 'owner', 'a/b/c', 'a b/c']) {
       expect(parseGithubRepoRef(value), value).toBeNull();
     }
+  });
+});
+
+describe('parseGithubRepoInput', () => {
+  it.each([
+    'https://github.com/octo/alpha',
+    'http://github.com/octo/alpha',
+    'github.com/octo/alpha',
+    'www.github.com/octo/alpha',
+    'git@github.com:octo/alpha',
+    'ssh://git@github.com/octo/alpha',
+    'https://github.com/octo/alpha.git',
+    'https://github.com/octo/alpha/',
+    'https://github.com/octo/alpha.git/',
+  ])('accepts pasted repo address %s', (value) => {
+    expect(parseGithubRepoInput(value)).toEqual({ owner: 'octo', repo: 'alpha' });
+    expect(githubRepoInputToRef(value)).toBe('octo/alpha');
+  });
+
+  it.each([
+    'https://github.com/octo/alpha/tree/main',
+    'https://github.com/octo',
+    'https://github.com/',
+    'https://gitlab.com/octo/alpha',
+    'https://github.com/../alpha',
+    'https://github.com/octo/alpha?tab=readme',
+    'git@gitlab.com:octo/alpha',
+    'owner/repo/extra',
+  ])('rejects %s', (value) => {
+    expect(parseGithubRepoInput(value)).toBeNull();
+    expect(githubRepoInputToRef(value)).toBeNull();
+  });
+
+  it('plain owner/repo still parses and isGithubRepoRef stays strict', () => {
+    expect(parseGithubRepoInput('octo/alpha')).toEqual({ owner: 'octo', repo: 'alpha' });
+    expect(isGithubRepoRef('https://github.com/octo/alpha')).toBe(false);
   });
 });
 

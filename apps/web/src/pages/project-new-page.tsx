@@ -3,7 +3,7 @@ import {
   FS_PICK_ERROR_COPY,
   type FsPickErrorReason,
   type GithubRepoSummary,
-  isGithubRepoRef,
+  githubRepoInputToRef,
   LOCAL_ERROR_REASON_COPY,
   type LocalErrorReason,
   type ProjectIcon,
@@ -178,7 +178,8 @@ export function ProjectNewPage() {
   const onGithubRepoChange = (value: string) => {
     setGithubRepo(value);
     const ref = value.trim();
-    if (isGithubRepoRef(ref)) backfillName(ref.slice(ref.indexOf('/') + 1));
+    const normalized = githubRepoInputToRef(ref);
+    if (normalized !== null) backfillName(normalized.slice(normalized.indexOf('/') + 1));
   };
   const onLocalPathChange = (value: string) => {
     setLocalPath(value);
@@ -243,7 +244,7 @@ export function ProjectNewPage() {
 
   const formOk =
     repoSel === 'github'
-      ? isGithubRepoRef(githubRepo.trim())
+      ? githubRepoInputToRef(githubRepo.trim()) !== null
       : repoSel === 'local'
         ? localPath.trim() !== ''
         : true;
@@ -371,7 +372,11 @@ export function ProjectNewPage() {
     if (blockDemoWrite()) return;
     const body: CreateProjectBody =
       repoSel === 'github'
-        ? { name: name.trim(), kind: 'github', githubRepo: githubRepo.trim() }
+        ? {
+            name: name.trim(),
+            kind: 'github',
+            githubRepo: githubRepoInputToRef(githubRepo.trim()) ?? githubRepo.trim(),
+          }
         : repoSel === 'local'
           ? { name: name.trim(), kind: 'local', localPath: localPath.trim() }
           : { name: name.trim() };

@@ -315,6 +315,22 @@ export function isGithubRepoRef(value: string): boolean {
   return parseGithubRepoRef(value) !== null;
 }
 
+const GITHUB_REPO_INPUT_URL =
+  /^(?:(?:https?|ssh):\/\/)?(?:www\.|git@)?github\.com[:/]([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/i;
+
+export function parseGithubRepoInput(value: string): GithubRepoRef | null {
+  const direct = parseGithubRepoRef(value);
+  if (direct !== null) return direct;
+  const m = GITHUB_REPO_INPUT_URL.exec(value);
+  if (m === null) return null;
+  return parseGithubRepoRef(`${m[1]}/${m[2]}`);
+}
+
+export function githubRepoInputToRef(value: string): string | null {
+  const ref = parseGithubRepoInput(value);
+  return ref === null ? null : `${ref.owner}/${ref.repo}`;
+}
+
 export const createProjectBodySchema = z.object({
   name: z.string(),
   teamId: z.string().optional(),

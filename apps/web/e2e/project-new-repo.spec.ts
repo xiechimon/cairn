@@ -211,6 +211,21 @@ test('github owner/repo backfills the repo segment once valid', async ({ page })
   await expect(name).toHaveValue('Renamed');
 });
 
+test('a pasted github.com URL backfills the name and submits owner/repo', async ({ page }) => {
+  await stubBoot(page);
+  const bodies = await stubCreateProject(page, () => ({ json: okProject }));
+  await page.goto(NEW_PROJECT_LIVE);
+  await fillLiveForm(page, { kind: 'github', value: 'https://github.com/xiechimon/cairn' });
+  await expect(page.locator('#prj-new-name')).toHaveValue('cairn');
+  const submit = page.getByRole('button', { name: '创建项目' });
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(page).toHaveURL(/\/app\?project=proj-1&chat=1$/);
+  expect(bodies).toEqual([
+    { name: 'cairn', teamId: 'team-1', kind: 'github', githubRepo: 'xiechimon/cairn' },
+  ]);
+});
+
 test('the dialog icon derives from the typed name until one is picked', async ({ page }) => {
   await page.goto(NEW_PROJECT);
   const mark = page.getByTestId('project-icon-trigger');

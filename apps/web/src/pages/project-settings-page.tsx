@@ -1,5 +1,5 @@
 import {
-  isGithubRepoRef,
+  githubRepoInputToRef,
   type ProjectModelChoice,
   type ProjectModelUse,
   type ProjectRecord,
@@ -339,8 +339,8 @@ export function ProjectSettingsPage() {
                     }
                     onClick={() => {
                       if (id === undefined) return;
-                      const repo = (repoDraft ?? '').trim();
-                      if (!isGithubRepoRef(repo)) {
+                      const repo = githubRepoInputToRef((repoDraft ?? '').trim());
+                      if (repo === null) {
                         setRepoError(t('GitHub 仓库格式应为 owner/repo。'));
                         return;
                       }
@@ -447,8 +447,8 @@ export function ProjectSettingsPage() {
                       disabled={mutations.patchProject.isPending || convRepo.trim() === ''}
                       onClick={() => {
                         if (id === undefined) return;
-                        const repo = convRepo.trim();
-                        if (!isGithubRepoRef(repo)) {
+                        const repo = githubRepoInputToRef(convRepo.trim());
+                        if (repo === null) {
                           setConvError(t('GitHub 仓库格式应为 owner/repo。'));
                           return;
                         }
