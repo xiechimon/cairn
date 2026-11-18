@@ -1,12 +1,18 @@
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Socket } from 'node:net';
 import { join } from 'node:path';
 import type { LocalToolDef, RemoteToolDef } from '@cairn/shared';
+import { z } from 'zod';
+import { parametersToShape } from '../backend/claude-code.js';
+
+export const HOST_MCP_TOKEN_ENV = 'CAIRN_HOST_MCP_TOKEN';
 
 const BRIDGE_SCRIPT = `import { connect } from 'node:net';
 import { createInterface } from 'node:readline';
 const socket = connect(process.argv[2]);
 socket.on('error', () => process.exit(1));
+socket.write(String(process.env.CAIRN_HOST_MCP_TOKEN ?? '') + '\\n');
 const rl = createInterface({ input: process.stdin });
 rl.on('line', (line) => socket.write(line + '\\n'));
 rl.on('close', () => socket.end());
@@ -27,12 +33,14 @@ interface HostTool {
   name: string;
   description: string;
   inputSchema: unknown;
+  schema: z.ZodType;
   execute(params: Record<string, unknown>): Promise<string>;
 }
 
 export interface HostMcpBridge {
   readonly socketPath: string;
   readonly command: readonly string[];
+  readonly env: Record<string, string>;
   close(): void;
 }
 
@@ -49,6 +57,7 @@ export async function openHostMcpBridge(opts: HostMcpBridgeOpts): Promise<HostMc
       name: def.name,
       description: def.description,
       inputSchema: def.parameters,
+      schema: z.object(parametersToShape(def.parameters, def.name)),
       execute: async (params: Record<string, unknown>) =>
         opts.relay === undefined
           ? `${def.name} rejected: relay unavailable`
@@ -58,6 +67,7 @@ export async function openHostMcpBridge(opts: HostMcpBridgeOpts): Promise<HostMc
       name: def.name,
       description: def.description,
       inputSchema: def.parameters,
+      schema: z.object(parametersToShape(def.parameters, def.name)),
       execute: (params: Record<string, unknown>) => def.execute(params),
     })),
   ];
@@ -66,7 +76,8 @@ export async function openHostMcpBridge(opts: HostMcpBridgeOpts): Promise<HostMc
   const socketPath = join(opts.dir, 'host-mcp.sock');
   const bridgePath = join(opts.dir, 'host-mcp-bridge.mjs');
   writeFileSync(bridgePath, BRIDGE_SCRIPT, { mode: 0o700 });
-  const server = createServer((socket) => serveSocket(socket, tools));
+  const token = randomBytes(24).toString('hex');
+  const server = createServer((socket) => serveSocket(socket, tools, token));
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(socketPath, () => resolve());
@@ -74,6 +85,7 @@ export async function openHostMcpBridge(opts: HostMcpBridgeOpts): Promise<HostMc
   return {
     socketPath,
     command: [process.execPath, bridgePath, socketPath],
+    env: { [HOST_MCP_TOKEN_ENV]: token },
     close() {
       server.close();
       rmSync(opts.dir, { recursive: true, force: true });
@@ -81,8 +93,15 @@ export async function openHostMcpBridge(opts: HostMcpBridgeOpts): Promise<HostMc
   };
 }
 
-function serveSocket(socket: Socket, tools: HostTool[]): void {
+function tokenMatches(line: string, token: string): boolean {
+  const presented = Buffer.from(line.trim(), 'utf8');
+  const expected = Buffer.from(token, 'utf8');
+  return presented.length === expected.length && timingSafeEqual(presented, expected);
+}
+
+function serveSocket(socket: Socket, tools: HostTool[], token: string): void {
   socket.setNoDelay(true);
+  let authed = false;
   let rest = '';
   socket.on('data', (chunk: Buffer) => {
     rest += chunk.toString('utf8');
@@ -91,6 +110,15 @@ function serveSocket(socket: Socket, tools: HostTool[]): void {
       const line = rest.slice(0, idx);
       rest = rest.slice(idx + 1);
       idx = rest.indexOf('\n');
+      if (!authed) {
+        if (line.trim() === '') continue;
+        authed = true;
+        if (!tokenMatches(line, token)) {
+          socket.destroy();
+          return;
+        }
+        continue;
+      }
       if (line.trim() === '') continue;
       void handleLine(socket, line, tools);
     }
@@ -140,12 +168,26 @@ async function handleLine(socket: Socket, line: string, tools: HostTool[]): Prom
           });
           return;
         }
+        const parsed = tool.schema.safeParse(
+          typeof params?.arguments === 'object' && params.arguments !== null
+            ? params.arguments
+            : {},
+        );
+        if (!parsed.success) {
+          const issue = parsed.error.issues[0];
+          reply({
+            content: [
+              {
+                type: 'text',
+                text: `${tool.name} rejected: invalid arguments${issue === undefined ? '' : ` (${issue.path.join('.')}: ${issue.message})`}`,
+              },
+            ],
+            isError: true,
+          });
+          return;
+        }
         try {
-          const text = await tool.execute(
-            typeof params?.arguments === 'object' && params.arguments !== null
-              ? (params.arguments as Record<string, unknown>)
-              : {},
-          );
+          const text = await tool.execute(parsed.data as Record<string, unknown>);
           reply({ content: [{ type: 'text', text }] });
         } catch (error) {
           reply({

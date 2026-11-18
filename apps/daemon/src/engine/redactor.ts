@@ -3,7 +3,7 @@ import { redactSecrets } from '@cairn/shared';
 const PATTERN_HOLD_CHARS = 64;
 const PENDING_CAP_CHARS = 8 * 1024 * 1024;
 const TOKEN_CHAR = /[^\s&"'<>\\]/;
-const OPEN_MARKER = /(?:Bearer|Basic|#?token=|github_pat_)\s*$/;
+const OPEN_MARKER = /(?:Bearer|Basic|#?token=|github_pat_)\s*$/i;
 
 export class PtyRedactor {
   private readonly decoder = new TextDecoder('utf-8');

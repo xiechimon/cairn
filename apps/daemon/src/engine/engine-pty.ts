@@ -7,12 +7,15 @@ export interface EnginePtyOptions {
   onExit?: () => void;
 }
 
+const QUEUED_STDIN_MAX_BYTES = 256 * 1024;
+
 export class EnginePty {
   private readonly ring = new EngineScrollback();
   private readonly redactor: PtyRedactor;
   private readonly sinks = new Set<(chunk: Buffer) => void>();
   private readonly queued: { bytes: Buffer; resolve: () => void; reject: (e: Error) => void }[] =
     [];
+  private queuedBytes = 0;
   private hold: { leaseId: string; fence: number } | null = null;
   private ended = false;
   private readonly onExit: (() => void) | undefined;
@@ -52,8 +55,12 @@ export class EnginePty {
     const data = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
     if (this.ended) return Promise.reject(new Error('engine pty closed'));
     if (this.hold !== null) {
+      if (this.queuedBytes + data.length > QUEUED_STDIN_MAX_BYTES) {
+        return Promise.reject(new Error('engine pty input queue full'));
+      }
       return new Promise<void>((resolve, reject) => {
         this.queued.push({ bytes: data, resolve, reject });
+        this.queuedBytes += data.length;
       });
     }
     this.proc.stream.write(data);
@@ -78,6 +85,7 @@ export class EnginePty {
     if (leaseId !== undefined && (hold.leaseId !== leaseId || hold.fence !== fence)) return false;
     this.hold = null;
     const pending = this.queued.splice(0);
+    this.queuedBytes = 0;
     for (const entry of pending) {
       try {
         this.proc.stream.write(entry.bytes);
@@ -118,6 +126,7 @@ export class EnginePty {
     for (const entry of this.queued.splice(0)) {
       entry.reject(new Error('engine pty closed while input was held'));
     }
+    this.queuedBytes = 0;
     this.sinks.clear();
     this.onExit?.();
   }

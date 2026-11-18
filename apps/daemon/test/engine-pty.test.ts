@@ -80,6 +80,15 @@ describe('PtyRedactor', () => {
     const redactor = new PtyRedactor(() => []);
     expect(redactor.push(Buffer.from(`echo ok\n${'a'.repeat(100)}`))?.toString()).toBe('echo ok\n');
   });
+
+  it('holds a lowercase bearer marker so its token is never emitted raw', () => {
+    const redactor = new PtyRedactor(() => []);
+    const first = redactor.push(Buffer.from(`${'a'.repeat(8)}bearer ${'b'.repeat(64)}`));
+    expect(first?.toString()).toBe('a'.repeat(8));
+    const second = redactor.push(Buffer.from('c'.repeat(20)));
+    expect(second).toBeNull();
+    expect(redactor.flush()?.toString()).toBe('[REDACTED]');
+  });
 });
 
 describe('EnginePty input gating and hold', () => {
@@ -103,6 +112,18 @@ describe('EnginePty input gating and hold', () => {
     expect(pty.releaseHold('lease-a', 1)).toBe(true);
     await Promise.all([first, second]);
     expect(Buffer.concat(written).toString()).toBe('steer-1\nsteer-2\n');
+    pty.close();
+  });
+
+  it('rejects held agent input past the queue cap and still flushes queued bytes', async () => {
+    const { proc, written } = fakeProc();
+    const pty = new EnginePty(proc, { secrets: () => [] });
+    pty.acquireHold('lease-a', 1);
+    const big = pty.writeAgent(Buffer.alloc(256 * 1024, 0x61));
+    await expect(pty.writeAgent('x')).rejects.toThrow(/queue full/);
+    expect(pty.releaseHold('lease-a', 1)).toBe(true);
+    await big;
+    expect(Buffer.concat(written).length).toBe(256 * 1024);
     pty.close();
   });
 

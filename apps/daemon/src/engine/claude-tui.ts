@@ -178,6 +178,7 @@ class ClaudePtyBackend implements AgentBackend {
         type: 'stdio',
         command: bridge.command[0],
         args: [...bridge.command.slice(1)],
+        env: { ...bridge.env },
       };
     }
     if (!locked) {
