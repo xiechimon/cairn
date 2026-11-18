@@ -14,10 +14,7 @@ import {
   stepRoute as stepRouteTable,
   step as stepTable,
 } from '../../apps/server/src/db/schema.js';
-import {
-  setCoordinatorInServer,
-  setCoordinatorServerContextEnabled,
-} from '../../apps/server/src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../../apps/server/src/services/coordinator-context.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
@@ -43,7 +40,6 @@ const seen: Record<string, unknown> = {};
 
 beforeAll(async () => {
   setCoordinatorInServer(true);
-  setCoordinatorServerContextEnabled(true);
   const userHome = makeTestTempDir('cairn-it-first-run-user-');
   mkdirSync(join(userHome, '.claude'), { recursive: true });
   writeFileSync(join(userHome, '.claude', 'settings.json'), '{}\n');
@@ -91,7 +87,6 @@ afterAll(async () => {
   await handle?.done;
   await server?.close();
   setCoordinatorInServer(false);
-  setCoordinatorServerContextEnabled(false);
   for (const [key, value] of Object.entries(saved)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;

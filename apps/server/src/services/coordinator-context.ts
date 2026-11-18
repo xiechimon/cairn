@@ -16,7 +16,6 @@ import { coordinatorProfile } from './routing-rules.js';
 
 export { DEFAULT_CONTEXT_WINDOW };
 
-let serverContextOn = false;
 let inServer = false;
 let wakeThread: (threadId: string) => void = () => {};
 
@@ -36,16 +35,8 @@ export function wakeCoordinator(threadId: string): void {
   wakeThread(threadId);
 }
 
-export function setCoordinatorServerContextEnabled(on: boolean): void {
-  serverContextOn = on;
-}
-
-export function coordinatorServerContextEnabled(): boolean {
-  return serverContextOn;
-}
-
 export function coordinatorRunsOnPi(): boolean {
-  return serverContextOn || inServer;
+  return inServer;
 }
 
 export function contextWindowOf(db: Db, teamId: string, usageModel: string): number {

@@ -91,7 +91,6 @@ function commit(work, message, { allowBuilds = 'esbuild: true', date, files = {}
 
 function fixture({
   claimed = 0,
-  digestClaimed = 0,
   heartbeatAgeMs = null,
   seedFiles = {},
   openComputerCalls = [],
@@ -136,12 +135,6 @@ function fixture({
     );
   for (const [i, tool] of openComputerCalls.entries())
     sqlite(db, `insert into computer_call values ('c${i}', '${tool}', 'running')`);
-  for (let i = 0; i < digestClaimed; i++)
-    sqlite(
-      db,
-      `insert into step(id, buildId, status, lastHeartbeatAt) values ('d${i}', 'chief-digest-chief-x', 'claimed', ${heartbeat})`,
-    );
-
   fakeTool(
     bin,
     'gh-wrapper',

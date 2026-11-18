@@ -83,7 +83,6 @@ describe('routing targets and the rule graph', () => {
         rule('coordinator', 'claude-code', 'claude-opus-5-5'),
         rule('review', 'openai-codex', 'gpt-6.1-sol'),
         rule('compaction', 'deleted-provider', 'glm-5.3'),
-        rule('digest', 'relay', 'x'),
       ],
       policies: [],
     };
@@ -93,7 +92,6 @@ describe('routing targets and the rule graph', () => {
     ).toEqual([
       ['coordinator', 'subscription:main', false, 'claude-opus-5-5'],
       ['review', 'provider:rec-codex', false, 'GPT-6.1 Sol'],
-      ['digest', 'provider:rec-relay', true, 'x'],
       ['compaction', null, true, 'glm-5.3'],
     ]);
     expect(claude?.nodes).toEqual([

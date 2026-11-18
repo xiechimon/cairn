@@ -37,17 +37,10 @@ export const ROUTE_USE_LABELS: Record<RouteUse, string> = {
   coordinator: 'Coordinator',
   session: '任务',
   review: '评审',
-  digest: '摘要',
   compaction: '压缩',
 };
 
-const GRAPH_USES: readonly RouteUse[] = [
-  'coordinator',
-  'session',
-  'review',
-  'digest',
-  'compaction',
-];
+const GRAPH_USES: readonly RouteUse[] = ['coordinator', 'session', 'review', 'compaction'];
 
 const CLAUDE_CODE_TARGET = 'claude-code';
 const DEVIN_TARGET = 'devin';

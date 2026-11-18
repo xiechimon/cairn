@@ -1,4 +1,4 @@
-import { type ClaimedStep, chiefDigestThreadId } from '@cairn/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -138,14 +138,11 @@ test('initialization failure propagates and rolls back instead of returning synt
   expect(() => injectMemories(H.s.db, teamScope())).toThrow('index initialization failed');
   expect(H.s.db.select().from(agentMemory).all()).toEqual([]);
 });
-test('digest loads index and file count without stamping use or including another thread scratchpad', () => {
+test('a turn loads index and file count without including another thread scratchpad', () => {
   put('fact', 'first\nDETAIL');
-  put('pad', 'OTHER-THREAD', null, { layer: 'scratchpad', threadId: H.threadId });
+  put('pad', 'OTHER-THREAD', null, { layer: 'scratchpad', threadId: 'chief-other-thread' });
   foldMemoryIndexes(H.s.db);
-  const before = H.s.db.select().from(agentMemory).all();
   const thread = H.s.db.select().from(chiefThread).where(eq(chiefThread.id, H.threadId)).get()!;
-  const digestId = chiefDigestThreadId(H.chiefId);
-  const digest = { ...thread, id: digestId };
   const ownerMessageId = seedOwnerMessage(H.s.db, H.threadId, 'hello');
   const id = enqueueChiefStep(H.s.svc, H.threadId, {
     prompt: 'hello',
@@ -154,15 +151,13 @@ test('digest loads index and file count without stamping use or including anothe
   });
   const row = H.s.db.select().from(step).where(eq(step.id, id)).get()!;
   expect(row.ownerMessageIds).toEqual([ownerMessageId]);
-  const result = chiefTurnContext(toolDeps(), { ...row, buildId: digestId }, digest, AGENT_ID);
-  expect(result.digest).toBe(true);
+  const result = chiefTurnContext(toolDeps(), row, thread, AGENT_ID);
   expect(result.memories).toContainEqual({
     title: '记忆文件',
     content: '1 个；用 memories 按需读取。',
   });
   expect(JSON.stringify(result.memories)).not.toContain('DETAIL');
   expect(JSON.stringify(result.memories)).not.toContain('OTHER-THREAD');
-  expect(H.s.db.select().from(agentMemory).all()).toEqual(before);
 });
 async function machineToken() {
   const key = await issueApiKey(H.s);

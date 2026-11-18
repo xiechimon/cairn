@@ -446,16 +446,16 @@ describe('review step execution surface (#511)', () => {
   });
 });
 
-describe('chief digest execution surface (#1939)', () => {
-  const claimedDigest: ClaimedStep = {
+describe('chief remote-tools-only execution surface', () => {
+  const claimedRemoteOnly: ClaimedStep = {
     step: {
-      id: 's-digest',
-      buildId: 'chief-digest-c1',
+      id: 's-remote',
+      buildId: 'chief-c1',
       kind: 'chief',
       machineId: 'm1',
       createdAt: 1,
     },
-    conversationId: 'chief-digest-c1',
+    conversationId: 'chief-c1',
     session: { action: 'new', sessionId: null },
     instruction: '整理这段对话',
     agent: {
@@ -466,14 +466,14 @@ describe('chief digest execution surface (#1939)', () => {
       modelId: 'stub-model',
       thinkingLevel: null,
     },
-    chief: { threadId: 'chief-digest-c1', systemPrompt: '只读整理', trigger: 'user' },
+    chief: { threadId: 'chief-c1', systemPrompt: '只读整理', trigger: 'user' },
     remoteTools: [{ name: 'todos', description: 'list tasks' }],
     mcpServers: [],
     remoteToolsOnly: true,
   };
 
-  test('a digest session gets only its remote tools and a managed-empty MCP set', async () => {
-    const { captured } = await setup(claimedDigest);
+  test('a remote-only chief session gets only its remote tools and a managed-empty MCP set', async () => {
+    const { captured } = await setup(claimedRemoteOnly);
     expect(captured[0]!.remoteToolsOnly).toBe(true);
     expect(captured[0]!.mcpServers).toEqual([]);
     expect(captured[0]!.remoteTools?.map((t) => t.name)).toEqual(['todos']);
@@ -481,7 +481,7 @@ describe('chief digest execution surface (#1939)', () => {
   });
 
   test('host lockdown: chief and review sessions are locked down, verify and build sessions are not', async () => {
-    const chief = await setup(claimedDigest);
+    const chief = await setup(claimedRemoteOnly);
     expect(chief.captured[0]!.lockedDown).toBe(true);
     const review = await setup(claimedReview('review', HOSTED_REPO));
     expect(review.captured[0]!.lockedDown).toBe(true);

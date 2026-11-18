@@ -315,7 +315,7 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
   });
 
   async function sendToCoordinator(content: string, projectId?: string): Promise<string> {
-    const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/coordinator/messages`, {
+    const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/chief/threads`, {
       content,
       ...(projectId === undefined ? {} : { projectId }),
     });

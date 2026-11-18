@@ -264,7 +264,6 @@ const ROUTING_GROUPS: RoutingSourceGroup[] = [
       { id: 'coordinator', name: 'Coordinator', tag: 'Claude Opus 5.5', target: 'claude' },
       { id: 'session', name: 'New tasks', tag: 'GPT-6.1 Sol', target: 'codex' },
       { id: 'review', name: 'Review', tag: 'Claude Sonnet 5.5', target: 'claude' },
-      { id: 'digest', name: 'Digest', tag: 'GLM-5.3', target: 'proxy', broken: true },
     ],
   },
   {

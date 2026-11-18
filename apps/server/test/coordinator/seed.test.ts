@@ -59,7 +59,7 @@ function serverDb(dir: string): string {
   return path;
 }
 
-describe('seeding the Coordinator store from the C2 summary', () => {
+describe('seeding the Coordinator store from thread rows', () => {
   it('reads only the thread rows after the summary, oldest first', () => {
     const rows = readThreadRows(serverDb(tempDir()), 't1', 10);
     expect(rows.map((r) => r.id)).toEqual(['u1', 'a1', 'c1', 'a2']);
@@ -76,29 +76,18 @@ describe('seeding the Coordinator store from the C2 summary', () => {
     expect(messages[1]?.text).toContain('read_history ids ["a2"]');
   });
 
-  it('writes the summary as the head of the context and refuses to seed twice', async () => {
+  it('writes the rows as the head of the context and refuses to seed twice', async () => {
     const dir = tempDir();
     const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });
     faux.setResponses([fauxAssistantMessage('ok')]);
     const models = createCoordinatorModels([faux.provider]);
     const harness = await openCoordinatorHarness(join(dir, 'c.sqlite'), models.models, ctx);
     const rows = readThreadRows(serverDb(dir), 't1', 10);
-    await seedCoordinator(
-      harness,
-      'D56: keep the step claim',
-      rows,
-      { provider: 'stub', modelId: 'm' },
-      ctx,
-    );
+    await seedCoordinator(harness, rows, { provider: 'stub', modelId: 'm' }, ctx);
     const view = await (await harness.root(ctx)).context(ctx);
-    const first = view.messages[0];
-    expect(first?.role).toBe('user');
-    expect(JSON.stringify(first?.content)).toContain(
-      '<summary>\\nD56: keep the step claim\\n</summary>',
-    );
-    expect(view.messages.map((m) => m.role)).toEqual(['user', 'user', 'assistant']);
+    expect(view.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
     await expect(
-      seedCoordinator(harness, 'again', rows, { provider: 'stub', modelId: 'm' }, ctx),
+      seedCoordinator(harness, rows, { provider: 'stub', modelId: 'm' }, ctx),
     ).rejects.toThrow(/already holds a conversation/);
     await harness.close(ctx);
   });

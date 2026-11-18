@@ -44,7 +44,6 @@ import {
   settleParkedStep,
   toBuildRecord,
 } from './builds.js';
-import { finishChiefDigest, isChiefDigestStep } from './chief-digest.js';
 import { releaseUnconsumedSteer } from './chief-turns.js';
 import {
   buildCiFixPrompt,
@@ -578,12 +577,6 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   }
   if (outcome.skillInjectionFacts !== undefined) {
     recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
-  }
-  if (stepRow.kind === 'chief' && isChiefDigestStep(stepRow)) {
-    finishChiefDigest(deps, stepRow, outcome, nowMs());
-    publishStepStatus(deps, stepId);
-    emitRuntimeStepSpan(deps.db, stepId);
-    return;
   }
   if (stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId)) {
     finishCoordinatorTurn(deps, stepRow, outcome);

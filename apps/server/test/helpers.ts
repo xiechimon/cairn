@@ -284,10 +284,7 @@ export function stampPersonSendBody(path: string, body: unknown): unknown {
   if (record.clientMessageId !== undefined || typeof record.queuedMessageId === 'string')
     return body;
   const bare = path.split('?')[0] ?? path;
-  const send =
-    bare.endsWith('/coordinator/messages') ||
-    bare.endsWith('/chief/threads') ||
-    /\/conversations\/[^/]+\/messages$/.test(bare);
+  const send = bare.endsWith('/chief/threads') || /\/conversations\/[^/]+\/messages$/.test(bare);
   if (!send) return body;
   personSendStamp += 1;
   return { ...record, clientMessageId: `test-send-${personSendStamp}` };

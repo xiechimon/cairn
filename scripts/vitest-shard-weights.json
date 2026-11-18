@@ -315,7 +315,6 @@
   "@xiechimon/cairn:test/chief-auto-confirm.test.ts": 33,
   "@xiechimon/cairn:test/chief-context-failure.test.ts": 232,
   "@xiechimon/cairn:test/chief-demotion.test.ts": 1195,
-  "@xiechimon/cairn:test/chief-digest.test.ts": 3471,
   "@xiechimon/cairn:test/chief-dispatch.test.ts": 1168,
   "@xiechimon/cairn:test/chief-gate-budget.test.ts": 758,
   "@xiechimon/cairn:test/chief-history.test.ts": 2547,

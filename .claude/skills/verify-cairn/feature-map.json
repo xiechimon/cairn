@@ -95,7 +95,6 @@
         "server": [
           "apps/server/src/routes-chief.ts",
           "apps/server/src/services/chief.ts",
-          "apps/server/src/services/coordinator.ts",
           "apps/server/src/coordinator"
         ]
       },
@@ -110,8 +109,7 @@
           "/api/teams/:id/chief/threads/:tid/messages/:mid",
           "/api/teams/:id/chief/threads/:tid/retry-greeting/:stepId",
           "/api/teams/:id/chief/threads/:tid/rewind",
-          "/api/teams/:id/chief/threads/:tid/stop",
-          "/api/teams/:id/coordinator**"
+          "/api/teams/:id/chief/threads/:tid/stop"
         ]
       },
       "reach": [
@@ -200,7 +198,7 @@
         "server": [
           "apps/server/src/services/coordinator-context.ts",
           "apps/server/src/services/chief-history.ts",
-          "apps/server/src/coordinator/seed-summary.ts"
+          "apps/server/src/coordinator/runtime/seed.ts"
         ]
       },
       "reach": [

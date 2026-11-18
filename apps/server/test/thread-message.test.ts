@@ -216,7 +216,7 @@ describe('Coordinator awareness of direct thread messages', () => {
   }
 
   async function sayToCoordinator(content: string) {
-    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, {
+    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
       content,
     });
     expect(res.status).toBe(201);
@@ -245,7 +245,7 @@ describe('Coordinator awareness of direct thread messages', () => {
   test('keeps the picked project readable when a direct-message note is attached', async () => {
     seedThread('building', 'claimed');
     await send({ content: 'Use the cached index', clientMessageId: 'c-9' });
-    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, {
+    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
       content: 'Status?',
       projectId: H.projectId,
     });

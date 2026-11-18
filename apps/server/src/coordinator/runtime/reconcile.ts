@@ -20,7 +20,6 @@ import { settleStaleSubmissions } from './stale-runs.js';
 export const PI_VERSION = '1.5.0';
 
 export interface ReconcileSeed {
-  summary: string;
   rows: SeedRow[];
   model: { provider: string; modelId: string };
 }
@@ -156,7 +155,7 @@ export async function openReconciledHarness(
       await options.beforeReconcile?.(harness, storeId);
     }
     const seed = await facts.seed();
-    await seedCoordinator(harness, seed.summary, seed.rows, seed.model, context);
+    await seedCoordinator(harness, seed.rows, seed.model, context);
     outcome = reseed;
   }
   const settled = await settleStaleSubmissions(harness, context, facts.isLive);

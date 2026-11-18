@@ -47,11 +47,6 @@ import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { turnProvenance } from './chief.js';
 import { chiefHistoryFor } from './chief-claim-history.js';
-import {
-  CHIEF_DIGEST_MIN_CLI_VERSION,
-  CHIEF_DIGEST_REMOTE_TOOLS,
-  isChiefDigestStep,
-} from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
@@ -193,7 +188,6 @@ export function serverTakesTurn(
   return (
     coordinatorInServerEnabled() &&
     stepRow.kind === 'chief' &&
-    !isChiefDigestStep(stepRow) &&
     coordinatorRoute(db, teamId, chiefThreadProject(db, stepRow.buildId)) !== null
   );
 }
@@ -209,6 +203,7 @@ function chiefThreadProject(db: MachineDeps['db'], threadId: string): string | n
 }
 
 export const TASK_SEGMENTS_MIN_CLI_VERSION = '0.2.4';
+export const CHIEF_MAIL_MIN_CLI_VERSION = '0.2.2';
 
 export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
   return cliVersionAtLeast(latestCliVersion, MCP_MIN_CLI_VERSION);
@@ -239,7 +234,7 @@ export function stepMcpGrant(
 }
 
 export function chiefTurnLocked(stepRow: typeof step.$inferSelect): boolean {
-  return isChiefDigestStep(stepRow) || turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
+  return turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
 }
 
 function claimLocalTools(agentTools: readonly string[]): string[] {
@@ -289,7 +284,7 @@ function chiefClaimPayload(
   machineRow?: typeof machine.$inferSelect,
 ): ClaimedStep {
   const model = effectiveModel(agentRow, stepRow);
-  const { digest, trigger, systemPrompt, memories, instruction, memoryTrace } = chiefTurnContext(
+  const { trigger, systemPrompt, memories, instruction, memoryTrace } = chiefTurnContext(
     deps,
     stepRow,
     threadRow,
@@ -309,7 +304,7 @@ function chiefClaimPayload(
     threadRow.sessionId !== '' &&
     !chiefLastRanOnOtherAccount(deps.db, threadRow.id, stepRow.id, boundSubscriptionId);
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
-  const locked = digest || mailTurn;
+  const locked = mailTurn;
   const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
   const chiefMcp = machineRow ? stepMcpGrant(deps.db, machineRow, locked) : locked ? [] : undefined;
   return {
@@ -346,11 +341,9 @@ function chiefClaimPayload(
       ...(history !== null ? { history } : {}),
     },
     remoteTools: [
-      ...(digest
-        ? CHIEF_DIGEST_REMOTE_TOOLS
-        : mailTurn
-          ? []
-          : [...coordinatorToolDefs(), ...connectorToolDefsForTeam(deps.db, threadRow.teamId)]),
+      ...(mailTurn
+        ? []
+        : [...coordinatorToolDefs(), ...connectorToolDefsForTeam(deps.db, threadRow.teamId)]),
     ],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(locked ? { remoteToolsOnly: true as const } : {}),
@@ -386,15 +379,14 @@ function claimChiefTurn(
   if (!machineRow) return null;
   if (machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers)) return null;
   const claudeBlocked = claudeBlockedReader(db);
-  const cands = claimChiefCandidates(deps, machineId, teamId)
-    .filter((cand) => cand.stepRow.createdAt <= createdUpTo)
-    .sort((a, b) => Number(isChiefDigestStep(a.stepRow)) - Number(isChiefDigestStep(b.stepRow)));
+  const cands = claimChiefCandidates(deps, machineId, teamId).filter(
+    (cand) => cand.stepRow.createdAt <= createdUpTo,
+  );
   for (const cand of cands) {
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
     if (
-      (isChiefDigestStep(cand.stepRow) ||
-        turnProvenance(cand.stepRow.prompt)?.startsWith('mail:') === true) &&
-      !cliVersionAtLeast(machineRow.latestCliVersion, CHIEF_DIGEST_MIN_CLI_VERSION)
+      turnProvenance(cand.stepRow.prompt)?.startsWith('mail:') === true &&
+      !cliVersionAtLeast(machineRow.latestCliVersion, CHIEF_MAIL_MIN_CLI_VERSION)
     ) {
       continue;
     }

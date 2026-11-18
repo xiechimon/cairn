@@ -144,126 +144,104 @@ describe('in-server Coordinator telemetry', () => {
     },
   );
 
-  it.each([false, true])(
-    'times streaming answers, suggestions and the summary prepared after them (summary fails: %s)',
-    async (summaryFails) => {
-      vi.stubEnv('CAIRN_OTEL_ENDPOINT', endpoint);
-      const spans = captureSpans();
-      const w = await world('resume on a new model');
-      w.s.db
-        .insert(chiefMessage)
-        .values(
-          Array.from({ length: 130 }, (_, i) => ({
-            id: `old-${i}`,
-            threadId: w.threadId,
-            role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
-            content: `earlier message ${i}`,
-            createdAt: 1_000 + i,
-          })),
-        )
-        .run();
-      w.s.db
-        .insert(chiefTurnUsage)
-        .values({
-          stepId: 'prior',
+  it('times streaming answers and suggestions after a reseed', async () => {
+    vi.stubEnv('CAIRN_OTEL_ENDPOINT', endpoint);
+    const spans = captureSpans();
+    const w = await world('resume on a new model');
+    w.s.db
+      .insert(chiefMessage)
+      .values(
+        Array.from({ length: 130 }, (_, i) => ({
+          id: `old-${i}`,
           threadId: w.threadId,
-          model: 'stub/previous',
-          input: 5_000,
-          output: 10,
-          cacheRead: 5_000,
-          cacheWrite: 0,
-          contextTokens: 5_000,
-          createdAt: Date.now() - 30_000,
-        })
-        .run();
-      const faux = fauxProvider({
-        provider: 'stub',
-        models: [{ id: 'm', contextWindow: 200_000 }],
-      });
-      const observations: { stage: string; start: number; first?: number; end?: number }[] = [];
-      const coordinator = boot(w, faux, {
-        fixedProviders: [
-          {
-            ...faux.provider,
-            streamSimple(model, context) {
-              const stage = JSON.stringify(context.messages).includes(
-                "You are Cairn's Coordinator summarization step.",
-              )
-                ? 'summary'
-                : context.messages[0]?.content === SUGGEST_REPLIES_ASK
-                  ? 'suggestion'
-                  : 'answer';
-              const observed: (typeof observations)[number] = { stage, start: Date.now() };
-              observations.push(observed);
-              const failed = stage === 'summary' && summaryFails;
-              const message = {
-                ...fauxAssistantMessage(
-                  stage === 'suggestion' ? '{"replies":["More"]}' : 'answer',
-                  {
-                    stopReason: failed ? 'error' : 'stop',
-                    ...(failed ? { errorMessage: 'summary websocket failed' } : {}),
-                  },
-                ),
-                api: model.api,
-                provider: model.provider,
-                model: model.id,
-                timestamp: Date.now(),
-              };
-              const stream = createAssistantMessageEventStream();
-              stream.push({ type: 'start', partial: message });
-              stream.push({ type: 'text_delta', contentIndex: 0, delta: '', partial: message });
-              void (async () => {
-                await delay(40);
-                if (!failed) {
-                  observed.first = Date.now();
-                  stream.push({
-                    type: 'text_delta',
-                    contentIndex: 0,
-                    delta: 'a',
-                    partial: message,
-                  });
-                }
-                await delay(25);
-                observed.end = Date.now();
-                if (failed) stream.push({ type: 'error', reason: 'error', error: message });
-                else stream.push({ type: 'done', reason: 'stop', message });
-                stream.end(message);
-              })();
-              return stream;
-            },
-          } satisfies typeof faux.provider,
-        ],
-      });
-      coordinator.wake(w.threadId);
-      await coordinator.idle();
-      await flushRuntimeOtel();
-      expect(observations.map((o) => o.stage)).toEqual(['answer', 'suggestion', 'summary']);
-      expect(observations[2]!.start).toBeGreaterThanOrEqual(observations[0]!.end!);
-      const turn = spans.find((s) => s.name === 'coordinator turn')!;
-      const summaries = spans.filter((s) => s.name === 'compaction seed-summary');
-      const chats = spans.filter((s) => s.name === 'chat m');
-      expect(summaries).toHaveLength(1);
-      expect(chats).toHaveLength(2);
-      for (const [i, span] of [...chats, ...summaries].entries()) {
-        const observed = observations[i]!;
-        const start = Number(BigInt(span.startTimeUnixNano) / 1_000_000n);
-        const end = Number(BigInt(span.endTimeUnixNano) / 1_000_000n);
-        expect(start).toBeLessThanOrEqual(observed.start + 5);
-        expect(end).toBeGreaterThanOrEqual(observed.end! - 5);
-        expect(end - start).toBeGreaterThanOrEqual(60);
-        if (i < chats.length) {
-          expect(span.traceId).toBe(turn.traceId);
-          expect(span.parentSpanId).toBe(turn.spanId);
-          const first = Date.parse(attr(span, 'langfuse.observation.completion_start_time') ?? '');
-          expect(first).toBeGreaterThanOrEqual(observed.first! - 5);
-          expect(first).toBeLessThanOrEqual(observed.end!);
-          expect(first - start).toBeGreaterThanOrEqual(35);
-          expect(first).toBeLessThan(end);
-        }
-      }
-      for (const summary of summaries) expect(summary.status?.code === 2).toBe(summaryFails);
-    },
-  );
+          role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
+          content: `earlier message ${i}`,
+          createdAt: 1_000 + i,
+        })),
+      )
+      .run();
+    w.s.db
+      .insert(chiefTurnUsage)
+      .values({
+        stepId: 'prior',
+        threadId: w.threadId,
+        model: 'stub/previous',
+        input: 5_000,
+        output: 10,
+        cacheRead: 5_000,
+        cacheWrite: 0,
+        contextTokens: 5_000,
+        createdAt: Date.now() - 30_000,
+      })
+      .run();
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000 }],
+    });
+    const observations: { stage: string; start: number; first?: number; end?: number }[] = [];
+    const coordinator = boot(w, faux, {
+      fixedProviders: [
+        {
+          ...faux.provider,
+          streamSimple(model, context) {
+            const stage =
+              context.messages[0]?.content === SUGGEST_REPLIES_ASK ? 'suggestion' : 'answer';
+            const observed: (typeof observations)[number] = { stage, start: Date.now() };
+            observations.push(observed);
+            const message = {
+              ...fauxAssistantMessage(stage === 'suggestion' ? '{"replies":["More"]}' : 'answer', {
+                stopReason: 'stop',
+              }),
+              api: model.api,
+              provider: model.provider,
+              model: model.id,
+              timestamp: Date.now(),
+            };
+            const stream = createAssistantMessageEventStream();
+            stream.push({ type: 'start', partial: message });
+            stream.push({ type: 'text_delta', contentIndex: 0, delta: '', partial: message });
+            void (async () => {
+              await delay(40);
+              observed.first = Date.now();
+              stream.push({
+                type: 'text_delta',
+                contentIndex: 0,
+                delta: 'a',
+                partial: message,
+              });
+              await delay(25);
+              observed.end = Date.now();
+              stream.push({ type: 'done', reason: 'stop', message });
+              stream.end(message);
+            })();
+            return stream;
+          },
+        } satisfies typeof faux.provider,
+      ],
+    });
+    coordinator.wake(w.threadId);
+    await coordinator.idle();
+    await flushRuntimeOtel();
+    expect(observations.map((o) => o.stage)).toEqual(['answer', 'suggestion']);
+    const turn = spans.find((s) => s.name === 'coordinator turn')!;
+    const chats = spans.filter((s) => s.name === 'chat m');
+    expect(chats).toHaveLength(2);
+    for (const [i, span] of chats.entries()) {
+      const observed = observations[i]!;
+      const start = Number(BigInt(span.startTimeUnixNano) / 1_000_000n);
+      const end = Number(BigInt(span.endTimeUnixNano) / 1_000_000n);
+      expect(start).toBeLessThanOrEqual(observed.start + 5);
+      expect(end).toBeGreaterThanOrEqual(observed.end! - 5);
+      expect(end - start).toBeGreaterThanOrEqual(60);
+      expect(span.traceId).toBe(turn.traceId);
+      expect(span.parentSpanId).toBe(turn.spanId);
+      const first = Date.parse(attr(span, 'langfuse.observation.completion_start_time') ?? '');
+      expect(first).toBeGreaterThanOrEqual(observed.first! - 5);
+      expect(first).toBeLessThanOrEqual(observed.end!);
+      expect(first - start).toBeGreaterThanOrEqual(35);
+      expect(first).toBeLessThan(end);
+    }
+  });
 
   it('exports the turn, one chat span per model call and one span per tool call under the thread session', async () => {
     vi.stubEnv('CAIRN_OTEL_ENDPOINT', endpoint);

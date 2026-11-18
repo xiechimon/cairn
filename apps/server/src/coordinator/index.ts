@@ -14,7 +14,6 @@ import {
   build,
   chief,
   chiefMessage,
-  chiefSummary,
   chiefThread,
   coordinatorConversation,
   coordinatorEntry,
@@ -26,7 +25,6 @@ import {
 import { nowMs } from '../lib/ids.js';
 import { blockedNow } from '../services/blockers.js';
 import { parseChiefTrigger } from '../services/chief.js';
-import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep, STEER_HOLDS } from '../services/chief-turns.js';
 import { teamHasVmComputer } from '../services/cloak-license.js';
 import { connectorToolDefsForTeam } from '../services/connector-broker.js';
@@ -54,11 +52,9 @@ import { settleInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
 import { providerBinding } from './provider-binding.js';
 import { isColdResume, resolveCacheRetentionTier, retentionMsFor } from './runtime/cold-slim.js';
-import { summarizerFor } from './runtime/compaction.js';
-import { reportCompactionFailure, setFailureSink } from './runtime/failure-report.js';
+import { setFailureSink } from './runtime/failure-report.js';
 import { startInfoCardRunner } from './runtime/info-card-runner.js';
 import type { MachineApi } from './runtime/machine-api.js';
-import { createCoordinatorModels } from './runtime/models.js';
 import type { ReconcileFacts } from './runtime/reconcile.js';
 import type { SeedRow } from './runtime/seed.js';
 import {
@@ -66,7 +62,6 @@ import {
   type ProviderBinding,
   type ServerRuntimeConfig,
 } from './runtime/server-runtime.js';
-import { laggingSeedWindowStart, SUMMARY_LAG_ROWS, seedSummary } from './seed-summary.js';
 import { createCoordinatorServerApi } from './server-api.js';
 import { parseWatermark } from './watermark.js';
 
@@ -214,21 +209,12 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           live.flatMap((r) => [r.id, transcriptPromptRowId(r.id), ...(r.ownerMessageIds ?? [])]),
         );
         if (watermark?.kind === 'rewind') pendingUsers.add(watermark.anchorMessageId);
-        const prior = db
-          .select()
-          .from(chiefSummary)
-          .where(eq(chiefSummary.threadId, threadId))
-          .get();
-        const unsummarized = (m: { createdAt: number }, rowid: number) =>
-          prior === undefined ||
-          m.createdAt > prior.coveredAt ||
-          (m.createdAt === prior.coveredAt && rowid > prior.coveredRowid);
         const window = db
           .select({ message: chiefMessage, rowid: sql<number>`rowid` })
           .from(chiefMessage)
           .where(eq(chiefMessage.threadId, threadId))
           .orderBy(sql`${chiefMessage.createdAt} desc`, sql`rowid desc`)
-          .limit(SEED_MAX_ROWS + SUMMARY_LAG_ROWS + pendingUsers.size + 20)
+          .limit(SEED_MAX_ROWS + pendingUsers.size + 20)
           .all()
           .filter(
             ({ message: m }) =>
@@ -237,8 +223,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
               !m.id.startsWith('chief-digest-') &&
               !m.id.startsWith('chief-report-'),
           )
-          .slice(0, SEED_MAX_ROWS + SUMMARY_LAG_ROWS)
-          .filter(({ message: m, rowid }, index) => index < SEED_MAX_ROWS || unsummarized(m, rowid))
+          .slice(0, SEED_MAX_ROWS)
           .reverse();
         const rows = window.map(
           ({ message: m }): SeedRow => ({
@@ -249,7 +234,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           }),
         );
         return {
-          summary: prior?.summary ?? '',
           rows,
           model: {
             provider: providers?.router.provider ?? 'unknown',
@@ -599,50 +583,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     };
   };
 
-  const preparing = new Map<string, Promise<void>>();
-
-  const prepareSummary = (
-    threadId: string,
-    teamId: string,
-    providers: CoordinatorProviders,
-  ): void => {
-    if (closing || preparing.has(threadId)) return;
-    const windowStart = laggingSeedWindowStart(db, threadId, SEED_MAX_ROWS, SUMMARY_LAG_ROWS);
-    if (windowStart === null) return;
-    const models = createCoordinatorModels(options.fixedProviders ?? []);
-    const summaryBind = binding(teamId, providers.summary);
-    models.useProvider(summaryBind.config, summaryBind.resolveKey);
-    let summarize: ReturnType<typeof summarizerFor>;
-    try {
-      summarize = summarizerFor(
-        models.models,
-        { provider: providers.summary.provider, modelId: providers.summary.modelId },
-        { threadId, stage: 'seed-summary' },
-      );
-    } catch (error) {
-      reportCompactionFailure({ threadId }, 'summary-model', error);
-      return;
-    }
-    const reportScrubbed = (error: unknown, startAt?: number) => {
-      const message = scrubProviderError(
-        { db, box: machine.box },
-        teamId,
-        [providers.router.provider, providers.summary.provider],
-        String(error),
-      );
-      const scrubbed = new Error(message);
-      scrubbed.name = error instanceof Error ? error.name : 'Error';
-      reportCompactionFailure({ threadId }, 'seed-summary', scrubbed, startAt);
-    };
-    const running = seedSummary(db, threadId, windowStart, summarize, reportScrubbed, nowMs())
-      .then(
-        () => {},
-        (error: unknown) => reportScrubbed(error),
-      )
-      .finally(() => preparing.delete(threadId));
-    preparing.set(threadId, running);
-  };
-
   const runStep = async (row: StepRow): Promise<void> => {
     const teamId = threadTeam(row.buildId);
     if (teamId === null) return;
@@ -668,7 +608,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         router: binding(teamId, providers.router),
         summary: binding(teamId, providers.summary),
       });
-      prepareSummary(row.buildId, teamId, providers);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const scrubbed = scrubProviderError({ db, box: machine.box }, teamId, keyed, message);
@@ -743,10 +682,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     if (draining.has(threadId)) {
       if (
         liveSteps(threadId).some(
-          (row) =>
-            row.status === 'pending' &&
-            !isChiefDigestStep(row) &&
-            parseChiefTrigger(row.prompt) === 'user',
+          (row) => row.status === 'pending' && parseChiefTrigger(row.prompt) === 'user',
         )
       )
         runtime.yieldSuggestions(threadId);
@@ -772,10 +708,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         ...pending.map((row) => row.threadId),
         ...recoveryThreads,
       ]),
-    ].filter((threadId) => {
-      const live = liveSteps(threadId);
-      return live.length === 0 || !live.every((row) => isChiefDigestStep(row));
-    });
+    ];
   };
 
   const tick = (): void => {
@@ -819,8 +752,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     tick,
     idle: async () => {
       await Promise.resolve();
-      while (draining.size > 0 || preparing.size > 0)
-        await Promise.allSettled([...draining.values(), ...preparing.values()]);
+      while (draining.size > 0) await Promise.allSettled([...draining.values()]);
       await infoCards.idle();
     },
     close: async () => {

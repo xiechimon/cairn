@@ -18,10 +18,7 @@ import type { MachineApi } from '../../daemon/src/machine-client.js';
 import { performRepoArchive } from '../../daemon/src/repo-archive.js';
 import { startCoordinator } from '../src/coordinator/index.js';
 import { attachment, build, message, step, todo } from '../src/db/schema.js';
-import {
-  setCoordinatorInServer,
-  setCoordinatorServerContextEnabled,
-} from '../src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { dropComputerWaiters, receiveComputerFrames } from '../src/services/machine-computer.js';
 import { claimStep } from '../src/services/machines.js';
 import { createProvider } from '../src/services/providers.js';
@@ -51,7 +48,6 @@ afterEach(async () => {
   for (const dispose of disposables.splice(0)) await dispose();
   dropComputerWaiters();
   setCoordinatorInServer(false);
-  setCoordinatorServerContextEnabled(false);
 });
 
 async function infoCard(
@@ -210,7 +206,6 @@ async function runInfoCard(
   vm: { calls: ComputerCall[]; files: Map<string, Buffer> };
 }> {
   setCoordinatorInServer(true);
-  setCoordinatorServerContextEnabled(true);
   const s = bootServer();
   disposables.push(() => s.dispose());
   const machineId = insertMachine(s, { name: 'mac', capabilities: VM_CAPABILITIES });

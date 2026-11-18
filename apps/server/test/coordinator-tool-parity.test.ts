@@ -6,7 +6,6 @@ import {
   chiefThread as chiefThreadTable,
   step as stepTable,
 } from '../src/db/schema.js';
-import { CHIEF_DIGEST_REMOTE_TOOLS } from '../src/services/chief-digest.js';
 import { claimStep } from '../src/services/machines.js';
 import { fakeMachineApi } from './coordinator/fake-machine-api.js';
 import { bootServer, insertClaudeSubscription, insertMachine, seedRoute } from './helpers.js';
@@ -87,19 +86,5 @@ describe('the Coordinator tool table is the same on the in-server runtime and on
     }));
     const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
     expect(offered.sort(byName)).toEqual(registered.sort(byName));
-  });
-
-  test('a digest turn is offered read tools only, none of the computer or archive tools', () => {
-    const names = CHIEF_DIGEST_REMOTE_TOOLS.map((tool) => tool.name);
-    for (const forbidden of [
-      'browser_navigate',
-      'browser_snapshot',
-      'browser_act',
-      'request_takeover',
-      'archive_project',
-      'unarchive_project',
-    ]) {
-      expect(names).not.toContain(forbidden);
-    }
   });
 });

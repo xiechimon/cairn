@@ -16,7 +16,7 @@ import {
   todo,
   tokenUsage,
 } from '../src/db/schema.js';
-import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { recordStepUsage } from '../src/services/coordinator-steps.js';
 import { dailyUsage } from '../src/services/usage-daily.js';
 import { H, registerChiefHarness } from './chief-harness.js';
@@ -25,10 +25,10 @@ import { req } from './helpers.js';
 registerChiefHarness();
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
-  setCoordinatorServerContextEnabled(true);
+  setCoordinatorInServer(true);
 });
 afterEach(() => {
-  setCoordinatorServerContextEnabled(false);
+  setCoordinatorInServer(false);
   vi.useRealTimers();
 });
 
@@ -141,7 +141,7 @@ describe('recordStepUsage writes one step_usage row per step and model', () => {
     vi.setSystemTime(YESTERDAY);
     report('t1', H.threadId, [u('m', 100)]);
     vi.setSystemTime(NOW);
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
     report('t1', H.threadId, [u('m', 40)]);
     expect(H.s.db.select().from(stepUsage).get()).toMatchObject({
       input: 140,
@@ -304,7 +304,7 @@ describe('dailyUsage groups tokens by local calendar day', () => {
     vi.setSystemTime(YESTERDAY);
     report('t1', H.threadId, [u('m', 100)]);
     legacyOnly();
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
     vi.setSystemTime(NOW);
     report('t1', H.threadId, [u('m', 40)]);
     expect(daily(60)).toEqual([
@@ -339,11 +339,11 @@ describe('dailyUsage groups tokens by local calendar day', () => {
       .run();
     vi.setSystemTime(at('2026-11-14T09:00:00+08:00'));
     report('pi-turn', H.threadId, [u('m', 70)]);
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
     report('off-turn', H.threadId, [u('m', 20)]);
     report('digest', digest, [u('m', 5)]);
     legacyOnly();
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     vi.setSystemTime(NOW);
     report('new-turn', H.threadId, [u('m', 8)]);
     expect(daily(30)).toEqual([

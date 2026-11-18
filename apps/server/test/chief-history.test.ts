@@ -481,34 +481,24 @@ describe('cache-stable system prompt', () => {
         .trimEnd(),
     );
     expect(composeChiefSystemPrompt(resource(), H.teamId, H.threadId)).toBe(built.text);
-    expect(built.sections.map((s) => s.name)).toEqual(['static', 'team', 'channel', 'digests']);
+    expect(built.sections.map((s) => s.name)).toEqual(['static', 'team', 'channel']);
     for (const section of built.sections) expect(section.hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  test('a new digest row changes only the last section and leaves the earlier prefix identical', () => {
+  test('a new digest row leaves the prompt identical', () => {
     H.s.db.insert(chiefMessage).values(digestRow(1, 'first decision')).run();
     const before = buildChiefSystemPrompt(resource(), H.teamId, H.threadId);
     H.s.db.insert(chiefMessage).values(digestRow(2, 'second decision')).run();
     const after = buildChiefSystemPrompt(resource(), H.teamId, H.threadId);
 
-    expect(after.sections.map((s) => s.hash).slice(0, -1)).toEqual(
-      before.sections.map((s) => s.hash).slice(0, -1),
-    );
-    expect(after.sections.at(-1)?.hash).not.toBe(before.sections.at(-1)?.hash);
-    const prefix = before.sections
-      .slice(0, -1)
-      .map((s) => s.text)
-      .join('\n');
-    expect(after.text.startsWith(prefix)).toBe(true);
-    expect(after.text).toContain('second decision');
+    expect(after.sections.map((s) => s.hash)).toEqual(before.sections.map((s) => s.hash));
+    expect(after.text).toBe(before.text);
+    expect(after.text).not.toContain('second decision');
   });
 
-  test('static content precedes team context, which precedes digests', () => {
-    H.s.db.insert(chiefMessage).values(digestRow(1, 'a decision')).run();
+  test('static content precedes team context', () => {
     const { text } = buildChiefSystemPrompt(resource(), H.teamId, H.threadId);
-    const order = ['## 工作约定', '## 团队', '## 记忆', '## 之前对话的摘要'].map((m) =>
-      text.indexOf(`\n${m}`),
-    );
+    const order = ['## 工作约定', '## 团队', '## 记忆'].map((m) => text.indexOf(`\n${m}`));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });

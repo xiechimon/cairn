@@ -7,7 +7,7 @@ import { modelRefSchema } from './model-source.js';
 import type { StepKind } from './step.js';
 import { workPolicyRecordSchema } from './work-policy.js';
 
-export const ROUTE_USES = ['coordinator', 'session', 'review', 'digest', 'compaction'] as const;
+export const ROUTE_USES = ['coordinator', 'session', 'review', 'compaction'] as const;
 export type RouteUse = (typeof ROUTE_USES)[number];
 export const routeUseSchema = z.enum(ROUTE_USES);
 

@@ -34,7 +34,7 @@ function chiefSteps(threadId: string) {
 }
 
 async function sendFromComposer(content: string, projectId?: string) {
-  const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, {
+  const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
     content,
     ...(projectId === undefined ? {} : { projectId }),
   });

@@ -91,7 +91,7 @@ The wake prompt carries ids, the rule name, and a fenced excerpt. The server alr
 
 Reuse the issue-fence shape, with a mail marker, not `ISSUE_FENCE_OPEN`. Excerpt is display name, subject, and a short text slice. No raw MIME, no attachment bytes, no tokens.
 
-The live wake is untrusted only if the Coordinator's own prompt says so. `buildChiefSystemPrompt` in `apps/server/src/services/chief.ts` names `ISSUE_FENCE_OPEN` and nothing else. The mail marker is added to that third-party paragraph. The same marker is added wherever that constant is the trust boundary today: `shortEvent`, `validateMemoryText`, `apps/server/src/services/memory-consolidation.ts`, `chief-digest.ts`, `chief-report.ts`, `trajectory-curate.ts`, and `trajectory-reflect.ts`. A marker that only `shortEvent` omits still sits in the prompt as instructions.
+The live wake is untrusted only if the Coordinator's own prompt says so. `buildChiefSystemPrompt` in `apps/server/src/services/chief.ts` names `ISSUE_FENCE_OPEN` and nothing else. The mail marker is added to that third-party paragraph. The same marker is added wherever that constant is the trust boundary today: `shortEvent`, `validateMemoryText`, `apps/server/src/services/memory-consolidation.ts`, `trajectory-curate.ts`, and `trajectory-reflect.ts`. A marker that only `shortEvent` omits still sits in the prompt as instructions.
 
 - The mail-body read may return the fenced body of this event only. The fence stays on that text. If the implementation reuses the `read_history` name, the handler accepts only this event's id.
 - Server-side allowlist, not the prompt: that one read, and nothing else. Every other chief tool and every relay, computer, shell, and secret path is refused before dispatch.

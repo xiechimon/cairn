@@ -1401,6 +1401,13 @@
       "when": 1794993642732,
       "tag": "0204_hard_iron_man",
       "breakpoints": true
+    },
+    {
+      "idx": 205,
+      "version": "6",
+      "when": 1794995890319,
+      "tag": "0205_retire_chief_digest",
+      "breakpoints": true
     }
   ]
 }

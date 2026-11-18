@@ -20,7 +20,6 @@ interface Sent {
 }
 
 const entryPoints = [
-  ['POST /coordinator/messages', () => `/api/teams/${H.teamId}/coordinator/messages`],
   ['POST /chief/threads', () => `/api/teams/${H.teamId}/chief/threads`],
   ['POST /conversations/:chiefThread/messages', () => `/api/conversations/${H.threadId}/messages`],
 ] as const;
@@ -130,7 +129,7 @@ describe.each(entryPoints)('%s with a client message id', (_name, urlOf) => {
 
 describe('a replay while the original turn is already running', () => {
   test('does not steer again', async () => {
-    await post(`/api/teams/${H.teamId}/coordinator/messages`, { content: 'earlier' });
+    await post(`/api/teams/${H.teamId}/chief/threads`, { content: 'earlier' });
     const [running] = chiefSteps();
     H.s.db
       .update(step)
@@ -139,11 +138,11 @@ describe('a replay while the original turn is already running', () => {
       .run();
     const signal = vi.spyOn(H.s.machineHub, 'steerSignal');
     const body = { content: 'steer me once', clientMessageId: 'key-1' };
-    await post(`/api/teams/${H.teamId}/coordinator/messages`, body);
+    await post(`/api/teams/${H.teamId}/chief/threads`, body);
     expect(signal).toHaveBeenCalledTimes(1);
     const steered = H.s.db.select().from(coordinatorInput).get();
     expect(steered?.content).toBe('steer me once');
-    await post(`/api/teams/${H.teamId}/coordinator/messages`, body);
+    await post(`/api/teams/${H.teamId}/chief/threads`, body);
     expect(signal).toHaveBeenCalledTimes(1);
     expect(H.s.db.select().from(coordinatorInput).all()).toEqual([steered]);
     expect(chiefSteps()).toHaveLength(2);
@@ -269,7 +268,7 @@ describe('POST /api/todos/:id/messages with a client message id', () => {
 
   test('the same key as a Coordinator send is a different scope', async () => {
     seedThread('todo-a', 'build-a');
-    await post(`/api/teams/${H.teamId}/coordinator/messages`, {
+    await post(`/api/teams/${H.teamId}/chief/threads`, {
       content: 'coordinator text',
       clientMessageId: 'key-1',
     });

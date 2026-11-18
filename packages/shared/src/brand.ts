@@ -69,8 +69,6 @@ export const ENV_VARS = {
   hookTimeoutMs: 'CAIRN_HOOK_TIMEOUT_MS',
   issueIntake: 'CAIRN_ISSUE_INTAKE',
   scheduling: 'CAIRN_SCHEDULING',
-  coordinatorServerContext: 'CAIRN_COORDINATOR_SERVER_CONTEXT',
-  coordinatorMachineId: 'CAIRN_COORDINATOR_MACHINE_ID',
   coordinatorInServer: 'CAIRN_COORDINATOR_IN_SERVER',
   confinementPlatform: 'CAIRN_CONFINEMENT_PLATFORM',
   confineDeniedRoots: 'CAIRN_CONFINE_DENIED_ROOTS',

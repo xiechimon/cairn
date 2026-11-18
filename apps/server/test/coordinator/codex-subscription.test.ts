@@ -5,7 +5,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tm
 import { coordinatorApiKey, coordinatorProviders } from '../../src/coordinator/credentials.js';
 import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
 import { routingRule } from '../../src/db/schema.js';
-import { setCoordinatorServerContextEnabled } from '../../src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../../src/services/coordinator-context.js';
 import { createProvider } from '../../src/services/providers.js';
 import { bootServer } from '../helpers.js';
 
@@ -28,9 +28,9 @@ function codexHome(token: string | null): string {
   return home;
 }
 
-beforeEach(() => setCoordinatorServerContextEnabled(true));
+beforeEach(() => setCoordinatorInServer(true));
 afterEach(() => {
-  setCoordinatorServerContextEnabled(false);
+  setCoordinatorInServer(false);
   if (savedHome === undefined) delete process.env.CODEX_HOME;
   else process.env.CODEX_HOME = savedHome;
   for (const d of disposers.splice(0)) d();

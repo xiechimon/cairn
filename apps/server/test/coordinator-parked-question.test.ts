@@ -17,7 +17,7 @@ registerChiefHarness();
 const QUESTIONS = [{ header: 'scope', question: 'Which pages?', options: [] }];
 
 async function askFromProjectTurn(projectId: string, ageMs: number) {
-  const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, {
+  const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
     content: 'plan it',
     projectId,
   });
@@ -140,7 +140,7 @@ describe('ask_user parks instead of holding the one Coordinator thread', () => {
     await holdForQuestion({ db: H.s.db }, { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 });
     finishTurn(asker);
     const site = await postProject(H.s.app, 'cairn-site');
-    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, {
+    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
       content: 'site intake',
       projectId: site,
     });

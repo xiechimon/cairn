@@ -19,12 +19,9 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
-  CHIEF_DIGEST_GROUP_LABELS,
-  CHIEF_DIGEST_ROW_ID_PREFIX,
   CHIEF_WATCH_REASON_DISPATCH,
   COORDINATOR_DECISION_RULES,
   COORDINATOR_NOT_READY,
-  chiefDigestContentSchema,
   chiefDigestThreadId,
   chiefIdFormat,
   chiefTurnErrorContentSchema,
@@ -1828,8 +1825,6 @@ function fireChiefWake(
   });
 }
 
-const CHIEF_DIGEST_PROMPT_DIGESTS = 3;
-
 const ROUTER_PROMPT_THREADS_MAX = 20;
 
 function routerStateLines(db: Db, teamId: string): string[] {
@@ -1927,30 +1922,6 @@ export function buildChiefSystemPrompt(
     : { memories: [], omitted: 0, fileCount: 0 };
   const memories = injected.memories;
 
-  const digestRows = deps.db
-    .select({ content: chiefMessage.content })
-    .from(chiefMessage)
-    .where(
-      and(
-        eq(chiefMessage.threadId, threadId ?? ''),
-        like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`),
-      ),
-    )
-    .orderBy(desc(chiefMessage.createdAt))
-    .limit(CHIEF_DIGEST_PROMPT_DIGESTS)
-    .all();
-  const digestLines: string[] = [];
-  for (const row of digestRows.reverse()) {
-    const parsed = chiefDigestContentSchema.safeParse(
-      typeof row.content === 'string' ? JSON.parse(row.content) : row.content,
-    );
-    if (!parsed.success) continue;
-    for (const item of parsed.data.items) {
-      digestLines.push(
-        `- [${CHIEF_DIGEST_GROUP_LABELS[item.group]}] ${item.text}${item.reason !== '' ? `（${item.reason}）` : ''}`,
-      );
-    }
-  }
   const staticLines: string[] = [
     '你是「Coordinator」：每个「用户×团队」一个的路由与对话代理。你理解用户的请求，用 create_todo 建任务并自动启动一条 thread，再根据 thread 的状态回答用户。plan、写测试、实现、自检都由 thread 自己完成；你只路由，不写方案、不选模型、不亲手做事；唯一的例外是用户要你直接操作电脑，见「电脑操作」。',
     '',
@@ -1985,7 +1956,7 @@ export function buildChiefSystemPrompt(
     '### 回答',
     '- 用用户的语言、白话短句回答；没有新信息就不回复。',
     '- 回答进度、合并或运行状态前，先用 todos、pull_requests、workflow_runs 或 machines 查当前状态，不凭记忆回答。',
-    '- 「之前对话的摘要」只记对话，任务状态以工具查到的为准，两者对不上时信任务状态。用户问起以前的决定时，先从摘要里找，再用 todos 查任务现状，只回答，不建任务。',
+    '- 用户问起以前的决定时，先翻对话记录，再用 todos 查任务现状，只回答，不建任务。',
     '- 插话：你回复途中用户补充的话会直接送进本回合。照插话调整，插话和原请求冲突时以插话为准，并在这次回复里用一句话说明因为插话改了什么。',
     '- 提到任务时写成链接 [任务名](todo:<id>)，id 来自工具结果里的 id 或 todoId：界面把它显示成可点开的任务名，带当前状态。不写「#n」这样的编号，也不在链接前后再写一遍任务名。本回合 create_todo 建的任务会显示在你这条回复的上方，回复里不用再说「已建任务 …」，直接讲放在哪、接下来会怎样。写不了链接的地方（比如 ask_user 的标题和选项）直接写任务名。',
     '- 一个意思写成一段话。界面里每个空行隔开的段落都是一个单独的气泡，所以同一件事的补充说明写进同一段，不另起一段、不加括号里的「提醒一句」；只有两件不相干的事才空行分段。',
@@ -2056,8 +2027,6 @@ export function buildChiefSystemPrompt(
     `记忆文件：${injected.fileCount} 个；用 memories 按需读取。`,
     '',
   ];
-  const digestSectionLines: string[] =
-    digestLines.length > 0 ? ['## 之前对话的摘要（原文仍在对话里）', ...digestLines] : [];
   const channelProject =
     threadId === undefined
       ? undefined
@@ -2077,7 +2046,6 @@ export function buildChiefSystemPrompt(
     { name: 'static', lines: staticLines },
     { name: 'team', lines: teamLines },
     { name: 'channel', lines: channelLines },
-    { name: 'digests', lines: digestSectionLines },
   ].map(({ name, lines }) => {
     const text = lines.join('\n');
     return { name, text, hash: sha256Hex(text) };

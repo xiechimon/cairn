@@ -83,7 +83,6 @@ const USE_DISPLAY_NAMES: Record<RouteUse, string> = {
   coordinator: 'Coordinator',
   session: 'Session',
   review: 'Reviewer',
-  digest: 'Digest',
   compaction: 'Compaction',
 };
 

@@ -3,7 +3,6 @@ import { eq, sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   chiefMessage,
-  chiefSummary,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   machine as machineTable,
@@ -14,10 +13,7 @@ import {
   CHIEF_HISTORY_LINE_MAX_CHARS,
   CHIEF_HISTORY_MAX_CHARS,
 } from '../src/services/chief-claim-history.js';
-import {
-  setCoordinatorInServer,
-  setCoordinatorServerContextEnabled,
-} from '../src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { claimStep } from '../src/services/machines.js';
 import {
   bootServer,
@@ -31,12 +27,10 @@ const disposables: (() => void)[] = [];
 afterEach(() => {
   for (const d of disposables.splice(0)) d();
   setCoordinatorInServer(false);
-  setCoordinatorServerContextEnabled(false);
 });
 
 function world(provider = 'claude-code') {
   setCoordinatorInServer(true);
-  setCoordinatorServerContextEnabled(true);
   const s = bootServer({ githubFetch: async () => new Response('[]') });
   insertClaudeSubscription(s);
   disposables.push(() => s.dispose());
@@ -159,59 +153,27 @@ describe('the earlier conversation carried to a Runner claim', () => {
     expect(claimed?.chief?.systemPrompt).not.toContain('plan the release');
   });
 
-  test('a secret in a message or in the summary is redacted', async () => {
+  test('a secret in a message is redacted', async () => {
     const { s, machineId } = world();
     message(s, 'm1', 'user', `my key is ${LEAKED}`, 10);
     message(s, 'm2', 'assistant', 'noted', 11);
-    s.db
-      .insert(chiefSummary)
-      .values({
-        threadId: 't1',
-        summary: `earlier we used ${LEAKED}`,
-        coveredThroughId: 'gone',
-        coveredAt: 5,
-        coveredRowid: 0,
-        compactedMessages: 3,
-        generation: 1,
-        updatedAt: 5,
-      })
-      .run();
     chiefStep(s, 's1', 21);
     const { history } = await historyOf(s, machineId);
     expect(history).not.toContain(LEAKED);
     expect(history).toContain('[REDACTED]');
-    expect(history).toContain('[摘要');
   });
 
-  test('rows at or before the summary cursor are not repeated; a tie on time is resolved by row order', async () => {
+  test('every conversational row appears; a tie on time is resolved by row order', async () => {
     const { s, machineId } = world();
     message(s, 'c1', 'user', 'covered one', 10);
     message(s, 'c2', 'assistant', 'covered two', 10);
     message(s, 'n1', 'user', 'after the cursor', 10);
-    const rowid = s.db
-      .select({ rowid: sql<number>`rowid` })
-      .from(chiefMessage)
-      .where(eq(chiefMessage.id, 'c2'))
-      .get()?.rowid as number;
-    s.db
-      .insert(chiefSummary)
-      .values({
-        threadId: 't1',
-        summary: 'a summary',
-        coveredThroughId: 'c2',
-        coveredAt: 10,
-        coveredRowid: rowid,
-        compactedMessages: 2,
-        generation: 1,
-        updatedAt: 10,
-      })
-      .run();
     chiefStep(s, 's1', 21);
     const { history } = await historyOf(s, machineId);
+    expect(history).toContain('covered one');
+    expect(history).toContain('covered two');
     expect(history).toContain('after the cursor');
-    expect(history).toContain('a summary');
-    expect(history).not.toContain('covered one');
-    expect(history).not.toContain('covered two');
+    expect(history?.indexOf('covered one')).toBeLessThan(history?.indexOf('covered two') ?? 0);
   });
 
   test('a thread whose newest rows are all tool calls still replays the conversation behind them', async () => {

@@ -18,7 +18,6 @@ import {
   warnInsecureBind,
 } from './config.js';
 import { warnTeamsWithoutCoordinatorRule } from './coordinator/boot-guard.js';
-import { migrateSidecarState } from './coordinator/boot-migration.js';
 import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
@@ -34,11 +33,7 @@ import { runServerCommand } from './server-command.js';
 import { loadApnsConfig } from './services/apns.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
-import {
-  setCoordinatorInServer,
-  setCoordinatorServerContextEnabled,
-  setCoordinatorWake,
-} from './services/coordinator-context.js';
+import { setCoordinatorInServer, setCoordinatorWake } from './services/coordinator-context.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
@@ -149,7 +144,6 @@ const vapidKeys = {
 const seeded = seed(db);
 await fillSystemAvatar(seeded.user);
 seedLocalMachine(db, seeded.team.id);
-setCoordinatorServerContextEnabled(config.coordinatorServerContext || config.coordinatorInServer);
 setCoordinatorInServer(config.coordinatorInServer);
 logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 backfillTokenUsageCost(db);
@@ -294,13 +288,6 @@ const scheduler = createScheduler(
   schedulingRunOf(config, { githubFetch, logger }),
 );
 if (config.coordinatorInServer) {
-  migrateSidecarState({
-    machine: { db, hub, machineHub },
-    homeDir: config.homeDir,
-    storageDir: coordinatorStoreDir(config.dataDir),
-    sidecarMachineId: config.coordinatorMachineId,
-    logger,
-  });
   warnTeamsWithoutCoordinatorRule(db, logger);
 }
 const coordinator = config.coordinatorInServer

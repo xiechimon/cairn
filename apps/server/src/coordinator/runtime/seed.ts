@@ -2,12 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { dropMailFence, shortEvent } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import type { Message } from '@earendil-works/pi-ai';
-import {
-  AssistantEntry,
-  CompactionEntry,
-  type Harness,
-  UserEntry,
-} from '@earendil-works/pi-durable';
+import { AssistantEntry, type Harness, UserEntry } from '@earendil-works/pi-durable';
 
 export const SEED_MAX_ROWS = 100;
 export const SEED_ROW_MAX_CHARS = 8_000;
@@ -111,7 +106,6 @@ const usage = {
 
 export async function seedCoordinator(
   harness: Harness,
-  summary: string,
   rows: readonly SeedRow[],
   model: { provider: string; modelId: string },
   context: Context,
@@ -123,41 +117,27 @@ export async function seedCoordinator(
   const messages = seedMessages(rows);
   const now = Date.now();
   await root.commit(async (tx) => {
-    let firstKept: Awaited<ReturnType<typeof tx.appendEntry>>['id'] | undefined;
     for (const message of messages) {
-      const entry =
-        message.role === 'user'
-          ? await tx.appendEntry(UserEntry, root.id, {
-              model: [{ role: 'user', content: message.text, timestamp: now } satisfies Message],
-            })
-          : await tx.appendEntry(AssistantEntry, root.id, {
-              model: [
-                {
-                  role: 'assistant',
-                  content: [{ type: 'text', text: message.text }],
-                  api: 'anthropic-messages',
-                  provider: model.provider,
-                  model: model.modelId,
-                  usage,
-                  stopReason: 'stop',
-                  timestamp: now,
-                } satisfies Message,
-              ],
-            });
-      firstKept ??= entry.id;
+      if (message.role === 'user')
+        await tx.appendEntry(UserEntry, root.id, {
+          model: [{ role: 'user', content: message.text, timestamp: now } satisfies Message],
+        });
+      else
+        await tx.appendEntry(AssistantEntry, root.id, {
+          model: [
+            {
+              role: 'assistant',
+              content: [{ type: 'text', text: message.text }],
+              api: 'anthropic-messages',
+              provider: model.provider,
+              model: model.modelId,
+              usage,
+              stopReason: 'stop',
+              timestamp: now,
+            } satisfies Message,
+          ],
+        });
     }
-    if (firstKept === undefined || summary === '') return;
-    await tx.appendEntry(CompactionEntry, root.id, {
-      head: firstKept,
-      model: [
-        {
-          role: 'user',
-          content: `The conversation history before this point was compacted into the following summary:\n\n<summary>\n${summary}\n</summary>`,
-          timestamp: now,
-        } satisfies Message,
-      ],
-      data: { reason: 'manual' },
-    });
   }, context);
   return { messages: messages.length };
 }

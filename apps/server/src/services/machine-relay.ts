@@ -21,7 +21,6 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import { attachWorkerFile } from './agent-attachments.js';
 import { NotFoundError } from './builds.js';
 import { requireTurnProvenance } from './chief.js';
-import { assertChiefDigestTool } from './chief-digest.js';
 import {
   ASK_HOLD_MS,
   type ChiefQuestionDeps,
@@ -142,7 +141,6 @@ export async function relayComputerTool(
 ): Promise<ComputerRelayResult> {
   const row = ownedStep(deps, machineId, stepId);
   refuseRestrictedTurnTool(row.prompt, name, params, row.ownerMessageIds ?? []);
-  assertChiefDigestTool(row.buildId, name);
   if (row.kind !== 'chief') {
     throw new HttpError(400, 'computer tools require a chief step');
   }
@@ -202,7 +200,6 @@ export async function executeRelayToolCall(
     throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
   }
   const threadId = row.buildId;
-  assertChiefDigestTool(threadId, name);
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   if (!threadRow) throw new NotFoundError(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();

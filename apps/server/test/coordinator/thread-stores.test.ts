@@ -40,7 +40,6 @@ describe('createThreadHarnesses', () => {
     expect(await harnesses.get('thread-a')).toBe(a);
     await seedCoordinator(
       a,
-      '',
       [{ id: 'm1', role: 'user', content: '"private to thread a"', createdAt: 1 }],
       { provider: 'stub', modelId: 'm' },
       ctx,

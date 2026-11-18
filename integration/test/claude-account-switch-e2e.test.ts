@@ -14,10 +14,7 @@ import {
   step as stepTable,
 } from '../../apps/server/src/db/schema.js';
 import { enqueueStep } from '../../apps/server/src/services/builds.js';
-import {
-  setCoordinatorInServer,
-  setCoordinatorServerContextEnabled,
-} from '../../apps/server/src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../../apps/server/src/services/coordinator-context.js';
 import { setTodoPhase } from '../../apps/server/src/services/todos.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
@@ -96,7 +93,6 @@ async function planToConfirm(
 
 beforeAll(async () => {
   setCoordinatorInServer(true);
-  setCoordinatorServerContextEnabled(true);
   const userHome = makeTestTempDir('cairn-it-switch-user-');
   const configDir = join(userHome, '.claude');
   const transcripts = join(configDir, 'projects', PROJECT_DIR_NAME);
@@ -165,7 +161,6 @@ afterAll(async () => {
   await server?.close();
   await stub?.close();
   setCoordinatorInServer(false);
-  setCoordinatorServerContextEnabled(false);
   for (const [key, value] of Object.entries(saved)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;

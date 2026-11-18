@@ -15,7 +15,7 @@ import {
 import { newRecordId } from '../src/lib/ids.js';
 import { chiefBinding } from '../src/services/chief.js';
 import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
-import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { coordinatorRoute } from '../src/services/coordinator-route.js';
 import { createProvider } from '../src/services/providers.js';
 import {
@@ -634,9 +634,9 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     seedRoute(s, 'coordinator', { provider: 'pi', modelId });
     expect(session(s)).toMatchObject({ provider: 'deepseek', modelId });
     expect(coordinatorProfile(s.db, s.team.id)).toMatchObject({ provider: 'deepseek', modelId });
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     expect(coordinatorRoute(s.db, s.team.id)).toBeNull();
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
 
   test('with no stored Session rule, a Claude subscription and a Runner with Claude Code give the routed default even while offline', () => {
@@ -728,7 +728,7 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     const s = bare();
     addProvider(s, 'deepseek', { key: false, models: ['m0'], createdAt: 1 });
     addProvider(s, 'vani', { models: ['m1', 'm2'], createdAt: 2 });
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     try {
       expect(coordinatorRoute(s.db, s.team.id)).toMatchObject({ provider: 'vani', modelId: 'm1' });
       expect(coordinatorProfile(s.db, s.team.id)).toMatchObject({ provider: 'vani' });
@@ -740,7 +740,7 @@ describe('rules store provider ids, with a read-time default for Session', () =>
       });
       expect(listRoutingSettings(s.db, s.team.id, true).rules).toEqual([]);
     } finally {
-      setCoordinatorServerContextEnabled(false);
+      setCoordinatorInServer(false);
     }
     expect(coordinatorRoute(s.db, s.team.id)).toBeNull();
     expect(listRoutingSettings(s.db, s.team.id).coordinatorDefault).toBeUndefined();
@@ -750,7 +750,7 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     const s = bare();
     addProvider(s, 'vani', { models: ['m1'] });
     expect(chiefBinding(s.svc, s.team.id)).toEqual({ agentId: null, canOrchestrate: false });
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     try {
       expect(chiefBinding(s.svc, s.team.id)).toEqual({ agentId: null, canOrchestrate: true });
       expect(coordinatorMemoryOwner(s.db, s.team.id)).toBeUndefined();
@@ -758,7 +758,7 @@ describe('rules store provider ids, with a read-time default for Session', () =>
       expect(chiefBinding(s.svc, s.team.id)).toEqual({ agentId: ruleId, canOrchestrate: true });
       expect(coordinatorMemoryOwner(s.db, s.team.id)).toBe(ruleId);
     } finally {
-      setCoordinatorServerContextEnabled(false);
+      setCoordinatorInServer(false);
     }
   });
 
@@ -841,7 +841,7 @@ describe('rules store provider ids, with a read-time default for Session', () =>
       provider: 'claude-code',
       modelId: 'claude-sonnet-5-5',
     });
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     try {
       expect(coordinatorProfile(s.db, s.team.id)).toMatchObject({
         provider: 'claude-code',
@@ -849,7 +849,7 @@ describe('rules store provider ids, with a read-time default for Session', () =>
       });
       expect(coordinatorRoute(s.db, s.team.id)).toBeNull();
     } finally {
-      setCoordinatorServerContextEnabled(false);
+      setCoordinatorInServer(false);
     }
     s.db
       .update(machineTable)

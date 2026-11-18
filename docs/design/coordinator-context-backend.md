@@ -8,7 +8,7 @@ The Coordinator has one continuing conversation. `chief_message` is canonical hi
 
 There is one runtime compaction path: pi-durable threshold compaction through `coordinatorCompactionExtension`. It runs in the background from the background start; it blocks a request only above the blocking threshold, where the request would not fit.
 
-A send never waits on a summary (mon X, 2026-11-14). A model switch sends the whole conversation, the same view the next warm turn would send, so it needs no summary. Reconstructing the derived runtime store seeds from the stored `chief_summary` and every row it does not cover, up to `SEED_MAX_ROWS + SUMMARY_LAG_ROWS` rows, without calling a model. After each turn, when at least `SUMMARY_LAG_ROWS` rows lie between the summary cursor and the newest `SEED_MAX_ROWS` rows, `seedSummary` folds that gap in the background so the next reconstruction finds the summary ready.
+A send never waits on a summary (mon X, 2026-11-14). A model switch sends the whole conversation, the same view the next warm turn would send, so it needs no summary. Reconstructing the derived runtime store seeds the newest `SEED_MAX_ROWS` conversational rows from `chief_message`, without calling a model. The earlier `chief_summary` recovery cache and its `seedSummary` fold were retired by #5349: a seeded session no longer prepends a compacted block, so rows older than the window are recoverable only through the history tools.
 
 ## Budget
 
@@ -24,13 +24,9 @@ Summary input is divided by `COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS`; output i
 |---|---|---|
 | `chief_message` | Canonical rows in a thread | Never removed by compaction |
 | pi durable store | Runtime entries and compaction checkpoints | Derived; keep valid turn/tool boundaries |
-| `chief_summary` | Recovery cache keyed by `threadId` | Write only after nonempty successful folding |
-| Recovery coverage | `coveredThroughId`, `coveredAt`, `coveredRowid` | Commit atomically with summary and generation |
-| Turn usage | Actual request context usage | Diagnostic; the background summary is triggered by row lag, not usage |
+| Turn usage | Actual request context usage | Diagnostic |
 
-Recovery orders equal timestamps by SQLite rowid. Snapshot `windowStart` before reading the older gap, and include only rows strictly before it and strictly after the prior coverage cursor. Messages appended during folding are not covered by that checkpoint. A restart reads the last committed generation; partial model output is not a checkpoint.
-
-The current recovery implementation reads up to 2,000 newest gap rows and folds at most eight newest batches. This is bounded recovery, not evidence of complete older-history coverage. The design requires explicit coverage semantics: retain a searchable-history pointer for any skipped prefix and do not describe the summary as a complete account. Tests must distinguish the retained summarized range from omitted older history. The after-turn fold keeps the gap short; it does not make the summary a complete account.
+Rows older than the seed window are not carried into a reconstructed session; they stay reachable through the canonical history tools.
 
 ## Compaction flow
 
@@ -49,10 +45,8 @@ Memory flush and summary are deliberately separate failure domains. A flush fail
 |---|---|---|
 | Small/unknown model window | Reject invalid budget before model request; no negative threshold | `apps/server/test/coordinator/compaction.test.ts` |
 | Summary missing model, provider error or non-stop completion | Report and preserve canonical history and prior checkpoint | `apps/server/test/coordinator/compaction-failures.test.ts` |
-| Empty summary | Do not advance recovery cursor or replace a valid checkpoint | Seed-summary tests under `apps/server/test/coordinator/` |
-| Equal timestamps at boundary | Exactly ordered inclusion; no duplicate/omitted boundary row | Seed-summary tests |
-| Append during fold | New rows remain outside committed coverage | Seed-summary tests |
-| More than 2,000 rows/eight batches | Explicit omitted-prefix semantics and recoverability through history tools | Seed-summary tests plus history integration |
+| Equal timestamps at boundary | Exactly ordered inclusion; no duplicate/omitted boundary row | Seed tests under `apps/server/test/coordinator/` |
+| Rows beyond the seed window | Recoverable through history tools, never a partial summary | Seed tests plus history integration |
 | Restart after flush, before summary commit | Replay reuses task memo; no duplicate durable fact | Compaction and memory-flush tests |
 | Failed flush | One observable failure, successful summary can continue, no false flush success claim | Compaction failure tests |
 | Tool call/result spans cut | No orphaned tool result submitted | Runtime integration |
@@ -63,7 +57,6 @@ Run existing compaction/history tests before adding behavior. A compiled runtime
 ## Code areas and replacement boundary
 
 - `apps/server/src/coordinator/runtime/compaction.ts`: threshold settings, transcript shaping, fold and task memos.
-- `apps/server/src/coordinator/seed-summary.ts`: ordered recovery cache and cursor semantics.
 - `apps/server/src/services/chief-history.ts`: canonical read/search, not lossy summary search.
 - `apps/server/src/services/coordinator-context.ts`: measured usage and display window.
 - `apps/server/src/coordinator/memory-flush.ts`: durable facts through validated memory service.

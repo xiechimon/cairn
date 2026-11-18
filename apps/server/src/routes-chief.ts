@@ -3,8 +3,6 @@ import {
   chiefMessageEditBodySchema,
   chiefRewindBodySchema,
   chiefSendMessageBodySchema,
-  coordinatorPageQuerySchema,
-  coordinatorSendBodySchema,
   OWN_COMPUTER_ACTIONS,
   patchChiefBodySchema,
 } from '@cairn/shared';
@@ -45,7 +43,6 @@ import {
   publishQuestion,
 } from './services/chief-questions.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
-import { readCoordinatorPage } from './services/coordinator.js';
 import { latestChiefMemoryUsage } from './services/coordinator-steps.js';
 import { isChiefConversation } from './services/machines.js';
 import { ownComputerDecisionOf } from './services/own-computer.js';
@@ -82,31 +79,6 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       dispatchActionWakes(svc);
     }
   };
-
-  app.get('/api/teams/:id/coordinator', (c) => {
-    const teamId = c.req.param('id');
-    requireTeam(ctx, teamId);
-    const query = parseWith(coordinatorPageQuerySchema, c.req.query(), 'query');
-    return c.json(readCoordinatorPage(svc, teamId, query));
-  });
-
-  app.post('/api/teams/:id/coordinator/messages', async (c) => {
-    const teamId = c.req.param('id');
-    requireTeam(ctx, teamId);
-    const body = parseWith(coordinatorSendBodySchema, await jsonBody(c), 'body');
-    const { result, replayed } = sendChiefMessageFromComposer(svc, teamId, {
-      threadId: null,
-      ...body,
-    });
-    if (!replayed)
-      ctx.convHub?.publishMessage(
-        result.thread.id,
-        { ...result.message },
-        undefined,
-        body.clientMessageId,
-      );
-    return c.json(result, 201);
-  });
 
   app.get('/api/teams/:id/chief', (c) => {
     const teamId = c.req.param('id');

@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test } from 'vitest';
 import { routingRule } from '../src/db/schema.js';
 import { buildChiefSystemPrompt } from '../src/services/chief.js';
-import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { createProvider } from '../src/services/providers.js';
 import { coordinatorMemoryOwner } from '../src/services/routing-rules.js';
 import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
@@ -43,8 +43,8 @@ describe('save_memory write path (r5 section 6)', () => {
 
   test('on the default coordinator route the memory is saved under the chief and read back next turn', async () => {
     H.s.db.delete(routingRule).where(eq(routingRule.use, 'coordinator')).run();
-    setCoordinatorServerContextEnabled(true);
-    onTestFinished(() => setCoordinatorServerContextEnabled(false));
+    setCoordinatorInServer(true);
+    onTestFinished(() => setCoordinatorInServer(false));
     expect(coordinatorMemoryOwner(H.s.db, H.teamId)).toBeUndefined();
     createProvider(
       { db: H.s.db, box: H.s.secretBox },

@@ -47,14 +47,10 @@ async function orchestrate(todoId: string): Promise<string> {
 }
 
 async function orchestrationOf(): Promise<Orchestration | null | undefined> {
-  const page = (await (await req(H.s.app, 'GET', `/api/teams/${H.teamId}/coordinator`)).json()) as {
-    thread: { orchestration?: Orchestration | null };
-  };
   const list = (await (
     await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/threads`)
   ).json()) as { orchestration?: Orchestration | null }[];
-  expect(list[0]?.orchestration).toEqual(page.thread.orchestration);
-  return page.thread.orchestration;
+  return list[0]?.orchestration;
 }
 
 function setStep(id: string, set: Partial<typeof stepTable.$inferInsert>) {
@@ -97,7 +93,7 @@ describe('thread.orchestration describes the latest orchestrate turn', () => {
   });
 
   test('a finished orchestration reports null, and so does a thread without one', async () => {
-    await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, { content: 'hi' });
+    await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, { content: 'hi' });
     expect(await orchestrationOf()).toBeNull();
     const todoId = await postTodo(H.projectId, 'first');
     const stepId = await orchestrate(todoId);
@@ -109,7 +105,7 @@ describe('thread.orchestration describes the latest orchestrate turn', () => {
     const todoId = await postTodo(H.projectId, 'first');
     const stepId = await orchestrate(todoId);
     setStep(stepId, { status: 'claimed', claimedAt: Date.now() });
-    await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, { content: 'hi' });
+    await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, { content: 'hi' });
     enqueueChiefStep(H.s.svc, H.threadId, {
       prompt: 'gate facts',
       trigger: 'gate',
@@ -264,7 +260,7 @@ describe('overlong chief turns are stopped so one turn cannot block the thread',
 
 describe('rewind never cuts another project out of the shared transcript', () => {
   async function send(content: string, projectId?: string) {
-    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, {
+    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
       content,
       ...(projectId !== undefined ? { projectId } : {}),
     });
@@ -339,9 +335,13 @@ describe('rewind never cuts another project out of the shared transcript', () =>
     });
     setStep(anchor, { status: 'done' });
     const page = (await (
-      await req(H.s.app, 'GET', `/api/teams/${H.teamId}/coordinator?projectId=${H.projectId}`)
-    ).json()) as { messages: { id: string }[] };
-    expect(page.messages.map((m) => m.id)).toEqual([anchor, `user-${anchor}`, `reply-${anchor}`]);
+      await req(H.s.app, 'GET', `/api/conversations/${H.threadId}/messages`)
+    ).json()) as { messages: { id: string; projectId: string | null }[] };
+    expect(page.messages.filter((m) => m.projectId === H.projectId).map((m) => m.id)).toEqual([
+      anchor,
+      `user-${anchor}`,
+      `reply-${anchor}`,
+    ]);
     const siteTurn = await send('plan the site', site);
     upsertChiefMessage(H.s.db, {
       id: `user-${siteTurn}`,
@@ -388,7 +388,7 @@ describe('rewind never cuts another project out of the shared transcript', () =>
 
   test('a queued turn refuses the rewind', async () => {
     const anchor = await send('plan demo', H.projectId);
-    await req(H.s.app, 'POST', `/api/teams/${H.teamId}/coordinator/messages`, {
+    await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
       content: 'queued',
       projectId: H.projectId,
     });

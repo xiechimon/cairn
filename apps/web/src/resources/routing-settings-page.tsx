@@ -44,11 +44,10 @@ import { RuleIssueNotices } from './rule-issue-notices.js';
 
 const AGENT_USES: readonly RouteUse[] = ['coordinator'];
 
-const STORED_ONLY_USES: readonly RouteUse[] = ['digest', 'compaction'];
+const STORED_ONLY_USES: readonly RouteUse[] = ['compaction'];
 
 const USE_HINTS: Partial<Record<RouteUse, string>> = {
   coordinator: '和你对话、派活',
-  digest: '对话摘要',
   compaction: '上下文快满时压缩对话',
 };
 

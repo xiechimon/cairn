@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, routingRule, step as stepTable } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { sendChiefMessage } from '../src/services/chief.js';
-import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { createProvider } from '../src/services/providers.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
@@ -86,11 +86,11 @@ describe('chief thread surface persistence (02 section 4.3 / r5 section 3.6)', (
         { threadId: H.threadId, content: 'x' },
       );
     expect(send).toThrow(HttpError);
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     try {
       expect(send).not.toThrow();
     } finally {
-      setCoordinatorServerContextEnabled(false);
+      setCoordinatorInServer(false);
     }
   });
 });

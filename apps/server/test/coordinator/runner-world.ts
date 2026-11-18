@@ -10,7 +10,6 @@ import { SUGGEST_REPLIES_ASK } from '../../src/coordinator/runtime/suggest-repli
 import { routingRule, step } from '../../src/db/schema.js';
 import {
   setCoordinatorInServer,
-  setCoordinatorServerContextEnabled,
   setCoordinatorWake,
 } from '../../src/services/coordinator-context.js';
 import { createProvider } from '../../src/services/providers.js';
@@ -24,13 +23,11 @@ afterEach(async () => {
   for (const close of closers.splice(0)) await close();
   for (const d of dirs.splice(0)) releaseTestTempDir(d);
   setCoordinatorInServer(false);
-  setCoordinatorServerContextEnabled(false);
   setCoordinatorWake(() => {});
 });
 
 beforeEach(() => {
   setCoordinatorInServer(true);
-  setCoordinatorServerContextEnabled(true);
 });
 
 export interface World {

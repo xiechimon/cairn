@@ -20,7 +20,7 @@ Main-thread work is small next to the bytes: `JSON.parse` of the 17.6 MB body ta
 
 Three causes, in order of weight:
 
-1. The task branch of the messages route returns every row (`apps/server/src/routes-builds.ts:111`). The Coordinator branch of the same route already pages newest-first with `before` and `limit` (`chiefMessagePage`, `apps/server/src/services/coordinator.ts:20`).
+1. The task branch of the messages route returns every row (`apps/server/src/routes-builds.ts:79`). The chief conversation route already pages newest-first with `before` and `limit` (`newestMessagePage`, `apps/server/src/routes-builds.ts:85`).
 2. Every `message` event on the conversation stream invalidates `['messages', id]` (`apps/web/src/api/sse.ts:231`), so each new row refetches the whole transcript although the event already carries that row.
 3. The `merge_gate_run` record copies every assistant row of the build into `rawOutput` (`apps/server/src/services/merge-gate-run.ts:431-439`): 7.5 MB of the 17.6 MB is one row duplicating the other 422 tool-call rows. Its readers need only the review step's output.
 

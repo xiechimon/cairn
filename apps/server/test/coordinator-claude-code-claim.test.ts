@@ -5,10 +5,7 @@ import {
   chiefThread as chiefThreadTable,
   step as stepTable,
 } from '../src/db/schema.js';
-import {
-  setCoordinatorInServer,
-  setCoordinatorServerContextEnabled,
-} from '../src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { coordinatorRouteVerdict } from '../src/services/coordinator-route.js';
 import { claimStep } from '../src/services/machines.js';
 import {
@@ -23,12 +20,10 @@ const disposables: (() => void)[] = [];
 afterEach(() => {
   for (const d of disposables.splice(0)) d();
   setCoordinatorInServer(false);
-  setCoordinatorServerContextEnabled(false);
 });
 
 function world(provider = 'claude-code') {
   setCoordinatorInServer(true);
-  setCoordinatorServerContextEnabled(true);
   const s = bootServer({ githubFetch: async () => new Response('[]') });
   insertClaudeSubscription(s);
   disposables.push(() => s.dispose());

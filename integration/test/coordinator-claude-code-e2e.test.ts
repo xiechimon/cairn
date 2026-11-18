@@ -12,10 +12,7 @@ import {
   machine as machineTable,
   step as stepTable,
 } from '../../apps/server/src/db/schema.js';
-import {
-  setCoordinatorInServer,
-  setCoordinatorServerContextEnabled,
-} from '../../apps/server/src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../../apps/server/src/services/coordinator-context.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
@@ -39,7 +36,6 @@ const saved: Record<string, string | undefined> = {};
 
 beforeAll(async () => {
   setCoordinatorInServer(true);
-  setCoordinatorServerContextEnabled(true);
   const userHome = makeTestTempDir('cairn-it-coord-cc-user-');
   mkdirSync(join(userHome, '.claude'), { recursive: true });
   writeFileSync(
@@ -91,7 +87,6 @@ afterAll(async () => {
   await stub?.close();
   if (home) rmSync(home, { recursive: true, force: true });
   setCoordinatorInServer(false);
-  setCoordinatorServerContextEnabled(false);
   for (const [key, value] of Object.entries(saved)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;

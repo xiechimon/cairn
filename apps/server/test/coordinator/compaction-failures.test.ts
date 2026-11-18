@@ -24,7 +24,6 @@ import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js
 import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
 import { coordinatorToolsExtension, createStepGate } from '../../src/coordinator/runtime/tools.js';
 import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
-import { step } from '../../src/db/schema.js';
 import { flushRuntimeOtel, shutdownRuntimeOtel } from '../../src/runtime-otel.js';
 import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
 import { boot, stub, world } from './runner-world.js';
@@ -151,7 +150,7 @@ describe('compaction failures are never silent', () => {
           },
         } as never,
         { provider: 'stub', modelId: 'sum' },
-        { threadId: 'summary-thread', stage: 'seed-summary' },
+        { threadId: 'summary-thread', stage: 'summary-fold' },
       );
       if (outcome === 'stop')
         expect(await summarize('private transcript')).toBe('private summary content');
@@ -160,7 +159,7 @@ describe('compaction failures are never silent', () => {
           outcome === 'throw' ? 'timeout' : outcome,
         );
       await flushSpans();
-      const span = spans.find((s) => s.name === 'summary seed-summary')!;
+      const span = spans.find((s) => s.name === 'summary summary-fold')!;
       expect(span).toBeDefined();
       expect(
         Number(BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano)),
@@ -435,67 +434,13 @@ describe('compaction failures are never silent', () => {
     await harness.close(ctx);
   }, 60_000);
 
-  it('a failing seed summary is logged without the key, marked on a span and counted', async () => {
-    const w = await world('go on');
-    w.s.db
-      .insert((await import('../../src/db/schema.js')).chiefMessage)
-      .values(
-        Array.from({ length: 130 }, (_, i) => ({
-          id: `old-${i}`,
-          threadId: w.threadId,
-          role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
-          content: `earlier message ${i}`,
-          createdAt: 1000 + i,
-        })),
-      )
-      .run();
-    const { faux } = stub('unused');
-    faux.setResponses(
-      Array(4).fill((c: { messages: unknown[] }) =>
-        JSON.stringify(c.messages).includes("You are Cairn's Coordinator summarization step.")
-          ? fauxAssistantMessage([], { stopReason: 'error', errorMessage: `401 key ${SECRET}` })
-          : fauxAssistantMessage('answered'),
-      ),
-    );
-    const coordinator = boot(w, faux, {
-      logger: {
-        info: () => {},
-        warn: () => {},
-        error: (fields: object, message: string) =>
-          logs.push({ fields: fields as Record<string, unknown>, message }),
-      },
-    });
-    coordinator.wake(w.threadId);
-    await coordinator.idle();
-    expect(
-      w.s.db
-        .select()
-        .from(step)
-        .all()
-        .map((r) => r.status),
-    ).toEqual(['done']);
-    expect(failureLogs().map((l) => l.fields.stage)).toContain('seed-summary');
-    expect(JSON.stringify(logs)).not.toContain(SECRET);
-    expect(compactionFailureCounts()['seed-summary']).toBeGreaterThan(0);
-    await flushSpans();
-    expect(spans.some((s) => s.name === 'compaction seed-summary' && s.status?.code === 2)).toBe(
-      true,
-    );
-  }, 60_000);
-
   it('flush output that is not JSON is a failure, not an empty result', () => {
     expect(() => parseFlushOutput('I saved nothing.')).toThrow(/memory flush output/);
     expect(() => parseFlushOutput('{"memories":"x"}')).toThrow(/memory flush output/);
     expect(parseFlushOutput('{"memories":[]}')).toEqual([]);
   });
 
-  it.each([
-    'memory-flush',
-    'summary-fold',
-    'summary-model',
-    'seed-summary',
-    'background-compaction',
-  ] as const)(
+  it.each(['memory-flush', 'summary-fold', 'background-compaction'] as const)(
     'removes the resolved provider key from the %s report even when it has no known prefix',
     async (stage) => {
       const credential = 'custom-provider-credential-1234567890';

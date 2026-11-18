@@ -120,7 +120,7 @@ Verified against [#3695](https://github.com/xiechimon/cairn/pull/3695) at `3ff43
 - `capMemories`, `MEMORY_INJECT_TOKEN_CAP` and `lastInjectedAt`-based expiry.
 - Consolidation merge and expiry.
 - The `记忆 · {n} / {max}` count in `chief-settings.tsx`.
-- The scattered `chief-digest-` prefix checks. They become one side-thread predicate that covers digest and memory-edit.
+- The scattered `chief-digest-` prefix checks. They become one side-thread predicate for memory-edit threads once the digest pipeline retires (#5349).
 
 ## 7. Tests to write first
 

@@ -5,7 +5,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { coordinatorApiKey, coordinatorProviders } from '../src/coordinator/credentials.js';
 import { machine as machineTable, routingRule } from '../src/db/schema.js';
-import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { coordinatorRoute } from '../src/services/coordinator-route.js';
 import { resolveChiefStepCredentials } from '../src/services/credentials.js';
 import { createProvider } from '../src/services/providers.js';
@@ -233,7 +233,7 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
 
   test('coordinatorRoute: a keyed non-Anthropic provider is the route', async () => {
     const w = await world();
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     createProvider(
       { db: w.s.db, box: w.s.secretBox },
       {
@@ -258,23 +258,23 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
       provider: 'vani',
       modelId: 'deepseek/deepseek-v4.1-flash',
     });
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
 
   test('coordinatorRoute: a keyed Anthropic provider is the default route and writes no rule', async () => {
     const w = await world({ rule: false });
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     addAnthropicKey(w);
     expect(coordinatorRoute(w.s.db, w.teamId)).toMatchObject({ provider: 'anthropic' });
     expect(
       w.s.db.select().from(routingRule).where(eq(routingRule.use, 'coordinator')).all(),
     ).toEqual([]);
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
 
   test('coordinatorRoute: a keyed Anthropic provider is the route', async () => {
     const w = await world();
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     addAnthropicKey(w);
     seedRoute(w.s, 'coordinator', {
       provider: 'anthropic',
@@ -282,12 +282,12 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
       machineId: w.machineId,
     });
     expect(coordinatorRoute(w.s.db, w.teamId)).not.toBeNull();
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
 
   test('coordinatorRoute: a Claude model behind an OpenAI-compatible gateway is the route', async () => {
     const w = await world();
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     createProvider(
       { db: w.s.db, box: w.s.secretBox },
       {
@@ -309,12 +309,12 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
       machineId: w.machineId,
     });
     expect(coordinatorRoute(w.s.db, w.teamId)).not.toBeNull();
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
 
   test('coordinatorProviders: a paid Claude compaction rule is used as written', async () => {
     const w = await world();
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     addAnthropicKey(w);
     createProvider(
       { db: w.s.db, box: w.s.secretBox },
@@ -343,11 +343,11 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
     });
     const deps = { db: w.s.db, box: w.s.secretBox };
     expect(coordinatorProviders(deps, w.teamId)?.summary.provider).toBe('anthropic');
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
   test('a project Coordinator model drives its own channel, and a removed provider falls back to the team model', async () => {
     const w = await world();
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     addKeyless(w, 'local-llm', 'team-model');
     addAnthropicKey(w);
     const projectId = await postProject(w.s.app, 'route-project');
@@ -369,11 +369,11 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
     expect(coordinatorRoute(w.s.db, w.teamId)?.modelId).toBe('team-model');
     expect((await setChoice('removed-provider')).status).toBe(200);
     expect(coordinatorRoute(w.s.db, w.teamId, projectId)?.modelId).toBe('team-model');
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
   test('a project Coordinator on Claude Code hands its turns to a Runner while the team Coordinator stays in the server', async () => {
     const w = await world();
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     addKeyless(w, 'local-llm', 'team-model');
     const projectId = await postProject(w.s.app, 'runner-project');
     const patched = await call(w.s.app, 'PATCH', `/api/projects/${projectId}`, {
@@ -390,11 +390,11 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
       provider: 'claude-code',
       modelId: 'opus',
     });
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
   test('coordinatorRoute: a keyless custom endpoint drives the Coordinator with no key', async () => {
     const w = await world();
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     addKeyless(w, 'local-llm', 'fake-model');
     expect(coordinatorRoute(w.s.db, w.teamId)).toMatchObject({
       provider: 'local-llm',
@@ -406,7 +406,7 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
       baseUrl: 'http://127.0.0.1:8798/v1',
     });
     expect(coordinatorApiKey(deps, w.teamId, 'local-llm')).toBeNull();
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
 
   test.each([
@@ -417,19 +417,19 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
     'coordinatorRoute: a keyless %s row is still refused, as a preset or built-in vendor id',
     async (providerId, modelId) => {
       const w = await world();
-      setCoordinatorServerContextEnabled(true);
+      setCoordinatorInServer(true);
       addKeyless(w, providerId, modelId);
       expect(coordinatorRoute(w.s.db, w.teamId)).toBeNull();
-      setCoordinatorServerContextEnabled(false);
+      setCoordinatorInServer(false);
     },
   );
 
   test('coordinatorRoute: a keyless endpoint serving a Claude model is the route', async () => {
     const w = await world();
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     addKeyless(w, 'local-claude-proxy', 'claude-sonnet-5-5');
     expect(coordinatorRoute(w.s.db, w.teamId)).not.toBeNull();
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
   test('a coordinator rule saved as the runtime pi reaches the Runner as the provider that stores the model', async () => {
     const w = await world();
@@ -463,7 +463,7 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
 
   test('coordinatorProviders: a compaction rule saved as pi resolves to the provider that stores the model', async () => {
     const w = await world();
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     addKeyless(w, 'local-llm', 'fake-model');
     createProvider(
       { db: w.s.db, box: w.s.secretBox },
@@ -487,6 +487,6 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
     });
     const deps = { db: w.s.db, box: w.s.secretBox };
     expect(coordinatorProviders(deps, w.teamId)?.summary.provider).toBe('summary-gw');
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
 });

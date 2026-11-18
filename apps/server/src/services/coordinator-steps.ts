@@ -28,7 +28,6 @@ import {
   recoverGateWake,
   turnProvenance,
 } from './chief.js';
-import { CHIEF_DIGEST_SYSTEM_PROMPT, isChiefDigestStep } from './chief-digest.js';
 import { cancelPendingQuestions } from './chief-questions.js';
 import { QUEUED_HOLD, recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
@@ -162,10 +161,9 @@ export function chiefTurnContext(
   threadRow: ThreadRow,
   agentId: string | null,
 ) {
-  const digest = isChiefDigestStep(stepRow);
-  const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
+  const ctx = chiefClaimContext(deps, threadRow.id);
   const trigger = parseChiefTrigger(stepRow.prompt);
-  const systemPrompt = digest ? CHIEF_DIGEST_SYSTEM_PROMPT : (ctx?.systemPrompt ?? '');
+  const systemPrompt = ctx?.systemPrompt ?? '';
   let routeSection = '';
   if (ctx && trigger === 'user') {
     const hint = suggestSkillsForMessage(
@@ -186,20 +184,18 @@ export function chiefTurnContext(
           teamId: threadRow.teamId,
           threadId: threadRow.id,
           projectId: null,
-          recordUse: !digest,
+          recordUse: true,
         });
   const memories = [
     ...injected.memories.map(({ title, content }) => ({ title, content })),
     { title: '记忆文件', content: `${injected.fileCount} 个；用 memories 按需读取。` },
   ];
-  const project = digest
-    ? null
-    : projectTurnContextTraced(deps.db, {
-        teamId: threadRow.teamId,
-        agentId,
-        projectId: stepScopeProjectId(stepRow),
-        threadId: threadRow.id,
-      });
+  const project = projectTurnContextTraced(deps.db, {
+    teamId: threadRow.teamId,
+    agentId,
+    projectId: stepScopeProjectId(stepRow),
+    threadId: threadRow.id,
+  });
   const recall =
     ctx && trigger === 'user' && agentId !== null
       ? recallMemorySection(
@@ -226,7 +222,7 @@ export function chiefTurnContext(
     stepRow.prompt === null
       ? null
       : [stepRow.prompt, ...sections].filter((part) => part).join('\n\n');
-  return { digest, trigger, systemPrompt, memories, instruction, sections, memoryTrace };
+  return { trigger, systemPrompt, memories, instruction, sections, memoryTrace };
 }
 
 export function latestChiefMemoryUsage(db: Db, teamId: string) {
@@ -358,10 +354,7 @@ export function recordStepUsage(
   const { db } = deps;
   const usageTeamId = stepTeamId(deps, stepRow);
   const mirrorsTurnUsage =
-    coordinatorRunsOnPi() &&
-    stepRow.kind === 'chief' &&
-    isChiefConversation(stepRow.buildId) &&
-    !isChiefDigestStep(stepRow);
+    coordinatorRunsOnPi() && stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId);
   db.transaction((tx) => {
     for (const u of usage) {
       const prior = db

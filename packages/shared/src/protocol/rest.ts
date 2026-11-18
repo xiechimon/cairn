@@ -116,7 +116,12 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams/{id}/agents/{aid}' },
   { method: 'GET', path: '/api/teams/{id}/agents/{aid}/tasks' },
   { method: 'GET', path: '/api/teams/{id}/agents/{aid}/memories', note: '02 §4.4/r5 §6 实测' },
-  { method: 'GET', path: '/api/teams/{id}/chief' },
+  {
+    method: 'GET',
+    path: '/api/teams/{id}/chief',
+    query: ['threadId'],
+    note: '{chief, agentActor, context, watches, wakes, orchestration, outage}; orchestration = latest orchestrate turn {todoId, state, error} or null',
+  },
   {
     method: 'GET',
     path: '/api/teams/{id}/chief/threads',
@@ -131,17 +136,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     method: 'POST',
     path: '/api/teams/{id}/chief/channels/{projectId}',
     note: 'find or create the project channel thread; 201 with a greeting turn queued when created, 200 when it exists; 404 for a project outside the team, 409 when archived',
-  },
-  {
-    method: 'GET',
-    path: '/api/teams/{id}/coordinator',
-    query: ['projectId', 'before', 'limit'],
-    note: '{thread, messages, hasEarlier}; the one global Coordinator thread, created on first read (D58); thread.orchestration = latest orchestrate turn {todoId, state, error} or null',
-  },
-  {
-    method: 'POST',
-    path: '/api/teams/{id}/coordinator/messages',
-    note: 'body {content, projectId?, clientMessageId}; a missing clientMessageId is 400; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn',
   },
   { method: 'GET', path: '/api/projects', query: ['teamId'] },
   { method: 'GET', path: '/api/projects/{id}/todos' },

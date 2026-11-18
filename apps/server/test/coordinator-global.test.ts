@@ -26,25 +26,30 @@ interface CoordinatorRow {
   projectId: string | null;
 }
 interface CoordinatorPage {
-  thread: { id: string; projectId: string | null; pending?: unknown; lastTurnError?: unknown };
   messages: CoordinatorRow[];
-  hasEarlier: boolean;
+  nextCursor: string | null;
 }
 interface SendReply {
   thread: { id: string };
   message: { id: string; content: string };
 }
 
-const base = () => `/api/teams/${H.teamId}/coordinator`;
+const base = () => `/api/teams/${H.teamId}/chief/threads`;
 
 async function readCoordinator(query = ''): Promise<CoordinatorPage> {
-  const res = await req(H.s.app, 'GET', `${base()}${query}`);
+  const res = await req(H.s.app, 'GET', `/api/conversations/${H.threadId}/messages${query}`);
   expect(res.status).toBe(200);
   return (await res.json()) as CoordinatorPage;
 }
 
+async function threadList(): Promise<{ id: string }[]> {
+  const res = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/threads`);
+  expect(res.status).toBe(200);
+  return (await res.json()) as { id: string }[];
+}
+
 function sendToCoordinator(content: string, projectId?: string) {
-  return req(H.s.app, 'POST', `${base()}/messages`, {
+  return req(H.s.app, 'POST', base(), {
     content,
     ...(projectId !== undefined ? { projectId } : {}),
   });
@@ -122,22 +127,20 @@ function seedOtherTeamProject() {
 
 describe('one global Coordinator thread per team (D58)', () => {
   test('reading returns the existing global thread with the thread-list fields', async () => {
+    const list = await threadList();
+    expect(list.map((t) => t.id)).toEqual([H.threadId]);
     const page = await readCoordinator();
-    expect(page.thread.id).toBe(H.threadId);
     expect(page.messages).toEqual([]);
-    expect(page.hasEarlier).toBe(false);
-    const list = (await (
-      await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/threads`)
-    ).json()) as unknown[];
-    expect(list).toEqual([page.thread]);
+    expect(page.nextCursor).toBeNull();
   });
 
-  test('reading creates the thread once when none exists', async () => {
+  test('parallel sends create the thread once when none exists', async () => {
     H.s.db.delete(chiefThread).where(eq(chiefThread.id, H.threadId)).run();
-    const [a, b] = await Promise.all([readCoordinator(), readCoordinator()]);
-    expect(a.thread.id).toBe(b.thread.id);
-    expect((await readCoordinator()).thread.id).toBe(a.thread.id);
-    expect(activeThreads().map((t) => t.id)).toEqual([a.thread.id]);
+    const [a, b] = await Promise.all([sendToCoordinator('first'), sendToCoordinator('second')]);
+    const aThread = ((await a.json()) as SendReply).thread.id;
+    const bThread = ((await b.json()) as SendReply).thread.id;
+    expect(aThread).toBe(bThread);
+    expect(activeThreads().map((t) => t.id)).toEqual([aThread]);
   });
 
   test('the database refuses a second active Coordinator thread', () => {
@@ -167,15 +170,6 @@ describe('one global Coordinator thread per team (D58)', () => {
     expect(activeThreads()).toHaveLength(1);
   });
 
-  test('rows have the conversation-route shape plus projectId', async () => {
-    await sendToCoordinator('hi', H.projectId);
-    const conv = (await (
-      await req(H.s.app, 'GET', `/api/conversations/${H.threadId}/messages`)
-    ).json()) as { messages: Record<string, unknown>[] };
-    const page = await readCoordinator();
-    expect(page.messages).toEqual(conv.messages.map((m) => ({ ...m, projectId: H.projectId })));
-  });
-
   test('the team thread routes reuse the one thread', async () => {
     const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
       content: 'new topic',
@@ -197,28 +191,26 @@ describe('one global Coordinator thread per team (D58)', () => {
     expect(res.status).toBe(201);
     const created = ((await res.json()) as SendReply).thread.id;
     expect(activeThreads().map((t) => t.id)).toEqual([created]);
-    expect((await readCoordinator()).thread.id).toBe(created);
+    expect((await threadList()).map((t) => t.id)).toEqual([created]);
   });
 
   test('archived threads stay out of the list and are not chosen', async () => {
     const old = `chief-${newUuidv7()}`;
     seedThread(old, { archivedAt: 5, projectId: H.projectId });
-    const list = (await (
-      await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/threads`)
-    ).json()) as { id: string }[];
-    expect(list.map((t) => t.id)).toEqual([H.threadId]);
-    expect((await readCoordinator()).thread.id).toBe(H.threadId);
+    expect((await threadList()).map((t) => t.id)).toEqual([H.threadId]);
+    const sent = (await (await sendToCoordinator('hi')).json()) as SendReply;
+    expect(sent.thread.id).toBe(H.threadId);
   });
 
   test('a blank send is rejected and stores nothing', async () => {
-    expect((await sendToCoordinator('   ')).status).toBe(400);
+    expect((await sendToCoordinator('')).status).toBe(400);
     expect((await readCoordinator()).messages).toEqual([]);
   });
 
-  test('a project of another team is refused and does not leak through the filter', async () => {
+  test('a project of another team is refused and stores nothing', async () => {
     seedOtherTeamProject();
     expect((await sendToCoordinator('hi', 'proj-other')).status).toBe(400);
-    expect((await readCoordinator('?projectId=proj-other')).messages).toEqual([]);
+    expect((await readCoordinator()).messages).toEqual([]);
   });
 
   test('the per-project Coordinator routes are gone', async () => {
@@ -236,20 +228,27 @@ describe('one global Coordinator thread per team (D58)', () => {
 
   test('another team id is not found', async () => {
     seedOtherTeamProject();
-    expect((await req(H.s.app, 'GET', '/api/teams/team-other/coordinator')).status).toBe(404);
+    expect((await req(H.s.app, 'GET', '/api/teams/team-other/chief')).status).toBe(404);
+    expect(
+      (await req(H.s.app, 'POST', '/api/teams/team-other/chief/threads', { content: 'hi' })).status,
+    ).toBe(404);
   });
 });
 
-describe('Coordinator page filter and cursor', () => {
-  test('?projectId keeps only that project', async () => {
+describe('Coordinator page cursor and project tags', () => {
+  test('messages keep their project tags in the page', async () => {
     const other = await postProject(H.s.app, 'cairn-site');
     seedMessage('m1', 10, H.projectId);
     seedMessage('m2', 20, other);
     seedMessage('m3', 30, null);
     seedMessage('m4', 40, H.projectId);
-    const page = await readCoordinator(`?projectId=${H.projectId}`);
-    expect(page.messages.map((m) => m.id)).toEqual(['m1', 'm4']);
-    expect(page.hasEarlier).toBe(false);
+    const page = await readCoordinator();
+    expect(page.messages.map((m) => [m.id, m.projectId])).toEqual([
+      ['m1', H.projectId],
+      ['m2', other],
+      ['m3', null],
+      ['m4', H.projectId],
+    ]);
   });
 
   test('?before walks back page by page, oldest first, ties broken by insertion order', async () => {
@@ -263,16 +262,16 @@ describe('Coordinator page filter and cursor', () => {
       seedMessage(id, at, null);
     const newest = await readCoordinator('?limit=2');
     expect(newest.messages.map((m) => m.id)).toEqual(['d', 'e']);
-    expect(newest.hasEarlier).toBe(true);
+    expect(newest.nextCursor).toBe('d');
     const middle = await readCoordinator('?limit=2&before=d');
     expect(middle.messages.map((m) => m.id)).toEqual(['b', 'c']);
-    expect(middle.hasEarlier).toBe(true);
+    expect(middle.nextCursor).toBe('b');
     const oldest = await readCoordinator('?limit=2&before=b');
     expect(oldest.messages.map((m) => m.id)).toEqual(['a']);
-    expect(oldest.hasEarlier).toBe(false);
+    expect(oldest.nextCursor).toBeNull();
     const past = await readCoordinator('?limit=2&before=a');
     expect(past.messages).toEqual([]);
-    expect(past.hasEarlier).toBe(false);
+    expect(past.nextCursor).toBeNull();
   });
 
   test('rows written during a turn carry that turn project, even with another turn queued', async () => {
@@ -312,10 +311,13 @@ describe('Coordinator page filter and cursor', () => {
       content: 'r',
       createdAt: Date.now() + 12,
     });
-    const filtered = await readCoordinator(`?projectId=${H.projectId}`);
-    expect(filtered.messages.map((m) => m.id)).toEqual([a, `user-${a}`, 'reply-a']);
-    const siteOnly = await readCoordinator(`?projectId=${site}`);
-    expect(siteOnly.messages.map((m) => m.id)).toEqual([b, 'reply-b']);
+    const page = await readCoordinator();
+    const tags = new Map(page.messages.map((m) => [m.id, m.projectId]));
+    expect(tags.get(a)).toBe(H.projectId);
+    expect(tags.get(`user-${a}`)).toBe(H.projectId);
+    expect(tags.get('reply-a')).toBe(H.projectId);
+    expect(tags.get(b)).toBe(site);
+    expect(tags.get('reply-b')).toBe(site);
   });
 
   test('rows of a wake turn stay untagged even after a later tagged user message', async () => {
@@ -401,32 +403,23 @@ describe('Coordinator page filter and cursor', () => {
     expect(report?.projectId).toBe(H.projectId);
   });
 
-  test('?before combines with ?projectId', async () => {
-    seedMessage('p1', 10, H.projectId);
-    seedMessage('x1', 15, null);
-    seedMessage('p2', 20, H.projectId);
-    seedMessage('p3', 30, H.projectId);
-    const page = await readCoordinator(`?projectId=${H.projectId}&before=p3&limit=1`);
-    expect(page.messages.map((m) => m.id)).toEqual(['p2']);
-    expect(page.hasEarlier).toBe(true);
-  });
-
-  test('the default page is the newest 50', async () => {
-    for (let i = 0; i < 55; i += 1) seedMessage(`n${String(i).padStart(2, '0')}`, i, null);
+  test('the default page is the newest 100', async () => {
+    for (let i = 0; i < 105; i += 1) seedMessage(`n${String(i).padStart(3, '0')}`, i, null);
     const page = await readCoordinator();
-    expect(page.messages).toHaveLength(50);
-    expect(page.messages[0]?.id).toBe('n05');
-    expect(page.hasEarlier).toBe(true);
+    expect(page.messages).toHaveLength(100);
+    expect(page.messages[0]?.id).toBe('n005');
+    expect(page.nextCursor).toBe('n005');
   });
 
   test('a cursor outside the thread or a bad limit is rejected', async () => {
     const old = `chief-${newUuidv7()}`;
     seedThread(old, { archivedAt: 5 });
     seedMessage('elsewhere', 10, null, old);
-    expect((await req(H.s.app, 'GET', `${base()}?before=elsewhere`)).status).toBe(404);
-    expect((await req(H.s.app, 'GET', `${base()}?before=missing`)).status).toBe(404);
-    expect((await req(H.s.app, 'GET', `${base()}?limit=0`)).status).toBe(400);
-    expect((await req(H.s.app, 'GET', `${base()}?limit=abc`)).status).toBe(400);
+    const conv = () => `/api/conversations/${H.threadId}/messages`;
+    expect((await req(H.s.app, 'GET', `${conv()}?before=elsewhere`)).status).toBe(404);
+    expect((await req(H.s.app, 'GET', `${conv()}?before=missing`)).status).toBe(404);
+    expect((await req(H.s.app, 'GET', `${conv()}?limit=0`)).status).toBe(400);
+    expect((await req(H.s.app, 'GET', `${conv()}?limit=abc`)).status).toBe(400);
   });
 
   test('messages tagged with a deleted project stay readable', async () => {
@@ -469,11 +462,6 @@ describe('archived projects stay read-only for the Coordinator', () => {
   test('a send naming an archived project is refused on every send route', async () => {
     await archive(H.projectId);
     expect((await sendToCoordinator('hi', H.projectId)).status).toBe(409);
-    const team = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
-      content: 'hi',
-      projectId: H.projectId,
-    });
-    expect(team.status).toBe(409);
     const conv = await req(H.s.app, 'POST', `/api/conversations/${H.threadId}/messages`, {
       content: 'hi',
       projectId: H.projectId,

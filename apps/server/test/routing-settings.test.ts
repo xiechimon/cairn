@@ -8,7 +8,7 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test } from 'vitest';
 import { machine as machineTable, routingRule } from '../src/db/schema.js';
-import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { createProvider } from '../src/services/providers.js';
 import {
   bootServer,
@@ -322,8 +322,8 @@ describe('routing rule issues and the one-click fix', () => {
 
   test('coordinator in-server: the issue comes from the route verdict and the fix is the Coordinator default', async () => {
     const s = bootServer();
-    setCoordinatorServerContextEnabled(true);
-    onTestFinished(() => setCoordinatorServerContextEnabled(false));
+    setCoordinatorInServer(true);
+    onTestFinished(() => setCoordinatorInServer(false));
     addProvider(s, 'vani');
     seedRoute(s, 'coordinator', { provider: 'gone', modelId: 'glm-5.3' });
     const before = ruleRow(s, 'coordinator')!;
@@ -339,8 +339,8 @@ describe('routing rule issues and the one-click fix', () => {
 
   test('coordinator in-server on Claude Code: judged by the Runners like any Claude Code rule', async () => {
     const s = bootServer();
-    setCoordinatorServerContextEnabled(true);
-    onTestFinished(() => setCoordinatorServerContextEnabled(false));
+    setCoordinatorInServer(true);
+    onTestFinished(() => setCoordinatorInServer(false));
     const machineId = insertMachine(s);
     seedRoute(s, 'coordinator', {
       provider: 'claude-code',

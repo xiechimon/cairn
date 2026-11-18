@@ -19,7 +19,7 @@ import { getChiefEnvelope } from '../src/services/chief.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import {
   DEFAULT_CONTEXT_WINDOW,
-  setCoordinatorServerContextEnabled,
+  setCoordinatorInServer,
 } from '../src/services/coordinator-context.js';
 import { hasRepoBinding, projectRepoRef, toProjectRecord } from '../src/services/git.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
@@ -223,7 +223,7 @@ describe('#1470 chief usage: only own-team builds and own-team chief turns are r
 
 describe('#1470 the chief envelope context.tokens: only this chief own threads are counted', () => {
   test('U9 another team chief turns do not enter the reading', () => {
-    setCoordinatorServerContextEnabled(true);
+    setCoordinatorInServer(true);
     H.s.db
       .insert(chiefTurnUsage)
       .values({
@@ -257,7 +257,7 @@ describe('#1470 the chief envelope context.tokens: only this chief own threads a
       tokens: 2,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
   });
 });
 

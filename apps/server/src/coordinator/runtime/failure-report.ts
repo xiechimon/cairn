@@ -2,12 +2,7 @@ import { otelErrorMessage } from '@cairn/shared';
 import type { AssistantMessage } from '@earendil-works/pi-ai';
 import { emitCompactionSpan, emitSummaryCallSpan } from '../../runtime-otel.js';
 
-export type CompactionStage =
-  | 'memory-flush'
-  | 'seed-summary'
-  | 'summary-model'
-  | 'summary-fold'
-  | 'background-compaction';
+export type CompactionStage = 'memory-flush' | 'summary-fold' | 'background-compaction';
 
 export interface FailureScope {
   threadId?: string;

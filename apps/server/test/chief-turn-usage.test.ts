@@ -1,5 +1,5 @@
 import type { MachineDoneBody } from '@cairn/shared';
-import { chiefDigestThreadId, machineDoneBodySchema } from '@cairn/shared';
+import { machineDoneBodySchema } from '@cairn/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { isColdResume, SHORT_RETENTION_MS } from '../src/coordinator/runtime/cold-slim.js';
@@ -19,15 +19,15 @@ import {
   DEFAULT_CONTEXT_WINDOW,
   lastContextBearingTurnUsage,
   lastTurnUsageForColdResume,
-  setCoordinatorServerContextEnabled,
+  setCoordinatorInServer,
 } from '../src/services/coordinator-context.js';
 import { finishStep } from '../src/services/machines.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { insertMachine } from './helpers.js';
 
 registerChiefHarness();
-beforeEach(() => setCoordinatorServerContextEnabled(true));
-afterEach(() => setCoordinatorServerContextEnabled(false));
+beforeEach(() => setCoordinatorInServer(true));
+afterEach(() => setCoordinatorInServer(false));
 
 function deps() {
   return {
@@ -183,16 +183,6 @@ describe('chief turns record their own usage per step', () => {
     expect(turnRows()).toEqual([]);
   });
 
-  test('a background digest step is not a Coordinator turn and writes no turn row', async () => {
-    const machineId = insertMachine(H.s);
-    claimedStep(machineId, 'digest-step', { buildId: chiefDigestThreadId(H.chiefId) });
-    await finishStep(deps(), machineId, 'digest-step', {
-      status: 'success',
-      usage: [usage('pi/glm', 9000, 0)],
-    });
-    expect(turnRows()).toEqual([]);
-  });
-
   test('a build step keeps only the cumulative total', async () => {
     const machineId = insertMachine(H.s);
     const now = Date.now();
@@ -245,9 +235,9 @@ describe('the done report carries time to first token', () => {
   });
 });
 
-describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
+describe('the context meter under the in-server Coordinator', () => {
   test('flag off: no turn row is written and the meter stays empty', async () => {
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-off');
     await finishStep(deps(), machineId, 'turn-off', {
@@ -269,7 +259,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       tokens: 1810,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
-    setCoordinatorServerContextEnabled(false);
+    setCoordinatorInServer(false);
     expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toBeNull();
   });
 

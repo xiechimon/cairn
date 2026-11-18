@@ -78,22 +78,15 @@ describe('Coordinator resume boundaries from the historical task 169 sequence', 
     expect(H.s.db.select().from(chiefMessage).all()).toEqual(before);
   });
 
-  test.each(['coordinator', 'conversation'] as const)(
-    '%s HTTP read restores the reply',
-    async (surface) => {
-      seedResume();
-      const path =
-        surface === 'coordinator'
-          ? `/api/teams/${H.teamId}/coordinator`
-          : `/api/conversations/${H.threadId}/messages`;
-      const response = await req(H.s.app, 'GET', path);
-      expect(response.status).toBe(200);
-      const result = (await response.json()) as { messages: { id: string; content: unknown }[] };
-      expect(boundaries(result.messages)).toEqual([
-        expect.objectContaining({ id: 'user-resumed', content: '' }),
-      ]);
-    },
-  );
+  test('the conversation read restores the reply', async () => {
+    seedResume();
+    const response = await req(H.s.app, 'GET', `/api/conversations/${H.threadId}/messages`);
+    expect(response.status).toBe(200);
+    const result = (await response.json()) as { messages: { id: string; content: unknown }[] };
+    expect(boundaries(result.messages)).toEqual([
+      expect.objectContaining({ id: 'user-resumed', content: '' }),
+    ]);
+  });
 
   test('a claimed resume beyond the last persisted message projects its live boundary', () => {
     seedResume();
