@@ -1,6 +1,6 @@
 # Connector fabric
 
-Status: design for the owner's review. Nothing here is built. Board item "Connector fabric" (W2 Affairs+IM, seq 30): a server-side tool-shape verdict and a Coordinator connector path; the Composio routing for the consumer-app catalog is recorded in `docs/ops/launch-owner-actions.md` row 7 and `docs/research/duskbot-vs-cairn-2026-11-17.md` §4. Grounded on `origin/main` `7cc6dd1fc`. Prior art: dusk bot's `connector-verdict.ts` — a server-side allowlist that must hold even against a garbled model — and its Composio routing; the pattern is borrowed, not the code. No Composio API key is needed to review this page; the key is an owner action.
+Status: shipped. The broker holds a cached `tools/list` per connector and rejects malformed, unknown or unapproved calls before any upstream request (`apps/server/src/services/connector-broker.ts`, rejection shapes in `apps/server/test/connector-broker.test.ts`); the daemon leg grants `stepConnectorEndpoints` on the step token (`apps/server/src/services/mcp-servers.ts`); the in-server Coordinator offers `connector_<slug>__<tool>` defs and dispatches them through the broker (`apps/server/src/coordinator/index.ts`, `apps/server/src/services/machine-relay.ts`, end-to-end turn in `apps/server/test/coordinator/connector.test.ts`). Still deferred, as §8 lists: per-step or per-agent grants, direct per-app OAuth, Composio `manage_connections`, app webhooks, broker enforcement on the daemon step path, and connector tools on `mcp-face.ts`. Board item "Connector fabric" (W2 Affairs+IM, seq 30): a server-side tool-shape verdict and a Coordinator connector path; the Composio routing for the consumer-app catalog is recorded in `docs/ops/launch-owner-actions.md` row 7 and `docs/research/duskbot-vs-cairn-2026-11-17.md` §4. Grounded on `origin/main` `7cc6dd1fc`. Prior art: dusk bot's `connector-verdict.ts` — a server-side allowlist that must hold even against a garbled model — and its Composio routing; the pattern is borrowed, not the code. No Composio API key is needed to review this page; the key is an owner action.
 
 ## 1. What the fabric is
 
@@ -21,7 +21,7 @@ The broker sits where connector tools are exposed. It holds a cached `tools/list
 Two delivery paths, one verdict:
 
 - **Daemon step (shipped):** `stepConnectorEndpoints` resolves granted slugs into `mcpConnectors` endpoints on the machine token (`stepToken`, `apps/server/src/services/machine-step-token.ts`); the daemon mounts them as per-step MCP servers (`stepMcpEndpoints`, `apps/daemon/src/step-skill-tool.ts`). `needs_auth` or expired connectors are withheld (`withheldMcp`). Grant = every connector slug on a machine with `capabilities.mcpConnectors` — the 2026-11-16 ruling that every step gets every connector stands.
-- **Coordinator step (new):** the broker generates `connector_<slug>__<tool>` tool definitions from the cached list beside `coordinatorToolDefs` (`apps/server/src/coordinator/runtime/tools.ts`), dispatches them through the same relay path (`executeRelayToolCall`), and applies the verdict server-side at dispatch. The Coordinator today has no connector path — only in-process chief tools.
+- **Coordinator step (shipped):** the broker generates `connector_<slug>__<tool>` tool definitions from the cached list beside `coordinatorToolDefs` (`apps/server/src/coordinator/runtime/tools.ts`), dispatches them through the same relay path (`executeRelayToolCall`), and applies the verdict server-side at dispatch.
 
 ## 3. States and transitions
 
@@ -56,9 +56,9 @@ Lifecycle view over the stored `status` (`unchecked | connected | needs_auth | e
 | Settings REST (`/api/teams/:id/mcp-connectors*`, `apps/server/src/routes-resources.ts`) | rows, catalog, Composio toolkit list | rows, `unchecked` reset on target change | validation or conflict → no row |
 | Probe `checkMcpConnector` | row, sealed headers/bearer | status, reason, `toolCount`, `checkedAt`, cached tool list — conditional on `updatedAt`/`authRevision`/`tokenGeneration` | maps to `needs_auth`/`error`; a lost race keeps the newer row |
 | OAuth start/callback (`services/oauth.ts` `states` map, `/api/oauth/callback`) | pending state | `oauthCipher`, `oauthMeta`, `authRevision+1`, `tokenGeneration+1` | issuer/exchange/conflict → landing flag, no row change; restart drops pending back to `auth-required` |
-| Composio adapter (new) | sealed key, connected-account status | session URL + key cipher on the row | Composio down → `degraded`; bad key → `auth-required` |
+| Composio adapter (shipped) | sealed key, connected-account status | session URL + key cipher on the row | Composio down → `degraded`; bad key → `auth-required` |
 | Token delivery `stepConnectorEndpoints` | row, bearer; refresh if expiring within 10 min, 5 s bound | refreshed cipher, `tokenGeneration` | not deliverable → `withheldMcp`; step still runs |
-| Broker dispatch (new) | cached tool list, action registry, autonomy tier | journal entry per external call | unknown connector/tool/args or unapproved class → rejected before dispatch, logged; upstream error → tool error result, turn continues |
+| Broker dispatch (shipped) | cached tool list, action registry, autonomy tier | journal entry per external call | unknown connector/tool/args or unapproved class → rejected before dispatch, logged; upstream error → tool error result, turn continues |
 | Owner UI | records, status | sign-in, reconnect, revoke, delete | none — display only |
 
 ## 5. Failure modes to cover at build time
