@@ -1601,15 +1601,18 @@
           "/app/project/:id/settings"
         ],
         "server": [
+          "/api/actions/journal",
+          "/api/actions/journal/:id/undo",
+          "/api/actions/proposals",
+          "/api/actions/proposals/:id/answer",
+          "/api/fs/list",
+          "/api/fs/pick",
           "/api/projects",
           "/api/projects/:id",
           "/api/projects/:id/${action}",
           "/api/projects/:id/autonomy",
           "/api/projects/:id/branches",
-          "/api/projects/:id/files",
-          "/api/fs/list",
-          "/api/fs/pick",
-          "/api/actions/proposals/:id/answer"
+          "/api/projects/:id/files"
         ]
       },
       "reach": [
