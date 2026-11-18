@@ -23,6 +23,7 @@ import {
   autonomyPause,
   build as buildTable,
   machine as machineTable,
+  project as projectTable,
   routingRule,
   step as stepTable,
   todo as todoTable,
@@ -607,10 +608,35 @@ export function pinSessionRoute(s: TestServer, machineId: string): void {
 export function startLegacyBuild(
   s: TestServer,
   todoId: string,
-  opts: { withPlan: boolean; prompt?: string; triggerSource?: 'user' | 'schedule' },
+  opts: {
+    withPlan: boolean;
+    prompt?: string;
+    triggerSource?: 'user' | 'schedule';
+    planAutoApproveEnabled?: boolean;
+  },
 ): string {
   const todoRow = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
   if (todoRow === undefined) throw new Error(`startLegacyBuild: todo ${todoId} missing`);
+  if (opts.withPlan) {
+    const row = s.db
+      .select()
+      .from(projectTable)
+      .where(eq(projectTable.id, todoRow.projectId))
+      .get();
+    if (row === undefined)
+      throw new Error(`startLegacyBuild: project ${todoRow.projectId} missing`);
+    s.db
+      .update(projectTable)
+      .set({
+        autonomy: {
+          ...row.autonomy,
+          planAutoApproveEnabled:
+            opts.planAutoApproveEnabled ?? row.autonomy?.planAutoApproveEnabled ?? false,
+        },
+      })
+      .where(eq(projectTable.id, row.id))
+      .run();
+  }
   const id = newUuidv7();
   const createdAt = Date.now();
   s.db

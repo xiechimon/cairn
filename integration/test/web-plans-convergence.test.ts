@@ -181,7 +181,10 @@ test('an autonomous project starts the work when the plan is delivered, with no 
     { title: '直接开工探针', spec: '在 plan.md 落一版方案。' },
     { repoKind: 'hosted', projectName: 'direct-start' },
   );
-  const buildId = startLegacyBuild(server, todoId, { withPlan: true });
+  const buildId = startLegacyBuild(server, todoId, {
+    withPlan: true,
+    planAutoApproveEnabled: true,
+  });
   const phases: string[] = [];
   const watching = setInterval(() => phases.push(server.todoPhase(todoId)), 50);
   await page.goto(`${server.url}/app/todo/${todoId}`);

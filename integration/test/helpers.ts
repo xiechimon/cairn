@@ -16,6 +16,7 @@ import { createApp } from '../../apps/server/src/app.js';
 import { openDbWithHandle, openMemoryDb } from '../../apps/server/src/db/client.js';
 import {
   build as buildTable,
+  project as projectTable,
   provider as providerTable,
   routingRule as routingRuleTable,
   todo as todoTable,
@@ -500,10 +501,28 @@ export function pinSessionRouteMachine(server: RealServer, machineId: string): v
 export function startLegacyBuild(
   server: RealServer,
   todoId: string,
-  opts: { withPlan: boolean; prompt?: string },
+  opts: { withPlan: boolean; prompt?: string; planAutoApproveEnabled?: boolean },
 ): string {
   const todoRow = server.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
   if (todoRow === undefined) throw new Error(`startLegacyBuild: todo ${todoId} missing`);
+  if (opts.withPlan) {
+    const row = server.db
+      .select()
+      .from(projectTable)
+      .where(eq(projectTable.id, todoRow.projectId))
+      .get()!;
+    server.db
+      .update(projectTable)
+      .set({
+        autonomy: {
+          ...row.autonomy,
+          planAutoApproveEnabled:
+            opts.planAutoApproveEnabled ?? row.autonomy?.planAutoApproveEnabled ?? false,
+        },
+      })
+      .where(eq(projectTable.id, row.id))
+      .run();
+  }
   const id = newUuidv7();
   const createdAt = Date.now();
   server.db

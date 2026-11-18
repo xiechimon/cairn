@@ -86,6 +86,11 @@ async function setupWorld() {
   seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model' });
   const { token } = (await enrollRes.json()) as { token: string };
   const projectId = await postProject(s.app, 'demo');
+  s.db
+    .update(projectTable)
+    .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, planAutoApproveEnabled: true } })
+    .where(eq(projectTable.id, projectId))
+    .run();
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: 'Auto-confirm probe', spec: 'Probe README' },
   });
