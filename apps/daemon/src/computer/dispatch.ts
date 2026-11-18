@@ -473,6 +473,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         now,
         signal: controller.signal,
         session: call.scopeKey,
+        ...(call.browserScope === undefined ? {} : { browserScope: call.browserScope }),
         ...(call.tabScope === undefined ? {} : { tabScope: call.tabScope }),
         cairnOrigins: options.cairnOrigins,
         browserSecrets: call.browserSecrets,
@@ -523,6 +524,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         now,
         signal: controller.signal,
         session: call.scopeKey,
+        ...(call.browserScope === undefined ? {} : { browserScope: call.browserScope }),
         tabScope: call.tabScope,
         cairnOrigins: [],
       });

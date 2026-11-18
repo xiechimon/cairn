@@ -12,11 +12,17 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
 import { z } from 'zod';
-import { AGENT_BROWSER_BINARY, browserSessionName, isStealthBrowserCommand } from './browser.js';
+import {
+  AGENT_BROWSER_BINARY,
+  browserProfileKeyOfSession,
+  browserScopedSessionName,
+  browserSessionName,
+  isStealthBrowserCommand,
+} from './browser.js';
 import { CloakBrowser, shellQuote, writeCloakLauncher } from './cloak-browser.js';
 import { executableOnPath } from './contained-spawn.js';
 import type { ComputerDesktops, ComputerHoldUse } from './desktops.js';
@@ -59,6 +65,22 @@ const BROWSER_COMMAND_TIMEOUT_MS = 30_000;
 const PROFILE_RELEASE_MS = 10_000;
 const BROWSER_PROFILE = join('.cairn', 'browser-profile');
 const CLOAK_PROFILE = join('.cairn', 'cloak-profile');
+const KEYED_PROFILES = join('.cairn', 'browser-profiles');
+
+export function keyedBrowserProfile(home: string, key: string, stealth: boolean): string {
+  return join(home, KEYED_PROFILES, key, stealth ? 'cloak' : 'chromium');
+}
+
+function sessionOfBrowserArgv(argv: readonly string[]): string | undefined {
+  if (argv[0] !== AGENT_BROWSER_BINARY) return undefined;
+  const index = argv.indexOf('--session');
+  return index >= 0 ? argv[index + 1] : undefined;
+}
+
+function browserKeyOfArgv(argv: readonly string[]): string | null {
+  const session = sessionOfBrowserArgv(argv);
+  return session === undefined ? null : browserProfileKeyOfSession(session);
+}
 const CLOAK_IDENTITY = '.cairn-cloak-identity.json';
 const CHROMIUM_ARGS = [
   '--disable-blink-features=AutomationControlled',
@@ -225,6 +247,7 @@ export class HostDesktops implements ComputerDesktops {
   private readonly busy = new Map<string, number>();
   private readonly stopping = new Map<string, Promise<void>>();
   private readonly takeovers = new Map<string, number>();
+  private readonly ownerProfiles = new Map<string, string>();
   private readonly handoffs = new Map<string, Promise<void>>();
   private readonly now: () => number;
   private readonly browser: CloakBrowser;
@@ -345,11 +368,15 @@ export class HostDesktops implements ComputerDesktops {
     return (await this.desktop(scopeKey)).display;
   }
 
-  async hold(scopeKey: string, use: ComputerHoldUse = 'view'): Promise<() => void> {
+  async hold(
+    scopeKey: string,
+    use: ComputerHoldUse = 'view',
+    browserScope?: string,
+  ): Promise<() => void> {
     this.enter(scopeKey);
     try {
       await this.desktop(scopeKey);
-      if (use === 'handoff') await this.takeOver(scopeKey);
+      if (use === 'handoff') await this.takeOver(scopeKey, browserScope);
     } catch (error) {
       this.leave(scopeKey);
       throw error;
@@ -372,13 +399,13 @@ export class HostDesktops implements ComputerDesktops {
     return next;
   }
 
-  private async takeOver(scopeKey: string): Promise<void> {
+  private async takeOver(scopeKey: string, browserScope?: string): Promise<void> {
     const count = this.takeovers.get(scopeKey) ?? 0;
     this.takeovers.set(scopeKey, count + 1);
     try {
       await (count === 0
         ? this.handoff(scopeKey, async () => {
-            if (this.offersStealthBrowser()) await this.openOwnerBrowser(scopeKey);
+            if (this.offersStealthBrowser()) await this.openOwnerBrowser(scopeKey, browserScope);
           })
         : this.handoffs.get(scopeKey));
     } catch (error) {
@@ -435,7 +462,9 @@ export class HostDesktops implements ComputerDesktops {
       if (this.now() >= deadline) throw refuse();
       await sleep(100);
     }
-    await this.profileReleased(join(directory, 'home', CLOAK_PROFILE));
+    await this.profileReleased(
+      this.ownerProfiles.get(scopeKey) ?? join(directory, 'home', CLOAK_PROFILE),
+    );
   }
 
   private async startManualBrowser(scopeKey: string, url?: string): Promise<void> {
@@ -446,11 +475,14 @@ export class HostDesktops implements ComputerDesktops {
     if (started.code !== 0) throw new ComputerRefusal('The owner browser could not be started');
   }
 
-  private async openOwnerBrowser(scopeKey: string): Promise<void> {
+  private async openOwnerBrowser(scopeKey: string, browserScope?: string): Promise<void> {
     if (await this.manualActive(scopeKey)) return this.startManualBrowser(scopeKey);
     const desktop = await this.desktop(scopeKey);
     if (await this.manualActive(scopeKey)) return this.startManualBrowser(scopeKey);
-    const session = browserSessionName(scopeKey, true);
+    const session =
+      browserScope === undefined
+        ? browserSessionName(scopeKey, true)
+        : browserScopedSessionName(browserScope, true);
     let url: string | undefined;
     const listed = await browserCommand(desktop.provider, ['--json', 'session', 'list'])
       .then(({ code, text }) => (code === 0 ? sessionList.safeParse(JSON.parse(text)) : undefined))
@@ -464,10 +496,42 @@ export class HostDesktops implements ComputerDesktops {
     const closed = await browserCommand(desktop.provider, ['--session', session, 'close']);
     if (closed.code !== 0) throw new ComputerRefusal('The agent browser did not close');
     const directory = this.directory(scopeKey);
-    const profile = join(directory, 'home', CLOAK_PROFILE);
+    const profile =
+      browserScope === undefined
+        ? join(directory, 'home', CLOAK_PROFILE)
+        : keyedBrowserProfile(join(directory, 'home'), browserSessionName(browserScope), true);
     await this.profileReleased(profile);
     await writeCloakLauncher(directory, profile, this.browser, this.browserProxyArgs());
+    this.ownerProfiles.set(scopeKey, profile);
     await this.startManualBrowser(scopeKey, url);
+  }
+
+  private prepareChromiumProfile(profile: string): void {
+    const preferencesPath = join(profile, 'Default', 'Preferences');
+    const preferences = existsSync(preferencesPath)
+      ? (JSON.parse(readFileSync(preferencesPath, 'utf8')) as Record<string, unknown>)
+      : {};
+    mkdirSync(join(profile, 'Default'), { recursive: true, mode: 0o700 });
+    writeFileSync(
+      preferencesPath,
+      JSON.stringify({
+        ...preferences,
+        credentials_enable_service: false,
+        profile: {
+          ...(preferences.profile as Record<string, unknown> | undefined),
+          password_manager_enabled: false,
+        },
+      }),
+      { mode: 0o600 },
+    );
+  }
+
+  private adoptLegacyProfile(home: string, target: string, stealth: boolean): void {
+    if (existsSync(target)) return;
+    const legacy = join(home, stealth ? CLOAK_PROFILE : BROWSER_PROFILE);
+    if (!existsSync(legacy)) return;
+    mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+    renameSync(legacy, target);
   }
 
   private async profileReleased(profile: string): Promise<void> {
@@ -489,8 +553,12 @@ export class HostDesktops implements ComputerDesktops {
     }
   }
 
-  private async importSavedLogin(scopeKey: string, home: string, provider: HostComputerProvider) {
-    const session = browserSessionName(scopeKey);
+  private async importSavedLogin(
+    scopeKey: string,
+    home: string,
+    provider: HostComputerProvider,
+    session = browserSessionName(scopeKey),
+  ) {
     const saved = join(home, '.agent-browser', 'sessions', `${session}-${session}.json`);
     if (!existsSync(saved)) return;
     const parsed = savedLogin.safeParse(JSON.parse(readFileSync(saved, 'utf8')));
@@ -670,24 +738,13 @@ export class HostDesktops implements ComputerDesktops {
         const cloakProfile = join(home, CLOAK_PROFILE);
         if (existsSync(join(profile, CLOAK_IDENTITY)) && !existsSync(cloakProfile))
           renameSync(profile, cloakProfile);
-        const preferencesPath = join(profile, 'Default', 'Preferences');
-        const preferences = existsSync(preferencesPath)
-          ? (JSON.parse(readFileSync(preferencesPath, 'utf8')) as Record<string, unknown>)
-          : {};
-        mkdirSync(join(profile, 'Default'), { recursive: true, mode: 0o700 });
-        writeFileSync(
-          preferencesPath,
-          JSON.stringify({
-            ...preferences,
-            credentials_enable_service: false,
-            profile: {
-              ...(preferences.profile as Record<string, unknown> | undefined),
-              password_manager_enabled: false,
-            },
-          }),
-          { mode: 0o600 },
-        );
-        await this.importSavedLogin(scopeKey, home, desktop.provider).catch(() => {});
+        this.prepareChromiumProfile(profile);
+        await this.importSavedLogin(
+          scopeKey,
+          home,
+          desktop.provider,
+          browserSessionName(scopeKey),
+        ).catch(() => {});
       }
     }
     this.desktops.set(scopeKey, desktop);
@@ -743,19 +800,28 @@ export class HostDesktops implements ComputerDesktops {
       browserEnvironment: async (argv): Promise<Record<string, string>> => {
         const proxy = this.browserProxyArgs();
         if (!argv.includes('--session')) return {};
-        if (!isStealthBrowserCommand(argv)) {
+        const stealth = isStealthBrowserCommand(argv);
+        const key = browserKeyOfArgv(argv);
+        const profile =
+          key === null
+            ? join(home, stealth ? CLOAK_PROFILE : BROWSER_PROFILE)
+            : keyedBrowserProfile(home, key, stealth);
+        if (key !== null) {
+          this.adoptLegacyProfile(home, profile, stealth);
+          if (!stealth) this.prepareChromiumProfile(profile);
+        }
+        if (!stealth) {
           const chromium = this.chromium();
           if (!chromium)
             throw new ComputerRefusal('The browser needs Chromium installed on this machine');
           return {
             AGENT_BROWSER_EXECUTABLE_PATH: chromium,
             AGENT_BROWSER_NO_VERSION_CHECK: '1',
-            AGENT_BROWSER_PROFILE: join(home, BROWSER_PROFILE),
+            AGENT_BROWSER_PROFILE: profile,
             AGENT_BROWSER_ARGS: [...CHROMIUM_ARGS, ...proxy].join(','),
           };
         }
         if (!this.browser.ready) throw new ComputerRefusal(NO_CLOAK_LICENSE_ON_HOST);
-        const profile = join(home, CLOAK_PROFILE);
         const launch = await this.browser.launch(profile);
         return {
           ...launch.env,
@@ -783,8 +849,15 @@ export class HostDesktops implements ComputerDesktops {
           const current = await provider();
           if (isStealthBrowserCommand(request.argv)) await this.closeOwnerBrowser(scopeKey);
           else await this.handoffs.get(scopeKey);
-          if (request.argv[0] === AGENT_BROWSER_BINARY)
-            await this.importSavedLogin(scopeKey, join(this.directory(scopeKey), 'home'), current);
+          if (request.argv[0] === AGENT_BROWSER_BINARY) {
+            const session = sessionOfBrowserArgv(request.argv);
+            await this.importSavedLogin(
+              scopeKey,
+              join(this.directory(scopeKey), 'home'),
+              current,
+              ...(session === undefined ? [] : [session]),
+            );
+          }
           events = await current.execute(request);
         } catch (error) {
           leave();
@@ -854,20 +927,26 @@ export class HostDesktops implements ComputerDesktops {
 
   private async stop(scopeKey: string, unit: string): Promise<void> {
     await this.handoff(scopeKey, () => this.quitManualBrowser(scopeKey));
+    this.ownerProfiles.delete(scopeKey);
     const directory = this.directory(scopeKey);
     const provider =
       this.desktops.get(scopeKey)?.provider ??
       this.provider(join(directory, 'home'), this.ready(directory) ?? '');
-    for (const stealth of [false, true])
-      await browserCommand(provider, [
-        '--session',
-        browserSessionName(scopeKey, stealth),
-        'close',
-      ]).catch(() => {});
+    const listed = await browserCommand(provider, ['--json', 'session', 'list'])
+      .then(({ code, text }) =>
+        code === 0 ? (sessionList.safeParse(JSON.parse(text)).data?.data.sessions ?? []) : [],
+      )
+      .catch(() => [] as string[]);
+    for (const session of new Set([...listed, ...this.legacySessions(scopeKey)]))
+      await browserCommand(provider, ['--session', session, 'close']).catch(() => {});
     await provider.killAll();
     this.desktops.delete(scopeKey);
     this.lastUsed.delete(scopeKey);
     await this.run(['systemctl', '--user', 'stop', unit]);
+  }
+
+  private legacySessions(scopeKey: string): string[] {
+    return [browserSessionName(scopeKey), browserSessionName(scopeKey, true)];
   }
 
   async presence(): Promise<ComputerPresence[]> {

@@ -44,7 +44,11 @@ export function openReadOnlyView(): ReadOnlyView {
 }
 
 export interface ComputerScreenProviderOptions {
-  holdComputer?: (scopeKey: string, use: ComputerHoldUse) => Promise<() => void>;
+  holdComputer?: (
+    scopeKey: string,
+    use: ComputerHoldUse,
+    browserScope?: string,
+  ) => Promise<() => void>;
   socketPath?: (scopeKey: string, kind: 'view' | 'control') => string;
   terminalCommand?: (scopeKey: string) => Promise<readonly string[]>;
   socketWaitMs?: number;
@@ -149,6 +153,7 @@ export function createComputerScreenProvider(
         ? await options.holdComputer(
             request.scopeKey,
             request.kind === 'control' && request.handoff === true ? 'handoff' : request.kind,
+            request.browserScope,
           )
         : () => {};
       try {

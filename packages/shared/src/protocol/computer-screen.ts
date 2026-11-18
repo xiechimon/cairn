@@ -20,6 +20,7 @@ export const computerScreenRequestSchema = z
     controlLeaseId: z.string().nullable(),
     controlFence: z.number().int().nonnegative(),
     handoff: z.literal(true).optional(),
+    browserScope: z.string().min(1).max(200).optional(),
   })
   .strict()
   .refine((request) => request.kind === 'view' || request.controlLeaseId !== null)

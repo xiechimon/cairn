@@ -9,7 +9,7 @@ export interface ComputerDesktops extends ScopedComputerProviders, ComputerPrese
   missingPrograms(): string[];
   offersBrowser(): boolean;
   offersStealthBrowser(): boolean;
-  hold(scopeKey: string, use?: ComputerHoldUse): Promise<() => void>;
+  hold(scopeKey: string, use?: ComputerHoldUse, browserScope?: string): Promise<() => void>;
   socketPath(scopeKey: string, kind: 'view' | 'control'): string;
   sweep(): Promise<void>;
   close(): void;

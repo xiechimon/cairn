@@ -17,7 +17,12 @@ import {
   type VmDownload,
 } from '@cairn/shared';
 import { z } from 'zod';
-import { AGENT_BROWSER_BINARY, browserSessionName, isStealthBrowserCommand } from './browser.js';
+import {
+  AGENT_BROWSER_BINARY,
+  browserScopedSessionName,
+  browserSessionName,
+  isStealthBrowserCommand,
+} from './browser.js';
 import { resolveHostBrowserLocaleAndTimezone } from './cloak-browser.js';
 import type { ComputerDesktops, ComputerHoldUse } from './desktops.js';
 import { AsyncEventQueue, HOST_MAX_FILE_BYTES } from './host.js';
@@ -324,11 +329,15 @@ export class VmDesktops implements ComputerDesktops {
     return (await this.desktop(scopeKey)).address;
   }
 
-  async hold(scopeKey: string, use: ComputerHoldUse = 'view'): Promise<() => void> {
+  async hold(
+    scopeKey: string,
+    use: ComputerHoldUse = 'view',
+    browserScope?: string,
+  ): Promise<() => void> {
     this.enter(scopeKey);
     try {
       await this.desktop(scopeKey);
-      if (use === 'handoff') await this.takeOver(scopeKey);
+      if (use === 'handoff') await this.takeOver(scopeKey, browserScope);
     } catch (error) {
       this.leave(scopeKey);
       throw error;
@@ -351,14 +360,23 @@ export class VmDesktops implements ComputerDesktops {
     return next;
   }
 
-  private async takeOver(scopeKey: string): Promise<void> {
+  private async takeOver(scopeKey: string, browserScope?: string): Promise<void> {
     const count = this.takeovers.get(scopeKey) ?? 0;
     this.takeovers.set(scopeKey, count + 1);
     try {
       await (count === 0
         ? this.handoff(scopeKey, async () => {
-            if (this.licensed.has(scopeKey))
-              await this.browserScript(scopeKey, ['owner', browserSessionName(scopeKey, true)]);
+            if (this.licensed.has(scopeKey)) {
+              const args =
+                browserScope === undefined
+                  ? ['owner', browserSessionName(scopeKey, true)]
+                  : [
+                      'owner',
+                      browserScopedSessionName(browserScope, true),
+                      `browser-profiles/${browserSessionName(browserScope)}/cloak`,
+                    ];
+              await this.browserScript(scopeKey, args);
+            }
           })
         : this.handoffs.get(scopeKey));
     } catch (error) {
@@ -1159,6 +1177,7 @@ export class VmDesktops implements ComputerDesktops {
           'cairn-browser',
           'quit',
           browserSessionName(scopeKey, true),
+          'all',
         ],
         { timeoutMs: BROWSER_COMMAND_MS },
       );

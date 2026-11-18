@@ -11,6 +11,10 @@ export type ComputerThread = Pick<
 
 export const NO_CARD_THREAD = '';
 
+export function browserScopeFor(thread: Pick<ComputerThread, 'id' | 'chiefId'>): string {
+  return thread.id === NO_CARD_THREAD ? `chief-fallback:${thread.chiefId}` : thread.id;
+}
+
 export function infoCardTodoOf(
   db: Pick<Db, 'select'>,
   stepRow: Pick<typeof step.$inferSelect, 'kind' | 'buildId'>,

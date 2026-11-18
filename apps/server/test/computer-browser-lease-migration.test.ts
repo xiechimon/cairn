@@ -1,0 +1,55 @@
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { MIGRATIONS_FOLDER } from '../src/db/client.js';
+
+const journal = JSON.parse(readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8')) as {
+  entries: { idx: number; tag: string; when: number }[];
+};
+
+test('computer_browser_lease is created by the forward upgrade and rows survive re-migration', () => {
+  const directory = makeTestTempDir('cairn-browser-lease-migration-');
+  const sqlite = new Database(join(directory, 'db.sqlite'));
+  const db = drizzle(sqlite);
+  try {
+    const cut = journal.entries.findIndex((entry) => entry.tag.endsWith('_hard_iron_man'));
+    expect(cut).toBeGreaterThan(0);
+    const prior = join(directory, 'prior');
+    mkdirSync(join(prior, 'meta'), { recursive: true });
+    const entries = journal.entries.slice(0, cut);
+    writeFileSync(join(prior, 'meta/_journal.json'), JSON.stringify({ ...journal, entries }));
+    for (const entry of entries) {
+      copyFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(prior, `${entry.tag}.sql`));
+    }
+    migrate(db, { migrationsFolder: prior });
+    expect(
+      sqlite
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get('computer_browser_lease'),
+    ).toBeUndefined();
+    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    sqlite.exec("INSERT INTO team (id, name, createdAt) VALUES ('team', 'Team', 1)");
+    sqlite.exec(
+      "INSERT INTO machine (id, teamId, name, online, lastSeenAt, capabilities) VALUES ('m1', 'team', 'omarchy', 1, 1, '{}')",
+    );
+    sqlite.exec(
+      "INSERT INTO computer (id, teamId, scope, scopeKey, machineId, kind, providerRef, state, executionFence, controlHolder, controlFence, screenGeneration, createdAt, updatedAt) VALUES ('c1', 'team', 'private', 'chief:c1', 'm1', 'orb', 'ref', 'stopped', 0, 'none', 0, 0, 1, 1)",
+    );
+    sqlite.exec(
+      "INSERT INTO computer_browser_lease (id, computerId, profileKey, stepId, expiresAt, fence, updatedAt) VALUES ('l1', 'c1', 'thread-a', 's1', 99, 1, 1)",
+    );
+    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    expect(
+      sqlite
+        .prepare('SELECT profileKey, stepId FROM computer_browser_lease WHERE id = ?')
+        .get('l1'),
+    ).toEqual({ profileKey: 'thread-a', stepId: 's1' });
+  } finally {
+    sqlite.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

@@ -500,6 +500,25 @@ describe('VmDesktops', () => {
     ).rejects.toThrow(message);
   });
 
+  test('a handoff hold with a browserScope re-launches Cloak on that thread profile', async () => {
+    const env = setup();
+    const desktops = env.make();
+    const ownerCalls = () =>
+      env.calls().filter((argv) => argv.includes('cairn-browser') && argv.includes('owner'));
+    const provider = desktops.forScope('chief:a', { browserLicense: 'cloak-test-key' });
+    await provider.execute(
+      request(['agent-browser', '--session', 'p_thread_t1-stealth', 'snapshot']),
+    );
+    const release = await desktops.hold('chief:a', 'handoff', 'thread:t1');
+    expect(ownerCalls().map((argv) => argv.slice(-3).join(' '))).toEqual([
+      'owner p_thread_t1-stealth browser-profiles/thread_t1/cloak',
+    ]);
+    await expect(
+      provider.execute(request(['agent-browser', '--session', 'p_thread_t2', 'snapshot'])),
+    ).rejects.toThrow('taken over');
+    release();
+  });
+
   test('only a handoff hold relaunches Cloak for the owner, after a stealth call, and blocks the agent browser', async () => {
     const env = setup();
     const desktops = env.make();
@@ -543,7 +562,7 @@ describe('VmDesktops', () => {
     await desktops.sweep();
     expect(env.state().vms[NAME]?.state).toBe('stopped');
     const quit = env.calls().find((argv) => argv.includes('quit')) as string[];
-    expect(quit.at(-1)).toBe('chief_a-stealth');
+    expect(quit.slice(-2)).toEqual(['chief_a-stealth', 'all']);
     expect(env.calls().findIndex((argv) => argv.includes('quit'))).toBeLessThan(
       env.calls().findIndex((argv) => argv[0] === 'stop'),
     );

@@ -8,6 +8,7 @@ import { createCoordinatorServerApi } from '../src/coordinator/server-api.js';
 import {
   chief as chiefTable,
   chiefThread as chiefThreadTable,
+  computerBrowserLease as computerBrowserLeaseTable,
   computerCall as computerCallTable,
   computer as computerTable,
   machine as machineTable,
@@ -812,6 +813,121 @@ describe('leases', () => {
     });
     expect(calls).toHaveLength(2);
     expect(calls[1]?.tool).toBe('read_file');
+  });
+});
+
+describe('per-thread browser scopes', () => {
+  const THREAD_B = 'chief-second-thread';
+
+  function addThreadStep(s: TestServer, threadId: string, stepId: string, chiefId: string) {
+    s.db
+      .insert(chiefThreadTable)
+      .values({
+        id: threadId,
+        chiefId,
+        userId: s.user.id,
+        teamId: s.team.id,
+        title: 'second',
+        createdAt: 1,
+        updatedAt: 1,
+        sessionRuntime: 'pi',
+        sessionId: '',
+        sessionOpenedAt: 1,
+        pendingSessionResumeAt: null,
+        toolDefHashes: {},
+        toolResultHashes: {},
+        activeRun: null,
+        archivedAt: 1,
+      })
+      .run();
+    s.db
+      .insert(stepTable)
+      .values({
+        id: stepId,
+        buildId: threadId,
+        kind: 'chief',
+        machineId: 'sidecar',
+        status: 'claimed',
+        prompt: 'work',
+        createdAt: 2,
+      })
+      .run();
+  }
+
+  function browserCall(toolCallId: string) {
+    return {
+      computer: true as const,
+      name: 'browser_navigate' as const,
+      toolCallId,
+      params: { url: 'https://example.com' },
+    };
+  }
+
+  test('browser calls from two threads run concurrently, stamped with their own browserScope', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true, browser: true });
+    const calls = connect(ctx.s, 'omarchy');
+    addThreadStep(ctx.s, THREAD_B, 'step-b', ctx.chiefId);
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', browserCall('nav-a'));
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-b', browserCall('nav-b'));
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    const byStep = new Map(calls.map((call) => [call.stepId, call]));
+    expect(byStep.get('step-a')?.browserScope).toBe(THREAD);
+    expect(byStep.get('step-a')?.tabScope).toBe('coordinator');
+    expect(byStep.get('step-b')?.browserScope).toBe(THREAD_B);
+    expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
+    const leases = ctx.s.db.select().from(computerBrowserLeaseTable).all();
+    expect(leases.map((lease) => `${lease.profileKey}:${lease.stepId}`).sort()).toEqual([
+      `${THREAD}:step-a`,
+      `${THREAD_B}:step-b`,
+    ]);
+  });
+
+  test('a second step on the same thread profile is busy; the execution lease is untouched', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true, browser: true });
+    const calls = connect(ctx.s, 'omarchy');
+    addStep(ctx.s, 'step-b', 'sidecar');
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', browserCall('nav-a'));
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    await expect(
+      forwardComputerCall(ctx.deps, 'sidecar', 'step-b', browserCall('nav-b')),
+    ).rejects.toThrow(COMPUTER_BUSY);
+    expect(calls).toHaveLength(1);
+    expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-b', shell('ls', 'tc-b'));
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBe('step-b');
+  });
+
+  test('an expired profile lease is taken over with the fence incremented', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true, browser: true });
+    const calls = connect(ctx.s, 'omarchy');
+    addStep(ctx.s, 'step-b', 'sidecar');
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', browserCall('nav-a'));
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    ctx.s.db
+      .update(computerBrowserLeaseTable)
+      .set({ expiresAt: Date.now() - 1 })
+      .run();
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-b', browserCall('nav-b'));
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    const lease = ctx.s.db.select().from(computerBrowserLeaseTable).get();
+    expect(lease?.stepId).toBe('step-b');
+    expect(lease?.fence).toBe(2);
+  });
+
+  test('stopStepComputer releases the browser lease of a finished step', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true, browser: true });
+    connect(ctx.s, 'omarchy');
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', browserCall('nav-a'));
+    await vi.waitFor(() =>
+      expect(ctx.s.db.select().from(computerBrowserLeaseTable).all()).toHaveLength(1),
+    );
+    stopStepComputer(ctx.deps, 'step-a');
+    expect(ctx.s.db.select().from(computerBrowserLeaseTable).all()).toEqual([]);
   });
 });
 

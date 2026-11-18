@@ -426,6 +426,25 @@ export const computerCall = sqliteTable(
   ],
 );
 
+export const computerBrowserLease = sqliteTable(
+  'computer_browser_lease',
+  {
+    id: text('id').primaryKey(),
+    computerId: text('computerId')
+      .notNull()
+      .references(() => computer.id, { onDelete: 'cascade' }),
+    profileKey: text('profileKey').notNull(),
+    stepId: text('stepId').notNull(),
+    expiresAt: epochMs('expiresAt').notNull(),
+    fence: integer('fence').notNull().default(0),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('computer_browser_lease_profile_idx').on(t.computerId, t.profileKey),
+    index('computer_browser_lease_step_idx').on(t.stepId),
+  ],
+);
+
 export const queuedMessage = sqliteTable(
   'queued_message',
   {

@@ -502,7 +502,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     provider: createComputerScreenProvider(
       hostDesktops
         ? {
-            holdComputer: (scopeKey, use) => hostDesktops.hold(scopeKey, use),
+            holdComputer: (scopeKey, use, browserScope) =>
+              hostDesktops.hold(scopeKey, use, browserScope),
             socketPath: (scopeKey, kind) => hostDesktops.socketPath(scopeKey, kind),
             ...(hostDesktops instanceof VmDesktops
               ? { terminalCommand: (scopeKey: string) => hostDesktops.terminalCommand(scopeKey) }

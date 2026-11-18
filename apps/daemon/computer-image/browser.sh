@@ -5,6 +5,7 @@ profile=$HOME/.cairn/cloak-profile
 env_file=$state/cloak.env
 key_file=$state/cloak.key
 owner_pid=$state/owner.pid
+owner_profile=$state/owner.profile
 export DISPLAY=:1
 
 read_key() {
@@ -21,7 +22,7 @@ owner_alive() {
 }
 
 lock_released() {
-  local lock=$profile/SingletonLock owner pid
+  local lock=$1/SingletonLock owner pid
   for _ in $(seq 100); do
     [[ -L $lock ]] || return 0
     owner=$(readlink "$lock")
@@ -31,6 +32,16 @@ lock_released() {
     sleep 0.1
   done
   return 1
+}
+
+profile_locks_released() {
+  local dir
+  lock_released "$profile" || return 1
+  for dir in "$HOME"/.cairn/browser-profiles/*/cloak; do
+    [[ -d $dir ]] || continue
+    lock_released "$dir" || return 1
+  done
+  return 0
 }
 
 quit_windows() {
@@ -82,13 +93,14 @@ PY
 }
 
 launch_owner() {
-  local url=$1 pid
+  local url=$1 dir=$2 pid
   read_key || { echo 'No CloakBrowser license; set team secret CLOAKBROWSER_LICENSE_KEY' >&2; exit 2; }
   . "$env_file"
   read -r -a args <<< "$CAIRN_CLOAK_ARGS"
-  CLOAKBROWSER_LICENSE_KEY=$key setsid "$CAIRN_CLOAK_EXECUTABLE" "${args[@]}" "--user-data-dir=$profile" ${url:+"$url"} >/dev/null 2>&1 < /dev/null &
+  CLOAKBROWSER_LICENSE_KEY=$key setsid "$CAIRN_CLOAK_EXECUTABLE" "${args[@]}" "--user-data-dir=$dir" ${url:+"$url"} >/dev/null 2>&1 < /dev/null &
   pid=$!
   printf '%s\n' "$pid" > "$owner_pid"
+  printf '%s\n' "$dir" > "$owner_profile"
   for _ in $(seq 100); do
     kill -0 "$pid" 2>/dev/null || { echo 'The owner browser could not be started' >&2; exit 1; }
     xdotool search --onlyvisible --pid "$pid" >/dev/null 2>&1 && exit 0
@@ -112,6 +124,11 @@ case ${1:-} in
     ;;
   owner)
     session=${2:?session}
+    dir=$profile
+    if [[ -n ${3:-} ]]; then
+      [[ $3 =~ ^browser-profiles/[A-Za-z0-9_-]+/cloak$ ]] || exit 64
+      dir=$HOME/.cairn/$3
+    fi
     owner_alive && exit 0
     [[ -r $env_file ]] || exit 0
     agent-browser --json session list 2>/dev/null | grep -qF "\"$session\"" || exit 0
@@ -119,19 +136,21 @@ case ${1:-} in
     url=
     [[ $current =~ ^https?:// ]] && url=$current
     agent-browser --session "$session" close >/dev/null 2>&1 || { echo 'The agent browser did not close' >&2; exit 1; }
-    lock_released || { echo 'The agent browser did not close' >&2; exit 1; }
-    launch_owner "$url"
+    lock_released "$dir" || { echo 'The agent browser did not close' >&2; exit 1; }
+    launch_owner "$url" "$dir"
     ;;
   agent)
     owner_alive || exit 0
     pid=$(< "$owner_pid")
+    dir=$profile
+    [[ -r $owner_profile ]] && dir=$(< "$owner_profile")
     windows=$(xdotool search --onlyvisible --pid "$pid" 2>/dev/null || true)
     [[ -n $windows ]] || { echo 'The owner browser did not close' >&2; exit 1; }
     quit_windows $windows || { echo 'The owner browser did not close' >&2; exit 1; }
     for _ in $(seq 100); do
       if ! kill -0 "$pid" 2>/dev/null; then
-        rm -f "$owner_pid"
-        lock_released && exit 0
+        rm -f "$owner_pid" "$owner_profile"
+        lock_released "$dir" && exit 0
         break
       fi
       sleep 0.1
@@ -144,13 +163,18 @@ case ${1:-} in
     "$0" agent
     agent-browser --session "$session" close >/dev/null 2>&1 || true
     agent-browser --session "${session%-stealth}" close >/dev/null 2>&1 || true
-    lock_released
+    if [[ ${3:-} == all ]]; then
+      while IFS= read -r name; do
+        agent-browser --session "$name" close >/dev/null 2>&1 || true
+      done < <(agent-browser --json session list 2>/dev/null | sed -n 's/.*"\(p_[^"]*\)".*/\1/p')
+    fi
+    profile_locks_released
     ;;
   open)
     owner_alive && exit 0
     [[ -r $env_file ]] || { echo 'Open the stealth browser once from the agent first' >&2; exit 2; }
-    lock_released || { echo 'The agent is using the stealth browser' >&2; exit 1; }
-    launch_owner ''
+    profile_locks_released || { echo 'The agent is using the stealth browser' >&2; exit 1; }
+    launch_owner '' "$profile"
     ;;
   *)
     echo 'usage: cairn-browser key|prepare|owner|agent|quit|open' >&2

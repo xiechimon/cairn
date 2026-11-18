@@ -3241,6 +3241,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               "minLength": 1,
               "type": "string",
             },
+            "browserScope": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string",
+            },
             "browserSecrets": {
               "items": {
                 "additionalProperties": false,
@@ -3383,6 +3388,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "channel": {
           "additionalProperties": false,
           "properties": {
+            "browserScope": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string",
+            },
             "computerId": {
               "type": "string",
             },
@@ -10054,6 +10064,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief_summary",
   "computer",
   "computer_call",
+  "computer_browser_lease",
   "due_event",
   "client_message",
   "harness_profile",

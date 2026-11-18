@@ -119,6 +119,7 @@ export const computerCallSchema = z.object({
   params: z.record(z.string(), z.unknown()),
   deadlineAt: epochMs,
   scopeKey: z.string().min(1).optional(),
+  browserScope: z.string().min(1).max(200).optional(),
   tabScope: z
     .string()
     .regex(/^[A-Za-z0-9_:-]{1,96}$/)

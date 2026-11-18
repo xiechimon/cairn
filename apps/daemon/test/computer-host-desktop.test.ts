@@ -222,6 +222,39 @@ describe('HostDesktops', () => {
     );
   });
 
+  test('a keyed browser call runs on its thread profile and adopts the legacy profile once', async () => {
+    const { root, env } = workspace(BROWSER);
+    const log = join(root, 'environment.log');
+    fakeAgentBrowser(env.PATH, log);
+    const home = scopeHome(root, 'chief:a');
+    const legacy = join(home, '.cairn', 'browser-profile');
+    mkdirSync(join(legacy, 'Default'), { recursive: true });
+    writeFileSync(join(legacy, 'Default', 'Cookies'), 'login');
+    const desktops = new HostDesktops({ root, toolsRoot: root, env, run: fakeSystemd('90').run });
+    const provider = desktops.forScope('chief:a');
+    const request = { timeoutMs: 5_000, signal: new AbortController().signal };
+    for await (const _ of await provider.execute({
+      ...request,
+      argv: ['agent-browser', '--session', 'p_thread_a', 'snapshot'],
+    }));
+    for await (const _ of await provider.execute({
+      ...request,
+      argv: ['agent-browser', '--session', 'p_thread_b', 'snapshot'],
+    }));
+    const keyed = join(home, '.cairn', 'browser-profiles');
+    expect(readFileSync(log, 'utf8')).toContain(
+      `${join(keyed, 'thread_a', 'chromium')}|--session p_thread_a snapshot`,
+    );
+    expect(readFileSync(log, 'utf8')).toContain(
+      `${join(keyed, 'thread_b', 'chromium')}|--session p_thread_b snapshot`,
+    );
+    expect(readFileSync(join(keyed, 'thread_a', 'chromium', 'Default', 'Cookies'), 'utf8')).toBe(
+      'login',
+    );
+    expect(existsSync(join(legacy, 'Default', 'Cookies'))).toBe(false);
+    expect(existsSync(join(keyed, 'thread_b', 'chromium', 'Default', 'Preferences'))).toBe(true);
+  });
+
   test('an old Cloak profile moves to the stealth profile and Chromium starts fresh', async () => {
     const { root, env } = workspace(BROWSER);
     const home = scopeHome(root, 'chief:a');
@@ -782,8 +815,14 @@ describe('HostDesktops', () => {
     await desktops.sweep();
     expect(systemd.active.size).toBe(0);
     expect(closedBeforeStop).toEqual([true]);
-    const [line] = readFileSync(log, 'utf8').trim().split('\n');
-    expect(line).toMatch(new RegExp(`^${root}/[0-9a-f]{16}/home --session chief_a close$`));
+    const lines = readFileSync(log, 'utf8').trim().split('\n');
+    expect(lines[0]).toMatch(new RegExp(`^${root}/[0-9a-f]{16}/home --json session list$`));
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/home --session chief_a close$/),
+        expect.stringMatching(/home --session chief_a-stealth close$/),
+      ]),
+    );
     expect((await desktops.presence())[0]?.state).toBe('stopped');
 
     expect(await desktops.forScope('chief:a').readFile('note.txt')).toBe('x');

@@ -4,6 +4,9 @@ import {
   AGENT_CURSOR_INIT_PATH,
   AGENT_CURSOR_INIT_SCRIPT,
   agentCursorScript,
+  browserProfileKeyOfSession,
+  browserScopedSessionName,
+  browserSessionFor,
   browserSessionName,
   isStealthBrowserCommand,
   LOGIN_DETECTION_SCRIPT,
@@ -55,6 +58,45 @@ describe('browserSessionName', () => {
     ).toBe(true);
     expect(isStealthBrowserCommand(['agent-browser', '--session', 'chief_c1', 'open'])).toBe(false);
     expect(isStealthBrowserCommand(['bash', '--session', 'x-stealth'])).toBe(false);
+  });
+});
+
+describe('keyed browser sessions', () => {
+  test('browserScopedSessionName prefixes the sanitized scope, round-trips to its profile key', () => {
+    expect(browserScopedSessionName('thread:abc-123')).toBe('p_thread_abc-123');
+    expect(browserScopedSessionName('thread:abc-123', true)).toBe('p_thread_abc-123-stealth');
+    expect(browserScopedSessionName('chief-fallback:c1')).toBe('p_chief-fallback_c1');
+    expect(browserProfileKeyOfSession('p_thread_abc-123')).toBe('thread_abc-123');
+    expect(browserProfileKeyOfSession('p_thread_abc-123-stealth')).toBe('thread_abc-123');
+    expect(browserProfileKeyOfSession('chief_c1')).toBeNull();
+    expect(browserProfileKeyOfSession('chief_c1-stealth')).toBeNull();
+  });
+
+  test('browserSessionFor picks the keyed name only when browserScope is set', () => {
+    expect(browserSessionFor({ session: 'chief:c1' })).toBe('chief_c1');
+    expect(browserSessionFor({ session: 'chief:c1' }, true)).toBe('chief_c1-stealth');
+    expect(browserSessionFor({ session: 'chief:c1', browserScope: 't:9' })).toBe('p_t_9');
+    expect(browserSessionFor({ session: 'chief:c1', browserScope: 't:9' }, true)).toBe(
+      'p_t_9-stealth',
+    );
+  });
+
+  test('a keyed browser call drives the p_-prefixed session on the wire', async () => {
+    const log: string[] = [];
+    await runBrowserTool(
+      recordingProvider(log),
+      'browser_navigate',
+      { url: 'https://example.com/' },
+      {
+        timeoutMs: 5_000,
+        signal: new AbortController().signal,
+        cairnOrigins: [],
+        session: 'chief:c1',
+        browserScope: 'thread:b',
+      },
+    );
+    expect(log.some((argv) => argv.includes('--session p_thread_b'))).toBe(true);
+    expect(log.some((argv) => argv.includes('--session chief_c1'))).toBe(false);
   });
 });
 

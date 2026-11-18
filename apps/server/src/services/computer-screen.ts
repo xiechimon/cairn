@@ -14,7 +14,7 @@ import { eq } from 'drizzle-orm';
 import { createWebSocketStream, type WebSocket, WebSocketServer } from 'ws';
 import { z } from 'zod';
 import type { AppContext } from '../context.js';
-import { computer, machine as machineTable } from '../db/schema.js';
+import { computer, machine as machineTable, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { forwardedOrigin } from '../lib/forwarded-origin.js';
 import { ownedPrivateComputer } from './computer-access.js';
@@ -25,6 +25,7 @@ import {
   releaseComputerControl,
   renewComputerControl,
 } from './computer-control.js';
+import { browserScopeFor, computerThreadOf } from './computer-thread.js';
 import { findMachineByToken } from './machines.js';
 import { assertDeviceActive, deviceStreams } from './paired-devices.js';
 
@@ -164,6 +165,17 @@ export class ComputerScreenGateway {
         .from(machineTable)
         .where(eq(machineTable.id, row.machineId))
         .get()?.capabilities?.screenHandoff === true;
+    const handoffBrowserScope = (() => {
+      if (!handoff || row.handoffStepId === null) return undefined;
+      const stepRow = this.deps.db
+        .select({ kind: step.kind, buildId: step.buildId })
+        .from(step)
+        .where(eq(step.id, row.handoffStepId))
+        .get();
+      if (stepRow === undefined) return undefined;
+      const thread = computerThreadOf(this.deps.db, stepRow);
+      return thread === null ? undefined : browserScopeFor(thread);
+    })();
     const request: ComputerScreenRequest = computerScreenRequestSchema.parse({
       id: randomBytes(32).toString('hex'),
       computerId,
@@ -173,6 +185,7 @@ export class ComputerScreenGateway {
       controlLeaseId: kind === 'view' ? null : (leaseId ?? null),
       controlFence: row.controlFence,
       ...(handoff ? { handoff: true } : {}),
+      ...(handoffBrowserScope !== undefined ? { browserScope: handoffBrowserScope } : {}),
       expiresAt: Math.min(
         now + COMPUTER_SCREEN_CAP_TTL_MS,
         kind === 'view' ? Number.POSITIVE_INFINITY : (row.controlLeaseExpiresAt ?? now),

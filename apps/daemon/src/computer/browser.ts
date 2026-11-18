@@ -273,6 +273,7 @@ function parseLoginSignals(output: string): LoginSignal[] | null {
 export interface BrowserRunOptions {
   signal: AbortSignal;
   session?: string;
+  browserScope?: string;
   tabScope?: string;
   binary?: string;
   deadlineAt?: number;
@@ -336,6 +337,29 @@ export function browserSessionName(scopeKey: string | undefined, stealth = false
     .replace(/^[-_]+|[-_]+$/g, '');
   const base = cleaned.length > 0 ? cleaned : AGENT_BROWSER_SESSION;
   return stealth ? `${base}${STEALTH_SESSION_SUFFIX}` : base;
+}
+
+export const PROFILED_SESSION_PREFIX = 'p_';
+
+export function browserScopedSessionName(browserScope: string, stealth = false): string {
+  return `${PROFILED_SESSION_PREFIX}${browserSessionName(browserScope, stealth)}`;
+}
+
+export function browserProfileKeyOfSession(session: string): string | null {
+  if (!session.startsWith(PROFILED_SESSION_PREFIX)) return null;
+  const body = session.slice(PROFILED_SESSION_PREFIX.length);
+  return body.endsWith(STEALTH_SESSION_SUFFIX)
+    ? body.slice(0, -STEALTH_SESSION_SUFFIX.length)
+    : body;
+}
+
+export function browserSessionFor(
+  options: Pick<BrowserRunOptions, 'browserScope' | 'session'>,
+  stealth = false,
+): string {
+  return options.browserScope === undefined
+    ? browserSessionName(options.session, stealth)
+    : browserScopedSessionName(options.browserScope, stealth);
 }
 
 export function isStealthBrowserCommand(argv: readonly string[]): boolean {
@@ -512,7 +536,7 @@ export async function runBrowserTool(
 ): Promise<BrowserToolResult> {
   const binary = options.binary ?? AGENT_BROWSER_BINARY;
   const stealth = params.stealth === true;
-  const session = browserSessionName(options.session, stealth);
+  const session = browserSessionFor(options, stealth);
   const deadlineAt = browserDeadlineAt(options);
   const timed = { ...options, deadlineAt };
   const cursorScriptWritten = stealth
@@ -964,7 +988,7 @@ export async function closeScopeTab(
   const timed = { ...options, deadlineAt };
   let closed = 0;
   for (const stealth of [false, true]) {
-    const session = browserSessionName(options.session, stealth);
+    const session = browserSessionFor(options, stealth);
     const key = scopeTabKey(session, label);
     if (!scopeTabUse.has(key)) continue;
     scopeTabUse.delete(key);

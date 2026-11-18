@@ -30,7 +30,15 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chiefThread, computer, computerCall, machine, secret, step } from '../db/schema.js';
+import {
+  chiefThread,
+  computer,
+  computerBrowserLease,
+  computerCall,
+  machine,
+  secret,
+  step,
+} from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -59,7 +67,12 @@ import {
   TAKEOVER_NO_COMPUTER,
   TAKEOVER_NOT_DONE,
 } from './computer-handoff.js';
-import { type ComputerThread, computerThreadOf, NO_CARD_THREAD } from './computer-thread.js';
+import {
+  browserScopeFor,
+  type ComputerThread,
+  computerThreadOf,
+  NO_CARD_THREAD,
+} from './computer-thread.js';
 import type { TeamStreamHub } from './events.js';
 import { type MachineDeps, ownedStep } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -552,6 +565,7 @@ function releaseExecutionLease(db: Db, stepId: string): void {
     .set({ ...HANDOFF_CLEARED, updatedAt: nowMs() })
     .where(eq(computer.handoffStepId, stepId))
     .run();
+  db.delete(computerBrowserLease).where(eq(computerBrowserLease.stepId, stepId)).run();
 }
 
 export function stopStepComputer(
@@ -696,6 +710,62 @@ function acquireExecutionLease(
       updatedAt: now,
     })
     .where(eq(computer.id, computerId))
+    .run();
+}
+
+function acquireBrowserLease(
+  db: Db,
+  computerId: string,
+  profileKey: string,
+  stepId: string,
+  readOnly: boolean,
+  deadlineAt: number,
+): void {
+  const row = db.select().from(computer).where(eq(computer.id, computerId)).get();
+  if (!row) return;
+  const now = nowMs();
+  const userHolds =
+    row.controlHolder === 'user' &&
+    (row.controlLeaseExpiresAt === null || row.controlLeaseExpiresAt > now);
+  if (userHolds) {
+    if (readOnly) return;
+    throw new HttpError(409, COMPUTER_USER_CONTROL);
+  }
+  const lease = db
+    .select()
+    .from(computerBrowserLease)
+    .where(
+      and(
+        eq(computerBrowserLease.computerId, computerId),
+        eq(computerBrowserLease.profileKey, profileKey),
+      ),
+    )
+    .get();
+  const held = lease !== undefined && lease.expiresAt > now;
+  if (held && lease.stepId !== stepId) throw new HttpError(409, COMPUTER_BUSY);
+  const renewed = Math.max(now + COMPUTER_EXECUTION_LEASE_MS, deadlineAt);
+  if (lease === undefined) {
+    db.insert(computerBrowserLease)
+      .values({
+        id: newRecordId(),
+        computerId,
+        profileKey,
+        stepId,
+        expiresAt: renewed,
+        fence: 1,
+        updatedAt: now,
+      })
+      .run();
+    return;
+  }
+  db.update(computerBrowserLease)
+    .set({
+      stepId,
+      expiresAt: held ? Math.max(lease.expiresAt, renewed) : renewed,
+      fence: held ? lease.fence : lease.fence + 1,
+      updatedAt: now,
+    })
+    .where(eq(computerBrowserLease.id, lease.id))
     .run();
 }
 
@@ -1110,6 +1180,7 @@ export function closeInfoCardTab(
     deadlineAt,
     scopeKey: owned.scopeKey,
     tabScope: browserTabScope(stepRow),
+    browserScope: browserScopeFor(thread),
   };
   if (!deps.machineHub.pushComputer(owned.machineId, call)) {
     db.delete(computerCall).where(eq(computerCall.id, callId)).run();
@@ -1302,8 +1373,11 @@ export async function forwardComputerCall(
     };
   const now = nowMs();
   const deadlineAt = now + computerDeadlineMs(tool, body.params);
+  const browserTool = isComputerBrowserTool(tool);
   if (target.computerId !== null) {
-    acquireExecutionLease(db, target.computerId, stepId, safe, deadlineAt);
+    if (browserTool)
+      acquireBrowserLease(db, target.computerId, browserScopeFor(thread), stepId, safe, deadlineAt);
+    else acquireExecutionLease(db, target.computerId, stepId, safe, deadlineAt);
   }
 
   const fresh = {
@@ -1372,7 +1446,9 @@ export async function forwardComputerCall(
     params: body.params,
     deadlineAt,
     ...('scopeKey' in target && target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
-    ...(isComputerBrowserTool(tool) ? { tabScope: browserTabScope(stepRow) } : {}),
+    ...(browserTool
+      ? { tabScope: browserTabScope(stepRow), browserScope: browserScopeFor(thread) }
+      : {}),
     ...(own === null ? {} : { ownComputerGrant: own.stamp }),
   };
   try {
