@@ -8,6 +8,7 @@ export const SETTINGS_SECTION_IDS = [
   'skills',
   'mcp',
   'secrets',
+  'vault',
   'api-keys',
   'remote',
   'im',

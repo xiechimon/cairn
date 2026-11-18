@@ -13,6 +13,7 @@ import {
   Smartphone,
   Sun,
   User,
+  Vault,
   X,
 } from 'lucide-react';
 import {
@@ -52,6 +53,7 @@ import { McpServersPage } from '../resources/mcp-servers-page.js';
 import { ModelRoutingPage } from '../resources/model-routing-page.js';
 import { SecretsPage } from '../resources/secrets-page.js';
 import { SkillsPage } from '../resources/skills-page.js';
+import { VaultPage } from '../resources/vault-page.js';
 import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
 import { ImConnectionsPage } from '../routes/im-page.js';
@@ -167,6 +169,13 @@ const GROUPS: Group[] = [
         label: '密钥与环境变量',
         Icon: ShieldEllipsis,
         element: () => <SecretsPage />,
+      },
+      {
+        id: 'vault',
+        label: '保险库',
+        Icon: Vault,
+        keywords: ['vault', 'password', 'login', '密码', '登录', '网站', '授权'],
+        element: () => <VaultPage />,
       },
       {
         id: 'api-keys',

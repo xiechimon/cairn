@@ -1,5 +1,14 @@
-import type { SecretListEntry } from '@cairn/shared';
-import { legacyDone, legacyReview, R3_BUILDER, TEAM_ID } from './core.js';
+import type { BrowserPasswordGrant, SecretListEntry } from '@cairn/shared';
+import {
+  legacyDone,
+  legacyReview,
+  MACHINE_ID,
+  MACHINE_NAME,
+  MACHINE_REMOTE_ID,
+  MACHINE_REMOTE_NAME,
+  R3_BUILDER,
+  TEAM_ID,
+} from './core.js';
 import type { ChiefContent, FixtureSet, ResourcesContent } from './records.js';
 import { RESOURCES } from './resources.js';
 import { teamGrid } from './team.js';
@@ -54,6 +63,102 @@ const SECRET_ROWS: SecretListEntry[] = [
   },
   { id: 'secret-npm', teamId: TEAM_ID, projectId: null, name: 'NPM_TOKEN', description: null },
 ];
+
+const VAULT_SECRET_ROWS: SecretListEntry[] = [
+  {
+    id: 'secret-gh-login',
+    teamId: TEAM_ID,
+    projectId: null,
+    name: 'GITHUB_COM',
+    description: 'github.com',
+    kind: 'pair',
+    updatedAt: SECRET_NOW - 2 * 24 * 60 * MINUTE_MS,
+  },
+  {
+    id: 'secret-notion-login',
+    teamId: TEAM_ID,
+    projectId: null,
+    name: 'NOTION_SO',
+    description: 'notion.so',
+    kind: 'pair',
+    updatedAt: SECRET_NOW - 26 * 60 * MINUTE_MS,
+  },
+  {
+    id: 'secret-vps-login',
+    teamId: TEAM_ID,
+    projectId: null,
+    name: 'LOGIN_VPS_EXAMPLE_COM',
+    description: 'vps.example.com',
+    kind: 'pair',
+    updatedAt: SECRET_NOW - 9 * 24 * 60 * MINUTE_MS,
+  },
+  {
+    id: 'secret-gh-token',
+    teamId: TEAM_ID,
+    projectId: null,
+    name: 'GH_TOKEN',
+    description: null,
+    kind: 'secret',
+    updatedAt: SECRET_NOW - 30 * 24 * 60 * MINUTE_MS,
+  },
+];
+
+const VAULT_GRANTS: BrowserPasswordGrant[] = [
+  {
+    grantId: 'grant-gh-active',
+    secretId: 'secret-gh-login',
+    secretName: 'GITHUB_COM',
+    origin: 'https://github.com',
+    machineId: MACHINE_ID,
+    machineName: MACHINE_NAME,
+    state: 'active',
+    createdAt: SECRET_NOW - 3 * 60 * MINUTE_MS,
+    grantedAt: SECRET_NOW - 3 * 60 * MINUTE_MS,
+    revokedAt: null,
+  },
+  {
+    grantId: 'grant-notion-stale',
+    secretId: 'secret-notion-login',
+    secretName: 'NOTION_SO',
+    origin: 'https://www.notion.so',
+    machineId: MACHINE_REMOTE_ID,
+    machineName: MACHINE_REMOTE_NAME,
+    state: 'stale',
+    createdAt: SECRET_NOW - 5 * 24 * 60 * MINUTE_MS,
+    grantedAt: SECRET_NOW - 5 * 24 * 60 * MINUTE_MS,
+    revokedAt: null,
+  },
+  {
+    grantId: 'grant-gitlab-revoked',
+    secretId: 'secret-gh-token',
+    secretName: 'GH_TOKEN',
+    origin: 'https://gitlab.com',
+    machineId: MACHINE_ID,
+    machineName: MACHINE_NAME,
+    state: 'revoked',
+    createdAt: SECRET_NOW - 8 * 24 * 60 * MINUTE_MS,
+    grantedAt: SECRET_NOW - 8 * 24 * 60 * MINUTE_MS,
+    revokedAt: SECRET_NOW - 26 * 60 * MINUTE_MS,
+  },
+];
+
+export const vaultList: FixtureSet = {
+  ...teamGrid,
+  resources: {
+    ...SECRETS_BASE,
+    secrets: VAULT_SECRET_ROWS,
+    browserPasswordGrants: VAULT_GRANTS,
+  },
+};
+
+export const vaultEmpty: FixtureSet = {
+  ...teamGrid,
+  resources: {
+    ...SECRETS_BASE,
+    secrets: [],
+    browserPasswordGrants: [],
+  },
+};
 
 export const secretsList: FixtureSet = {
   ...teamGrid,

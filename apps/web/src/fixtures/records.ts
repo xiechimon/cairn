@@ -352,6 +352,7 @@ export interface ResourcesContent {
   providers?: ProviderRecord[];
   memories?: MemoryRecord[];
   secrets?: SecretListEntry[];
+  browserPasswordGrants?: import('@cairn/shared').BrowserPasswordGrant[];
   accounts?: AccountsContent;
   routingSettings?: import('@cairn/shared').TeamRoutingSettings;
   topModels?: import('@cairn/shared').TopModel[] | null;

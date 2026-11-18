@@ -3,6 +3,7 @@ import type {
   AskUserAnswer,
   AskUserQuestionContent,
   AutonomyRecord,
+  BrowserPasswordGrantsResponse,
   BuildRecord,
   CapabilitiesResponse,
   ChiefGetResponse,
@@ -603,6 +604,14 @@ export const useSecrets = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['secrets', teamId],
     queryFn: () => api.get<SecretListEntry[]>(`/api/teams/${teamId}/secrets`),
+    enabled: enabled && teamId !== undefined,
+  });
+
+export const useBrowserPasswordGrants = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['browserPasswordGrants', teamId],
+    queryFn: () =>
+      api.get<BrowserPasswordGrantsResponse>(`/api/teams/${teamId}/browser-password-grants`),
     enabled: enabled && teamId !== undefined,
   });
 
@@ -1419,12 +1428,23 @@ export function useApiMutations(teamId: string | undefined) {
     updateSecret: useMutation({
       mutationFn: (input: {
         id: string;
-        body: { name?: string; value?: string; kind?: 'secret' };
+        body: {
+          name?: string;
+          description?: string | null;
+          value?: string;
+          username?: string;
+          kind?: 'secret' | 'pair';
+        };
       }) => api.patch<SecretRecord>(`/api/teams/${teamId}/secrets/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
     deleteSecret: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/secrets/${id}`),
+      onSuccess: invalidateAll,
+    }),
+    revokeBrowserPasswordGrant: useMutation({
+      mutationFn: (grantId: string) =>
+        api.del<void>(`/api/teams/${teamId}/browser-password-grants/${grantId}`),
       onSuccess: invalidateAll,
     }),
     saveCloakLicense: useMutation({

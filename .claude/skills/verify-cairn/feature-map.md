@@ -17,6 +17,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
 | `secrets` | `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars) | [Secrets](#secrets) |
+| `vault` | `设置` (Settings) › `安全` (Security) › `保险库` (Vault) | [Secrets](#secrets) |
 | `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
 | `im` | `设置` (Settings) › `消息` (Messages) › `IM` | [IM connections](#im-connections) |
@@ -986,24 +987,26 @@ Reach:
 
 ### secrets
 
-**Secrets** (shipped, centrality 3). Encrypted secrets and readable environment variables; first-use browser passwords ask for website approval in chat.
+**Secrets** (shipped, centrality 3). Encrypted secrets and readable environment variables; first-use browser passwords ask for website approval in chat; the vault settings section lists saved site logins and per-site fill authorizations.
 
-States: Original add/edit form with name, value and secret checkbox; browser website approval pending, refused or approved; subsequent same-site fills; reapproval after password, website or machine changes.
+States: Original add/edit form with name, value and secret checkbox; browser website approval pending, refused or approved; subsequent same-site fills; reapproval after password, website or machine changes; vault section lists login pairs masked, empty state, and grants active/stale/revoked with revoke.
 
 Reach:
 
 1. `settings secrets`
 2. `click testid:resource-new`
 3. `click label:机密`
+4. `settings vault`
+5. `click label:添加登录`
 
 - Web routes: `/app/resources/secrets`
-- Settings: `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars)
+- Settings: `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars); `设置` (Settings) › `安全` (Security) › `保险库` (Vault)
 - Keyboard shortcuts in its code: `D`, `E`, `S`
-- Test ids in its code: `resource-empty`, `secret-bulk`, `secret-convert-confirm`, `secret-kind`, `secret-menu`, `secret-menu-convert`, `secret-menu-delete`, `secret-menu-edit`, `secret-scope`, `secret-value`
+- Test ids in its code: `pair-name`, `pair-password`, `pair-site`, `pair-username`, `resource-empty`, `secret-bulk`, `secret-convert-confirm`, `secret-kind`, `secret-menu`, `secret-menu-convert`, `secret-menu-delete`, `secret-menu-edit`, `secret-scope`, `secret-value`, `vault-empty`, `vault-entry-delete`, `vault-entry-edit`, `vault-entry-menu`, `vault-grant-revoke`, `vault-new`
 - Research: [docs/research/1775-gateway-prior-art.md](../../../docs/research/1775-gateway-prior-art.md), [docs/research/browser-secret-fill-2026-11-16.md](../../../docs/research/browser-secret-fill-2026-11-16.md)
 - Frontend design: [docs/design/browser-secret-fill.md](../../../docs/design/browser-secret-fill.md)
 - Backend design: [docs/research/1775-secret-gateway-design.md](../../../docs/research/1775-secret-gateway-design.md), [docs/design/browser-secret-fill.md](../../../docs/design/browser-secret-fill.md)
-- Evidence: `apps/web/e2e/secret-add-dialog.spec.ts`, `apps/web/e2e/project-secrets.spec.ts`, `apps/server/test/project-secrets.test.ts`, `apps/server/test/secret-delivery-policy.test.ts`, `apps/server/test/computer-login-handoff.test.ts`, `apps/server/test/browser-password-vault.test.ts`, `apps/daemon/test/browser-secret-fill.test.ts`
+- Evidence: `apps/web/e2e/secret-add-dialog.spec.ts`, `apps/web/e2e/project-secrets.spec.ts`, `apps/server/test/project-secrets.test.ts`, `apps/server/test/secret-delivery-policy.test.ts`, `apps/server/test/computer-login-handoff.test.ts`, `apps/server/test/browser-password-vault.test.ts`, `apps/daemon/test/browser-secret-fill.test.ts`, `apps/web/e2e/vault.spec.ts`
 
 ### server-status
 

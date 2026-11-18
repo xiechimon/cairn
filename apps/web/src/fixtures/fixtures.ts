@@ -1,4 +1,11 @@
-export { chiefAgentChip, chiefFabAvatar, chiefFabAvatarOverride, secretsList } from './agents.js';
+export {
+  chiefAgentChip,
+  chiefFabAvatar,
+  chiefFabAvatarOverride,
+  secretsList,
+  vaultEmpty,
+  vaultList,
+} from './agents.js';
 export { apiKeysCreated } from './api-keys.js';
 export {
   boardChiefProbes,

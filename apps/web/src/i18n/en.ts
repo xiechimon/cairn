@@ -779,6 +779,47 @@ export const EN: Record<string, string> = {
   个文件: 'file(s)',
   描述: 'Description',
 
+  保险库: 'Vault',
+  '浏览器代填用的网站登录保存在这里。Coordinator 只在你批准的网站上填入用户名和密码，这两个值不会出现在页面或对话里。':
+    'Site logins for browser fill live here. The Coordinator fills the username and password only on sites you approved, and neither value ever appears on a page or in a conversation.',
+  网站登录: 'Site logins',
+  添加登录: 'Add login',
+  添加网站登录: 'Add site login',
+  正在加载网站登录: 'Loading site logins',
+  网站登录没能加载: 'Site logins could not be loaded',
+  还没有保存的网站登录: 'No saved site logins yet',
+  '保存网站的用户名和密码后，Coordinator 可以在浏览器里代填。':
+    'Save a site username and password and the Coordinator can fill them in the browser.',
+  网站: 'Site',
+  登录: 'Login',
+  用户名: 'Username',
+  密码: 'Password',
+  用户名和密码: 'Username and password',
+  '标记这条登录用在哪个网站，代填前仍会请你批准网站。':
+    'Marks which site this login is for; filling still asks for your approval first.',
+  'Coordinator 用这个名字找到这条登录。': 'The Coordinator finds this login by this name.',
+  '原用户名已隐藏。留空保持不变，填写则替换。':
+    'The saved username is hidden. Leave empty to keep it, or type to replace it.',
+  '原密码已隐藏。留空保持不变，填写则替换。':
+    'The saved password is hidden. Leave empty to keep it, or type to replace it.',
+  '加密保存，保存后不再显示，也不会进入对话。':
+    'Stored encrypted. It is never shown again and never enters a conversation.',
+  网站授权: 'Site authorizations',
+  'Coordinator 第一次在某个网站代填时会请求批准；批准后这个网站在这台执行机上直接代填，撤销后重新请求。':
+    'The Coordinator asks for approval the first time it fills on a site; afterwards it fills directly on that site and machine, and revoking makes it ask again.',
+  正在加载网站授权: 'Loading site authorizations',
+  网站授权没能加载: 'Site authorizations could not be loaded',
+  还没有批准过的网站: 'No approved sites yet',
+  授权时间: 'Approved',
+  撤销授权: 'Revoke',
+  已撤销: 'Revoked',
+  已失效: 'Inactive',
+  已删除的登录: 'Deleted login',
+  已删除的执行机: 'Deleted machine',
+  '没能撤销授权，请重试。': 'Could not revoke the authorization. Try again.',
+  '删除后，用到它的任务和网站代填就拿不到这条登录了':
+    'Once deleted, tasks and site fills that use it no longer get this login',
+
   // —— project routes (r2 07/24/24b/24c) ——
   文件: 'Files',
   历史: 'History',

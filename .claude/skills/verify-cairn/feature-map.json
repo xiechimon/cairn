@@ -2177,15 +2177,17 @@
     {
       "id": "secrets",
       "name": "Secrets",
-      "summary": "Encrypted secrets and readable environment variables; first-use browser passwords ask for website approval in chat.",
-      "states": "Original add/edit form with name, value and secret checkbox; browser website approval pending, refused or approved; subsequent same-site fills; reapproval after password, website or machine changes.",
+      "summary": "Encrypted secrets and readable environment variables; first-use browser passwords ask for website approval in chat; the vault settings section lists saved site logins and per-site fill authorizations.",
+      "states": "Original add/edit form with name, value and secret checkbox; browser website approval pending, refused or approved; subsequent same-site fills; reapproval after password, website or machine changes; vault section lists login pairs masked, empty state, and grants active/stale/revoked with revoke.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/resources/secrets-page.tsx",
           "apps/web/src/resources/secret-dialog.tsx",
-          "apps/web/src/resources/bulk-secret-dialog.tsx"
+          "apps/web/src/resources/bulk-secret-dialog.tsx",
+          "apps/web/src/resources/vault-page.tsx",
+          "apps/web/src/resources/vault-pair-dialog.tsx"
         ],
         "server": [
           "apps/server/src/services/secrets.ts"
@@ -2194,7 +2196,8 @@
       "routes": {
         "web": [
           "/app/resources/secrets",
-          "settings:secrets"
+          "settings:secrets",
+          "settings:vault"
         ],
         "server": [
           "/api/teams/:id/secrets**",
@@ -2205,7 +2208,9 @@
       "reach": [
         "settings secrets",
         "click testid:resource-new",
-        "click label:机密"
+        "click label:机密",
+        "settings vault",
+        "click label:添加登录"
       ],
       "research": [
         "docs/research/1775-gateway-prior-art.md",
@@ -2225,7 +2230,8 @@
         "apps/server/test/secret-delivery-policy.test.ts",
         "apps/server/test/computer-login-handoff.test.ts",
         "apps/server/test/browser-password-vault.test.ts",
-        "apps/daemon/test/browser-secret-fill.test.ts"
+        "apps/daemon/test/browser-secret-fill.test.ts",
+        "apps/web/e2e/vault.spec.ts"
       ]
     },
     {

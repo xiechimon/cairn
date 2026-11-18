@@ -593,7 +593,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### secrets
 
-**Secrets** (shipped). Encrypted secrets and readable environment variables; first-use browser passwords ask for website approval in chat.
+**Secrets** (shipped). Encrypted secrets and readable environment variables; first-use browser passwords ask for website approval in chat; the vault settings section lists saved site logins and per-site fill authorizations.
 
 - Research: [docs/research/1775-gateway-prior-art.md](research/1775-gateway-prior-art.md), [docs/research/browser-secret-fill-2026-11-16.md](research/browser-secret-fill-2026-11-16.md)
 - Frontend design: [docs/design/browser-secret-fill.md](design/browser-secret-fill.md)

@@ -42,7 +42,9 @@ export function SecretsPage() {
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
   const secretsQ = useSecrets(teamId, live);
-  const secrets = live ? (secretsQ.data ?? []) : (fixture.resources?.secrets ?? []);
+  const secrets = (live ? (secretsQ.data ?? []) : (fixture.resources?.secrets ?? [])).filter(
+    (row) => row.kind !== 'pair',
+  );
   const mutations = useApiMutations(teamId);
   const projectsQ = useProjects(teamId, live);
   const projects = (projectsQ.data ?? []).map((project) => ({

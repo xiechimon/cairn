@@ -203,6 +203,7 @@ const RESOURCES = [
   'provider-',
   'providers-',
   'secret-',
+  'vault',
   'skills-',
   'title-',
   'segmented-',
