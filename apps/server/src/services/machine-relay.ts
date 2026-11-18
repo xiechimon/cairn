@@ -227,6 +227,7 @@ export async function executeRelayToolCall(
         user: deps.user,
         vapidKeys: deps.vapidKeys,
         reposDir: deps.reposDir,
+        ...(deps.mailSend !== undefined ? { sendMail: deps.mailSend } : {}),
         ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
       },
       {

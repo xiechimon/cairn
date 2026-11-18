@@ -9,6 +9,7 @@ import { NotFoundError } from './builds.js';
 import { upsertChiefMessage } from './chief.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import type { SendMail } from './mail-smtp.js';
 import type { McpOAuthState } from './mcp-servers.js';
 import type { OAuthClientConfig } from './oauth.js';
 import type { VapidKeys } from './push.js';
@@ -37,6 +38,7 @@ export interface MachineDeps {
   oauthFetch?: FetchLike;
   oauthClient?: OAuthClientConfig | null;
   mcpFetch?: typeof fetch;
+  mailSend?: SendMail;
   mcpOAuthState?: McpOAuthState;
 }
 

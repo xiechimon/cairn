@@ -71,6 +71,7 @@ A secret row holds the refresh token or the app password. Its name is not granta
 |---|---|---|
 | `disconnected` | `connecting` | Owner starts connect. No secret row yet. |
 | `connecting` | `watching` | Secret sealed; Gmail watch baseline and catch-up job committed, or IMAP initial UID baseline persisted and reconciliation complete; renewal armed. |
+| `connecting` | `degraded` or `revoked` | IMAP v1 only: the first connect failed on the network (`degraded`, retried) or the login was rejected (`revoked`, not retried). |
 | `connecting` | `disconnected` | OAuth denied, seal failed, or origin not publicly reachable. Delete any partial secret. |
 | `watching` | `degraded` | IDLE drop, watch renew failure, history fetch failure. Watermark does not advance. |
 | `degraded` | `watching` | Renew or reconnect succeeded. |

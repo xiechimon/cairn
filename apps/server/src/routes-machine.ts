@@ -211,6 +211,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
     ...(ctx.oauthFetch !== undefined ? { oauthFetch: ctx.oauthFetch } : {}),
     ...(ctx.mcpFetch !== undefined ? { mcpFetch: ctx.mcpFetch } : {}),
+    ...(ctx.mailSend !== undefined ? { mailSend: ctx.mailSend } : {}),
     mcpOAuthState: ctx.mcpOAuthState,
   };
 

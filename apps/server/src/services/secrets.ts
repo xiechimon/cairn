@@ -307,6 +307,16 @@ export function deleteSecret(deps: SecretDeps, teamId: string, id: string): bool
   return true;
 }
 
+export function openMailPassword(
+  deps: SecretDeps,
+  teamId: string,
+  secretId: string,
+): string | null {
+  const row = getRow(deps, teamId, secretId);
+  if (row === undefined || !isMailSecretName(row.name) || row.valueCipher === null) return null;
+  return deps.box.open(row.valueCipher);
+}
+
 export interface HttpSecretRow {
   id: string;
   name: string;

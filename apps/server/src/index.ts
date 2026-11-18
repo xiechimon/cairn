@@ -40,6 +40,7 @@ import { drainEffects, effectRegistry, reconcileEffects } from './services/exter
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { createImService } from './services/im/core.js';
+import { createMailConnector } from './services/mail-connector.js';
 import { liveImEnv } from './services/im/env.js';
 import { setImRuntime } from './services/im/runtime.js';
 import { createSlackAdapter } from './services/im/slack.js';
@@ -198,6 +199,11 @@ const im = createImService({
   },
 });
 setImRuntime(im.runtime);
+const mail = createMailConnector({
+  secrets: { db, box: secretBox },
+  mailDeps: { db, hub, machineHub, user: seeded.user, vapidKeys },
+  log: logger,
+});
 const app = createApp(
   {
     remote: {
@@ -216,6 +222,7 @@ const app = createApp(
     user: seeded.user,
     team: seeded.team,
     im,
+    mail,
     pingIntervalMs: config.pingIntervalMs,
     claimHoldMs: config.claimHoldMs,
     uploads: new Map(),
@@ -322,6 +329,7 @@ const coordinator = config.coordinatorInServer
   : null;
 if (coordinator !== null) setCoordinatorWake((threadId) => coordinator.wake(threadId));
 scheduler.start();
+mail.resume();
 void im.resume().catch((error: unknown) => {
   logger.warn({ err: error }, 'im connections could not be resumed');
 });
@@ -392,6 +400,7 @@ async function shutdown(): Promise<void> {
   killInFlightPick();
   computerScreens.close();
   await im.shutdown().catch(() => {});
+  await mail.shutdown().catch(() => {});
   setImRuntime(null);
   await drainHttp(shutdownRuntimeOtel);
   await (await tsnetStarting)?.stop();

@@ -38,6 +38,9 @@ import { createClaudeSubscription } from '../src/services/claude-subscriptions.j
 import { createDevinSubscription } from '../src/services/devin-subscriptions.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { teamAutonomyPaused } from '../src/services/github-autonomy-brake.js';
+import { createMailConnector } from '../src/services/mail-connector.js';
+import type { OpenMailbox } from '../src/services/mail-imap.js';
+import type { SendMail } from '../src/services/mail-smtp.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { newMcpOAuthState } from '../src/services/mcp-servers.js';
 import type { VapidKeys } from '../src/services/push.js';
@@ -95,6 +98,8 @@ export function bootServer(
     deployRecordPath?: string;
     remote?: Partial<NonNullable<AppContext['remote']>>;
     im?: AppContext['im'];
+    openMailbox?: OpenMailbox;
+    mailSend?: SendMail;
   } = {},
 ) {
   const db = opts.db ?? openMemoryDb();
@@ -134,6 +139,16 @@ export function bootServer(
   const codexDeviceStates: AppContext['codexDeviceStates'] = new Map();
   const mcpOAuthState = newMcpOAuthState();
   const githubConnectionDeviceStates: AppContext['githubConnectionDeviceStates'] = new Map();
+  const mail = createMailConnector({
+    secrets: { db, box: secretBox },
+    mailDeps: { db, hub, machineHub, user, vapidKeys },
+    openMailbox:
+      opts.openMailbox ??
+      (() => {
+        throw new Error('no mailbox in this test');
+      }),
+    backoff: { initialMs: 10, maxMs: 40 },
+  });
   try {
     const appContext: AppContext = {
       remote: {
@@ -155,6 +170,8 @@ export function bootServer(
       user,
       team,
       ...(opts.im !== undefined ? { im: opts.im } : {}),
+      mail,
+      ...(opts.mailSend !== undefined ? { mailSend: opts.mailSend } : {}),
       pingIntervalMs: opts.pingIntervalMs ?? 3_600_000,
       claimHoldMs: opts.claimHoldMs ?? 250,
       uploads: new Map(),
@@ -215,6 +232,7 @@ export function bootServer(
       }
     }) as typeof app.request;
     try {
+      onTestFinished(() => mail.shutdown());
       onTestFinished(dispose);
     } catch {
       void 0;
@@ -229,6 +247,7 @@ export function bootServer(
       vapidKeys,
       user,
       team,
+      mail,
       reposDir,
       attachmentsDir,
       skillsDir,

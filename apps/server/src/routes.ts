@@ -10,6 +10,7 @@ import { registerDraftRoutes } from './routes-drafts.js';
 import { registerGitHostingRoutes } from './routes-git-hosting.js';
 import { githubAppOf } from './routes-helpers.js';
 import { registerImRoutes } from './routes-im.js';
+import { registerMailRoutes } from './routes-mail.js';
 import { registerMemoryRoutes } from './routes-memories.js';
 import { registerProjectRoutes } from './routes-projects.js';
 import { registerPushRoutes } from './routes-push.js';
@@ -34,6 +35,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerGitHostingRoutes(app, ctx);
   registerPushRoutes(app, ctx);
   registerImRoutes(app, ctx);
+  registerMailRoutes(app, ctx);
 
   app.all('/api/mcp', (c) =>
     handleMcpRequest(

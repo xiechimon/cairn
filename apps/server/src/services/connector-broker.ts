@@ -10,10 +10,11 @@ import {
   type RemoteToolDef,
   type UserRecord,
 } from '@cairn/shared';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
+import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { actionJournal, mcpConnector } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { actionJournal, mailAccount, mailEvent, mcpConnector } from '../db/schema.js';
+import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { proposalCardId } from './action-proposals.js';
 import { executeAction } from './action-registry.js';
@@ -24,7 +25,9 @@ import {
   connectorEndpointBySlug,
   type McpConnectorDeps,
 } from './mcp-servers.js';
+import { type SendMail, sendSmtpMail } from './mail-smtp.js';
 import type { VapidKeys } from './push.js';
+import { openMailPassword } from './secrets.js';
 
 export interface ConnectorBrokerDeps {
   db: Db;
@@ -34,6 +37,7 @@ export interface ConnectorBrokerDeps {
   user?: UserRecord;
   vapidKeys?: VapidKeys | null;
   reposDir: string;
+  sendMail?: SendMail;
 }
 
 export interface ConnectorCallContext {
@@ -48,6 +52,54 @@ type ConnectorRow = typeof mcpConnector.$inferSelect;
 function cachedTools(row: ConnectorRow): McpConnectorTool[] {
   const parsed = cachedConnectorToolsSchema.safeParse(row.toolsJson ?? []);
   return parsed.success ? parsed.data : [];
+}
+
+export const MAIL_CONNECTOR_SLUG = 'cairn-mail';
+const MAIL_SEND_TOOL = 'send';
+
+const mailSendArgsSchema = z
+  .object({
+    to: z.string().email().max(254),
+    subject: z
+      .string()
+      .min(1)
+      .max(300)
+      .regex(/^[^\r\n]+$/, 'subject must be one line'),
+    body: z.string().min(1).max(20_000),
+    inReplyTo: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+const MAIL_SEND_DEF: RemoteToolDef = {
+  name: connectorToolName(MAIL_CONNECTOR_SLUG, MAIL_SEND_TOOL),
+  label: '邮件: send',
+  description:
+    "Send a plain-text email from the owner's connected mailbox. The owner approves every send on a card that shows the recipient, subject and body; nothing leaves before that. Set inReplyTo to the mail event id when answering a received mail.",
+  parameters: {
+    type: 'object',
+    required: ['to', 'subject', 'body'],
+    properties: {
+      to: { type: 'string', description: 'One recipient email address.' },
+      subject: { type: 'string' },
+      body: { type: 'string' },
+      inReplyTo: { type: 'string', description: 'Mail event id this message answers.' },
+    },
+  },
+};
+
+function liveMailAccounts(db: Db, teamId: string) {
+  return db
+    .select()
+    .from(mailAccount)
+    .where(
+      and(
+        eq(mailAccount.teamId, teamId),
+        eq(mailAccount.provider, 'imap'),
+        inArray(mailAccount.status, ['watching', 'degraded']),
+      ),
+    )
+    .orderBy(asc(mailAccount.createdAt), asc(mailAccount.id))
+    .all();
 }
 
 export function connectorToolDefsForTeam(db: Db, teamId: string): RemoteToolDef[] {
@@ -70,6 +122,7 @@ export function connectorToolDefsForTeam(db: Db, teamId: string): RemoteToolDef[
       });
     }
   }
+  if (liveMailAccounts(db, teamId).length > 0) defs.push(MAIL_SEND_DEF);
   return defs;
 }
 
@@ -207,6 +260,55 @@ function gateOutboundAction(
   });
 }
 
+async function executeMailSend(
+  deps: ConnectorBrokerDeps,
+  ctx: ConnectorCallContext,
+  params: Record<string, unknown>,
+): Promise<string> {
+  const entry = connectorActionEntry(MAIL_CONNECTOR_SLUG, MAIL_SEND_TOOL, undefined);
+  const args = parseWith(mailSendArgsSchema, params, 'args');
+  const accounts = liveMailAccounts(deps.db, ctx.teamId);
+  const replied =
+    args.inReplyTo === undefined
+      ? undefined
+      : deps.db.select().from(mailEvent).where(eq(mailEvent.id, args.inReplyTo)).get();
+  const account =
+    accounts.find((row) => row.id === replied?.accountId) ?? (replied ? undefined : accounts[0]);
+  if (account === undefined) throw new HttpError(409, 'no connected mailbox can send this');
+  const parked = gateOutboundAction(deps, ctx, entry, args);
+  if (parked !== null) return parked;
+  const password =
+    account.secretId === null
+      ? null
+      : openMailPassword({ db: deps.db, box: deps.mcp.box }, ctx.teamId, account.secretId);
+  if (password === null || account.address === null || account.smtpHost === null) {
+    journalRow(deps, ctx, entry.id, MAIL_CONNECTOR_SLUG, args, 'error');
+    throw new HttpError(409, 'the mailbox has no usable credentials');
+  }
+  try {
+    await (deps.sendMail ?? sendSmtpMail)(
+      {
+        host: account.smtpHost,
+        port: account.smtpPort ?? 465,
+        user: account.address,
+        password,
+      },
+      {
+        from: account.address,
+        to: args.to,
+        subject: args.subject,
+        text: args.body,
+        inReplyTo: replied?.messageId ?? null,
+      },
+    );
+  } catch {
+    journalRow(deps, ctx, entry.id, MAIL_CONNECTOR_SLUG, args, 'error');
+    throw new HttpError(502, 'the mail server refused or could not send this message');
+  }
+  journalRow(deps, ctx, entry.id, MAIL_CONNECTOR_SLUG, args, 'run');
+  return JSON.stringify({ sent: true, to: args.to, subject: args.subject });
+}
+
 export async function executeConnectorToolCall(
   deps: ConnectorBrokerDeps,
   ctx: ConnectorCallContext,
@@ -216,6 +318,10 @@ export async function executeConnectorToolCall(
 ): Promise<string> {
   const parsed = parseConnectorToolName(name);
   if (parsed === null) throw new HttpError(400, `unknown connector tool ${name}`);
+  if (parsed.slug === MAIL_CONNECTOR_SLUG) {
+    if (parsed.tool !== MAIL_SEND_TOOL) throw new HttpError(400, `unknown connector tool ${name}`);
+    return executeMailSend(deps, ctx, params);
+  }
   const row = deps.db
     .select()
     .from(mcpConnector)
