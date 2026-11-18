@@ -173,7 +173,7 @@ test('the user event is published outside the transaction after the capsule and 
     sqlite.close();
   });
   const db = drizzle(sqlite, { schema });
-  migrateDatabase(sqlite, db);
+  migrateDatabase(db);
   const { s } = await taskWorld({ db });
   s.db
     .insert(queuedMessage)

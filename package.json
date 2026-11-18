@@ -29,8 +29,7 @@
     "prepush": "node scripts/prepush.mjs",
     "test:changed": "node scripts/test-changed.mjs",
     "spec:parse": "node scripts/spec-parse-gate.mjs",
-    "format": "biome format --write .",
-    "migration-oracle:full": "node scripts/migration-oracle-full.mjs"
+    "format": "biome format --write ."
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

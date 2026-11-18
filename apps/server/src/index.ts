@@ -34,6 +34,7 @@ import { loadApnsConfig } from './services/apns.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import { setCoordinatorInServer, setCoordinatorWake } from './services/coordinator-context.js';
+import { runDataMigrationOnce } from './services/data-migrations.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
@@ -102,10 +103,7 @@ logSecrets.push(config.authToken ?? '');
 
 const opened = (() => {
   try {
-    return openDbWithHandle(config.dbPath, {
-      legacyExportDir: config.homeDir,
-      migrationLogger: logger,
-    });
+    return openDbWithHandle(config.dbPath);
   } catch (error) {
     logger.fatal(
       { err: error },
@@ -146,16 +144,21 @@ await fillSystemAvatar(seeded.user);
 seedLocalMachine(db, seeded.team.id);
 setCoordinatorInServer(config.coordinatorInServer);
 logger.info(seedDefaultRouting(db), 'default routing rules and policies');
-backfillTokenUsageCost(db);
-const concurrencyBackfilled = backfillMachineConcurrency(db);
-if (concurrencyBackfilled > 0) {
+runDataMigrationOnce(db, 'token-usage-cost-backfill', () => backfillTokenUsageCost(db));
+const concurrencyBackfilled = runDataMigrationOnce(db, 'machine-concurrency-backfill', () =>
+  backfillMachineConcurrency(db),
+);
+if ((concurrencyBackfilled ?? 0) > 0) {
   logger.info(
     { machines: concurrencyBackfilled },
     'machine concurrency backfilled to recommendation',
   );
 }
-const ownersSeeded = seedOwnerCheckpoints(db);
-if (ownersSeeded > 0) logger.info({ tasks: ownersSeeded }, 'thread owner checkpoints seeded');
+const ownersSeeded = runDataMigrationOnce(db, 'owner-checkpoints-seed', () =>
+  seedOwnerCheckpoints(db),
+);
+if ((ownersSeeded ?? 0) > 0)
+  logger.info({ tasks: ownersSeeded }, 'thread owner checkpoints seeded');
 const hub = new TeamStreamHub();
 const convHub = new ConversationStreamHub();
 const machineHub = new MachineWakeHub();

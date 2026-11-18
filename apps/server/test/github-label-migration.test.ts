@@ -3,7 +3,6 @@ import Database from 'better-sqlite3';
 import { afterEach, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
-import { runAgentLayerDataMigration } from '../src/legacy/agent-layer/data-migration.js';
 import { migrateUpTo } from './migrate-helpers.js';
 
 const directories: string[] = [];
@@ -18,8 +17,6 @@ function legacyDatabase() {
   const sqlite = new Database(path);
   try {
     sqlite.pragma('foreign_keys = ON');
-    migrateUpTo(sqlite, directory, '0119_agent_layer_backup');
-    runAgentLayerDataMigration(sqlite);
     migrateUpTo(sqlite, directory, '0143_blocked_by_hold');
     sqlite.exec(`
       INSERT INTO team (id, name, createdAt) VALUES ('team', 'Team', 1);

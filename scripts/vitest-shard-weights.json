@@ -388,7 +388,6 @@
   "@xiechimon/cairn:test/issue-fence.test.ts": 995,
   "@xiechimon/cairn:test/issue-intake.test.ts": 25960,
   "@xiechimon/cairn:test/keys.test.ts": 1273,
-  "@xiechimon/cairn:test/legacy-export.test.ts": 529,
   "@xiechimon/cairn:test/local-merge-digest.test.ts": 253,
   "@xiechimon/cairn:test/local-merge-facts.test.ts": 1450,
   "@xiechimon/cairn:test/local-merge-landing.test.ts": 3925,

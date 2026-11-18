@@ -104,10 +104,6 @@
                 "message": "Seam discipline (ACP): ACP SDK and adapters may only be consumed through apps/daemon/src/backend/."
               },
               {
-                "group": ["**/legacy/agent-layer/*"],
-                "message": "Seam discipline: the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
-              },
-              {
                 "group": ["@opentelemetry/*", "@opentelemetry/*/*", "@langfuse/*"],
                 "message": "Seam discipline (observability-4): the OpenTelemetry SDK is consumed only through the bridge packages/shared/src/otel.ts, and convention keys (@opentelemetry/semantic-conventions, @langfuse/core) only through packages/shared/src/genai-conventions.ts."
               }
@@ -143,7 +139,6 @@
         "apps/daemon/src/backend/**",
         "apps/server/src/coordinator/runtime/**",
         "apps/server/src/db/client.ts",
-        "apps/server/src/legacy/**",
         "apps/server/test/**"
       ],
       "linter": {
@@ -228,7 +223,6 @@
         "apps/server/src/**",
         "!apps/server/src/coordinator/runtime/**",
         "!apps/server/src/db/client.ts",
-        "!apps/server/src/legacy/**",
         "!apps/server/src/services/mcp-face.ts",
         "!apps/server/src/services/mcp-servers.ts",
         "!apps/server/src/services/schedules.ts"
@@ -275,10 +269,6 @@
                     "message": "Seam discipline (ACP): ACP SDK and adapters may only be consumed through apps/daemon/src/backend/."
                   },
                   {
-                    "group": ["**/legacy/agent-layer/*"],
-                    "message": "Seam discipline: the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
-                  },
-                  {
                     "group": ["@opentelemetry/*", "@opentelemetry/*/*", "@langfuse/*"],
                     "message": "Seam discipline (observability-4): the OpenTelemetry SDK is consumed only through the bridge packages/shared/src/otel.ts, and convention keys (@opentelemetry/semantic-conventions, @langfuse/core) only through packages/shared/src/genai-conventions.ts."
                   },
@@ -308,7 +298,6 @@
       "includes": [
         "apps/server/src/coordinator/runtime/**",
         "apps/server/src/db/client.ts",
-        "apps/server/src/legacy/**",
         "apps/server/src/services/mcp-face.ts",
         "apps/server/src/services/mcp-servers.ts",
         "apps/server/src/services/schedules.ts"

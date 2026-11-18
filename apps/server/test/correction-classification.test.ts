@@ -5,7 +5,6 @@ import { sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER, openDbWithHandle } from '../src/db/client.js';
-import { runAgentLayerDataMigration } from '../src/legacy/agent-layer/data-migration.js';
 import { isCorrectionTask } from '../src/services/correction.js';
 import { bootServer, postProject, req } from './helpers.js';
 import { migrateUpTo } from './migrate-helpers.js';
@@ -28,8 +27,6 @@ function previousDatabase(): string {
   const sqlite = new Database(path);
   try {
     sqlite.pragma('foreign_keys = ON');
-    migrateUpTo(sqlite, dir, '0119_agent_layer_backup');
-    runAgentLayerDataMigration(sqlite);
     migrateUpTo(sqlite, dir, '0138_step_prompt_origin');
     sqlite.exec(`
       INSERT INTO user (id, displayName) VALUES ('u', 'Owner');

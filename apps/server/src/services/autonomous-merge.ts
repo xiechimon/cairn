@@ -1,14 +1,6 @@
-import { and, eq, gte, isNull, lt, or } from 'drizzle-orm';
+import { and, eq, gte, lt, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import {
-  autonomousMergeAdmission,
-  build,
-  message,
-  project,
-  step,
-  team,
-  todo,
-} from '../db/schema.js';
+import { autonomousMergeAdmission, build, message, project, team, todo } from '../db/schema.js';
 import { conflict } from '../lib/errors.js';
 import { type FetchLike, githubPull } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
@@ -44,77 +36,7 @@ export function autonomousMergePolicy(
       ),
     )
     .all();
-  let count = admissions.filter((row) => row.buildId !== excludeBuildId).length;
-  const recorded = new Set(admissions.map((row) => row.buildId));
-  const all = db
-    .select({ message, project })
-    .from(message)
-    .leftJoin(
-      autonomousMergeAdmission,
-      eq(message.conversationId, autonomousMergeAdmission.buildId),
-    )
-    .innerJoin(build, eq(message.conversationId, build.id))
-    .innerJoin(todo, eq(build.todoId, todo.id))
-    .innerJoin(project, eq(todo.projectId, project.id))
-    .where(
-      and(
-        eq(todo.teamId, teamId),
-        eq(message.role, 'system'),
-        isNull(autonomousMergeAdmission.buildId),
-        gte(message.createdAt, start),
-        lt(message.createdAt, end),
-      ),
-    )
-    .all();
-  const localRecorded = new Set<string>();
-  for (const { message: row } of all) {
-    if (recorded.has(row.conversationId) || row.createdAt < start || row.createdAt >= end) continue;
-    let raw = row.content;
-    if (typeof raw === 'string') {
-      if (/^PR #\d+ 已由 cairn 经 GitHub 合并/.test(raw)) {
-        count++;
-        continue;
-      }
-      try {
-        raw = JSON.parse(raw) as unknown;
-      } catch {
-        continue;
-      }
-    }
-    if (raw === null || typeof raw !== 'object') continue;
-    const result = raw as { kind?: unknown; result?: { outcome?: unknown } };
-    if (result.kind === 'local-merge-result' && result.result?.outcome === 'merged') {
-      count++;
-      localRecorded.add(row.conversationId);
-    }
-  }
-  const legacySteps = db
-    .select({ step, project })
-    .from(step)
-    .leftJoin(autonomousMergeAdmission, eq(step.buildId, autonomousMergeAdmission.buildId))
-    .innerJoin(build, eq(step.buildId, build.id))
-    .innerJoin(todo, eq(build.todoId, todo.id))
-    .innerJoin(project, eq(todo.projectId, project.id))
-    .where(
-      and(
-        eq(todo.teamId, teamId),
-        eq(step.kind, 'merge'),
-        eq(step.status, 'done'),
-        isNull(autonomousMergeAdmission.buildId),
-        gte(step.finishedAt, start),
-        lt(step.finishedAt, end),
-      ),
-    )
-    .all();
-  for (const { step: row } of legacySteps) {
-    if (
-      !recorded.has(row.buildId) &&
-      !localRecorded.has(row.buildId) &&
-      row.checkpointCommit !== null &&
-      row.prompt?.includes('"local-merge"')
-    )
-      count++;
-  }
+  const count = admissions.filter((row) => row.buildId !== excludeBuildId).length;
   const teamRow = db.select().from(team).where(eq(team.id, teamId)).get();
   return {
     autonomyPaused: teamRow === undefined || teamAutonomyPaused(db, teamId),
