@@ -86,6 +86,12 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
    promote predicate, so lanes do not need a local watcher. It pushes with
    the `cairn-release` app token — GITHUB_TOKEN pushes cannot carry commits
    that touch `.github/workflows` and would not re-trigger `desktop-release`.
+   Verified live on the first two workflow_run events: both fired on queue
+   completions and failed in setup because `actions/setup-node` auto-enables
+   `package-manager-cache` for pnpm, which the job does not install — fixed
+   by disabling the cache (`a9e6004c3`). The trigger wiring, the
+   `desktop-release` environment secrets and the app-token checkout all
+   worked on the first attempt.
    Remaining optional work: batching policy and prepush slimming.
 
 ## Tests
