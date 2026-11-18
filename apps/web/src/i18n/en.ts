@@ -2368,6 +2368,13 @@ export const EN: Record<string, string> = {
   全部测试: 'Test all',
   '还没选模型。从上游拉一份清单来勾选。': 'No models yet. Fetch the upstream list and pick some.',
   获取上游模型: 'Fetch upstream models',
+  '还没勾选模型，订阅按执行机上报的名单兜底。':
+    'No models picked yet. The subscription falls back to the list machines report.',
+  低价: 'Low cost',
+  中价: 'Med cost',
+  高价: 'High cost',
+  'Devin 原生': 'Devin native',
+  'Fusion 组合': 'Fusion combos',
   '上游拒绝了 API key。检查 key 后重试。':
     'The upstream refused the API key. Check the key and retry.',
   '上游没有提供模型清单。': 'The upstream does not offer a model list.',

@@ -108,6 +108,39 @@ export const DEVIN_SUBSCRIPTIONS: DevinSubscriptionWire[] = [
     windows: [],
     lastUsedAt: NOW - 3 * HOUR,
     stepsLast24h: 4,
+    models: [
+      {
+        id: 'swe-2-high',
+        name: 'SWE-2',
+        contextTokens: 262_144,
+        costTier: 'High cost',
+      },
+      {
+        id: 'swe-2-flash-medium',
+        name: 'SWE-2 Flash',
+        contextTokens: 262_144,
+        costTier: 'Free',
+      },
+      {
+        id: 'adaptive',
+        name: 'Adaptive',
+        contextTokens: 262_144,
+        costTier: 'Free',
+      },
+      {
+        id: 'claude-opus-5-5-medium',
+        name: 'Claude Opus 5.5',
+        contextTokens: 1_000_000,
+        costTier: 'High cost',
+        costSummary: '$4 / 1M Input · $0.2 / 1M Cached input · $20 / 1M Output',
+      },
+      {
+        id: 'gemini-4-carbon',
+        name: 'Gemini 4 Carbon',
+        contextTokens: 1_000_000,
+        costTier: 'Med cost',
+      },
+    ],
   },
 ];
 

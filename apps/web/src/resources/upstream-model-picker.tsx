@@ -11,10 +11,25 @@ import { Skeleton } from '../components/ui/skeleton.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { useI18n } from '../i18n/provider.js';
 
+export interface UpstreamOption {
+  id: string;
+  name: string;
+  family?: string;
+  costTier?: string;
+  costSummary?: string;
+  contextTokens?: number;
+}
+
 type Load =
   | { phase: 'loading' }
-  | { phase: 'ok'; models: { id: string; name: string }[] }
+  | { phase: 'ok'; models: UpstreamOption[] }
   | { phase: 'failed'; failure: ProviderFailure | 'unavailable'; httpStatus: number | null };
+
+export const COST_TIER_LABEL: Record<string, string> = {
+  'Low cost': '低价',
+  'Med cost': '中价',
+  'High cost': '高价',
+};
 
 const LIST_FAILURE: Record<ProviderFailure | 'unavailable', string> = {
   auth: '上游拒绝了 API key。检查 key 后重试。',
@@ -32,12 +47,16 @@ export function UpstreamModelPicker({
   endpoint,
   selected,
   load,
+  groupModels,
+  testable = true,
   onClose,
   onSave,
 }: {
   endpoint: string;
   selected: readonly string[];
   load: () => Promise<UpstreamModelsResult>;
+  groupModels?: (models: UpstreamOption[]) => [string, UpstreamOption[]][];
+  testable?: boolean;
   onClose: () => void;
   onSave: (ids: string[], names: ReadonlyMap<string, string>) => void;
 }) {
@@ -72,10 +91,16 @@ export function UpstreamModelPicker({
 
   const upstream = state.phase === 'ok' ? state.models : [];
   const names = new Map(upstream.map((model) => [model.id, model.name]));
+  const byId = new Map(upstream.map((model) => [model.id, model]));
   const picked = new Set(draft);
   const q = query.trim().toLowerCase();
-  const hit = (id: string) =>
-    q === '' || id.toLowerCase().includes(q) || (names.get(id) ?? '').toLowerCase().includes(q);
+  const hit = (id: string) => {
+    if (q === '') return true;
+    const model = byId.get(id);
+    return [id, model?.name, model?.family, model?.costTier]
+      .filter((part): part is string => part !== undefined)
+      .some((part) => part.toLowerCase().includes(q));
+  };
   const pickedRows = draft.filter(hit);
   const otherRows = upstream.map((model) => model.id).filter((id) => !picked.has(id) && hit(id));
   const toggle = (id: string) =>
@@ -87,8 +112,14 @@ export function UpstreamModelPicker({
     setTyped('');
   };
 
+  const contextLabel = (tokens: number) =>
+    tokens >= 1_000_000
+      ? `${Number((tokens / 1_000_000).toFixed(1))}M`
+      : `${Math.round(tokens / 1000)}K`;
+
   const row = (id: string) => {
     const name = names.get(id);
+    const model = byId.get(id);
     const checkboxId = `upstream-model-${id}`;
     return (
       <label
@@ -96,6 +127,7 @@ export function UpstreamModelPicker({
         htmlFor={checkboxId}
         data-testid="upstream-model"
         data-model-id={id}
+        title={model?.costSummary}
         className="flex min-h-9 cursor-pointer items-center gap-3 rounded-md px-2 hover:bg-menu-hover pointer-coarse:min-h-11"
       >
         <Checkbox id={checkboxId} checked={picked.has(id)} onCheckedChange={() => toggle(id)} />
@@ -105,6 +137,24 @@ export function UpstreamModelPicker({
             <span className="truncate text-meta text-content-tertiary">{name}</span>
           )}
         </span>
+        {model?.costTier === 'Free' && (
+          <span
+            data-testid="upstream-model-free"
+            className="flex-none rounded border border-border px-1 text-caption text-content-tertiary"
+          >
+            Free
+          </span>
+        )}
+        {model?.costTier !== undefined && model.costTier !== 'Free' && (
+          <span className="flex-none text-caption text-content-tertiary">
+            {t(COST_TIER_LABEL[model.costTier] ?? model.costTier)}
+          </span>
+        )}
+        {model?.contextTokens !== undefined && (
+          <span className="flex-none text-caption text-content-tertiary tabular-nums">
+            {contextLabel(model.contextTokens)}
+          </span>
+        )}
       </label>
     );
   };
@@ -134,7 +184,7 @@ export function UpstreamModelPicker({
             disabled={draft.length === 0}
             onClick={() => onSave(draft, names)}
           >
-            {added > 0 ? t('保存并测试新选的') : t('保存')}
+            {testable && added > 0 ? t('保存并测试新选的') : t('保存')}
           </Button>
         </>
       }
@@ -208,20 +258,42 @@ export function UpstreamModelPicker({
           )}
           {pickedRows.length > 0 && (
             <div className="flex flex-col">
-              <span className="px-2 pt-1 pb-1 text-meta text-content-tertiary">
+              <span
+                data-testid="upstream-group"
+                className="px-2 pt-1 pb-1 text-meta text-content-tertiary"
+              >
                 {t('已选 {n}', { n: draft.length })}
               </span>
               {pickedRows.map(row)}
             </div>
           )}
-          {otherRows.length > 0 && (
-            <div className="flex flex-col">
-              <span className="px-2 pt-1 pb-1 text-meta text-content-tertiary">
-                {t('上游其他')}
-              </span>
-              {otherRows.map(row)}
-            </div>
-          )}
+          {otherRows.length > 0 &&
+            (groupModels === undefined ? (
+              <div className="flex flex-col">
+                <span
+                  data-testid="upstream-group"
+                  className="px-2 pt-1 pb-1 text-meta text-content-tertiary"
+                >
+                  {t('上游其他')}
+                </span>
+                {otherRows.map(row)}
+              </div>
+            ) : (
+              groupModels(otherRows.map((id) => byId.get(id) ?? { id, name: id })).map(
+                ([group, models]) =>
+                  models.length > 0 && (
+                    <div key={group} className="flex flex-col">
+                      <span
+                        data-testid="upstream-group"
+                        className="px-2 pt-1 pb-1 text-meta text-content-tertiary"
+                      >
+                        {t(group)} · {models.length}
+                      </span>
+                      {models.map((model) => row(model.id))}
+                    </div>
+                  ),
+              )
+            ))}
           {upstream.length > 0 && pickedRows.length === 0 && otherRows.length === 0 && (
             <p className="m-0 py-2 text-meta text-content-tertiary">{t('没有匹配的模型')}</p>
           )}

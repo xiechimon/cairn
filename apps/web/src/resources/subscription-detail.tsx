@@ -5,12 +5,14 @@ import {
   type ModelSourceRuntime,
 } from '@cairn/shared';
 import { cn } from 'cn';
+import { Download, X } from 'lucide-react';
 import type { AccountStatus, VerifyFailure } from '../api/account-verification.js';
 import type {
   AccountStep,
   AccountVendor,
   QuotaWindow,
   SubscriptionAccount,
+  SubscriptionModel,
 } from '../api/claude-accounts.js';
 import { relativeTime } from '../board/rel-time.js';
 import { AccountStepRow, useClock, VENDORS } from '../components/accounts/account-parts.js';
@@ -34,6 +36,7 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { ACCENT_INK } from '../phase.js';
 import { CommitInput } from './provider-editors.js';
+import { COST_TIER_LABEL } from './upstream-model-picker.js';
 
 const WINDOW_LABELS: Record<string, string> = {
   five_hour: '5 小时',
@@ -254,6 +257,9 @@ export interface SubscriptionActions {
   onVerify?: () => void;
   onRename?: (label: string) => void;
   onRemove: () => void;
+  onPickUpstream?: () => void;
+  onRemoveModel?: (id: string) => void;
+  modelsBusy?: boolean;
 }
 
 function SubscriptionModelChip({ model }: { model: ModelSourceModel }) {
@@ -284,9 +290,74 @@ function SubscriptionModelChip({ model }: { model: ModelSourceModel }) {
   );
 }
 
+function PickedModelChip({
+  model,
+  busy,
+  onRemove,
+}: {
+  model: SubscriptionModel;
+  busy: boolean;
+  onRemove?: () => void;
+}) {
+  const { t } = useI18n();
+  const dead = model.liveness === 'dead';
+  const tier =
+    model.costTier === undefined ? undefined : (COST_TIER_LABEL[model.costTier] ?? model.costTier);
+  const context =
+    model.contextTokens === undefined
+      ? undefined
+      : model.contextTokens >= 1_000_000
+        ? `${Number((model.contextTokens / 1_000_000).toFixed(1))}M`
+        : `${Math.round(model.contextTokens / 1000)}K`;
+  return (
+    <span
+      data-testid="subscription-picked-model"
+      data-model-id={model.id}
+      title={model.costSummary}
+      className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-md bg-secondary pl-2.5 pr-1 text-ui text-foreground ring-1 ring-border"
+    >
+      <span className={cn('truncate', dead && 'text-content-tertiary line-through')}>
+        {model.name}
+      </span>
+      {model.name !== model.id && (
+        <code className="truncate font-mono text-caption text-content-tertiary">{model.id}</code>
+      )}
+      {model.costTier === 'Free' && (
+        <span
+          data-testid="subscription-model-free"
+          className="flex-none rounded border border-border px-1 text-caption text-content-tertiary"
+        >
+          Free
+        </span>
+      )}
+      {tier !== undefined && model.costTier !== 'Free' && (
+        <span className="flex-none text-caption text-content-tertiary">{t(tier)}</span>
+      )}
+      {context !== undefined && (
+        <span className="flex-none text-caption text-content-tertiary tabular-nums">{context}</span>
+      )}
+      {dead && <span className="flex-none text-caption text-content-tertiary">{t('已下架')}</span>}
+      {onRemove !== undefined && (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={t('移除模型')}
+          data-testid="subscription-model-remove"
+          disabled={busy}
+          className="size-5 text-content-tertiary"
+          onClick={onRemove}
+        >
+          <X />
+        </Button>
+      )}
+    </span>
+  );
+}
+
 export function SubscriptionDetail({
   account,
   models,
+  picked,
   now,
   view,
   verifying,
@@ -295,6 +366,7 @@ export function SubscriptionDetail({
 }: {
   account: SubscriptionAccount;
   models: readonly ModelSourceModel[];
+  picked?: readonly SubscriptionModel[];
   now: number;
   view: SubscriptionStatusView;
   verifying: boolean;
@@ -384,24 +456,82 @@ export function SubscriptionDetail({
             </>
           )}
         </SettingsCard>
-        <SettingsSection title={t('模型')}>
-          <SettingsCard>
-            {models.length === 0 ? (
-              <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
-                {t('还没有执行机上报 {runtime} 模型', { runtime: runtimeLabel })}
+        {picked === undefined ? (
+          <SettingsSection title={t('模型')}>
+            <SettingsCard>
+              {models.length === 0 ? (
+                <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
+                  {t('还没有执行机上报 {runtime} 模型', { runtime: runtimeLabel })}
+                </div>
+              ) : (
+                <div
+                  data-testid="subscription-models"
+                  className={cn(SETTINGS_ROW_CLS, 'flex-wrap justify-start gap-1.5 py-2.5')}
+                >
+                  {models.map((model) => (
+                    <SubscriptionModelChip key={model.id} model={model} />
+                  ))}
+                </div>
+              )}
+            </SettingsCard>
+          </SettingsSection>
+        ) : (
+          <section data-testid="subscription-models" className="flex min-w-0 flex-col gap-2.5">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+              <h3 className="m-0 text-ui font-semibold text-foreground">{t('模型')}</h3>
+              <span
+                data-testid="subscription-models-summary"
+                className="text-meta text-content-tertiary"
+              >
+                {t('{n} 个', { n: picked.length })}
+              </span>
+              {actions.onPickUpstream !== undefined && (
+                <span className="ml-auto flex items-center gap-2 max-sm:w-full max-sm:justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="subscription-pick-upstream"
+                    onClick={actions.onPickUpstream}
+                  >
+                    <Download aria-hidden />
+                    {t('从上游选择')}
+                  </Button>
+                </span>
+              )}
+            </div>
+            {picked.length === 0 ? (
+              <div className="flex flex-col items-start gap-2.5 py-1">
+                <p className="m-0 text-ui text-content-secondary">
+                  {t('还没勾选模型，订阅按执行机上报的名单兜底。')}
+                </p>
+                {actions.onPickUpstream !== undefined && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="subscription-fetch-upstream"
+                    onClick={actions.onPickUpstream}
+                  >
+                    <Download aria-hidden />
+                    {t('获取上游模型')}
+                  </Button>
+                )}
               </div>
             ) : (
-              <div
-                data-testid="subscription-models"
-                className={cn(SETTINGS_ROW_CLS, 'flex-wrap justify-start gap-1.5 py-2.5')}
-              >
-                {models.map((model) => (
-                  <SubscriptionModelChip key={model.id} model={model} />
+              <div className="flex flex-wrap gap-1.5">
+                {picked.map((model) => (
+                  <PickedModelChip
+                    key={model.id}
+                    model={model}
+                    busy={actions.modelsBusy ?? false}
+                    {...(actions.onRemoveModel === undefined
+                      ? {}
+                      : { onRemove: () => actions.onRemoveModel?.(model.id) })}
+                  />
                 ))}
               </div>
             )}
-          </SettingsCard>
-        </SettingsSection>
+          </section>
+        )}
         {account.vendor !== 'devin' && (
           <SettingsSection title={t('额度')}>
             <SettingsCard>

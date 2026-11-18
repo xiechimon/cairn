@@ -1,13 +1,14 @@
 import type { ModelSource, ModelSourceModel, ProviderRecord } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cpu } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
 import {
   type AccountStep,
   type AccountVendor,
   type SubscriptionAccount,
+  type SubscriptionModel,
   toClaudeAccount,
 } from '../api/claude-accounts.js';
 import {
@@ -18,12 +19,14 @@ import {
   useSubscriptionVerification,
 } from '../api/claude-subscriptions.js';
 import {
+  fetchDevinUpstreamModels,
   toDevinAccount,
   useDeleteDevinSubscription,
   useDevinSubscriptionSteps,
   useDevinSubscriptions,
   useDevinSubscriptionVerification,
   useRenameDevinSubscription,
+  useUpdateDevinSubscriptionModels,
 } from '../api/devin-subscriptions.js';
 import { useApiMutations, useModelSources, useProviders } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
@@ -40,6 +43,7 @@ import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { AddProviderFlow, type AddProviderView } from './add-provider-flow.js';
+import { groupDevinUpstream } from './devin-model-groups.js';
 import {
   type ProviderEditActions,
   providerKind,
@@ -54,6 +58,7 @@ import {
   subscriptionStatusView,
   subscriptionSummary,
 } from './subscription-detail.js';
+import { UpstreamModelPicker } from './upstream-model-picker.js';
 
 interface Entry {
   item: ProviderItem;
@@ -124,19 +129,28 @@ function subscriptionEntries(
       deps.t,
       deps.clock,
     );
+    const runtimeLiveness = new Map(deps.models.map((model) => [model.id, model.liveness]));
+    const picked = account.vendor === 'devin' ? (account.models ?? []) : undefined;
+    const pickedWithLiveness = picked?.map((model) => ({
+      ...model,
+      liveness: runtimeLiveness.get(model.id) === 'dead' ? 'dead' : model.liveness,
+    }));
+    const rowModels =
+      picked !== undefined && picked.length > 0 ? (picked as ModelSourceModel[]) : deps.models;
     return {
       item: {
         id: `subscription:${account.id}`,
         name: account.label,
         Mark: VENDORS[account.vendor].Mark,
-        status: subscriptionSummary(account, view, deps.models, deps.now, deps.t),
-        tone: subscriptionRowTone(view, deps.models),
+        status: subscriptionSummary(account, view, rowModels, deps.now, deps.t),
+        tone: subscriptionRowTone(view, rowModels),
       },
       editor: (
         <SubscriptionDetail
           key={account.id}
           account={account}
           models={deps.models}
+          picked={pickedWithLiveness}
           now={deps.now}
           view={view}
           verifying={verification?.phase === 'verifying'}
@@ -164,12 +178,15 @@ export function ProvidersSection() {
   const deleteDevinSubscription = useDeleteDevinSubscription(teamId);
   const renameSubscription = useRenameClaudeSubscription(teamId);
   const renameDevinSubscription = useRenameDevinSubscription(teamId);
+  const updateDevinModels = useUpdateDevinSubscriptionModels(teamId);
   const verification = useSubscriptionVerification(teamId);
   const devinVerification = useDevinSubscriptionVerification(teamId);
   const [addView, setAddView] = useState<AddProviderView>('closed');
   const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
     null,
   );
+  const [pickingDevin, setPickingDevin] = useState<SubscriptionAccount | null>(null);
+  const devinUpstreamRef = useRef<ReadonlyMap<string, SubscriptionModel>>(new Map());
   const [connectError, setConnectError] = useState<string | null>(null);
 
   const sources = live
@@ -262,6 +279,15 @@ export function ProvidersSection() {
         }
       : {};
 
+  const saveDevinModels = (account: SubscriptionAccount, models: SubscriptionModel[]) =>
+    updateDevinModels.mutate(
+      { id: account.id, models },
+      {
+        onSuccess: () => setPickingDevin(null),
+        onError: (error) => toastError(t('保存失败，请重试。'), error),
+      },
+    );
+
   const announceVerification = (ref: { id: string; label: string; vendor: AccountVendor }) => {
     const verify = ref.vendor === 'devin' ? devinVerification.verify : verification.verify;
     void verify(ref.id).then((outcome) => {
@@ -284,6 +310,17 @@ export function ProvidersSection() {
                       { id: account.id, label },
                       { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
                     ),
+                  ...(account.vendor === 'devin'
+                    ? {
+                        onPickUpstream: () => setPickingDevin(account),
+                        onRemoveModel: (id: string) =>
+                          saveDevinModels(
+                            account,
+                            (account.models ?? []).filter((model) => model.id !== id),
+                          ),
+                        modelsBusy: updateDevinModels.isPending,
+                      }
+                    : {}),
                 }
               : {}),
           }
@@ -386,6 +423,26 @@ export function ProvidersSection() {
           announceVerification({ id: created.id, label: created.label, vendor: source });
         }}
       />
+      {pickingDevin !== null && live && teamId !== undefined && (
+        <UpstreamModelPicker
+          endpoint={`devin · ${pickingDevin.label}`}
+          selected={(pickingDevin.models ?? []).map((model) => model.id)}
+          groupModels={groupDevinUpstream}
+          testable={false}
+          load={async () => {
+            const result = await fetchDevinUpstreamModels(teamId, pickingDevin.id);
+            if (result.status === 'ok')
+              devinUpstreamRef.current = new Map(result.models.map((model) => [model.id, model]));
+            return result;
+          }}
+          onClose={() => setPickingDevin(null)}
+          onSave={(ids) => {
+            const catalog = devinUpstreamRef.current;
+            const models = ids.map((id) => catalog.get(id) ?? { id, name: id });
+            saveDevinModels(pickingDevin, models);
+          }}
+        />
+      )}
       <AlertDialogShell
         title={t('移除「{name}」？', { name: removingSubscription?.label ?? '' })}
         ariaLabel={t('移除订阅')}

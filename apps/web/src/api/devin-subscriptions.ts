@@ -2,6 +2,7 @@ import type {
   CreateDevinSubscription,
   DevinSubscription,
   DevinSubscriptionVerifyResult,
+  ProviderFailure,
 } from '@cairn/shared';
 import { devinKeyFromToml } from '@cairn/shared';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +15,7 @@ import {
   type AccountStepsPage,
   type QuotaWindow,
   type SubscriptionAccount,
+  type SubscriptionModel,
 } from './claude-accounts.js';
 import { ApiError, api } from './client.js';
 
@@ -50,6 +52,7 @@ export function toDevinAccount(wire: DevinSubscriptionWire, now: number): Subscr
     windows: Array.isArray(wire.windows) ? wire.windows : [],
     lastUsedAt: wire.lastUsedAt ?? null,
     stepsLast24h: typeof wire.stepsLast24h === 'number' ? wire.stepsLast24h : null,
+    models: Array.isArray(wire.models) ? wire.models : [],
   };
 }
 
@@ -107,6 +110,33 @@ export function useRenameDevinSubscription(teamId: string | undefined) {
         label: input.label,
       }),
     onSuccess: () => client.invalidateQueries({ queryKey: ['devin-subscriptions', teamId] }),
+  });
+}
+
+export type DevinUpstreamModelsResult =
+  | { status: 'ok'; models: SubscriptionModel[] }
+  | { status: 'failed'; failure: ProviderFailure; httpStatus: number | null };
+
+export function fetchDevinUpstreamModels(
+  teamId: string,
+  id: string,
+): Promise<DevinUpstreamModelsResult> {
+  return api.post<DevinUpstreamModelsResult>(
+    `/api/teams/${teamId}/devin-subscriptions/${id}/upstream-models`,
+  );
+}
+
+export function useUpdateDevinSubscriptionModels(teamId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; models: SubscriptionModel[] }) =>
+      api.patch<DevinSubscription>(`/api/teams/${teamId}/devin-subscriptions/${input.id}`, {
+        models: input.models,
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['devin-subscriptions', teamId] });
+      void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
+    },
   });
 }
 

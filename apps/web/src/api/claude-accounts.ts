@@ -1,4 +1,4 @@
-import type { ClaudeSubscription, MachineRecord } from '@cairn/shared';
+import type { ClaudeSubscription, DevinSubscriptionModel, MachineRecord } from '@cairn/shared';
 
 export const ACCOUNT_STATES = ['ok', 'cooling', 'exhausted', 'expired'] as const;
 export type AccountState = (typeof ACCOUNT_STATES)[number];
@@ -25,6 +25,8 @@ export type AccountVendor = (typeof ACCOUNT_VENDORS)[number];
 
 const PLAN_LABELS: Record<AccountPlan, string> = { pro: 'Pro', max: 'Max' };
 
+export type SubscriptionModel = DevinSubscriptionModel;
+
 export interface SubscriptionAccount {
   id: string;
   vendor: AccountVendor;
@@ -37,6 +39,7 @@ export interface SubscriptionAccount {
   windows: QuotaWindow[];
   lastUsedAt: number | null;
   stepsLast24h: number | null;
+  models?: SubscriptionModel[];
 }
 
 const isAccountState = (value: unknown): value is AccountState =>
