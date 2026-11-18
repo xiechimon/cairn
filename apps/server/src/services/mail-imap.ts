@@ -44,6 +44,7 @@ export const openImapMailbox: OpenMailbox = async (config) => {
     host: config.host,
     port: config.port,
     secure: config.port !== 143,
+    doSTARTTLS: config.port === 143,
     auth: { user: config.user, pass: config.password },
     logger: false,
     maxIdleTime: IDLE_RESTART_MS,

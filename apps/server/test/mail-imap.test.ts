@@ -227,6 +227,8 @@ describe('mailbox ingestion over IMAP', () => {
     const s = bootMail(box);
     const account = await connect(s);
     expect(s.db.select().from(secret).all().length).toBe(1);
+    box.deliver(mail(1));
+    await vi.waitFor(() => expect(s.db.select().from(mailEvent).all()).toHaveLength(1));
     const del = await req(s.app, 'DELETE', `/api/teams/${s.team.id}/mail/accounts/${account.id}`);
     expect(del.status).toBe(200);
     expect(await listAccounts(s)).toEqual([]);
@@ -235,10 +237,14 @@ describe('mailbox ingestion over IMAP', () => {
     expect(
       s.db.select().from(mailAccount).where(eq(mailAccount.id, account.id)).get(),
     ).toMatchObject({ status: 'disconnected', secretId: null });
-    box.deliver(mail(1));
+    expect(s.db.select().from(mailEvent).get()).toMatchObject({
+      excerpt: null,
+      subject: null,
+      fromAddress: null,
+    });
+    box.deliver(mail(2));
     await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(s.db.select().from(mailEvent).all()).toEqual([]);
-    expect(mailSteps(s)).toEqual([]);
+    expect(s.db.select().from(mailEvent).all()).toHaveLength(1);
   });
 
   test('the password is sealed at rest and never appears in responses, errors or logs', async () => {

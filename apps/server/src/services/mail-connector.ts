@@ -318,6 +318,10 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
           .where(eq(mailAccount.id, accountId))
           .run();
         db.delete(mailRule).where(eq(mailRule.accountId, accountId)).run();
+        db.update(mailEvent)
+          .set({ displayName: null, fromAddress: null, subject: null, excerpt: null })
+          .where(eq(mailEvent.accountId, accountId))
+          .run();
         if (row.secretId !== null) deleteSecret(options.secrets, teamId, row.secretId);
       });
       await stopRunner(accountId);

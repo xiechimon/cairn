@@ -275,7 +275,8 @@ async function executeMailSend(
   const account =
     accounts.find((row) => row.id === replied?.accountId) ?? (replied ? undefined : accounts[0]);
   if (account === undefined) throw new HttpError(409, 'no connected mailbox can send this');
-  const parked = gateOutboundAction(deps, ctx, entry, args);
+  const gated = { ...args, from: account.address };
+  const parked = gateOutboundAction(deps, ctx, entry, gated);
   if (parked !== null) return parked;
   const password =
     account.secretId === null
@@ -298,7 +299,9 @@ async function executeMailSend(
         to: args.to,
         subject: args.subject,
         text: args.body,
-        inReplyTo: replied?.messageId ?? null,
+        inReplyTo: /^<[^\s<>]+>$/.test(replied?.messageId ?? '')
+          ? (replied?.messageId ?? null)
+          : null,
       },
     );
   } catch {

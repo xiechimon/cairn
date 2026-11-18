@@ -24,6 +24,7 @@ export const sendSmtpMail: SendMail = async (config, mail) => {
     host: config.host,
     port: config.port,
     secure: config.port === 465,
+    requireTLS: config.port !== 465,
     auth: { user: config.user, pass: config.password },
     connectionTimeout: SMTP_TIMEOUT_MS,
     greetingTimeout: SMTP_TIMEOUT_MS,
