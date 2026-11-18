@@ -155,7 +155,7 @@ describe('translation call coverage', () => {
 
 function unbranchedPlurals(template: string): string[] {
   return [...template.matchAll(/\{\w+\}\s+[A-Za-z]+s\b/g)]
-    .filter((match) => !['is', 'has', 'expires', 'writes'].includes(match[0].split(/\s+/)[1] ?? ''))
+    .filter((match) => !['is', 'has', 'expires', 'writes', 'sees'].includes(match[0].split(/\s+/)[1] ?? ''))
     .map((match) => match[0]);
 }
 
@@ -179,5 +179,10 @@ describe('English plural coverage', () => {
     expect(unbranchedPlurals('{n#1 member|# members}, {m} tasks')).toEqual(['{m} tasks']);
     expect(unbranchedPlurals('{n#1 member|# members}, {n} tasks')).toEqual(['{n} tasks']);
     expect(unbranchedPlurals('{n#1 member|# members}')).toEqual([]);
+  });
+
+  it('does not mistake a singular verb for a plural noun', () => {
+    expect(unbranchedPlurals('{name} sees images')).toEqual([]);
+    expect(unbranchedPlurals('{name} sees {n} images')).toEqual(['{n} images']);
   });
 });

@@ -3,6 +3,20 @@ import { expect, type Page, test } from '@playwright/test';
 const VAULT = '/app/settings/vault?scenario=vault-list';
 const VAULT_EMPTY = '/app/settings/vault?scenario=vault-empty';
 
+for (const locale of ['zh', 'en'] as const) {
+  test(`settings search finds the vault by site authorization (${locale})`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem('cairn.locale', value), locale);
+    await page.goto('/app/settings/account?scenario=vault-list');
+    await page.getByLabel(locale === 'zh' ? '搜索设置' : 'Search settings').fill(
+      locale === 'zh' ? '授权' : 'authorization',
+    );
+    const result = page.locator('[data-settings-result="vault"]');
+    await expect(result).toBeVisible();
+    await result.click();
+    await expect(page.getByTestId('settings-head')).toHaveText(locale === 'zh' ? '保险库' : 'Vault');
+  });
+}
+
 test('the vault lists saved site logins masked and site authorizations with revoke', async ({
   page,
 }) => {

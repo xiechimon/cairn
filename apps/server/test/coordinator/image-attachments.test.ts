@@ -82,7 +82,7 @@ describe('Coordinator owner image attachments', () => {
         providerId,
         ...(api === 'openai-codex-responses' ? {} : { baseUrl: 'http://127.0.0.1:9' }),
         api: api === 'openai-codex-responses' ? 'openai-responses' : api,
-        models: [{ id: 'm', name: 'm' }],
+        models: [{ id: 'm', name: 'm', input: ['text', 'image'] }],
       });
       const jwtPayload = Buffer.from(
         JSON.stringify({

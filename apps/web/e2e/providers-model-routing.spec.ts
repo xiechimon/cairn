@@ -168,7 +168,8 @@ test('live: rename, verify and remove hit the agreed routes', async ({
   await expect(page.getByTestId('subscription-detail')).toHaveCount(0);
 
   await page.locator('[data-instance-id="subscription:s2"]').click();
-  await expect(detail.getByLabel('名称', { exact: true })).toHaveCount(0);
+  await expect(detail).toHaveAttribute('data-account-id', 's2');
+  await expect(detail.getByLabel('名称', { exact: true })).toHaveValue('Legacy');
   await detail.getByRole('button', { name: '移除', exact: true }).click();
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toContainText('Legacy');

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import type {
   AgentBackend,
@@ -68,6 +68,7 @@ import {
 import {
   appendSkillsCatalog,
   collectDeniedSkillDirs,
+  collectVisibleSkillFileMap,
   composeSkillsSection,
   createSkillReadGate,
   piWorktreeSkillDirs,
@@ -1054,7 +1055,22 @@ export class PiBackend implements AgentBackend {
           gateToolCallHandler({
             ...(this.opts.gateRules ? { rules: this.opts.gateRules } : {}),
             ...(this.opts.onGateLog ? { log: this.opts.onGateLog } : {}),
-            folders: { cwd: opts.cwd, roots: this.opts.folderRoots?.() ?? [] },
+            folders: {
+              cwd: opts.cwd,
+              roots: this.opts.folderRoots?.() ?? [],
+              readRoots:
+                this.opts.skills === undefined
+                  ? []
+                  : [
+                      ...collectVisibleSkillFileMap({
+                        ...this.opts.skills,
+                        ...(opts.teamSkillsDir !== undefined
+                          ? { teamSkillsDir: opts.teamSkillsDir }
+                          : {}),
+                        worktreeSkillsDirs: piWorktreeSkillDirs(opts.cwd),
+                      }).values(),
+                    ].map((file) => dirname(file)),
+            },
           }),
         );
       },

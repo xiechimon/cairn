@@ -174,7 +174,7 @@ const GROUPS: Group[] = [
         id: 'vault',
         label: '保险库',
         Icon: Vault,
-        keywords: ['vault', 'password', 'login', '密码', '登录', '网站', '授权'],
+        keywords: ['vault', 'password', 'login', '密码', '登录', '网站', '网站授权'],
         element: () => <VaultPage />,
       },
       {

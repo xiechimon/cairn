@@ -23,6 +23,7 @@ export interface GateDecision {
 export interface FolderGateContext {
   cwd: string;
   roots: readonly string[];
+  readRoots?: readonly string[];
 }
 
 const FOLDER_DENY: GateDecision = { action: 'reject', ruleId: 'folder-grant' };
@@ -1138,7 +1139,11 @@ export function decideToolCall(
   }
   if (folders !== undefined && FOLDER_FILE_TOOLS.has(toolName)) {
     const path = params.path;
-    if (typeof path === 'string' && folderTokenBlocked(path, prepareFolderRoots(folders))) {
+    const roots = prepareFolderRoots({
+      cwd: folders.cwd,
+      roots: toolName === 'read' ? [...folders.roots, ...(folders.readRoots ?? [])] : folders.roots,
+    });
+    if (typeof path === 'string' && folderTokenBlocked(path, roots)) {
       return FOLDER_DENY;
     }
   }

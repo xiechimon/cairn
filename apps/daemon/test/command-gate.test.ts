@@ -383,6 +383,30 @@ describe('folder grants bound where tool calls can reach', () => {
     });
   });
 
+  it('skill read roots allow reads without granting writes, shell access or symlink escapes', async () => {
+    const { ctx, outside } = folders();
+    const skill = join(outside, 'demo');
+    mkdirSync(skill);
+    writeFileSync(join(skill, 'SKILL.md'), 'skill body');
+    writeFileSync(join(outside, 'secret'), 'secret');
+    symlinkSync(join(outside, 'secret'), join(skill, 'escape'));
+    const handler = gateToolCallHandler({ folders: { ...ctx, readRoots: [skill] } });
+    expect(await handler(toolEvent('read', { path: join(skill, 'SKILL.md') }))).toBeUndefined();
+    for (const tool of ['write', 'edit', 'grep', 'find', 'ls']) {
+      expect((await handler(toolEvent(tool, { path: join(skill, 'SKILL.md') })))?.block).toBe(true);
+    }
+    expect((await handler(bashEvent(`cat ${skill}/SKILL.md`)))?.block).toBe(true);
+    expect((await handler(toolEvent('read', { path: join(skill, 'escape') })))?.block).toBe(true);
+    expect((await handler(toolEvent('read', { path: join(outside, 'secret') })))?.block).toBe(true);
+    const denied = gateToolCallHandler({
+      folders: { ...ctx, readRoots: [skill] },
+      rules: [{ id: 'deny-read', tool: 'read', action: 'reject' }],
+    });
+    expect((await denied(toolEvent('read', { path: join(skill, 'SKILL.md') })))?.reason).toContain(
+      'deny-read',
+    );
+  });
+
   it('pi file tools resolve paths against the step cwd and the enabled roots', () => {
     const { ctx, cwd, outside } = folders();
     writeFileSync(join(cwd, 'a.txt'), 'x');
