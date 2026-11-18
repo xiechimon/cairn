@@ -254,7 +254,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### memory
 
-**Memory** (shipped). Team and project memories the Coordinator reads, writes and injects into later turns and threads. Oversized indexes prompt normal-turn maintenance; no daily tidy pass runs. A design plans direct in-place edits of MEMORY.md and memory files.
+**Memory** (shipped). Team and project memories the Coordinator reads, writes and injects into later turns and threads. Oversized indexes prompt normal-turn maintenance; no daily tidy pass runs. Owners edit memory conversationally through a durable memory-edit request run on a dedicated chief-memory side thread restricted to the four memory tools, with receipts and before/after diffs. A first-run import card offers CLAUDE.md/AGENTS.md files as unverified searchable memory.
 
 - Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](research/memory-inplace-edit-2026-11-09.md)
 - Frontend design: [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)

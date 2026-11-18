@@ -66,6 +66,9 @@ interface MockOptions {
   deleteFails?: boolean;
   updateFails?: boolean;
   memories?: typeof MEMORIES;
+  edit?: Record<string, unknown> | null;
+  editReply?: 'done' | 'clarify' | 'fail';
+  candidates?: { projectId: string; projectName: string; file: string; imported: boolean }[];
 }
 
 async function mockMemory(page: Page, options: MockOptions = {}) {
@@ -73,6 +76,10 @@ async function mockMemory(page: Page, options: MockOptions = {}) {
   const deleted: string[] = [];
   const projectPatches: unknown[] = [];
   const memoryPatches: { id: string; body: Record<string, string> }[] = [];
+  const editPosts: Record<string, unknown>[] = [];
+  const importPosts: Record<string, unknown>[] = [];
+  const candidates = (options.candidates ?? []).map((c) => ({ ...c }));
+  let edit: Record<string, unknown> | null = options.edit === undefined ? null : options.edit;
   let listReply = options.list ?? 'ok';
   let projectsReply = options.projects ?? 'ok';
   const projects = PROJECTS.map(project => ({ ...project, instructions: '保留已保存的项目说明。' as string | null, archivedAt: options.archived ? NOV_8 : null }));
@@ -97,6 +104,73 @@ async function mockMemory(page: Page, options: MockOptions = {}) {
       }
       if (p.endsWith('/branches')) {
         return json({ defaultBranch: 'main', branches: [{ name: 'main', isDefault: true }] });
+      }
+      if (p === '/api/teams/t1/memory-edits' && route.request().method() === 'POST') {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        editPosts.push(body);
+        if (options.editReply === 'fail') return json({ error: 'boom' }, 500);
+        edit = {
+          id: 'me-1',
+          teamId: 't1',
+          status: 'working',
+          attempt: 1,
+          instruction: body.text,
+          file: body.file ?? null,
+          projectId: body.projectId ?? null,
+          reply: null,
+          receipts: [],
+          createdAt: NOV_8,
+          updatedAt: NOV_8,
+        };
+        return json(edit, 201);
+      }
+      if (p === '/api/teams/t1/memory-edits/current') {
+        if (edit !== null && options.editReply !== 'clarify' && options.editReply !== 'fail') {
+          edit = {
+            ...edit,
+            status: 'done',
+            receipts: [
+              {
+                id: 'mr-1',
+                editId: 'me-1',
+                callId: 'call-1',
+                tool: 'update_memory',
+                scope: 'team',
+                file: '验证命令',
+                beforeVersion: 'v1',
+                afterVersion: 'v2',
+                before: '推送代码前先跑受影响的测试。',
+                after: '推送代码前只跑 vitest。',
+                summary: '更新验证命令',
+                createdAt: NOV_8,
+              },
+            ],
+          };
+        }
+        if (edit !== null && options.editReply === 'clarify') {
+          edit = { ...edit, status: 'awaiting_input', reply: '要改哪一条？' };
+        }
+        return json(edit);
+      }
+      if (p.match(/\/api\/teams\/t1\/memory-edits\/[^/]+\/stop$/)) {
+        if (edit !== null) edit = { ...edit, status: 'stopped' };
+        return json(edit);
+      }
+      if (p === '/api/teams/t1/memory-imports/candidates') {
+        return json({ candidates });
+      }
+      if (p === '/api/teams/t1/memory-imports' && route.request().method() === 'POST') {
+        const body = route.request().postDataJSON() as { projectId: string; file: string };
+        importPosts.push(body);
+        const hit = candidates.find(
+          (c) => c.projectId === body.projectId && c.file === body.file,
+        );
+        if (hit === undefined) return json({ error: 'missing' }, 404);
+        hit.imported = true;
+        memories.push(
+          row(`m-${body.file}`, body.file, '导入的说明。', body.projectId, NOV_8, 'searchable'),
+        );
+        return json({ result: { file: body.file } }, 201);
       }
       if (p === '/api/teams/t1/memories') {
         if (deleted.length > 0 && options.refreshFails) return json({ error: 'boom' }, 500);
@@ -141,6 +215,8 @@ async function mockMemory(page: Page, options: MockOptions = {}) {
     deleted,
     projectPatches,
     memoryPatches,
+    editPosts,
+    importPosts,
     recover: () => {
       listReply = 'ok';
       projectsReply = 'ok';
@@ -190,8 +266,8 @@ test('Coordinator settings lists team memory only, with no scope headings or cou
     /评审交接/,
     /代码风格/,
   ]);
-  await expect(list.getByRole('textbox')).toHaveCount(0);
-  await expect(page.getByPlaceholder(/告诉 Coordinator/)).toHaveCount(0);
+  await expect(list.getByRole('list').getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByPlaceholder('告诉 Coordinator 要改什么')).toHaveCount(1);
 
   const verify = memoryRow(page, '验证命令');
   await expect(verify).toContainText('推送代码前先跑受影响的测试。');
@@ -551,4 +627,79 @@ test('edits made while instructions are saving remain a draft', async ({ page })
   release();
   await expect(page.getByRole('button', { name: '保存项目说明' })).toBeEnabled();
   await expect(input).toHaveValue('保存期间补充的草稿。');
+});
+
+
+test('memory edit composer submits an instruction and shows the applied result', async ({ page }) => {
+  const control = await openMemory(page);
+  const input = page.getByPlaceholder('告诉 Coordinator 要改什么');
+  await input.fill('把验证命令改成只跑 vitest');
+  await page.getByRole('button', { name: '发送' }).click();
+  expect(control.editPosts).toHaveLength(1);
+  expect(control.editPosts[0].text).toBe('把验证命令改成只跑 vitest');
+  await expect(page.getByText('已按你的话改了 1 处')).toBeVisible();
+  await expect(page.getByText('- 推送代码前先跑受影响的测试。')).toBeVisible();
+  await expect(page.getByText('+ 推送代码前只跑 vitest。')).toBeVisible();
+  await expect(memoryRow(page, '验证命令')).toContainText('刚刚更新');
+  await expect(input).toHaveValue('');
+  await evidenceShot(page, 'memory-edit-applied.png');
+});
+
+
+test('memory edit composer keeps the draft when the post fails', async ({ page }) => {
+  await openMemory(page, { editReply: 'fail' });
+  const input = page.getByPlaceholder('告诉 Coordinator 要改什么');
+  await input.fill('这条会失败');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect(page.getByText('没有发出去，内容还在输入框里，再试一次。')).toBeVisible();
+  await expect(input).toHaveValue('这条会失败');
+});
+
+
+test('memory edit composer shows a clarification request', async ({ page }) => {
+  await openMemory(page, { editReply: 'clarify' });
+  const input = page.getByPlaceholder('告诉 Coordinator 要改什么');
+  await input.fill('改一下端口');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect(page.getByText('要改哪一条？')).toBeVisible();
+  await evidenceShot(page, 'memory-edit-clarify.png');
+});
+
+
+test('import card lists CLAUDE.md and AGENTS.md candidates and imports one', async ({ page }) => {
+  const control = await openMemory(page, {
+    candidates: [
+      { projectId: 'p-notes', projectName: 'Field Notes', file: 'CLAUDE.md', imported: false },
+      { projectId: 'p-harbor', projectName: 'Harbor API', file: 'docs/AGENTS.md', imported: false },
+    ],
+  });
+  await expect(page.getByText('从仓库导入记忆')).toBeVisible();
+  await expect(page.getByText('Field Notes · CLAUDE.md')).toBeVisible();
+  await expect(page.getByText('Harbor API · docs/AGENTS.md')).toBeVisible();
+  const item = page.locator('li').filter({ hasText: 'Field Notes · CLAUDE.md' });
+  await item.getByRole('button', { name: '导入' }).click();
+  expect(control.importPosts).toEqual([{ projectId: 'p-notes', file: 'CLAUDE.md' }]);
+  await expect(page.getByText('Field Notes · CLAUDE.md')).toHaveCount(0);
+  await expect(page.getByText('Harbor API · docs/AGENTS.md')).toBeVisible();
+  await evidenceShot(page, 'memory-import-card.png');
+});
+
+
+test('import card dismisses itself and stays dismissed', async ({ page }) => {
+  await openMemory(page, {
+    candidates: [
+      { projectId: 'p-notes', projectName: 'Field Notes', file: 'CLAUDE.md', imported: false },
+    ],
+  });
+  await expect(page.getByText('从仓库导入记忆')).toBeVisible();
+  await page.getByRole('button', { name: '以后再说' }).click();
+  await expect(page.getByText('从仓库导入记忆')).toHaveCount(0);
+  await page.reload();
+  await page.goto('/app?chief=settings');
+  await page.getByRole('tab', { name: '记忆' }).click();
+  await expect(page.getByTestId('memory-list')).toBeVisible();
+  await expect(page.getByText('从仓库导入记忆')).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('cairn:memory-import-dismissed:t1')))
+    .toBe('1');
 });

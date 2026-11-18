@@ -1444,6 +1444,26 @@ export const EN: Record<string, string> = {
   '没有保存成功，原内容保持不变，请重试。': 'The memory was not saved and is unchanged. Try again.',
   '离线中。记忆只能查看，重新连接后才能编辑或删除。':
     'Offline. Memories are read-only until you reconnect.',
+  '离线中。重新连接后才能让 Coordinator 修改。':
+    'Offline. Reconnect before the Coordinator can change memory.',
+  '告诉 Coordinator 要改什么': 'Tell the Coordinator what to change',
+  '你：{text}': 'You: {text}',
+  'Coordinator 正在改记忆{elapsed}': 'The Coordinator is updating memory{elapsed}',
+  'Coordinator 看过了，记忆没有要改的。': 'The Coordinator looked and found nothing to change.',
+  '已按你的话改了 {count} 处': 'Changed {count#1 place|# places} as you asked',
+  'Coordinator 想确认一下再改。': 'The Coordinator wants to confirm before changing.',
+  '已修改 {count} 处，其余未完成': 'Changed {count#1 place|# places}; the rest is unfinished',
+  '已停止，记忆没有变': 'Stopped. Memory is unchanged.',
+  'Coordinator 这次没有改成，记忆没有变。':
+    'The Coordinator could not make the change this time. Memory is unchanged.',
+  '没有发出去，内容还在输入框里，再试一次。':
+    'It was not sent. Your words are still in the box; try again.',
+  刚刚更新: 'Updated just now',
+  未验证导入: 'Imported, unverified',
+  从仓库导入记忆: 'Import memory from repositories',
+  '这些仓库里有给代理看的说明文件，可以导入成可检索记忆；导入后不会自动注入。':
+    'These repositories contain instruction files for agents. Import them as searchable memory; they will not auto-inject.',
+  以后再说: 'Not now',
   模型与执行机: 'Model & Runner',
 
   '搜索记忆…': 'Search memories…',

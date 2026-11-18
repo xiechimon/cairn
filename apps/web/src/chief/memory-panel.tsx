@@ -1,8 +1,19 @@
-import type { MemoryRecord, PatchMemoryBody, ProjectRecord } from '@cairn/shared';
+import type {
+  MemoryImportCandidate,
+  MemoryRecord,
+  PatchMemoryBody,
+  ProjectRecord,
+} from '@cairn/shared';
 import { cn } from 'cn';
 import { useRef, useState } from 'react';
 import { useConnected } from '../api/connection-state.js';
-import { useApiMutations, useChiefMemoryUsage, useMemories } from '../api/hooks.js';
+import {
+  useApiMutations,
+  useChiefMemoryUsage,
+  useCurrentMemoryEdit,
+  useMemories,
+  useMemoryImportCandidates,
+} from '../api/hooks.js';
 import { ProjectInstructionsField } from '../board/project-instructions-field.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
@@ -12,12 +23,67 @@ import { Skeleton } from '../components/ui/skeleton.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
+import { MemoryEditComposer, memoryEditTouchedFiles } from './memory-edit-composer.js';
 import { isAutoInjected, memoriesByLayer, splitMemoryContent } from './memory-list.js';
 
 const ROW_GRID_CLS =
   'grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-6 gap-y-0.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]';
 const HEAD_CLS = 'text-ui font-normal text-foreground';
 const HINT_CLS = 'mt-1 text-ui text-content-secondary';
+
+const importDismissKey = (teamId: string) => `cairn:memory-import-dismissed:${teamId}`;
+
+function MemoryImportCard({
+  teamId,
+  candidates,
+}: {
+  teamId: string;
+  candidates: MemoryImportCandidate[];
+}) {
+  const { t } = useI18n();
+  const mutations = useApiMutations(teamId);
+  const [dismissed, setDismissed] = useState(
+    () => localStorage.getItem(importDismissKey(teamId)) === '1',
+  );
+  const pending = candidates.filter((c) => !c.imported);
+  if (dismissed || pending.length === 0) return null;
+  const dismiss = () => {
+    localStorage.setItem(importDismissKey(teamId), '1');
+    setDismissed(true);
+  };
+  return (
+    <div className="mt-4 rounded-lg border border-border px-4 py-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-ui font-normal text-foreground">{t('从仓库导入记忆')}</p>
+        <Button variant="ghost" size="sm" onClick={dismiss}>
+          {t('以后再说')}
+        </Button>
+      </div>
+      <p className="mt-1 text-meta text-content-secondary">
+        {t('这些仓库里有给代理看的说明文件，可以导入成可检索记忆；导入后不会自动注入。')}
+      </p>
+      <ul className="mt-2 divide-y divide-border">
+        {pending.map((c) => (
+          <li key={`${c.projectId}:${c.file}`} className="flex items-center gap-3 py-2 text-ui">
+            <span className="min-w-0 flex-1 truncate text-foreground">
+              {c.projectName} · {c.file}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={mutations.importMemoryFile.isPending}
+              onClick={() =>
+                mutations.importMemoryFile.mutate({ projectId: c.projectId, file: c.file })
+              }
+            >
+              {t('导入')}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 const updatedOn = (at: number, t: TFunc) => {
   const date = new Date(at);
@@ -41,6 +107,8 @@ export function MemoryPanel({
   const connected = useConnected();
   const memoriesQ = useMemories(teamId, live);
   const usageQ = useChiefMemoryUsage(teamId, live && project === null);
+  const editQ = useCurrentMemoryEdit(teamId, live && teamId !== undefined);
+  const importQ = useMemoryImportCandidates(teamId, live && connected);
   const mutations = useApiMutations(teamId);
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -51,6 +119,13 @@ export function MemoryPanel({
   const editContentRef = useRef<HTMLTextAreaElement>(null);
   const memories = memoriesQ.data ?? [];
   const { injected, lookup } = memoriesByLayer(memories, project?.id ?? null);
+  const touchedFiles = memoryEditTouchedFiles(editQ.data);
+  const rowDate = (memory: MemoryRecord) =>
+    touchedFiles.has(`${memory.projectId ?? 'team'}:${memory.title}`)
+      ? t('刚刚更新')
+      : memory.source?.startsWith('import:')
+        ? t('未验证导入')
+        : t('更新于 {date}', { date: updatedOn(memory.updatedAt, t) });
   const open = [...injected, ...lookup].find((memory) => memory.id === openId) ?? null;
   const deleting = mutations.deleteMemory;
   const updating = mutations.updateMemory;
@@ -141,7 +216,7 @@ export function MemoryPanel({
                     data-slot="memory-date"
                     className="col-start-2 row-start-1 whitespace-nowrap text-content-secondary sm:col-start-3"
                   >
-                    {t('更新于 {date}', { date: updatedOn(memory.updatedAt, t) })}
+                    {rowDate(memory)}
                   </span>
                 </span>
               </Button>
@@ -303,6 +378,16 @@ export function MemoryPanel({
         )}
       </div>
       {autoMemory}
+      {live && teamId !== undefined && importQ.data !== undefined && (
+        <MemoryImportCard teamId={teamId} candidates={importQ.data} />
+      )}
+      {live && (
+        <MemoryEditComposer
+          teamId={teamId}
+          projectId={project?.id ?? null}
+          projectName={project?.name ?? null}
+        />
+      )}
       <DialogShell
         open={open !== null && !confirming}
         title={open?.title ?? ''}
@@ -335,6 +420,14 @@ export function MemoryPanel({
                 {updating.isPending ? t('保存中…') : t('保存')}
               </Button>
             </DialogFootRow>
+          ) : live && open !== null ? (
+            <MemoryEditComposer
+              embedded
+              teamId={teamId}
+              projectId={open.projectId}
+              projectName={project?.name ?? null}
+              file={isAutoInjected(open.layer) ? 'MEMORY.md' : open.title}
+            />
           ) : undefined
         }
       >

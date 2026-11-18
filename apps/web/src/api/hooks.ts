@@ -47,6 +47,10 @@ import type {
   MachineRecord,
   McpConnectorRecord,
   McpServerRecord,
+  MemoryEditBody,
+  MemoryEditRecord,
+  MemoryImportBody,
+  MemoryImportCandidate,
   MemoryRecord,
   ModelSourcesEnvelope,
   NotificationRecord,
@@ -518,6 +522,27 @@ export const useMemories = (teamId: string | undefined, enabled: boolean) =>
     queryKey: ['memories', teamId],
     queryFn: () => api.get<MemoryRecord[]>(`/api/teams/${teamId}/memories`),
     enabled: enabled && teamId !== undefined,
+  });
+
+export const useCurrentMemoryEdit = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['memory-edit', teamId],
+    queryFn: () => api.get<MemoryEditRecord | null>(`/api/teams/${teamId}/memory-edits/current`),
+    enabled: enabled && teamId !== undefined,
+    refetchInterval: (query) => (query.state.data?.status === 'working' ? 1000 : false),
+  });
+
+export const useMemoryImportCandidates = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['memory-import-candidates', teamId],
+    queryFn: () =>
+      api
+        .get<{ candidates: MemoryImportCandidate[] }>(
+          `/api/teams/${teamId}/memory-imports/candidates`,
+        )
+        .then((r) => r.candidates),
+    enabled: enabled && teamId !== undefined,
+    staleTime: 60_000,
   });
 
 export const useChiefMemoryUsage = (teamId: string | undefined, enabled: boolean) =>
@@ -1538,6 +1563,39 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: (record, input) => {
         qc.setQueryData<MemoryRecord[]>(['memories', teamId], (records) =>
           records?.map((existing) => (existing.id === input.memoryId ? record : existing)),
+        );
+        invalidateAll();
+      },
+    }),
+    submitMemoryEdit: useMutation({
+      mutationFn: (body: MemoryEditBody) =>
+        api.post<MemoryEditRecord>(`/api/teams/${teamId}/memory-edits`, body),
+      onSuccess: (record) => {
+        qc.setQueryData<MemoryEditRecord | null>(['memory-edit', teamId], record);
+        invalidateAll();
+      },
+    }),
+    stopMemoryEdit: useMutation({
+      mutationFn: (input: { editId: string; attempt?: number }) =>
+        api.post<MemoryEditRecord>(
+          `/api/teams/${teamId}/memory-edits/${input.editId}/stop`,
+          input.attempt === undefined ? {} : { attempt: input.attempt },
+        ),
+      onSuccess: (record) => {
+        qc.setQueryData<MemoryEditRecord | null>(['memory-edit', teamId], record);
+        invalidateAll();
+      },
+    }),
+    importMemoryFile: useMutation({
+      mutationFn: (body: MemoryImportBody) =>
+        api.post<{ result: unknown }>(`/api/teams/${teamId}/memory-imports`, body),
+      onSuccess: (_data, body) => {
+        qc.setQueryData<MemoryImportCandidate[]>(
+          ['memory-import-candidates', teamId],
+          (candidates) =>
+            candidates?.map((c) =>
+              c.projectId === body.projectId && c.file === body.file ? { ...c, imported: true } : c,
+            ),
         );
         invalidateAll();
       },
