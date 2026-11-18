@@ -35,7 +35,7 @@ test('receipt seams hold provider and tool dispatch separately and qualify the t
   const registry = createRegistry();
   registry.install(
     coordinatorToolsExtension(
-      { relayTool: relay, relayComputer: vi.fn(), askUser: vi.fn() },
+      { relayTool: relay, relayComputer: vi.fn(), askUser: vi.fn(), transcriptRow: vi.fn() },
       gate,
       {
         beforeTool: async (_signal, conversationId) => {

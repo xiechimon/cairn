@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import {
+  type AttachmentImageTextDeps,
   attachmentImageText,
   tesseractOcrRunner,
 } from '../../src/coordinator/runtime/image-text.js';
@@ -71,37 +72,103 @@ describe('attachmentImageText', () => {
     ({ type: 'image', data, mimeType }) as const;
 
   it('labels OCR output as machine transcription', async () => {
-    const text = await attachmentImageText({
+    const result = await attachmentImageText({
       models: noVision,
       image,
       prepareImage,
       ocr: async () => '  three tasks listed  ',
+      cache: new Map(),
     });
-    expect(text).toContain('OCR transcript');
-    expect(text).toContain('shot.png');
-    expect(text).toContain('three tasks listed');
+    expect(result.via).toBe('ocr');
+    expect(result.text).toContain('OCR transcript');
+    expect(result.text).toContain('shot.png');
+    expect(result.text).toContain('three tasks listed');
   });
 
   it('says OCR found no text instead of claiming content', async () => {
-    const text = await attachmentImageText({
+    const result = await attachmentImageText({
       models: noVision,
       image,
       prepareImage,
       ocr: async () => '   ',
+      cache: new Map(),
     });
-    expect(text).toContain('found no text');
-    expect(text).toContain('ask_user');
+    expect(result.via).toBe('ocr-empty');
+    expect(result.text).toContain('found no text');
+    expect(result.text).toContain('ask_user');
   });
 
   it('names the file and points at ask_user when nothing can read the image', async () => {
-    const text = await attachmentImageText({
+    const result = await attachmentImageText({
       models: noVision,
       image,
       prepareImage,
       ocr: async () => undefined,
+      cache: new Map(),
     });
-    expect(text).toContain('shot.png');
-    expect(text).toContain('cannot see images');
-    expect(text).toContain('ask_user');
+    expect(result.via).toBe('unreadable');
+    expect(result.text).toContain('shot.png');
+    expect(result.text).toContain('cannot see images');
+    expect(result.text).toContain('ask_user');
+  });
+
+  it('reuses a cached extraction for identical bytes', async () => {
+    const cache = new Map();
+    let calls = 0;
+    const ocr = async () => {
+      calls += 1;
+      return 'cached words';
+    };
+    const deps = { models: noVision, image, prepareImage, ocr, cache };
+    const first = await attachmentImageText(deps);
+    const second = await attachmentImageText(deps);
+    expect(calls).toBe(1);
+    expect(second.text).toBe(first.text);
+    expect(second.via).toBe('ocr');
+  });
+
+  it('does not cache failed reads', async () => {
+    const cache = new Map();
+    let calls = 0;
+    const deps = {
+      models: noVision,
+      image,
+      prepareImage,
+      ocr: async () => {
+        calls += 1;
+        return undefined;
+      },
+      cache,
+    };
+    await attachmentImageText(deps);
+    await attachmentImageText(deps);
+    expect(calls).toBe(2);
+  });
+
+  it('caches vision captions by image bytes', async () => {
+    const cache = new Map();
+    let calls = 0;
+    const models = {
+      getModels: () => [{ provider: 'v', id: 'vm', input: ['text', 'image'], cost: { input: 0 } }],
+      completeSimple: async () => {
+        calls += 1;
+        return { stopReason: 'stop', content: [{ type: 'text', text: 'a panel' }] };
+      },
+    } as unknown as AttachmentImageTextDeps['models'];
+    const deps = {
+      models,
+      image,
+      prepareImage,
+      ocr: async () => {
+        throw new Error('ocr must not run');
+      },
+      cache,
+    };
+    const first = await attachmentImageText(deps);
+    expect(first.via).toBe('caption');
+    expect(first.attribution).toBe('v/vm');
+    const second = await attachmentImageText(deps);
+    expect(calls).toBe(1);
+    expect(second.text).toBe(first.text);
   });
 });

@@ -547,7 +547,7 @@ describe('coordinator tools', () => {
     async function runAttachment(options: {
       providers?: Provider[];
       ocrRunner?: OcrRunner;
-    }): Promise<{ seenResults: string[] }> {
+    }): Promise<{ seenResults: string[]; rows: { role: string; content: unknown }[] }> {
       const { coordinatorModels, seenResults } = toolThenAnswer(
         'attachment',
         { attachmentId: 'team/screen.png' },
@@ -558,7 +558,12 @@ describe('coordinator tools', () => {
       api.relayTool = async () => pngRelay();
       const gate = createStepGate();
       const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
-        extensions: [coordinatorToolsExtension(api, gate, { ocrRunner: options.ocrRunner })],
+        extensions: [
+          coordinatorToolsExtension(api, gate, {
+            ocrRunner: options.ocrRunner,
+            imageTextCache: new Map(),
+          }),
+        ],
       });
       try {
         await runCoordinatorTurn(
@@ -576,7 +581,7 @@ describe('coordinator tools', () => {
       } finally {
         await harness.close(ctx);
       }
-      return { seenResults };
+      return { seenResults, rows: api.rows.map((r) => r.row) };
     }
 
     function resultText(seenResults: string[]): string {
@@ -645,6 +650,40 @@ describe('coordinator tools', () => {
       expect(text).toContain('screen.png');
       expect(text).toContain('cannot see images');
       expect(text).toContain('ask_user');
+    });
+
+    it('writes a transcript marker naming the vision model that read the image', async () => {
+      const vis = fauxProvider({
+        provider: 'vis',
+        models: [{ id: 'vm', contextWindow: 200_000, input: ['text', 'image'] }],
+      });
+      vis.setResponses([fauxAssistantMessage('a dark panel')]);
+      const { rows } = await runAttachment({ providers: [vis.provider] });
+      const marker = rows.find(
+        (row) => row.role === 'system' && String(row.content).includes('screen.png'),
+      );
+      expect(marker).toBeDefined();
+      expect(String(marker?.content)).toContain('vis/vm');
+      expect(String(marker?.content)).toContain('转录');
+    });
+
+    it('writes a transcript marker naming OCR when tesseract reads the image', async () => {
+      const { rows } = await runAttachment({ ocrRunner: async () => 'OCR-RESULT' });
+      const marker = rows.find(
+        (row) => row.role === 'system' && String(row.content).includes('screen.png'),
+      );
+      expect(marker).toBeDefined();
+      expect(String(marker?.content)).toContain('OCR');
+      expect(String(marker?.content)).toContain('tesseract');
+    });
+
+    it('writes a transcript marker when nothing could read the image', async () => {
+      const { rows } = await runAttachment({ ocrRunner: async () => undefined });
+      const marker = rows.find(
+        (row) => row.role === 'system' && String(row.content).includes('screen.png'),
+      );
+      expect(marker).toBeDefined();
+      expect(String(marker?.content)).toContain('未能读取');
     });
   });
 });

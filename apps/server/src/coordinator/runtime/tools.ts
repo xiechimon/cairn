@@ -14,7 +14,12 @@ import {
 } from '@earendil-works/pi-durable';
 import { coordinatorToolDefs } from '../../services/coordinator-tool-defs.js';
 import { createCutOffRecovery } from './cut-off-recovery.js';
-import { attachmentImageText, type OcrRunner } from './image-text.js';
+import {
+  type AttachmentImageTextResult,
+  attachmentImageText,
+  type ImageTextCacheEntry,
+  type OcrRunner,
+} from './image-text.js';
 import { boundCoordinatorImages, prepareCoordinatorImage } from './images.js';
 import type { MachineApi } from './machine-api.js';
 
@@ -30,7 +35,24 @@ export const COORDINATOR_CUT_OFF_MESSAGE =
 
 export const COORDINATOR_TOOL_OUTPUT_MAX_BYTES = 32_768;
 
-export type ToolChannel = Pick<MachineApi, 'relayTool' | 'relayComputer' | 'askUser'>;
+export type ToolChannel = Pick<
+  MachineApi,
+  'relayTool' | 'relayComputer' | 'askUser' | 'transcriptRow'
+>;
+
+function imageReadMarker(fileName: string | undefined, read: AttachmentImageTextResult): string {
+  const name = fileName ?? 'attachment';
+  switch (read.via) {
+    case 'caption':
+      return `图片附件 ${name}：当前模型看不到图片，已由视觉模型 ${read.attribution ?? ''} 转录为文字`;
+    case 'ocr':
+      return `图片附件 ${name}：当前模型看不到图片，已由 tesseract OCR 转录为文字`;
+    case 'ocr-empty':
+      return `图片附件 ${name}：当前模型看不到图片，tesseract OCR 未发现文字`;
+    case 'unreadable':
+      return `图片附件 ${name}：当前模型看不到图片，视觉模型与 OCR 均不可用，未能读取`;
+  }
+}
 
 const DESKTOP_TOOL_NAMES: ReadonlySet<string> = new Set(
   COMPUTER_DESKTOP_TOOLS.map((def) => def.name),
@@ -137,6 +159,7 @@ export function coordinatorTool(
   beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>,
   storeId?: () => string | undefined,
   ocrRunner?: OcrRunner,
+  imageTextCache?: Map<string, ImageTextCacheEntry>,
 ): ToolRegistration {
   return defineTool({
     name: def.name,
@@ -206,7 +229,7 @@ export function coordinatorTool(
                 output: [await prepareCoordinatorImage(attachment.content, attachment.mimeType)],
               };
             }
-            const imageText = await attachmentImageText({
+            const read = await attachmentImageText({
               models: api.models,
               image: {
                 fileName: attachment.fileName ?? 'attachment',
@@ -218,8 +241,21 @@ export function coordinatorTool(
               preferProvider: model?.provider,
               ocr: ocrRunner,
               signal: context.abortSignal,
+              ...(imageTextCache === undefined ? {} : { cache: imageTextCache }),
             });
-            return { output: [{ type: 'text', text: imageText }] };
+            const markerId = createHash('sha256')
+              .update(attachment.content)
+              .digest('hex')
+              .slice(0, 10);
+            await channel
+              .transcriptRow(stepId, {
+                id: `image-read-${stepId}-${markerId}`,
+                role: 'system',
+                content: imageReadMarker(attachment.fileName, read),
+                createdAt: Date.now(),
+              })
+              .catch(() => undefined);
+            return { output: [{ type: 'text', text: read.text }] };
           }
         }
         return { output: [{ type: 'text', text }] };
@@ -245,6 +281,7 @@ export function coordinatorToolsExtension(
     beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>;
     storeId?: () => string | undefined;
     ocrRunner?: OcrRunner;
+    imageTextCache?: Map<string, ImageTextCacheEntry>;
   } = {},
 ) {
   const defs = [...coordinatorToolDefs(options), ...(options.connectorTools ?? [])];
@@ -268,6 +305,7 @@ export function coordinatorToolsExtension(
         options.beforeTool,
         options.storeId,
         options.ocrRunner,
+        options.imageTextCache,
       ),
     ),
   });

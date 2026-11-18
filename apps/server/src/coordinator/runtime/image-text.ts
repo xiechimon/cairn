@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -34,6 +35,20 @@ export interface AttachmentImageInput {
 
 export type OcrRunner = (image: AttachmentImageInput) => Promise<string | undefined>;
 
+export type ImageTextVia = 'caption' | 'ocr' | 'ocr-empty' | 'unreadable';
+
+export interface AttachmentImageTextResult {
+  text: string;
+  via: ImageTextVia;
+  attribution?: string;
+}
+
+export interface ImageTextCacheEntry {
+  via: 'caption' | 'ocr';
+  attribution?: string;
+  tail: string;
+}
+
 export interface AttachmentImageTextDeps {
   models: Pick<Models, 'getModels' | 'completeSimple'>;
   image: AttachmentImageInput;
@@ -41,6 +56,7 @@ export interface AttachmentImageTextDeps {
   preferProvider?: string;
   ocr?: OcrRunner;
   signal?: AbortSignal;
+  cache?: Map<string, ImageTextCacheEntry>;
 }
 
 function attachmentLabel(image: AttachmentImageInput): string {
@@ -153,18 +169,53 @@ async function runOcr(deps: AttachmentImageTextDeps): Promise<string | undefined
   }
 }
 
-export async function attachmentImageText(deps: AttachmentImageTextDeps): Promise<string> {
+const IMAGE_TEXT_CACHE_LIMIT = 128;
+const sharedImageTextCache = new Map<string, ImageTextCacheEntry>();
+
+function imageTextCacheKey(image: AttachmentImageInput): string {
+  return createHash('sha256').update(`${image.mimeType}\0${image.content}`).digest('hex');
+}
+
+function rememberImageText(
+  cache: Map<string, ImageTextCacheEntry>,
+  key: string,
+  entry: ImageTextCacheEntry,
+): void {
+  cache.set(key, entry);
+  const oldest = cache.size > IMAGE_TEXT_CACHE_LIMIT ? cache.keys().next().value : undefined;
+  if (oldest !== undefined) cache.delete(oldest);
+}
+
+export async function attachmentImageText(
+  deps: AttachmentImageTextDeps,
+): Promise<AttachmentImageTextResult> {
   const label = attachmentLabel(deps.image);
+  const cache = deps.cache ?? sharedImageTextCache;
+  const key = imageTextCacheKey(deps.image);
+  const hit = cache.get(key);
+  if (hit !== undefined) {
+    return { text: `${label} — ${hit.tail}`, via: hit.via, attribution: hit.attribution };
+  }
   const caption = await visionCaption(deps);
   if (caption !== undefined) {
-    return `${label} — described by ${caption.by} because this model cannot see images:\n\n${caption.text}`;
+    const tail = `described by ${caption.by} because this model cannot see images:\n\n${caption.text}`;
+    rememberImageText(cache, key, { via: 'caption', attribution: caption.by, tail });
+    return { text: `${label} — ${tail}`, via: 'caption', attribution: caption.by };
   }
   const ocrText = await runOcr(deps);
   if (ocrText !== undefined && ocrText.trim() !== '') {
-    return `${label} — OCR transcript (tesseract; this model cannot see images and no vision-capable model is configured). Raw OCR may lose layout and non-text content:\n\n${ocrText.trim()}`;
+    const tail = `OCR transcript (tesseract; this model cannot see images and no vision-capable model is configured). Raw OCR may lose layout and non-text content:\n\n${ocrText.trim()}`;
+    rememberImageText(cache, key, { via: 'ocr', tail });
+    return { text: `${label} — ${tail}`, via: 'ocr' };
   }
   if (ocrText !== undefined) {
-    return `${label} — OCR (tesseract) found no text. This model cannot see images and no vision-capable model is configured; ask the owner to describe it via ask_user if its content matters.`;
+    return {
+      text: `${label} — OCR (tesseract) found no text. This model cannot see images and no vision-capable model is configured; ask the owner to describe it via ask_user if its content matters.`,
+      via: 'ocr-empty',
+    };
   }
-  return `${label} is an image; this model cannot see images, and neither a vision-capable model nor tesseract OCR is available to read it. Ask the owner for a text description via ask_user.`;
+  return {
+    text: `${label} is an image; this model cannot see images, and neither a vision-capable model nor tesseract OCR is available to read it. Ask the owner for a text description via ask_user.`,
+    via: 'unreadable',
+  };
 }
