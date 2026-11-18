@@ -190,6 +190,10 @@ const INFERRED_ROUTES = [
   'GET /api/todos/{id}/github-issue',
   'POST /api/todos/{id}/github-issue/retry',
   'GET /api/projects/{id}/files',
+  'POST /api/teams/{teamId}/engine-runs/{stepId}/screen',
+  'POST /api/teams/{teamId}/engine-runs/{stepId}/takeover',
+  'PATCH /api/teams/{teamId}/engine-runs/{stepId}/takeover',
+  'DELETE /api/teams/{teamId}/engine-runs/{stepId}/takeover',
 ];
 
 const CORE_ROUTES = [
