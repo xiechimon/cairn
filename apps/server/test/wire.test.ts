@@ -43,6 +43,7 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/devin-subscriptions/{cid}/enable',
   'POST /api/teams/{id}/devin-subscriptions/{cid}/disable',
   'GET /api/teams/{id}/devin-subscriptions/{cid}/steps',
+  'POST /api/teams/{id}/devin-subscriptions/{cid}/upstream-models',
   'POST /api/teams/{id}/presence',
   'DELETE /api/teams/{id}/presence',
   'POST /api/projects',

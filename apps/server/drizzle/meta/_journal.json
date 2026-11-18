@@ -1324,6 +1324,13 @@
       "when": 1794968647916,
       "tag": "0193_next_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 194,
+      "version": "6",
+      "tag": "0194_clever_leper_queen",
+      "breakpoints": true,
+      "when": 1794972330252
     }
   ]
 }

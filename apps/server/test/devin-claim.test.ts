@@ -394,4 +394,83 @@ describe('model sources', () => {
       },
     ]);
   });
+
+  test('the enabled subscription selection leads, machine catalogs append, first-wins dedupe', async () => {
+    const { s } = await world();
+    const subscriptionId = insertDevinSubscription(s);
+    s.db
+      .update(devinSubscriptionTable)
+      .set({
+        models: [
+          { id: 'swe-3', name: 'SWE-3 picked', costTier: 'High cost' },
+          { id: 'gpt-5.5', name: 'GPT-5.5' },
+        ],
+      })
+      .where(eq(devinSubscriptionTable.id, subscriptionId))
+      .run();
+    const machineId = insertMachine(s, {
+      name: 'devin-merged',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        devin: {
+          installed: true,
+          models: [
+            { id: 'gpt-5.5', name: 'GPT-5.5 reported' },
+            { id: 'swe-2-high', name: 'SWE-2' },
+          ],
+        },
+      },
+    });
+    expect(listDevinSources(s.db, s.team.id)).toEqual([
+      {
+        runtime: 'devin',
+        installed: true,
+        hostname: 'devin-merged',
+        machineId,
+        models: [
+          { id: 'swe-3', name: 'SWE-3 picked' },
+          { id: 'gpt-5.5', name: 'GPT-5.5' },
+          { id: 'swe-2-high', name: 'SWE-2' },
+        ],
+      },
+    ]);
+  });
+
+  test('a disabled or expired subscription contributes nothing to the merged list', async () => {
+    const { s } = await world();
+    const disabled = insertDevinSubscription(s, { label: 'Disabled' });
+    const expired = insertDevinSubscription(s, { label: 'Expired' });
+    s.db
+      .update(devinSubscriptionTable)
+      .set({ enabledAt: null, models: [{ id: 'gone', name: 'Gone' }] })
+      .where(eq(devinSubscriptionTable.id, disabled))
+      .run();
+    s.db
+      .update(devinSubscriptionTable)
+      .set({
+        enabledAt: 5,
+        expiresAt: 1,
+        models: [{ id: 'expired-model', name: 'Expired Model' }],
+      })
+      .where(eq(devinSubscriptionTable.id, expired))
+      .run();
+    const machineId = insertMachine(s, {
+      name: 'devin-plain',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        devin: { installed: true, models: [{ id: 'swe-2-high', name: 'SWE-2' }] },
+      },
+    });
+    expect(listDevinSources(s.db, s.team.id)).toEqual([
+      {
+        runtime: 'devin',
+        installed: true,
+        hostname: 'devin-plain',
+        machineId,
+        models: [{ id: 'swe-2-high', name: 'SWE-2' }],
+      },
+    ]);
+  });
 });

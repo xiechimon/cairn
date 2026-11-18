@@ -67,11 +67,12 @@ import { stepIdOfGitKey } from './services/credentials.js';
 import {
   createDevinSubscription,
   deleteDevinSubscription,
+  devinSubscriptionUpstreamModels,
   disableDevinSubscription,
   enableDevinSubscription,
   listDevinSubscriptionSteps,
   listDevinSubscriptions,
-  renameDevinSubscription,
+  updateDevinSubscription,
   verifyDevinSubscriptionConnection,
 } from './services/devin-subscriptions.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
@@ -615,7 +616,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     const body = parseWith(renameDevinSubscriptionSchema, await jsonBody(c), 'body');
-    return c.json(renameDevinSubscription(keysvc, teamId, c.req.param('cid'), body.label));
+    return c.json(updateDevinSubscription(keysvc, teamId, c.req.param('cid'), body));
   });
 
   app.post('/api/teams/:id/devin-subscriptions/:cid/enable', async (c) => {
@@ -644,6 +645,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     return c.json(await verifyDevinSubscriptionConnection(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/devin-subscriptions/:cid/upstream-models', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(await devinSubscriptionUpstreamModels(keysvc, teamId, c.req.param('cid')));
   });
 
   app.get('/api/teams/:id/providers', (c) => {

@@ -18,6 +18,7 @@ import type {
   ComputerImage,
   ComputerState,
   ComputerTool,
+  DevinSubscriptionModel,
   DocumentDiffFile,
   EvidenceStore,
   ImConnectionStatus,
@@ -1509,6 +1510,7 @@ export const devinSubscription = sqliteTable(
     tokenCipher: text('tokenCipher').notNull(),
     expiresAt: epochMs('expiresAt'),
     enabledAt: epochMs('enabledAt'),
+    models: json<DevinSubscriptionModel[]>('models').notNull().default(sql`'[]'`),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [

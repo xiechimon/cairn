@@ -1,6 +1,7 @@
 import { hostname } from 'node:os';
 import {
   DEFAULT_DEVIN_MODELS,
+  type ModelSourceModel,
   type ModelSourcesEnvelope,
   PROVIDER_OAUTH_PRESET_IDS,
   PROVIDER_PRESET_IDS,
@@ -16,6 +17,7 @@ import type { Db } from '../db/client.js';
 import { machine, provider } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { enabledDevinSubscriptionModels } from './devin-subscriptions.js';
 import { getModelLiveness } from './model-liveness.js';
 
 export interface ProviderDeps {
@@ -126,29 +128,30 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
 }
 
 export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
-  return db
+  const machines = db
     .select()
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .orderBy(asc(machine.name))
     .all()
-    .flatMap((row) => {
-      const devin = row.capabilities?.devin;
-      return row.online && devin?.installed === true
-        ? [
-            {
-              runtime: 'devin' as const,
-              installed: true,
-              hostname: row.name,
-              machineId: row.id,
-              models:
-                devin.models !== undefined && devin.models.length > 0
-                  ? [...devin.models]
-                  : [...DEFAULT_DEVIN_MODELS],
-            },
-          ]
-        : [];
-    });
+    .filter((row) => row.online && row.capabilities?.devin?.installed === true);
+  const seen = new Set<string>();
+  const merged = [
+    ...enabledDevinSubscriptionModels({ db }, teamId),
+    ...machines.flatMap((row) => row.capabilities?.devin?.models ?? []),
+  ].filter((model) => {
+    if (model.id === '' || seen.has(model.id)) return false;
+    seen.add(model.id);
+    return true;
+  });
+  const models: ModelSourceModel[] = merged.length > 0 ? merged : [...DEFAULT_DEVIN_MODELS];
+  return machines.map((row) => ({
+    runtime: 'devin' as const,
+    installed: true,
+    hostname: row.name,
+    machineId: row.id,
+    models: models.map((model) => ({ ...model })),
+  }));
 }
 
 export function getModelSources(deps: ProviderDeps, teamId: string): ModelSourcesEnvelope {

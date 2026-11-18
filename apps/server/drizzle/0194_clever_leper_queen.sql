@@ -1,0 +1,1 @@
+ALTER TABLE `devin_subscription` ADD `models` text DEFAULT '[]' NOT NULL;
