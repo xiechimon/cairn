@@ -9,9 +9,9 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { build, gateVerdict, type step, todo } from '../db/schema.js';
 import { isFullSha } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
-import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
+import type { GithubTokenDeps } from './github-connection.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGateReadPort } from './merge-gate-github.js';
@@ -62,7 +62,7 @@ export async function flushVerdictDigests(): Promise<void> {
 }
 
 export function persistGateVerdict(
-  deps: BuildDeps,
+  deps: GithubTokenDeps,
   stepRow: typeof step.$inferSelect,
   facts: { stepFailed: boolean; extracted: boolean; blocked: boolean; report: VerdictReport },
 ): void {

@@ -12,9 +12,9 @@ import { type FetchLike, refreshOAuthAccessToken } from '../lib/github.js';
 import { onGithubOauthBase } from '../lib/github-oauth-base.js';
 import { isAppToken, type UserToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import type { OAuthClientConfig } from '../lib/oauth-client.js';
 import { SecretBoxError } from '../lib/secret-box.js';
 import { refreshGithubDeviceToken } from './github-device-core.js';
-import type { OAuthClientConfig } from './oauth.js';
 
 const REFRESH_SKEW_MS = 60_000;
 

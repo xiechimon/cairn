@@ -9,13 +9,18 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { machine, type StepFallbackRow, type step } from '../db/schema.js';
+import { machine, type routingRule, type StepFallbackRow, type step } from '../db/schema.js';
 import { runtimeGatePasses } from './dispatch-eligibility.js';
 import { getModelLiveness } from './model-liveness.js';
 import { providerHealth } from './provider-health.js';
-import type { RouteProfile } from './routing-rules.js';
 
-type AgentRow = RouteProfile;
+interface AgentRow {
+  teamId: string;
+  machineId: string | null;
+  provider: string | null;
+  modelId: string | null;
+  fallbackModels: (typeof routingRule.$inferSelect)['fallbackModels'];
+}
 type StepRow = typeof step.$inferSelect;
 
 export const FALLBACK_STEP_KINDS: readonly StepKind[] = ['plan', 'build', 'session'];

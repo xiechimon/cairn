@@ -13,6 +13,7 @@ import {
 } from '../lib/github.js';
 import { onGithubOauthBase } from '../lib/github-oauth-base.js';
 import { newRecordId } from '../lib/ids.js';
+import type { OAuthClientConfig } from '../lib/oauth-client.js';
 import { upsertGithubConnection } from './github-connection.js';
 import {
   completeMcpConnectorOAuth,
@@ -49,10 +50,7 @@ export type OAuthStateEntry =
       pending: McpOAuthPending;
     };
 
-export interface OAuthClientConfig {
-  clientId: string;
-  clientSecret: string;
-}
+export type { OAuthClientConfig } from '../lib/oauth-client.js';
 
 export interface OAuthDeps {
   db: Db;
