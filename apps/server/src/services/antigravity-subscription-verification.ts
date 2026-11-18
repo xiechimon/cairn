@@ -10,6 +10,7 @@ import {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MANAGED_ROOT = join(homedir(), '.local', 'share', 'cairn', 'antigravity');
+const GOOGLE_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const FORWARDED_ENV = [
   'HTTPS_PROXY',
   'HTTP_PROXY',
@@ -25,11 +26,8 @@ const FORWARDED_ENV = [
 const AUTH_FAILURE =
   /authentication|401|invalid|expired|login|unauthorized|forbidden|auth method|api key/i;
 
-function childEnv(home: string, token: string | undefined): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
-    HOME: token !== undefined ? home : homedir(),
-    ...(token !== undefined ? { GEMINI_API_KEY: token, GEMINI_HOME: home } : {}),
-  };
+function childEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { HOME: homedir() };
   if (process.env.PATH !== undefined) env.PATH = process.env.PATH;
   for (const name of FORWARDED_ENV) {
     const value = process.env[name];
@@ -111,32 +109,27 @@ function collectLines(buffer: string): { lines: string[]; rest: string } {
   return { lines, rest };
 }
 
-function errorResult(text: string, hostOnly: boolean): AntigravitySubscriptionVerifyResult {
-  if (!AUTH_FAILURE.test(text)) return { ok: false, reason: 'failed' };
-  return hostOnly ? { ok: false, reason: 'missing_local_login' } : { ok: false, reason: 'auth' };
+function errorResult(text: string): AntigravitySubscriptionVerifyResult {
+  return AUTH_FAILURE.test(text)
+    ? { ok: false, reason: 'missing_local_login' }
+    : { ok: false, reason: 'failed' };
 }
 
-function probe(
-  token: string | undefined,
-  home: string,
-  timeoutMs: number,
-): Promise<AntigravitySubscriptionVerifyResult> {
+function probe(home: string, timeoutMs: number): Promise<AntigravitySubscriptionVerifyResult> {
   return new Promise((resolve) => {
-    const hostOnly = token === undefined;
     const bin = resolveAgyBinary();
     const args = basename(bin.command).startsWith('agy')
       ? [...bin.args, '--log-file', join(home, 'probe.log')]
       : bin.args;
     const child = spawn(bin.command, args, {
       cwd: home,
-      env: childEnv(home, token),
+      env: childEnv(),
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
     let settled = false;
     let output = '';
     let buffer = '';
-    let hasApiKeyMethod = false;
     const finish = (result: AntigravitySubscriptionVerifyResult) => {
       if (settled) return;
       settled = true;
@@ -155,7 +148,6 @@ function probe(
     const onMessage = (line: string) => {
       let message: {
         id?: number;
-        result?: { authMethods?: { id?: unknown }[] };
         error?: { code?: number; message?: string };
       };
       try {
@@ -165,45 +157,15 @@ function probe(
       }
       if (message.id === 1) {
         if (message.error !== undefined) {
-          finish(errorResult(message.error.message ?? '', hostOnly));
+          finish(errorResult(message.error.message ?? ''));
           return;
         }
-        const methods = (message.result?.authMethods ?? [])
-          .map((method) => method.id)
-          .filter((id): id is string => typeof id === 'string');
-        hasApiKeyMethod = methods.includes('gemini-api-key');
         write(2, 'session/new', { cwd: home, mcpServers: [] });
         return;
       }
       if (message.id === 2) {
-        if (message.error === undefined) {
-          finish({ ok: true });
-          return;
-        }
-        if (
-          token !== undefined &&
-          hasApiKeyMethod &&
-          AUTH_FAILURE.test(message.error.message ?? '')
-        ) {
-          write(3, 'authenticate', { methodId: 'gemini-api-key', _meta: { api_key: token } });
-          return;
-        }
-        finish(errorResult(message.error.message ?? '', hostOnly));
-        return;
-      }
-      if (message.id === 3) {
-        if (message.error !== undefined) {
-          finish(errorResult(message.error.message ?? '', hostOnly));
-          return;
-        }
-        write(4, 'session/new', { cwd: home, mcpServers: [] });
-        return;
-      }
-      if (message.id === 4) {
         finish(
-          message.error === undefined
-            ? { ok: true }
-            : errorResult(message.error.message ?? '', hostOnly),
+          message.error === undefined ? { ok: true } : errorResult(message.error.message ?? ''),
         );
       }
     };
@@ -226,7 +188,7 @@ function probe(
     });
     child.on('close', (code) => {
       if (settled) return;
-      finish(code === 0 ? { ok: false, reason: 'failed' } : errorResult(output, hostOnly));
+      finish(code === 0 ? { ok: false, reason: 'failed' } : errorResult(output));
     });
     write(1, 'initialize', { protocolVersion: 1, clientCapabilities: {} });
   });
@@ -236,11 +198,22 @@ export async function verifyAntigravitySubscription(
   token: string,
   options: { timeoutMs?: number } = {},
 ): Promise<AntigravitySubscriptionVerifyResult> {
-  const home = await mkdtemp(join(tmpdir(), 'cairn-antigravity-verify-'));
   try {
-    return await probe(token, home, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  } finally {
-    await rm(home, { recursive: true, force: true });
+    const response = await fetch(GOOGLE_MODELS_URL, {
+      headers: { 'x-goog-api-key': token },
+      signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+    });
+    if (response.ok || response.status === 429) return { ok: true };
+    if (response.status === 400 || response.status === 401 || response.status === 403) {
+      return { ok: false, reason: 'auth' };
+    }
+    return { ok: false, reason: 'failed' };
+  } catch (error) {
+    const name = error instanceof Error ? error.name : '';
+    return {
+      ok: false,
+      reason: name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'unavailable',
+    };
   }
 }
 
@@ -249,7 +222,7 @@ export async function verifyAntigravityHostLogin(
 ): Promise<AntigravitySubscriptionVerifyResult> {
   const home = await mkdtemp(join(tmpdir(), 'cairn-antigravity-host-verify-'));
   try {
-    return await probe(undefined, home, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    return await probe(home, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   } finally {
     await rm(home, { recursive: true, force: true });
   }

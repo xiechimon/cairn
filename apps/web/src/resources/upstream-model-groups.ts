@@ -54,3 +54,14 @@ export function groupDevinUpstream(models: UpstreamOption[]): [string, UpstreamO
     ...(fusion.length > 0 ? [['Fusion 组合', fusion] as [string, UpstreamOption[]]] : []),
   ];
 }
+
+export function groupAntigravityUpstream(models: UpstreamOption[]): [string, UpstreamOption[]][] {
+  const byVendor = new Map<string, UpstreamOption[]>();
+  for (const model of models) {
+    const vendor = vendorOf(model);
+    const group = byVendor.get(vendor);
+    if (group === undefined) byVendor.set(vendor, [model]);
+    else group.push(model);
+  }
+  return [...byVendor.entries()].sort(([a], [b]) => a.localeCompare(b));
+}

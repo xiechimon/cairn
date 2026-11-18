@@ -15,7 +15,6 @@ import {
   OpenAIMark,
   PiMark,
 } from '../brand-marks.js';
-import { ListRow } from '../list-card.js';
 import { MachineName } from '../machine-label.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
 import { StatusChip, type StatusTone } from '../ui/status-chip.js';

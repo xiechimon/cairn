@@ -1,6 +1,6 @@
 import { DEFAULT_ANTIGRAVITY_MODELS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   antigravitySubscription,
   build as buildTable,
@@ -232,5 +232,219 @@ describe('antigravity subscriptions REST & model sources', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}`,
     );
     expect(removed.status).toBe(204);
+  });
+});
+
+describe('antigravity token verification via Google API', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test('verifies a token by calling the Google models endpoint with the key header', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const token = `AIzaSyA${'t'.repeat(28)}`;
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'API Key',
+      token,
+    });
+    const sub = (await created.json()) as { id: string };
+    const res = await req(
+      s.app,
+      'POST',
+      `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models');
+    expect(url).not.toContain(token);
+    expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe(token);
+  });
+
+  test('maps Google failures to verify reasons', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 401 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'Bad Key',
+      token: `AIzaSyA${'u'.repeat(28)}`,
+    });
+    const sub = (await created.json()) as { id: string };
+    const res = await req(
+      s.app,
+      'POST',
+      `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: false, reason: 'auth' });
+  });
+
+  test('treats a network failure as unavailable', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('fetch failed');
+      }),
+    );
+    const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'Offline Key',
+      token: `AIzaSyA${'v'.repeat(28)}`,
+    });
+    const sub = (await created.json()) as { id: string };
+    const res = await req(
+      s.app,
+      'POST',
+      `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: false, reason: 'unavailable' });
+  });
+});
+
+describe('antigravity upstream models', () => {
+  test('lists models reported by online runners and dedupes across machines', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    insertMachine(s, {
+      name: 'agy-one',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [
+            { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+            { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+          ],
+        },
+      },
+    });
+    insertMachine(s, {
+      name: 'agy-two',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [
+            { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+            { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+          ],
+        },
+      },
+    });
+    const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'Keyring',
+    });
+    const sub = (await created.json()) as { id: string };
+    const res = await req(
+      s.app,
+      'POST',
+      `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/upstream-models`,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      status: 'ok',
+      models: [
+        { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+        { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+        { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+      ],
+    });
+
+    const rateLimited = await req(
+      s.app,
+      'POST',
+      `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/upstream-models`,
+    );
+    expect(rateLimited.status).toBe(429);
+  });
+
+  test('fails with upstream when no runner reports antigravity models', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    insertMachine(s, {
+      name: 'plain-box',
+      capabilities: { mcpServers: [], skills: [] },
+    });
+    const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'Keyring',
+    });
+    const sub = (await created.json()) as { id: string };
+    const res = await req(
+      s.app,
+      'POST',
+      `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/upstream-models`,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: 'failed', failure: 'upstream', httpStatus: null });
+  });
+
+  test('stores a curated model subset and offers it in model sources', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    insertMachine(s, {
+      name: 'agy-mac',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [
+            { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+            { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+          ],
+        },
+      },
+    });
+    const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'Curated',
+    });
+    const sub = (await created.json()) as { id: string; enabled: boolean };
+    expect(sub.enabled).toBe(true);
+
+    const patched = await req(
+      s.app,
+      'PATCH',
+      `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}`,
+      {
+        models: [
+          { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+          { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+          { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen' },
+        ],
+      },
+    );
+    expect(patched.status).toBe(200);
+    expect(await patched.json()).toMatchObject({
+      models: [
+        { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+        { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen' },
+      ],
+    });
+
+    const sources = getModelSources({ db: s.db, box: s.secretBox }, s.team.id).sources;
+    expect(sources).toContainEqual({
+      runtime: 'antigravity',
+      installed: true,
+      hostname: 'agy-mac',
+      machineId: 'machine-agy-mac',
+      models: [
+        { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', slot: 'builtin' },
+        { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', slot: 'builtin' },
+        { id: 'gemini-4-argon', name: 'Gemini 4 Argon', slot: 'builtin' },
+      ],
+    });
   });
 });

@@ -52,13 +52,14 @@ import {
   svcOf,
 } from './routes-helpers.js';
 import {
+  antigravitySubscriptionUpstreamModels,
   createAntigravitySubscription,
   deleteAntigravitySubscription,
   disableAntigravitySubscription,
   enableAntigravitySubscription,
   listAntigravitySubscriptionSteps,
   listAntigravitySubscriptions,
-  renameAntigravitySubscription,
+  patchAntigravitySubscription,
   verifyAntigravitySubscriptionConnection,
 } from './services/antigravity-subscriptions.js';
 import { createApiKey, listApiKeys } from './services/api-keys.js';
@@ -670,7 +671,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     const body = parseWith(renameAntigravitySubscriptionSchema, await jsonBody(c), 'body');
-    return c.json(renameAntigravitySubscription(keysvc, teamId, c.req.param('cid'), body.label));
+    return c.json(patchAntigravitySubscription(keysvc, teamId, c.req.param('cid'), body));
   });
 
   app.post('/api/teams/:id/antigravity-subscriptions/:cid/enable', async (c) => {
@@ -701,6 +702,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.json(
       await verifyAntigravitySubscriptionConnection(keysvc, teamId, c.req.param('cid')),
     );
+  });
+
+  app.post('/api/teams/:id/antigravity-subscriptions/:cid/upstream-models', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(await antigravitySubscriptionUpstreamModels(keysvc, teamId, c.req.param('cid')));
   });
 
   app.get('/api/teams/:id/providers', (c) => {

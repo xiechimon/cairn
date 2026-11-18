@@ -3,7 +3,9 @@ import type {
   AntigravitySubscriptionListEntry,
   AntigravitySubscriptionVerifyResult,
   CreateAntigravitySubscription,
+  PatchAntigravitySubscription,
   SecretBox,
+  UpstreamModelsResult,
 } from '@cairn/shared';
 import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -33,6 +35,25 @@ type Deps = { db: Db; box: SecretBox };
 type Row = typeof antigravitySubscription.$inferSelect;
 
 const verificationWindows = new WeakMap<Db, Map<string, number>>();
+const upstreamModelsWindows = new WeakMap<Db, Map<string, number>>();
+
+function claimRateWindow(
+  store: WeakMap<Db, Map<string, number>>,
+  db: Db,
+  connectionId: string,
+  action: string,
+): void {
+  const now = nowMs();
+  const windows = store.get(db) ?? new Map<string, number>();
+  for (const [id, retryAt] of windows) {
+    if (retryAt <= now) windows.delete(id);
+  }
+  if (windows.has(connectionId)) {
+    throw new HttpError(429, `Please wait 10 seconds between ${action} for this connection.`);
+  }
+  windows.set(connectionId, now + 10_000);
+  store.set(db, windows);
+}
 
 function toRecord(row: Row): AntigravitySubscription {
   return {
@@ -43,6 +64,7 @@ function toRecord(row: Row): AntigravitySubscription {
     expiresAt: row.expiresAt,
     enabled: row.enabledAt !== null,
     enabledAt: row.enabledAt,
+    models: row.models,
     createdAt: row.createdAt,
   };
 }
@@ -120,23 +142,39 @@ async function verifyRowCredentials(
   );
 }
 
-export function renameAntigravitySubscription(
+export function patchAntigravitySubscription(
   deps: Deps,
   teamId: string,
   id: string,
-  label: string,
+  patch: PatchAntigravitySubscription,
 ): AntigravitySubscription {
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Antigravity subscription connection');
-  if (row.tokenCipher !== null && label.includes(deps.box.open(row.tokenCipher))) {
+  if (row.tokenCipher !== null && patch.label?.includes(deps.box.open(row.tokenCipher))) {
     throw new HttpError(400, 'Connection label must not contain the token');
+  }
+  let models: Row['models'] | undefined;
+  if (patch.models !== undefined) {
+    const seen = new Set<string>();
+    models = patch.models.filter((model) => {
+      if (model.id === '' || seen.has(model.id)) return false;
+      seen.add(model.id);
+      return true;
+    });
   }
   deps.db
     .update(antigravitySubscription)
-    .set({ label })
+    .set({
+      ...(patch.label !== undefined ? { label: patch.label } : {}),
+      ...(models !== undefined ? { models } : {}),
+    })
     .where(and(eq(antigravitySubscription.teamId, teamId), eq(antigravitySubscription.id, id)))
     .run();
-  return toRecord({ ...row, label });
+  return toRecord({
+    ...row,
+    ...(patch.label !== undefined ? { label: patch.label } : {}),
+    ...(models !== undefined ? { models } : {}),
+  });
 }
 
 export async function enableAntigravitySubscription(
@@ -305,6 +343,7 @@ export function createAntigravitySubscription(
     tokenCipher: token !== null ? deps.box.seal(token) : null,
     expiresAt: body.expiresAt ?? null,
     enabledAt: null,
+    models: [],
     createdAt: now,
   };
   return deps.db.transaction((tx) => {
@@ -339,20 +378,42 @@ export async function verifyAntigravitySubscriptionConnection(
     .get();
   if (!row) throw notFound('Antigravity subscription connection');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false };
-  const now = nowMs();
-  const windows = verificationWindows.get(deps.db) ?? new Map<string, number>();
-  for (const [connectionId, retryAt] of windows) {
-    if (retryAt <= now) windows.delete(connectionId);
-  }
-  if (windows.has(row.id)) {
-    throw new HttpError(
-      429,
-      'Please wait 10 seconds between verification attempts for this connection.',
-    );
-  }
-  windows.set(row.id, now + 10_000);
-  verificationWindows.set(deps.db, windows);
+  claimRateWindow(verificationWindows, deps.db, row.id, 'verification attempts');
   return verifyRowCredentials(deps, teamId, row);
+}
+
+export async function antigravitySubscriptionUpstreamModels(
+  deps: Deps,
+  teamId: string,
+  id: string,
+): Promise<UpstreamModelsResult> {
+  const row = subscriptionRow(deps.db, teamId, id);
+  if (!row) throw notFound('Antigravity subscription connection');
+  if (row.expiresAt !== null && row.expiresAt <= nowMs()) {
+    return { status: 'failed', failure: 'auth', httpStatus: null };
+  }
+  claimRateWindow(upstreamModelsWindows, deps.db, row.id, 'model list attempts');
+  const seen = new Set<string>();
+  const models = deps.db
+    .select({ capabilities: machine.capabilities })
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
+    .all()
+    .flatMap((m) =>
+      m.capabilities?.antigravity?.installed === true
+        ? (m.capabilities.antigravity.models ?? [])
+        : [],
+    )
+    .filter((model) => {
+      if (model.id === '' || seen.has(model.id)) return false;
+      seen.add(model.id);
+      return true;
+    })
+    .map((model) => ({ id: model.id, name: model.name }));
+  if (models.length === 0) {
+    return { status: 'failed', failure: 'upstream', httpStatus: null };
+  }
+  return { status: 'ok', models };
 }
 
 export function openAntigravitySubscription(
@@ -385,6 +446,16 @@ export function enabledAntigravitySubscriptionId(
   teamId: string,
 ): string | null {
   return activeSubscriptionRow(deps, teamId)?.id ?? null;
+}
+
+export function enabledAntigravitySubscriptionModels(
+  deps: { db: Pick<Db, 'select'> },
+  teamId: string,
+): { id: string; name: string }[] {
+  return (activeSubscriptionRow(deps, teamId)?.models ?? []).map((model) => ({
+    id: model.id,
+    name: model.name,
+  }));
 }
 
 export function activeAntigravitySubscriptionMode(

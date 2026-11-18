@@ -5,6 +5,7 @@ CREATE TABLE `antigravity_subscription` (
 	`tokenCipher` text,
 	`expiresAt` integer,
 	`enabledAt` integer,
+	`models` text DEFAULT '[]' NOT NULL,
 	`createdAt` integer NOT NULL,
 	FOREIGN KEY (`teamId`) REFERENCES `team`(`id`) ON UPDATE no action ON DELETE cascade
 );

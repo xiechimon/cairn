@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2836799a-e84f-4b9b-b18e-007009a244b0",
+  "id": "3336b277-03a9-4090-9809-217a71f977fb",
   "prevId": "6999e7f2-0696-4aaa-bbed-917f67e00040",
   "tables": {
     "action_journal": {
@@ -569,6 +569,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "models": {
+          "name": "models",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
         },
         "createdAt": {
           "name": "createdAt",
