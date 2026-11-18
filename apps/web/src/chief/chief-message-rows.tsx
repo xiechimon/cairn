@@ -1,9 +1,7 @@
 import { parseReplyQuote, type RunnerOfflineContent, type StepQueueBlocked } from '@cairn/shared';
-import { CircleAlert } from 'lucide-react';
 import { type CSSProperties, Fragment, memo, type ReactNode, useContext, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
-import { turnErrorCopy } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
@@ -14,7 +12,7 @@ import { StatusLine } from '../components/chat/status-line.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { MachineName } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
-import { Marker, MarkerContent, MarkerIcon } from '../components/ui/marker.js';
+import { Marker } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
@@ -50,6 +48,7 @@ import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
 import type { ChannelMirror, ThreadActivity } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
+import { TurnFailureLine } from './turn-failure.js';
 
 const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
 
@@ -102,10 +101,6 @@ const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
-const MARKER_ERROR_CLS = 'my-3 gap-2 text-meta text-(--destructive)';
-const MARKER_RETRY_CLS = 'my-3 items-start gap-2 text-meta';
-const ERROR_ACTION_CLS = 'pointer-coarse:h-11';
-const ON_MAC = typeof navigator !== 'undefined' && /Macintosh/.test(navigator.userAgent);
 const SAID_CLS = `${REPLY_BUBBLE_CLS} min-w-0 font-sans ${CHAT_BODY_CLS} text-(--foreground) [overflow-wrap:anywhere]`;
 
 function CoordinatorSaid({ testId, children }: { testId: string; children: ReactNode }) {
@@ -450,7 +445,6 @@ interface ChiefStreamRowProps {
   onReply?: ((draft: ReplyQuoteDraft) => void) | undefined;
   onWithdraw?: ((messageId: string, text: string) => void) | undefined;
   entering?: boolean;
-  onRetry?: (() => void) | undefined;
   joinsPrev?: boolean;
   joinsNext?: boolean;
   taskRefs?: readonly TaskRef[];
@@ -618,7 +612,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   onReply,
   onWithdraw,
   entering = false,
-  onRetry,
   joinsPrev = false,
   joinsNext = false,
   taskRefs = NO_TASK_REFS,
@@ -635,54 +628,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'channel-mirror') return <ChannelMirrorRow mirror={item} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
     return null;
-  if (item.kind === 'error') {
-    const copy = turnErrorCopy(item.text, ON_MAC);
+  if (item.kind === 'error')
     return (
-      <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-        {onRetry === undefined ? (
-          <Marker role="alert" className={MARKER_ERROR_CLS} title={item.text}>
-            <MarkerIcon>
-              <CircleAlert />
-            </MarkerIcon>
-            <MarkerContent data-testid="chief-turn-error" className="text-content-secondary">
-              {t(copy.title)}
-            </MarkerContent>
-          </Marker>
-        ) : (
-          <Marker role="alert" className={MARKER_RETRY_CLS} title={item.text}>
-            <MarkerIcon className="flex h-lh items-center text-(--destructive)">
-              <CircleAlert />
-            </MarkerIcon>
-            <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <MarkerContent data-testid="chief-turn-error" className="text-(--destructive)">
-                {t(copy.title)}
-              </MarkerContent>
-              <span className="text-pretty break-keep text-content-secondary">{t(copy.hint)}</span>
-              <span className="mt-2 flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={ERROR_ACTION_CLS}
-                  render={<Link to={settingsHref('routing')} />}
-                >
-                  {t(copy.fix)}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={ERROR_ACTION_CLS}
-                  data-testid="chief-turn-retry"
-                  onClick={onRetry}
-                >
-                  {t('重试')}
-                </Button>
-              </span>
-            </span>
-          </Marker>
-        )}
+      <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
+        <TurnFailureLine error={item.error ?? { message: item.text }} />
       </MessageScrollerItem>
     );
-  }
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'cloak-license') return <CloakLicenseCard item={item} />;

@@ -1,129 +1,121 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { mockLive, THREAD } from './chief-home-mock';
 
+const failure = (id: string, createdAt: number, facts: Record<string, unknown>) => ({
+  id,
+  role: 'system',
+  content: JSON.stringify({ kind: 'chief_turn_error', ...facts }),
+  createdAt,
+});
+
+const TIMEOUT = {
+  message: 'Coordinator turn ended: model_error "Request timed out."',
+  providerId: 'prov-wb',
+  provider: 'WorkBuddy',
+  model: 'DeepSeek V4.1 Flash',
+  elapsedMs: 199_000,
+};
+
+async function open(page: Page, messages: unknown[], sent: string[] = []) {
+  await mockLive(page, { threads: [THREAD], messages }, (path, route, json) => {
+    if (path === `/api/conversations/${THREAD.id}/messages` && route.request().method() === 'POST') {
+      sent.push((route.request().postDataJSON() as { content: string }).content);
+      return json({ thread: THREAD }, 201);
+    }
+    return undefined;
+  });
+  await page.goto('/app');
+}
+
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
-});
-
-test('a failed turn says so in a plain sentence, keeps the raw text in a tooltip and retries the last message', async ({
-  page,
-}) => {
-  const sent: string[] = [];
-  await mockLive(
-    page,
-    {
-      threads: [THREAD],
-      messages: [
-        { id: 'm1', role: 'user', content: 'Check the repo', createdAt: 10 },
-        {
-          id: 'm2',
-          role: 'system',
-          content: JSON.stringify({
-            kind: 'chief_turn_error',
-            message: 'chief agent not bound (503) {"code":"E_UNBOUND"}',
-          }),
-          createdAt: 11,
-        },
-      ],
-    },
-    (path, route, json) => {
-      if (path === `/api/conversations/${THREAD.id}/messages` && route.request().method() === 'POST') {
-        sent.push((route.request().postDataJSON() as { content: string }).content);
-        return json({ thread: THREAD }, 201);
-      }
-      return undefined;
-    },
-  );
-  await page.goto('/app');
-  const row = page.getByTestId('chief-turn-error');
-  await expect(row).toHaveText('This turn did not finish');
-  await expect(page.getByRole('alert').filter({ has: row })).toContainText(
-    'The model provider returned an error this time.',
-  );
-  await expect(page.getByRole('alert').filter({ has: row })).toHaveAttribute('title', /E_UNBOUND/);
-  await expect(page.getByTestId('chief-stream')).not.toContainText('E_UNBOUND');
-  await page.getByTestId('chief-turn-retry').click();
-  await expect.poll(() => sent).toEqual(['Check the repo']);
-});
-
-test('only the latest failed turn offers retry once the owner has sent another message', async ({
-  page,
-}) => {
-  const failure = (id: string, createdAt: number) => ({
-    id,
-    role: 'system',
-    content: JSON.stringify({ kind: 'chief_turn_error', message: 'provider timeout' }),
-    createdAt,
-  });
-  await mockLive(page, {
-    threads: [THREAD],
-    messages: [
-      { id: 'm1', role: 'user', content: 'Check the repo', createdAt: 10 },
-      failure('m2', 11),
-      { id: 'm3', role: 'user', content: 'Open the pull request', createdAt: 12 },
-      failure('m4', 13),
-    ],
-  });
-  await page.goto('/app');
-  await expect(page.getByTestId('chief-turn-error')).toHaveCount(2);
-  const alerts = page.getByRole('alert').filter({ has: page.getByTestId('chief-turn-error') });
-  await expect(alerts.first().getByTestId('chief-turn-retry')).toHaveCount(0);
-  await expect(alerts.last().getByTestId('chief-turn-retry')).toBeVisible();
-});
-
-test('a turn that could not reach the model says why in plain words, links to providers and retries the message', async ({
-  page,
-}) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'zh'));
+});
+
+test('every failure is the same grey line in the conversation, and only the latest gets the card', async ({
+  page,
+}) => {
   const sent: string[] = [];
-  await mockLive(
+  await open(
     page,
-    {
-      threads: [THREAD],
-      messages: [
-        {
-          id: 'm0',
-          role: 'system',
-          content: JSON.stringify({
-            kind: 'chief_turn_error',
-            message: 'Coordinator turn ended: model_error "Connection error."',
-          }),
-          createdAt: 9,
-        },
-        { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
-        {
-          id: 'm2',
-          role: 'system',
-          content: JSON.stringify({
-            kind: 'chief_turn_error',
-            message: 'Coordinator turn ended: model_error "Connection error."',
-          }),
-          createdAt: 11,
-        },
-      ],
-    },
-    (path, route, json) => {
-      if (path === `/api/conversations/${THREAD.id}/messages` && route.request().method() === 'POST') {
-        sent.push((route.request().postDataJSON() as { content: string }).content);
-        return json({ thread: THREAD }, 201);
-      }
-      return undefined;
-    },
+    [
+      { id: 'm1', role: 'user', content: '帮我测一下中文输入', createdAt: 10 },
+      failure('m2', 11, { message: 'Coordinator turn ended: interrupted "generation, 3 times"' }),
+      { id: 'm3', role: 'user', content: '再试一次', createdAt: 12 },
+      failure('m4', 13, TIMEOUT),
+    ],
+    sent,
   );
-  await page.goto('/app');
-  const alerts = page.getByRole('alert').filter({ has: page.getByTestId('chief-turn-error') });
-  await expect(page.getByTestId('chief-turn-error')).toHaveText(['连不上模型服务', '连不上模型服务']);
-  await expect(alerts.first()).not.toContainText('本地网络');
-  const alert = alerts.last();
-  await expect(alert).toContainText('地址填错了');
-  await expect(alert).not.toContainText('系统设置');
-  await expect(page.getByTestId('chief-stream')).not.toContainText('Connection error.');
-  await expect(alert.getByRole('link', { name: '打开模型路由设置' })).toHaveAttribute(
+  const lines = page.getByTestId('chief-turn-error');
+  await expect(lines).toHaveText(['没完成：这一轮被打断了', '没完成：模型太久没有回应']);
+  await expect(page.getByTestId('chief-stream')).not.toContainText('Request timed out');
+  const card = page.getByTestId('chief-turn-error-card');
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText('模型太久没有回应');
+  await expect(card).toContainText('DeepSeek V4.1 Flash（WorkBuddy）3 分钟没有回应');
+  await expect(card.getByRole('link', { name: '换 Coordinator 模型' })).toHaveAttribute(
     'href',
-    /\/app\/settings\/routing/,
+    /\/app\/settings\/routing#route-coordinator/,
   );
-  await alert.getByTestId('chief-turn-retry').click();
-  await expect.poll(() => sent).toEqual(['你好']);
+  await card.getByRole('button', { name: '详情' }).click();
+  await expect(card.getByTestId('chief-turn-error-raw')).toContainText('Request timed out.');
+  await lines.first().click();
+  await expect(page.getByTestId('chief-turn-error-detail')).toContainText('Cairn 在回复途中重启');
+  await card.getByTestId('chief-turn-retry').click();
+  await expect.poll(() => sent).toEqual(['再试一次']);
+});
+
+test('closing the card leaves only the line', async ({ page }) => {
+  await open(page, [
+    { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
+    failure('m2', 11, TIMEOUT),
+  ]);
+  const card = page.getByTestId('chief-turn-error-card');
+  await expect(card).toBeVisible();
+  await page.getByTestId('chief-turn-error-dismiss').click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByTestId('chief-turn-error')).toHaveText('没完成：模型太久没有回应');
+});
+
+test('a failure followed by an owner message has no card', async ({ page }) => {
+  await open(page, [
+    { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
+    failure('m2', 11, TIMEOUT),
+    { id: 'm3', role: 'user', content: '算了', createdAt: 12 },
+  ]);
+  await expect(page.getByTestId('chief-turn-error')).toHaveCount(1);
+  await expect(page.getByTestId('chief-turn-error-card')).toHaveCount(0);
+});
+
+test('a rejected key names the provider and links to that provider', async ({ page }) => {
+  await open(page, [
+    { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
+    failure('m2', 11, {
+      message: 'Coordinator turn ended: model_error "401: {\\"message\\":\\"Invalid API key\\"}"',
+      providerId: 'prov-wb',
+      provider: 'WorkBuddy',
+    }),
+  ]);
+  const card = page.getByTestId('chief-turn-error-card');
+  await expect(card).toContainText('WorkBuddy 不接受这个 API key');
+  await expect(card.getByRole('link', { name: '重新填写 API key' })).toHaveAttribute(
+    'href',
+    /\/app\/settings\/routing\?item=provider:prov-wb/,
+  );
+  await expect(card.getByTestId('chief-turn-retry')).toBeVisible();
+});
+
+test('a missing model offers no retry', async ({ page }) => {
+  await open(page, [
+    { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
+    failure('m2', 11, {
+      message:
+        '404: {"message":"Model \\"glm-5.3\\" is not supported by any configured account in this group","type":"model_not_found"}',
+      model: 'GLM-5.3',
+    }),
+  ]);
+  const card = page.getByTestId('chief-turn-error-card');
+  await expect(card).toContainText('用不了 GLM-5.3 这个模型');
+  await expect(card.getByTestId('chief-turn-retry')).toHaveCount(0);
 });
 
 test.describe('on a Mac', () => {
@@ -133,70 +125,14 @@ test.describe('on a Mac', () => {
   });
 
   test('an unreachable model also names the macOS Local Network setting', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('cairn.locale', 'zh'));
-    await mockLive(page, {
-      threads: [THREAD],
-      messages: [
-        { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
-        {
-          id: 'm2',
-          role: 'system',
-          content: JSON.stringify({
-            kind: 'chief_turn_error',
-            message: 'Coordinator turn ended: model_error "connect EHOSTUNREACH 192.0.2.10:8080"',
-          }),
-          createdAt: 11,
-        },
-      ],
-    });
-    await page.goto('/app');
-    const alert = page.getByRole('alert').filter({ has: page.getByTestId('chief-turn-error') });
-    await expect(alert).toContainText('系统设置 → 隐私与安全性 → 本地网络');
-    await expect(alert.getByTestId('chief-turn-retry')).toBeVisible();
-  });
-});
-
-test('a rejected API key says so and links to the key', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'zh'));
-  await mockLive(page, {
-    threads: [THREAD],
-    messages: [
+    await open(page, [
       { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
-      {
-        id: 'm2',
-        role: 'system',
-        content: JSON.stringify({
-          kind: 'chief_turn_error',
-          message: 'Coordinator turn ended: model_error "401: {\\"message\\":\\"Invalid API key\\"}"',
-        }),
-        createdAt: 11,
-      },
-    ],
+      failure('m2', 11, {
+        message: 'Coordinator turn ended: model_error "connect EHOSTUNREACH 192.0.2.10:8080"',
+      }),
+    ]);
+    const card = page.getByTestId('chief-turn-error-card');
+    await expect(card).toContainText('系统设置 → 隐私与安全性 → 本地网络');
+    await expect(card.getByTestId('chief-turn-retry')).toBeVisible();
   });
-  await page.goto('/app');
-  const alert = page.getByRole('alert').filter({ has: page.getByTestId('chief-turn-error') });
-  await expect(page.getByTestId('chief-turn-error')).toHaveText('模型服务不接受这个 API key');
-  await expect(alert.getByRole('link', { name: '重新填写 API key' })).toBeVisible();
-  await expect(alert.getByTestId('chief-turn-retry')).toBeVisible();
-});
-
-test('a forbidden model request is not reported as a bad API key', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'zh'));
-  await mockLive(page, {
-    threads: [THREAD],
-    messages: [
-      { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
-      {
-        id: 'm2',
-        role: 'system',
-        content: JSON.stringify({
-          kind: 'chief_turn_error',
-          message: 'Coordinator turn ended: model_error "403: model not available in your region"',
-        }),
-        createdAt: 11,
-      },
-    ],
-  });
-  await page.goto('/app');
-  await expect(page.getByTestId('chief-turn-error')).toHaveText('这一轮没有完成');
 });

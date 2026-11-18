@@ -16,6 +16,7 @@ import {
   chiefThread,
   machine as machineTable,
   notification as notificationTable,
+  provider as providerTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
@@ -276,6 +277,24 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
 
   test('done(failed) -> failure reason lands in a chief_message system row, no notification', async () => {
     const w = await setupChiefWorld();
+    w.s.db
+      .insert(providerTable)
+      .values({
+        id: 'prov-m4a',
+        teamId: w.teamId,
+        kind: 'custom',
+        providerId: 'stub-gw',
+        label: 'Stub Gateway',
+        baseUrl: 'http://127.0.0.1:9/v1',
+        api: 'openai-completions',
+        authHeader: true,
+        compat: { supportsDeveloperRole: false },
+        models: [{ id: 'stub-model', name: 'Stub Model' }],
+        createdBy: w.s.user.id,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+      .run();
     const claimed = await w.claim();
     const stepId = claimed.step.id;
     const doneRes = await w.done(stepId, {
@@ -304,6 +323,10 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     expect(JSON.parse(failureRow!.content as string)).toEqual({
       kind: 'chief_turn_error',
       message: '400: {"message":"Model does not support this protocol."}',
+      providerId: 'prov-m4a',
+      provider: 'Stub Gateway',
+      model: 'Stub Model',
+      elapsedMs: expect.any(Number),
     });
   });
 

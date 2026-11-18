@@ -13,6 +13,7 @@ import {
   chiefTurnUsage,
   claudeSubscription,
   coordinatorInput,
+  provider,
   step,
   stepUsage,
   tokenUsage,
@@ -44,6 +45,7 @@ import { injectMemoryDocuments } from './memory.js';
 import { recallMemorySection } from './memory-recall.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContextTraced } from './project-instructions.js';
+import { coordinatorProfile } from './routing-rules.js';
 import { scanLocalSkills } from './skills.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
 
@@ -301,13 +303,51 @@ export function finishCoordinatorTurn(
       id: `chief-err-${stepRow.id}`,
       threadId: stepRow.buildId,
       role: 'system',
-      content: JSON.stringify({ kind: CHIEF_TURN_ERROR_KIND, message: outcome.errorMessage }),
+      content: JSON.stringify({
+        kind: CHIEF_TURN_ERROR_KIND,
+        message: outcome.errorMessage,
+        ...turnErrorFacts(deps, stepRow),
+      }),
       createdAt: nowMs(),
     });
   }
   const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
   if (finished !== undefined) imTurnFinished(finished);
   emitRuntimeStepSpan(deps.db, stepRow.id, process.env, observation);
+}
+
+function turnErrorFacts(deps: MachineDeps, stepRow: StepRow) {
+  const elapsed =
+    stepRow.claimedAt === null ? {} : { elapsedMs: Math.max(0, nowMs() - stepRow.claimedAt) };
+  const teamId = stepTeamId(deps, stepRow);
+  if (teamId === null) return elapsed;
+  const projectId =
+    deps.db
+      .select({ projectId: chiefThread.projectId })
+      .from(chiefThread)
+      .where(eq(chiefThread.id, stepRow.buildId))
+      .get()?.projectId ?? null;
+  const profile = coordinatorProfile(deps.db, teamId, projectId);
+  const ran = stepRow.fallback?.model ?? {
+    provider: profile?.provider ?? null,
+    modelId: profile?.modelId ?? null,
+  };
+  if (ran.provider == null) return elapsed;
+  const row = deps.db
+    .select({ id: provider.id, label: provider.label, models: provider.models })
+    .from(provider)
+    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, ran.provider)))
+    .get();
+  if (row === undefined) return elapsed;
+  const modelId = ran.modelId ?? null;
+  return {
+    ...elapsed,
+    providerId: row.id,
+    provider: row.label,
+    ...(modelId === null
+      ? {}
+      : { model: row.models.find((m) => m.id === modelId)?.name || modelId }),
+  };
 }
 
 export function recordStepUsage(

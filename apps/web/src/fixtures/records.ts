@@ -1,6 +1,7 @@
 import {
   type AgentTodoItem,
   type ChiefReportContent,
+  type ChiefTurnErrorContent,
   type ClaudeLogin,
   type ConfinementCause,
   type ConfinementReport,
@@ -593,7 +594,13 @@ export type ChiefStreamItem =
   | (ThreadReportContent & { id: string; projectId?: string | null })
   | (ThreadMessageContent & { id: string; projectId?: string | null })
   | { kind: 'note'; text: string; machineName?: string }
-  | { kind: 'error'; text: string; createdAt?: number }
+  | {
+      kind: 'error';
+      text: string;
+      error?: Omit<ChiefTurnErrorContent, 'kind'>;
+      id?: string;
+      createdAt?: number;
+    }
   | { kind: 'handoff'; todoId: string; id?: string }
   | { kind: 'report-ack'; id: string; todoId: string; buildId: string }
   | {

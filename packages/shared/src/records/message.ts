@@ -78,6 +78,10 @@ export const CHIEF_TURN_ERROR_KIND = 'chief_turn_error';
 export const chiefTurnErrorContentSchema = z.object({
   kind: z.literal(CHIEF_TURN_ERROR_KIND),
   message: z.string(),
+  providerId: z.string().optional(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+  elapsedMs: z.number().nonnegative().optional(),
 });
 export type ChiefTurnErrorContent = z.infer<typeof chiefTurnErrorContentSchema>;
 

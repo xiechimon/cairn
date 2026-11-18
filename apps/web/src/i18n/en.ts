@@ -1483,17 +1483,64 @@ export const EN: Record<string, string> = {
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
   这一轮没有完成: 'This turn did not finish',
-  连不上模型服务: "Can't reach the model provider",
   '可能是地址填错了、网络或代理不通，或者本地模型没有开。':
     "The address may be wrong, the network or proxy may be blocking it, or the local model isn't running.",
   '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。':
     "The address may be wrong, the network or proxy may be blocking it, or the local model isn't running. If the model is on this Mac or your local network, also turn on Cairn in System Settings → Privacy & Security → Local Network.",
+  'Cairn 连不上 {provider}。可能是地址填错了、网络或代理不通，或者本地模型没有开。':
+    "Cairn can't reach {provider}. The address may be wrong, the network or proxy may be blocking it, or the local model isn't running.",
+  'Cairn 连不上 {provider}。可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。':
+    "Cairn can't reach {provider}. The address may be wrong, the network or proxy may be blocking it, or the local model isn't running. If the model is on this Mac or your local network, also turn on Cairn in System Settings → Privacy & Security → Local Network.",
+  '{model}（{provider}）{minutes} 分钟没有回应，这一轮停下了。多半是服务商那边慢，重试一般就好；经常这样的话，给 Coordinator 换个模型。':
+    "{model} ({provider}) didn't respond for {minutes} min, so this turn stopped. The provider is usually just slow and a retry works. If this keeps happening, switch the Coordinator to another model.",
+  模型太久没有回应: "The model didn't respond in time",
+  '模型 {minutes} 分钟没有回应，这一轮停下了。多半是服务商那边慢，重试一般就好；经常这样的话，给 Coordinator 换个模型。':
+    "The model didn't respond for {minutes} min, so this turn stopped. The provider is usually just slow and a retry works. If this keeps happening, switch the Coordinator to another model.",
+  '模型没有回应，这一轮停下了。多半是服务商那边慢，重试一般就好；经常这样的话，给 Coordinator 换个模型。':
+    "The model didn't respond, so this turn stopped. The provider is usually just slow and a retry works. If this keeps happening, switch the Coordinator to another model.",
+  '{provider} 不接受这个 API key': "{provider} didn't accept this API key",
+  'API key 填错了或已经失效。重新填一个，再重试。':
+    'The API key is wrong or has expired. Enter it again, then retry.',
+  '{provider} 的额度用完了': '{provider} is out of quota',
+  模型额度用完了: 'The model is out of quota',
+  '这个账号的额度已经用完。充值或等额度恢复后再试，或者先给 Coordinator 换个模型。':
+    'This account has used up its quota. Top up or wait for it to reset, or switch the Coordinator to another model for now.',
+  '{provider} 这会儿太忙': '{provider} is busy right now',
+  模型服务这会儿太忙: 'The model provider is busy right now',
+  '服务商暂时接不了这个请求，不是你的设置问题。过几分钟重试；急的话先给 Coordinator 换个模型。':
+    "The provider can't take this request right now; your settings are fine. Retry in a few minutes, or switch the Coordinator to another model if it's urgent.",
+  '用不了 {model} 这个模型': "{model} isn't available",
+  用不了这个模型: "This model isn't available",
+  '服务商下线了这个模型，或者这个账号用不了它。给 Coordinator 换一个能用的模型。':
+    "The provider retired this model or this account can't use it. Switch the Coordinator to a model that works.",
+  '对话太长，模型读不下了': 'The conversation is too long for the model',
+  '这段对话超过了模型能读的长度，自动压缩也没压下来。换一个上下文更长的模型再重试。':
+    "This conversation is longer than the model can read, and compaction couldn't shrink it enough. Switch to a model with a longer context, then retry.",
+  '{provider} 这次出错了': '{provider} returned an error',
+  '服务商返回了错误，这一轮没有完成。稍后重试；经常这样的话，给 Coordinator 换个模型。':
+    "The provider returned an error, so this turn didn't finish. Try again later. If this keeps happening, switch the Coordinator to another model.",
+  'Coordinator 还没有能用的模型': 'The Coordinator has no usable model',
+  'Coordinator 的模型没有选，或者它的服务商已经删掉了。选一个模型后再重试。':
+    'No Coordinator model is chosen, or its provider was removed. Pick a model, then retry.',
+  这一轮被打断了: 'This turn was interrupted',
+  'Cairn 在回复途中重启或断开了，这一轮没跑完。已经做完的操作不会撤回；重试会把刚才的话再发一次。':
+    "Cairn restarted or disconnected mid-reply, so this turn didn't finish. Finished actions stay done; retry sends your last message again.",
+  这一轮的步数用完了: 'This turn ran out of steps',
+  'Coordinator 连着做了很多步还没收尾，先停下了。点「继续」让它接着做。':
+    'The Coordinator took many steps without finishing and paused. Click Continue to let it carry on.',
+  '没能认出具体原因。重试一般就好；一直这样的话，点「详情」看原话。':
+    "The exact cause wasn't recognised. A retry usually works; if it keeps happening, open Details for the original error.",
+  继续: 'Continue',
+  '选 Coordinator 模型': 'Choose Coordinator model',
+  '检查 {provider}': 'Check {provider}',
+  打开模型设置: 'Open model settings',
+  模型服务: 'the model provider',
+  复制原始错误: 'Copy original error',
+  '没完成：{title}': "Didn't finish: {title}",
+  模型服务这次出错了: 'The model provider returned an error',
+  连不上模型服务: "Can't reach the model provider",
   '模型服务不接受这个 API key': "The model provider didn't accept this API key",
-  'API key 填错了或已经失效。': 'The API key is wrong or has expired.',
-  '模型服务这次出错了。稍后重试；一直出错的话，检查模型路由设置。':
-    'The model provider returned an error this time. Try again later; if it keeps failing, check the model routing settings.',
   '重新填写 API key': 'Re-enter the API key',
-  打开模型路由设置: 'Open model routing settings',
   '撤回失败，Coordinator 已经读到这条了。': 'Could not withdraw: the Coordinator already read it.',
   '插话失败，请重试。': 'Could not steer. Try again.',
   '停止失败，请重试。': 'Could not stop. Try again.',
@@ -1581,7 +1628,6 @@ export const EN: Record<string, string> = {
   排队中: 'queued',
   '已交给 Coordinator 安排': 'Handed to the Coordinator',
   'Coordinator 正在安排这个任务...': 'The Coordinator is arranging this task...',
-  'Coordinator 没能安排这个任务：{reason}': 'The Coordinator could not arrange this task: {reason}',
   'Coordinator 没有派发这个任务，原因见上面的回复。点「开始」再试一次。':
     'The Coordinator did not dispatch this task; its reply above says why. Press Start to try again.',
   'Coordinator 没有派发这个任务，也没有说明原因。点「开始」再试一次。':

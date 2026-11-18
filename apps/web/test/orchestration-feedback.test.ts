@@ -81,6 +81,6 @@ test('a queued owner message does not end the running turn', () => {
 test('a failed turn shows its error', () => {
   const error: MessageRow = { id: 'chief-err-s1', role: 'system', createdAt: 160, content: JSON.stringify({ kind: CHIEF_TURN_ERROR_KIND, message: 'The model provider refused the request.' }) };
   const items = mapOrchestrationFeedback(todo, thread, [request('m1', 150), error]);
-  expect(items.at(-1)).toMatchObject({ kind: 'note', text: 'Coordinator 没能安排这个任务：{reason}', vars: { reason: 'The model provider refused the request.' } });
+  expect(items.at(-1)).toMatchObject({ kind: 'note', text: '这一轮没有完成' });
   expect(items).toHaveLength(2);
 });

@@ -4,6 +4,7 @@ import type {
   ChiefGetResponse,
   ChiefPendingMessage,
   ChiefThread,
+  ChiefTurnErrorContent,
   DocumentDiffFile,
   MachineRecord,
   McpServerRecord,
@@ -69,11 +70,13 @@ import {
   systemRowOf,
   TAKEOVER_HANDED_BACK,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  type TurnErrorKind,
   threadMessageContentSchema,
   threadReportContentSchema,
   toolResultText,
   toolResultValue,
   transcriptPromptRowId,
+  turnErrorKind,
   VERIFY_VERDICT_KIND,
   verifyVerdictSchema,
   WORKSPACE_HOOK_ROW_KIND,
@@ -1413,41 +1416,127 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
   return options;
 }
 
-const MODEL_UNREACHABLE_RE =
-  /Connection error|NECP|ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|fetch failed/i;
+export type TurnErrorFacts = Omit<ChiefTurnErrorContent, 'kind'>;
 
-const MODEL_KEY_REJECTED_RE =
-  /\b401\b|(invalid|incorrect).{0,20}api key|unauthorized|authentication_error/i;
+export type TurnFailureAction =
+  | 'retry'
+  | 'continue'
+  | 'swap'
+  | 'pick'
+  | 'provider'
+  | 'key'
+  | 'settings';
 
 export interface TurnErrorCopy {
+  kind: TurnErrorKind;
   title: string;
-  hint: string;
-  fix: string;
+  why: string;
+  vars: Record<string, string>;
+  actions: TurnFailureAction[];
 }
 
-export function turnErrorCopy(turnError: string, onMac: boolean): TurnErrorCopy {
-  if (MODEL_UNREACHABLE_RE.test(turnError))
-    return {
-      title: '连不上模型服务',
-      hint: onMac
-        ? '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。'
-        : '可能是地址填错了、网络或代理不通，或者本地模型没有开。',
-      fix: '打开模型路由设置',
-    };
-  if (MODEL_KEY_REJECTED_RE.test(turnError))
-    return {
-      title: '模型服务不接受这个 API key',
-      hint: 'API key 填错了或已经失效。',
-      fix: '重新填写 API key',
-    };
-  return {
-    title: '这一轮没有完成',
-    hint: '模型服务这次出错了。稍后重试；一直出错的话，检查模型路由设置。',
-    fix: '打开模型路由设置',
+export function turnErrorCopy(error: TurnErrorFacts, onMac: boolean): TurnErrorCopy {
+  const kind = turnErrorKind(error.message);
+  const named = error.provider !== undefined;
+  const vars: Record<string, string> = {
+    provider: error.provider ?? '',
+    model: error.model ?? '',
+    minutes: String(Math.round((error.elapsedMs ?? 0) / 60_000)),
   };
+  const copy = (title: string, why: string, actions: TurnFailureAction[]): TurnErrorCopy => ({
+    kind,
+    title,
+    why,
+    vars,
+    actions,
+  });
+  switch (kind) {
+    case 'timeout':
+      return copy(
+        '模型太久没有回应',
+        (error.elapsedMs ?? 0) < 60_000
+          ? '模型没有回应，这一轮停下了。多半是服务商那边慢，重试一般就好；经常这样的话，给 Coordinator 换个模型。'
+          : named && error.model !== undefined
+            ? '{model}（{provider}）{minutes} 分钟没有回应，这一轮停下了。多半是服务商那边慢，重试一般就好；经常这样的话，给 Coordinator 换个模型。'
+            : '模型 {minutes} 分钟没有回应，这一轮停下了。多半是服务商那边慢，重试一般就好；经常这样的话，给 Coordinator 换个模型。',
+        ['retry', 'swap'],
+      );
+    case 'connect':
+      return copy(
+        '连不上模型服务',
+        named
+          ? onMac
+            ? 'Cairn 连不上 {provider}。可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。'
+            : 'Cairn 连不上 {provider}。可能是地址填错了、网络或代理不通，或者本地模型没有开。'
+          : onMac
+            ? '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。'
+            : '可能是地址填错了、网络或代理不通，或者本地模型没有开。',
+        ['provider', 'retry'],
+      );
+    case 'key':
+      return copy(
+        named ? '{provider} 不接受这个 API key' : '模型服务不接受这个 API key',
+        'API key 填错了或已经失效。重新填一个，再重试。',
+        ['key', 'retry'],
+      );
+    case 'quota':
+      return copy(
+        named ? '{provider} 的额度用完了' : '模型额度用完了',
+        '这个账号的额度已经用完。充值或等额度恢复后再试，或者先给 Coordinator 换个模型。',
+        ['swap', 'retry'],
+      );
+    case 'busy':
+      return copy(
+        named ? '{provider} 这会儿太忙' : '模型服务这会儿太忙',
+        '服务商暂时接不了这个请求，不是你的设置问题。过几分钟重试；急的话先给 Coordinator 换个模型。',
+        ['retry', 'swap'],
+      );
+    case 'model':
+      return copy(
+        error.model !== undefined ? '用不了 {model} 这个模型' : '用不了这个模型',
+        '服务商下线了这个模型，或者这个账号用不了它。给 Coordinator 换一个能用的模型。',
+        ['swap'],
+      );
+    case 'context':
+      return copy(
+        '对话太长，模型读不下了',
+        '这段对话超过了模型能读的长度，自动压缩也没压下来。换一个上下文更长的模型再重试。',
+        ['swap', 'retry'],
+      );
+    case 'provider':
+      return copy(
+        named ? '{provider} 这次出错了' : '模型服务这次出错了',
+        '服务商返回了错误，这一轮没有完成。稍后重试；经常这样的话，给 Coordinator 换个模型。',
+        ['retry', 'swap'],
+      );
+    case 'no-model':
+      return copy(
+        'Coordinator 还没有能用的模型',
+        'Coordinator 的模型没有选，或者它的服务商已经删掉了。选一个模型后再重试。',
+        ['pick', 'retry'],
+      );
+    case 'interrupted':
+      return copy(
+        '这一轮被打断了',
+        'Cairn 在回复途中重启或断开了，这一轮没跑完。已经做完的操作不会撤回；重试会把刚才的话再发一次。',
+        ['retry'],
+      );
+    case 'turn-limit':
+      return copy(
+        '这一轮的步数用完了',
+        'Coordinator 连着做了很多步还没收尾，先停下了。点「继续」让它接着做。',
+        ['continue'],
+      );
+    case 'unknown':
+      return copy(
+        '这一轮没有完成',
+        '没能认出具体原因。重试一般就好；一直这样的话，点「详情」看原话。',
+        ['retry', 'settings'],
+      );
+  }
 }
 
-export function chiefTurnErrorOfContent(content: unknown): string | null {
+export function chiefTurnErrorOfContent(content: unknown): TurnErrorFacts | null {
   if (typeof content !== 'string') return null;
   let parsed: unknown;
   try {
@@ -1463,7 +1552,9 @@ export function chiefTurnErrorOfContent(content: unknown): string | null {
     return null;
   }
   const row = chiefTurnErrorContentSchema.safeParse(parsed);
-  return row.success ? row.data.message : null;
+  if (!row.success) return null;
+  const { kind: _kind, ...facts } = row.data;
+  return facts;
 }
 
 const WATCH_PROVENANCE_PREFIX = 'watch:';
@@ -1684,7 +1775,7 @@ function collectChiefStream(
     const turnError = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (turnError !== null) {
       pendingTools = [];
-      items.push({ kind: 'error', text: turnError });
+      items.push({ kind: 'error', text: turnError.message, error: turnError, id: m.id });
       continue;
     }
     if (m.role === 'system') {
@@ -2045,12 +2136,8 @@ export function mapOrchestrationFeedback(
   for (const m of turn) {
     const error = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (error !== null) {
-      items.push({
-        kind: 'note',
-        text: 'Coordinator 没能安排这个任务：{reason}',
-        vars: { reason: error },
-        id: m.id,
-      });
+      const copy = turnErrorCopy(error, false);
+      items.push({ kind: 'note', text: copy.title, vars: copy.vars, id: m.id });
       return items;
     }
     const text = m.role === 'assistant' ? textOfContent(m.content).trim() : '';

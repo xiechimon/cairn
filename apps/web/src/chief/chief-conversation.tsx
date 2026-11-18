@@ -55,6 +55,7 @@ import { AnswerComposer } from './answer-composer.js';
 import { type BubbleRun, bubbleRuns } from './bubble-runs.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
 import {
+  BANNER_CLS,
   ChiefConnectionBanner,
   ChiefFallbackBanner,
   ChiefOutageBanner,
@@ -85,6 +86,7 @@ import {
   subThreadRowIds,
 } from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
+import { TurnFailureCard } from './turn-failure.js';
 import { VirtualStream } from './virtual-stream.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
@@ -608,6 +610,18 @@ export function ChiefConversation({
     () => (onSend == null || lastUserText === null ? undefined : () => resend(lastUserText)),
     [onSend, lastUserText, resend],
   );
+  const [dismissedFailure, setDismissedFailure] = useState<string | null>(null);
+  const failure = useMemo(() => {
+    if (latestError === undefined || latestError.item.kind !== 'error') return null;
+    if (latestUser != null && latestUser.i > latestError.i) return null;
+    const key = String(latestError.item.id ?? latestError.i);
+    if (key === dismissedFailure) return null;
+    return {
+      key,
+      error: latestError.item.error ?? { message: latestError.item.text },
+      retry: latestUser == null ? onRetryGreeting : retryLastUser,
+    };
+  }, [latestError, latestUser, dismissedFailure, onRetryGreeting, retryLastUser]);
   const clock = useMinuteClock();
   const dayEarlier = day?.earlier ?? 0;
   const [earlierLayout, streamLayout] = useMemo(() => {
@@ -643,13 +657,6 @@ export function ChiefConversation({
       onCopy={copyText}
       onRewindRequest={requestRewind}
       entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
-      onRetry={
-        latestUser != null && i > latestUser.i
-          ? retryLastUser
-          : latestUser == null && i === latestError?.i
-            ? onRetryGreeting
-            : undefined
-      }
       onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
       onWithdraw={onWithdraw != null ? withdrawSteer : undefined}
       joinsPrev={run?.joinsPrev === true}
@@ -792,6 +799,14 @@ export function ChiefConversation({
         <ChiefConnectionBanner />
       ) : chief.outage != null ? (
         <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} />
+      ) : failure !== null ? (
+        <TurnFailureCard
+          key={failure.key}
+          error={failure.error}
+          className={BANNER_CLS}
+          onRetry={failure.retry}
+          onDismiss={() => setDismissedFailure(failure.key)}
+        />
       ) : (
         chief.fallbackModel != null && (
           <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
