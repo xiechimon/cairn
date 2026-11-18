@@ -56,7 +56,9 @@ export function EngineRawView({ run }: { run: EngineRun }) {
           data-testid="engine-raw"
           className="scroll-fade m-0 min-h-0 flex-1 overflow-auto px-5 py-3 font-prose-mono text-code whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere]"
         >
-          <span className="block">{run.rawOutput}</span>
+          <span className="block">
+            {run.rawOutput === '' ? t('引擎还没有输出') : run.rawOutput}
+          </span>
         </pre>
       </div>
     </div>

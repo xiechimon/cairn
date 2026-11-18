@@ -4,7 +4,13 @@ import { formatWorkDuration } from '../detail/work-trace.js';
 import type { DiffFile, TodoRecord, TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { ThreadUsageSummary } from './thread-usage-model.js';
 
-export type EngineRunState = 'running' | 'waiting' | 'finished' | 'failed' | 'taken_over';
+export type EngineRunState =
+  | 'running'
+  | 'waiting'
+  | 'finished'
+  | 'failed'
+  | 'stopped'
+  | 'taken_over';
 export type EngineAnswer = 'allowed' | 'refused';
 
 export interface EnginePlanStep {
@@ -48,6 +54,7 @@ export interface EngineRunView {
   actions?: EngineRunActions;
   controls?: ReactNode;
   phase?: TodoRecord['phase'];
+  eventsInTranscript?: boolean;
 }
 
 export type EngineRunStage = ComponentType<{
@@ -65,7 +72,7 @@ export function engineUsageSummary(
 ): ThreadUsageSummary {
   return {
     ...summary,
-    engines: [run.engine],
+    engines: [...new Set([run.engine, ...summary.engines])],
     duration:
       run.elapsedSeconds === null ? summary.duration : formatWorkDuration(run.elapsedSeconds),
     cost: engineCost(run.costUsd) ?? summary.cost,

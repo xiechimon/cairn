@@ -1275,7 +1275,7 @@ function workCall(
   return { ...base, action: 'tool', target: call.name.replace(/^mcp__/, '').replace(/__/g, ' · ') };
 }
 
-function isJsonPlumbing(text: string): boolean {
+export function isJsonPlumbing(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return false;
   try {

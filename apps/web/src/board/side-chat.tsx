@@ -437,7 +437,9 @@ function ThreadBody({
           <TranscriptColumn
             transcript={[
               ...chat.transcript.filter((item) => item.kind !== 'plan'),
-              ...(engine === undefined ? [] : engineTranscript(engine.run)),
+              ...(engine === undefined || engine.eventsInTranscript === true
+                ? []
+                : engineTranscript(engine.run)),
             ]}
             liveStep={null}
             agent={null}
@@ -592,6 +594,7 @@ export function SideChat({
       />
     );
 
+  const { live } = useLiveData();
   const panelRef = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
     const releaseCovered = (target: EventTarget | null) => {
@@ -634,7 +637,14 @@ export function SideChat({
         Stage !== undefined ? (
           <Stage>{thread}</Stage>
         ) : (
-          thread(chat.engineRun === undefined ? undefined : { run: chat.engineRun })
+          thread(
+            chat.engineRun === undefined
+              ? undefined
+              : {
+                  run: chat.engineRun,
+                  ...(live ? { eventsInTranscript: true } : {}),
+                },
+          )
         )
       ) : (
         <>

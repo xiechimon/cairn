@@ -52,6 +52,7 @@ import { useI18n } from '../i18n/provider.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
 import type { EngineRun, EngineRunStage } from './engine-run.js';
+import { liveEngineRun } from './live-engine-run.js';
 import { deriveThreadChanges, type ThreadChanges } from './thread-changes.js';
 import { useMarkThreadRead } from './use-mark-thread-read.js';
 
@@ -265,6 +266,11 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     [transcript, orchestration],
   );
 
+  const liveRun = useMemo(
+    () => (live ? liveEngineRun({ messages, steps, agentTodo, build: buildQ.data ?? null }) : null),
+    [live, messages, steps, agentTodo, buildQ.data],
+  );
+
   const load: ThreadChatLoad = !live
     ? listed != null
       ? 'ready'
@@ -384,9 +390,11 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       : fixtureDetail?.doc,
     planVersions: live ? mapPlanVersions(plans) : fixtureDetail?.planVersions,
     changes,
-    ...(!live && fixtureDetail?.engineRun !== undefined
-      ? { engineRun: fixtureDetail.engineRun, engineStage: fixtureDetail.engineStage }
-      : {}),
+    ...(live
+      ? { ...(liveRun !== null ? { engineRun: liveRun } : {}) }
+      : fixtureDetail?.engineRun !== undefined
+        ? { engineRun: fixtureDetail.engineRun, engineStage: fixtureDetail.engineStage }
+        : {}),
     retryChanges: () => {
       void changesQ.refetch();
     },
