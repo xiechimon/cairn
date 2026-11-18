@@ -7,6 +7,7 @@ import { registerComputerRoutes } from './routes-computers.js';
 import { registerCoreRoutes } from './routes-core.js';
 import { registerDeployRoutes } from './routes-deploy.js';
 import { registerDraftRoutes } from './routes-drafts.js';
+import { registerEngineScreenRoutes } from './routes-engine-screen.js';
 import { registerGitHostingRoutes } from './routes-git-hosting.js';
 import { githubAppOf } from './routes-helpers.js';
 import { registerImRoutes } from './routes-im.js';
@@ -24,6 +25,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerDeployRoutes(app, ctx);
   registerComputerRoutes(app, ctx);
   registerComputerScreenRoutes(app, ctx);
+  registerEngineScreenRoutes(app, ctx);
   registerProjectRoutes(app, ctx);
   registerTodoRoutes(app, ctx);
   registerBuildRoutes(app, ctx);

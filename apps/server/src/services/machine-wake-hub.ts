@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type {
   ComputerCall,
   ComputerScreenRequest,
+  EngineScreenRequest,
   MachineRepoArchiveCommand,
   MachineStreamEvent,
 } from '@cairn/shared';
@@ -266,6 +267,17 @@ export class MachineWakeHub {
     if (!entry) return false;
     try {
       entry.send({ type: 'computer.screen', channel });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  pushEngineScreen(machineId: string, channel: EngineScreenRequest): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send({ type: 'engine.screen', channel });
       return true;
     } catch {
       return false;
