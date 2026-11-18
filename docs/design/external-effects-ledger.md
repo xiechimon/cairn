@@ -60,3 +60,24 @@ Wired kinds: `im-send` (`unsafe`; also the `PAIRING_REQUESTED`/`PAIRING_APPROVED
 - `github-issue-create` dedupe is `(teamId, todoId, owner, repo)` — a repo move is a new intent; a repeated create attaches and replays the stored `number` receipt. `runSelfIssueCreate` settles an attached `interrupted`/stale `sending` row through the probe before sending, so a crash after GitHub accepted the issue yields `delivered` via the list-issues probe and zero second `POST /issues`; a confirmed miss re-sends exactly once.
 - Startup (`index.ts`) and the scheduler tick run `reconcileEffects` then `drainEffects`, guarded by an `effectsSweeping` flag like the push-alert sweep. Rows whose kind is not yet registered are skipped, never `interrupted` — a lazily registered kind settles on the next tick.
 - Channels that already carry a durable ledger stay on it (single path, no double accounting): `push_delivery`/`sendMustReachAlert`, `client_message` dedupe, `task_issue_close` tombstones + `issueState` convergence, `deliverMailEvent`, `coordinatorInput`/outbox dedupe, `computer_call`, merge write-ahead admission. Migrating any of them onto `external_effect` is a later slice per kind.
+- `runEffectRow` keeps a per-kind consecutive-failure counter (in-memory, like `drainsRunning`); at `EFFECT_KIND_FAILURE_REPORT_AFTER` (3) it writes one `EXTERNAL EFFECT KIND FAILING <kind>` line to stderr and re-arms after the next `delivered`.
+
+## Channel × idempotency key
+
+Every outward side-effect channel reachable from assignment-tree orchestration, and the durable key that dedupes it:
+
+| Channel | Writer path | Idempotency / dedupe key | Ledger |
+|---|---|---|---|
+| IM reply / notice send | `sendToOrigin`, pairing notices in `im/core.ts` | `im-send` digest of `(connId, chatKey, stepId-or-pairing-scope, text, replyTo)` on `external_effect` | `external_effect` (`im-send`, `unsafe`) |
+| GitHub issue create (self) | `runSelfIssueCreate` in `todos.ts` | `github-issue-create:<teamId>:<todoId>:<owner>/<repo>` + `<!-- cairn:todo <id> -->` body marker for the probe | `external_effect` (`github-issue-create`, `probe`) |
+| GitHub issue state sync | `settle` in `task-issue-sync.ts` | `task_issue_close` tombstone + `issueState` convergence re-read | own ledger |
+| Web push / must-reach alert | `sendMustReachAlert` in `push-alerts.ts` | `push_delivery` row id + fallback claim | `push_delivery` |
+| Client request replay | `claimClientMessage` | `client_message` `(conversationId, clientMessageId)` | `client_message` |
+| Steer / queued message | `sendBuildSteer`, `queueTaskMessage`; `clientMessageId` plumbed through `message_todo`, `mcp reply_thread` | `client_message` key when supplied, else `queuedMessage` row | `client_message` / `queuedMessage` |
+| Mail event delivery | `deliverMailEvent` | mail event row + `watching` state machine | own ledger |
+| Coordinator input | coordinator dispatch | `coordinatorInput` outbox dedupe | own ledger |
+| Agent browser/shell writes | `computer_call` daemon protocol | `computer_call` replaySafe flag | `computer_call` |
+| Merge admission | `autonomousMergeAdmission` | write-ahead admission row + reconciler | own ledger |
+| Chief wake | `fireChiefWake` | wake id removed from `chief.wakes` + chief step enqueued in one transaction | `chief.wakes` JSON |
+| IM inbound dedupe | `im_seen_inbound` insert | `(connId, messageId)` unique | `im_seen_inbound` |
+| IM reply addressing | `im_turn_origin` | `(stepId, connId)` unique | `im_turn_origin` |

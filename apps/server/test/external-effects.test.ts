@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { externalEffect } from '../src/db/schema.js';
 import {
   cancelScopeEffects,
@@ -125,6 +125,41 @@ describe('runEffectRow and drainEffects', () => {
     const { row } = recordEffect(s.db, intent(effectDedupeKey('k', 'fail')));
     expect(await runEffectRow(s.db, registry, row.id)).toBe('failed');
     expect(rowById(row.id).state).toBe('failed');
+  });
+
+  test('a kind is reported once after three consecutive failures and re-arms on success', async () => {
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write);
+    try {
+      let up = false;
+      const registry = createEffectRegistry();
+      registry.set('test-kind', {
+        policy: 'unsafe',
+        send: async () => {
+          if (!up) throw retryEffect('down');
+          return { ok: true };
+        },
+      });
+      const failing = (n: number) =>
+        recordEffect(s.db, intent(effectDedupeKey('k', `f${n}`))).row.id;
+      for (let n = 0; n < 2; n += 1) await runEffectRow(s.db, registry, failing(n));
+      expect(writes.filter((w) => w.includes('EXTERNAL EFFECT KIND FAILING'))).toHaveLength(0);
+      await runEffectRow(s.db, registry, failing(2));
+      expect(writes.filter((w) => w.includes('test-kind'))).toHaveLength(1);
+      await runEffectRow(s.db, registry, failing(3));
+      expect(writes.filter((w) => w.includes('test-kind'))).toHaveLength(1);
+      up = true;
+      const { row } = recordEffect(s.db, intent(effectDedupeKey('k', 'ok')));
+      expect(await runEffectRow(s.db, registry, row.id)).toBe('delivered');
+      up = false;
+      for (let n = 4; n < 7; n += 1) await runEffectRow(s.db, registry, failing(n));
+      expect(writes.filter((w) => w.includes('test-kind'))).toHaveLength(2);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

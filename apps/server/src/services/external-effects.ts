@@ -213,15 +213,40 @@ export async function runEffectRow(
   try {
     const receipt = await def.send(claimed);
     markEffectDelivered(db, id, claimed.claimFence ?? now, receipt ?? null);
+    noteEffectHealth(db, claimed.kind, true);
     return 'delivered';
   } catch (err) {
     const next = settleSendError(err, claimed.attempts, nowMs());
     markEffectAttempt(db, id, claimed.claimFence ?? now, next);
+    if (next.countAttempt !== false) noteEffectHealth(db, claimed.kind, false);
     return next.state === 'failed' ? 'failed' : 'pending';
   }
 }
 
 const drainsRunning = new WeakSet<Db>();
+
+export const EFFECT_KIND_FAILURE_REPORT_AFTER = 3;
+
+const kindFailures = new WeakMap<Db, Map<string, number>>();
+
+function noteEffectHealth(db: Db, kind: string, ok: boolean) {
+  let counts = kindFailures.get(db);
+  if (counts === undefined) {
+    counts = new Map();
+    kindFailures.set(db, counts);
+  }
+  if (ok) {
+    counts.delete(kind);
+    return;
+  }
+  const failures = (counts.get(kind) ?? 0) + 1;
+  counts.set(kind, failures);
+  if (failures === EFFECT_KIND_FAILURE_REPORT_AFTER) {
+    process.stderr.write(
+      `EXTERNAL EFFECT KIND FAILING ${kind}: ${failures} consecutive failures\n`,
+    );
+  }
+}
 
 export async function drainEffects(
   db: Db,
@@ -269,6 +294,7 @@ export async function settleEffectRow(
           ),
         )
         .run();
+      noteEffectHealth(db, row.kind, true);
     } else if (verdict.verdict === 'unsent') {
       db.update(externalEffect)
         .set({ state: 'pending', dueAt: now, updatedAt: nowMs() })
