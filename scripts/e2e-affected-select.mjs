@@ -340,6 +340,7 @@ const FULL_PATH_PREFIXES = [
   'apps/web/tsconfig',
   'apps/web/e2e/evidence.ts',
   'apps/web/e2e/png.ts',
+  'scripts/diff-base.mjs',
   'scripts/e2e-affected.mjs',
   'scripts/e2e-affected-select.mjs',
   'scripts/heavy-slots.mjs',

@@ -9,6 +9,7 @@ const selector = 'scripts/e2e-affected.mjs';
 const selectorDeps = [
   'scripts/heavy-slots.mjs',
   'scripts/owned-process.mjs',
+  'scripts/diff-base.mjs',
   'scripts/e2e-affected-select.mjs',
   'scripts/timed-partition.mjs',
 ];
