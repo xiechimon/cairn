@@ -27,7 +27,7 @@ Question (ian, 2026-11-17): cairn has two GitHub auth surfaces — the team `git
 
 - Separation is normal **when the two surfaces need different credential types** (installation token vs user token vs PAT) or different permission boundaries. Cursor, Devin, Linear, Claude Code all fit.
 - Sharing is the direction **when the credential type is the same**: VS Code explicitly built token reuse for its first-party MCP server; Codex/Jules use GitHub's `request_oauth_on_install` to deliver both in one screen.
-- GitHub's remote MCP accepts any valid user credential including `ghu_` GitHub App user tokens (github-mcp-server `pkg/utils/token.go`, host-integration docs) — inferred: a `github_connection` token could serve as the MCP bearer directly; production acceptance still unverified (one stale 403 report predates `ghu_` support; our design doc also flags "need real validation").
+- GitHub's remote MCP accepts `ghu_` GitHub App user tokens — verified live 2026-11-18: a freshly minted cairnwright `ghu_` (device flow, `offline_access`, the same token `github_connection` produces) completed `initialize` + `tools/list` on `api.githubcopilot.com/mcp/` and listed the same 49 tools the connector stores. An earlier "unverified / stale 403" caveat is resolved.
 - cairn is the odd case: two identical-looking device-flow dialogs issuing the same token type on the same App — the duplication is pure UX cost, while revocation is not actually independent.
 
 ## Direction if changed
