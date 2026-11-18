@@ -443,6 +443,7 @@ async function runClaimedStep(
     remoteToolsOnly: claimed.remoteToolsOnly === true,
     telemetry,
     env: stepEnv.env,
+    secrets: () => credentialValues,
   });
 
   const transcript = guardCredentialOutputs(

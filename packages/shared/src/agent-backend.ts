@@ -171,6 +171,7 @@ export interface SessionOpts {
   readOnly?: boolean;
   remoteToolsOnly?: boolean;
   env?: Record<string, string>;
+  secrets?: () => readonly (string | undefined)[];
   telemetry?: StepOtelContext;
   cwd: string;
   prompt?: string;

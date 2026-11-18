@@ -1,5 +1,6 @@
 import type { AgentSessionHandle, CommitIdentity, ProviderConfig } from '@cairn/shared';
 import type { AskChannel } from './ask-channel.js';
+import { enginePtyOf } from './engine/registry.js';
 import { deliverStepOutcome, type StepDeliveryInput } from './step-deliver.js';
 import type { StepGitRunner } from './step-git-tools.js';
 import type { StepPassState } from './step-pass-events.js';
@@ -125,6 +126,7 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     refreshGitToken: input.refreshGitToken,
     transcript,
     session: { sessionId: handle?.sessionId ?? input.continueId, sessionFile: handle?.sessionFile },
+    enginePtyLog: enginePtyOf(handle)?.scrollback() ?? null,
     usage,
     lastError,
     stopped,

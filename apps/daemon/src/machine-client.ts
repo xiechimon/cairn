@@ -138,7 +138,7 @@ export interface MachineApi {
   putUpload(
     url: string,
     headers: Record<string, string>,
-    body: TranscriptUpload | string,
+    body: TranscriptUpload | string | Buffer,
     contentType?: string,
   ): Promise<void>;
   done(stepId: string, body: MachineDoneBody): Promise<void>;
@@ -517,7 +517,7 @@ export class MachineClient implements MachineApi {
   async putUpload(
     url: string,
     headers: Record<string, string>,
-    body: TranscriptUpload | string,
+    body: TranscriptUpload | string | Buffer,
     contentType?: string,
   ): Promise<void> {
     const sameOrigin = new URL(url).origin === new URL(this.opts.serverUrl).origin;
@@ -529,7 +529,7 @@ export class MachineClient implements MachineApi {
         ...headers,
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
-      body: typeof body === 'string' ? body : JSON.stringify(body),
+      body: Buffer.isBuffer(body) ? body : typeof body === 'string' ? body : JSON.stringify(body),
     });
     if (!res.ok) throw new MachineApiError(res.status, await res.text());
     machineOkResponseSchema.parse(await res.json());

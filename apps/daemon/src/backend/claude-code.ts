@@ -120,7 +120,7 @@ function fillRateLimitReading(
   }
 }
 
-function toUsageRows(
+export function toUsageRows(
   msg: {
     modelUsage?: Record<
       string,
@@ -856,7 +856,7 @@ export function sdkTranscriptPath(cwd: string, sessionId: string): string {
   return join(claudeProjectsRoot(), slug, `${sessionId}.jsonl`);
 }
 
-const HOST_MCP_SERVER_NAME = 'cairn';
+export const HOST_MCP_SERVER_NAME = 'cairn';
 const HOST_TOOL_PREFIX = `mcp__${HOST_MCP_SERVER_NAME}__`;
 const HOST_BUILTIN_TOOLS = ['Read', 'Glob', 'Grep'] as const;
 const HOST_ALLOWED_TOOLS = [`mcp__${HOST_MCP_SERVER_NAME}`, ...HOST_BUILTIN_TOOLS] as const;

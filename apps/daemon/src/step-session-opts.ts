@@ -25,6 +25,7 @@ export interface StepSessionOptsInput {
   remoteToolsOnly: boolean;
   telemetry: SessionOpts['telemetry'];
   env: Record<string, string>;
+  secrets?: SessionOpts['secrets'];
 }
 
 export function composeStepSessionOpts(input: StepSessionOptsInput): SessionOpts {
@@ -55,6 +56,7 @@ export function composeStepSessionOpts(input: StepSessionOptsInput): SessionOpts
     ...(isChief || isReview || input.remoteToolsOnly ? { lockedDown: true } : {}),
     ...(input.remoteToolsOnly ? { remoteToolsOnly: true } : {}),
     ...(input.telemetry !== undefined ? { telemetry: input.telemetry } : {}),
+    ...(input.secrets !== undefined ? { secrets: input.secrets } : {}),
     ...(Object.keys(input.env).length > 0 ? { env: input.env } : {}),
   };
 }
