@@ -55,7 +55,7 @@ async function scrollUntilShown(page: Page, text: string) {
     .poll(async () => {
       if ((await row(page, text).count()) === 0) await toTop(page);
       return row(page, text).count();
-    })
+    }, { intervals: [100] })
     .toBe(1);
 }
 
@@ -110,7 +110,7 @@ test('scrolling up shows the loaded rows above before asking for an older page',
         node.scrollTop = Math.max(node.scrollTop - 400, 600);
       });
       return row(page, 'question 200').count();
-    })
+    }, { intervals: [100] })
     .toBe(1);
   await expect(row(page, top)).toHaveCount(0);
   expect(requested).toEqual([null]);

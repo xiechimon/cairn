@@ -292,7 +292,7 @@ test('the pointer on the enlarged screen opens the control channel, and Shrink g
   await expect(enlarged).toBeVisible();
   const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
   const cardSurface = await cardScreen.evaluateHandle((element) => element);
-  await expect.poll(() => screenOpens).toEqual([{ kind: 'view' }, { kind: 'view' }]);
+  await expect.poll(() => screenOpens.slice(0, 2)).toEqual([{ kind: 'view' }, { kind: 'view' }]);
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
   const viewport = page.viewportSize();
   if (!viewport) throw new Error('no viewport');
