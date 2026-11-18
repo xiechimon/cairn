@@ -6,7 +6,7 @@ await admitTestRun();
 export default defineConfig({
   test: {
     fsModuleCache: true,
-    setupFiles: ['./test/tmpdir-cleanup-setup.ts'],
+    setupFiles: ['./test/tmpdir-cleanup-setup.ts', './test/antigravity-offline-setup.ts'],
     testTimeout: 180_000,
     hookTimeout: 120_000,
     fileParallelism: false,
