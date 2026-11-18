@@ -229,3 +229,12 @@ Paths that read or write the quoted messages:
 - Readers (prompt builders, board, claim payload) read `request.segments` as before.
 
 Failure: a replace that fails validation or a routing change writes nothing, as for append.
+
+## Amendment, 2026-11-18: an ambiguous default quote is an error
+
+Owner decision. The default quote of 2026-11-17 once cited an unrelated, already answered question together with the real request.
+
+- `create_todo` without `messageIds` (`defaultQuoteIds`) collects the same candidates as before: unbound owner messages of this thread created after the newest bound message, plus every message of the current turn; transcript prompts and orchestration requests are skipped.
+- Exactly one candidate: it is cited, as before. A turn with no owner message (a wake turn) keeps the 400.
+- More than one candidate: the call returns 400 listing each candidate as id plus its first 80 characters, and asks for `messageIds`. Nothing is written. The 8000 character trim is removed, since it only applied to several candidates.
+- `messageIds`, `quotes` and `sourceTodoId` are unchanged.

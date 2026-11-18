@@ -346,9 +346,9 @@ export function quickLaneRefusal(
   return null;
 }
 
-const MAX_DEFAULT_QUOTE_CHARS = 8000;
+const CANDIDATE_PREVIEW_CHARS = 80;
 
-function ownerMessagesSinceLastTask(db: Db, ctx: RequestCtx): string[] {
+function defaultQuoteIds(db: Db, ctx: RequestCtx): string[] {
   const turn = ctx.turnMessageIds ?? [];
   if (turn.length === 0) return [];
   const boundKeys = new Set(
@@ -378,15 +378,18 @@ function ownerMessagesSinceLastTask(db: Db, ctx: RequestCtx): string[] {
         orchestratedTodoIdOf(row.content) === null &&
         (lastBound === undefined || row.createdAt > lastBound.createdAt)),
   );
-  let size = 0;
-  const kept: string[] = [];
-  for (const row of picked.toReversed()) {
-    size += typeof row.content === 'string' ? row.content.length : 0;
-    if (size > MAX_DEFAULT_QUOTE_CHARS && !turnSet.has(row.id)) break;
-    kept.unshift(row.id);
-  }
   const answered = turn.filter((id) => !rows.some((row) => row.id === id));
-  return [...kept, ...answered];
+  const ids = [...picked.map((row) => row.id), ...answered];
+  if (ids.length <= 1) return ids;
+  const preview = (id: string) => {
+    const content = picked.find((row) => row.id === id)?.content;
+    const text = typeof content === 'string' ? content.replace(/\s+/g, ' ').trim() : '(answer)';
+    return `- ${id}: ${text.slice(0, CANDIDATE_PREVIEW_CHARS)}`;
+  };
+  throw new HttpError(
+    400,
+    `messageIds omitted, but ${ids.length} owner messages since the last task could be this task's request. Nothing was created. Pass messageIds with the ones that state this task's request:\n${ids.map(preview).join('\n')}`,
+  );
 }
 
 export function createRequestTodo(
@@ -397,7 +400,7 @@ export function createRequestTodo(
 ): TodoRecord & { uncovered?: string[] } {
   parseWith(categoryFreeTaskInputSchema, params, 'params');
   const { db } = deps;
-  const messageIds = params.messageIds ?? ownerMessagesSinceLastTask(db, ctx);
+  const messageIds = params.messageIds ?? defaultQuoteIds(db, ctx);
   if (params.sourceTodoId === undefined && messageIds.length === 0) {
     throw new HttpError(400, NO_OWNER_WORDS);
   }
