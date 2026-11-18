@@ -299,6 +299,42 @@ describe('request_cloak_license is offered only with a VM computer', () => {
     expect(teamHasVmComputer(s.db, s.team.id)).toBe(true);
   });
 
+  test('a VM machine without the computer capability or with the desktop grant off has no VM computer', () => {
+    const { s } = boot();
+    s.db
+      .insert(machineTable)
+      .values({
+        id: 'mac-kind-only',
+        teamId: s.team.id,
+        name: 'mac-kind-only',
+        online: true,
+        lastSeenAt: 2,
+        capabilities: { mcpServers: [], skills: [], computerKind: 'vm' },
+      })
+      .run();
+    expect(teamHasVmComputer(s.db, s.team.id)).toBe(false);
+    addVmMachine(s, 'vm');
+    expect(teamHasVmComputer(s.db, s.team.id)).toBe(true);
+    s.db
+      .update(machineTable)
+      .set({ desktopOverride: false })
+      .where(eq(machineTable.id, 'mac-vm'))
+      .run();
+    expect(teamHasVmComputer(s.db, s.team.id)).toBe(false);
+    s.db
+      .update(machineTable)
+      .set({ desktopOverride: null })
+      .where(eq(machineTable.id, 'mac-vm'))
+      .run();
+    expect(teamHasVmComputer(s.db, s.team.id)).toBe(true);
+    s.db
+      .update(machineTable)
+      .set({ desktopOverride: true })
+      .where(eq(machineTable.id, 'mac-vm'))
+      .run();
+    expect(teamHasVmComputer(s.db, s.team.id)).toBe(true);
+  });
+
   test('the prompt sends a missing or rejected key to the card only with a VM computer', () => {
     const { s, deps } = boot();
     const prompt = () => composeChiefSystemPrompt(deps, s.team.id, THREAD);

@@ -14,11 +14,16 @@ import { createSecret, type SecretDeps, updateSecret } from './secrets.js';
 
 export function teamHasVmComputer(db: Db, teamId: string): boolean {
   return db
-    .select({ capabilities: machine.capabilities })
+    .select({ capabilities: machine.capabilities, desktopOverride: machine.desktopOverride })
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .all()
-    .some((row) => row.capabilities?.computerKind === 'vm');
+    .some(
+      (row) =>
+        row.desktopOverride !== false &&
+        row.capabilities?.computer === true &&
+        row.capabilities.computerKind === 'vm',
+    );
 }
 
 function licenseRow(db: Db, teamId: string) {

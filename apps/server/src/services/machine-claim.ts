@@ -55,6 +55,7 @@ import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { teamHasVmComputer } from './cloak-license.js';
 import { connectorToolDefsForTeam } from './connector-broker.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { quickLaneRefusal } from './coordinator-request.js';
@@ -78,6 +79,7 @@ import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { infoCardPlan, infoCardRemoteTools } from './info-card.js';
 import { infoRepoOffered } from './info-repo-snapshot.js';
+import { teamOffersDesktop } from './machine-computer.js';
 import { failEarlierClaimDeliverables } from './machine-deliverables.js';
 import {
   type MachineDeps,
@@ -100,6 +102,7 @@ import { injectMemories } from './memory.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
+import { ownComputerOffered } from './own-computer.js';
 import { projectMergeConfigOf } from './projects.js';
 import {
   coordinatorMemoryOwner,
@@ -384,7 +387,14 @@ function chiefClaimPayload(
         ? []
         : memoryEditTurn
           ? [...WORKER_MEMORY_REMOTE_TOOLS]
-          : [...coordinatorToolDefs(), ...connectorToolDefsForTeam(deps.db, threadRow.teamId)]),
+          : [
+              ...coordinatorToolDefs({
+                desktopTools: teamOffersDesktop(deps.db, threadRow.teamId),
+                vmComputer: teamHasVmComputer(deps.db, threadRow.teamId),
+                ownComputer: ownComputerOffered(deps.db, stepRow.buildId, stepRow.id),
+              }),
+              ...connectorToolDefsForTeam(deps.db, threadRow.teamId),
+            ]),
     ],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(locked ? { remoteToolsOnly: true as const } : {}),
