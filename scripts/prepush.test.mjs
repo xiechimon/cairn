@@ -962,7 +962,7 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
 });
 
 test('a dead configured base falls back to origin/main only under a queue ref', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-queue-'));
+  const directory = makeTestTempDir('cairn-prepush-queue-');
   const work = join(directory, 'work');
   try {
     gitIn(directory, ['init', work]);
@@ -990,7 +990,7 @@ test('a dead configured base falls back to origin/main only under a queue ref', 
     });
     assert.notEqual(ordinary.status, 0);
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    releaseTestTempDir(directory);
   }
 });
 

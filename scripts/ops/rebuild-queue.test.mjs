@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import { planRebuild, queueChain, rebuild } from './rebuild-queue.mjs';
 
 const A = 'a'.repeat(40);
@@ -28,7 +28,7 @@ test('a sha not on the queue is rejected', () => {
 });
 
 function makeRepo() {
-  const dir = mkdtempSync(join(tmpdir(), 'rebuild-queue-test-'));
+  const dir = makeTestTempDir('rebuild-queue-test-');
   const env = {
     ...process.env,
     GIT_AUTHOR_NAME: 't',
@@ -44,7 +44,7 @@ function makeRepo() {
     git(['commit', '-qm', name]);
     return git(['rev-parse', 'HEAD']);
   };
-  return { dir, git, commit, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  return { dir, git, commit, cleanup: () => releaseTestTempDir(dir) };
 }
 
 test('rebuild replays the queue without the dropped sha', (t) => {
