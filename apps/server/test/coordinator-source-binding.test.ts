@@ -33,24 +33,28 @@ describe('Coordinator source bindings', () => {
       outcomes.push(await Promise.allSettled([relay('create_todo', params, turn)]));
     }
     expect(outcomes.flat().map((result) => result.status)).toEqual([
+      'rejected',
       'fulfilled',
-      'rejected',
-      'rejected',
+      'fulfilled',
     ]);
     const rows = H.s.db.select().from(todo).all();
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(2);
     expect(rows.map((row) => row.request?.segments.map((segment) => segment.source))).toEqual([
-      [
-        { kind: 'chat', threadId: H.threadId, messageId: caret, span: 'whole' },
-        { kind: 'chat', threadId: H.threadId, messageId: preview, span: 'whole' },
-      ],
+      [{ kind: 'chat', threadId: H.threadId, messageId: preview, span: 'whole' }],
+      [{ kind: 'chat', threadId: H.threadId, messageId: caret, span: 'whole' }],
     ]);
   });
 
-  test('a task created on a follow-up turn quotes the earlier request too', async () => {
-    message('Summarize 10 AI application developer jobs on BOSS.');
+  test('a follow-up turn with an earlier unbound request lists both and creates nothing until messageIds is passed', async () => {
+    const request = message('Summarize 10 AI application developer jobs on BOSS.');
     const followUp = message('The BOSS window is the private browser.');
-    await relay('create_todo', { projectId: H.projectId }, { turnMessageIds: [followUp] });
+    const turn = { turnMessageIds: [followUp] };
+    await expect(relay('create_todo', { projectId: H.projectId }, turn)).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringContaining(request),
+    });
+    expect(H.s.db.select().from(todo).all()).toHaveLength(0);
+    await relay('create_todo', { projectId: H.projectId, messageIds: [request, followUp] }, turn);
     const rows = H.s.db.select().from(todo).all();
     expect(rows).toHaveLength(1);
     expect(rows[0]?.request?.segments.map((segment) => segment.text)).toEqual([
