@@ -125,9 +125,9 @@ Not in scope: liveness; chief steps and ship-gate merge steps; concurrency-cap, 
 
 ## Coverage record
 
-`run.sh` reads two things below: the `sync-commit` line and the `coverage` code block (each line a two-space-indented path). `sync-commit` was not advanced by the archive and pooled-claim changes, and covered code has drifted since; it has not been re-read against the model in full (see the mismatch list).
+`run.sh` reads two things below: the `sync-commit` line and the `coverage` code block (each line a two-space-indented path). `sync-commit` was not advanced by the archive and pooled-claim changes, and covered code has drifted since; it has not been re-read against the model in full (see the mismatch list). At 7edb3acfc only the steer/stop send-hold-ack surface (`fetchSteer`, `ackSteer`, `fetchStop`, daemon `deliverSteer`/`deliverStop`/reconnect re-fetch) was re-read against the model; earlier drift in other covered files remains unreviewed.
 
-sync-commit: 93b9ce21
+sync-commit: 7edb3acfc
 
 ```coverage
   apps/server/src/services/machines.ts
