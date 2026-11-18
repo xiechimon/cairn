@@ -67,6 +67,7 @@ import {
   stepRuntimeFor,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
+import { interruptedEffectsNote } from './external-effects.js';
 import { projectOfTodo, projectRepoRef } from './git.js';
 import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
@@ -696,7 +697,7 @@ async function tryClaim(
           }
         : undefined;
     publishStepStatus(deps, cand.stepRow.id);
-    const instruction =
+    const guardInstruction =
       guardPr === null
         ? cand.stepRow.prompt
         : cand.stepRow.prompt !== null
@@ -705,6 +706,11 @@ async function tryClaim(
               prUrl: guardPr.prUrl,
             })
           : buildMergedPrGuardInstruction({ prNumber: guardPr.prNumber, prUrl: guardPr.prUrl });
+    const effectNote = interruptedEffectsNote(db, cand.todoRow.id);
+    const instruction =
+      guardInstruction !== null && effectNote !== null
+        ? `${guardInstruction}\n\n${effectNote}`
+        : (guardInstruction ?? effectNote);
     const decided = new Set(cand.todoRow.decisions.map((decision) => decision.requestId));
     const answerIds = receivesAnswers(cand.stepRow.kind)
       ? undeliveredAnswers(db, cand.stepRow.buildId)

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { and, asc, eq, inArray, lte, type SQLWrapper, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lte, or, type SQLWrapper, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { externalEffect } from '../db/schema.js';
+import { build, externalEffect, step } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
 export const EFFECT_CLAIM_STALE_MS = 120_000;
@@ -218,7 +218,8 @@ export async function runEffectRow(
   } catch (err) {
     const next = settleSendError(err, claimed.attempts, nowMs());
     markEffectAttempt(db, id, claimed.claimFence ?? now, next);
-    if (next.countAttempt !== false) noteEffectHealth(db, claimed.kind, false);
+    if (next.state !== 'pending' || next.countAttempt !== false)
+      noteEffectHealth(db, claimed.kind, false);
     return next.state === 'failed' ? 'failed' : 'pending';
   }
 }
@@ -402,6 +403,39 @@ export function effectsForScope(db: Db, scopeKind: EffectScopeKind, scopeId: str
 
 export function effectRow(db: Db, id: string): EffectRow | undefined {
   return db.select().from(externalEffect).where(eq(externalEffect.id, id)).get();
+}
+
+export function interruptedEffectsForTodo(db: Db, todoId: string): EffectRow[] {
+  const stepIds = db
+    .select({ id: step.id })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .where(eq(build.todoId, todoId))
+    .all()
+    .map((r) => r.id);
+  return db
+    .select()
+    .from(externalEffect)
+    .where(
+      and(
+        eq(externalEffect.state, 'interrupted'),
+        stepIds.length === 0
+          ? and(eq(externalEffect.scopeKind, 'todo'), eq(externalEffect.scopeId, todoId))
+          : or(
+              and(eq(externalEffect.scopeKind, 'todo'), eq(externalEffect.scopeId, todoId)),
+              and(eq(externalEffect.scopeKind, 'step'), inArray(externalEffect.scopeId, stepIds)),
+            ),
+      ),
+    )
+    .orderBy(asc(externalEffect.createdAt), asc(externalEffect.id))
+    .all();
+}
+
+export function interruptedEffectsNote(db: Db, todoId: string): string | null {
+  const rows = interruptedEffectsForTodo(db, todoId);
+  if (rows.length === 0) return null;
+  const kinds = [...new Set(rows.map((r) => r.kind))].join(', ');
+  return `External effect notice: ${rows.length} outward action(s) for this task (${kinds}) ended in an unknown state and were not retried. Report the uncertainty to the user instead of resending.`;
 }
 
 export function cancelPendingEffects(db: Db, where: SQLWrapper | undefined): number {

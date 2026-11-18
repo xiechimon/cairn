@@ -1,6 +1,14 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { externalEffect } from '../src/db/schema.js';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
+import {
+  build as buildTable,
+  externalEffect,
+  machine as machineTable,
+  project as projectTable,
+  step as stepTable,
+  todo as todoTable,
+} from '../src/db/schema.js';
 import {
   cancelScopeEffects,
   claimEffect,
@@ -16,7 +24,8 @@ import {
   runEffectRow,
   settleEffectRow,
 } from '../src/services/external-effects.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { claimStep, type MachineDeps } from '../src/services/machines.js';
+import { bootServer, seedSessionRoute, type TestServer } from './helpers.js';
 
 let s: TestServer;
 
@@ -336,5 +345,93 @@ describe('settleEffectRow and cancellation', () => {
     expect(n).toBe(1);
     expect(rowById(a.row.id).state).toBe('cancelled');
     expect(rowById(b.row.id).state).toBe('pending');
+  });
+});
+
+describe('interrupted surfacing', () => {
+  const MACHINE = 'machine-fx';
+
+  const world = (scope: { kind: 'todo' | 'step'; id: string }) => {
+    s.db
+      .insert(machineTable)
+      .values(readyMachine({ id: MACHINE, teamId: s.team.id, name: 'fx', online: true }))
+      .run();
+    seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: MACHINE });
+    s.db.insert(projectTable).values({ id: 'proj-fx', name: 'fx', teamId: s.team.id }).run();
+    s.db
+      .insert(todoTable)
+      .values({
+        id: 'todo-fx',
+        teamId: s.team.id,
+        projectId: 'proj-fx',
+        title: 'fx',
+        phase: 'building',
+        phaseAt: 1,
+        latestBuildId: 'build-fx',
+        seqNum: 1,
+      })
+      .run();
+    s.db
+      .insert(buildTable)
+      .values({
+        id: 'build-fx',
+        todoId: 'todo-fx',
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: 2,
+      })
+      .run();
+    const stepId = scope.kind === 'step' ? scope.id : 'step-fx';
+    s.db
+      .insert(stepTable)
+      .values({
+        id: stepId,
+        buildId: 'build-fx',
+        kind: 'build',
+        status: 'pending',
+        machineId: null,
+        createdAt: 3,
+      })
+      .run();
+    const { row } = recordEffect(s.db, {
+      teamId: s.team.id,
+      scopeKind: scope.kind,
+      scopeId: scope.id,
+      kind: 'im-send',
+      dedupeKey: `fx:${scope.kind}:${scope.id}`,
+      payload: {},
+    });
+    s.db
+      .update(externalEffect)
+      .set({ state: 'interrupted', lastError: 'crash' })
+      .where(eq(externalEffect.id, row.id))
+      .run();
+    const deps: MachineDeps = {
+      ...s.svc,
+      box: s.secretBox,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+    };
+    return deps;
+  };
+
+  test('the next claimed step on the todo carries the interrupted-effects note', async () => {
+    const deps = world({ kind: 'todo', id: 'todo-fx' });
+    const claim = await claimStep(deps, MACHINE, s.team.id, 10, 'http://localhost');
+    expect(claim?.instruction).toContain('External effect notice');
+    expect(claim?.instruction).toContain('im-send');
+  });
+
+  test('a step-scoped interrupted row also surfaces on the todo', async () => {
+    const deps = world({ kind: 'step', id: 'step-fx' });
+    const claim = await claimStep(deps, MACHINE, s.team.id, 10, 'http://localhost');
+    expect(claim?.instruction).toContain('im-send');
+  });
+
+  test('a clean todo produces no note', async () => {
+    const deps = world({ kind: 'todo', id: 'todo-fx' });
+    s.db.update(externalEffect).set({ state: 'delivered' }).run();
+    const claim = await claimStep(deps, MACHINE, s.team.id, 10, 'http://localhost');
+    expect(claim?.instruction ?? '').not.toContain('External effect notice');
   });
 });
