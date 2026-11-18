@@ -6,7 +6,6 @@ import {
   deleteMemoryEntry,
   injectMemories,
   listMemoryEntries,
-  promoteMemoryEntry,
   saveMemoryEntry,
   updateMemoryEntry,
 } from '../src/services/memory.js';
@@ -316,7 +315,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual([]);
   });
 
-  test('promoting the original does not unmask its project-scoped adopted copy', () => {
+  test('deleting the original keeps its adopted copy masked', () => {
     s.db.insert(projectTable).values({ id: 'proj-1', name: 'one', teamId: s.team.id }).run();
     const original = save({
       agentId: 'planner',
@@ -326,17 +325,12 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     });
     insertSessionRule();
     insertAdoptedCopy(original);
-    expect(
-      promoteMemoryEntry(s.db, {
-        memoryId: original.id,
-        agentId: 'builder',
-        teamId: s.team.id,
-      })?.projectId,
-    ).toBeNull();
-    const listed = listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id });
-    expect(listed).toHaveLength(1);
-    expect(listed[0]?.id).toBe(original.id);
-    expect(listed[0]?.projectId).toBeNull();
+    deleteMemoryEntry(s.db, {
+      memoryId: original.id,
+      agentId: 'builder',
+      teamId: s.team.id,
+    });
+    expect(listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id })).toEqual([]);
   });
 
   test('a new rule-owned save is listed even when an invalid original has the same content', () => {

@@ -9,7 +9,6 @@ import {
   listMemoryEntries,
   listStoredMemoryEntries,
   MEMORY_VERSION_RETENTION_MS,
-  promoteMemoryEntry,
   purgeExpiredMemoryVersions,
   updateMemoryEntry,
 } from '../src/services/memory.js';
@@ -130,7 +129,7 @@ test('retention trims fact history inside active documents without losing curren
 
 test.each([
   ['delete', deleteMemoryEntry],
-  ['promote', promoteMemoryEntry],
+  ['update', updateMemoryEntry],
 ] as const)(
   'stale internal document IDs cannot mutate a whole scope (%s)',
   (_operation, mutate) => {
@@ -139,7 +138,9 @@ test.each([
     const document = listStoredMemoryEntries(H.s.db, scope()).find((r) =>
       r.id.startsWith(MEMORY_INDEX_ID_PREFIX),
     )!;
-    expect(() => mutate(H.s.db, { ...scope(), memoryId: document.id })).toThrow('managed');
+    expect(() =>
+      mutate(H.s.db, { ...scope(), memoryId: document.id, content: 'different' }),
+    ).toThrow('managed');
     expect(listMemoryEntries(H.s.db, scope())).toMatchObject([
       { id: 'fact', projectId: H.projectId },
     ]);

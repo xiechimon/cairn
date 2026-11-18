@@ -4,7 +4,7 @@ import {
   IN_PROGRESS_PHASES,
   isActiveStepStatus,
   isChiefConversationId,
-  isChiefDigestThreadId,
+  isChiefSideThreadId,
   orchestrationSourceRef,
 } from '@cairn/shared';
 import { and, asc, desc, eq, exists, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
@@ -105,7 +105,7 @@ function requireThread(db: Db, teamId: string, threadId: string) {
       .from(chiefThread)
       .where(and(eq(chiefThread.id, threadId), eq(chiefThread.teamId, teamId)))
       .get();
-    if (!row || isChiefDigestThreadId(threadId)) throw new HttpError(404, `Thread ${threadId}`);
+    if (!row || isChiefSideThreadId(threadId)) throw new HttpError(404, `Thread ${threadId}`);
     return { kind: 'coordinator' as const, row };
   }
   const row = db
@@ -234,7 +234,7 @@ function searchThreads(
     )
     .orderBy(desc(chiefThread.updatedAt))
     .all()
-    .filter((row) => !isChiefDigestThreadId(row.id))
+    .filter((row) => !isChiefSideThreadId(row.id))
     .map((row) => coordinatorSummary(db, row))
     .filter((row) => input.projectId === undefined || row.projectId === input.projectId)
     .map((row) => ({
@@ -323,7 +323,7 @@ export async function executeThreadMcpTool(
         .where(and(eq(chiefThread.teamId, teamId), eq(chiefThread.userId, deps.user.id)))
         .orderBy(desc(chiefThread.updatedAt))
         .all()
-        .filter((row) => !isChiefDigestThreadId(row.id))
+        .filter((row) => !isChiefSideThreadId(row.id))
         .map((row) => coordinatorSummary(db, row))
         .filter(
           (row) =>

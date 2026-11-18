@@ -281,6 +281,7 @@ export function coordinatorToolsExtension(
     vmComputer?: boolean;
     ownComputer?: boolean;
     connectorTools?: RemoteToolDef[];
+    remoteTools?: readonly RemoteToolDef[];
     shuttingDown?: () => boolean;
     beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>;
     storeId?: () => string | undefined;
@@ -288,7 +289,10 @@ export function coordinatorToolsExtension(
     imageTextCache?: Map<string, ImageTextCacheEntry>;
   } = {},
 ) {
-  const defs = [...coordinatorToolDefs(options), ...(options.connectorTools ?? [])];
+  const defs =
+    options.remoteTools !== undefined
+      ? [...options.remoteTools]
+      : [...coordinatorToolDefs(options), ...(options.connectorTools ?? [])];
   return defineExtension({
     name: 'cairn-coordinator-tools',
     hooks: [

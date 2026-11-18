@@ -116,32 +116,3 @@ test('multiline facts stay lossless through repeated folds and file edits', asyn
     { id: updated.id, title: 'DB：prod\nnotes', content: 'edited\nfile' },
   ]);
 });
-
-test('promotion retains the fact ID referenced by digest and trajectory rows', async () => {
-  const saved = (await saveMemoryEntry(H.s.db, {
-    ...scope(),
-    sourceTodoId: null,
-    sourceBuildId: null,
-    title: 'project',
-    content: 'one\ntwo',
-    projectId: H.projectId,
-  })) as { id: string };
-  await save('team', 'A sibling fact.');
-  foldMemoryIndexes(H.s.db);
-  const file = listStoredMemoryEntries(H.s.db, scope()).find((row) => row.layer === 'searchable')!;
-  const response = await req(
-    H.s.app,
-    'POST',
-    `/api/teams/${H.teamId}/memories/${saved.id}/promote`,
-  );
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({ id: saved.id, projectId: null });
-  expect(facts().find((row) => row.id === saved.id)).toMatchObject({
-    content: 'one\ntwo',
-    projectId: null,
-  });
-  expect(facts()).toHaveLength(2);
-  expect(
-    listStoredMemoryEntries(H.s.db, scope(), true).find((row) => row.id === file.id),
-  ).toMatchObject({ invalidAt: expect.any(Number) });
-});

@@ -24,6 +24,7 @@ import {
   selectSkillsForTask,
   WORKER_ASK_USER_TOOL,
   WORKER_CLOSE_AS_DUPLICATE_TOOL,
+  WORKER_MEMORY_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
   WORKER_THREAD_REPORT_TOOL,
@@ -45,7 +46,6 @@ import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
-import { turnProvenance } from './chief.js';
 import { chiefHistoryFor } from './chief-claim-history.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
@@ -93,6 +93,7 @@ import {
 } from './machine-routing.js';
 import { connectorSlugs } from './mcp-servers.js';
 import { injectMemories } from './memory.js';
+import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf } from './projects.js';
@@ -108,6 +109,7 @@ import { recordStepRoute, routedModelRunsOn } from './step-route.js';
 import { stepNamesTask } from './task-naming.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
+import { turnProvenance } from './turn-provenance.js';
 
 function workerSkillInjection(
   deps: MachineDeps,
@@ -313,7 +315,8 @@ function chiefClaimPayload(
     threadRow.sessionId !== '' &&
     !chiefLastRanOnOtherAccount(deps.db, threadRow.id, stepRow.id, boundSubscriptionId);
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
-  const locked = mailTurn;
+  const memoryEditTurn = memoryEditIdOfPrompt(stepRow.prompt) !== null;
+  const locked = mailTurn || memoryEditTurn;
   const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
   const chiefMcp = machineRow ? stepMcpGrant(deps.db, machineRow, locked) : locked ? [] : undefined;
   return {
@@ -352,7 +355,9 @@ function chiefClaimPayload(
     remoteTools: [
       ...(mailTurn
         ? []
-        : [...coordinatorToolDefs(), ...connectorToolDefsForTeam(deps.db, threadRow.teamId)]),
+        : memoryEditTurn
+          ? [...WORKER_MEMORY_REMOTE_TOOLS]
+          : [...coordinatorToolDefs(), ...connectorToolDefsForTeam(deps.db, threadRow.teamId)]),
     ],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(locked ? { remoteToolsOnly: true as const } : {}),

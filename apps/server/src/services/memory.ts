@@ -1029,56 +1029,6 @@ export function moveProjectMemoriesToTeam(db: Db | MemoryTx, projectId: string):
   });
 }
 
-export function promoteMemoryEntry(
-  db: Db | MemoryTx,
-  input: {
-    memoryId: string;
-    agentId: string;
-    teamId: string;
-    threadId?: string;
-    teamScoped?: boolean;
-  },
-): typeof agentMemory.$inferSelect | null {
-  const indexed = indexedFact(db, input, input.memoryId);
-  if (indexed !== undefined) {
-    if (indexed.row.projectId === null) return indexed.row;
-    return db.transaction((tx) => {
-      const saved = saveMemoryEntry(tx, {
-        ...indexed.row,
-        projectId: null,
-        teamScoped: input.teamScoped,
-      });
-      removeIndexedFact(tx, indexed);
-      foldMemoryIndexes(tx);
-      const promoted = indexedFact(tx, input, saved.id);
-      if (promoted === undefined) throw new HttpError(409, 'promoted memory is missing');
-      replaceMemory(
-        tx,
-        promoted.document,
-        writeIndex(
-          promoted.entries.map((fact) =>
-            fact.id === saved.id ? { ...fact, id: indexed.entry.id } : fact,
-          ),
-        ),
-      );
-      return { ...saved, id: indexed.entry.id };
-    });
-  }
-  const where = and(
-    eq(agentMemory.id, input.memoryId),
-    ownerWhere(input),
-    scratchpadVisible(input.threadId),
-  );
-  const row = db.select().from(agentMemory).where(where).get();
-  if (row === undefined) return null;
-  if (indexRow(row))
-    throw new HttpError(400, 'memory index is managed; promote a fact ID from memories');
-  if (row.projectId === null) return row;
-  const updatedAt = nowMs();
-  db.update(agentMemory).set({ projectId: null, updatedAt }).where(where).run();
-  return { ...row, projectId: null, updatedAt };
-}
-
 export function deleteMemoryEntry(
   db: Db | MemoryTx,
   input: {

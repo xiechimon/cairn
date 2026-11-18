@@ -1,4 +1,4 @@
-import { chiefDigestThreadId } from '@cairn/shared';
+import { chiefDigestThreadId, chiefMemoryThreadId } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, chiefThread } from '../db/schema.js';
@@ -234,6 +234,7 @@ export async function channelMessages(
         eq(chiefThread.chiefId, own.chiefId),
         eq(chiefThread.userId, scope.userId),
         ne(chiefThread.id, chiefDigestThreadId(own.chiefId)),
+        ne(chiefThread.id, chiefMemoryThreadId(own.chiefId)),
         isNull(chiefThread.archivedAt),
         projectId === null ? isNull(chiefThread.projectId) : eq(chiefThread.projectId, projectId),
       ),

@@ -25,6 +25,20 @@ export function chiefDigestThreadId(chiefId: string): string {
   return `${CHIEF_DIGEST_THREAD_ID_PREFIX}${chiefId}`;
 }
 
+export const CHIEF_MEMORY_THREAD_ID_PREFIX = `${CHIEF_THREAD_ID_PREFIX}memory-`;
+
+export function isChiefMemoryThreadId(id: string): boolean {
+  return id.startsWith(CHIEF_MEMORY_THREAD_ID_PREFIX);
+}
+
+export function chiefMemoryThreadId(chiefId: string): string {
+  return `${CHIEF_MEMORY_THREAD_ID_PREFIX}${chiefId}`;
+}
+
+export function isChiefSideThreadId(id: string): boolean {
+  return isChiefDigestThreadId(id) || isChiefMemoryThreadId(id);
+}
+
 export function newChiefThreadId(uuidv7: string): string {
   return `${CHIEF_THREAD_ID_PREFIX}${uuidv7}`;
 }

@@ -57,6 +57,7 @@ import {
 } from './issue-intake.js';
 import { sweepStaleMachines } from './machines.js';
 import { purgeExpiredMemoryVersions } from './memory.js';
+import { sweepAbandonedMemoryEditSteps } from './memory-edit-turns.js';
 import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { handoffUnclaimedOwnershipWake, ownershipHandoffEventId } from './owner.js';
@@ -531,6 +532,7 @@ export function createScheduler(
     }
     releaseBlockedSteps(deps);
     sweepStaleMachines(deps);
+    sweepAbandonedMemoryEditSteps(deps, now);
     sweepAbandonedChiefSteps(deps, now);
     sweepOverlongChiefTurns(deps, now);
     sweepAbandonedBuildSteps(deps, now);

@@ -6,7 +6,7 @@ import {
   stripTurnContext,
   suggestSkillsForMessage,
 } from '@cairn/shared';
-import { and, asc, desc, eq, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, notInArray, notLike, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   chiefThread,
@@ -27,7 +27,6 @@ import {
   notifyChiefTurn,
   parseChiefTrigger,
   recoverGateWake,
-  turnProvenance,
 } from './chief.js';
 import { cancelPendingQuestions } from './chief-questions.js';
 import { QUEUED_HOLD, recordChiefStop, steeredMessageScopes } from './chief-turns.js';
@@ -42,12 +41,14 @@ import {
   upsertChiefRow,
 } from './machine-deps.js';
 import { injectMemoryDocuments } from './memory.js';
+import { settleMemoryEditTurn } from './memory-edit-turns.js';
 import { recallMemorySection } from './memory-recall.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContextTraced } from './project-instructions.js';
 import { coordinatorProfile } from './routing-rules.js';
 import { scanLocalSkills } from './skills.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
+import { turnProvenance } from './turn-provenance.js';
 
 type StepRow = typeof step.$inferSelect;
 type ThreadRow = typeof chiefThread.$inferSelect;
@@ -243,7 +244,14 @@ export function latestChiefMemoryUsage(db: Db, teamId: string) {
     })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
-    .where(and(eq(chiefThread.teamId, teamId), eq(step.kind, 'chief'), isNotNull(step.memoryTrace)))
+    .where(
+      and(
+        eq(chiefThread.teamId, teamId),
+        eq(step.kind, 'chief'),
+        notLike(chiefThread.id, 'chief-memory-%'),
+        isNotNull(step.memoryTrace),
+      ),
+    )
     .orderBy(desc(step.createdAt))
     .limit(1)
     .get();
@@ -294,6 +302,12 @@ export function finishCoordinatorTurn(
     '回合已结束',
   );
   finishChiefTurn(deps, stepRow.buildId, { ...outcome, sessionId: reportedSessionId });
+  settleMemoryEditTurn(
+    db,
+    stepRow,
+    outcome.status === 'success' ? 'success' : outcome.status === 'stopped' ? 'stopped' : 'failed',
+    outcome.errorMessage ?? undefined,
+  );
   if (outcome.status === 'success')
     notifyChiefTurn(
       deps,

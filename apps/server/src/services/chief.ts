@@ -24,11 +24,13 @@ import {
   COORDINATOR_NOT_READY,
   chiefDigestThreadId,
   chiefIdFormat,
+  chiefMemoryThreadId,
   chiefTurnErrorContentSchema,
   conversationBranch,
   fencedTitle,
   ISSUE_FENCE_OPEN,
-  isChiefDigestThreadId,
+  isChiefMemoryThreadId,
+  isChiefSideThreadId,
   isInfoOutput,
   MAIL_FENCE_OPEN,
   mailSharedTranscript,
@@ -56,6 +58,7 @@ import {
   like,
   ne,
   notInArray,
+  notLike,
   sql,
 } from 'drizzle-orm';
 import { rewindWatermark } from '../coordinator/watermark.js';
@@ -110,6 +113,7 @@ import { runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemoryDocuments } from './memory.js';
+import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { notifyChiefMessage } from './notifications.js';
 import { ownershipOf, rescheduleOwnershipHandoff } from './owner.js';
 import { listedProjects } from './personal-space.js';
@@ -134,6 +138,7 @@ import { type LocalSkill, scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo } from './todos.js';
 import { insertMessageRow } from './transcript.js';
+import { turnProvenance, WAKE_PROMPT_PREFIX } from './turn-provenance.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
 export interface ChiefDeps {
@@ -150,8 +155,6 @@ export interface ChiefResourceDeps extends ChiefDeps {
 
 type ChiefRow = typeof chief.$inferSelect;
 type ThreadRow = typeof chiefThread.$inferSelect;
-
-export const WAKE_PROMPT_PREFIX = '[wake:';
 
 export function ensureChief(deps: ChiefDeps, teamId: string): ChiefRow {
   const existing = chiefRowOf(deps, teamId);
@@ -227,6 +230,7 @@ function chiefOrchestration(deps: ChiefDeps, teamId: string): ChiefGetResponse['
       and(
         eq(step.kind, 'chief'),
         eq(chiefThread.teamId, teamId),
+        notLike(chiefThread.id, 'chief-memory-%'),
         inArray(step.status, ['pending', 'claimed']),
       ),
     )
@@ -347,6 +351,7 @@ function existingCoordinatorThread(
       and(
         eq(chiefThread.chiefId, chiefRow.id),
         ne(chiefThread.id, chiefDigestThreadId(chiefRow.id)),
+        ne(chiefThread.id, chiefMemoryThreadId(chiefRow.id)),
         isNull(chiefThread.archivedAt),
         projectId === null ? isNull(chiefThread.projectId) : eq(chiefThread.projectId, projectId),
       ),
@@ -484,7 +489,12 @@ export function retryProjectGreeting(
     (db) => {
       const scoped = { ...deps, db };
       const thread = getChiefThread(scoped, threadId);
-      if (!thread || thread.teamId !== teamId || thread.userId !== deps.user.id)
+      if (
+        !thread ||
+        thread.teamId !== teamId ||
+        thread.userId !== deps.user.id ||
+        isChiefSideThreadId(thread.id)
+      )
         throw new HttpError(404, `chief thread ${threadId}`);
       const failed = retryableGreetingStep(scoped, thread);
       if (failed === undefined || failed.id !== failedStepId)
@@ -595,6 +605,7 @@ export function listChiefThreads(deps: ChiefDeps, teamId: string): ChiefThread[]
       and(
         eq(chiefThread.chiefId, chiefRow.id),
         ne(chiefThread.id, chiefDigestThreadId(chiefRow.id)),
+        ne(chiefThread.id, chiefMemoryThreadId(chiefRow.id)),
         isNull(chiefThread.archivedAt),
       ),
     )
@@ -820,7 +831,7 @@ export function submitChiefMessage(
   let threadRow: ThreadRow;
   if (body.threadId !== null) {
     const found = getChiefThread(deps, body.threadId);
-    if (!found || found.teamId !== teamId || isChiefDigestThreadId(found.id)) {
+    if (!found || found.teamId !== teamId || isChiefSideThreadId(found.id)) {
       throw new HttpError(404, `chief thread ${body.threadId}`);
     }
     requireWritableThread(found);
@@ -929,7 +940,7 @@ export function editChiefMessage(
   body: ChiefMessageEditBody,
 ): { ok: true } {
   const threadRow = getChiefThread(deps, threadId);
-  if (!threadRow || threadRow.teamId !== teamId)
+  if (!threadRow || threadRow.teamId !== teamId || isChiefSideThreadId(threadRow.id))
     throw new HttpError(404, `chief thread ${threadId}`);
   const message = deps.db
     .select()
@@ -1052,12 +1063,6 @@ export function wakeProvenance(wakeId: string): string {
   return `wake:${wakeId}`;
 }
 
-const WAKE_PROVENANCE_RE = /^\[wake:\w+\] provenance=(\S+)\n/;
-
-export function turnProvenance(prompt: string | null): string | null {
-  return WAKE_PROVENANCE_RE.exec(prompt ?? '')?.[1] ?? null;
-}
-
 export function requireTurnProvenance(
   turnPrompt: string | null,
   given: unknown,
@@ -1107,7 +1112,9 @@ export function enqueueChiefStep(
       ownerMessageIds: opts.ownerMessageIds,
       createdAt: nowMs(),
       ...(opts.trigger !== 'user' &&
-      (opts.provenance.startsWith('mail:') || opts.provenance.startsWith('im:'))
+      (opts.provenance.startsWith('mail:') ||
+        opts.provenance.startsWith('im:') ||
+        isChiefMemoryThreadId(threadId))
         ? { freshSession: true }
         : {}),
     })
@@ -1152,7 +1159,7 @@ export function rewindChiefThread(
   body: { messageId: string },
 ): { deletedCount: number; thread: ChiefThread } {
   const threadRow = getChiefThread(deps, threadId);
-  if (!threadRow || threadRow.teamId !== teamId) {
+  if (!threadRow || threadRow.teamId !== teamId || isChiefSideThreadId(threadRow.id)) {
     throw new HttpError(404, `chief thread ${threadId}`);
   }
   requireWritableThread(threadRow);
@@ -2266,7 +2273,7 @@ export function sweepAbandonedChiefSteps(
     .from(step)
     .where(eq(step.kind, 'chief'))
     .all()
-    .filter((r) => r.status === 'claimed');
+    .filter((r) => r.status === 'claimed' && memoryEditIdOfPrompt(r.prompt) === null);
   for (const row of candidates) {
     const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, row.buildId)).get();
     if (!thread) continue;

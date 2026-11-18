@@ -2,7 +2,7 @@ import {
   type ChiefThread,
   confinementDispatchReady,
   isBuildStepKind,
-  isChiefDigestThreadId,
+  isChiefSideThreadId,
   isInfoOutput,
   type MachineQueuedThread,
   MODEL_SOURCE_RUNTIME_LABELS,
@@ -261,11 +261,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     target: QueueTargetStep,
     row: (typeof queue)[number],
   ): StepQueueBlocked | undefined {
-    if (
-      !('todoRow' in row) &&
-      coordinatorInServerEnabled() &&
-      !isChiefDigestThreadId(row.threadId)
-    ) {
+    if (!('todoRow' in row) && coordinatorInServerEnabled() && !isChiefSideThreadId(row.threadId)) {
       const serverRoute = serverRouteOf(row.projectId);
       if (serverRoute !== null) {
         if (!('refusal' in serverRoute)) return undefined;

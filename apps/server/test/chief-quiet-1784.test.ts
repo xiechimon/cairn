@@ -19,10 +19,10 @@ import {
   enqueueChiefStep,
   fireDueChiefWakes,
   setChiefWake,
-  turnProvenance,
   wakeProvenance,
   watchProvenance,
 } from '../src/services/chief.js';
+import { turnProvenance } from '../src/services/turn-provenance.js';
 import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
 

@@ -4,6 +4,7 @@ import {
   type ChiefOutage,
   type ChiefPendingMessage,
   type ChiefTurnStoppedContent,
+  isChiefSideThreadId,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
@@ -25,10 +26,12 @@ import { nowMs } from '../lib/ids.js';
 import { queueCoordinatorInput, STEER_WITHDRAW_HOLD } from './coordinator-inputs.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { settleMemoryEditTurn } from './memory-edit-turns.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContext } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
 import { coordinatorMemoryOwner, coordinatorProfile } from './routing-rules.js';
+import { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -37,7 +40,7 @@ const STEER_SENT_HOLD = 'steer_sent';
 export const STEER_HOLDS = [STEERED_HOLD, STEER_SENT_HOLD, STEER_WITHDRAW_HOLD];
 export const QUEUED_HOLD = 'queued';
 
-export const CHIEF_ABANDONED_STEP_MS = 120_000;
+export { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
 
 export const CHIEF_TURN_MAX_MS = 30 * 60_000;
 
@@ -167,7 +170,8 @@ export function settleChiefActiveRun(db: Db, threadId: string): void {
 
 function requireThread(db: Db, teamId: string, threadId: string) {
   const row = db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
-  if (!row || row.teamId !== teamId) throw new HttpError(404, `chief thread ${threadId}`);
+  if (!row || row.teamId !== teamId || isChiefSideThreadId(row.id))
+    throw new HttpError(404, `chief thread ${threadId}`);
   return row;
 }
 
@@ -647,6 +651,7 @@ function stopClaimedChiefStep(
     .run();
   deps.db.delete(stopPending).where(eq(stopPending.stepId, head.id)).run();
   releaseUnconsumedSteer(deps.db, head);
+  settleMemoryEditTurn(deps.db, head, 'stopped', 'executor lost');
   recordChiefStop(deps, head);
   settleChiefActiveRun(deps.db, threadId);
   const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();

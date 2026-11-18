@@ -5,6 +5,7 @@ import {
   COMPUTER_OBSERVE_TOOLS,
   CONNECTOR_TOOL_PREFIX,
   INSTALL_PACKAGES_TOOL,
+  MEMORY_TOOLS,
   REPORT_ACK_KIND,
   type ReportAckContent,
 } from '@cairn/shared';
@@ -13,7 +14,9 @@ import type { Db } from '../db/client.js';
 import { actionProposal, build, chiefMessage, chiefThread, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
-import { insertChiefMessageOnce, turnProvenance } from './chief.js';
+import { insertChiefMessageOnce } from './chief.js';
+import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
+import { turnProvenance } from './turn-provenance.js';
 
 export interface ReportRef {
   todoId: string;
@@ -137,6 +140,10 @@ export function refuseRestrictedTurnTool(
   if (turnForcesOutboundApproval(db, prompt)) {
     if (mailTurnAllows(name)) return;
     throw new HttpError(403, `mail turn cannot call ${name}`);
+  }
+  if (memoryEditIdOfPrompt(prompt) !== null) {
+    if ((MEMORY_TOOLS as readonly string[]).includes(name)) return;
+    throw new HttpError(403, `memory-edit turn cannot call ${name}`);
   }
   if (!isReportTurn(prompt) || ownerMessageIds.length > 0) return;
   const ref = reportRefOfPrompt(prompt);

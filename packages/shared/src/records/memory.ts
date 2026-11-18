@@ -54,6 +54,68 @@ export const patchMemoryBodySchema = z
   });
 export type PatchMemoryBody = z.infer<typeof patchMemoryBodySchema>;
 
+export const MEMORY_EDIT_STATUSES = [
+  'working',
+  'awaiting_input',
+  'done',
+  'failed',
+  'stopped',
+  'partial',
+] as const;
+export type MemoryEditStatus = (typeof MEMORY_EDIT_STATUSES)[number];
+
+export const memoryEditBodySchema = z
+  .object({
+    text: z.string().min(1).max(8192),
+    file: z
+      .string()
+      .min(1)
+      .max(1024)
+      .regex(/^[^\r\n\0]+$/)
+      .optional(),
+    projectId: z.string().min(1).nullable().optional(),
+    editId: z.string().min(1).optional(),
+    attempt: z.number().int().positive().safe().optional(),
+  })
+  .strict();
+export type MemoryEditBody = z.infer<typeof memoryEditBodySchema>;
+
+export const memoryEditStopBodySchema = z
+  .object({ attempt: z.number().int().positive().safe().optional() })
+  .strict();
+export type MemoryEditStopBody = z.infer<typeof memoryEditStopBodySchema>;
+
+export const memoryEditReceiptRecordSchema = z.object({
+  id: recordId,
+  editId: recordId,
+  callId: z.string(),
+  tool: z.string(),
+  scope: z.string().nullable(),
+  file: z.string().nullable(),
+  beforeVersion: z.string().nullable(),
+  afterVersion: z.string().nullable(),
+  before: z.string().nullable(),
+  after: z.string().nullable(),
+  summary: z.string(),
+  createdAt: epochMs,
+});
+export type MemoryEditReceiptRecord = z.infer<typeof memoryEditReceiptRecordSchema>;
+
+export const memoryEditRecordSchema = z.object({
+  id: recordId,
+  teamId: recordId,
+  status: z.enum(MEMORY_EDIT_STATUSES),
+  attempt: z.number().int(),
+  instruction: z.string(),
+  file: z.string().nullable(),
+  projectId: z.string().nullable(),
+  reply: z.string().nullable(),
+  receipts: z.array(memoryEditReceiptRecordSchema),
+  createdAt: epochMs,
+  updatedAt: epochMs,
+});
+export type MemoryEditRecord = z.infer<typeof memoryEditRecordSchema>;
+
 const memoryScopeParam = z
   .string()
   .min(1)

@@ -658,6 +658,59 @@ export const memoryCandidate = sqliteTable(
   (t) => [index('memory_candidate_scope_idx').on(t.agentId, t.teamId, t.projectId)],
 );
 
+export type MemoryEditStatus =
+  | 'working'
+  | 'awaiting_input'
+  | 'done'
+  | 'failed'
+  | 'stopped'
+  | 'partial';
+
+export const memoryEdit = sqliteTable(
+  'memory_edit',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId').notNull(),
+    userId: text('userId').notNull(),
+    chiefId: text('chiefId').notNull(),
+    threadId: text('threadId').notNull(),
+    stepId: text('stepId'),
+    instruction: text('instruction').notNull(),
+    file: text('file'),
+    projectId: text('projectId'),
+    status: text('status').$type<MemoryEditStatus>().notNull().default('working'),
+    attempt: integer('attempt').notNull().default(1),
+    reply: text('reply'),
+    failureReason: text('failureReason'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [index('memory_edit_team_idx').on(t.teamId, t.createdAt)],
+);
+
+export const memoryEditReceipt = sqliteTable(
+  'memory_edit_receipt',
+  {
+    id: text('id').primaryKey(),
+    editId: text('editId')
+      .notNull()
+      .references(() => memoryEdit.id, { onDelete: 'cascade' }),
+    callId: text('callId').notNull(),
+    tool: text('tool').notNull(),
+    scope: text('scope'),
+    file: text('file'),
+    beforeVersion: text('beforeVersion'),
+    afterVersion: text('afterVersion'),
+    summary: text('summary').notNull(),
+    result: text('result').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('memory_edit_receipt_call_unique').on(t.editId, t.callId),
+    index('memory_edit_receipt_edit_idx').on(t.editId, t.createdAt),
+  ],
+);
+
 export const pushSubscription = sqliteTable(
   'push_subscription',
   {
@@ -1036,7 +1089,7 @@ export const chiefThread = sqliteTable(
     uniqueIndex('chief_thread_coordinator_unique')
       .on(t.chiefId)
       .where(
-        sql`${t.archivedAt} is null and ${t.projectId} is null and ${t.id} not like 'chief-digest-%'`,
+        sql`${t.archivedAt} is null and ${t.projectId} is null and ${t.id} not like 'chief-digest-%' and ${t.id} not like 'chief-memory-%'`,
       ),
     uniqueIndex('chief_thread_channel_unique')
       .on(t.chiefId, t.projectId)

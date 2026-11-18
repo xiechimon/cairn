@@ -85,6 +85,8 @@ import { executeGithubReadTool } from './github-reads.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import { executeMemoryDocumentTool } from './memory-documents.js';
+import { executeMemoryEditTool } from './memory-edit.js';
+import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
@@ -140,6 +142,7 @@ export interface ChiefToolCtx {
   threadId: string;
   chiefAgentId: string | null;
   conversationId: string;
+  toolCallId?: string;
   turnPrompt?: string | null;
   turnMessageIds?: readonly string[];
   turnScopeProjectId?: string | null;
@@ -1113,20 +1116,21 @@ export async function executeChiefTool(
     case 'memories': {
       if (ctx.chiefAgentId === null)
         throw new HttpError(409, 'no coordinator routing rule — memory has no store');
-      return json(
-        executeMemoryDocumentTool(
-          db,
-          {
-            agentId: ctx.chiefAgentId,
-            teamId: ctx.teamId,
-            projectId: ctx.turnScopeProjectId ?? null,
-            source: 'Coordinator',
-            sourceBuildId: ctx.conversationId,
-          },
-          name,
-          params,
-        ),
-      );
+      const owner = {
+        agentId: ctx.chiefAgentId,
+        teamId: ctx.teamId,
+        projectId: ctx.turnScopeProjectId ?? null,
+        source: 'Coordinator',
+        sourceBuildId: ctx.conversationId,
+      };
+      const editId = memoryEditIdOfPrompt(ctx.turnPrompt ?? null);
+      if (editId !== null) {
+        if (ctx.toolCallId === undefined)
+          throw new HttpError(409, 'memory-edit turn requires a tool call id');
+        const receipt = executeMemoryEditTool(db, owner, editId, ctx.toolCallId, name, params);
+        return json(receipt.output);
+      }
+      return json(executeMemoryDocumentTool(db, owner, name, params));
     }
     case 'watch_todos': {
       const todoIds = strArr(params, 'todoIds');

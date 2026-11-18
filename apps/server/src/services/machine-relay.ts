@@ -273,6 +273,7 @@ export async function executeRelayToolCall(
         threadId,
         chiefAgentId: coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
         conversationId: threadId,
+        ...(toolCallId !== undefined ? { toolCallId } : {}),
         turnPrompt: row.prompt,
         turnMessageIds: row.ownerMessageIds ?? [],
         turnScopeProjectId: stepScopeProjectId(row),

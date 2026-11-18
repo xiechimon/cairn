@@ -1,19 +1,28 @@
-import { patchMemoryBodySchema } from '@cairn/shared';
+import {
+  memoryEditBodySchema,
+  memoryEditStopBodySchema,
+  patchMemoryBodySchema,
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { agentMemory } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
-import { jsonBody, requireTeam, toMemoryRecord } from './routes-helpers.js';
+import { jsonBody, requireTeam, svcOf, toMemoryRecord } from './routes-helpers.js';
 import {
   deleteMemoryEntry,
   isMemoryIndex,
   listMemoryEntries,
   memoryDocumentVersion,
-  promoteMemoryEntry,
   updateMemoryEntry,
 } from './services/memory.js';
 import { executeMemoryDocumentTool } from './services/memory-documents.js';
+import {
+  currentMemoryEdit,
+  stopMemoryEdit,
+  submitMemoryEdit,
+  toMemoryEditRecord,
+} from './services/memory-edit.js';
 
 export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/memories', (c) => {
@@ -27,16 +36,25 @@ export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
     return c.json(rows.map(toMemoryRecord));
   });
 
-  app.post('/api/teams/:id/memories/:mid/promote', (c) => {
+  app.post('/api/teams/:id/memory-edits', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    const row = promoteMemoryEntry(ctx.db, {
-      memoryId: c.req.param('mid'),
-      agentId: teamId,
-      teamId,
-    });
-    if (row === null) throw notFound(`memory ${c.req.param('mid')}`);
-    return c.json(toMemoryRecord(row));
+    const body = parseWith(memoryEditBodySchema, await jsonBody(c), 'body');
+    return c.json(submitMemoryEdit(svcOf(ctx), teamId, body), 201);
+  });
+
+  app.get('/api/teams/:id/memory-edits/current', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const row = currentMemoryEdit(ctx.db, teamId);
+    return c.json(row === undefined ? null : toMemoryEditRecord(ctx.db, row));
+  });
+
+  app.post('/api/teams/:id/memory-edits/:eid/stop', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(memoryEditStopBodySchema, await jsonBody(c), 'body');
+    return c.json(stopMemoryEdit(svcOf(ctx), teamId, c.req.param('eid'), body.attempt));
   });
 
   app.patch('/api/teams/:id/memories/:mid', async (c) => {

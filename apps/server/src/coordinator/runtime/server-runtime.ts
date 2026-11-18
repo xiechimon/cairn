@@ -1,9 +1,11 @@
 import {
   type ClaimedStep,
+  isChiefMemoryThreadId,
   isMailWakeText,
   type MachineDoneBody,
   type ProviderConfig,
   type RemoteToolDef,
+  WORKER_MEMORY_REMOTE_TOOLS,
 } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import type { Provider } from '@earendil-works/pi-ai';
@@ -129,6 +131,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         desktopTools: config.desktopTools?.(threadId) === true,
         vmComputer: config.vmComputer?.(threadId) === true,
         connectorTools: config.connectorTools?.(threadId) ?? [],
+        ...(isChiefMemoryThreadId(threadId) ? { remoteTools: WORKER_MEMORY_REMOTE_TOOLS } : {}),
         ownComputer,
         shuttingDown: () => shuttingDown,
         ...(inputs === undefined
