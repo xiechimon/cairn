@@ -27,6 +27,7 @@ test.describe('the Coordinator lives only on the home', () => {
     page,
   }) => {
     await page.goto('/app?scenario=11&pane=tasks&tab=scheduled');
+    await expect(page.getByTestId('home-c')).toBeVisible();
     await pressOpenCoordinator(page);
     await expect(page).toHaveURL(/\/app\?scenario=11$/);
     await expect(page.getByTestId('home-c')).toBeVisible();

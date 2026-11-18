@@ -236,6 +236,7 @@ test('write: the primary action and the delete confirm are blocked', async ({ pa
 test('write: sending to the Coordinator is blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app?pane=tasks&tab=scheduled`);
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await pressOpenCoordinator(page);
   const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
   await input.fill('把购物车那张票提到最前面');
