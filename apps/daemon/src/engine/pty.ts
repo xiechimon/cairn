@@ -47,6 +47,7 @@ export interface EnginePtySpawnOptions {
   env?: NodeJS.ProcessEnv;
   cols?: number;
   rows?: number;
+  fdToken?: string;
 }
 
 export function openEnginePtyProcess(
@@ -56,11 +57,16 @@ export function openEnginePtyProcess(
   if (command.length === 0) throw new Error('engine pty requires a command');
   const size = `${opts.rows ?? 50}x${opts.cols ?? 160}`;
   const child = spawn('python3', ['-S', '-c', ENGINE_PTY, size, ...command], {
-    stdio: ['pipe', 'pipe', 'pipe'],
+    stdio: opts.fdToken !== undefined ? ['pipe', 'pipe', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
     ...(opts.cwd !== undefined ? { cwd: opts.cwd } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
   });
+  const tokenChannel = opts.fdToken !== undefined ? child.stdio[3] : null;
+  if (tokenChannel !== null && tokenChannel !== undefined && 'end' in tokenChannel) {
+    tokenChannel.on('error', () => {});
+    tokenChannel.end(opts.fdToken);
+  }
   const pid = new Promise<number>((resolve, reject) => {
     let text = '';
     const onData = (chunk: Buffer) => {

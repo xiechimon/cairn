@@ -45,6 +45,7 @@ const METERED_CLAUDE_AUTH_BLANK = {
   CLAUDE_CODE_USE_FOUNDRY: '',
 };
 const EFFORT_LEVELS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+const OAUTH_TOKEN_FD = 3;
 const TAIL_POLL_MS = 250;
 
 export interface ClaudePtyBackendOpts extends ClaudeCodeBackendOpts {
@@ -119,6 +120,12 @@ class ClaudePtyBackend implements AgentBackend {
       ...sessionEnv,
       ...(stepToken !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
     });
+    delete env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB;
+    delete env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR;
+    if (stepToken !== undefined) {
+      delete env.CLAUDE_CODE_OAUTH_TOKEN;
+      env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = String(OAUTH_TOKEN_FD);
+    }
     const locked = session.lockedDown === true;
     const denied = collectDeniedSkillDirs(this.opts.skills, session);
     const skillDenyRules = buildSkillDenyRules(denied);
@@ -149,6 +156,7 @@ class ClaudePtyBackend implements AgentBackend {
         skillDenyRules,
         pluginDir,
         bridge,
+        stepToken,
       );
     } catch (error) {
       bridge?.close();
@@ -171,6 +179,7 @@ class ClaudePtyBackend implements AgentBackend {
     skillDenyRules: string[],
     pluginDir: string | null,
     bridge: HostMcpBridge | null,
+    fdToken: string | undefined,
   ): Promise<AgentSessionHandle> {
     const mcpServers: Record<string, unknown> = {};
     if (bridge !== null) {
@@ -237,7 +246,11 @@ class ClaudePtyBackend implements AgentBackend {
     if (session.prompt !== undefined) args.push(session.prompt);
     const command = [this.opts.executablePath ?? 'claude', ...args];
     this.opts.log?.(`engine pty spawn: ${command[0]} (${resumeId === null ? 'new' : 'resume'})`);
-    const proc = openEnginePtyProcess(command, { cwd: session.cwd, env });
+    const proc = openEnginePtyProcess(command, {
+      cwd: session.cwd,
+      env,
+      ...(fdToken !== undefined ? { fdToken } : {}),
+    });
     const pty = new EnginePty(proc, {
       secrets: () => session.secrets?.() ?? [],
       onExit: () => handle.onProcessExit(),
@@ -257,7 +270,6 @@ class ClaudePtyBackend implements AgentBackend {
 function ptyEligible(session: SessionOpts, opts: ClaudePtyBackendOpts): boolean {
   if (opts.inOrb === true) return false;
   if (session.promptImages !== undefined && session.promptImages.length > 0) return false;
-  if (session.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB === '1') return false;
   if (process.env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB === '1') return false;
   return true;
 }
