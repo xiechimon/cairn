@@ -36,10 +36,15 @@ export interface World {
   threadId: string;
   stepId: string;
   storageDir: string;
+  mcpFetch?: typeof fetch;
 }
 
-export async function world(content = 'hello', apiKey = KEY): Promise<World> {
-  const s = bootServer();
+export async function world(
+  content = 'hello',
+  apiKey = KEY,
+  opts: { mcpFetch?: typeof fetch } = {},
+): Promise<World> {
+  const s = bootServer(opts.mcpFetch === undefined ? {} : { mcpFetch: opts.mcpFetch });
   insertMachine(s);
   closers.push(() => s.dispose());
   const teamId = s.team.id;
@@ -76,7 +81,14 @@ export async function world(content = 'hello', apiKey = KEY): Promise<World> {
   const stepRow = s.db.select().from(step).get();
   const storageDir = makeTestTempDir('coord-runner-');
   dirs.push(storageDir);
-  return { s, teamId, threadId: thread.id, stepId: stepRow?.id ?? '', storageDir };
+  return {
+    s,
+    teamId,
+    threadId: thread.id,
+    stepId: stepRow?.id ?? '',
+    storageDir,
+    ...(opts.mcpFetch === undefined ? {} : { mcpFetch: opts.mcpFetch }),
+  };
 }
 
 export function boot(
@@ -96,6 +108,7 @@ export function boot(
       attachmentsDir: w.s.attachmentsDir,
       skillsDir: w.s.skillsDir,
       convHub: w.s.convHub,
+      ...(w.mcpFetch === undefined ? {} : { mcpFetch: w.mcpFetch }),
     },
     storageDir: w.storageDir,
     logger: { info: () => {}, warn: () => {}, error: () => {} },
