@@ -5,6 +5,7 @@ await admitTestRun();
 
 export default defineConfig({
   test: {
+    fsModuleCache: true,
     setupFiles: ['./test/tmpdir-cleanup-setup.ts'],
     testTimeout: 180_000,
     hookTimeout: 120_000,

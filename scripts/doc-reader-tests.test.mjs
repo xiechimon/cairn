@@ -58,3 +58,17 @@ test('the retired collector archive is excluded while current identity safeguard
     },
   );
 });
+
+test('generated feature map and canon snapshots do not re-trigger generator self-tests', () => {
+  const seen = [];
+  const result = docReaderTests(
+    ['docs/feature-map.md', '.claude/skills/verify-cairn/feature-map.md', 'docs/CANON.md'],
+    (doc) => {
+      seen.push(doc);
+      return ['scripts/generate-feature-map.test.mjs'];
+    },
+    [],
+  );
+  assert.deepEqual(seen, []);
+  assert.deepEqual(result, { node: [], vitest: [] });
+});

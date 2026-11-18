@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { declaredIdentifiers, selectTests } from './test-changed.mjs';
+import {
+  buildReferencing,
+  declaredIdentifiers,
+  selectTests,
+  selectTestsWithReport,
+} from './test-changed.mjs';
 
 const tests = [
   'apps/daemon/test/computer-vm-desktop.test.ts',
@@ -97,4 +102,38 @@ test('a schema or migration change runs every old-database migration test', () =
       ),
       true,
     );
+});
+
+test('buildReferencing scores matching tests in memory without spawning git per identifier', () => {
+  const readCounts = new Map();
+  const referencing = buildReferencing({
+    readSource: () => 'export function buildPlanRoute() {}\nexport function unusedHelper() {}',
+    diffFor: () => '',
+    tests: ['apps/server/test/plan.test.ts', 'apps/server/test/other.test.ts'],
+    readTest: (file) => {
+      readCounts.set(file, (readCounts.get(file) ?? 0) + 1);
+      return file.includes('plan') ? 'expect(buildPlanRoute()).toBeTruthy()' : 'unrelated';
+    },
+  });
+  assert.deepEqual(referencing('apps/server/src/services/plan-route.ts'), [
+    ['apps/server/test/plan.test.ts', 1],
+  ]);
+  assert.deepEqual(referencing('apps/server/src/services/plan-route.ts'), [
+    ['apps/server/test/plan.test.ts', 1],
+  ]);
+  assert.equal(readCounts.get('apps/server/test/plan.test.ts'), 1);
+});
+
+test('stem matching prioritizes exact filename match and caps broad fan-out', () => {
+  const manyRunnerTests = [
+    ...Array.from(
+      { length: 12 },
+      (_, i) => `apps/daemon/test/runner-extra-${String(i).padStart(2, '0')}.test.ts`,
+    ),
+    'apps/daemon/test/runner.test.ts',
+  ];
+  const report = selectTestsWithReport(['apps/daemon/src/runner.ts'], manyRunnerTests);
+  assert.equal(report.selected.length, 8);
+  assert.equal(report.selected.includes('apps/daemon/test/runner.test.ts'), true);
+  assert.equal(report.dropped.length, 5);
 });

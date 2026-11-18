@@ -11,6 +11,7 @@ export default defineConfig({
     ],
   },
   test: {
+    fsModuleCache: true,
     include: ['test/**/*.test.ts'],
   },
 });

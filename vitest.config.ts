@@ -19,6 +19,7 @@ const projects =
 
 export default defineConfig({
   test: {
+    fsModuleCache: true,
     projects,
     sequence: { sequencer: TimedShardSequencer },
   },

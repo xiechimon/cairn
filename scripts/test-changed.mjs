@@ -14,6 +14,8 @@ const EXPORT_DECLARATION =
 const TOOL_NAME_LITERAL = /\bname:\s*['"]([a-z][a-z0-9_]*)['"]/;
 const MIN_IDENTIFIER_LENGTH = 5;
 const MAX_REFERENCING_TESTS = 40;
+const MAX_STEM_MATCHES = 8;
+const IDENTIFIER_TOKEN = /[A-Za-z_$][\w$]{4,}/g;
 const CONTRACT_TESTS = ['packages/shared/test/snapshot.test.ts', 'apps/server/test/wire.test.ts'];
 
 export function declaredIdentifiers(content, changedLines = null) {
@@ -49,6 +51,7 @@ export function selectTests(changed, tests, migrationTests = [], referencing = (
 export function selectTestsWithReport(changed, tests, migrationTests = [], referencing = () => []) {
   const known = new Set(tests);
   const picked = new Set();
+  const stemOverflow = new Set();
   const referenceScores = new Map();
   for (const file of changed) {
     if (SCHEMA_CHANGE.test(file))
@@ -68,10 +71,18 @@ export function selectTestsWithReport(changed, tests, migrationTests = [], refer
     if (pkg === 'packages/shared') continue;
     const stem = basename(file).replace(/\.(ts|tsx|mts)$/, '');
     if (stem === 'index') continue;
-    for (const candidate of tests) {
-      if (candidate.startsWith(`${pkg}/test/`) && basename(candidate).includes(stem))
-        picked.add(candidate);
-    }
+    const stemMatches = tests
+      .filter(
+        (candidate) => candidate.startsWith(`${pkg}/test/`) && basename(candidate).includes(stem),
+      )
+      .sort((a, b) => {
+        const aExact = basename(a).startsWith(`${stem}.test.`);
+        const bExact = basename(b).startsWith(`${stem}.test.`);
+        if (aExact !== bExact) return aExact ? -1 : 1;
+        return a.localeCompare(b);
+      });
+    for (const candidate of stemMatches.slice(0, MAX_STEM_MATCHES)) picked.add(candidate);
+    for (const candidate of stemMatches.slice(MAX_STEM_MATCHES)) stemOverflow.add(candidate);
   }
   const extra = [...referenceScores]
     .filter(([candidate]) => !picked.has(candidate))
@@ -79,7 +90,10 @@ export function selectTestsWithReport(changed, tests, migrationTests = [], refer
     .map(([candidate]) => candidate);
   const room = Math.max(0, MAX_REFERENCING_TESTS - picked.size);
   for (const candidate of extra.slice(0, room)) picked.add(candidate);
-  return { selected: [...picked].sort(), dropped: extra.slice(room).sort() };
+  const dropped = [
+    ...new Set([...extra.slice(room), ...[...stemOverflow].filter((file) => !picked.has(file))]),
+  ].sort();
+  return { selected: [...picked].sort(), dropped };
 }
 
 function changedLinesOf(diffText) {
@@ -92,8 +106,37 @@ function changedLinesOf(diffText) {
   return lines;
 }
 
-function buildReferencing({ readSource, diffFor, tests }) {
+export function buildReferencing({
+  readSource,
+  diffFor,
+  tests,
+  readTest = (file) => readFileSync(file, 'utf8'),
+}) {
   const known = new Set(tests);
+  let tokenIndex = null;
+  const indexOf = () => {
+    if (tokenIndex !== null) return tokenIndex;
+    tokenIndex = new Map();
+    for (const file of tests) {
+      if (!known.has(file)) continue;
+      let body;
+      try {
+        body = readTest(file);
+      } catch {
+        continue;
+      }
+      const tokens = new Set(body.match(IDENTIFIER_TOKEN) ?? []);
+      for (const token of tokens) {
+        let hits = tokenIndex.get(token);
+        if (hits === undefined) {
+          hits = [];
+          tokenIndex.set(token, hits);
+        }
+        hits.push(file);
+      }
+    }
+    return tokenIndex;
+  };
   return (file) => {
     if (!SOURCE_FILE.test(file) || basename(file).startsWith('index.')) return [];
     let content;
@@ -103,13 +146,14 @@ function buildReferencing({ readSource, diffFor, tests }) {
       return [];
     }
     const hunks = PROTOCOL_FILE.test(file) ? changedLinesOf(diffFor(file)) : null;
+    const identifiers = declaredIdentifiers(content, hunks?.length ? hunks : null);
+    if (identifiers.length === 0) return [];
+    const index = indexOf();
     const scores = new Map();
-    for (const identifier of declaredIdentifiers(content, hunks?.length ? hunks : null)) {
-      let hits = [];
-      try {
-        hits = git(['grep', '-l', '-w', '-F', '-e', identifier, '--', 'apps', 'packages']);
-      } catch {}
-      for (const hit of hits) if (known.has(hit)) scores.set(hit, (scores.get(hit) ?? 0) + 1);
+    for (const identifier of identifiers) {
+      for (const hit of index.get(identifier) ?? []) {
+        scores.set(hit, (scores.get(hit) ?? 0) + 1);
+      }
     }
     return [...scores];
   };
@@ -172,7 +216,11 @@ function main() {
     return;
   }
   console.log(`test:changed: ${selected.length} file(s)\n${selected.join('\n')}`);
-  const child = spawn('pnpm', ['exec', 'vitest', 'run', ...selected], { stdio: 'inherit' });
+  const env =
+    process.platform === 'darwin' && !process.env.CAIRN_TEST_TEMP_ROOT
+      ? { ...process.env, CAIRN_TEST_TEMP_ROOT: '/tmp' }
+      : process.env;
+  const child = spawn('pnpm', ['exec', 'vitest', 'run', ...selected], { stdio: 'inherit', env });
   const timer = setTimeout(() => {
     console.error(
       `test:changed: over the ${BUDGET_MS / 60_000}-minute budget; stopped. Run the slow file alone and fix it.`,

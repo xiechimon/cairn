@@ -5,9 +5,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+const GENERATED_DOCS = new Set([
+  'docs/feature-map.md',
+  '.claude/skills/verify-cairn/feature-map.md',
+  'docs/CANON.md',
+]);
+
 export function docReaderTests(docPaths, grep, knownRed) {
   const readers = new Set();
-  for (const doc of docPaths.filter((path) => path.includes('/'))) {
+  for (const doc of docPaths.filter((path) => path.includes('/') && !GENERATED_DOCS.has(path))) {
     for (const file of grep(doc)) {
       if (!file.startsWith('integration/') && !knownRed.includes(file)) readers.add(file);
     }

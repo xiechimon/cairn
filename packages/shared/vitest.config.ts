@@ -3,4 +3,8 @@ import { admitTestRun } from '../../scripts/test-admission.mjs';
 
 await admitTestRun();
 
-export default defineConfig({});
+export default defineConfig({
+  test: {
+    fsModuleCache: true,
+  },
+});
