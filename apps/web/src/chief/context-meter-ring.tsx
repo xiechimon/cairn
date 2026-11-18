@@ -189,7 +189,7 @@ export function ContextMeterGlyph({
           x2={CX + (RADIUS + 3.2) * Math.cos(tick)}
           y2={CY + (RADIUS + 3.2) * Math.sin(tick)}
           stroke="currentColor"
-          strokeWidth={1.6}
+          strokeWidth={1.75}
           strokeLinecap="round"
         />
       )}
