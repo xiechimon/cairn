@@ -18,7 +18,7 @@ describe('resolveOrbRuntime', () => {
     expect(resolveOrbRuntime(env)).toBe('nspawn');
   });
 
-  test.each(['nspawn', 'podman', 'docker', 'apple'] as const)('parses %s', (name) => {
+  test.each(['nspawn', 'podman', 'e2b'] as const)('parses %s', (name) => {
     expect(resolveOrbRuntime({ CAIRN_ORB_RUNTIME: name })).toBe(name);
   });
 
@@ -26,14 +26,14 @@ describe('resolveOrbRuntime', () => {
     'rejects non-canonical value %j instead of normalizing it',
     (value) => {
       expect(() => resolveOrbRuntime({ CAIRN_ORB_RUNTIME: value })).toThrow(
-        `${ORB_RUNTIME_ENV} must be one of nspawn, podman, docker, apple, e2b`,
+        `${ORB_RUNTIME_ENV} must be one of nspawn, podman, e2b`,
       );
     },
   );
 
   test('an unknown value names the variable, the value and the allowed values', () => {
     expect(() => resolveOrbRuntime({ CAIRN_ORB_RUNTIME: 'lxc' })).toThrow(
-      'CAIRN_ORB_RUNTIME must be one of nspawn, podman, docker, apple, e2b (got "lxc")',
+      'CAIRN_ORB_RUNTIME must be one of nspawn, podman, e2b (got "lxc")',
     );
   });
 });
@@ -109,17 +109,6 @@ describe('createOrbProvider', () => {
     ).toThrow('CAIRN_ORB_EGRESS_SOCKET must be an absolute path');
   });
 
-  test.each(['docker', 'apple'])(
-    'executor orb with %s fails instead of falling back to nspawn',
-    (runtime) => {
-      expect(() =>
-        createOrbProvider({ CAIRN_EXECUTOR: 'orb', CAIRN_ORB_RUNTIME: runtime }, home),
-      ).toThrow(
-        `CAIRN_ORB_RUNTIME=${runtime} is not implemented yet; only nspawn, podman and e2b are available`,
-      );
-    },
-  );
-
   test('executor orb with an unknown runtime fails', () => {
     expect(() =>
       createOrbProvider({ CAIRN_EXECUTOR: 'orb', CAIRN_ORB_RUNTIME: 'lxc' }, home),
@@ -138,7 +127,7 @@ describe('createOrbProvider', () => {
 
 describe('daemon startup', () => {
   test.each([
-    ['docker', 'CAIRN_ORB_RUNTIME=docker is not implemented yet'],
+    ['e2b', 'E2B_API_KEY must be set'],
     ['podman', 'CAIRN_ORB_IMAGE must name the built image'],
   ])(
     'executor orb with %s that cannot start rejects startup before enrolling',

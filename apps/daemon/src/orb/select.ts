@@ -21,7 +21,7 @@ export const E2B_TIMEOUT_ENV = 'CAIRN_E2B_TIMEOUT_MS';
 
 type OrbBackendName = 'nspawn' | 'e2b' | OrbRuntimeName;
 
-const ORB_BACKENDS: readonly OrbBackendName[] = ['nspawn', 'podman', 'docker', 'apple', 'e2b'];
+const ORB_BACKENDS: readonly OrbBackendName[] = ['nspawn', 'podman', 'e2b'];
 
 export function resolveOrbRuntime(env: NodeJS.ProcessEnv): OrbBackendName {
   const value = env[ORB_RUNTIME_ENV];
@@ -106,11 +106,6 @@ export function createOrbProvider(env: NodeJS.ProcessEnv, home: string): OrbProv
   if (runtime === 'nspawn')
     return new NspawnOrbProvider({ stateFile: join(home, 'orb-state', 'orbs.json') });
   if (runtime === 'podman') return new ContainerOrbProvider(podmanProviderOptions(env, home));
-  if (runtime === 'e2b') {
-    const { apiKey, template, sessionTimeoutMs } = e2bProviderOptions(env);
-    return new E2bOrbProvider({ client: createE2bClient(apiKey), template, sessionTimeoutMs });
-  }
-  throw new Error(
-    `${ORB_RUNTIME_ENV}=${runtime} is not implemented yet; only nspawn, podman and e2b are available`,
-  );
+  const { apiKey, template, sessionTimeoutMs } = e2bProviderOptions(env);
+  return new E2bOrbProvider({ client: createE2bClient(apiKey), template, sessionTimeoutMs });
 }

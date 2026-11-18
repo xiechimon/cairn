@@ -3,24 +3,26 @@ import { buildProgram } from '../src/cli.js';
 import { type DoctorEnv, formatDoctor, runDoctor, runDoctorCommand } from '../src/doctor.js';
 
 const GIB = 1024 ** 3;
-const ALL_TOOLS = ['systemd-nspawn', 'machinectl', 'nft', 'ip', 'nmcli', 'sudo'];
+const LINUX_TOOLS = ['systemd-run', 'bwrap'];
 
 interface Overrides {
   platform?: string;
   uid?: number;
   username?: string;
+  home?: string;
   nodeVersion?: string;
   files?: Record<string, string | undefined>;
   missing?: string[];
-  fsType?: string;
   free?: number;
   osRelease?: string;
+  stdout?: Record<string, string>;
 }
 
 function fakeEnv(o: Overrides = {}): DoctorEnv {
   const files: Record<string, string | undefined> = {
     '/proc/1/comm': 'systemd\n',
     '/proc/sys/fs/protected_hardlinks': '1\n',
+    '/proc/sys/user/max_user_namespaces': '28633\n',
     '/etc/os-release': o.osRelease ?? 'ID=arch\n',
     ...o.files,
   };
@@ -28,16 +30,23 @@ function fakeEnv(o: Overrides = {}): DoctorEnv {
     platform: o.platform ?? 'linux',
     uid: o.uid ?? 1000,
     username: o.username ?? 'ian',
+    home: o.home ?? '/home/ian',
     nodeVersion: o.nodeVersion ?? '24.14.0',
     readFile: (path) => files[path],
     which: (cmd) => !(o.missing ?? []).includes(cmd),
-    run: (cmd) =>
-      cmd === 'systemctl'
-        ? { status: 0, stdout: 'systemd 262 (262-1-arch)\n+PAM +AUDIT\n' }
-        : { status: 0, stdout: '7.2.0-arch1-1\n' },
-    statfsType: () => o.fsType ?? 'btrfs',
+    run: (cmd) => ({ status: 0, stdout: o.stdout?.[cmd] ?? '' }),
     freeBytes: () => o.free ?? 100 * GIB,
   };
+}
+
+function linuxEnv(o: Overrides = {}): DoctorEnv {
+  return fakeEnv({
+    stdout: {
+      systemctl: 'systemd 262 (262-1-arch)\n+PAM +AUDIT\n',
+      uname: '7.2.0-arch1-1\n',
+    },
+    ...o,
+  });
 }
 
 function check(env: DoctorEnv, id: string) {
@@ -46,34 +55,57 @@ function check(env: DoctorEnv, id: string) {
   return found;
 }
 
-describe('runDoctor', () => {
-  it('stops after the linux check on other platforms', () => {
+describe('runDoctor on macOS', () => {
+  it('reports runner readiness instead of failing as a non-Linux host', () => {
     const result = runDoctor(fakeEnv({ platform: 'darwin' }));
-    expect(result.ok).toBe(false);
-    expect(result.checks).toEqual([
-      {
-        id: 'linux',
-        label: 'Linux host',
-        status: 'fail',
-        detail: 'The Coordinator computer needs a Linux host; this machine can still run tasks',
-      },
+    expect(result.ok).toBe(true);
+    expect(check(fakeEnv({ platform: 'darwin' }), 'macos').status).toBe('pass');
+    expect(result.checks.map((c) => c.id)).toEqual([
+      'macos',
+      'node',
+      'not-root',
+      'seatbelt',
+      'vm-runtime',
+      'disk',
+      'versions',
     ]);
   });
 
-  it('passes every required check on a ready Arch host and reports versions', () => {
-    const result = runDoctor(fakeEnv());
+  it('fails when sandbox-exec is missing', () => {
+    const env = fakeEnv({ platform: 'darwin', missing: ['sandbox-exec'] });
+    const c = check(env, 'seatbelt');
+    expect(c.status).toBe('fail');
+    expect(runDoctor(env).ok).toBe(false);
+  });
+
+  it('reports the VM runtime as optional info when container is absent', () => {
+    const absent = check(fakeEnv({ platform: 'darwin', missing: ['container'] }), 'vm-runtime');
+    expect(absent.status).toBe('info');
+    expect(absent.detail).toContain('optional');
+    expect(runDoctor(fakeEnv({ platform: 'darwin', missing: ['container'] })).ok).toBe(true);
+    expect(check(fakeEnv({ platform: 'darwin' }), 'vm-runtime').status).toBe('pass');
+  });
+});
+
+describe('runDoctor on Linux', () => {
+  it('passes every required check on a ready host and reports versions', () => {
+    const result = runDoctor(linuxEnv());
     expect(result.ok).toBe(true);
     expect(result.checks.filter((c) => c.status === 'fail')).toEqual([]);
-    expect(check(fakeEnv(), 'btrfs').status).toBe('pass');
-    expect(check(fakeEnv(), 'disk').status).toBe('pass');
-    const versions = check(fakeEnv(), 'versions');
+    const versions = check(linuxEnv(), 'versions');
     expect(versions.status).toBe('info');
     expect(versions.detail).toContain('systemd 262, kernel 7.2.0-arch1-1');
     expect(versions.detail).toContain('known to work: systemd 262, kernel 7.2');
   });
 
+  it('fails on unsupported platforms', () => {
+    const result = runDoctor(fakeEnv({ platform: 'win32' }));
+    expect(result.ok).toBe(false);
+    expect(result.checks[0]).toMatchObject({ id: 'platform', status: 'fail' });
+  });
+
   it('fails when pid 1 is not systemd', () => {
-    const env = fakeEnv({ files: { '/proc/1/comm': 'init\n' } });
+    const env = linuxEnv({ files: { '/proc/1/comm': 'init\n' } });
     expect(check(env, 'systemd-pid1').status).toBe('fail');
     expect(runDoctor(env).ok).toBe(false);
   });
@@ -83,49 +115,37 @@ describe('runDoctor', () => {
       'arch',
       'ID=arch\n',
       {
-        'systemd-nspawn': 'sudo pacman -S --needed systemd',
-        machinectl: 'sudo pacman -S --needed systemd',
-        nft: 'sudo pacman -S --needed nftables',
-        ip: 'sudo pacman -S --needed iproute2',
-        nmcli: 'sudo pacman -S --needed networkmanager',
-        sudo: 'sudo pacman -S --needed sudo',
+        'systemd-run': 'sudo pacman -S --needed systemd',
+        bwrap: 'sudo pacman -S --needed bubblewrap',
       },
     ],
     [
       'debian',
       'ID=ubuntu\nID_LIKE=debian\n',
       {
-        'systemd-nspawn': 'sudo apt install systemd-container',
-        machinectl: 'sudo apt install systemd-container',
-        nft: 'sudo apt install nftables',
-        ip: 'sudo apt install iproute2',
-        nmcli: 'sudo apt install network-manager',
-        sudo: 'sudo apt install sudo',
+        'systemd-run': 'sudo apt install systemd',
+        bwrap: 'sudo apt install bubblewrap',
       },
     ],
     [
       'fedora',
       'ID=fedora\n',
       {
-        'systemd-nspawn': 'sudo dnf install systemd-container',
-        machinectl: 'sudo dnf install systemd-container',
-        nft: 'sudo dnf install nftables',
-        ip: 'sudo dnf install iproute',
-        nmcli: 'sudo dnf install NetworkManager',
-        sudo: 'sudo dnf install sudo',
+        'systemd-run': 'sudo dnf install systemd',
+        bwrap: 'sudo dnf install bubblewrap',
       },
     ],
     [
       'unknown',
       'ID=gentoo\n',
-      Object.fromEntries(ALL_TOOLS.map((t) => [t, `install the package that provides ${t}`])),
+      Object.fromEntries(LINUX_TOOLS.map((t) => [t, `install the package that provides ${t}`])),
     ],
   ];
 
   for (const [name, osRelease, fixes] of distros) {
-    it(`gives ${name} install fixes for each missing tool`, () => {
-      for (const tool of ALL_TOOLS) {
-        const env = fakeEnv({ osRelease, missing: [tool] });
+    it(`gives ${name} install fixes for each missing confinement tool`, () => {
+      for (const tool of LINUX_TOOLS) {
+        const env = linuxEnv({ osRelease, missing: [tool] });
         const c = check(env, `tool:${tool}`);
         expect(c.status).toBe('fail');
         expect(c.fix).toBe(fixes[tool]);
@@ -134,100 +154,82 @@ describe('runDoctor', () => {
     });
   }
 
+  it('fails when unprivileged user namespaces are disabled', () => {
+    for (const knob of [
+      '/proc/sys/user/max_user_namespaces',
+      '/proc/sys/kernel/unprivileged_userns_clone',
+    ]) {
+      const env = linuxEnv({ files: { [knob]: '0\n' } });
+      expect(check(env, 'userns').status).toBe('fail');
+      expect(runDoctor(env).ok).toBe(false);
+    }
+  });
+
   it('treats rhel-like hosts as dnf hosts', () => {
-    const env = fakeEnv({
+    const env = linuxEnv({
       osRelease: 'ID=rocky\nID_LIKE="rhel centos fedora"\n',
-      missing: ['nft'],
+      missing: ['bwrap'],
     });
-    expect(check(env, 'tool:nft').fix).toBe('sudo dnf install nftables');
+    expect(check(env, 'tool:bwrap').fix).toBe('sudo dnf install bubblewrap');
+  });
+
+  it('reports optional orb backends as info, not failures', () => {
+    const env = linuxEnv({ missing: ['podman', 'systemd-nspawn', 'machinectl'] });
+    expect(check(env, 'orb:podman').status).toBe('info');
+    expect(check(env, 'orb:nspawn').status).toBe('info');
+    expect(runDoctor(env).ok).toBe(true);
+    expect(check(linuxEnv(), 'orb:podman').status).toBe('pass');
+    expect(check(linuxEnv(), 'orb:nspawn').status).toBe('pass');
+  });
+
+  it('passes orb:nspawn only when both nspawn tools exist', () => {
+    const env = linuxEnv({ missing: ['machinectl'] });
+    expect(check(env, 'orb:nspawn').status).toBe('info');
   });
 
   it('requires Node 22.19 or newer', () => {
-    const old = check(fakeEnv({ nodeVersion: '22.18.0' }), 'node');
+    const old = check(linuxEnv({ nodeVersion: '22.18.0' }), 'node');
     expect(old.status).toBe('fail');
     expect(old.fix).toBe('install Node 22.19 or newer');
-    expect(check(fakeEnv({ nodeVersion: '22.19.0' }), 'node').status).toBe('pass');
+    expect(check(linuxEnv({ nodeVersion: '22.19.0' }), 'node').status).toBe('pass');
   });
 
   it('fails when run as root', () => {
-    const c = check(fakeEnv({ uid: 0 }), 'not-root');
+    const c = check(linuxEnv({ uid: 0 }), 'not-root');
     expect(c.status).toBe('fail');
-    expect(c.fix).toBe('run cairn doctor as the account that will own the computer, without sudo');
+    expect(c.fix).toBe('run cairn doctor as the account that will run tasks, without sudo');
   });
 
   it('fails when protected_hardlinks is off', () => {
-    const env = fakeEnv({ files: { '/proc/sys/fs/protected_hardlinks': '0\n' } });
+    const env = linuxEnv({ files: { '/proc/sys/fs/protected_hardlinks': '0\n' } });
     const c = check(env, 'protected-hardlinks');
     expect(c.status).toBe('fail');
     expect(c.fix).toContain('sudo sysctl -w fs.protected_hardlinks=1');
     expect(c.fix).toContain('/etc/sysctl.d');
   });
 
-  it('warns on a non-btrfs filesystem without failing', () => {
-    const env = fakeEnv({ fsType: 'ext4' });
-    const c = check(env, 'btrfs');
-    expect(c.status).toBe('warn');
-    expect(c.detail).toBe(
-      'not btrfs: images are plain directories and rebuilds copy the whole tree',
-    );
-    expect(runDoctor(env).ok).toBe(true);
-  });
-
-  it('warns on low disk space and notes the image size', () => {
-    const env = fakeEnv({ free: 4 * GIB });
+  it('warns on low disk space', () => {
+    const env = linuxEnv({ free: 4 * GIB });
     const c = check(env, 'disk');
     expect(c.status).toBe('warn');
     expect(c.detail).toContain('4.0 GiB');
-    expect(c.detail).toContain('the base image is about 2 GiB');
     expect(runDoctor(env).ok).toBe(true);
-  });
-
-  describe('install state', () => {
-    it('is info when not installed', () => {
-      const c = check(fakeEnv(), 'install');
-      expect(c.status).toBe('info');
-      expect(c.detail).toBe('not installed yet');
-      expect(c.fix).toBe('sudo bash scripts/ops/orb/install-host.sh');
-    });
-
-    it('passes when the owner matches the current user', () => {
-      const env = fakeEnv({ files: { '/etc/cairn-orb/owner': 'ian\n' } });
-      const c = check(env, 'install');
-      expect(c.status).toBe('pass');
-      expect(c.detail).toBe('installed for ian');
-    });
-
-    it('fails when the owner is another user', () => {
-      const env = fakeEnv({ files: { '/etc/cairn-orb/owner': 'alice\n' } });
-      const c = check(env, 'install');
-      expect(c.status).toBe('fail');
-      expect(c.detail).toBe('installed for alice; run as alice');
-      expect(runDoctor(env).ok).toBe(false);
-    });
-
-    it('fails on an invalid owner file', () => {
-      const env = fakeEnv({ files: { '/etc/cairn-orb/owner': 'Bad Owner!\n' } });
-      const c = check(env, 'install');
-      expect(c.status).toBe('fail');
-      expect(c.detail).toBe('invalid owner file');
-    });
   });
 });
 
 describe('doctor output', () => {
   it('renders marks, fix lines and the summary', () => {
-    const result = runDoctor(fakeEnv({ missing: ['nft'], fsType: 'ext4' }));
+    const result = runDoctor(linuxEnv({ missing: ['bwrap'] }));
     const text = formatDoctor(result);
     expect(text).toMatch(/^✓ /m);
-    expect(text).toMatch(/^✗ .*nft/m);
-    expect(text).toMatch(/^! /m);
+    expect(text).toMatch(/^✗ .*bwrap/m);
     expect(text).toMatch(/^· /m);
-    expect(text).toContain('Fix: sudo pacman -S --needed nftables');
+    expect(text).toContain('Fix: sudo pacman -S --needed bubblewrap');
     expect(text.trimEnd().split('\n').at(-1)).toBe('1 problem(s) found.');
   });
 
   it('prints the all-clear line when nothing fails', () => {
-    const text = formatDoctor(runDoctor(fakeEnv()));
+    const text = formatDoctor(runDoctor(linuxEnv()));
     expect(text.trimEnd().split('\n').at(-1)).toBe('All required checks passed.');
   });
 
@@ -235,7 +237,7 @@ describe('doctor output', () => {
     let out = '';
     const code = runDoctorCommand(
       { json: true },
-      { env: fakeEnv({ uid: 0 }), writeOut: (t) => (out += t) },
+      { env: linuxEnv({ uid: 0 }), writeOut: (t) => (out += t) },
     );
     expect(code).toBe(1);
     const parsed = JSON.parse(out) as { ok: boolean; checks: Array<{ id: string }> };
@@ -245,9 +247,7 @@ describe('doctor output', () => {
 
   it('registers the doctor command with a --json option', () => {
     const doctor = buildProgram().commands.find((c) => c.name() === 'doctor');
-    expect(doctor?.description()).toBe(
-      'Check whether this machine can host the Coordinator computer',
-    );
+    expect(doctor?.description()).toBe('Check whether this machine is ready to run Cairn tasks');
     expect(doctor?.options.map((o) => o.long)).toContain('--json');
   });
 });

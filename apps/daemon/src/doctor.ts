@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, statfsSync } from 'node:fs';
-import { userInfo } from 'node:os';
+import { homedir, userInfo } from 'node:os';
 import process from 'node:process';
 
 export type CheckStatus = 'pass' | 'fail' | 'warn' | 'info';
@@ -22,11 +22,11 @@ export interface DoctorEnv {
   platform: string;
   uid: number;
   username: string;
+  home: string;
   nodeVersion: string;
   readFile(path: string): string | undefined;
   which(cmd: string): boolean;
   run(cmd: string, args: string[]): { status: number | null; stdout: string };
-  statfsType(path: string): string | undefined;
   freeBytes(path: string): number | undefined;
 }
 
@@ -38,22 +38,15 @@ interface ToolSpec {
   packages: Record<KnownFamily, string>;
 }
 
-const SYSTEMD_PACKAGES = {
-  arch: 'systemd',
-  debian: 'systemd-container',
-  fedora: 'systemd-container',
-};
-
-const TOOLS: ToolSpec[] = [
-  { cmd: 'systemd-nspawn', packages: SYSTEMD_PACKAGES },
-  { cmd: 'machinectl', packages: SYSTEMD_PACKAGES },
-  { cmd: 'nft', packages: { arch: 'nftables', debian: 'nftables', fedora: 'nftables' } },
-  { cmd: 'ip', packages: { arch: 'iproute2', debian: 'iproute2', fedora: 'iproute' } },
+const LINUX_REQUIRED_TOOLS: ToolSpec[] = [
   {
-    cmd: 'nmcli',
-    packages: { arch: 'networkmanager', debian: 'network-manager', fedora: 'NetworkManager' },
+    cmd: 'systemd-run',
+    packages: { arch: 'systemd', debian: 'systemd', fedora: 'systemd' },
   },
-  { cmd: 'sudo', packages: { arch: 'sudo', debian: 'sudo', fedora: 'sudo' } },
+  {
+    cmd: 'bwrap',
+    packages: { arch: 'bubblewrap', debian: 'bubblewrap', fedora: 'bubblewrap' },
+  },
 ];
 
 const INSTALL_COMMAND: Record<KnownFamily, string> = {
@@ -70,9 +63,6 @@ const FAMILY_IDS: Record<KnownFamily, string[]> = {
 
 const MIN_NODE = [22, 19, 0];
 const MIN_FREE_BYTES = 10 * 1024 ** 3;
-const OWNER_FILE = '/etc/cairn-orb/owner';
-const OWNER_PATTERN = /^[a-z_][a-z0-9_-]{0,31}$/;
-const BTRFS_MAGIC = 0x9123683e;
 
 function osReleaseIds(content: string | undefined): string[] {
   if (content === undefined) return [];
@@ -113,56 +103,93 @@ function formatGib(bytes: number): string {
   return `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
 }
 
-function versionsDetail(env: DoctorEnv): string {
-  const firstLine = env.run('systemctl', ['--version']).stdout.split('\n')[0] ?? '';
-  const systemd = /^systemd\s+(\S+)/.exec(firstLine)?.[1] ?? 'unknown';
-  const kernel = env.run('uname', ['-r']).stdout.trim() || 'unknown';
-  return `systemd ${systemd}, kernel ${kernel} (known to work: systemd 262, kernel 7.2)`;
+function nodeCheck(env: DoctorEnv): Check {
+  return nodeAtLeastMinimum(env.nodeVersion)
+    ? { id: 'node', label: 'Node', status: 'pass', detail: env.nodeVersion }
+    : {
+        id: 'node',
+        label: 'Node',
+        status: 'fail',
+        detail: env.nodeVersion,
+        fix: 'install Node 22.19 or newer',
+      };
 }
 
-function installCheck(env: DoctorEnv): Check {
-  const label = 'Host install';
-  const raw = env.readFile(OWNER_FILE);
-  if (raw === undefined) {
-    return {
-      id: 'install',
-      label,
-      status: 'info',
-      detail: 'not installed yet',
-      fix: 'sudo bash scripts/ops/orb/install-host.sh',
-    };
-  }
-  const owner = raw.trim();
-  if (!OWNER_PATTERN.test(owner)) {
-    return { id: 'install', label, status: 'fail', detail: 'invalid owner file' };
-  }
-  if (owner !== env.username) {
-    return {
-      id: 'install',
-      label,
-      status: 'fail',
-      detail: `installed for ${owner}; run as ${owner}`,
-    };
-  }
-  return { id: 'install', label, status: 'pass', detail: `installed for ${owner}` };
+function notRootCheck(env: DoctorEnv): Check {
+  return env.uid !== 0
+    ? { id: 'not-root', label: 'Not running as root', status: 'pass' }
+    : {
+        id: 'not-root',
+        label: 'Not running as root',
+        status: 'fail',
+        fix: 'run cairn doctor as the account that will run tasks, without sudo',
+      };
 }
 
-export function runDoctor(env: DoctorEnv): DoctorResult {
-  if (env.platform !== 'linux') {
+function diskCheck(env: DoctorEnv): Check {
+  const free = env.freeBytes(env.home);
+  if (free !== undefined && free >= MIN_FREE_BYTES) {
     return {
-      ok: false,
-      checks: [
-        {
-          id: 'linux',
-          label: 'Linux host',
+      id: 'disk',
+      label: 'Free disk space',
+      status: 'pass',
+      detail: `${formatGib(free)} free under ${env.home}`,
+    };
+  }
+  return {
+    id: 'disk',
+    label: 'Free disk space',
+    status: 'warn',
+    detail: free === undefined ? 'free space unknown' : `${formatGib(free)} free under ${env.home}`,
+    fix: 'free up space in the home directory (at least 10 GiB recommended)',
+  };
+}
+
+function darwinChecks(env: DoctorEnv): Check[] {
+  const checks: Check[] = [
+    { id: 'macos', label: 'macOS host', status: 'pass' },
+    nodeCheck(env),
+    notRootCheck(env),
+    env.which('sandbox-exec')
+      ? { id: 'seatbelt', label: 'seatbelt confinement (sandbox-exec)', status: 'pass' }
+      : {
+          id: 'seatbelt',
+          label: 'seatbelt confinement (sandbox-exec)',
           status: 'fail',
-          detail: 'The Coordinator computer needs a Linux host; this machine can still run tasks',
+          detail: 'sandbox-exec not found; it is required to confine step runs',
+          fix: 'sandbox-exec ships with macOS; update or reinstall the OS to restore it',
         },
-      ],
-    };
-  }
+    env.which('container')
+      ? {
+          id: 'vm-runtime',
+          label: 'Computer VM runtime (container)',
+          status: 'pass',
+          detail: 'Apple container CLI found',
+        }
+      : {
+          id: 'vm-runtime',
+          label: 'Computer VM runtime (container)',
+          status: 'info',
+          detail: 'not installed; optional — enables the Linux VM Computer feature',
+        },
+    diskCheck(env),
+    {
+      id: 'versions',
+      label: 'Versions',
+      status: 'info',
+      detail: `macOS ${env.run('sw_vers', ['-productVersion']).stdout.trim() || 'unknown'}, kernel ${
+        env.run('uname', ['-r']).stdout.trim() || 'unknown'
+      }`,
+    },
+  ];
+  return checks;
+}
+
+function linuxChecks(env: DoctorEnv): Check[] {
   const checks: Check[] = [{ id: 'linux', label: 'Linux host', status: 'pass' }];
   const family = distroFamily(env.readFile('/etc/os-release'));
+
+  checks.push(nodeCheck(env), notRootCheck(env));
 
   const init = env.readFile('/proc/1/comm')?.trim();
   checks.push(
@@ -177,7 +204,7 @@ export function runDoctor(env: DoctorEnv): DoctorResult {
         },
   );
 
-  for (const tool of TOOLS) {
+  for (const tool of LINUX_REQUIRED_TOOLS) {
     checks.push(
       env.which(tool.cmd)
         ? { id: `tool:${tool.cmd}`, label: tool.cmd, status: 'pass' }
@@ -185,33 +212,24 @@ export function runDoctor(env: DoctorEnv): DoctorResult {
             id: `tool:${tool.cmd}`,
             label: tool.cmd,
             status: 'fail',
-            detail: 'not found',
+            detail: 'not found; required to confine step runs',
             fix: installFix(tool, family),
           },
     );
   }
 
+  const maxUserns = env.readFile('/proc/sys/user/max_user_namespaces')?.trim();
+  const usernsClone = env.readFile('/proc/sys/kernel/unprivileged_userns_clone')?.trim();
   checks.push(
-    nodeAtLeastMinimum(env.nodeVersion)
-      ? { id: 'node', label: 'Node', status: 'pass', detail: env.nodeVersion }
-      : {
-          id: 'node',
-          label: 'Node',
+    maxUserns === '0' || usernsClone === '0'
+      ? {
+          id: 'userns',
+          label: 'Unprivileged user namespaces',
           status: 'fail',
-          detail: env.nodeVersion,
-          fix: 'install Node 22.19 or newer',
-        },
-  );
-
-  checks.push(
-    env.uid !== 0
-      ? { id: 'not-root', label: 'Not running as root', status: 'pass' }
-      : {
-          id: 'not-root',
-          label: 'Not running as root',
-          status: 'fail',
-          fix: 'run cairn doctor as the account that will own the computer, without sudo',
-        },
+          detail: 'disabled; bubblewrap confinement cannot create namespaces',
+          fix: 'sudo sysctl -w user.max_user_namespaces=28633 kernel.unprivileged_userns_clone=1, and persist it in /etc/sysctl.d',
+        }
+      : { id: 'userns', label: 'Unprivileged user namespaces', status: 'pass' },
   );
 
   checks.push(
@@ -225,47 +243,83 @@ export function runDoctor(env: DoctorEnv): DoctorResult {
         },
   );
 
-  const fsType = env.statfsType('/var/lib/machines') ?? env.statfsType('/var/lib');
+  checks.push(diskCheck(env));
+
+  const systemd = /^systemd\s+(\S+)/.exec(
+    env.run('systemctl', ['--version']).stdout.split('\n')[0] ?? '',
+  )?.[1];
+  const kernel = env.run('uname', ['-r']).stdout.trim() || 'unknown';
+  checks.push({
+    id: 'versions',
+    label: 'Versions',
+    status: 'info',
+    detail: `systemd ${systemd ?? 'unknown'}, kernel ${kernel} (known to work: systemd 262, kernel 7.2)`,
+  });
+
   checks.push(
-    fsType === 'btrfs'
+    env.which('podman')
       ? {
-          id: 'btrfs',
-          label: 'Image storage filesystem',
+          id: 'orb:podman',
+          label: 'podman orb backend',
           status: 'pass',
-          detail: 'btrfs (image snapshots)',
+          detail: 'available for CAIRN_ORB_RUNTIME=podman',
         }
       : {
-          id: 'btrfs',
-          label: 'Image storage filesystem',
-          status: 'warn',
-          detail: 'not btrfs: images are plain directories and rebuilds copy the whole tree',
+          id: 'orb:podman',
+          label: 'podman orb backend',
+          status: 'info',
+          detail: 'not installed; optional — enables CAIRN_ORB_RUNTIME=podman containers',
+          fix: installFix(
+            {
+              cmd: 'podman',
+              packages: { arch: 'podman', debian: 'podman', fedora: 'podman' },
+            },
+            family,
+          ),
+        },
+    env.which('systemd-nspawn') && env.which('machinectl')
+      ? {
+          id: 'orb:nspawn',
+          label: 'nspawn orb backend',
+          status: 'pass',
+          detail: 'available for CAIRN_ORB_RUNTIME=nspawn',
+        }
+      : {
+          id: 'orb:nspawn',
+          label: 'nspawn orb backend',
+          status: 'info',
+          detail: 'not installed; optional — enables CAIRN_ORB_RUNTIME=nspawn',
+          fix: installFix(
+            {
+              cmd: 'systemd-nspawn',
+              packages: {
+                arch: 'systemd',
+                debian: 'systemd-container',
+                fedora: 'systemd-container',
+              },
+            },
+            family,
+          ),
         },
   );
 
-  const free = env.freeBytes('/var/lib');
-  if (free !== undefined && free >= MIN_FREE_BYTES) {
-    checks.push({
-      id: 'disk',
-      label: 'Free disk space',
-      status: 'pass',
-      detail: `${formatGib(free)} free in /var/lib; the base image is about 2 GiB`,
-    });
-  } else {
-    checks.push({
-      id: 'disk',
-      label: 'Free disk space',
-      status: 'warn',
-      detail:
-        free === undefined
-          ? 'free space unknown; the base image is about 2 GiB'
-          : `${formatGib(free)} free in /var/lib; the base image is about 2 GiB`,
-      fix: 'free up space under /var/lib (at least 10 GiB recommended)',
-    });
-  }
+  return checks;
+}
 
-  checks.push({ id: 'versions', label: 'Versions', status: 'info', detail: versionsDetail(env) });
-  checks.push(installCheck(env));
-
+export function runDoctor(env: DoctorEnv): DoctorResult {
+  const checks =
+    env.platform === 'darwin'
+      ? darwinChecks(env)
+      : env.platform === 'linux'
+        ? linuxChecks(env)
+        : [
+            {
+              id: 'platform',
+              label: 'Supported platform',
+              status: 'fail' as const,
+              detail: `${env.platform} is unsupported; cairn runs on macOS and Linux`,
+            },
+          ];
   return { checks, ok: checks.every((check) => check.status !== 'fail') };
 }
 
@@ -305,6 +359,7 @@ export function realDoctorEnv(): DoctorEnv {
     platform: process.platform,
     uid: process.getuid?.() ?? -1,
     username: userInfo().username,
+    home: homedir(),
     nodeVersion: process.versions.node,
     readFile: (path) => {
       try {
@@ -315,14 +370,6 @@ export function realDoctorEnv(): DoctorEnv {
     },
     which: (cmd) => realRun('sh', ['-c', `command -v ${cmd}`]).status === 0,
     run: realRun,
-    statfsType: (path) => {
-      try {
-        const type = statfsSync(path).type;
-        return type === BTRFS_MAGIC ? 'btrfs' : `0x${type.toString(16)}`;
-      } catch {
-        return undefined;
-      }
-    },
     freeBytes: (path) => {
       try {
         const stats = statfsSync(path);

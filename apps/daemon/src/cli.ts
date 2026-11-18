@@ -286,7 +286,7 @@ export function buildProgram(): Command {
 
   program
     .command('doctor')
-    .description('Check whether this machine can host the Coordinator computer')
+    .description('Check whether this machine is ready to run Cairn tasks')
     .option('--json', 'print the result as JSON')
     .action((opts: { json?: boolean }) => {
       const code = runDoctorCommand(opts, {

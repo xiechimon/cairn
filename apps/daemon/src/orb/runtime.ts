@@ -1,6 +1,6 @@
 import type { OrbExecOptions, OrbExecResult } from './provider.js';
 
-export type OrbRuntimeName = 'podman' | 'docker' | 'apple';
+export type OrbRuntimeName = 'podman';
 
 export interface OrbSpawnSpec {
   orbId: string;
