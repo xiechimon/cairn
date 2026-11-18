@@ -61,7 +61,13 @@ test('diff mode reds added Chinese lines and Chinese commit messages only', () =
     spawnSync(process.execPath, [script], {
       cwd,
       encoding: 'utf8',
-      env: { ...process.env, ENGLISH_ONLY_BASE_SHA: '', PREPUSH_BASE_SHA: '', ...env },
+      env: {
+        ...process.env,
+        ENGLISH_ONLY_BASE_SHA: '',
+        PREPUSH_BASE_SHA: '',
+        GITHUB_REF: '',
+        ...env,
+      },
     });
   try {
     git('init');
