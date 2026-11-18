@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { openDbWithHandle } from '../../apps/server/src/db/client.js';
 import { githubConnection } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
-import { githubUserRepos } from '../../apps/server/src/lib/github.js';
+import { githubAppUserRepos } from '../../apps/server/src/lib/github.js';
 import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
 import { githubTokenOrNull } from '../../apps/server/src/services/github-connection.js';
 import {
@@ -102,7 +102,7 @@ export async function runGithubAuthEmulatorCase() {
       world.team.id,
     );
     assert.match(token ?? '', /^ghu_/);
-    const repos = await githubUserRepos(globalThis.fetch, token ?? '');
+    const repos = await githubAppUserRepos(globalThis.fetch, token ?? '');
     assert(repos.some((r) => r.fullName === 'octo/demo'));
 
     db.update(githubConnection)

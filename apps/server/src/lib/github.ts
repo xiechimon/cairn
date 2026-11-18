@@ -473,39 +473,90 @@ export interface GithubUserRepo {
 }
 
 const USER_REPOS_PER_PAGE = 100;
+const MAX_REPO_PAGES = 10_000;
+
+export function isGithubAppUserToken(token: string): boolean {
+  return token.startsWith('ghu_');
+}
+
+function toUserRepo(raw: Record<string, unknown>): GithubUserRepo | null {
+  const owner = raw.owner as { login?: unknown } | null | undefined;
+  if (
+    typeof raw.id !== 'number' ||
+    typeof raw.name !== 'string' ||
+    typeof raw.full_name !== 'string' ||
+    typeof owner?.login !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    id: raw.id,
+    owner: owner.login,
+    name: raw.name,
+    fullName: raw.full_name,
+    isPrivate: raw.private === true,
+  };
+}
+
+function pageTotal(data: unknown): number {
+  const total = (data as { total_count?: unknown } | null)?.total_count;
+  return typeof total === 'number' && total >= 0 ? total : 0;
+}
 
 export async function githubUserRepos(
   fetchImpl: FetchLike,
   token: string,
 ): Promise<GithubUserRepo[]> {
-  const url = `${githubApiBaseUrl()}/user/repos?per_page=${USER_REPOS_PER_PAGE}&sort=pushed`;
-  const data = await readJson(fetchImpl, url, {
-    ...API_HEADERS,
-    authorization: `Bearer ${token}`,
-  });
-  if (!Array.isArray(data)) {
-    throw new HttpError(502, 'github user repos response not an array');
-  }
+  const headers = { ...API_HEADERS, authorization: `Bearer ${token}` };
   const repos: GithubUserRepo[] = [];
-  for (const raw of data as Array<Record<string, unknown>>) {
-    const owner = raw.owner as { login?: unknown } | null | undefined;
-    if (
-      typeof raw.id !== 'number' ||
-      typeof raw.name !== 'string' ||
-      typeof raw.full_name !== 'string' ||
-      typeof owner?.login !== 'string'
-    ) {
-      continue;
+  for (let page = 1; page <= MAX_REPO_PAGES; page++) {
+    const url = `${githubApiBaseUrl()}/user/repos?per_page=${USER_REPOS_PER_PAGE}&sort=pushed&page=${page}`;
+    const data = await readJson(fetchImpl, url, headers);
+    if (!Array.isArray(data)) {
+      throw new HttpError(502, 'github user repos response not an array');
     }
-    repos.push({
-      id: raw.id,
-      owner: owner.login,
-      name: raw.name,
-      fullName: raw.full_name,
-      isPrivate: raw.private === true,
-    });
+    for (const raw of data as Array<Record<string, unknown>>) {
+      const repo = toUserRepo(raw);
+      if (repo !== null) repos.push(repo);
+    }
+    if (data.length < USER_REPOS_PER_PAGE) break;
   }
   return repos;
+}
+
+export async function githubAppUserRepos(
+  fetchImpl: FetchLike,
+  token: string,
+): Promise<GithubUserRepo[]> {
+  const headers = { ...API_HEADERS, authorization: `Bearer ${token}` };
+  const installationIds: number[] = [];
+  for (let page = 1; page <= MAX_REPO_PAGES; page++) {
+    const url = `${githubApiBaseUrl()}/user/installations?per_page=${USER_REPOS_PER_PAGE}&page=${page}`;
+    const data = (await readJson(fetchImpl, url, headers)) as { installations?: unknown };
+    const list = Array.isArray(data.installations) ? data.installations : [];
+    for (const raw of list as Array<Record<string, unknown>>) {
+      if (typeof raw.id === 'number') installationIds.push(raw.id);
+    }
+    if (list.length === 0 || page * USER_REPOS_PER_PAGE >= pageTotal(data)) break;
+  }
+  const found: { repo: GithubUserRepo; pushedAt: number }[] = [];
+  for (const installationId of installationIds) {
+    for (let page = 1; page <= MAX_REPO_PAGES; page++) {
+      const url = `${githubApiBaseUrl()}/user/installations/${installationId}/repositories?per_page=${USER_REPOS_PER_PAGE}&page=${page}`;
+      const data = (await readJson(fetchImpl, url, headers)) as { repositories?: unknown };
+      const list = Array.isArray(data.repositories) ? data.repositories : [];
+      for (const raw of list as Array<Record<string, unknown>>) {
+        const repo = toUserRepo(raw);
+        if (repo !== null) {
+          const pushedAt = Date.parse(typeof raw.pushed_at === 'string' ? raw.pushed_at : '');
+          found.push({ repo, pushedAt: Number.isNaN(pushedAt) ? 0 : pushedAt });
+        }
+      }
+      if (list.length === 0 || page * USER_REPOS_PER_PAGE >= pageTotal(data)) break;
+    }
+  }
+  found.sort((a, b) => b.pushedAt - a.pushedAt);
+  return found.map((entry) => entry.repo);
 }
 
 export async function githubUserIdentity(

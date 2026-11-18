@@ -54,6 +54,25 @@ const REPOS_PAYLOAD = [
   { id: 'bad-entry', name: 42 },
 ];
 
+function mockGithubRoutes(routes: (url: URL) => { status?: number; body: unknown } | null) {
+  const calls: string[] = [];
+  const impl: FetchLike = async (input) => {
+    const url = new URL(String(input));
+    calls.push(`${url.pathname}${url.search}`);
+    const hit = routes(url);
+    const status = hit === null ? 404 : (hit.status ?? 200);
+    const body = hit?.body ?? { message: 'unmocked path' };
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: () => null },
+      json: async () => body,
+      text: async () => JSON.stringify(body),
+    };
+  };
+  return { impl, calls };
+}
+
 describe('github_connection DAO (reauth overwrite / disconnect deletes the row)', () => {
   test('create: row persisted, token stored only as a v1: envelope ciphertext, plaintext in no column', () => {
     const s = bootServer();
@@ -230,6 +249,99 @@ describe('GET /api/github/repos?q= proxy (spec 12 data-contract surface)', () =>
       seedConnection(s);
       const res = await req(s.app, 'GET', '/api/github/repos');
       expect(res.status).toBe(502);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('/user/repos paginates past the first page', async () => {
+    const pageOne = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      name: `repo-${i}`,
+      full_name: `octo/repo-${i}`,
+      private: false,
+      owner: { login: 'octo' },
+    }));
+    const { impl, calls } = mockGithubRoutes((url) => {
+      if (url.pathname !== '/user/repos') return null;
+      const page = Number(url.searchParams.get('page') ?? '1');
+      return {
+        body:
+          page === 1
+            ? pageOne
+            : [
+                {
+                  id: 101,
+                  name: 'private-tail',
+                  full_name: 'octo/private-tail',
+                  private: true,
+                  owner: { login: 'octo' },
+                },
+              ],
+      };
+    });
+    const s = bootServer({ githubFetch: impl });
+    try {
+      seedConnection(s);
+      const res = await req(s.app, 'GET', '/api/github/repos');
+      expect(res.status).toBe(200);
+      const parsed = githubReposResponseSchema.parse(await res.json());
+      expect(parsed.repos).toHaveLength(101);
+      expect(parsed.repos.at(-1)?.full_name).toBe('octo/private-tail');
+      expect(calls.filter((u) => u.startsWith('/user/repos'))).toHaveLength(2);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('app user token (ghu_, device grant): lists installation repos incl. private, never calls /user/repos', async () => {
+    const { impl, calls } = mockGithubRoutes((url) => {
+      if (url.pathname === '/user/installations') {
+        return { body: { total_count: 1, installations: [{ id: 7 }] } };
+      }
+      if (url.pathname === '/user/installations/7/repositories') {
+        return {
+          body: {
+            total_count: 2,
+            repository_selection: 'all',
+            repositories: [
+              {
+                id: 1,
+                name: 'alpha',
+                full_name: 'octo/alpha',
+                private: false,
+                owner: { login: 'octo' },
+                pushed_at: '2026-11-01T00:00:00Z',
+              },
+              {
+                id: 2,
+                name: 'beta-private',
+                full_name: 'octo/beta-private',
+                private: true,
+                owner: { login: 'octo' },
+                pushed_at: '2026-11-02T00:00:00Z',
+              },
+            ],
+          },
+        };
+      }
+      if (url.pathname === '/user/repos') return { body: [REPOS_PAYLOAD[0]] };
+      return null;
+    });
+    const s = bootServer({ githubFetch: impl });
+    try {
+      upsertGithubConnection(depsOf(s), {
+        teamId: s.team.id,
+        login: 'octo',
+        accessToken: 'ghu_device_grant_token',
+        scope: '',
+        device: { clientId: 'Iv23shared', refreshTokenExpiresAt: Date.now() + 86_400_000 },
+      });
+      const res = await req(s.app, 'GET', '/api/github/repos');
+      expect(res.status).toBe(200);
+      const parsed = githubReposResponseSchema.parse(await res.json());
+      expect(parsed.repos.map((r) => r.full_name)).toEqual(['octo/beta-private', 'octo/alpha']);
+      expect(calls.every((u) => !u.startsWith('/user/repos'))).toBe(true);
     } finally {
       s.dispose();
     }

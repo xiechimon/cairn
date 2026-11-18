@@ -36,7 +36,7 @@ import type { AppContext } from './context.js';
 import type { Db } from './db/client.js';
 import { build, machine, provider, routingRule, step, team, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
-import { githubUserRepos } from './lib/github.js';
+import { githubAppUserRepos, githubUserRepos, isGithubAppUserToken } from './lib/github.js';
 import { nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import {
@@ -956,7 +956,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     );
     if (!('token' in access)) throw notFound('github connection');
     const fetchImpl = ctx.githubFetch ?? fetch;
-    const repos = await githubUserRepos(fetchImpl, access.token);
+    const repos = isGithubAppUserToken(access.token)
+      ? await githubAppUserRepos(fetchImpl, access.token)
+      : await githubUserRepos(fetchImpl, access.token);
     const q = c.req.query('q')?.trim().toLowerCase() ?? '';
     const hits = q === '' ? repos : repos.filter((r) => r.fullName.toLowerCase().includes(q));
     return c.json(

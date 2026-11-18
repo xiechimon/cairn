@@ -7,7 +7,7 @@ Exercise the GitHub authorization surfaces (team device sign-in, OAuth transport
 - OAuth base: `CAIRN_GITHUB_OAUTH_BASE_URL` repoints device-code, token-poll, refresh and authorize URLs. Unset or empty retains `https://github.com`. Only loopback `http:` (127.0.0.1, [::1], localhost) with an optional path prefix is accepted; every other value — including https and non-loopback hosts — is rejected, so a grant can never be redirected to a remote host by configuration.
 - Device journey: `startGithubConnectionDevice` issues a code, a real Chromium leg opens the fake `/login/device` page, enters the user code and clicks Authorize; `pollGithubConnectionDevice` then completes with the verified login.
 - Persistence: the completed poll seals both tokens and writes login, numeric user ID, App client ID and both expiries to `github_connection`; `adoptGithubProfile` sets the account display name and avatar.
-- Reads: `githubUserRepos` lists the seeded fake repository over the API base.
+- Reads: `githubAppUserRepos` lists the seeded fake repository over the API base (the `ghu_` grant walks `/user/installations` + `/user/installations/{id}/repositories`).
 - Lifecycle: forcing expiry rotates the pair through the refresh grant; revoking the refresh token disconnects the row with `GitHub authorization expired`.
 
 ## How to get to it (user POV)
@@ -29,7 +29,7 @@ PR coverage lines:
 
 ```text
 Live: Cairn device/OAuth transport, connection persistence, profile adoption and repo reads over loopback HTTP; migrated SQLite DB.
-Mocked: in-repo githubAuthFake (device codes, token exchange, refresh, /user, /user/repos, /user/installations, /login/device approval page).
+Mocked: in-repo githubAuthFake (device codes, token exchange, refresh, /user, /user/repos, /user/installations, /user/installations/{id}/repositories, /login/device approval page).
 Not covered: real GitHub authorization UI and rate limits, legacy OAuth web callback, App installation page, MCP connector sign-in UI, daemon git/gh calls.
 ```
 

@@ -6,7 +6,7 @@ Users bring an existing local git repo into cairn as a project (one of spec 12's
 
 - `local-create` — `POST /api/projects {kind:'local', localPath}`: server-side `~` expansion + existence + git-worktree judgment, any failure 400s (reason codes: not_found / not_git / not_absolute, #386); on pass 201, the record/DB row carries the normalized localPath.
 - `hosted-compat` — the legacy `repoKind:'hosted'` creation surface does not regress (bare repo provisioning + cloneUrl).
-- `repos-proxy` — `GET /api/github/repos?q=`: the token comes from github_connection (SecretBox ciphertext), 404 when not connected; once connected it proxies GitHub `/user/repos` (the connection write surface is in github-oauth-picker.md).
+- `repos-proxy` — `GET /api/github/repos?q=`: the token comes from github_connection (SecretBox ciphertext), 404 when not connected; once connected it lists by token kind — an OAuth token (`gho_`/`ghp_`) proxies GitHub `/user/repos` (paginated), an App user token (`ghu_`, the device grant) enumerates `/user/installations` + `/user/installations/{id}/repositories` so private repos the App is installed on show up (the connection write surface is in github-oauth-picker.md).
 - `connection-table` — the github_connection table shape: one row per teamId, accessToken only as a cipher column, no plaintext token column.
 
 ## How to get to it (user POV)

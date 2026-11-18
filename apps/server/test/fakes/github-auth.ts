@@ -30,6 +30,7 @@ interface GrantState {
   refreshToken: string;
   revoked: boolean;
   accessRevoked: boolean;
+  kind: 'ghu_' | 'gho_';
 }
 
 export interface AuthCall {
@@ -111,6 +112,7 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
       refreshToken,
       revoked: false,
       accessRevoked: false,
+      kind: accessToken.startsWith('ghu_') ? 'ghu_' : 'gho_',
     });
   };
 
@@ -145,10 +147,16 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
     if (grant !== undefined) grant.accessRevoked = true;
   };
 
-  function mintGrant(userId: number) {
-    const accessToken = `ghu_${nextId()}`;
+  function mintGrant(userId: number, kind: 'ghu_' | 'gho_') {
+    const accessToken = `${kind}${nextId()}`;
     const refreshToken = `ghr_${nextId()}`;
-    grants.set(accessToken, { userId, refreshToken, revoked: false, accessRevoked: false });
+    grants.set(accessToken, {
+      userId,
+      refreshToken,
+      revoked: false,
+      accessRevoked: false,
+      kind,
+    });
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -180,7 +188,7 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
       if (device.status === 'pending')
         return { status: 200, body: { error: 'authorization_pending' } };
       if (device.status === 'denied') return { status: 200, body: { error: 'access_denied' } };
-      return { status: 200, body: mintGrant(device.userId) };
+      return { status: 200, body: mintGrant(device.userId, 'ghu_') };
     }
     if (grantType === 'refresh_token') {
       const refreshToken = form.get('refresh_token') ?? '';
@@ -191,7 +199,7 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
         return { status: 200, body: { error: 'bad_refresh_token' } };
       }
       entry[1].revoked = true;
-      return { status: 200, body: mintGrant(entry[1].userId) };
+      return { status: 200, body: mintGrant(entry[1].userId, entry[1].kind) };
     }
     if (grantType === 'authorization_code' || (grantType === null && form.has('code'))) {
       const code = form.get('code') ?? '';
@@ -205,6 +213,7 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
         refreshToken,
         revoked: false,
         accessRevoked: false,
+        kind: 'gho_',
       });
       return {
         status: 200,
@@ -300,10 +309,29 @@ export function githubAuthFake(options: GithubAuthFakeOptions = {}) {
         headers: {},
       };
     }
+    const installationRepos = path.match(/\/user\/installations\/(\d+)\/repositories$/);
+    if (method === 'GET' && installationRepos) {
+      if (bearerUser(auth) === null)
+        return { status: 401, body: { message: 'Bad credentials' }, headers: {} };
+      if (installations === 0) return { status: 404, body: { message: 'Not Found' }, headers: {} };
+      const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? '30') || 30);
+      const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1);
+      return {
+        status: 200,
+        body: {
+          total_count: repos.length,
+          repository_selection: 'all',
+          repositories: repos.slice((page - 1) * perPage, page * perPage),
+        },
+        headers: {},
+      };
+    }
     if (method === 'GET' && path.endsWith('/user/repos')) {
       if (bearerUser(auth) === null)
         return { status: 401, body: { message: 'Bad credentials' }, headers: {} };
-      return { status: 200, body: repos, headers: {} };
+      const bearer = auth?.startsWith('Bearer ') ? auth.slice(7) : '';
+      const visible = bearer.startsWith('ghu_') ? repos.filter((r) => r.private !== true) : repos;
+      return { status: 200, body: visible, headers: {} };
     }
     if (method === 'GET' && path.endsWith('/user')) {
       const user = bearerUser(auth);
