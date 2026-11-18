@@ -15,6 +15,7 @@ export const prepushModules = [
   'scripts/public-content-allowlist.json',
   'scripts/journal-newline-gate.mjs',
   'scripts/scrub-git-env.mjs',
+  'scripts/import-cycle-gate.mjs',
 ];
 
 export const ciOnlyScripts = {
@@ -40,6 +41,7 @@ export const selfTests = [
   'scripts/public-content-gate.test.mjs',
   'scripts/journal-newline-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
+  'scripts/import-cycle-gate.test.mjs',
   'scripts/epic-done.test.mjs',
   'scripts/agent-rules.test.mjs',
   'scripts/test-changed.test.mjs',
@@ -145,6 +147,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     ['node', 'scripts/ui-drift-gate.mjs'],
     ['node', 'scripts/ui-page-style-gate.mjs'],
     ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
+    ['node', 'scripts/import-cycle-gate.mjs'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],

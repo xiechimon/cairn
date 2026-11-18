@@ -629,6 +629,7 @@ test('code changes keep suites in CI and out of local plans', () => {
         ['node', 'scripts/ui-drift-gate.mjs'],
         ['node', 'scripts/ui-page-style-gate.mjs'],
         ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
+        ['node', 'scripts/import-cycle-gate.mjs'],
         ['pnpm', 'lint'],
         ['pnpm', 'typecheck'],
         ['pnpm', 'spec:parse'],
