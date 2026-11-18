@@ -2255,7 +2255,7 @@ export const EN: Record<string, string> = {
   还没分配机器: 'No machine yet',
   开始条件: 'Starts after',
   '等「{title}」': 'Waits for “{title}”',
-  '等 {n} 个任务': 'Waits for {n} tasks',
+  '等 {n} 个任务': 'Waits for {n#1 task|# tasks}',
   '{name} 拒绝了这个令牌。检查令牌是否填对、有没有过期，然后换一个新的。':
     '{name} rejected this token. Check that it is correct and not expired, then use a new one.',
   '令牌有效，但权限不够。给令牌加上需要的权限后重新检查。':
