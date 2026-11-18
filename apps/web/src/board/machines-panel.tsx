@@ -1,4 +1,4 @@
-import type { ComputerRecord, VmDownload } from '@cairn/shared';
+import type { ComputerRecord, ComputerState, VmDownload } from '@cairn/shared';
 import { cn } from 'cn';
 import { Laptop, Monitor, Plus } from 'lucide-react';
 import { type ReactElement, type ReactNode, useEffect, useState } from 'react';
@@ -25,7 +25,7 @@ import {
   computerActionNoteText,
   useComputerActions,
 } from './computer-actions-menu.js';
-import { CoordinatorComputer } from './computer-feed.js';
+import { CommandFeed } from './computer-feed.js';
 import { MachineScreenSurface } from './computer-screen.js';
 import { ComputerScreenDialog } from './computer-screen-dialog.js';
 import { fleetStatus, fleetStatusLine, machineStateLabel } from './fleet-status.js';
@@ -71,12 +71,39 @@ function MachineGlyph({ machine }: { machine: MachineRow }) {
 
 const COMPUTERS_PANEL_REFRESH_MS = 5_000;
 
+const COMPUTER_STATE_LABEL: Record<ComputerState, string> = {
+  stopped: '关着',
+  starting: '正在开机',
+  running: '开着',
+  failed: '出错',
+};
+
 function machineMeta(machine: MachineRow, now: number, t: TFunc): string {
   if (machine.online !== true) {
     const seen = machine.lastSeenAt ?? 0;
     return seen > 0 ? joinMeta([t('离线'), relativeTime(seen, now, t)]) : t('离线');
   }
   return machineStateLabel(machine, t);
+}
+
+function MachineMeta({
+  machine,
+  computer,
+}: {
+  machine: MachineRow;
+  computer: ComputerRecord | null;
+}) {
+  const { t } = useI18n();
+  const base = machineMeta(machine, Date.now(), t);
+  if (computer === null || machine.online !== true) return <>{base}</>;
+  return (
+    <>
+      {`${base} · `}
+      <span data-testid="computer-state" data-state={computer.state}>
+        {t(COMPUTER_STATE_LABEL[computer.state])}
+      </span>
+    </>
+  );
 }
 
 export function MachineChip({
@@ -291,7 +318,7 @@ function MachineCard({
             <MachineName machine={machine} showIcon={false} />
           </span>
           <span className="truncate text-meta text-content-tertiary">
-            {machineMeta(machine, Date.now(), t)}
+            <MachineMeta machine={machine} computer={computer} />
           </span>
         </span>
         {machine.id !== undefined && (
@@ -374,6 +401,7 @@ function MachineCard({
           )}
         </>
       )}
+      {computer !== null && <CommandFeed computerId={computer.id} />}
     </div>
   );
 }
@@ -467,11 +495,6 @@ export function MachinesPanel({
             render={<Link to={settingsHref('machines')} />}
           />
         </div>
-        {host !== null && (
-          <div className="mt-7">
-            <CoordinatorComputer />
-          </div>
-        )}
       </div>
     </SidePanel>
   );

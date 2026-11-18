@@ -199,7 +199,6 @@ export const EN: Record<string, string> = {
   命令记录: 'Command log',
   '还没有命令。Coordinator 在这台电脑上跑的命令会出现在这里。':
     'No commands yet. Commands the Coordinator runs on this computer show up here.',
-  'Coordinator 的电脑': "Coordinator's computer",
   电脑离线: 'Computer offline',
   'Coordinator 在这台': 'Coordinator runs here',
   放大: 'Enlarge',
@@ -2011,8 +2010,8 @@ export const EN: Record<string, string> = {
   模型服务没能加载: 'Providers did not load',
   正在加载命令记录: 'Loading command history',
   命令记录没能加载: 'Command history did not load',
-  '正在加载 Coordinator 的电脑': "Loading the Coordinator's computer",
-  'Coordinator 的电脑没能加载': "The Coordinator's computer did not load",
+  '显示全部 {n} 条': 'Show all {n}',
+  '只看最近 {n} 条': 'Show latest {n}',
   正在加载任务: 'Loading tasks',
   任务没能加载: 'Tasks did not load',
   正在加载成果: 'Loading results',

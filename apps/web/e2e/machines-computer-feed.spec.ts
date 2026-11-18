@@ -88,6 +88,10 @@ async function emit(page: Page, event: unknown) {
 
 const entries = (panel: ReturnType<Page['getByRole']>) => panel.getByTestId('computer-command');
 
+async function showAll(panel: ReturnType<Page['getByRole']>) {
+  await panel.getByTestId('computer-feed-toggle').click();
+}
+
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` });
 }
@@ -107,6 +111,9 @@ test('opening the panel shows the computer state and the command history, newest
   const panel = await open(page, HISTORY_FEED);
   await expect(panel.getByTestId('computer-state')).toHaveText('开着');
   await expect(panel).toContainText('omarchy');
+  await expect(panel.getByTestId('machine-card')).toHaveCount(1);
+  await expect(panel.getByText('Coordinator 的电脑')).toHaveCount(0);
+  await expect(panel.getByTestId('machine-card').getByTestId('computer-feed')).toBeVisible();
   await expect(entries(panel)).toHaveCount(3);
   await expect(entries(panel).nth(0)).toContainText('git status --short');
   await expect(entries(panel).nth(0)).toHaveAttribute('data-status', 'done');
@@ -138,6 +145,8 @@ test('a new command appears live as running and the same entry settles to done',
     type: 'computer.command',
     command: command(4, { command: 'ls', status: 'running', exitCode: null, output: '', at: T0 + 4000 }),
   });
+  await expect(panel.getByTestId('computer-feed-toggle')).toHaveText('显示全部 4 条');
+  await showAll(panel);
   await expect(entries(panel)).toHaveCount(4);
   await expect(entries(panel).nth(3)).toHaveAttribute('data-status', 'running');
 
@@ -184,6 +193,8 @@ test('the feed follows new commands at the bottom and stays put once scrolled up
   const many = Array.from({ length: 30 }, (_, i) => command(i + 1, { output: '' }));
   const panel = await open(page, { computers: [computer()], commands: many });
   const feed = panel.getByTestId('computer-feed');
+  await expect(entries(panel)).toHaveCount(3);
+  await showAll(panel);
   await expect(entries(panel)).toHaveCount(30);
   const atBottom = () =>
     feed.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight < 2);
@@ -318,27 +329,35 @@ test('a computer with no commands shows an empty feed, not an error', async ({ p
 test('an offline machine shows the computer state with an offline note and keeps the history', async ({
   page,
 }) => {
-  const panel = await open(page, {
-    computers: [computer({ machine: { id: 'm1', name: 'omarchy', online: false } })],
-    commands: [command(1)],
-  });
+  const panel = await open(
+    page,
+    {
+      computers: [computer({ machine: { id: 'm1', name: 'omarchy', online: false } })],
+      commands: [command(1)],
+    },
+    [{ ...FEED_MACHINE, online: false }],
+  );
   await expect(panel).toContainText('omarchy');
-  await expect(panel.getByTestId('computer-state')).toHaveText('离线');
-  await expect(panel.getByTestId('computer-state')).toHaveAttribute('data-state', 'offline');
+  await expect(panel.getByTestId('machine-list-row')).toContainText('离线');
+  await expect(panel.getByTestId('computer-state')).toHaveCount(0);
   await expect(entries(panel)).toHaveCount(1);
   await expect(panel.getByRole('alert')).toHaveCount(0);
 });
 
-test('machine presence updates the computer badge without reloading or losing history', async ({
+test('machine presence updates the card state without reloading or losing history', async ({
   page,
 }) => {
   const feed: Feed = { computers: [computer()], commands: [command(1)] };
-  const panel = await open(page, feed);
+  const machine = { ...FEED_MACHINE };
+  const panel = await open(page, feed, [machine]);
   await expect(panel.getByTestId('computer-state')).toHaveText('开着');
+  machine.online = false;
   feed.computers = [computer({ machine: { id: 'm1', name: 'omarchy', online: false } })];
   await emit(page, { type: 'machine_presence', machineId: 'm1', online: false });
-  await expect(panel.getByTestId('computer-state')).toHaveText('离线');
+  await expect(panel.getByTestId('machine-list-row')).toContainText('离线');
+  await expect(panel.getByTestId('computer-state')).toHaveCount(0);
   await expect(entries(panel)).toHaveCount(1);
+  machine.online = true;
   feed.computers = [computer()];
   await emit(page, { type: 'machine_presence', machineId: 'm1', online: true });
   await expect(panel.getByTestId('computer-state')).toHaveText('开着');
@@ -750,6 +769,16 @@ const MACHINE = { id: 'm1', name: 'omarchy', online: true, kind: 'remote', maxCo
 
 const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?: unknown[] }> = {
   machines: { feed: HISTORY_FEED, expand: null, machines: [MACHINE] },
+  nocommands: { feed: { computers: [computer()], commands: [] }, expand: null, machines: [SCREEN_MACHINE] },
+  few: { feed: HISTORY_FEED, expand: null, machines: [SCREEN_MACHINE] },
+  many: {
+    feed: {
+      computers: [computer()],
+      commands: Array.from({ length: 8 }, (_, i) => command(i + 1, { command: `pnpm test --filter pkg-${i}` })),
+    },
+    expand: null,
+    machines: [SCREEN_MACHINE],
+  },
   empty: { feed: { computers: [], commands: [] }, expand: null },
   history: { feed: HISTORY_FEED, expand: 1 },
   offline: {
@@ -769,7 +798,7 @@ const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?
 };
 
 for (const theme of ['light', 'dark'] as const) {
-  for (const width of [1280, 390]) {
+  for (const width of [1440, 390]) {
     for (const [scene, { feed, expand, machines }] of Object.entries(SHOT_SCENES)) {
       test(`screenshots ${scene} ${theme} ${width}`, async ({ page }) => {
         test.skip(!SHOTS, 'screenshots only on request');

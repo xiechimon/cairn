@@ -1,11 +1,8 @@
-import type { ComputerCommand, ComputerRecord, ComputerState } from '@cairn/shared';
+import type { ComputerCommand } from '@cairn/shared';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { useAuth } from '../api/auth.js';
 import { computerFeedStore, mergeComputerFeed } from '../api/computer-feed.js';
-import { useComputerCommands, useComputers } from '../api/hooks.js';
+import { useComputerCommands } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { ListCard } from '../components/list-card.js';
-import { MachineName } from '../components/machine-label.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Badge } from '../components/ui/badge.js';
@@ -17,17 +14,11 @@ import {
 } from '../components/ui/collapsible.js';
 import { StatusChip, type StatusTone } from '../components/ui/status-chip.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronRight, Terminal } from '../icons/index.js';
+import { ChevronRight } from '../icons/index.js';
 import { relativeTime } from './rel-time.js';
 
 const STICK_PX = 24;
-
-const STATE_LABEL: Record<ComputerState, string> = {
-  stopped: '关着',
-  starting: '正在开机',
-  running: '开着',
-  failed: '出错',
-};
+const COLLAPSED_COMMANDS = 3;
 
 const TIME_TICK_MS = 30_000;
 
@@ -80,7 +71,7 @@ function CommandEntry({ command, now }: { command: ComputerCommand; now: number 
       data-testid="computer-command"
       data-call-id={command.callId}
       data-status={command.status}
-      className="flex min-w-0 flex-col gap-1 px-3.5 py-2.5"
+      className="flex min-w-0 flex-col gap-1 px-5 py-2.5"
     >
       <div className="flex min-w-0 items-center gap-2">
         <span className="flex-none text-meta text-content-tertiary">
@@ -163,7 +154,7 @@ function CommandEntry({ command, now }: { command: ComputerCommand; now: number 
   );
 }
 
-function CommandFeed({ computerId }: { computerId: string }) {
+export function CommandFeed({ computerId }: { computerId: string }) {
   const { t } = useI18n();
   const { teamId } = useLiveData();
   const now = useNow();
@@ -180,12 +171,13 @@ function CommandFeed({ computerId }: { computerId: string }) {
       ),
     [history.data, liveCommands, computerId],
   );
+  const [showAll, setShowAll] = useState(false);
   const scroller = useRef<HTMLUListElement>(null);
   const stuck = useRef(true);
   useLayoutEffect(() => {
     const el = scroller.current;
     if (el !== null && commands.length > 0 && stuck.current) el.scrollTop = el.scrollHeight;
-  }, [commands]);
+  }, [commands, showAll]);
   if (commands.length === 0) {
     return (
       <QueryBoundary
@@ -193,11 +185,11 @@ function CommandFeed({ computerId }: { computerId: string }) {
         isEmpty
         loadingLabel={t('正在加载命令记录')}
         errorTitle={t('命令记录没能加载')}
-        className="px-3.5 py-3"
+        className="px-5 py-3"
         empty={
           <p
             data-testid="computer-feed-empty"
-            className="m-0 px-3.5 py-3 text-meta text-content-tertiary"
+            className="m-0 px-5 py-3 text-meta text-content-tertiary"
           >
             {t('还没有命令。Coordinator 在这台电脑上跑的命令会出现在这里。')}
           </p>
@@ -207,75 +199,38 @@ function CommandFeed({ computerId }: { computerId: string }) {
       </QueryBoundary>
     );
   }
+  const collapsible = commands.length > COLLAPSED_COMMANDS;
+  const visible = collapsible && !showAll ? commands.slice(-COLLAPSED_COMMANDS) : commands;
   return (
-    <ul
-      ref={scroller}
-      data-testid="computer-feed"
-      aria-label={t('命令记录')}
-      onScroll={(event) => {
-        const el = event.currentTarget;
-        stuck.current = el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_PX;
-      }}
-      className="m-0 flex max-h-80 list-none flex-col divide-y divide-border overflow-y-auto p-0"
-    >
-      {commands.map((command) => (
-        <CommandEntry key={command.callId} command={command} now={now} />
-      ))}
-    </ul>
-  );
-}
-
-function ComputerHead({ computer }: { computer: ComputerRecord }) {
-  const { t } = useI18n();
-  return (
-    <div className="flex items-center gap-3 px-3.5 py-3">
-      <Terminal aria-hidden="true" className="size-5.5 flex-none text-content-secondary" />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-ui font-medium text-foreground">
-          {t('Coordinator 的电脑')}
-        </span>
-        <span className="truncate text-meta text-content-tertiary">
-          <MachineName machine={computer.machine} compact />
-        </span>
-      </span>
-      <Badge
-        data-testid="computer-state"
-        data-state={computer.machine.online ? computer.state : 'offline'}
-        variant="secondary"
-        className={`flex-none font-normal ${computer.machine.online ? '' : 'text-content-tertiary'}`}
+    <>
+      <ul
+        ref={scroller}
+        data-testid="computer-feed"
+        aria-label={t('命令记录')}
+        onScroll={(event) => {
+          const el = event.currentTarget;
+          stuck.current = el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_PX;
+        }}
+        className="m-0 flex max-h-80 list-none flex-col divide-y divide-border overflow-y-auto p-0"
       >
-        {computer.machine.online ? t(STATE_LABEL[computer.state]) : t('离线')}
-      </Badge>
-    </div>
-  );
-}
-
-function ComputerSection() {
-  const { t } = useI18n();
-  const { teamId } = useLiveData();
-  const computers = useComputers(teamId, true);
-  const computer = computers.data?.[0];
-  return (
-    <QueryBoundary
-      query={computers}
-      isEmpty={computer === undefined}
-      loadingLabel={t('正在加载 Coordinator 的电脑')}
-      errorTitle={t('Coordinator 的电脑没能加载')}
-      skeletonRows={1}
-      empty={null}
-    >
-      {computer !== undefined && (
-        <ListCard className="flex-none">
-          <ComputerHead computer={computer} />
-          <CommandFeed computerId={computer.id} />
-        </ListCard>
+        {visible.map((command) => (
+          <CommandEntry key={command.callId} command={command} now={now} />
+        ))}
+      </ul>
+      {collapsible && (
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid="computer-feed-toggle"
+          aria-expanded={showAll}
+          onClick={() => setShowAll(!showAll)}
+          className="h-9 w-full justify-start rounded-none border-t border-border px-5 text-meta font-normal text-content-secondary pointer-coarse:h-11"
+        >
+          {showAll
+            ? t('只看最近 {n} 条', { n: COLLAPSED_COMMANDS })
+            : t('显示全部 {n} 条', { n: commands.length })}
+        </Button>
       )}
-    </QueryBoundary>
+    </>
   );
-}
-
-export function CoordinatorComputer() {
-  const { live } = useLiveData();
-  const auth = useAuth();
-  return live && !auth.gateOpen ? <ComputerSection /> : null;
 }
