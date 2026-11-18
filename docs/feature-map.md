@@ -239,11 +239,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### engine-view
 
-**Engine run in a task thread** (partial). A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with time and cost in the usage popover and a read-only raw output view and takeover in the thread menu. A web prototype on fixture data: no backend sends a run yet.
+**Engine run in a task thread** (partial). A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with time and cost in the usage popover and a raw output view and takeover in the thread menu. Live scrollback streams over the paired engine-screen channel when the machine advertises enginePty (CAIRN_ENGINE_PTY=1 daemon flag), rendered by the in-repo VT grid; keystrokes reach PTY stdin only while the owner's takeover lease holds; fallback to the synthesized transcript view otherwise.
 
 - Research: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md)
 - Frontend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/references/thread-review](design/references/thread-review)
-- Backend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/side-panels-backend-gaps.md](design/side-panels-backend-gaps.md)
+- Backend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/side-panels-backend-gaps.md](design/side-panels-backend-gaps.md), [docs/design/enginerun-takeover-protocol.md](design/enginerun-takeover-protocol.md)
 
 ### harness-dispatch
 
