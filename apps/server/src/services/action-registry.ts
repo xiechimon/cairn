@@ -6,6 +6,7 @@ import {
   type ExternalActionClass,
   isConnectorActionId,
   isExternalActionClass,
+  type ProjectTargetInput,
   projectArchiveAction,
   projectDeleteAction,
   projectUnarchiveAction,
@@ -13,7 +14,7 @@ import {
   type TodoDeleteInput,
   todoDeleteAction,
 } from '@cairn/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { actionJournal, actionProposal, project, todo } from '../db/schema.js';
 import { HttpError, notFound, parseWith } from '../lib/errors.js';
@@ -226,8 +227,25 @@ function externalCard(entry: ActionEntry, targetId: string): AskUserQuestion[] {
   ];
 }
 
+function bindProjectDelete(db: Db, input: ProjectTargetInput, teamId: string): BoundProposal {
+  const row = requireOwnedProject(db, input.projectId, teamId);
+  return {
+    input,
+    card: [
+      {
+        header: '审批',
+        question: `删除项目「${cardText(row.name, CARD_PROJECT_MAX_CHARS)}」：它的任务、构建、对话和定时会一起删除，正在运行的工作会被移除，删除后无法恢复。`,
+        options: [{ label: APPROVE_CHOICE }, { label: REFUSE_CHOICE }],
+      },
+    ],
+  };
+}
+
 function bindProposal(db: Db, entry: ActionEntry, input: unknown, teamId: string): BoundProposal {
   if (entry.id === todoDeleteAction.id) return bindTodoDelete(db, input as TodoDeleteInput, teamId);
+  if (entry.id === projectDeleteAction.id) {
+    return bindProjectDelete(db, input as ProjectTargetInput, teamId);
+  }
   const targetId = entry.targetOf(input);
   if (isExternalActionClass(entry.class)) {
     if (entry.scope === 'project') requireOwnedProject(db, targetId, teamId);
@@ -435,4 +453,100 @@ export function executeAction(
     { behavior: 'immediate' },
   );
   return { status: 'executed', journalId: row.id, output };
+}
+
+export interface UndoJournalInput {
+  journalId: string;
+  teamId: string;
+  actor: 'user' | 'coordinator';
+  surface: ActionSurface;
+  registry?: readonly ActionEntry[];
+}
+
+export function undoJournalEntry(deps: { db: Db }, input: UndoJournalInput): { journalId: string } {
+  const registry: readonly ActionEntry[] = input.registry ?? SLICE1_ACTIONS;
+  let conflictJournalId: string | undefined;
+  const undoRowId = deps.db.transaction(
+    (tx) => {
+      const found = tx
+        .select({ rowid: sql<number>`rowid`, row: actionJournal })
+        .from(actionJournal)
+        .where(eq(actionJournal.id, input.journalId))
+        .get();
+      if (found === undefined || found.row.teamId !== input.teamId) {
+        throw notFound(`journal ${input.journalId}`);
+      }
+      const row = found.row;
+      if (row.kind !== 'run' && row.kind !== 'undo') {
+        throw new HttpError(409, `journal ${row.id} is not undoable`, 'not-undoable');
+      }
+      const entry = registry.find((item) => item.id === row.actionId);
+      const inverse =
+        entry === undefined || entry.inverse === null
+          ? undefined
+          : registry.find((item) => item.id === entry.inverse);
+      const archivePair =
+        inverse?.id === projectArchiveAction.id || inverse?.id === projectUnarchiveAction.id;
+      if (inverse === undefined || !archivePair) {
+        throw new HttpError(409, `action ${row.actionId} has no inverse`, 'no-inverse');
+      }
+      const blocker = tx
+        .select({ id: actionJournal.id })
+        .from(actionJournal)
+        .where(
+          and(
+            eq(actionJournal.teamId, row.teamId),
+            eq(actionJournal.targetId, row.targetId),
+            inArray(actionJournal.kind, ['run', 'undo']),
+            sql`rowid > ${found.rowid}`,
+          ),
+        )
+        .orderBy(desc(sql`rowid`))
+        .get();
+      if (blocker !== undefined) {
+        conflictJournalId = blocker.id;
+        tx.insert(actionJournal)
+          .values({
+            id: newRecordId(),
+            teamId: row.teamId,
+            actionId: row.actionId,
+            targetId: row.targetId,
+            actor: input.actor,
+            surface: input.surface,
+            kind: 'undo-refused',
+            inputHash: inputHash({ undoOf: row.id }),
+            createdAt: nowMs(),
+          })
+          .run();
+        return null;
+      }
+      const inverseInput = parseWith(inverse.inputSchema, { projectId: row.targetId }, 'input');
+      archiveOn(tx, row.targetId, row.teamId, inverse.id === projectArchiveAction.id);
+      const undoId = newRecordId();
+      tx.insert(actionJournal)
+        .values({
+          id: undoId,
+          teamId: row.teamId,
+          actionId: inverse.id,
+          targetId: row.targetId,
+          actor: input.actor,
+          surface: input.surface,
+          kind: 'undo',
+          inputHash: inputHash(inverseInput),
+          createdAt: nowMs(),
+        })
+        .run();
+      return undoId;
+    },
+    { behavior: 'immediate' },
+  );
+  if (undoRowId === null) {
+    throw new HttpError(
+      409,
+      `journal ${input.journalId} cannot be undone: the target changed in ${conflictJournalId}`,
+      'undo-refused',
+      { conflictJournalId },
+    );
+  }
+  return { journalId: undoRowId };
 }

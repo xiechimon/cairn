@@ -14,6 +14,8 @@ import {
 const ACTION_COPY: Record<string, string> = {
   archive_project: 'Archive a project. It stays readable and can be unarchived.',
   unarchive_project: 'Unarchive a project so it can be changed again.',
+  delete_project:
+    'Ask the owner to approve deleting a project. This call deletes nothing: the server parks an approval card and deletes only when the owner approves it there, and the delete cannot be undone. Tell the owner you are waiting for that approval and end the turn.',
 };
 
 export type CoordinatorComputerToolOffer =
@@ -55,7 +57,6 @@ function actionToolDefs(): RemoteToolDef[] {
   return SLICE1_ACTIONS.filter(
     (entry) =>
       entry.surfaces.includes('coordinator') &&
-      entry.toolName !== 'delete_project' &&
       !CHIEF_REMOTE_TOOLS.some((def) => def.name === entry.toolName),
   ).map((entry) => {
     const description = ACTION_COPY[entry.toolName];

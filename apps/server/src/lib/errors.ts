@@ -5,7 +5,7 @@ export class HttpError extends Error {
     readonly status: number,
     message: string,
     readonly reason?: string,
-    readonly fields?: { code?: string; running?: number },
+    readonly fields?: { code?: string; running?: number; conflictJournalId?: string },
   ) {
     super(message);
     this.name = 'HttpError';

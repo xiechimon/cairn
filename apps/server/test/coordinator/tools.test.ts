@@ -87,11 +87,10 @@ describe('coordinator tools', () => {
       ...CHIEF_REPLY_TOOLS,
       ...COMPUTER_REMOTE_TOOLS,
     ];
-    const actionNames = ['archive_project', 'unarchive_project'];
+    const actionNames = ['archive_project', 'unarchive_project', 'delete_project'];
     expect(tools.map((t) => t.name).sort()).toEqual(
       [...defs.map((t) => t.name), ...actionNames].sort(),
     );
-    expect(tools.map((t) => t.name)).not.toContain('delete_project');
     for (const name of actionNames) {
       expect(CHIEF_REMOTE_TOOLS.map((t) => t.name)).not.toContain(name);
       expect(tools.find((t) => t.name === name)?.replay).toBe('unsafe');

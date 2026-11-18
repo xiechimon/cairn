@@ -6,12 +6,13 @@ import {
   patchAutonomyBodySchema,
   patchProjectBodySchema,
 } from '@cairn/shared';
-import { eq, inArray } from 'drizzle-orm';
-import type { Hono } from 'hono';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { build, project, todo } from './db/schema.js';
+import { actionJournal, actionProposal, build, project, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { nowMs } from './lib/ids.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import {
   githubAppOf,
   githubIssueDepsOf,
@@ -22,13 +23,14 @@ import {
   svcOf,
 } from './routes-helpers.js';
 import { answerProposal } from './services/action-proposals.js';
-import { executeAction } from './services/action-registry.js';
+import { executeAction, undoJournalEntry } from './services/action-registry.js';
 import { patchAutonomy, readAutonomy } from './services/autonomy-gates.js';
 import { toBuildRecord } from './services/builds.js';
 import { listDir } from './services/fs-list.js';
 import { pickFolder } from './services/fs-pick.js';
 import { readBranches, readFiles, toProjectRecord } from './services/git.js';
 import { importGithubIssue } from './services/github-issues.js';
+import { isOwner } from './services/instance-owner.js';
 import { listedProjects } from './services/personal-space.js';
 import { createProject, updateProject } from './services/projects.js';
 import { latestScheduleReport } from './services/scheduling/store.js';
@@ -36,6 +38,20 @@ import { listTodos } from './services/todos.js';
 
 export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
+
+  const requireOwnerSession = (c: Context): void => {
+    const owner =
+      pairedDeviceIdOf(c) === null &&
+      (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
+      isOwner(ctx.db, ctx.user.id);
+    if (!owner) throw new HttpError(403, 'owner session required');
+  };
+
+  const journalListLimit = (raw: string | undefined): number => {
+    const parsed = raw === undefined ? Number.NaN : Number(raw);
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) return 100;
+    return Math.min(parsed, 500);
+  };
 
   app.get('/api/projects', (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
@@ -190,6 +206,44 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
           teamId: ctx.team.id,
           decision,
           decidedBy: ctx.user.id,
+        },
+      ),
+    );
+  });
+
+  app.get('/api/actions/journal', (c) => {
+    requireOwnerSession(c);
+    const rows = ctx.db
+      .select()
+      .from(actionJournal)
+      .where(eq(actionJournal.teamId, ctx.team.id))
+      .orderBy(desc(actionJournal.createdAt), desc(sql`rowid`))
+      .limit(journalListLimit(c.req.query('limit')))
+      .all();
+    return c.json(rows);
+  });
+
+  app.get('/api/actions/proposals', (c) => {
+    requireOwnerSession(c);
+    const rows = ctx.db
+      .select()
+      .from(actionProposal)
+      .where(and(eq(actionProposal.teamId, ctx.team.id), eq(actionProposal.status, 'pending')))
+      .orderBy(desc(actionProposal.createdAt))
+      .all();
+    return c.json(rows);
+  });
+
+  app.post('/api/actions/journal/:id/undo', (c) => {
+    requireOwnerSession(c);
+    return c.json(
+      undoJournalEntry(
+        { db: ctx.db },
+        {
+          journalId: c.req.param('id'),
+          teamId: ctx.team.id,
+          actor: 'user',
+          surface: 'web',
         },
       ),
     );

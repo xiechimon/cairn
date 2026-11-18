@@ -6,6 +6,7 @@ import {
   mergeAcceptedResponseSchema,
   notificationsResponseSchema,
   projectRecordSchema,
+  SLICE1_ACTIONS,
   startBuildsBodySchema,
   stepRecordSchema,
   teamMemberSchema,
@@ -19,6 +20,7 @@ import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { plan as planTable, step as stepTable } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
+import { coordinatorToolDefs } from '../src/services/coordinator-tool-defs.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, insertMachine, postProject, req, startLegacyBuild } from './helpers.js';
 
@@ -57,6 +59,9 @@ const INFERRED_ROUTES = [
   'GET /api/projects/{id}/schedule',
   'DELETE /api/projects/{id}',
   'POST /api/actions/proposals/{id}/answer',
+  'GET /api/actions/journal',
+  'GET /api/actions/proposals',
+  'POST /api/actions/journal/{id}/undo',
   'DELETE /api/schedules/{id}',
   'POST /api/schedules/{id}/run',
   'DELETE /api/teams/{id}/providers/{pid}',
@@ -296,6 +301,32 @@ describe('the route surface = the 02 §6.1 vocabulary', () => {
   test('no invented paths outside the vocabulary ([inferred] surfaces explicitly registered)', () => {
     for (const route of have) {
       expect(canon.has(route), `invented route ${route}`).toBe(true);
+    }
+  });
+
+  test('every registry action has a generated face on its declared surfaces and none on mcp/cli', () => {
+    const WEB_ACTION_ROUTES: Record<string, string> = {
+      'project.archive': 'POST /api/projects/{id}/archive',
+      'project.unarchive': 'POST /api/projects/{id}/unarchive',
+      'project.delete': 'DELETE /api/projects/{id}',
+    };
+    const coordinatorDefs = coordinatorToolDefs();
+    for (const entry of SLICE1_ACTIONS) {
+      expect(entry.surfaces).not.toContain('mcp');
+      expect(entry.surfaces).not.toContain('cli');
+      if (entry.surfaces.includes('coordinator')) {
+        const def = coordinatorDefs.find((tool) => tool.name === entry.toolName);
+        expect(def?.description, `coordinator copy for ${entry.toolName}`).toBeTruthy();
+        expect(
+          (def?.parameters as { type?: string } | undefined)?.type,
+          `coordinator parameters for ${entry.toolName}`,
+        ).toBe('object');
+      }
+      if (entry.surfaces.includes('web')) {
+        const route = WEB_ACTION_ROUTES[entry.id];
+        expect(route, `web face for ${entry.id}`).toBeDefined();
+        expect(have.has(route ?? ''), `live route for ${entry.id}`).toBe(true);
+      }
     }
   });
 });

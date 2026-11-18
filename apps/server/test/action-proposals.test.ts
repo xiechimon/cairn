@@ -107,14 +107,29 @@ function propose(
   );
 }
 
+function answerViaCard(
+  s: ReturnType<typeof world>,
+  proposalId: string,
+  choice: string,
+  threadId = 'thread-a',
+) {
+  return req(
+    s.app,
+    'POST',
+    `/api/teams/${s.team.id}/chief/threads/${threadId}/questions/approval-${proposalId}/answer`,
+    { answers: [{ header: '审批', choices: [choice] }] },
+  );
+}
+
 describe('action proposals', () => {
-  test('the Coordinator tool list omits delete_project and the proposal service still accepts it', () => {
+  test('the Coordinator tool list offers delete_project and a call still proposes instead of deleting', () => {
     for (const routerTools of [true, false]) {
       const names = (
         coordinatorToolsExtension(fakeMachineApi(), createStepGate(), { routerTools }).tools ?? []
       ).map((tool) => tool.name);
-      expect(names).toEqual(expect.arrayContaining(['archive_project', 'unarchive_project']));
-      expect(names).not.toContain('delete_project');
+      expect(names).toEqual(
+        expect.arrayContaining(['archive_project', 'unarchive_project', 'delete_project']),
+      );
     }
     const s = world();
     const proposed = propose(s, 'thread-a', 'project-a');
@@ -122,6 +137,63 @@ describe('action proposals', () => {
     if (proposed.status !== 'pending') return;
     expect(proposalById(s.db, proposed.proposalId)?.status).toBe('pending');
     expect(s.db.select().from(projectTable).get()?.id).toBe('project-a');
+    s.dispose();
+  });
+
+  test('a delete_project proposal parks a card that names the project and never offers always', async () => {
+    const s = world();
+    const proposed = propose(s, 'thread-a', 'project-a');
+    if (proposed.status !== 'pending') {
+      expect.unreachable('expected a pending proposal');
+      return;
+    }
+    const card = askQuestionContentOf(
+      s.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, `approval-${proposed.proposalId}`))
+        .get()?.content,
+    );
+    const question = card?.questions[0];
+    expect(question?.question).toContain('Alpha');
+    expect(question?.question).toContain('无法恢复');
+    expect(question?.options.map((option) => option.label)).toEqual([
+      APPROVE_CHOICE,
+      REFUSE_CHOICE,
+    ]);
+    const direct = await req(
+      s.app,
+      'POST',
+      `/api/actions/proposals/${proposed.proposalId}/answer`,
+      { decision: 'allow-once' },
+    );
+    expect(direct.status).toBe(409);
+    s.dispose();
+  });
+
+  test('a delete_project proposal for a missing or foreign project writes nothing', () => {
+    const s = world();
+    s.db.insert(teamTable).values({ id: 'team-other', name: 'Other', createdAt: 0 }).run();
+    s.db
+      .insert(projectTable)
+      .values({ id: 'project-other', teamId: 'team-other', name: 'Elsewhere' })
+      .run();
+    for (const projectId of ['missing', 'project-other']) {
+      expect(() =>
+        executeAction(
+          { db: s.db, reposDir: s.reposDir },
+          {
+            id: 'project.delete',
+            input: { projectId },
+            actor: 'coordinator',
+            surface: 'coordinator',
+            teamId: s.team.id,
+            threadId: 'thread-a',
+          },
+        ),
+      ).toThrow(expect.objectContaining({ status: 404 }));
+    }
+    expect(s.db.select().from(actionProposal).all()).toEqual([]);
     s.dispose();
   });
 
@@ -218,21 +290,12 @@ describe('action proposals', () => {
       .set({ expiresAt: 1 })
       .where(eq(actionProposal.id, proposed.proposalId))
       .run();
-    const expired = await req(
-      s.app,
-      'POST',
-      `/api/actions/proposals/${proposed.proposalId}/answer`,
-      {
-        decision: 'allow-once',
-      },
-    );
+    const expired = await answerViaCard(s, proposed.proposalId, APPROVE_CHOICE);
     expect(expired.status).toBe(409);
     expect(proposalById(s.db, proposed.proposalId)?.status).toBe('expired');
     expect(s.db.select().from(actionWakeOutbox).all()[0]?.outcome).toBe('expired');
     expect(s.db.select().from(projectTable).get()?.id).toBe('project-a');
-    const again = await req(s.app, 'POST', `/api/actions/proposals/${proposed.proposalId}/answer`, {
-      decision: 'allow-once',
-    });
+    const again = await answerViaCard(s, proposed.proposalId, APPROVE_CHOICE);
     expect(again.status).toBe(409);
     s.dispose();
   });
@@ -240,16 +303,9 @@ describe('action proposals', () => {
   test('refuse wakes subscribers and does not delete the project', async () => {
     const s = world();
     const proposed = propose(s, 'thread-a', null) as { proposalId: string };
-    const response = await req(
-      s.app,
-      'POST',
-      `/api/actions/proposals/${proposed.proposalId}/answer`,
-      {
-        decision: 'refuse',
-      },
-    );
+    const response = await answerViaCard(s, proposed.proposalId, REFUSE_CHOICE);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: 'refused' });
+    expect(proposalById(s.db, proposed.proposalId)?.status).toBe('refused');
     expect(s.db.select().from(projectTable).get()?.id).toBe('project-a');
     expect(s.db.select().from(actionWakeOutbox).all()[0]?.outcome).toBe('refused');
     s.dispose();
@@ -269,16 +325,9 @@ describe('action proposals', () => {
         createdAt: 1,
       })
       .run();
-    const blocked = await req(
-      s.app,
-      'POST',
-      `/api/actions/proposals/${proposed.proposalId}/answer`,
-      {
-        decision: 'allow-once',
-      },
-    );
+    const blocked = await answerViaCard(s, proposed.proposalId, APPROVE_CHOICE);
     expect(blocked.status).toBe(200);
-    expect(await blocked.json()).toEqual({ status: 'failed' });
+    expect(proposalById(s.db, proposed.proposalId)?.status).toBe('failed');
     expect(s.db.select().from(projectTable).get()?.id).toBe('project-a');
     expect(
       s.db
@@ -287,14 +336,12 @@ describe('action proposals', () => {
         .all()
         .map((row) => row.kind),
     ).toEqual(['error']);
-    s.db.delete(step).where(eq(step.id, 'running')).run();
+    s.db.delete(step).run();
     s.db.delete(actionProposal).where(eq(actionProposal.id, proposed.proposalId)).run();
     const again = propose(s, 'thread-b', null) as { proposalId: string };
-    const allowed = await req(s.app, 'POST', `/api/actions/proposals/${again.proposalId}/answer`, {
-      decision: 'allow-once',
-    });
+    const allowed = await answerViaCard(s, again.proposalId, APPROVE_CHOICE, 'thread-b');
     expect(allowed.status).toBe(200);
-    expect(await allowed.json()).toEqual({ status: 'executed' });
+    expect(proposalById(s.db, again.proposalId)?.status).toBe('executed');
     expect(s.db.select().from(projectTable).all()).toEqual([]);
     expect(
       s.db
@@ -312,12 +359,7 @@ describe('action proposals', () => {
     s.db.run(
       "CREATE TRIGGER reject_executed BEFORE UPDATE ON action_proposal WHEN NEW.status = 'executed' BEGIN SELECT RAISE(FAIL, 'proposal close unavailable'); END",
     );
-    const answered = await req(
-      s.app,
-      'POST',
-      `/api/actions/proposals/${proposed.proposalId}/answer`,
-      { decision: 'allow-once' },
-    );
+    const answered = await answerViaCard(s, proposed.proposalId, APPROVE_CHOICE);
     expect(answered.status).toBe(500);
     expect(s.db.select().from(projectTable).get()?.id).toBe('project-a');
     expect(proposalById(s.db, proposed.proposalId)?.status).toBe('pending');
@@ -328,14 +370,7 @@ describe('action proposals', () => {
   test('always is refused and the proposal stays pending', async () => {
     const s = world();
     const proposed = propose(s, 'thread-a', null) as { proposalId: string };
-    const response = await req(
-      s.app,
-      'POST',
-      `/api/actions/proposals/${proposed.proposalId}/answer`,
-      {
-        decision: 'always',
-      },
-    );
+    const response = await answerViaCard(s, proposed.proposalId, ALWAYS_CHOICE);
     expect(response.status).toBe(409);
     expect(proposalById(s.db, proposed.proposalId)?.status).toBe('pending');
     expect(s.db.select().from(actionWakeOutbox).all()).toEqual([]);
