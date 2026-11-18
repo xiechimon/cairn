@@ -36,6 +36,7 @@ import {
 } from './computer.js';
 import { computerPresenceListSchema } from './computer-presence.js';
 import { computerScreenRequestSchema } from './computer-screen.js';
+import { engineScreenRequestSchema } from './engine-screen.js';
 import { machineJsonSchema } from './executor.js';
 
 export const machineEnrollBodySchema = z.object({
@@ -327,6 +328,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.cancel'), callId: computerCallIdSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
+  z.object({ type: z.literal('engine.screen'), channel: engineScreenRequestSchema }),
 ]);
 export type MachineStreamEvent = z.infer<typeof machineStreamEventSchema>;
 

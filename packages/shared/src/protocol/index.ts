@@ -4,6 +4,7 @@ export * from './computer.js';
 export * from './computer-presence.js';
 export * from './computer-screen.js';
 export * from './computer-tools.js';
+export * from './engine-screen.js';
 export * from './executor.js';
 export * from './fs-list.js';
 export * from './fs-pick.js';
