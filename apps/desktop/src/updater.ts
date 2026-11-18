@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { constants, createWriteStream } from 'node:fs';
-import { access, mkdtemp, readdir, rename, rm } from 'node:fs/promises';
+import { access, mkdtemp, rename } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import {
@@ -13,12 +13,17 @@ import {
   desktopUpdateFrom,
 } from '@cairn/shared';
 import { app } from 'electron';
+import {
+  removeFolder,
+  removeFolderAfterExit,
+  removeStagingFolders,
+  STAGING_PREFIX,
+} from './update-staging.js';
 
 const run = promisify(execFile);
 const REQUEST_HEADERS = { 'User-Agent': 'Cairn-Desktop' };
 const NO_MANIFEST = 404;
 const APP_BUNDLE_NAME = 'Cairn.app';
-const STAGING_PREFIX = '.cairn-update-';
 const QUIT_FALLBACK_MS = 30_000;
 
 export interface Updater {
@@ -45,13 +50,7 @@ async function updateBlocker(bundle: string): Promise<DesktopUpdateBlocker | nul
 export async function removeLeftoverUpdates(): Promise<void> {
   const bundle = runningBundle();
   if (!app.isPackaged || !bundle.endsWith('.app')) return;
-  const folder = dirname(bundle);
-  const entries = await readdir(folder).catch(() => []);
-  await Promise.all(
-    entries
-      .filter((name) => name.startsWith(STAGING_PREFIX))
-      .map((name) => rm(join(folder, name), { recursive: true, force: true }).catch(() => {})),
-  );
+  await removeStagingFolders(dirname(bundle));
 }
 
 function messageOf(error: unknown): string {
@@ -158,12 +157,13 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
       );
       set({ status: 'installing', version: update.version });
       await swapBundle(bundle, staging, zip);
+      removeFolderAfterExit(staging, process.pid);
       set({ status: 'restarting', version: update.version });
       app.relaunch();
       setTimeout(() => app.exit(0), QUIT_FALLBACK_MS).unref();
       app.quit();
     } catch (error) {
-      await rm(staging, { recursive: true, force: true });
+      await removeFolder(staging).catch(() => {});
       set({ status: 'error', message: messageOf(error) });
     }
   }
