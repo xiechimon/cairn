@@ -41,91 +41,90 @@ export function QueueTabs({
   const narrow = useNarrow();
   const [expanded, setExpanded] = useState(false);
   if (messages.length === 0) return null;
-  if (editingId !== null) {
-    return (
-      <div data-testid="chief-queue" data-state="editing" className={TAB_CLS}>
-        <div className={ROW_CLS}>
-          <span className="min-w-0 flex-1 truncate text-caption text-(--text-tertiary)">
-            {t('编辑排队消息')}
-          </span>
-          <Button
-            variant="ghost"
-            size="xs"
-            data-testid="chief-queue-cancel-edit"
-            className={`${ACTION_CLS} gap-1.5`}
-            onClick={onCancelEdit}
-          >
-            {t('取消')}
-            <Kbd>Esc</Kbd>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-  const held = messages.some((message) => message.held);
   const cap = narrow ? 2 : 3;
   const shown = expanded ? messages : messages.slice(0, cap);
   const rest = messages.length - shown.length;
   return (
-    <section data-testid="chief-queue" aria-label={t('排队中的消息')} className={TAB_CLS}>
-      <div className={`${ROW_CLS} text-caption text-(--text-tertiary)`}>
-        <span className="min-w-0 flex-1 truncate">
-          {held ? t('恢复后发出') : t('这一轮后发出')}
-        </span>
-        <span className="w-7 flex-none text-center pointer-coarse:w-11">{messages.length}</span>
-      </div>
+    <section
+      data-testid="chief-queue"
+      data-state={editingId === null ? 'queued' : 'editing'}
+      aria-label={t('排队中的消息')}
+      className={TAB_CLS}
+    >
       <ul className="m-0 flex max-h-44 list-none flex-col overflow-y-auto p-0">
-        {shown.map((message) => (
-          <li key={message.id} data-testid="chief-queued-message" className={ROW_CLS}>
-            <Clock width={16} height={16} className="flex-none text-(--text-tertiary)" />
-            {onEdit !== undefined && !message.held && !message.sending ? (
-              <Button
-                variant="ghost"
-                size="xs"
-                data-testid="chief-queued-message-text"
-                aria-label={t('编辑排队消息：{text}', { text: message.text })}
-                className="h-auto min-w-0 flex-1 cursor-text justify-start rounded-none px-0 py-1 text-meta font-normal text-foreground hover:bg-transparent dark:hover:bg-transparent"
-                onClick={() => onEdit(message)}
-              >
-                <span className="truncate">{message.text}</span>
-              </Button>
-            ) : (
-              <span
-                data-testid="chief-queued-message-text"
-                className="min-w-0 flex-1 truncate text-foreground"
-              >
-                {message.text}
-              </span>
-            )}
-            {onSteer !== undefined && !message.held && !message.sending && (
-              <Button
-                variant="ghost"
-                size="xs"
-                data-testid="chief-queued-steer"
-                className={ACTION_CLS}
-                onClick={() => onSteer(message)}
-              >
-                {t('插话')}
-              </Button>
-            )}
-            {onRemove !== undefined && !message.sending && (
-              <IconTooltip
-                label={message.held ? t('撤回') : t('删除')}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    data-testid="chief-queued-remove"
-                    className={ICON_ACTION_CLS}
-                    onClick={() => onRemove(message)}
-                  />
-                }
-              >
-                <X width={20} height={20} />
-              </IconTooltip>
-            )}
-          </li>
-        ))}
+        {shown.map((message) => {
+          const editing = message.id === editingId;
+          const idle = editingId === null;
+          return (
+            <li
+              key={message.id}
+              data-testid="chief-queued-message"
+              data-state={editing ? 'editing' : undefined}
+              aria-current={editing ? 'true' : undefined}
+              className={`${ROW_CLS} ${editing ? 'bg-(--menu-hover)' : ''}`}
+            >
+              <Clock width={16} height={16} className="flex-none text-(--text-tertiary)" />
+              {idle && onEdit !== undefined && !message.held && !message.sending ? (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  data-testid="chief-queued-message-text"
+                  aria-label={t('编辑排队消息：{text}', { text: message.text })}
+                  className="h-auto min-w-0 flex-1 cursor-text justify-start rounded-none px-0 py-1 text-meta font-normal text-foreground hover:bg-transparent dark:hover:bg-transparent"
+                  onClick={() => onEdit(message)}
+                >
+                  <span className="truncate">{message.text}</span>
+                </Button>
+              ) : (
+                <span
+                  data-testid="chief-queued-message-text"
+                  className={`min-w-0 flex-1 truncate ${editing || idle ? 'text-foreground' : 'text-(--text-tertiary)'}`}
+                >
+                  {message.text}
+                </span>
+              )}
+              {editing && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  data-testid="chief-queue-cancel-edit"
+                  className={`${ACTION_CLS} gap-1.5`}
+                  onClick={onCancelEdit}
+                >
+                  {t('取消')}
+                  <Kbd>Esc</Kbd>
+                </Button>
+              )}
+              {idle && onSteer !== undefined && !message.held && !message.sending && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  data-testid="chief-queued-steer"
+                  className={ACTION_CLS}
+                  onClick={() => onSteer(message)}
+                >
+                  {t('插话')}
+                </Button>
+              )}
+              {!editing && onRemove !== undefined && !message.sending && (
+                <IconTooltip
+                  label={message.held ? t('撤回') : t('删除')}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      data-testid="chief-queued-remove"
+                      className={ICON_ACTION_CLS}
+                      onClick={() => onRemove(message)}
+                    />
+                  }
+                >
+                  <X width={20} height={20} />
+                </IconTooltip>
+              )}
+            </li>
+          );
+        })}
       </ul>
       {rest > 0 && (
         <Button

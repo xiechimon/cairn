@@ -214,7 +214,7 @@ test.describe('chief unavailable (T4)', () => {
     await expect(banner.getByRole('button', { name: '给 Coordinator 换模型' })).toBeVisible();
     const held = home.getByTestId('chief-queued-message');
     await expect(held).toHaveCount(2);
-    await expect(home.getByTestId('chief-queue')).toContainText('恢复后发出');
+    await expect(home.getByTestId('chief-queue')).not.toContainText('恢复后发出');
     await expect(held.first().getByRole('button', { name: '撤回' })).toBeVisible();
     await expect(held.first().getByRole('button', { name: '插话' })).toHaveCount(0);
     await expect(home.getByTestId('chief-stream').getByTestId('chief-queued-message')).toHaveCount(0);
@@ -368,11 +368,16 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     const rows = home.getByTestId('chief-queued-message');
     await expect(rows).toHaveCount(2);
     await expect(home.getByTestId('chief-stream').getByText('只看 cairn 项目就行')).toHaveCount(0);
-    await expect(home.getByTestId('chief-queue')).toContainText('这一轮后发出');
+    await expect(home.getByTestId('chief-queue')).not.toContainText('这一轮后发出');
     const input = home.getByTestId('chief-composer-input');
     await input.fill('还没写完的话');
     await rows.first().getByTestId('chief-queued-message-text').click();
     await expect(home.getByTestId('chief-queue')).toHaveAttribute('data-state', 'editing');
+    await expect(home.getByTestId('chief-queue')).not.toContainText('编辑排队消息');
+    await expect(rows.first()).toHaveAttribute('aria-current', 'true');
+    await expect(rows.last()).not.toHaveAttribute('aria-current', 'true');
+    await expect(rows.last().getByTestId('chief-queued-steer')).toHaveCount(0);
+    await expect(rows.first().getByTestId('chief-queue-cancel-edit')).toContainText('取消');
     await expect(input).toHaveValue('只看 cairn 项目就行');
     await expect.poll(() => state.bodies).toContainEqual({ editing: true });
     await input.fill('只看 cairn 和 site 两个项目');
@@ -383,6 +388,11 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     await input.press('Escape');
     await expect(input).toHaveValue('还没写完的话');
     await expect.poll(() => state.bodies).toContainEqual({ editing: false });
+    await expect(home.getByTestId('chief-queue')).toHaveAttribute('data-state', 'queued');
+    await rows.first().getByTestId('chief-queued-message-text').click();
+    await rows.first().getByTestId('chief-queue-cancel-edit').click();
+    await expect(input).toHaveValue('还没写完的话');
+    await expect(home.getByTestId('chief-queue')).toHaveAttribute('data-state', 'queued');
     await rows.last().getByRole('button', { name: '删除' }).click();
     await expect.poll(() => calls).toContain('DELETE /messages/m4');
     await expect(input).toHaveValue('还没写完的话');

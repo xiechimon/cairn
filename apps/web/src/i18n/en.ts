@@ -1582,8 +1582,6 @@ export const EN: Record<string, string> = {
   排队中的消息: 'Queued messages',
   '插进这一轮 · ⌘↵ 排队': 'Adds to this turn · ⌘↵ queues',
   '插进这一轮 · 长按排队': 'Adds to this turn · hold to queue',
-  恢复后发出: 'Sent once back',
-  这一轮后发出: 'Sent after this turn',
   插话: 'Steer',
   排队: 'Queue',
   撤回: 'Withdraw',
