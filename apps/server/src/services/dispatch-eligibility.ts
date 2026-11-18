@@ -38,11 +38,18 @@ export function machineRuntimeAvailable(
   runtime: MachineRuntime,
 ): boolean {
   if (runtime === 'pi') return true;
-  if (runtime === 'gemini') return true;
+  if (runtime === 'gemini') return false;
   if (runtime === 'devin') return machineRow.capabilities?.devin?.installed === true;
   return (
     machineRow.claudeCodeReport?.installed === true || machineRow.capabilities?.executor === 'orb'
   );
+}
+
+export function machineRuntimeClaimable(
+  machineRow: MachineRuntimeFacts,
+  runtime: MachineRuntime,
+): boolean {
+  return runtime === 'gemini' || machineRuntimeAvailable(machineRow, runtime);
 }
 
 export function availableRuntimes(machineRow: MachineRuntimeFacts): MachineRuntime[] {
@@ -53,7 +60,7 @@ export function runtimeGatePasses(
   machineRow: MachineRuntimeFacts,
   agentProvider: string | null | undefined,
 ): boolean {
-  return machineRuntimeAvailable(machineRow, stepRuntimeFor(agentProvider));
+  return machineRuntimeClaimable(machineRow, stepRuntimeFor(agentProvider));
 }
 
 export function claudeCodeUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
@@ -176,7 +183,7 @@ export function homeMachineRejectReason(
   catalog?: ReadonlyArray<{ id: string; liveness?: 'alive' | 'dead' | 'unknown' }>,
 ): string | null {
   const runtime = stepRuntimeFor(agentRow.provider);
-  if (!machineRuntimeAvailable(machineRow, runtime)) {
+  if (!machineRuntimeClaimable(machineRow, runtime)) {
     return runtimeMissingReason(machineRow.name, runtime);
   }
   if (
@@ -238,7 +245,7 @@ export type MachineIneligibility =
 export function machineEligibility(input: EligibilityInput): MachineIneligibility | null {
   const { machine: machineRow, agent: agentRow, model } = input;
   const runtime = stepRuntimeFor(model.provider);
-  if (!machineRuntimeAvailable(machineRow, runtime)) return { kind: 'runtime' };
+  if (!machineRuntimeClaimable(machineRow, runtime)) return { kind: 'runtime' };
   const modelReject =
     agentRow.machineId === machineRow.id
       ? null
