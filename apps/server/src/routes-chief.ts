@@ -47,7 +47,6 @@ import {
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { readCoordinatorPage } from './services/coordinator.js';
 import { latestChiefMemoryUsage } from './services/coordinator-steps.js';
-import { isJobOwnerCaller, jobSubmitAnswerActor } from './services/job-applications.js';
 import { isChiefConversation } from './services/machines.js';
 import { ownComputerDecisionOf } from './services/own-computer.js';
 import {
@@ -250,16 +249,11 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         .get();
       return c.json(askQuestionContentOf(settled?.content));
     }
-    const answeredBy = jobSubmitAnswerActor(
-      waiting?.content,
-      isJobOwnerCaller(c.get('pairedDeviceId'), c.get('ownerIdentity'), ctx.authToken),
-    );
     return c.json(
       answerChiefQuestion(svc, teamId, {
         threadId,
         requestId,
         answers,
-        ...(answeredBy === undefined ? {} : { answeredBy }),
       }),
     );
   });

@@ -2650,36 +2650,7 @@
       "evidence": [],
       "batch": "B12"
     },
-    {
-      "id": "job-applications",
-      "name": "Job applications",
-      "summary": "Owner-gated host allow, profile and daily cap for a later host-browser submit.",
-      "centrality": 4,
-      "status": "planned",
-      "code": {
-        "server": [
-          "apps/server/src/services/job-applications.ts",
-          "apps/server/src/routes-job-applications.ts"
-        ]
-      },
-      "routes": {
-        "server": [
-          "/api/job-applications/cap",
-          "/api/job-applications/hosts",
-          "/api/job-applications/profile"
-        ]
-      },
-      "research": {
-        "na": "the owner design is the source; no reference product is copied"
-      },
-      "frontendDesign": {
-        "na": "this slice has no product UI"
-      },
-      "backendDesign": [
-        "docs/design/job-applications.md"
-      ]
-    },
-    {
+        {
       "id": "im-connections",
       "name": "IM connections",
       "summary": "Outbound-polling chat connections that reach the Coordinator without a native app or a public callback. Telegram connects with a bot token; WeChat connects by scanning a Tencent iLink QR that creates the connection and pairs the scanning account; Slack connects with an app-level token and bot token over Socket Mode. Paired senders' messages become coordinator turns and text replies return to the same chat.",

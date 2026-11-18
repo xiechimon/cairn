@@ -11,7 +11,6 @@ import { registerDraftRoutes } from './routes-drafts.js';
 import { registerGitHostingRoutes } from './routes-git-hosting.js';
 import { githubAppOf } from './routes-helpers.js';
 import { registerImRoutes } from './routes-im.js';
-import { registerJobApplicationRoutes } from './routes-job-applications.js';
 import { registerProjectRoutes } from './routes-projects.js';
 import { registerPushRoutes } from './routes-push.js';
 import { registerResourceRoutes } from './routes-resources.js';
@@ -35,7 +34,6 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerGitHostingRoutes(app, ctx);
   registerPushRoutes(app, ctx);
   registerImRoutes(app, ctx);
-  registerJobApplicationRoutes(app, ctx);
 
   app.post('/api/analytics/first-touch', () => new Response(null, { status: 204 }));
   app.post('/_mp/api/track', () => new Response(null, { status: 204 }));

@@ -1,5 +1,7 @@
 # Job applications in the owner's browser
 
+Status: superseded (2026-11-19, #5340). The dedicated subsystem was retired; job workflows use generic browser threads and action-approval cards. Kept for the research docs that cite it.
+
 Status: proposal for the owner's review. Nothing here is built. Owner route: a later implementation crosses the machine and command boundary. This page does not change code.
 
 Completes to-do item: Job applications in the browser. The checkbox stays unticked until #3924 merges.

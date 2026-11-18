@@ -542,7 +542,6 @@ describe('todo deletion approval', () => {
         threadId: 'thread-a',
         requestId: `approval-${proposed.proposalId}`,
         answers: [{ header: '审批', choices: ['批准执行'] }],
-        answeredBy: 'person',
       }),
     ).toThrow(expect.objectContaining({ status: 403 }));
     const direct = await req(

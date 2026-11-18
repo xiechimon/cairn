@@ -272,16 +272,12 @@ export function answerQuestion(
     threadId: string;
     requestId: string;
     answers: AskUserAnswer[];
-    answeredBy?: 'person' | 'coordinator';
   },
 ): AskUserQuestionContent {
   const content = readQuestion(deps.db, input.threadId, input.requestId);
   if (content === null) throw new HttpError(404, `question ${input.requestId}`);
   if (proposalIdOfCard(content) !== null) {
     throw new HttpError(403, 'an approval card is answered only on its card in Cairn');
-  }
-  if (content.askedFor?.includes('job_submit') && input.answeredBy !== 'person') {
-    throw new HttpError(403, 'only the owner can answer a job submission');
   }
   if (content.status !== 'pending') {
     const reason = content.status === 'cancelled' ? content.cancelReason : undefined;
@@ -327,7 +323,6 @@ export function answerQuestion(
     status: 'answered',
     answers: validated,
     answeredAt,
-    ...(input.answeredBy === undefined ? {} : { answeredBy: input.answeredBy }),
   };
   writeQuestion(deps.db, input.threadId, input.requestId, next, answeredAt);
   publishQuestion(deps, input.threadId, input.requestId);

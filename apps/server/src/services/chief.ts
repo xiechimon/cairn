@@ -995,7 +995,6 @@ export function answerChiefQuestion(
     threadId: string;
     requestId: string;
     answers: AskUserAnswer[];
-    answeredBy?: 'person' | 'coordinator';
   },
 ): AskUserQuestionContent {
   const waiting = deps.db

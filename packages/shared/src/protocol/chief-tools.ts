@@ -55,7 +55,6 @@ export const CHIEF_TOOLS_ADDED = [
   'update_memory',
   'search_history',
   'read_history',
-  'job_profile',
   'channel_messages',
   'archive_todos',
   'unarchive_todos',
@@ -81,7 +80,6 @@ export const CHIEF_TOOL_CATEGORIES = {
     'search_history',
     'read_history',
     'channel_messages',
-    'job_profile',
   ],
   organize: [
     'create_todo',
@@ -818,15 +816,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     description: 'Cancel a pending wake-up.',
     parameters: obj({ wakeId: str('Wake id.') }, ['wakeId']),
   },
-  {
-    name: 'job_profile',
-    description: 'Read owner profile fields marked fillable. Omits unmarked fields.',
-    parameters: obj({}),
-    replaySafe: true,
-  },
 ];
 
-export const CHIEF_TOOL_COUNT = 47;
+export const CHIEF_TOOL_COUNT = 46;
 
 export const CHIEF_ROUTER_TOOL_NAMES = [
   'open_thread',
