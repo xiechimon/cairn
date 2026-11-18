@@ -9,9 +9,17 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { applyBuildConfirm } from '../src/services/build-confirm.js';
-import { completeStep } from '../src/services/builds.js';
+import { completeStep, startBuilds } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, req, startLegacyBuild, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  postProject,
+  req,
+  seedSessionRoute,
+  startLegacyBuild,
+  type TestServer,
+} from './helpers.js';
 
 async function todoAtConfirm(s: TestServer) {
   const projectId = await postProject(s.app);
@@ -106,5 +114,42 @@ describe('settle atomicity (effect-paths-audit rows 2 and 3)', () => {
 
     expect(() => completeStep(s.svc, buildStep?.id ?? '')).not.toThrow();
     expect(phaseOf(s, todoId)).toBe('done');
+  });
+
+  test('startBuilds: a mid-dispatch failure leaves no orphan build or step (audit row 1)', async () => {
+    const s = bootServer({});
+    const machineId = insertMachine(s);
+    seedSessionRoute(s, { machineId });
+    const projectId = await postProject(s.app);
+    const todoDoc = (await (
+      await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+        title: '派发原子性',
+        spec: '',
+      })
+    ).json()) as { id: string };
+
+    const machineHub = s.machineHub as { wake: unknown };
+    const originalWake = machineHub.wake;
+    machineHub.wake = () => {
+      throw new Error('simulated kill after step insert');
+    };
+    try {
+      expect(() =>
+        startBuilds(s.svc, { projectId, todoIds: [todoDoc.id], triggerSource: 'user' }),
+      ).toThrow('simulated kill');
+    } finally {
+      machineHub.wake = originalWake;
+    }
+
+    expect(phaseOf(s, todoDoc.id)).toBe('todo');
+    expect(
+      s.db.select().from(buildTable).where(eq(buildTable.todoId, todoDoc.id)).all(),
+    ).toHaveLength(0);
+    expect(s.db.select().from(stepTable).all()).toHaveLength(0);
+
+    expect(() =>
+      startBuilds(s.svc, { projectId, todoIds: [todoDoc.id], triggerSource: 'user' }),
+    ).not.toThrow();
+    expect(phaseOf(s, todoDoc.id)).toBe('queued');
   });
 });

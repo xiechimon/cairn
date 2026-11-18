@@ -112,41 +112,43 @@ export function startBuilds(
           };
     const id = newUuidv7();
     const createdAt = nowMs();
-    deps.db
-      .insert(build)
-      .values({
+    deps.db.transaction(() => {
+      deps.db
+        .insert(build)
+        .values({
+          id,
+          todoId,
+          withPlan: false,
+          prevPhase: todoRecord.phase,
+          triggerSource,
+          scheduledBy: input.scheduledBy ?? null,
+          planDocId: null,
+          errorMessage: null,
+          prUrl: null,
+          prNumber: null,
+          changes: null,
+          diffHash: null,
+          createdAt,
+        })
+        .run();
+      const lessons =
+        todoRecord.phase === 'failed' && todoRecord.latestBuildId !== null
+          ? retryLessonsOf(deps.db, todoRecord.latestBuildId)
+          : null;
+      enqueueStep(
+        deps,
         id,
-        todoId,
-        withPlan: false,
-        prevPhase: todoRecord.phase,
-        triggerSource,
-        scheduledBy: input.scheduledBy ?? null,
-        planDocId: null,
-        errorMessage: null,
-        prUrl: null,
-        prNumber: null,
-        changes: null,
-        diffHash: null,
-        createdAt,
-      })
-      .run();
-    const lessons =
-      todoRecord.phase === 'failed' && todoRecord.latestBuildId !== null
-        ? retryLessonsOf(deps.db, todoRecord.latestBuildId)
-        : null;
-    enqueueStep(
-      deps,
-      id,
-      'session',
-      todoRecord.teamId,
-      [sessionBriefFor(todoRecord.request), input.prompt, lessons]
-        .filter((part) => part != null)
-        .join('\n\n'),
-    );
-    setTodoPhase(deps, todoId, 'queued', {
-      ...(routeOverride !== undefined ? { routeOverride } : {}),
-      latestBuildId: id,
-      lastRunAt: createdAt,
+        'session',
+        todoRecord.teamId,
+        [sessionBriefFor(todoRecord.request), input.prompt, lessons]
+          .filter((part) => part != null)
+          .join('\n\n'),
+      );
+      setTodoPhase(deps, todoId, 'queued', {
+        ...(routeOverride !== undefined ? { routeOverride } : {}),
+        latestBuildId: id,
+        lastRunAt: createdAt,
+      });
     });
     const row = deps.db.select().from(build).where(eq(build.id, id)).get();
     if (!row) throw new Error('build missing after insert');
