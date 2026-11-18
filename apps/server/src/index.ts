@@ -50,6 +50,7 @@ import { createTelegramAdapter } from './services/im/telegram.js';
 import { wechatAdapter } from './services/im/wechat.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
+import { adoptGithubConnectorGrants } from './services/mcp-github-connector.js';
 import { newMcpOAuthState } from './services/mcp-servers.js';
 import { seedOwnerCheckpoints } from './services/owner.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
@@ -249,6 +250,8 @@ const app = createApp(
   },
   logger,
 );
+
+adoptGithubConnectorGrants({ db, box: secretBox });
 
 warnInsecureBind(logger, config);
 warnIgnoredTailscaleUsers(logger);

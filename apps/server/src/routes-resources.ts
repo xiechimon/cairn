@@ -1,4 +1,5 @@
 import {
+  bindGithubConnectorBodySchema,
   capabilitiesResponseSchema,
   cloakLicenseBodySchema,
   createClaudeSubscriptionSchema,
@@ -79,6 +80,7 @@ import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
 import {
   deleteGithubConnection,
+  hasGithubConnection,
   readGithubConnectionStatus,
   teamGithubToken,
 } from './services/github-connection.js';
@@ -99,14 +101,17 @@ import {
   toMachineRecord,
 } from './services/machines.js';
 import {
+  bindGithubConnector,
   cancelGithubConnectorDevice,
   githubConnectorAvailability,
   githubConnectorInstalled,
+  githubConnectorTarget,
   pollGithubConnectorDevice,
   startGithubConnectorDevice,
 } from './services/mcp-github-connector.js';
 import {
   checkMcpConnector,
+  connectorRow,
   createMcpConnector,
   deleteMcpConnector,
   githubAppOfDeps,
@@ -114,6 +119,7 @@ import {
   listMcpServers,
   type McpConnectorDeps,
   publicOAuthFetch,
+  toConnectorRecord,
   updateMcpConnector,
 } from './services/mcp-servers.js';
 import { mergedCatalogModels, refreshAllRelayCatalogs } from './services/model-liveness.js';
@@ -739,6 +745,8 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     fetch: ctx.mcpFetch ?? globalThis.fetch,
     oauthFetch: ctx.mcpFetch ?? publicOAuthFetch,
     oauthState: ctx.mcpOAuthState,
+    githubFetch: ctx.githubFetch,
+    oauthClient: ctx.oauthClient,
     ...(ctx.mcpGithubApp !== undefined ? { githubApp: ctx.mcpGithubApp } : {}),
   });
 
@@ -1034,8 +1042,25 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.get('/api/teams/:id/mcp-connectors/github', (c) => {
-    requireTeam(ctx, c.req.param('id'));
-    return c.json(githubConnectorAvailability(mcpDeps()));
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(githubConnectorAvailability(mcpDeps(), teamId));
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/github/bind', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(bindGithubConnectorBodySchema, (await jsonBody(c)) ?? {}, 'body');
+    if (!hasGithubConnection(ctx.db, teamId)) throw new HttpError(409, 'connect GitHub first');
+    const deps = mcpDeps();
+    const target = githubConnectorTarget(deps, teamId, body.connectorId);
+    const id = bindGithubConnector(deps, teamId, target);
+    try {
+      await checkMcpConnector(deps, teamId, id);
+    } catch (err) {
+      if (!(err instanceof HttpError)) throw err;
+    }
+    return c.json(toConnectorRecord(deps, connectorRow(deps, teamId, id)), 201);
   });
 
   app.post('/api/teams/:id/mcp-connectors/github/device', async (c) => {
@@ -1043,7 +1068,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const body = parseWith(startGithubConnectorDeviceBodySchema, (await jsonBody(c)) ?? {}, 'body');
     return c.json(
-      await startGithubConnectorDevice(mcpDeps(), {
+      await startGithubConnectorDevice(mcpDeps(), connectionDeviceDeps(), {
         teamId,
         userId: ctx.user.id,
         connectorId: body.connectorId,
@@ -1054,19 +1079,19 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/mcp-connectors/github/device/:attempt', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(
-      await pollGithubConnectorDevice(mcpDeps(), {
-        teamId,
-        userId: ctx.user.id,
-        attemptId: c.req.param('attempt'),
-      }),
-    );
+    const result = await pollGithubConnectorDevice(mcpDeps(), connectionDeviceDeps(), {
+      teamId,
+      userId: ctx.user.id,
+      attemptId: c.req.param('attempt'),
+    });
+    if (result.status === 'complete') adoptGithubProfile(ctx, teamId);
+    return c.json(result);
   });
 
   app.delete('/api/teams/:id/mcp-connectors/github/device/:attempt', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    cancelGithubConnectorDevice(mcpDeps(), {
+    cancelGithubConnectorDevice(connectionDeviceDeps(), {
       teamId,
       userId: ctx.user.id,
       attemptId: c.req.param('attempt'),

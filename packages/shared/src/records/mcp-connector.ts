@@ -273,6 +273,7 @@ export const startMcpConnectorOAuthResponseSchema = z.object({ authorizationUrl:
 export const githubConnectorAvailabilitySchema = z.object({
   available: z.boolean(),
   installUrl: z.string().nullable(),
+  connectionReady: z.boolean(),
 });
 export type GithubConnectorAvailability = z.infer<typeof githubConnectorAvailabilitySchema>;
 
@@ -280,6 +281,9 @@ export const startGithubConnectorDeviceBodySchema = z.strictObject({
   connectorId: recordId.optional(),
 });
 export type StartGithubConnectorDeviceBody = z.infer<typeof startGithubConnectorDeviceBodySchema>;
+
+export const bindGithubConnectorBodySchema = startGithubConnectorDeviceBodySchema;
+export type BindGithubConnectorBody = z.infer<typeof bindGithubConnectorBodySchema>;
 
 export const githubConnectorDeviceStartSchema = z.object({
   attemptId: z.string(),

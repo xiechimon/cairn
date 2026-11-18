@@ -132,6 +132,7 @@ export function bootServer(
   const xaiDeviceStates: AppContext['xaiDeviceStates'] = new Map();
   const codexDeviceStates: AppContext['codexDeviceStates'] = new Map();
   const mcpOAuthState = newMcpOAuthState();
+  const githubConnectionDeviceStates: AppContext['githubConnectionDeviceStates'] = new Map();
   try {
     const appContext: AppContext = {
       remote: {
@@ -160,7 +161,7 @@ export function bootServer(
       oauthStates,
       xaiDeviceStates,
       codexDeviceStates,
-      githubConnectionDeviceStates: new Map(),
+      githubConnectionDeviceStates,
       mcpOAuthState,
       oauthClient: opts.oauthClient ?? null,
       ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
@@ -233,7 +234,7 @@ export function bootServer(
       oauthStates,
       xaiDeviceStates,
       codexDeviceStates,
-      githubConnectionDeviceStates: new Map(),
+      githubConnectionDeviceStates,
       mcpOAuthState,
       svc: {
         db,

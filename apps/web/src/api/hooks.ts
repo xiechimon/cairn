@@ -1366,6 +1366,14 @@ export function useApiMutations(teamId: string | undefined) {
           body,
         ),
     }),
+    bindGithubConnector: useMutation({
+      mutationFn: (connectorId: string | undefined) =>
+        api.post<McpConnectorRecord>(
+          `/api/teams/${teamId}/mcp-connectors/github/bind`,
+          connectorId === undefined ? {} : { connectorId },
+        ),
+      onSuccess: invalidateAll,
+    }),
     startGithubDevice: useMutation({
       mutationFn: (connectorId: string | undefined) =>
         api.post<GithubConnectorDeviceStart>(

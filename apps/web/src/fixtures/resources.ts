@@ -537,6 +537,7 @@ const GITHUB_APP_CONNECTOR = connector('mcp-github-app', {
 const GITHUB_APP_READY = {
   available: true,
   installUrl: 'https://github.com/apps/cairn-app/installations/new',
+  connectionReady: true,
 };
 
 const githubDevice = (

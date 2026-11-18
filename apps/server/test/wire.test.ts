@@ -89,6 +89,7 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/mcp-connectors/{cid}/check',
   'POST /api/teams/{id}/mcp-connectors/oauth/start',
   'GET /api/teams/{id}/mcp-connectors/github',
+  'POST /api/teams/{id}/mcp-connectors/github/bind',
   'POST /api/teams/{id}/mcp-connectors/github/device',
   'POST /api/teams/{id}/mcp-connectors/github/device/{attempt}',
   'DELETE /api/teams/{id}/mcp-connectors/github/device/{attempt}',

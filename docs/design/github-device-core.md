@@ -16,7 +16,7 @@ Device/token endpoints default to github.com and can be repointed with CAIRN_GIT
 
 ## Consumer state ownership
 
-Publication and MCP separately own attempts, scheduling, cancellation, encrypted token pairs, connection generations, persistence and refresh arbitration. Starting or disconnecting one connection must not mutate the other's row or attempts. Both grants share upstream App authorization and installation permissions; separate storage does not make them independent revocation scopes.
+The team `github_connection` is the only credential owner: it holds attempts, scheduling, cancellation, the encrypted token pair, the connection generation and refresh arbitration. The GitHub MCP connector holds a reference only — its sign-in reuses the same device transport and attempt map with a target tag, and it resolves the bearer from the connection row at call time ([github-shared-grant.md](./github-shared-grant.md)). One grant therefore has exactly one refresh writer, which GitHub's refresh-token rotation requires.
 
 | Entry | Caller responsibility | Transport regression |
 | --- | --- | --- |

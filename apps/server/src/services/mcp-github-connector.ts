@@ -4,42 +4,59 @@ import {
   type GithubConnectorDeviceStart,
   mcpCatalogEntry,
 } from '@cairn/shared';
-import { and, eq, sql } from 'drizzle-orm';
-import { mcpConnector } from '../db/schema.js';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { githubConnection, mcpConnector } from '../db/schema.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import { githubUserHasInstallation } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { pollGithubDeviceCode, requestGithubDeviceCode } from './github-device-core.js';
+import {
+  connectionToken,
+  readGithubConnectionStatus,
+  upsertGithubConnection,
+} from './github-connection.js';
+import {
+  cancelGithubConnectionDevice,
+  type GithubConnectionDeviceDeps,
+  pollGithubConnectionDevice,
+  startGithubConnectionDevice,
+} from './github-connection-device.js';
 import {
   assertSlugFree,
   checkMcpConnector,
   connectorRow,
-  type GithubConnectorAttempt,
   type GithubConnectorTarget,
   githubAppOfDeps,
   guardedOAuthFetch,
   type McpConnectorDeps,
-  openGithubApp,
-  refreshMcpConnectorToken,
-  sealGithubApp,
   toConnectorRecord,
   UNCHECKED,
 } from './mcp-servers.js';
 
 const GITHUB_CATALOG_ID = 'github';
 
-function requireApp(deps: McpConnectorDeps) {
+function requireApp(deps: Pick<McpConnectorDeps, 'githubApp'>) {
   const app = githubAppOfDeps(deps);
   if (app === null)
     throw new HttpError(400, 'GitHub sign-in is not set up on this server; use a token');
   return app;
 }
 
-export function githubConnectorAvailability(deps: McpConnectorDeps): GithubConnectorAvailability {
+export function githubConnectorAvailability(
+  deps: Pick<McpConnectorDeps, 'githubApp' | 'db' | 'box'>,
+  teamId: string,
+): GithubConnectorAvailability {
   const app = githubAppOfDeps(deps);
+  const connectionReady = readGithubConnectionStatus(
+    { db: deps.db, box: deps.box },
+    teamId,
+  ).connected;
   return app === null
-    ? { available: false, installUrl: null }
-    : { available: true, installUrl: `https://github.com/apps/${app.slug}/installations/new` };
+    ? { available: false, installUrl: null, connectionReady: false }
+    : {
+        available: true,
+        installUrl: `https://github.com/apps/${app.slug}/installations/new`,
+        connectionReady,
+      };
 }
 
 function freeGithubSlug(deps: McpConnectorDeps, teamId: string): string {
@@ -55,73 +72,69 @@ function freeGithubSlug(deps: McpConnectorDeps, teamId: string): string {
   throw conflict('every GitHub connector name is taken; delete one first');
 }
 
-function sweep(attempts: Map<string, GithubConnectorAttempt>): void {
-  const now = nowMs();
-  for (const [id, attempt] of attempts) if (attempt.expiresAt <= now) attempts.delete(id);
+export function githubConnectorTarget(
+  deps: McpConnectorDeps,
+  teamId: string,
+  connectorId: string | undefined,
+): GithubConnectorTarget {
+  if (connectorId !== undefined) {
+    const row = connectorRow(deps, teamId, connectorId);
+    if (row.authKind !== 'github-app')
+      throw new HttpError(400, 'only a GitHub sign-in connector can reconnect here');
+    return { kind: 'reconnect', connectorId: row.id, authRevision: row.authRevision };
+  }
+  return { kind: 'new', slug: freeGithubSlug(deps, teamId) };
 }
 
 export async function startGithubConnectorDevice(
   deps: McpConnectorDeps,
+  connectionDeps: GithubConnectionDeviceDeps,
   input: { teamId: string; userId: string; connectorId?: string | undefined },
 ): Promise<GithubConnectorDeviceStart> {
-  const app = requireApp(deps);
-  let target: GithubConnectorTarget;
-  if (input.connectorId !== undefined) {
-    const row = connectorRow(deps, input.teamId, input.connectorId);
-    if (row.authKind !== 'github-app')
-      throw new HttpError(400, 'only a GitHub sign-in connector can reconnect here');
-    target = { kind: 'reconnect', connectorId: row.id, authRevision: row.authRevision };
-  } else {
-    target = { kind: 'new', slug: freeGithubSlug(deps, input.teamId) };
-  }
-  const code = await requestGithubDeviceCode({ fetch: guardedOAuthFetch(deps) }, app.clientId);
-  const attempts = deps.oauthState.githubDevice;
-  sweep(attempts);
-  for (const [id, attempt] of attempts) if (attempt.teamId === input.teamId) attempts.delete(id);
-  const attemptId = newRecordId(32);
-  const now = nowMs();
-  attempts.set(attemptId, {
+  requireApp(deps);
+  const target = githubConnectorTarget(deps, input.teamId, input.connectorId);
+  return startGithubConnectionDevice(connectionDeps, {
     teamId: input.teamId,
     userId: input.userId,
-    deviceCode: code.deviceCode,
-    target,
-    intervalSeconds: code.intervalSeconds,
-    expiresAt: now + code.expiresInSeconds * 1000,
-    nextPollAt: now + code.intervalSeconds * 1000,
-    polling: false,
+    target: { type: 'mcp-connector', target },
   });
-  return {
-    attemptId,
-    userCode: code.userCode,
-    verificationUri: code.verificationUri,
-    intervalSeconds: code.intervalSeconds,
-    expiresInSeconds: code.expiresInSeconds,
-  };
 }
 
-function ownAttempt(
-  deps: McpConnectorDeps,
+interface ConnectorAttemptTag {
+  type: 'mcp-connector';
+  target: GithubConnectorTarget;
+}
+
+function attemptTarget(
+  connectionDeps: GithubConnectionDeviceDeps,
   input: { teamId: string; userId: string; attemptId: string },
-): GithubConnectorAttempt {
-  const attempt = deps.oauthState.githubDevice.get(input.attemptId);
-  if (!attempt || attempt.teamId !== input.teamId || attempt.userId !== input.userId)
+): GithubConnectorTarget {
+  const attempt = connectionDeps.attempts.get(input.attemptId);
+  const tag = attempt?.target;
+  if (
+    attempt === undefined ||
+    attempt.teamId !== input.teamId ||
+    attempt.userId !== input.userId ||
+    typeof tag !== 'object' ||
+    tag === null ||
+    (tag as { type?: string }).type !== 'mcp-connector'
+  )
     throw notFound('GitHub sign-in attempt');
-  return attempt;
+  return (tag as ConnectorAttemptTag).target;
 }
 
 export function cancelGithubConnectorDevice(
-  deps: McpConnectorDeps,
+  connectionDeps: GithubConnectionDeviceDeps,
   input: { teamId: string; userId: string; attemptId: string },
 ): void {
-  ownAttempt(deps, input);
-  deps.oauthState.githubDevice.delete(input.attemptId);
+  attemptTarget(connectionDeps, input);
+  cancelGithubConnectionDevice(connectionDeps, input);
 }
 
-function saveGrant(
+export function bindGithubConnector(
   deps: McpConnectorDeps,
   teamId: string,
   target: GithubConnectorTarget,
-  oauthCipher: string,
 ): string {
   const now = nowMs();
   if (target.kind === 'new') {
@@ -145,7 +158,7 @@ function saveGrant(
         headerNames: [],
         valuesCipher: null,
         authKind: 'github-app',
-        oauthCipher,
+        oauthCipher: null,
         authRevision: 1,
         tokenGeneration: 1,
         ...UNCHECKED,
@@ -158,9 +171,7 @@ function saveGrant(
   const changed = deps.db
     .update(mcpConnector)
     .set({
-      oauthCipher,
       authRevision: target.authRevision + 1,
-      tokenGeneration: sql`${mcpConnector.tokenGeneration} + 1`,
       ...UNCHECKED,
       updatedAt: sql`max(${now}, ${mcpConnector.updatedAt} + 1)`,
     })
@@ -180,46 +191,13 @@ function saveGrant(
 
 export async function pollGithubConnectorDevice(
   deps: McpConnectorDeps,
+  connectionDeps: GithubConnectionDeviceDeps,
   input: { teamId: string; userId: string; attemptId: string },
 ): Promise<GithubConnectorDevicePoll> {
-  const attempt = ownAttempt(deps, input);
-  const attempts = deps.oauthState.githubDevice;
-  const now = nowMs();
-  if (attempt.expiresAt <= now) {
-    attempts.delete(input.attemptId);
-    return { status: 'expired' };
-  }
-  if (attempt.polling || now < attempt.nextPollAt)
-    return { status: 'pending', intervalSeconds: attempt.intervalSeconds };
-  const app = requireApp(deps);
-  attempt.polling = true;
-  let result: Awaited<ReturnType<typeof pollGithubDeviceCode>>;
-  try {
-    result = await pollGithubDeviceCode(
-      { fetch: guardedOAuthFetch(deps) },
-      app.clientId,
-      attempt.deviceCode,
-    );
-  } finally {
-    attempt.polling = false;
-    attempt.nextPollAt = nowMs() + attempt.intervalSeconds * 1000;
-  }
-  if (attempts.get(input.attemptId) !== attempt) return { status: 'expired' };
-  if (result.status === 'pending')
-    return { status: 'pending', intervalSeconds: attempt.intervalSeconds };
-  if (result.status === 'slow_down') {
-    attempt.intervalSeconds = result.intervalSeconds ?? attempt.intervalSeconds + 5;
-    attempt.nextPollAt = nowMs() + attempt.intervalSeconds * 1000;
-    return { status: 'pending', intervalSeconds: attempt.intervalSeconds };
-  }
-  attempts.delete(input.attemptId);
-  if (result.status !== 'complete') return { status: result.status };
-  const id = saveGrant(
-    deps,
-    input.teamId,
-    attempt.target,
-    sealGithubApp(deps, result, result.identity),
-  );
+  const target = attemptTarget(connectionDeps, input);
+  const result = await pollGithubConnectionDevice(connectionDeps, input);
+  if (result.status !== 'complete') return result;
+  const id = bindGithubConnector(deps, input.teamId, target);
   try {
     await checkMcpConnector(deps, input.teamId, id);
   } catch (err) {
@@ -239,10 +217,74 @@ export async function githubConnectorInstalled(
   const row = connectorRow(deps, teamId, connectorId);
   if (row.authKind !== 'github-app')
     throw new HttpError(400, 'only a GitHub sign-in connector has installations');
-  if ((openGithubApp(deps, row)?.expiresAt ?? 0) <= nowMs())
-    await refreshMcpConnectorToken(deps, teamId, connectorId);
-  const secrets = openGithubApp(deps, connectorRow(deps, teamId, connectorId));
-  if (secrets === null || secrets.expiresAt <= nowMs())
-    throw new HttpError(409, 'reconnect GitHub first');
-  return githubUserHasInstallation(guardedOAuthFetch(deps), secrets.accessToken);
+  const access = await connectionToken(
+    {
+      db: deps.db,
+      box: deps.box,
+      githubFetch: deps.githubFetch ?? deps.oauthFetch,
+      oauthClient: deps.oauthClient,
+    },
+    teamId,
+  );
+  if (!('token' in access)) throw new HttpError(409, 'reconnect GitHub first');
+  return githubUserHasInstallation(deps.githubFetch ?? guardedOAuthFetch(deps), access.token);
+}
+
+interface LegacyGithubAppSecrets {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  refreshExpiresAt: number;
+  login: string;
+  userId: number;
+}
+
+export function adoptGithubConnectorGrants(
+  deps: Pick<McpConnectorDeps, 'db' | 'box' | 'githubApp'>,
+): void {
+  const rows = deps.db
+    .select()
+    .from(mcpConnector)
+    .where(and(eq(mcpConnector.authKind, 'github-app'), isNotNull(mcpConnector.oauthCipher)))
+    .all();
+  if (rows.length === 0) return;
+  const app = githubAppOfDeps(deps);
+  for (const row of rows) {
+    let secrets: LegacyGithubAppSecrets;
+    try {
+      secrets = JSON.parse(deps.box.open(row.oauthCipher as string)) as LegacyGithubAppSecrets;
+    } catch {
+      continue;
+    }
+    const hasConnection =
+      deps.db
+        .select({ teamId: githubConnection.teamId })
+        .from(githubConnection)
+        .where(eq(githubConnection.teamId, row.teamId))
+        .get() !== undefined;
+    if (!hasConnection) {
+      if (app === null) continue;
+      upsertGithubConnection(
+        { db: deps.db, box: deps.box },
+        {
+          teamId: row.teamId,
+          login: secrets.login,
+          githubUserId: secrets.userId,
+          accessToken: secrets.accessToken,
+          refreshToken: secrets.refreshToken,
+          accessTokenExpiresAt: secrets.expiresAt,
+          scope: '',
+          device: {
+            clientId: app.clientId,
+            refreshTokenExpiresAt: secrets.refreshExpiresAt,
+          },
+        },
+      );
+    }
+    deps.db
+      .update(mcpConnector)
+      .set({ oauthCipher: null })
+      .where(eq(mcpConnector.id, row.id))
+      .run();
+  }
 }

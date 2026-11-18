@@ -18,6 +18,7 @@ export interface GithubConnectionDeviceAttempt {
   expiresAt: number;
   nextPollAt: number;
   polling: boolean;
+  target?: unknown;
 }
 
 export interface GithubConnectionDeviceDeps {
@@ -46,7 +47,7 @@ function sweep(attempts: Map<string, GithubConnectionDeviceAttempt>): void {
 
 export async function startGithubConnectionDevice(
   deps: GithubConnectionDeviceDeps,
-  input: { teamId: string; userId: string },
+  input: { teamId: string; userId: string; target?: unknown },
 ): Promise<GithubConnectionDeviceStart> {
   const app = requireApp(deps);
   const code = await requestGithubDeviceCode({ fetch: deps.fetch }, app.clientId);
@@ -63,6 +64,7 @@ export async function startGithubConnectionDevice(
     expiresAt: now + code.expiresInSeconds * 1000,
     nextPollAt: now + code.intervalSeconds * 1000,
     polling: false,
+    ...(input.target !== undefined ? { target: input.target } : {}),
   });
   return {
     attemptId,

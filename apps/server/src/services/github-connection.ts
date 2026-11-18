@@ -130,7 +130,10 @@ export function openGithubToken(deps: GithubConnectionDeps, teamId: string): str
 
 const refreshChains = new Map<string, Promise<GithubTokenAccess>>();
 
-async function connectionToken(deps: GithubTokenDeps, teamId: string): Promise<GithubTokenAccess> {
+export async function connectionToken(
+  deps: GithubTokenDeps,
+  teamId: string,
+): Promise<GithubTokenAccess> {
   const box = deps.box;
   if (box === undefined) return { reason: 'no-secret-box' };
   const connectionDeps = { db: deps.db, box };

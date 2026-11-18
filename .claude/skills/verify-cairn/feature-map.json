@@ -2081,6 +2081,7 @@
           "/api/teams/:id/mcp-connectors/:cid/check",
           "/api/teams/:id/mcp-connectors/oauth/start",
           "/api/teams/:id/mcp-connectors/github",
+          "/api/teams/:id/mcp-connectors/github/bind",
           "/api/teams/:id/mcp-connectors/github/device",
           "/api/teams/:id/mcp-connectors/github/device/:attempt",
           "/api/teams/:id/mcp-connectors/:cid/github/installations"

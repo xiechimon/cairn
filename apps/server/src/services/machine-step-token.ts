@@ -141,6 +141,8 @@ async function connectorFields(
       fetch: deps.mcpFetch ?? globalThis.fetch,
       oauthFetch: deps.mcpFetch ?? publicOAuthFetch,
       oauthState: deps.mcpOAuthState ?? newMcpOAuthState(),
+      githubFetch: deps.githubFetch,
+      oauthClient: deps.oauthClient,
     },
     teamId,
     grant ?? [],

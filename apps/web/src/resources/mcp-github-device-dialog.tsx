@@ -99,6 +99,7 @@ export function GithubDeviceDialog({
   live,
   teamId,
   connectorId,
+  boundConnector,
   installUrl,
   fixture,
   fixtureConnector,
@@ -108,6 +109,7 @@ export function GithubDeviceDialog({
   live: boolean;
   teamId: string | undefined;
   connectorId?: string;
+  boundConnector?: McpConnectorRecord;
   installUrl: string | null;
   fixture?: GithubDeviceFixtureStep;
   fixtureConnector?: McpConnectorRecord;
@@ -119,13 +121,17 @@ export function GithubDeviceDialog({
   const { startGithubDevice, pollGithubDevice, cancelGithubDevice, githubInstallations } =
     mutations;
   const [step, setStep] = useState<Step>(() =>
-    fixture === undefined ? { kind: 'starting' } : fixtureStep(t, fixture, fixtureConnector),
+    boundConnector !== undefined
+      ? { kind: 'repos', connector: boundConnector, opened: false, missing: false }
+      : fixture === undefined
+        ? { kind: 'starting' }
+        : fixtureStep(t, fixture, fixtureConnector),
   );
   const primaryRef = useRef<HTMLButtonElement>(null);
   const reconnect = connectorId !== undefined || fixture === 'reconnect';
 
   useEffect(() => {
-    if (!live) return;
+    if (!live || boundConnector !== undefined) return;
     let cancelled = false;
     startGithubDevice
       .mutateAsync(connectorId)
@@ -138,7 +144,7 @@ export function GithubDeviceDialog({
     return () => {
       cancelled = true;
     };
-  }, [live, connectorId, startGithubDevice.mutateAsync, t]);
+  }, [live, connectorId, boundConnector, startGithubDevice.mutateAsync, t]);
 
   useEffect(() => {
     if (!live || step.kind !== 'code') return;

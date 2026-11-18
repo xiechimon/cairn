@@ -59,6 +59,7 @@ type FixtureDialog =
 
 interface DeviceTarget {
   connectorId?: string;
+  bound?: McpConnectorRecord;
   run: number;
 }
 
@@ -241,8 +242,15 @@ export function McpServersPage() {
 
   const requestSignIn = (request: McpOAuthRequest) => {
     setDialog(null);
-    if (request.kind === 'reconnect' && request.connector.authKind === 'github-app')
-      return setDevice({ connectorId: request.connector.id, run: 0 });
+    if (request.kind === 'reconnect' && request.connector.authKind === 'github-app') {
+      const target = { connectorId: request.connector.id, run: 0 };
+      if (live && githubApp?.connectionReady === true)
+        return mutations.bindGithubConnector.mutate(request.connector.id, {
+          onSuccess: (connector) => setDevice({ ...target, bound: connector }),
+          onError: () => setDevice(target),
+        });
+      return setDevice(target);
+    }
     if (request.kind === 'custom') return startSignIn({ name: request.label, body: request });
     startSignIn({
       name: request.connector.label,
@@ -254,6 +262,11 @@ export function McpServersPage() {
   const connect = (entry: McpCatalogEntry) => {
     if (entry.auth.includes('github-app') && githubApp?.available === true) {
       setNotice(null);
+      if (live && githubApp.connectionReady)
+        return mutations.bindGithubConnector.mutate(undefined, {
+          onSuccess: (connector) => setDevice({ run: 0, bound: connector }),
+          onError: () => setDevice({ run: 0 }),
+        });
       return setDevice({ run: 0 });
     }
     if (entry.auth.includes('oauth')) return startSignIn(catalogAttempt(entry));
@@ -423,6 +436,7 @@ export function McpServersPage() {
           live={live}
           teamId={teamId}
           {...(device.connectorId !== undefined ? { connectorId: device.connectorId } : {})}
+          {...(device.bound !== undefined ? { boundConnector: device.bound } : {})}
           installUrl={githubApp?.installUrl ?? null}
           {...(device.run === 0 && fixtureDevice !== undefined ? { fixture: fixtureDevice } : {})}
           {...(fixtureGithub !== undefined ? { fixtureConnector: fixtureGithub } : {})}
