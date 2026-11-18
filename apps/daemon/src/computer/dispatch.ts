@@ -19,6 +19,7 @@ import {
   closeScopeTab,
   runBrowserTool,
 } from './browser.js';
+import { DesktopAccessibility } from './desktop-accessibility.js';
 import { DesktopScreen } from './desktop-screen.js';
 import { FramePoster } from './frame-poster.js';
 import {
@@ -74,6 +75,8 @@ const ORB_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'write_file',
   'computer_observe',
   'computer_act',
+  'desktop_snapshot',
+  'desktop_act',
   'browser_navigate',
   'browser_snapshot',
   'browser_act',
@@ -161,6 +164,10 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
   let closing = false;
   const postingLifetime = new AbortController();
   const desktopScreen = new DesktopScreen({ now });
+  const desktopAccessibility = new DesktopAccessibility({
+    now,
+    cairnOrigins: options.cairnOrigins,
+  });
 
   function remember(callId: string): void {
     finishedUnsafe.add(callId);
@@ -652,6 +659,18 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
           call.tool === 'computer_act'
             ? desktopScreen.act(route.provider, scopeKey, request)
             : desktopScreen.observe(route.provider, scopeKey, request),
+        controller,
+      );
+      return;
+    }
+    if (call.tool === 'desktop_snapshot' || call.tool === 'desktop_act') {
+      const scopeKey = call.scopeKey ?? '';
+      await handleScreen(
+        call,
+        (request) =>
+          call.tool === 'desktop_act'
+            ? desktopAccessibility.act(route.provider, scopeKey, request)
+            : desktopAccessibility.snapshot(route.provider, scopeKey, request),
         controller,
       );
       return;

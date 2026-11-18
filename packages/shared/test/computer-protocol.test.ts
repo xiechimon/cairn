@@ -52,7 +52,7 @@ describe('computer protocol (D75)', () => {
   it('only read tools are replay-safe', () => {
     for (const tool of COMPUTER_REPLAY_SAFE_TOOLS) {
       expect(COMPUTER_TOOLS).toContain(tool);
-      expect(tool).toMatch(/^(list_files|read_file|.*observe|browser_snapshot)$/);
+      expect(tool).toMatch(/^(list_files|read_file|.*observe|browser_snapshot|desktop_snapshot)$/);
     }
     expect(COMPUTER_REPLAY_SAFE_TOOLS.has('shell')).toBe(false);
     expect(COMPUTER_REPLAY_SAFE_TOOLS.has('user_computer_act')).toBe(false);

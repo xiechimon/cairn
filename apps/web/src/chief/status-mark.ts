@@ -81,6 +81,7 @@ const LOOK_TOOLS = new Set([
   'get_schedule',
   'wakes',
   'browser_snapshot',
+  'desktop_snapshot',
 ]);
 const LOOK_TOOL = /read|grep|glob|search|list|fetch|view/i;
 

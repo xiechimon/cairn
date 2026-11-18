@@ -116,7 +116,9 @@ export function isCoordinatorComputerTool(name: string): boolean {
     name === 'request_takeover' ||
     name === INSTALL_PACKAGES_TOOL ||
     name === 'computer_observe' ||
-    name === 'computer_act'
+    name === 'computer_act' ||
+    name === 'desktop_snapshot' ||
+    name === 'desktop_act'
   );
 }
 

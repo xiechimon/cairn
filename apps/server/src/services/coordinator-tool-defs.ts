@@ -32,6 +32,8 @@ export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorC
     attach_file: { withheld: 'the Coordinator attaches files through attachment' },
     computer_observe: { offered: 'when_machine_reports_computer' },
     computer_act: { offered: 'when_machine_reports_computer' },
+    desktop_snapshot: { offered: 'when_machine_reports_computer' },
+    desktop_act: { offered: 'when_machine_reports_computer' },
     open_path: { withheld: 'host app control waits for its approval gate' },
     launch_app: { withheld: 'host app control waits for its approval gate' },
     browser_navigate: { offered: 'always' },

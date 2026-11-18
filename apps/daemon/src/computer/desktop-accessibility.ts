@@ -1,0 +1,510 @@
+import { setTimeout as sleep } from 'node:timers/promises';
+import { z } from 'zod';
+import {
+  SCREEN_ERROR_MESSAGE_MAX_CHARS,
+  SCREEN_MAX_ACTIONS,
+  SCREEN_MAX_WAIT_MS,
+  SCREEN_OUTPUT_CAP_BYTES,
+  SCREEN_TEXT_MAX_CHARS,
+  type ScreenCall,
+  type ScreenOutcome,
+} from './host-screen.js';
+import { type AccessibilityNode, accessibilityRows } from './host-screen-rows.js';
+import { isBrowserApp, originHosts, showsCairn } from './host-screen-self.js';
+import { type ComputerProvider, ComputerRefusal } from './provider.js';
+
+export const AGENT_DESKTOP_BINARY = 'agent-desktop';
+export const DESKTOP_NOT_INSTALLED =
+  'agent-desktop is not installed on this computer; update the computer to the latest image';
+const COMMAND_NOT_FOUND = 127;
+const COMMAND_TIMEOUT_MS = 30_000;
+const FINAL_FRAME_MARGIN_MS = 5_000;
+const MIN_BUDGET_MS = 1_000;
+const SNAPSHOT_TIMEOUT_MS = '8000';
+const FIND_LIMIT = 50;
+const READ_MAX_CHARS = 4_000;
+const CAIRN_WINDOW_REFUSAL = 'This window shows the cairn web app; it is never driven';
+const MODIFIER_NAMES = { cmd: 'ctrl', ctrl: 'ctrl', alt: 'alt', option: 'alt', shift: 'shift' };
+
+const elementNumber = z.number().int().min(1).max(100_000);
+const actionSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('click'),
+    element: elementNumber,
+    double: z.boolean().optional(),
+    button: z.enum(['left', 'right']).optional(),
+  }),
+  z.strictObject({ kind: z.literal('type'), element: elementNumber, text: z.string().max(10_000) }),
+  z.strictObject({ kind: z.literal('set'), element: elementNumber, value: z.string().max(10_000) }),
+  z.strictObject({
+    kind: z.literal('key'),
+    key: z.string().min(1).max(32),
+    modifiers: z
+      .array(z.enum(['cmd', 'ctrl', 'alt', 'option', 'shift']))
+      .max(4)
+      .optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('read'),
+    element: elementNumber,
+    property: z.enum(['value', 'text']).optional(),
+  }),
+  z.strictObject({ kind: z.literal('wait'), ms: z.number().int().min(1).max(SCREEN_MAX_WAIT_MS) }),
+]);
+type DesktopUiAction = z.infer<typeof actionSchema>;
+const ACTION_KINDS = ['click', 'type', 'set', 'key', 'read', 'wait'];
+
+const appSchema = z.string().trim().min(1).max(100);
+const snapshotSchema = z.object({
+  app: appSchema.optional(),
+  query: z.string().trim().min(1).max(200).optional(),
+});
+const actSchema = z.object({ app: appSchema, actions: z.array(z.unknown()) });
+
+interface Envelope {
+  ok: boolean;
+  data?: unknown;
+  error?: { code?: string; disposition?: { retry?: string } };
+}
+
+interface UiWindow {
+  id: string;
+  title?: string;
+  app_name: string;
+  accessible?: boolean;
+  minimized?: boolean;
+  visible?: boolean;
+}
+
+interface Target {
+  app: string;
+  windowId: string;
+  title: string;
+}
+
+interface Budget {
+  endsAt: number;
+}
+
+class Stop extends Error {
+  constructor(readonly outcome: Extract<ScreenOutcome, { kind: 'error' }>) {
+    super(outcome.message);
+  }
+}
+
+function refuse(message: string): Stop {
+  return new Stop({ kind: 'error', message, delivery: 'not_delivered' });
+}
+
+function clip(text: string, max: number): string {
+  return text.length <= max ? text : text.slice(0, max);
+}
+
+export interface DesktopAccessibilityOptions {
+  now?: () => number;
+  cairnOrigins?: readonly string[];
+}
+
+export class DesktopAccessibility {
+  private readonly now: () => number;
+  private readonly hosts: string[];
+  private readonly snapshots = new Map<string, { id: string; windowId: string }>();
+  private readonly cairnWindows = new Set<string>();
+
+  constructor(options: DesktopAccessibilityOptions = {}) {
+    this.now = options.now ?? Date.now;
+    this.hosts = originHosts(options.cairnOrigins ?? []);
+  }
+
+  async snapshot(
+    provider: ComputerProvider,
+    scopeKey: string,
+    call: ScreenCall,
+  ): Promise<ScreenOutcome> {
+    try {
+      const parsed = snapshotSchema.safeParse(call.params);
+      if (!parsed.success) {
+        throw refuse('desktop_snapshot takes an optional app name and an optional query string');
+      }
+      const budget = this.budget(call);
+      const run = new Runner(provider, call, budget, this.now);
+      if (parsed.data.app === undefined) {
+        return { kind: 'done', text: this.appList(await this.windows(run)), images: [] };
+      }
+      const target = await this.target(run, parsed.data.app);
+      return {
+        kind: 'done',
+        text: await this.observation(run, scopeKey, target, parsed.data.query),
+        images: [],
+      };
+    } catch (error) {
+      if (error instanceof Stop) return error.outcome;
+      throw error;
+    }
+  }
+
+  async act(
+    provider: ComputerProvider,
+    scopeKey: string,
+    call: ScreenCall,
+  ): Promise<ScreenOutcome> {
+    try {
+      const parsed = actSchema.safeParse(call.params);
+      if (!parsed.success) throw refuse('desktop_act needs an app name and an actions list');
+      const { app, actions: rawActions } = parsed.data;
+      if (rawActions.length === 0) throw refuse('desktop_act needs at least one action');
+      if (rawActions.length > SCREEN_MAX_ACTIONS) {
+        throw refuse(
+          `At most ${SCREEN_MAX_ACTIONS} actions are allowed per call and ${rawActions.length} were sent; nothing ran`,
+        );
+      }
+      const actions = rawActions.map((raw, index) => {
+        const action = actionSchema.safeParse(raw);
+        if (action.success) return action.data;
+        const kind = (raw as { kind?: unknown } | null)?.kind;
+        throw refuse(
+          typeof kind === 'string' && ACTION_KINDS.includes(kind)
+            ? `Action ${index + 1} (${kind}) has invalid arguments; nothing ran`
+            : `Action ${index + 1} has an unknown kind; use one of ${ACTION_KINDS.join(', ')}. Nothing ran`,
+        );
+      });
+      const budget = this.budget(call);
+      const run = new Runner(provider, call, budget, this.now);
+      const target = await this.target(run, app);
+      for (const action of actions) if ('element' in action) this.ref(scopeKey, target, action);
+      const done: string[] = [];
+      for (const [index, action] of actions.entries()) {
+        try {
+          if (isBrowserApp(target.app)) await this.assertNotCairn(run, target);
+          done.push(await this.perform(run, scopeKey, target, action, index, done.length));
+        } catch (error) {
+          if (error instanceof Stop && done.length > 0) {
+            throw new Stop({ ...error.outcome, delivery: 'unknown' });
+          }
+          throw error;
+        }
+      }
+      let tail: string;
+      try {
+        tail = await this.observation(run, scopeKey, target);
+      } catch (error) {
+        if (!(error instanceof Stop)) throw error;
+        tail = `The actions ran, but looking at ${target.app} afterwards failed: ${error.outcome.message}`;
+      }
+      return {
+        kind: 'done',
+        text: clip(`${done.join('\n')}\n\n${tail}`, SCREEN_TEXT_MAX_CHARS),
+        images: [],
+      };
+    } catch (error) {
+      if (error instanceof Stop) return error.outcome;
+      throw error;
+    }
+  }
+
+  private budget(call: ScreenCall): Budget {
+    const endsAt = call.deadlineAt - FINAL_FRAME_MARGIN_MS;
+    if (endsAt - this.now() < MIN_BUDGET_MS) {
+      throw refuse('Too little time was left before the call deadline, so nothing ran');
+    }
+    return { endsAt };
+  }
+
+  private async windows(run: Runner): Promise<UiWindow[]> {
+    const listed = await run.read(['list-windows']);
+    return (Array.isArray(listed) ? (listed as UiWindow[]) : []).filter(
+      (window) => window?.id && window.app_name,
+    );
+  }
+
+  private appList(windows: readonly UiWindow[]): string {
+    if (windows.length === 0) {
+      return 'No app has a window the accessibility tree can see. Open one, then call desktop_snapshot again. Use computer_observe for a screenshot.';
+    }
+    const lines = windows.map(
+      (window) => `- ${window.app_name}${window.title ? `: ${JSON.stringify(window.title)}` : ''}`,
+    );
+    return `Open apps with windows; call desktop_snapshot with one of these app names:\n${lines.join('\n')}`;
+  }
+
+  private async target(run: Runner, appName: string): Promise<Target> {
+    const windows = await this.windows(run);
+    const wanted = appName.toLowerCase();
+    const matching = windows.filter((window) => window.app_name.toLowerCase() === wanted);
+    if (matching.length === 0) {
+      const open = [...new Set(windows.map((window) => window.app_name))].slice(0, 12);
+      throw refuse(
+        open.length > 0
+          ? `No open app is named exactly "${appName}". Open apps with windows: ${open.join(', ')}`
+          : `No open app is named exactly "${appName}", and no app has a window the accessibility tree can see`,
+      );
+    }
+    const usable = matching.filter(
+      (window) => window.accessible !== false && window.visible !== false && !window.minimized,
+    );
+    const window = usable.find((candidate) => !this.cairnWindows.has(candidate.id)) ?? usable[0];
+    if (!window) throw refuse(`${matching[0]?.app_name ?? appName} has no visible window to drive`);
+    const title = window.title ?? '';
+    if (
+      this.cairnWindows.has(window.id) ||
+      (isBrowserApp(window.app_name) && showsCairn([title], ['cairn', ...this.hosts]))
+    ) {
+      throw refuse(CAIRN_WINDOW_REFUSAL);
+    }
+    return { app: window.app_name, windowId: window.id, title };
+  }
+
+  private async assertNotCairn(run: Runner, target: Target): Promise<void> {
+    const data = (await run.read([
+      'snapshot',
+      '--window-id',
+      target.windowId,
+      '--timeout-ms',
+      SNAPSHOT_TIMEOUT_MS,
+      '--compact',
+      '--max-depth',
+      '40',
+    ])) as { tree?: AccessibilityNode } | null;
+    const rows = accessibilityRows(data?.tree ? [data.tree] : [], '', false);
+    if (showsCairn(rows.strings, ['cairn', ...this.hosts])) {
+      this.cairnWindows.add(target.windowId);
+      throw refuse(CAIRN_WINDOW_REFUSAL);
+    }
+  }
+
+  private async observation(
+    run: Runner,
+    scopeKey: string,
+    target: Target,
+    query?: string,
+  ): Promise<string> {
+    const scope = ['--window-id', target.windowId, '--timeout-ms', SNAPSHOT_TIMEOUT_MS];
+    const data = ((await run.read(
+      query
+        ? ['find', ...scope, '--text', query, '--limit', String(FIND_LIMIT)]
+        : ['snapshot', ...scope, '--compact', '--max-depth', '40'],
+    )) ?? {}) as {
+      snapshot_id?: string;
+      complete?: boolean;
+      tree?: AccessibilityNode;
+      matches?: AccessibilityNode[];
+      truncated?: boolean;
+    };
+    const snapshotId = typeof data.snapshot_id === 'string' ? data.snapshot_id : '';
+    if (snapshotId) {
+      this.snapshots.set(`${scopeKey}\0${target.app.toLowerCase()}`, {
+        id: snapshotId,
+        windowId: target.windowId,
+      });
+    }
+    const rows = accessibilityRows(
+      data.tree ? [data.tree] : (data.matches ?? []),
+      snapshotId,
+      data.complete === false || data.truncated === true,
+    );
+    if (isBrowserApp(target.app) && showsCairn(rows.strings, ['cairn', ...this.hosts])) {
+      this.cairnWindows.add(target.windowId);
+      throw refuse(CAIRN_WINDOW_REFUSAL);
+    }
+    const header = [
+      `app: ${target.app}`,
+      ...(target.title ? [`window: ${target.title}`] : []),
+      ...(snapshotId ? [`snapshot: ${snapshotId} (element numbers in [] belong to it)`] : []),
+    ];
+    const footer = rows.truncated ? '\n[accessibility rows truncated]' : '';
+    return clip(`${header.join('\n')}\n\n${rows.text}${footer}`, SCREEN_TEXT_MAX_CHARS);
+  }
+
+  private ref(
+    scopeKey: string,
+    target: Target,
+    action: Extract<DesktopUiAction, { element: number }>,
+  ): string {
+    const snapshot = this.snapshots.get(`${scopeKey}\0${target.app.toLowerCase()}`);
+    if (!snapshot || snapshot.windowId !== target.windowId) {
+      throw refuse(
+        `Call desktop_snapshot for ${target.app} before using element numbers; nothing ran`,
+      );
+    }
+    return `@${snapshot.id}:e${action.element}`;
+  }
+
+  private async perform(
+    run: Runner,
+    scopeKey: string,
+    target: Target,
+    action: DesktopUiAction,
+    index: number,
+    ran: number,
+  ): Promise<string> {
+    const label = `Action ${index + 1} (${action.kind})`;
+    const go = (...args: string[]) => run.step(args, label, ran);
+    const delivered = `${index + 1}. ${action.kind}: delivered`;
+    switch (action.kind) {
+      case 'click': {
+        const ref = this.ref(scopeKey, target, action);
+        if (action.double) await go('double-click', '--headed', '--', ref);
+        else if (action.button === 'right') await go('right-click', '--', ref);
+        else await go('click', '--', ref);
+        return delivered;
+      }
+      case 'type':
+        await go('type', '--headed', '--', this.ref(scopeKey, target, action), action.text);
+        return delivered;
+      case 'set':
+        await go('set-value', '--', this.ref(scopeKey, target, action), action.value);
+        return delivered;
+      case 'key': {
+        const modifiers = [
+          ...new Set((action.modifiers ?? []).map((name) => MODIFIER_NAMES[name])),
+        ];
+        const key = action.key.length === 1 ? action.key.toLowerCase() : action.key;
+        await go(
+          'press',
+          '--headed',
+          '--window-id',
+          target.windowId,
+          '--',
+          [...modifiers, key].join('+'),
+        );
+        return delivered;
+      }
+      case 'read': {
+        const data = (await go(
+          'get',
+          '--property',
+          action.property ?? 'value',
+          '--',
+          this.ref(scopeKey, target, action),
+        )) as { value?: unknown } | null;
+        const value =
+          typeof data?.value === 'string' ? data.value : JSON.stringify(data?.value ?? null);
+        return `${index + 1}. read: ${JSON.stringify(clip(value, READ_MAX_CHARS))}`;
+      }
+      case 'wait': {
+        const remaining = run.endsAt - this.now();
+        if (remaining < action.ms) {
+          throw new Stop({
+            kind: 'error',
+            message: `${label} would outlive the call deadline; it did not run`,
+            delivery: ran > 0 ? 'unknown' : 'not_delivered',
+          });
+        }
+        await sleep(action.ms, undefined, { signal: run.signal }).catch(() => {
+          throw new Stop({
+            kind: 'error',
+            message: 'The call was cancelled during a wait',
+            delivery: 'unknown',
+          });
+        });
+        return delivered;
+      }
+    }
+  }
+}
+
+class Runner {
+  constructor(
+    private readonly provider: ComputerProvider,
+    private readonly call: ScreenCall,
+    private readonly budget: Budget,
+    private readonly now: () => number,
+  ) {}
+
+  get endsAt(): number {
+    return this.budget.endsAt;
+  }
+
+  get signal(): AbortSignal {
+    return this.call.signal;
+  }
+
+  async read(args: readonly string[]): Promise<unknown> {
+    const envelope = await this.execute(args, `agent-desktop ${args[0]}`, 0);
+    if (!envelope.ok)
+      throw refuse(clip(JSON.stringify(envelope.error), SCREEN_ERROR_MESSAGE_MAX_CHARS));
+    return envelope.data;
+  }
+
+  async step(args: readonly string[], label: string, ran: number): Promise<unknown> {
+    const envelope = await this.execute(args, label, ran);
+    if (envelope.ok) return envelope.data;
+    const retry = envelope.error?.disposition?.retry;
+    const completed = ran > 0 ? ` ${ran} earlier action(s) already ran.` : '';
+    throw new Stop({
+      kind: 'error',
+      message: clip(
+        `${label} was refused by agent-desktop.${completed} agent-desktop said: ${JSON.stringify(envelope.error)}`,
+        SCREEN_ERROR_MESSAGE_MAX_CHARS,
+      ),
+      delivery: retry === 'safe' && ran === 0 ? 'not_delivered' : 'unknown',
+    });
+  }
+
+  private async execute(args: readonly string[], label: string, ran: number): Promise<Envelope> {
+    const timeoutMs = Math.min(COMMAND_TIMEOUT_MS, this.budget.endsAt - this.now());
+    const delivery = ran > 0 ? 'unknown' : 'not_delivered';
+    if (timeoutMs < 1) {
+      throw new Stop({
+        kind: 'error',
+        message: 'The call deadline passed before the next step could run',
+        delivery,
+      });
+    }
+    let events: Awaited<ReturnType<ComputerProvider['execute']>>;
+    try {
+      events = await this.provider.execute({
+        argv: [AGENT_DESKTOP_BINARY, ...args],
+        timeoutMs,
+        signal: this.call.signal,
+      });
+    } catch (error) {
+      if (error instanceof ComputerRefusal) {
+        throw new Stop({
+          kind: 'error',
+          message: clip(error.message, SCREEN_ERROR_MESSAGE_MAX_CHARS),
+          delivery: ran > 0 ? 'unknown' : error.delivery,
+        });
+      }
+      throw error;
+    }
+    let stdout = '';
+    let size = 0;
+    let code = 1;
+    let stopped = false;
+    for await (const event of events) {
+      if (event.kind === 'exit') {
+        code = event.code;
+        stopped = event.reason !== undefined;
+        continue;
+      }
+      size += event.text.length;
+      if (size > SCREEN_OUTPUT_CAP_BYTES) {
+        throw new Stop({
+          kind: 'error',
+          message: `${label} produced more output than the ${SCREEN_OUTPUT_CAP_BYTES} byte cap`,
+          delivery,
+        });
+      }
+      if (event.kind === 'stdout') stdout += event.text;
+    }
+    if (code === COMMAND_NOT_FOUND)
+      throw new Stop({ kind: 'error', message: DESKTOP_NOT_INSTALLED, delivery });
+    if (stopped) {
+      throw new Stop({
+        kind: 'error',
+        message: `${label} timed out or was cancelled and agent-desktop was killed`,
+        delivery: 'unknown',
+      });
+    }
+    try {
+      const envelope = JSON.parse(stdout) as Envelope;
+      if (typeof envelope?.ok === 'boolean') return envelope;
+    } catch {}
+    throw new Stop({
+      kind: 'error',
+      message: `${label} returned output that is not an agent-desktop JSON envelope`,
+      delivery: ran > 0 ? 'unknown' : delivery,
+    });
+  }
+}

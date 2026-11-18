@@ -63,7 +63,10 @@ export function handoffRefusal(
 ): string | null {
   if (!row) return null;
   if (tool === 'browser_navigate' && row.handoffReason !== null) return HANDOFF_NAVIGATE_REFUSED;
-  if ((tool === 'browser_snapshot' || tool === 'computer_observe') && ownerHoldsControl(row, now)) {
+  if (
+    (tool === 'browser_snapshot' || tool === 'computer_observe' || tool === 'desktop_snapshot') &&
+    ownerHoldsControl(row, now)
+  ) {
     return HANDOFF_OWNER_CONTROL_REFUSED;
   }
   return null;

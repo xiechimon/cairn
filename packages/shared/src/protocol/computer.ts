@@ -11,6 +11,8 @@ export const COMPUTER_TOOLS = [
   'attach_file',
   'computer_observe',
   'computer_act',
+  'desktop_snapshot',
+  'desktop_act',
   'open_path',
   'launch_app',
   'browser_navigate',
@@ -31,6 +33,7 @@ export const COMPUTER_REPLAY_SAFE_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'list_files',
   'read_file',
   'computer_observe',
+  'desktop_snapshot',
   'browser_snapshot',
   'user_computer_observe',
 ]);

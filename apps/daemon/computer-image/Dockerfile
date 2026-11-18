@@ -17,6 +17,16 @@ RUN set -eu; \
     install -m 755 "/tmp/package/bin/$agent" /opt/agent-browser/agent-browser; \
     cd /opt/cloak; \
     npm install --ignore-scripts --legacy-peer-deps --no-audit --no-fund --omit=dev cloakbrowser@0.7.2
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      arm64) triple=aarch64; desktop=438990a703fbeb19775596c341c3701435e80adbfa1b2f64b82ff17567d5573b ;; \
+      amd64) triple=x86_64; desktop=ca77b6b75034eeb12e537dd8c0a4f2a3424119253f38b7e6bd79ba0d2fef1264 ;; \
+      *) echo "unsupported architecture $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSLo /tmp/agent-desktop.tgz "https://github.com/vercel-labs/agent-desktop/releases/download/v1.3.1/agent-desktop-v1.3.1-${triple}-unknown-linux-gnu.tar.gz"; \
+    echo "$desktop  /tmp/agent-desktop.tgz" | sha256sum -c -; \
+    mkdir -p /opt/agent-desktop; \
+    tar -xzf /tmp/agent-desktop.tgz -C /opt/agent-desktop
 
 FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
 ARG TARGETARCH
@@ -28,7 +38,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN set -eu; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-      xvfb x11vnc openbox picom hsetroot xdotool xclip dbus-x11 libglib2.0-bin \
+      xvfb x11vnc openbox picom hsetroot xdotool xclip dbus-x11 libglib2.0-bin at-spi2-core \
       chromium lxterminal fonts-noto-cjk fonts-noto-color-emoji \
       fonts-freefont-ttf fonts-unifont fonts-ipafont-gothic fonts-wqy-zenhei fonts-tlwg-loma-otf \
       fonts-liberation2 fonts-crosextra-carlito fonts-crosextra-caladea \
@@ -56,6 +66,7 @@ RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm; \
     ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 COPY --from=packages /opt/agent-browser /opt/agent-browser
 COPY --from=packages /opt/cloak /opt/cloak
+COPY --from=packages /opt/agent-desktop /opt/agent-desktop
 COPY guard.nft /etc/cairn/guard.nft
 COPY agent-env.sh /etc/profile.d/cairn-agent.sh
 COPY cloak.mjs /opt/cloak/cloak.mjs
@@ -64,5 +75,6 @@ COPY --chmod=755 entry.sh /usr/local/bin/cairn-entry
 COPY --chmod=755 desktop.sh /usr/local/bin/cairn-desktop
 COPY --chmod=755 browser.sh /usr/local/bin/cairn-browser
 COPY --chmod=755 agent-browser.sh /usr/local/bin/agent-browser
+COPY --chmod=755 agent-desktop.sh /usr/local/bin/agent-desktop
 WORKDIR /home/agent
 CMD ["/usr/local/bin/cairn-entry"]

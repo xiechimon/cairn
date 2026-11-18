@@ -65,6 +65,8 @@ describe('Coordinator computer tool offers', () => {
     expect(COMPUTER_DESKTOP_TOOLS.map((def) => def.name).sort()).toEqual([
       'computer_act',
       'computer_observe',
+      'desktop_act',
+      'desktop_snapshot',
     ]);
   });
 });

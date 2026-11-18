@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
 Name=Chromium
-Exec=/usr/bin/chromium --no-sandbox --user-data-dir=/home/agent/.cairn/browser-profile --start-maximized --ozone-platform=x11 --password-store=basic --no-first-run --no-default-browser-check --restore-last-session
+Exec=/usr/bin/chromium --no-sandbox --user-data-dir=/home/agent/.cairn/browser-profile --force-renderer-accessibility --start-maximized --ozone-platform=x11 --password-store=basic --no-first-run --no-default-browser-check --restore-last-session
 Icon=chromium
 Terminal=false

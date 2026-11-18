@@ -97,6 +97,8 @@ const SHELL_TOOLS: ReadonlySet<ComputerTool> = new Set(['shell', 'user_computer_
 const SCREEN_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'computer_observe',
   'computer_act',
+  'desktop_snapshot',
+  'desktop_act',
   'user_computer_observe',
   'user_computer_act',
   'open_path',
