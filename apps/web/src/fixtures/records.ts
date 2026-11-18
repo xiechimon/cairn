@@ -385,7 +385,8 @@ export interface FailFacts {
 }
 
 export type WorkStep =
-  | { kind: 'think'; id: string; text: string; seconds: number | null }
+  | { kind: 'think'; id: string; text: string; seconds: number | null; running?: boolean }
+  | { kind: 'say'; id: string; text: string }
   | {
       kind: 'call';
       id: string;
@@ -438,7 +439,15 @@ export type TranscriptItem =
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }
-  | { kind: 'work'; id: string; steps: WorkStep[]; expanded?: boolean; createdAt?: number }
+  | {
+      kind: 'work';
+      id: string;
+      steps: WorkStep[];
+      expanded?: boolean;
+      running?: boolean;
+      startedAt?: number;
+      createdAt?: number;
+    }
   | { kind: 'elapsed'; seconds: number }
   | {
       kind: 'note';

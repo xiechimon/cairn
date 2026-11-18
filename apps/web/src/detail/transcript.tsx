@@ -5,7 +5,7 @@ import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { BlockedTyping, LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
+import { BlockedTyping, LiveRow, LiveSignal, TaskLiveRow } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
@@ -22,7 +22,7 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
 import { inlineSegments } from '../lib/markdown.js';
-import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS, TaskCard } from './chat-markdown.js';
+import { ChatMarkdown, REPLY_BLOCK_CLS, TaskCard } from './chat-markdown.js';
 import { failFactsText } from './fail-facts.js';
 import { Segments } from './segments.js';
 import { shouldExpandLastWork } from './work-expansion.js';
@@ -221,7 +221,7 @@ function Row({
       return (
         <div
           data-testid="transcript-question"
-          className={`mt-5 flex flex-col gap-2 py-2 text-ui ${REPLY_BUBBLE_CLS}`}
+          className="mt-5 agent-measure flex flex-col gap-2 py-2 text-ui"
         >
           {item.questions.map((q) => (
             <div key={q.header} className="flex flex-col gap-1">
@@ -324,31 +324,21 @@ function Row({
       const copy = robotCopyText(item);
       return (
         <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
-          {item.markdown != null ? (
+          <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
             <div
-              className="chat-text min-w-0 max-w-full font-sans text-ui leading-5 break-words text-(--foreground)"
+              className="chat-text agent-measure min-w-0 font-sans text-ui leading-5.5 break-words text-(--foreground)"
               data-testid="agent-text"
             >
-              <ChatMarkdown
-                text={item.markdown}
-                bubbles
-                bubbleTools={(group) => <RowTools placement="right" copy={group.source} />}
-              />
-            </div>
-          ) : (
-            <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
-              <div
-                className={`chat-text min-w-0 font-sans text-ui leading-5 break-words text-(--foreground) ${REPLY_BUBBLE_CLS}`}
-                data-slot="reply-bubble"
-                data-testid="agent-text"
-              >
-                {(item.paragraphs ?? []).map((raw, i) => (
+              {item.markdown != null ? (
+                <ChatMarkdown text={item.markdown} />
+              ) : (
+                (item.paragraphs ?? []).map((raw, i) => (
                   <Para key={i} para={Array.isArray(raw) ? { segments: raw } : raw} gap={i > 0} />
-                ))}
-              </div>
-              <RowTools placement="right" copy={copy} />
+                ))
+              )}
             </div>
-          )}
+            <RowTools placement="right" copy={copy} />
+          </div>
           <RowTools placement="below-start" copy={copy} />
         </div>
       );
@@ -391,7 +381,12 @@ function Row({
                 actions={<CoordinatorFixLinks kind={item.blockedKind} />}
               />
             ) : (
-              <TypingDots testId="live-row" label={t(item.label, item.labelVars)} />
+              <TaskLiveRow
+                testId="live-row"
+                label={t(item.label, item.labelVars)}
+                seconds={item.seconds}
+                startedAt={item.startedAt}
+              />
             )
           ) : (
             <LiveRow
@@ -474,10 +469,9 @@ function Row({
     case 'review':
       return (
         <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
-          <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
+          <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
             <div
-              className={`chat-text min-w-0 text-ui leading-5 break-words text-(--foreground) ${REPLY_BUBBLE_CLS}`}
-              data-slot="reply-bubble"
+              className="chat-text agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
               data-testid="agent-text"
             >
               <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -545,10 +539,9 @@ function Row({
     case 'verify':
       return (
         <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
-          <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
+          <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
             <div
-              className={`chat-text min-w-0 text-ui leading-5 break-words text-(--foreground) ${REPLY_BUBBLE_CLS}`}
-              data-slot="reply-bubble"
+              className="chat-text agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
               data-testid="agent-text"
             >
               <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -761,7 +754,9 @@ export function Transcript({
 }: TranscriptProps) {
   const { t } = useI18n();
   const previous = useRef<{ live: boolean; ids: Set<string> }>({ live: false, ids: new Set() });
-  const live = transcript.some((item) => item.kind === 'streaming');
+  const live = transcript.some(
+    (item) => item.kind === 'streaming' || (item.kind === 'work' && item.running === true),
+  );
   const workItems = transcript.filter((item) => item.kind === 'work');
   const entering = new Set<string>();
   const ids = new Set<string>();
@@ -792,8 +787,10 @@ export function Transcript({
     if (before.lastUserId !== lastUserId && before.rows > 0) setEnteringUser(lastUserId);
   }, [lastUserId, transcript.length]);
   const lastWork = shouldExpandLastWork(workItems) ? workItems.at(-1) : undefined;
-  const resultAt =
-    transcript.at(-1)?.kind === 'streaming' ? transcript.length - 1 : transcript.length;
+  const tailItem = transcript.at(-1);
+  const hasLiveTail =
+    tailItem?.kind === 'streaming' || (tailItem?.kind === 'work' && tailItem.running === true);
+  const resultAt = hasLiveTail ? transcript.length - 1 : transcript.length;
   const rows = transcript.map((item, index) => {
     const id =
       ('id' in item ? item.id : undefined) ?? (item.kind === 'user' ? `user-${index}` : undefined);
@@ -806,7 +803,7 @@ export function Transcript({
           onOpenPlan={onOpenPlan}
           agent={agent}
           liveStep={liveStep}
-          defaultExpanded={item === lastWork}
+          defaultExpanded={item === lastWork || (item.kind === 'work' && item.expanded === true)}
           entering={entering}
           enteringUser={enteringUser}
         />

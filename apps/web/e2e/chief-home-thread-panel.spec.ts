@@ -325,27 +325,25 @@ test('the head is one calm row: a one-line title, the status in the task tone, c
   );
 });
 
-test('the request shows once as the task text, and replies sit in reply bubbles', async ({
+test('the request shows once as the task text, and replies render as unframed prose', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
   await expect(page.getByTestId('thread-purpose')).toHaveText('Fold finished turns before review.');
   await expect(page.getByTestId('thread-request')).toHaveCount(0);
   await expect(page.locator('.side-panel').getByText('Fold finished turns before review.')).toHaveCount(1);
-  const fills = await page
-    .getByTestId('transcript-col')
-    .locator('[data-slot="reply-bubble"]')
-    .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
-  const replyFill = await page.evaluate(() => {
-    const probe = document.createElement('span');
-    probe.style.backgroundColor = 'var(--reply-bubble-fill)';
-    document.body.appendChild(probe);
-    const fill = getComputedStyle(probe).backgroundColor;
-    probe.remove();
-    return fill;
-  });
-  expect(fills.length).toBeGreaterThan(0);
-  expect(new Set(fills)).toEqual(new Set([replyFill]));
+  await expect(
+    page.getByTestId('transcript-col').locator('[data-slot="reply-bubble"]'),
+  ).toHaveCount(0);
+  const texts = page.getByTestId('transcript-col').getByTestId('agent-text');
+  expect(await texts.count()).toBeGreaterThan(0);
+  const fills = await texts.evaluateAll((nodes) =>
+    nodes.map((node) => getComputedStyle(node).backgroundColor),
+  );
+  expect(new Set(fills)).toEqual(new Set(['rgba(0, 0, 0, 0)']));
+  await expect(
+    page.getByTestId('transcript-col').locator('[data-slot="reply-block"]').first(),
+  ).toBeAttached();
 });
 
 test('the more menu offers rename and move beside the existing actions, and no usage item', async ({
@@ -371,12 +369,13 @@ test('the more menu offers rename and move beside the existing actions, and no u
   await expect(page.getByRole('menu', { name: '更多' })).toBeVisible();
 });
 
-test('a running thread ends in a reply bubble of three typing dots', async ({ page }) => {
+test('a running thread ends in an unframed live status row with three typing dots', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-working-c`);
   const live = page.locator('.side-panel').getByTestId('live-row');
   await expect(live).toHaveCount(1);
   await expect(live).toHaveAttribute('role', 'status');
   await expect(live).toHaveText('处理中...');
+  await expect(live.locator('[data-slot="reply-bubble"]')).toHaveCount(0);
   await expect(live.getByTestId('typing-dot')).toHaveCount(3);
   await expect(live.getByTestId('typing-dot').first()).toHaveCSS('animation-name', 'typing-hop');
   await expect(page.getByTestId('live-pulse')).toHaveCount(0);

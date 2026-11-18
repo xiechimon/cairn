@@ -91,6 +91,7 @@ async function stubWorld(
   page: Page,
   stepStatus: 'claimed' | 'stopped' = 'claimed',
   phase: string = 'review',
+  messages: unknown[] = MESSAGES,
 ) {
   const json = (body: unknown, status = 200) => ({
     status,
@@ -158,7 +159,7 @@ async function stubWorld(
       if (path === `/api/conversations/${BUILD_ID}/messages`) {
         return route.fulfill(
           json({
-            messages: MESSAGES,
+            messages,
             chips: [],
             historyEpoch: 0,
             steerPending: [],
@@ -175,7 +176,7 @@ async function stubWorld(
   await expect(page.getByTestId('transcript-col')).toBeVisible();
 }
 
-test('work groups consecutive thinking and calls, with only the last block expanded', async ({ page }, testInfo) => {
+test('work groups consecutive thinking and calls, keeping blocks collapsed until opened', async ({ page }, testInfo) => {
   await stubWorld(page);
   const summaries = page.getByTestId('work-summary');
   await expect(summaries).toHaveCount(2);
@@ -189,9 +190,11 @@ test('work groups consecutive thinking and calls, with only the last block expan
   await expect(summaries.last().locator('[data-trace-summary]')).toHaveText('Check formatting');
   await expect(summaries.last()).toHaveAttribute('data-trace-state', 'running');
   await expect(summaries.first()).toHaveAttribute('aria-expanded', 'false');
-  await expect(summaries.last()).toHaveAttribute('aria-expanded', 'true');
+  await expect(summaries.last()).toHaveAttribute('aria-expanded', 'false');
   await summaries.first().click();
   const block = page.getByTestId('work-block').first();
+  await expect(block.getByTestId('work-earlier')).toHaveText('之前的 2 步');
+  await block.getByTestId('work-earlier').click();
   const read = block.getByTestId('work-call').first();
   await expect(read).toContainText('读');
   await expect(read).toContainText('src/main.ts L10–29');
@@ -201,8 +204,36 @@ test('work groups consecutive thinking and calls, with only the last block expan
   await expect(read.locator('..').getByTestId('tool-output')).toContainText('export const ready = true;');
   await block.getByTestId('work-think').click();
   await expect(block.getByTestId('thinking-body')).toHaveText(LONG_THINKING);
-  await expect(page.getByTestId('work-block').last().getByTestId('work-spinner')).toBeVisible();
+  await summaries.last().click();
+  const lastBlock = page.getByTestId('work-block').last();
+  await expect(lastBlock.locator('[data-slot="work-say"]')).toHaveText('The checks passed.');
+  await expect(lastBlock.getByTestId('work-spinner')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('work-trace-current.png') });
+});
+
+test('the last work block auto-expands when it contains a failed call', async ({ page }) => {
+  await stubWorld(page, 'stopped', 'failed', [
+    msg('user', TASK_PROMPT, 1000),
+    msg(
+      'assistant',
+      {
+        kind: 'toolcall',
+        call: {
+          id: 'fail-last',
+          name: 'Bash',
+          arguments: { command: 'pnpm test' },
+          result: 'FAIL 1 test',
+          isError: true,
+          startedAt: 2000,
+          endedAt: 3200,
+        },
+      },
+      3200,
+    ),
+  ]);
+  const summary = page.getByTestId('work-summary').last();
+  await expect(summary).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByTestId('work-block').last().getByTestId('tool-output')).toContainText('FAIL 1 test');
 });
 
 test('call details preserve commands, cap output and show edit lines', async ({ page }) => {
@@ -233,6 +264,7 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
 
 test('a call cut off by a stopped run shows as cancelled, not done', async ({ page }) => {
   await stubWorld(page, 'stopped');
+  await page.getByTestId('work-summary').last().click();
   const cut = page.getByTestId('work-call').filter({ hasText: 'Check formatting' });
   await expect(cut.getByTestId('work-cancelled')).toBeVisible();
   await expect(cut.getByTestId('work-cancelled')).toHaveText('已取消');
@@ -245,7 +277,7 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
   test(`history does not animate on first render (${reducedMotion})`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion });
     await stubWorld(page);
-    await expect(page.getByTestId('work-call').last()).toBeVisible();
+    await expect(page.getByTestId('work-summary').last()).toBeVisible();
     await expect(page.locator('.work-enter')).toHaveCount(0);
     await expect
       .poll(async () =>
@@ -258,6 +290,9 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
         ),
       )
       .toBe(0);
+    await page.getByTestId('work-summary').last().click();
+    await expect(page.getByTestId('work-call').last()).toBeVisible();
+    await expect(page.locator('.work-enter')).toHaveCount(0);
   });
 }
 
@@ -279,7 +314,9 @@ test('a long summary stays on one line in a narrow column and keeps the full tex
 test('expanding a row at the bottom keeps the reading position', async ({ page }) => {
   await page.setViewportSize({ width: 760, height: 460 });
   await stubWorld(page, 'claimed', 'building');
+  await page.getByTestId('work-summary').last().click();
   const col = page.getByTestId('transcript-col');
+  await col.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
   const gap = () => col.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
   await expect.poll(gap).toBeLessThanOrEqual(1);
   const scrollTop = await col.evaluate((el) => el.scrollTop);
@@ -297,7 +334,9 @@ test('expanding a row at the bottom keeps the reading position', async ({ page }
 test('returning to the bottom after expanding resumes following', async ({ page }) => {
   await page.setViewportSize({ width: 760, height: 460 });
   await stubWorld(page, 'claimed', 'building');
+  await page.getByTestId('work-summary').last().click();
   const col = page.getByTestId('transcript-col');
+  await col.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
   const gap = () => col.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
   await expect.poll(gap).toBeLessThanOrEqual(1);
   const row = page.getByTestId('work-call').last();

@@ -151,11 +151,14 @@ function thinkingRow(page: Page) {
 
 test('T1: thinking shares a work block with the other rows at the 36px row height', async ({ page }) => {
   await stubWorld(page);
+  const summary = page.getByTestId('work-summary');
+  await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  await expect(summary).toContainText('思考 1 次');
+  await summary.click();
   const row = thinkingRow(page);
   await expect(row).toHaveCount(1);
   const height = await row.evaluate((el) => el.getBoundingClientRect().height);
   expect(height).toBe(36);
-  await expect(page.getByTestId('work-summary')).toContainText('思考 1 次');
 });
 
 test('T2: the work block stays inside the transcript width', async ({ page }) => {
@@ -169,6 +172,7 @@ test('T2: the work block stays inside the transcript width', async ({ page }) =>
 
 test('T3: the long preview stays on one line and hides while full thinking is open', async ({ page }) => {
   await stubWorld(page);
+  await page.getByTestId('work-summary').click();
   const row = thinkingRow(page);
   await expect(page.getByTestId('thinking-body')).toHaveCount(0);
   const collapsedHeight = await row.evaluate((el) => el.getBoundingClientRect().height);
@@ -182,6 +186,7 @@ test('T3: the long preview stays on one line and hides while full thinking is op
 
 test('T4: full thinking preserves whitespace without horizontal page overflow', async ({ page }) => {
   await stubWorld(page);
+  await page.getByTestId('work-summary').click();
   await thinkingRow(page).click();
   await expect(page.getByTestId('thinking-body')).toHaveText(LONG_THINKING);
   expect(await page.getByTestId('thinking-body').evaluate((el) => getComputedStyle(el).whiteSpace)).toBe('pre-wrap');

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { formatLiveElapsed } from '../src/components/chat/live-row.js';
 import { workPurposes, workResult } from '../src/detail/work-trace.js';
 import type { WorkStep } from '../src/fixtures/records.js';
 import { EN } from '../src/i18n/en.js';
@@ -93,6 +94,23 @@ describe('workPurposes from reasoning headings', () => {
     ];
     expect(workPurposes(steps, true, t)).toEqual(['Latest']);
     expect(workPurposes(steps.slice(0, 2), true, t)).toEqual([]);
+  });
+
+  test('plain-text live thinking falls back to its trailing line only while running', () => {
+    const steps = [think('a', 'First check config\n\nInspecting attachment headers')];
+    expect(workPurposes(steps, true, t)).toEqual(['Inspecting attachment headers']);
+    expect(workPurposes(steps, false, t)).toEqual([]);
+  });
+});
+
+describe('formatLiveElapsed', () => {
+  test('shows cumulative seconds starting at 5s and formats minutes above 60s', () => {
+    expect(formatLiveElapsed(null)).toBe('');
+    expect(formatLiveElapsed(0)).toBe('');
+    expect(formatLiveElapsed(4)).toBe('');
+    expect(formatLiveElapsed(5)).toBe('5s');
+    expect(formatLiveElapsed(59)).toBe('59s');
+    expect(formatLiveElapsed(65)).toBe('1m 5s');
   });
 });
 

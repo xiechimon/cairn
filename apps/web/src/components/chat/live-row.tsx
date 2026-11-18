@@ -24,6 +24,11 @@ export function formatClock(totalSeconds: number): string {
   return `${minutes}:${String(totalSeconds % 60).padStart(2, '0')}`;
 }
 
+export function formatLiveElapsed(seconds: number | null): string {
+  if (seconds === null || seconds < 5) return '';
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
 const HEAD =
   'flex min-w-0 max-w-full items-center gap-1 overflow-hidden whitespace-nowrap text-(--text-tertiary)';
 
@@ -76,6 +81,41 @@ export function TypingDots({
       <TypingDotMarks />
       {label !== undefined && <span className="sr-only">{label}</span>}
     </span>
+  );
+}
+
+export function TaskLiveRow({
+  label,
+  seconds,
+  startedAt,
+  testId = 'live-row',
+}: {
+  label: string;
+  seconds?: number | undefined;
+  startedAt?: number | undefined;
+  testId?: string | undefined;
+}) {
+  const liveSeconds = useLiveSeconds(seconds === undefined ? (startedAt ?? null) : null);
+  const elapsed = formatLiveElapsed(seconds ?? liveSeconds);
+  return (
+    <div
+      role="status"
+      data-testid={testId}
+      className="flex min-w-0 max-w-full items-center gap-2 py-1 text-ui leading-5 text-(--text-secondary)"
+    >
+      <span className="inline-flex flex-none items-center gap-1">
+        <TypingDotMarks />
+      </span>
+      <span className="min-w-0 truncate shimmer motion-reduce:shimmer-none">{label}</span>
+      {elapsed !== '' && (
+        <span
+          className="flex-none text-meta tabular-nums text-(--text-tertiary)"
+          data-slot="live-elapsed"
+        >
+          {elapsed}
+        </span>
+      )}
+    </div>
   );
 }
 

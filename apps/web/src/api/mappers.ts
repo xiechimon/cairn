@@ -1,5 +1,6 @@
 import type {
   AgentTodo,
+  AgentTodoItem,
   BuildRecord,
   ChiefGetResponse,
   ChiefPendingMessage,
@@ -53,6 +54,7 @@ import {
   PACKAGES_NOT_ANSWERED,
   PLACEHOLDER_TITLE_FALLBACK,
   PLAN_SECTIONS,
+  parseAgentTodoText,
   REQUEST_CLOAK_LICENSE_TOOL,
   REVIEW_VERDICT_KIND,
   RUNNER_OS_LABELS,
@@ -73,6 +75,7 @@ import {
   type TurnErrorKind,
   threadMessageContentSchema,
   threadReportContentSchema,
+  todoFromTodoWrite,
   toolResultText,
   toolResultValue,
   transcriptPromptRowId,
@@ -83,6 +86,7 @@ import {
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
+import { isNarrationPreamble } from '../detail/narration-preamble.js';
 import type {
   BranchInfoContent,
   ChiefContent,
@@ -709,13 +713,21 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   const stepPromptIds = new Set(steps.map((step) => transcriptPromptRowId(step.id)));
   const claimedSince = steps.find((s) => s.status === 'claimed')?.createdAt ?? null;
   const entries: TimelineEntry[] = [];
+  const todoSnapshots: { at: number; order: number; items: AgentTodoItem[] }[] = [];
   let previousAt: number | null = null;
-  for (const m of messages) {
+  for (let msgIndex = 0; msgIndex < messages.length; msgIndex++) {
+    const m = messages[msgIndex];
+    if (!m) continue;
     const seconds =
       previousAt !== null && m.createdAt > previousAt ? (m.createdAt - previousAt) / 1000 : null;
     previousAt = m.createdAt;
     const call = toolCallOfContent(m.content);
     if (call !== null) {
+      const callTodo = call.todo ?? todoFromTodoWrite(call.name, call.arguments);
+      if (callTodo !== null && callTodo.length > 0 && call.isError !== true) {
+        todoSnapshots.push({ at: m.createdAt, order: msgIndex, items: callTodo });
+      }
+      if (call.name === 'TodoWrite' && call.isError !== true) continue;
       const owner = steps
         .filter((s) => s.createdAt <= m.createdAt)
         .sort((a, b) => a.createdAt - b.createdAt)
@@ -846,6 +858,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       continue;
     }
     if (text !== '') {
+      const textTodo = parseAgentTodoText(text);
+      if (textTodo !== null) {
+        todoSnapshots.push({ at: m.createdAt, order: msgIndex, items: textTodo });
+      }
       entries.push({
         at: m.createdAt,
         item: { kind: 'robot', markdown: text, id: m.id, createdAt: m.createdAt },
@@ -898,7 +914,25 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     : Number.NEGATIVE_INFINITY;
   const loaded = entries.filter((entry) => entry.at >= loadedFrom).sort((a, b) => a.at - b.at);
   const items: TranscriptItem[] = [...head];
-  for (const entry of loaded) {
+  for (let index = 0; index < loaded.length; index++) {
+    const entry = loaded[index];
+    if (!entry) continue;
+    const nextEntry = loaded[index + 1];
+    if (
+      entry.item.kind === 'robot' &&
+      entry.item.markdown !== undefined &&
+      isNarrationPreamble(entry.item.markdown) &&
+      nextEntry?.item.kind === '__work__'
+    ) {
+      const id = entry.item.id ?? `say-${entry.at}`;
+      items.push({
+        kind: 'work',
+        id,
+        steps: [{ kind: 'say', id, text: entry.item.markdown }],
+        createdAt: entry.at,
+      });
+      continue;
+    }
     if (entry.item.kind === '__work__') {
       const previous = items.at(-1);
       if (previous?.kind === 'work') {
@@ -930,6 +964,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.splice(head.length, 0, { kind: 'skills', read: readSkills, denied: skillDeniedNames });
   }
 
+  const persistedTodo =
+    todoSnapshots.sort((a, b) => a.at - b.at || a.order - b.order).at(-1)?.items ?? null;
   const running = steps.find(
     (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
   );
@@ -945,15 +981,34 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         id: 'live-thinking',
         text: liveThinking,
         seconds: null,
+        running: true,
       };
       const previous = items.at(-1);
       if (previous?.kind === 'work') previous.steps.push(step);
       else items.push({ kind: 'work', id: step.id, steps: [step] });
     }
+    const tailWork = items.at(-1);
+    const hasActiveTailWork =
+      tailWork?.kind === 'work' &&
+      tailWork.steps.some(
+        (step) =>
+          (step.kind === 'call' && step.running) ||
+          (step.kind === 'think' && step.running === true),
+      );
+    if (hasActiveTailWork && tailWork?.kind === 'work') {
+      tailWork.running = true;
+      tailWork.startedAt = running.createdAt;
+    }
     if (liveReply !== null) items.push(liveReply);
     const liveTodo = agentTodo != null && agentTodo.stepId === running.id ? agentTodo : null;
-    if (liveTodo !== null && liveTodo.items.length > 0) {
-      items.push({ kind: 'agent-todo', items: liveTodo.items });
+    const shownTodo = liveTodo?.items ?? persistedTodo;
+    if (shownTodo !== null && shownTodo.length > 0) {
+      const todoRow: TranscriptItem = { kind: 'agent-todo', items: shownTodo };
+      if (hasActiveTailWork && liveReply === null) {
+        items.splice(items.length - 1, 0, todoRow);
+      } else {
+        items.push(todoRow);
+      }
     }
     const act = activity != null && activity.stepId === running.id ? activity : null;
     const actLabel = act != null && !stopping ? activityLabel(act) : null;
@@ -963,36 +1018,38 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       running.status === 'waiting_quota' && running.quotaWait != null
         ? quotaWaitLabel(running.quotaWait)
         : null;
-    items.push({
-      kind: 'streaming',
-      startedAt: running.createdAt,
-      ...(queued != null && running.queue?.blocked != null ? { blocked: true as const } : {}),
-      label:
-        queued != null
-          ? queued.label
+    if (queued != null || quota != null || stopping || (!hasActiveTailWork && liveReply === null)) {
+      items.push({
+        kind: 'streaming',
+        startedAt: running.createdAt,
+        ...(queued != null && running.queue?.blocked != null ? { blocked: true as const } : {}),
+        label:
+          queued != null
+            ? queued.label
+            : quota != null
+              ? quota.label
+              : actLabel != null
+                ? actLabel.label
+                : stopping
+                  ? '正在停止…'
+                  : running.kind === 'plan' && steps.length === 1 && running.status === 'pending'
+                    ? '准备工作区...'
+                    : '处理中...',
+        ...(queued != null
+          ? { labelVars: queued.vars }
           : quota != null
-            ? quota.label
-            : actLabel != null
-              ? actLabel.label
-              : stopping
-                ? '正在停止…'
-                : running.kind === 'plan' && steps.length === 1 && running.status === 'pending'
-                  ? '准备工作区...'
-                  : '处理中...',
-      ...(queued != null
-        ? { labelVars: queued.vars }
-        : quota != null
-          ? { labelVars: quota.vars }
-          : actLabel?.vars !== undefined
-            ? { labelVars: actLabel.vars }
-            : {}),
-      ...(queued == null && quota == null && actLabel != null && act != null
-        ? { signalAt: act.at }
-        : {}),
-      ...(queued == null && quota == null && act?.skills !== undefined && act.skills.length > 0
-        ? { skills: act.skills }
-        : {}),
-    });
+            ? { labelVars: quota.vars }
+            : actLabel?.vars !== undefined
+              ? { labelVars: actLabel.vars }
+              : {}),
+        ...(queued == null && quota == null && actLabel != null && act != null
+          ? { signalAt: act.at }
+          : {}),
+        ...(queued == null && quota == null && act?.skills !== undefined && act.skills.length > 0
+          ? { skills: act.skills }
+          : {}),
+      });
+    }
   } else if (
     build &&
     todo.phase === 'building' &&
@@ -1016,6 +1073,19 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       body: failGuidanceBody(classifyStepFailure(build.errorMessage)),
     });
   }
+  if (
+    !running &&
+    persistedTodo !== null &&
+    persistedTodo.length > 0 &&
+    persistedTodo.some((it) => it.state !== 'done')
+  ) {
+    items.push({
+      kind: 'agent-todo',
+      items: persistedTodo.map((it) =>
+        it.state === 'doing' ? { ...it, state: 'todo' as const } : it,
+      ),
+    });
+  }
   const folded: TranscriptItem[] = [];
   for (let index = 0; index < items.length; index++) {
     const item = items[index];
@@ -1030,7 +1100,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const turn: TranscriptItem[] = [];
     while (index + 1 < items.length) {
       const next = items[index + 1];
-      if (!next || ['user', 'scheduled', 'streaming', 'fail'].includes(next.kind)) break;
+      if (!next || ['user', 'scheduled', 'streaming', 'fail', 'agent-todo'].includes(next.kind))
+        break;
       turn.push(next);
       index++;
     }

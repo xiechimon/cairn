@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
+import { isNarrationPreamble } from '../detail/narration-preamble.js';
 import { formatWorkDuration } from '../detail/work-trace.js';
 import type { DiffFile, TodoRecord, TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { ThreadUsageSummary } from './thread-usage-model.js';
@@ -144,27 +145,58 @@ export function enginePendingQuestion(
 
 export function engineTranscript(run: EngineRun): TranscriptItem[] {
   const items: TranscriptItem[] = [];
-  if (run.plan.length > 0) items.push({ kind: 'agent-todo', items: run.plan });
   const pending = enginePendingQuestion(run);
+  const visible = run.events.filter((event) => event !== pending);
   let steps: WorkStep[] = [];
   const flush = (id: string) => {
     if (steps.length === 0) return;
-    items.push({ kind: 'work', id: `engine-work-${id}`, steps });
+    const isRunning = steps.some((step) => step.kind === 'call' && step.running);
+    items.push({
+      kind: 'work',
+      id: `engine-work-${id}`,
+      steps,
+      ...(isRunning ? { running: true } : {}),
+    });
     steps = [];
   };
-  for (const event of run.events) {
-    if (event === pending) continue;
-    if (event.kind === 'text' || event.kind === 'question') {
+  for (let index = 0; index < visible.length; index++) {
+    const event = visible[index];
+    if (!event) continue;
+    const nextEvent = visible[index + 1];
+    if (event.kind === 'text') {
+      if (
+        isNarrationPreamble(event.text) &&
+        nextEvent !== undefined &&
+        nextEvent.kind !== 'text' &&
+        nextEvent.kind !== 'question'
+      ) {
+        flush(event.id);
+        steps.push({ kind: 'say', id: event.id, text: event.text });
+      } else {
+        flush(event.id);
+        items.push({ kind: 'robot', id: event.id, markdown: event.text });
+      }
+    } else if (event.kind === 'question') {
       flush(event.id);
       items.push({ kind: 'robot', id: event.id, markdown: event.text });
-      if (event.kind === 'question')
-        items.push({
-          kind: 'note',
-          id: `${event.id}-answer`,
-          text: event.answer === 'allowed' ? '已允许这一次' : '已拒绝',
-        });
-    } else steps.push(engineWorkStep(event));
+      items.push({
+        kind: 'note',
+        id: `${event.id}-answer`,
+        text: event.answer === 'allowed' ? '已允许这一次' : '已拒绝',
+      });
+    } else {
+      steps.push(engineWorkStep(event));
+    }
   }
   flush('end');
+  if (run.plan.length > 0) {
+    const todoRow: TranscriptItem = { kind: 'agent-todo', items: run.plan };
+    const tail = items.at(-1);
+    if (tail?.kind === 'work' && tail.running === true) {
+      items.splice(items.length - 1, 0, todoRow);
+    } else {
+      items.push(todoRow);
+    }
+  }
   return items;
 }

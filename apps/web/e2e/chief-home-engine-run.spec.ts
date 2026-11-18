@@ -42,6 +42,20 @@ for (const { state, data, phase } of STATES) {
 test('a running run shows its plan and steps, with its time so far in the usage popover', async ({ page }) => {
   await open(page, 'running');
   await expect.poll(() => planStates(page)).toEqual(['done', 'done', 'doing', 'todo']);
+  const tailOrder = await transcript(page).evaluate((root) => {
+    const items = [...root.querySelectorAll('[data-testid="agent-todo"], [data-testid="work-block"]')];
+    const todoIndex = items.findIndex((el) => el.getAttribute('data-testid') === 'agent-todo');
+    const workIndex = items.findLastIndex((el) => el.getAttribute('data-testid') === 'work-block');
+    return { todoIndex, workIndex };
+  });
+  expect(tailOrder.todoIndex).toBeGreaterThan(-1);
+  expect(tailOrder.workIndex).toBeGreaterThan(tailOrder.todoIndex);
+  const lastSummary = page.getByTestId('work-summary').last();
+  await expect(lastSummary).toHaveAttribute('aria-expanded', 'false');
+  await lastSummary.click();
+  await expect(
+    page.getByTestId('work-block').last().locator('[data-slot="work-say"]'),
+  ).toHaveText('先看下载接口怎么设置文件名。');
   await expect(page.getByTestId('work-spinner')).toBeVisible();
   await page.getByTestId('thread-usage-ring').click();
   const usage = page.getByTestId('thread-usage');
@@ -55,6 +69,14 @@ test('a running run shows its plan and steps, with its time so far in the usage 
 test('a finished run keeps time and cost in the usage popover and offers no takeover', async ({ page }) => {
   await open(page, 'finished');
   await expect.poll(() => planStates(page)).toEqual(['done', 'done', 'done', 'done']);
+  const settledOrder = await transcript(page).evaluate((root) => {
+    const items = [...root.querySelectorAll('[data-testid="agent-todo"], [data-testid="work-block"]')];
+    const workIndex = items.findLastIndex((el) => el.getAttribute('data-testid') === 'work-block');
+    const todoIndex = items.findIndex((el) => el.getAttribute('data-testid') === 'agent-todo');
+    return { workIndex, todoIndex };
+  });
+  expect(settledOrder.workIndex).toBeGreaterThan(-1);
+  expect(settledOrder.todoIndex).toBeGreaterThan(settledOrder.workIndex);
   await expect(page.getByTestId('engine-question')).toHaveCount(0);
   await expect(transcript(page)).toContainText('已允许这一次');
   await page.getByTestId('thread-usage-ring').click();
@@ -64,6 +86,7 @@ test('a finished run keeps time and cost in the usage popover and offers no take
 
 test('a failed run opens the failed command with its output', async ({ page }) => {
   await open(page, 'failed');
+  await expect(page.getByTestId('work-summary').last()).toHaveAttribute('aria-expanded', 'true');
   const failed = lastSteps(page).last();
   await expect(failed).toHaveAttribute('aria-expanded', 'true');
   await expect(failed).toContainText('pnpm test:upload');
@@ -99,6 +122,12 @@ test('the raw output fills the panel at its end and back returns to the conversa
 
 test('a long step list folds its earlier steps behind one row', async ({ page }) => {
   await open(page, 'long');
+  const summary = page.getByTestId('work-summary').last();
+  await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  await summary.click();
+  await expect(
+    page.getByTestId('work-block').last().locator('[data-slot="work-say"]'),
+  ).toHaveText('设置文件名的地方不止下载接口一处，我先把它们都找出来。');
   const earlier = page.getByTestId('work-earlier');
   await expect(earlier).toHaveText('之前的 18 步');
   await expect(lastSteps(page)).toHaveCount(5);
@@ -117,6 +146,7 @@ test('the fixture driver stays off the page unless the address asks for it', asy
 
 test('an unknown event names its type and opens its raw payload', async ({ page }) => {
   await open(page, 'unknown');
+  await page.getByTestId('work-summary').last().click();
   const row = lastSteps(page).filter({ hasText: 'context_compaction' });
   await expect(row).toHaveCount(1);
   await row.click();

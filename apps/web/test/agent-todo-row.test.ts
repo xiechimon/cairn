@@ -1,6 +1,6 @@
 import type { AgentTodo, BuildRecord, StepJournalRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { mapTranscript } from '../src/api/mappers.js';
+import { type MessageRow, mapTranscript } from '../src/api/mappers.js';
 import type { TodoRecord, TranscriptItem } from '../src/fixtures/records.js';
 import { NOW, todo } from './helpers.js';
 
@@ -36,12 +36,13 @@ function todoUpdate(stepId: string, items: { text: string; state: 'todo' | 'doin
 }
 
 function render(overrides: {
+  messages?: MessageRow[];
   steps?: StepJournalRow[];
   agentTodo?: AgentTodo | null;
   build?: BuildRecord | null;
 }): TranscriptItem[] {
   return mapTranscript({
-    messages: [],
+    messages: overrides.messages ?? [],
     steps: overrides.steps ?? [],
     plans: [],
     build: overrides.build === undefined ? BUILD : overrides.build,
@@ -108,5 +109,111 @@ describe('mapTranscript agent todo list (#1524)', () => {
       agentTodo: todoUpdate('s1', []),
     });
     expect(todoItems(items)).toHaveLength(0);
+  });
+
+  test('persisted TodoWrite keeps unfinished items after step settles and stays hidden from WorkTrace', () => {
+    const todoWrite: MessageRow = {
+      id: 'm-todo',
+      role: 'assistant',
+      createdAt: NOW - 10_000,
+      content: {
+        kind: 'toolcall',
+        call: {
+          id: 'c-todo',
+          name: 'TodoWrite',
+          arguments: {
+            todos: [
+              { content: '读配置', status: 'completed', activeForm: '正在读配置' },
+              { content: '改接口', status: 'in_progress', activeForm: '正在改接口' },
+              { content: '补测试', status: 'pending', activeForm: '等待补测试' },
+            ],
+          },
+          result: 'ok',
+        },
+      },
+    };
+    const items = render({
+      messages: [todoWrite],
+      steps: [{ ...runningStep('s1'), status: 'done' }],
+    });
+    expect(items.some((item) => item.kind === 'work')).toBe(false);
+    expect(todoItems(items)).toEqual([
+      {
+        kind: 'agent-todo',
+        items: [
+          { text: '读配置', state: 'done' },
+          { text: '改接口', state: 'todo' },
+          { text: '补测试', state: 'todo' },
+        ],
+      },
+    ]);
+  });
+
+  test('persisted TodoWrite hides once all items are done after the step settles', () => {
+    const todoWrite: MessageRow = {
+      id: 'm-todo-done',
+      role: 'assistant',
+      createdAt: NOW - 10_000,
+      content: {
+        kind: 'toolcall',
+        call: {
+          id: 'c-todo-done',
+          name: 'TodoWrite',
+          arguments: {
+            todos: [
+              { content: '读配置', status: 'completed', activeForm: '正在读配置' },
+              { content: '改接口', status: 'completed', activeForm: '正在改接口' },
+            ],
+          },
+          result: 'ok',
+        },
+      },
+    };
+    const items = render({
+      messages: [todoWrite],
+      steps: [{ ...runningStep('s1'), status: 'done' }],
+    });
+    expect(todoItems(items)).toHaveLength(0);
+  });
+
+  test('settled work sits above agent-todo while an active running work block sits below it', () => {
+    const settledCall: MessageRow = {
+      id: 'm-read',
+      role: 'assistant',
+      createdAt: NOW - 20_000,
+      content: {
+        kind: 'toolcall',
+        call: { id: 'c-read', name: 'Read', arguments: { file_path: 'src/a.ts' }, result: 'ok' },
+      },
+    };
+    const note: MessageRow = {
+      id: 'm-note',
+      role: 'assistant',
+      createdAt: NOW - 15_000,
+      content: '第一阶段读完了，下面开始运行测试。',
+    };
+    const activeCall: MessageRow = {
+      id: 'm-bash',
+      role: 'assistant',
+      createdAt: NOW - 5_000,
+      content: {
+        kind: 'toolcall',
+        call: { id: 'c-bash', name: 'Bash', arguments: { command: 'pnpm test' } },
+      },
+    };
+    const items = render({
+      messages: [settledCall, note, activeCall],
+      steps: [runningStep('s1')],
+      agentTodo: todoUpdate('s1', [
+        { text: '读文件', state: 'done' },
+        { text: '跑测试', state: 'doing' },
+      ]),
+    });
+    const settledWorkAt = items.findIndex((i) => i.kind === 'work' && i.running !== true);
+    const todoAt = items.findIndex((i) => i.kind === 'agent-todo');
+    const activeWorkAt = items.findIndex((i) => i.kind === 'work' && i.running === true);
+    expect(settledWorkAt).toBeGreaterThan(-1);
+    expect(todoAt).toBeGreaterThan(settledWorkAt);
+    expect(activeWorkAt).toBeGreaterThan(todoAt);
   });
 });

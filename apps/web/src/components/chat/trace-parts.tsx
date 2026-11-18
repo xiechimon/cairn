@@ -111,6 +111,7 @@ export function TraceChevron({ open }: { open: boolean }) {
 export function TraceGroupSummary({
   summary,
   failed,
+  elapsed,
   open,
   summaryTitle,
   running = false,
@@ -119,6 +120,7 @@ export function TraceGroupSummary({
 }: Omit<ComponentProps<typeof Button>, 'children'> & {
   summary: ReactNode;
   failed?: string | null;
+  elapsed?: string;
   summaryTitle?: string;
   open: boolean;
   running?: boolean;
@@ -142,6 +144,14 @@ export function TraceGroupSummary({
       {failed != null && (
         <span className="-ml-1 flex-none text-destructive" data-trace-failed="">
           {failed}
+        </span>
+      )}
+      {elapsed !== undefined && elapsed !== '' && (
+        <span
+          className="flex-none text-meta tabular-nums text-(--text-tertiary)"
+          data-slot="trace-elapsed"
+        >
+          {elapsed}
         </span>
       )}
       <TraceChevron open={open} />

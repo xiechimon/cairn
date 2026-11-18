@@ -1,4 +1,3 @@
-import { cn } from 'cn';
 import { useLayoutEffect, useRef } from 'react';
 import { REPLY_CHIP_CLS } from '../chief/quick-replies.js';
 import { Button } from '../components/ui/button.js';
@@ -7,7 +6,7 @@ import {
   DIALOG_TEXT_BUTTON,
   DialogShell,
 } from '../components/ui/dialog-shell.js';
-import { CopyCodeButton, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
+import { CopyCodeButton } from '../detail/chat-markdown.js';
 import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { type EngineRun, type EngineRunActions, enginePendingQuestion } from './engine-run.js';
@@ -120,9 +119,7 @@ export function EngineQuestion({
   if (question === null) return null;
   return (
     <div data-testid="engine-question" data-answer="pending" className="mt-5">
-      <div className={cn('w-fit max-w-full text-ui leading-5 text-foreground', REPLY_BUBBLE_CLS)}>
-        {question.text}
-      </div>
+      <div className="agent-measure text-ui leading-5.5 text-foreground">{question.text}</div>
       {actions !== undefined && run.state !== 'taken_over' && (
         <fieldset
           aria-label={t('回答引擎')}

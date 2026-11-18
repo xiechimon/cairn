@@ -295,7 +295,7 @@ describe('task thread hierarchy', () => {
     expect(shouldExpandLastWork(setupOnly)).toBe(false);
   });
 
-  test('the last work group with agent calls is still expanded by default', () => {
+  test('the last work group stays collapsed unless one of its calls failed', () => {
     const withCall = render(
       rows([
         ['system', STRUCTURED_HOOK],
@@ -309,7 +309,30 @@ describe('task thread hierarchy', () => {
       ]),
       'building',
     ).filter((item) => item.kind === 'work');
-    expect(shouldExpandLastWork(withCall)).toBe(true);
+    expect(shouldExpandLastWork(withCall)).toBe(false);
+
+    const withFailedCall = render(
+      rows([
+        ['system', STRUCTURED_HOOK],
+        [
+          'assistant',
+          {
+            kind: 'toolcall',
+            call: {
+              id: 'c2',
+              name: 'Bash',
+              arguments: { command: 'pnpm test' },
+              result: 'exit 1',
+              isError: true,
+              startedAt: 0,
+              endedAt: 100,
+            },
+          },
+        ],
+      ]),
+      'failed',
+    ).filter((item) => item.kind === 'work');
+    expect(shouldExpandLastWork(withFailedCall)).toBe(true);
   });
 
   test('a failed build without a failure row still shows its error once', () => {

@@ -24,7 +24,6 @@ import type {
   AgentBackend,
   AgentBackendCapabilities,
   AgentSessionHandle,
-  AgentTodoItem,
   AgentTokenUsage,
   BriefChannel,
   ClaudeRateLimitNotice,
@@ -38,12 +37,7 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
-import {
-  AGENT_TODO_MAX_ITEMS,
-  CLAUDE_TODO_STATUS_STATES,
-  contextTokensOf,
-  subscriptionKeyOf,
-} from '@cairn/shared';
+import { contextTokensOf, subscriptionKeyOf, todoFromTodoWrite } from '@cairn/shared';
 import { z } from 'zod';
 import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-auth.js';
 import { credentialRedactor } from '../credential-output.js';
@@ -83,22 +77,7 @@ function isRetryableError(message: string): boolean {
   return /rate.?limit|overloaded|timeout|temporarily|5\d\d/i.test(message);
 }
 
-export function todoFromTodoWrite(name: unknown, input: unknown): AgentTodoItem[] | null {
-  if (name !== 'TodoWrite') return null;
-  const todos = (input as { todos?: unknown } | null | undefined)?.todos;
-  if (!Array.isArray(todos) || todos.length === 0) return null;
-  const items: AgentTodoItem[] = [];
-  for (const raw of todos) {
-    const content = (raw as { content?: unknown })?.content;
-    const status = (raw as { status?: unknown })?.status;
-    if (typeof content !== 'string' || content === '') continue;
-    const state = typeof status === 'string' ? CLAUDE_TODO_STATUS_STATES[status] : undefined;
-    if (state === undefined) continue;
-    if (items.length >= AGENT_TODO_MAX_ITEMS) break;
-    items.push({ text: content, state });
-  }
-  return items.length > 0 ? items : null;
-}
+export { todoFromTodoWrite };
 
 export interface ClaudeMapState {
   calls: Map<string, ToolCallRecord>;

@@ -1,5 +1,6 @@
 import { CircleDashed } from 'lucide-react';
 import { useState } from 'react';
+import { formatLiveElapsed, useLiveSeconds } from '../components/chat/live-row.js';
 import {
   EMPTY_TRACE_COUNTS,
   TraceCard,
@@ -51,12 +52,25 @@ const NAMED_PURPOSES = 2;
 
 export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TFunc): string[] {
   const purposes = steps.flatMap((step, index) => {
+    if (step.kind === 'say') return [];
     if (step.kind === 'think') {
       if (running && index !== steps.length - 1) return [];
       const headings = [...step.text.matchAll(THINK_HEADING)].map((match) =>
         (match[1] ?? '').trim(),
       );
-      return running ? headings.slice(-1) : headings;
+      if (headings.length > 0) return running ? headings.slice(-1) : headings;
+      if (!running || index !== steps.length - 1) return [];
+      const tail = step.text
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line !== '')
+        .at(-1);
+      const cleaned =
+        tail
+          ?.replace(/^(?:#{1,6}\s+|[-*>]\s+)/, '')
+          .replace(/^\*+|\*+$/g, '')
+          .trim() ?? '';
+      return cleaned === '' ? [] : [cleaned];
     }
     if (step.command === undefined || step.description === undefined) return [];
     if (running && !step.running) return [];
@@ -122,7 +136,15 @@ function stepTarget(step: Extract<WorkStep, { kind: 'call' }>): string {
   return (step.command ?? step.target ?? '').split('\n')[0] ?? '';
 }
 
-function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TFunc }) {
+function WorkStepRow({
+  step,
+  enter,
+  t,
+}: {
+  step: Exclude<WorkStep, { kind: 'say' }>;
+  enter: boolean;
+  t: TFunc;
+}) {
   const [open, setOpen] = useState(step.kind === 'call' && step.error);
   const [animate] = useState(enter);
   const call = step.kind === 'call' ? step : null;
@@ -142,10 +164,10 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
       ]
     : null;
   const lineCount = changeLines?.length ?? lines.length;
-  const running = call?.running === true;
+  const running = call !== null ? call.running === true : step.running === true;
   const verb =
     call === null
-      ? t(open ? '思考' : '思考了')
+      ? t(running ? '正在思考' : open ? '思考' : '思考了')
       : t(running ? RUNNING_VERBS[call.action] : DONE_VERBS[call.action]);
   const preview = step.kind === 'think' ? step.text.trim().split('\n')[0] : undefined;
   return (
@@ -280,15 +302,24 @@ export function WorkTrace({
   const [showsEarlier, setShowsEarlier] = useState(false);
   const expanded =
     disclosure?.defaultExpanded === defaultExpanded ? disclosure.open : defaultExpanded;
-  const earlier = disclosure === null ? earlierStepCount(item.steps.length) : 0;
-  const shown = showsEarlier ? item.steps : item.steps.slice(earlier);
+  const saySteps = item.steps.filter(
+    (step): step is Extract<WorkStep, { kind: 'say' }> => step.kind === 'say',
+  );
+  const traceSteps = item.steps.filter(
+    (step): step is Exclude<WorkStep, { kind: 'say' }> => step.kind !== 'say',
+  );
+  const earlier = earlierStepCount(traceSteps.length);
+  const shown = showsEarlier ? traceSteps : traceSteps.slice(earlier);
   const counts = { ...EMPTY_TRACE_COUNTS };
   const readPaths = new Set<string>();
   const editPaths = new Set<string>();
-  let running = false;
+  let running = item.running === true;
   for (const step of item.steps) {
-    if (step.kind === 'think') counts.think += 1;
-    else {
+    if (step.kind === 'say') continue;
+    if (step.kind === 'think') {
+      counts.think += 1;
+      if (step.running === true) running = true;
+    } else {
       if (step.action === 'read') readPaths.add((step.target ?? '').replace(/ L\d.*$/, ''));
       else if (step.action === 'edit') editPaths.add(step.target ?? '');
       else if (step.action === 'setup') counts.setup = 1;
@@ -303,6 +334,7 @@ export function WorkTrace({
   const purposes = workPurposes(item.steps, running, t);
   const result = running ? null : workResult(item.steps, t);
   const detail = !running && purposes.length > 0 ? `${purposes.join(t('，'))} · ${text}` : text;
+  const liveSeconds = useLiveSeconds(running ? (item.startedAt ?? null) : null);
   return (
     <div className="my-2 min-w-0" data-testid="work-block">
       <div className="flex items-center gap-1">
@@ -325,6 +357,7 @@ export function WorkTrace({
           }
           summaryTitle={failed === null ? detail : `${detail} ${failed}`}
           failed={failed}
+          elapsed={running ? formatLiveElapsed(liveSeconds) : ''}
           open={expanded}
           running={running}
           onClick={() => setDisclosure({ defaultExpanded, open: !expanded })}
@@ -332,6 +365,15 @@ export function WorkTrace({
       </div>
       {expanded && (
         <TraceCard>
+          {saySteps.map((step) => (
+            <div
+              key={step.id}
+              data-slot="work-say"
+              className="px-3 py-2 text-ui leading-5 text-(--text-secondary) [overflow-wrap:anywhere]"
+            >
+              {step.text}
+            </div>
+          ))}
           {earlier > 0 && (
             <div>
               <TraceRowButton
