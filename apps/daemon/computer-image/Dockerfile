@@ -69,6 +69,7 @@ COPY --from=packages /opt/cloak /opt/cloak
 COPY --from=packages /opt/agent-desktop /opt/agent-desktop
 COPY guard.nft /etc/cairn/guard.nft
 COPY agent-env.sh /etc/profile.d/cairn-agent.sh
+COPY chromium-accessibility.conf /etc/chromium.d/cairn-accessibility
 COPY cloak.mjs /opt/cloak/cloak.mjs
 COPY cairn-browser.desktop cairn-chromium.desktop /usr/share/applications/
 COPY --chmod=755 entry.sh /usr/local/bin/cairn-entry

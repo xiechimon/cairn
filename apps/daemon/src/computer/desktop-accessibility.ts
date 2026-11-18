@@ -230,7 +230,7 @@ export class DesktopAccessibility {
 
   private appList(windows: readonly UiWindow[]): string {
     if (windows.length === 0) {
-      return 'No app has a window the accessibility tree can see. Open one, then call desktop_snapshot again. Use computer_observe for a screenshot.';
+      return 'No app has a window the accessibility tree can see. Start one from the shell tool (for example `nohup chromium https://example.com >/dev/null 2>&1 &`, which runs with the desktop session environment) or click a dock launcher with computer_act, then call desktop_snapshot again. Use computer_observe for a screenshot.';
     }
     const lines = windows.map(
       (window) => `- ${window.app_name}${window.title ? `: ${JSON.stringify(window.title)}` : ''}`,
@@ -247,7 +247,7 @@ export class DesktopAccessibility {
       throw refuse(
         open.length > 0
           ? `No open app is named exactly "${appName}". Open apps with windows: ${open.join(', ')}`
-          : `No open app is named exactly "${appName}", and no app has a window the accessibility tree can see`,
+          : `No open app is named exactly "${appName}", and no app has a window the accessibility tree can see; start the app from the shell tool or a dock launcher first`,
       );
     }
     const usable = matching.filter(

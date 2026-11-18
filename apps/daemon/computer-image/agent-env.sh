@@ -5,3 +5,4 @@ case ":$PATH:" in
   *":$HOME/.local/bin:"*) ;;
   *) export PATH="$HOME/.local/bin:$PATH" ;;
 esac
+[ -r /run/cairn/session.env ] && . /run/cairn/session.env

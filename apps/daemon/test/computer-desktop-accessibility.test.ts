@@ -178,6 +178,12 @@ describe('desktop_snapshot and desktop_act on a scope desktop', () => {
     expect(listed?.kind === 'done' && listed.text).toContain('lxterminal');
   });
 
+  test('with no window in the accessibility tree, the reply says how to open an app', async () => {
+    const { run } = setup((argv) => (argv[1] === 'list-windows' ? envelope([]) : undefined));
+    const listed = await run('desktop_snapshot', {});
+    expect(listed?.kind === 'done' && listed.text).toContain('Start one from the shell tool');
+  });
+
   const CHROMIUM = {
     id: 'w-chromium-1',
     app_name: 'chromium',
