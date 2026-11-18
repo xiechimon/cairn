@@ -118,7 +118,7 @@ export const copy = {
         },
         {
           title: '接入模型，说第一件事',
-          body: '添加模型服务，或在 Runner 上登录 Claude Code。Coordinator 默认用你添加的服务商，想换再去 规则与策略 里选；然后就能在首页说第一件事了。',
+          body: '在接入模型里选 OpenAI Codex，按设备码在浏览器登录；不用另装 Codex CLI。确认 Coordinator 和任务模型（全新 Codex-only 设置是 GPT-6.1 Sol、任务用 pi），再建本地项目，说第一件事。也可用自己的 API key。',
           code: null,
         },
       ],
@@ -241,7 +241,7 @@ export const copy = {
         },
         {
           title: 'Connect a model, say the first thing',
-          body: 'Add a provider, or sign in to Claude Code on the Runner. The Coordinator uses your provider by default (change it in Rules & policies), so just tell it on the home page what you want.',
+          body: 'Choose OpenAI Codex in Connect models and sign in with its device code; no Codex CLI is needed. Confirm Coordinator and Tasks (GPT-6.1 Sol with pi tasks for a fresh Codex-only setup), then create a local project and ask for your first change. Your own API key works too.',
           code: null,
         },
       ],

@@ -7,9 +7,15 @@ import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 服务端就是网页应用、Coordinator 和数据库。你只跑一份，放在你平时用浏览器的机器上，或者一台常开的主机上。光有服务端就能四处看看；要让 agent 真正干活，还要[连接一台 Runner](/zh-cn/docs/runner/) 并[接入模型](/zh-cn/docs/models/)。
 
+## 桌面应用
+
+macOS 从[最新发布](https://github.com/xiechimon/cairn/releases/latest)下载 DMG：Apple 芯片用 arm64，Intel 用 x64。拖进“应用程序”再打开。应用还没有公证；被拦时到“系统设置 → 隐私与安全性”点“仍要打开”（macOS 14 及更早：右键应用选“打开”）。它会启动服务端和 pi Runner，并以 owner 身份登录。不需要 Node.js、单独安装 pi 或 Codex CLI。接着看[接入模型](/zh-cn/docs/models/)。
+
+Linux x64 桌面端目前是 **本地源码构建**，没有公开下载包或自动更新。按[桌面构建和解压步骤](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md#linux-x64-archive)操作，需要图形会话、Git、bubblewrap 0.11+ 和可用的 systemd 用户会话，解压到 `/tmp` 之外。应用自带服务端和 Runner，退出会停止两者。无图形界面的 Linux 服务端用下面的 npm 路线。
+
 ## 需要什么
 
-- **Node.js 22 或 24。** 这两条 LTS 线有预编译的 `better-sqlite3`；别的版本可能要从源码编译，得装编译工具链。
+- **Node.js 22.19+（22 或 24 LTS）和 Git。** 这两条 LTS 线有预编译的 `better-sqlite3`；别的版本可能要从源码编译，得装编译工具链。
 - 服务端跑在 Linux 或 macOS 上。Windows 要多走下面的配对一步。
 
 ## 启动服务端
@@ -46,7 +52,9 @@ import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 </Steps>
 
-界面跟随浏览器语言，可以在 `设置` → `账号` → `语言` 里切换。之后首页会提示你完成两步设置：接入模型来源、连接一台 Runner。接下来几页按这个顺序讲。添加服务商后 Coordinator 默认就用它；只有它没有能用的模型时，才会多出第三步 `打开工作路由`。
+界面跟随浏览器语言。首次向导依次显示 **接入模型** 和 **确认设置**，后者分别核对 Coordinator 和任务模型。按[接入模型](/zh-cn/docs/models/)操作后确认选择。独立的 npm 安装还要[连接 Runner](/zh-cn/docs/runner/)。Linux 上请检查任务沙箱已就绪，不要只看 Online。
+
+macOS 和 Windows 的 npm 浏览器配对不是 owner 会话，目前不能添加模型连接或批准 Runner。按[上手指南](https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#run-the-server)用 owner-token API，或改用自带 owner 登录的 Mac 桌面应用。浏览器配对成功不等于模型设置完成。
 
 <Aside type="caution">
 服务端只监听 `127.0.0.1`，非浏览器的客户端一律要带令牌。不要在没有令牌的情况下把它绑到公网地址；见下面的 [用 Docker 跑](#用-docker-跑) 和 [在手机上访问](#在手机上访问)。
@@ -54,7 +62,7 @@ import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 ## 数据放在哪
 
-都在 `~/.cairn` 下（设 `CAIRN_HOME` 可以换位置）：服务端有 `server/server.db` 和 `server/secretbox.key`；Runner 有 `machine.json`、`daemon.log` 和 `workspaces/`。**备份就是复制整个目录。** 只拷数据库没用，因为密钥是加密存的，少了密钥文件解不开。
+npm 默认都在 `~/.cairn` 下（设 `CAIRN_HOME` 可以换位置）：服务端有 `server/server.db` 和 `server/secretbox.key`；Runner 有 `machine.json`、`daemon.log` 和 `workspaces/`。桌面端 macOS 在 `~/Library/Application Support/@cairn/desktop`，Linux 在 `$XDG_CONFIG_HOME/@cairn/desktop`（默认 `~/.config/@cairn/desktop`）。**备份就是复制整个数据目录。** 只拷数据库没用，少了密钥文件解不开。
 
 ## 用 Docker 跑
 
@@ -79,7 +87,7 @@ docker run -d --name cairn -v cairn-data:/data \
 ```sh
 git clone https://github.com/xiechimon/cairn
 cd cairn
-pnpm install
+pnpm install --frozen-lockfile --ignore-scripts
 pnpm start
 ```
 

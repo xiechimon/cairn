@@ -48,6 +48,7 @@ import { isLoopbackPeer, pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody } from './routes-helpers.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
+import { hasActiveDevinSubscription } from './services/devin-subscriptions.js';
 import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
 import { folderPinsForPresence } from './services/machine-folders.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
@@ -371,7 +372,11 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         if (admission !== 'ignore') markPresence(deps, row.id, body, admission === 'online');
         const current = ctx.db.select().from(machineTable).where(eq(machineTable.id, row.id)).get();
         const folderPins = folderPinsForPresence(current?.folderGrants ?? null);
-        return c.json({ ok: true as const, ...(folderPins !== undefined ? { folderPins } : {}) });
+        return c.json({
+          ok: true as const,
+          ...(folderPins !== undefined ? { folderPins } : {}),
+          ...(hasActiveDevinSubscription(deps, row.teamId) ? { installDevin: true } : {}),
+        });
       },
     );
   });

@@ -1,8 +1,10 @@
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
   ClaimedStep,
+  CommitIdentity,
   MachineDoneBody,
   MachineStreamEvent,
   ProviderConfig,
@@ -64,6 +66,7 @@ class FakeClient implements MachineApi {
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
   uploads: (TranscriptUpload | string)[] = [];
   failDone = false;
+  commitIdentity: CommitIdentity | undefined;
   constructor(
     private readonly tokenProvider: ProviderConfig | null,
     private readonly subscriptionToken?: string,
@@ -95,6 +98,7 @@ class FakeClient implements MachineApi {
       provider: this.tokenProvider,
       secrets: {},
       git: null,
+      commitIdentity: this.commitIdentity,
       claudeSubscriptionToken: this.subscriptionToken,
     };
   }
@@ -194,6 +198,7 @@ async function setup(
     withoutSubscription?: boolean;
     machineName?: string;
     runEnv?: Record<string, string>;
+    commitIdentity?: CommitIdentity;
   } = {},
 ) {
   const home = testTempDir('cairn-runner-runtime-');
@@ -206,6 +211,7 @@ async function setup(
       : (opts.subscriptionToken ?? STEP_SUBSCRIPTION_TOKEN),
   );
   client.failDone = opts.failDone ?? false;
+  client.commitIdentity = opts.commitIdentity;
   const journal = new StepJournal(paths.outboxDir);
   const { backend, sessions, resumed } = recordingBackend(
     opts.echoToken ? opts.subscriptionToken : undefined,
@@ -231,6 +237,49 @@ async function setup(
 }
 
 describe('runner runtime identity branch (spec 17 A3/A4)', () => {
+  test.each([
+    { provider: 'stub-gw', identity: undefined, expected: 'stub-builder <cairn@localhost>' },
+    { provider: 'claude-code', identity: undefined, expected: 'stub-builder <cairn@localhost>' },
+    {
+      provider: 'stub-gw',
+      identity: { name: 'Connected owner', email: 'owner@example.com' },
+      expected: 'Connected owner <owner@example.com>',
+    },
+  ])(
+    'a $provider session can commit with an empty HOME using $expected without writing global config',
+    async ({ provider, identity, expected }) => {
+      const { sessions } = await setup(claimedStep({ provider, modelId: 'stub-model' }), {
+        commitIdentity: identity,
+        runEnv: { GIT_AUTHOR_NAME: 'Inherited', GIT_AUTHOR_EMAIL: 'wrong@example.com' },
+      });
+      const dir = testTempDir('runner-commit-');
+      const env = {
+        PATH: process.env.PATH,
+        HOME: dir,
+        XDG_CONFIG_HOME: dir,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: join(dir, '.gitconfig'),
+        ...sessions[0]?.env,
+      };
+      execFileSync('git', ['init', '-q'], { cwd: dir, env });
+      execFileSync('git', ['commit', '--allow-empty', '-m', 'First task result'], {
+        cwd: dir,
+        env,
+      });
+      expect(
+        execFileSync('git', ['show', '-s', '--format=%an <%ae>%n%cn <%ce>'], {
+          cwd: dir,
+          env,
+          encoding: 'utf8',
+        }),
+      ).toBe(`${expected}\n${expected}\n`);
+      expect(existsSync(join(dir, '.gitconfig'))).toBe(false);
+      expect(
+        execFileSync('git', ['config', '--local', '--list'], { cwd: dir, env, encoding: 'utf8' }),
+      ).not.toMatch(/^user\./m);
+    },
+  );
+
   test('failure mode 1: runtime step + token provider null → executed by the claude backend + inert provider + canon line', async () => {
     const { client, lines, sessions, resolved } = await setup(
       claimedStep({ provider: 'claude-code', modelId: 'claude-sonnet-4-5' }),

@@ -1,6 +1,6 @@
 # Cairn desktop
 
-An Electron shell for macOS. The main process starts the bundled Cairn server on Electron's own Node with `utilityProcess.fork`, bound to `127.0.0.1` on a free port with `CAIRN_HOME` under the app's `userData` directory, waits until it answers, and opens its web UI in a window. The server writes its owner token to `CAIRN_HOME/token`; the main process reads it and adds `Authorization: Bearer <token>` only to requests whose initiator is the app's own origin, so the window signs in as the owner on macOS, where the server's loopback owner check is Linux-only. `CAIRN_TOKEN` and `CAIRN_AUTH` are removed from the server's environment so the token file is always the one in use. Once the server answers, the main process enrolls this computer as the server's local Runner: it starts an enrollment and confirms it with the owner token (`/api/machine/enroll/start` and `/confirm`, the same pair the browser approval uses), writes the returned `machine.json` (mode 0600, in a 0700 directory) under `userData/runner`, and starts the bundled daemon with `cairn start --foreground --server <origin>`. The daemon runs on Electron's binary with `ELECTRON_RUN_AS_NODE=1`, so anything it starts through `process.execPath` is Node too; it is restarted up to five times if it exits, and the enrollment is repeated at every launch, which rotates the machine token. Links to other origins open in the default browser. A menu bar icon (`assets/trayTemplate*.png`, drawn from `apps/web/public/logo-mark.svg`) shows the server address and offers Open Cairn and Quit Cairn; while Keep the Mac Awake is on it switches to `assets/trayAwakeTemplate*.png`, the same spiral with a cup in its lower right corner. Closing the window only hides it and the server keeps running; the Dock icon or Open Cairn brings it back. Quitting the app stops the Runner and then the server with SIGTERM and removes the icon.
+An Electron shell for macOS and local Linux x64 builds. The main process starts the bundled Cairn server on Electron's own Node with `utilityProcess.fork`, bound to `127.0.0.1` on a free port with `CAIRN_HOME` under the app's `userData` directory, waits until it answers, and opens its web UI in a window. The server writes its owner token to `CAIRN_HOME/token`; the main process reads it and adds `Authorization: Bearer <token>` only to requests whose initiator is the app's own origin, so the window signs in as the owner on macOS, where the server's loopback owner check is Linux-only. `CAIRN_TOKEN` and `CAIRN_AUTH` are removed from the server's environment so the token file is always the one in use. Once the server answers, the main process enrolls this computer as the server's local Runner: it starts an enrollment and confirms it with the owner token (`/api/machine/enroll/start` and `/confirm`, the same pair the browser approval uses), writes the returned `machine.json` (mode 0600, in a 0700 directory) under `userData/runner`, and starts the bundled daemon with `cairn start --foreground --server <origin>`. The daemon runs on Electron's binary with `ELECTRON_RUN_AS_NODE=1`, so anything it starts through `process.execPath` is Node too; it is restarted up to five times if it exits, and the enrollment is repeated at every launch, which rotates the machine token. Links to other origins open in the default browser. A menu bar icon (`assets/trayTemplate*.png`, drawn from `apps/web/public/logo-mark.svg`) shows the server address and offers Open Cairn and Quit Cairn; while Keep the Mac Awake is on it switches to `assets/trayAwakeTemplate*.png`, the same spiral with a cup in its lower right corner. Closing the window only hides it and the server keeps running; the Dock icon or Open Cairn brings it back. Quitting the app stops the Runner and then the server with SIGTERM and removes the icon.
 
 ## Telemetry
 
@@ -11,6 +11,14 @@ Export to an OTLP collector such as Langfuse is off unless `~/Library/Applicatio
 The macOS package is released automatically. Linux x64 can be packaged locally as a portable archive; Linux releases and automatic updates are not provided. The research behind the stack is `docs/research/desktop-app-stack-2026-11-08.md`.
 
 ## Build
+
+Start in a checkout with Node.js 22.19+ (22 or 24 LTS), Git and pnpm installed:
+
+```bash
+git clone https://github.com/xiechimon/cairn
+cd cairn
+pnpm install --frozen-lockfile --ignore-scripts
+```
 
 ```bash
 pnpm --filter @cairn/web build
@@ -42,6 +50,8 @@ tar -xzf apps/desktop/release/Cairn-0.0.0-linux-x64.tar.gz -C "$HOME/.local/opt/
 The archive bundles Electron, the server and Runner, so running it does not require Node.js. It needs a graphical Linux session, bubblewrap 0.11 or newer and a working systemd user session for task confinement, as described in `docs/getting-started.md`. It chooses a free loopback port and keeps its data under `$XDG_CONFIG_HOME/@cairn/desktop` (normally `~/.config/@cairn/desktop`). Use an independent `HOME` and `XDG_CONFIG_HOME` to test without importing existing model logins or app data. This command never publishes a release. Quit Cairn to stop its server and Runner.
 
 Extract the app outside `/tmp`, which the task sandbox deliberately hides. A source checkout and build output may still live in `/tmp`.
+
+The bundled Runner includes pi. In **Connect models → OpenAI Codex**, follow the browser device-login prompt; no separate Codex CLI or pi install is needed. With only Codex connected on fresh data, **Confirm settings** shows GPT-6.1 Sol for Coordinator and Tasks, with pi executing tasks. Confirm, then create a local Git project and ask for a small change. See [the first-result steps](../../README.md#connect-a-model-and-get-your-first-result). Claude Code is optional and needs its own installed CLI plus a subscription token connected in Model services. Devin is downloaded only for an enabled, unexpired Devin subscription.
 
 On Linux the app runs the Runner in its own transient systemd user service and stops that service when the Runner is turned off or the app quits. It does not fall back to an unsandboxed Runner. See `docs/design/desktop-linux-runner.md` for ownership and failure behavior.
 

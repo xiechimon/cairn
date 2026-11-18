@@ -1,84 +1,46 @@
 ---
 title: Connect a model
-description: Use the subscription or API key you already pay for.
+description: Connect Codex inside Cairn, or use your own subscription token or API key.
 ---
 
-import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+Cairn includes the pi execution engine, not a model subscription. Use your own account or API key. A fresh installation opens **Connect models**; later, open **Settings → Model services** to manage connections.
 
-Cairn brings no model of its own and resells no compute. Threads and the Coordinator run on a model source you already have. Pick whichever you have; one is enough to start.
+## Codex subscription: no separate CLI required
 
-| You have | Where it goes |
-|---|---|
-| Claude Code, signed in | On a Runner. Cairn picks it up by itself. |
-| Codex CLI, signed in | On a Runner. Cairn picks it up by itself. |
-| A Claude subscription token | `Settings` → `Model routing` → `Add provider` → `Claude` |
-| An API key from a provider | `Settings` → `Model routing` → `Add provider` → the provider |
-| Any OpenAI- or Anthropic-compatible endpoint | `Settings` → `Model routing` → `Add provider` → `Custom endpoint` |
+1. Choose **OpenAI Codex** in Connect models (or add a connection in Model services).
+2. Open the device-login link Cairn displays in your browser, sign in to your own OpenAI account, and enter the displayed code. Keep Cairn open until authorization finishes. If the code expires, start the login again.
+3. Return to **Confirm settings**. With only Codex connected on a fresh installation, **Coordinator** and **Tasks** both select **GPT-6.1 Sol**. Tasks use the bundled **pi** engine, not an external Codex process.
+4. Review the two model selections and click **Confirm and start chatting**.
 
-<Tabs syncKey="model-source">
-<TabItem label="Claude Code">
+You do not need to install pi, install the Codex CLI, or run `codex login`. The Codex CLI's own login on a Runner is not the setup procedure for this connection.
 
-Install [Claude Code](https://claude.com/product/claude-code) on the Runner machine and sign in there with `claude`, as the same user that runs `cairn`. The Runner reports it to the server; it appears under `Model routing` as `Claude Code` on that Runner, with a status such as `Signed in`.
+## Provider API key or custom endpoint
 
-Its models come from the slots in that machine's `~/.claude/settings.json` (`env.ANTHROPIC_*_MODEL`). While a Runner with Claude Code is online, new work defaults to Claude Code.
+In Connect models or Model services, choose your provider and enter your own API key. For a relay or self-hosted service, choose **Custom endpoint** and supply its name, provider ID, base URL, API protocol and model IDs. Supported protocols include OpenAI Completions, OpenAI Responses and Anthropic Messages. A keyless endpoint can leave the key empty and disable the authorization header.
 
-</TabItem>
-<TabItem label="Codex">
+Keys are encrypted on your server. Use **Test connection** to check the connection; it sends a model request and may incur provider charges. Review the actual Coordinator and Tasks selections before confirming setup rather than assuming every provider uses the Codex defaults.
 
-Install the [Codex CLI](https://github.com/openai/codex) on the Runner machine and run `codex login` as the same user that runs `cairn`. The Runner reports the login (it reads `~/.codex/auth.json`, or `$CODEX_HOME/auth.json`). When no Runner has Claude Code, work defaults to Codex.
+## Optional Claude Code subscription
 
-</TabItem>
-<TabItem label="Claude token">
+Claude Code is a separate runtime. Install `claude` on each Runner that should execute it. The Runner detects it on PATH or in the usual installation folders. Cairn tasks require a subscription token connected to the team; merely running `claude` to sign in locally does not replace this token.
 
-On any machine where Claude Code is signed in, run:
+1. On a machine signed in to your Claude subscription, run `claude setup-token`.
+2. In Model services add **Claude**, tagged **Subscription**, give the connection a name and paste the token. Set its expiry if known.
+3. Use **Verify**. The server host also needs the Claude CLI for this check.
+4. Review Coordinator and Tasks in Confirm settings or **Settings → Rules & policies**. A usable Claude Code runtime and subscription offer `claude-sonnet-5-5` as the task default when no saved rule overrides it. The Coordinator has its own selection.
 
-```sh
-claude setup-token
-```
+An Anthropic API key is a different connection and can run through pi; it does not require the Claude Code CLI.
 
-Then in Cairn open `Settings` → `Model routing` → `Add provider`, pick `Claude` under `Subscription sign-in`, and paste the token. You can also enter the date it expires.
+## Optional Devin subscription
 
-</TabItem>
-<TabItem label="API key">
+Connect and enable a Devin subscription in Model services only if you want to use Devin. Runners download its managed runtime after the server reports an enabled, unexpired subscription; a pi-only installation does not download Devin. Installation and capability reporting may take a presence cycle (normally 30 seconds) before the runtime is available. Disabling a subscription prevents new installation attempts but does not remove an installed runtime or cancel a download already in progress.
 
-Open `Settings` → `Model routing` → `Add provider`. The list is grouped into model vendors (Anthropic, OpenAI, Google, xAI, DeepSeek, Mistral, Moonshot, Kimi For Coding, MiniMax, Qwen, Z.ai and more), cloud platforms (Amazon Bedrock, Google Vertex AI, Cloudflare Workers AI), inference platforms (Groq, Cerebras, Fireworks, Together and more) and gateways (OpenRouter, Vercel AI Gateway, Cloudflare AI Gateway, OpenCode). Pick one and paste the key. xAI also offers a `Sign in with SuperGrok or X Premium` button.
+## Defaults and saved rules
 
-The key is stored encrypted on your server and cannot be viewed again after saving. `Test connection` sends one minimal request without showing the key.
+There is no universal default independent of your connections. On a fresh Codex-only installation the confirmation screen shows GPT-6.1 Sol for both roles. With other connections, the defaults can differ: a usable Claude Code subscription/runtime is preferred for tasks; the Coordinator prefers an Anthropic API connection, then an eligible provider, then usable Claude Code. Saved Coordinator and Session rules take precedence. Inspect **Settings → Rules & policies** to see or change those selections.
 
-</TabItem>
-<TabItem label="Custom endpoint">
-
-For a relay, a self-hosted model or anything not in the list, pick `Custom endpoint` under `Other` and fill in:
-
-- **Name**;
-- **API key**: leave it empty for a gateway with no key;
-- under `Connection`: **Provider ID** (for example `my-relay`), **Base URL** (for example `https://api.example.com/v1`), **API protocol** (`OpenAI Completions`, `OpenAI Responses` or `Anthropic Messages`), and whether to send the key as an `Authorization: Bearer` header (on by default);
-- **Models (optional)**: `Add model`, then type a model id.
-
-Save, open the provider and press `Test` next to `Test connection` to check it.
-
-</TabItem>
-</Tabs>
-
-<Aside type="note" title="Not available yet">
-The provider list also shows OpenAI Codex sign-in, marked `Not yet available`; use the Codex CLI on a Runner instead. GitHub Copilot sign-in works only when the server is started with your own GitHub OAuth App (`CAIRN_GITHUB_OAUTH_CLIENT_ID` and `CAIRN_GITHUB_OAUTH_CLIENT_SECRET`). Gemini CLI appears on a Runner but is locked until it goes through the command gate.
-</Aside>
-
-## Which model the Coordinator uses
-
-You do not have to set a model for the Coordinator. Without a rule of its own it uses a default: the team's Anthropic API key if there is one, otherwise the first provider you added that it can run on, such as one with an API key. `Settings` → `Rules & policies` shows the default on the `Coordinator` card, for example `Current default: {model} · {provider} (the first provider you added that the Coordinator can use)`.
-
-To use a different model, create a rule on that card:
-
-1. `Runtime`: `Built-in (pi)`, which runs your providers' models;
-2. `Model`: one of the models you added;
-3. press `Create`.
-
-If the card says `No default yet: add a provider with an API key, or create the rule here`, the Coordinator has nothing to run on, for example when your only model source is Claude Code on a Runner. Only then does the home page show a third setup step, `Open work routing`, which leads to this card.
-
-The `Session` card on the same page shows which default new work uses and why, for example `Current default: Claude Code (a Runner has Claude Code installed)`.
+You need both a model and an online Runner with a ready sandbox to finish [your first task](/docs/first-task/). On Linux, Online alone does not establish sandbox readiness; see [Runner setup](/docs/runner/#keep-it-running-on-linux).
 
 ## Where credentials live
 
-- Provider keys and tokens you add in the web app are encrypted on the server under `~/.cairn/server/`. Back up the whole `~/.cairn` directory; the database is useless without `secretbox.key`.
-- Claude Code and Codex sign-ins stay in those tools' own files on the machine where you signed in.
+Connections made in Cairn are stored encrypted with the server data. For npm this is under `~/.cairn/server`; desktop uses its app data directory (`~/Library/Application Support/@cairn/desktop` on macOS, `$XDG_CONFIG_HOME/@cairn/desktop` or `~/.config/@cairn/desktop` on Linux). Back up the whole data directory, including `secretbox.key`, not just the database. External CLI logins remain separate from Cairn's connections.

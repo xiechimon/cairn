@@ -5,11 +5,23 @@ description: 建一个项目，说一件事，一路看到任务完成。
 
 import { Aside } from '@astrojs/starlight/components';
 
-开始之前，首页输入框下面那条设置提示应该已经消失了，也就是设置都做完了：[接入了模型](/zh-cn/docs/models/)和[一台 Runner](/zh-cn/docs/runner/)，Coordinator 也有模型可用（默认是你最早添加的服务商）。提示还在的话，点它就会带你去缺的那一步。
+开始之前，先[接入模型](/zh-cn/docs/models/)，在 **确认设置** 核对 Coordinator 和任务模型，再点 **确认并开始聊天**。全新且只有 Codex 的设置，两项都是 GPT-6.1 Sol，任务通过 pi 执行。还需要[一台 Runner](/zh-cn/docs/runner/) 在线且任务沙箱就绪；桌面应用会自带 Runner，npm 服务端不会。
 
 下面用一个本地仓库，从提需求一路走到任务完成，大约几分钟。
 
 ## 1. 建一个项目
+
+选 Runner 上一个已有的小 Git 仓库，或在那台机器上新建一次性仓库：
+
+```sh
+mkdir -p "$HOME/cairn-first-task"
+git -C "$HOME/cairn-first-task" init
+printf '# First task\n' > "$HOME/cairn-first-task/README.md"
+git -C "$HOME/cairn-first-task" add README.md
+git -C "$HOME/cairn-first-task" -c user.name='Cairn demo' -c user.email=demo@localhost commit -m 'Initialize demo'
+```
+
+作者身份只作用于这一次初始化命令，不改全局 Git 配置。后续 agent 命令由 Cairn 提供任务提交身份。请用新目录，不要覆盖已有工作。
 
 一个项目对应一个代码仓库。点侧栏的 `新建项目`，填：
 
@@ -29,7 +41,7 @@ import { Aside } from '@astrojs/starlight/components';
 在输入框里用一句话说你要什么，比如：
 
 ```text
-把 README 里的标题改成 Hello
+把 README 里的标题改成 Hello，不推送、不合并。
 ```
 
 Coordinator 会开一个任务，回复里显示任务标题，后面跟着它的状态。右上角的 `任务` 面板也会列出这个任务；点它打开任务，看 thread 在干什么。

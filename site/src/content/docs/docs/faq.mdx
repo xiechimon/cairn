@@ -27,9 +27,9 @@ Not yet. That is planned as a project with no repository, where agents read, sor
 
 The home page shows the next setup step that is missing. Work through them in order:
 
-1. `Connect a model source`: add a provider, or sign in to Claude Code on a Runner. See [Connect a model](/docs/models/).
-2. `Connect a Runner`: at least one Runner must be online. See [Connect a Runner](/docs/runner/).
-3. `Open work routing`: this step shows only when the Coordinator has no model it can use by default. Add a provider with an API key, or on the `Coordinator` card in `Rules & policies` pick `Built-in (pi)` and a model, then `Create`. See [Which model the Coordinator uses](/docs/models/#which-model-the-coordinator-uses).
+1. In `Connect models`, complete the in-app Codex device login or add your own API key. A local Claude CLI login alone is not Cairn's subscription setup. See [Connect a model](/docs/models/).
+2. In `Confirm settings`, check both Coordinator and Tasks, then confirm. A fresh Codex-only setup selects GPT-6.1 Sol with pi tasks. Existing rules can differ; inspect `Settings → Rules & policies`.
+3. Check the Runner is online and its task sandbox is ready. Desktop starts one for you; an npm server needs a separate Runner. See [Connect a Runner](/docs/runner/).
 
 ## My Runner is online but tasks stay queued
 

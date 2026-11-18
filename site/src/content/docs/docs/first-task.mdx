@@ -5,11 +5,23 @@ description: Create a project, say one thing, and follow it until the task is do
 
 import { Aside } from '@astrojs/starlight/components';
 
-Before you start, the setup hint under the home page's message box should be gone, which means setup is done: you [connected a model](/docs/models/) and [a Runner](/docs/runner/), and the Coordinator has a model to use, by default the first provider you added. If the hint is still there, click it and it takes you to the missing step.
+Before you start, [connect a model](/docs/models/), review Coordinator and Tasks in **Confirm settings**, then click **Confirm and start chatting**. A fresh Codex-only setup uses GPT-6.1 Sol for both roles, with pi running tasks. You also need [a Runner](/docs/runner/) online with its task sandbox ready. Desktop starts that Runner for you; npm does not.
 
 This walk uses a local repository and goes from a request to a finished task, in a few minutes.
 
 ## 1. Create a project
+
+Use a small existing Git repository, or create a throwaway one on the Runner machine:
+
+```sh
+mkdir -p "$HOME/cairn-first-task"
+git -C "$HOME/cairn-first-task" init
+printf '# First task\n' > "$HOME/cairn-first-task/README.md"
+git -C "$HOME/cairn-first-task" add README.md
+git -C "$HOME/cairn-first-task" -c user.name='Cairn demo' -c user.email=demo@localhost commit -m 'Initialize demo'
+```
+
+The identity applies only to this initialization command, not your global Git configuration. Cairn supplies its task commit identity to subsequent agent commands. Use a new directory, not a repository with existing work.
 
 A project is one code repository. Click `New project` in the sidebar and fill in:
 
@@ -29,7 +41,7 @@ For the first run, use a small repository or a throwaway copy, and see how the a
 Type what you want in one sentence, for example:
 
 ```text
-Change the title in the README to Hello
+Change the title in the README to Hello. Do not push or merge.
 ```
 
 The Coordinator opens a task, and its reply shows the task title with its state. The `Tasks` panel at the top right lists it too; click it to open the task and see what the thread is doing.

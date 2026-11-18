@@ -1,84 +1,46 @@
 ---
 title: 接入模型
-description: 用你已经在付费的订阅或 API key。
+description: 在 Cairn 内登录 Codex，或使用你自己的订阅令牌、API key。
 ---
 
-import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+Cairn 内置 pi 执行引擎，不提供模型订阅。请使用你自己的账户或 API key。全新安装会打开 **接入模型（Connect models）**；以后在 **设置 → 模型服务** 管理连接。
 
-Cairn 自己不带模型，也不转售算力。thread 和 Coordinator 都跑在你已有的模型来源上。手上有哪个就用哪个，有一个就能开始。
+## Codex 订阅：不用另外装 CLI
 
-| 你手上有 | 放在哪 |
-|---|---|
-| 已登录的 Claude Code | 装在 Runner 上，Cairn 自己会识别 |
-| 已登录的 Codex CLI | 装在 Runner 上，Cairn 自己会识别 |
-| Claude 订阅令牌 | `设置` → `模型路由` → `添加服务商` → `Claude` |
-| 某个服务商的 API key | `设置` → `模型路由` → `添加服务商` → 对应服务商 |
-| 任何兼容 OpenAI 或 Anthropic 的端点 | `设置` → `模型路由` → `添加服务商` → `自定义端点` |
+1. 在接入模型里选 **OpenAI Codex**，或在模型服务里添加连接。
+2. 在浏览器打开 Cairn 显示的设备登录链接，登录你自己的 OpenAI 账户，输入页面给出的设备码。保持 Cairn 打开，等授权完成；设备码过期就重新开始登录。
+3. 回到 **确认设置（Confirm settings）**。全新安装且只有 Codex 连接时，**Coordinator** 和 **任务（Tasks）** 都选择 **GPT-6.1 Sol**。任务用内置 **pi** 引擎执行，不是外部 Codex 进程。
+4. 核对这两项模型后，点 **确认并开始聊天**。
 
-<Tabs syncKey="model-source">
-<TabItem label="Claude Code">
+不用安装 pi、Codex CLI，也不用执行 `codex login`。Runner 上 Codex CLI 自己的登录不是这条连接路线的设置步骤。
 
-在 Runner 那台机器上装好 [Claude Code](https://claude.com/product/claude-code)，用跑 `cairn` 的同一个用户执行 `claude` 登录。Runner 会把它上报给服务端；在 `模型路由` 里它显示为那台 Runner 上的 `Claude Code`，状态比如 `已登录`。
+## 服务商 API key 或自定义端点
 
-它的模型来自那台机器 `~/.claude/settings.json` 里的模型槽（`env.ANTHROPIC_*_MODEL`）。只要有一台装了 Claude Code 的 Runner 在线，新的活默认就用 Claude Code。
+在接入模型或模型服务里选服务商，输入自己的 API key。中转或自建服务选 **自定义端点**，填名称、服务商 ID、Base URL、API 协议和模型 ID。支持 OpenAI Completions、OpenAI Responses、Anthropic Messages 等协议。无密钥端点可以留空 key，并关闭授权请求头。
 
-</TabItem>
-<TabItem label="Codex">
+密钥加密保存在你的服务端。用 **测试连接** 检查是否能调用；这会发起模型请求，可能产生服务商费用。确认前看实际的 Coordinator 和任务模型，不要把 Codex 的默认值套到其他服务商上。
 
-在 Runner 那台机器上装好 [Codex CLI](https://github.com/openai/codex)，用跑 `cairn` 的同一个用户执行 `codex login`。Runner 会上报这个登录（读的是 `~/.codex/auth.json`，或 `$CODEX_HOME/auth.json`）。没有 Runner 装 Claude Code 时，默认就用 Codex。
+## 可选：Claude Code 订阅
 
-</TabItem>
-<TabItem label="Claude 令牌">
+Claude Code 是独立运行时。每台要执行它的 Runner 都要安装 `claude`，Runner 会从 PATH 或常见安装目录检测。Cairn 的任务需要接入团队的订阅令牌；只在本机运行 `claude` 登录不能替代这个令牌。
 
-在任意一台已登录 Claude Code 的机器上执行：
+1. 在一台已登录 Claude 订阅的机器上运行 `claude setup-token`。
+2. 到模型服务添加标为 **订阅** 的 **Claude**，给连接起名并粘贴令牌；知道过期日期的话一并填写。
+3. 点 **验证**。这一步的服务端主机也需要 Claude CLI。
+4. 在确认设置或 **设置 → 规则与策略** 核对 Coordinator 和任务。可用的 Claude Code 运行时加订阅，会在没有已保存规则覆盖时提供 `claude-sonnet-5-5` 作为任务默认值；Coordinator 有自己的选择。
 
-```sh
-claude setup-token
-```
+Anthropic API key 是另一种连接，可通过 pi 使用，不需要 Claude Code CLI。
 
-然后在 Cairn 里打开 `设置` → `模型路由` → `添加服务商`，在 `订阅登录` 下选 `Claude`，粘贴令牌。也可以顺手填上它的过期日期。
+## 可选：Devin 订阅
 
-</TabItem>
-<TabItem label="API key">
+只有想使用 Devin 时，才在模型服务接入并启用 Devin 订阅。服务端确认有启用且未过期的订阅后，Runner 才下载其托管运行时；仅使用 pi 时不下载 Devin。下载完成后，可能还要等一轮状态上报（通常 30 秒）才显示可用。禁用订阅会阻止新的安装尝试，但不会卸载已有运行时或取消正在进行的下载。
 
-打开 `设置` → `模型路由` → `添加服务商`。列表分组：模型厂商（Anthropic、OpenAI、Google、xAI、DeepSeek、Mistral、Moonshot、Kimi For Coding、MiniMax、Qwen、Z.ai 等）、云平台（Amazon Bedrock、Google Vertex AI、Cloudflare Workers AI）、推理平台（Groq、Cerebras、Fireworks、Together 等）、网关与聚合（OpenRouter、Vercel AI Gateway、Cloudflare AI Gateway、OpenCode）。选一个，粘贴 key。xAI 还可以用 `Sign in with SuperGrok or X Premium` 按钮登录。
+## 默认模型与已保存规则
 
-key 加密存在你的服务端，保存后不能再查看。`测试连接` 会发一个最小请求，不会显示密钥。
+不存在脱离连接情况的统一默认值。全新且只连接 Codex 时，确认页两项都是 GPT-6.1 Sol。其他连接会改变默认选择：任务优先用可用的 Claude Code 订阅和运行时；Coordinator 优先 Anthropic API 连接，再选符合条件的服务商，最后才是可用的 Claude Code。已保存的 Coordinator、会话规则优先。在 **设置 → 规则与策略** 查看或修改。
 
-</TabItem>
-<TabItem label="自定义端点">
-
-中转、自建模型或者列表里没有的，在 `其他` 下选 `自定义端点`，填：
-
-- **名称**；
-- **API 密钥**：无密钥网关可留空；
-- `连接设置` 里：**服务商 ID**（比如 `my-relay`）、**Base URL**（比如 `https://api.example.com/v1`）、**API 协议**（`OpenAI Completions`、`OpenAI Responses` 或 `Anthropic Messages`），以及是否以 `Authorization: Bearer` 请求头发送密钥（默认勾选）；
-- **模型（可选）**：点 `添加模型`，输入模型 ID。
-
-保存后打开这个服务商，在 `测试连接` 旁点 `测试` 确认能连上。
-
-</TabItem>
-</Tabs>
-
-<Aside type="note" title="还不能用的">
-列表里也有 OpenAI Codex 的订阅登录，标着 `暂未开通`；现在请改用 Runner 上的 Codex CLI。GitHub Copilot 登录只有在服务端配了你自己的 GitHub OAuth App（`CAIRN_GITHUB_OAUTH_CLIENT_ID` 和 `CAIRN_GITHUB_OAUTH_CLIENT_SECRET`）时才能用。Gemini CLI 会出现在 Runner 上，但在接入命令闸之前不能开启。
-</Aside>
-
-## Coordinator 用哪个模型
-
-不用专门给 Coordinator 选模型。它没有自己的规则时会用默认的：团队有 Anthropic API key 就用它，否则用你最早添加、它能直接用的服务商（比如带 API key 的）。`设置` → `规则与策略` 的 `Coordinator` 卡片上会写明，比如 `当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）`。
-
-想换一个模型，就在这张卡片上建一条规则：
-
-1. `运行时`：选 `内置 (pi)`，用你添加的服务商的模型；
-2. `模型`：选一个你添加过的模型；
-3. 点 `创建`。
-
-如果卡片上写着 `当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则`，说明 Coordinator 没有能用的模型，比如你只在 Runner 上登录了 Claude Code。只有这种情况，首页才会多出第三步设置 `打开工作路由`，点它就到这张卡片。
-
-同一页的 `会话` 卡片会显示新的活默认用什么、为什么，比如 `当前默认：Claude Code（因为有 Runner 装了 Claude Code）`。
+要完成[第一个任务](/zh-cn/docs/first-task/)，除了模型，还需要在线且沙箱已就绪的 Runner。Linux 上 Online 不等于沙箱就绪，见 [Runner 设置](/zh-cn/docs/runner/#在-linux-上保持常驻)。
 
 ## 凭证放在哪
 
-- 你在网页里添加的服务商 key 和令牌，加密存在服务端的 `~/.cairn/server/` 下。备份整个 `~/.cairn` 目录；少了 `secretbox.key`，数据库解不开。
-- Claude Code 和 Codex 的登录留在你登录的那台机器上，在它们自己的文件里。
+在 Cairn 内建立的连接加密保存在服务端数据里。npm 默认在 `~/.cairn/server`；桌面端在应用数据目录：macOS 是 `~/Library/Application Support/@cairn/desktop`，Linux 是 `$XDG_CONFIG_HOME/@cairn/desktop`，默认 `~/.config/@cairn/desktop`。请备份整个数据目录，包括 `secretbox.key`，不要只拷数据库。外部 CLI 的登录与 Cairn 的连接分开。

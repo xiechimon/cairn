@@ -18,6 +18,7 @@ import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { composeSessionBrief } from './brief-file.js';
 import { credentialRedactor, guardCredentialOutputs } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
+import { commitEnv } from './git.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
@@ -391,7 +392,7 @@ async function runClaimedStep(
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
   const stepEnv = prepareStepEnv(
     {
-      inherited: opts.env,
+      inherited: { ...opts.env, ...commitEnv(stepIdentity) },
       git: repo?.kind === 'github' ? creds.git : null,
       appCredential,
       readonlyGit: attachmentVerify,

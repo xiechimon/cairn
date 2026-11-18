@@ -299,11 +299,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const scrapling = new ScraplingProbe(() => readScrapling(paths.home));
   const devinManaged =
     opts.devinManaged ?? createDevinManaged({ log: (line) => logger.machine(line) });
-  void devinManaged.ensure().catch((error: unknown) => {
-    logger.machine(
-      `devin managed install failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  });
+  let devinInstalling = false;
+  let devinInstalled = false;
   let devinModels = loadDevinModels(paths);
   const capabilitiesReport = (): MachineCapabilities => {
     const reach = agentReach.current();
@@ -524,6 +521,24 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     send: async (body, signal) => {
       const response = await client.presence(body, signal);
       folderPins.setPins(response.folderPins ?? []);
+      if (response.installDevin === true && !devinInstalling && !devinInstalled) {
+        devinInstalling = true;
+        void devinManaged
+          .ensure()
+          .then(
+            (install) => {
+              devinInstalled = install !== null;
+            },
+            (error: unknown) => {
+              logger.machine(
+                `devin managed install failed: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            },
+          )
+          .finally(() => {
+            devinInstalling = false;
+          });
+      }
     },
     onSuccess: () => {
       networkFailures = 0;

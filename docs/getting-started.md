@@ -6,11 +6,15 @@ Cairn is one server you browse plus a daemon on every machine that runs builds. 
 
 On a Mac, the desktop app is the whole install. Download it from the [latest release](https://github.com/xiechimon/cairn/releases/latest) (`-arm64.dmg` for Apple silicon, `-x64.dmg` for Intel), drag it to Applications and open it. The app is not notarized yet, so macOS blocks the first launch: open System Settings, then Privacy & Security, and click **Open Anyway** next to Cairn; on macOS 14 and earlier, right-click Cairn in Applications and choose Open instead.
 
-The app runs the server and a Runner on this Mac, approves that Runner and signs you in as the owner. Tasks run with Claude Code: install it and run `claude` once in Terminal to sign in. The app finds `claude` on your `PATH` or in its usual install folders. The rest of this page is for Linux, Windows and extra Runners.
+The app runs the server and a Runner on this Mac, approves that Runner and signs you in as the owner. The Runner includes pi: connect Codex inside Cairn or add a provider API key; neither the Codex CLI nor Claude Code is required for this route. Follow [Connect a model and get your first result](../README.md#connect-a-model-and-get-your-first-result). Claude Code is optional; its subscription setup is below.
+
+## Linux desktop from source
+
+There is no published Linux desktop package or Linux automatic update. To build the portable x64 archive, follow [the desktop build and extraction commands](../apps/desktop/README.md#linux-x64-archive). It needs a graphical Linux session, Git, bubblewrap 0.11+ and a working systemd user session. Extract outside `/tmp`, which task sandboxes hide. The app starts its own server and pi Runner, signs you in locally, and uses the same model-connection wizard as the Mac app. Quit stops both services. For a headless server or separate Runner, use npm below.
 
 ## Run the server
 
-Requirements: Node.js 22 or 24 (LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to source compilation and need a build toolchain).
+Requirements: Node.js 22.19+ on the 22 or 24 LTS line and Git (these LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to source compilation and need a build toolchain).
 
 ```sh
 npx @xiechimon/cairn
@@ -87,9 +91,9 @@ Set the subscription up once on the server; every machine you enroll then runs C
 2. **Enroll the machine** as in the section above. Wait until its log shows `claude binary: <path>`. If the machine's runtime list shows Claude Code as not installed, check that `claude` is on the daemon's `PATH`. A daemon older than the detection fix in #4795 also needs a `~/.claude/settings.json` that lists a model; without it an unpinned task never goes to that machine, so update the daemon or pin the task.
 3. **Create the token.** On any computer where you are signed in to your Claude subscription, run `claude setup-token` and copy the `sk-ant-oat01-…` value it prints.
 4. **Paste it in the Model services page.** Add a connection, pick Claude (tagged Subscription), give it a name, paste the token, optionally set the expiry date, and save. The token cannot be viewed afterwards. Then press Verify: a good token shows ok, a revoked one shows an authentication failure.
-5. **Start a task.** The default route sends a task to Claude Code (`claude-sonnet-5-5`). The plan step and the build run on a machine from step 2 and appear in the task conversation.
+5. **Choose the runtime and model.** Review Coordinator and Tasks in the confirmation screen, or change their rules in Settings → Rules & policies. A usable Claude Code subscription and installed runtime offer Claude Code with `claude-sonnet-5-5` for tasks; saved rules take precedence. This does not change an existing Codex/pi setup automatically. The plan step and build appear in the task conversation.
 
-Places a newcomer gets stuck: the server host missing `claude` in step 1; a machine that does not have `claude` on the daemon's `PATH`, whose Runner page then shows Claude Code as not detected; and a token that is not in the `sk-ant-oat01-` format, which is rejected as an invalid credential.
+Places a newcomer gets stuck: the server host missing `claude` in step 1; a machine that does not have `claude` on the daemon's `PATH`, whose Runner page then shows Claude Code as not detected; and a token that is not in the `sk-ant-oat01-` format, which is rejected as an invalid credential. Merely signing in with `claude` on a Runner does not replace this per-team subscription token. For Codex, use the in-app device login instead; with only Codex connected on a fresh installation, Coordinator and Tasks select GPT-6.1 Sol and tasks run through pi.
 
 ## Run the server in Docker
 
@@ -107,7 +111,7 @@ The image sets `CAIRN_REQUIRE_TOKEN=1`: without a non-empty `CAIRN_TOKEN` the co
 Requires Node.js >= 22.19 and pnpm (e.g. via `corepack enable`).
 
 ```sh
-pnpm install
+pnpm install --frozen-lockfile --ignore-scripts
 pnpm start        # builds the web UI and starts the server hosting it on the same origin
 ```
 

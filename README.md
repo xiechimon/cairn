@@ -77,9 +77,11 @@ You decide what you want and the architecture. The thread does the rest:
 
 **On a Mac**, download Cairn for Mac from the [latest release](https://github.com/xiechimon/cairn/releases/latest): `-arm64.dmg` for Apple silicon, `-x64.dmg` for Intel. Drag Cairn to Applications and open it. The app is not notarized yet, so macOS blocks the first launch: open System Settings, then Privacy & Security, and click **Open Anyway** next to Cairn (on macOS 14 and earlier, right-click Cairn in Applications and choose Open). The app runs Cairn and a Runner on this Mac and signs you in.
 
-Tasks run with Claude Code. Install it, run `claude` once in Terminal to sign in, and the app finds it on your `PATH` or in its usual install folders.
+The bundled Runner includes **pi**, which can run tasks with your Codex subscription or a provider API key. You do not need to install pi or the Codex CLI. Claude Code is an optional separate runtime, not a prerequisite.
 
-**On Linux or Windows, or to add a Runner on another machine**, use npm with Node.js 22 or 24:
+**On Linux**, use the npm server and Runner below, or [build the Linux x64 desktop archive](./apps/desktop/README.md#linux-x64-archive) from source. There is no published Linux desktop download or Linux automatic update. The archive needs a graphical session, systemd user services and bubblewrap 0.11+; extract it outside `/tmp`. Like the Mac app, it starts its own server and Runner and signs you in locally.
+
+**For the npm server or an extra Runner**, use Node.js 22.19+ on the 22 or 24 LTS line, and Git:
 
 ```sh
 npx @xiechimon/cairn
@@ -94,7 +96,14 @@ cairn start --server http://127.0.0.1:8787
 
 It prints a link; open it in the browser where Cairn is open and approve the machine. Use your server's address instead when the Runner is on another machine. A Linux Runner also needs bubblewrap for its task sandbox; see [getting started](./docs/getting-started.md#keep-the-daemon-running-on-linux). On macOS and Windows, the npm server's browser cannot yet approve that machine or add providers; those need the owner token, as [getting started](./docs/getting-started.md#run-the-server) shows.
 
-Then connect a model: sign in to Claude Code or the Codex CLI on a machine that runs the daemon, or add a provider in the web UI with a Claude token from `claude setup-token`, an API key, or a custom endpoint. Not available yet: OpenAI Codex sign-in in the provider list (it is marked as such) and Gemini CLI. GitHub Copilot sign-in needs your own GitHub OAuth App (`CAIRN_GITHUB_OAUTH_CLIENT_ID`, `CAIRN_GITHUB_OAUTH_CLIENT_SECRET`). To follow along from your phone, see [private access over Tailscale](./docs/deploy/tailscale-mobile.md). Docker and building from source are in [getting started](./docs/getting-started.md).
+### Connect a model and get your first result
+
+1. In **Connect models**, choose **OpenAI Codex**. Open the displayed device-login link in your browser, sign in to your own OpenAI account, and enter the code. Keep Cairn open until authorization completes. This connects your subscription inside Cairn; `codex login` is not required. Alternatively add your own provider API key or custom endpoint. Later connections live under **Settings → Model services**.
+2. Review **Confirm settings** and the models for **Coordinator** and **Tasks**, then click **Confirm and start chatting**. On a fresh installation with only Codex connected, both show **GPT-6.1 Sol**, with tasks using **pi**. Other connections or saved rules can change the selection; use the actual confirmation screen, not a presumed universal default.
+3. Check that a Runner is online and its **task sandbox is ready**. On Linux, Online alone is not enough: [check systemd and bubblewrap](./docs/getting-started.md#keep-the-daemon-running-on-linux).
+4. Choose **New project → Select repo → Local folder** and select a small, initialized Git repository on that Runner. This needs no GitHub connection. Ask, for example, “Change the README title to Hello; do not push or merge.” Open **Tasks** to inspect the change and test results. Completed work stays on its task branch until you ask to merge. [First-task walkthrough and a throwaway repository](./site/src/content/docs/docs/first-task.mdx).
+
+For optional Claude Code tasks, install `claude` on each Runner and connect a subscription token from `claude setup-token` in Model services; a local CLI login alone does not supply Cairn's task subscription. Devin downloads only after a Devin subscription is connected and enabled. See [model connection details](./site/src/content/docs/docs/models.mdx). To follow along from your phone, see [private access over Tailscale](./docs/deploy/tailscale-mobile.md). Docker and building from source are in [getting started](./docs/getting-started.md).
 
 ## "Wait, what are you selling?"
 

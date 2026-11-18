@@ -138,6 +138,7 @@ export type MachinePresencePin = z.infer<typeof machinePresencePinSchema>;
 
 export const machinePresenceResponseSchema = machineOkResponseSchema.extend({
   folderPins: z.array(machinePresencePinSchema).max(MACHINE_FOLDER_PINS_LIMIT).optional(),
+  installDevin: z.boolean().optional(),
 });
 export type MachinePresenceResponse = z.infer<typeof machinePresenceResponseSchema>;
 

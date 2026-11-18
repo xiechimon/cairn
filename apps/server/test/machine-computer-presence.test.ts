@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
-import { computer, machine } from '../src/db/schema.js';
+import { computer, devinSubscription, machine, team } from '../src/db/schema.js';
+import { createDevinSubscription } from '../src/services/devin-subscriptions.js';
 import { computerMachineName, computerVmName } from '../src/services/machine-computer.js';
 import { bootServer, issueApiKey } from './helpers.js';
 
@@ -54,6 +55,42 @@ async function setup() {
 }
 
 describe('computer observations in machine presence', () => {
+  test('Devin installation follows only this team’s enabled, unexpired subscription', async () => {
+    const f = await setup();
+    const presence = async () => {
+      const response = await post(f.s, '/api/machine/presence', f.token, {});
+      expect(response.status).toBe(200);
+      return response.json();
+    };
+    expect(await presence()).not.toHaveProperty('installDevin', true);
+    f.s.db.insert(team).values({ id: 'foreign', name: 'Foreign', createdAt: 1 }).run();
+    const token = `wsk-${'x'.repeat(64)}`;
+    createDevinSubscription({ db: f.s.db, box: f.s.secretBox }, 'foreign', {
+      label: 'Foreign',
+      token,
+    });
+    expect(await presence()).not.toHaveProperty('installDevin', true);
+    const connection = createDevinSubscription({ db: f.s.db, box: f.s.secretBox }, f.s.team.id, {
+      label: 'Personal',
+      token,
+    });
+    expect(await presence()).toMatchObject({ installDevin: true });
+    f.s.db
+      .update(devinSubscription)
+      .set({ enabledAt: null })
+      .where(eq(devinSubscription.id, connection.id))
+      .run();
+    expect(await presence()).not.toHaveProperty('installDevin', true);
+    f.s.db
+      .update(devinSubscription)
+      .set({ enabledAt: 1, expiresAt: Date.now() - 1 })
+      .where(eq(devinSubscription.id, connection.id))
+      .run();
+    const expired = await presence();
+    expect(expired).not.toHaveProperty('installDevin', true);
+    expect(JSON.stringify(expired)).not.toContain(token);
+  });
+
   test('actual runtime transitions update state and notify an already-online panel', async () => {
     const f = await setup();
     for (const state of ['starting', 'running', 'stopped', 'failed']) {

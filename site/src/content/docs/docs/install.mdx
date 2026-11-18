@@ -7,9 +7,15 @@ import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 The server is the web app, the Coordinator and the database. You run one copy, on the machine you browse from or on an always-on host. It alone is enough to look around; agents start working once you [connect a Runner](/docs/runner/) and [a model](/docs/models/).
 
+## Desktop app
+
+On macOS, download the appropriate DMG from the [latest release](https://github.com/xiechimon/cairn/releases/latest): arm64 for Apple silicon, x64 for Intel. Drag Cairn to Applications and open it. It is not notarized: if macOS blocks it, use System Settings → Privacy & Security → Open Anyway (on macOS 14 and earlier, right-click the app and choose Open). The app starts its server and pi Runner and signs you in as the owner. Node.js, a separate pi installation and the Codex CLI are not required. Continue with [Connect a model](/docs/models/).
+
+Linux x64 desktop is currently a **local source build**, not a published download or automatic update. Follow the [desktop build and extraction commands](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md#linux-x64-archive). It requires a graphical session, Git, bubblewrap 0.11+ and a working systemd user session. Extract outside `/tmp`. It starts its own server and Runner; quit the app to stop them. For a headless Linux server, use npm below.
+
 ## Requirements
 
-- **Node.js 22 or 24.** These LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to compiling from source and need a build toolchain.
+- **Node.js 22.19+ on the 22 or 24 LTS line, and Git.** These LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to compiling from source and need a build toolchain.
 - Linux or macOS for the server. Windows needs the pairing step below.
 
 ## Start the server
@@ -46,7 +52,9 @@ The server is the web app, the Coordinator and the database. You run one copy, o
 
 </Steps>
 
-The interface follows your browser's language; switch it under `Settings` → `Account` → `Language`. The home page then asks you to finish two setup steps: connect a model source and connect a Runner. The next pages cover them in that order. Once you add a provider the Coordinator uses it by default; a third step, open work routing, shows only if it has no model it can use.
+The interface follows your browser's language. The first-run wizard shows **Connect models**, then **Confirm settings** for Coordinator and Tasks. Follow [Connect a model](/docs/models/), then confirm the selections. A separate npm install also needs [a Runner](/docs/runner/). On Linux check that its task sandbox is ready, not just Online.
+
+On macOS and Windows the paired npm browser is not an owner session: it cannot yet add model connections or approve Runners. Use the owner-token API as described in [getting started](https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#run-the-server), or use the Mac desktop app for owner access. Do not interpret browser pairing as completion of model setup.
 
 <Aside type="caution">
 The server listens on `127.0.0.1` only and always requires a token for non-browser clients. Do not bind it to a public address without a token; see [Run it in Docker](#run-it-in-docker) and [Reach it from your phone](#reach-it-from-your-phone).
@@ -54,7 +62,7 @@ The server listens on `127.0.0.1` only and always requires a token for non-brows
 
 ## Where your data lives
 
-Everything is under `~/.cairn` (set `CAIRN_HOME` to move it): the server keeps `server/server.db` and `server/secretbox.key`; a Runner keeps `machine.json`, `daemon.log` and `workspaces/`. **To back up, copy the whole directory.** The database is useless without the key file, because secrets are stored encrypted.
+For npm, everything is under `~/.cairn` (set `CAIRN_HOME` to move it): the server keeps `server/server.db` and `server/secretbox.key`; a Runner keeps `machine.json`, `daemon.log` and `workspaces/`. Desktop uses `~/Library/Application Support/@cairn/desktop` on macOS and `$XDG_CONFIG_HOME/@cairn/desktop` (normally `~/.config/@cairn/desktop`) on Linux. **To back up, copy the whole data directory.** The database is useless without the key file, because secrets are stored encrypted.
 
 ## Run it in Docker
 
@@ -79,7 +87,7 @@ Requires Node.js 22.19 or later and pnpm (for example through `corepack enable`)
 ```sh
 git clone https://github.com/xiechimon/cairn
 cd cairn
-pnpm install
+pnpm install --frozen-lockfile --ignore-scripts
 pnpm start
 ```
 

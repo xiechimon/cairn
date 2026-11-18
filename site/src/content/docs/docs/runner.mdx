@@ -7,6 +7,8 @@ import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 A Runner is the `cairn` daemon on a machine where agents should work. It claims work from your server and runs each thread in its own git worktree on that machine, so code and credentials stay there. One Runner can be the same machine as the server; you can add more later.
 
+The desktop app already starts and approves its bundled pi Runner; do not install a second CLI for it. The commands below are for npm or extra machines. pi is included in the Runner and does not require a Codex CLI login. [Connect your model in Cairn](/docs/models/). Check that the task sandbox is ready as well as Online.
+
 <Aside type="tip">
 Prefer a machine that stays on, such as a desktop, a home server or a VPS. A laptop sleeps or drops off the network, and work waits until it is back.
 </Aside>

@@ -275,7 +275,7 @@ export async function withGitCredentialFallback(
   }
 }
 
-export function commitEnv(identity: CommitIdentity): NodeJS.ProcessEnv {
+export function commitEnv(identity: CommitIdentity): Record<string, string> {
   return {
     GIT_AUTHOR_NAME: identity.name,
     GIT_AUTHOR_EMAIL: identity.email,

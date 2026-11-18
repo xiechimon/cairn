@@ -1,8 +1,103 @@
-import type { ClaimedStep } from '@cairn/shared';
+import type { ClaimedStep, MachinePresenceResponse } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 
 describe('per-step backend resolution (spec 17 A3: backendFor is the only branch point)', () => {
+  test('pi startup never installs Devin; opting in installs once and reports readiness', async () => {
+    const api = new FakeMachineApi();
+    const presence = api.presence.bind(api);
+    let requested: boolean | undefined;
+    api.presence = async (body): Promise<MachinePresenceResponse> => ({
+      ...(await presence(body)),
+      ...(requested === undefined ? {} : { installDevin: requested }),
+    });
+    let attempts = 0;
+    let installed = false;
+    let finish: (() => void) | undefined;
+    const { handle } = await boot({
+      api,
+      presenceIntervalMs: 20,
+      devinManaged: {
+        current: () =>
+          installed
+            ? { version: 'test', binPath: '/devin', args: ['acp'], home: '/devin-home' }
+            : null,
+        ensure: async () => {
+          attempts += 1;
+          await new Promise<void>((resolve) => {
+            finish = resolve;
+          });
+          installed = true;
+          return { version: 'test', binPath: '/devin', args: ['acp'], home: '/devin-home' };
+        },
+      },
+    });
+    await waitFor(() => api.presenceBodies.length >= 3);
+    expect(attempts).toBe(0);
+    requested = false;
+    const count = api.presenceBodies.length;
+    await waitFor(() => api.presenceBodies.length >= count + 2);
+    expect(attempts).toBe(0);
+    requested = true;
+    await waitFor(() => finish !== undefined);
+    const pending = api.presenceBodies.length;
+    await waitFor(() => api.presenceBodies.length >= pending + 2);
+    expect(attempts).toBe(1);
+    finish?.();
+    await waitFor(() =>
+      api.presenceBodies.some(
+        (body) =>
+          (body as { capabilities?: { devin?: { installed: boolean } } }).capabilities?.devin
+            ?.installed === true,
+      ),
+    );
+    expect(attempts).toBe(1);
+    await handle.stop();
+    await handle.done;
+  });
+
+  test.each(['rejected', 'unavailable'])(
+    'a %s Devin install retries only while requested',
+    async (failure) => {
+      const api = new FakeMachineApi();
+      const presence = api.presence.bind(api);
+      let requested = true;
+      api.presence = async (body): Promise<MachinePresenceResponse> => ({
+        ...(await presence(body)),
+        installDevin: requested,
+      });
+      let attempts = 0;
+      let finish: (() => void) | undefined;
+      const { handle } = await boot({
+        api,
+        presenceIntervalMs: 20,
+        devinManaged: {
+          current: () => null,
+          ensure: async () => {
+            attempts += 1;
+            await new Promise<void>((resolve) => {
+              finish = resolve;
+            });
+            if (failure === 'rejected') throw new Error('download unavailable');
+            return null;
+          },
+        },
+      });
+      await waitFor(() => finish !== undefined);
+      requested = false;
+      finish?.();
+      const count = api.presenceBodies.length;
+      await waitFor(() => api.presenceBodies.length >= count + 2);
+      expect(attempts).toBe(1);
+      requested = true;
+      await waitFor(() => attempts === 2);
+      requested = false;
+      finish?.();
+      await handle.stop();
+      await handle.done;
+    },
+  );
+
   function claudeClaimed(): ClaimedStep {
     return { ...CLAIMED, agent: { ...CLAIMED.agent!, provider: 'claude-code' } };
   }

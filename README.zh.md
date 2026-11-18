@@ -77,9 +77,11 @@
 
 **Mac 上**，从[最新发布](https://github.com/xiechimon/cairn/releases/latest)下载 Cairn for Mac：Apple 芯片选 `-arm64.dmg`，Intel 选 `-x64.dmg`。把 Cairn 拖进“应用程序”再打开。应用还没做公证，第一次打开会被 macOS 拦下：打开“系统设置”里的“隐私与安全性”，在 Cairn 旁边点**仍要打开**（macOS 14 及更早：在“应用程序”里右键 Cairn，选“打开”）。应用会在这台 Mac 上跑 Cairn 和一个执行机，并自动登录。
 
-任务用 Claude Code 跑。先装好它，在终端里运行一次 `claude` 登录；应用会在 `PATH` 或常见安装目录里找到它。
+内置 Runner 自带 **pi**，可以用你的 Codex 订阅或服务商 API key 跑任务，不需要另装 pi 或 Codex CLI。Claude Code 是可选的独立运行时，不是安装前提。
 
-**Linux、Windows，或者想在另一台机器上加执行机**，用 npm，环境要求 Node.js 22 或 24：
+**Linux 上**可以用下面的 npm 服务端和 Runner，也可以[从源码构建 Linux x64 桌面归档](./apps/desktop/README.md#linux-x64-archive)。目前没有公开提供的 Linux 桌面安装包或自动更新。归档需要图形会话、systemd 用户服务和 bubblewrap 0.11+，必须解压到 `/tmp` 之外；它和 Mac 应用一样会自带服务端、Runner 并自动登录本机。
+
+**用 npm 跑服务端或增加 Runner**，需要 Node.js 22.19+（22 或 24 LTS）和 Git：
 
 ```sh
 npx @xiechimon/cairn
@@ -94,7 +96,14 @@ cairn start --server http://127.0.0.1:8787
 
 它会打印一个链接；在打开着 Cairn 的浏览器里打开它，批准这台机器。执行机在别的机器上时，换成你 server 的地址。Linux 执行机的任务沙箱还需要 bubblewrap，见[上手指南](./docs/getting-started.md#keep-the-daemon-running-on-linux)。在 macOS 和 Windows 上用 npm 跑 server 时，浏览器暂时不能批准这台机器、也不能添加服务商，这些要用 owner token 来做，见[上手指南](./docs/getting-started.md#run-the-server)。
 
-然后接上模型：在跑守护进程的机器上登录 Claude Code 或 Codex CLI；或者在网页里添加服务商，用 `claude setup-token` 得到的 Claude 令牌、API key 或自定义端点。还不能用的：服务商列表里的 OpenAI Codex 登录（标着“暂未开通”）和 Gemini CLI。GitHub Copilot 登录要先配好你自己的 GitHub OAuth App（`CAIRN_GITHUB_OAUTH_CLIENT_ID`、`CAIRN_GITHUB_OAUTH_CLIENT_SECRET`）。想在手机上跟进，看[用 Tailscale 私网访问](./docs/deploy/tailscale-mobile.md)。Docker 和从源码构建见[上手指南](./docs/getting-started.md)。
+### 接上模型，拿到第一个结果
+
+1. 在 **接入模型（Connect models）** 里选 **OpenAI Codex**。在浏览器打开页面给出的设备登录链接，登录你自己的 OpenAI 账户并输入设备码；保持 Cairn 打开，等授权完成。这是在 Cairn 内接入订阅，不用先执行 `codex login`。也可以添加自己的服务商 API key 或自定义端点。以后在 **设置 → 模型服务** 管理连接。
+2. 到 **确认设置（Confirm settings）**，核对 **Coordinator** 和 **任务（Tasks）** 的模型，再点 **确认并开始聊天**。全新安装且只连接 Codex 时，两项都显示 **GPT-6.1 Sol**，任务用 **pi** 执行。其他连接或已保存规则可能改变选择，以确认页为准，不存在所有安装都相同的默认模型。
+3. 确认 Runner 在线，而且 **任务沙箱已就绪**。Linux 上仅显示 Online 不够，见 [systemd 和 bubblewrap 检查](./docs/getting-started.md#keep-the-daemon-running-on-linux)。
+4. 点 **新建项目 → 选择仓库 → 本地文件夹**，选 Runner 上一个已初始化的小 Git 仓库，无需连接 GitHub。比如说「把 README 标题改成 Hello，不推送、不合并」。打开 **任务** 查看改动和测试结果；完成后保留在任务分支，等你要求才合并。[首个任务步骤与一次性测试仓库](./site/src/content/docs/zh-cn/docs/first-task.mdx)。
+
+如果要用可选的 Claude Code 任务，在各 Runner 安装 `claude`，并把 `claude setup-token` 得到的订阅令牌接入模型服务；只在 CLI 登录并不等于给 Cairn 提供任务订阅。只有接入并启用 Devin 订阅后，Runner 才下载 Devin。更多见[模型连接说明](./site/src/content/docs/zh-cn/docs/models.mdx)。手机跟进见[用 Tailscale 私网访问](./docs/deploy/tailscale-mobile.md)。Docker 和从源码构建见[上手指南](./docs/getting-started.md)。
 
 ## 「等等，你们卖什么？」
 
