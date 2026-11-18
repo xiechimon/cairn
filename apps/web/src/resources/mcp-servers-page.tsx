@@ -5,6 +5,7 @@ import {
   type StartMcpConnectorOAuthBody,
   startMcpConnectorOAuthBodySchema,
 } from '@cairn/shared';
+import { Mail } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
@@ -30,6 +31,7 @@ import { Ban, Plus } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
 import { ComposioSection } from './composio-section.js';
 import { MCP_HREF } from './hrefs.js';
+import { useMailConnectors } from './mail-connectors.js';
 import {
   ConnectorStatus,
   McpConnectorDialog,
@@ -193,6 +195,13 @@ export function McpServersPage() {
       entry !== undefined ? catalogAttempt(entry) : null,
     );
   });
+  const mail = useMailConnectors({
+    teamId,
+    live,
+    fixtureAccounts: fixture.resources?.mailAccounts ?? [],
+  });
+  const mailConnected = mail.cards.filter((card) => card.connected);
+  const mailAvailable = mail.cards.filter((card) => !card.connected);
   const connectedCatalog = new Set(connectors.map((c) => c.catalogId));
   const available = MCP_CATALOG.filter((entry) => !connectedCatalog.has(entry.id));
 
@@ -341,7 +350,7 @@ export function McpServersPage() {
                 }
               />
             )}
-            {connectors.length > 0 && (
+            {(connectors.length > 0 || mailConnected.length > 0) && (
               <SettingsSection title={t('已接入')} testId="mcp-connected">
                 <CardGrid>
                   {connectors.map((record) => {
@@ -368,10 +377,31 @@ export function McpServersPage() {
                       />
                     );
                   })}
+                  {mailConnected.map((card) => (
+                    <ConnectorCard
+                      key={card.provider}
+                      testId={`mail-card-${card.provider}`}
+                      catalogId={null}
+                      icon={<MailIcon />}
+                      name={t(card.name)}
+                      description={mail.summaryOf(card.provider)}
+                      status={<MailStatus attention={card.needsAttention} />}
+                      action={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={card.open}
+                          aria-label={t('管理 {name}', { name: t(card.name) })}
+                        >
+                          {t('管理')}
+                        </Button>
+                      }
+                    />
+                  ))}
                 </CardGrid>
               </SettingsSection>
             )}
-            {available.length > 0 && (
+            {(available.length > 0 || mailAvailable.length > 0) && (
               <SettingsSection title={t('可接入')} testId="mcp-catalog">
                 <CardGrid>
                   {available.map((entry) => (
@@ -396,6 +426,26 @@ export function McpServersPage() {
                           aria-label={t('接入 {name}', { name: entry.name })}
                         >
                           {authorizing === entry.id ? t('正在准备…') : t('接入')}
+                        </Button>
+                      }
+                    />
+                  ))}
+                  {mailAvailable.map((card) => (
+                    <ConnectorCard
+                      key={card.provider}
+                      testId={`mail-card-${card.provider}`}
+                      catalogId={null}
+                      icon={<MailIcon />}
+                      name={t(card.name)}
+                      description={t(card.description)}
+                      action={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={card.open}
+                          aria-label={t('接入 {name}', { name: t(card.name) })}
+                        >
+                          {t('接入')}
                         </Button>
                       }
                     />
@@ -430,6 +480,7 @@ export function McpServersPage() {
           )}
         </div>
       </QueryBoundary>
+      {mail.dialogs}
       <McpConnectorDialog
         target={dialog}
         live={live}
@@ -491,13 +542,43 @@ function CardGrid({ children }: { children: ReactNode }) {
   return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>;
 }
 
+function MailIcon() {
+  return (
+    <span
+      aria-hidden
+      className="flex size-5 flex-none items-center justify-center text-content-secondary"
+    >
+      <Mail size={18} strokeWidth={1.75} />
+    </span>
+  );
+}
+
+function MailStatus({ attention }: { attention: boolean }) {
+  const { t } = useI18n();
+  return attention ? (
+    <span className="inline-flex items-center gap-1.5 text-meta text-destructive">
+      <span aria-hidden className="size-1.5 flex-none rounded-full bg-destructive" />
+      {t('需要处理')}
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 text-meta text-content-secondary">
+      <span aria-hidden className="size-1.5 flex-none rounded-full bg-running" />
+      {t('已连接')}
+    </span>
+  );
+}
+
 function ConnectorCard({
+  testId,
+  icon,
   catalogId,
   name,
   description,
   status,
   action,
 }: {
+  testId?: string;
+  icon?: ReactNode;
   catalogId: string | null;
   name: string;
   description: string;
@@ -508,10 +589,11 @@ function ConnectorCard({
     <Card
       size="sm"
       data-connector-card={catalogId ?? name}
+      data-testid={testId}
       className="gap-2 rounded-(--radius-card) px-4 ring-border"
     >
       <div className="flex items-center gap-3">
-        <McpConnectorIcon catalogId={catalogId} />
+        {icon ?? <McpConnectorIcon catalogId={catalogId} />}
         <span className="min-w-0 flex-1 truncate text-ui font-medium text-foreground">{name}</span>
         {action}
       </div>

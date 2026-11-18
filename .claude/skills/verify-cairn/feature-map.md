@@ -21,7 +21,6 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
 | `im` | `设置` (Settings) › `消息` (Messages) › `IM` | [IM connections](#im-connections) |
-| `mail` | `设置` (Settings) › `消息` (Messages) › `邮箱` (Mailbox) | [Mailbox connector](#mail-connector) |
 
 ## Features
 
@@ -851,16 +850,16 @@ Reach:
 
 **Mailbox connector** (partial, centrality 3). The owner connects an IMAP mailbox (QQ Mail authorization code, Gmail or Outlook app password). One held IDLE connection per mailbox turns new mail into a mail-provenance Coordinator turn with the mail fenced as untrusted data; replies go out over SMTP only after an approval card.
 
-States: An empty mailbox list, connecting, connected, error (rejected login or unreachable server, with the reason), a last-mail time, wake rules (all new mail or matching sender/subject), and an approval card for every reply.
+States: Mail cards under Available on the MCP page, then under Connected once a mailbox is connected, with a Manage dialog; connecting, connected, error (rejected login or unreachable server, with the reason), a last-mail time, wake rules (all new mail or matching sender/subject), and an approval card for every reply.
 
 Reach:
 
-1. `settings mail`
+1. `settings mcp`
 
 - Web routes: none
-- Settings: `设置` (Settings) › `消息` (Messages) › `邮箱` (Mailbox)
+- Settings: `设置` (Settings) › `执行环境` (Execution) › `MCP`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `mail-account-*`, `mail-accounts`, `mail-add`, `mail-address-input`, `mail-connect-submit`, `mail-empty`, `mail-imap-host-input`, `mail-imap-port-input`, `mail-password-input`, `mail-remove-*`, `mail-rule-*`, `mail-rule-add`, `mail-rule-pattern-input`, `mail-rule-remove-*`, `mail-rules-*`, `mail-smtp-host-input`, `mail-smtp-port-input`
+- Test ids in its code: `mail-account-*`, `mail-add`, `mail-address-input`, `mail-connect-submit`, `mail-imap-host-input`, `mail-imap-port-input`, `mail-password-input`, `mail-remove-*`, `mail-rule-*`, `mail-rule-add`, `mail-rule-pattern-input`, `mail-rule-remove-*`, `mail-rules-*`, `mail-smtp-host-input`, `mail-smtp-port-input`
 - Research: n/a: the binding contract is docs/design/mail-connector.md; no reference product is copied
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/design/mail-connector.md](../../../docs/design/mail-connector.md)
@@ -880,7 +879,7 @@ Reach:
 - Web routes: `/app/resources/mcp-servers`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `MCP`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composio-authorize-*`, `composio-connect-*`, `composio-key-change`, `composio-key-input`, `composio-key-remove`, `composio-key-save`, `composio-reconnect-*`, `composio-remove-*`, `mcp-add-server`, `mcp-catalog`, `mcp-composio`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
+- Test ids in its code: `composio-authorize-*`, `composio-connect-*`, `composio-key-change`, `composio-key-input`, `composio-key-remove`, `composio-key-save`, `composio-reconnect-*`, `composio-remove-*`, `mail-card-*`, `mcp-add-server`, `mcp-catalog`, `mcp-composio`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
 - Verify recipes: [.claude/skills/verify-cairn/features/mcp-servers.md](features/mcp-servers.md)
 - Research: [docs/research/mcp-connectors-2026-11-15.md](../../../docs/research/mcp-connectors-2026-11-15.md)
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md), [docs/design/connector-fabric.md](../../../docs/design/connector-fabric.md)

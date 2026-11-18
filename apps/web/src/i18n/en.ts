@@ -2694,8 +2694,8 @@ export const EN: Record<string, string> = {
   '退出 Cairn': 'Quit Cairn',
   等你: 'Waiting on you',
   已断开: 'Disconnected',
-  '登录被拒绝。请检查邮箱地址，并确认填的是授权码，不是登录密码。':
-    'Login was rejected. Check the address and make sure you entered the authorization code, not the account password.',
+  '登录被拒绝。请检查邮箱地址，并确认填的是授权码或应用专用密码，不是登录密码。':
+    'Login was rejected. Check the address and make sure you entered the authorization code or app password, not the account password.',
   '找不到邮件服务器，请检查 IMAP 地址。': 'The mail server was not found. Check the IMAP address.',
   '服务器拒绝了连接，请检查端口。': 'The server refused the connection. Check the port.',
   '连接超时，稍后会自动重试。': 'The connection timed out. It will retry automatically.',
@@ -2705,8 +2705,28 @@ export const EN: Record<string, string> = {
   连接邮箱: 'Connect mailbox',
   邮箱地址: 'Email address',
   授权码: 'Authorization code',
-  'QQ 邮箱：网页版设置 → 账号 → POP3/IMAP/SMTP 服务，开启 IMAP/SMTP 后生成授权码。Gmail 和 Outlook 用应用专用密码。':
-    'QQ Mail: web settings → Account → POP3/IMAP/SMTP service, turn on IMAP/SMTP, then generate the code. Gmail and Outlook use an app password.',
+  '连接 QQ 邮箱': 'Connect QQ Mail',
+  '连接 Gmail': 'Connect Gmail',
+  连接其他邮箱: 'Connect another mailbox',
+  应用专用密码: 'App password',
+  授权码或应用专用密码: 'Authorization code or app password',
+  'QQ 邮箱：网页版设置 → 账号 → POP3/IMAP/SMTP 服务，开启 IMAP/SMTP 后生成授权码，填授权码，不要填 QQ 密码。':
+    'QQ Mail: web settings → Account → POP3/IMAP/SMTP service, turn on IMAP/SMTP, generate the authorization code, and enter it instead of your QQ password.',
+  'Gmail：先在 Google 账号里开启两步验证，再打开 myaccount.google.com/apppasswords 生成 16 位应用专用密码，填它，不要填登录密码。':
+    'Gmail: turn on 2-Step Verification in your Google account, open myaccount.google.com/apppasswords, generate a 16-character app password, and enter it instead of your login password.',
+  'Outlook 等海外邮箱用应用专用密码；163、126 等国内邮箱在网页版设置的 IMAP/SMTP 服务页生成授权码。':
+    'Outlook and other overseas mailboxes use an app password; 163, 126 and similar mailboxes generate an authorization code on the web settings IMAP/SMTP page.',
+  'QQ 邮箱': 'QQ Mail',
+  其他邮箱: 'Other mailbox',
+  '用授权码连接，新邮件会唤醒 Coordinator，回信前先问你。':
+    'Connect with an authorization code. New mail wakes the Coordinator, and it asks you before replying.',
+  '用应用专用密码连接，新邮件会唤醒 Coordinator，回信前先问你。':
+    'Connect with an app password. New mail wakes the Coordinator, and it asks you before replying.',
+  'Outlook、163 等支持 IMAP 的邮箱，填好服务器即可连接。':
+    'Outlook, 163 and other IMAP mailboxes connect once you fill in the servers.',
+  '{n} 个邮箱': '{n#1 mailbox|# mailboxes}',
+  邮箱: 'Mailbox',
+  需要处理: 'Needs attention',
   '收信服务器（IMAP）': 'Incoming server (IMAP)',
   'IMAP 端口': 'IMAP port',
   '发信服务器（SMTP）': 'Outgoing server (SMTP)',
@@ -2726,11 +2746,6 @@ export const EN: Record<string, string> = {
   '仅匹配 {count} 条规则': 'Rules only, {count} set',
   还没有收到新邮件: 'No new mail yet',
   '最近一封 {time}': 'Latest {time}',
-  邮箱: 'Mailbox',
-  还没有连接邮箱: 'No mailbox connected',
-  '连上邮箱后，新邮件会唤醒 Coordinator，回信前会先问你。':
-    'Once connected, new mail wakes the Coordinator, and it asks you before replying.',
-  已连接的邮箱: 'Connected mailboxes',
   'Coordinator 回信前总会先给你看一张确认卡。':
     'The Coordinator always shows you a confirmation card before replying.',
   '连接失败，请检查填写的内容。': 'Could not connect. Check what you entered.',

@@ -2701,12 +2701,12 @@
       "id": "mail-connector",
       "name": "Mailbox connector",
       "summary": "The owner connects an IMAP mailbox (QQ Mail authorization code, Gmail or Outlook app password). One held IDLE connection per mailbox turns new mail into a mail-provenance Coordinator turn with the mail fenced as untrusted data; replies go out over SMTP only after an approval card.",
-      "states": "An empty mailbox list, connecting, connected, error (rejected login or unreachable server, with the reason), a last-mail time, wake rules (all new mail or matching sender/subject), and an approval card for every reply.",
+      "states": "Mail cards under Available on the MCP page, then under Connected once a mailbox is connected, with a Manage dialog; connecting, connected, error (rejected login or unreachable server, with the reason), a last-mail time, wake rules (all new mail or matching sender/subject), and an approval card for every reply.",
       "centrality": 3,
       "status": "partial",
       "code": {
         "web": [
-          "apps/web/src/routes/mail-page.tsx"
+          "apps/web/src/resources/mail-connectors.tsx"
         ],
         "server": [
           "apps/server/src/services/mail.ts",
@@ -2722,7 +2722,7 @@
       },
       "routes": {
         "web": [
-          "settings:mail"
+          "settings:mcp"
         ],
         "server": [
           "/api/teams/:id/mail/accounts",
@@ -2732,7 +2732,7 @@
         ]
       },
       "reach": [
-        "settings mail"
+        "settings mcp"
       ],
       "research": {
         "na": "the binding contract is docs/design/mail-connector.md; no reference product is copied"
