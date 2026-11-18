@@ -47,7 +47,6 @@ import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
 import { THREAD_PARAM, threadCopy, threadStatus, VIEW_PARAM } from './thread-copy.js';
-import { ThreadFacts } from './thread-facts.js';
 import { ThreadLead } from './thread-lead.js';
 import {
   type ThreadChatStream,
@@ -735,7 +734,6 @@ function ReadyThread({
           updates={updates}
         />
       </Head>
-      <ThreadFacts todo={todo} prOpen={prRows.length > 0} />
       <ThreadPrPanel
         status={prs.status}
         rows={prRows}

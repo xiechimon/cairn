@@ -101,12 +101,14 @@ export function TaskLiveRow({
     <div
       role="status"
       data-testid={testId}
-      className="flex min-w-0 max-w-full items-center gap-2 py-1 text-ui leading-5 text-(--text-secondary)"
+      className="flex min-w-0 max-w-full items-start gap-2 py-1 text-ui leading-5 text-(--text-secondary)"
     >
-      <span className="inline-flex flex-none items-center gap-1">
+      <span className="inline-flex h-5 flex-none items-center gap-1">
         <TypingDotMarks />
       </span>
-      <span className="min-w-0 truncate shimmer motion-reduce:shimmer-none">{label}</span>
+      <span className="min-w-0 [overflow-wrap:anywhere] shimmer motion-reduce:shimmer-none">
+        {label}
+      </span>
       {elapsed !== '' && (
         <span
           className="flex-none text-meta tabular-nums text-(--text-tertiary)"
@@ -115,6 +117,19 @@ export function TaskLiveRow({
           {elapsed}
         </span>
       )}
+    </div>
+  );
+}
+
+export function TaskBlockedRow({ text, actions }: { text: string; actions?: ReactNode }) {
+  return (
+    <div
+      role="status"
+      data-testid="queue-blocked"
+      className="agent-measure flex min-w-0 flex-col items-start gap-1.5 text-meta leading-5 text-content-secondary [overflow-wrap:anywhere]"
+    >
+      <span>{text}</span>
+      {actions}
     </div>
   );
 }

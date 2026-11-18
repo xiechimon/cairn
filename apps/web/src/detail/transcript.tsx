@@ -5,7 +5,7 @@ import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { BlockedTyping, LiveRow, LiveSignal, TaskLiveRow } from '../components/chat/live-row.js';
+import { LiveRow, LiveSignal, TaskBlockedRow, TaskLiveRow } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
@@ -376,7 +376,7 @@ function Row({
         <div className={`${AGENT_ROW} ${margin} [&>*]:max-w-full`} data-row="agent">
           {liveStep == null ? (
             item.blocked === true ? (
-              <BlockedTyping
+              <TaskBlockedRow
                 text={t(item.label, item.labelVars)}
                 actions={<CoordinatorFixLinks kind={item.blockedKind} />}
               />

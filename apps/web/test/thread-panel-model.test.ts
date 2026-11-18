@@ -1,24 +1,77 @@
+import type { TaskRequest } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { threadProgress } from '../src/board/thread-panel-model.js';
+import { threadOrigin, threadUpdates } from '../src/board/thread-panel-model.js';
 
-describe('threadProgress', () => {
-  test.each([
-    'queued', 'confirm', 'building', 'needs_input', 'review', 'done',
-  ] as const)('a code task in %s does not imply mandatory review or merging', (phase) => {
-    expect(threadProgress({ phase, output: 'code' }, false)).toBeNull();
-    expect(threadProgress({ phase, output: 'code' }, true)).toBeNull();
+describe('threadUpdates', () => {
+  test('returns null outside waiting/review phases', () => {
+    expect(
+      threadUpdates({ phase: 'building', phaseAt: 100 }, [
+        { kind: 'verify', passed: true, conclusion: 'All checks passed', evidence: [], createdAt: 200 },
+      ]),
+    ).toBeNull();
+    expect(
+      threadUpdates({ phase: 'done', phaseAt: 100 }, [
+        { kind: 'robot', markdown: 'Finished.', createdAt: 200 },
+      ]),
+    ).toBeNull();
   });
 
-  test('a research task has two steps and waits on you once its report is in review', () => {
-    expect(threadProgress({ phase: 'review', output: 'info' }, false)).toEqual({
-      steps: ['调研', '交报告'],
-      at: 1,
-      tone: 'wait',
+  test('collects pending questions, verify/review/report lines and latest timestamp in review phase', () => {
+    const result = threadUpdates({ phase: 'review', phaseAt: 100 }, [
+      {
+        kind: 'question',
+        status: 'pending',
+        questions: [{ header: 'Auth', question: 'Keep cookie auth?', options: [] }],
+      },
+      { kind: 'verify', passed: true, conclusion: 'Tests passed', evidence: [], createdAt: 300 },
+      { kind: 'review', conclusion: 'Looks clean', findings: [], createdAt: 250 },
+    ]);
+    expect(result).toEqual({
+      lines: ['Keep cookie auth?', 'Tests passed', 'Looks clean'],
+      at: 300,
     });
   });
 
-  test('failed and closed tasks show no progress', () => {
-    expect(threadProgress({ phase: 'failed', output: 'code' }, false)).toBeNull();
-    expect(threadProgress({ phase: 'closed', output: 'code' }, true)).toBeNull();
+  test('falls back to latest robot first line in review phase when no summary rows exist', () => {
+    const result = threadUpdates({ phase: 'review', phaseAt: 100 }, [
+      { kind: 'robot', markdown: '## Summary\nDetails here', createdAt: 420 },
+    ]);
+    expect(result).toEqual({ lines: ['Summary'], at: 420 });
+  });
+});
+
+describe('threadOrigin', () => {
+  test('resolves matching owner chat segment and timestamp from the stream', () => {
+    const request: TaskRequest = {
+      segments: [
+        {
+          text: 'Inspect login traces',
+          author: 'owner',
+          source: { kind: 'chat', messageId: 'msg-1' },
+        },
+      ],
+    };
+    const origin = threadOrigin(request, {
+      items: [{ kind: 'user', id: 'msg-1', text: 'Inspect login traces', createdAt: 555 }],
+      at: [555],
+    });
+    expect(origin).toEqual({ messageId: 'msg-1', text: 'Inspect login traces', at: 555 });
+  });
+
+  test('returns null timestamp when originating message is not loaded in stream', () => {
+    const request: TaskRequest = {
+      segments: [
+        {
+          text: 'Inspect login traces',
+          author: 'owner',
+          source: { kind: 'chat', messageId: 'msg-missing' },
+        },
+      ],
+    };
+    expect(threadOrigin(request, { items: [], at: [] })).toEqual({
+      messageId: 'msg-missing',
+      text: 'Inspect login traces',
+      at: null,
+    });
   });
 });

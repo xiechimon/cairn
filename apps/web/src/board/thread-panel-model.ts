@@ -1,4 +1,4 @@
-import { IN_PROGRESS_PHASES, isInfoOutput, isWaitingPhase, type TaskRequest } from '@cairn/shared';
+import type { TaskRequest } from '@cairn/shared';
 import type { ChiefStreamItem, TodoRecord, TranscriptItem } from '../fixtures/records.js';
 
 export const MAX_UPDATE_LINES = 3;
@@ -100,29 +100,4 @@ export function clockTime(ts: number, locale: string): string {
     minute: '2-digit',
     hour12: false,
   }).format(ts);
-}
-
-export interface ThreadProgress {
-  steps: readonly string[];
-  at: number;
-  tone: 'wait' | 'run' | 'idle';
-}
-
-const INFO_STEPS = ['调研', '交报告'] as const;
-
-export function threadProgress(
-  todo: Pick<TodoRecord, 'phase' | 'output'>,
-  _prOpen: boolean,
-): ThreadProgress | null {
-  const { phase } = todo;
-  if (phase === 'failed' || phase === 'closed') return null;
-  const tone = isWaitingPhase(phase)
-    ? 'wait'
-    : (IN_PROGRESS_PHASES as readonly string[]).includes(phase)
-      ? 'run'
-      : 'idle';
-  if (isInfoOutput(todo.output)) {
-    return { steps: INFO_STEPS, at: phase === 'done' ? 2 : phase === 'review' ? 1 : 0, tone };
-  }
-  return null;
 }

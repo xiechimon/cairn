@@ -196,6 +196,8 @@ for (const theme of ['light', 'dark'] as const) {
     await stubSurface(page, INFO_CARD);
     await page.goto(`/app/todo/${INFO_CARD_ID}`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await expect(page.getByTestId('thread-facts')).toHaveCount(0);
+    await expect(page.getByTestId('thread-progress')).toHaveCount(0);
 
     const report = page.getByTestId('info-report');
     const card = report.getByTestId('research-report-card');
@@ -255,6 +257,63 @@ for (const theme of ['light', 'dark'] as const) {
     expect(merges).toBe(0);
   });
 }
+
+test('a queued info card blocked on runtime shows no stage stepper and no typing bubble', async ({
+  page,
+}) => {
+  await useTheme(page, 'light');
+  await stubSurface(page, { ...INFO_CARD, phase: 'queued' });
+  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route) =>
+    route.fulfill({
+      json: {
+        messages: [TASK_ROW],
+        chips: null,
+        historyEpoch: 0,
+        steerPending: [],
+        activeRun: null,
+        nextCursor: null,
+      },
+    }),
+  );
+  await page.route(`**/api/builds/${BUILD_ID}/steps`, (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 'step-blocked',
+          buildId: BUILD_ID,
+          kind: 'build',
+          machineId: null,
+          createdAt: 1000,
+          status: 'pending',
+          checkpointCommit: null,
+          skillInjection: null,
+          queue: {
+            position: 1,
+            waitingFor: null,
+            blocked: { kind: 'info-card-runtime', missing: ['devin'] },
+          },
+        },
+      ],
+    }),
+  );
+
+  await page.goto(`/app/todo/${INFO_CARD_ID}`);
+  const panel = page.locator('.side-panel');
+  await expect(panel).toBeVisible();
+  await expect(page.getByTestId('thread-facts')).toHaveCount(0);
+  await expect(page.getByTestId('thread-progress')).toHaveCount(0);
+  await expect(panel).not.toContainText('交报告');
+
+  const blocked = panel.getByTestId('queue-blocked');
+  await expect(blocked).toBeVisible();
+  await expect(blocked).toContainText('排队中：信息卡暂时不能用 devin 跑');
+  await expect(panel.getByTestId('typing-dots')).toHaveCount(0);
+  await expect(panel.getByTestId('typing-dot')).toHaveCount(0);
+  await expect(panel.locator('[data-slot="reply-bubble"]')).toHaveCount(0);
+  expect(await blocked.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
+    'rgba(0, 0, 0, 0)',
+  );
+});
 
 test('a delivered code card has no completion or merge choice', async ({ page }) => {
   await useTheme(page, 'dark');

@@ -1020,7 +1020,9 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       items.push({
         kind: 'streaming',
         startedAt: running.createdAt,
-        ...(queued != null && running.queue?.blocked != null ? { blocked: true as const } : {}),
+        ...(queued != null && running.queue?.blocked != null
+          ? { blocked: true as const, blockedKind: running.queue.blocked.kind }
+          : {}),
         label:
           queued != null
             ? queued.label

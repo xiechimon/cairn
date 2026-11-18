@@ -27,8 +27,6 @@ export const EN: Record<string, string> = {
   '去{channel}': 'Open {channel}',
   进度: 'Progress',
   改代码: 'Code',
-  调研: 'Research',
-  交报告: 'Report',
   有新版本: 'A new version is available',
   点此刷新: 'Refresh',
   订阅账户没能加载: 'Subscriptions could not be loaded',

@@ -339,7 +339,14 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
         }),
       ],
     });
-    const row = tail(items) as { label: string; labelVars: Record<string, string | number> };
+    const row = tail(items) as {
+      blocked?: boolean;
+      blockedKind?: string;
+      label: string;
+      labelVars: Record<string, string | number>;
+    };
+    expect(row.blocked).toBe(true);
+    expect(row.blockedKind).toBe('runtime-disabled');
     expect(translate('zh', EN, row.label, row.labelVars)).toBe(
       '排队中：执行机上没有检测到 codex，装好后重启执行机（前面 0 个）',
     );
