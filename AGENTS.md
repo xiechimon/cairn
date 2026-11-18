@@ -22,7 +22,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 
 ## Ship
 
-Work lands on `main` directly. There is no pull request, merge queue or PR-body format. Production safety lives in the deploy: `scripts/ops/deploy-watch.sh` deploys only main commits whose `check`, `pack-smoke` and `e2e-gate` runs are green, with a migration rehearsal, a backup and rollback. A Claude Code cloud session lands work the same way: it pushes `HEAD:main` and opens no pull request, whatever branch its session defaults name (ian, 2026-11-16).
+Work lands on `main` directly. There is no pull request, merge queue or PR-body format. Production safety lives in the deploy: the shipped product is the Mac desktop app, published by the `desktop-release` workflow on every push whose app sources moved since the last `desktop-v*` tag — it does not gate on `check`/`pack-smoke`/`e2e-gate`. The omarchy self-deploy watcher that enforced those gates was torn down on 2026-11-18 (`docs/ops/self-deploy.md`). A Claude Code cloud session lands work the same way: it pushes `HEAD:main` and opens no pull request, whatever branch its session defaults name (ian, 2026-11-16).
 
 Work happens in worktrees, never in the primary checkout at `~/Code/AgentProjects/cairn`: a machine-level pre-commit hook there refuses commits, and its tree stays clean so `cairn-autopull` can fast-forward it to `origin/main`.
 
