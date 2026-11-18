@@ -4,7 +4,7 @@ Why: over HTTP/1.1 a browser allows 6 connections per origin. Each tab held a te
 
 ## Before
 
-- Team stream `GET /api/teams/:id/stream`: `ping`, `machine_presence`, `todo`, `build`, `notification`, `branch_sync`, `computer.command`, `computer.state`. Hub: `TeamStreamHub`.
+- Team stream `GET /api/teams/:id/stream`: `ping`, `machine_presence`, `todo`, `build`, `notification`, `branch_sync`, `computer.state`. Hub: `TeamStreamHub`.
 - Conversation stream `GET /api/conversations/:id/stream`, one per followed conversation (the open task thread or the open Coordinator thread): `ping`, `message`, `text_delta`, `thinking_delta`, `step`, `activity`, `agent_todo`. Hub: `ConversationStreamHub`, which replays the buffered live text, thinking, activity and agent todo to a new subscriber.
 
 ## After

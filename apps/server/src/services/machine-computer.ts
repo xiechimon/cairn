@@ -2,14 +2,12 @@ import { createHash } from 'node:crypto';
 import {
   browserSecretFillActionSchema,
   CLOAK_LICENSE_SECRET,
-  COMPUTER_FEED_TOOLS,
   COMPUTER_HANDOFF_TIMEOUT_MS,
   COMPUTER_MANAGE_OUTCOMES,
   COMPUTER_MANAGE_TIMEOUT_MS,
   COMPUTER_REPLAY_SAFE_TOOLS,
   type ComputerCall,
   type ComputerCallState,
-  type ComputerCommand,
   type ComputerFrame,
   type ComputerManageAction,
   type ComputerManageOutcome,
@@ -81,7 +79,6 @@ export const COMPUTER_SHELL_DEADLINE_SLACK_MS = 30_000;
 export const COMPUTER_SCREEN_DEADLINE_MS = 2 * 60_000;
 export const COMPUTER_OTHER_DEADLINE_MS = 10 * 60_000;
 export const COMPUTER_EXECUTION_LEASE_MS = 5 * 60_000;
-export const COMPUTER_FEED_OUTPUT_CHARS = 4 * 1024;
 export const COMPUTER_STORED_PARAM_CHARS = 8 * 1024;
 
 export const COMPUTER_NOT_CONNECTED = 'the computer is not connected';
@@ -105,7 +102,6 @@ const SCREEN_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'open_path',
   'launch_app',
 ]);
-const FEED_TOOLS: ReadonlySet<string> = new Set(COMPUTER_FEED_TOOLS);
 
 export function hasPendingComputerOutput(callId: string): boolean {
   return pendingOutput.has(callId);
@@ -347,7 +343,7 @@ export function receiveComputerFrames(
   if (result.finished) settleComputerCall(db, callId, hub);
   else if (result.publishOutput) {
     const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
-    if (row) publishFeed(db, publishHub, row);
+    if (row) publishComputerChanged(db, publishHub, row);
   }
   return result.response;
 }
@@ -473,41 +469,17 @@ function resultOfRow(row: CallRow): ComputerRelayResult {
   }
 }
 
-export function feedOf(row: CallRow): ComputerCommand | null {
-  if (!FEED_TOOLS.has(row.tool)) return null;
-  const param = (key: string): string => {
-    const value = row.params[key];
-    return typeof value === 'string' ? value : '';
-  };
-  const shell = SHELL_TOOLS.has(row.tool);
-  const command = shell
-    ? param('command')
-    : row.tool === 'launch_app'
-      ? [param('application'), param('uri')].filter((part) => part !== '').join(' ')
-      : param('path');
-  const streamed = row.outputHead + row.outputTail;
-  const output = shell
-    ? streamed || (row.resultText ?? row.errorMessage ?? '')
-    : (row.errorMessage ?? '');
-  return {
-    callId: row.id,
-    computerId: row.computerId,
-    stepId: row.stepId,
-    tool: row.tool as ComputerCommand['tool'],
-    command: redact(command),
-    cwd: shell ? redact(param('cwd') || '.') : '.',
-    status: isFinalState(row.state) ? (row.state as ComputerCommand['status']) : 'running',
-    exitCode: row.exitCode,
-    output: redact(output).slice(-COMPUTER_FEED_OUTPUT_CHARS),
-    at: row.createdAt,
-  };
-}
-
-function publishFeed(db: Db, hub: TeamStreamHub, row: CallRow): void {
-  const command = feedOf(row);
-  if (!command) return;
+function publishComputerChanged(db: Db, hub: TeamStreamHub, row: CallRow): void {
+  if (row.computerId === null) return;
   const userId = computerCallOwnerUserId(db, row);
-  if (userId) hub.publishPrivate(row.teamId, userId, () => ({ type: 'computer.command', command }));
+  const owned =
+    userId === undefined ? undefined : ownedPrivateComputer(db, row.teamId, userId, row.computerId);
+  if (userId === undefined || owned === undefined) return;
+  hub.publishPrivate(row.teamId, userId, () => ({
+    type: 'computer.state',
+    computerId: owned.id,
+    state: owned.state,
+  }));
 }
 
 export function settleComputerCall(db: Db, callId: string, hub?: TeamStreamHub): void {
@@ -519,7 +491,7 @@ export function settleComputerCall(db: Db, callId: string, hub?: TeamStreamHub):
     live.dispose();
   }
   const publishHub = live?.hub ?? hub;
-  if (publishHub) publishFeed(db, publishHub, row);
+  if (publishHub) publishComputerChanged(db, publishHub, row);
   live?.resolve(resultOfRow(row));
 }
 
@@ -1156,7 +1128,7 @@ export async function forwardComputerCall(
         .where(eq(computerCall.id, callId))
         .run();
       const interrupted = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
-      if (interrupted) publishFeed(db, deps.hub, interrupted);
+      if (interrupted) publishComputerChanged(db, deps.hub, interrupted);
       return resultOfRow({ ...existing, state: 'interrupted' });
     }
     return resultOfRow(existing);
@@ -1354,6 +1326,6 @@ export async function forwardComputerCall(
   }
   const pending = openPending(deps, call);
   const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
-  if (row) publishFeed(db, deps.hub, row);
+  if (row) publishComputerChanged(db, deps.hub, row);
   return waitForCall(deps, pending, stepId, opts.signal);
 }

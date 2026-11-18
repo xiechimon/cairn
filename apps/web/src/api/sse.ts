@@ -101,7 +101,7 @@ export function startTeamStream(
       if (patched) {
         notePatchedEvent(qc, teamId);
       }
-      if (ev.type === 'computer.command') {
+      if (ev.type === 'computer.state') {
         void invalidateConverged(qc, { queryKey: ['computers', teamId] });
       }
       if (ev.type === 'notification') {

@@ -1,29 +1,12 @@
-import {
-  COMPUTER_COMMANDS_LIMIT_DEFAULT,
-  COMPUTER_COMMANDS_LIMIT_MAX,
-  COMPUTER_FEED_TOOLS,
-  type ComputerCommand,
-  type ComputerRecord,
-  chiefIdFormat,
-} from '@cairn/shared';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { type ComputerRecord, chiefIdFormat } from '@cairn/shared';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { computer, computerCall, machine } from '../db/schema.js';
+import { computer, machine } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import {
-  computerCallOwnerUserId,
-  ownedPrivateComputer,
-  privateComputerWhere,
-} from './computer-access.js';
+import { ownedPrivateComputer, privateComputerWhere } from './computer-access.js';
 import { computerActivity } from './computer-activity.js';
-import { computerMachineName, feedOf } from './machine-computer.js';
-
-export function clampCommandsLimit(raw: string | undefined): number {
-  const asked = Number(raw);
-  if (!Number.isInteger(asked) || asked < 1) return COMPUTER_COMMANDS_LIMIT_DEFAULT;
-  return Math.min(asked, COMPUTER_COMMANDS_LIMIT_MAX);
-}
+import { computerMachineName } from './machine-computer.js';
 
 export function ensureCoordinatorComputer(db: Db, teamId: string, userId: string): void {
   const scopeKey = `chief:${chiefIdFormat(userId, teamId)}`;
@@ -179,32 +162,4 @@ export function ensureComputerBrowserEnabled(
   const updated = listComputers(db, teamId, userId).find((row) => row.id === existing.id);
   if (updated === undefined) return { ok: false, reason: 'missing_machine' };
   return { ok: true, computer: updated };
-}
-
-export function recentComputerCommands(
-  db: Db,
-  teamId: string,
-  userId: string,
-  computerId: string,
-  limit: number,
-): ComputerCommand[] {
-  if (!ownedPrivateComputer(db, teamId, userId, computerId)) return [];
-  const rows = db
-    .select()
-    .from(computerCall)
-    .where(
-      and(
-        eq(computerCall.teamId, teamId),
-        eq(computerCall.computerId, computerId),
-        inArray(computerCall.tool, [...COMPUTER_FEED_TOOLS]),
-      ),
-    )
-    .orderBy(desc(computerCall.createdAt), desc(computerCall.id))
-    .limit(limit)
-    .all();
-  return rows
-    .reverse()
-    .filter((row) => computerCallOwnerUserId(db, row) === userId)
-    .map(feedOf)
-    .filter((command): command is ComputerCommand => command !== null);
 }

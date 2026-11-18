@@ -8,13 +8,10 @@ import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
-import { ownedPrivateComputer } from './services/computer-access.js';
 import {
-  clampCommandsLimit,
   ensureComputerBrowserEnabled,
   ensureCoordinatorComputer,
   listComputers,
-  recentComputerCommands,
   setComputerBrowserEnabled,
 } from './services/computer-feed.js';
 import { decidePackageInstall, manageComputer } from './services/machine-computer.js';
@@ -84,15 +81,5 @@ export function registerComputerRoutes(app: Hono, ctx: AppContext): void {
     );
     if (!computer) throw notFound(`computer ${id}`);
     return c.json({ computer });
-  });
-
-  app.get('/api/computers/:id/commands', (c) => {
-    const id = c.req.param('id');
-    if (!ownedPrivateComputer(ctx.db, ctx.team.id, ctx.user.id, id))
-      throw notFound(`computer ${id}`);
-    const limit = clampCommandsLimit(c.req.query('limit'));
-    return c.json({
-      commands: recentComputerCommands(ctx.db, ctx.team.id, ctx.user.id, id, limit),
-    });
   });
 }

@@ -8557,98 +8557,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
     {
       "additionalProperties": false,
       "properties": {
-        "command": {
-          "additionalProperties": false,
-          "properties": {
-            "at": {
-              "maximum": 9007199254740991,
-              "minimum": -9007199254740991,
-              "type": "integer",
-            },
-            "callId": {
-              "pattern": "^[0-9a-f]{64}$",
-              "type": "string",
-            },
-            "command": {
-              "type": "string",
-            },
-            "computerId": {
-              "type": [
-                "string",
-                "null",
-              ],
-            },
-            "cwd": {
-              "type": "string",
-            },
-            "exitCode": {
-              "anyOf": [
-                {
-                  "maximum": 9007199254740991,
-                  "minimum": -9007199254740991,
-                  "type": "integer",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-            "output": {
-              "type": "string",
-            },
-            "status": {
-              "enum": [
-                "running",
-                "done",
-                "error",
-                "interrupted",
-                "cancelled",
-              ],
-              "type": "string",
-            },
-            "stepId": {
-              "type": "string",
-            },
-            "tool": {
-              "enum": [
-                "shell",
-                "user_computer_shell",
-                "write_file",
-                "attach_file",
-                "open_path",
-                "launch_app",
-              ],
-              "type": "string",
-            },
-          },
-          "required": [
-            "callId",
-            "computerId",
-            "stepId",
-            "tool",
-            "command",
-            "cwd",
-            "status",
-            "exitCode",
-            "output",
-            "at",
-          ],
-          "type": "object",
-        },
-        "type": {
-          "const": "computer.command",
-          "type": "string",
-        },
-      },
-      "required": [
-        "type",
-        "command",
-      ],
-      "type": "object",
-    },
-    {
-      "additionalProperties": false,
-      "properties": {
         "computerId": {
           "type": "string",
         },
@@ -10319,14 +10227,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "owner stops, updates, recovers or resets a VM computer",
     "path": "/api/computers/{id}/actions",
-  },
-  {
-    "method": "GET",
-    "note": "recent computer.command feed entries, newest last (D75 P8a)",
-    "path": "/api/computers/{id}/commands",
-    "query": [
-      "limit",
-    ],
   },
   {
     "method": "POST",

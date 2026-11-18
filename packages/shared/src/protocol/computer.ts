@@ -213,30 +213,6 @@ export const computerRelayResultSchema = z.object({
 });
 export type ComputerRelayResult = z.infer<typeof computerRelayResultSchema>;
 
-export const COMPUTER_FEED_TOOLS = [
-  'shell',
-  'user_computer_shell',
-  'write_file',
-  'attach_file',
-  'open_path',
-  'launch_app',
-] as const;
-export type ComputerFeedTool = (typeof COMPUTER_FEED_TOOLS)[number];
-
-export const computerCommandSchema = z.object({
-  callId: computerCallIdSchema,
-  computerId: recordId.nullable(),
-  stepId: recordId,
-  tool: z.enum(COMPUTER_FEED_TOOLS),
-  command: z.string(),
-  cwd: z.string(),
-  status: z.enum(['running', 'done', 'error', 'interrupted', 'cancelled']),
-  exitCode: z.number().int().nullable(),
-  output: z.string(),
-  at: epochMs,
-});
-export type ComputerCommand = z.infer<typeof computerCommandSchema>;
-
 export const computerActivitySchema = z.object({
   inUse: z.boolean(),
   title: z.string().nullable(),
@@ -281,11 +257,3 @@ export type ComputerBrowserTool = (typeof COMPUTER_BROWSER_TOOLS)[number];
 export function isComputerBrowserTool(name: string): name is ComputerBrowserTool {
   return (COMPUTER_BROWSER_TOOLS as readonly string[]).includes(name);
 }
-
-export const COMPUTER_COMMANDS_LIMIT_DEFAULT = 50;
-export const COMPUTER_COMMANDS_LIMIT_MAX = 200;
-
-export const computerCommandsResponseSchema = z.object({
-  commands: z.array(computerCommandSchema),
-});
-export type ComputerCommandsResponse = z.infer<typeof computerCommandsResponseSchema>;

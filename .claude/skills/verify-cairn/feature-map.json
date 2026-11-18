@@ -1025,7 +1025,6 @@
         "server": [
           "/api/computers",
           "/api/computers/:id",
-          "/api/computers/:id/commands",
           "/api/teams/:teamId/computers/**",
           "/api/teams/:id/cloak-license",
           "/api/computers/package-install",
@@ -1060,7 +1059,7 @@
         "apps/daemon/test/own-computer-daemon.test.ts",
         "apps/web/test/machine-capabilities.test.ts",
         "apps/server/test/computer-screen-routes.test.ts",
-        "apps/server/test/computer-feed-routes.test.ts",
+        "apps/server/test/computer-routes.test.ts",
         "apps/daemon/test/computer-guard.test.ts",
         "apps/daemon/test/computer-browser.test.ts",
         "apps/daemon/test/machine-boot.test.ts",

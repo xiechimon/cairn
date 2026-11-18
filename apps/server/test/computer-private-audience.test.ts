@@ -3,18 +3,9 @@ import { type ServerType, serve } from '@hono/node-server';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
 import { createApp } from '../src/app.js';
-import {
-  chief,
-  chiefThread,
-  computer,
-  computerCall,
-  machine,
-  step,
-  user,
-} from '../src/db/schema.js';
+import { chief, chiefThread, computer, machine, step, user } from '../src/db/schema.js';
 import { TeamStreamHub } from '../src/services/events.js';
 import {
-  computerCallId,
   dropComputerWaiters,
   forwardComputerCall,
   receiveComputerFrames,
@@ -204,14 +195,12 @@ describe('private computer principal boundary with two server-bound AppContexts'
     const { s, bob, aliceApp, bobApp } = await world();
     expect((await fetch(`${aliceApp}/api/computers`)).status).toBe(401);
     expect((await fetch(`${bobApp}/api/teams/${s.team.id}/stream`)).status).toBe(401);
-    for (const [app, owner, foreign] of [
-      [aliceApp, s.user, bob],
-      [bobApp, bob, s.user],
+    for (const [app, owner] of [
+      [aliceApp, s.user],
+      [bobApp, bob],
     ] as const) {
       const response = await get(app, '/api/computers');
       expect(await response.json()).toMatchObject({ computers: [{ id: `computer-${owner.id}` }] });
-      expect((await get(app, `/api/computers/computer-${owner.id}/commands`)).status).toBe(200);
-      expect((await get(app, `/api/computers/computer-${foreign.id}/commands`)).status).toBe(404);
     }
     expect(
       await (await get(aliceApp, '/api/auth/session', 'cairn_session=bob')).json(),
@@ -262,82 +251,16 @@ describe('private computer principal boundary with two server-bound AppContexts'
       [aliceEvents, s.user, bob],
       [bobEvents, bob, s.user],
     ] as const) {
-      const commands = events
-        .filter((event) => event.type === 'computer.command')
-        .map((event) => event.command);
-      expect(commands).toHaveLength(4);
-      expect(commands).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            computerId: `computer-${owner.id}`,
-            status: 'running',
-            output: expect.stringContaining('[REDACTED]'),
-          }),
-          expect.objectContaining({ computerId: `computer-${owner.id}`, status: 'done' }),
-        ]),
-      );
+      const changed = events
+        .filter((event) => event.type === 'computer.state')
+        .map((event) => event.computerId);
+      expect(changed.length).toBeGreaterThan(0);
+      expect(new Set(changed)).toEqual(new Set([`computer-${owner.id}`]));
       const raw = JSON.stringify(events);
       expect(raw).not.toContain(`private-${foreign.id}`);
-      expect(raw).not.toContain(`private-output-${foreign.id}`);
       expect(raw).not.toContain(`/private/${foreign.id}`);
       expect(raw).not.toContain(TOKEN);
-      const history = await (
-        await get(
-          owner.id === bob.id ? bobApp : aliceApp,
-          `/api/computers/computer-${owner.id}/commands`,
-        )
-      ).text();
-      expect(history).toContain('[REDACTED]');
-      expect(history).not.toContain(TOKEN);
     }
-  });
-
-  test('host-null feed resolves Bob through the step, even when MachineDeps.user is Alice', async () => {
-    const { s, bob, aliceApp, bobApp } = await world();
-    const a = await rawStream(aliceApp, s.team.id);
-    const b = await rawStream(bobApp, s.team.id);
-    const callId = computerCallId(`step-${bob.id}`, 'host-shell');
-    s.db
-      .insert(computerCall)
-      .values({
-        id: callId,
-        teamId: s.team.id,
-        stepId: `step-${bob.id}`,
-        toolCallId: 'host-shell',
-        machineId: 'worker',
-        computerId: null,
-        tool: 'user_computer_shell',
-        replaySafe: false,
-        params: { command: 'echo private-host-bob' },
-        state: 'dispatched',
-        deadlineAt: Date.now() + 60_000,
-        createdAt: 1,
-      })
-      .run();
-    receiveComputerFrames(s.db, s.hub, 'worker', callId, [
-      { kind: 'output', seq: 1, stream: 'stdout', text: 'host-bob ' },
-    ]);
-    receiveComputerFrames(s.db, s.hub, 'worker', callId, [
-      { kind: 'done', seq: 2, text: 'host-bob', exitCode: 0 },
-    ]);
-    s.hub.publish(s.team.id, (conn) => ({
-      type: 'machine_presence',
-      seq: conn.nextSeq(),
-      machineId: 'presence-barrier',
-      online: true,
-    }));
-    const [aEvents, bEvents] = await Promise.all([
-      a.through('machine_presence'),
-      b.through('machine_presence'),
-    ]);
-    expect(aEvents.filter((event) => event.type === 'computer.command')).toEqual([]);
-    expect(
-      bEvents.filter((event) => event.type === 'computer.command').map((event) => event.command),
-    ).toEqual([
-      expect.objectContaining({ computerId: null, status: 'running' }),
-      expect.objectContaining({ computerId: null, status: 'done' }),
-    ]);
-    expect(s.db.select().from(computerCall).all()).toHaveLength(1);
   });
 });
 

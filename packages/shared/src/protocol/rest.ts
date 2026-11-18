@@ -33,12 +33,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'owner stops, updates, recovers or resets a VM computer',
   },
   {
-    method: 'GET',
-    path: '/api/computers/{id}/commands',
-    query: ['limit'],
-    note: 'recent computer.command feed entries, newest last (D75 P8a)',
-  },
-  {
     method: 'POST',
     path: '/api/teams/{teamId}/computers/{computerId}/screen',
     note: 'D75: mint one sealed viewer capability for a screen or controlled terminal',
