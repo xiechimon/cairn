@@ -203,6 +203,7 @@ describe('install_packages asks the owner before anything runs', () => {
       tool: 'install_packages',
       params: { packages: ['ffmpeg', 'jq'] },
       scopeKey,
+      computerGrant: 'desktop',
     });
     receiveComputerFrames(deps.db, deps.hub, 'mac', calls[0]!.callId, [
       { kind: 'output', seq: 1, stream: 'stdout', text: 'Setting up ffmpeg ...\n' },

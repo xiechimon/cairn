@@ -4,6 +4,7 @@ import {
   type ComputerCall,
   type ComputerFrame,
   type ComputerTool,
+  isComputerBrowserTool,
   type MachineComputerFramesBody,
   PACKAGES_INSTALLED_PREFIX,
 } from '@cairn/shared';
@@ -11,6 +12,7 @@ import { describe, expect, test } from 'vitest';
 import { AUTO_STEALTH_NOTE } from '../src/computer/browser.js';
 import {
   createComputerDispatcher,
+  NO_COMPUTER_GRANT_MESSAGE,
   NO_COMPUTER_PROVIDER_MESSAGE,
   NO_COMPUTER_SCOPE_MESSAGE,
   NO_VM_COMPUTER_MESSAGE,
@@ -94,6 +96,11 @@ function call(
     ...(tool === 'user_computer_shell' && typeof params.command === 'string'
       ? { ownComputerGrant: { proposalId: 'grant-1', key: params.command } }
       : {}),
+    ...(tool.startsWith('user_computer_')
+      ? {}
+      : {
+          computerGrant: isComputerBrowserTool(tool) ? ('browser' as const) : ('desktop' as const),
+        }),
     ...extra,
   } satisfies ComputerCall;
 }
@@ -120,6 +127,68 @@ describe('orb routing', () => {
       });
     },
   );
+
+  test.each([
+    ['shell', { command: 'ls' }, 'desktop'],
+    ['read_file', { path: 'a' }, 'desktop'],
+    ['desktop_snapshot', {}, 'desktop'],
+    ['browser_navigate', { url: 'https://example.com' }, 'browser'],
+    ['browser_snapshot', {}, 'browser'],
+    ['install_packages', { packages: ['ffmpeg'] }, 'desktop'],
+  ] as const)(
+    'an unstamped %s call is refused and never reaches a provider',
+    async (tool, params, grant) => {
+      const log: string[] = [];
+      const fake = fakeClient();
+      const dispatcher = createComputerDispatcher({
+        client: fake.client,
+        orb: {
+          ...fakeOrb(log),
+          async installPackages() {
+            log.push('install:ran');
+            return 0;
+          },
+        },
+        ...FAST,
+      });
+      await dispatcher.dispatch(
+        call(tool, params, { scopeKey: 'chief:c1', computerGrant: undefined }),
+      );
+      expect(errorOf(fake.frames)).toMatchObject({
+        message: NO_COMPUTER_GRANT_MESSAGE,
+        delivery: 'not_delivered',
+      });
+      expect(log).toEqual([]);
+      fake.frames.length = 0;
+      const wrong = grant === 'browser' ? ('desktop' as const) : ('browser' as const);
+      await dispatcher.dispatch(call(tool, params, { scopeKey: 'chief:c1', computerGrant: wrong }));
+      expect(errorOf(fake.frames)).toMatchObject({
+        message: NO_COMPUTER_GRANT_MESSAGE,
+        delivery: 'not_delivered',
+      });
+      expect(log).toEqual([]);
+    },
+  );
+
+  test('computer_manage and browser_close_tab run without a grant stamp', async () => {
+    const log: string[] = [];
+    const fake = fakeClient();
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      orb: {
+        ...fakeOrb(log),
+        async manage(scopeKey, action) {
+          log.push(`manage[${scopeKey}]:${action}`);
+          return 'stopped' as const;
+        },
+      },
+      ...FAST,
+    });
+    await dispatcher.dispatch(
+      call('computer_manage', { action: 'stop' }, { scopeKey: 'chief:c1' }),
+    );
+    expect(log).toEqual(['manage[chief:c1]:stop']);
+  });
 
   test('an Orb tool without a scope is refused and never reaches a provider', async () => {
     const log: string[] = [];

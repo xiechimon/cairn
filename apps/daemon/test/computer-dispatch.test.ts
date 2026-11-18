@@ -77,13 +77,16 @@ function call(
   overrides: Partial<ComputerCall> & { command?: string; cwd?: string } = {},
 ): ComputerCall {
   const { command, cwd, ...rest } = overrides;
+  const tool = rest.tool ?? 'user_computer_shell';
   return {
     callId: 'a'.repeat(64),
     stepId: 'step-1',
-    tool: 'user_computer_shell',
+    tool,
     params: { command: command ?? 'echo hi', ...(cwd !== undefined ? { cwd } : {}) },
     deadlineAt: Date.now() + 60_000,
-    ownComputerGrant: { proposalId: 'grant-1', key: command ?? 'echo hi' },
+    ...(tool.startsWith('user_computer_')
+      ? { ownComputerGrant: { proposalId: 'grant-1', key: command ?? 'echo hi' } }
+      : { computerGrant: 'desktop' as const }),
     ...rest,
   };
 }

@@ -40,6 +40,8 @@ import {
 
 export const NO_COMPUTER_PROVIDER_MESSAGE = 'This machine has no computer provider';
 export const NO_COMPUTER_SCOPE_MESSAGE = 'The call names no computer';
+export const NO_COMPUTER_GRANT_MESSAGE =
+  'The server did not stamp a computer grant on this call, so it was not run; update the Cairn server';
 export const NO_OWNER_GRANT_MESSAGE =
   'The owner did not approve this call on their Mac, so it was not run; update the Cairn server';
 export const NO_VM_COMPUTER_MESSAGE =
@@ -136,6 +138,12 @@ function ownerGrantMissing(call: ComputerCall): boolean {
     return false;
   const key = ownComputerGrantKey(call.tool, call.params);
   return key === null || call.ownComputerGrant?.key !== key;
+}
+
+function orbGrantNeeded(call: ComputerCall): 'browser' | 'desktop' | null {
+  if (BROWSER_TOOLS.has(call.tool)) return 'browser';
+  if (call.tool === 'install_packages' || ORB_TOOLS.has(call.tool)) return 'desktop';
+  return null;
 }
 
 function lastLines(text: string, count: number): string {
@@ -626,6 +634,11 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
     if (ownerGrantMissing(call)) {
       await refuse(call, NO_OWNER_GRANT_MESSAGE);
+      return;
+    }
+    const grant = orbGrantNeeded(call);
+    if (grant !== null && call.computerGrant !== grant) {
+      await refuse(call, NO_COMPUTER_GRANT_MESSAGE);
       return;
     }
     if (call.tool === 'install_packages') {

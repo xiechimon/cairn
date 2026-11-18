@@ -1013,6 +1013,7 @@ async function holdPackageInstall(
     tool: 'install_packages',
     params: { packages },
     deadlineAt,
+    computerGrant: 'desktop',
     ...(target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
   };
   if (!deps.machineHub.pushComputer(target.machineId, call)) {
@@ -1460,7 +1461,9 @@ export async function forwardComputerCall(
     ...(browserTool
       ? { tabScope: browserTabScope(stepRow), browserScope: browserScopeFor(thread) }
       : {}),
-    ...(own === null ? {} : { ownComputerGrant: own.stamp }),
+    ...(own === null
+      ? { computerGrant: browserTool ? ('browser' as const) : ('desktop' as const) }
+      : { ownComputerGrant: own.stamp }),
   };
   try {
     if (browserRows.length > 0)

@@ -371,6 +371,34 @@ describe('forwardComputerCall target and presence', () => {
     ).toBeUndefined();
   });
 
+  test.each([
+    ['shell', 'desktop'],
+    ['list_files', 'desktop'],
+    ['read_file', 'desktop'],
+    ['write_file', 'desktop'],
+    ['computer_observe', 'desktop'],
+    ['computer_act', 'desktop'],
+    ['desktop_snapshot', 'desktop'],
+    ['desktop_act', 'desktop'],
+    ['browser_navigate', 'browser'],
+    ['browser_snapshot', 'browser'],
+    ['browser_act', 'browser'],
+  ] as const)('a granted %s call reaches the daemon stamped %s', async (name, grant) => {
+    const { s, deps } = boot();
+    addMachine(s, 'omarchy', { computer: true, browser: true });
+    const calls = connect(s, 'omarchy');
+    const pending = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name,
+      toolCallId: `stamp-${name}`,
+      params: name === 'browser_navigate' ? { url: 'https://example.com' } : {},
+    });
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({ tool: name, computerGrant: grant });
+    receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1, 'ok')]);
+    await pending;
+  });
+
   test('browser tools refuse before creating a starting computer when browser is off', async () => {
     const { s, deps } = boot();
     addMachine(s, 'omarchy', { computer: true });

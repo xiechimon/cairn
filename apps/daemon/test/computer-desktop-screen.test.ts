@@ -73,6 +73,7 @@ function call(tool: ComputerTool, params: Record<string, unknown>, scopeKey = 'c
     tool,
     params,
     scopeKey,
+    computerGrant: 'desktop',
     deadlineAt: Date.now() + 60_000,
   } satisfies ComputerCall;
 }

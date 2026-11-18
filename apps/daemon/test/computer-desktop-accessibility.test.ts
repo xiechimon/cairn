@@ -111,6 +111,7 @@ function setup(script: Script = () => undefined) {
       tool,
       params,
       scopeKey: 'chief:c1',
+      computerGrant: 'desktop',
       deadlineAt: Date.now() + 60_000,
     } satisfies ComputerCall);
     return fake.frames.find((frame) => frame.kind === 'done' || frame.kind === 'error');
