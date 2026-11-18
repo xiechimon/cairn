@@ -32,6 +32,7 @@ import {
   chiefMessage,
   chiefThread,
   machine,
+  notification,
   project,
   schedule,
   todo,
@@ -1075,14 +1076,23 @@ export async function executeChiefTool(
         const existing = db.select().from(chiefMessage).where(eq(chiefMessage.id, noticeId)).get();
         if (existing !== undefined) {
           deps.convHub?.publishMessage(ctx.threadId, existing);
-          notifyChiefMessage(
-            { db, hub: deps.hub, user: deps.user },
-            {
-              threadId: ctx.threadId,
-              message: text,
-              agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
-            },
-          );
+          const notificationId = `${deps.user.id}:${ctx.threadId}`;
+          const announced =
+            db
+              .select({ id: notification.id })
+              .from(notification)
+              .where(eq(notification.id, notificationId))
+              .get() !== undefined;
+          if (!announced) {
+            notifyChiefMessage(
+              { db, hub: deps.hub, user: deps.user },
+              {
+                threadId: ctx.threadId,
+                message: text,
+                agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+              },
+            );
+          }
         }
         return json({ notified: true, duplicate: true });
       }
