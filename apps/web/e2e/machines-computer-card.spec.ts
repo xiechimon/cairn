@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { relativeTime } from '../src/board/rel-time.js';
 import { HISTORY, mockLive } from './chief-home-mock';
 
 const SHOTS = process.env.D75_SHOTS;
@@ -112,6 +113,7 @@ test('an idle computer shows only its name, and the Coordinator using it links t
 });
 
 test('an offline machine shows only its header and no activity line', async ({ page }) => {
+  const lastSeenAt = minutesAgo(120);
   const panel = await open(
     page,
     {
@@ -122,9 +124,11 @@ test('an offline machine shows only its header and no activity line', async ({ p
         }),
       ],
     },
-    [{ ...FEED_MACHINE, online: false, lastSeenAt: minutesAgo(120) }],
+    [{ ...FEED_MACHINE, online: false, lastSeenAt }],
   );
-  await expect(panel.getByTestId('machine-list-row')).toContainText('离线 · 2 小时前');
+  await expect(panel.getByTestId('machine-list-row')).toContainText(
+    `离线 · ${relativeTime(lastSeenAt, Date.now())}`,
+  );
   await expect(panel.getByTestId('machine-line')).toHaveAttribute(
     'title',
     '在这台电脑上打开 Cairn，它就会上线',
