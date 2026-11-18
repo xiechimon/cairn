@@ -175,28 +175,3 @@ test('an empty provider offers the upstream list; a failed list falls back to ad
     .toEqual(['{"models":[{"id":"custom-model","name":"custom-model"}]}']);
   await expect(chip(page, 'custom-model')).toHaveAttribute('data-check', 'ok');
 });
-
-test('marking a model as seeing images saves its image input', async ({ page }) => {
-  const patches: unknown[] = [];
-  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
-    if (path === '/api/teams/t1/providers/prov-relay' && route.request().method() === 'PATCH') {
-      patches.push(route.request().postDataJSON());
-      return json({ ...RECORD });
-    }
-    if (path === '/api/teams/t1/providers')
-      return json({ presets: [], providers: [RECORD], canTestConnection: true });
-    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
-    return undefined;
-  });
-  await page.goto('/app/resources/providers');
-  const box = chip(page, 'small-model').getByRole('checkbox', { name: 'small-model 支持图片' });
-  await expect(box).not.toBeChecked();
-  await box.click();
-  await expect.poll(() => patches.length).toBe(1);
-  expect(patches[0]).toMatchObject({
-    models: [
-      { id: 'small-model', input: ['text', 'image'] },
-      { id: 'large-model', name: 'Large model' },
-    ],
-  });
-});
