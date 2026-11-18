@@ -7,7 +7,7 @@ description: Behavior verification for cairn - spin up an isolated live stack (s
 
 cairn = a React/vite web + Hono REST/SSE/SQLite server. This skill spins up an **isolated instance** (own ports, own data root; never the real `~/.cairn` or the live dev stacks on 8787/5173), walks real user journeys with the repo's Playwright chromium, produces evidence, then cleans up. Scripts live under `scripts/`; runtime state and evidence live under `.claude/` (gitignored).
 
-Surfaces: the web UI (`apps/web`, vite dev proxying `/api` and `/git` to the server) and the HTTP API (`apps/server`). The daemon is optional. The seeded owner is auto-logged-in. Live mode = a URL **without** `?scenario=` (`?scenario=` is the e2e fixture face). Observe through screenshots (1440x732), API JSON (`/api/auth/session`, `/api/todos`, `/api/teams`), read-only SQLite (`<CAIRN_HOME>/server/server.db`) and the server and web logs.
+Surfaces: the web UI (`apps/web`, vite dev proxying `/api` and `/git` to the server) and the HTTP API (`apps/server`). The daemon is optional. The seeded owner is auto-logged-in. Live mode = a URL **without** `?scenario=` (`?scenario=` is the e2e fixture face). Observe through screenshots (1440x732), API JSON (`/api/user/me`, `/api/todos`, `/api/teams`), read-only SQLite (`<CAIRN_HOME>/server/server.db`) and the server and web logs.
 
 Start from the feature map [feature-map.md](feature-map.md) (generated from `feature-map.json`): per feature, its states, reach steps from a fresh page load, routes, settings path, shortcuts and test ids. Match a report or screenshot to a feature, follow its reach steps, then drive the recipe it links under `features/`.
 
@@ -64,7 +64,7 @@ node .claude/skills/verify-cairn/scripts/launch.mjs
 - It starts the server (`pnpm exec tsx src/index.ts`, no watch) and vite dev (`--strictPort`) through `scripts/owned-process.mjs`. Stopping the task, ending the session, `vp.mjs cleanup`, or either process exiting takes the whole stack down.
 - **Every launch clears the run directory, so every launch has a fresh DB** (first boot seeds one owner; no login needed).
 - **Run `cleanup.mjs` before re-launching.** Launch refuses when ports are taken or a recorded stack is still alive; if an old stack still holds the ports, probes drive the old stack's DB and "fresh DB" assertions silently mix in the previous round.
-- Readiness: `GET /api/auth/session` 200 and `GET /app` 200; on timeout it prints both log tails and stops its own processes.
+- Readiness: `GET /api/user/me` 200 and `GET /app` 200; on timeout it prints both log tails and stops its own processes.
 - Runtime state in `VERIFY_RUN_DIR`: `server.pid`, `web.pid`, `server.log`, `web.log`, `ports.json` (includes `supervisorPid`).
 - Read logs with the Read tool, not Bash `tail` (not re-checked: a hook may block Bash commands that reference `*.log`).
 
@@ -74,7 +74,7 @@ node .claude/skills/verify-cairn/scripts/launch.mjs
 node .claude/skills/verify-cairn/scripts/doctor.mjs   # read-only
 ```
 
-Checks that the server and vite process groups are alive and that `/api/auth/session` (named owner), `/api/teams`, `/api/projects` and web `/app` answer 200. Any FAIL exits 1; with no stack it says to launch first.
+Checks that the server and vite process groups are alive and that `/api/user/me` (named owner), `/api/teams`, `/api/projects` and web `/app` answer 200. Any FAIL exits 1; with no stack it says to launch first.
 
 ## Drive
 

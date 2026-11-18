@@ -53,12 +53,12 @@ const getJson = async (url) => {
 };
 
 try {
-  const session = await getJson(`${API}/api/auth/session`);
+  const session = await getJson(`${API}/api/user/me`);
   check(
     session.status === 200 &&
       typeof session.body?.displayName === 'string' &&
       session.body.displayName.trim().length > 0,
-    'GET /api/auth/session returns a named owner',
+    'GET /api/user/me returns a named owner',
     `status=${session.status} displayName=${session.body?.displayName}`,
   );
 
