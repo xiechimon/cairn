@@ -41,22 +41,22 @@ test('the Personal detail reads status, last use, steps and each quota window in
   await expect(detail).not.toContainText('—');
 });
 
-test('the Devin subscription lists its Runner models and shows no quota section', async ({
+test('the Devin subscription lists its catalog models and shows no quota section', async ({
   page,
 }) => {
   await page.goto(URL);
   const row = page.locator('[data-instance-id="subscription:sub-devin"]');
-  await expect(row).toContainText('订阅 · 3 个模型 · 可用');
+  await expect(row).toContainText('订阅 · 5 个模型 · 可用');
   await row.click();
   const detail = page.getByTestId('subscription-detail');
-  await expect(detail.getByTestId('subscription-model')).toHaveCount(3);
-  await expect(detail.getByTestId('subscription-model').first()).toContainText('SWE-2');
-  await expect(detail.getByTestId('subscription-model').first()).toContainText('swe-2-high');
+  await expect(detail.getByTestId('subscription-picked-model')).toHaveCount(5);
+  await expect(detail.getByTestId('subscription-picked-model').first()).toContainText('SWE-2');
+  await expect(detail.getByTestId('subscription-picked-model').first()).toContainText('swe-2-high');
   await expect(detail).not.toContainText('额度');
   await expect(detail).not.toContainText('—');
 });
 
-test('subscriptions whose Runner reports nothing read 0 models with the warn tone', async ({
+test('subscriptions whose Runner reports nothing: Claude reads 0 models and warns, the Devin catalog still shows', async ({
   page,
 }) => {
   await page.goto('/app/settings/routing?scenario=model-routing-no-runner');
@@ -67,9 +67,10 @@ test('subscriptions whose Runner reports nothing read 0 models with the warn ton
   const detail = page.getByTestId('subscription-detail');
   await expect(detail).toContainText('还没有执行机上报 Claude Code 模型');
   const devin = page.locator('[data-instance-id="subscription:sub-devin"]');
-  await expect(devin).toContainText('订阅 · 0 个模型 · 可用');
+  await expect(devin).toContainText('订阅 · 5 个模型 · 可用');
+  await expect(devin).toHaveAttribute('data-tone', 'ok');
   await devin.click();
-  await expect(detail).toContainText('还没有执行机上报 Devin 模型');
+  await expect(detail.getByTestId('subscription-picked-model')).toHaveCount(5);
 });
 
 test('an account nobody has used says so once, and still has a quota line of its own', async ({
