@@ -36,7 +36,7 @@ describe('isDesktopNotifyPayload', () => {
   test('rejects unknown sound names', () => {
     expect(isDesktopNotifyPayload({ ...payload, sound: 'Basso' })).toBe(false);
     expect(isDesktopNotifyPayload({ ...payload, sound: '' })).toBe(false);
-    for (const sound of ['system', 'Glass', 'Ping', 'Pop', 'none']) {
+    for (const sound of ['system', 'Glass', 'Ping', 'Pop', 'Purr', 'none']) {
       expect(isDesktopNotifyPayload({ ...payload, sound })).toBe(true);
     }
   });

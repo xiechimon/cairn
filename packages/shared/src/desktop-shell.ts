@@ -28,7 +28,7 @@ export function isAppPath(path: unknown): path is string {
   return typeof path === 'string' && /^\/app(?:[/?]|$)/.test(path);
 }
 
-export const DESKTOP_NOTIFY_SOUNDS = ['system', 'Glass', 'Ping', 'Pop', 'none'] as const;
+export const DESKTOP_NOTIFY_SOUNDS = ['system', 'Glass', 'Ping', 'Pop', 'Purr', 'none'] as const;
 
 export type DesktopNotifySound = (typeof DESKTOP_NOTIFY_SOUNDS)[number];
 
@@ -60,6 +60,7 @@ export const DESKTOP_NOTIFY_SOUND_FILES: Partial<Record<DesktopNotifySound, stri
   Glass: 'Glass.aiff',
   Ping: 'Ping.aiff',
   Pop: 'Pop.aiff',
+  Purr: 'Purr.aiff',
 };
 
 export interface DesktopNotificationOptions {
