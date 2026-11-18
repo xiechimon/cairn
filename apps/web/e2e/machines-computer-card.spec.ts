@@ -407,6 +407,10 @@ test.describe('on a touch phone', () => {
   test('with no hover the bar stays shown and Shrink is a 44px touch target', async ({ page }) => {
     const feed: Feed = { computers: [computer()], controlCalls: [] };
     await open(page, feed, [SCREEN_MACHINE], '/app?pane=machines&machine=m1&screen=1');
+    await expect(page.getByTestId('machine-screen-enlarged')).toBeVisible();
+    await page.mouse.move(195, 400);
+    await page.waitForTimeout(400);
+    expect(feed.controlCalls).toEqual([]);
     const bar = page.getByTestId('machine-screen-bar');
     await expect(bar).toBeVisible();
     await expect.poll(() => bar.evaluate((element) => getComputedStyle(element).opacity)).toBe('1');

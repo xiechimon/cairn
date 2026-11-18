@@ -110,6 +110,12 @@ function leaveUnlessDraggingInside(event: ReactPointerEvent<HTMLElement>, leave:
   );
 }
 
+const NO_HOVER_QUERY = '(hover: none)';
+
+function hoversWithMouse(event: ReactPointerEvent<HTMLElement>): boolean {
+  return event.pointerType !== 'touch' && !window.matchMedia(NO_HOVER_QUERY).matches;
+}
+
 export function useScreenHoverControl(control: ComputerControl, loginPending = false): ScreenHover {
   const [wanted, setWanted] = useState(false);
   const login = useRef(loginPending);
@@ -125,10 +131,10 @@ export function useScreenHoverControl(control: ComputerControl, loginPending = f
     leave: intent.leave,
     pointer: {
       onPointerEnter: (event) => {
-        if (event.pointerType !== 'touch') intent.enter();
+        if (hoversWithMouse(event)) intent.enter();
       },
       onPointerMove: (event) => {
-        if (event.pointerType !== 'touch') intent.enter();
+        if (hoversWithMouse(event)) intent.enter();
       },
       onPointerLeave: (event) => {
         if (event.pointerType !== 'touch') leaveUnlessDraggingInside(event, intent.leave);
