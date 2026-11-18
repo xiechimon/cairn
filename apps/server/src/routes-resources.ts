@@ -308,7 +308,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, row.teamId);
     const body = parseWith(patchMachineBodySchema, await jsonBody(c), 'body');
     if (body.browserOverride !== undefined || body.desktopOverride !== undefined) {
-      if (!c.get('ownerIdentity')) throw new HttpError(403, 'owner session required');
+      if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
       if (
         (body.browserOverride === true && row.capabilities?.browser !== true) ||
         (body.desktopOverride === true && row.capabilities?.computer !== true)
@@ -317,7 +317,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       }
     }
     if (body.isDefault === true) {
-      if (!c.get('ownerIdentity')) throw new HttpError(403, 'owner session required');
+      if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
       if (row.tokenHash === null) throw new HttpError(409, 'machine is not enrolled');
     }
     if (body.enabledRuntimes !== undefined) {

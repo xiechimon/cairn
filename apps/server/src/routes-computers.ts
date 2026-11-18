@@ -50,7 +50,7 @@ export function registerComputerRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.post('/api/computers', async (c) => {
-    if (!c.get('ownerIdentity')) throw new HttpError(403, 'owner session required');
+    requireOwnerSession(c);
     const body = parseWith(computerEnsureBodySchema, await c.req.json(), 'body');
     const result = ensureComputerBrowserEnabled(
       ctx.db,
@@ -69,7 +69,7 @@ export function registerComputerRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.patch('/api/computers/:id', async (c) => {
-    if (!c.get('ownerIdentity')) throw new HttpError(403, 'owner session required');
+    requireOwnerSession(c);
     const id = c.req.param('id');
     const body = parseWith(computerPatchBodySchema, await c.req.json(), 'body');
     const computer = setComputerBrowserEnabled(

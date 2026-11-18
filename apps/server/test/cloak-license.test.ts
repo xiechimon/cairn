@@ -286,7 +286,7 @@ describe('request_cloak_license holds the turn until the owner saves', () => {
   });
 });
 
-describe('request_cloak_license is offered only with a VM computer', () => {
+describe('request_cloak_license is offered with a VM computer or a browser-usable VM', () => {
   const names = (vmComputer: boolean) => coordinatorToolDefs({ vmComputer }).map((def) => def.name);
 
   test('the tool list carries it only when asked', () => {
@@ -354,9 +354,9 @@ describe('request_cloak_license is offered only with a VM computer', () => {
   });
 
   test('the license tool is offered for a browser-usable VM even with the desktop grant off', () => {
-    expect(
-      coordinatorToolDefs({ vmBrowser: true }).map((def) => def.name),
-    ).toContain(REQUEST_CLOAK_LICENSE_TOOL);
+    expect(coordinatorToolDefs({ vmBrowser: true }).map((def) => def.name)).toContain(
+      REQUEST_CLOAK_LICENSE_TOOL,
+    );
     const names = coordinatorToolDefs({ vmBrowser: true }).map((def) => def.name);
     expect(names).not.toContain('shell');
     expect(names).not.toContain('install_packages');

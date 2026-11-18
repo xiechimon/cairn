@@ -120,6 +120,44 @@ test.each(['device', 'agent'] as const)(
   },
 );
 
+test('grant patches work on an auth-off server without a session cookie', async () => {
+  s = bootServer({ githubFetch: async () => new Response('[]') });
+  s.db
+    .insert(machine)
+    .values({
+      id: 'grant-machine',
+      name: 'orb',
+      teamId: s.team.id,
+      tokenHash: 'synthetic',
+      capabilities: { mcpServers: [], skills: [], computer: true, browser: true },
+    })
+    .run();
+  const call = (path: string, body: unknown) =>
+    s.app.request(path, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
+      body: JSON.stringify(body),
+    });
+  expect(
+    (
+      await s.app.request('/api/computers', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
+        body: JSON.stringify({ machineId: 'grant-machine', browserEnabled: true }),
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await call('/api/machines/grant-machine', {
+        browserOverride: false,
+        desktopOverride: false,
+      })
+    ).status,
+  ).toBe(200);
+  expect((await call('/api/machines/grant-machine', { isDefault: true })).status).toBe(200);
+});
+
 test('compatibility writes mirror the machine grant and cannot undo explicit off', async () => {
   boot();
   const response = await call(

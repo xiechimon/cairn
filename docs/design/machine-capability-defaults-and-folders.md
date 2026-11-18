@@ -28,10 +28,11 @@ These are separate mechanisms, not one switch.
 
 ## Tool surface
 
-`coordinatorToolDefs(options)` is the single definition. `COMPUTER_REMOTE_TOOLS` (browser + `request_takeover`) is always offered; `COMPUTER_DESKTOP_TOOLS` needs `desktopTools`, `COMPUTER_VM_TOOLS` needs `vmComputer`, `OWN_COMPUTER_TOOLS` needs `ownComputer`. Both chief-turn constructors compute the same three options:
+`coordinatorToolDefs(options)` is the single definition. `COMPUTER_REMOTE_TOOLS` (browser + `request_takeover`) is always offered; `COMPUTER_DESKTOP_TOOLS` needs `desktopTools`, `COMPUTER_VM_TOOLS` needs `vmComputer`, `request_cloak_license` alone is offered when `vmBrowser` holds but `vmComputer` does not, `OWN_COMPUTER_TOOLS` needs `ownComputer`. Both chief-turn constructors compute the same options:
 
-- In-server turn (`apps/server/src/coordinator/index.ts`, `claimedPayload`) and Runner claim (`apps/server/src/services/machine-claim.ts`, `chiefClaimPayload`): `desktopTools: teamOffersDesktop(db, teamId)`, `vmComputer: teamHasVmComputer(db, teamId)`, `ownComputer: ownComputerOffered(db, threadId, stepId)`.
+- In-server turn (`apps/server/src/coordinator/index.ts`, `claimedPayload`) and Runner claim (`apps/server/src/services/machine-claim.ts`, `chiefClaimPayload`): `desktopTools: teamOffersDesktop(db, teamId)`, `vmComputer: teamHasVmComputer(db, teamId)`, `vmBrowser: teamHasVmBrowser(db, teamId)`, `ownComputer: ownComputerOffered(db, threadId, stepId)`.
 - `teamHasVmComputer` means a machine reports `capabilities.computer === true` and `capabilities.computerKind === 'vm'` and has not `desktopOverride === false`, so the VM tools are offered exactly when their calls can run.
+- `teamHasVmBrowser` means a VM-kind machine keeps `capabilities.computer === true` and `capabilities.browser === true` with `browserOverride !== false`: stealth browser calls can still need a CloakBrowser license there, so the license card stays offered even when the desktop grant is off.
 - `chiefRemoteTools` in `routing-rules.ts` keeps the bare `coordinatorToolDefs()` list on purpose: it feeds `toolDefHashes`, which must name every tool a thread could ever see, not the subset of this turn.
 
 Mail turns and memory-edit turns are locked and keep their own tool sets unchanged.
@@ -43,7 +44,7 @@ Server side, before any dispatch:
 - `selectTarget` filters the fleet by `capabilities.computer === true` and the connected machines by `machineAcceptsTool(row, tool)` (browser tools read the browser grant, everything else the desktop grant), then `assertMachineGrant` rejects 403 on explicit off or missing capability.
 - `forwardComputerCall` rejects `computer_manage` and `browser_close_tab` (panel- and server-owned), gates `user_computer_*` through `ownComputerGate`, routes `request_takeover` and `install_packages` to their hold loops, and applies the browser-secret and license extras. Every call that reaches `pushComputer` for a scope computer is stamped `computerGrant`; `holdPackageInstall` stamps `desktop` on the approved install call.
 - `manageComputer` and `closeInfoCardTab` push `computer_manage` and `browser_close_tab` without a stamp: owner lifecycle and server-initiated cleanup are not grant decisions. Revoking the desktop grant must not strand the VM so it cannot be stopped or deleted.
-- `POST /api/machines/:id` writes the grants owner-session-only; `browserOverride`/`desktopOverride: true` returns 409 without the matching capability and writes nothing. Paired devices and agent credentials cannot write.
+- `PATCH /api/machines/:id` writes the grants owner-session-only; `browserOverride`/`desktopOverride: true` returns 409 without the matching capability and writes nothing. Paired devices and agent credentials cannot write.
 - `GET /api/computers` runs `ensureCoordinatorComputer`, materializing the Coordinator computer row on a capable, granted, connected machine — this is what makes default-on visible in the Computers panel.
 
 Daemon side, `handle()` in `apps/daemon/src/computer/dispatch.ts`:
