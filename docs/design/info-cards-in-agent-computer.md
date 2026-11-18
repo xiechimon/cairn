@@ -93,3 +93,19 @@ Deleted in the same change: the daemon's info-build branch (`isInfoBuild`, `read
 2. **Info cards in a code project.** When the card's project has a repo, a read-only snapshot of the default branch (`git archive`) is copied into the VM task dir at start. There is no second host path.
 3. **No computer anywhere in the team** (macOS < 26, Intel Mac, Windows, VM not installed or not running). The card waits and the UI says why. There is no fallback to a host harness.
 4. **Shared VM.** Info cards share the one VM and its signed-in browser with the Coordinator: one tab per card, the existing input fence, owner priority. No second VM.
+
+## Repository snapshot for a local-repo project (decision 2, local case)
+
+A project with `repoKind: 'local'` keeps its code on one Runner's disk (`localPath`); the server cannot read it. The snapshot still reaches the VM task dir through the one seeding path in `seedRepoSnapshot` (`apps/server/src/services/info-card-tools.ts`): `infoRepoSnapshot` returns `{ tarGz }` or `{ reason }`, and the same chunked `write_file` plus `tar xz` unpack runs. Only the source of the bytes differs by repo kind: hosted reads the bare repo, GitHub fetches the tarball, local asks the Runner.
+
+**Flow.**
+
+1. `infoRepoOffered` is true for a local project with a `localPath`. The Runner that holds the code is the project route's `machineId` (`profileForStep`), the same machine the dispatcher pins local-project steps to. No pinned machine, or one that is offline, writes `repo-snapshot-failed.txt` with the reason; the card still runs.
+2. The server rejects a `baseBranch` that starts with `-`, then registers a pending request keyed by the info step id and pushes a `repo.archive` event (`stepId`, `directory = localPath`, `ref = baseBranch ?? 'HEAD'`, `maxBytes = INFO_SNAPSHOT_MAX_BYTES`) on that Runner's stream, next to `sync` and `computer`.
+3. The Runner (`apps/daemon/src/repo-archive.ts`) re-checks the ref (no leading `-`), runs `git rev-parse --verify --end-of-options <ref>^{commit}` and `git archive --format=tar.gz` into a temp file with the same timeout, and rejects an archive over `maxBytes`.
+4. The Runner returns the bytes over the existing step upload channel: `POST /api/machine/upload-urls/:stepId` then `PUT /api/machine/upload/:uploadId`, as the plan and session files do. The upload body is the base64 of the archive under the file name `repo-archive.b64`; a failure is a text body under `repo-archive-failed.txt`. The upload-urls call accepts these two names for an info step (which no Runner owns) only while a pending request names that Runner and step; any other name still needs `ownedStep`.
+5. The PUT settles the pending request: the server decodes the archive, enforces `INFO_SNAPSHOT_MAX_BYTES` again, and `seedRepoSnapshot` writes it into the VM task dir. A Runner that answers nothing within 90 s, or a stopped step, settles the request with a reason.
+
+**Failure behavior.** Offline Runner, missing path, not a git repo, unknown ref, oversized archive, timeout: each becomes a reason in `repo-snapshot-failed.txt`; none fails the card. The snapshot is the committed tree of the ref, so uncommitted edits in the owner's checkout are not included. With no `baseBranch` the ref is `HEAD` of the checkout.
+
+**Who reads or writes what.** Runner: reads the repo, writes a temp archive it deletes, uploads once. Server: holds the bytes in memory for the seeding call, writes nothing to disk. VM: receives the files read-only under `repo/`, as for the other repo kinds. A second request for the same step while one is pending is refused.

@@ -30,6 +30,8 @@ import {
   machineUploadUrlsBodySchema,
   normalizeEnrollCode,
   PLAN_FILE_NAME,
+  REPO_ARCHIVE_FAILED_FILE_NAME,
+  REPO_ARCHIVE_FILE_NAME,
   SESSION_FILE_NAME,
   transcriptUploadSchema,
 } from '@cairn/shared';
@@ -50,6 +52,7 @@ import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
+import { receiveRepoArchive, receiveRepoArchiveFailure } from './services/machine-repo-archive.js';
 import {
   createUploadUrls,
   getStepSession,
@@ -661,6 +664,20 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         () => c.req.text(),
         (_row, body) => {
           receivePlanUpload(deps, upload, body);
+          return completeUpload();
+        },
+      );
+    }
+    if (upload.name === REPO_ARCHIVE_FILE_NAME || upload.name === REPO_ARCHIVE_FAILED_FILE_NAME) {
+      return executeMachineCommand(
+        c,
+        () => c.req.text(),
+        (_row, body) => {
+          if (upload.name === REPO_ARCHIVE_FILE_NAME) {
+            receiveRepoArchive(upload.machineId, upload.stepId, body);
+          } else {
+            receiveRepoArchiveFailure(upload.machineId, upload.stepId, body);
+          }
           return completeUpload();
         },
       );

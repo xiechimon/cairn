@@ -1,19 +1,23 @@
-import type { todo } from '../db/schema.js';
+import type { step, todo } from '../db/schema.js';
 import { runGit } from '../lib/git.js';
 import { githubRepoOfProject, projectOfTodo, repoDirFor } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import type { MachineDeps } from './machine-deps.js';
+import { requestRepoArchive } from './machine-repo-archive.js';
+import { profileForStep } from './routing-rules.js';
 
 export const INFO_SNAPSHOT_MAX_BYTES = 6 * 1024 * 1024;
 const SNAPSHOT_TIMEOUT_MS = 60_000;
 
 type TodoRow = typeof todo.$inferSelect;
+type StepRow = typeof step.$inferSelect;
 
 export function infoRepoOffered(deps: Pick<MachineDeps, 'db'>, todoRow: TodoRow): boolean {
   const project = projectOfTodo(deps.db, todoRow);
   return (
     project !== undefined &&
     ((project.repoKind === 'hosted' && project.repoName !== null) ||
+      (project.repoKind === 'local' && project.localPath !== null) ||
       githubRepoOfProject(project) !== null)
   );
 }
@@ -21,9 +25,28 @@ export function infoRepoOffered(deps: Pick<MachineDeps, 'db'>, todoRow: TodoRow)
 export async function infoRepoSnapshot(
   deps: MachineDeps,
   todoRow: TodoRow,
+  stepRow: StepRow,
+  signal: AbortSignal | undefined,
 ): Promise<{ tarGz: Buffer } | { reason: string } | null> {
   const project = projectOfTodo(deps.db, todoRow);
   if (project === undefined) return null;
+  if (project.repoKind === 'local' && project.localPath !== null) {
+    const ref = project.baseBranch ?? 'HEAD';
+    if (ref.startsWith('-')) return { reason: 'the default branch name is not valid' };
+    const holder = profileForStep(deps.db, todoRow, stepRow.kind, stepRow.id)?.machineId ?? null;
+    if (holder === null) return { reason: 'no Runner is set for this project' };
+    return requestRepoArchive(
+      deps,
+      holder,
+      {
+        stepId: stepRow.id,
+        directory: project.localPath,
+        ref,
+        maxBytes: INFO_SNAPSHOT_MAX_BYTES,
+      },
+      signal,
+    );
+  }
   if (project.repoKind === 'hosted' && project.repoName !== null) {
     if (deps.reposDir === undefined) return { reason: 'hosted repositories are not configured' };
     const dir = repoDirFor(deps.reposDir, project.teamId, project.repoName);

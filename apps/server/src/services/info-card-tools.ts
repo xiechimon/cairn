@@ -136,7 +136,7 @@ async function seedRepoSnapshot(
     );
   let snapshot: Awaited<ReturnType<typeof infoRepoSnapshot>>;
   try {
-    snapshot = await infoRepoSnapshot(deps, todoRow);
+    snapshot = await infoRepoSnapshot(deps, todoRow, row, signal);
   } catch (error) {
     await failed(error instanceof Error ? error.message : String(error));
     return;

@@ -69,6 +69,7 @@ import { createOrbProvider } from './orb/select.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
+import { performRepoArchive } from './repo-archive.js';
 import {
   ensureStateDirs,
   loadDevinModels,
@@ -921,6 +922,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'steer') void deliverSteer(ev.stepId);
             if (ev.type === 'stop') void deliverStop(ev.stepId);
             if (ev.type === 'sync') void deliverSync(ev.sync);
+            if (ev.type === 'repo.archive') {
+              void performRepoArchive({ client, logger }, ev.archive);
+            }
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
             if (ev.type === 'computer.cancel') computerDispatcher.cancel(ev.callId);
             if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);

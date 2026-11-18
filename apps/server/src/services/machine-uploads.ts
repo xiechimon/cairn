@@ -1,11 +1,17 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { SESSION_JSONL_MAX_BYTES, type TranscriptUpload } from '@cairn/shared';
+import {
+  REPO_ARCHIVE_FAILED_FILE_NAME,
+  REPO_ARCHIVE_FILE_NAME,
+  SESSION_JSONL_MAX_BYTES,
+  type TranscriptUpload,
+} from '@cairn/shared';
 import { desc, eq } from 'drizzle-orm';
 import { build, plan as planTable, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
+import { authorizeRepoArchiveUpload } from './machine-repo-archive.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -29,7 +35,15 @@ export function createUploadUrls(
   origin: string,
   uploads: Map<string, PendingUpload>,
 ): { uploads: { name: string; url: string; method: 'PUT'; headers: Record<string, string> }[] } {
-  ownedStep(deps, machineId, stepId);
+  const archiveNames = [REPO_ARCHIVE_FILE_NAME, REPO_ARCHIVE_FAILED_FILE_NAME];
+  if (files.some((f) => archiveNames.includes(f.name))) {
+    if (!files.every((f) => archiveNames.includes(f.name))) {
+      throw new HttpError(400, 'repository snapshot uploads cannot be mixed with other files');
+    }
+    authorizeRepoArchiveUpload(machineId, stepId);
+  } else {
+    ownedStep(deps, machineId, stepId);
+  }
   const out = files.map((f) => {
     const uploadId = newRecordId();
     uploads.set(uploadId, { stepId, name: f.name, machineId });

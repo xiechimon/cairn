@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type {
   ComputerCall,
   ComputerScreenRequest,
+  MachineRepoArchiveCommand,
   MachineStreamEvent,
   MachineSyncCommand,
 } from '@cairn/shared';
@@ -209,6 +210,17 @@ export class MachineWakeHub {
     if (!entry) return false;
     try {
       entry.send({ type: 'sync', sync: cmd });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  pushRepoArchive(machineId: string, cmd: MachineRepoArchiveCommand): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send({ type: 'repo.archive', archive: cmd });
       return true;
     } catch {
       return false;

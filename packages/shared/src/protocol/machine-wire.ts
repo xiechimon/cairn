@@ -286,6 +286,17 @@ export const machineSyncCommandSchema = z.object({
 });
 export type MachineSyncCommand = z.infer<typeof machineSyncCommandSchema>;
 
+export const REPO_ARCHIVE_FILE_NAME = 'repo-archive.b64';
+export const REPO_ARCHIVE_FAILED_FILE_NAME = 'repo-archive-failed.txt';
+
+export const machineRepoArchiveCommandSchema = z.object({
+  stepId: recordId,
+  directory: z.string().min(1),
+  ref: z.string().min(1),
+  maxBytes: z.number().int().positive(),
+});
+export type MachineRepoArchiveCommand = z.infer<typeof machineRepoArchiveCommandSchema>;
+
 export const machineSyncResultBodySchema = z.object({
   status: z.enum(['running', 'synced', 'failed']),
   errorMessage: z.string().optional(),
@@ -301,6 +312,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('steer'), stepId: recordId }),
   z.object({ type: z.literal('stop'), stepId: recordId }),
   z.object({ type: z.literal('sync'), sync: machineSyncCommandSchema }),
+  z.object({ type: z.literal('repo.archive'), archive: machineRepoArchiveCommandSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.cancel'), callId: computerCallIdSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),

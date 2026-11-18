@@ -1,15 +1,21 @@
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type ClaudeCodeReport,
   type ComputerCall,
   infoTaskDir,
   type MachineCapabilities,
+  machineEnrollResponseSchema,
+  machineUploadUrlsResponseSchema,
 } from '@cairn/shared';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import type { MachineApi } from '../../daemon/src/machine-client.js';
+import { performRepoArchive } from '../../daemon/src/repo-archive.js';
 import { startCoordinator } from '../src/coordinator/index.js';
 import { attachment, build, message, step, todo } from '../src/db/schema.js';
 import {
@@ -25,6 +31,7 @@ import {
   bootServer,
   insertClaudeSubscription,
   insertMachine,
+  issueApiKey,
   req,
   seedRoute,
   type TestServer,
@@ -47,8 +54,14 @@ afterEach(async () => {
   setCoordinatorServerContextEnabled(false);
 });
 
-async function infoCard(s: TestServer): Promise<{ todoId: string; buildId: string }> {
-  const project = await req(s.app, 'POST', '/api/projects', { name: 'info-computer' });
+async function infoCard(
+  s: TestServer,
+  projectBody: Record<string, unknown> = {},
+): Promise<{ todoId: string; buildId: string }> {
+  const project = await req(s.app, 'POST', '/api/projects', {
+    name: 'info-computer',
+    ...projectBody,
+  });
   const projectId = ((await project.json()) as { id: string }).id;
   const created = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: '调研登录方案',
@@ -64,7 +77,10 @@ async function infoCard(s: TestServer): Promise<{ todoId: string; buildId: strin
   return { todoId, buildId };
 }
 
-function fakeComputer(s: TestServer, machineId: string): { calls: ComputerCall[] } {
+function fakeComputer(
+  s: TestServer,
+  machineId: string,
+): { calls: ComputerCall[]; files: Map<string, Buffer> } {
   const files = new Map<string, Buffer>();
   const calls: ComputerCall[] = [];
   const answer = (call: ComputerCall): { text: string; exitCode?: number; output?: string } => {
@@ -131,12 +147,68 @@ function fakeComputer(s: TestServer, machineId: string): { calls: ComputerCall[]
       ]),
     );
   });
-  return { calls };
+  return { calls, files };
+}
+
+interface LocalRepo {
+  project: Record<string, unknown>;
+  runnerId: string;
+}
+
+async function enrollLocalRunner(s: TestServer, repoDir: string): Promise<LocalRepo> {
+  const enrolled = await s.app.request('/api/machine/enroll', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${await issueApiKey(s)}`,
+    },
+    body: JSON.stringify(readyMachine({ teamId: s.team.id, name: 'repo-runner' })),
+  });
+  const runner = machineEnrollResponseSchema.parse(await enrolled.json());
+  const call = async (path: string, init: RequestInit) => {
+    const res = await s.app.request(path, {
+      ...init,
+      headers: { ...init.headers, authorization: `Bearer ${runner.token}` },
+    });
+    expect(res.status).toBe(200);
+    return res;
+  };
+  const client = {
+    uploadUrls: async (stepId: string, files: { name: string }[]) =>
+      machineUploadUrlsResponseSchema.parse(
+        await (
+          await call(`/api/machine/upload-urls/${stepId}`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ files }),
+          })
+        ).json(),
+      ),
+    putUpload: async (url: string, _headers: unknown, body: string, contentType: string) => {
+      await call(url.replace(/^https?:\/\/[^/]+/, ''), {
+        method: 'PUT',
+        headers: { 'content-type': contentType },
+        body,
+      });
+    },
+  } as unknown as MachineApi;
+  s.machineHub.subscribeMachine(s.team.id, runner.machineId, (event) => {
+    if (event.type === 'repo.archive') {
+      void performRepoArchive({ client, logger: { workspace: () => {} } as never }, event.archive);
+    }
+  });
+  return { project: { kind: 'local', localPath: repoDir }, runnerId: runner.machineId };
 }
 
 async function runInfoCard(
   responses: (dir: string) => Parameters<ReturnType<typeof fauxProvider>['setResponses']>[0],
-): Promise<{ s: TestServer; buildId: string; todoId: string; vm: { calls: ComputerCall[] } }> {
+  localRepoDir?: string,
+): Promise<{
+  s: TestServer;
+  buildId: string;
+  todoId: string;
+  vm: { calls: ComputerCall[]; files: Map<string, Buffer> };
+}> {
   setCoordinatorInServer(true);
   setCoordinatorServerContextEnabled(true);
   const s = bootServer();
@@ -157,9 +229,15 @@ async function runInfoCard(
       createdBy: s.user.id,
     },
   );
-  seedRoute(s, 'session', { provider: 'stub', modelId: 'm' });
+  const localRepo =
+    localRepoDir === undefined ? undefined : await enrollLocalRunner(s, localRepoDir);
+  seedRoute(s, 'session', {
+    provider: 'stub',
+    modelId: 'm',
+    ...(localRepo === undefined ? {} : { machineId: localRepo.runnerId }),
+  });
   const vm = fakeComputer(s, machineId);
-  const { todoId, buildId } = await infoCard(s);
+  const { todoId, buildId } = await infoCard(s, localRepo?.project);
   const dir = infoTaskDir(buildId);
 
   const faux = fauxProvider({
@@ -203,6 +281,56 @@ async function runInfoCard(
 }
 
 describe('info cards run in the agent computer', () => {
+  test('an info card in a local-repo project gets a snapshot of the repo from its Runner in the task dir', async () => {
+    const repo = makeTestTempDir('info-local-repo-');
+    disposables.push(() => {
+      releaseTestTempDir(repo);
+    });
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: repo });
+    git('init', '-q');
+    writeFileSync(join(repo, 'README.md'), 'LOCAL-REPO-SNAPSHOT-MARKER\n');
+    git('add', 'README.md');
+    git('commit', '-q', '-m', 'init');
+
+    const { s, buildId, vm } = await runInfoCard(
+      (dir) => [
+        () =>
+          fauxAssistantMessage([fauxToolCall('shell', { command: 'echo hello' })], {
+            stopReason: 'toolUse',
+          }),
+        () =>
+          fauxAssistantMessage(
+            [fauxToolCall('write_file', { path: `${dir}/report.md`, content: REPORT })],
+            { stopReason: 'toolUse' },
+          ),
+        () =>
+          fauxAssistantMessage([fauxToolCall('submit_report', { path: `${dir}/report.md` })], {
+            stopReason: 'toolUse',
+          }),
+        () => fauxAssistantMessage('报告已提交。'),
+      ],
+      repo,
+    );
+
+    const dir = infoTaskDir(buildId);
+    const archive = Buffer.from(
+      vm.files.get(`${dir}/.repo-0.b64`)?.toString('utf8') ?? '',
+      'base64',
+    );
+    expect(archive.length).toBeGreaterThan(0);
+    const unpacked = makeTestTempDir('info-local-unpacked-');
+    disposables.push(() => {
+      releaseTestTempDir(unpacked);
+    });
+    execFileSync('tar', ['xz', '-C', unpacked], { input: archive });
+    expect(readFileSync(join(unpacked, 'README.md'), 'utf8')).toBe('LOCAL-REPO-SNAPSHOT-MARKER\n');
+    expect(vm.files.has(`${dir}/repo-snapshot-failed.txt`)).toBe(false);
+    const unpack = vm.calls.find((call) => JSON.stringify(call.params).includes('tar xz'));
+    expect(JSON.stringify(unpack?.params)).not.toContain('--strip-components');
+    expect(s.db.select().from(step).where(eq(step.buildId, buildId)).get()?.status).toBe('done');
+  });
+
   test('a provider route writes its report through submit_report from the computer', async () => {
     let shellResult = '';
     const { s, buildId, todoId, vm } = await runInfoCard((dir) => [
