@@ -515,6 +515,16 @@ export class VmDesktops implements ComputerDesktops {
     this.desktops.delete(scopeKey);
     this.licensed.delete(scopeKey);
     if (
+      entry &&
+      !runsImage(entry.image, this.image) &&
+      !this.takeovers.has(scopeKey) &&
+      (await this.pullImage(binary))
+    ) {
+      if (entry.state === 'running') await this.stop(scopeKey, binary, name).catch(() => {});
+      await this.discard(scopeKey, binary, name, true);
+      entry = undefined;
+    }
+    if (
       entry?.state === 'running' &&
       entry.address &&
       (await this.ready(binary, name, entry.address))
@@ -732,13 +742,7 @@ export class VmDesktops implements ComputerDesktops {
     try {
       const binary = await this.options.runtime.install((bytes) => this.progress(bytes));
       this.progress(VM_DOWNLOAD_PARTS.runtime + VM_DOWNLOAD_PARTS.kernel);
-      const pull = (image: string) =>
-        this.run(
-          [binary, 'image', 'pull', '--progress', 'none', '--platform', 'linux/arm64', image],
-          {
-            timeoutMs: 30 * 60_000,
-          },
-        );
+      const pull = (image: string) => this.pull(binary, image);
       if ((await pull(VM_INIT_IMAGE)).code !== 0)
         throw new ComputerRefusal('The computer image could not be downloaded');
       this.progress(VM_DOWNLOAD_PARTS.runtime + VM_DOWNLOAD_PARTS.kernel + VM_DOWNLOAD_PARTS.init);
@@ -756,6 +760,20 @@ export class VmDesktops implements ComputerDesktops {
         ? error
         : new ComputerRefusal('The Linux VM could not be downloaded');
     }
+  }
+
+  private pull(binary: string, image: string): Promise<{ code: number }> {
+    return this.run(
+      [binary, 'image', 'pull', '--progress', 'none', '--platform', 'linux/arm64', image],
+      { timeoutMs: 30 * 60_000 },
+    );
+  }
+
+  private async pullImage(binary: string): Promise<boolean> {
+    const pulled = await this.pull(binary, this.image);
+    if (pulled.code !== 0)
+      this.options.log?.('computer image update skipped: the pinned image could not be pulled');
+    return pulled.code === 0;
   }
 
   async manage(scopeKey: string, action: ComputerManageAction): Promise<ComputerManageOutcome> {

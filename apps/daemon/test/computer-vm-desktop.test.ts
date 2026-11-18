@@ -683,6 +683,33 @@ describe('VmDesktops', () => {
     expect(env.logs.some((line) => line.includes('reinstalled ffmpeg'))).toBe(true);
   });
 
+  test('a stopped VM on an older pinned image is recreated on the new image at the next use, keeping the volume and packages', async () => {
+    const env = setup();
+    const old = 'ghcr.io/example/computer@sha256:'.padEnd(97, 'a');
+    const pinned = 'ghcr.io/example/computer@sha256:'.padEnd(97, 'b');
+    const before = env.make({ image: old });
+    await before.installPackages('chief:a', ['ffmpeg'], installOptions());
+    await before.manage('chief:a', 'stop');
+    await env.make({ image: pinned }).ensure('chief:a');
+    expect(env.state().vms[NAME]?.image).toBe(pinned);
+    expect(env.state().vms[NAME]?.installed).toEqual(['ffmpeg']);
+    expect(env.state().volumes).toEqual([NAME]);
+    expect(env.calls().some((argv) => argv[0] === 'volume' && argv[1] === 'delete')).toBe(false);
+  });
+
+  test('a computer held by this daemon is not recreated mid-use when the pin differs', async () => {
+    const env = setup();
+    const old = 'ghcr.io/example/computer@sha256:'.padEnd(97, 'a');
+    const desktops = env.make({ image: old });
+    await desktops.ensure('chief:a');
+    const pinned = 'ghcr.io/example/computer@sha256:'.padEnd(97, 'b');
+    const state = env.state();
+    (state.vms[NAME] as { image: string }).image = pinned;
+    writeFileSync(join(env.fake, 'state.json'), JSON.stringify(state));
+    await desktops.ensure('chief:a');
+    expect(env.calls().some((argv) => argv[0] === 'delete')).toBe(false);
+  });
+
   test('recover recreates a broken VM with its volume and reinstalls approved packages as root', async () => {
     const env = setup();
     const desktops = env.make();
