@@ -334,7 +334,8 @@ test('REST round-trip: post, get current, stop', async () => {
   const body = (await created.json()) as { id: string; status: string };
   expect(body.status).toBe('working');
   const current = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/memory-edits/current`);
-  expect((await current.json())?.id).toBe(body.id);
+  const cur = (await current.json()) as { id: string } | null;
+  expect(cur?.id).toBe(body.id);
   const stopped = await req(
     H.s.app,
     'POST',

@@ -116,6 +116,19 @@ export const memoryEditRecordSchema = z.object({
 });
 export type MemoryEditRecord = z.infer<typeof memoryEditRecordSchema>;
 
+export const memoryImportBodySchema = z
+  .object({ projectId: recordId, file: z.string().min(1).max(1024) })
+  .strict();
+export type MemoryImportBody = z.infer<typeof memoryImportBodySchema>;
+
+export const memoryImportCandidateSchema = z.object({
+  projectId: recordId,
+  projectName: z.string(),
+  file: z.string(),
+  imported: z.boolean(),
+});
+export type MemoryImportCandidate = z.infer<typeof memoryImportCandidateSchema>;
+
 const memoryScopeParam = z
   .string()
   .min(1)

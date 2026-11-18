@@ -1,6 +1,7 @@
 import {
   memoryEditBodySchema,
   memoryEditStopBodySchema,
+  memoryImportBodySchema,
   patchMemoryBodySchema,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
@@ -23,6 +24,11 @@ import {
   submitMemoryEdit,
   toMemoryEditRecord,
 } from './services/memory-edit.js';
+import {
+  importMemoryFile,
+  listMemoryImportCandidates,
+  repoReaderOf,
+} from './services/memory-import.js';
 
 export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/memories', (c) => {
@@ -55,6 +61,21 @@ export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const body = parseWith(memoryEditStopBodySchema, await jsonBody(c), 'body');
     return c.json(stopMemoryEdit(svcOf(ctx), teamId, c.req.param('eid'), body.attempt));
+  });
+
+  app.get('/api/teams/:id/memory-imports/candidates', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json({
+      candidates: await listMemoryImportCandidates(ctx.db, teamId, repoReaderOf(ctx)),
+    });
+  });
+
+  app.post('/api/teams/:id/memory-imports', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(memoryImportBodySchema, await jsonBody(c), 'body');
+    return c.json({ result: await importMemoryFile(ctx.db, teamId, body, repoReaderOf(ctx)) }, 201);
   });
 
   app.patch('/api/teams/:id/memories/:mid', async (c) => {
