@@ -1,4 +1,6 @@
+import { existsSync } from 'node:fs';
 import { connect } from 'node:net';
+import { dirname, join } from 'node:path';
 import type { LocalToolDef } from '@cairn/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -97,6 +99,30 @@ describe('host mcp bridge', () => {
     } finally {
       bridge.close();
     }
+  });
+
+  it('listens on a short socket when the bridge dir is too deep for a unix socket path', async () => {
+    const deep = join(takeDir(), 'deep'.repeat(40));
+    const bridge = await openHostMcpBridge({
+      dir: deep,
+      remoteTools: [],
+      localTools: [askHost],
+    });
+    if (bridge === null) throw new Error('bridge missing');
+    const socketDir = dirname(bridge.socketPath);
+    try {
+      expect(bridge.socketPath.length).toBeLessThanOrEqual(100);
+      expect(socketDir.startsWith(deep)).toBe(false);
+      const token = String(bridge.env[HOST_MCP_TOKEN_ENV]);
+      const replies = await rpc(bridge.socketPath, token, [
+        { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+      ]);
+      const listed = (replies[0] as { result: { tools: { name: string }[] } }).result.tools;
+      expect(listed.map((tool) => tool.name)).toEqual(['ask_host']);
+    } finally {
+      bridge.close();
+    }
+    expect(existsSync(socketDir)).toBe(false);
   });
 
   it('rejects a tools/call whose arguments fail the schema and executes valid ones', async () => {

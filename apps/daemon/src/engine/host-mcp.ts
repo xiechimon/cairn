@@ -1,12 +1,15 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Socket } from 'node:net';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { LocalToolDef, RemoteToolDef } from '@cairn/shared';
 import { z } from 'zod';
 import { parametersToShape } from '../backend/claude-code.js';
 
 export const HOST_MCP_TOKEN_ENV = 'CAIRN_HOST_MCP_TOKEN';
+
+const UNIX_SOCKET_PATH_BUDGET = 100;
 
 const BRIDGE_SCRIPT = `import { connect } from 'node:net';
 import { createInterface } from 'node:readline';
@@ -73,7 +76,13 @@ export async function openHostMcpBridge(opts: HostMcpBridgeOpts): Promise<HostMc
   ];
   if (tools.length === 0) return null;
   mkdirSync(opts.dir, { recursive: true, mode: 0o700 });
-  const socketPath = join(opts.dir, 'host-mcp.sock');
+  let socketDir = opts.dir;
+  let socketPath = join(socketDir, 'host-mcp.sock');
+  if (socketPath.length > UNIX_SOCKET_PATH_BUDGET) {
+    socketDir = join(tmpdir(), `cairn-mcp-${randomBytes(6).toString('hex')}`);
+    mkdirSync(socketDir, { recursive: true, mode: 0o700 });
+    socketPath = join(socketDir, 'host-mcp.sock');
+  }
   const bridgePath = join(opts.dir, 'host-mcp-bridge.mjs');
   writeFileSync(bridgePath, BRIDGE_SCRIPT, { mode: 0o700 });
   const token = randomBytes(24).toString('hex');
@@ -89,6 +98,7 @@ export async function openHostMcpBridge(opts: HostMcpBridgeOpts): Promise<HostMc
     close() {
       server.close();
       rmSync(opts.dir, { recursive: true, force: true });
+      if (socketDir !== opts.dir) rmSync(socketDir, { recursive: true, force: true });
     },
   };
 }
