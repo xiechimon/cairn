@@ -1,8 +1,22 @@
 # Mail connector
 
-Status: proposal for the owner's review. Nothing here is built. Owner route: a later implementation touches the secrets service and adds an unauthenticated inbound endpoint. This page does not change code.
+Status: v1 is IMAP IDLE only and is being built (ian, 2026-11-19). The Gmail watch and Pub/Sub sections below stay as the deferred second provider; nothing in v1 depends on them.
 
-Completes to-do item: Mail that reaches the owner without polling. The checkbox stays unticked until #3924 merges.
+## v1 for the desktop install
+
+Cairn mostly runs as the owner's Mac desktop app with the server on 127.0.0.1. A Gmail Pub/Sub push needs a public `https` endpoint and an owner-set public origin, and the desktop install has neither. IMAP IDLE needs only an outbound socket, so v1 builds that one path for every IMAP mailbox: QQ Mail with its authorization code (授权码), Gmail and Outlook with an app password. Gmail OAuth and Pub/Sub are out of v1 because they add an unauthenticated inbound endpoint, a Google verifier, watch renewal and an OAuth app review, none of which the owner needs to read mail on his Mac. `mail_account.provider` keeps the `gmail` value for later.
+
+Decisions that close the open items for v1:
+
+- The server holds one IDLE connection per account (`apps/server/src/services/mail-connector.ts`, bridge over `imapflow` in `mail-imap.ts`). The daemon stays out.
+- Connect: the account row is inserted as `connecting` with the password sealed as secret `mail.imap.<accountId>` and linked through `secretId`. First SELECT persists `UIDNEXT - 1` as the cursor, so old mail is never replayed, then `watching`.
+- Each pass fetches every UID above the cursor, inserts `mail_event` rows (unique on `accountId, externalId = uidvalidity:uid`, and skipped when the same `Message-ID` is already stored), advances the cursor in the same transaction, ranks, then delivers. A `UIDVALIDITY` change re-baselines to the new `UIDNEXT - 1` instead of replaying the mailbox; mail that arrived between the change and the SELECT is not delivered. This closes the cross-epoch open item by choosing no replay.
+- Socket drop or timeout: `degraded` with a one-line reason, exponential backoff (5 s doubling to 5 min), same cursor. A rejected login is `revoked` with no retry until the owner re-enters the password.
+- Wake rule: `mail_account.defaultRank` is `needs_you` by default (every new INBOX mail starts a Coordinator turn). The owner may switch to filtered mode: `mail_rule` rows (sender or subject contains) rank `needs_you`, and unmatched mail ranks `can_wait` (digest push, no turn).
+- Excerpt: display name, sender, subject and the first 2000 characters of the text part, from at most 256 KiB of the message source. Stored on the event, fenced with `fenceMailText` in the wake prompt.
+- Reply: the built-in tool `connector_cairn-mail__send` (`to`, `subject`, `body`, optional `inReplyTo` event id) goes through `connectorActionEntry` with no read-only hint, so the registry classes it `send` and a mail turn parks an approval card before SMTP is touched. The same SMTP account sends after the owner approves. Owner-started turns follow the action tier.
+- Disconnect: status `disconnected`, generation advances, the socket closes, the sealed password is deleted, events stay.
+- Password handling: the owner types it, it is sealed on arrival, no API response, log line, event row or error text contains it.
 
 ## Problem
 
