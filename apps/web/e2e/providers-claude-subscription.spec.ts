@@ -58,6 +58,7 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
 
   const detail = page.getByTestId('subscription-detail');
   await expect(page.getByText(locale === 'zh' ? '「Personal Claude」验证通过' : 'Personal Claude verified')).toBeVisible();
+  await expect(detail.getByLabel(locale === 'zh' ? '名称' : 'Name')).toBeVisible();
 
   const remove = locale === 'zh' ? '移除' : 'Remove';
   const removeButton = detail.getByRole('button', { name: remove, exact: true });

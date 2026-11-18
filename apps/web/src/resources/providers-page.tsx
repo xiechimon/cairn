@@ -203,12 +203,8 @@ export function ProvidersSection() {
   const devinSubscriptions: SubscriptionAccount[] = (
     live ? (devinSubscriptionsQ.data ?? []) : (fixtureAccounts?.devinSubscriptions ?? [])
   ).map((wire) => toDevinAccount(wire, now));
-  const subscriptionApiIds = live
-    ? (subscriptionsQ.data ?? []).filter((s) => s.state !== undefined).map((s) => s.id)
-    : [];
-  const devinApiIds = live
-    ? (devinSubscriptionsQ.data ?? []).filter((s) => s.state !== undefined).map((s) => s.id)
-    : [];
+  const subscriptionApiIds = live ? (subscriptionsQ.data ?? []).map((s) => s.id) : [];
+  const devinApiIds = live ? (devinSubscriptionsQ.data ?? []).map((s) => s.id) : [];
   const stepsQ = useClaudeSubscriptionSteps(teamId, subscriptionApiIds, live);
   const devinStepsQ = useDevinSubscriptionSteps(teamId, devinApiIds, live);
   const stepsByAccount: Record<string, AccountStep[]> = live
