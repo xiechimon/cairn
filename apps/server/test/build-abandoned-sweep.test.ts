@@ -16,7 +16,13 @@ import {
 } from '../src/services/build-abandoned-sweep.js';
 import { claimStep } from '../src/services/machines.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, seedRoute, seedSessionRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  seedRoute,
+  seedSessionRoute,
+  subscriptionClaudeReport,
+  type TestServer,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -63,11 +69,9 @@ function makeWorld(step: {
         teamId,
         name: 'sweep-box',
         online: step.machineOnline ?? false,
-        ...(step.machineRuntimes !== undefined
-          ? { enabledRuntimes: step.machineRuntimes }
-          : step.withRoute
-            ? { enabledRuntimes: ['pi'] }
-            : {}),
+        ...(step.machineRuntimes?.includes('claude-code')
+          ? { claudeCodeReport: subscriptionClaudeReport }
+          : {}),
       }),
     )
     .run();
@@ -233,7 +237,6 @@ describe('#862 T1 release of lost-contact claimed steps (sweepAbandonedBuildStep
           teamId: w.teamId,
           name: 'mea',
           online: true,
-          enabledRuntimes: ['pi'],
         }),
       )
       .run();
@@ -647,13 +650,7 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
       machineRuntimes: ['pi'],
       pin: 'self',
     });
-    const otherId = addOnlineMachine(w);
-    w.s.db
-      .update(machineTable)
-      .set({ enabledRuntimes: ['pi', 'claude-code'] })
-      .where(eq(machineTable.id, otherId))
-      .run();
-
+    addOnlineMachine(w);
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
     expect(stepRowOf(w).status).toBe('pending');

@@ -1,5 +1,3 @@
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
 import {
   claimedStepSchema,
@@ -7,15 +5,9 @@ import {
   machineUploadUrlsResponseSchema,
   PLAN_FILE_NAME,
 } from '@cairn/shared';
-import Database from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { afterAll, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { MIGRATIONS_FOLDER } from '../src/db/client.js';
-import * as schema from '../src/db/schema.js';
 import {
   chief as chiefTable,
   machine as machineTable,
@@ -24,7 +16,6 @@ import {
 import {
   bootServer,
   insertClaudeSubscription,
-  insertLegacyUserAndTeam,
   issueApiKey,
   postProject,
   req,
@@ -35,16 +26,6 @@ import {
   type TestServer,
   withVerification,
 } from './helpers.js';
-
-const temps: string[] = [];
-function temp(prefix: string): string {
-  const dir = makeTestTempDir(prefix);
-  temps.push(dir);
-  return dir;
-}
-afterAll(() => {
-  for (const dir of temps) rmSync(dir, { recursive: true, force: true });
-});
 
 function call(
   app: TestServer['app'],
@@ -100,7 +81,6 @@ interface World {
 async function setupWorld(): Promise<World> {
   const s = bootServer({ claimHoldMs: 200 });
   insertClaudeSubscription(s);
-  temps.push('');
   const tokenA = await enroll(s, 'home-mbp');
   const tokenB = await enroll(s, 'home-other');
   const machineAId = s.db
@@ -240,11 +220,6 @@ describe('#1312 other-machine mark on a resumed session', () => {
 describe('#682 runtime real gate (semantics unchanged, home-machine version)', () => {
   test('a stored all-off runtime list no longer gates: the pi step claims and the switch write is refused', async () => {
     const w = await setupWorld();
-    w.s.db
-      .update(machineTable)
-      .set({ enabledRuntimes: [] })
-      .where(eq(machineTable.id, w.machineAId))
-      .run();
     const off = await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
       enabledRuntimes: [],
     });
@@ -294,7 +269,6 @@ describe('#682 runtime real gate (semantics unchanged, home-machine version)', (
     w.s.db
       .update(machineTable)
       .set({
-        enabledRuntimes: ['pi'],
         claudeCodeReport: {
           ...subscriptionClaudeReport,
           hostname: 'home-mbp',
@@ -446,95 +420,5 @@ describe('#895 GET /chief orchestration envelope (#1260 re-source)', () => {
     const body = await getEnvelope(w);
     expect(body.orchestration.homeMachineId).toBeNull();
     expect(body.orchestration.activity).toEqual([]);
-  });
-});
-
-describe('#682 0022 backfill (legacy [] machine rows -> [pi])', () => {
-  function readJournal(folder: string): { entries: { idx: number; tag: string }[] } {
-    return JSON.parse(readFileSync(join(folder, 'meta', '_journal.json'), 'utf8'));
-  }
-
-  function pinMigrationIdx(): number {
-    const journal = readJournal(MIGRATIONS_FOLDER);
-    const idx = journal.entries.findIndex((entry) =>
-      /UPDATE `machine` SET `enabledRuntimes`/i.test(
-        readFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), 'utf8'),
-      ),
-    );
-    expect(idx, 'enabledRuntimes backfill migration missing from journal').toBeGreaterThan(0);
-    return idx;
-  }
-
-  function prePinMigrations(): string {
-    const journal = readJournal(MIGRATIONS_FOLDER);
-    const cut = pinMigrationIdx();
-    const dir = temp('cairn-migrations-pre-pin-');
-    mkdirSync(join(dir, 'meta'));
-    for (const entry of journal.entries.slice(0, cut)) {
-      cpSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
-      const snapshot = join(MIGRATIONS_FOLDER, 'meta', `${entry.tag}_snapshot.json`);
-      try {
-        cpSync(snapshot, join(dir, 'meta', `${entry.tag}_snapshot.json`));
-      } catch {}
-    }
-    const full = readJournal(MIGRATIONS_FOLDER);
-    writeFileSync(
-      join(dir, 'meta', '_journal.json'),
-      JSON.stringify({ ...full, entries: full.entries.slice(0, cut) }, null, 2),
-    );
-    return dir;
-  }
-
-  function buildPrePinDb(): string {
-    const dir = temp('cairn-pin-db-');
-    const dbPath = join(dir, 'server.db');
-    const sqlite = new Database(dbPath);
-    const db = drizzle(sqlite, { schema });
-    migrate(db, { migrationsFolder: prePinMigrations() });
-    const { teamId } = insertLegacyUserAndTeam(sqlite, {
-      userId: 'user-legacy',
-      teamId: 'team-legacy',
-    });
-    const insert = sqlite.prepare(
-      'INSERT INTO machine (id, teamId, name, enabledRuntimes) VALUES (?, ?, ?, ?)',
-    );
-    insert.run('m-legacy-off', teamId, 'legacy-off', '[]');
-    insert.run('m-legacy-cc', teamId, 'legacy-cc', '["claude-code"]');
-    sqlite.close();
-    return dbPath;
-  }
-
-  function readRuntimes(dbPath: string, id: string): string[] {
-    const sqlite = new Database(dbPath, { readonly: true });
-    const row = sqlite.prepare('SELECT enabledRuntimes FROM machine WHERE id = ?').get(id) as {
-      enabledRuntimes: string;
-    };
-    sqlite.close();
-    return JSON.parse(row.enabledRuntimes);
-  }
-
-  test('pre-upgrade legacy db -> full backfill migration rerun: [] rows backfilled [pi], already claude-code-enabled rows untouched', () => {
-    const dbPath = buildPrePinDb();
-    const sqlite = new Database(dbPath);
-    const db = drizzle(sqlite, { schema });
-    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-    sqlite.close();
-    expect(readRuntimes(dbPath, 'm-legacy-off')).toEqual(['pi']);
-    expect(readRuntimes(dbPath, 'm-legacy-cc')).toEqual(['claude-code']);
-  });
-
-  test('backfill UPDATE idempotent (defensive replay produces no duplicates; ALTER section not in the replay surface)', () => {
-    const dbPath = buildPrePinDb();
-    const entry = readJournal(MIGRATIONS_FOLDER).entries[pinMigrationIdx()]!;
-    const sql = readFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), 'utf8');
-    const updateStmt = sql
-      .split('--> statement-breakpoint')
-      .map((s) => s.trim())
-      .find((s) => /^UPDATE `machine`/i.test(s))!;
-    const sqlite = new Database(dbPath);
-    sqlite.exec(updateStmt);
-    sqlite.exec(updateStmt);
-    sqlite.close();
-    expect(readRuntimes(dbPath, 'm-legacy-off')).toEqual(['pi']);
   });
 });

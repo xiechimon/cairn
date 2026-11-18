@@ -28,7 +28,4 @@ Lanes add an entry when they land or revise a ruling, keyed `area.topic`.
 ## docs/spec/29-evaluation-and-data-loop.md
 
 - **eval.data-loop** (2026-10-08, volume) — The trajectory exporter and the trajectory-pack schema are protected paths; no change may edit what judges it.
-## docs/spec/30-harness-profile-opt-in.md
-
-- **harness.profile-opt-in** (2026-10-08, volume) — Harness profile rules live here; new harness surfaces are opt-in.
 

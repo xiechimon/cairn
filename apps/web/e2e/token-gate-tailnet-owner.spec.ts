@@ -66,11 +66,11 @@ for (const theme of ['light', 'dark'] as const) {
         expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await page.screenshot({ path: testInfo.outputPath(`pair-${theme}-${width}.png`), fullPage: true });
-        const identity = await page.evaluate(async () => {
-          const response = await fetch('/api/remote/identity');
-          return { status: response.status, body: await response.json() as { login: null; via: null } };
+        const descriptor = await page.evaluate(async () => {
+          const response = await fetch('/api/remote/descriptor');
+          return { status: response.status, body: await response.json() as { environmentId: string; version: number } };
         });
-        expect(identity.status).toBe(401);
+        expect(descriptor.status).toBe(401);
         const transcript = testInfo.outputPath('calls.txt');
         writeFileSync(transcript, [
           'Isolated live server; synthetic sidecar metadata and HTTPS identity proxy.',
@@ -79,9 +79,9 @@ for (const theme of ['light', 'dark'] as const) {
           'GET /api/teams',
           `HTTP ${(await teams).status()}`,
           '',
-          'GET /api/remote/identity',
-          `HTTP ${identity.status}`,
-          JSON.stringify(identity.body),
+          'GET /api/remote/descriptor',
+          `HTTP ${descriptor.status}`,
+          JSON.stringify(descriptor.body),
           '',
           'Pair page shown. Tailscale identity did not sign the browser in.',
         ].join('\n'));

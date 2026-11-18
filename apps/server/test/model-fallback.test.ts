@@ -96,11 +96,6 @@ async function setupWorld(
   expect(enrollRes.status).toBe(200);
   const token = ((await enrollRes.json()) as { token: string }).token;
   const machineRow = s.db.select().from(machineTable).limit(1).all()[0]!;
-  s.db
-    .update(machineTable)
-    .set({ enabledRuntimes: ['pi'] })
-    .where(eq(machineTable.id, machineRow.id))
-    .run();
   seedRoute(s, 'session', {
     provider: 'relay-a',
     modelId,

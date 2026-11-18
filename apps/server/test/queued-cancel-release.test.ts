@@ -37,7 +37,6 @@ function insertMachine(s: TestServer, id: string, opts: { cap?: number; online?:
         name: id,
         online: opts.online ?? true,
         maxConcurrent: opts.cap ?? 8,
-        enabledRuntimes: ['pi'],
       }),
     )
     .run();

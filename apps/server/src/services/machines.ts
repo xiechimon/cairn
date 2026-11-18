@@ -330,7 +330,6 @@ export function seedLocalMachine(db: Db, teamId: string): void {
       apiKeyId: null,
       latestCliVersion: null,
       kind: 'local',
-      enabledRuntimes: ['pi'],
     })
     .run();
 }
@@ -421,7 +420,6 @@ export function enrollMachine(
       apiKeyId: input.keyId,
       latestCliVersion: input.cliVersion ?? null,
       kind: isLocalName ? 'local' : 'remote',
-      enabledRuntimes: ['pi'],
       ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
       ...(capabilities !== undefined
         ? reportedConcurrencyPatch(
@@ -482,7 +480,6 @@ export function authorizeEnrollmentMachine(
       apiKeyId: null,
       latestCliVersion: null,
       kind: isLocal ? 'local' : 'remote',
-      enabledRuntimes: ['pi'],
     })
     .run();
   adoptAsDefaultIfUnset(db, input.teamId, machineId);

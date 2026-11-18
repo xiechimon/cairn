@@ -19,14 +19,13 @@ test.each([
   expect(homeMachineRejectReason(home, selectedModel)).not.toBeNull();
 });
 
-test('pause-only PATCH preserves every first-PR field, including dismissal and recorded first PR', async () => {
+test('pause-only PATCH preserves every unrelated team field', async () => {
   const s = bootServer();
   try {
     const fields = {
-      firstPrReportPromptEnabled: true,
-      firstPrReportPromptDismissedAt: 1234,
-      firstPrReportPromptFirstPrAt: 2345,
-      firstPrReportPromptFirstPrNumber: 7,
+      plan: 'enterprise',
+      avatarStyle: 'beam',
+      defaultMachineId: 'machine-spare',
     };
     s.db.update(team).set(fields).where(eq(team.id, s.team.id)).run();
     const before = s.db.select().from(team).where(eq(team.id, s.team.id)).get()!;

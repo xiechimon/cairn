@@ -139,9 +139,6 @@ describe('token auth: the four exempt surfaces (failure modes 3/4/5/8)', () => {
     writeFileSync(join(webDir, 'index.html'), '<!doctype html><title>shell</title>');
     const s = bootServer({ authToken: TOKEN, webDir });
 
-    const track = await req(s.app, 'POST', '/_mp/api/track');
-    expect(track.status).toBe(204);
-
     const shell = await req(s.app, 'GET', '/');
     expect(shell.status).toBe(200);
     expect(shell.headers.get('content-type')).toContain('text/html');

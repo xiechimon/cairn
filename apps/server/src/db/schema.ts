@@ -95,13 +95,7 @@ export const team = sqliteTable('team', {
   createdAt: epochMs('createdAt').notNull(),
   plan: text('plan').notNull().default('free'),
   avatarStyle: text('avatarStyle'),
-  coAuthorTrailer: bool('coAuthorTrailer').notNull().default(true),
-  requestInstructorReview: bool('requestInstructorReview').notNull().default(false),
   maxAutonomousMergesPerDay: integer('maxAutonomousMergesPerDay').notNull().default(10),
-  firstPrReportPromptEnabled: bool('firstPrReportPromptEnabled').notNull().default(false),
-  firstPrReportPromptDismissedAt: epochMs('firstPrReportPromptDismissedAt'),
-  firstPrReportPromptFirstPrAt: epochMs('firstPrReportPromptFirstPrAt'),
-  firstPrReportPromptFirstPrNumber: integer('firstPrReportPromptFirstPrNumber'),
   defaultMachineId: text('defaultMachineId'),
   actionTier: text('actionTier').$type<ActionTier>().notNull().default('full'),
 });
@@ -564,11 +558,6 @@ export const routingRule = sqliteTable(
     fallbackModels: json<ModelRef[] | null>('fallbackModels'),
     machineId: text('machineId').references(() => machine.id),
     requiredCapabilities: json<RequiredCapabilities | null>('requiredCapabilities'),
-    tools: json<string[] | null>('tools'),
-    mcpServers: json<string[] | null>('mcpServers'),
-    skillsAllowlist: json<string[] | null>('skillsAllowlist'),
-    defaultSkill: text('defaultSkill'),
-    secrets: json<string[] | null>('secrets'),
     seededFromAgentId: text('seededFromAgentId'),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
@@ -722,33 +711,6 @@ export const pushDigestItem = sqliteTable('push_digest_item', {
 
 export type CoordinatorTurn = { stepId: string; workKey: string };
 
-type HarnessEvalAttemptState = 'claimed' | 'dispatched' | 'dispatch_uncertain' | 'terminal';
-type HarnessEvalAttemptOutcome =
-  | 'completed'
-  | 'timeout'
-  | 'worker_failure'
-  | 'rejected_publication'
-  | 'unavailable_worker'
-  | 'budget_refusal';
-
-export const harnessEvalAttempt = sqliteTable(
-  'harness_eval_attempts',
-  {
-    id: text('id').primaryKey(),
-    repo: text('repo').notNull(),
-    pr: integer('pr').notNull(),
-    patchDigest: text('patchDigest').notNull(),
-    workerId: text('workerId').notNull(),
-    state: text('state').$type<HarnessEvalAttemptState>().notNull(),
-    deadlineAt: epochMs('deadlineAt').notNull(),
-    outcome: text('outcome').$type<HarnessEvalAttemptOutcome | null>(),
-    createdAt: epochMs('createdAt').notNull(),
-  },
-  (t) => [
-    uniqueIndex('harness_eval_attempts_repo_pr_digest_unique').on(t.repo, t.pr, t.patchDigest),
-  ],
-);
-
 export const skillAudit = sqliteTable('skill_audit', {
   id: text('id').primaryKey(),
   skillId: text('skillId').notNull(),
@@ -878,7 +840,6 @@ export const machine = sqliteTable(
     apiKeyId: text('apiKeyId'),
     latestCliVersion: text('latestCliVersion'),
     kind: text('kind').notNull().default('remote'),
-    enabledRuntimes: json<string[]>('enabledRuntimes').notNull().default(sql`'[]'`),
     claudeCodeReport: json<ClaudeCodeReport | null>('claudeCodeReport'),
     claudeRateLimits: json<ClaudeRateLimitWindow[] | null>('claudeRateLimits'),
     maxConcurrent: integer('maxConcurrent').notNull().default(3),
@@ -891,23 +852,6 @@ export const machine = sqliteTable(
     folderGrants: json<MachineFolderGrants | null>('folderGrants'),
   },
   (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
-);
-
-export const harnessProfile = sqliteTable(
-  'harness_profile',
-  {
-    id: text('id').primaryKey(),
-    teamId: text('teamId')
-      .notNull()
-      .references(() => team.id),
-    mode: text('mode').notNull().default('independent'),
-    capabilities: json<string[]>('capabilities').notNull().default(sql`'[]'`),
-    targets: json<string[]>('targets').notNull().default(sql`'[]'`),
-    version: integer('version').notNull().default(0),
-    createdAt: epochMs('createdAt').notNull(),
-    updatedAt: epochMs('updatedAt').notNull(),
-  },
-  (t) => [uniqueIndex('harness_profile_team_unique').on(t.teamId)],
 );
 
 export const threadPr = sqliteTable(
@@ -1030,8 +974,6 @@ export const coordinatorConversation = sqliteTable('coordinator_conversation', {
   conversationId: text('conversationId').notNull(),
   mailOwnerConversationId: text('mailOwnerConversationId'),
   lastMirroredEntryId: text('lastMirroredEntryId'),
-  lastColdSlimAt: epochMs('lastColdSlimAt'),
-  lastColdSlimStepId: text('lastColdSlimStepId'),
   piVersion: text('piVersion').notNull(),
   updatedAt: epochMs('updatedAt').notNull(),
 });
@@ -1615,25 +1557,6 @@ export const hostedCleanupOutbox = sqliteTable(
       .on(t.teamId, t.repoName)
       .where(sql`${t.state} != 'done'`),
   ],
-);
-
-export const threadConversation = sqliteTable('thread_conversation', {
-  threadId: text('threadId').primaryKey(),
-  storeId: text('storeId').notNull(),
-  conversationId: text('conversationId').notNull(),
-  lastMirroredEntryId: text('lastMirroredEntryId'),
-  updatedAt: epochMs('updatedAt').notNull(),
-});
-
-export const threadEntry = sqliteTable(
-  'thread_entry',
-  {
-    messageId: text('messageId').primaryKey(),
-    threadId: text('threadId').notNull(),
-    conversationId: text('conversationId').notNull(),
-    entryId: text('entryId').notNull(),
-  },
-  (t) => [index('thread_entry_thread_idx').on(t.threadId, t.conversationId)],
 );
 
 export const mailAccount = sqliteTable(

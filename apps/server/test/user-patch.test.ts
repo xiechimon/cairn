@@ -24,7 +24,7 @@ describe('PATCH /api/user/me (the #1031 rename round trip)', () => {
     vi.mocked(os.userInfo).mockReturnValue({ ...os.userInfo(), username });
     const s = bootServer();
     try {
-      const response = await req(s.app, 'GET', '/api/auth/session');
+      const response = await req(s.app, 'GET', '/api/user/me');
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({ displayName: expected });
       expect(s.db.select().from(userTable).get()?.displayName).toBe(expected);
@@ -104,7 +104,7 @@ describe('PATCH /api/user/me (the #1031 rename round trip)', () => {
         displayName: string;
       };
       expect(me.displayName).toBe('新名字');
-      const session = (await (await req(s.app, 'GET', '/api/auth/session')).json()) as {
+      const session = (await (await req(s.app, 'GET', '/api/user/me')).json()) as {
         displayName: string;
       };
       expect(session.displayName).toBe('新名字');
@@ -119,7 +119,7 @@ describe('PATCH /api/user/me (the #1031 rename round trip)', () => {
       expect(seed(s.db).user.displayName).toBe('新名字');
       const restarted = bootServer({ db: s.db });
       try {
-        expect(await (await req(restarted.app, 'GET', '/api/auth/session')).json()).toMatchObject({
+        expect(await (await req(restarted.app, 'GET', '/api/user/me')).json()).toMatchObject({
           displayName: '新名字',
         });
       } finally {

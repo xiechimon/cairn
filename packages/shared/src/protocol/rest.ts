@@ -6,7 +6,6 @@ export interface RestEndpoint {
 }
 
 export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
-  { method: 'GET', path: '/api/auth/session', note: '保形返回 seed 用户（02 §2.1）' },
   { method: 'GET', path: '/api/user/me' },
   { method: 'GET', path: '/api/teams', note: '恒 seed 一行（02 §2.2）' },
   { method: 'GET', path: '/api/teams/{id}/members', note: 'Agent 列表实际走此端点（r5 §1）' },
@@ -113,9 +112,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     query: ['fileName'],
     note: 'spec 13 #367：技能目录文件读面（磁盘现读，文本投影）',
   },
-  { method: 'GET', path: '/api/teams/{id}/agents/{aid}' },
-  { method: 'GET', path: '/api/teams/{id}/agents/{aid}/tasks' },
-  { method: 'GET', path: '/api/teams/{id}/agents/{aid}/memories', note: '02 §4.4/r5 §6 实测' },
   {
     method: 'GET',
     path: '/api/teams/{id}/chief',
@@ -213,7 +209,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'POST', path: '/api/builds/{id}/steps', note: '确认/驳回回路（02 §4.2/r5 §4）' },
   { method: 'POST', path: '/api/teams/{id}/providers' },
   { method: 'POST', path: '/api/teams/{id}/mcp-servers' },
-  { method: 'POST', path: '/api/teams/{id}/agents', note: '→ 201 {id}（r5 §1/§8 补录）' },
   {
     method: 'GET',
     path: '/api/teams/{id}/push/key',
@@ -259,14 +254,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: '#1170：按记录的来源重拉（技能 id 不变，复用 updateLocalSkill 覆写语义）；无来源记录 = 409',
   },
   { method: 'POST', path: '/api/schedules' },
-  { method: 'POST', path: '/api/analytics/first-touch', note: '形状保留、内容自选；可空实现' },
-  {
-    method: 'POST',
-    path: '/_mp/api/track',
-    note: '埋点端点（r3 §8.2 PostHog 风格 base64 batch）；复刻可空实现（02 §6.1）',
-  },
   { method: 'PATCH', path: '/api/teams/{id}/providers/{pid}' },
-  { method: 'PATCH', path: '/api/teams/{id}/agents/{aid}' },
   { method: 'PATCH', path: '/api/teams/{id}/chief', note: '绑定 Agent（r5 §2 抓包）' },
   {
     method: 'POST',
@@ -306,10 +294,8 @@ export const DELETE_FACE = {
   rule: 'REST 同名 DELETE（02 §6.1）',
   resources: [
     'teams/{id}/machines',
-    'teams/{id}/agents/{aid}',
     'teams/{id}/skills',
     'teams/{id}/mcp-servers',
-    'teams/{id}/agents/{aid}/memories',
     'teams/{id}/providers',
     'teams/{id}/secrets',
     'todos',

@@ -117,7 +117,6 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     return c.json(ticket);
   });
 
-  app.get('/api/auth/session', (c) => c.json(ctx.user));
   app.get('/api/user/me', (c) => c.json(ctx.user));
 
   app.patch('/api/user/me', async (c) => {

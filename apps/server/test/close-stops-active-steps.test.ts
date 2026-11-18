@@ -76,7 +76,6 @@ function makeWorld(opts: {
         name: machineId,
         online: opts.machineOnline ?? true,
         maxConcurrent: 8,
-        enabledRuntimes: ['pi'],
       }),
     )
     .run();

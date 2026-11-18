@@ -107,13 +107,6 @@
       "section": "volume"
     },
     {
-      "id": "harness.profile-opt-in",
-      "date": "2026-10-08",
-      "ruling": "Harness profile rules live here; new harness surfaces are opt-in.",
-      "spec": "docs/spec/30-harness-profile-opt-in.md",
-      "section": "volume"
-    },
-    {
       "id": "tokens.canonical",
       "date": "2026-10-08",
       "ruling": "The canonical color and geometry token table lives here; UI code consumes tokens, not literals.",

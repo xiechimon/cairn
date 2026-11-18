@@ -62,7 +62,6 @@ function insertMachine(
       teamId: w.teamId,
       name: opts.id,
       online: opts.online ?? true,
-      enabledRuntimes: opts.runtimes ?? ['pi'],
       capabilities: opts.capabilities === undefined ? null : opts.capabilities,
       ...(opts.claudeModels !== undefined
         ? {

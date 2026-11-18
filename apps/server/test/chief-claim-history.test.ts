@@ -41,11 +41,6 @@ function world(provider = 'claude-code') {
     auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
   } as ClaudeCodeReport;
   const machineId = insertMachine(s, { name: 'omarchy', claudeCodeReport: report });
-  s.db
-    .update(machineTable)
-    .set({ enabledRuntimes: ['pi', 'claude-code'] })
-    .where(eq(machineTable.id, machineId))
-    .run();
   seedRoute(s, 'coordinator', {
     provider,
     modelId: 'sonnet',

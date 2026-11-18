@@ -380,11 +380,6 @@ describe('resolveStepCredentials routing', () => {
 
   test('a session work policy that names no secrets opens none, whatever the rule row carries', async () => {
     const s = await withRoutedStack();
-    s.db
-      .update(routingRule)
-      .set({ secrets: ['STRIPE_API_KEY'] })
-      .where(and(eq(routingRule.teamId, s.team.id), eq(routingRule.use, 'session')))
-      .run();
     seedPolicy(s, 'session', { secrets: [] });
     expect(resolveStepCredentials(s.keysvc, addStep(s, s.buildId, 'build')).secrets).toEqual({});
   });

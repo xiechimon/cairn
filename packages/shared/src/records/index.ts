@@ -35,7 +35,6 @@ export * from './deploy-status.js';
 export * from './document-diff.js';
 export * from './github.js';
 export * from './github-label.js';
-export * from './harness-profile.js';
 export * from './machine.js';
 export * from './machine-capabilities.js';
 export * from './mcp-connector.js';

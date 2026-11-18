@@ -15,13 +15,13 @@
 
 | Item | Count |
 |---|---|
-| Features | 56 |
+| Features | 55 |
 | status shipped | 45 |
-| status partial | 9 |
+| status partial | 8 |
 | status planned | 2 |
 | research, frontend design and backend design all present or not applicable | 27 |
 | Research gaps | 13 |
-| Frontend design gaps | 16 |
+| Frontend design gaps | 15 |
 | Backend design gaps | 18 |
 | notes cited but not on main | 20 |
 
@@ -70,7 +70,6 @@
 | [Coordinator over MCP](#coordinator-mcp) | 3 | shipped | gap | n/a | yes | B11 |
 | [Built-in git hosting](#git-hosting) | 3 | shipped | gap | n/a | gap | B11 |
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
-| [Harness profile](#harness-profile) | 3 | partial | yes (not on main) | gap | yes | B9 |
 | [IM connections](#im-connections) | 3 | partial | n/a | yes | yes |  |
 | [MCP servers](#mcp-servers) | 3 | shipped | yes | yes | yes |  |
 | [Projects](#projects) | 3 | shipped | yes | yes | yes |  |
@@ -165,7 +164,6 @@ Settings that change how harnesses run on each machine: skills, MCP servers, the
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Harness profile](#harness-profile) | 3 | Frontend design: the settings section planned in plan §22.7 is not in the repository |
 | [Quota wait](#quota-wait) | 3 | Frontend design: the quota banner and waiting thread state have no design<br>Backend design: no design for rate-limit events, account cooldown and resume |
 | [Skills](#skills) | 3 | Research: no current note on how Amp, t3code and Claude Code manage skills across machines |
 
@@ -525,14 +523,6 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
-
-### harness-profile
-
-**Harness profile** (partial). Spec 30: an opt-in, secret-free profile that keeps harness configuration the same across machines; default off.
-
-- Research: [docs/research/t3code-devices-and-scope-2026-11-06.md](research/t3code-devices-and-scope-2026-11-06.md) (not on main)
-- Frontend design: **gap**: the settings section planned in plan §22.7 is not in the repository
-- Backend design: [docs/spec/30-harness-profile-opt-in.md](spec/30-harness-profile-opt-in.md)
 
 ### im-connections
 

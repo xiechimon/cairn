@@ -221,7 +221,6 @@ describe('#1108 queue projection (position + waiting target + read-surface mount
           teamId: w.s.team.id,
           name: 'cap-mbp-b',
           online: true,
-          enabledRuntimes: ['pi'],
           maxConcurrent: 3,
         }),
       )

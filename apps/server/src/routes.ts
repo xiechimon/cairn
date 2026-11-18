@@ -1,6 +1,5 @@
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { registerAgentRoutes } from './routes-agents.js';
 import { registerBuildRoutes } from './routes-builds.js';
 import { registerChiefRoutes } from './routes-chief.js';
 import { registerComputerScreenRoutes } from './routes-computer-screen.js';
@@ -11,6 +10,7 @@ import { registerDraftRoutes } from './routes-drafts.js';
 import { registerGitHostingRoutes } from './routes-git-hosting.js';
 import { githubAppOf } from './routes-helpers.js';
 import { registerImRoutes } from './routes-im.js';
+import { registerMemoryRoutes } from './routes-memories.js';
 import { registerProjectRoutes } from './routes-projects.js';
 import { registerPushRoutes } from './routes-push.js';
 import { registerResourceRoutes } from './routes-resources.js';
@@ -29,14 +29,11 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerUploadRoutes(app, ctx);
   registerDraftRoutes(app, ctx);
   registerChiefRoutes(app, ctx);
-  registerAgentRoutes(app, ctx);
+  registerMemoryRoutes(app, ctx);
   registerResourceRoutes(app, ctx);
   registerGitHostingRoutes(app, ctx);
   registerPushRoutes(app, ctx);
   registerImRoutes(app, ctx);
-
-  app.post('/api/analytics/first-touch', () => new Response(null, { status: 204 }));
-  app.post('/_mp/api/track', () => new Response(null, { status: 204 }));
 
   app.all('/api/mcp', (c) =>
     handleMcpRequest(

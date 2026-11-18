@@ -8,10 +8,7 @@ const REJECTED_PREFIX = 'split-proposal-rejected:v1\n';
 async function world() {
   const s = bootServer();
   const machineId = insertMachine(s, { name: 'proposal-machine' });
-  s.db
-    .update(machine)
-    .set({ online: true, enabledRuntimes: ['pi'] })
-    .run();
+  s.db.update(machine).set({ online: true }).run();
   seedSessionRoute(s, { provider: 'pi', machineId });
   const projectId = await postProject(s.app);
   expect(

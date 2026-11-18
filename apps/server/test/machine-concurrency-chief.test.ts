@@ -292,7 +292,7 @@ describe('#1260 read-surface semantics (runningSteps includes running chiefs)', 
     setCap(w, 1);
     w.s.db
       .update(machineTable)
-      .set({ online: true, enabledRuntimes: ['pi'] })
+      .set({ online: true })
       .where(eq(machineTable.id, w.machineAId))
       .run();
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000, kind: 'chief' });
@@ -387,7 +387,7 @@ describe('chief turns never wait behind a worker step another machine owns', () 
       .get()!.id;
     w.s.db
       .update(machineTable)
-      .set({ online: true, enabledRuntimes: ['pi'] })
+      .set({ online: true })
       .where(eq(machineTable.id, otherMachineId))
       .run();
     seedSessionRoute(w.s, {

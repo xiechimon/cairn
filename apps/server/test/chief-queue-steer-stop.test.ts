@@ -99,7 +99,7 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
   const machineId = s.db.select().from(machineTable).limit(1).all()[0]!.id;
   s.db
     .update(machineTable)
-    .set({ online: true, enabledRuntimes: ['pi'], maxConcurrent: 4 })
+    .set({ online: true, maxConcurrent: 4 })
     .where(eq(machineTable.id, machineId))
     .run();
   seedRoute(s, 'coordinator', {
@@ -701,10 +701,7 @@ describe('chief unavailable (T4)', () => {
 
   test('a backup model on another runtime is skipped, so the thread session stays usable', async () => {
     const w = await setupWorld([{ provider: 'claude-code', modelId: 'sonnet' }]);
-    w.s.db
-      .update(machineTable)
-      .set({ enabledRuntimes: ['pi', 'claude-code'] })
-      .run();
+    w.s.db;
     await w.send('第一句');
     const running = await w.claim();
     await w.done(running!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
@@ -722,7 +719,6 @@ describe('chief unavailable (T4)', () => {
     w.s.db
       .update(machineTable)
       .set({
-        enabledRuntimes: ['pi', 'claude-code', 'gemini'],
         claudeCodeReport: subscriptionClaudeReport,
       })
       .run();

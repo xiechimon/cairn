@@ -3,8 +3,8 @@ set -euo pipefail
 BASE=http://127.0.0.1:8791
 cd "$(mktemp -d)"
 
-echo '== 1. GET /api/auth/session =='
-curl -s $BASE/api/auth/session; echo
+echo '== 1. GET /api/user/me =='
+curl -s $BASE/api/user/me; echo
 
 echo '== 2. GET /api/teams (always one seeded row) =='
 TEAM=$(curl -s $BASE/api/teams | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const t=JSON.parse(d)[0];console.error(JSON.stringify(t));console.log(t.id)})")

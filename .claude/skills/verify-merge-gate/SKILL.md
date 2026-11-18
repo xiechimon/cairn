@@ -56,7 +56,7 @@ Each negative control drops exactly the guard its property names, and its counte
 
 Checked against the code on 2026-11-16. The full write-ups, including the reasoning, are in `evidence/findings.md`, a snapshot taken when each was found. Numbers follow that file; F3 and F5 are no longer true and are omitted here.
 
-- **F1 (P4, live gap)**: `mergeThroughGithub` through `apiMergeGate` (`build-github-merge.ts`) merges with the checkpoint pin alone (`pull.headSha === checkpoint`, `sha: checkpoint`). Neither it nor `build-merge-request.ts` references `mergeReadiness` or any verdict, so the digest is not re-derived at merge time. `mergeReadiness` is called from `merge-gate-run.ts`, `local-merge-facts.ts` and `merge-gate/harness-eval-judge.ts`. Whether a stored evaluation gates this path was not re-checked. The P4 counterexample is three verdicts, `Evaluate`, `BaseMoveInteracting`, merge: the head SHA is unchanged while the diff against the default branch is not.
+- **F1 (P4, live gap)**: `mergeThroughGithub` through `apiMergeGate` (`build-github-merge.ts`) merges with the checkpoint pin alone (`pull.headSha === checkpoint`, `sha: checkpoint`). Neither it nor `build-merge-request.ts` references `mergeReadiness` or any verdict, so the digest is not re-derived at merge time. `mergeReadiness` is called from `merge-gate-run.ts` and `merge-gate/harness-eval-judge.ts`. Whether a stored evaluation gates this path was not re-checked. The P4 counterexample is three verdicts, `Evaluate`, `BaseMoveInteracting`, merge: the head SHA is unchanged while the diff against the default branch is not.
 - **F2 (P1H, model-only)**: dropping only the review-head equality still yields a counterexample, so the head check is load-bearing on its own. In the code both conditions are one conjunction in the same filter.
 - **F4 (local path, wired)**: `enqueueLocalMerge` (`local-merge.ts`) judges through `localGateFacts`; `landLocalMerge` (`apps/daemon/src/local-merge.ts`) calls `decideLocalMerge` before building the candidate and again before landing, and lands through `landGitSquash`, which updates the ref with `git update-ref --stdin`. The earlier audit recorded that the update carries the expected old value, so the fast-forward check and the update are one step; this was not re-audited.
 - **F6 (hosted landing, not covered by P3)**: `applyMergeLanding` (`machine-merge-landing.ts`, hosted projects) awaits `isAncestor`, then several checks, then a separate `updateBranchRef`, so an intervening advance can be overwritten. The reproduction is `evidence/local-landing-race.json`. See F6 before using this model to accept a change to that path.
@@ -138,7 +138,6 @@ Not in scope: scheduler and chief wiring, the CI green-wash loop, `unstable` mer
   apps/server/src/services/machine-merge-landing.ts
   apps/server/src/services/machine-finish-step.ts
   apps/server/src/services/local-merge.ts
-  apps/server/src/services/local-merge-facts.ts
   apps/server/src/services/merge-gate-run.ts
   apps/server/src/lib/github.ts
   packages/shared/src/records/project.ts

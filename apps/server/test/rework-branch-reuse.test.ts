@@ -83,7 +83,6 @@ function makeWorld(opts: WorldOpts = {}): World {
         teamId: s.team.id,
         name: `owner-${suffix}`,
         online: true,
-        enabledRuntimes: ['pi'],
       }),
     )
     .run();
@@ -95,7 +94,6 @@ function makeWorld(opts: WorldOpts = {}): World {
         teamId: s.team.id,
         name: `other-${suffix}`,
         online: true,
-        enabledRuntimes: ['pi'],
       }),
     )
     .run();

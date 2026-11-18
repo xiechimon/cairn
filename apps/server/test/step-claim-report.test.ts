@@ -54,9 +54,7 @@ function makeWorld(opts: WorldOpts = {}) {
     .run();
   s.db
     .insert(machineTable)
-    .values(
-      readyMachine({ id: MACHINE, teamId, name: 'm1', online: true, enabledRuntimes: ['pi'] }),
-    )
+    .values(readyMachine({ id: MACHINE, teamId, name: 'm1', online: true }))
     .run();
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: MACHINE });
   s.db

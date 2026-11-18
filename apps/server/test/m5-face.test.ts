@@ -336,9 +336,6 @@ describe('M5 vocabulary completion surface (02 section 6.1 canonical)', () => {
       ).json()) as { todos: { total: number; byPhase: Record<string, number> } };
       expect(progress.todos.total).toBe(1);
       expect(progress.todos.byPhase.todo).toBe(1);
-
-      expect((await req(s.app, 'POST', '/api/analytics/first-touch', {})).status).toBe(204);
-      expect((await req(s.app, 'POST', '/_mp/api/track', {})).status).toBe(204);
     } finally {
       s.dispose();
     }

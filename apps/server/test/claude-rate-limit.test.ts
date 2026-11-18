@@ -68,7 +68,6 @@ async function enroll(s: ReturnType<typeof bootServer>, key: string, name: strin
     .update(machineTable)
     .set({
       online: true,
-      enabledRuntimes: ['pi', 'claude-code'],
       claudeCodeReport: {
         installed: true,
         hostname: name,

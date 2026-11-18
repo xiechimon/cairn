@@ -461,14 +461,9 @@ describe('work_policy: tools, skills and secrets live on the policy', () => {
     });
   });
 
-  test('permission columns left on the routing rule grant nothing', async () => {
+  test('a routing rule grants no permissions of its own', async () => {
     const w = await setupWorld();
-    const ruleId = sessionRule(w.s);
-    w.s.db
-      .update(routingRule)
-      .set({ tools: ['rule-tool'], secrets: ['RULE_SECRET'] })
-      .where(eq(routingRule.id, ruleId))
-      .run();
+    sessionRule(w.s);
     const todoRow = await buildTodo(w);
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
       tools: [],
@@ -574,7 +569,6 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     auth: ClaudeCodeReport['auth'] = undefined,
   ): string {
     const id = insertMachine(s, {
-      enabledRuntimes: ['pi', 'claude-code'],
       claudeCodeReport: {
         installed: true,
         hostname: 'h',
@@ -587,7 +581,7 @@ describe('rules store provider ids, with a read-time default for Session', () =>
   }
 
   function piOnlyRunner(s: TestServer, codex: 'ok' | 'absent' = 'absent'): string {
-    const id = insertMachine(s, { enabledRuntimes: ['pi'] });
+    const id = insertMachine(s);
     const row = s.db.select().from(machineTable).where(eq(machineTable.id, id)).get()!;
     s.db
       .update(machineTable)

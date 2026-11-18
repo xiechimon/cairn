@@ -83,7 +83,7 @@ test('relay grants reject private, different installation and old generation wit
   expect(pairFromGrant(s.db, { ...input, relayScope: SCOPE })).toBeNull();
   expect(s.db.select().from(pairedDevice).all()).toHaveLength(1);
   expect(resolveBrowserSession(s.db, paired!.sessionToken)).toBeNull();
-  for (const path of ['/api/auth/session', '/api/auth/stream-ticket']) {
+  for (const path of ['/api/user/me', '/api/auth/stream-ticket']) {
     const denied = await s.app.request(path, {
       method: path.endsWith('stream-ticket') ? 'POST' : 'GET',
       headers: { cookie: `cairn_auth=${paired!.sessionToken}`, 'sec-fetch-site': 'same-origin' },
@@ -114,7 +114,7 @@ test('private grants cannot be converted to relay credentials and private HTTP s
   ).toBeNull();
   expect(
     (
-      await s.app.request('/api/auth/session', {
+      await s.app.request('/api/user/me', {
         headers: { cookie: `cairn_auth=${paired.sessionToken}` },
       })
     ).status,

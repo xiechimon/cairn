@@ -103,7 +103,6 @@ const INFERRED_ROUTES = [
   'DELETE /api/teams/{id}/browser-password-grants/{grantId}',
   'GET /api/teams/{id}/api-keys',
   'POST /api/teams/{id}/api-keys',
-  'GET /api/remote/identity',
   'GET /api/remote/descriptor',
   'GET /api/remote/tailscale',
   'POST /api/remote/tailscale',
@@ -174,7 +173,6 @@ const INFERRED_ROUTES = [
 ];
 
 const CORE_ROUTES = [
-  'GET /api/auth/session',
   'GET /api/user/me',
   'GET /api/teams',
   'GET /api/teams/{id}/members',
@@ -221,7 +219,6 @@ const M5_ROUTES = [
   'GET /api/teams/{id}/skills/{sid}',
   'GET /api/teams/{id}/skills/{sid}/file',
   'GET /api/skills',
-  'POST /api/analytics/first-touch',
   'GET /api/conversations/{id}/stream',
   'PUT /api/streams/{connectionId}/conversations',
   'GET /api/builds/{id}/plans',
@@ -289,10 +286,6 @@ describe('the route surface = the 02 §6.1 vocabulary', () => {
     for (const route of M5_ROUTES) {
       expect(have.has(route), `missing ${route}`).toBe(true);
     }
-    const all = new Set(
-      app.routes.filter((r) => r.method !== 'ALL').map((r) => `${r.method} ${r.path}`),
-    );
-    expect(all.has('POST /_mp/api/track'), 'missing POST /_mp/api/track').toBe(true);
   });
 
   test('no invented paths outside the vocabulary ([inferred] surfaces explicitly registered)', () => {
@@ -305,8 +298,8 @@ describe('the route surface = the 02 §6.1 vocabulary', () => {
 describe('seed shape-keeping endpoints (02 §2)', () => {
   const s = bootServer();
 
-  test('GET /api/auth/session and /api/user/me return the seed user, shape kept', async () => {
-    for (const path of ['/api/auth/session', '/api/user/me']) {
+  test('GET /api/user/me returns the seed user, shape kept', async () => {
+    for (const path of ['/api/user/me']) {
       const res = await req(s.app, 'GET', path);
       expect(res.status).toBe(200);
       expect(userRecordSchema.safeParse(await res.json()).success).toBe(true);

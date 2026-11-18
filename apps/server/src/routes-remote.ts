@@ -36,11 +36,6 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     }
   };
 
-  app.get('/api/remote/identity', (c) => {
-    c.header('cache-control', 'no-store');
-    return c.json({ login: null, via: null });
-  });
-
   app.get('/api/remote/descriptor', (c) => {
     const descriptor: RemoteDescriptor = {
       environmentId: remote.environmentId,

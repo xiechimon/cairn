@@ -240,7 +240,7 @@
           "apps/server/src/services/memory.ts",
           "apps/server/src/services/memory-documents.ts",
           "apps/server/src/services/memory-recall.ts",
-          "apps/server/src/routes-agents.ts"
+          "apps/server/src/routes-memories.ts"
         ]
       },
       "routes": {
@@ -251,7 +251,7 @@
       },
       "reach": [
         "open /app",
-        "click label:Coordinator \u8bbe\u7f6e"
+        "click label:Coordinator 设置"
       ],
       "research": [
         "docs/research/personal-agent-memory-2026-11-07.md",
@@ -286,15 +286,12 @@
           "apps/server/src/services/chief-tools.ts",
           "apps/server/src/services/chief-router-tools.ts",
           "apps/server/src/services/orchestrate.ts",
-          "apps/server/src/services/coordinator-route.ts",
-          "apps/server/src/routes-agents.ts"
+          "apps/server/src/services/coordinator-route.ts"
         ]
       },
       "routes": {
         "server": [
-          "/api/todos/:id/orchestrate",
-          "/api/teams/:id/agents",
-          "/api/teams/:id/agents/*"
+          "/api/todos/:id/orchestrate"
         ]
       },
       "reach": [
@@ -636,8 +633,8 @@
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
-        "click label:\u66f4\u591a\u64cd\u4f5c\u2026",
-        "click label:\u63a5\u7ba1"
+        "click label:更多操作…",
+        "click label:接管"
       ],
       "research": [
         "docs/design/durable-threads-and-engines.md"
@@ -684,7 +681,7 @@
         "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:composer-card",
         "type a follow-up while the thread runs",
-        "click label:\u505c\u6b62"
+        "click label:停止"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/stop-button.md"
@@ -750,8 +747,7 @@
       "evidence": [
         "apps/web/e2e/thread-pr-panel.spec.ts",
         "apps/web/test/pr-panel-model.test.ts",
-        "apps/server/test/thread-pr.test.ts",
-        "apps/server/test/pr-wakes.test.ts"
+        "apps/server/test/thread-pr.test.ts"
       ]
     },
     {
@@ -829,7 +825,7 @@
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
-        "click label:\u67e5\u770b\u8ba1\u5212",
+        "click label:查看计划",
         "click testid:doc-pane"
       ],
       "verify": [
@@ -980,7 +976,7 @@
       "id": "agent-computer",
       "name": "The agent's computer",
       "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.",
-      "states": "No computer; one machine card per computer with an activity line (in use by a task or the Coordinator, idle with the last user, none) and no line when offline; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; CloakBrowser license card waiting, rejected key reason, saved, not saved, owner-only refusal; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; own-Mac switch on the machine row in Settings, Computers: off with the warning on the switch hover; state folds into the row's meta line \u2014 finish setup in the Cairn app, installing, verifying read as plain meta text; install failed, not installed, Accessibility missing and Screen Recording missing expand an inline drawer (open by default) with the reason and their actions; ready stays collapsed behind a grant-count meta segment, expanding to standing grants with revoke; own-Mac approval card in the Coordinator conversation (allow once, allow in this conversation or always allow this command, deny); browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
+      "states": "No computer; one machine card per computer with an activity line (in use by a task or the Coordinator, idle with the last user, none) and no line when offline; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; CloakBrowser license card waiting, rejected key reason, saved, not saved, owner-only refusal; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; own-Mac switch on the machine row in Settings, Computers: off with the warning on the switch hover; state folds into the row's meta line — finish setup in the Cairn app, installing, verifying read as plain meta text; install failed, not installed, Accessibility missing and Screen Recording missing expand an inline drawer (open by default) with the reason and their actions; ready stays collapsed behind a grant-count meta segment, expanding to standing grants with revoke; own-Mac approval card in the Coordinator conversation (allow once, allow in this conversation or always allow this command, deny); browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
       "centrality": 1,
       "status": "partial",
       "code": {
@@ -1452,7 +1448,7 @@
       },
       "routes": {
         "server": [
-          "/api/auth/session"
+          "/api/user/me"
         ]
       },
       "reach": [
@@ -2114,35 +2110,6 @@
       ]
     },
     {
-      "id": "harness-profile",
-      "name": "Harness profile",
-      "summary": "Spec 30: an opt-in, secret-free profile that keeps harness configuration the same across machines; default off.",
-      "states": "Off by default with no UI; spec 30 plans a settings section.",
-      "centrality": 3,
-      "status": "partial",
-      "code": {
-        "server": [
-          "apps/server/src/services/harness-profile.ts"
-        ]
-      },
-      "reach": [
-        "settings machines"
-      ],
-      "research": [
-        "docs/research/t3code-devices-and-scope-2026-11-06.md"
-      ],
-      "frontendDesign": {
-        "gap": "the settings section planned in plan \u00a722.7 is not in the repository"
-      },
-      "backendDesign": [
-        "docs/spec/30-harness-profile-opt-in.md"
-      ],
-      "evidence": [
-        "apps/server/test/harness-profile-default-off.test.ts"
-      ],
-      "batch": "B9"
-    },
-    {
       "id": "quota-wait",
       "name": "Quota wait",
       "summary": "When a subscription hits its limit, threads wait for the reset and the board says so.",
@@ -2211,9 +2178,9 @@
       "reach": [
         "settings secrets",
         "click testid:resource-new",
-        "click label:\u673a\u5bc6",
+        "click label:机密",
         "settings vault",
-        "click label:\u6dfb\u52a0\u767b\u5f55"
+        "click label:添加登录"
       ],
       "research": [
         "docs/research/1775-gateway-prior-art.md",
@@ -2402,9 +2369,7 @@
         "server": [
           "/*",
           "/api/teams/:id/stream",
-          "/api/streams/:connectionId/conversations",
-          "/api/analytics/first-touch",
-          "/_mp/api/track"
+          "/api/streams/:connectionId/conversations"
         ]
       },
       "reach": [
@@ -2454,7 +2419,7 @@
         "settings api-keys"
       ],
       "research": {
-        "gap": "the t3code comparison of plan \u00a721 is not in the repository"
+        "gap": "the t3code comparison of plan §21 is not in the repository"
       },
       "frontendDesign": {
         "na": "an API for other harnesses with no page"

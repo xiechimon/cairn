@@ -3,20 +3,10 @@ import { expect, test } from 'vitest';
 import { team } from '../src/db/schema.js';
 import { bootServer, req } from './helpers.js';
 
-test('retired team features stay absent even when their historical settings are enabled', async () => {
+test('retired team features stay absent from the wire and reject writes', async () => {
   const s = bootServer();
   try {
-    s.db
-      .update(team)
-      .set({
-        coAuthorTrailer: true,
-        requestInstructorReview: true,
-        firstPrReportPromptEnabled: true,
-        firstPrReportPromptFirstPrAt: 42,
-        firstPrReportPromptFirstPrNumber: 7,
-      })
-      .where(eq(team.id, s.team.id))
-      .run();
+    s.db.update(team).set({ maxAutonomousMergesPerDay: 7 }).where(eq(team.id, s.team.id)).run();
     const listed = (await (await req(s.app, 'GET', '/api/teams')).json()) as Record<
       string,
       unknown

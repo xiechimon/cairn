@@ -205,7 +205,6 @@ test('completed delivery merge remains claimable despite old autonomy controls',
         teamId: f.s.team.id,
         name: 'Worker',
         online: true,
-        enabledRuntimes: ['pi'],
       }),
     )
     .run();
@@ -232,7 +231,6 @@ test.each(['base', 'checks', 'project', 'delivery'] as const)(
           teamId: f.s.team.id,
           name: 'Worker',
           online: true,
-          enabledRuntimes: ['pi'],
         }),
       )
       .run();

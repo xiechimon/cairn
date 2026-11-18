@@ -24,8 +24,8 @@ test('the owner browser on the server machine opens /app without a token', async
   expect((await teams).status()).toBe(200);
   await expect(page.locator('.token-gate')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
-  const identity = await page.evaluate(async () => (await fetch('/api/remote/identity')).json());
-  expect(identity).toEqual({ login: null, via: null });
+  const descriptor = await page.evaluate(async () => (await fetch('/api/remote/descriptor')).json());
+  expect(descriptor).toMatchObject({ environmentId: expect.any(String), version: 1 });
   const pairing = await page.evaluate(async () => (await fetch('/api/remote/pairing', { method: 'POST' })).status);
   expect(pairing).toBe(201);
   await page.screenshot({ path: testInfo.outputPath('loopback-owner.png'), fullPage: true });

@@ -85,7 +85,6 @@ async function machineOf(
           }
         : {}),
       online: opts.online ?? true,
-      enabledRuntimes: opts.runtimes ?? ['pi'],
       maxConcurrent: opts.maxConcurrent ?? 3,
     })
     .where(eq(machineTable.id, machineId))

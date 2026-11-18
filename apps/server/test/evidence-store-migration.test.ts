@@ -74,11 +74,6 @@ test('evidence migration upgrades its predecessor database without replacing its
     expect(sqlite.prepare('SELECT browserEnabled FROM computer').all()).toEqual([]);
     expect(sqlite.prepare('SELECT coordinatorTurn FROM todo').all()).toEqual([]);
     expect(
-      sqlite
-        .prepare('SELECT lastColdSlimAt, lastColdSlimStepId FROM coordinator_conversation')
-        .all(),
-    ).toEqual([]);
-    expect(
       sqlite.prepare("SELECT name FROM sqlite_master WHERE name = 'feature_flag'").get(),
     ).toBeUndefined();
     expect(

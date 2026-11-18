@@ -87,7 +87,7 @@ describe('retired agent-layer boot path', () => {
           sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('agent', 'legacy_agent_backup')`,
         )
         .map((row) => row.name),
-    ).toEqual(['legacy_agent_backup']);
+    ).toEqual([]);
     close();
   });
 });

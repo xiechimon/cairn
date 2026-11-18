@@ -56,11 +56,6 @@ async function world(opts: { rule?: boolean } = {}): Promise<World> {
   });
   const { token } = (await enrolled.json()) as { token: string };
   const machineId = s.db.select().from(machineTable).get()!.id;
-  s.db
-    .update(machineTable)
-    .set({ enabledRuntimes: ['pi', 'claude-code'] })
-    .where(eq(machineTable.id, machineId))
-    .run();
   if (opts.rule !== false) {
     seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model', machineId });
   }

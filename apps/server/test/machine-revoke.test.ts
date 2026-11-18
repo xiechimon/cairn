@@ -420,7 +420,6 @@ describe('machine token revocation (#2494)', () => {
             name: 'foreign',
             online: true,
             tokenHash: createHash('sha256').update('foreign-token').digest('hex'),
-            enabledRuntimes: ['pi'],
           }),
         )
         .run();

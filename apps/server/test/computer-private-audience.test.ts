@@ -202,9 +202,9 @@ describe('private computer principal boundary with two server-bound AppContexts'
       const response = await get(app, '/api/computers');
       expect(await response.json()).toMatchObject({ computers: [{ id: `computer-${owner.id}` }] });
     }
-    expect(
-      await (await get(aliceApp, '/api/auth/session', 'cairn_session=bob')).json(),
-    ).toMatchObject({ id: s.user.id });
+    expect(await (await get(aliceApp, '/api/user/me', 'cairn_session=bob')).json()).toMatchObject({
+      id: s.user.id,
+    });
   });
 
   test('actual dispatch, redacted incremental output and completion cross raw SSE only to their stored owner', async () => {

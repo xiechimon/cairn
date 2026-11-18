@@ -72,7 +72,7 @@ describe('server OS account avatar fallback', () => {
       await fillSystemAvatar(s.user);
       await decoded(s.user.avatarUrl);
       expect(s.db.select().from(userTable).get()?.avatarUrl).toBeNull();
-      for (const path of ['/api/auth/session', '/api/user/me', `/api/teams/${s.team.id}/members`]) {
+      for (const path of ['/api/user/me', `/api/teams/${s.team.id}/members`]) {
         const response = await req(s.app, 'GET', path);
         expect(response.status).toBe(200);
         const body = JSON.stringify(await response.json());

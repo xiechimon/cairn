@@ -91,16 +91,16 @@ test('A1: forged identity over TCP loopback cannot authenticate', async () => {
   expect(response.status).toBe(401);
 });
 
-test('A2: owner identity no longer gets teams or a signed-in login', async () => {
+test('A2: owner identity no longer gets teams but can read the descriptor', async () => {
   const s = await setup();
   expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
   expect(
-    (await call(s.socketPath, '/api/remote/identity', 'GET', { authorization: `Bearer ${TOKEN}` }))
-      .body,
-  ).toEqual({
-    login: null,
-    via: null,
-  });
+    (
+      await call(s.socketPath, '/api/remote/descriptor', 'GET', {
+        authorization: `Bearer ${TOKEN}`,
+      })
+    ).body,
+  ).toMatchObject({ environmentId: expect.any(String), version: expect.any(Number) });
 });
 
 test.each(['other@example.com', 'sharee@example.com', ''])(

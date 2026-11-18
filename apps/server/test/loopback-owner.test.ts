@@ -86,7 +86,7 @@ test('the owner browser on loopback exchanges a bootstrap for a session', async 
     .find((value) => value.startsWith('cairn_auth='));
   expect(cookie).toBeTruthy();
   expect((await call(port, '/api/teams', { headers: { cookie: cookie ?? '' } })).status).toBe(200);
-  expect((await call(port, '/api/remote/identity')).body).toEqual({ error: 'Unauthorized' });
+  expect((await call(port, '/api/remote/routes')).body).toEqual({ error: 'Unauthorized' });
 });
 
 test('a peer owned by another local user still needs the token', async () => {

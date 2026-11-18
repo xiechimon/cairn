@@ -2,7 +2,7 @@
 
 Audit of every server path where a decision is committed to SQLite and a side effect follows outside that transaction. Crash windows are inferred from code order on 2026-11-04, not reproduced; the last column names the only tests that exist. "Lost" means the effect never happens after a kill and nothing re-derives it. "Dup" means it can happen twice on retry or restart.
 
-There is no general outbox. Most effects are inline calls after separate autocommit statements. `chief-tools.ts`, `todos.ts`, `notifications.ts` and `machine-finish-step.ts` contain no `db.transaction`. The transactions that exist: `sendBuildSteer`, `chief.ts` composer send and answer, `local-merge.ts`, `pr-feedback.ts`, `chief-report.ts`, `autonomous-merge.ts`.
+There is no general outbox. Most effects are inline calls after separate autocommit statements. `chief-tools.ts`, `todos.ts`, `notifications.ts` and `machine-finish-step.ts` contain no `db.transaction`. The transactions that exist: `sendBuildSteer`, `chief.ts` composer send and answer, `local-merge.ts`, `autonomous-merge.ts`.
 
 ## Paths
 

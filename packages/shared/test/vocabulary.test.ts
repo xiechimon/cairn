@@ -210,7 +210,6 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
 
   it('covers the current GET list', () => {
     for (const [method, path] of [
-      ['GET', '/api/auth/session'],
       ['GET', '/api/user/me'],
       ['GET', '/api/teams'],
       ['GET', '/api/teams/{id}/members'],
@@ -223,9 +222,6 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
       ['GET', '/api/teams/{id}/stream'],
       ['GET', '/api/teams/{id}/skills/{sid}'],
       ['GET', '/api/teams/{id}/skills/{sid}/file'],
-      ['GET', '/api/teams/{id}/agents/{aid}'],
-      ['GET', '/api/teams/{id}/agents/{aid}/tasks'],
-      ['GET', '/api/teams/{id}/agents/{aid}/memories'],
       ['GET', '/api/teams/{id}/chief'],
       ['GET', '/api/teams/{id}/chief/threads'],
       ['GET', '/api/projects'],
@@ -273,11 +269,8 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
       ['POST', '/api/builds/{id}/steps'],
       ['POST', '/api/teams/{id}/providers'],
       ['POST', '/api/teams/{id}/mcp-servers'],
-      ['POST', '/api/teams/{id}/agents'],
       ['POST', '/api/schedules'],
-      ['POST', '/api/analytics/first-touch'],
       ['PATCH', '/api/teams/{id}/providers/{pid}'],
-      ['PATCH', '/api/teams/{id}/agents/{aid}'],
       ['PATCH', '/api/teams/{id}/chief'],
     ] as const) {
       expect(has(method, path), `${method} ${path}`).toBe(true);
@@ -533,18 +526,16 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
   });
 });
 
-describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; +devin_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message; 5346 −chief_report −retro_proposal; seq-13 +computer_browser_lease; 5349 −chief_summary)', () => {
+describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; +devin_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message; 5346 −chief_report −retro_proposal; seq-13 +computer_browser_lease; 5349 −chief_summary; 5348 −harness_* −thread_*)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
     expect(INTERNAL_ONLY_TABLES).toContain('autonomy_pause');
-    expect(DB_TABLES).toHaveLength(85);
+    expect(DB_TABLES).toHaveLength(81);
     for (const table of [
       'action_journal',
       'action_proposal',
       'action_subscriber',
       'action_wake_outbox',
       'hosted_cleanup_outbox',
-      'thread_conversation',
-      'thread_entry',
       'mail_account',
       'mail_event',
       'mail_rule',
@@ -591,14 +582,16 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(DB_TABLES).toContain('schedule_report');
     expect(INTERNAL_ONLY_TABLES).toContain('schedule_report');
     expect(DB_TABLES).not.toContain('feishu_binding');
+    expect(DB_TABLES).not.toContain('harness_eval_attempts');
+    expect(DB_TABLES).not.toContain('harness_profile');
+    expect(DB_TABLES).not.toContain('thread_conversation');
+    expect(DB_TABLES).not.toContain('thread_entry');
     expect(DB_TABLES).toContain('push_subscription');
     expect(DB_TABLES).toContain('push_digest_item');
     expect(DB_TABLES).toContain('push_delivery');
     expect(INTERNAL_ONLY_TABLES).toContain('push_delivery');
     expect(DB_TABLES).toContain('apns_device');
     expect(INTERNAL_ONLY_TABLES).toContain('apns_device');
-    expect(DB_TABLES).toContain('harness_eval_attempts');
-    expect(INTERNAL_ONLY_TABLES).toContain('harness_eval_attempts');
     expect(DB_TABLES).toContain('routing_rule');
     expect(INTERNAL_ONLY_TABLES).toContain('routing_rule');
     expect(DB_TABLES).toContain('work_policy');
@@ -611,8 +604,6 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(INTERNAL_ONLY_TABLES).toContain('client_message');
     expect(DB_TABLES).toContain('due_event');
     expect(INTERNAL_ONLY_TABLES).toContain('due_event');
-    expect(DB_TABLES).toContain('harness_profile');
-    expect(INTERNAL_ONLY_TABLES).toContain('harness_profile');
     expect(DB_TABLES).toContain('thread_pr');
     expect(INTERNAL_ONLY_TABLES).toContain('thread_pr');
     expect(DB_TABLES).toContain('composer_draft');

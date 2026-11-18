@@ -283,12 +283,6 @@ describe('#881 home machine online but blocked by the runtime gate (sweepAbandon
       .all()
       .find((m) => m.id !== pinnedId)!;
     setMachineOnline(w.s, otherRow.id, true);
-    w.s.db
-      .update(machineTable)
-      .set({ enabledRuntimes: ['pi', 'claude-code'] })
-      .where(eq(machineTable.id, otherRow.id))
-      .run();
-
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
 
     expect(stepRowOf(w).status).toBe('pending');
@@ -315,11 +309,6 @@ describe('#881 home machine online but blocked by the runtime gate (sweepAbandon
     await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     setMachineOnline(w.s, pinnedId, true);
-    w.s.db
-      .update(machineTable)
-      .set({ enabledRuntimes: ['pi', 'claude-code'] })
-      .where(eq(machineTable.id, pinnedId))
-      .run();
     bindChiefAgent(w.s, pinnedId);
 
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 3_000_000);

@@ -37,14 +37,13 @@ function localRows(db: ReturnType<typeof bootServer>['db'], teamId: string) {
 }
 
 describe('local-machine row seed (spec 11 A8: server boot seed, idempotent)', () => {
-  test('seed creates kind=local row (name=os.hostname(), enabledRuntimes default [pi])', () => {
+  test('seed creates a kind=local row named after the host', () => {
     const s = bootServer();
     try {
       seedLocalMachine(s.db, s.team.id);
       const rows = localRows(s.db, s.team.id);
       expect(rows).toHaveLength(1);
       expect(rows[0]?.kind).toBe('local');
-      expect(rows[0]?.enabledRuntimes).toEqual(['pi']);
     } finally {
       s.dispose();
     }
@@ -150,7 +149,6 @@ describe('enroll hostname same law (spec 11 A9: loopback enroll lands kind=local
         .all()
         .find((r) => r.name === 'lan-box');
       expect(row?.kind).toBe('remote');
-      expect(row?.enabledRuntimes).toEqual(['pi']);
     } finally {
       s.dispose();
     }
@@ -201,7 +199,6 @@ describe('PATCH /api/machines/{id} (runtimes follow detection)', () => {
       s.db
         .update(machineTable)
         .set({
-          enabledRuntimes: ['pi', 'gemini'],
           claudeCodeReport: { installed: true, hostname: 'local', models: [] },
         })
         .where(eq(machineTable.id, id))
@@ -216,7 +213,13 @@ describe('PATCH /api/machines/{id} (runtimes follow detection)', () => {
         expect(res.status).toBe(409);
         expect(((await res.json()) as { error: string }).error).toMatch(/no runtime switch/);
       }
-      expect(localRows(s.db, s.team.id)[0]?.enabledRuntimes).toEqual(['pi', 'gemini']);
+      const after = (await (
+        await req(s.app, 'GET', `/api/teams/${s.team.id}/machines`)
+      ).json()) as unknown[];
+      expect(
+        machineRecordSchema.parse(after.find((m) => (m as { id: string }).id === id))
+          .enabledRuntimes,
+      ).toEqual(['pi', 'claude-code']);
     } finally {
       s.dispose();
     }
@@ -248,7 +251,6 @@ describe('PATCH /api/machines/{id} (runtimes follow detection)', () => {
         enabledRuntimes: 'pi',
       });
       expect(shape.status).toBe(400);
-      expect(localRows(s.db, s.team.id)[0]?.enabledRuntimes).toEqual(['pi']);
     } finally {
       s.dispose();
     }

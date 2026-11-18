@@ -96,10 +96,6 @@ function equipMachine(
     .update(machineTable)
     .set({
       online: true,
-      enabledRuntimes: [
-        ...(options.claude ? ['claude-code'] : []),
-        ...(options.codex ? ['pi'] : []),
-      ],
       claudeCodeReport: options.claude
         ? {
             installed: true,
@@ -341,11 +337,6 @@ describe('a routed model only runs on a machine that can host it', () => {
   test("Codex needs the team's openai-codex provider row, not a Runner login", async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: false });
-    w.s.db
-      .update(machineTable)
-      .set({ enabledRuntimes: ['claude-code', 'pi'] })
-      .where(eq(machineTable.id, w.machineId))
-      .run();
     const row = () =>
       w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!;
     const codex = { provider: 'openai-codex', modelId: 'gpt-6.1-sol' };
@@ -373,7 +364,6 @@ describe('a routed model only runs on a machine that can host it', () => {
       .update(machineTable)
       .set({
         online: false,
-        enabledRuntimes: ['claude-code', 'pi'],
         capabilities: { mcpServers: [], skills: [] },
       })
       .where(eq(machineTable.id, other))
@@ -525,7 +515,6 @@ describe('the router respects where the step can actually run', () => {
     w.s.db
       .update(machineTable)
       .set({
-        enabledRuntimes: ['pi'],
         claudeCodeReport: null,
         capabilities: {
           mcpServers: [],
@@ -554,7 +543,6 @@ describe('the router respects where the step can actually run', () => {
     w.s.db
       .update(machineTable)
       .set({
-        enabledRuntimes: ['claude-code'],
         capabilities: { mcpServers: ['linear'], skills: [] },
       })
       .where(eq(machineTable.id, w.machineId))

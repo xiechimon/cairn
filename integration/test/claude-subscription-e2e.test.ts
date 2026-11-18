@@ -140,8 +140,10 @@ describe('one setup-token, stored once, runs a Claude Code task on a host machin
     );
     expect(verified.body).toEqual({ ok: true });
 
-    const machineRow = server.db.select().from(machineTable).get();
-    expect(machineRow?.enabledRuntimes).toEqual(['pi']);
+    const machines = (await (
+      await api(server.url, 'GET', `/api/teams/${server.teamId}/machines`)
+    ).body) as { enabledRuntimes?: string[] }[];
+    expect(machines[0]?.enabledRuntimes).toEqual(['pi']);
 
     const world = await seedWorld(server.url, server.teamId, {
       title: 'subscription probe',

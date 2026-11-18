@@ -307,7 +307,6 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
             teamId: H.teamId,
             name: 'Blocker claim',
             online: true,
-            enabledRuntimes: ['pi'],
           }),
         )
         .run();
@@ -397,7 +396,6 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
             teamId: H.teamId,
             name: 'Unheld claim',
             online: true,
-            enabledRuntimes: ['pi'],
           }),
         )
         .run();

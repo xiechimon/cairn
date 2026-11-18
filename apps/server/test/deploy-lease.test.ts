@@ -101,8 +101,8 @@ test('new claims pause while existing work finishes, then resume without changin
   await req(s.app, 'DELETE', path, { owner: lease.owner });
   expect(await claim()).not.toBeNull();
   expect(
-    s.db.select().from(machine).where(eq(machine.id, machineId)).get()?.enabledRuntimes,
-  ).toEqual(before.enabledRuntimes);
+    s.db.select().from(machine).where(eq(machine.id, machineId)).get()?.claudeCodeReport,
+  ).toEqual(before.claudeCodeReport);
 });
 
 test('a pending long poll rechecks the drain lease after waking', async () => {

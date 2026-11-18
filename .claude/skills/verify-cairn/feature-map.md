@@ -395,7 +395,7 @@ Reach:
 - Research: [docs/research/thread-pr-placement-2026-11-06.md](../../../docs/research/thread-pr-placement-2026-11-06.md) (not on main), [docs/research/review-findings-before-ready-2026-11-07.md](../../../docs/research/review-findings-before-ready-2026-11-07.md)
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review)
 - Backend design: [docs/research/thread-pr-autofix.md](../../../docs/research/thread-pr-autofix.md)
-- Evidence: `apps/web/e2e/thread-pr-panel.spec.ts`, `apps/web/test/pr-panel-model.test.ts`, `apps/server/test/thread-pr.test.ts`, `apps/server/test/pr-wakes.test.ts`
+- Evidence: `apps/web/e2e/thread-pr-panel.spec.ts`, `apps/web/test/pr-panel-model.test.ts`, `apps/server/test/thread-pr.test.ts`
 
 ### thread-transcript
 
@@ -823,24 +823,6 @@ Reach:
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 - Evidence: `apps/web/e2e/github-issue-writeback.spec.ts`, `apps/server/test/github-issues.test.ts`, `apps/server/test/github-connection.test.ts`
-
-### harness-profile
-
-**Harness profile** (partial, centrality 3). Spec 30: an opt-in, secret-free profile that keeps harness configuration the same across machines; default off.
-
-States: Off by default with no UI; spec 30 plans a settings section.
-
-Reach:
-
-1. `settings machines`
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: [docs/research/t3code-devices-and-scope-2026-11-06.md](../../../docs/research/t3code-devices-and-scope-2026-11-06.md) (not on main)
-- Frontend design: **gap**: the settings section planned in plan §22.7 is not in the repository
-- Backend design: [docs/spec/30-harness-profile-opt-in.md](../../../docs/spec/30-harness-profile-opt-in.md)
-- Evidence: `apps/server/test/harness-profile-default-off.test.ts`
 
 ### im-connections
 

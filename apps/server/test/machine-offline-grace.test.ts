@@ -308,7 +308,6 @@ describe('Runner offline grace (docs/design/runner-offline-grace.md)', () => {
           name: 'foreign',
           online: true,
           tokenHash: createHash('sha256').update('foreign-token').digest('hex'),
-          enabledRuntimes: ['pi'],
         }),
       )
       .run();

@@ -55,7 +55,6 @@ async function failedBuild(failure: 'duration' | 'idle' | 'crash' = 'duration') 
         teamId: s.team.id,
         name: 'probe',
         online: true,
-        enabledRuntimes: ['pi'],
       }),
     )
     .run();

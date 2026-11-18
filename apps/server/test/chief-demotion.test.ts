@@ -244,7 +244,7 @@ describe('#1260 route re-source: chief step destination = the coordinator rule h
     const w = await setupWorld({ provider: 'claude-code' });
     w.s.db
       .update(machineTable)
-      .set({ enabledRuntimes: ['pi'], claudeCodeReport: subscriptionClaudeReport })
+      .set({ claudeCodeReport: subscriptionClaudeReport })
       .where(eq(machineTable.id, w.machineAId))
       .run();
     expect((await claimOn(w, w.machineAId))?.step.kind).toBe('chief');

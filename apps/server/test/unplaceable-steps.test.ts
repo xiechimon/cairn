@@ -61,7 +61,6 @@ async function machineOf(
     .update(machineTable)
     .set({
       online: opts.online ?? true,
-      enabledRuntimes: opts.runtimes ?? ['pi'],
       maxConcurrent: opts.maxConcurrent ?? 3,
     })
     .where(eq(machineTable.id, machineId))

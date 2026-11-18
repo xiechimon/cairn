@@ -84,7 +84,7 @@ function makeWorld(opts: WorldOpts = {}): World {
   ] as const) {
     s.db
       .insert(machineTable)
-      .values(readyMachine({ id, teamId: s.team.id, name, online: true, enabledRuntimes: ['pi'] }))
+      .values(readyMachine({ id, teamId: s.team.id, name, online: true }))
       .run();
   }
   seedSessionRoute(s, {

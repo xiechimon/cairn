@@ -57,7 +57,6 @@ function makeWorld(opts: {
       teamId: s.team.id,
       name: `inj-m-${suffix}`,
       online: true,
-      enabledRuntimes: ['pi'],
     })
     .run();
   seedSessionRoute(s, {

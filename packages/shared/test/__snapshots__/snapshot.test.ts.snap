@@ -9363,10 +9363,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > DELETE surface ru
   "DELETE_FACE": {
     "resources": [
       "teams/{id}/machines",
-      "teams/{id}/agents/{aid}",
       "teams/{id}/skills",
       "teams/{id}/mcp-servers",
-      "teams/{id}/agents/{aid}/memories",
       "teams/{id}/providers",
       "teams/{id}/secrets",
       "todos",
@@ -10053,7 +10051,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "push_digest_item",
   "push_delivery",
   "apns_device",
-  "harness_eval_attempts",
   "autonomous_merge_admission",
   "routing_rule",
   "work_policy",
@@ -10064,11 +10061,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "computer_browser_lease",
   "due_event",
   "client_message",
-  "harness_profile",
   "composer_draft",
   "thread_pr",
-  "thread_conversation",
-  "thread_entry",
   "coordinator_conversation",
   "coordinator_entry",
   "coordinator_input",
@@ -10090,11 +10084,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
 
 exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint vocabulary (02 §6.1) 1`] = `
 [
-  {
-    "method": "GET",
-    "note": "保形返回 seed 用户（02 §2.1）",
-    "path": "/api/auth/session",
-  },
   {
     "method": "GET",
     "path": "/api/user/me",
@@ -10256,19 +10245,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "query": [
       "fileName",
     ],
-  },
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/agents/{aid}",
-  },
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/agents/{aid}/tasks",
-  },
-  {
-    "method": "GET",
-    "note": "02 §4.4/r5 §6 实测",
-    "path": "/api/teams/{id}/agents/{aid}/memories",
   },
   {
     "method": "GET",
@@ -10454,11 +10430,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/teams/{id}/mcp-servers",
   },
   {
-    "method": "POST",
-    "note": "→ 201 {id}（r5 §1/§8 补录）",
-    "path": "/api/teams/{id}/agents",
-  },
-  {
     "method": "GET",
     "note": "#1686: VAPID public-key endpoint for pushManager.subscribe applicationServerKey",
     "path": "/api/teams/{id}/push/key",
@@ -10521,22 +10492,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/schedules",
   },
   {
-    "method": "POST",
-    "note": "形状保留、内容自选；可空实现",
-    "path": "/api/analytics/first-touch",
-  },
-  {
-    "method": "POST",
-    "note": "埋点端点（r3 §8.2 PostHog 风格 base64 batch）；复刻可空实现（02 §6.1）",
-    "path": "/_mp/api/track",
-  },
-  {
     "method": "PATCH",
     "path": "/api/teams/{id}/providers/{pid}",
-  },
-  {
-    "method": "PATCH",
-    "path": "/api/teams/{id}/agents/{aid}",
   },
   {
     "method": "PATCH",

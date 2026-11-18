@@ -20,10 +20,11 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
     expect(names).toHaveLength(DB_TABLES.length);
     expect(names).toContain('autonomous_merge_admission');
     expect(names).toContain('chief');
-    expect(names).toContain('thread_conversation');
-    expect(names).toContain('thread_entry');
     expect(names).toContain('attachment');
     expect(names).not.toContain('branch_sync');
+    expect(names).not.toContain('thread_conversation');
+    expect(names).not.toContain('thread_entry');
+    expect(names).not.toContain('harness_profile');
     expect(names).toContain('github_connection');
     expect(names).toContain('schedule');
     expect(names).toContain('schedule_report');
@@ -74,7 +75,6 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
         expect(columns.some((column) => column.name === 'machineAccess')).toBe(true);
         expect(db.select().from(schema.team).get()?.maxAutonomousMergesPerDay).toBe(10);
         expect(db.select().from(schema.autonomousMergeAdmission).all()).toEqual([]);
-        expect(db.select().from(schema.harnessEvalAttempt).all()).toEqual([]);
       } finally {
         sqlite.close();
         rmSync(previous, { recursive: true, force: true });
@@ -113,7 +113,6 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
           .find((row) => row.id === 'legacy')?.maxAutonomousMergesPerDay,
       ).toBe(10);
       expect(db.select().from(schema.pushDelivery).all()).toEqual([]);
-      expect(db.select().from(schema.harnessEvalAttempt).all()).toEqual([]);
     } finally {
       sqlite.close();
       rmSync(directory, { recursive: true, force: true });

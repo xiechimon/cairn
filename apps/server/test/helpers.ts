@@ -427,7 +427,6 @@ export function insertMachine(
   s: TestServer,
   opts: {
     name?: string;
-    enabledRuntimes?: string[];
     claudeCodeReport?: import('@cairn/shared').ClaudeCodeReport | null;
     capabilities?: import('@cairn/shared').MachineCapabilities | null;
   } = {},
@@ -443,7 +442,6 @@ export function insertMachine(
         teamId: s.team.id,
         name: opts.name ?? 'test-machine',
         online: true,
-        enabledRuntimes: opts.enabledRuntimes ?? ['pi', 'claude-code'],
         claudeCodeReport: opts.claudeCodeReport ?? null,
         ...(opts.capabilities !== undefined ? { capabilities: opts.capabilities } : {}),
       }),
@@ -466,7 +464,6 @@ export function insertMachineIntoOldSchema(sqlite: BetterSqlite.Database, teamId
     teamId,
     name: 'test-machine',
     online: true,
-    enabledRuntimes: ['pi', 'claude-code'],
     claudeCodeReport: null,
   });
   const columns = new Set(
@@ -717,7 +714,7 @@ export async function enrollConnectorRunner(
   const body = (await res.json()) as { machineId: string; token: string };
   s.db
     .update(machineTable)
-    .set({ online: true, enabledRuntimes: ['pi'], latestCliVersion: '0.3.0' })
+    .set({ online: true, latestCliVersion: '0.3.0' })
     .where(eq(machineTable.id, body.machineId))
     .run();
   return body;

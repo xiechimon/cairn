@@ -133,7 +133,6 @@ test('presence persists the handshake and rejects stale generations, revisions a
     expect((await w.presence(stale)).status).toBe(409);
   expect(w.read()).toMatchObject({
     online: true,
-    enabledRuntimes: ['pi'],
     capabilities: { confinement: ready },
   });
   expect((await w.presence({ ...w.report, generation: 2, invocation: randomUUID() })).status).toBe(

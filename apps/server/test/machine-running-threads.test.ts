@@ -295,7 +295,6 @@ describe('G3 running threads on a machine', () => {
         teamId: otherTeam,
         name: 'other-mbp',
         online: true,
-        enabledRuntimes: ['pi'],
       })
       .run();
     const foreign = insertThread(w.s, {
