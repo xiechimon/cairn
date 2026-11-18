@@ -111,6 +111,9 @@ describe('tool arguments repair in a Coordinator turn', () => {
       askUser: async () => {
         throw new Error('no ask');
       },
+      transcriptRow: async () => {
+        throw new Error('no transcript');
+      },
     } as ToolChannel;
     const { settled } = await runTurn(
       [
@@ -142,6 +145,9 @@ describe('tool arguments repair in a Coordinator turn', () => {
       },
       askUser: async () => {
         throw new Error('no ask');
+      },
+      transcriptRow: async () => {
+        throw new Error('no transcript');
       },
     } as ToolChannel;
     let secondContext = '';
@@ -175,6 +181,9 @@ describe('tool arguments repair in a Coordinator turn', () => {
       },
       askUser: async () => {
         throw new Error('no ask');
+      },
+      transcriptRow: async () => {
+        throw new Error('no transcript');
       },
     } as ToolChannel;
     const bad = () =>
