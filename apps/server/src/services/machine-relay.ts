@@ -3,7 +3,9 @@ import type { ComputerRelayResult, MachineAskBody, MachineAskResponse } from '@c
 import {
   AGENT_TOOL_SKILL_CREATE,
   AGENT_TOOL_SKILL_UPDATE,
+  COMPUTER_OUTBOUND_TOOLS,
   CONNECTOR_TOOL_PREFIX,
+  computerActionEntry,
   computerToolSchema,
   createSkillBodySchema,
   derivePlaceholderTitle,
@@ -36,7 +38,7 @@ import {
 import { steeredMessageScopes } from './chief-turns.js';
 import { holdCloakLicense } from './cloak-license.js';
 import { infoCardTodoOf } from './computer-thread.js';
-import { executeConnectorToolCall } from './connector-broker.js';
+import { executeConnectorToolCall, gateOutboundAction } from './connector-broker.js';
 import {
   capturePreCallWorld,
   captureToolResult,
@@ -56,7 +58,7 @@ import {
 } from './mcp-servers.js';
 import { isOwnComputerTool } from './own-computer.js';
 import { stepScopeProjectId } from './picked-project.js';
-import { refuseRestrictedTurnTool } from './report-turn.js';
+import { refuseRestrictedTurnTool, turnForcesOutboundApproval } from './report-turn.js';
 import {
   coordinatorMemoryOwner,
   memoryOpsAreTeamScoped,
@@ -152,6 +154,29 @@ export async function relayComputerTool(
   if (row.status !== 'claimed') {
     throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
   }
+  if (COMPUTER_OUTBOUND_TOOLS.includes(name) && turnForcesOutboundApproval(deps.db, row.prompt)) {
+    const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, row.buildId)).get();
+    if (!thread) throw new NotFoundError(`chief thread ${row.buildId}`);
+    const parked = gateOutboundAction(
+      {
+        db: deps.db,
+        reposDir: deps.reposDir,
+        hub: deps.hub,
+        user: deps.user,
+        vapidKeys: deps.vapidKeys,
+        ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
+      },
+      {
+        teamId: thread.teamId,
+        threadId: thread.id,
+        scopeProjectId: stepScopeProjectId(row),
+        untrustedTurn: true,
+      },
+      computerActionEntry(name),
+      params,
+    );
+    if (parked !== null) return { text: parked };
+  }
   return forwardComputerCall(
     deps,
     machineId,
@@ -231,6 +256,7 @@ export async function executeRelayToolCall(
         teamId: threadRow.teamId,
         threadId,
         scopeProjectId: stepScopeProjectId(row),
+        ...(turnForcesOutboundApproval(deps.db, row.prompt) ? { untrustedTurn: true } : {}),
       },
       name,
       params,

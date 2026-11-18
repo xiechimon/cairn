@@ -578,8 +578,8 @@ describe('mail connector slice 1', () => {
       attachmentsDir: s.attachmentsDir,
       skillsDir: s.skillsDir,
     };
-    await expect(executeChiefTool(toolDeps, ctx, 'create_todo', {})).rejects.toThrow(
-      /mail turn cannot call create_todo/,
+    await expect(executeChiefTool(toolDeps, ctx, 'schedule_todo', {})).rejects.toThrow(
+      /mail turn cannot call schedule_todo/,
     );
     const machineDeps = { ...toolDeps, machineHub: s.machineHub };
     await expect(
@@ -592,7 +592,7 @@ describe('mail connector slice 1', () => {
       /mail turn cannot call set_secret/,
     );
     expect(() =>
-      refuseRestrictedTurnTool('[wake:wake] provenance=watch:todo\n', 'create_todo'),
+      refuseRestrictedTurnTool('[wake:wake] provenance=watch:todo\n', 'schedule_todo'),
     ).not.toThrow();
   });
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { INSTALL_PACKAGES_TOOL } from './protocol/computer-tools.js';
 
 export const ACTION_CLASSES = ['free', 'confirm-once', 'send', 'submit', 'owner-only'] as const;
 export type ActionClass = (typeof ACTION_CLASSES)[number];
@@ -145,6 +146,18 @@ export interface ConnectorToolHints {
 const connectorInputSchema = z.record(z.string(), z.unknown());
 const connectorOutputSchema = z.unknown();
 
+export function inputDigest(input: unknown): string {
+  const text = JSON.stringify(input) ?? '';
+  let a = 0x811c9dc5;
+  let b = 0x01000193;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    a = Math.imul(a ^ code, 0x01000193) >>> 0;
+    b = Math.imul(b + code, 0x85ebca6b) >>> 0;
+  }
+  return `${a.toString(16).padStart(8, '0')}${b.toString(16).padStart(8, '0')}`;
+}
+
 export function connectorActionEntry(
   slug: string,
   tool: string,
@@ -162,11 +175,49 @@ export function connectorActionEntry(
     standingGrant: false,
     inverse: null,
     surfaces: ['coordinator'],
-    targetOf: () => slug,
+    targetOf: (input) => `${slug}#${inputDigest(input)}`,
+  };
+}
+
+export const COMPUTER_ACTION_PREFIX = 'computer.';
+
+export const COMPUTER_OBSERVE_TOOLS: readonly string[] = [
+  'browser_snapshot',
+  'computer_observe',
+  'desktop_snapshot',
+];
+
+export const COMPUTER_OUTBOUND_TOOLS: readonly string[] = [
+  'shell',
+  'browser_navigate',
+  'browser_act',
+  'computer_act',
+  'desktop_act',
+  INSTALL_PACKAGES_TOOL,
+];
+
+export function isComputerActionId(id: string): boolean {
+  return id.startsWith(COMPUTER_ACTION_PREFIX);
+}
+
+export function computerActionEntry(tool: string): ActionEntry<Record<string, unknown>, unknown> {
+  return {
+    id: `${COMPUTER_ACTION_PREFIX}${tool}`,
+    toolName: tool,
+    inputSchema: connectorInputSchema,
+    outputSchema: connectorOutputSchema,
+    scope: 'team',
+    class: 'send',
+    standingGrant: false,
+    inverse: null,
+    surfaces: ['coordinator'],
+    targetOf: (input) => `${tool}#${inputDigest(input)}`,
   };
 }
 
 export function connectorActionForId(actionId: string): ActionEntry | undefined {
+  if (isComputerActionId(actionId))
+    return computerActionEntry(actionId.slice(COMPUTER_ACTION_PREFIX.length));
   if (!isConnectorActionId(actionId)) return undefined;
   const rest = actionId.slice(CONNECTOR_ACTION_PREFIX.length);
   const split = rest.indexOf('.');

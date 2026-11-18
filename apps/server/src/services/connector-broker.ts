@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  type ActionEntry,
   CONNECTOR_TOOL_NAME_MAX,
   cachedConnectorToolsSchema,
   connectorActionEntry,
@@ -39,6 +40,7 @@ export interface ConnectorCallContext {
   teamId: string;
   threadId: string;
   scopeProjectId: string | null;
+  untrustedTurn?: boolean;
 }
 
 type ConnectorRow = typeof mcpConnector.$inferSelect;
@@ -166,6 +168,45 @@ function validateAgainstSchema(schema: unknown, value: unknown, path: string): s
   return null;
 }
 
+export function gateOutboundAction(
+  deps: Pick<ConnectorBrokerDeps, 'db' | 'reposDir' | 'hub' | 'convHub' | 'user' | 'vapidKeys'>,
+  ctx: ConnectorCallContext,
+  entry: ActionEntry,
+  params: Record<string, unknown>,
+): string | null {
+  const result = executeAction(
+    { db: deps.db, reposDir: deps.reposDir },
+    {
+      id: entry.id,
+      input: params,
+      actor: 'coordinator',
+      surface: 'coordinator',
+      teamId: ctx.teamId,
+      threadId: ctx.threadId,
+      scopeProjectId: ctx.scopeProjectId,
+      ...(ctx.untrustedTurn === true ? { untrustedTurn: true } : {}),
+      registry: [entry],
+    },
+  );
+  if (result.status !== 'pending') return null;
+  if (result.created)
+    announceQuestion(
+      {
+        db: deps.db,
+        ...(deps.hub !== undefined ? { hub: deps.hub } : {}),
+        ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
+        ...(deps.user !== undefined ? { user: deps.user } : {}),
+        vapidKeys: deps.vapidKeys,
+      },
+      ctx.threadId,
+      proposalCardId(result.proposalId),
+    );
+  return JSON.stringify({
+    ...result,
+    note: '没有发出任何内容。审批卡已发给用户，卡上是这次要发出的全部内容和对象；用户点发送后你会被唤醒，再用完全相同的参数重新调用才会发出，改动任何参数都要重新审批。告诉用户在等批准，然后结束本轮。',
+  });
+}
+
 export async function executeConnectorToolCall(
   deps: ConnectorBrokerDeps,
   ctx: ConnectorCallContext,
@@ -214,37 +255,8 @@ export async function executeConnectorToolCall(
       throw err;
     }
   }
-  const result = executeAction(
-    { db: deps.db, reposDir: deps.reposDir },
-    {
-      id: entry.id,
-      input: params,
-      actor: 'coordinator',
-      surface: 'coordinator',
-      teamId: ctx.teamId,
-      threadId: ctx.threadId,
-      scopeProjectId: ctx.scopeProjectId,
-      registry: [entry],
-    },
-  );
-  if (result.status === 'pending') {
-    if (result.created)
-      announceQuestion(
-        {
-          db: deps.db,
-          ...(deps.hub !== undefined ? { hub: deps.hub } : {}),
-          ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-          ...(deps.user !== undefined ? { user: deps.user } : {}),
-          vapidKeys: deps.vapidKeys,
-        },
-        ctx.threadId,
-        proposalCardId(result.proposalId),
-      );
-    return JSON.stringify({
-      ...result,
-      note: '没有执行任何改动。审批卡已发给用户；只有用户在卡片上批准后服务端才会执行。告诉用户在等批准，然后结束本轮。',
-    });
-  }
+  const parked = gateOutboundAction(deps, ctx, entry, params);
+  if (parked !== null) return parked;
   try {
     return await dispatch();
   } catch (err) {

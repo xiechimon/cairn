@@ -50,6 +50,8 @@ import { deleteTodo } from './todos.js';
 export const APPROVE_CHOICE = '批准执行';
 export const REFUSE_CHOICE = '不执行';
 export const ALWAYS_CHOICE = '以后都允许';
+export const SEND_CHOICE = '发送';
+export const DECLINE_SEND_CHOICE = '不发';
 
 type ProposalStatus = 'pending' | 'refused' | 'executed' | 'failed' | 'expired' | 'superseded';
 export type Decision = 'refuse' | 'allow-once' | 'always' | 'conversation';
@@ -63,6 +65,7 @@ export interface ProposeInput {
   threadId: string;
   scopeProjectId: string | null;
   card?: readonly AskUserQuestion[];
+  untrusted?: boolean;
   subscribe?: boolean;
   now?: number;
 }
@@ -215,6 +218,8 @@ const OWN_COMPUTER_CHOICES: Record<Decision, string> = {
 
 function choiceOf(actionId: string, decision: Decision): string {
   if (OWN_COMPUTER_ACTIONS.includes(actionId)) return OWN_COMPUTER_CHOICES[decision];
+  if (isConnectorActionId(actionId))
+    return decision === 'allow-once' ? SEND_CHOICE : DECLINE_SEND_CHOICE;
   if (decision === 'allow-once') return APPROVE_CHOICE;
   if (decision === 'always') return ALWAYS_CHOICE;
   return REFUSE_CHOICE;
@@ -346,10 +351,14 @@ export function proposeAction(
   input: ProposeInput,
 ): { proposalId: string; created: boolean } {
   const now = input.now ?? nowMs();
-  const stored =
+  const carded =
     input.card === undefined
       ? input.input
       : { ...(input.input as Record<string, unknown>), cardDigest: cardDigest(input.card) };
+  const stored =
+    input.untrusted === true
+      ? { ...(carded as Record<string, unknown>), untrustedTurn: true }
+      : carded;
   const inputHash = hashInput(stored);
   return db.transaction(
     (tx) => {

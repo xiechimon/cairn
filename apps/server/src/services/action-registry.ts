@@ -4,6 +4,8 @@ import {
   type ActionSurface,
   type AskUserQuestion,
   type ExternalActionClass,
+  isComputerActionId,
+  isConnectorActionId,
   isExternalActionClass,
   projectArchiveAction,
   projectDeleteAction,
@@ -20,8 +22,10 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import {
   ALWAYS_CHOICE,
   APPROVE_CHOICE,
+  DECLINE_SEND_CHOICE,
   proposeAction,
   REFUSE_CHOICE,
+  SEND_CHOICE,
   settlePendingProposal,
 } from './action-proposals.js';
 import { actionTierOf } from './autonomy-gates.js';
@@ -42,6 +46,7 @@ export interface ExecuteActionRequest {
   teamId: string;
   threadId?: string;
   scopeProjectId?: string | null;
+  untrustedTurn?: boolean;
   registry?: readonly ActionEntry[];
 }
 
@@ -110,6 +115,89 @@ function bindTodoDelete(db: Db, input: TodoDeleteInput, teamId: string): BoundPr
   };
 }
 
+const CALL_FIELD_LABELS: Record<string, string> = {
+  to: '收件人',
+  recipient: '收件人',
+  recipient_email: '收件人',
+  recipients: '收件人',
+  cc: '抄送',
+  bcc: '密送',
+  subject: '主题',
+  title: '标题',
+  body: '正文',
+  text: '内容',
+  message: '内容',
+  content: '内容',
+  url: '网址',
+  command: '命令',
+};
+const CALL_FIELD_ORDER = ['收件人', '抄送', '密送', '主题', '标题', '网址', '命令', '正文', '内容'];
+const CALL_VALUE_MAX_CHARS = 4000;
+const CALL_TOTAL_MAX_CHARS = 8000;
+
+function callValueText(value: unknown): string {
+  const raw = typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
+  return raw
+    .normalize('NFKC')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, (ch) => (ch === '\n' ? ch : ' '))
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function callFieldLine(label: string, value: unknown): string {
+  const text = callValueText(value);
+  const clipped =
+    text.length > CALL_VALUE_MAX_CHARS
+      ? `${text.slice(0, CALL_VALUE_MAX_CHARS)}…（已截断，原文共 ${text.length} 字）`
+      : text;
+  if (clipped.includes('\n') || clipped.length > 80) {
+    return `${label}：\n${clipped
+      .split('\n')
+      .map((line) => `> ${line}`)
+      .join('\n')}`;
+  }
+  return `${label}：${clipped}`;
+}
+
+function describeCall(input: unknown): string {
+  if (typeof input !== 'object' || input === null) return callFieldLine('内容', input);
+  const fields = Object.entries(input as Record<string, unknown>)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => ({
+      label: CALL_FIELD_LABELS[key] ?? callValueText(key).slice(0, 40),
+      value,
+    }));
+  const rank = (label: string) => {
+    const at = CALL_FIELD_ORDER.indexOf(label);
+    return at < 0 ? CALL_FIELD_ORDER.length : at;
+  };
+  const lines = fields
+    .map((field, index) => ({ ...field, index }))
+    .sort((a, b) => rank(a.label) - rank(b.label) || a.index - b.index)
+    .map((field) => callFieldLine(field.label, field.value));
+  const text = lines.join('\n');
+  return text.length > CALL_TOTAL_MAX_CHARS ? `${text.slice(0, CALL_TOTAL_MAX_CHARS)}…` : text;
+}
+
+function outboundCallCard(entry: ActionEntry, input: unknown): AskUserQuestion[] {
+  const connector = isConnectorActionId(entry.id);
+  const subject = connector
+    ? entry.id.slice('connector.'.length).replace('.', ' · ')
+    : entry.toolName;
+  const verb = connector ? '对外发送' : '对外执行';
+  return [
+    {
+      header: '审批',
+      question: `${verb}：${cardText(subject, CARD_TARGET_MAX_CHARS)}\n${describeCall(input)}\n\n只会按上面的内容发出，发出后无法收回。`,
+      options: connector
+        ? [{ label: SEND_CHOICE }, { label: DECLINE_SEND_CHOICE }]
+        : [{ label: APPROVE_CHOICE }, { label: REFUSE_CHOICE }],
+    },
+  ];
+}
+
 function externalCard(entry: ActionEntry, targetId: string): AskUserQuestion[] {
   const actionClass = entry.class;
   const verb = isExternalActionClass(actionClass) ? EXTERNAL_CLASS_VERBS[actionClass] : actionClass;
@@ -130,6 +218,8 @@ function bindProposal(db: Db, entry: ActionEntry, input: unknown, teamId: string
   const targetId = entry.targetOf(input);
   if (isExternalActionClass(entry.class)) {
     if (entry.scope === 'project') requireOwnedProject(db, targetId, teamId);
+    if (isConnectorActionId(entry.id) || isComputerActionId(entry.id))
+      return { input, card: outboundCallCard(entry, input) };
     return { input, card: externalCard(entry, targetId) };
   }
   requireOwnedProject(db, targetId, teamId);
@@ -174,7 +264,7 @@ type ProposalRow = typeof actionProposal.$inferSelect;
 function storedInputOf(row: ProposalRow): unknown {
   const stored = JSON.parse(row.inputJson) as unknown;
   if (stored !== null && typeof stored === 'object' && !Array.isArray(stored)) {
-    const { cardDigest: _, ...rest } = stored as Record<string, unknown>;
+    const { cardDigest: _, untrustedTurn: __, ...rest } = stored as Record<string, unknown>;
     return rest;
   }
   return stored;
@@ -268,7 +358,8 @@ export function executeAction(
   if (request.actor === 'coordinator' && asks) {
     const covered =
       isExternalActionClass(entry.class) &&
-      (actionTierOf(deps.db, request.teamId, request.scopeProjectId ?? null) === 'full' ||
+      ((request.untrustedTurn !== true &&
+        actionTierOf(deps.db, request.teamId, request.scopeProjectId ?? null) === 'full') ||
         coveringGrant(deps.db, request.teamId, entry, targetId, input) !== undefined);
     if (!covered) {
       if (!request.threadId)
@@ -281,6 +372,7 @@ export function executeAction(
         input: bound.input,
         threadId: request.threadId,
         scopeProjectId: request.scopeProjectId ?? null,
+        ...(request.untrustedTurn === true ? { untrusted: true } : {}),
         ...(bound.card === undefined ? {} : { card: bound.card }),
       });
       return { status: 'pending', ...proposed };

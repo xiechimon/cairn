@@ -85,7 +85,35 @@ Event: history fetch or IDLE line accepted → `received` (ids only) → fetch m
 
 User-visible push title and body are a fixed template naming the rule that matched, not the subject or the body. The href is the Coordinator thread, so `isViewingThread` suppresses push while that thread is open. The in-app snippet is the same template. Raw mail never enters `push.ts` or `notification.snippet`.
 
-The wake prompt carries ids, the rule name, and a fenced excerpt. The server already notified. Prompt text is not the control. A turn whose provenance starts with `mail:` is default-deny at `executeChiefTool` (`apps/server/src/services/chief-tools.ts`) and at every entry in `machine-relay.ts`, including the `ask_user` path that does not go through the switch. The only permitted operation is returning the fenced body of this event. It is not a general history read of arbitrary ids. `CHIEF_TOOL_CATEGORIES` on main also includes organize and execute names (`create_todo`, `update_todo`, `delete_todos`, `schedule_todo`, `unschedule_todo`, `create_project`, `update_project`, `connect_repo`, `create_skill`, `update_skill`, `set_secret`, `delete_secrets`, `cancel_builds`, `merge_builds`) plus `delete_memory`, `set_wake`, and the other private tools. A denylist of notify, memory, computer, shell, and `get_secret` would still let those run. They are refused before dispatch.
+The wake prompt carries ids, the rule name, and a fenced excerpt. The server already notified. Prompt text is not the control. A turn whose provenance starts with `mail:` is default-deny at `executeChiefTool` (`apps/server/src/services/chief-tools.ts`) and at every entry in `machine-relay.ts`, including the `ask_user` path that does not go through the switch. The only permitted operation is returning the fenced body of this event. It is not a general history read of arbitrary ids. `CHIEF_TOOL_CATEGORIES` on main also includes organize and execute names (`create_todo`, `update_todo`, `delete_todos`, `schedule_todo`, `unschedule_todo`, `create_project`, `update_project`, `connect_repo`, `create_skill`, `update_skill`, `set_secret`, `delete_secrets`, `cancel_builds`, `merge_builds`) plus `delete_memory`, `set_wake`, and the other private tools. A denylist of notify, memory, computer, shell, and `get_secret` would still let those run. They are refused before dispatch, except what the section on outbound actions in mail turns lets through.
+
+## Outbound actions in mail turns (owner decision 2026-11-18)
+
+This section replaces the allowlist of "that one read" in the paragraph above and in the Fence section. Basis: `docs/research/prompt-injection-tool-gating-2026-11-18.md`, the lethal trifecta: private data, untrusted content and an outbound channel in one turn. The owner keeps the first two and puts a person on the third: in a turn whose provenance starts with `mail:`, the Coordinator may read, draft, create tasks and use its computer, and every outbound action waits for the owner's confirmation before it happens.
+
+Which tools are outbound, from the registry:
+
+| Tool | In a mail turn |
+|---|---|
+| Read tools (`CHIEF_TOOL_CATEGORIES.read` except `secrets`), `create_todo`, `browser_snapshot`, `computer_observe`, `desktop_snapshot` | run as in an owner turn |
+| Connector tools (`connector_<slug>__<tool>`) with `readOnlyHint: true` | run as in an owner turn |
+| Every other connector tool, whether Gmail send, reply, forward, Slack post or an IM message: an unknown action is outbound unless its tool says it is read-only | confirmation card, class `send` (`destructiveHint` is `submit`) |
+| `shell`, `browser_navigate`, `browser_act`, `computer_act`, `desktop_act`, `install_packages`: they reach the network or other people's sites, so a read-only claim cannot be proven | confirmation card, class `send` |
+| Everything else: memory writes, secrets, `schedule_todo`, `update_*`, `ask_user`, `notify_user`, `request_takeover`, the owner's own Mac (`user_computer_*`), merge and cancel | refused with 403 as before |
+
+The card reuses the approval-card path of `delete_todos` and the own-Mac approvals (`action_proposal`, a parked `approval-<id>` message in the thread, push, 7-day expiry). It is built by the server from the call arguments, never by the model: line one names the connector and tool; then the recipient, subject, body and any other argument, one per line, in that order; a body or any multi-line value is quoted line by line with `> ` so text inside it cannot pass for a field; control, format and bidi characters are removed and each value is clipped at 4000 characters with the original length stated. Connector cards offer `发送` and `不发`; computer cards offer `批准执行` and `不执行`. There is no standing grant, so there is no always-allow.
+
+Paths:
+
+| Path | Behavior |
+|---|---|
+| Mail turn calls an outbound tool | one `pending` proposal per distinct call (the target carries a digest of the arguments, so two drafts make two cards), one card, nothing sent; the tool result tells the model a card is waiting and to end the turn |
+| Owner answers `发送` | the proposal is `executed` and the model is woken. The wake turn inherits the mail turn's rule (`action-proposal:<id>` of a proposal marked `untrustedTurn`). Re-issuing the call with identical arguments sends it; any changed argument is a new proposal and a new card. The grant covers one send |
+| Owner answers `不发`, or the card expires after 7 days, or nobody answers | nothing is sent; the model is woken with `refused` or `expired` and told not to retry unless the owner asks again. An unanswered card stays pending |
+| Owner-started turn, same tool | unchanged: the team or project action tier decides (`full` sends without a card, `guarded` asks) |
+| Report turn | unchanged: the report allowlist already refuses every outbound tool |
+
+Residual risk, named: `create_todo` in a mail turn can put mail text into a task and its GitHub self-issue, and the owner approves only what he sees on a card. A card whose body is long hides its tail past the clip. Prompt injection can still steer what the card says, so the card is the check, not the model.
 
 ## Fence
 
@@ -108,7 +136,7 @@ Implementation must first fail tests for: a Gmail push that stores a message-id 
 - Pub/Sub push retries. Idempotency is the event unique key, not a 200 that forgot to store the id.
 - IDLE on the server ties mailbox reachability to wherever the server runs. That is accepted in v1; see the open decision.
 - `notification` collapses to one row per entity. Using the chief thread id replaces the previous chief snippet. The event rows are the record; the notice is a pointer. Do not mint a second inbox to keep every subject.
-- Prompt injection that survives the fence still cannot send mail in v1, because send does not exist, and cannot call any tool except the fenced body read for this event, because the handler and the relay default-deny this provenance. The system prompt names the fence so the model is told; the handler is what holds.
+- Prompt injection that survives the fence cannot send anything out without the owner's answer on a card, and cannot call a tool outside the mail-turn list; see the section on outbound actions in mail turns. The system prompt names the fence so the model is told; the handler is what holds.
 
 ## Open decisions for the owner
 

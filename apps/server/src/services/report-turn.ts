@@ -1,8 +1,15 @@
 import { createHash } from 'node:crypto';
-import { REPORT_ACK_KIND, type ReportAckContent } from '@cairn/shared';
+import {
+  CHIEF_TOOL_CATEGORIES,
+  COMPUTER_OBSERVE_TOOLS,
+  COMPUTER_OUTBOUND_TOOLS,
+  CONNECTOR_TOOL_PREFIX,
+  REPORT_ACK_KIND,
+  type ReportAckContent,
+} from '@cairn/shared';
 import { eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, chiefMessage, chiefThread, todo } from '../db/schema.js';
+import { actionProposal, build, chiefMessage, chiefThread, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { insertChiefMessageOnce, turnProvenance } from './chief.js';
@@ -34,6 +41,41 @@ const REPORT_REF_TOOLS = new Set([
   'archive_todos',
   'message_thread',
 ]);
+
+const MAIL_TURN_OPEN_TOOLS: ReadonlySet<string> = new Set([
+  ...CHIEF_TOOL_CATEGORIES.read.filter((name) => name !== 'secrets'),
+  'create_todo',
+  ...COMPUTER_OBSERVE_TOOLS,
+]);
+const ACTION_WAKE_PROVENANCE_PREFIX = 'action-proposal:';
+
+function mailTurnAllows(name: string): boolean {
+  return (
+    MAIL_TURN_OPEN_TOOLS.has(name) ||
+    COMPUTER_OUTBOUND_TOOLS.includes(name) ||
+    name.startsWith(CONNECTOR_TOOL_PREFIX)
+  );
+}
+
+function proposalFromUntrustedTurn(db: Db, proposalId: string): boolean {
+  const row = db
+    .select({ inputJson: actionProposal.inputJson })
+    .from(actionProposal)
+    .where(eq(actionProposal.id, proposalId))
+    .get();
+  if (row === undefined) return false;
+  return (JSON.parse(row.inputJson) as { untrustedTurn?: unknown }).untrustedTurn === true;
+}
+
+export function turnForcesOutboundApproval(db: Db, prompt: string | null): boolean {
+  const provenance = turnProvenance(prompt);
+  if (provenance === null) return false;
+  if (provenance.startsWith('mail:')) return true;
+  return (
+    provenance.startsWith(ACTION_WAKE_PROVENANCE_PREFIX) &&
+    proposalFromUntrustedTurn(db, provenance.slice(ACTION_WAKE_PROVENANCE_PREFIX.length))
+  );
+}
 
 export function reportProvenance(todoId: string): string {
   return `${REPORT_PROVENANCE_PREFIX}${todoId}`;
@@ -93,6 +135,7 @@ export function refuseRestrictedTurnTool(
   ownerMessageIds: readonly string[] = [],
 ): void {
   if (turnProvenance(prompt)?.startsWith('mail:') === true) {
+    if (mailTurnAllows(name)) return;
     throw new HttpError(403, `mail turn cannot call ${name}`);
   }
   if (!isReportTurn(prompt) || ownerMessageIds.length > 0) return;

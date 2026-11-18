@@ -282,7 +282,7 @@ export function QuestionChips({
           <ChipTip tip={question.header === '' ? null : question.header}>
             <div
               data-testid="chief-question-text"
-              className={cn(REPLY_BUBBLE_CLS, 'text-ui leading-5 break-words')}
+              className={cn(REPLY_BUBBLE_CLS, 'text-ui leading-5 break-words whitespace-pre-line')}
             >
               {question.question}
             </div>

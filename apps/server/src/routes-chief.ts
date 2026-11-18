@@ -21,6 +21,7 @@ import {
   dispatchActionWakes,
   proposalById,
   proposalCardId,
+  SEND_CHOICE,
 } from './services/action-proposals.js';
 import { sendBuildSteer } from './services/builds.js';
 import {
@@ -208,7 +209,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       );
       const decision: Decision = ownComputer
         ? ownComputerDecisionOf(choice)
-        : choice === APPROVE_CHOICE
+        : choice === APPROVE_CHOICE || choice === SEND_CHOICE
           ? 'allow-once'
           : choice === ALWAYS_CHOICE
             ? 'always'
