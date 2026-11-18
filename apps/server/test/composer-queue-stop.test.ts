@@ -144,6 +144,7 @@ test('steer now consumes the queued bubble once and does not start a later turn'
   expect((await w.send({ content: 'Steer this', queuedMessageId: queued?.id })).status).toBe(409);
   await w.finish('success');
   expect(w.s.db.select().from(step).where(eq(step.buildId, 'build')).all()).toHaveLength(1);
+  expect(w.s.db.select().from(step).where(eq(step.kind, 'chief')).all()).toHaveLength(1);
 });
 
 test('plain send still steers immediately', async () => {

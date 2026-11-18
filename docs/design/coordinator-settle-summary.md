@@ -20,6 +20,7 @@ Finished tasks (`todo.phase -> 'done'`) currently diverge across two broken path
   1. `reportAnsweredIn(deps.db, threadId, todoRecord)` is `true` (an `info` report turn already sent `report-notice-*` or recorded `report-silent-*`).
   2. `options.silentSettleThreadId === threadId` (the Coordinator itself just called `complete_todos` in that thread).
   3. Manual owner phase update (`updateTodo(..., { manualPhase: true })`), which already bypasses `notifyPhaseEntry`.
+  4. An unarchived task still has a deliverable `queuedMessage` (`error === null`) on `latestBuildId`, in which case `drainTaskMessageQueue` immediately continues the task, so `triggerChiefWakes` returns without posting a premature `done` report, enqueueing `[wake:settle]`, or clearing watches.
 - **Active `[wake:settle]`**: inserts `thread-report` with `wakeStepId` and atomically enqueues a `chief` step (`trigger: 'settle'`, `provenance: 'watch:<todoId>'`) inside the `setTodoPhase` SQLite transaction.
 
 ### `[wake:settle]` prompt contract
@@ -42,6 +43,7 @@ Finished tasks (`todo.phase -> 'done'`) currently diverge across two broken path
 | Project-channel task reaches `done` | `insertThreadReport` mirror check | Channel receives wake; main channel gets `fromThreadId` mirror | `ChannelMirrorRow` renders; `chief-sub-thread` never renders | `coordinator-project-channels.test.ts`, `thread-activity.test.ts` |
 | Third-party GitHub issue task settles | `titleAuthor === 'third-party'` | `settleDeliveryBlock` omits worker prose; title stays solely inside `ISSUE_FENCE_OPEN..CLOSE` | Notice shows task chip (`C15`) | `issue-fence.test.ts`, `chief-thread-report.test.ts` |
 | Manual owner mark-done | `updateTodo(..., { manualPhase: true })` | Skips `notifyPhaseEntry`; no wake | No duplicate notice | `routes-todos` / existing suite |
+| Build completes with queued continuation message | `finishTodoDone` before `drainTaskMessageQueue` | Returns early without `thread-report`, `[wake:settle]`, or watch clear while deliverable `queuedMessage` exists | Task stays active into queued turn with no premature notice | `composer-queue-stop.test.ts` |
 
 ## Failure behavior
 

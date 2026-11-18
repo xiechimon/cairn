@@ -73,6 +73,7 @@ import {
   machine,
   message,
   project,
+  queuedMessage,
   step,
   todo,
 } from '../db/schema.js';
@@ -1480,6 +1481,22 @@ export function triggerChiefWakes(
   if (to !== 'done') {
     postThreadReport(deps, todoRecord, to);
     if (to === 'failed') removeChiefWatches(deps, todoRecord.teamId, [todoRecord.id]);
+    return;
+  }
+  if (
+    todoRecord.archivedAt === null &&
+    todoRecord.latestBuildId !== null &&
+    deps.db
+      .select({ id: queuedMessage.id })
+      .from(queuedMessage)
+      .where(
+        and(
+          eq(queuedMessage.conversationId, todoRecord.latestBuildId),
+          isNull(queuedMessage.error),
+        ),
+      )
+      .get() !== undefined
+  ) {
     return;
   }
   const chiefs = deps.db.select().from(chief).where(eq(chief.teamId, todoRecord.teamId)).all();
