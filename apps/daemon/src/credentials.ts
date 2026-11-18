@@ -26,6 +26,7 @@ function openSecretVault(values: Record<string, string>): SecretVault {
 export interface StepCredentials {
   claudeSubscriptionToken?: string;
   devinToken?: string;
+  antigravityToken?: string;
   provider: ProviderConfig | null;
   secrets: SecretVault;
   git: BoundGitCredentials | null;
@@ -39,6 +40,7 @@ export function pushCredential(
     provider: token.provider,
     claudeSubscriptionToken: token.claudeSubscriptionToken,
     ...(token.devinToken !== undefined ? { devinToken: token.devinToken } : {}),
+    ...(token.antigravityToken !== undefined ? { antigravityToken: token.antigravityToken } : {}),
     secrets: openSecretVault(token.secrets),
     git: token.git === null || repoUrl === null ? null : { ...token.git, url: repoUrl },
   };
@@ -48,6 +50,7 @@ export function clearCredentials(creds: StepCredentials): void {
   creds.provider = null;
   delete creds.claudeSubscriptionToken;
   delete creds.devinToken;
+  delete creds.antigravityToken;
   creds.secrets = EMPTY_SECRET_VAULT;
   creds.git = null;
 }

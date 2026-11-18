@@ -13,6 +13,10 @@ import {
 } from '../api/hooks.js';
 import { mapMachines, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import {
+  AntigravityLoginBanner,
+  useAntigravityLoginWarnings,
+} from '../board/antigravity-login-banner.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { ArchivedProjectState } from '../board/archived-project-bar.js';
 import { BackupBanner } from '../board/backup-banner.js';
@@ -162,6 +166,7 @@ export function BoardPage() {
   const backupWarning = backupQ.data ?? null;
   const loginWarnings = useClaudeLoginWarnings(now);
   const devinLoginWarnings = useDevinLoginWarnings(now);
+  const antigravityLoginWarnings = useAntigravityLoginWarnings(now);
   const setup = useFirstRunSetup();
   const [skipped, setSkipped] = useState(setupSkipped);
   const resumeStep = live ? setupResumeStep(setup) : null;
@@ -187,7 +192,9 @@ export function BoardPage() {
     ...(backupWarning != null
       ? [{ kind: 'backup' as const, node: <BackupBanner key="backup" notice={backupWarning} /> }]
       : []),
-    ...(loginWarnings.length > 0 || devinLoginWarnings.length > 0
+    ...(loginWarnings.length > 0 ||
+    devinLoginWarnings.length > 0 ||
+    antigravityLoginWarnings.length > 0
       ? [
           {
             kind: 'login' as const,
@@ -195,6 +202,7 @@ export function BoardPage() {
               <div key="login" className="flex flex-col gap-2">
                 <ClaudeLoginBanner warnings={loginWarnings} />
                 <DevinLoginBanner warnings={devinLoginWarnings} />
+                <AntigravityLoginBanner warnings={antigravityLoginWarnings} />
               </div>
             ),
           },

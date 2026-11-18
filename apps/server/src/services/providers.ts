@@ -1,5 +1,6 @@
 import { hostname } from 'node:os';
 import {
+  DEFAULT_ANTIGRAVITY_MODELS,
   DEFAULT_DEVIN_MODELS,
   type ModelSourceModel,
   type ModelSourcesEnvelope,
@@ -154,6 +155,32 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
   }));
 }
 
+export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
+  return db
+    .select()
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .orderBy(asc(machine.name))
+    .all()
+    .flatMap((row) => {
+      const report = row.capabilities?.antigravity;
+      if (!row.online || report?.installed !== true) return [];
+      const models =
+        report.models !== undefined && report.models.length > 0
+          ? report.models.map((m) => ({ id: m.id, name: m.name, slot: 'builtin' }))
+          : [...DEFAULT_ANTIGRAVITY_MODELS];
+      return [
+        {
+          runtime: 'antigravity' as const,
+          installed: true,
+          hostname: row.name,
+          machineId: row.id,
+          models,
+        },
+      ];
+    });
+}
+
 export function getModelSources(deps: ProviderDeps, teamId: string): ModelSourcesEnvelope {
   const piSources: ModelSourcesEnvelope['sources'] = listProviders(deps, teamId).map((p) => {
     const stored = p.models.filter((m) => m.id !== '');
@@ -177,6 +204,7 @@ export function getModelSources(deps: ProviderDeps, teamId: string): ModelSource
         : [{ runtime: 'pi' as const, installed: true, hostname: hostname(), models: [] }]),
       ...listClaudeCodeSources(deps.db, teamId),
       ...listDevinSources(deps.db, teamId),
+      ...listAntigravitySources(deps.db, teamId),
     ],
   };
 }

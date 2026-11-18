@@ -15,12 +15,18 @@ export function devinSubscriptionMissingMessage(): string {
   );
 }
 
+export function antigravitySubscriptionMissingMessage(): string {
+  return '团队还没有可用的 Antigravity 订阅：请在桌面端登录本机 agy，或在「我的订阅」中填入 GEMINI_API_KEY 后重试。';
+}
+
 export function agentStepRefusal(input: {
   stepKind: string;
   agentTools: readonly string[] | undefined;
   runtimeId: string | null;
   hasSubscriptionToken: boolean;
   hasDevinToken?: boolean;
+  hasAntigravityToken?: boolean;
+  hasAntigravityHostAuth?: boolean;
 }): string | null {
   const agentTools = input.agentTools;
   if (input.stepKind === 'merge' && agentTools !== undefined) {
@@ -34,6 +40,13 @@ export function agentStepRefusal(input: {
   }
   if (input.runtimeId === 'devin' && input.hasDevinToken !== true) {
     return devinSubscriptionMissingMessage();
+  }
+  if (
+    input.runtimeId === 'antigravity' &&
+    input.hasAntigravityToken !== true &&
+    input.hasAntigravityHostAuth !== true
+  ) {
+    return antigravitySubscriptionMissingMessage();
   }
   return null;
 }
@@ -94,10 +107,13 @@ export async function prepareStepPromptDelivery(input: {
     materializeDir: input.materializeDir,
     log,
     imageSupport,
+    ...(input.backend.describeImage === undefined
+      ? {}
+      : { describeImage: input.backend.describeImage.bind(input.backend, input.provider) }),
   });
   if (resolved.skippedNoVision > 0) {
     log(
-      `image attachment skipped: model ${input.modelKey} does not support images (${resolved.skippedNoVision} image(s) not delivered)`,
+      `image attachment not delivered inline: model ${input.modelKey} does not support images (${resolved.skippedNoVision} image(s) delivered as text or file instead)`,
     );
   }
   return {

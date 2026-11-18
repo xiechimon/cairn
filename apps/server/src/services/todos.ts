@@ -48,6 +48,7 @@ import type { FetchLike } from '../lib/github.js';
 import { githubCreateIssue, githubListIssues, githubUpdateIssueTitle } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
 import { checkBlockedBy, holdBlockedBuild, releaseBlockedSteps } from './blockers.js';
 import { triggerChiefWakes } from './chief.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
@@ -457,6 +458,7 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
         : priorSessionOf(deps.db, s, buildRow, {
             claude: enabledSubscriptionId(deps, row.teamId),
             devin: enabledDevinSubscriptionId(deps, row.teamId),
+            antigravity: enabledAntigravitySubscriptionId(deps, row.teamId),
           });
     const named =
       !prior.freshSession && prior.priorSessionId !== null

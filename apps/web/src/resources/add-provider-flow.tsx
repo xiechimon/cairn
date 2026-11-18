@@ -1,20 +1,27 @@
 import { type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useCreateAntigravitySubscription } from '../api/antigravity-subscriptions.js';
 import { useCreateClaudeSubscription } from '../api/claude-subscriptions.js';
 import { useCreateDevinSubscription } from '../api/devin-subscriptions.js';
 import { useApiMutations, useCapabilities } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
+import { AddAntigravitySubscriptionDialog } from './antigravity-subscriptions.js';
 import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
 import type { CreateProviderDialog as CreateProviderDialogModule } from './create-provider-dialog.js';
 import { AddDevinSubscriptionDialog } from './devin-subscriptions.js';
 
-export type AddProviderView = 'closed' | 'picker' | 'subscription' | 'devin-subscription';
+export type AddProviderView =
+  | 'closed'
+  | 'picker'
+  | 'subscription'
+  | 'devin-subscription'
+  | 'antigravity-subscription';
 
 export type CreatedSubscription = { id: string; label: string };
 
-export type SubscriptionSource = 'claude' | 'devin';
+export type SubscriptionSource = 'claude' | 'devin' | 'antigravity';
 
 interface DeviceLogin {
   state: string;
@@ -120,6 +127,7 @@ export function AddProviderFlow({
   const client = useQueryClient();
   const createSubscription = useCreateClaudeSubscription(teamId);
   const createDevinSubscription = useCreateDevinSubscription(teamId);
+  const createAntigravitySubscription = useCreateAntigravitySubscription(teamId);
   const capabilities = useCapabilities(live);
   const [CreateProviderDialog, setCreateProviderDialog] = useState<
     typeof CreateProviderDialogModule | null
@@ -220,6 +228,14 @@ export function AddProviderFlow({
                 }
               : undefined
           }
+          onPickAntigravitySubscription={
+            live
+              ? () => {
+                  createAntigravitySubscription.reset();
+                  onViewChange('antigravity-subscription');
+                }
+              : undefined
+          }
         />
       ) : null}
       {view === 'subscription' && (
@@ -260,6 +276,26 @@ export function AddProviderFlow({
           }
           pending={createDevinSubscription.isPending}
           error={createDevinSubscription.isError}
+        />
+      )}
+      {view === 'antigravity-subscription' && (
+        <AddAntigravitySubscriptionDialog
+          onClose={() => {
+            createAntigravitySubscription.reset();
+            onViewChange('closed');
+          }}
+          onCreate={(body) =>
+            createAntigravitySubscription.mutate(body, {
+              onSuccess: (created) => {
+                createAntigravitySubscription.reset();
+                onViewChange('closed');
+                void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
+                onSubscriptionCreated?.(created, 'antigravity');
+              },
+            })
+          }
+          pending={createAntigravitySubscription.isPending}
+          error={createAntigravitySubscription.isError}
         />
       )}
     </>

@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { gitCredentialEnv } from './git.js';
@@ -17,6 +19,7 @@ export interface StepEnvInput {
   claudeSubscriptionToken: string | undefined;
   devinToken?: string;
   devinHome?: string;
+  antigravityToken?: string;
 }
 
 export interface StepEnv {
@@ -59,6 +62,16 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
     env.HOME = input.devinHome;
     for (const key of Object.keys(env)) {
       if (key.startsWith('CHISEL_') || key.startsWith('DEVIN_')) delete env[key];
+    }
+  }
+  delete env.GEMINI_API_KEY;
+  if (input.antigravityToken !== undefined) {
+    env.GEMINI_API_KEY = input.antigravityToken;
+    const tempBase = input.temporary.TMPDIR;
+    if (tempBase !== undefined && tempBase !== '') {
+      const isolatedGeminiHome = join(tempBase, 'gemini-home');
+      mkdirSync(isolatedGeminiHome, { recursive: true });
+      env.GEMINI_HOME = isolatedGeminiHome;
     }
   }
   return {

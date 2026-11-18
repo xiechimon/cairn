@@ -15,6 +15,7 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, routingRule, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
 import { accountHeld } from './claude-account-hold.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
@@ -67,6 +68,8 @@ function ineligibleBlocked(gap: MachineIneligibility, runtime: string): StepQueu
       return { kind: 'claude-logged-out', missing: [] };
     case 'devin-subscription':
       return { kind: 'devin-subscription', missing: [] };
+    case 'antigravity-subscription':
+      return { kind: 'antigravity-subscription', missing: [] };
   }
 }
 
@@ -179,6 +182,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
   const catalog = mergedCatalogModels();
   const enabledId = enabledSubscriptionId({ db }, teamId);
   const enabledDevinId = enabledDevinSubscriptionId({ db }, teamId);
+  const enabledAntigravityId = enabledAntigravitySubscriptionId({ db }, teamId);
 
   interface WorkerRouting {
     verdict: RouteVerdict;
@@ -203,6 +207,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const prior = priorSessionOf(db, row, row.buildRow, {
       claude: enabledId,
       devin: enabledDevinId,
+      antigravity: enabledAntigravityId,
     });
     const need = agentRow.requiredCapabilities?.os;
     const sole = platformFallbackMachineId(db, teamMachines, defaultMachineId, need);

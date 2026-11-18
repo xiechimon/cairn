@@ -156,6 +156,7 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
       '/api/schedules': [],
       '/api/teams/team-archive/claude-subscriptions': [],
       '/api/teams/team-archive/devin-subscriptions': [],
+      '/api/teams/team-archive/antigravity-subscriptions': [],
       '/api/capabilities': { thinkingLevels: [] },
     };
     if (request.method() === 'GET' && Object.hasOwn(responses, path))

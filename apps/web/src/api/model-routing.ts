@@ -44,11 +44,18 @@ const GRAPH_USES: readonly RouteUse[] = ['coordinator', 'session', 'review', 'co
 
 const CLAUDE_CODE_TARGET = 'claude-code';
 const DEVIN_TARGET = 'devin';
+const ANTIGRAVITY_TARGET = 'antigravity';
+
+const SUBSCRIPTION_TARGETS: Record<string, 'claude-code' | 'devin' | 'antigravity'> = {
+  [CLAUDE_CODE_TARGET]: 'claude-code',
+  [DEVIN_TARGET]: 'devin',
+  [ANTIGRAVITY_TARGET]: 'antigravity',
+};
 
 export interface RoutingTargetRow {
   id: string;
   name: string;
-  runtime: 'claude-code' | 'devin' | 'pi';
+  runtime: 'claude-code' | 'devin' | 'antigravity' | 'pi';
   unavailable: boolean;
   record?: ProviderRecord;
 }
@@ -56,11 +63,13 @@ export interface RoutingTargetRow {
 export function routingTargets({
   subscriptions,
   devinSubscriptions = [],
+  antigravitySubscriptions = [],
   providers,
   routing,
 }: {
   subscriptions: readonly SubscriptionAccount[];
   devinSubscriptions?: readonly SubscriptionAccount[];
+  antigravitySubscriptions?: readonly SubscriptionAccount[];
   providers: readonly ProviderRecord[];
   routing: ModelRouting | undefined;
 }): RoutingTargetRow[] {
@@ -75,6 +84,12 @@ export function routingTargets({
       id: `subscription:${account.id}`,
       name: account.label,
       runtime: 'devin' as const,
+      unavailable: account.state === 'expired',
+    })),
+    ...antigravitySubscriptions.map((account) => ({
+      id: `subscription:${account.id}`,
+      name: account.label,
+      runtime: 'antigravity' as const,
       unavailable: account.state === 'expired',
     })),
   );
@@ -92,8 +107,8 @@ export function routingTargets({
 }
 
 function targetOfRule(provider: string, targets: readonly RoutingTargetRow[]) {
-  if (provider === CLAUDE_CODE_TARGET || provider === DEVIN_TARGET) {
-    const runtime = provider === CLAUDE_CODE_TARGET ? 'claude-code' : 'devin';
+  const runtime = SUBSCRIPTION_TARGETS[provider];
+  if (runtime !== undefined) {
     const owned = targets.filter((target) => target.runtime === runtime);
     return owned.find((target) => !target.unavailable) ?? owned[0];
   }
@@ -157,6 +172,15 @@ export function ruleGraphGroups(
     groups.push({
       label: 'Devin',
       nodes: [{ id: 'devin-models', name: t('所有 Devin 模型'), target: devin.id }],
+    });
+  }
+  const antigravity = targetOfRule(ANTIGRAVITY_TARGET, targets);
+  if (antigravity !== undefined) {
+    groups.push({
+      label: 'Antigravity',
+      nodes: [
+        { id: 'antigravity-models', name: t('所有 Antigravity 模型'), target: antigravity.id },
+      ],
     });
   }
   return groups;

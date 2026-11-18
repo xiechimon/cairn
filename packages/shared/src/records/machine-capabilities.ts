@@ -126,6 +126,22 @@ export const devinReportSchema = z
   .strict();
 export type DevinReport = z.infer<typeof devinReportSchema>;
 
+export const antigravityModelSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+});
+
+export const antigravityReportSchema = z
+  .object({
+    installed: z.boolean(),
+    version: z.string().min(1).max(64).optional(),
+    authenticated: z.boolean().optional(),
+    source: z.enum(['local', 'managed']).optional(),
+    models: z.array(antigravityModelSchema).optional(),
+  })
+  .strict();
+export type AntigravityReport = z.infer<typeof antigravityReportSchema>;
+
 export const agentReachReportSchema = z.object({
   version: z.string().min(1).max(32),
   channels: z
@@ -204,6 +220,7 @@ export const machineCapabilitiesSchema = z.object({
   mcpConnectors: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
   devin: devinReportSchema.optional(),
+  antigravity: antigravityReportSchema.optional(),
   confinement: confinementReportSchema.optional(),
   confinementCause: confinementCauseSchema.optional().catch(undefined),
   agentReach: agentReachReportSchema.optional(),
@@ -232,6 +249,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const executor = machineExecutorSchema.safeParse(rec.executor);
   const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
   const devin = devinReportSchema.safeParse(rec.devin);
+  const antigravity = antigravityReportSchema.safeParse(rec.antigravity);
   const agentReach = agentReachReportSchema.safeParse(rec.agentReach);
   const scrapling = machineCapabilitiesSchema.shape.scrapling.safeParse(rec.scrapling);
   const hostPermissions = hostPermissionsSchema.safeParse(rec.hostPermissions);
@@ -254,6 +272,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(confinementCause.success ? { confinementCause: confinementCause.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
     ...(devin.success ? { devin: devin.data } : {}),
+    ...(antigravity.success ? { antigravity: antigravity.data } : {}),
     ...(agentReach.success ? { agentReach: agentReach.data } : {}),
     ...(scrapling.success && scrapling.data !== undefined ? { scrapling: scrapling.data } : {}),
     ...(hostPermissions.success ? { hostPermissions: hostPermissions.data } : {}),
@@ -309,6 +328,7 @@ export const stepQueueBlockedSchema = z.object({
     'claude-rate-limited',
     'claude-logged-out',
     'devin-subscription',
+    'antigravity-subscription',
     'account-switched',
     'coordinator-provider-missing',
     'coordinator-provider-no-key',

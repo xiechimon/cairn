@@ -18,6 +18,7 @@ import { ROUTE_USE_LABELS } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import {
+  AntigravityMark,
   ClaudeMark,
   DevinMark,
   GeminiMark,
@@ -63,6 +64,7 @@ const levelLabel = (level: string) => level.charAt(0).toUpperCase() + level.slic
 function vendorMark(modelId: string): ComponentType<SVGProps<SVGSVGElement>> {
   if (modelId.startsWith('claude')) return ClaudeMark;
   if (modelId.startsWith('devin')) return DevinMark;
+  if (modelId.startsWith('antigravity')) return AntigravityMark;
   if (/^(gpt|o\d|codex)/.test(modelId)) return OpenAIMark;
   if (modelId.startsWith('gemini')) return GeminiMark;
   if (modelId.startsWith('grok')) return GrokMark;

@@ -5,6 +5,13 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
 import {
+  toAntigravityAccount,
+  useAntigravitySubscriptions,
+  useAntigravitySubscriptionVerification,
+  useDeleteAntigravitySubscription,
+  useRenameAntigravitySubscription,
+} from '../api/antigravity-subscriptions.js';
+import {
   type AccountVendor,
   type SubscriptionAccount,
   type SubscriptionModel,
@@ -64,6 +71,12 @@ interface Entry {
 
 const CLAUDE_SUBSCRIPTION_ADD = 'claude-subscription';
 const DEVIN_SUBSCRIPTION_ADD = 'devin-subscription';
+const ANTIGRAVITY_SUBSCRIPTION_ADD = 'antigravity-subscription';
+const SUBSCRIPTION_VIEWS: Record<string, AddProviderView> = {
+  [CLAUDE_SUBSCRIPTION_ADD]: 'subscription',
+  [DEVIN_SUBSCRIPTION_ADD]: 'devin-subscription',
+  [ANTIGRAVITY_SUBSCRIPTION_ADD]: 'antigravity-subscription',
+};
 
 function deadModelIds(sources: readonly ModelSource[]): Set<string> {
   return new Set(
@@ -169,13 +182,17 @@ export function ProvidersSection() {
   const clock = useClock();
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
   const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
+  const antigravitySubscriptionsQ = useAntigravitySubscriptions(teamId, live);
   const deleteSubscription = useDeleteClaudeSubscription(teamId);
   const deleteDevinSubscription = useDeleteDevinSubscription(teamId);
+  const deleteAntigravitySubscription = useDeleteAntigravitySubscription(teamId);
   const renameSubscription = useRenameClaudeSubscription(teamId);
   const renameDevinSubscription = useRenameDevinSubscription(teamId);
   const updateDevinModels = useUpdateDevinSubscriptionModels(teamId);
+  const renameAntigravitySubscription = useRenameAntigravitySubscription(teamId);
   const verification = useSubscriptionVerification(teamId);
   const devinVerification = useDevinSubscriptionVerification(teamId);
+  const antigravityVerification = useAntigravitySubscriptionVerification(teamId);
   const [addView, setAddView] = useState<AddProviderView>('closed');
   const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
     null,
@@ -198,8 +215,12 @@ export function ProvidersSection() {
   const devinSubscriptions: SubscriptionAccount[] = live
     ? (devinSubscriptionsQ.data ?? []).map((wire) => toDevinAccount(wire, now))
     : (fixtureAccounts?.devinSubscriptions ?? []);
+  const antigravitySubscriptions: SubscriptionAccount[] = live
+    ? (antigravitySubscriptionsQ.data ?? []).map((wire) => toAntigravityAccount(wire, now))
+    : (fixtureAccounts?.antigravitySubscriptions ?? []);
   const subscriptionApiIds = live ? (subscriptionsQ.data ?? []).map((s) => s.id) : [];
   const devinApiIds = live ? (devinSubscriptionsQ.data ?? []).map((s) => s.id) : [];
+  const antigravityApiIds = live ? (antigravitySubscriptionsQ.data ?? []).map((s) => s.id) : [];
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');
@@ -217,13 +238,7 @@ export function ProvidersSection() {
   useEffect(() => {
     const add = searchParams.get('add');
     if (add === null) return;
-    setAddView(
-      add === CLAUDE_SUBSCRIPTION_ADD
-        ? 'subscription'
-        : add === DEVIN_SUBSCRIPTION_ADD
-          ? 'devin-subscription'
-          : 'picker',
-    );
+    setAddView(SUBSCRIPTION_VIEWS[add] ?? 'picker');
     const next = new URLSearchParams(searchParams);
     next.delete('add');
     setSearchParams(next, { replace: true });
@@ -269,16 +284,43 @@ export function ProvidersSection() {
       },
     );
 
+  const verifyByVendor: Partial<Record<AccountVendor, typeof verification.verify>> = {
+    devin: devinVerification.verify,
+    antigravity: antigravityVerification.verify,
+  };
+  const renameByVendor: Partial<
+    Record<
+      AccountVendor,
+      {
+        mutate: (
+          input: { id: string; label: string },
+          options: { onError: (error: Error) => void },
+        ) => void;
+      }
+    >
+  > = {
+    devin: renameDevinSubscription,
+    antigravity: renameAntigravitySubscription,
+  };
+  const apiIdsByVendor: Partial<Record<AccountVendor, readonly string[]>> = {
+    devin: devinApiIds,
+    antigravity: antigravityApiIds,
+  };
+  const deleteByVendor: Partial<Record<AccountVendor, typeof deleteSubscription>> = {
+    devin: deleteDevinSubscription,
+    antigravity: deleteAntigravitySubscription,
+  };
+
   const announceVerification = (ref: { id: string; label: string; vendor: AccountVendor }) => {
-    const verify = ref.vendor === 'devin' ? devinVerification.verify : verification.verify;
+    const verify = verifyByVendor[ref.vendor] ?? verification.verify;
     void verify(ref.id).then((outcome) => {
       if (outcome?.ok) toastSuccess(t('「{name}」验证通过', { name: ref.label }));
     });
   };
 
   const subscriptionActionsFor = (account: SubscriptionAccount): SubscriptionActions => {
-    const rename = account.vendor === 'devin' ? renameDevinSubscription : renameSubscription;
-    const apiIds = account.vendor === 'devin' ? devinApiIds : subscriptionApiIds;
+    const rename = renameByVendor[account.vendor] ?? renameSubscription;
+    const apiIds = apiIdsByVendor[account.vendor] ?? subscriptionApiIds;
     return {
       onRemove: () => setRemovingSubscription(account),
       ...(live
@@ -311,7 +353,11 @@ export function ProvidersSection() {
 
   const subscriptionDeps = {
     now,
-    verifications: { ...verification.states, ...devinVerification.states },
+    verifications: {
+      ...verification.states,
+      ...devinVerification.states,
+      ...antigravityVerification.states,
+    },
     actionsFor: subscriptionActionsFor,
     t,
     clock,
@@ -325,10 +371,14 @@ export function ProvidersSection() {
       ...subscriptionDeps,
       models: subscriptionModels(sources, 'devin'),
     }),
+    ...subscriptionEntries(antigravitySubscriptions, {
+      ...subscriptionDeps,
+      models: subscriptionModels(sources, 'antigravity'),
+    }),
     ...teamEntries(providers, deadModelIds(sources), actionsFor, t),
   ];
   const partialFailure =
-    subscriptionsQ.isError || devinSubscriptionsQ.isError
+    subscriptionsQ.isError || devinSubscriptionsQ.isError || antigravitySubscriptionsQ.isError
       ? 'subscriptions'
       : providersQ.isError
         ? 'providers'
@@ -353,6 +403,7 @@ export function ProvidersSection() {
                 if (partialFailure === 'subscriptions') {
                   void subscriptionsQ.refetch();
                   void devinSubscriptionsQ.refetch();
+                  void antigravitySubscriptionsQ.refetch();
                 } else {
                   void providersQ.refetch();
                 }
@@ -369,7 +420,14 @@ export function ProvidersSection() {
           empty={
             <QueryBoundary
               query={
-                live ? mergeQueries(providersQ, subscriptionsQ, devinSubscriptionsQ) : undefined
+                live
+                  ? mergeQueries(
+                      providersQ,
+                      subscriptionsQ,
+                      devinSubscriptionsQ,
+                      antigravitySubscriptionsQ,
+                    )
+                  : undefined
               }
               isEmpty
               loadingLabel={t('正在加载模型服务')}
@@ -432,14 +490,17 @@ export function ProvidersSection() {
           <AlertDialogActions
             cancelLabel={t('取消')}
             confirmLabel={t('移除')}
-            confirmDisabled={deleteSubscription.isPending || deleteDevinSubscription.isPending}
+            confirmDisabled={
+              deleteSubscription.isPending ||
+              deleteDevinSubscription.isPending ||
+              deleteAntigravitySubscription.isPending
+            }
             onCancel={() => setRemovingSubscription(null)}
             onConfirm={() => {
               const target = removingSubscription;
               setRemovingSubscription(null);
               if (target === null || !live) return;
-              const remove =
-                target.vendor === 'devin' ? deleteDevinSubscription : deleteSubscription;
+              const remove = deleteByVendor[target.vendor] ?? deleteSubscription;
               remove.mutate(target.id, {
                 onSuccess: () =>
                   void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] }),

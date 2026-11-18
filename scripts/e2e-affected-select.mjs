@@ -208,6 +208,7 @@ const RESOURCES = [
   'segmented-',
   'dialog-',
   'devin-',
+  'antigravity-',
   'checkbox-unified',
   'registry-focus-ring',
   'skill-import',

@@ -18,20 +18,22 @@ import { and, eq, isNotNull, ne } from 'drizzle-orm';
 import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { build, machine, provider, step, todo } from '../db/schema.js';
+import { activeAntigravitySubscriptionMode } from './antigravity-subscriptions.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
-): 'pi' | 'claude-code' | 'gemini' | 'devin' {
+): 'pi' | 'claude-code' | 'gemini' | 'devin' | 'antigravity' {
   if (agentProvider === 'gemini') return 'gemini';
   if (agentProvider === 'devin') return 'devin';
+  if (agentProvider === 'antigravity') return 'antigravity';
   return isBackendRuntimeId(agentProvider) ? 'claude-code' : 'pi';
 }
 
 export interface MachineRuntimeFacts {
   claudeCodeReport: Pick<ClaudeCodeReport, 'installed'> | null;
-  capabilities: Pick<MachineCapabilities, 'executor' | 'devin'> | null;
+  capabilities: Pick<MachineCapabilities, 'executor' | 'devin' | 'antigravity'> | null;
 }
 
 export function machineRuntimeAvailable(
@@ -41,6 +43,7 @@ export function machineRuntimeAvailable(
   if (runtime === 'pi') return true;
   if (runtime === 'gemini') return false;
   if (runtime === 'devin') return machineRow.capabilities?.devin?.installed === true;
+  if (runtime === 'antigravity') return machineRow.capabilities?.antigravity?.installed === true;
   return (
     machineRow.claudeCodeReport?.installed === true || machineRow.capabilities?.executor === 'orb'
   );
@@ -84,6 +87,21 @@ export function devinUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
     .some((row) => machineRuntimeAvailable(row, 'devin'));
 }
 
+export function antigravityUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
+  const mode = activeAntigravitySubscriptionMode({ db }, teamId);
+  if (mode === 'none') return false;
+  return db
+    .select({ claudeCodeReport: machine.claudeCodeReport, capabilities: machine.capabilities })
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
+    .all()
+    .some(
+      (row) =>
+        machineRuntimeAvailable(row, 'antigravity') &&
+        (mode === 'token' || row.capabilities?.antigravity?.authenticated === true),
+    );
+}
+
 export function codexProviderKeyed(db: Pick<Db, 'select'>, teamId: string): boolean {
   return (
     db
@@ -103,6 +121,9 @@ export function codexProviderKeyed(db: Pick<Db, 'select'>, teamId: string): bool
 function runtimeMissingReason(name: string, runtime: MachineRuntime): string {
   if (runtime === 'devin') {
     return `执行机 ${name} 还没装好 Devin（托管下载失败或未上线）：等它上线或重启执行机。`;
+  }
+  if (runtime === 'antigravity') {
+    return `执行机 ${name} 还没装好 Antigravity（agy 未检测到且托管下载失败或未上线）：请安装 agy 或重启执行机。`;
   }
   return `执行机 ${name} 上没有检测到 ${MODEL_SOURCE_RUNTIME_LABELS[runtime]}：装好后重启执行机。`;
 }
@@ -240,6 +261,7 @@ export interface EligibilityInput {
   claudeRateBlocked: boolean;
   claudeSubscriptionMissing: boolean;
   devinSubscriptionMissing: boolean;
+  antigravitySubscriptionMissing?: boolean;
 }
 
 export type MachineIneligibility =
@@ -250,7 +272,8 @@ export type MachineIneligibility =
         | 'local-path'
         | 'claude-blocked'
         | 'claude-login'
-        | 'devin-subscription';
+        | 'devin-subscription'
+        | 'antigravity-subscription';
     }
   | { kind: 'model'; reason: string }
   | { kind: 'capability'; missing: string[] };
@@ -275,6 +298,9 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
   if (runtime === 'claude-code' && input.claudeSubscriptionMissing) return { kind: 'claude-login' };
   if (runtime === 'devin' && input.devinSubscriptionMissing) {
     return { kind: 'devin-subscription' };
+  }
+  if (runtime === 'antigravity' && input.antigravitySubscriptionMissing === true) {
+    return { kind: 'antigravity-subscription' };
   }
   if (!confinementDispatchReady(machineRow.capabilities)) return { kind: 'confinement' };
   return null;

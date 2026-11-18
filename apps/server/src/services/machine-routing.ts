@@ -2,6 +2,7 @@ import { claudeRateBlock, isBuildStepKind, type RunnerOs, runnerOsOf } from '@ca
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type build, type machine, step, team } from '../db/schema.js';
+import { activeAntigravitySubscriptionMode } from './antigravity-subscriptions.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 import {
@@ -29,6 +30,8 @@ export function workerIneligibility(
   now: number,
 ): MachineIneligibility | null {
   const runtime = stepRuntimeFor(facts.model.provider);
+  const antigravityMode =
+    runtime === 'antigravity' ? activeAntigravitySubscriptionMode({ db }, machineRow.teamId) : null;
   const ineligible = machineEligibility({
     machine: machineRow,
     agent: facts.agentRow,
@@ -40,6 +43,11 @@ export function workerIneligibility(
       runtime === 'claude-code' && !hasActiveClaudeSubscription({ db }, machineRow.teamId),
     devinSubscriptionMissing:
       runtime === 'devin' && !hasActiveDevinSubscription({ db }, machineRow.teamId),
+    antigravitySubscriptionMissing:
+      runtime === 'antigravity' &&
+      (antigravityMode === 'none' ||
+        (antigravityMode === 'host' &&
+          machineRow.capabilities?.antigravity?.authenticated !== true)),
   });
   return ineligible;
 }
@@ -67,7 +75,11 @@ export function priorSessionOf(
     'buildId' | 'kind' | 'fallback' | 'freshSession' | 'byPerson'
   >,
   buildRow: Pick<typeof build.$inferSelect, 'prevPhase' | 'withPlan' | 'planDocId'>,
-  enabledSubscriptionIds: { claude: string | null; devin: string | null },
+  enabledSubscriptionIds: {
+    claude: string | null;
+    devin: string | null;
+    antigravity?: string | null;
+  },
 ): {
   priorSessionId: string | null;
   priorMachineId: string | null;
@@ -81,6 +93,7 @@ export function priorSessionOf(
       fallback: step.fallback,
       subscriptionId: step.claudeSubscriptionId,
       devinSubscriptionId: step.devinSubscriptionId,
+      antigravitySubscriptionId: step.antigravitySubscriptionId,
     })
     .from(step)
     .where(
@@ -107,11 +120,14 @@ export function priorSessionOf(
     stepRow.kind === 'build' && buildRow.withPlan && buildRow.planDocId === null;
   const priorSubscriptionId = priorRow?.subscriptionId ?? null;
   const priorDevinSubscriptionId = priorRow?.devinSubscriptionId ?? null;
+  const priorAntigravitySubscriptionId = priorRow?.antigravitySubscriptionId ?? null;
   const startsNewRun =
     (stepRow.byPerson || stepRow.kind === 'merge') &&
     ((priorSubscriptionId !== null && priorSubscriptionId !== enabledSubscriptionIds.claude) ||
       (priorDevinSubscriptionId !== null &&
-        priorDevinSubscriptionId !== enabledSubscriptionIds.devin));
+        priorDevinSubscriptionId !== enabledSubscriptionIds.devin) ||
+      (priorAntigravitySubscriptionId !== null &&
+        priorAntigravitySubscriptionId !== (enabledSubscriptionIds.antigravity ?? null)));
   return {
     priorSessionId: startsNewRun ? null : (priorRow?.sessionId ?? null),
     priorMachineId: startsNewRun ? null : (priorRow?.machineId ?? null),

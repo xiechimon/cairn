@@ -1,4 +1,6 @@
 import type {
+  AntigravityLocalStatus,
+  AntigravityLoginOutcome,
   DesktopMenuCommand,
   DesktopNotifyPayload,
   DesktopNotifySound,
@@ -74,6 +76,13 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
       ipcRenderer.invoke('devin:import-key'),
     login: (): Promise<DevinLoginOutcome> => ipcRenderer.invoke('devin:login'),
     cancelLogin: (): Promise<void> => ipcRenderer.invoke('devin:cancel-login'),
+  },
+  antigravity: {
+    status: (): Promise<AntigravityLocalStatus> => ipcRenderer.invoke('antigravity:status'),
+    importKey: (): Promise<{ ok: true; key: string } | { ok: false; reason: string }> =>
+      ipcRenderer.invoke('antigravity:import-key'),
+    login: (): Promise<AntigravityLoginOutcome> => ipcRenderer.invoke('antigravity:login'),
+    cancelLogin: (): Promise<void> => ipcRenderer.invoke('antigravity:cancel-login'),
   },
   windowControls: {
     setVisible: (visible: boolean): void => {

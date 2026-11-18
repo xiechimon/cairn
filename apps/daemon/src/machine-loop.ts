@@ -23,6 +23,10 @@ import {
 } from '@cairn/shared';
 import { AgentReachProbe } from './agent-reach.js';
 import { createAcpBackend, createGeminiBackend } from './backend/acp.js';
+import {
+  type AntigravityManaged,
+  createAntigravityManaged,
+} from './backend/antigravity-managed.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { createSessionConfiner, type Launch } from './backend/confine-session.js';
@@ -97,6 +101,7 @@ export interface MachineLoopOpts {
   claudeCodeBackend?: AgentBackend;
   geminiBackend?: AgentBackend;
   devinManaged?: DevinManaged;
+  antigravityManaged?: AntigravityManaged;
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
   readClaudeOauthExpiresAt?: () => number | null;
   capabilitiesProbe?: () => MachineCapabilities;
@@ -302,6 +307,19 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let devinInstalling = false;
   let devinInstalled = false;
   let devinModels = loadDevinModels(paths);
+  const antigravityManaged =
+    opts.antigravityManaged ?? createAntigravityManaged({ log: (line) => logger.machine(line) });
+  let sendPresenceNow: (() => Promise<void>) | null = null;
+  void antigravityManaged
+    .ensure()
+    .then((install) => {
+      if (install !== null && sendPresenceNow !== null) return sendPresenceNow();
+    })
+    .catch((error: unknown) => {
+      logger.machine(
+        `antigravity managed setup failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
   const capabilitiesReport = (): MachineCapabilities => {
     const reach = agentReach.current();
     const scraper = scrapling.current();
@@ -325,6 +343,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
               ...(devinModels.length > 0 ? { models: devinModels } : {}),
             };
       })(),
+      antigravity: (() => {
+        const install = antigravityManaged.current();
+        return install === null
+          ? { installed: false }
+          : {
+              installed: true,
+              version: install.version,
+              authenticated: install.authenticated,
+              source: install.source,
+              models: install.models,
+            };
+      })(),
       executor: orbProvider.kind,
       mcpConnectors: true,
       ...(orbComputer ? { computer: true as const } : {}),
@@ -346,9 +376,30 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
   let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
   let devinBackend: AgentBackend | null = null;
+  let antigravityBackend: AgentBackend | null = null;
   let claudeAnnounced = false;
   let geminiAnnounced = false;
   const backendFor = (agentProviderId: string | null | undefined): AgentBackend => {
+    if (agentProviderId === 'antigravity') {
+      const install = antigravityManaged.current();
+      if (install === null) {
+        throw new Error(
+          'Antigravity runtime is not installed yet: install agy or wait for managed setup, then retry the step',
+        );
+      }
+      antigravityBackend ??= createAcpBackend({
+        harness: 'antigravity',
+        command: install.binPath,
+        args: install.args,
+        permissions: 'allow-once',
+        sessionResume: true,
+        allowHostMcp: true,
+        skills: { skillsDir: config.skillsDir, cwd: config.home },
+        onSkillsLog: (msg) => logger.skills(msg),
+        ...(confine !== null && confine !== undefined ? { confine } : {}),
+      });
+      return antigravityBackend;
+    }
     if (agentProviderId === 'devin') {
       const install = devinManaged.current();
       if (install === null) {
@@ -579,6 +630,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     me: () => client.me(),
     send: () => presenceReporter.send(),
   });
+  sendPresenceNow = () => presenceReporter.send();
   const probeHarnesses = async () => {
     if (!availability?.ready) return;
     if (platform !== 'darwin') claudeBin = await probeClaudeBin();
@@ -994,6 +1046,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   const presenceTimer = setInterval(() => {
     void refreshCap();
+    const currentAg = antigravityManaged.current();
+    if (currentAg === null || !currentAg.authenticated) {
+      void antigravityManaged.probe().catch(() => {});
+    }
     void probeAuthAndRemember()
       .then(() => presenceReporter.send())
       .catch((err: unknown) => {
@@ -1029,6 +1085,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       journal,
       backendFor,
       devinHome: () => devinManaged.current()?.home,
+      antigravityAuth: () => antigravityManaged.current()?.authenticated === true,
       orbProxyUrl: capEnv.CAIRN_ORB_PROXY_URL,
       logger,
       paths,

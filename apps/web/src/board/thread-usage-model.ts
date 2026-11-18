@@ -14,7 +14,13 @@ export interface ThreadUsageSummary {
   engines: string[];
 }
 
-const HARNESS_NAMES = { 'claude-code': 'Claude Code', pi: 'Cairn', devin: 'Devin' } as const;
+const HARNESS_NAMES = {
+  'claude-code': 'Claude Code',
+  pi: 'Cairn',
+  devin: 'Devin',
+  antigravity: 'Antigravity',
+  gemini: 'Gemini',
+} as const;
 
 export function threadRunSeconds(steps: readonly StepJournalRow[], now: number): number | null {
   const started = steps.filter((step) => step.startedAt !== undefined);

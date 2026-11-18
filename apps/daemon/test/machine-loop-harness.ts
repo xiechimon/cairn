@@ -303,6 +303,7 @@ export async function boot(opts: {
   strandedUploadReplayMs?: number;
   strandedUploadMinAgeMs?: number;
   devinManaged?: import('../src/backend/devin-managed.js').DevinManaged;
+  antigravityManaged?: import('../src/backend/antigravity-managed.js').AntigravityManaged;
   otel?: import('../src/backend/otel.js').DaemonOtel | null;
 }) {
   const home = makeTestTempDir('loop-');
@@ -368,6 +369,11 @@ export async function boot(opts: {
       ...(opts.capEnv !== undefined ? { capEnv: opts.capEnv } : {}),
       ...(opts.orbComputer !== undefined ? { orbComputer: opts.orbComputer } : {}),
       devinManaged: opts.devinManaged ?? { current: () => null, ensure: async () => null },
+      antigravityManaged: opts.antigravityManaged ?? {
+        current: () => null,
+        ensure: async () => null,
+        probe: async () => null,
+      },
       ...(opts.otel !== undefined ? { otel: opts.otel } : {}),
     });
     onTestFinished(async () => {

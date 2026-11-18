@@ -92,6 +92,44 @@ export const EN: Record<string, string> = {
     '{name}: expired, so the Coordinator and tasks cannot run for now. Run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin and add the whole output under Settings → Model routing.',
   '{name}：将在 {days} 天后过期。到期前在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把输出整个添加到「设置 → 模型路由」。':
     '{name}: expires in {days## day|# days}. Before then, run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin and add the whole output under Settings → Model routing.',
+  'Antigravity 订阅': 'Antigravity subscription',
+  '添加 Antigravity 订阅': 'Add Antigravity subscription',
+  '等待 Antigravity 登录超时，可以再试一次，或改用下方粘贴。':
+    'Signing in to Antigravity timed out. Try again, or paste below instead.',
+  'Antigravity 登录没有完成，可以再试一次，或改用下方粘贴。':
+    'Antigravity sign-in did not finish. Try again, or paste below instead.',
+  '已在浏览器中打开 Antigravity 登录页，完成后会自动继续。':
+    'The Antigravity sign-in page is open in your browser; this continues automatically when it finishes.',
+  '这台 Mac 已登录 Antigravity。': 'This Mac is signed in to Antigravity.',
+  '从这台 Mac 接入': 'Connect from this Mac',
+  '在这台 Mac 上登录 Antigravity': 'Sign in to Antigravity on this Mac',
+  '会打开浏览器完成 Google 账号登录。': 'A browser opens to sign in with your Google account.',
+  '默认使用执行机已登录的 Antigravity（OS 钥匙串）。也可以展开下方粘贴 `GEMINI_API_KEY`。':
+    'Uses the Antigravity sign-in from your Runner OS keychain by default. You can also expand below to paste a `GEMINI_API_KEY`.',
+  '也可以粘贴 API Key': 'Or paste an API key',
+  '粘贴 `GEMINI_API_KEY` 或 `.env` 片段。Token 加密保存，保存后无法再查看。':
+    'Paste a `GEMINI_API_KEY` or `.env` snippet. The key is stored encrypted and cannot be viewed after saving.',
+  '这个订阅的登录已失效。在执行机重新登录 Google 账号或更新 API Key 后，移除并重新添加。':
+    'This subscription is no longer signed in. Sign in with Google on your Runner or update the API key, then remove and add it again.',
+  '这个订阅已过期。在执行机重新登录 Google 账号或更新 API Key 后，移除并重新添加。':
+    'This subscription has expired. Sign in with Google on your Runner or update the API key, then remove and add it again.',
+  '服务器上找不到 agy 命令': 'The agy command was not found on the server',
+  '执行机上还没有登录 Antigravity，请先运行 `agy acp --login` 或改用 API Key':
+    'Antigravity is not signed in on the Runner; run `agy acp --login` or paste an API key',
+  '{name}：已过期，Coordinator 和任务都暂时用不了。在执行机重新登录 Google 账号或更新 API Key 后，添加到「设置 → 模型路由」。':
+    '{name}: expired, so the Coordinator and tasks cannot run for now. Sign in with Google on your Runner or update the API key under Settings → Model routing.',
+  '{name}：将在 {days} 天后过期。到期前在执行机重新登录 Google 账号或更新 API Key 后，添加到「设置 → 模型路由」。':
+    '{name}: expires in {days## day|# days}. Before then, sign in with Google on your Runner or update the API key under Settings → Model routing.',
+  'Antigravity 登录需要处理': 'Antigravity sign-in needs attention',
+  '{count} 处 Antigravity 登录已过期': '{count} Antigravity logins have expired',
+  '{count} 处 Antigravity 登录即将过期': '{count} Antigravity logins are about to expire',
+  '到期前更新登录或 API Key，任务才不会中断。':
+    'Refresh your sign-in or API key before expiry so tasks do not stall.',
+  '更新登录或 API Key 之前，这些订阅不会接新任务。':
+    'These subscriptions will not take new tasks until you refresh the sign-in or API key.',
+  '所有 Antigravity 模型': 'All Antigravity models',
+  '排队中：团队还没有可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅（前面 {ahead} 个）':
+    'Queued: the team has no usable Antigravity subscription. Run agy acp --login on your Runner and add an Antigravity subscription under Model routing ({ahead} ahead)',
   Archived: 'Archived',
   Agent: 'Agent',
 

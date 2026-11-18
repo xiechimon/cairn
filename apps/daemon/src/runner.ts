@@ -54,6 +54,7 @@ export interface RunStepDeps {
   journal: StepJournal;
   backendFor: (agentProviderId: string | null | undefined) => AgentBackend;
   devinHome?: () => string | undefined;
+  antigravityAuth?: () => boolean;
   logger: DaemonLogger;
   paths: StatePaths;
   workspacesDir: string;
@@ -218,6 +219,7 @@ async function runClaimedStep(
   const credentialValues = [
     creds.claudeSubscriptionToken,
     creds.devinToken,
+    creds.antigravityToken,
     creds.git?.password,
     ...(tokenRes.mcpConnectors ?? []).flatMap((c) => mcpConnectorSecretValues(c.headers)),
   ];
@@ -275,6 +277,8 @@ async function runClaimedStep(
     runtimeId,
     hasSubscriptionToken: creds.claudeSubscriptionToken !== undefined,
     hasDevinToken: creds.devinToken !== undefined,
+    hasAntigravityToken: creds.antigravityToken !== undefined,
+    hasAntigravityHostAuth: deps.antigravityAuth?.() === true,
   });
   if (refusal !== null) {
     clearCredentials(creds);
@@ -400,6 +404,7 @@ async function runClaimedStep(
         runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
       devinToken: runtimeId === 'devin' ? creds.devinToken : undefined,
       devinHome: runtimeId === 'devin' ? deps.devinHome?.() : undefined,
+      antigravityToken: runtimeId === 'antigravity' ? creds.antigravityToken : undefined,
     },
     stepCleanups,
   );

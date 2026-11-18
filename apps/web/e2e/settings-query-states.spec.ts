@@ -27,6 +27,7 @@ const ROUTING_PAGE_OK: Record<string, unknown> = {
   providers: { providers: [] },
   'claude-subscriptions': [],
   'devin-subscriptions': [],
+  'antigravity-subscriptions': [],
 };
 
 async function stub(page: Page, endpoint: string, state: { fail: boolean; ok: unknown }) {

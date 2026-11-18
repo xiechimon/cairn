@@ -11,7 +11,10 @@ export interface SubscriptionUsage {
 
 export function subscriptionUsageStats(
   db: Pick<Db, 'select'>,
-  column: typeof step.claudeSubscriptionId | typeof step.devinSubscriptionId,
+  column:
+    | typeof step.claudeSubscriptionId
+    | typeof step.devinSubscriptionId
+    | typeof step.antigravitySubscriptionId,
   ids: readonly string[],
   since: number,
 ): Map<string, SubscriptionUsage> {

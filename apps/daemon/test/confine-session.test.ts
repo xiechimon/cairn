@@ -167,4 +167,57 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
     expect(profile).not.toContain(`(subpath "${realpathSync(join(runnerHome, 'chat-sessions'))}")`);
     expect(profile).toContain('(allow file-read-metadata (literal');
   });
+
+  test.runIf(process.platform === 'darwin')(
+    'antigravity grants read-only Library/Keychains only when GEMINI_HOME is unset and keeps Keychains denied for all other harnesses',
+    () => {
+      const { root, runnerHome, worktree, serverHome } = fixture();
+      const home = join(root, 'user');
+      const keychains = join(home, 'Library', 'Keychains');
+      const isolatedGemini = join(root, 'isolated-gemini');
+      mkdirSync(keychains, { recursive: true });
+      mkdirSync(isolatedGemini, { recursive: true });
+      writeFileSync(join(keychains, 'login.keychain-db'), 'kc-secret');
+      const confine = createSessionConfiner({
+        daemonHome: runnerHome,
+        extraDeniedRoots: [serverHome],
+        readable: [],
+        handoffDirectories: [],
+        serverUrl: 'http://127.0.0.1:1',
+        platform: 'darwin',
+        home,
+        environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+      }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+
+      const agLaunch = confine({ cwd: worktree, env: {} }, 'antigravity', {
+        command: '/bin/sh',
+        args: ['-c', `cat '${join(keychains, 'login.keychain-db')}'`],
+      });
+      expect(execFileSync(agLaunch.command, agLaunch.args, { encoding: 'utf8' })).toBe('kc-secret');
+
+      const agWrite = confine({ cwd: worktree, env: {} }, 'antigravity', {
+        command: '/bin/sh',
+        args: ['-c', `echo write > '${join(keychains, 'tamper')}'`],
+      });
+      expect(() => execFileSync(agWrite.command, agWrite.args, { stdio: 'pipe' })).toThrow();
+
+      const agIsolated = confine(
+        { cwd: worktree, env: { GEMINI_HOME: isolatedGemini } },
+        'antigravity',
+        {
+          command: '/bin/sh',
+          args: ['-c', `cat '${join(keychains, 'login.keychain-db')}'`],
+        },
+      );
+      expect(() => execFileSync(agIsolated.command, agIsolated.args, { stdio: 'pipe' })).toThrow();
+
+      for (const other of ['claude-code', 'codex', 'devin', 'gemini', 'pi'] as const) {
+        const denied = confine({ cwd: worktree, env: {} }, other, {
+          command: '/bin/sh',
+          args: ['-c', `cat '${join(keychains, 'login.keychain-db')}'`],
+        });
+        expect(() => execFileSync(denied.command, denied.args, { stdio: 'pipe' })).toThrow();
+      }
+    },
+  );
 });

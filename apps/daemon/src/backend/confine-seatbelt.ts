@@ -91,7 +91,7 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
   }
   const traversable = [
     ...new Set(
-      reexposed
+      [...reexposed, ...readable]
         .flatMap(ancestorsOf)
         .filter((path) => deniedDirectories.some((secret) => contains(secret, path))),
     ),

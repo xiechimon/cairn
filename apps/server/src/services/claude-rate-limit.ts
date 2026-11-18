@@ -21,6 +21,7 @@ import {
   todo,
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
 import { holdBlockedBuild } from './blockers.js';
 import { accountHeld } from './claude-account-hold.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
@@ -122,6 +123,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   const defaultMachineId = teamDefaultMachineId(deps.db, teamId);
   const enabledId = enabledSubscriptionId(deps, teamId);
   const enabledDevinId = enabledDevinSubscriptionId(deps, teamId);
+  const enabledAntigravityId = enabledAntigravitySubscriptionId(deps, teamId);
   const consider = (
     stepRow: StepRow,
     agentRow: AgentRow,
@@ -139,6 +141,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
         : priorSessionOf(deps.db, stepRow, buildRow, {
             claude: enabledId,
             devin: enabledDevinId,
+            antigravity: enabledAntigravityId,
           });
     const sessionId =
       !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null;

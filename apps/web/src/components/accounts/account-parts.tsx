@@ -7,7 +7,15 @@ import type {
   ProviderRuntime,
 } from '../../api/claude-accounts.js';
 import { useI18n } from '../../i18n/provider.js';
-import { ClaudeMark, DevinMark, GrokMark, OpenAIMark, PiMark } from '../brand-marks.js';
+import {
+  AntigravityMark,
+  ClaudeMark,
+  DevinMark,
+  GrokMark,
+  OpenAIMark,
+  PiMark,
+} from '../brand-marks.js';
+import { ListRow } from '../list-card.js';
 import { MachineName } from '../machine-label.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
 import { StatusChip, type StatusTone } from '../ui/status-chip.js';
@@ -21,6 +29,7 @@ export const VENDORS: Record<AccountVendor, { label: string; short: string; Mark
   codex: { label: 'ChatGPT · Codex', short: 'Codex', Mark: OpenAIMark },
   grok: { label: 'Grok', short: 'Grok', Mark: GrokMark },
   devin: { label: 'Devin', short: 'Devin', Mark: DevinMark },
+  antigravity: { label: 'Antigravity', short: 'Antigravity', Mark: AntigravityMark },
 };
 
 export const PROVIDERS: Record<ProviderRuntime, { label: string; Mark: Mark }> = {
@@ -28,6 +37,7 @@ export const PROVIDERS: Record<ProviderRuntime, { label: string; Mark: Mark }> =
   codex: { label: 'Codex', Mark: OpenAIMark },
   pi: { label: 'pi', Mark: PiMark },
   devin: { label: 'Devin', Mark: DevinMark },
+  antigravity: { label: 'Antigravity', Mark: AntigravityMark },
 };
 
 export function useClock(): (ts: number, now: number) => string {

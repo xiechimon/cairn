@@ -1,4 +1,3 @@
-import type { ClaudeSubscriptionVerifyResult } from '@cairn/shared';
 import type { AccountState } from './claude-accounts.js';
 import { ApiError } from './client.js';
 
@@ -9,6 +8,7 @@ export const VERIFY_FAILURES = [
   'failed',
   'network',
   'rate-limited',
+  'missing_local_login',
 ] as const;
 export type VerifyFailure = (typeof VERIFY_FAILURES)[number];
 
@@ -34,7 +34,7 @@ function failureReason(error: unknown): VerifyFailure {
 }
 
 export async function runVerification(
-  post: () => Promise<ClaudeSubscriptionVerifyResult>,
+  post: () => Promise<{ ok: boolean; reason?: VerifyFailure }>,
   timeoutMs: number = VERIFY_TIMEOUT_MS,
 ): Promise<VerifyOutcome> {
   let timer: ReturnType<typeof setTimeout> | undefined;

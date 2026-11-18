@@ -113,7 +113,7 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
   finishedAt: epochMs.optional(),
   route: z
     .object({
-      harness: z.enum(['claude-code', 'pi', 'devin']).nullable(),
+      harness: z.enum(['claude-code', 'pi', 'devin', 'antigravity']).nullable(),
       modelId: z.string().nullable(),
     })
     .nullable()
