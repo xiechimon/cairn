@@ -1,6 +1,7 @@
 import type { DesktopRunnerState, DesktopTrayOpen, DesktopTrayState } from '@cairn/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
-import { Coffee, Laptop, Search, Settings, SquarePen } from 'lucide-react';
+import { ChartColumn, Coffee, Laptop, Search, Settings, SquarePen } from 'lucide-react';
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -10,16 +11,26 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useTasks } from '../api/hooks.js';
+import { useClaudeSubscriptions } from '../api/claude-subscriptions.js';
+import { useChiefThreads, useMachines, useTasks } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { useDailyUsage } from '../api/usage-daily.js';
 import { tasksFromQuery } from '../board/tasks-sections.js';
+import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { desktopTray } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
-import { type TrayGroup, trayGroups } from './tray-groups.js';
+import { USAGE_PATH } from '../resources/hrefs.js';
+import {
+  type TrayGroup,
+  type TrayText,
+  type TrayUsage,
+  trayGroups,
+  trayUsage,
+} from './tray-groups.js';
 
 const ON_MAC = typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh');
 
@@ -30,10 +41,37 @@ const RUNNER_WORD: Record<DesktopRunnerState, string> = {
   failed: '已停止',
 };
 
-function useTrayGroups(): TrayGroup[] {
+const TRAY_REFRESH_MS = 30_000;
+const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+function useTrayData(): { groups: TrayGroup[]; usage: TrayUsage | null; coordinatorBusy: boolean } {
   const { live, teamId } = useLiveData();
+  const client = useQueryClient();
+  const [now, setNow] = useState(Date.now);
   const tasksQ = useTasks(teamId, live);
-  return useMemo(() => trayGroups(tasksFromQuery(tasksQ.data)), [tasksQ.data]);
+  const machinesQ = useMachines(teamId, live);
+  const usageQ = useDailyUsage(teamId, 1, TIME_ZONE, live);
+  const subscriptionsQ = useClaudeSubscriptions(teamId, live);
+  const threadsQ = useChiefThreads(teamId, live);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+      void client.invalidateQueries({ queryKey: ['machines', teamId] });
+      void client.invalidateQueries({ queryKey: ['usage-daily', teamId] });
+    }, TRAY_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [client, teamId]);
+
+  const groups = useMemo(
+    () => trayGroups(tasksFromQuery(tasksQ.data), machinesQ.data, now),
+    [tasksQ.data, machinesQ.data, now],
+  );
+  const usage = useMemo(
+    () => trayUsage(usageQ.data, subscriptionsQ.data, now),
+    [usageQ.data, subscriptionsQ.data, now],
+  );
+  return { groups, usage, coordinatorBusy: threadsQ.data?.some(threadTurnInFlight) ?? false };
 }
 
 function moveFocus(event: KeyboardEvent<HTMLDivElement>, hide: () => void) {
@@ -55,12 +93,18 @@ function TrayItem({
   glyph,
   label,
   hint,
+  warn = false,
+  tip,
+  keepLabel = false,
   testId,
   onClick,
 }: {
   glyph?: ReactNode;
   label: string;
   hint?: string;
+  warn?: boolean;
+  tip?: string;
+  keepLabel?: boolean;
   testId?: string;
   onClick?: () => void;
 }) {
@@ -69,13 +113,16 @@ function TrayItem({
       variant="ghost"
       role="menuitem"
       data-testid={testId}
-      className="tray-item"
+      title={tip}
+      className={cn('tray-item', keepLabel && 'tray-item-keep')}
       disabled={onClick === undefined}
       onClick={onClick}
     >
       <span className="tray-item-glyph">{glyph}</span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {hint !== undefined && <span className="tray-item-hint">{hint}</span>}
+      <span className="tray-item-label">{label}</span>
+      {hint !== undefined && (
+        <span className={cn('tray-item-hint', warn && 'tray-warn')}>{hint}</span>
+      )}
     </Button>
   );
 }
@@ -85,7 +132,8 @@ export function TrayPage() {
   const { user } = useLiveData();
   const bridge = useMemo(desktopTray, []);
   const [state, setState] = useState<DesktopTrayState | null>(null);
-  const groups = useTrayGroups();
+  const { groups, usage, coordinatorBusy } = useTrayData();
+  const say = (text: TrayText) => t(text.key, text.vars);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -163,16 +211,33 @@ export function TrayPage() {
         <TrayItem
           glyph={<BrandGlyph className="size-4" />}
           label="Coordinator"
+          hint={coordinatorBusy ? t('正在回复') : undefined}
           onClick={() => open({ kind: 'path', path: '/app' })}
         />
         {groups.map((group) => (
           <section key={group.key} aria-label={t(group.label)} className="flex flex-col">
-            <h2 className="tray-head">{t(group.label)}</h2>
+            <h2 className="tray-head">
+              <span className="min-w-0 truncate">
+                {group.literal ? group.label : t(group.label)}
+              </span>
+              {group.meta !== undefined && (
+                <span
+                  data-testid="tray-machine-meta"
+                  title={say(group.meta.tip)}
+                  className={cn('tray-head-meta', group.meta.warn && 'tray-warn')}
+                >
+                  {group.meta.parts.map(say).join(' · ')}
+                </span>
+              )}
+            </h2>
             {group.rows.map((row) => (
               <TrayItem
                 key={row.key}
-                glyph={<StatusGlyph kind={row.glyph} />}
-                label={row.title}
+                glyph={row.note === undefined ? <StatusGlyph kind={row.glyph} /> : undefined}
+                label={row.note === undefined ? row.title : say(row.note)}
+                hint={row.hint === undefined ? undefined : say(row.hint)}
+                warn={row.warn}
+                tip={row.tip === undefined ? undefined : say(row.tip)}
                 onClick={() => open({ kind: 'path', path: row.path })}
               />
             ))}
@@ -180,6 +245,22 @@ export function TrayPage() {
         ))}
         {groups.length === 0 && <TrayItem label={t('没有等你的事')} />}
       </div>
+
+      {usage !== null && (
+        <>
+          <div className="tray-rule" />
+          <div className="flex flex-col">
+            <TrayItem
+              testId="tray-usage"
+              keepLabel
+              glyph={<ChartColumn className="size-4" aria-hidden="true" />}
+              label={t('今天用了 {tokens} tokens', { tokens: usage.tokens })}
+              hint={usage.quota === null ? undefined : say(usage.quota)}
+              onClick={() => open({ kind: 'path', path: USAGE_PATH })}
+            />
+          </div>
+        </>
+      )}
 
       <div className="tray-row">
         <Button

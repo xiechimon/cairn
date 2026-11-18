@@ -2,7 +2,13 @@ import { RESEARCH_BEFORE_PLAN_SOURCE_KIND, RESEARCH_STUCK_SOURCE_KIND } from '@c
 import { expect, test } from 'vitest';
 import type { TaskEntry, TaskSection } from '../src/board/tasks-sections.js';
 import type { TodoRecord } from '../src/fixtures/records.js';
-import { TRAY_MAX_ROWS, trayGroups } from '../src/tray/tray-groups.js';
+import {
+  TRAY_MACHINE_MAX_ROWS,
+  TRAY_MAX_ROWS,
+  type TrayMachine,
+  trayGroups,
+  trayUsage,
+} from '../src/tray/tray-groups.js';
 import { todo } from './helpers.js';
 
 const entry = (
@@ -57,4 +63,107 @@ test('running rows fill only what the waiting rows leave of the cap', () => {
   const groups = trayGroups(view);
   expect(groups.flatMap((group) => group.rows)).toHaveLength(TRAY_MAX_ROWS);
   expect(groups[1]?.rows.map((row) => row.title)).toEqual(['新']);
+});
+
+const MIN = 60_000;
+const machine = (extra: Partial<TrayMachine>): TrayMachine => ({
+  id: 'm1',
+  name: 'xmon 的 MacBook Pro',
+  online: true,
+  maxConcurrent: 3,
+  running: [],
+  queued: [],
+  strain: [],
+  capabilities: null,
+  ...extra,
+});
+const thread = (id: string, startedAt: number, lastProgressAt?: number) => ({
+  threadId: id,
+  title: id,
+  projectId: 'p',
+  startedAt,
+  ...(lastProgressAt === undefined ? {} : { lastProgressAt }),
+});
+
+test('a computer groups its tasks: stalled first, then running oldest first, then queued', () => {
+  const now = 100 * MIN;
+  const view = { questions: [], entries: [entry(9, 'working', 1, { id: 'loose', title: 'loose' })] };
+  const groups = trayGroups(
+    view,
+    [
+      machine({
+        running: [thread('fresh', now - 2 * MIN), thread('old', now - 30 * MIN, now - MIN), thread('hung', now - 20 * MIN, now - 16 * MIN)],
+        queued: [
+          { threadId: 'full', title: 'full', projectId: 'p', reason: 'capacity', retryAt: null },
+          { threadId: 'tight', title: 'tight', projectId: 'p', reason: 'strained', retryAt: null },
+        ],
+      }),
+      machine({ id: 'idle', name: 'idle', running: [] }),
+      machine({ id: 'off', name: 'off', online: false, running: [thread('ghost', now)] }),
+    ],
+    now,
+  );
+  expect(groups.map((g) => g.label)).toEqual(['xmon 的 MacBook Pro', '进行中']);
+  const rows = groups[0]?.rows ?? [];
+  expect(rows.map((r) => [r.title, r.hint?.key, r.hint?.vars?.n, r.warn ?? false])).toEqual([
+    ['hung', '{n} 分没进展', 16, true],
+    ['old', '{n} 分', 30, false],
+    ['fresh', '{n} 分', 2, false],
+    ['full', '排队中', undefined, false],
+    ['tight', '电脑吃紧', undefined, false],
+  ]);
+  expect(groups[1]?.rows.map((r) => r.title)).toEqual(['loose']);
+});
+
+test('a running task on a computer leaves the 进行中 group, and a long list ends in a more row', () => {
+  const now = 100 * MIN;
+  const running = Array.from({ length: TRAY_MACHINE_MAX_ROWS + 2 }, (_, i) => thread(`t${i}`, now - i * MIN));
+  const view = { questions: [], entries: [entry(1, 'working', 5, { id: 't0' })] };
+  const groups = trayGroups(view, [machine({ running })], now);
+  expect(groups).toHaveLength(1);
+  const rows = groups[0]?.rows ?? [];
+  expect(rows).toHaveLength(TRAY_MACHINE_MAX_ROWS + 1);
+  expect(rows.at(-1)?.note).toEqual({ key: '还有 {n} 个，在 Cairn 里看', vars: { n: 2 } });
+});
+
+test('an idle computer shows only when strained, with its strain in the header', () => {
+  const hardware = { cpuCores: 10, memoryTotalMb: 16_384, memoryAvailableMb: 1_024, loadAvg1: 2, loadAvg5: 7, diskFreeMb: 2_048 };
+  const groups = trayGroups(
+    { questions: [], entries: [] },
+    [machine({ strain: ['memory', 'disk'], capabilities: { hardware } as TrayMachine['capabilities'] })],
+    0,
+  );
+  expect(groups).toHaveLength(1);
+  expect(groups[0]?.rows).toEqual([]);
+  expect(groups[0]?.meta?.warn).toBe(true);
+  expect(groups[0]?.meta?.parts).toEqual([
+    { key: '内存 {memory}%', vars: { memory: 94 } },
+    { key: '负载偏高' },
+    { key: '磁盘快满了' },
+  ]);
+});
+
+test('usage is hidden before anything ran today and reports the tightest Claude window', () => {
+  const day = (coordinator: number, tasks: number) => ({
+    days: [{ date: '2026-11-18', coordinator, tasks, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, models: {}, projects: {}, todos: [], cost: null }],
+    models: [],
+    projects: [],
+  });
+  const sub = (utilization: number[], extra = {}) => ({
+    id: String(utilization),
+    kind: 'claude-subscription' as const,
+    label: 'x',
+    expiresAt: null,
+    createdAt: 0,
+    windows: utilization.map((u) => ({ name: 'w', utilization: u, resetsAt: null, observedAt: 0 })),
+    ...extra,
+  });
+  expect(trayUsage(day(0, 0), [sub([0.5])], 0)).toBeNull();
+  expect(trayUsage(day(240_000, 1_000_000), [sub([0.2, 0.38]), sub([0.1])], 0)).toEqual({
+    tokens: '1.24M',
+    quota: { key: 'Claude 额度 {pct}%', vars: { pct: 38 } },
+  });
+  expect(trayUsage(day(1, 0), [sub([1], { state: 'exhausted', cooldownUntil: 50 })], 10)?.quota?.key).toBe(
+    'Claude 额度用完 · {at} 恢复',
+  );
 });

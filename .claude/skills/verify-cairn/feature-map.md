@@ -464,7 +464,7 @@ Reach:
 
 - Web routes: `/tray`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `tray-new-task`, `tray-popover`, `tray-quit`, `tray-rows`, `tray-runner`
+- Test ids in its code: `tray-machine-meta`, `tray-new-task`, `tray-popover`, `tray-quit`, `tray-rows`, `tray-runner`, `tray-usage`
 - Research: [docs/research/desktop-app-stack-2026-11-08.md](../../../docs/research/desktop-app-stack-2026-11-08.md) (not on main)
 - Frontend design: **gap**: no design for the window and install flow
 - Backend design: **gap**: no design for packaging, process supervision, updates and data location
