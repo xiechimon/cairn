@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { matchesGlob, resolve } from 'node:path';
+import { mergeBase } from './diff-base.mjs';
 
 const allowlist = JSON.parse(
   readFileSync(new URL('./public-content-allowlist.json', import.meta.url), 'utf8'),
@@ -134,7 +135,8 @@ function scanSnapshot(commit, parents = []) {
 export function scanDiff({ staged = false, base } = {}) {
   if (staged) return scanSnapshot();
   const ref = base && !/^0{40}$/.test(base) ? base : 'origin/main';
-  const ancestor = git('rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`).trim();
+  const ancestor = mergeBase(process.cwd(), ref);
+  if (!ancestor) throw new Error(`no merge-base between HEAD and ${ref}`);
   const commits = git('rev-list', '--reverse', '--parents', 'HEAD', `^${ancestor}`)
     .trim()
     .split('\n')

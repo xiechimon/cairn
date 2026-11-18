@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { mergeBase } from './diff-base.mjs';
 import { OWNED_PROCESS_CLI } from './owned-process.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
@@ -14,6 +15,7 @@ export const prepushModules = [
   'scripts/public-content-gate.mjs',
   'scripts/public-content-allowlist.json',
   'scripts/journal-newline-gate.mjs',
+  'scripts/diff-base.mjs',
   'scripts/scrub-git-env.mjs',
   'scripts/import-cycle-gate.mjs',
 ];
@@ -249,6 +251,11 @@ export function runPlan(
 
 export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main') {
   const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  const strictBase = (configured) => {
+    const resolved = mergeBase(root, configured);
+    if (!resolved) throw new Error(`no merge-base between HEAD and ${configured}`);
+    return resolved;
+  };
   if (base === 'origin/main') {
     const fetch = spawnSync('git', ['fetch', 'origin', 'main'], { cwd: root });
     if (fetch.status !== 0)
@@ -256,7 +263,7 @@ export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main
         `[prepush] git fetch origin main failed (exit ${fetch.status ?? 1}); using local origin/main, which may be stale`,
       );
   }
-  const ancestor = /^0{40}$/.test(base) ? null : git(['merge-base', 'HEAD', base]).trim();
+  const ancestor = /^0{40}$/.test(base) ? null : strictBase(base);
   return [
     ...new Set(
       [

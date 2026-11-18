@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { mergeBase } from './diff-base.mjs';
 
 const HAN = /[\p{Script=Han}\u3000-\u303f\uff01-\uff60]/u;
 const PROSE = /\.(md|mdx|ya?ml)$/;
@@ -99,11 +100,11 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
       const git = (...gitArgs) =>
         execFileSync('git', gitArgs, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
       const configured = process.env.ENGLISH_ONLY_BASE_SHA || process.env.PREPUSH_BASE_SHA || '';
-      const base = git(
-        'merge-base',
-        'HEAD',
+      const base = mergeBase(
+        process.cwd(),
         configured && !/^0{40}$/.test(configured) ? configured : 'origin/main',
-      ).trim();
+      );
+      if (!base) throw new Error('cannot resolve a merge-base against origin/main');
       const files = git('diff', '--name-only', '-z', '--diff-filter=ACMR', base)
         .split('\0')
         .filter(isChecked);

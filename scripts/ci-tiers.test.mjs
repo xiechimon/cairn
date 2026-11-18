@@ -134,7 +134,7 @@ test('the full 4-shard e2e and 2-shard e2e-affected match classifier tiers unles
   assert.match(job('e2e-affected'), /fetch-depth: 0/);
   assert.match(
     job('e2e-affected'),
-    /PREPUSH_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.before \}\}/,
+    /PREPUSH_BASE_SHA: \$\{\{ needs\.changes\.outputs\.base-sha \|\| github\.event\.pull_request\.base\.sha \|\| github\.event\.before \}\}/,
   );
   assert.doesNotMatch(job('e2e-affected'), /prepush --e2e-shard/);
   for (const [name, github] of Object.entries(events)) {
@@ -260,6 +260,21 @@ test('gates runs only when gates-needed is not false and not cancelled', () => {
         }
 });
 
+test('every classify step output is re-exported as a changes job output', () => {
+  const block = job('changes');
+  const exposed = new Set(
+    [...block.matchAll(/^ {6}[\w-]+: \$\{\{.*steps\.classify\.outputs\.([\w-]+).*$/gm)].map(
+      (match) => match[1],
+    ),
+  );
+  const emitted = new Set(
+    [...block.matchAll(/echo "([\w-]+)=.*" >> "\$GITHUB_OUTPUT"/g)].map((match) => match[1]),
+  );
+  assert.ok(emitted.size > 0, 'the classify step emits no outputs');
+  for (const name of emitted)
+    assert.ok(exposed.has(name), `classify emits ${name} but changes.outputs drops it`);
+});
+
 test('changes classify script sets outputs across push and pull_request diffs in a real git repo', () => {
   const classifyScript = job('changes')
     .match(/run: \|\n([\s\S]*)/)[1]
@@ -286,6 +301,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
     git('commit', '-q', '-m', 'base');
     const baseSha = git('rev-parse', 'HEAD').trim();
 
+    let lastBaseSha = null;
     const runClassify = (files, { baseOverride = baseSha, env = {} } = {}) => {
       for (const [rel, content] of Object.entries(files)) {
         mkdirSync(dirname(join(repo, rel)), { recursive: true });
@@ -300,6 +316,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
         env: {
           ...scrubGateEnv(),
           PREPUSH_BASE_SHA: baseOverride,
+          GITHUB_REF: 'refs/heads/main',
           GITHUB_OUTPUT: outputFile,
           ...env,
         },
@@ -311,6 +328,8 @@ test('changes classify script sets outputs across push and pull_request diffs in
           .split('\n')
           .map((line) => line.split('=')),
       );
+      lastBaseSha = outputs['base-sha'];
+      delete outputs['base-sha'];
       git('checkout', '-q', '-B', 'case', baseSha);
       return outputs;
     };
@@ -323,6 +342,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'needs-integration': 'false',
       'e2e-tier': 'none',
     });
+    assert.equal(lastBaseSha, baseSha);
 
     assert.deepEqual(runClassify({ 'apps/web/src/foo.test.ts': 'export {};\n' }), {
       'has-code': 'true',
@@ -432,6 +452,8 @@ test('changes classify script sets outputs across push and pull_request diffs in
           .split('\n')
           .map((line) => line.split('=')),
       );
+      assert.equal(stacked['base-sha'], baseSha);
+      delete stacked['base-sha'];
       assert.deepEqual(stacked, {
         'has-code': 'true',
         'has-sidecar': 'false',

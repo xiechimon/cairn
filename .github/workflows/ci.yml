@@ -22,6 +22,8 @@ jobs:
       has-sidecar: ${{ steps.classify.outputs.has-sidecar }}
       gates-needed: ${{ steps.classify.outputs.gates-needed }}
       ops-selftests: ${{ steps.classify.outputs.ops-selftests }}
+      needs-integration: ${{ steps.classify.outputs.needs-integration }}
+      base-sha: ${{ steps.classify.outputs.base-sha }}
       e2e-tier: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft) && 'none' || steps.classify.outputs.e2e-tier }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -79,6 +81,7 @@ jobs:
           echo "gates-needed=$gates_needed" >> "$GITHUB_OUTPUT"
           echo "ops-selftests=$ops_selftests" >> "$GITHUB_OUTPUT"
           echo "needs-integration=$needs_integration" >> "$GITHUB_OUTPUT"
+          echo "base-sha=$base_ref" >> "$GITHUB_OUTPUT"
           echo "e2e-tier=$e2e_tier" >> "$GITHUB_OUTPUT"
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
@@ -145,8 +148,8 @@ jobs:
 
       - name: Prepush checks (#1533)
         env:
-          PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          ENGLISH_ONLY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          PREPUSH_BASE_SHA: ${{ needs.changes.outputs.base-sha || github.event.pull_request.base.sha || github.event.before }}
+          ENGLISH_ONLY_BASE_SHA: ${{ needs.changes.outputs.base-sha || github.event.pull_request.base.sha || github.event.before }}
           UI_DEBT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: pnpm prepush --ci
 
@@ -291,7 +294,7 @@ jobs:
 
       - name: E2E (specs affected by this PR, split by recorded spec times)
         env:
-          PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          PREPUSH_BASE_SHA: ${{ needs.changes.outputs.base-sha || github.event.pull_request.base.sha || github.event.before }}
         run: pnpm --filter @cairn/web e2e:affected --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Fixture build for the CSS mechanism gate

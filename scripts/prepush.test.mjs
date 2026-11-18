@@ -230,11 +230,15 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   assert.equal(jobs.get('dead-class-gate'), undefined);
   assert.match(changes, /fetch-depth: 0/);
   assert.doesNotMatch(readFileSync('.github/workflows/ci.yml', 'utf8'), /^ {4}paths(?:-ignore)?:/m);
-  for (const name of ['vitest-light', 'vitest-integration', 'pack-smoke']) {
+  for (const name of ['vitest-light', 'pack-smoke']) {
     const job = jobs.get(name);
     assert.match(job ?? '', /^ {4}needs: changes$/m, name);
     assert.match(job, /^ {4}if: needs.changes.outputs.has-code != 'false'$/m, name);
   }
+  assert.match(
+    jobs.get('vitest-integration') ?? '',
+    /^ {4}if: needs\.changes\.outputs\.has-code != 'false' && needs\.changes\.outputs\.needs-integration != 'false'$/m,
+  );
   for (const name of sidecarJobs) {
     const job = jobs.get(name);
     assert.match(job ?? '', /^ {4}needs: changes$/m, name);
@@ -273,7 +277,7 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   for (const variable of ['PREPUSH_BASE_SHA', 'ENGLISH_ONLY_BASE_SHA'])
     assert.ok(
       core.includes(
-        `${variable}: \${{ github.event.pull_request.base.sha || github.event.before }}`,
+        `${variable}: \${{ needs.changes.outputs.base-sha || github.event.pull_request.base.sha || github.event.before }}`,
       ),
       variable,
     );
@@ -332,13 +336,22 @@ test('required aggregates only accept skipped work its classification excused', 
       ),
     );
     const classifications = ['true', 'false', '', 'unknown'].flatMap((hasCode) =>
-      ['true', 'false', '', 'unknown'].map((sidecar) => ({ hasCode, sidecar })),
+      ['true', 'false', '', 'unknown'].flatMap((sidecar) =>
+        ['true', 'false'].map((needsIntegration) => ({ hasCode, sidecar, needsIntegration })),
+      ),
     );
-    for (const { hasCode, sidecar } of classifications) {
+    const skipAllowed = (dependency, { hasCode, sidecar, needsIntegration }) => {
+      if (dependency === 'vitest-integration')
+        return hasCode === 'false' || needsIntegration === 'false';
+      return (sidecarJobs.includes(dependency) ? sidecar : hasCode) === 'false';
+    };
+    for (const classification of classifications) {
+      const { hasCode, sidecar, needsIntegration } = classification;
       for (const results of scenarios) {
         const shell = command.replace(/\$\{\{ (.*?) \}\}/g, (_, expression) => {
           if (expression === 'needs.changes.outputs.has-code') return hasCode;
           if (expression === 'needs.changes.outputs.has-sidecar') return sidecar;
+          if (expression === 'needs.changes.outputs.needs-integration') return needsIntegration;
           const match = /^needs\.([\w-]+)\.result$/.exec(expression);
           assert.ok(match, expression);
           assert.ok(dependencies.includes(match[1]), expression);
@@ -355,10 +368,9 @@ test('required aggregates only accept skipped work its classification excused', 
               .every(
                 (dependency) =>
                   results[dependency] === 'success' ||
-                  ((sidecarJobs.includes(dependency) ? sidecar : hasCode) === 'false' &&
-                    results[dependency] === 'skipped'),
+                  (skipAllowed(dependency, classification) && results[dependency] === 'skipped'),
               ),
-          `${name}: ${hasCode} ${sidecar} ${JSON.stringify(results)}`,
+          `${name}: ${JSON.stringify(classification)} ${JSON.stringify(results)}`,
         );
       }
     }
@@ -944,6 +956,39 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     assert.match(result.stdout, /PASS \(3 checks\)/);
     assert.match(result.stderr, /git fetch origin main failed.*may be stale/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('a dead configured base falls back to origin/main only under a queue ref', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-queue-'));
+  const work = join(directory, 'work');
+  try {
+    gitIn(directory, ['init', work]);
+    mkdirSync(join(work, 'scripts'));
+    for (const file of prepushFixtureFiles) copyFileSync(file, join(work, file));
+    writeFileSync(join(work, 'README.md'), 'first\n');
+    gitIn(work, ['add', 'README.md', ...prepushFixtureFiles]);
+    gitIn(work, ['commit', '-m', 'initial']);
+    gitIn(work, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    writeFileSync(join(work, 'README.md'), 'second\n');
+    gitIn(work, ['add', 'README.md']);
+    gitIn(work, ['commit', '-m', 'docs']);
+    const dead = '1'.repeat(40);
+    const queued = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
+      cwd: work,
+      encoding: 'utf8',
+      env: prepushEnv({ PREPUSH_BASE_SHA: dead, GITHUB_REF: 'refs/heads/queue/main' }),
+    });
+    assert.equal(queued.status, 0, `${queued.stdout}\n${queued.stderr}`);
+    assert.match(queued.stdout, /PASS \(3 checks\)/);
+    const ordinary = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
+      cwd: work,
+      encoding: 'utf8',
+      env: prepushEnv({ PREPUSH_BASE_SHA: dead, GITHUB_REF: 'refs/heads/topic' }),
+    });
+    assert.notEqual(ordinary.status, 0);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

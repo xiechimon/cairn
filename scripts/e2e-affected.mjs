@@ -3,6 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { mergeBase } from './diff-base.mjs';
 import {
   DEPENDENCY_FILES,
   DIR_RULES,
@@ -32,7 +33,7 @@ function changedPaths(explicit) {
     if (explicit.length > 0) return { paths: explicit, source: 'explicit', base: '' };
     return { paths: ['package.json'], source: `initial push fallback (${target})`, base: '' };
   }
-  const base = git(['merge-base', 'HEAD', target]).trim();
+  const base = mergeBase(REPO_ROOT, target);
   if (explicit.length > 0) return { paths: explicit, source: 'explicit', base };
   const paths = new Set();
   for (const line of git(['status', '--porcelain=v1']).split('\n')) {
