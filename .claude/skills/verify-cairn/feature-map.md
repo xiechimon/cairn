@@ -959,7 +959,7 @@ Reach:
 
 - Web routes: `/app/schedules`
 - Keyboard shortcuts in its code: `D`, `E`, `N`, `P`
-- Test ids in its code: `schedule-new`, `schedule-popover`, `schedule-popover-runs`, `schedule-row-menu-button`, `schedules-ended`, `tasks-schedules-empty`, `tasks-section`
+- Test ids in its code: `schedule-new`, `schedule-popover`, `schedule-popover-runs`, `schedule-row-menu-button`, `schedule-webhook-url`, `schedules-ended`, `tasks-schedules-empty`, `tasks-section`
 - Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
 - Frontend design: **gap**: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules

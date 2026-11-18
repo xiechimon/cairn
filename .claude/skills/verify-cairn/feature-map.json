@@ -1765,7 +1765,8 @@
         ],
         "server": [
           "/api/schedules**",
-          "/api/projects/:id/schedule"
+          "/api/projects/:id/schedule",
+          "/api/webhook/schedule/:token"
         ]
       },
       "reach": [

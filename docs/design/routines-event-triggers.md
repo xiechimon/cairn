@@ -117,7 +117,7 @@ decides the outcome.
 
 ## UI
 
-`ScheduleTrigger` gains `webhook`（`Webhook 触发`）and `event`（`事件触发`）.
+`ScheduleTrigger` gains `webhook` and `event` (labeled "Webhook trigger" and "Event trigger" in the editor).
 The editor hides date/time/cron inputs for them and shows a one-line
 hint; for `webhook`, the saved response's one-time `webhookUrl` +
 `webhookToken` is shown in the popover until it closes (it is never
