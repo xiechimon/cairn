@@ -20,8 +20,11 @@ describe('threadUpdates', () => {
     const result = threadUpdates({ phase: 'review', phaseAt: 100 }, [
       {
         kind: 'question',
+        id: 'question-1',
+        requestId: 'request-1',
         status: 'pending',
         questions: [{ header: 'Auth', question: 'Keep cookie auth?', options: [] }],
+        answers: null,
       },
       { kind: 'verify', passed: true, conclusion: 'Tests passed', evidence: [], createdAt: 300 },
       { kind: 'review', conclusion: 'Looks clean', findings: [], createdAt: 250 },
@@ -47,9 +50,14 @@ describe('threadOrigin', () => {
         {
           text: 'Inspect login traces',
           author: 'owner',
-          source: { kind: 'chat', messageId: 'msg-1' },
+          sourceRef: null,
+          source: { kind: 'chat', threadId: 'chief-1', messageId: 'msg-1', span: 'whole' },
         },
       ],
+      siblings: [],
+      difficulty: null,
+      titleSource: 'owner',
+      titleSourceRef: null,
     };
     const origin = threadOrigin(request, {
       items: [{ kind: 'user', id: 'msg-1', text: 'Inspect login traces', createdAt: 555 }],
@@ -64,9 +72,14 @@ describe('threadOrigin', () => {
         {
           text: 'Inspect login traces',
           author: 'owner',
-          source: { kind: 'chat', messageId: 'msg-missing' },
+          sourceRef: null,
+          source: { kind: 'chat', threadId: 'chief-1', messageId: 'msg-missing', span: 'whole' },
         },
       ],
+      siblings: [],
+      difficulty: null,
+      titleSource: 'owner',
+      titleSourceRef: null,
     };
     expect(threadOrigin(request, { items: [], at: [] })).toEqual({
       messageId: 'msg-missing',

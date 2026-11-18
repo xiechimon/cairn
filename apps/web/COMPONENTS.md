@@ -54,7 +54,6 @@ spinner.tsx              # registry spinner (lucide Loader2, spins): a busy butt
 status-chip.tsx          # the five-state task-status chip (idle/plan/confirm/done/failed, skin = --chip-* token pairs); lands on badge.tsx, the state vehicle is data-tone; replaces the old-track ui/chip.tsx (canonical table spec/22 §5.2, #942)
 switch.tsx
 tabs.tsx                 # default/line tiers ride the upstream native data-[variant] mechanism + zero-chrome TabsIndicator pass-through (#644, keep-or-go belongs to #1009); the segmented/bare hand-written tiers are retired (#991), the segmented control skin = the SEG_* recipes in pages/parts.ts
-tag-chip.tsx             # user-data-colored tag chip (tag.color via inline style with white text); lands on badge.tsx, do not create a new skin piece
 textarea.tsx             # multi-line input (registry-same-source); **do not place a bare `<textarea>`** — the old .dlg-form-textarea family is retired (spec/22 §5.3)
 toaster.tsx              # toast primitive (sonner, the official shadcn recipe; #631): mount <Toaster /> once at the App root, then imperative `toast.*` anywhere; **do not build another silent catch for failure feedback** — exceptions/toasts always go through it
 tooltip.tsx              # hover/focus info bubble (official-site form; z goes through the single --z-dialog ladder); the shortcut hint chip = the Tooltip+Kbd composition (#983 ruling, landed in #1008, kbd-hint.tsx retired); the App root already mounts a site-wide TooltipProvider (delay=0)
@@ -89,7 +88,6 @@ trace.tsx                # shadcn Trace family (Trace/Line/Icon/Title/Descriptio
 | Hover info bubble | `components/ui/tooltip.tsx` | — |
 | Divider | `components/ui/separator.tsx` | Do not use `<hr>` / `border-t` divs |
 | Shortcut hint chip | the `tooltip.tsx` + `kbd.tsx` composition assembled at the consumer (Kbd inside TooltipContent, the #1008/#983 ruling) | Do not hand-write absolute positioning + show/hide; the key caps in doc body text use `kbd.tsx` directly |
-| Tag chip (user data color) | `components/ui/tag-chip.tsx` | The status color family still goes through `badge.tsx`; do not mix the two color sources |
 | **Toast / lightweight failure feedback** | `toast.*` (imperative; `components/ui/toaster.tsx` is already mounted at the App root) | Do not silently swallow mutation errors; **surfaces that already have an in-surface scoped red-line canon (XMON-80/P2) keep going in-surface and do not stack toast on top** |
 
 ## 4. Consumption snapshot (2026-09-30 snapshot, for judgment only, not gated)
