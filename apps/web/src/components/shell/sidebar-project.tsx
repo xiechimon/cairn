@@ -1,4 +1,4 @@
-import type { ProjectIcon } from '@cairn/shared';
+import { type ProjectIcon, projectIconOrAuto } from '@cairn/shared';
 import { cn } from 'cn';
 import { Archive, Box, ChevronDown, ChevronRight, Folder } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
@@ -58,22 +58,14 @@ export function ProjectGlyph({
   icon?: ProjectIcon | null | undefined;
   name?: string;
 }) {
-  if (icon == null && name !== undefined) {
-    return (
-      <span
-        aria-hidden
-        data-slot="project-glyph"
-        className="grid size-4 flex-none place-items-center text-ui font-medium text-content-secondary"
-      >
-        {Array.from(name.trim())[0]?.toUpperCase()}
-      </span>
-    );
-  }
-  const Glyph = (icon != null && PROJECT_ICON_COMPONENTS[icon]) || Box;
+  const resolved = projectIconOrAuto(icon, name);
+  const auto = icon == null && resolved !== 'box';
+  const Glyph = PROJECT_ICON_COMPONENTS[resolved] ?? Box;
   return (
     <Glyph
       data-slot="project-glyph"
-      data-project-icon={icon ?? undefined}
+      data-project-icon={auto || icon != null ? resolved : undefined}
+      data-project-icon-auto={auto || undefined}
       className="size-5 flex-none text-sidebar-ink"
       strokeWidth={1.75}
     />
@@ -196,7 +188,7 @@ export function SidebarProjectRow({
           rename={rename}
           className={flat ? 'pr-2 pl-1.5' : 'pr-2 pl-2.5'}
         >
-          <ProjectGlyph icon={icon} />
+          <ProjectGlyph icon={icon} name={name} />
         </SidebarNameField>
       </div>
     );
@@ -222,7 +214,7 @@ export function SidebarProjectRow({
         menu != null && REVEAL_PAD,
       )}
     >
-      <ProjectGlyph icon={icon} />
+      <ProjectGlyph icon={icon} name={name} />
       <span className="min-w-0 flex-1 truncate text-left" title={name}>
         {name}
       </span>

@@ -1,8 +1,8 @@
 import {
   type PatchProjectBody,
-  PROJECT_ICONS,
   type ProjectColor,
   type ProjectIcon,
+  searchProjectIcons,
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Search } from 'lucide-react';
@@ -34,8 +34,7 @@ export function ProjectIconPicker({
 }: ProjectIconPickerProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
-  const needle = query.trim().toLowerCase().replaceAll(' ', '-');
-  const shown = PROJECT_ICONS.filter((name) => name.includes(needle));
+  const shown = searchProjectIcons(query);
   return (
     <Popover onOpenChange={() => setQuery('')}>
       <PopoverTrigger
@@ -65,7 +64,7 @@ export function ProjectIconPicker({
             className="h-8 pl-8 pointer-coarse:h-11"
           />
         </div>
-        <fieldset className="m-0 grid min-h-34 min-w-0 grid-cols-8 content-start gap-0 border-0 px-1.5 py-1 pointer-coarse:grid-cols-6">
+        <fieldset className="m-0 grid max-h-64 min-h-34 min-w-0 grid-cols-8 content-start gap-0 overflow-y-auto border-0 px-1.5 py-1 pointer-coarse:max-h-80 pointer-coarse:grid-cols-6">
           <legend className="sr-only">{t('图标')}</legend>
           {shown.map((name) => {
             const Icon = PROJECT_ICON_COMPONENTS[name];

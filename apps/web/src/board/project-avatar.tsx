@@ -1,9 +1,9 @@
-import type { ProjectColor, ProjectIcon } from '@cairn/shared';
+import { type ProjectColor, type ProjectIcon, projectIconOrAuto } from '@cairn/shared';
 import { cn } from 'cn';
-import { Box } from 'lucide-react';
 import { PROJECT_ICON_COMPONENTS } from './project-icon-map.js';
 
 export function ProjectAvatar({
+  name,
   icon,
   bare = false,
   className,
@@ -15,13 +15,16 @@ export function ProjectAvatar({
   bare?: boolean;
   className?: string;
 }) {
-  const Icon = icon != null ? PROJECT_ICON_COMPONENTS[icon] : Box;
-  const tiled = icon != null && !bare;
+  const resolved = projectIconOrAuto(icon, name);
+  const auto = icon == null && resolved !== 'box';
+  const Icon = PROJECT_ICON_COMPONENTS[resolved];
+  const tiled = resolved !== 'box' && !bare;
   return (
     <span
       aria-hidden="true"
-      data-project-icon={icon ?? undefined}
-      data-project-type={icon == null ? 'box' : undefined}
+      data-project-icon={resolved === 'box' && icon == null ? undefined : resolved}
+      data-project-icon-auto={auto || undefined}
+      data-project-type={resolved === 'box' && icon == null ? 'box' : undefined}
       className={cn(
         'project-avatar grid flex-none place-items-center text-content-tertiary',
         tiled

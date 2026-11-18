@@ -43,13 +43,7 @@ export function ProjectCard({
       data-slot="project-card"
       className="group/pcard relative flex items-start gap-3.5 rounded-(--radius-card) bg-card p-4 shadow-(--e1)"
     >
-      <ProjectAvatar
-        name={name}
-        tone={tone}
-        icon={icon}
-        color={color}
-        className={icon == null ? 'size-9 rounded-(--cds-radius-xl) text-heading' : undefined}
-      />
+      <ProjectAvatar name={name} tone={tone} icon={icon} color={color} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <Button
@@ -114,11 +108,7 @@ export function ArchivedProjectCard({
         className,
       )}
     >
-      <ProjectAvatar
-        name={name}
-        tone={tone}
-        className="size-9 rounded-(--cds-radius-xl) text-heading"
-      />
+      <ProjectAvatar name={name} tone={tone} />
       <div className="min-w-0 flex-1">
         <b className="block truncate text-card-title font-semibold text-foreground">{name}</b>
         <p className="mt-0.5 mb-0 text-meta text-content-tertiary">{note}</p>

@@ -211,6 +211,19 @@ test('github owner/repo backfills the repo segment once valid', async ({ page })
   await expect(name).toHaveValue('Renamed');
 });
 
+test('the dialog icon derives from the typed name until one is picked', async ({ page }) => {
+  await page.goto(NEW_PROJECT);
+  const mark = page.getByTestId('project-icon-trigger');
+  await page.locator('#prj-new-name').fill('Plain');
+  await expect(mark.locator('[data-project-icon-auto]')).toBeVisible();
+  await page.locator('#prj-new-name').fill('Iconed');
+  await expect(mark.locator('[data-project-icon-auto]')).toBeVisible();
+  await mark.click();
+  await page.getByTestId('project-icon-picker').getByRole('button', { name: 'rocket' }).click();
+  await expect(mark.locator('[data-project-icon="rocket"]')).toBeVisible();
+  await expect(mark.locator('[data-project-icon-auto]')).toHaveCount(0);
+});
+
 test('the name input focus is the field ring: one --focus-ring border, no halo, not the UA default', async ({
   page,
 }) => {

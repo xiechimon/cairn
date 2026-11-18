@@ -269,7 +269,7 @@ export function ProjectSettingsPage() {
                 disabled={id === undefined}
                 onChange={patch}
                 triggerClassName="grid size-8 flex-none place-items-center rounded-(--radius-control) bg-popover text-content-secondary ring-1 ring-border hover:bg-(--menu-hover)"
-                trigger={<ProjectAvatar bare icon={project?.icon} />}
+                trigger={<ProjectAvatar bare name={project?.name} icon={project?.icon} />}
               />
               <Input
                 aria-label={t('项目名称')}

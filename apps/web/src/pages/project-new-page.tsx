@@ -7,6 +7,7 @@ import {
   LOCAL_ERROR_REASON_COPY,
   type LocalErrorReason,
   type ProjectIcon,
+  projectIconOrAuto,
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { type KeyboardEvent, type Ref, useEffect, useRef, useState } from 'react';
@@ -420,7 +421,7 @@ export function ProjectNewPage() {
             color={null}
             onChange={(patch) => setIcon(patch.icon ?? null)}
             triggerClassName="grid place-items-center rounded-full"
-            trigger={<NewProjectIcon icon={icon} />}
+            trigger={<NewProjectIcon icon={icon} name={name} />}
           />
         </span>
         <FormField label={t('项目名称')} htmlFor="prj-new-name">
@@ -720,9 +721,15 @@ export function ProjectNewPage() {
   );
 }
 
-function NewProjectIcon({ icon }: { icon: ProjectIcon | null }) {
-  const Icon = PROJECT_ICON_COMPONENTS[icon ?? 'box'];
+function NewProjectIcon({ icon, name }: { icon: ProjectIcon | null; name: string }) {
+  const resolved = projectIconOrAuto(icon, name);
+  const auto = icon === null && resolved !== 'box';
+  const Icon = PROJECT_ICON_COMPONENTS[resolved];
   return (
-    <Icon className={cn('size-5', icon === null ? 'text-content-tertiary' : 'text-foreground')} />
+    <Icon
+      data-project-icon={icon !== null || auto ? resolved : undefined}
+      data-project-icon-auto={auto || undefined}
+      className={cn('size-5', resolved === 'box' ? 'text-content-tertiary' : 'text-foreground')}
+    />
   );
 }
