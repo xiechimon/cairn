@@ -1158,7 +1158,6 @@ export const EN: Record<string, string> = {
   // XMON-19/B2 删除 Agent：三串 = 原版产线 bundle 的 en 语料原文
   // （agent_modal.remove / remove_title / remove_confirm），非回译。
   复制链接: 'Copy link',
-  暂停: 'Snooze',
   撤销: 'Undo',
   负责人: 'Owner',
   'Coordinator 用的模型额度已用完': "The Coordinator's model is out of quota",
@@ -1955,16 +1954,15 @@ export const EN: Record<string, string> = {
   '可以任意组合，需同时满足': 'Combine any; they all apply',
   '没有筛选的词匹配标题。在筛选前加 - 表示排除。':
     'Words without a filter match titles. Prefix a filter with - to exclude it.',
-  '状态：failed、waiting、review、running、done、snoozed':
-    'State: failed, waiting, review, running, done, snoozed',
+  '状态：failed、waiting、review、running、done': 'State: failed, waiting, review, running, done',
   项目名: 'A project name',
   'PR 编号，或 any': 'A pull request number, or any',
   '发起它的 Agent 或成员': 'The agent or person who started it',
   '日期，或距今的时间段': 'A date or a span back from now',
   '花费，用 > 或 <': 'Spend, with > or <',
   这个筛选还没有值: 'This filter has no value yet',
-  '状态只能是 failed、waiting、review、running、done 或 snoozed':
-    'State must be failed, waiting, review, running, done or snoozed',
+  '状态只能是 failed、waiting、review、running 或 done':
+    'State must be failed, waiting, review, running or done',
   '请写 PR 编号，或 any': 'Use a PR number, or any',
   '请写日期如 2026-11-01，或时间段如 7d': 'Use a date like 2026-11-01, or a span like 7d',
   '请写 > 或 < 加数字，如 >5': 'Use > or < with a number, like >5',

@@ -420,9 +420,9 @@ Reach:
 
 ### threads
 
-**Threads** (shipped, centrality 1). A thread is one piece of work with its own session: created, continued, snoozed, archived, reset and counted by phase.
+**Threads** (shipped, centrality 1). A thread is one piece of work with its own session: created, continued, archived, reset and counted by phase.
 
-States: Running, waiting on the user, done, snoozed or archived; the thread opens in the side panel with its actions menu. Tasks reads include recent archives and pending standalone Coordinator questions; section is derived on every read.
+States: Running, waiting on the user, done or archived; the thread opens in the side panel with its actions menu. Tasks reads include recent archives and pending standalone Coordinator questions; section is derived on every read.
 
 Reach:
 
@@ -438,7 +438,7 @@ Reach:
 - Research: [docs/research/r12-save-and-start-behavior.md](../../../docs/research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
-- Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/snooze.test.ts`, `apps/server/test/archive.test.ts`, `apps/server/test/tasks.test.ts`
+- Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/archive.test.ts`, `apps/server/test/tasks.test.ts`
 
 ### trajectory-export
 

@@ -914,7 +914,6 @@ describe('ownership is derived in one place (#3512)', () => {
     { pattern: /\bfailureAwaitsAutomaticRetry\(/, home: 'services/owner.ts' },
     { pattern: /\benqueueOwnershipWake\(/, home: 'services/owner.ts' },
     { pattern: /\bnotifyOwnership\(/, home: 'services/owner.ts' },
-    { pattern: /\bendSnoozeOn\([^)]*'needs-you'/, home: 'services/owner.ts' },
   ];
 
   test('no server file outside owner.ts derives ownership or sends ownership wakes', () => {

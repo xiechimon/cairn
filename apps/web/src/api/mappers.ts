@@ -311,8 +311,6 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     phase: w.phase,
     phaseAt: w.phaseAt,
     archivedAt: w.archivedAt ?? null,
-    snoozedUntil: w.snoozedUntil ?? null,
-    snoozeMode: w.snoozeMode ?? null,
     seqNum: w.seqNum,
     orderIndex: w.orderIndex,
     tagIds: w.tagIds,

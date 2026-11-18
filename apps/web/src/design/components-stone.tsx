@@ -209,7 +209,6 @@ interface DemoThread {
   tone: StoneTone;
   age: string;
   pr?: number;
-  snoozed?: boolean;
 }
 
 const DEMO_THREADS: readonly DemoThread[] = [
@@ -245,10 +244,9 @@ const DEMO_THREADS: readonly DemoThread[] = [
   {
     id: 'e',
     title: 'Automation badge and popover',
-    reason: 'Snoozed until needed',
+    reason: 'Not started yet',
     tone: 'idle',
-    age: '',
-    snoozed: true,
+    age: '2d',
   },
 ];
 
@@ -271,7 +269,6 @@ export function ThreadRowSection() {
         tone={t.tone}
         age={t.age}
         pr={t.pr}
-        snoozed={t.snoozed}
         selected={selected.has(t.id)}
         onSelectedChange={(on) => toggle(t.id, on)}
       />
@@ -287,7 +284,7 @@ export function ThreadRowSection() {
         title="Inbox trail"
         note="Hover a row, tick the checkbox"
         stage="canvas"
-        code={`<ThreadRow title="Fold finished turns" reason="PR is ready" tone="review" pr={2271} age="32m" />\n<BulkBar count={2} onResolve={...} onSnooze={...} onArchive={...} onClear={...} />`}
+        code={`<ThreadRow title="Fold finished turns" reason="PR is ready" tone="review" pr={2271} age="32m" />\n<BulkBar count={2} onResolve={...} onArchive={...} onClear={...} />`}
       >
         <div className="relative w-full max-w-130 overflow-hidden rounded-(--radius-card) bg-background pb-14">
           <StoneTrail>
@@ -318,7 +315,6 @@ export function ThreadRowSection() {
                   toastSuccess(`Resolved ${selected.size} threads`);
                   setSelected(new Set());
                 }}
-                onSnooze={() => toastSuccess(`Snoozed ${selected.size} threads`)}
                 onArchive={() => toastSuccess(`Archived ${selected.size} threads`)}
                 onClear={() => setSelected(new Set())}
               />

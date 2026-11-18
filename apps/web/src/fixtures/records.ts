@@ -73,8 +73,6 @@ export interface TodoRecord {
   phase: Phase;
   phaseAt: number;
   archivedAt?: number | null;
-  snoozedUntil?: number | null;
-  snoozeMode?: 'needed' | 'until' | null;
   seqNum: number;
   orderIndex: number;
   tagIds: string[];

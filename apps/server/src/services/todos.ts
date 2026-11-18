@@ -339,8 +339,6 @@ function todoRecordOf(
     phase: row.phase,
     phaseAt: row.phaseAt,
     archivedAt: row.archivedAt,
-    snoozedUntil: row.snoozedUntil,
-    snoozeMode: row.snoozeMode,
     ...(row.decisions.length > 0 ? { decisions: row.decisions } : {}),
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,

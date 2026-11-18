@@ -37,7 +37,6 @@ import {
 } from './client-message.js';
 import { projectOfTodo } from './git.js';
 import { assertAutomaticRetryAllowed } from './retry-parking.js';
-import { endSnoozeOn } from './snooze.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { settleQuestionAnswers, settleWorkerReply } from './worker-questions.js';
@@ -357,8 +356,5 @@ export async function sendBuildSteer(
     return replayAfterConflict<BuildSteerResult>(db, conversationId, body.clientMessageId, error);
   }
   for (const publish of afterCommit) publish();
-  const fromUser =
-    continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-  if (fromUser && !continuationOptions.schedule) endSnoozeOn(deps, buildRow.todoId, 'user-message');
   return sent;
 }

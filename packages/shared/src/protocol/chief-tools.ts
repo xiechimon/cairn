@@ -53,7 +53,6 @@ export const CHIEF_TOOLS_ADDED = [
   'update_skill',
   'models',
   'update_memory',
-  'snooze_todos',
   'search_history',
   'read_history',
   'job_profile',
@@ -100,7 +99,6 @@ export const CHIEF_TOOL_CATEGORIES = {
     'delete_secrets',
     'schedule_todo',
     'unschedule_todo',
-    'snooze_todos',
   ],
   execute: ['cancel_builds', 'merge_builds'],
   private: [
@@ -717,21 +715,6 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     parameters: obj({ todoId: str('Todo id.') }, ['todoId']),
   },
   {
-    name: 'snooze_todos',
-    description:
-      'Snooze todo threads so they leave the active list and stop pushing. until is "needed" (back when the agent needs the user), "tomorrow" (next 08:00), "tomorrow-09:00", "next-monday" (09:00), epoch ms as a digit string or an ISO timestamp with offset. A user message, a finished scheduled run, a cleared schedule or a needs-you event ends the snooze early and marks the thread unread.',
-    parameters: obj(
-      {
-        todoIds: idArr('Todo ids to snooze.'),
-        until: str(
-          'needed | tomorrow | tomorrow-09:00 | next-monday | epoch ms as digits | ISO timestamp with offset.',
-        ),
-        tz: str('Optional IANA time zone for the presets; defaults to the server time zone.'),
-      },
-      ['todoIds', 'until'],
-    ),
-  },
-  {
     name: 'cancel_builds',
     description:
       'Cancel running or queued builds. The reason is recorded on each build and shown in threads, so say why (for example "priority: finish #131 first").',
@@ -843,7 +826,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-export const CHIEF_TOOL_COUNT = 48;
+export const CHIEF_TOOL_COUNT = 47;
 
 export const CHIEF_ROUTER_TOOL_NAMES = [
   'open_thread',
@@ -945,6 +928,7 @@ export const CHIEF_TOOLS_REMOVED_UNDER_D60 = {
   update_agent: 'routing rules (agents are no longer configured here)',
   delete_agents: 'routing rules (agents are no longer configured here)',
   message_todo: 'message_thread',
+  snooze_todos: 'archive_todos or schedule_todo (snooze was retired)',
 } as const satisfies Record<string, string>;
 
 const WORKER_ATTACHMENT_TOOL: RemoteToolDef = {

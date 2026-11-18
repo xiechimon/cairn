@@ -158,12 +158,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/todos/{id}' },
   {
     method: 'POST',
-    path: '/api/todos/{id}/snooze',
-    note: 'body {until: needed|tomorrow|tomorrow-09:00|next-monday|epoch ms|ISO, tz?}',
-  },
-  { method: 'POST', path: '/api/todos/{id}/unsnooze', note: 'clears the snooze' },
-  {
-    method: 'POST',
     path: '/api/todos/{id}/runner',
     note: 'body {machineId}; runs a waiting task on that Runner this time; 409 once claimed, after a session, for a local-path project or when the Runner fails a hard gate',
   },

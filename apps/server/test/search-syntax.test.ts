@@ -132,10 +132,20 @@ describe('search filters: is:', () => {
     expect(titles(await run(s, 'is:done'))).toEqual(['web done', 'web closed']);
   });
 
-  test('is:snoozed matches threads with a snooze mode, in any phase', async () => {
-    const { s, web } = corpus();
-    addThread(s, web, 'napping', { phase: 'review', snoozeMode: 'until', snoozedUntil: NOW + DAY });
-    expect(titles(await run(s, 'is:snoozed'))).toEqual(['napping']);
+  test('is:snoozed is an unknown state now that snooze is gone', async () => {
+    const { s } = corpus();
+    const hit = await run(s, 'is:snoozed');
+    expect(hit.todos).toEqual([]);
+    expect(hit.filters).toEqual([
+      {
+        key: 'is',
+        raw: 'is:snoozed',
+        value: 'snoozed',
+        negated: false,
+        valid: false,
+        reason: 'unknown_state',
+      },
+    ]);
   });
 
   test('multiple positive is: filters are ORed', async () => {

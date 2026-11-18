@@ -28,7 +28,6 @@ import {
   finishScheduledStep,
   workerScheduleRunHistory,
 } from '../src/services/schedules.js';
-import { snoozeTodo } from '../src/services/snooze.js';
 import { executeThreadScheduleTool } from '../src/services/thread-schedule-tools.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
@@ -556,22 +555,18 @@ test('completed once metadata stays visible and is excluded from later due selec
   expect(s.db.select().from(step).all()).toHaveLength(stepCount);
 });
 
-test('replayed once completion does not renotify or end a newer snooze', async () => {
+test('replayed once completion does not renotify or re-unread the thread', async () => {
   const s = await world('once');
   const notice = vi.spyOn(notifications, 'notifyScheduleRun');
   await s.scheduler.tick(s.due);
   s.db.update(schedule).set({ enabled: false }).where(eq(schedule.id, s.saved.id)).run();
   const fired = s.db.select().from(step).all().at(-1)!;
-  snoozeTodo(s.svc, s.todoId, { until: 'needed' });
   setTodoPhase(s.svc, s.todoId, 'building');
   builds.completeStep(s.svc, fired.id);
-  expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.snoozeMode).toBeNull();
   expect(notice).toHaveBeenCalledOnce();
   const readNotice = notifications.markNotificationRead(s.svc, s.team.id, s.todoId);
-  snoozeTodo(s.svc, s.todoId, { until: 'needed' });
   finishScheduledStep(s.svc, fired);
   expect(notice).toHaveBeenCalledOnce();
-  expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.snoozeMode).toBe('needed');
   expect(notifications.markNotificationRead(s.svc, s.team.id, s.todoId)).toEqual(readNotice);
 });
 
@@ -634,16 +629,14 @@ test('recreating a completed once schedule replaces its unique row and clears pr
   ]);
 });
 
-test('explicitly deleting a retained once row still ends snooze and removes it', async () => {
+test('explicitly deleting a retained once row removes it', async () => {
   const s = await world('once');
   await s.scheduler.tick(s.due);
   const fired = s.db.select().from(step).all().at(-1)!;
   setTodoPhase(s.svc, s.todoId, 'building');
   builds.completeStep(s.svc, fired.id);
-  snoozeTodo(s.svc, s.todoId, { until: 'needed' });
   expect((await req(s.app, 'DELETE', `/api/schedules/${s.saved.id}`)).status).toBe(204);
   expect(s.stored()).toBeUndefined();
-  expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.snoozeMode).toBeNull();
 });
 
 test.each(['task-api', 'coordinator'] as const)(

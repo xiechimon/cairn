@@ -83,7 +83,6 @@ import {
   workerScheduleRunHistory,
 } from './schedules.js';
 import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
-import { sweepSnoozeExpiry } from './snooze.js';
 import { createTaskIssueSync } from './task-issue-sync.js';
 import { insertMessageRow } from './transcript.js';
 import { sweepUnplaceableSteps } from './unplaceable-steps.js';
@@ -506,7 +505,6 @@ export function createScheduler(
     }
     for (const row of dueSchedules(deps, now)) pending.push(runSchedule(row, now));
     sweepIdleChiefUnread(deps, now);
-    sweepSnoozeExpiry(deps, now);
     fireDueChiefWakes(deps, now);
     try {
       releaseResearchReworkHolds(deps, now);

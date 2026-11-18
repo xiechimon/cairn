@@ -14,7 +14,6 @@ const IS_PHASES: Record<SearchIsState, (todo: TodoRecord) => boolean> = {
   review: (todo) => todo.phase === 'review',
   running: (todo) => ['queued', 'planning', 'building'].includes(todo.phase),
   done: (todo) => todo.phase === 'done' || todo.phase === 'closed',
-  snoozed: (todo) => todo.snoozeMode != null,
 };
 
 function matchesCondition(

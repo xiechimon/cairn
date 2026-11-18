@@ -1,11 +1,10 @@
 import { cn } from 'cn';
-import { AlarmClockOff, Archive, Check, X } from 'lucide-react';
+import { Archive, Check, X } from 'lucide-react';
 import { Button } from '../ui/button.js';
 
 export interface BulkBarProps {
   count: number;
   onResolve?: () => void;
-  onSnooze?: () => void;
   onArchive?: () => void;
   onClear?: () => void;
   className?: string;
@@ -14,14 +13,7 @@ export interface BulkBarProps {
 const ACTION_CLS =
   'h-7 text-ui text-primary-foreground hover:bg-primary-foreground/12 hover:text-primary-foreground dark:hover:bg-primary-foreground/12';
 
-export function BulkBar({
-  count,
-  onResolve,
-  onSnooze,
-  onArchive,
-  onClear,
-  className,
-}: BulkBarProps) {
+export function BulkBar({ count, onResolve, onArchive, onClear, className }: BulkBarProps) {
   return (
     <div
       role="toolbar"
@@ -36,10 +28,6 @@ export function BulkBar({
       <Button variant="ghost" onClick={onResolve} className={ACTION_CLS}>
         <Check className="size-4" />
         Resolve
-      </Button>
-      <Button variant="ghost" onClick={onSnooze} className={ACTION_CLS}>
-        <AlarmClockOff className="size-4" />
-        Snooze
       </Button>
       <Button variant="ghost" onClick={onArchive} className={ACTION_CLS}>
         <Archive className="size-4" />

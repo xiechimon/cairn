@@ -35,8 +35,8 @@ export function PanelSection() {
               <StoneTrail>
                 <StoneGroup tone="waiting" label="Waiting on you" count={1}>
                   <ThreadRow
-                    title="Snooze until needed"
-                    reason="Question · keep the snooze when a reply lands?"
+                    title="Pick the build machine"
+                    reason="Question · run on the VM or the Mac?"
                     tone="waiting"
                     age="12m"
                   />

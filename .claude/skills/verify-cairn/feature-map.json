@@ -499,8 +499,8 @@
     {
       "id": "threads",
       "name": "Threads",
-      "summary": "A thread is one piece of work with its own session: created, continued, snoozed, archived, reset and counted by phase.",
-      "states": "Running, waiting on the user, done, snoozed or archived; the thread opens in the side panel with its actions menu. Tasks reads include recent archives and pending standalone Coordinator questions; section is derived on every read.",
+      "summary": "A thread is one piece of work with its own session: created, continued, archived, reset and counted by phase.",
+      "states": "Running, waiting on the user, done or archived; the thread opens in the side panel with its actions menu. Tasks reads include recent archives and pending standalone Coordinator questions; section is derived on every read.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -512,7 +512,6 @@
         "server": [
           "apps/server/src/routes-todos.ts",
           "apps/server/src/services/todos.ts",
-          "apps/server/src/services/snooze.ts",
           "apps/server/src/services/phase.ts",
           "apps/server/src/services/tasks.ts"
         ]
@@ -526,8 +525,6 @@
           "/api/todos/:id",
           "/api/todos/:id/archive",
           "/api/todos/:id/unarchive",
-          "/api/todos/:id/snooze",
-          "/api/todos/:id/unsnooze",
           "/api/todos/:id/reset",
           "/api/todos/:id/stop-and-done",
           "/api/builds/:id/merge",
@@ -565,7 +562,6 @@
       "evidence": [
         "apps/web/e2e/detail-continue-thread.spec.ts",
         "apps/web/e2e/detail-archive.spec.ts",
-        "apps/server/test/snooze.test.ts",
         "apps/server/test/archive.test.ts",
         "apps/server/test/tasks.test.ts"
       ]

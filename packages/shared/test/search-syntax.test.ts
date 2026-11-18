@@ -46,7 +46,7 @@ describe('parseSearchQuery', () => {
   });
 
   test('keys are case-insensitive and is: values map to states', () => {
-    const states = ['failed', 'waiting', 'review', 'running', 'done', 'snoozed'];
+    const states = ['failed', 'waiting', 'review', 'running', 'done'];
     for (const state of states) {
       expect(parse(`IS:${state.toUpperCase()}`).filters[0]?.condition).toEqual({
         key: 'is',
@@ -103,11 +103,11 @@ describe('parseSearchQuery', () => {
   });
 
   test('repeated filters are all kept in order; the search service ORs same-key positives and ANDs negatives', () => {
-    const parsed = parse('is:failed is:review -is:snoozed');
+    const parsed = parse('is:failed is:review -is:done');
     expect(parsed.filters.map((f) => [f.negated, f.value])).toEqual([
       [false, 'failed'],
       [false, 'review'],
-      [true, 'snoozed'],
+      [true, 'done'],
     ]);
   });
 

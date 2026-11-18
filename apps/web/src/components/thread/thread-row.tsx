@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { AlarmClockOff, GitPullRequest } from 'lucide-react';
+import { GitPullRequest } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import type { StoneTone } from '../stone/tone.js';
@@ -23,7 +23,6 @@ export interface ThreadRowProps {
   pr?: number;
   prLink?: { number: number; url: string };
   age?: string;
-  snoozed?: boolean;
   selected?: boolean;
   onSelectedChange?: (next: boolean) => void;
   onOpen?: () => void;
@@ -38,7 +37,6 @@ export function ThreadRow({
   pr,
   prLink,
   age,
-  snoozed = false,
   selected = false,
   onSelectedChange,
   onOpen,
@@ -104,7 +102,7 @@ export function ThreadRow({
           menu != null && 'group-focus-within/row:invisible group-hover/row:invisible',
         )}
       >
-        {snoozed ? <AlarmClockOff className="size-4" aria-label={t('已暂停')} /> : age}
+        {age}
       </span>
       {menu != null && (
         <span className="absolute top-1.5 right-1.5 hidden items-center group-focus-within/row:flex group-hover/row:flex">

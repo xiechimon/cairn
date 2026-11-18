@@ -78,7 +78,16 @@ test('cutover preserves exact label identities and metadata, moved origins and s
       { todoId: 'ordinary', tagId: 'local-only' },
       { todoId: 'ordinary', tagId: 'shared' },
     ]);
-    expect(opened.db.all('SELECT * FROM todo ORDER BY id')).toEqual(original.tasks);
+    expect(opened.db.all('SELECT * FROM todo ORDER BY id')).toEqual(
+      original.tasks.map((row) => {
+        const {
+          snoozedUntil: _snoozedUntil,
+          snoozeMode: _snoozeMode,
+          ...rest
+        } = row as Record<string, unknown>;
+        return rest;
+      }),
+    );
     expect(opened.db.all('SELECT * FROM build ORDER BY id')).toEqual(
       original.builds.map((row) => ({ ...(row as object), afterStopPhase: null })),
     );

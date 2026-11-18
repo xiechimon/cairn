@@ -21,7 +21,6 @@ export {
   boardWithProbe,
   sidebarGroups,
   sidebarProjectIcons,
-  sidebarSnooze,
   sidebarThreadStatuses,
   sidebarThreads,
   sidebarUnread,

@@ -245,11 +245,11 @@ export function isSilencedTodoPush(db: Db, teamId: string, href: string): boolea
   const match = /^\/app\/todo\/([^/?#]+)$/.exec(href);
   if (match?.[1] === undefined) return false;
   const row = db
-    .select({ archivedAt: todo.archivedAt, snoozeMode: todo.snoozeMode })
+    .select({ archivedAt: todo.archivedAt })
     .from(todo)
     .where(and(eq(todo.id, match[1]), eq(todo.teamId, teamId)))
     .get();
-  return row !== undefined && (row.archivedAt !== null || row.snoozeMode !== null);
+  return row !== undefined && row.archivedAt !== null;
 }
 
 export function pushToUserSafely(

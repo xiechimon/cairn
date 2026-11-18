@@ -8083,32 +8083,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               "minimum": -9007199254740991,
               "type": "integer",
             },
-            "snoozeMode": {
-              "anyOf": [
-                {
-                  "enum": [
-                    "needed",
-                    "until",
-                  ],
-                  "type": "string",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-            "snoozedUntil": {
-              "anyOf": [
-                {
-                  "maximum": 9007199254740991,
-                  "minimum": -9007199254740991,
-                  "type": "integer",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
             "sourceBuildId": {
               "type": [
                 "string",
@@ -10582,16 +10556,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   {
     "method": "GET",
     "path": "/api/todos/{id}",
-  },
-  {
-    "method": "POST",
-    "note": "body {until: needed|tomorrow|tomorrow-09:00|next-monday|epoch ms|ISO, tz?}",
-    "path": "/api/todos/{id}/snooze",
-  },
-  {
-    "method": "POST",
-    "note": "clears the snooze",
-    "path": "/api/todos/{id}/unsnooze",
   },
   {
     "method": "POST",
@@ -14154,32 +14118,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
       "type": "integer",
-    },
-    "snoozeMode": {
-      "anyOf": [
-        {
-          "enum": [
-            "needed",
-            "until",
-          ],
-          "type": "string",
-        },
-        {
-          "type": "null",
-        },
-      ],
-    },
-    "snoozedUntil": {
-      "anyOf": [
-        {
-          "maximum": 9007199254740991,
-          "minimum": -9007199254740991,
-          "type": "integer",
-        },
-        {
-          "type": "null",
-        },
-      ],
     },
     "sourceBuildId": {
       "type": [

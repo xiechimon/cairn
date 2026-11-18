@@ -61,7 +61,6 @@ const SIDEBAR = [
   'shadcn-primitives',
   'storage-unavailable',
   'mobile-narrow',
-  'thread-snooze',
 ];
 const DETAIL = [
   'menu-keys',
@@ -235,7 +234,7 @@ export const FILE_RULES = new Map([
   ['apps/web/src/design/components-overlays.tsx', ['menu-keys', 'shadcn-primitives']],
   [
     'apps/web/src/components/menu-keys.tsx',
-    ['menu-keys', 'detail-archive', 'thread-snooze', 'dead-buttons', 'hotkeys', 'sidebar-'],
+    ['menu-keys', 'detail-archive', 'dead-buttons', 'hotkeys', 'sidebar-'],
   ],
   ['apps/web/src/components/key-hint.tsx', ['menu-keys', 'hotkeys', 'sidebar-', 'board-shell']],
   [

@@ -21,7 +21,6 @@ import {
   SECRET_NAME_PATTERN,
   SECRET_NAME_RULE,
   SUGGEST_REPLIES_TOOL_NAME,
-  snoozeTodoBodySchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
@@ -103,7 +102,6 @@ import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
-import { snoozeTodo } from './snooze.js';
 import { listBuildStepRoutes } from './step-route.js';
 import { startThreadBuild } from './thread-message.js';
 import { getTodo, listTodos, setTodoArchived, setTodoPhase } from './todos.js';
@@ -214,7 +212,6 @@ const PROJECT_WRITE_TOOLS = new Set([
   'connect_repo',
   'schedule_todo',
   'unschedule_todo',
-  'snooze_todos',
   'run_builds',
   'run_review',
   'confirm_builds',
@@ -962,41 +959,6 @@ export async function executeChiefTool(
       const rows = db.select().from(schedule).where(eq(schedule.todoId, todoId)).all();
       for (const r of rows) deleteSchedule({ db, hub: deps.hub, user: deps.user }, r.id);
       return json({ todoId, removed: rows.length });
-    }
-
-    case 'snooze_todos': {
-      const todoIds = strArr(params, 'todoIds');
-      const body = parseWith(
-        snoozeTodoBodySchema,
-        {
-          until:
-            typeof params.until === 'string' && /^\d+$/.test(params.until)
-              ? Number(params.until)
-              : params.until,
-          ...(optStr(params, 'tz') ? { tz: optStr(params, 'tz') } : {}),
-        },
-        'params',
-      );
-      const snoozed: { id: string; snoozeMode: string | null; snoozedUntil: number | null }[] = [];
-      const skipped: string[] = [];
-      for (const id of todoIds) {
-        const owned = db
-          .select({ id: todo.id })
-          .from(todo)
-          .where(and(eq(todo.id, id), eq(todo.teamId, ctx.teamId)))
-          .get();
-        const record = owned ? snoozeTodo(svc, id, body) : null;
-        if (!record) {
-          skipped.push(id);
-          continue;
-        }
-        snoozed.push({
-          id,
-          snoozeMode: record.snoozeMode ?? null,
-          snoozedUntil: record.snoozedUntil ?? null,
-        });
-      }
-      return json({ snoozed, skipped });
     }
 
     case 'cancel_builds': {

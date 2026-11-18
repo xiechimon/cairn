@@ -5,7 +5,6 @@ import { epochMs, phaseSchema, recordId } from './common.js';
 import { parseGithubRepoRef } from './project.js';
 import { deliverablesMessageSchema } from './report.js';
 import { routeOverrideSchema } from './routing-rule.js';
-import { snoozeModeSchema } from './snooze.js';
 import { quotaWaitSchema } from './step.js';
 import { taskRequestSchema } from './task-request.js';
 
@@ -110,8 +109,6 @@ export const todoRecordSchema = z.object({
   phase: phaseSchema,
   phaseAt: epochMs,
   archivedAt: epochMs.nullish(),
-  snoozedUntil: epochMs.nullish(),
-  snoozeMode: snoozeModeSchema.nullish(),
   seqNum: z.number().int(),
   orderIndex: z.number(),
   tagIds: z.array(recordId),

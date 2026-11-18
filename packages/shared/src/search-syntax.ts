@@ -1,14 +1,7 @@
 export const SEARCH_FILTER_KEYS = ['is', 'project', 'pr', 'by', 'after', 'cost'] as const;
 export type SearchFilterKey = (typeof SEARCH_FILTER_KEYS)[number];
 
-export const SEARCH_IS_STATES = [
-  'failed',
-  'waiting',
-  'review',
-  'running',
-  'done',
-  'snoozed',
-] as const;
+export const SEARCH_IS_STATES = ['failed', 'waiting', 'review', 'running', 'done'] as const;
 export type SearchIsState = (typeof SEARCH_IS_STATES)[number];
 
 export type SearchFilterProblem = 'empty' | 'unknown_state' | 'bad_pr' | 'bad_date' | 'bad_cost';

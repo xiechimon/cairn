@@ -30,7 +30,6 @@ const IS_CONDITIONS: Record<SearchIsState, SQL> = {
   review: sql`${todo.phase} = 'review'`,
   running: sql`${todo.phase} IN ('queued', 'planning', 'building')`,
   done: sql`${todo.phase} IN ('done', 'closed')`,
-  snoozed: sql`${todo.snoozeMode} IS NOT NULL`,
 };
 
 interface ResolvedFilter {

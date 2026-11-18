@@ -253,6 +253,7 @@ describe('internal correction classification', () => {
       .prepare('PRAGMA table_info(todo)')
       .all()
       .map((column) => (column as { name: string }).name)
+      .filter((name) => name !== 'snoozedUntil' && name !== 'snoozeMode')
       .join(', ');
     const tasks = before.prepare(`SELECT ${taskColumns} FROM todo ORDER BY id`).all();
     const labels = before.prepare('SELECT * FROM tag ORDER BY id').all();

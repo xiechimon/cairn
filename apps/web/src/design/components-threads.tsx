@@ -39,7 +39,7 @@ export function PermissionSection() {
           <PermissionCard
             title="Allow this command on omarchy?"
             command={
-              '$ pnpm db:migrate\n+ ALTER TABLE thread ADD COLUMN snooze_until integer;\n+ ALTER TABLE thread ADD COLUMN snooze_reason text;'
+              '$ pnpm db:migrate\n+ ALTER TABLE thread ADD COLUMN owner_hint text;\n+ ALTER TABLE thread ADD COLUMN handoff_note text;'
             }
             help="Writes to the self-use database. A backup ran 47 minutes ago."
             alwaysLabel="Always allow in this project"

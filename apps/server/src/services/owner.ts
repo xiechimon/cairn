@@ -18,7 +18,6 @@ import { failureAwaitsAutomaticRetry } from './needs-you.js';
 import { notifyOwnership } from './notifications.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { publishStepRow } from './quota-wait.js';
-import { endSnoozeOn } from './snooze.js';
 import { getTodo } from './todos.js';
 
 type TodoRow = typeof todo.$inferSelect;
@@ -183,7 +182,6 @@ const PUSH_TITLE: Record<NeedsYouReason, string> = {
 };
 
 function notifyOwner(deps: OwnerDeps, row: TodoRow, reason: NeedsYouReason): void {
-  endSnoozeOn(deps, row.id, 'needs-you');
   notifyOwnership(deps, row, reason);
   pushToUserSafely(deps.db, deps.vapidKeys ?? null, deps.user.id, row.teamId, {
     title: PUSH_TITLE[reason],

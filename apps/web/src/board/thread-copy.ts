@@ -1,16 +1,7 @@
-import type { StoneTone } from '../components/stone/tone.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { STATUS_WORDS } from './status-words.js';
 
 export type ThreadStatus = 'running' | 'needs-you' | 'failed' | 'done' | 'idle';
-
-const THREAD_TONE: Record<ThreadStatus, StoneTone> = {
-  running: 'working',
-  'needs-you': 'waiting',
-  failed: 'failed',
-  done: 'resolved',
-  idle: 'idle',
-};
 
 export function threadStatus(todo: TodoRecord): ThreadStatus {
   switch (todo.phase) {
@@ -90,11 +81,4 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
     case 'todo':
       return { state: STATUS_WORDS.idle, reason: '还没开始。' };
   }
-}
-
-export function threadTone(todo: TodoRecord): StoneTone {
-  if (todo.phase === 'done' || todo.phase === 'closed') return 'resolved';
-  if (todo.snoozeMode != null) return 'idle';
-  if (todo.phase === 'review') return 'review';
-  return THREAD_TONE[threadStatus(todo)];
 }
