@@ -1,29 +1,17 @@
-import type { ClaudeSubscription, DevinSubscriptionModel, MachineRecord } from '@cairn/shared';
+import type {
+  ClaudeSubscriptionListEntry,
+  ClaudeSubscriptionQuotaWindow,
+  DevinSubscriptionModel,
+  MachineRecord,
+} from '@cairn/shared';
 
 export const ACCOUNT_STATES = ['ok', 'cooling', 'exhausted', 'expired'] as const;
 export type AccountState = (typeof ACCOUNT_STATES)[number];
-export type AccountPlan = 'pro' | 'max';
 
-export interface QuotaWindow {
-  name: string;
-  utilization: number;
-  resetsAt: number | null;
-  observedAt: number;
-}
-
-export type ClaudeSubscriptionWire = ClaudeSubscription & {
-  plan?: AccountPlan | null;
-  state?: AccountState;
-  cooldownUntil?: number | null;
-  windows?: QuotaWindow[];
-  lastUsedAt?: number | null;
-  stepsLast24h?: number;
-};
+export type QuotaWindow = ClaudeSubscriptionQuotaWindow;
 
 export const ACCOUNT_VENDORS = ['claude', 'codex', 'grok', 'devin'] as const;
 export type AccountVendor = (typeof ACCOUNT_VENDORS)[number];
-
-const PLAN_LABELS: Record<AccountPlan, string> = { pro: 'Pro', max: 'Max' };
 
 export type SubscriptionModel = DevinSubscriptionModel;
 
@@ -45,7 +33,10 @@ export interface SubscriptionAccount {
 const isAccountState = (value: unknown): value is AccountState =>
   typeof value === 'string' && (ACCOUNT_STATES as readonly string[]).includes(value);
 
-export function toClaudeAccount(wire: ClaudeSubscriptionWire, now: number): SubscriptionAccount {
+export function toClaudeAccount(
+  wire: ClaudeSubscriptionListEntry,
+  now: number,
+): SubscriptionAccount {
   const expired = wire.expiresAt !== null && wire.expiresAt <= now;
   return {
     id: wire.id,
@@ -53,7 +44,7 @@ export function toClaudeAccount(wire: ClaudeSubscriptionWire, now: number): Subs
     label: wire.label,
     expiresAt: wire.expiresAt,
     createdAt: wire.createdAt,
-    plan: wire.plan === 'pro' || wire.plan === 'max' ? PLAN_LABELS[wire.plan] : null,
+    plan: null,
     state: isAccountState(wire.state) ? wire.state : expired ? 'expired' : 'ok',
     cooldownUntil: wire.cooldownUntil ?? null,
     windows: Array.isArray(wire.windows) ? wire.windows : [],

@@ -197,12 +197,12 @@ export function ProvidersSection() {
     : (fixture.resources?.providers ?? []);
   const now = live ? Date.now() : fixture.now;
   const fixtureAccounts = fixture.resources?.accounts;
-  const subscriptions: SubscriptionAccount[] = (
-    live ? (subscriptionsQ.data ?? []) : (fixtureAccounts?.subscriptions ?? [])
-  ).map((wire) => toClaudeAccount(wire, now));
-  const devinSubscriptions: SubscriptionAccount[] = (
-    live ? (devinSubscriptionsQ.data ?? []) : (fixtureAccounts?.devinSubscriptions ?? [])
-  ).map((wire) => toDevinAccount(wire, now));
+  const subscriptions: SubscriptionAccount[] = live
+    ? (subscriptionsQ.data ?? []).map((wire) => toClaudeAccount(wire, now))
+    : (fixtureAccounts?.subscriptions ?? []);
+  const devinSubscriptions: SubscriptionAccount[] = live
+    ? (devinSubscriptionsQ.data ?? []).map((wire) => toDevinAccount(wire, now))
+    : (fixtureAccounts?.devinSubscriptions ?? []);
   const subscriptionApiIds = live ? (subscriptionsQ.data ?? []).map((s) => s.id) : [];
   const devinApiIds = live ? (devinSubscriptionsQ.data ?? []).map((s) => s.id) : [];
   const stepsQ = useClaudeSubscriptionSteps(teamId, subscriptionApiIds, live);

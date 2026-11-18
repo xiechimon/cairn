@@ -2,19 +2,17 @@ import { DEFAULT_DEVIN_MODELS, type ModelSource, type RoutingRuleRecord } from '
 import type {
   AccountMachine,
   AccountStep,
-  ClaudeSubscriptionWire,
   MachineWithProviders,
   SubscriptionAccount,
 } from '../api/claude-accounts.js';
-import type { DevinSubscriptionWire } from '../api/devin-subscriptions.js';
 import type { ModelRouting } from '../api/model-routing.js';
 import { MACHINE_ID, MACHINE_NAME, MACHINE_REMOTE_ID, MACHINE_REMOTE_NAME, r7 } from './core.js';
 import type { FixtureSet } from './records.js';
 import { RESOURCES, resourcesDefault } from './resources.js';
 
 export interface AccountsContent {
-  subscriptions: ClaudeSubscriptionWire[];
-  devinSubscriptions: DevinSubscriptionWire[];
+  subscriptions: SubscriptionAccount[];
+  devinSubscriptions: SubscriptionAccount[];
   otherAccounts: SubscriptionAccount[];
   stepsByAccount: Record<string, AccountStep[]>;
   machines: AccountMachine[];
@@ -31,14 +29,14 @@ export const ACCOUNT_OK_ID = 'sub-personal';
 export const ACCOUNT_COOLING_ID = 'sub-work';
 export const ACCOUNT_EXPIRED_ID = 'sub-old-laptop';
 
-export const ACCOUNT_SUBSCRIPTIONS: ClaudeSubscriptionWire[] = [
+export const ACCOUNT_SUBSCRIPTIONS: SubscriptionAccount[] = [
   {
     id: ACCOUNT_OK_ID,
-    kind: 'claude-subscription',
+    vendor: 'claude',
     label: 'Personal',
     expiresAt: NOW + 300 * DAY,
     createdAt: NOW - 40 * DAY,
-    plan: 'max',
+    plan: 'Max',
     state: 'ok',
     cooldownUntil: null,
     windows: [
@@ -55,11 +53,11 @@ export const ACCOUNT_SUBSCRIPTIONS: ClaudeSubscriptionWire[] = [
   },
   {
     id: ACCOUNT_COOLING_ID,
-    kind: 'claude-subscription',
+    vendor: 'claude',
     label: 'Work',
     expiresAt: null,
     createdAt: NOW - 12 * DAY,
-    plan: 'pro',
+    plan: 'Pro',
     state: 'cooling',
     cooldownUntil: NOW + 51 * MINUTE,
     windows: [
@@ -81,11 +79,11 @@ export const ACCOUNT_SUBSCRIPTIONS: ClaudeSubscriptionWire[] = [
   },
   {
     id: ACCOUNT_EXPIRED_ID,
-    kind: 'claude-subscription',
+    vendor: 'claude',
     label: 'Old laptop',
     expiresAt: NOW - 2 * DAY,
     createdAt: NOW - 400 * DAY,
-    plan: 'pro',
+    plan: 'Pro',
     state: 'expired',
     cooldownUntil: null,
     windows: [],
@@ -96,13 +94,14 @@ export const ACCOUNT_SUBSCRIPTIONS: ClaudeSubscriptionWire[] = [
 
 export const DEVIN_SUBSCRIPTION_ID = 'sub-devin';
 
-export const DEVIN_SUBSCRIPTIONS: DevinSubscriptionWire[] = [
+export const DEVIN_SUBSCRIPTIONS: SubscriptionAccount[] = [
   {
     id: DEVIN_SUBSCRIPTION_ID,
-    kind: 'devin-subscription',
+    vendor: 'devin',
     label: 'Devin',
     expiresAt: NOW + 180 * DAY,
     createdAt: NOW - 6 * DAY,
+    plan: null,
     state: 'ok',
     cooldownUntil: null,
     windows: [],

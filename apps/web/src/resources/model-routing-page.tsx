@@ -52,14 +52,12 @@ function RoutingContent() {
       : undefined
     : fixtureAccounts?.routing;
   const targets = routingTargets({
-    subscriptions: (live
-      ? (subscriptionsQ.data ?? [])
-      : (fixtureAccounts?.subscriptions ?? [])
-    ).map((wire) => toClaudeAccount(wire, now)),
-    devinSubscriptions: (live
-      ? (devinSubscriptionsQ.data ?? [])
-      : (fixtureAccounts?.devinSubscriptions ?? [])
-    ).map((wire) => toDevinAccount(wire, now)),
+    subscriptions: live
+      ? (subscriptionsQ.data ?? []).map((wire) => toClaudeAccount(wire, now))
+      : (fixtureAccounts?.subscriptions ?? []),
+    devinSubscriptions: live
+      ? (devinSubscriptionsQ.data ?? []).map((wire) => toDevinAccount(wire, now))
+      : (fixtureAccounts?.devinSubscriptions ?? []),
     providers: live ? (providersQ.data?.providers ?? []) : (fixture.resources?.providers ?? []),
     routing,
   });

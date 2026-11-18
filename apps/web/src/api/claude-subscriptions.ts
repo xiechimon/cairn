@@ -1,12 +1,13 @@
 import type {
   ClaudeSubscription,
+  ClaudeSubscriptionListEntry,
   ClaudeSubscriptionVerifyResult,
   CreateClaudeSubscription,
 } from '@cairn/shared';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
-import type { AccountStepsPage, ClaudeSubscriptionWire } from './claude-accounts.js';
+import type { AccountStepsPage } from './claude-accounts.js';
 import { ApiError, api } from './client.js';
 
 async function unlessMissing<T>(request: Promise<T>): Promise<T | null> {
@@ -21,7 +22,8 @@ async function unlessMissing<T>(request: Promise<T>): Promise<T | null> {
 export function useClaudeSubscriptions(teamId: string | undefined, live: boolean) {
   return useQuery({
     queryKey: ['claude-subscriptions', teamId],
-    queryFn: () => api.get<ClaudeSubscriptionWire[]>(`/api/teams/${teamId}/claude-subscriptions`),
+    queryFn: () =>
+      api.get<ClaudeSubscriptionListEntry[]>(`/api/teams/${teamId}/claude-subscriptions`),
     enabled: live && teamId !== undefined,
   });
 }

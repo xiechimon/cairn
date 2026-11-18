@@ -1,6 +1,7 @@
 import type {
   CreateDevinSubscription,
   DevinSubscription,
+  DevinSubscriptionListEntry,
   DevinSubscriptionVerifyResult,
   ProviderFailure,
 } from '@cairn/shared';
@@ -8,37 +9,21 @@ import { devinKeyFromToml } from '@cairn/shared';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
-import {
-  ACCOUNT_STATES,
-  type AccountPlan,
-  type AccountState,
-  type AccountStepsPage,
-  type QuotaWindow,
-  type SubscriptionAccount,
-  type SubscriptionModel,
+import type {
+  AccountStepsPage,
+  SubscriptionAccount,
+  SubscriptionModel,
 } from './claude-accounts.js';
 import { ApiError, api } from './client.js';
 
 export type { CreateDevinSubscription, DevinSubscription, DevinSubscriptionVerifyResult };
-
-export type DevinSubscriptionWire = DevinSubscription & {
-  plan?: AccountPlan | null;
-  state?: AccountState;
-  cooldownUntil?: number | null;
-  windows?: QuotaWindow[];
-  lastUsedAt?: number | null;
-  stepsLast24h?: number;
-};
-
-const isAccountState = (value: unknown): value is AccountState =>
-  typeof value === 'string' && (ACCOUNT_STATES as readonly string[]).includes(value);
 
 export function extractDevinToken(input: string): string {
   const trimmed = input.trim();
   return devinKeyFromToml(trimmed) ?? trimmed;
 }
 
-export function toDevinAccount(wire: DevinSubscriptionWire, now: number): SubscriptionAccount {
+export function toDevinAccount(wire: DevinSubscriptionListEntry, now: number): SubscriptionAccount {
   const expired = wire.expiresAt !== null && wire.expiresAt <= now;
   return {
     id: wire.id,
@@ -47,9 +32,9 @@ export function toDevinAccount(wire: DevinSubscriptionWire, now: number): Subscr
     expiresAt: wire.expiresAt,
     createdAt: wire.createdAt,
     plan: null,
-    state: isAccountState(wire.state) ? wire.state : expired ? 'expired' : 'ok',
-    cooldownUntil: wire.cooldownUntil ?? null,
-    windows: Array.isArray(wire.windows) ? wire.windows : [],
+    state: expired ? 'expired' : 'ok',
+    cooldownUntil: null,
+    windows: [],
     lastUsedAt: wire.lastUsedAt ?? null,
     stepsLast24h: typeof wire.stepsLast24h === 'number' ? wire.stepsLast24h : null,
     models: Array.isArray(wire.models) ? wire.models : [],
@@ -68,7 +53,8 @@ async function unlessMissing<T>(request: Promise<T>): Promise<T | null> {
 export function useDevinSubscriptions(teamId: string | undefined, live: boolean) {
   return useQuery({
     queryKey: ['devin-subscriptions', teamId],
-    queryFn: () => api.get<DevinSubscriptionWire[]>(`/api/teams/${teamId}/devin-subscriptions`),
+    queryFn: () =>
+      api.get<DevinSubscriptionListEntry[]>(`/api/teams/${teamId}/devin-subscriptions`),
     enabled: live && teamId !== undefined,
   });
 }

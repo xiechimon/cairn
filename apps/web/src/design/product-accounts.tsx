@@ -3,11 +3,7 @@ import { Layers, Monitor, Palette, Server, User } from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
-import {
-  type MachineWithProviders,
-  type SubscriptionAccount,
-  toClaudeAccount,
-} from '../api/claude-accounts.js';
+import type { MachineWithProviders, SubscriptionAccount } from '../api/claude-accounts.js';
 import { MachineProvidersCard, useClock } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -50,9 +46,9 @@ const QUERY_PHASES = [
 ] as const;
 
 function fixtureAccount(label: string): SubscriptionAccount {
-  const wire = ACCOUNT_SUBSCRIPTIONS.find((candidate) => candidate.label === label);
-  if (wire === undefined) throw new Error(`no fixture subscription named ${label}`);
-  return toClaudeAccount(wire, NOW);
+  const account = ACCOUNT_SUBSCRIPTIONS.find((candidate) => candidate.label === label);
+  if (account === undefined) throw new Error(`no fixture subscription named ${label}`);
+  return account;
 }
 
 const FRESH_SUBSCRIPTION: SubscriptionAccount = {
