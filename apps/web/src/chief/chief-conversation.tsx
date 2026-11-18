@@ -744,7 +744,7 @@ export function ChiefConversation({
               ref={viewportRef}
               {...reader.viewportProps}
               data-testid="chief-body"
-              className="scrollbar-gutter-both data-pending-scroll:visible data-pending-scroll:opacity-0 [--scroll-fade-size:32px] in-data-[chat-top=under-header]:[--scroll-fade-size-top:96px] in-data-[chat-top=under-header]:[--scroll-fade-inset-top:24px] [html[data-narrow-chrome]_&]:[--scroll-fade-size-top:108px] [html[data-narrow-chrome]_&]:[--scroll-fade-inset-top:60px]"
+              className="scrollbar-gutter-both data-pending-scroll:visible data-pending-scroll:opacity-0 [--scroll-fade-size:32px] in-data-[chat-top=under-header]:[--scroll-fade-size-top:128px] in-data-[chat-top=under-header]:[--scroll-fade-inset-top:80px] [html[data-narrow-chrome]_&]:[--scroll-fade-size-top:120px] [html[data-narrow-chrome]_&]:[--scroll-fade-inset-top:72px]"
             >
               <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
                 <TodoGlanceContext.Provider value={glances}>

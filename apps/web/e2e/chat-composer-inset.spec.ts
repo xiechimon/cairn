@@ -187,7 +187,7 @@ for (const mask of MASK_CASES) {
               ];
             }),
           )
-          .toEqual(['96px', '32px']);
+          .toEqual(['128px', '32px']);
         const read = await scope.evaluate((root) => {
           const body = root.querySelector('[data-testid="chief-body"]') as HTMLElement;
           const style = getComputedStyle(body);
@@ -205,7 +205,7 @@ for (const mask of MASK_CASES) {
           };
         });
         expect(read.mask).toContain('linear-gradient');
-        expect(read.hiddenTop).toBe('24px');
+        expect(read.hiddenTop).toBe('80px');
         expect(read.listToComposer).toBe(0);
         expect(read.left).toBeLessThan(1);
         expect(read.right).toBeLessThan(1);
