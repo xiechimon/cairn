@@ -2,22 +2,13 @@ import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { CHIEF_ROUTER_TOOLS } from '@cairn/shared';
 import Database from 'better-sqlite3';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { expect, onTestFinished, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import type { Db } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
-import {
-  agentMemory,
-  chief,
-  chiefMessage,
-  chiefReport,
-  chiefThread,
-  retroProposal,
-  step,
-  todo,
-} from '../src/db/schema.js';
+import { agentMemory, chief, chiefMessage, chiefThread, step, todo } from '../src/db/schema.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { finishStep } from '../src/services/machines.js';
 import { createScheduler } from '../src/services/scheduler.js';
@@ -81,8 +72,11 @@ test('daily ticks and scheduler restarts create no reports, summaries or memory 
   for (const at of [MORNING, MORNING + 60_000, MORNING + 86_400_000]) {
     await createScheduler(s.svc, { tickMs: 15_000 }).tick(at);
   }
-  expect(s.db.select().from(chiefReport).all()).toEqual([]);
-  expect(s.db.select().from(retroProposal).all()).toEqual([]);
+  expect(
+    s.db.all(
+      sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('chief_report', 'retro_proposal')`,
+    ),
+  ).toEqual([]);
   const steps = s.db.select().from(step).all();
   expect(steps).toEqual([]);
   expect(
@@ -94,66 +88,9 @@ test('daily ticks and scheduler restarts create no reports, summaries or memory 
   ).toEqual([]);
 });
 
-test.each(['running', 'retrying'] as const)(
-  'a historical %s report is not resumed or rewritten after restart',
-  async (status) => {
-    const s = world();
-    s.db
-      .insert(chiefReport)
-      .values({
-        id: 'old-report',
-        chiefId: 'chief',
-        teamId: s.team.id,
-        threadId: 'main',
-        day: '2026-11-15',
-        status,
-        attempts: 1,
-        createdAt: YESTERDAY,
-      })
-      .run();
-    const before = s.db.select().from(chiefReport).all();
-    for (const at of [MORNING, MORNING + 86_400_000]) {
-      await createScheduler(s.svc, { tickMs: 15_000 }).tick(at);
-    }
-    expect(s.db.select().from(chiefReport).all()).toEqual(before);
-    expect(s.db.select().from(step).all()).toEqual([]);
-    expect(s.db.select().from(chiefMessage).all()).toEqual([]);
-  },
-);
-
-test('old report decisions are unavailable and leave history and already-created tasks intact', async () => {
+test('old report decisions are unavailable and already-created tasks are intact', async () => {
   const s = world();
   const projectId = await postProject(s.app, 'project');
-  s.db
-    .insert(chiefReport)
-    .values({
-      id: 'old-report',
-      chiefId: 'chief',
-      teamId: s.team.id,
-      threadId: 'main',
-      day: '2026-11-15',
-      status: 'posted',
-      createdAt: YESTERDAY,
-    })
-    .run();
-  s.db
-    .insert(retroProposal)
-    .values({
-      id: 'old-retro',
-      reportId: 'old-report',
-      teamId: s.team.id,
-      projectId,
-      title: 'Guard manual releases',
-      what: 'A release was retried',
-      why: 'Missing guard',
-      safeguard: 'Add a check',
-      sourceKind: 'coordinator',
-      sourceId: 'old-message',
-      sourceLabel: 'Coordinator',
-      status: 'draft',
-      createdAt: YESTERDAY,
-    })
-    .run();
   s.db
     .insert(todo)
     .values({
@@ -165,7 +102,6 @@ test('old report decisions are unavailable and leave history and already-created
       phaseAt: YESTERDAY,
     })
     .run();
-  const before = s.db.select().from(retroProposal).all();
   const tasks = s.db.select().from(todo).all();
   for (const decision of ['accept', 'dismiss']) {
     const response = await req(
@@ -175,11 +111,7 @@ test('old report decisions are unavailable and leave history and already-created
     );
     expect(response.status).toBe(404);
   }
-  expect(s.db.select().from(retroProposal).all()).toEqual(before);
   expect(s.db.select().from(todo).all()).toEqual(tasks);
-  expect(
-    s.db.select().from(chiefReport).where(eq(chiefReport.id, 'old-report')).get(),
-  ).toBeDefined();
 });
 
 test('the Coordinator no longer advertises daily reports or their decision tool', () => {
@@ -216,19 +148,11 @@ test.each(['report', 'daily'] as const)(
               : null,
         },
       ]);
-      s.db
-        .insert(chiefReport)
-        .values({
-          id: `report-${i}`,
-          chiefId: 'chief',
-          teamId: s.team.id,
-          threadId: 'main',
-          day: `2026-11-${10 + i}`,
-          status: 'running',
-          stepId: kind === 'report' ? `report-${status}` : null,
-          createdAt: YESTERDAY,
-        })
-        .run();
+      sqlite.exec(
+        `INSERT INTO chief_report (id, chiefId, teamId, threadId, day, status, stepId, createdAt)
+         VALUES ('report-${i}', 'chief', '${s.team.id}', 'main', '2026-11-${10 + i}', 'running',
+                 ${kind === 'report' ? `'report-${status}'` : 'NULL'}, ${YESTERDAY})`,
+      );
     }
     const controls = [
       ['summary', null],
@@ -275,7 +199,6 @@ test.each(['report', 'daily'] as const)(
         createdAt: YESTERDAY,
       },
     ]);
-    const reports = s.db.select().from(chiefReport).all();
     const ended = stepRowsRaw(sqlite).filter((row) =>
       ['done', 'failed'].includes(row.status as string),
     );
@@ -346,13 +269,16 @@ test.each(['report', 'daily'] as const)(
         generation: YESTERDAY,
       },
     );
+    const absent = () =>
+      s.db.all(
+        sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('chief_report', 'retro_proposal')`,
+      );
     expect(s.db.select().from(step).where(eq(step.id, 'report-claimed')).get()).toEqual(stopped);
-    expect(s.db.select().from(chiefReport).all()).toEqual(reports);
-    expect(s.db.select().from(retroProposal).all()).toEqual([]);
+    expect(absent()).toEqual([]);
     expect(s.db.select().from(chiefMessage).all()).toEqual(messages);
     expect(s.db.select().from(agentMemory).all()).toEqual(memories);
     expect(s.db.select().from(chief).all()).toEqual(chiefs);
     migrateAll(sqlite);
-    expect(s.db.select().from(chiefReport).all()).toEqual(reports);
+    expect(absent()).toEqual([]);
   },
 );

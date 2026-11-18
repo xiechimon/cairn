@@ -417,7 +417,7 @@
       "id": "daily-report",
       "name": "Read-only report history",
       "summary": "Existing report messages remain readable; daily generation, retries, push and suggestion decisions are retired.",
-      "states": "Historical posted and unfinished reports, read-only draft suggestions and links to already-created tasks. No new report for new users. Historical intake suggestions remain hidden.",
+      "states": "Historical posted and unfinished reports, read-only draft suggestions and links to already-created tasks. No new report for new users. Historical intake suggestions remain hidden; the chief_report/retro_proposal tables are dropped.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -426,7 +426,8 @@
           "apps/web/src/chief/research-report.tsx"
         ],
         "server": [
-          "apps/server/drizzle/0177_retire_daily_reports.sql"
+          "apps/server/drizzle/0177_retire_daily_reports.sql",
+          "apps/server/drizzle/0203_retire_chief_report.sql"
         ]
       },
       "reach": [
@@ -440,7 +441,7 @@
         "apps/web/DESIGN-RULES.md"
       ],
       "backendDesign": {
-        "gap": "Retired: historical tables and records are retained; only active report-linked steps are stopped."
+        "gap": "Retired: only chief_message report rows remain for read-only rendering; report-linked steps are stopped and the bookkeeping tables are dropped."
       },
       "evidence": [
         "apps/web/e2e/chief-daily-report.spec.ts",

@@ -96,7 +96,7 @@ The attention surfaces of the phase 1 graduation criteria: the needs-you tray, q
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Read-only report history](#daily-report) | 1 | Backend design: Retired: historical tables and records are retained; only active report-linked steps are stopped. |
+| [Read-only report history](#daily-report) | 1 | Backend design: Retired: only chief_message report rows remain for read-only rendering; report-linked steps are stopped and the bookkeeping tables are dropped. |
 | [Task references and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
 | [Phone push](#push-notifications) | 1 | Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
 | [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
@@ -236,7 +236,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 - Research: [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: [apps/web/DESIGN-RULES.md](../apps/web/DESIGN-RULES.md)
-- Backend design: **gap**: Retired: historical tables and records are retained; only active report-linked steps are stopped.
+- Backend design: **gap**: Retired: only chief_message report rows remain for read-only rendering; report-linked steps are stopped and the bookkeeping tables are dropped.
 
 ### engine-view
 

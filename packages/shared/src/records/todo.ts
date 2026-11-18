@@ -19,7 +19,6 @@ export const TASK_SOURCE_KINDS = [
   'github-issue-self',
   'orchestration',
   'research-intake',
-  'research-intake-item',
   'research-citation-check',
   RESEARCH_BEFORE_PLAN_SOURCE_KIND,
   RESEARCH_STUCK_SOURCE_KIND,

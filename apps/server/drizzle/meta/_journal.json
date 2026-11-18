@@ -1387,6 +1387,13 @@
       "when": 1794991999938,
       "tag": "0202_retire_tag_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 203,
+      "version": "6",
+      "when": 1794993222156,
+      "tag": "0203_retire_chief_report",
+      "breakpoints": true
     }
   ]
 }

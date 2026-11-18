@@ -109,7 +109,7 @@ Reach:
 
 **Read-only report history** (shipped, centrality 1). Existing report messages remain readable; daily generation, retries, push and suggestion decisions are retired.
 
-States: Historical posted and unfinished reports, read-only draft suggestions and links to already-created tasks. No new report for new users. Historical intake suggestions remain hidden.
+States: Historical posted and unfinished reports, read-only draft suggestions and links to already-created tasks. No new report for new users. Historical intake suggestions remain hidden; the chief_report/retro_proposal tables are dropped.
 
 Reach:
 
@@ -121,7 +121,7 @@ Reach:
 - Test ids in its code: `chief-report-sentence`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`
 - Research: [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [apps/web/DESIGN-RULES.md](../../../apps/web/DESIGN-RULES.md)
-- Backend design: **gap**: Retired: historical tables and records are retained; only active report-linked steps are stopped.
+- Backend design: **gap**: Retired: only chief_message report rows remain for read-only rendering; report-linked steps are stopped and the bookkeeping tables are dropped.
 - Evidence: `apps/web/e2e/chief-daily-report.spec.ts`, `apps/server/test/daily-report-retirement.test.ts`
 
 ### engine-view
