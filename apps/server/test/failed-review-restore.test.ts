@@ -69,7 +69,6 @@ interface World {
   done(stepId: string, body: Record<string, unknown>): Promise<void>;
   uploadPlan(stepId: string, content: string): Promise<void>;
   confirm(buildId: string): Promise<void>;
-  startReview(buildId: string): Promise<Response>;
   merge(buildId: string): Promise<Response>;
   seedConvChanges(buildId: string): Promise<string>;
   todoRow(): ReturnType<typeof loadTodoRow>;
@@ -173,11 +172,6 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     });
     expect(res.status).toBe(202);
   }
-  async function startReview(buildId: string): Promise<Response> {
-    return call(s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review' },
-    });
-  }
   async function merge(buildId: string): Promise<Response> {
     return call(s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
   }
@@ -224,7 +218,6 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     done,
     uploadPlan,
     confirm,
-    startReview,
     merge,
     seedConvChanges,
     todoRow: () => loadTodoRow(s, todoId),
@@ -256,8 +249,17 @@ async function driveToDeadlock(
   expect(w.todoRow().phase).toBe('done');
   w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
   expect(w.todoRow().phase).toBe('review');
-  const reviewRes = await w.startReview(buildId);
-  expect(reviewRes.status).toBe(202);
+  w.s.db
+    .insert(stepTable)
+    .values({
+      id: `review-${buildId}`,
+      buildId,
+      kind: 'review',
+      status: 'pending',
+      prompt: `${JSON.stringify({ kind: 'review', agentId: 'route-reviewer', gate: 'review' })}\n请审核`,
+      createdAt: Date.now(),
+    })
+    .run();
   const reviewClaimed = await w.claim();
   expect(reviewClaimed.kind).toBe('review');
   const errorMessage = 'stream timeout (first=300000ms idle=480000ms)';
@@ -314,21 +316,6 @@ describe('#702 legacy failed-review restore (B-C17 deadlock shape)', () => {
         w.s.dispose();
       }
     });
-
-    test('only rerun the review: failed (build leg done) starting an AI review -> 202 + review step enqueued + phase back to review', async () => {
-      try {
-        const buildId = await driveToDeadlock(w);
-        const res = await w.startReview(buildId);
-        expect(res.status).toBe(202);
-        expect(w.todoRow().phase).toBe('review');
-        const reviewSteps = w.stepsOf(buildId).filter((s) => s.kind === 'review');
-        expect(reviewSteps).toHaveLength(2);
-        expect(reviewSteps[0]?.status).toBe('failed');
-        expect(reviewSteps[1]?.status).toBe('pending');
-      } finally {
-        w.s.dispose();
-      }
-    });
   });
 
   describe('failure mode 2 counterexample: half-finished build not allowed', () => {
@@ -337,7 +324,7 @@ describe('#702 legacy failed-review restore (B-C17 deadlock shape)', () => {
       w = await setupWorld();
     });
 
-    test('build step itself failed (legs unfinished) -> merge 409 + review start 409', async () => {
+    test('build step itself failed (legs unfinished) -> merge 409', async () => {
       try {
         const buildId = await w.startBuild(false);
         const buildClaimed = await w.claim();
@@ -349,15 +336,13 @@ describe('#702 legacy failed-review restore (B-C17 deadlock shape)', () => {
 
         const mergeRes = await w.merge(buildId);
         expect(mergeRes.status).toBe(409);
-        const reviewRes = await w.startReview(buildId);
-        expect(reviewRes.status).toBe(409);
         expect(w.stepsOf(buildId).filter((s) => s.kind === 'merge')).toHaveLength(0);
       } finally {
         w.s.dispose();
       }
     });
 
-    test('build done but zero artifacts (no commit, no PR) -> merge 409 + review start 409', async () => {
+    test('build done but zero artifacts (no commit, no PR) -> merge 409', async () => {
       try {
         const buildId = await driveToDeadlock(w, { buildCommit: null });
         const buildStep = w
@@ -371,8 +356,6 @@ describe('#702 legacy failed-review restore (B-C17 deadlock shape)', () => {
 
         const mergeRes = await w.merge(buildId);
         expect(mergeRes.status).toBe(409);
-        const reviewRes = await w.startReview(buildId);
-        expect(reviewRes.status).toBe(409);
       } finally {
         w.s.dispose();
       }

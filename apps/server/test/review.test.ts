@@ -4,8 +4,6 @@ import {
   claimedStepSchema,
   conversationBranch,
   MERGE_ANNOUNCEMENT,
-  parseReviewPromptMeta,
-  REVIEW_ANNOUNCEMENT,
   REVIEW_VERDICT_KIND,
   reviewVerdictSchema,
 } from '@cairn/shared';
@@ -82,7 +80,7 @@ interface World {
   done(stepId: string, body: Record<string, unknown>): Promise<void>;
   uploadPlan(stepId: string, content: string): Promise<void>;
   confirm(buildId: string): Promise<void>;
-  startReview(buildId: string, body?: { focus?: string }): Promise<Response>;
+  seedReviewStep(buildId: string): void;
   todoRow(): ReturnType<typeof loadTodoRow>;
   buildRow(buildId: string): ReturnType<typeof loadBuildRow>;
   stepsOf(buildId: string): ReturnType<typeof loadStepsOf>;
@@ -190,10 +188,18 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     });
     expect(res.status).toBe(202);
   }
-  async function startReview(buildId: string, body: { focus?: string } = {}): Promise<Response> {
-    return call(s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review', ...body },
-    });
+  function seedReviewStep(buildId: string): void {
+    s.db
+      .insert(stepTable)
+      .values({
+        id: `review-${buildId}`,
+        buildId,
+        kind: 'review',
+        status: 'pending',
+        prompt: `${JSON.stringify({ kind: 'review', agentId: REVIEW_ROUTE_ID, gate: 'review' })}\n请审核`,
+        createdAt: Date.now(),
+      })
+      .run();
   }
 
   async function seedConvChanges(buildId: string, files: Record<string, string>): Promise<void> {
@@ -231,7 +237,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     done,
     uploadPlan,
     confirm,
-    startReview,
+    seedReviewStep,
     todoRow: () => loadTodoRow(s, todoId),
     buildRow: (buildId: string) => loadBuildRow(s, buildId),
     stepsOf: (buildId: string) => loadStepsOf(s, buildId),
@@ -246,47 +252,6 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     w = await setupWorld();
   });
 
-  test('failure mode 1: planning phase -> 409, not silent', async () => {
-    const buildId = await w.startBuild(true);
-    const claimed = await w.claim();
-    expect(claimed.kind).toBe('plan');
-    const res = await w.startReview(buildId);
-    expect(res.status).toBe(409);
-    expect(w.stepsOf(buildId).find((s) => s.kind === 'review')).toBeUndefined();
-  });
-
-  test('happy path: initiating review from confirm -> the review step queued + REVIEW_ANNOUNCEMENT + the phase stays confirm', async () => {
-    const buildId = await w.startBuild(true);
-    const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
-    await w.done(planClaimed.stepId, { status: 'success' });
-    expect(w.todoRow().phase).toBe('confirm');
-
-    const res = await w.startReview(buildId, {
-      focus: '关注边界情况',
-    });
-    expect(res.status).toBe(202);
-
-    const steps = w.stepsOf(buildId);
-    const reviewStep = steps.find((s) => s.kind === 'review');
-    expect(reviewStep).toBeDefined();
-    expect(reviewStep?.status).toBe('pending');
-    const meta = parseReviewPromptMeta(reviewStep?.prompt ?? null);
-    expect(meta).not.toBeNull();
-    expect(meta?.kind).toBe('review');
-    expect(meta?.agentId).toBe(REVIEW_ROUTE_ID);
-    expect(reviewStep?.prompt ?? '').toContain('关注边界情况');
-
-    const messages = w.messagesOf(buildId);
-    const announcement = messages.find(
-      (m) => m.role === 'user' && m.content === REVIEW_ANNOUNCEMENT,
-    );
-    expect(announcement).toBeDefined();
-
-    expect(w.todoRow().phase).toBe('confirm');
-    expect(w.todoRow().hasChanges).toBe(false);
-  });
-
   test('happy path: claiming the review step -> the claim payload agent = the review routing rule (not the session rule)', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
@@ -294,8 +259,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
 
-    const startRes = await w.startReview(buildId);
-    expect(startRes.status).toBe(202);
+    w.seedReviewStep(buildId);
 
     const claimRes = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
       cred: w.machineToken,
@@ -308,41 +272,13 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     expect(parsed.agent?.id).not.toBe(SESSION_ROUTE_ID);
   });
 
-  test('happy path: empty focus allowed (the optional textarea may be empty)', async () => {
-    const buildId = await w.startBuild(true);
-    const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
-    await w.done(planClaimed.stepId, { status: 'success' });
-    expect(w.todoRow().phase).toBe('confirm');
-    const res = await w.startReview(buildId, { focus: '' });
-    expect(res.status).toBe(202);
-    expect(w.stepsOf(buildId).find((s) => s.kind === 'review')).toBeDefined();
-  });
-
-  test('happy path: another review can be initiated from the review phase too', async () => {
-    const buildId = await w.startBuild(true);
-    const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
-    await w.done(planClaimed.stepId, { status: 'success' });
-    await w.confirm(buildId);
-    expect(w.todoRow().phase).toBe('building');
-    const buildClaimed = await w.claim();
-    expect(buildClaimed.kind).toBe('build');
-    await w.done(buildClaimed.stepId, { status: 'success' });
-    expect(w.todoRow().phase).toBe('done');
-    w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
-    const res = await w.startReview(buildId);
-    expect(res.status).toBe(202);
-    expect(w.stepsOf(buildId).filter((s) => s.kind === 'review')).toHaveLength(1);
-  });
-
   test('terminal loop (no blocking): the review step done(success, empty verdict) -> the REVIEW_VERDICT_KIND message lands + the phase unchanged', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
-    await w.startReview(buildId);
+    w.seedReviewStep(buildId);
     expect(w.todoRow().phase).toBe('confirm');
 
     const reviewClaimed = await w.claim();
@@ -387,7 +323,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
-    await w.startReview(buildId);
+    w.seedReviewStep(buildId);
     expect(w.todoRow().phase).toBe('confirm');
 
     const reviewClaimed = await w.claim();
@@ -456,7 +392,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     const planClaimed = await w.claim();
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
-    await w.startReview(buildId);
+    w.seedReviewStep(buildId);
 
     const reviewClaimed = await w.claim();
     await w.done(reviewClaimed.stepId, { status: 'success' });
@@ -474,7 +410,7 @@ describe('the AI review initiation write surface (M7 #312)', () => {
     const planClaimed = await w.claim();
     await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
-    await w.startReview(buildId);
+    w.seedReviewStep(buildId);
 
     const reviewClaimed = await w.claim();
     await w.done(reviewClaimed.stepId, {
@@ -491,8 +427,8 @@ describe('the AI review initiation write surface (M7 #312)', () => {
   });
 });
 
-const CONV_CHANGE_FILE = 'src/parse.ts';
-const CONV_CHANGE_BODY = 'export function parseInput() {}\n';
+const _CONV_CHANGE_FILE = 'src/parse.ts';
+const _CONV_CHANGE_BODY = 'export function parseInput() {}\n';
 const PLAN_V1 = withVerification('# plan v1\n\n## Changes\n- 加 parseInput\n');
 
 async function advanceToReviewGate(w: World): Promise<string> {
@@ -509,7 +445,7 @@ async function advanceToReviewGate(w: World): Promise<string> {
   return buildId;
 }
 
-function reviewPromptOf(w: World, buildId: string): string {
+function _reviewPromptOf(w: World, buildId: string): string {
   const step = w.stepsOf(buildId).find((s) => s.kind === 'review');
   expect(step).toBeDefined();
   return step?.prompt ?? '';
@@ -521,7 +457,7 @@ describe('retired gate work cannot take delivery back from the user', () => {
     async (version) => {
       const w = await setupWorld();
       const buildId = await advanceToReviewGate(w);
-      await w.startReview(buildId);
+      w.seedReviewStep(buildId);
       const claimed = await w.claim();
       if (version === 'previous version') {
         w.s.db
@@ -554,7 +490,7 @@ describe('retired gate work cannot take delivery back from the user', () => {
     async (status) => {
       const w = await setupWorld();
       const buildId = await advanceToReviewGate(w);
-      await w.startReview(buildId);
+      w.seedReviewStep(buildId);
       const claimed = await w.claim();
       w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
       w.s.db
@@ -710,84 +646,5 @@ describe('retired gate work cannot take delivery back from the user', () => {
     expect(w.stepsOf(buildId).find((s) => s.id === 'old-verify')?.status).toBe('stopped');
     if (state === 'live implementation')
       expect(w.stepsOf(buildId).find((s) => s.id === 'ongoing-session')?.status).toBe('pending');
-  });
-});
-
-describe('review step material forks by gate (#511)', () => {
-  beforeEach(async () => {
-    w = await setupWorld({ hosted: true });
-  });
-  let w: World;
-
-  test('failure mode 1: the confirm-gate material contains no changes -- even when the conversation branch already has them', async () => {
-    const buildId = await w.startBuild(true);
-    await w.seedConvChanges(buildId, { [CONV_CHANGE_FILE]: CONV_CHANGE_BODY });
-    const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, PLAN_V1);
-    await w.done(planClaimed.stepId, { status: 'success', sessionId: 'sess-plan' });
-    expect(w.todoRow().phase).toBe('confirm');
-
-    const res = await w.startReview(buildId);
-    expect(res.status).toBe(202);
-    const prompt = reviewPromptOf(w, buildId);
-    expect(prompt).toContain(PLAN_V1);
-    expect(prompt).not.toContain(CONV_CHANGE_FILE);
-    expect(parseReviewPromptMeta(prompt)?.gate).toBe('confirm');
-  });
-
-  test('failure mode 2: the review-gate material contains the plan + changes (file paths and line-by-line diffs all present)', async () => {
-    const buildId = await advanceToReviewGate(w);
-    await w.seedConvChanges(buildId, { [CONV_CHANGE_FILE]: CONV_CHANGE_BODY });
-
-    const res = await w.startReview(buildId);
-    expect(res.status).toBe(202);
-    const prompt = reviewPromptOf(w, buildId);
-    expect(prompt).toContain(PLAN_V1);
-    expect(prompt).toContain(CONV_CHANGE_FILE);
-    expect(prompt).toContain('+export function parseInput() {}');
-    expect(parseReviewPromptMeta(prompt)?.gate).toBe('review');
-  });
-
-  test('failure mode 3: an empty change surface at the review gate -> initiation still works, the material honestly says no changes', async () => {
-    const buildId = await advanceToReviewGate(w);
-    const res = await w.startReview(buildId);
-    expect(res.status).toBe(202);
-    const prompt = reviewPromptOf(w, buildId);
-    expect(prompt).toContain(PLAN_V1);
-    expect(prompt).toContain('变更面为空');
-    expect(prompt).toContain('检出');
-    expect(prompt).not.toContain(CONV_CHANGE_FILE);
-    expect(parseReviewPromptMeta(prompt)?.gate).toBe('review');
-  });
-
-  test('failure mode 4: the changes in the material = the same computation path as the human change surface (the GET /changes file set matches)', async () => {
-    const buildId = await advanceToReviewGate(w);
-    await w.seedConvChanges(buildId, {
-      [CONV_CHANGE_FILE]: CONV_CHANGE_BODY,
-      'plan.md': '# plan v1\n\n## Changes\n- 加 parseInput\n- 再改一行\n',
-    });
-    const changesRes = await call(w.s.app, 'GET', `/api/builds/${buildId}/changes`);
-    expect(changesRes.status).toBe(200);
-    const { files } = (await changesRes.json()) as { files: { path: string }[] };
-    expect(files.length).toBeGreaterThan(0);
-
-    await w.startReview(buildId);
-    const prompt = reviewPromptOf(w, buildId);
-    for (const file of files) expect(prompt).toContain(file.path);
-    expect(prompt).toContain(`本轮共 ${files.length} 个文件改动`);
-  });
-
-  test('failure mode 6: the review step claim payload session = new (the prompt goes to a new session, not continuing the main conv)', async () => {
-    const buildId = await advanceToReviewGate(w);
-    await w.startReview(buildId);
-    const claimRes = await call(w.s.app, 'POST', '/api/machine/tasks/claim', {
-      cred: w.machineToken,
-      body: {},
-    });
-    const parsed = claimedStepSchema.parse(((await claimRes.json()) as { step: unknown }).step);
-    expect(parsed.step.kind).toBe('review');
-    expect(parsed.session.action).toBe('new');
-    expect(parsed.session.sessionId).toBeNull();
-    expect(parsed.instruction ?? '').toContain(PLAN_V1);
   });
 });

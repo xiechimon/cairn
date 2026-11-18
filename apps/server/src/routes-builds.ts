@@ -35,7 +35,6 @@ import { ClientMessageConflict, findClientMessage } from './services/client-mess
 import { createSerialConnection } from './services/events.js';
 import { readBuildChangeFile, readBuildChanges } from './services/git.js';
 import { isChiefConversation } from './services/machines.js';
-import { readMergeGateState } from './services/merge-gate-run.js';
 import { newestMessagePage } from './services/message-page.js';
 import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
 import { PhaseTransitionError } from './services/phase.js';
@@ -62,12 +61,6 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
         }),
       ),
     );
-  });
-
-  app.get('/api/builds/:id/gate', (c) => {
-    const id = c.req.param('id');
-    if (!getBuild(svc, id)) throw notFound(`build ${id}`);
-    return c.json({ state: readMergeGateState(ctx.db, id) });
   });
 
   app.get('/api/builds/:id/steps', (c) => {

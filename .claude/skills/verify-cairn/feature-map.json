@@ -763,7 +763,6 @@
         ],
         "server": [
           "apps/server/src/services/merge-gate",
-          "apps/server/src/services/merge-gate-run.ts",
           "apps/server/src/services/autonomous-merge.ts",
           "apps/server/src/services/local-merge.ts"
         ],
@@ -773,7 +772,6 @@
       },
       "routes": {
         "server": [
-          "/api/builds/:id/gate",
           "/api/builds/:id/merge",
           "/api/builds/:id/merge-permission"
         ]

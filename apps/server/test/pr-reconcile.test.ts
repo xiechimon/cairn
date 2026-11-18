@@ -14,17 +14,12 @@ import {
 import { githubBranchPulls, githubCompareStatus, githubPull } from '../src/lib/github.js';
 import { BLOCKED_BY_HOLD } from '../src/services/blockers.js';
 import { requestMerge } from '../src/services/build-merge-request.js';
-import {
-  applyBuildStepAction,
-  completeStep,
-  finishTodoDone,
-  startBuilds,
-} from '../src/services/builds.js';
+import { completeStep, finishTodoDone, startBuilds } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { updateTodo } from '../src/services/todos.js';
-import { bootServer, insertMachine, seedRoute, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, type TestServer } from './helpers.js';
 
 const globalFetch = vi.fn(() => Promise.reject(new Error('Unexpected global fetch')));
 beforeEach(() => {
@@ -1079,24 +1074,6 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     ).rejects.toThrow('读取 PR 期间任务相位已变为 done，没有发起合并');
     expect(w.todoRow().phase).toBe('done');
     expect(w.stepRows().filter((r) => r.kind === 'merge')).toEqual([]);
-  });
-
-  test('㉖b AI review: the reconcile finishes the card while the changes are read → no review step', async () => {
-    const w = makeWorld();
-    seedRoute(w.s, 'review');
-    const pending = applyBuildStepAction({ ...w.s.svc, reposDir: '/nonexistent' }, w.buildId, {
-      action: 'review',
-    });
-    w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, w.todoId)).run();
-    await expect(pending).rejects.toThrow('读取变更期间任务相位已变为 done');
-    expect(w.stepRows().filter((r) => r.kind === 'review')).toEqual([]);
-    const announced = w.s.db
-      .select()
-      .from(messageTable)
-      .where(eq(messageTable.conversationId, w.buildId))
-      .all()
-      .filter((r) => r.role === 'user');
-    expect(announced).toEqual([]);
   });
 
   test('⑱e dragged to done by hand before the reconcile saw the merge, then back to review → the merge is reported once', async () => {

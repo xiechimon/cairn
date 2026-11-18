@@ -1,5 +1,4 @@
 import {
-  buildReviewStepPrompt,
   buildVerifyStepPrompt,
   claimedStepSchema,
   GATE_LIMITS,
@@ -276,12 +275,7 @@ async function claimReview(w: World, buildId: string): Promise<string> {
       buildId,
       kind: 'review',
       status: 'pending',
-      prompt: buildReviewStepPrompt({
-        agentId: w.reviewerId,
-        gate: 'review',
-        planText: '',
-        expectedHeadSha: HEAD,
-      }),
+      prompt: `${JSON.stringify({ kind: 'review', agentId: w.reviewerId, gate: 'review', expectedHeadSha: HEAD })}\n请审核`,
       createdAt: Date.now(),
     })
     .run();
@@ -319,11 +313,6 @@ describe('#1404 historical verdict binding', () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w);
-    const reviewRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review' },
-    });
-    expect(reviewRes.status).toBe(409);
-    expect(w.stepsOf(buildId).some((r) => r.kind === 'review')).toBe(false);
     const stepId = await claimReview(w, buildId);
     const reviewStep = w.stepsOf(buildId).find((r) => r.kind === 'review');
     expect(reviewStep).toBeDefined();
@@ -409,10 +398,17 @@ describe('#1404 historical verdict binding', () => {
     });
     expect(put.status).toBe(200);
     await w.done(planClaimed.stepId, { status: 'success' });
-    const reviewRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review' },
-    });
-    expect(reviewRes.status).toBe(202);
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `confirm-review-${buildId}`,
+        buildId,
+        kind: 'review',
+        status: 'pending',
+        prompt: `${JSON.stringify({ kind: 'review', agentId: w.reviewerId, gate: 'confirm' })}\n请审核`,
+        createdAt: Date.now(),
+      })
+      .run();
     const reviewStep = w.stepsOf(buildId).find((r) => r.kind === 'review');
     expect(parseReviewPromptMeta(reviewStep?.prompt ?? null)?.expectedHeadSha).toBeUndefined();
     const claimed = await w.claim();

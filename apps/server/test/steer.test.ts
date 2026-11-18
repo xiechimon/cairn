@@ -1,9 +1,4 @@
-import {
-  buildReviewStepPrompt,
-  type ClaimedStep,
-  claimedStepSchema,
-  DEFAULT_AUTONOMY_SETTINGS,
-} from '@cairn/shared';
+import { type ClaimedStep, claimedStepSchema, DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
@@ -19,7 +14,7 @@ import {
   todo,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
-import { enqueueStep, maybeEnqueueIndependentReview } from '../src/services/builds.js';
+import { enqueueStep } from '../src/services/builds.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { TestServer } from './helpers.js';
 import {
@@ -27,7 +22,6 @@ import {
   issueApiKey,
   postProject,
   req,
-  seedRoute,
   seedSessionRoute,
   startLegacyBuild,
 } from './helpers.js';
@@ -141,57 +135,6 @@ describe('the steer server write surface (W3 #278)', () => {
   let w: World;
   beforeEach(async () => {
     w = await setupWorld();
-  });
-
-  test('a previous round review does not deduplicate the current round review', async () => {
-    const buildId = await finishBuild(w);
-    const current = w.s.db.select().from(todo).where(eq(todo.id, w.todoId)).get()!;
-    w.s.db
-      .update(project)
-      .set({ repoKind: 'github', githubRepo: 'demo-owner/demo-repo' })
-      .where(eq(project.id, current.projectId))
-      .run();
-    w.s.db.update(build).set({ prNumber: 43 }).where(eq(build.id, buildId)).run();
-    w.s.db
-      .update(step)
-      .set({ checkpointCommit: 'a'.repeat(40), createdAt: 1 })
-      .where(eq(step.buildId, buildId))
-      .run();
-    seedRoute(w.s, 'session', { provider: 'stub-gw', modelId: 'claude-sonnet-5-5' });
-    const reviewRuleId = seedRoute(w.s, 'review', {
-      provider: 'openai-codex',
-      modelId: 'gpt-6.1-sol',
-    });
-    const prompt = buildReviewStepPrompt({
-      agentId: reviewRuleId,
-      gate: 'review',
-      planText: '',
-      changes: [],
-      checkout: true,
-      expectedHeadSha: 'a'.repeat(40),
-    });
-    w.s.db
-      .insert(step)
-      .values({
-        id: 'previous-round-review',
-        buildId,
-        kind: 'review',
-        status: 'done',
-        prompt,
-        createdAt: 2,
-      })
-      .run();
-    enqueueStep(w.s.svc, buildId, 'build', w.s.team.id, 'Continue this round');
-    maybeEnqueueIndependentReview(w.s.svc, current, buildId);
-    maybeEnqueueIndependentReview(w.s.svc, current, buildId);
-    expect(
-      w.s.db
-        .select()
-        .from(step)
-        .where(eq(step.buildId, buildId))
-        .all()
-        .filter((row) => row.kind === 'review'),
-    ).toHaveLength(2);
   });
 
   test.each(['merged', 'closed', 'open', 'none', 'unreadable'] as const)(

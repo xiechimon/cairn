@@ -48,7 +48,6 @@ import type {
   McpConnectorRecord,
   McpServerRecord,
   MemoryRecord,
-  MergeReadiness,
   ModelSourcesEnvelope,
   NotificationRecord,
   NotificationsResponse,
@@ -245,16 +244,6 @@ export const useBuild = (id: string | null | undefined, enabled: boolean) =>
     queryKey: ['build', id],
     queryFn: () => api.get<BuildRecord>(`/api/builds/${id}`),
     enabled: enabled && id != null,
-  });
-
-export const useBuildGate = (buildId: string | null | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['buildGate', buildId],
-    queryFn: () =>
-      api.get<{ state: (MergeReadiness & { evaluatedAt: number }) | null }>(
-        `/api/builds/${buildId}/gate`,
-      ),
-    enabled: enabled && buildId != null,
   });
 
 export const PR_POLL_MS = 30_000;
@@ -1023,7 +1012,6 @@ export function useApiMutations(teamId: string | undefined) {
         body:
           | { action: 'confirm' }
           | { action: 'revision'; side: 'plan'; feedback: string; clientMessageId: string }
-          | { action: 'review'; agentId?: string; focus: string }
           | { action: 'restart'; feedback: string; clientMessageId: string };
       }) => api.post<{ delegated: true }>(`/api/builds/${input.buildId}/steps`, input.body),
       onSuccess: invalidateAll,

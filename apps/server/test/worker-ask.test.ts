@@ -2,12 +2,7 @@ import { threadReportContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import { build, chiefMessage, machine, message, project, step, todo } from '../src/db/schema.js';
-import {
-  applyStoppedStep,
-  completeStep,
-  maybeEnqueueIndependentReview,
-  startBuilds,
-} from '../src/services/builds.js';
+import { applyStoppedStep, completeStep, startBuilds } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
@@ -439,20 +434,6 @@ describe('a parked worker question holds the gates', () => {
     );
     return { todoId, buildId };
   }
-
-  test('independent review is not dispatched while the question is pending', async () => {
-    const { todoId, buildId } = await parked(true);
-    const row = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
-    maybeEnqueueIndependentReview(deps(), row, buildId);
-    expect(
-      H.s.db
-        .select()
-        .from(step)
-        .where(eq(step.buildId, buildId))
-        .all()
-        .filter((r) => r.kind === 'review'),
-    ).toHaveLength(0);
-  });
 
   test.each(['building', 'review'] as const)(
     'the CI poller does not touch a %s thread with a pending question and an open PR',

@@ -338,10 +338,6 @@ export class NotFoundError extends Error {
 }
 
 export {
-  maybeEnqueueIndependentReview,
-  maybeEnqueueVerifyStep,
-} from './build-review-enqueue.js';
-export {
   applyStepFailure,
   failStepWithEvents,
   noteDeliveredPlanResidual,

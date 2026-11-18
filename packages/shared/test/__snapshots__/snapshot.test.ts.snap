@@ -4815,22 +4815,6 @@ exports[`body/envelope schema snapshots > buildStepActionBody > buildStepActionB
       "additionalProperties": false,
       "properties": {
         "action": {
-          "const": "review",
-          "type": "string",
-        },
-        "focus": {
-          "type": "string",
-        },
-      },
-      "required": [
-        "action",
-      ],
-      "type": "object",
-    },
-    {
-      "additionalProperties": false,
-      "properties": {
-        "action": {
           "const": "restart",
           "type": "string",
         },

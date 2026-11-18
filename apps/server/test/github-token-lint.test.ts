@@ -58,7 +58,6 @@ test('former migration allowlist no longer exempts any legacy getter importer', 
     'services/ci-loop',
     'services/issue-intake',
     'services/machine-step-token',
-    'services/merge-gate-run',
     'services/todos',
     'services/scheduler',
   ]) {

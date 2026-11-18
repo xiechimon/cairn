@@ -5,6 +5,7 @@ import type {
   AgentBackend,
   AgentSessionHandle,
   ClaimedStep,
+  DocumentDiffFile,
   GitCredentials,
   MachineDoneBody,
   MachineStreamEvent,
@@ -13,7 +14,6 @@ import type {
   TranscriptUpload,
   WorktreeOps,
 } from '@cairn/shared';
-import { buildReviewStepPrompt, type DocumentDiffFile } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { builtinToolNames, PI_CAPABILITIES, sessionToolNames } from '../src/backend/pi.js';
 import { commitEnv, runGitOk } from '../src/git.js';
@@ -36,6 +36,25 @@ const CHANGES: DocumentDiffFile[] = [
     hunks: [{ header: '@@ -0,0 +1,1 @@', lines: ['+export function parseInput() {}'] }],
   },
 ];
+
+function reviewPrompt(gate: 'confirm' | 'review'): string {
+  const changes = CHANGES.map((f) =>
+    [
+      `### ${f.path} (+${f.additions} -${f.deletions})`,
+      '```diff',
+      ...f.hunks.flatMap((h) => [h.header, ...h.lines]),
+      '```',
+    ].join('\n'),
+  ).join('\n\n');
+  return [
+    JSON.stringify({ kind: 'review', agentId: 'a1', gate }),
+    '请审核以下方案与本轮变更。',
+    '',
+    '## 待审核方案',
+    PLAN_TEXT,
+    ...(gate === 'review' ? ['', '## 本轮变更', changes] : []),
+  ].join('\n');
+}
 
 function captureLogger(): DaemonLogger {
   const noop = () => {};
@@ -63,12 +82,7 @@ function claimedReview(
     step: { id: 's-review', buildId: 'conv-1', kind: 'review', machineId: 'm1', createdAt: 1 },
     conversationId: 'conv-1',
     session: { action: 'new', sessionId: null },
-    instruction: buildReviewStepPrompt({
-      agentId: 'a1',
-      gate,
-      planText: PLAN_TEXT,
-      ...(gate === 'review' ? { changes: CHANGES } : {}),
-    }),
+    instruction: reviewPrompt(gate),
     todo: { id: 't1', seqNum: 1, title: '审核探针', spec: '实现一段示例代码' },
     project: { id: 'p1', name: 'demo', repo },
     agent: {

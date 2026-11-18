@@ -284,10 +284,6 @@ describe('delivery checks (B-C11/B-C14): zero changes / fake completion -> compl
         sessionId: 'pi-b5',
       });
       expect(w.todoRow().phase).toBe('done');
-      const res = await call(w.s.app, 'POST', `/api/builds/${buildStep.step.buildId}/steps`, {
-        body: { action: 'review' },
-      });
-      expect(res.status).toBe(409);
       const reviewStepId = 'legacy-review';
       w.s.db
         .insert(stepTable)

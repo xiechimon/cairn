@@ -1,5 +1,4 @@
 import {
-  buildReviewStepPrompt,
   CHIEF_REMOTE_TOOLS,
   type ClaimedStep,
   WORKER_REMOTE_TOOLS,
@@ -694,13 +693,7 @@ test.each(['review', 'verify', 'merge'] as const)(
         machineId: null,
         prompt:
           kind === 'review'
-            ? buildReviewStepPrompt({
-                agentId: 'review-route',
-                gate: 'review',
-                planText: '',
-                changes: [],
-                checkout: false,
-              })
+            ? `${JSON.stringify({ kind: 'review', agentId: 'review-route', gate: 'review' })}\n请审核`
             : null,
       })
       .where(eq(step.id, s.claimed.step.id))

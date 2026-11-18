@@ -1,5 +1,5 @@
 import type { ClaimedStep } from '@cairn/shared';
-import { buildReviewStepPrompt, claimedStepSchema } from '@cairn/shared';
+import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
@@ -577,7 +577,7 @@ describe('claude rate limit (#1852)', () => {
       .update(stepTable)
       .set({
         kind: 'review',
-        prompt: buildReviewStepPrompt({ agentId: 'review-route', gate: 'review', planText: '' }),
+        prompt: `${JSON.stringify({ kind: 'review', agentId: 'review-route', gate: 'review' })}\n请审核`,
       })
       .where(eq(stepTable.buildId, piBuild))
       .run();

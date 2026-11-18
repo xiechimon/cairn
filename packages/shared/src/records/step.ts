@@ -132,10 +132,6 @@ export const buildStepActionBodySchema = z.discriminatedUnion('action', [
   }),
   z.object({ action: z.literal('confirm') }),
   z.object({
-    action: z.literal('review'),
-    focus: z.string().optional(),
-  }),
-  z.object({
     action: z.literal('restart'),
     feedback: z.string().min(1),
     clientMessageId: z.string(),

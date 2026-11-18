@@ -1,13 +1,7 @@
-import type { ReviewGate, StepActionOrigin } from '@cairn/shared';
-import {
-  buildReplanPrompt,
-  buildReviewRejectPrompt,
-  buildReviewStepPrompt,
-  REVIEW_ANNOUNCEMENT,
-  SESSION_REWORK_BRIEF,
-} from '@cairn/shared';
-import { asc, eq } from 'drizzle-orm';
-import { build, plan as planTable } from '../db/schema.js';
+import type { StepActionOrigin } from '@cairn/shared';
+import { buildReplanPrompt, buildReviewRejectPrompt, SESSION_REWORK_BRIEF } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
+import { build } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { recordBuildFeedback } from './build-provenance.js';
@@ -17,20 +11,16 @@ import {
   assertParkedBuildIdle,
   type BuildDeps,
   buildRunsSession,
-  dispatchHeadSha,
   enqueueStep,
   NotFoundError,
-  restoreFailedReview,
 } from './builds.js';
 import { claimClientMessage, findClientMessage } from './client-message.js';
-import { hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
 import { planAutoConfirmation } from './plan-auto-confirm.js';
 import { holdSecondRejectionRework } from './research-stuck.js';
 import { assertAutomaticRetryAllowed } from './retry-parking.js';
-import { routeForStep } from './routing-rules.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { getTodo, setTodoPhase } from './todos.js';
-import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
+import { insertMessageRow } from './transcript.js';
 
 export async function applyBuildStepAction(
   deps: BuildDeps,
@@ -38,7 +28,6 @@ export async function applyBuildStepAction(
   body:
     | { action: 'confirm' }
     | { action: 'revision'; side: 'plan'; feedback: string; clientMessageId: string }
-    | { action: 'review'; focus?: string }
     | { action: 'restart'; feedback: string; clientMessageId: string },
   actor?: string,
   origin: StepActionOrigin = 'person',
@@ -53,7 +42,7 @@ export async function applyBuildStepAction(
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
   assertSplitProposalExecutable(row.errorMessage);
-  let todoRecord = getTodo(deps, row.todoId);
+  const todoRecord = getTodo(deps, row.todoId);
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
   const actorName = actor ?? deps.user.displayName;
@@ -71,62 +60,6 @@ export async function applyBuildStepAction(
       if (!eligibility.eligible) throw new HttpError(409, eligibility.reason);
     }
     applyBuildConfirm(deps, buildId, actorName, origin === 'person');
-    return;
-  }
-  if (body.action === 'review') {
-    const reviewRoute = routeForStep(deps.db, todoRecord, 'review');
-    if (reviewRoute === null) {
-      throw new HttpError(
-        400,
-        'No review routing rule: add a `review` routing rule in routing settings before requesting an AI review.',
-      );
-    }
-    restoreFailedReview(deps, row);
-    if (todoRecord.phase === 'failed') {
-      const restored = getTodo(deps, row.todoId);
-      if (restored) todoRecord = restored;
-    }
-    if (todoRecord.phase !== 'confirm' && todoRecord.phase !== 'review') {
-      throw new HttpError(409, `AI 审核仅在待确认/审核关口允许，当前相位 ${todoRecord.phase}`);
-    }
-    const plan = deps.db
-      .select({ content: planTable.content })
-      .from(planTable)
-      .where(eq(planTable.buildId, buildId))
-      .orderBy(asc(planTable.version))
-      .all();
-    const planText = plan.map((p) => p.content).join('\n\n---\n\n');
-    const gate: ReviewGate = todoRecord.phase === 'review' ? 'review' : 'confirm';
-    const projectRow = projectOfTodo(deps.db, todoRecord);
-    const checkout = hasRepoBinding(projectRow);
-    const changes =
-      gate === 'review'
-        ? deps.reposDir !== undefined
-          ? (await readBuildChanges({ db: deps.db, reposDir: deps.reposDir }, buildId)).files
-          : []
-        : undefined;
-    const after = getTodo(deps, row.todoId);
-    if (after?.phase !== todoRecord.phase) {
-      throw new HttpError(
-        409,
-        `读取变更期间任务相位已变为 ${after?.phase ?? '（任务已删除）'}，未发起 AI 审核`,
-      );
-    }
-    insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
-    const expectedHeadSha = gate === 'review' ? dispatchHeadSha(deps, buildId) : null;
-    const promptArgs = {
-      gate,
-      planText,
-      ...(changes !== undefined ? { changes } : {}),
-      checkout,
-      ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
-    } as const;
-    const reviewPrompt = buildReviewStepPrompt({
-      agentId: reviewRoute.id,
-      ...promptArgs,
-      ...(body.focus !== undefined ? { focus: body.focus } : {}),
-    });
-    enqueueStep(deps, buildId, 'review', todoRecord.teamId, reviewPrompt);
     return;
   }
   if (todoRecord.phase !== 'confirm' && todoRecord.phase !== 'review') {
