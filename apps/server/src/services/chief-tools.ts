@@ -29,6 +29,7 @@ import type { Db } from '../db/client.js';
 import {
   build,
   chief,
+  chiefMessage,
   chiefThread,
   machine,
   project,
@@ -59,7 +60,6 @@ import {
   removeChiefWatches,
   requireTurnProvenance,
   setChiefWake,
-  upsertChiefMessage,
 } from './chief.js';
 import { channelMessages, readHistory, searchHistory } from './chief-history.js';
 import {
@@ -78,6 +78,7 @@ import {
   updateRequestTodo,
 } from './coordinator-request.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { effectDedupeKey } from './external-effects.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -1051,8 +1052,12 @@ export async function executeChiefTool(
         report === null
           ? str(params, 'message')
           : str(params, 'message').replaceAll(report.attachmentId, '报告');
+      const noticeId =
+        report === null
+          ? `notice-${effectDedupeKey(ctx.threadId, ctx.turnPrompt ?? '', provenance, text)}`
+          : reportNoticeId(ctx.threadId, report);
       const notice = {
-        id: report === null ? newRecordId() : reportNoticeId(ctx.threadId, report),
+        id: noticeId,
         threadId: ctx.threadId,
         role: 'system' as const,
         content: JSON.stringify({
@@ -1065,9 +1070,22 @@ export async function executeChiefTool(
         } satisfies ChiefNoticeContent),
         createdAt: nowMs(),
       };
-      const stored =
-        report === null ? upsertChiefMessage(db, notice) : insertChiefMessageOnce(db, notice);
-      if (stored === null) return json({ notified: true, duplicate: true });
+      const stored = insertChiefMessageOnce(db, notice);
+      if (stored === null) {
+        const existing = db.select().from(chiefMessage).where(eq(chiefMessage.id, noticeId)).get();
+        if (existing !== undefined) {
+          deps.convHub?.publishMessage(ctx.threadId, existing);
+          notifyChiefMessage(
+            { db, hub: deps.hub, user: deps.user },
+            {
+              threadId: ctx.threadId,
+              message: text,
+              agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+            },
+          );
+        }
+        return json({ notified: true, duplicate: true });
+      }
       deps.convHub?.publishMessage(ctx.threadId, stored);
       notifyChiefMessage(
         { db, hub: deps.hub, user: deps.user },

@@ -320,6 +320,35 @@ describe('quiet by default for event-triggered Coordinator turns (#1784)', () =>
     expect(republished).toHaveLength(2);
   });
 
+  test('a notify_user retry writes one card and re-announces it', async () => {
+    const w = await setup();
+    const streamed: object[] = [];
+    w.s.convHub.subscribe(w.threadId, {
+      nextSeq: () => 1,
+      send: (payload: object) => {
+        streamed.push(payload);
+        return Promise.resolve();
+      },
+    });
+    w.wake(watchProvenance('todo-a'));
+    const wake = await w.claim();
+    const params = {
+      message: '#1 失败两次，需要你给它换台执行机',
+      provenance: watchProvenance('todo-a'),
+    };
+    expect((await w.tool(wake.step.id, 'notify_user', params)).status).toBe(200);
+    expect(notices(w)).toHaveLength(1);
+    const retry = await w.tool(wake.step.id, 'notify_user', params);
+    expect(retry.status).toBe(200);
+    const retryBody = (await retry.json()) as { text: string };
+    expect(JSON.parse(retryBody.text)).toMatchObject({ notified: true, duplicate: true });
+    expect(notices(w)).toHaveLength(1);
+    const published = streamed.filter((payload) =>
+      JSON.stringify(payload).includes(CHIEF_NOTICE_KIND),
+    );
+    expect(published).toHaveLength(2);
+  });
+
   test('an ask_user relay retry re-announces the existing question card', async () => {
     const w = await setup();
     const streamed: object[] = [];
