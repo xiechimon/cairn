@@ -14,6 +14,7 @@ import {
 } from '@earendil-works/pi-durable';
 import { coordinatorToolDefs } from '../../services/coordinator-tool-defs.js';
 import { createCutOffRecovery } from './cut-off-recovery.js';
+import { attachmentImageText, type OcrRunner } from './image-text.js';
 import { boundCoordinatorImages, prepareCoordinatorImage } from './images.js';
 import type { MachineApi } from './machine-api.js';
 
@@ -135,6 +136,7 @@ export function coordinatorTool(
   shuttingDown: () => boolean = () => false,
   beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>,
   storeId?: () => string | undefined,
+  ocrRunner?: OcrRunner,
 ): ToolRegistration {
   return defineTool({
     name: def.name,
@@ -148,6 +150,15 @@ export function coordinatorTool(
       const store = storeId?.();
       const callId = store === undefined ? api.callId : coordinatorToolSourceId(store, api.callId);
       const params = args as Record<string, unknown>;
+      let driving: Promise<Awaited<ReturnType<typeof api.models.getModel>>> | undefined;
+      const drivingModel = () =>
+        (driving ??= api
+          .agent(context)
+          .then((agent) =>
+            agent.model === undefined
+              ? undefined
+              : api.models.getModel(agent.model.provider, agent.model.modelId),
+          ));
       if (def.name === 'ask_user') {
         const text = await askThroughChannel(
           channel,
@@ -161,12 +172,7 @@ export function coordinatorTool(
       }
       try {
         if (DESKTOP_TOOL_NAMES.has(def.name)) {
-          const agent = await api.agent(context);
-          const model =
-            agent.model === undefined
-              ? undefined
-              : api.models.getModel(agent.model.provider, agent.model.modelId);
-          const seesImages = model?.input.includes('image') === true;
+          const seesImages = (await drivingModel())?.input.includes('image') === true;
           if (!seesImages && (def.name === 'computer_observe' || def.name === 'computer_act')) {
             return { output: [{ type: 'text', text: SCREENSHOT_UNAVAILABLE }], isError: true };
           }
@@ -187,14 +193,33 @@ export function coordinatorTool(
         const text = await channel.relayTool(stepId, def.name, params, callId, context.abortSignal);
         if (def.name === 'attachment') {
           const attachment = JSON.parse(text) as {
+            fileName?: string;
             mimeType: string;
+            sizeBytes?: number;
             encoding: string;
             content: string;
           };
           if (attachment.mimeType.startsWith('image/') && attachment.encoding === 'base64') {
-            return {
-              output: [await prepareCoordinatorImage(attachment.content, attachment.mimeType)],
-            };
+            const model = await drivingModel();
+            if (model?.input.includes('image') === true) {
+              return {
+                output: [await prepareCoordinatorImage(attachment.content, attachment.mimeType)],
+              };
+            }
+            const imageText = await attachmentImageText({
+              models: api.models,
+              image: {
+                fileName: attachment.fileName ?? 'attachment',
+                mimeType: attachment.mimeType,
+                sizeBytes: attachment.sizeBytes,
+                content: attachment.content,
+              },
+              prepareImage: prepareCoordinatorImage,
+              preferProvider: model?.provider,
+              ocr: ocrRunner,
+              signal: context.abortSignal,
+            });
+            return { output: [{ type: 'text', text: imageText }] };
           }
         }
         return { output: [{ type: 'text', text }] };
@@ -219,6 +244,7 @@ export function coordinatorToolsExtension(
     shuttingDown?: () => boolean;
     beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>;
     storeId?: () => string | undefined;
+    ocrRunner?: OcrRunner;
   } = {},
 ) {
   const defs = [...coordinatorToolDefs(options), ...(options.connectorTools ?? [])];
@@ -241,6 +267,7 @@ export function coordinatorToolsExtension(
         options.shuttingDown,
         options.beforeTool,
         options.storeId,
+        options.ocrRunner,
       ),
     ),
   });

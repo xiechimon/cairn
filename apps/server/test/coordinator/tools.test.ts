@@ -9,9 +9,15 @@ import {
   COMPUTER_REMOTE_TOOLS,
 } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
-import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
+import {
+  fauxAssistantMessage,
+  fauxProvider,
+  fauxToolCall,
+  type Provider,
+} from '@earendil-works/pi-ai';
 import { afterEach, describe, expect, it } from 'vitest';
 import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
+import type { OcrRunner } from '../../src/coordinator/runtime/image-text.js';
 import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
 import {
   askRequestId,
@@ -45,6 +51,7 @@ function toolThenAnswer(
   name: string,
   args: Parameters<typeof fauxToolCall>[1],
   input?: ('text' | 'image')[],
+  extraProviders: Provider[] = [],
 ) {
   const seenResults: string[] = [];
   const seenMessages: FauxContext[] = [];
@@ -63,7 +70,11 @@ function toolThenAnswer(
       return fauxAssistantMessage([fauxToolCall(name, args)], { stopReason: 'toolUse' });
     }),
   );
-  return { coordinatorModels: createCoordinatorModels([faux.provider]), seenResults, seenMessages };
+  return {
+    coordinatorModels: createCoordinatorModels([faux.provider, ...extraProviders]),
+    seenResults,
+    seenMessages,
+  };
 }
 
 describe('coordinator tools', () => {
@@ -520,5 +531,120 @@ describe('coordinator tools', () => {
     gate.set('step-resumed');
     await pending;
     expect(resolved).toBe('step-resumed');
+  });
+
+  describe('on a model without image input', () => {
+    const pngRelay = () =>
+      JSON.stringify({
+        id: 'att-1',
+        fileName: 'screen.png',
+        mimeType: 'image/png',
+        sizeBytes: validPng.length,
+        encoding: 'base64',
+        content: validPng.toString('base64'),
+      });
+
+    async function runAttachment(options: {
+      providers?: Provider[];
+      ocrRunner?: OcrRunner;
+    }): Promise<{ seenResults: string[] }> {
+      const { coordinatorModels, seenResults } = toolThenAnswer(
+        'attachment',
+        { attachmentId: 'team/screen.png' },
+        ['text'],
+        options.providers ?? [],
+      );
+      const api = fakeMachineApi();
+      api.relayTool = async () => pngRelay();
+      const gate = createStepGate();
+      const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+        extensions: [coordinatorToolsExtension(api, gate, { ocrRunner: options.ocrRunner })],
+      });
+      try {
+        await runCoordinatorTurn(
+          {
+            harness,
+            models: coordinatorModels,
+            api,
+            context: ctx,
+            heartbeatMs: 1000,
+            now: () => 1,
+            gate,
+          },
+          chiefStep('step-blind', 'What does the screenshot say?'),
+        );
+      } finally {
+        await harness.close(ctx);
+      }
+      return { seenResults };
+    }
+
+    function resultText(seenResults: string[]): string {
+      const blocks = JSON.parse(seenResults[0]!) as { type: string; text?: string }[];
+      expect(blocks.some((block) => block.type === 'image')).toBe(false);
+      return blocks.map((block) => block.text ?? '').join('\n');
+    }
+
+    it('asks a configured vision model to describe the image and returns that text', async () => {
+      const vis = fauxProvider({
+        provider: 'vis',
+        models: [{ id: 'vm', contextWindow: 200_000, input: ['text', 'image'] }],
+      });
+      const requests: FauxContext[] = [];
+      vis.setResponses([
+        (c: FauxContext) => {
+          requests.push(c);
+          return fauxAssistantMessage('a dark panel with three toggles');
+        },
+      ]);
+      const { seenResults } = await runAttachment({
+        providers: [vis.provider],
+        ocrRunner: async () => {
+          throw new Error('OCR must not run when a vision caption succeeds');
+        },
+      });
+      const text = resultText(seenResults);
+      expect(text).toContain('a dark panel with three toggles');
+      expect(text).toContain('vis/vm');
+      expect(JSON.stringify(requests[0]?.messages.at(-1)?.content)).toContain('"type":"image"');
+    });
+
+    it('runs OCR and marks the transcript as OCR when no vision model is configured', async () => {
+      let ocrArg: { fileName?: string; mimeType?: string } | undefined;
+      const { seenResults } = await runAttachment({
+        ocrRunner: async (image) => {
+          ocrArg = image;
+          return 'OCR-RESULT three tasks';
+        },
+      });
+      const text = resultText(seenResults);
+      expect(ocrArg?.fileName).toBe('screen.png');
+      expect(ocrArg?.mimeType).toBe('image/png');
+      expect(text).toContain('OCR-RESULT three tasks');
+      expect(text).toContain('OCR');
+    });
+
+    it('uses OCR when the configured vision model fails', async () => {
+      const vis = fauxProvider({
+        provider: 'vis',
+        models: [{ id: 'vm', contextWindow: 200_000, input: ['text', 'image'] }],
+      });
+      vis.setResponses([
+        fauxAssistantMessage('upstream down', { stopReason: 'error', errorMessage: 'down' }),
+      ]);
+      const { seenResults } = await runAttachment({
+        providers: [vis.provider],
+        ocrRunner: async () => 'OCR-RESULT after vision failure',
+      });
+      expect(resultText(seenResults)).toContain('OCR-RESULT after vision failure');
+    });
+
+    it('names the file and points at ask_user when neither vision nor OCR can read it', async () => {
+      const { seenResults } = await runAttachment({ ocrRunner: async () => undefined });
+      const text = resultText(seenResults);
+      expect(text).toContain('screen.png');
+      expect(text).toContain('cannot see images');
+      expect(text).toContain('ask_user');
+    });
   });
 });
