@@ -391,9 +391,7 @@ export function recordStepUsage(
   const { db } = deps;
   const usageTeamId = stepTeamId(deps, stepRow);
   const mirrorsTurnUsage =
-    coordinatorRunsOnPi() &&
-    stepRow.kind === 'chief' &&
-    isChiefConversation(stepRow.buildId);
+    coordinatorRunsOnPi() && stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId);
   db.transaction((tx) => {
     for (const u of usage) {
       const prior = db

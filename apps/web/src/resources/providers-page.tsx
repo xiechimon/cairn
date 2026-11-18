@@ -5,11 +5,13 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
 import {
+  fetchAntigravityUpstreamModels,
   toAntigravityAccount,
   useAntigravitySubscriptions,
   useAntigravitySubscriptionVerification,
   useDeleteAntigravitySubscription,
   useRenameAntigravitySubscription,
+  useUpdateAntigravitySubscriptionModels,
 } from '../api/antigravity-subscriptions.js';
 import {
   type AccountVendor,
@@ -47,7 +49,6 @@ import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { AddProviderFlow, type AddProviderView } from './add-provider-flow.js';
-import { groupDevinUpstream } from './devin-model-groups.js';
 import {
   type ProviderEditActions,
   providerKind,
@@ -62,6 +63,7 @@ import {
   subscriptionStatusView,
   subscriptionSummary,
 } from './subscription-detail.js';
+import { groupAntigravityUpstream, groupDevinUpstream } from './upstream-model-groups.js';
 import { UpstreamModelPicker } from './upstream-model-picker.js';
 
 interface Entry {
@@ -139,7 +141,10 @@ function subscriptionEntries(
       deps.clock,
     );
     const runtimeLiveness = new Map(deps.models.map((model) => [model.id, model.liveness]));
-    const picked = account.vendor === 'devin' ? (account.models ?? []) : undefined;
+    const picked =
+      account.vendor === 'devin' || account.vendor === 'antigravity'
+        ? (account.models ?? [])
+        : undefined;
     const pickedWithLiveness = picked?.map((model) => ({
       ...model,
       liveness: runtimeLiveness.get(model.id) === 'dead' ? 'dead' : model.liveness,
@@ -189,6 +194,7 @@ export function ProvidersSection() {
   const renameSubscription = useRenameClaudeSubscription(teamId);
   const renameDevinSubscription = useRenameDevinSubscription(teamId);
   const updateDevinModels = useUpdateDevinSubscriptionModels(teamId);
+  const updateAntigravityModels = useUpdateAntigravitySubscriptionModels(teamId);
   const renameAntigravitySubscription = useRenameAntigravitySubscription(teamId);
   const verification = useSubscriptionVerification(teamId);
   const devinVerification = useDevinSubscriptionVerification(teamId);
@@ -197,8 +203,8 @@ export function ProvidersSection() {
   const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
     null,
   );
-  const [pickingDevin, setPickingDevin] = useState<SubscriptionAccount | null>(null);
-  const devinUpstreamRef = useRef<ReadonlyMap<string, SubscriptionModel>>(new Map());
+  const [pickingSubscription, setPickingSubscription] = useState<SubscriptionAccount | null>(null);
+  const upstreamCatalogRef = useRef<ReadonlyMap<string, SubscriptionModel>>(new Map());
   const [connectError, setConnectError] = useState<string | null>(null);
 
   const sources = live
@@ -275,14 +281,21 @@ export function ProvidersSection() {
         }
       : {};
 
-  const saveDevinModels = (account: SubscriptionAccount, models: SubscriptionModel[]) =>
-    updateDevinModels.mutate(
+  const saveSubscriptionModels = (account: SubscriptionAccount, models: SubscriptionModel[]) => {
+    const update =
+      account.vendor === 'devin'
+        ? updateDevinModels
+        : account.vendor === 'antigravity'
+          ? updateAntigravityModels
+          : null;
+    update?.mutate(
       { id: account.id, models },
       {
-        onSuccess: () => setPickingDevin(null),
+        onSuccess: () => setPickingSubscription(null),
         onError: (error) => toastError(t('保存失败，请重试。'), error),
       },
     );
+  };
 
   const verifyByVendor: Partial<Record<AccountVendor, typeof verification.verify>> = {
     devin: devinVerification.verify,
@@ -333,15 +346,18 @@ export function ProvidersSection() {
                       { id: account.id, label },
                       { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
                     ),
-                  ...(account.vendor === 'devin'
+                  ...(account.vendor === 'devin' || account.vendor === 'antigravity'
                     ? {
-                        onPickUpstream: () => setPickingDevin(account),
+                        onPickUpstream: () => setPickingSubscription(account),
                         onRemoveModel: (id: string) =>
-                          saveDevinModels(
+                          saveSubscriptionModels(
                             account,
                             (account.models ?? []).filter((model) => model.id !== id),
                           ),
-                        modelsBusy: updateDevinModels.isPending,
+                        modelsBusy:
+                          account.vendor === 'devin'
+                            ? updateDevinModels.isPending
+                            : updateAntigravityModels.isPending,
                       }
                     : {}),
                 }
@@ -461,23 +477,28 @@ export function ProvidersSection() {
           announceVerification({ id: created.id, label: created.label, vendor: source });
         }}
       />
-      {pickingDevin !== null && live && teamId !== undefined && (
+      {pickingSubscription !== null && live && teamId !== undefined && (
         <UpstreamModelPicker
-          endpoint={`devin · ${pickingDevin.label}`}
-          selected={(pickingDevin.models ?? []).map((model) => model.id)}
-          groupModels={groupDevinUpstream}
+          endpoint={`${pickingSubscription.vendor} · ${pickingSubscription.label}`}
+          selected={(pickingSubscription.models ?? []).map((model) => model.id)}
+          groupModels={
+            pickingSubscription.vendor === 'devin' ? groupDevinUpstream : groupAntigravityUpstream
+          }
           testable={false}
           load={async () => {
-            const result = await fetchDevinUpstreamModels(teamId, pickingDevin.id);
+            const result =
+              pickingSubscription.vendor === 'devin'
+                ? await fetchDevinUpstreamModels(teamId, pickingSubscription.id)
+                : await fetchAntigravityUpstreamModels(teamId, pickingSubscription.id);
             if (result.status === 'ok')
-              devinUpstreamRef.current = new Map(result.models.map((model) => [model.id, model]));
+              upstreamCatalogRef.current = new Map(result.models.map((model) => [model.id, model]));
             return result;
           }}
-          onClose={() => setPickingDevin(null)}
+          onClose={() => setPickingSubscription(null)}
           onSave={(ids) => {
-            const catalog = devinUpstreamRef.current;
+            const catalog = upstreamCatalogRef.current;
             const models = ids.map((id) => catalog.get(id) ?? { id, name: id });
-            saveDevinModels(pickingDevin, models);
+            saveSubscriptionModels(pickingSubscription, models);
           }}
         />
       )}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupDevinUpstream } from '../src/resources/devin-model-groups.js';
+import { groupDevinUpstream } from '../src/resources/upstream-model-groups.js';
 import type { UpstreamOption } from '../src/resources/upstream-model-picker.js';
 
 const option = (id: string, family?: string): UpstreamOption => ({ id, name: id, family });

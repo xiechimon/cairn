@@ -1,6 +1,7 @@
 import type {
   ActionTier,
   ActiveRun,
+  AntigravitySubscriptionModel,
   AutonomyGateReason,
   AutonomyKind,
   AutonomyPauseMarker,
@@ -1417,6 +1418,7 @@ export const antigravitySubscription = sqliteTable(
     tokenCipher: text('tokenCipher'),
     expiresAt: epochMs('expiresAt'),
     enabledAt: epochMs('enabledAt'),
+    models: json<AntigravitySubscriptionModel[]>('models').notNull().default(sql`'[]'`),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [

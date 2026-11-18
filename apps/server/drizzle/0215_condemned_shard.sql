@@ -1,0 +1,1 @@
+ALTER TABLE `antigravity_subscription` ADD `models` text DEFAULT '[]' NOT NULL;

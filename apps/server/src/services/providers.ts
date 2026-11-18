@@ -18,6 +18,7 @@ import type { Db } from '../db/client.js';
 import { machine, provider } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { enabledAntigravitySubscriptionModels } from './antigravity-subscriptions.js';
 import { enabledDevinSubscriptionModels } from './devin-subscriptions.js';
 import { getModelLiveness } from './model-liveness.js';
 
@@ -156,29 +157,33 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
 }
 
 export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
-  return db
+  const machines = db
     .select()
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .orderBy(asc(machine.name))
     .all()
-    .flatMap((row) => {
-      const report = row.capabilities?.antigravity;
-      if (!row.online || report?.installed !== true) return [];
-      const models =
-        report.models !== undefined && report.models.length > 0
-          ? report.models.map((m) => ({ id: m.id, name: m.name, slot: 'builtin' }))
-          : [...DEFAULT_ANTIGRAVITY_MODELS];
-      return [
-        {
-          runtime: 'antigravity' as const,
-          installed: true,
-          hostname: row.name,
-          machineId: row.id,
-          models,
-        },
-      ];
-    });
+    .filter((row) => row.online && row.capabilities?.antigravity?.installed === true);
+  const seen = new Set<string>();
+  const merged = [
+    ...enabledAntigravitySubscriptionModels({ db }, teamId),
+    ...machines.flatMap((row) => row.capabilities?.antigravity?.models ?? []),
+  ].filter((model) => {
+    if (model.id === '' || seen.has(model.id)) return false;
+    seen.add(model.id);
+    return true;
+  });
+  const models: ModelSourceModel[] =
+    merged.length > 0
+      ? merged.map((model) => ({ id: model.id, name: model.name, slot: 'builtin' }))
+      : [...DEFAULT_ANTIGRAVITY_MODELS];
+  return machines.map((row) => ({
+    runtime: 'antigravity' as const,
+    installed: true,
+    hostname: row.name,
+    machineId: row.id,
+    models,
+  }));
 }
 
 export function getModelSources(deps: ProviderDeps, teamId: string): ModelSourcesEnvelope {

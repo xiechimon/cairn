@@ -3,13 +3,14 @@ import type {
   AntigravitySubscriptionListEntry,
   AntigravitySubscriptionVerifyResult,
   CreateAntigravitySubscription,
+  ProviderFailure,
 } from '@cairn/shared';
 import { antigravityKeyFromText } from '@cairn/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
-import type { SubscriptionAccount } from './claude-accounts.js';
-import { ApiError, api } from './client.js';
+import type { SubscriptionAccount, SubscriptionModel } from './claude-accounts.js';
+import { api } from './client.js';
 
 export type {
   AntigravitySubscription,
@@ -39,25 +40,15 @@ export function toAntigravityAccount(
     windows: [],
     lastUsedAt: wire.lastUsedAt ?? null,
     stepsLast24h: typeof wire.stepsLast24h === 'number' ? wire.stepsLast24h : null,
+    models: Array.isArray(wire.models) ? wire.models : [],
   };
-}
-
-async function unlessMissing<T>(request: Promise<T>): Promise<T | null> {
-  try {
-    return await request;
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
-    throw error;
-  }
 }
 
 export function useAntigravitySubscriptions(teamId: string | undefined, live: boolean) {
   return useQuery({
     queryKey: ['antigravity-subscriptions', teamId],
     queryFn: () =>
-      api.get<AntigravitySubscriptionListEntry[]>(
-        `/api/teams/${teamId}/antigravity-subscriptions`,
-      ),
+      api.get<AntigravitySubscriptionListEntry[]>(`/api/teams/${teamId}/antigravity-subscriptions`),
     enabled: live && teamId !== undefined,
   });
 }
@@ -124,4 +115,32 @@ export function useAntigravitySubscriptionVerification(teamId: string | undefine
     return outcome;
   };
   return { states, verify };
+}
+
+export type AntigravityUpstreamModelsResult =
+  | { status: 'ok'; models: SubscriptionModel[] }
+  | { status: 'failed'; failure: ProviderFailure; httpStatus: number | null };
+
+export function fetchAntigravityUpstreamModels(
+  teamId: string,
+  id: string,
+): Promise<AntigravityUpstreamModelsResult> {
+  return api.post<AntigravityUpstreamModelsResult>(
+    `/api/teams/${teamId}/antigravity-subscriptions/${id}/upstream-models`,
+  );
+}
+
+export function useUpdateAntigravitySubscriptionModels(teamId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; models: SubscriptionModel[] }) =>
+      api.patch<AntigravitySubscription>(
+        `/api/teams/${teamId}/antigravity-subscriptions/${input.id}`,
+        { models: input.models },
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] });
+      void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
+    },
+  });
 }

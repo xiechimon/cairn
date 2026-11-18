@@ -2,6 +2,13 @@ import { z } from 'zod';
 
 export const ANTIGRAVITY_TOKEN_REGEX = /^[A-Za-z0-9._~$+/=-]{16,4096}$/;
 
+export const antigravitySubscriptionModelSchema = z.strictObject({
+  id: z.string().min(1).max(256),
+  name: z.string().min(1).max(256),
+});
+
+export type AntigravitySubscriptionModel = z.infer<typeof antigravitySubscriptionModelSchema>;
+
 export const antigravitySubscriptionSchema = z.object({
   id: z.string(),
   kind: z.literal('antigravity-subscription'),
@@ -10,6 +17,7 @@ export const antigravitySubscriptionSchema = z.object({
   expiresAt: z.number().int().nullable(),
   enabled: z.boolean().optional(),
   enabledAt: z.number().int().nullable().optional(),
+  models: z.array(antigravitySubscriptionModelSchema).optional(),
   createdAt: z.number().int(),
 });
 
@@ -28,9 +36,16 @@ export const createAntigravitySubscriptionSchema = z.object({
 
 export type CreateAntigravitySubscription = z.infer<typeof createAntigravitySubscriptionSchema>;
 
-export const renameAntigravitySubscriptionSchema = z.object({
-  label: z.string().trim().min(1).max(100),
-});
+export const renameAntigravitySubscriptionSchema = z
+  .object({
+    label: z.string().trim().min(1).max(100).optional(),
+    models: z.array(antigravitySubscriptionModelSchema).max(2000).optional(),
+  })
+  .refine((body) => body.label !== undefined || body.models !== undefined, {
+    message: 'Nothing to update',
+  });
+
+export type PatchAntigravitySubscription = z.infer<typeof renameAntigravitySubscriptionSchema>;
 
 export const antigravitySubscriptionVerifyResultSchema = z.object({
   ok: z.boolean(),
