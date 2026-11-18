@@ -5,7 +5,12 @@ import type { EnginePtyProcess } from '../src/engine/pty.js';
 import { PtyRedactor } from '../src/engine/redactor.js';
 import { EngineScrollback } from '../src/engine/scrollback.js';
 
-function fakeProc(): { proc: EnginePtyProcess; stream: PassThrough; written: Buffer[]; closed: boolean } {
+function fakeProc(): {
+  proc: EnginePtyProcess;
+  stream: PassThrough;
+  written: Buffer[];
+  closed: boolean;
+} {
   const stream = new PassThrough();
   const written: Buffer[] = [];
   const state = { closed: false };
@@ -22,7 +27,14 @@ function fakeProc(): { proc: EnginePtyProcess; stream: PassThrough; written: Buf
     written.push(Buffer.isBuffer(chunk) ? (chunk as Buffer) : Buffer.from(String(chunk)));
     return true;
   }) as typeof stream.write;
-  return { proc, stream, written, get closed() { return state.closed; } };
+  return {
+    proc,
+    stream,
+    written,
+    get closed() {
+      return state.closed;
+    },
+  };
 }
 
 describe('EngineScrollback', () => {
@@ -66,9 +78,7 @@ describe('PtyRedactor', () => {
 
   it('holds a trailing token-charset run until the next chunk', () => {
     const redactor = new PtyRedactor(() => []);
-    expect(
-      redactor.push(Buffer.from(`echo ok\n${'a'.repeat(100)}`))?.toString(),
-    ).toBe('echo ok\n');
+    expect(redactor.push(Buffer.from(`echo ok\n${'a'.repeat(100)}`))?.toString()).toBe('echo ok\n');
   });
 });
 
