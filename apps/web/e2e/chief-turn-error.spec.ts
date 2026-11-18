@@ -71,7 +71,7 @@ test('closing the card leaves only the line', async ({ page }) => {
   ]);
   const card = page.getByTestId('chief-turn-error-card');
   await expect(card).toBeVisible();
-  await page.getByTestId('chief-turn-error-dismiss').click();
+  await page.getByTestId('chief-turn-error-card-dismiss').click();
   await expect(card).toHaveCount(0);
   await expect(page.getByTestId('chief-turn-error')).toHaveText('没完成：模型太久没有回应');
 });
@@ -135,4 +135,41 @@ test.describe('on a Mac', () => {
     await expect(card).toContainText('系统设置 → 隐私与安全性 → 本地网络');
     await expect(card.getByTestId('chief-turn-retry')).toBeVisible();
   });
+});
+
+test('a turn waiting for a computer or an offline Runner shows the card and leaves no line once it runs', async ({
+  page,
+}) => {
+  const waiting = (kind: string, name: string | null) => ({
+    ...THREAD,
+    activeRun: { phase: 'chief' },
+    turnQueue: {
+      position: 1,
+      waitingFor:
+        name === null ? null : { machineId: 'mx', name, running: 0, capacity: 1 },
+      blocked: { kind, missing: [] },
+    },
+  });
+  const state = {
+    threads: [waiting('machine-offline', 'xmon-mbp')] as unknown[],
+    messages: [{ id: 'm1', role: 'user', content: '你好', createdAt: 10 }],
+  };
+  await mockLive(page, state as Parameters<typeof mockLive>[1]);
+  await page.goto('/app');
+  const card = page.getByTestId('chief-queue-wait-card');
+  await expect(card).toContainText('执行机 xmon-mbp 离线');
+  await expect(card.getByRole('link', { name: '查看执行机' })).toHaveAttribute(
+    'href',
+    /\/app\/settings\/machines/,
+  );
+  state.threads = [waiting('no-computer', null)];
+  await page.reload();
+  await expect(card).toContainText('Coordinator 的电脑还没准备好');
+  await expect(card.getByRole('link', { name: '打开电脑' })).toHaveAttribute('href', /pane=machines/);
+  await page.getByTestId('chief-queue-wait-card-dismiss').click();
+  await expect(card).toHaveCount(0);
+  state.threads = [THREAD];
+  await page.reload();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByTestId('chief-turn-error')).toHaveCount(0);
 });

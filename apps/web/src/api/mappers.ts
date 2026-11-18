@@ -2036,15 +2036,27 @@ export function mapChief(
       const turnQueue = active?.turnQueue ?? null;
       if (turnQueue != null) {
         const queued = connectingLine(turnQueue);
-        chiefStream.push({
-          kind: 'streaming',
-          ...(turnQueue.blocked != null
-            ? { blocked: true as const, blockedKind: turnQueue.blocked.kind }
-            : {}),
-          label: queued.label,
-          ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),
-          ...(queued.detail !== undefined ? { labelDetail: queued.detail } : {}),
-        });
+        const waitKind = turnQueue.blocked?.kind;
+        if (waitKind === 'no-computer' || waitKind === 'machine-offline') {
+          chiefStream.push({
+            kind: 'streaming',
+            label: waitKind === 'no-computer' ? '排队中：等电脑就绪' : '排队中：等执行机上线',
+            queueWait: {
+              kind: waitKind,
+              ...(turnQueue.waitingFor != null ? { machine: turnQueue.waitingFor.name } : {}),
+            },
+          });
+        } else {
+          chiefStream.push({
+            kind: 'streaming',
+            ...(turnQueue.blocked != null
+              ? { blocked: true as const, blockedKind: turnQueue.blocked.kind }
+              : {}),
+            label: queued.label,
+            ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),
+            ...(queued.detail !== undefined ? { labelDetail: queued.detail } : {}),
+          });
+        }
       } else {
         const actLabel = opts.activity != null ? activityLabel(opts.activity) : null;
         chiefStream.push({

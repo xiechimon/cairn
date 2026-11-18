@@ -1483,6 +1483,17 @@ export const EN: Record<string, string> = {
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
   这一轮没有完成: 'This turn did not finish',
+  '排队中：等电脑就绪': 'Queued: waiting for the computer',
+  '排队中：等执行机上线': 'Queued: waiting for a Runner to come online',
+  'Coordinator 的电脑还没准备好': "The Coordinator's computer isn't ready",
+  '执行机 {machine} 离线': 'Runner {machine} is offline',
+  执行机离线: 'The Runner is offline',
+  '这一步要用电脑，但还没有能用的电脑。打开电脑面板启动它，就绪后这一轮会自动接着跑。':
+    "This step needs a computer and none is ready. Open the computers panel to start one; this turn continues on its own once it's ready.",
+  '这一步要在执行机上跑，但它现在不在线。确认电脑开着、Cairn 在运行，它一上线这一轮就会自动接着跑。':
+    "This step runs on a Runner that is offline. Make sure the computer is on and Cairn is running; this turn continues on its own once it's back.",
+  打开电脑: 'Open computers',
+  查看执行机: 'View Runners',
   '可能是地址填错了、网络或代理不通，或者本地模型没有开。':
     "The address may be wrong, the network or proxy may be blocking it, or the local model isn't running.",
   '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。':

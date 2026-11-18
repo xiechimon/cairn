@@ -590,6 +590,11 @@ export interface ChiefSegment {
   strong?: boolean;
 }
 
+export interface QueueWait {
+  kind: 'no-computer' | 'machine-offline';
+  machine?: string;
+}
+
 export type ChiefStreamItem =
   | (ThreadReportContent & { id: string; projectId?: string | null })
   | (ThreadMessageContent & { id: string; projectId?: string | null })
@@ -703,6 +708,7 @@ export type ChiefStreamItem =
       signalAt?: number;
       blocked?: true;
       blockedKind?: StepQueueBlocked['kind'];
+      queueWait?: QueueWait;
     };
 
 export interface ChiefToolRow {

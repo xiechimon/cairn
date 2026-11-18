@@ -86,7 +86,7 @@ import {
   subThreadRowIds,
 } from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
-import { TurnFailureCard } from './turn-failure.js';
+import { QueueWaitCard, TurnFailureCard } from './turn-failure.js';
 import { VirtualStream } from './virtual-stream.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
@@ -622,6 +622,13 @@ export function ChiefConversation({
       retry: latestUser == null ? onRetryGreeting : retryLastUser,
     };
   }, [latestError, latestUser, dismissedFailure, onRetryGreeting, retryLastUser]);
+  const [dismissedWait, setDismissedWait] = useState<string | null>(null);
+  const liveWait = rows.findLast(({ item }) => item.kind === 'streaming')?.item;
+  const waitNow = liveWait?.kind === 'streaming' ? (liveWait.queueWait ?? null) : null;
+  useEffect(() => {
+    if (waitNow === null) setDismissedWait(null);
+  }, [waitNow]);
+  const queueWait = waitNow !== null && waitNow.kind !== dismissedWait ? waitNow : null;
   const clock = useMinuteClock();
   const dayEarlier = day?.earlier ?? 0;
   const [earlierLayout, streamLayout] = useMemo(() => {
@@ -799,6 +806,13 @@ export function ChiefConversation({
         <ChiefConnectionBanner />
       ) : chief.outage != null ? (
         <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} />
+      ) : queueWait !== null ? (
+        <QueueWaitCard
+          key={queueWait.kind}
+          wait={queueWait}
+          className={BANNER_CLS}
+          onDismiss={() => setDismissedWait(queueWait.kind)}
+        />
       ) : failure !== null ? (
         <TurnFailureCard
           key={failure.key}

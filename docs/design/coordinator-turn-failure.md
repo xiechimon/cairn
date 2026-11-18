@@ -29,6 +29,7 @@ Derived in this order from `message`: `no-model` (`no_model`, no keyed provider)
 
 - Coordinator conversation (`chief-message-rows.tsx`): every failure row is one centred grey line `没完成：<title>` with an expander holding the sentence and the raw text with a copy button. No buttons.
 - Card above the composer (`chief-turn-error-card.tsx`): only the newest failure, and only while no owner message follows it. Title, sentence, actions per kind (first one filled), `详情` with the raw text, and close. Close or Escape hides it for that row id in this tab; retry sends the last owner message, which hides the card because an owner message now follows the failure. Above the composer one notice shows at a time: connection lost, Coordinator unavailable, this card, fallback model. When the unavailable banner shows, the card does not.
+- Queue wait card (same file, `QueueWaitCard`): a turn still queued on `no-computer` or `machine-offline` (`turnQueue.blocked`) is not a failure. It shows the same card shape with an ochre icon, `打开电脑` (the computers panel) or `查看执行机`, and close. It is derived from the live queue on every read, so it leaves when the computer or Runner is back and the turn runs, and nothing is written to the conversation. The live row shows only `排队中：等电脑就绪` or `排队中：等执行机上线`. It ranks above the failed-turn card.
 - Task panel (`Coordinator 没能安排这个任务：{reason}`): the reason is the kind's title, never the raw text.
 - Status mark: unchanged; it reads the item kind only.
 
