@@ -5,7 +5,7 @@ import type {
   MachineComputerFramesBody,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { DESKTOP_SCREENSHOT_SCRIPT } from '../src/computer/desktop-screen.js';
+import { DESKTOP_PASTE_SCRIPT, DESKTOP_SCREENSHOT_SCRIPT } from '../src/computer/desktop-screen.js';
 import { createComputerDispatcher } from '../src/computer/dispatch.js';
 import { encodePng, pngSize } from '../src/computer/host-screen-png.js';
 import type {
@@ -35,9 +35,11 @@ type Reply = { stdout?: string; stderr?: string; code: number };
 
 function desktopProvider(reply: (argv: readonly string[]) => Reply = () => ({ code: 0 })) {
   const ran: string[][] = [];
+  const stdins: Array<string | undefined> = [];
   const provider: ComputerProvider = {
     async execute(request: ComputerExecuteRequest) {
       ran.push([...request.argv]);
+      stdins.push(request.stdin);
       const shot = request.argv.join(' ').includes(DESKTOP_SCREENSHOT_SCRIPT);
       const answer = shot ? { stdout: SCREEN, code: 0 } : reply(request.argv);
       return (async function* (): AsyncGenerator<ComputerProcessEvent> {
@@ -55,7 +57,7 @@ function desktopProvider(reply: (argv: readonly string[]) => Reply = () => ({ co
     async writeFile() {},
     async killAll() {},
   };
-  return { provider, ran };
+  return { provider, ran, stdins };
 }
 
 let counter = 0;
@@ -85,7 +87,7 @@ function setup(reply?: (argv: readonly string[]) => Reply) {
     return fake.frames.find((frame) => frame.kind === 'done' || frame.kind === 'error');
   };
   const xdotool = () => desktop.ran.filter((argv) => argv[0] === 'xdotool');
-  return { run, ran: desktop.ran, xdotool };
+  return { run, ran: desktop.ran, stdins: desktop.stdins, xdotool };
 }
 
 describe('computer_observe on a scope desktop', () => {
@@ -185,6 +187,31 @@ describe('computer_act on a scope desktop', () => {
     ]);
     expect(frame.text).toContain('10. key: delivered');
     expect(frame.images).toHaveLength(1);
+  });
+
+  test('types non-ASCII text by pasting it through the clipboard instead of per-character keysyms', async () => {
+    const { run, ran, stdins } = setup();
+    const frame = await run('computer_act', {
+      actions: [
+        { kind: 'type', text: '前端工程师' },
+        { kind: 'type', text: 'plain' },
+      ],
+    });
+    expect(frame?.kind).toBe('done');
+    expect(ran.slice(0, 2)).toEqual([
+      ['sh', '-c', DESKTOP_PASTE_SCRIPT],
+      ['xdotool', 'type', '--delay', '12', '--', 'plain'],
+    ]);
+    expect(stdins.slice(0, 2)).toEqual(['前端工程师', undefined]);
+  });
+
+  test('reports a missing xclip when pasting non-ASCII text', async () => {
+    const { run } = setup((argv) => (argv[0] === 'sh' ? { code: 127 } : { code: 0 }));
+    const frame = await run('computer_act', { actions: [{ kind: 'type', text: '你好' }] });
+    expect(frame).toMatchObject({
+      kind: 'error',
+      message: expect.stringContaining('needs xclip'),
+    });
   });
 
   test('typing and keys need no observation first', async () => {

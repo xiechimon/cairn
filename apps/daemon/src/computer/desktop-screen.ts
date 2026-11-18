@@ -24,6 +24,19 @@ const MIN_BUDGET_MS = 1_000;
 const COMMAND_NOT_FOUND = 127;
 const DOUBLE_CLICK_DELAY_MS = '80';
 const TYPE_DELAY_MS = '12';
+const NON_ASCII = /\P{ASCII}/u;
+export const DESKTOP_PASTE_SCRIPT = [
+  'command -v xclip >/dev/null 2>&1 || exit 127',
+  'prev=$(mktemp)',
+  'if xclip -selection clipboard -out >"$prev" 2>/dev/null; then had=1; else had=0; fi',
+  'xclip -selection clipboard -in >/dev/null 2>&1 || exit 1',
+  'xdotool key --clearmodifiers ctrl+v',
+  'status=$?',
+  'sleep 0.3',
+  'if [ "$had" = 1 ]; then xclip -selection clipboard -in <"$prev" >/dev/null 2>&1; else : | xclip -selection clipboard -in >/dev/null 2>&1; fi',
+  'rm -f "$prev"',
+  'exit $status',
+].join('\n');
 
 const coordinate = z.number().int().min(0).max(100_000);
 const point = { x: coordinate, y: coordinate };
@@ -222,6 +235,7 @@ export class DesktopScreen {
     call: ScreenCall,
     budget: Budget,
     delivered: boolean,
+    stdin?: string,
   ): Promise<RunResult> {
     const timeoutMs = Math.min(SCREEN_COMMAND_TIMEOUT_MS, budget.endsAt - this.now());
     if (timeoutMs < 1) {
@@ -233,7 +247,12 @@ export class DesktopScreen {
     }
     let events: Awaited<ReturnType<ComputerProvider['execute']>>;
     try {
-      events = await provider.execute({ argv, timeoutMs, signal: call.signal });
+      events = await provider.execute({
+        argv,
+        timeoutMs,
+        signal: call.signal,
+        ...(stdin === undefined ? {} : { stdin }),
+      });
     } catch (error) {
       if (error instanceof ComputerRefusal) {
         throw new Stop({
@@ -383,20 +402,36 @@ export class DesktopScreen {
       });
       return;
     }
-    const args = this.xdotool(action, geometry);
-    const result = await this.run(provider, ['xdotool', ...args], call, budget, ran > 0);
+    const pasted = action.kind === 'type' && NON_ASCII.test(action.text);
+    const tool = pasted ? 'xclip' : 'xdotool';
+    const result = pasted
+      ? await this.run(
+          provider,
+          ['sh', '-c', DESKTOP_PASTE_SCRIPT],
+          call,
+          budget,
+          ran > 0,
+          action.text,
+        )
+      : await this.run(
+          provider,
+          ['xdotool', ...this.xdotool(action, geometry)],
+          call,
+          budget,
+          ran > 0,
+        );
     if (result.code === 0) return;
     if (result.code === COMMAND_NOT_FOUND) {
       throw new Stop({
         kind: 'error',
-        message: `${label} needs xdotool on this computer.${earlier}`,
+        message: `${label} needs ${tool} on this computer.${earlier}`,
         delivery: ran > 0 ? 'unknown' : 'not_delivered',
       });
     }
     throw new Stop({
       kind: 'error',
       message: clip(
-        `${label} failed and may have partly run.${earlier}${result.stderr.trim() ? ` xdotool said: ${result.stderr.trim()}` : ''}`,
+        `${label} failed and may have partly run.${earlier}${result.stderr.trim() ? ` ${tool} said: ${result.stderr.trim()}` : ''}`,
       ),
       delivery: 'unknown',
     });

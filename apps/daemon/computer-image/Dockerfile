@@ -28,7 +28,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN set -eu; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-      xvfb x11vnc openbox picom hsetroot xdotool dbus-x11 libglib2.0-bin \
+      xvfb x11vnc openbox picom hsetroot xdotool xclip dbus-x11 libglib2.0-bin \
       chromium lxterminal fonts-noto-cjk fonts-noto-color-emoji \
       fonts-freefont-ttf fonts-unifont fonts-ipafont-gothic fonts-wqy-zenhei fonts-tlwg-loma-otf \
       fonts-liberation2 fonts-crosextra-carlito fonts-crosextra-caladea \
