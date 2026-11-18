@@ -5,14 +5,12 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
 import {
-  type AccountStep,
   type AccountVendor,
   type SubscriptionAccount,
   type SubscriptionModel,
   toClaudeAccount,
 } from '../api/claude-accounts.js';
 import {
-  useClaudeSubscriptionSteps,
   useClaudeSubscriptions,
   useDeleteClaudeSubscription,
   useRenameClaudeSubscription,
@@ -22,7 +20,6 @@ import {
   fetchDevinUpstreamModels,
   toDevinAccount,
   useDeleteDevinSubscription,
-  useDevinSubscriptionSteps,
   useDevinSubscriptions,
   useDevinSubscriptionVerification,
   useRenameDevinSubscription,
@@ -109,7 +106,6 @@ function teamEntries(
 interface SubscriptionEntryDeps {
   now: number;
   models: readonly ModelSourceModel[];
-  steps: Record<string, AccountStep[]>;
   verifications: Record<string, Verification>;
   actionsFor: (account: SubscriptionAccount) => SubscriptionActions;
   t: TFunc;
@@ -154,7 +150,6 @@ function subscriptionEntries(
           now={deps.now}
           view={view}
           verifying={verification?.phase === 'verifying'}
-          steps={deps.steps[account.id]}
           actions={deps.actionsFor(account)}
         />
       ),
@@ -205,16 +200,6 @@ export function ProvidersSection() {
     : (fixtureAccounts?.devinSubscriptions ?? []);
   const subscriptionApiIds = live ? (subscriptionsQ.data ?? []).map((s) => s.id) : [];
   const devinApiIds = live ? (devinSubscriptionsQ.data ?? []).map((s) => s.id) : [];
-  const stepsQ = useClaudeSubscriptionSteps(teamId, subscriptionApiIds, live);
-  const devinStepsQ = useDevinSubscriptionSteps(teamId, devinApiIds, live);
-  const stepsByAccount: Record<string, AccountStep[]> = live
-    ? Object.fromEntries(
-        [...subscriptionApiIds, ...devinApiIds].flatMap((id, index) => {
-          const page = [...stepsQ, ...devinStepsQ][index]?.data;
-          return page == null || !Array.isArray(page.steps) ? [] : [[id, page.steps]];
-        }),
-      )
-    : (fixtureAccounts?.stepsByAccount ?? {});
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');
@@ -326,7 +311,6 @@ export function ProvidersSection() {
 
   const subscriptionDeps = {
     now,
-    steps: stepsByAccount,
     verifications: { ...verification.states, ...devinVerification.states },
     actionsFor: subscriptionActionsFor,
     t,

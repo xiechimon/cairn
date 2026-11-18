@@ -6,15 +6,11 @@ import type {
   ProviderFailure,
 } from '@cairn/shared';
 import { devinKeyFromToml } from '@cairn/shared';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
-import type {
-  AccountStepsPage,
-  SubscriptionAccount,
-  SubscriptionModel,
-} from './claude-accounts.js';
-import { ApiError, api } from './client.js';
+import type { SubscriptionAccount, SubscriptionModel } from './claude-accounts.js';
+import { api } from './client.js';
 
 export type { CreateDevinSubscription, DevinSubscription, DevinSubscriptionVerifyResult };
 
@@ -39,15 +35,6 @@ export function toDevinAccount(wire: DevinSubscriptionListEntry, now: number): S
     stepsLast24h: typeof wire.stepsLast24h === 'number' ? wire.stepsLast24h : null,
     models: Array.isArray(wire.models) ? wire.models : [],
   };
-}
-
-async function unlessMissing<T>(request: Promise<T>): Promise<T | null> {
-  try {
-    return await request;
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
-    throw error;
-  }
 }
 
 export function useDevinSubscriptions(teamId: string | undefined, live: boolean) {
@@ -123,25 +110,6 @@ export function useUpdateDevinSubscriptionModels(teamId: string | undefined) {
       void client.invalidateQueries({ queryKey: ['devin-subscriptions', teamId] });
       void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
     },
-  });
-}
-
-export function useDevinSubscriptionSteps(
-  teamId: string | undefined,
-  ids: readonly string[],
-  live: boolean,
-) {
-  return useQueries({
-    queries: ids.map((id) => ({
-      queryKey: ['devin-subscription-steps', teamId, id],
-      queryFn: () =>
-        unlessMissing(
-          api.get<AccountStepsPage>(
-            `/api/teams/${teamId}/devin-subscriptions/${id}/steps?limit=20`,
-          ),
-        ),
-      enabled: live && teamId !== undefined,
-    })),
   });
 }
 

@@ -87,8 +87,6 @@ const mount = (
       record.models = body.models;
       return json(record);
     }
-    if (path.startsWith('/api/teams/t1/devin-subscriptions/sub-d1/steps'))
-      return json({ steps: [] });
     return undefined;
   });
 

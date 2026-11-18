@@ -8,26 +8,13 @@ import type {
   SecretBox,
 } from '@cairn/shared';
 import { claudeRateBlock } from '@cairn/shared';
-import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, chiefThread, claudeSubscription, machine, step, todo } from '../db/schema.js';
+import { claudeSubscription, machine, step } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { verifyClaudeSubscription } from './claude-subscription-verification.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
-
-export type AccountStepsPage = {
-  steps: {
-    stepId: string;
-    kind: 'build' | 'plan' | 'chief' | 'review' | 'merge';
-    threadId: string;
-    todoId: string;
-    title: string | null;
-    startedAt: number;
-    outcome: 'done' | 'failed' | 'running';
-  }[];
-  hasEarlier: boolean;
-};
 
 type Deps = { db: Db; box: SecretBox };
 type Row = typeof claudeSubscription.$inferSelect;
@@ -183,46 +170,6 @@ export function disableClaudeSubscription(
       .run();
     return toRecord({ ...row, enabledAt: null });
   });
-}
-
-const STEP_KINDS_SHOWN = ['build', 'plan', 'chief', 'review', 'merge'] as const;
-
-export function listSubscriptionSteps(
-  deps: { db: Db },
-  teamId: string,
-  id: string,
-  limit: number,
-): AccountStepsPage {
-  if (!subscriptionRow(deps.db, teamId, id)) throw notFound('Claude subscription connection');
-  const rows = deps.db
-    .select({ stepRow: step, todoRow: todo, threadRow: chiefThread })
-    .from(step)
-    .leftJoin(build, eq(step.buildId, build.id))
-    .leftJoin(todo, eq(build.todoId, todo.id))
-    .leftJoin(chiefThread, eq(step.buildId, chiefThread.id))
-    .where(
-      and(
-        eq(step.claudeSubscriptionId, id),
-        isNotNull(step.claimedAt),
-        inArray(step.status, ['claimed', 'done', 'failed', 'stopped']),
-      ),
-    )
-    .orderBy(desc(step.claimedAt), desc(step.id))
-    .limit(limit + 1)
-    .all();
-  return {
-    steps: rows.slice(0, limit).map(({ stepRow, todoRow, threadRow }) => ({
-      stepId: stepRow.id,
-      kind: STEP_KINDS_SHOWN.find((kind) => kind === stepRow.kind) ?? 'build',
-      threadId: stepRow.buildId,
-      todoId: todoRow?.id ?? '',
-      title: todoRow?.title ?? threadRow?.title ?? null,
-      startedAt: stepRow.claimedAt ?? stepRow.createdAt,
-      outcome:
-        stepRow.status === 'claimed' ? 'running' : stepRow.status === 'done' ? 'done' : 'failed',
-    })),
-    hasEarlier: rows.length > limit,
-  };
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;

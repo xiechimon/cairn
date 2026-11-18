@@ -11,7 +11,7 @@ import { type ProviderItem, ProviderPanel } from '../components/providers/provid
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SettingsNav } from '../components/settings/settings-nav.js';
 import { SettingsSearch } from '../components/settings/settings-search.js';
-import { ACCOUNT_STEPS, ACCOUNT_SUBSCRIPTIONS, PROVIDER_MACHINES } from '../fixtures/accounts.js';
+import { ACCOUNT_SUBSCRIPTIONS, PROVIDER_MACHINES } from '../fixtures/accounts.js';
 import { r7 } from '../fixtures/core.js';
 import { useI18n } from '../i18n/provider.js';
 import { OnlineStatus } from '../resources/parts.js';
@@ -129,7 +129,6 @@ function SubscriptionPanelSpecimen() {
           now={NOW}
           view={current.view}
           verifying={current.verification?.phase === 'verifying'}
-          steps={ACCOUNT_STEPS[current.account.id]}
           actions={{
             onVerify: () => undefined,
             onRename: () => undefined,
@@ -154,7 +153,6 @@ function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
         now={NOW}
         view={view}
         verifying={false}
-        steps={ACCOUNT_STEPS[account.id]}
         actions={{
           onVerify: () => undefined,
           onRename: () => undefined,
@@ -283,7 +281,7 @@ export function AccountsSection() {
       <Specimen
         id="subscription-provider-list"
         title="Subscriptions in the provider list"
-        note="a subscription is one provider row beside API keys: kind, plan, one status, last use. States: available, verifying, failed with its reason, cooling, expired, never used. The detail shows status with Retry, quota, last use, 24 hour steps, steps and Remove"
+        note="a subscription is one provider row beside API keys: kind, plan, one status, last use. States: available, verifying, failed with its reason, cooling, expired, never used. The detail shows status with Retry, quota, last use, 24 hour steps and Remove"
         stage="sheet"
         code={`<ProviderPanel items={subscriptionItems} selectedId={id} onSelect={select}><SubscriptionDetail account={account} view={view} /></ProviderPanel>`}
       >
@@ -294,9 +292,9 @@ export function AccountsSection() {
       <Specimen
         id="subscription-detail-quota"
         title="Subscription detail with quota"
-        note="status, last use and 24 hour steps, then one bar per quota window, and the steps this account ran"
+        note="status, last use and 24 hour steps, then one bar per quota window"
         stage="sheet"
-        code={`<SubscriptionDetail account={account} now={now} view={view} verifying={false} steps={steps} actions={actions} />`}
+        code={`<SubscriptionDetail account={account} now={now} view={view} verifying={false} actions={actions} />`}
       >
         <div className="flex w-full max-w-160 flex-col gap-6">
           <SubscriptionDetailSpecimen state="ok" />

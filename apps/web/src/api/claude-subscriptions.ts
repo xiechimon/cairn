@@ -4,20 +4,10 @@ import type {
   ClaudeSubscriptionVerifyResult,
   CreateClaudeSubscription,
 } from '@cairn/shared';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
-import type { AccountStepsPage } from './claude-accounts.js';
-import { ApiError, api } from './client.js';
-
-async function unlessMissing<T>(request: Promise<T>): Promise<T | null> {
-  try {
-    return await request;
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
-    throw error;
-  }
-}
+import { api } from './client.js';
 
 export function useClaudeSubscriptions(teamId: string | undefined, live: boolean) {
   return useQuery({
@@ -65,25 +55,6 @@ export function useRenameClaudeSubscription(teamId: string | undefined) {
         label: input.label,
       }),
     onSuccess: () => client.invalidateQueries({ queryKey: ['claude-subscriptions', teamId] }),
-  });
-}
-
-export function useClaudeSubscriptionSteps(
-  teamId: string | undefined,
-  ids: readonly string[],
-  live: boolean,
-) {
-  return useQueries({
-    queries: ids.map((id) => ({
-      queryKey: ['claude-subscription-steps', teamId, id],
-      queryFn: () =>
-        unlessMissing(
-          api.get<AccountStepsPage>(
-            `/api/teams/${teamId}/claude-subscriptions/${id}/steps?limit=20`,
-          ),
-        ),
-      enabled: live && teamId !== undefined,
-    })),
   });
 }
 

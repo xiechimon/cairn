@@ -8,15 +8,13 @@ import { cn } from 'cn';
 import { Download, X } from 'lucide-react';
 import type { AccountStatus, VerifyFailure } from '../api/account-verification.js';
 import type {
-  AccountStep,
   AccountVendor,
   QuotaWindow,
   SubscriptionAccount,
   SubscriptionModel,
 } from '../api/claude-accounts.js';
 import { relativeTime } from '../board/rel-time.js';
-import { AccountStepRow, useClock, VENDORS } from '../components/accounts/account-parts.js';
-import { ListCard } from '../components/list-card.js';
+import { useClock, VENDORS } from '../components/accounts/account-parts.js';
 import { withCodeSpans } from '../components/notice-banner.js';
 import {
   ProviderEditorHead,
@@ -361,7 +359,6 @@ export function SubscriptionDetail({
   now,
   view,
   verifying,
-  steps,
   actions,
 }: {
   account: SubscriptionAccount;
@@ -370,7 +367,6 @@ export function SubscriptionDetail({
   now: number;
   view: SubscriptionStatusView;
   verifying: boolean;
-  steps: AccountStep[] | undefined;
   actions: SubscriptionActions;
 }) {
   const { t } = useI18n();
@@ -537,19 +533,6 @@ export function SubscriptionDetail({
             <SettingsCard>
               <QuotaRows windows={account.windows} now={now} />
             </SettingsCard>
-          </SettingsSection>
-        )}
-        {steps !== undefined && (
-          <SettingsSection title={t('最近步骤')}>
-            <ListCard>
-              {steps.length === 0 ? (
-                <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
-                  {t('最近 24 小时没有步骤')}
-                </div>
-              ) : (
-                steps.map((step) => <AccountStepRow key={step.stepId} step={step} now={now} />)
-              )}
-            </ListCard>
           </SettingsSection>
         )}
         <SettingsSection title={t('管理')}>

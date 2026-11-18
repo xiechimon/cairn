@@ -59,7 +59,6 @@ import {
   disableClaudeSubscription,
   enableClaudeSubscription,
   listClaudeSubscriptions,
-  listSubscriptionSteps,
   renameClaudeSubscription,
   verifySubscriptionConnection,
 } from './services/claude-subscriptions.js';
@@ -83,7 +82,6 @@ import {
   devinSubscriptionUpstreamModels,
   disableDevinSubscription,
   enableDevinSubscription,
-  listDevinSubscriptionSteps,
   listDevinSubscriptions,
   updateDevinSubscription,
   verifyDevinSubscriptionConnection,
@@ -559,13 +557,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.json(disableClaudeSubscription(keysvc, teamId, c.req.param('cid')));
   });
 
-  app.get('/api/teams/:id/claude-subscriptions/:cid/steps', (c) => {
-    const teamId = c.req.param('id');
-    requireTeam(ctx, teamId);
-    const limit = Math.min(Math.max(Math.trunc(Number(c.req.query('limit') ?? 20)) || 20, 1), 100);
-    return c.json(listSubscriptionSteps(keysvc, teamId, c.req.param('cid'), limit));
-  });
-
   app.post('/api/teams/:id/claude-subscriptions/:cid/verify', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
@@ -617,13 +608,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     return c.json(disableDevinSubscription(keysvc, teamId, c.req.param('cid')));
-  });
-
-  app.get('/api/teams/:id/devin-subscriptions/:cid/steps', (c) => {
-    const teamId = c.req.param('id');
-    requireTeam(ctx, teamId);
-    const limit = Math.min(Math.max(Math.trunc(Number(c.req.query('limit') ?? 20)) || 20, 1), 100);
-    return c.json(listDevinSubscriptionSteps(keysvc, teamId, c.req.param('cid'), limit));
   });
 
   app.post('/api/teams/:id/devin-subscriptions/:cid/verify', async (c) => {

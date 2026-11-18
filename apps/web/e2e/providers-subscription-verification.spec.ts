@@ -33,7 +33,6 @@ async function open(page: Page, verify: { current: Verify }, subscriptions?: Cla
   ];
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/claude-subscriptions') return json(accounts);
-    if (path.endsWith('/steps')) return json({ steps: [], hasEarlier: false });
     if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
     if (path === '/api/teams/t1/model-sources') {
       return json({

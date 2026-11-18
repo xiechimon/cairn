@@ -324,57 +324,6 @@ describe('switching the enabled Devin subscription', () => {
     expect(await refused.text()).not.toContain(tokenOf('a'));
     expect((await req(s.app, 'PATCH', `${path}/${first}`, { label: ' ' })).status).toBe(400);
   });
-
-  test('the steps list shows what ran on the account, newest first', async () => {
-    const { s, path, first, second } = await twoAccounts();
-    s.db
-      .insert(stepTable)
-      .values([
-        {
-          id: 's-old',
-          buildId: 'b1',
-          kind: 'build',
-          status: 'done',
-          claimedAt: 10,
-          createdAt: 9,
-          devinSubscriptionId: first,
-        },
-        {
-          id: 's-run',
-          buildId: 'b3',
-          kind: 'build',
-          status: 'claimed',
-          claimedAt: 30,
-          createdAt: 29,
-          devinSubscriptionId: first,
-        },
-        {
-          id: 's-other',
-          buildId: 'b5',
-          kind: 'build',
-          status: 'done',
-          claimedAt: 50,
-          createdAt: 49,
-          devinSubscriptionId: second,
-        },
-      ])
-      .run();
-    const response = await req(s.app, 'GET', `${path}/${first}/steps`);
-    expect(response.status).toBe(200);
-    const page = (await response.json()) as {
-      steps: { stepId: string; outcome: string }[];
-      hasEarlier: boolean;
-    };
-    expect(page.steps.map((row) => [row.stepId, row.outcome])).toEqual([
-      ['s-run', 'running'],
-      ['s-old', 'done'],
-    ]);
-    expect(page.hasEarlier).toBe(false);
-    expect((await req(s.app, 'GET', `${path}/missing/steps`)).status).toBe(404);
-    expect(
-      (await req(s.app, 'GET', `/api/teams/other/devin-subscriptions/${first}/steps`)).status,
-    ).toBe(404);
-  });
 });
 
 test('expired enabled subscription does not verify and no run reaches it', async () => {

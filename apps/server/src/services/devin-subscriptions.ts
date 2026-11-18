@@ -8,27 +8,14 @@ import type {
   SecretBox,
   UpstreamModelsResult,
 } from '@cairn/shared';
-import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, chiefThread, devinSubscription, step, todo } from '../db/schema.js';
+import { devinSubscription, step } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { fetchDevinSubscriptionModels } from './devin-subscription-models.js';
 import { verifyDevinSubscription } from './devin-subscription-verification.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
-
-export type DevinAccountStepsPage = {
-  steps: {
-    stepId: string;
-    kind: 'build' | 'plan' | 'chief' | 'review' | 'merge';
-    threadId: string;
-    todoId: string;
-    title: string | null;
-    startedAt: number;
-    outcome: 'done' | 'failed' | 'running';
-  }[];
-  hasEarlier: boolean;
-};
 
 type Deps = { db: Db; box: SecretBox };
 type Row = typeof devinSubscription.$inferSelect;
@@ -220,46 +207,6 @@ export function disableDevinSubscription(
     tx.update(devinSubscription).set({ enabledAt: null }).where(eq(devinSubscription.id, id)).run();
     return toRecord({ ...row, enabledAt: null });
   });
-}
-
-const STEP_KINDS_SHOWN = ['build', 'plan', 'chief', 'review', 'merge'] as const;
-
-export function listDevinSubscriptionSteps(
-  deps: { db: Db },
-  teamId: string,
-  id: string,
-  limit: number,
-): DevinAccountStepsPage {
-  if (!subscriptionRow(deps.db, teamId, id)) throw notFound('Devin subscription connection');
-  const rows = deps.db
-    .select({ stepRow: step, todoRow: todo, threadRow: chiefThread })
-    .from(step)
-    .leftJoin(build, eq(step.buildId, build.id))
-    .leftJoin(todo, eq(build.todoId, todo.id))
-    .leftJoin(chiefThread, eq(step.buildId, chiefThread.id))
-    .where(
-      and(
-        eq(step.devinSubscriptionId, id),
-        isNotNull(step.claimedAt),
-        inArray(step.status, ['claimed', 'done', 'failed', 'stopped']),
-      ),
-    )
-    .orderBy(desc(step.claimedAt), desc(step.id))
-    .limit(limit + 1)
-    .all();
-  return {
-    steps: rows.slice(0, limit).map(({ stepRow, todoRow, threadRow }) => ({
-      stepId: stepRow.id,
-      kind: STEP_KINDS_SHOWN.find((kind) => kind === stepRow.kind) ?? 'build',
-      threadId: stepRow.buildId,
-      todoId: todoRow?.id ?? '',
-      title: todoRow?.title ?? threadRow?.title ?? null,
-      startedAt: stepRow.claimedAt ?? stepRow.createdAt,
-      outcome:
-        stepRow.status === 'claimed' ? 'running' : stepRow.status === 'done' ? 'done' : 'failed',
-    })),
-    hasEarlier: rows.length > limit,
-  };
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;

@@ -53,25 +53,6 @@ export function toClaudeAccount(
   };
 }
 
-export const STEP_KINDS = ['build', 'plan', 'chief', 'review', 'merge'] as const;
-export type AccountStepKind = (typeof STEP_KINDS)[number];
-export type AccountStepOutcome = 'done' | 'failed' | 'rejected-rerun' | 'running';
-
-export interface AccountStep {
-  stepId: string;
-  kind: AccountStepKind;
-  threadId: string;
-  todoId: string;
-  title: string | null;
-  startedAt: number;
-  outcome: AccountStepOutcome;
-}
-
-export interface AccountStepsPage {
-  steps: AccountStep[];
-  hasEarlier: boolean;
-}
-
 export interface AccountMachine {
   id: string;
   name: string;

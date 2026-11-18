@@ -1,7 +1,6 @@
 import { DEFAULT_DEVIN_MODELS, type ModelSource, type RoutingRuleRecord } from '@cairn/shared';
 import type {
   AccountMachine,
-  AccountStep,
   MachineWithProviders,
   SubscriptionAccount,
 } from '../api/claude-accounts.js';
@@ -14,7 +13,6 @@ export interface AccountsContent {
   subscriptions: SubscriptionAccount[];
   devinSubscriptions: SubscriptionAccount[];
   otherAccounts: SubscriptionAccount[];
-  stepsByAccount: Record<string, AccountStep[]>;
   machines: AccountMachine[];
   providers: { id: string; label: string }[];
   routing: ModelRouting;
@@ -192,63 +190,6 @@ export const OTHER_ACCOUNTS: SubscriptionAccount[] = [
   },
 ];
 
-const STEPS: AccountStep[] = [
-  {
-    stepId: 'st-1',
-    kind: 'build',
-    threadId: 'th-1',
-    todoId: 'td-1',
-    title: 'Fix flaky merge-gate test',
-    startedAt: NOW - 12 * MINUTE,
-    outcome: 'running',
-  },
-  {
-    stepId: 'st-2',
-    kind: 'review',
-    threadId: 'th-2',
-    todoId: 'td-2',
-    title: 'Review the composer fold',
-    startedAt: NOW - 27 * MINUTE,
-    outcome: 'done',
-  },
-  {
-    stepId: 'st-3',
-    kind: 'chief',
-    threadId: 'th-3',
-    todoId: 'td-3',
-    title: null,
-    startedAt: NOW - 49 * MINUTE,
-    outcome: 'done',
-  },
-  {
-    stepId: 'st-4',
-    kind: 'plan',
-    threadId: 'th-4',
-    todoId: 'td-4',
-    title: 'Plan the account page',
-    startedAt: NOW - 2 * HOUR,
-    outcome: 'failed',
-  },
-  {
-    stepId: 'st-5',
-    kind: 'merge',
-    threadId: 'th-5',
-    todoId: 'td-5',
-    title: 'Merge the daemon heartbeat fix',
-    startedAt: NOW - 3 * HOUR,
-    outcome: 'rejected-rerun',
-  },
-];
-
-export const ACCOUNT_STEPS: Record<string, AccountStep[]> = {
-  [ACCOUNT_OK_ID]: [STEPS[0], STEPS[2]].filter((s): s is AccountStep => s !== undefined),
-  [ACCOUNT_COOLING_ID]: [STEPS[1], STEPS[3], STEPS[4]].filter(
-    (s): s is AccountStep => s !== undefined,
-  ),
-  [ACCOUNT_EXPIRED_ID]: [],
-  [DEVIN_SUBSCRIPTION_ID]: [STEPS[0]].filter((s): s is AccountStep => s !== undefined),
-};
-
 export const ACCOUNT_MACHINES: AccountMachine[] = [
   { id: MACHINE_REMOTE_ID, name: MACHINE_REMOTE_NAME },
   { id: MACHINE_ID, name: MACHINE_NAME },
@@ -389,7 +330,6 @@ export const ACCOUNTS: AccountsContent = {
   subscriptions: ACCOUNT_SUBSCRIPTIONS,
   devinSubscriptions: DEVIN_SUBSCRIPTIONS,
   otherAccounts: OTHER_ACCOUNTS,
-  stepsByAccount: ACCOUNT_STEPS,
   machines: ACCOUNT_MACHINES,
   providers: [
     { id: 'codex-main', label: 'ChatGPT · Personal' },
@@ -474,7 +414,6 @@ export const accountsEmpty: FixtureSet = {
       subscriptions: [],
       devinSubscriptions: [],
       otherAccounts: [],
-      stepsByAccount: {},
       machines: [],
       providers: [],
       routing: {

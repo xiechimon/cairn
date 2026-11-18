@@ -1,20 +1,15 @@
 import { cn } from 'cn';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import type {
-  AccountStep,
-  AccountStepOutcome,
   AccountVendor,
   MachineProvider,
   MachineWithProviders,
   ProviderRuntime,
 } from '../../api/claude-accounts.js';
-import { relativeTime } from '../../board/rel-time.js';
 import { useI18n } from '../../i18n/provider.js';
 import { ClaudeMark, DevinMark, GrokMark, OpenAIMark, PiMark } from '../brand-marks.js';
-import { ListRow } from '../list-card.js';
 import { MachineName } from '../machine-label.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
-import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
 import { StatusChip, type StatusTone } from '../ui/status-chip.js';
 
 const DAY = 86_400_000;
@@ -47,49 +42,6 @@ export function useClock(): (ts: number, now: number) => string {
           ? { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }
           : { month: 'short', day: 'numeric' },
     ).format(ts);
-}
-
-const OUTCOME_GLYPH: Record<AccountStepOutcome, { kind: GlyphKind; className: string }> = {
-  running: { kind: 'working', className: 'text-running' },
-  done: { kind: 'done', className: 'text-running' },
-  failed: { kind: 'failed', className: 'text-destructive' },
-  'rejected-rerun': { kind: 'closed', className: 'text-content-tertiary' },
-};
-
-const OUTCOME_LABELS: Record<AccountStepOutcome, string> = {
-  running: '运行中',
-  done: '完成',
-  failed: '失败',
-  'rejected-rerun': '驳回重跑',
-};
-
-const STEP_KIND_LABELS: Record<AccountStep['kind'], string> = {
-  build: '构建',
-  plan: '方案',
-  chief: 'Coordinator',
-  review: '评审',
-  merge: '合并',
-};
-
-export function AccountStepRow({ step, now }: { step: AccountStep; now: number }) {
-  const { t } = useI18n();
-  const glyph = OUTCOME_GLYPH[step.outcome];
-  const kind = t(STEP_KIND_LABELS[step.kind]);
-  return (
-    <ListRow
-      className="hover:bg-transparent"
-      icon={
-        <StatusGlyph
-          kind={glyph.kind}
-          className={glyph.className}
-          label={t(OUTCOME_LABELS[step.outcome])}
-        />
-      }
-      title={step.title ?? t('{kind} 步骤', { kind })}
-      subtitle={kind}
-      trailing={relativeTime(step.startedAt, now, t)}
-    />
-  );
 }
 
 const LOGIN_CHIP: Record<MachineProvider['login'], { tone: StatusTone; label: string }> = {
