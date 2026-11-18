@@ -116,24 +116,29 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
   }
 });
 
-test('computers share one group, each glyph carries its status dot, and the add row is outlined', async ({
+test('each computer is its own outlined card with its status dot, and the add row is outlined', async ({
   page,
 }) => {
   await page.clock.setFixedTime(MIDDAY_IN_BEIJING);
   await page.goto('/app?scenario=home-c-machines&pane=machines');
-  const group = panel(page).locator('[data-slot="list-card"]').filter({ hasText: 'xmonsMac' });
-  await expect(group).toHaveCount(1);
-  const rows = group.getByTestId('machine-list-row');
+  const cards = panel(page).getByTestId('machine-card');
+  await expect(cards).toHaveCount(4);
+  const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(4);
   await expect(rows.nth(0)).toContainText('xmonsMac');
-  const dots = group.getByTestId('machine-status-dot');
+  const dots = panel(page).getByTestId('machine-status-dot');
   await expect(dots).toHaveCount(4);
   await expect(dots.nth(0)).toHaveAttribute('data-online', 'true');
   await expect(dots.nth(1)).toHaveAttribute('data-online', 'false');
   await expect(dots.nth(2)).toHaveAttribute('data-online', 'true');
   await expect(dots.nth(3)).toHaveAttribute('data-online', 'false');
   await expect(rows.nth(3)).toHaveText('Office Mac mini离线 · 2 小时前');
-  await expect(group).toHaveAttribute('data-outlined', 'true');
+  for (let i = 0; i < 4; i++) {
+    await expect(cards.nth(i).locator('xpath=ancestor::*[@data-slot="list-card"]')).toHaveAttribute(
+      'data-outlined',
+      'true',
+    );
+  }
   await expect(panel(page).getByTestId('machines-add').locator('[data-slot="list-card"]')).toHaveAttribute(
     'data-outlined',
     'true',
