@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import type { ClaudeSubscriptionListEntry } from '@cairn/shared';
 import { mockLive } from './chief-home-mock';
 
 const NOW = Date.now();
@@ -14,7 +15,7 @@ test.use({
 
 type Verify = 'ok' | 'auth' | 'timeout' | 'unavailable' | 'rate-limited' | 'reset' | 'restart' | 'slow';
 
-async function open(page: Page, verify: { current: Verify }, subscriptions?: unknown[]) {
+async function open(page: Page, verify: { current: Verify }, subscriptions?: ClaudeSubscriptionListEntry[]) {
   const accounts = subscriptions ?? [
     {
       id: 's1',
@@ -22,9 +23,6 @@ async function open(page: Page, verify: { current: Verify }, subscriptions?: unk
       label: 'Claude subscription',
       expiresAt: null,
       createdAt: NOW - 10 * HOUR,
-      plan: 'max',
-      state: 'ok',
-      cooldownUntil: null,
       windows: [
         { name: 'five_hour', utilization: 0.38, resetsAt: NOW + HOUR, observedAt: NOW },
         { name: 'seven_day', utilization: 0.12, resetsAt: NOW + 50 * HOUR, observedAt: NOW },
@@ -97,7 +95,7 @@ const verify = (page: Page) => page.getByTestId('subscription-verify');
 test('a settled account reads one status, never available next to verifying', async ({ page }) => {
   const mode = { current: 'slow' as Verify };
   await open(page, mode);
-  await expect(row(page)).toContainText('订阅 · Max · 3 个模型 · 可用');
+  await expect(row(page)).toContainText('订阅 · 3 个模型 · 可用');
   await expect(status(page)).toHaveText('可用');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await shot(page, 'available-with-quota');
@@ -133,7 +131,7 @@ for (const failure of FAILURES) {
     await verify(page).click();
     await expect(status(page)).toHaveText('验证失败');
     await expect(page.getByTestId('subscription-detail')).toContainText(failure.reason);
-    await expect(row(page)).toContainText('订阅 · Max · 3 个模型 · 验证失败');
+    await expect(row(page)).toContainText('订阅 · 3 个模型 · 验证失败');
     await expect(page.getByTestId('subscription-reason')).toHaveText(failure.reason);
     await expect(row(page)).not.toContainText('可用');
     await expect(page.getByText('验证失败', { exact: true })).toHaveCount(1);
@@ -152,7 +150,7 @@ for (const failure of FAILURES) {
 test('an account nobody has used shows one muted line instead of dashes', async ({ page }) => {
   const mode = { current: 'ok' as Verify };
   await open(page, mode, [
-    { id: 's1', kind: 'claude-subscription', label: 'Spare laptop', expiresAt: null, createdAt: NOW - 60_000, plan: null },
+    { id: 's1', kind: 'claude-subscription', label: 'Spare laptop', expiresAt: null, createdAt: NOW - 60_000 },
   ]);
   await expect(page.getByTestId('subscription-detail').getByText('还没用过')).toHaveCount(1);
   await expect(page.getByTestId('subscription-detail')).not.toContainText('—');

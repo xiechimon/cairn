@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { ClaudeSubscriptionListEntry } from '@cairn/shared';
 import { mockLive } from './chief-home-mock';
 
 const NOW = Date.now();
@@ -73,16 +74,13 @@ test('live: rename, verify and remove hit the agreed routes', async ({
   page,
 }) => {
   const calls: string[] = [];
-  const subscriptions = [
+  const subscriptions: ClaudeSubscriptionListEntry[] = [
     {
       id: 's1',
       kind: 'claude-subscription',
       label: 'Personal',
       expiresAt: null,
       createdAt: NOW - 10 * HOUR,
-      plan: 'max',
-      state: 'ok',
-      cooldownUntil: null,
       windows: [
         { name: 'five_hour', utilization: 0.3, resetsAt: NOW + HOUR, observedAt: NOW },
         { name: 'seven_day', utilization: 0.9, resetsAt: NOW + 50 * HOUR, observedAt: NOW },

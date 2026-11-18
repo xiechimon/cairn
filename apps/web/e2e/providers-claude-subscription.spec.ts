@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { ClaudeSubscriptionListEntry } from '@cairn/shared';
 import { mockLive } from './chief-home-mock';
 
 const TOKEN = `sk-ant-oat01-${'e'.repeat(64)}`;
@@ -7,7 +8,7 @@ for (const locale of ['zh', 'en'] as const) {
 test(`connects, verifies and deletes a subscription on the providers page (${locale})`, async ({ page }) => {
   await page.addInitScript((value) => localStorage.setItem('cairn.locale', value), locale);
   let rejectDelete = true;
-  const connections: { id: string; kind: string; label: string; expiresAt: number | null; createdAt: number }[] = [];
+  const connections: ClaudeSubscriptionListEntry[] = [];
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
@@ -17,7 +18,7 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
         expect(body.token).toBe(TOKEN);
         const yearAhead = Date.now() + 365 * 24 * 60 * 60 * 1000;
         expect(Math.abs(body.expiresAt - yearAhead)).toBeLessThan(60_000);
-        const connection = { id: 'subscription-1', kind: 'claude-subscription', label: body.label, expiresAt: body.expiresAt, createdAt: Date.now() };
+        const connection: ClaudeSubscriptionListEntry = { id: 'subscription-1', kind: 'claude-subscription', label: body.label, expiresAt: body.expiresAt, createdAt: Date.now() };
         connections.push(connection);
         return json(connection, 201);
       }

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { ClaudeSubscriptionListEntry } from '@cairn/shared';
 import { mockLive } from './chief-home-mock';
 
 const URL = '/app/settings/routing?scenario=model-routing';
@@ -78,7 +79,15 @@ test('an account nobody has used says so once, and still has a quota line of its
 }) => {
   await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
     if (path === '/api/teams/t1/claude-subscriptions')
-      return json([{ id: 's1', kind: 'claude-subscription', label: 'Fresh', expiresAt: null, createdAt: 0, plan: null }]);
+      return json([
+        {
+          id: 's1',
+          kind: 'claude-subscription',
+          label: 'Fresh',
+          expiresAt: null,
+          createdAt: 0,
+        } satisfies ClaudeSubscriptionListEntry,
+      ]);
     if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     return undefined;

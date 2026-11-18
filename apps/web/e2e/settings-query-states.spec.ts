@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import type { ClaudeSubscriptionListEntry } from '@cairn/shared';
 
 const PANES = [
   { section: 'machines', endpoint: 'machines', empty: '[data-testid="resource-empty"]', ok: [] },
@@ -131,7 +132,15 @@ test('providers: a failed API providers fetch next to a loaded subscription stil
   await stub(page, 'providers', state);
   await page.route('**/api/teams/team-1/claude-subscriptions', (route) =>
     route.fulfill({
-      json: [{ id: 's1', label: 'Fresh', expiresAt: null, createdAt: 0, plan: null }],
+      json: [
+        {
+          id: 's1',
+          kind: 'claude-subscription',
+          label: 'Fresh',
+          expiresAt: null,
+          createdAt: 0,
+        } satisfies ClaudeSubscriptionListEntry,
+      ],
     }),
   );
   await page.route('**/api/teams/team-1/model-sources', (route) =>

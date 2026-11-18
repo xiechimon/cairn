@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import type { DevinSubscriptionListEntry, DevinSubscriptionModel } from '@cairn/shared';
 import { mockLive } from './chief-home-mock';
 
 const NOW = Date.now();
@@ -31,7 +32,7 @@ const UPSTREAM = [
   },
 ];
 
-const subscription = (models: object[]) => ({
+const subscription = (models: DevinSubscriptionModel[]): DevinSubscriptionListEntry => ({
   id: 'sub-d1',
   kind: 'devin-subscription',
   label: 'Devin',

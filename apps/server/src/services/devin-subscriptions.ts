@@ -1,6 +1,7 @@
 import type {
   CreateDevinSubscription,
   DevinSubscription,
+  DevinSubscriptionListEntry,
   DevinSubscriptionVerifyResult,
   PatchDevinSubscription,
   ProviderFailure,
@@ -259,11 +260,6 @@ export function listDevinSubscriptionSteps(
     })),
     hasEarlier: rows.length > limit,
   };
-}
-
-export interface DevinSubscriptionListEntry extends DevinSubscription {
-  lastUsedAt?: number | null;
-  stepsLast24h?: number | null;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;

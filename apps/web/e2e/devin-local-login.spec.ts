@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import type { DevinSubscriptionListEntry } from '@cairn/shared';
 import { mockLive } from './chief-home-mock';
 
 const KEY = 'wsk-local-import-0123456789abcdef';
@@ -42,7 +43,7 @@ async function openDialog(page: Page, status: { loggedIn: boolean; canLogin: boo
     },
     { key: KEY, devinStatus: status },
   );
-  const subscriptions: unknown[] = [];
+  const subscriptions: DevinSubscriptionListEntry[] = [];
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
@@ -50,7 +51,7 @@ async function openDialog(page: Page, status: { loggedIn: boolean; canLogin: boo
       if (route.request().method() === 'POST') {
         const body = route.request().postDataJSON();
         calls.created.push(body.token);
-        const created = {
+        const created: DevinSubscriptionListEntry = {
           id: 'devin-sub-1',
           kind: 'devin-subscription',
           label: body.label,

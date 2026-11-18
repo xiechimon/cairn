@@ -1,6 +1,8 @@
 import type {
   ClaudeRateLimitWindow,
   ClaudeSubscription,
+  ClaudeSubscriptionListEntry,
+  ClaudeSubscriptionQuotaWindow,
   ClaudeSubscriptionVerifyResult,
   CreateClaudeSubscription,
   SecretBox,
@@ -221,21 +223,6 @@ export function listSubscriptionSteps(
     })),
     hasEarlier: rows.length > limit,
   };
-}
-
-export interface ClaudeSubscriptionQuotaWindow {
-  name: string;
-  utilization: number;
-  resetsAt: number | null;
-  observedAt: number;
-}
-
-export interface ClaudeSubscriptionListEntry extends ClaudeSubscription {
-  state?: 'exhausted';
-  cooldownUntil?: number | null;
-  windows?: ClaudeSubscriptionQuotaWindow[];
-  lastUsedAt?: number | null;
-  stepsLast24h?: number | null;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
