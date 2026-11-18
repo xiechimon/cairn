@@ -59,7 +59,6 @@ export const SKILL_IMPORT_DEADLINE_MS = 120_000;
 
 export const SKILL_IMPORT_MAX_FILES = 256;
 
-const GH_RAW_BASE = 'https://raw.githubusercontent.com';
 // GitHub rejects API requests without a User-Agent (403).
 const GH_USER_AGENT = 'cairn-skill-import';
 const GH_HEADERS: Record<string, string> = {
@@ -344,11 +343,15 @@ async function fetchBytes(
   opts: SkillImportOpts,
   url: string,
   capBytes: number,
+  headers: Record<string, string> = {},
 ): Promise<{ ok: boolean; status: number; bytes: Buffer | null }> {
   const timeoutMs = opts.timeoutMs ?? SKILL_IMPORT_FETCH_TIMEOUT_MS;
   let res: Awaited<ReturnType<SkillImportFetch>>;
   try {
-    res = await opts.fetch(url, { headers: GH_HEADERS, signal: AbortSignal.timeout(timeoutMs) });
+    res = await opts.fetch(url, {
+      headers: { ...GH_HEADERS, ...headers },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
   } catch (err) {
     throw mapFetchError(url, err);
   }
@@ -473,13 +476,15 @@ async function collectFromGithubUrl(rawUrl: string, opts: SkillImportOpts): Prom
       );
     }
     const encoded = `${prefix}${entry.path}`.split('/').map(encodeURIComponent).join('/');
-    const rawUrl = `${GH_RAW_BASE}/${target.owner}/${target.repo}/${ref}/${encoded}`;
-    const res = await fetchBytes(opts, rawUrl, MAX_SKILL_FILE_BYTES);
+    const contentsUrl = `${githubApiBaseUrl()}/repos/${target.owner}/${target.repo}/contents/${encoded}?ref=${encodeURIComponent(ref)}`;
+    const res = await fetchBytes(opts, contentsUrl, MAX_SKILL_FILE_BYTES, {
+      accept: 'application/vnd.github.raw',
+    });
     if (!res.ok) {
       if (res.status === 404) {
         throw new HttpError(400, `file missing at source: ${entry.path}`);
       }
-      throw new HttpError(502, `GitHub raw fetch failed (status ${res.status}): ${entry.path}`);
+      throw new HttpError(502, `GitHub file fetch failed (status ${res.status}): ${entry.path}`);
     }
     // biome-ignore lint/style/noNonNullAssertion: res.ok guard above; fetchBytes returns bytes on the ok path
     files.push({ path: entry.path, content: decodeUtf8Strict(res.bytes!, entry.path) });

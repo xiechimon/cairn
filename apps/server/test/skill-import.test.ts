@@ -106,9 +106,10 @@ function githubMock(
       };
       return Promise.resolve(new Response(JSON.stringify(r.body), { status: r.status }));
     }
-    const raw = /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/.exec(u);
+    const raw =
+      /^https:\/\/api\.github\.com\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)\?ref=(.+)$/.exec(u);
     if (raw) {
-      const r = handlers.raw?.(raw[1]!, raw[2]!, raw[3]!, raw[4]!) ?? { status: 404, body: '' };
+      const r = handlers.raw?.(raw[1]!, raw[2]!, raw[4]!, raw[3]!) ?? { status: 404, body: '' };
       return Promise.resolve(new Response(r.body, { status: r.status }));
     }
     return Promise.resolve(new Response('unexpected url', { status: 500 }));
@@ -625,7 +626,7 @@ describe('POST /api/teams/{id}/skills/import (url)', () => {
       const text = await errorText(res);
       expect(text).toContain('big.txt');
       expect(text).toContain(`${MAX_SKILL_FILE_BYTES}`);
-      const rawCalls = fetch.calls().filter((u) => u.includes('raw.githubusercontent.com'));
+      const rawCalls = fetch.calls().filter((u) => u.includes('/contents/'));
       expect(rawCalls).toHaveLength(0);
     } finally {
       s.dispose();
