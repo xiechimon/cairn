@@ -27,7 +27,7 @@ Claude Code 是独立运行时。每台要执行它的 Runner 都要安装 `clau
 1. 在一台已登录 Claude 订阅的机器上运行 `claude setup-token`。
 2. 到模型服务添加标为 **订阅** 的 **Claude**，给连接起名并粘贴令牌；知道过期日期的话一并填写。
 3. 点 **验证**。这一步的服务端主机也需要 Claude CLI。
-4. 在确认设置或 **设置 → 规则与策略** 核对 Coordinator 和任务。可用的 Claude Code 运行时加订阅，会在没有已保存规则覆盖时提供 `claude-sonnet-5-5` 作为任务默认值；Coordinator 有自己的选择。
+4. 在确认设置或 **设置 → 模型** 核对 Coordinator 和任务。可用的 Claude Code 运行时加订阅，会在没有已保存规则覆盖时提供 `claude-sonnet-5-5` 作为任务默认值；Coordinator 有自己的选择。
 
 Anthropic API key 是另一种连接，可通过 pi 使用，不需要 Claude Code CLI。
 
@@ -37,7 +37,7 @@ Anthropic API key 是另一种连接，可通过 pi 使用，不需要 Claude Co
 
 ## 默认模型与已保存规则
 
-不存在脱离连接情况的统一默认值。全新且只连接 Codex 时，确认页两项都是 GPT-6.1 Sol。其他连接会改变默认选择：任务优先用可用的 Claude Code 订阅和运行时；Coordinator 优先 Anthropic API 连接，再选符合条件的服务商，最后才是可用的 Claude Code。已保存的 Coordinator、会话规则优先。在 **设置 → 规则与策略** 查看或修改。
+不存在脱离连接情况的统一默认值。全新且只连接 Codex 时，确认页两项都是 GPT-6.1 Sol。其他连接会改变默认选择：任务优先用可用的 Claude Code 订阅和运行时；Coordinator 优先 Anthropic API 连接，再选符合条件的服务商，最后才是可用的 Claude Code。已保存的 Coordinator、任务规则优先。在 **设置 → 模型** 查看或修改。
 
 要完成[第一个任务](/zh-cn/docs/first-task/)，除了模型，还需要在线且沙箱已就绪的 Runner。Linux 上 Online 不等于沙箱就绪，见 [Runner 设置](/zh-cn/docs/runner/#在-linux-上保持常驻)。
 

@@ -27,7 +27,7 @@ Claude Code is a separate runtime. Install `claude` on each Runner that should e
 1. On a machine signed in to your Claude subscription, run `claude setup-token`.
 2. In Model services add **Claude**, tagged **Subscription**, give the connection a name and paste the token. Set its expiry if known.
 3. Use **Verify**. The server host also needs the Claude CLI for this check.
-4. Review Coordinator and Tasks in Confirm settings or **Settings → Rules & policies**. A usable Claude Code runtime and subscription offer `claude-sonnet-5-5` as the task default when no saved rule overrides it. The Coordinator has its own selection.
+4. Review Coordinator and Tasks in Confirm settings or **Settings → Model**. A usable Claude Code runtime and subscription offer `claude-sonnet-5-5` as the task default when no saved rule overrides it. The Coordinator has its own selection.
 
 An Anthropic API key is a different connection and can run through pi; it does not require the Claude Code CLI.
 
@@ -37,7 +37,7 @@ Connect and enable a Devin subscription in Model services only if you want to us
 
 ## Defaults and saved rules
 
-There is no universal default independent of your connections. On a fresh Codex-only installation the confirmation screen shows GPT-6.1 Sol for both roles. With other connections, the defaults can differ: a usable Claude Code subscription/runtime is preferred for tasks; the Coordinator prefers an Anthropic API connection, then an eligible provider, then usable Claude Code. Saved Coordinator and Session rules take precedence. Inspect **Settings → Rules & policies** to see or change those selections.
+There is no universal default independent of your connections. On a fresh Codex-only installation the confirmation screen shows GPT-6.1 Sol for both roles. With other connections, the defaults can differ: a usable Claude Code subscription/runtime is preferred for tasks; the Coordinator prefers an Anthropic API connection, then an eligible provider, then usable Claude Code. Saved Coordinator and Tasks rules take precedence. Inspect **Settings → Model** to see or change those selections.
 
 You need both a model and an online Runner with a ready sandbox to finish [your first task](/docs/first-task/). On Linux, Online alone does not establish sandbox readiness; see [Runner setup](/docs/runner/#keep-it-running-on-linux).
 
