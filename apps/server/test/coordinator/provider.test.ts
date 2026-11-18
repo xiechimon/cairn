@@ -33,10 +33,10 @@ describe('the provider of a claimed Coordinator step', () => {
 
   it.each([
     { id: 'claude-sonnet-5-5', input: undefined, expected: ['text', 'image'] },
-    { id: 'deepseek-v4.1-flash', input: undefined, expected: ['text'] },
+    { id: 'gateway-private-model', input: undefined, expected: ['text'] },
     { id: 'claude-sonnet-5-5', input: ['text'] as ('text' | 'image')[], expected: ['text'] },
     {
-      id: 'deepseek-v4.1-flash',
+      id: 'gateway-private-model',
       input: ['text', 'image'] as ('text' | 'image')[],
       expected: ['text', 'image'],
     },
