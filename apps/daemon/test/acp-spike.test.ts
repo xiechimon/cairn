@@ -1,9 +1,13 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { createServer as createHttpServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { type SessionOpts, type StepEvent, toolCallRecordSchema } from '@cairn/shared';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, test, vi } from 'vitest';
-import { createAcpBackend } from '../src/backend/acp.js';
+import { createAcpBackend, createGeminiBackend } from '../src/backend/acp.js';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 
 const fixture = fileURLToPath(new URL('./fixtures/acp-agent.mjs', import.meta.url));
@@ -422,12 +426,114 @@ describe('ACP spike with a real scripted stdio child', () => {
     await expect(adapter(scenario).createSession(opts)).rejects.toThrow();
   });
 
-  test.each([{ skillsAllowlist: [] }, { injectedSkills: ['private'] }])(
-    'rejects unsupported session policy %j',
-    async (policy) => {
-      await expect(adapter().createSession({ ...opts, ...policy })).rejects.toThrow('unsupported');
-    },
-  );
+  test('enforces readOnly and remoteToolsOnly permission policies and strips external MCP', async () => {
+    const ext = [{ slug: 'ext', transport: 'http' as const, url: 'http://127.0.0.1:9/mcp' }];
+    const remote = vi.fn(async () => 'remote output');
+    const sharedOpts = {
+      ...opts,
+      mcpServers: ext,
+      remoteTools: [
+        { name: 'remote', description: 'Remote', parameters: { type: 'object', properties: {} } },
+      ],
+      executeRemoteTool: remote,
+    };
+
+    const readOnlySession = await createAcpBackend({
+      harness: 'codex',
+      command: process.execPath,
+      args: [fixture, 'policy-readonly'],
+      permissions: 'allow-once',
+      allowHostMcp: true,
+    }).createSession({ ...sharedOpts, readOnly: true });
+    expect(await collect(readOnlySession.events)).toContainEqual({ type: 'done', usage: [] });
+
+    const remoteOnlySession = await createAcpBackend({
+      harness: 'codex',
+      command: process.execPath,
+      args: [fixture, 'policy-remote-tools-only'],
+      permissions: 'allow-once',
+      allowHostMcp: true,
+    }).createSession({ ...sharedOpts, remoteToolsOnly: true });
+    expect(await collect(remoteOnlySession.events)).toContainEqual({ type: 'done', usage: [] });
+  });
+
+  test('maps thinkingLevel onto thought_level configOptions and tolerates skills and absent thinking options', async () => {
+    const withThinking = await adapter('thinking').createSession({
+      ...opts,
+      thinkingLevel: 'xhigh',
+      skillsAllowlist: [],
+      injectedSkills: ['sample-skill'],
+    });
+    expect(await collect(withThinking.events)).toContainEqual({ type: 'done', usage: [] });
+
+    const withoutThinking = await adapter('complete').createSession({
+      ...opts,
+      thinkingLevel: 'xhigh',
+      injectedSkills: ['sample-skill'],
+    });
+    expect(await collect(withoutThinking.events)).toContainEqual({ type: 'done', usage: [] });
+  });
+
+  test('bridges external HTTP MCP connectors over stdio when agent lacks mcpCapabilities.http', async () => {
+    const upstream = createHttpServer(async (req, res) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req)
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      const body =
+        chunks.length > 0 ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined;
+      const server = new Server({ name: 'ext', version: '1.0.0' }, { capabilities: { tools: {} } });
+      server.setRequestHandler(ListToolsRequestSchema, () => ({
+        tools: [{ name: 'ext_ping', description: 'Ping', inputSchema: { type: 'object' } }],
+      }));
+      server.setRequestHandler(CallToolRequestSchema, async ({ params }) => ({
+        content: [{ type: 'text', text: `${params.name} output` }],
+      }));
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      });
+      res.once('close', () => void server.close().catch(() => {}));
+      await server.connect(transport);
+      await transport.handleRequest(req, res, body);
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+    const addr = upstream.address() as { port: number };
+    try {
+      const session = await createAcpBackend({
+        harness: 'codex',
+        command: process.execPath,
+        args: [fixture, 'no-http-mcp'],
+        allowHostMcp: true,
+      }).createSession({
+        ...opts,
+        mcpServers: [{ slug: 'ext', transport: 'http', url: `http://127.0.0.1:${addr.port}/mcp` }],
+      });
+      expect(await collect(session.events)).toContainEqual({ type: 'done', usage: [] });
+    } finally {
+      upstream.close();
+      upstream.closeAllConnections();
+    }
+  });
+
+  test('Gemini backend relays local and remote tools over stdio MCP', async () => {
+    const remote = vi.fn(async () => 'remote output');
+    const local = vi.fn(async () => 'local output');
+    const session = await createGeminiBackend({
+      executablePath: process.execPath,
+      spawnProcess: (_cmd, _args, spawnOpts) =>
+        spawn(process.execPath, [fixture, 'host-tools'], spawnOpts),
+    }).createSession({
+      ...opts,
+      remoteTools: [
+        { name: 'remote', description: 'Remote', parameters: { type: 'object', properties: {} } },
+      ],
+      executeRemoteTool: remote,
+      localTools: [{ name: 'local', description: 'Local', execute: local }],
+    });
+    expect(await collect(session.events)).toContainEqual({ type: 'done', usage: [] });
+    expect(remote).toHaveBeenCalledWith('remote', { text: 'input' });
+    expect(local).toHaveBeenCalledWith({ text: 'input' });
+  });
 
   test('relays declared local and remote tools through authenticated MCP and closes the listener', async () => {
     const remote = vi.fn(async () => 'remote output');

@@ -360,6 +360,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         harness: 'devin',
         command: install.binPath,
         args: install.args,
+        permissions: 'allow-once',
         steering: 'mid-turn',
         sessionResume: true,
         allowHostMcp: true,
@@ -376,6 +377,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             );
           }
         },
+        skills: { skillsDir: config.skillsDir, cwd: config.home },
+        onSkillsLog: (msg) => logger.skills(msg),
         createUpdateNormalizer: createDevinUpdateNormalizer,
         gate: { log: (msg) => logger.gate(msg) },
         ...(confine !== null && confine !== undefined ? { confine } : {}),
@@ -390,6 +393,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       if (geminiBackend === null)
         geminiBackend = createGeminiBackend({
           gate: { folderRoots: () => folderPins.roots(), log: (msg) => logger.gate(msg) },
+          skills: { skillsDir: config.skillsDir, cwd: config.home },
+          onSkillsLog: (msg) => logger.skills(msg),
           ...(confine !== null ? { confine } : {}),
         });
       return geminiBackend;

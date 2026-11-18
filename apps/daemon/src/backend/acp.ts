@@ -9,6 +9,7 @@ import {
   type ContentBlock,
   client,
   type LoadSessionResponse,
+  type McpServer,
   methods,
   type NewSessionResponse,
   ndJsonStream,
@@ -22,6 +23,7 @@ import type {
   AgentBackendCapabilities,
   AgentSessionHandle,
   AgentTokenUsage,
+  BriefBackendId,
   BriefChannel,
   DeliveredImage,
   ModelSourceModel,
@@ -39,13 +41,14 @@ import {
   decideAcpPermission,
   restrictiveAcpMode,
 } from './acp-permission-gate.js';
-import { openAcpTools } from './acp-tools.js';
+import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
 import type { FolderGateContext, PermissionRule } from './command-gate.js';
 import type { SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { runtimeChildEnv } from './otel.js';
 import { withoutPinnedEnv } from './pinned-env.js';
+import { appendSkillsCatalog, composeSkillsSection } from './skills.js';
 
 const adapterProcessGroups = new Set<number>();
 
@@ -111,8 +114,35 @@ function advertisedDevinModels(option: SessionConfigOption): ModelSourceModel[] 
   return models;
 }
 
+const THINKING_FALLBACKS: Record<string, readonly string[]> = {
+  minimal: ['minimal', 'low'],
+  low: ['low'],
+  medium: ['medium'],
+  high: ['high'],
+  xhigh: ['xhigh', 'max', 'high'],
+  max: ['max', 'xhigh', 'high'],
+};
+
+function selectOptionValues(option: SessionConfigOption): Set<string> {
+  if (option.type !== 'select') return new Set();
+  return new Set(
+    option.options.flatMap((entry) =>
+      'options' in entry ? entry.options.map((item) => item.value) : [entry.value],
+    ),
+  );
+}
+
 export function acpErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
+  if (/spawn agy .*ENOENT|\bagy\b.*not found/i.test(message)) {
+    return 'Antigravity executable not found: install Google Antigravity (agy) on the Runner or enable managed install.';
+  }
+  if (
+    /(antigravity|\bagy\b)/i.test(message) &&
+    /authenticate|not logged in|login|unauthorized|api key|auth method/i.test(message)
+  ) {
+    return `Antigravity login failed: sign in to Antigravity on the Runner or enable a subscription with a token. ${message}`;
+  }
   if (/spawn gemini .*ENOENT|gemini.*not found/i.test(message)) {
     return 'Gemini executable not found: install Gemini CLI with npm install -g @google/gemini-cli';
   }
@@ -446,6 +476,9 @@ export interface GeminiBackendOptions {
   gate?: AcpGateOptions;
   executablePath?: string;
   confine?: SessionConfiner;
+  permissions?: 'deny' | 'allow-once';
+  skills?: { skillsDir: string; cwd: string };
+  onSkillsLog?: (msg: string) => void;
   spawnProcess?: (
     command: string,
     args: string[],
@@ -462,18 +495,50 @@ class AcpBackend implements AgentBackend {
   constructor(
     private readonly options: GeminiBackendOptions & { adapter?: AcpBackendOptions } = {},
   ) {
-    this.capabilities = options.adapter
+    const adapter = options.adapter;
+    this.capabilities = adapter
       ? {
           ...GEMINI_CAPABILITIES,
-          name: `${options.adapter.harness}-acp`,
-          steering: options.adapter.steering === 'mid-turn',
-          sessionResume: options.adapter.sessionResume === true,
+          name: `${adapter.harness}-acp`,
+          steering: adapter.steering === 'mid-turn',
+          sessionResume: adapter.sessionResume === true,
         }
       : GEMINI_CAPABILITIES;
-    if (!options.adapter) {
-      this.brief = { backendId: 'gemini', composeBody: (_opts, base) => base ?? '' };
-    } else if (options.adapter.harness === 'devin') {
-      this.brief = { backendId: 'devin', composeBody: (_opts, base) => base ?? '' };
+    const skills = options.skills ?? adapter?.skills;
+    const onSkillsLog = options.onSkillsLog ?? adapter?.onSkillsLog;
+    const briefId: BriefBackendId | null = !adapter
+      ? 'gemini'
+      : adapter.harness === 'devin' ||
+          adapter.harness === 'claude-code' ||
+          adapter.harness === 'antigravity'
+        ? adapter.harness
+        : null;
+    if (briefId !== null) {
+      this.brief = {
+        backendId: briefId,
+        composeBody: (sessionOpts, base) =>
+          appendSkillsCatalog(
+            base,
+            composeSkillsSection(
+              skills,
+              {
+                ...(sessionOpts.skillsAllowlist !== undefined
+                  ? { skillsAllowlist: sessionOpts.skillsAllowlist }
+                  : {}),
+                ...(sessionOpts.injectedSkills !== undefined
+                  ? { injectedSkills: sessionOpts.injectedSkills }
+                  : {}),
+                ...(sessionOpts.teamSkillsDir !== undefined
+                  ? { teamSkillsDir: sessionOpts.teamSkillsDir }
+                  : {}),
+                ...(sessionOpts.onSkillsResolved !== undefined
+                  ? { onSkillsResolved: sessionOpts.onSkillsResolved }
+                  : {}),
+              },
+              onSkillsLog,
+            ),
+          ) ?? '',
+      };
     }
   }
 
@@ -496,7 +561,12 @@ class AcpBackend implements AgentBackend {
 
   private async open(opts: SessionOpts, resumeId: string | undefined): Promise<AgentSessionHandle> {
     const adapter = this.options.adapter;
-    if (adapter && opts.mcpServers !== undefined && adapter.allowHostMcp !== true)
+    if (
+      adapter &&
+      opts.mcpServers !== undefined &&
+      adapter.allowHostMcp !== true &&
+      opts.remoteToolsOnly !== true
+    )
       throw new Error(
         'ACP mcpServers policy is unsupported: adapter host MCP configuration is not isolated',
       );
@@ -504,14 +574,6 @@ class AcpBackend implements AgentBackend {
     const hostToolNames = [...(opts.remoteTools ?? []), ...(opts.localTools ?? [])].map(
       (tool) => tool.name,
     );
-    if (
-      adapter &&
-      (opts.skillsAllowlist !== undefined ||
-        (opts.injectedSkills?.length ?? 0) > 0 ||
-        (opts.tools?.length ?? 0) > 0 ||
-        (opts.thinkingLevel !== undefined && opts.thinkingLevel !== 'off'))
-    )
-      throw new Error('ACP session policy or host tools are unsupported (fail-closed)');
     const validated = validateGeminiSession({
       cwd: opts.cwd,
       modelId: opts.modelId,
@@ -519,6 +581,7 @@ class AcpBackend implements AgentBackend {
       ...(opts.prompt !== undefined ? { prompt: opts.prompt } : {}),
     });
     const hostTools = await openAcpTools(opts);
+    const mcpBridges: AcpStdioBridge[] = [];
     const spawnProcess = this.options.spawnProcess ?? spawn;
     let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
     try {
@@ -562,7 +625,9 @@ class AcpBackend implements AgentBackend {
             toolCall,
             hostToolNames,
             normal: {
-              mode: adapter ? (adapter.permissions ?? 'deny') : 'gate',
+              mode: adapter
+                ? (adapter.permissions ?? 'deny')
+                : (this.options.permissions ?? 'gate'),
               ...(gateOptions?.rules ? { rules: gateOptions.rules } : {}),
               folders: (): FolderGateContext => ({
                 cwd: opts.cwd,
@@ -624,6 +689,8 @@ class AcpBackend implements AgentBackend {
       if (cleanedUp) return;
       cleanedUp = true;
       hostTools?.close();
+      for (const bridge of mcpBridges) bridge.close();
+      mcpBridges.length = 0;
       connection.close();
       terminate('SIGTERM');
       if (adapter && (groupPid !== undefined || !exited)) {
@@ -660,69 +727,49 @@ class AcpBackend implements AgentBackend {
           ...opts,
           imageCapability: caps?.promptCapabilities?.image === true,
         });
-      if (hostTools && !caps?.mcpCapabilities?.http)
-        throw new Error('ACP adapter does not support HTTP host tools');
       if (adapter && resumeId && !caps?.sessionCapabilities?.resume && !caps?.loadSession) {
         throw new Error('ACP resume is unsupported by this adapter');
+      }
+      const isRestricted = policy !== 'normal' || opts.lockedDown === true;
+      const externalMcpAllowed = (!adapter || adapter.allowHostMcp === true) && !isRestricted;
+      const externalMcpServers: McpServer[] = [];
+      if (externalMcpAllowed) {
+        for (const endpoint of opts.mcpServers ?? []) {
+          if (endpoint.transport === 'http' && endpoint.url !== undefined) {
+            if (caps?.mcpCapabilities?.http === true) {
+              externalMcpServers.push({
+                type: 'http',
+                name: endpoint.slug,
+                url: endpoint.url,
+                headers: Object.entries(endpoint.headers ?? {}).map(([name, value]) => ({
+                  name,
+                  value,
+                })),
+              });
+            } else {
+              const bridge = await bridgeHttpMcpToStdio(endpoint);
+              mcpBridges.push(bridge);
+              externalMcpServers.push(bridge.declaration);
+            }
+          } else if (endpoint.transport === 'stdio' && endpoint.command !== undefined) {
+            externalMcpServers.push({
+              name: endpoint.slug,
+              command: endpoint.command,
+              args: endpoint.args ?? [],
+              env: Object.entries(endpoint.env ?? {}).map(([name, value]) => ({
+                name,
+                value,
+              })),
+            });
+          }
+        }
       }
       const sessionMeta =
         adapter?.harness === 'claude-code' ? claudeAcpSessionMeta(policy) : undefined;
       const request = {
         cwd: opts.cwd,
         ...(sessionMeta !== undefined ? { _meta: sessionMeta } : {}),
-        mcpServers: [
-          ...(adapter?.allowHostMcp === true
-            ? (opts.mcpServers ?? []).flatMap(
-                (
-                  endpoint,
-                ): Array<
-                  | {
-                      type: 'http';
-                      name: string;
-                      url: string;
-                      headers: { name: string; value: string }[];
-                    }
-                  | {
-                      type: 'stdio';
-                      name: string;
-                      command: string;
-                      args: string[];
-                      env: { name: string; value: string }[];
-                    }
-                > => {
-                  if (endpoint.transport === 'http' && endpoint.url !== undefined) {
-                    return [
-                      {
-                        type: 'http' as const,
-                        name: endpoint.slug,
-                        url: endpoint.url,
-                        headers: Object.entries(endpoint.headers ?? {}).map(([name, value]) => ({
-                          name,
-                          value,
-                        })),
-                      },
-                    ];
-                  }
-                  if (endpoint.transport === 'stdio' && endpoint.command !== undefined) {
-                    return [
-                      {
-                        type: 'stdio' as const,
-                        name: endpoint.slug,
-                        command: endpoint.command,
-                        args: endpoint.args ?? [],
-                        env: Object.entries(endpoint.env ?? {}).map(([name, value]) => ({
-                          name,
-                          value,
-                        })),
-                      },
-                    ];
-                  }
-                  return [];
-                },
-              )
-            : []),
-          ...(hostTools ? [hostTools.declaration] : []),
-        ],
+        mcpServers: [...externalMcpServers, ...(hostTools ? [hostTools.declaration] : [])],
       };
       const response = resumeId
         ? await (async () => {
@@ -769,6 +816,26 @@ class AcpBackend implements AgentBackend {
           `Gemini ACP: no model configuration advertised; using the CLI default instead of ${opts.modelId}\n`,
         );
       }
+      if (opts.thinkingLevel !== undefined && opts.thinkingLevel !== 'off') {
+        const thinkingOption = response.configOptions?.find(
+          (option) =>
+            option.category === 'thought_level' ||
+            option.id === 'thought_level' ||
+            option.id === 'effort',
+        );
+        if (thinkingOption !== undefined) {
+          const supported = selectOptionValues(thinkingOption);
+          const candidates = THINKING_FALLBACKS[opts.thinkingLevel] ?? [opts.thinkingLevel];
+          const chosen = candidates.find((candidate) => supported.has(candidate));
+          if (chosen !== undefined) {
+            await connection.agent.request(methods.agent.session.setConfigOption, {
+              sessionId,
+              configId: thinkingOption.id,
+              value: chosen,
+            });
+          }
+        }
+      }
       const modes = 'modes' in response ? response.modes : null;
       if (policy !== 'normal') {
         if (modes) {
@@ -784,7 +851,11 @@ class AcpBackend implements AgentBackend {
             `${adapter.harness} ACP did not report its modes: refusing a locked turn (fail-closed)`,
           );
         }
-      } else if (adapter?.harness === 'codex' && this.options.confine !== undefined) {
+      } else if (
+        adapter?.harness === 'codex' &&
+        this.options.confine !== undefined &&
+        !isRestricted
+      ) {
         if (!modes?.availableModes.some((mode) => mode.id === 'full-access'))
           throw new Error('Codex ACP did not offer full-access mode under confinement');
         await connection.agent.request(methods.agent.session.setMode, {
@@ -792,13 +863,29 @@ class AcpBackend implements AgentBackend {
           modeId: 'full-access',
         });
       }
-      if (adapter?.harness === 'devin' && policy === 'normal') {
+      if (adapter?.harness === 'devin' && policy === 'normal' && !isRestricted) {
         if (!modes?.availableModes.some((mode) => mode.id === 'bypass'))
           throw new Error('Devin ACP did not offer bypass mode for unattended steps');
         await connection.agent.request(methods.agent.session.setMode, {
           sessionId,
           modeId: 'bypass',
         });
+      }
+      if (adapter?.harness === 'antigravity') {
+        const modes = 'modes' in response ? response.modes : null;
+        if (modes !== null && modes !== undefined) {
+          const preferred = !isRestricted
+            ? (modes.availableModes.find((mode) => mode.id === 'auto') ??
+              modes.availableModes.find((mode) => mode.id === 'accept-edits'))
+            : (modes.availableModes.find((mode) => mode.id === 'plan') ??
+              modes.availableModes.find((mode) => mode.id === 'default'));
+          if (preferred !== undefined && modes.currentModeId !== preferred.id) {
+            await connection.agent.request(methods.agent.session.setMode, {
+              sessionId,
+              modeId: preferred.id,
+            });
+          }
+        }
       }
       session = new AcpSession(
         sessionId,
@@ -841,7 +928,7 @@ export interface AcpUpdateNormalization {
 
 export interface AcpBackendOptions {
   confine?: SessionConfiner;
-  harness: 'claude-code' | 'codex' | 'devin';
+  harness: 'claude-code' | 'codex' | 'devin' | 'antigravity';
   command: string;
   args?: string[];
   permissions?: 'deny' | 'allow-once';
@@ -850,6 +937,8 @@ export interface AcpBackendOptions {
   sessionResume?: boolean;
   allowHostMcp?: boolean;
   usageEvents?: boolean;
+  skills?: { skillsDir: string; cwd: string };
+  onSkillsLog?: (msg: string) => void;
   onDevinModels?: (models: ModelSourceModel[]) => void;
   createUpdateNormalizer?: () => (update: SessionUpdate) => AcpUpdateNormalization;
   initializeTimeoutMs?: number;

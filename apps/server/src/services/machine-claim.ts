@@ -247,15 +247,15 @@ function claimLocalTools(agentTools: readonly string[]): string[] {
   return tools;
 }
 
-function claudeCodeSubscriptionMissing(
+function chiefSubscriptionMissing(
   deps: MachineDeps,
   machineRow: typeof machine.$inferSelect,
   provider: string | null | undefined,
 ): boolean {
-  return (
-    stepRuntimeFor(provider) === 'claude-code' &&
-    !hasActiveClaudeSubscription(deps, machineRow.teamId)
-  );
+  const runtime = stepRuntimeFor(provider);
+  if (runtime === 'claude-code') return !hasActiveClaudeSubscription(deps, machineRow.teamId);
+  if (runtime === 'devin') return !hasActiveDevinSubscription(deps, machineRow.teamId);
+  return false;
 }
 
 function buildChiefClaim(
@@ -269,17 +269,12 @@ function buildChiefClaim(
   if (!agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
   if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
-  if (claudeCodeSubscriptionMissing(deps, machineRow, model.provider)) return null;
+  if (chiefSubscriptionMissing(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const runtime = stepRuntimeFor(model.provider);
-  if (runtime === 'devin' && !hasActiveDevinSubscription(deps, machineRow.teamId)) return null;
-  const claimed = claimPendingChiefStep(
-    deps.db,
-    stepRow,
-    machineId,
-    runtime === 'claude-code' ? threadRow.teamId : null,
-    runtime === 'devin' ? threadRow.teamId : null,
-  );
+  const bindSubscription =
+    runtime === 'claude-code' || runtime === 'devin' ? { runtime, teamId: threadRow.teamId } : null;
+  const claimed = claimPendingChiefStep(deps.db, stepRow, machineId, bindSubscription);
   if (claimed === null) return null;
   return chiefClaimPayload(deps, machineId, claimed, threadRow, agentRow, machineRow);
 }
@@ -300,18 +295,33 @@ function chiefClaimPayload(
     coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
   );
   deps.db.update(step).set({ memoryTrace }).where(eq(step.id, stepRow.id)).run();
+  const runtime = stepRuntimeFor(model.provider);
   const boundSubscriptionId =
-    stepRuntimeFor(model.provider) === 'claude-code'
+    runtime === 'claude-code'
       ? (deps.db
           .select({ id: step.claudeSubscriptionId })
           .from(step)
           .where(eq(step.id, stepRow.id))
           .get()?.id ?? null)
-      : null;
+      : runtime === 'devin'
+        ? (deps.db
+            .select({ id: step.devinSubscriptionId })
+            .from(step)
+            .where(eq(step.id, stepRow.id))
+            .get()?.id ?? null)
+        : null;
   const continuesSession =
     !stepRow.freshSession &&
     threadRow.sessionId !== '' &&
-    !chiefLastRanOnOtherAccount(deps.db, threadRow.id, stepRow.id, boundSubscriptionId);
+    (runtime !== 'claude-code' && runtime !== 'devin'
+      ? true
+      : !chiefLastRanOnOtherAccount(
+          deps.db,
+          threadRow.id,
+          stepRow.id,
+          boundSubscriptionId,
+          runtime,
+        ));
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const locked = mailTurn;
   const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
