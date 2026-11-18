@@ -6,6 +6,7 @@ import {
   type AskUserQuestion,
   type AskUserQuestionContent,
   connectorActionForId,
+  isComputerActionId,
   isConnectorActionId,
   isExternalActionClass,
   OWN_COMPUTER_ACTIONS,
@@ -449,7 +450,7 @@ function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: numb
   }
   const entry = entryOf(deps, row.actionId);
   if (entry !== undefined && isExternalActionClass(entry.class)) return;
-  if (isConnectorActionId(row.actionId)) return;
+  if (isConnectorActionId(row.actionId) || isComputerActionId(row.actionId)) return;
   if (row.actionId === 'todo.delete') {
     runTodoDelete(deps, tx, row, now);
     return;
