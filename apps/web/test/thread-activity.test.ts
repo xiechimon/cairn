@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { mapChiefStream, type MessageRow } from '../src/api/mappers.js';
 import { foldTaskCards, placeReportCards, todoGlanceOf } from '../src/chief/chief-task-refs.js';
-import { groupThreadEvents, subThreadRowIds } from '../src/chief/thread-activity.js';
+import { groupThreadEvents } from '../src/chief/thread-activity.js';
 import type { TodoGlance } from '../src/detail/segments.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
 
@@ -33,15 +33,6 @@ function message(todoId: string) {
   } satisfies ChiefStreamItem;
 }
 
-const card = (todoId: string): ChiefStreamItem => ({
-  kind: 'task-card',
-  projectId: null,
-  id: nextId(),
-  todoId,
-  seq: 1,
-  title: todoId,
-});
-
 const glances = new Map<string, TodoGlance>([
   ['code', todoGlanceOf({ phase: 'queued', title: 'code' })],
   [
@@ -56,63 +47,27 @@ const glances = new Map<string, TodoGlance>([
   ['other', todoGlanceOf({ phase: 'building', title: 'other' })],
 ]);
 
-describe('subThreadRowIds', () => {
-  test('a thread already shown by its task card gets no row from its reports', () => {
-    expect(subThreadRowIds([card('code'), report('code'), message('code')], glances).size).toBe(0);
-  });
-
-  test('research hangs under its code task, so its reports add no row of their own', () => {
-    expect(subThreadRowIds([card('code'), report('research', 'needs-you')], glances).size).toBe(0);
-  });
-
-  test('a reply that only mentions a thread does not stand in for its row', () => {
-    const reply: ChiefStreamItem = {
-      kind: 'robot',
-      seconds: '1',
-      markdown: '[#1](todo:other) is still queued.',
-    };
-    const first = report('other');
-    expect([...subThreadRowIds([reply, first], glances)]).toEqual([first.id]);
-  });
-
-  test('a thread with no task card shows exactly one row, at its first event', () => {
-    const first = report('other');
-    const stream = [first, message('other'), report('other', 'needs-you')];
-    expect([...subThreadRowIds(stream, glances)]).toEqual([first.id]);
-  });
-});
-
 describe('groupThreadEvents', () => {
-  test('report and message rows are dropped and the kept one becomes a title-only row', () => {
-    const kept = report('other');
+  test('non-mirrored thread reports, relayed messages, and report acks add no bare row', () => {
     const user: ChiefStreamItem = { kind: 'user', id: nextId(), text: 'hi' };
-    const rows = [user, kept, report('other', 'needs-you')].map((item, i) => ({ item, i }));
-    expect(groupThreadEvents(rows, new Set([kept.id]))).toEqual([
-      { item: user, i: 0 },
-      {
-        item: { kind: 'thread-activity', id: kept.id, todoId: 'other', title: 'other' },
-        i: 1,
-      },
-    ]);
+    const ack: ChiefStreamItem = { kind: 'report-ack', id: nextId(), todoId: 'other', buildId: 'b1' };
+    const rows = [user, report('other'), message('other'), ack, report('other', 'needs-you')].map(
+      (item, i) => ({ item, i }),
+    );
+    expect(groupThreadEvents(rows)).toEqual([{ item: user, i: 0 }]);
   });
 });
 
 describe('a report mirrored from a project channel', () => {
-  test('stands as its own line each time and never takes the thread\'s row', () => {
+  test('stands as its own line each time while own-thread reports drop', () => {
     const first = { ...report('other', 'needs-you'), fromThreadId: 'chief-cairn' };
     const own = report('other');
     const done = { ...report('other'), fromThreadId: 'chief-cairn' };
     const rows = [first, own, done].map((item, i) => ({ item, i }));
-    const kept = subThreadRowIds(
-      rows.map((row) => row.item),
-      glances,
-    );
-    expect([...kept]).toEqual([own.id]);
     expect(
-      groupThreadEvents(rows, kept).map(({ item }) => [item.kind, 'id' in item ? item.id : null]),
+      groupThreadEvents(rows).map(({ item }) => [item.kind, 'id' in item ? item.id : null]),
     ).toEqual([
       ['channel-mirror', first.id],
-      ['thread-activity', own.id],
       ['channel-mirror', done.id],
     ]);
   });
@@ -167,25 +122,15 @@ describe('a research report the Coordinator delivered shows once, inside its not
     notice('n-reworked', 'reworked', 'b-old'),
     threadReport('r-reworked', 'reworked', 'b-new', 'review'),
   ]);
-  const kept = subThreadRowIds(stream, reportGlances);
   const { rows, startedBy } = foldTaskCards(
-    groupThreadEvents(
-      stream.map((item, i) => ({ item, i })),
-      kept,
-    ),
+    groupThreadEvents(stream.map((item, i) => ({ item, i }))),
     reportGlances,
   );
   const reports = placeReportCards(rows, startedBy, reportGlances, new Set());
   const bubble = (id: string) => rows.find(({ item }) => 'id' in item && item.id === id)?.item;
 
-  test('a notice or a silent acknowledgement replaces the standalone row for that build', () => {
-    expect([...kept]).toEqual(['r-unanswered', 'r-reworked']);
-    expect(rows.map(({ item }) => item.kind)).toEqual([
-      'robot',
-      'thread-activity',
-      'robot',
-      'thread-activity',
-    ]);
+  test('only Coordinator notice bubbles stay after dropping report and ack rows', () => {
+    expect(rows.map(({ item }) => item.kind)).toEqual(['robot', 'robot']);
   });
 
   test('the notice carries the report line only while its build is still the delivered one', () => {

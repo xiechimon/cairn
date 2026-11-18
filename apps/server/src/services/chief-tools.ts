@@ -796,7 +796,9 @@ export async function executeChiefTool(
     }
     case 'complete_todos': {
       const complete = () =>
-        transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor);
+        transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor, {
+          silentSettleThreadId: ctx.threadId,
+        });
       const report = reportRefOfCall(turnPrompt, turnMessageIds, name, params);
       if (report === null) return json(complete());
       const { result, ack } = acceptReport(
@@ -1143,7 +1145,7 @@ export function transitionTodos(
   todoIds: string[],
   to: 'closed' | 'todo' | 'done',
   actor: TransitionActor,
-  opts: { supersededBy?: string } = {},
+  opts: { supersededBy?: string; silentSettleThreadId?: string } = {},
 ): { transitioned: string[]; skipped: string[]; reasons?: Record<string, string> } {
   const svc = {
     db: deps.db,
@@ -1183,7 +1185,15 @@ export function transitionTodos(
       continue;
     }
     try {
-      const record = setTodoPhase(svc, id, to);
+      const record = setTodoPhase(
+        svc,
+        id,
+        to,
+        {},
+        opts.silentSettleThreadId !== undefined
+          ? { silentSettleThreadId: opts.silentSettleThreadId }
+          : {},
+      );
       if (record && to === 'closed') {
         deps.db
           .update(todo)

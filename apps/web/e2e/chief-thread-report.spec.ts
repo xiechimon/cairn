@@ -7,7 +7,7 @@ for (const [label, phase, verified] of [
   ['failed', 'failed', undefined],
   ['review', 'review', undefined],
 ] as const) {
-  test(`${label}: the task report is one title-only sub-thread row and the event turn stays silent`, async ({
+  test(`${label}: non-mirrored thread reports add no sub-thread row and the event turn stays silent`, async ({
     page,
   }) => {
     await mockLive(page, {
@@ -45,11 +45,8 @@ for (const [label, phase, verified] of [
     });
     await page.goto('/app');
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-    const row = stream.getByTestId('chief-sub-thread').getByTestId('chief-task-ref');
-    await expect(row).toHaveCount(1);
-    await expect(row).toHaveText(/^Repair board counts/);
-    await expect(row).toHaveAttribute('href', `/app?thread=${TASK.id}`);
-    await expect(row.locator('[data-slot="task-ref-elbow"]')).toHaveCount(0);
+    await expect(stream.getByTestId('chief-sub-thread')).toHaveCount(0);
+    await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
     await expect(stream.getByTestId('chief-bubble')).toHaveCount(1);
     await expect(stream).not.toContainText('[wake:');
     await expect(stream).not.toContainText('Internal worker reporting instructions');
@@ -196,7 +193,57 @@ const relay = (id: string, by: 'user' | 'coordinator', excerpt: string, createdA
   createdAt,
 });
 
-test('reports and relayed messages of one thread show one sub-thread row with no text, no reply and no report icon', async ({
+test('a settled task summary from notify_user renders as a reply bubble with an inline task chip and no sub-thread row', async ({
+  page,
+}) => {
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      {
+        id: 'report',
+        role: 'system',
+        content: JSON.stringify({
+          kind: 'thread-report',
+          todoId: TASK.id,
+          phase: 'done',
+          seqNum: TASK.seqNum,
+          title: 'quota-wire live check (devin)',
+          wakeStepId: 'wake-settle',
+        }),
+        createdAt: 20,
+      },
+      {
+        id: 'user-wake-step',
+        role: 'user',
+        content: `[wake:settle] provenance=watch:${TASK.id}\nInternal settle instructions`,
+        createdAt: 30,
+      },
+      {
+        id: 'notice',
+        role: 'system',
+        content: JSON.stringify({
+          kind: 'chief_notice',
+          message: `[#${TASK.seqNum}](todo:${TASK.id}) 已完成：校验配额线协议通过，改动在工作分支。`,
+          provenance: `watch:${TASK.id}`,
+        }),
+        createdAt: 32,
+      },
+    ],
+    todos: [{ ...TASK, phase: 'done', title: 'quota-wire live check (devin)' }],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  await expect(stream.getByTestId('chief-sub-thread')).toHaveCount(0);
+  const reply = stream.getByTestId('chief-reply-bubble').last();
+  await expect(reply.locator('a[data-slot="task-mention"]')).toHaveText(
+    'quota-wire live check (devin)',
+  );
+  await expect(reply).toContainText('已完成：校验配额线协议通过，改动在工作分支。');
+  await expect(stream).not.toContainText('[wake:settle]');
+  await expect(stream).not.toContainText('Internal settle instructions');
+});
+
+test('reports and relayed messages add no bare sub-thread row to the conversation', async ({
   page,
 }) => {
   await mockLive(page, {
@@ -212,9 +259,8 @@ test('reports and relayed messages of one thread show one sub-thread row with no
   });
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  const row = stream.getByTestId('chief-sub-thread');
-  await expect(row).toHaveCount(1);
-  await expect(row.getByTestId('chief-task-ref')).toHaveAttribute('data-phase', 'needs_input');
+  await expect(stream.getByTestId('chief-sub-thread')).toHaveCount(0);
+  await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
   await expect(stream).not.toContainText('Which export format?');
   await expect(stream).not.toContainText('Use CSV instead');
   await expect(stream).not.toContainText('JSON please');

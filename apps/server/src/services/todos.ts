@@ -108,11 +108,17 @@ export interface TodoDeps {
   oauthClient?: OAuthClientConfig | null;
 }
 
-function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: Phase): void {
+function notifyPhaseEntry(
+  deps: TodoDeps,
+  record: TodoRecord,
+  from: Phase,
+  to: Phase,
+  options: { silentSettleThreadId?: string } = {},
+): void {
   if (from === to) return;
   if (to === 'done') notifyTodo(deps, record, 'todo_done');
   reconcileOwners(deps, [record.id]);
-  triggerChiefWakes(deps, record, to);
+  triggerChiefWakes(deps, record, to, options);
 }
 
 type QuotaWait = TodoRecord['quotaWait'];
@@ -875,7 +881,7 @@ export function setTodoPhase(
   extra: Partial<
     Pick<TodoRow, 'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'routeOverride'>
   > = {},
-  options: { landedMerge?: true } = {},
+  options: { landedMerge?: true; silentSettleThreadId?: string } = {},
 ): TodoRecord | null {
   const { db } = deps;
   const row = getRow(deps, id);
@@ -920,7 +926,15 @@ export function setTodoPhase(
     const record = getTodo(deps, id);
     if (!record) return null;
     deps.hub.publishTodoDoc(record.teamId, record);
-    notifyPhaseEntry(deps, record, row.phase, to);
+    notifyPhaseEntry(
+      deps,
+      record,
+      row.phase,
+      to,
+      options.silentSettleThreadId !== undefined
+        ? { silentSettleThreadId: options.silentSettleThreadId }
+        : {},
+    );
     if (to === 'done') settleSplitOnDone(deps, id);
     if (to === 'done' || to === 'review') releaseBlockedSteps(deps);
     return record;

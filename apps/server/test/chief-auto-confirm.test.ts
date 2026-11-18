@@ -59,7 +59,8 @@ describe('wakeFacts gate text', () => {
 
   test('settle distinguishes task completion from merging', () => {
     const text = wakeFacts('settle', todo(), null);
-    expect(text).toContain('已完成（done），不代表分支或 PR 已合并');
+    expect(text).toContain('已完成（done）');
+    expect(text).toContain('done 本身不代表分支或 PR 已合并');
     expect(text).not.toContain('confirm_builds');
   });
 

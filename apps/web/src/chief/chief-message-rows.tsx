@@ -46,7 +46,7 @@ import { channelHref, useChannelOf } from './report-route.js';
 import { ResearchReportLine, ResearchReportRow } from './research-report.js';
 import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
-import type { ChannelMirror, ThreadActivity } from './thread-activity.js';
+import type { ChannelMirror } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
 import { TurnFailureLine } from './turn-failure.js';
 
@@ -274,30 +274,6 @@ function TaskRefWithChildren({
   );
 }
 
-function SubThreadRow({ activity }: { activity: ThreadActivity }) {
-  const glance = useContext(TodoGlanceContext)?.get(activity.todoId);
-  if (glance === undefined) return null;
-  return (
-    <MessageScrollerItem
-      messageId={activity.id}
-      style={SCROLLER_ITEM_STYLE}
-      className={EVENT_ROW_CLS}
-      data-testid="chief-sub-thread"
-    >
-      <TaskRefWithChildren
-        elbow={false}
-        reportsBelow
-        taskRef={{
-          todoId: activity.todoId,
-          seq: glance.seq ?? null,
-          title: glance.title ?? activity.title,
-          phase: glance.phase,
-        }}
-      />
-    </MessageScrollerItem>
-  );
-}
-
 const MIRROR_LINK_CLS = 'flex-none text-(--chat-link) no-underline hover:underline';
 
 function ChannelMirrorRow({ mirror }: { mirror: ChannelMirror }) {
@@ -411,7 +387,7 @@ function HandoffRow({ todoId }: { todoId: string }) {
 }
 
 export function chiefStreamRowKey(
-  item: ChiefStreamItem | ThreadActivity | ChannelMirror,
+  item: ChiefStreamItem | ChannelMirror,
   index: number,
 ): string | number {
   switch (item.kind) {
@@ -429,7 +405,6 @@ export function chiefStreamRowKey(
     case 'stopped':
     case 'thread-report':
     case 'thread-message':
-    case 'thread-activity':
     case 'channel-mirror':
       return item.id ?? index;
     default:
@@ -438,7 +413,7 @@ export function chiefStreamRowKey(
 }
 
 interface ChiefStreamRowProps {
-  item: ChiefStreamItem | ThreadActivity | ChannelMirror;
+  item: ChiefStreamItem | ChannelMirror;
   index: number;
   onCopy: (text: string) => void;
   onRewindRequest: (index: number, id: string | null) => void;
@@ -624,7 +599,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       ? { [REPLY_HIGHLIGHT_ATTR]: '' }
       : {};
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
-  if (item.kind === 'thread-activity') return <SubThreadRow activity={item} />;
   if (item.kind === 'channel-mirror') return <ChannelMirrorRow mirror={item} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
     return null;

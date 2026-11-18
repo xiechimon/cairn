@@ -4,8 +4,10 @@ import type { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
+  build as buildTable,
   chiefMessage as chiefMessageTable,
   chief as chiefTable,
+  message as messageTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
@@ -291,7 +293,7 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
     const ref = `任务 [修登录按钮](todo:${id})`;
     const provenance = `provenance=watch:${id}\n`;
     expect(prompts).toContain(
-      `[wake:settle] ${provenance}${ref} 已完成（done），不代表分支或 PR 已合并。对话里已记下这条，不用再告诉用户；该任务的关注已自动解除。`,
+      `[wake:settle] ${provenance}${ref} 已完成（done）。请用 notify_user（provenance 填首行的 provenance= 值）用 2–4 行告诉用户任务已完成并总结结果：第一句点明 [修登录按钮](todo:${id}) 已完成，接着概括它完成了什么或验证结论，以及交付状态（done 本身不代表分支或 PR 已合并，按下方交付事实如实说明；需要更多细节可调 conversation 查）。只有同一完成结论在本对话里已经通知过用户时，才不重发、直接结束本轮。该任务的关注已自动解除。`,
     );
     expect(prompts).toContain(
       `[wake:failed] ${provenance}${ref} 运行失败。先核实原因（machines 等工具），然后本轮必须落一个动作：用 message_thread 让它重试或换做法，或用 update_todo 调整 blockedBy 后再用 message_thread 重启，让系统按依赖放行，或用 archive_todos 归档。本轮结束时任务若仍是同一个失败，系统会把它交给用户处理。`,
@@ -313,6 +315,51 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
         expect(wakeFacts(kind, { ...plain, ...source }, null)).toBe(wakeFacts(kind, plain, null));
       }
     }
+  });
+
+  test('W5: settle wake for a third-party issue task with a build keeps hostile title and worker prose outside the main prompt', async () => {
+    const todoId = await importIssue();
+    const res = await call(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
+    expect(res.status).toBe(201);
+    const threadId = ((await res.json()) as { thread: { id: string } }).thread.id;
+    s.db
+      .insert(buildTable)
+      .values({
+        id: 'build-issue-settle',
+        todoId,
+        triggerSource: 'user',
+        withPlan: false,
+        createdAt: 1,
+      })
+      .run();
+    s.db
+      .insert(messageTable)
+      .values({
+        id: 'issue-worker-msg',
+        conversationId: 'build-issue-settle',
+        role: 'assistant',
+        content: `Completed ${ISSUE_TITLE}`,
+        createdAt: 2,
+      })
+      .run();
+    s.db
+      .update(todoTable)
+      .set({ phase: 'done', latestBuildId: 'build-issue-settle' })
+      .where(eq(todoTable.id, todoId))
+      .run();
+    const record = getTodo(deps(), todoId)!;
+    addChiefWatch(deps(), { teamId: s.team.id, todo: record, projectName: 'alpha', threadId });
+    triggerChiefWakes(deps(), record, 'done');
+    const wake = s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, threadId))
+      .all()
+      .find((row) => (row.prompt ?? '').startsWith('[wake:settle]'));
+    expect(wake?.prompt).toBeDefined();
+    expectTitleOnlyFenced(wake!.prompt!, ISSUE_TITLE);
+    expect(wake!.prompt).toContain('结项会话：conversationId=build-issue-settle');
+    expect(wake!.prompt).not.toContain(`Completed ${ISSUE_TITLE}`);
   });
 });
 

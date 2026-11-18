@@ -79,12 +79,7 @@ import { QuickReplies } from './quick-replies.js';
 import { ReaderFollowContext, useReaderFollow } from './reader-follow.js';
 import { ReplyingToBar } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
-import {
-  type GroupedRow,
-  groupThreadEvents,
-  type StreamRow,
-  subThreadRowIds,
-} from './thread-activity.js';
+import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 import { QueueWaitCard, TurnFailureCard } from './turn-failure.js';
 import { VirtualStream } from './virtual-stream.js';
@@ -108,16 +103,12 @@ interface StreamLayout {
 
 function layoutStream(
   list: readonly StreamRow[],
-  subThreadRows: ReadonlySet<string>,
   glances: ReadonlyMap<string, TodoGlance>,
   previousAt: number | null,
   seen: Set<string>,
   reportSeen: Set<string>,
 ): StreamLayout {
-  const { rows: grouped, startedBy } = foldTaskCards(
-    groupThreadEvents(list, subThreadRows),
-    glances,
-  );
+  const { rows: grouped, startedBy } = foldTaskCards(groupThreadEvents(list), glances);
   let lastAt = previousAt;
   const dividers = grouped.map(({ item }) => {
     const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
@@ -632,23 +623,12 @@ export function ChiefConversation({
   const clock = useMinuteClock();
   const dayEarlier = day?.earlier ?? 0;
   const [earlierLayout, streamLayout] = useMemo(() => {
-    const subThreadRows = subThreadRowIds(
-      rows.map(({ item }) => item),
-      glances,
-    );
     const seen = new Set<string>();
     const reportSeen = new Set<string>();
-    const before = layoutStream(
-      rows.slice(0, dayEarlier),
-      subThreadRows,
-      glances,
-      null,
-      seen,
-      reportSeen,
-    );
+    const before = layoutStream(rows.slice(0, dayEarlier), glances, null, seen, reportSeen);
     return [
       before,
-      layoutStream(rows.slice(dayEarlier), subThreadRows, glances, before.lastAt, seen, reportSeen),
+      layoutStream(rows.slice(dayEarlier), glances, before.lastAt, seen, reportSeen),
     ] as const;
   }, [rows, glances, dayEarlier]);
   const row = (

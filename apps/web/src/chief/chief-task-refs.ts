@@ -162,7 +162,7 @@ export function placeTaskRefs(
   };
   const placed = new Map<GroupedRow['item'], readonly TaskRef[]>();
   for (const { item } of rows) {
-    if (item.kind === 'task-card' || item.kind === 'thread-activity') show(item.todoId);
+    if (item.kind === 'task-card') show(item.todoId);
     if (item.kind !== 'robot' || item.typing === true) continue;
     const all = taskRefsOf({}, glances, startedBy.get(item) ?? []);
     const listed = new Set(all.map((ref) => ref.todoId));
@@ -197,10 +197,6 @@ export function placeReportCards(
   const noticed = new Set(rows.flatMap(({ item }) => deliveredIn(item)));
   const placed = new Map<GroupedRow['item'], readonly string[]>();
   for (const { item } of rows) {
-    if (item.kind === 'thread-activity') {
-      for (const id of withChildren(item.todoId)) seen.add(id);
-      continue;
-    }
     if (item.kind !== 'robot' || item.typing === true) continue;
     const started = (startedBy.get(item) ?? [])
       .flatMap(withChildren)

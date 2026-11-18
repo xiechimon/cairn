@@ -1,12 +1,21 @@
-import type { TranscriptRow } from '@cairn/shared';
+import { CHIEF_NOTICE_KIND, type TranscriptRow } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
-import { build, gateState, gateVerdict, step, todo } from '../src/db/schema.js';
+import {
+  build,
+  chiefMessage,
+  gateState,
+  gateVerdict,
+  message,
+  step,
+  todo,
+} from '../src/db/schema.js';
 import { addChiefWatch, sendChiefMessage } from '../src/services/chief.js';
 import { upsertChiefRow } from '../src/services/machine-deps.js';
+import { reportNoticeId } from '../src/services/report-turn.js';
 import { createAutonomousTodo, getTodo, setTodoPhase } from '../src/services/todos.js';
 import { buildVerified } from '../src/services/verified.js';
-import { H, registerChiefHarness } from './chief-harness.js';
+import { H, registerChiefHarness, relay } from './chief-harness.js';
 import { req } from './helpers.js';
 
 registerChiefHarness();
@@ -226,15 +235,153 @@ describe('worker reports in the chief conversation', () => {
     }
   });
 
-  test('unwatched tasks report into the Coordinator thread without waking it', async () => {
+  test('unwatched tasks report into the Coordinator thread and wake it to summarize', async () => {
     const { deps, todoId } = await seedTask(false);
     setTodoPhase(deps, todoId, 'done');
     const rows = await messages();
     expect(rows).toHaveLength(1);
     expect(rows[0]!.role).toBe('system');
+    const wake = H.s.db.select().from(step).where(eq(step.buildId, H.threadId)).get()!;
+    expect(wake.prompt).toMatch(new RegExp(`^\\[wake:settle\\] provenance=watch:${todoId}\\n`));
+    expect(wake.prompt).toContain(`(todo:${todoId})`);
     const report = JSON.parse(rows[0]!.content as string);
-    expect(report).toMatchObject({ kind: 'thread-report', todoId, phase: 'done' });
-    expect(report.wakeStepId).toBeUndefined();
+    expect(report).toMatchObject({
+      kind: 'thread-report',
+      todoId,
+      phase: 'done',
+      wakeStepId: wake.id,
+    });
+  });
+
+  test('settle wake carries bounded delivery facts, clipped quoted excerpt, and permits notify_user', async () => {
+    const { deps, todoId } = await seedTask(false);
+    H.s.db
+      .insert(build)
+      .values({
+        id: 'build-sum',
+        todoId,
+        triggerSource: 'user',
+        withPlan: false,
+        createdAt: 1,
+      })
+      .run();
+    H.s.db
+      .insert(step)
+      .values({
+        id: 'build-step-sum',
+        buildId: 'build-sum',
+        kind: 'build',
+        status: 'done',
+        checkpointCommit: 'abcdef1234567890',
+        createdAt: 2,
+      })
+      .run();
+    H.s.db
+      .insert(message)
+      .values({
+        id: 'worker-out',
+        conversationId: 'build-sum',
+        role: 'assistant',
+        content: [
+          {
+            type: 'text',
+            text: `Done ![shot](attachment:team-1/a1.png). ${'总结细节'.repeat(300)}`,
+          },
+        ],
+        createdAt: 3,
+      })
+      .run();
+    H.s.db
+      .update(todo)
+      .set({ latestBuildId: 'build-sum', hasChanges: true })
+      .where(eq(todo.id, todoId))
+      .run();
+
+    setTodoPhase(deps, todoId, 'done');
+    const wake = H.s.db.select().from(step).where(eq(step.buildId, H.threadId)).get()!;
+    expect(wake.prompt).toContain('交付事实：项目「demo」，改动保存在工作分支');
+    expect(wake.prompt).toContain('commit abcdef12');
+    expect(wake.prompt).toContain('Thread 结项摘录（conversationId=build-sum');
+    expect(wake.prompt).toContain('> Done ![shot](attachment-disabled:team-1/a1.png).');
+    expect(wake.prompt).toContain('（已截断）');
+    expect(wake.prompt?.length ?? 0).toBeLessThan(2000);
+
+    await relay(
+      'notify_user',
+      {
+        message: `[Repair board counts](todo:${todoId}) 已完成，改动留在工作分支。`,
+        provenance: `watch:${todoId}`,
+      },
+      { turnPrompt: wake.prompt },
+    );
+    const notices = H.s.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.threadId, H.threadId))
+      .all()
+      .filter((row) => String(row.content).includes(CHIEF_NOTICE_KIND));
+    expect(notices).toHaveLength(1);
+  });
+
+  test('complete_todos in the same thread and already-answered info reports skip a second settle wake', async () => {
+    const { todoId: completedId } = await seedTask(true);
+    const res = (await relay('complete_todos', { todoIds: [completedId] })) as {
+      transitioned: string[];
+    };
+    expect(res.transitioned).toEqual([completedId]);
+    expect(H.s.db.select().from(step).where(eq(step.buildId, H.threadId)).all()).toEqual([]);
+
+    const answered = createAutonomousTodo(H.s, {
+      teamId: H.teamId,
+      projectId: H.projectId,
+      title: 'Answered research',
+      spec: 'Check docs.',
+      createdBy: H.userId,
+      ownerId: H.userId,
+      output: 'info',
+    });
+    H.s.db
+      .insert(build)
+      .values({
+        id: 'build-info-ack',
+        todoId: answered.id,
+        triggerSource: 'user',
+        withPlan: false,
+        reportAttachmentId: 'att-info-1',
+        createdAt: 1,
+      })
+      .run();
+    H.s.db
+      .update(todo)
+      .set({ phase: 'review', latestBuildId: 'build-info-ack' })
+      .where(eq(todo.id, answered.id))
+      .run();
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: reportNoticeId(H.threadId, {
+          todoId: answered.id,
+          buildId: 'build-info-ack',
+          attachmentId: 'att-info-1',
+        }),
+        threadId: H.threadId,
+        role: 'system',
+        content: JSON.stringify({
+          kind: CHIEF_NOTICE_KIND,
+          message: 'done',
+          provenance: `report:${answered.id}`,
+        }),
+        createdAt: 2,
+      })
+      .run();
+    const svc = {
+      db: H.s.db,
+      hub: H.s.hub,
+      convHub: H.s.convHub,
+      machineHub: H.s.machineHub,
+      user: H.s.user,
+    };
+    setTodoPhase(svc, answered.id, 'done');
     expect(H.s.db.select().from(step).where(eq(step.buildId, H.threadId)).all()).toEqual([]);
   });
 
