@@ -1,10 +1,16 @@
-import type { ActionTier } from '@cairn/shared';
+import type { ActionTier, DesktopNotifySound } from '@cairn/shared';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useTeamAutonomy } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNotificationPermission } from '../board/notify-banner.js';
-import { type NotifyPref, persistNotifyPref, readNotifyPref } from '../board/notify-pref.js';
+import {
+  type NotifyPref,
+  persistNotifyPref,
+  persistNotifySound,
+  readNotifyPref,
+  readNotifySound,
+} from '../board/notify-pref.js';
 import { ProfileHeader } from '../components/profile-card.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
@@ -22,6 +28,7 @@ import {
 } from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
+import { desktopNotify } from '../desktop-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
@@ -35,6 +42,14 @@ import {
   unsubscribeDevicePush,
 } from '../pwa/push-device.js';
 import { safeLocalStorage } from '../safe-storage.js';
+
+const NOTIFY_SOUND_OPTIONS: { value: DesktopNotifySound; label: string }[] = [
+  { value: 'system', label: '跟随系统' },
+  { value: 'Glass', label: 'Glass' },
+  { value: 'Ping', label: 'Ping' },
+  { value: 'Pop', label: 'Pop' },
+  { value: 'none', label: '无声' },
+];
 
 export function AccountPage() {
   const { locale, setLocale, t } = useI18n();
@@ -72,6 +87,10 @@ export function AccountPage() {
   const [notifyPref, setNotifyPref] = useState<NotifyPref | null>(() =>
     readNotifyPref(safeLocalStorage()),
   );
+  const [notifySound, setNotifySound] = useState<DesktopNotifySound>(() =>
+    readNotifySound(safeLocalStorage()),
+  );
+  const desktopSoundPickable = desktopNotify() !== null;
   const { permission, request } = useNotificationPermission(
     live ? null : (fixture.ui?.notificationPermission ?? 'granted'),
   );
@@ -171,6 +190,35 @@ export function AccountPage() {
               }}
             />
           </SettingsRow>
+          {desktopSoundPickable && (
+            <SettingsRow label={t('提醒声音')} hint={t('系统通知的提示音')}>
+              <Select
+                value={notifySound}
+                onValueChange={(next) => {
+                  if (next === null) return;
+                  const sound = next as DesktopNotifySound;
+                  setNotifySound(sound);
+                  persistNotifySound(sound, safeLocalStorage());
+                }}
+              >
+                <SelectTrigger aria-label={t('提醒声音')} className={SETTINGS_SELECT_TRIGGER_CLS}>
+                  <SelectValue>
+                    {t(
+                      NOTIFY_SOUND_OPTIONS.find((o) => o.value === notifySound)?.label ??
+                        '跟随系统',
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent aria-label={t('提醒声音')} align="end" alignItemWithTrigger={false}>
+                  {NOTIFY_SOUND_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {t(option.label)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingsRow>
+          )}
           {devicePushLive && (
             <SettingsRow
               label={t('在这台设备上接收推送')}

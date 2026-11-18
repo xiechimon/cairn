@@ -13,8 +13,10 @@ import {
   type DesktopRunnerState,
   type DesktopTrayState,
   type DesktopUpdateState,
+  desktopNotificationOptions,
   ENV_VARS,
   isAppPath,
+  isDesktopNotifyPayload,
   parseAccessTokenFile,
 } from '@cairn/shared';
 import {
@@ -27,6 +29,7 @@ import {
   ipcMain,
   Menu,
   type NativeImage,
+  Notification,
   nativeImage,
   powerMonitor,
   powerSaveBlocker,
@@ -465,6 +468,17 @@ function showTray(origin: string, controls: TrayControls): Tray {
   return created;
 }
 
+function serveNotifications(origin: string): void {
+  ipcMain.on('desktop-notify', (event, payload: unknown) => {
+    if (event.senderFrame?.origin !== origin || !isDesktopNotifyPayload(payload)) return;
+    if (!Notification.isSupported()) return;
+    const notification = new Notification(desktopNotificationOptions(payload));
+    notification.on('click', () => sendToWindow('desktop-navigate', payload.href));
+    notification.on('failed', (_event, error) => console.warn('notification failed:', error));
+    notification.show();
+  });
+}
+
 function serveUpdates(origin: string): void {
   const showMenu = (state: DesktopUpdateState): void =>
     Menu.setApplicationMenu(
@@ -645,6 +659,7 @@ async function boot(): Promise<void> {
     });
     void removeLeftoverUpdates();
     serveUpdates(server.origin);
+    serveNotifications(server.origin);
     serveOwnComputer(server.origin);
     openWindow(server.origin);
   } catch (error) {

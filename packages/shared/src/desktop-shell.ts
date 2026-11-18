@@ -27,6 +27,53 @@ export function isAppPath(path: unknown): path is string {
   return typeof path === 'string' && /^\/app(?:[/?]|$)/.test(path);
 }
 
+export const DESKTOP_NOTIFY_SOUNDS = ['system', 'Glass', 'Ping', 'Pop', 'none'] as const;
+
+export type DesktopNotifySound = (typeof DESKTOP_NOTIFY_SOUNDS)[number];
+
+export interface DesktopNotifyPayload {
+  title: string;
+  body: string;
+  href: string;
+  tag: string;
+  sound: DesktopNotifySound;
+}
+
+export function isDesktopNotifyPayload(value: unknown): value is DesktopNotifyPayload {
+  if (typeof value !== 'object' || value === null) return false;
+  const payload = value as Partial<Record<keyof DesktopNotifyPayload, unknown>>;
+  return (
+    typeof payload.title === 'string' &&
+    payload.title !== '' &&
+    payload.title.length <= 200 &&
+    typeof payload.body === 'string' &&
+    payload.body.length <= 500 &&
+    isAppPath(payload.href) &&
+    typeof payload.tag === 'string' &&
+    payload.tag.length <= 100 &&
+    (DESKTOP_NOTIFY_SOUNDS as readonly string[]).includes(payload.sound as string)
+  );
+}
+
+export interface DesktopNotificationOptions {
+  title: string;
+  body: string;
+  silent: boolean;
+  sound?: string;
+}
+
+export function desktopNotificationOptions(
+  payload: DesktopNotifyPayload,
+): DesktopNotificationOptions {
+  const options: DesktopNotificationOptions = {
+    title: payload.title,
+    body: payload.body,
+    silent: payload.sound === 'none',
+  };
+  if (payload.sound !== 'system' && payload.sound !== 'none') options.sound = payload.sound;
+  return options;
+}
+
 export type DesktopUpdateBlocker = 'development' | 'not-in-applications' | 'read-only';
 
 export type DesktopUpdateState =

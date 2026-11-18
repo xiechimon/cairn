@@ -24,6 +24,11 @@ export const SETTINGS_ROW_INDEX: SettingsRowEntry[] = [
   { section: 'account', label: '推送通知', keywords: ['notification', 'push'] },
   {
     section: 'account',
+    label: '提醒声音',
+    keywords: ['notification', 'sound', '提醒声音', '无声'],
+  },
+  {
+    section: 'account',
     label: '在这台设备上接收推送',
     keywords: ['notification', 'push', 'device'],
   },

@@ -2,6 +2,7 @@ import {
   DESKTOP_SHELL_USER_AGENT,
   DESKTOP_TRAY_PATH,
   type DesktopMenuCommand,
+  type DesktopNotifyPayload,
   type DesktopTrayOpen,
   type DesktopTrayState,
 } from '@cairn/shared';
@@ -46,6 +47,18 @@ export function setDesktopWindowControlsVisible(visible: boolean): void {
   (
     window as Window & { cairnDesktop?: { windowControls?: DesktopWindowControlsBridge } }
   ).cairnDesktop?.windowControls?.setVisible(visible);
+}
+
+interface DesktopNotifyBridge {
+  show: (payload: DesktopNotifyPayload) => void;
+}
+
+export function desktopNotify(): DesktopNotifyBridge | null {
+  if (typeof window === 'undefined') return null;
+  return (
+    (window as Window & { cairnDesktop?: { notify?: DesktopNotifyBridge } }).cairnDesktop?.notify ??
+    null
+  );
 }
 
 interface DesktopNavigateBridge {

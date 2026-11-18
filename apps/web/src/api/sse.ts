@@ -13,8 +13,9 @@ import {
 } from '@cairn/shared';
 import { type InfiniteData, type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { readNotifyPref } from '../board/notify-pref.js';
+import { readNotifyPref, readNotifySound } from '../board/notify-pref.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
+import { desktopNotify } from '../desktop-shell.js';
 import { EN } from '../i18n/en.js';
 import { readStoredLocale } from '../i18n/locale.js';
 import { translate } from '../i18n/translate.js';
@@ -153,9 +154,7 @@ async function showViaServiceWorker(
 }
 
 function fireDesktopNotification(record: NotificationRecord): void {
-  if (!document.hidden) return;
   if (record.readAt !== null || SILENT_NOTIFICATION_TYPES.includes(record.type)) return;
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   if (readNotifyPref(safeLocalStorage()) === 'off') return;
   const t = (source: string) => translate(readStoredLocale(safeLocalStorage()), EN, source);
   const title =
@@ -174,6 +173,19 @@ function fireDesktopNotification(record: NotificationRecord): void {
                 : record.entityRef.title;
   const body = record.snippet ?? record.entityRef.title;
   const href = notificationHref(record);
+  const desktop = desktopNotify();
+  if (desktop !== null) {
+    desktop.show({
+      title,
+      body,
+      href,
+      tag: record.id,
+      sound: readNotifySound(safeLocalStorage()),
+    });
+    return;
+  }
+  if (!document.hidden) return;
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   void showViaServiceWorker(title, body, record.id, href).then((shown) => {
     if (shown) return;
     try {

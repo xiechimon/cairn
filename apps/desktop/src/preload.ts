@@ -1,5 +1,6 @@
 import type {
   DesktopMenuCommand,
+  DesktopNotifyPayload,
   DesktopTrayOpen,
   DesktopTrayState,
   DesktopUpdateState,
@@ -30,6 +31,9 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
         ipcRenderer.removeListener('desktop-navigate', relay);
       };
     },
+  },
+  notify: {
+    show: (payload: DesktopNotifyPayload): void => ipcRenderer.send('desktop-notify', payload),
   },
   tray: {
     state: (): Promise<DesktopTrayState | null> => ipcRenderer.invoke('desktop-tray:state'),

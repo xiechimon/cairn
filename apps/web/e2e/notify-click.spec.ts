@@ -36,11 +36,21 @@ const THREADS = [
   },
 ];
 
+interface DesktopNotifyCall {
+  title: string;
+  body: string;
+  href: string;
+  tag: string;
+  sound: string;
+}
+
 declare global {
   interface Window {
     __es: { url: string; readyState: number; emit: (ev: unknown) => void }[];
     __swNotifs: { title: string; options: { body?: string; tag?: string; data?: unknown } }[];
     __pageNotifs: { title: string; options: unknown; onclick: (() => void) | null }[];
+    __desktopNotifs: DesktopNotifyCall[];
+    cairnDesktop?: { notify?: { show?: (payload: DesktopNotifyCall) => void } };
     __stay?: string;
   }
 }
@@ -107,6 +117,15 @@ function spySwShowNotification(page: Page) {
     ServiceWorkerRegistration.prototype.showNotification = function (title, options) {
       window.__swNotifs.push({ title, options: options ?? {} });
       return Promise.resolve();
+    };
+  });
+}
+
+function stubDesktopNotify(page: Page) {
+  return page.addInitScript(() => {
+    window.__desktopNotifs = [];
+    window.cairnDesktop = {
+      notify: { show: (payload) => window.__desktopNotifs.push(payload) },
     };
   });
 }
@@ -441,5 +460,111 @@ test.describe('push notification click loop (XMON-106)', () => {
       href: '/app?thread=todo-y',
     });
     expect(await page.evaluate(() => window.__pageNotifs.length)).toBe(0);
+  });
+
+  test('T6: desktop shell → notification goes to cairnDesktop.notify with title/body/href/sound, never to SW or page Notification', async ({
+    page,
+  }) => {
+    await stubNotification(page);
+    await stubEventSource(page);
+    await spySwShowNotification(page);
+    await stubDesktopNotify(page);
+    await mockLiveApi(page);
+    await page.goto('/app');
+    await expect(page.locator('[data-route="board"]')).toBeVisible();
+
+    await fireTeamNotification(page, makeRecord({}));
+    await fireTeamNotification(
+      page,
+      makeRecord({
+        type: 'chief_message',
+        entityId: 'chief-xyz',
+        entityRef: { title: '线程主题', projectId: null, seqNum: null },
+        snippet: '消息全文',
+        id: 'u1:chief-xyz',
+      }),
+    );
+
+    await expect.poll(() => page.evaluate(() => window.__desktopNotifs.length)).toBe(2);
+    const calls = await page.evaluate(() => window.__desktopNotifs);
+
+    expect(calls[0]).toEqual({
+      title: '构建待审核',
+      body: '修一下按钮',
+      href: '/app?thread=todo-x',
+      tag: 'u1:todo-x',
+      sound: 'system',
+    });
+    expect(calls[1]).toEqual({
+      title: '线程主题',
+      body: '消息全文',
+      href: '/app?chief=chief-xyz',
+      tag: 'u1:chief-xyz',
+      sound: 'system',
+    });
+
+    expect(await page.evaluate(() => window.__swNotifs.length)).toBe(0);
+    expect(await page.evaluate(() => window.__pageNotifs.length)).toBe(0);
+  });
+
+  test('T6b: desktop shell honors the sound preference and the off switch', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('cairn.notifySound', 'Ping'));
+    await stubNotification(page);
+    await stubEventSource(page);
+    await stubDesktopNotify(page);
+    await mockLiveApi(page);
+    await page.goto('/app');
+    await expect(page.locator('[data-route="board"]')).toBeVisible();
+
+    await fireTeamNotification(page, makeRecord({}));
+    await expect.poll(() => page.evaluate(() => window.__desktopNotifs.length)).toBe(1);
+    expect(await page.evaluate(() => window.__desktopNotifs[0].sound)).toBe('Ping');
+
+    await page.evaluate(() => localStorage.setItem('cairn.notifyEnabled', '0'));
+    await fireTeamNotification(page, makeRecord({ entityId: 'todo-y', id: 'u1:todo-y' }));
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => window.__desktopNotifs.length)).toBe(1);
+  });
+
+  test('T6c: desktop shell stays quiet for silent types and read records', async ({ page }) => {
+    await stubNotification(page);
+    await stubEventSource(page);
+    await stubDesktopNotify(page);
+    await mockLiveApi(page);
+    await page.goto('/app');
+    await expect(page.locator('[data-route="board"]')).toBeVisible();
+
+    await fireTeamNotification(page, makeRecord({ type: 'todo_done' }));
+    await fireTeamNotification(page, makeRecord({ readAt: 2 }));
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => window.__desktopNotifs.length)).toBe(0);
+  });
+
+  test('T7: account page shows the sound picker only in the desktop shell, and the pick persists', async ({
+    page,
+  }) => {
+    await stubDesktopNotify(page);
+    await stubEventSource(page);
+    await mockLiveApi(page);
+    await page.goto('/app/settings/account');
+    const dialog = page.getByRole('dialog', { name: '设置' });
+    await expect(dialog.getByLabel('推送通知')).toBeVisible();
+
+    const picker = dialog.getByLabel('提醒声音');
+    await expect(picker).toBeVisible();
+    await picker.click();
+    await page.getByRole('option', { name: 'Ping' }).click();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('cairn.notifySound'))).toBe(
+      'Ping',
+    );
+  });
+
+  test('T7b: the sound picker does not render without the desktop bridge', async ({ page }) => {
+    await stubEventSource(page);
+    await mockLiveApi(page);
+    await page.goto('/app/settings/account');
+    const dialog = page.getByRole('dialog', { name: '设置' });
+    await expect(dialog.getByLabel('推送通知')).toBeVisible();
+    await expect(dialog.getByLabel('提醒声音')).toHaveCount(0);
   });
 });
