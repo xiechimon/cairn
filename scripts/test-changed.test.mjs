@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { selectTests } from './test-changed.mjs';
+import { declaredIdentifiers, selectTests } from './test-changed.mjs';
 
 const tests = [
   'apps/daemon/test/computer-vm-desktop.test.ts',
@@ -52,6 +52,37 @@ test('docs, styles and other packages select nothing', () => {
 
 test('a deleted test file is not selected', () => {
   assert.deepEqual(selectTests(['apps/daemon/test/gone.test.ts'], tests), []);
+});
+
+test('a changed create_todo behavior selects the tests that exercise it without being named after the file', () => {
+  const exercising = [
+    'apps/server/test/mcp-entry.test.ts',
+    'apps/server/test/coordinator/source-binding.test.ts',
+    'apps/server/test/coordinator-source-binding.test.ts',
+  ];
+  const protocol = [
+    'export const CHIEF_REMOTE_TOOLS = [',
+    '  {',
+    "    name: 'create_todo',",
+    "    description: 'Create a todo',",
+    '  },',
+    '];',
+  ].join('\n');
+  assert.deepEqual(declaredIdentifiers(protocol, [4]), ['CHIEF_REMOTE_TOOLS', 'create_todo']);
+  const referencing = (file) =>
+    file === 'apps/server/src/services/coordinator-request.ts'
+      ? exercising.map((candidate) => [candidate, 1])
+      : [];
+  const selected = selectTests(
+    [
+      'apps/server/src/services/coordinator-request.ts',
+      'packages/shared/src/protocol/chief-tools.ts',
+    ],
+    [...tests, ...exercising],
+    [],
+    referencing,
+  );
+  for (const candidate of exercising) assert.equal(selected.includes(candidate), true);
 });
 
 test('a schema or migration change runs every old-database migration test', () => {
