@@ -22,7 +22,7 @@ const STATUS_LINUX = JSON.stringify({
     state_root: '/home/ian/.agent-desktop',
     supported_surfaces: ['window', 'sheet', 'alert', 'menu'],
     tracing: false,
-    version: '1.1.0',
+    version: '1.3.1',
   },
 });
 
@@ -39,7 +39,7 @@ const STATUS_MAC_DENIED = JSON.stringify({
 });
 
 describe('parseAgentDesktopStatus', () => {
-  it('keeps the three permission states from agent-desktop 1.1.0 status output', () => {
+  it('keeps the three permission states from agent-desktop 1.3.1 status output', () => {
     expect(parseAgentDesktopStatus(STATUS_LINUX)).toEqual({
       accessibility: 'granted',
       automation: 'not_required',

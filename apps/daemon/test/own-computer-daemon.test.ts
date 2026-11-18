@@ -67,9 +67,9 @@ describe('one agent-desktop path', () => {
 describe('agent-desktop verification', () => {
   const sha = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
 
-  test('the pinned digest and version 1.1.0 verify; a tampered binary or another version does not', async () => {
+  test('the pinned digest and version 1.3.1 verify; a tampered binary or another version does not', async () => {
     const fake = setup([]);
-    const versions: string[] = ['1.1.0'];
+    const versions: string[] = ['1.3.1'];
     const verifier = new AgentDesktopVerifier({
       binary: fake.binary,
       expectedSha256: sha(fake.binary),
@@ -88,7 +88,7 @@ describe('agent-desktop verification', () => {
     const other = new AgentDesktopVerifier({
       binary: fake.binary,
       expectedSha256: sha(fake.binary),
-      runVersion: async () => '1.0.9',
+      runVersion: async () => '1.1.0',
     });
     other.current();
     await other.settled();
@@ -99,7 +99,7 @@ describe('agent-desktop verification', () => {
     const verifier = new AgentDesktopVerifier({
       binary: '/nonexistent/agent-desktop',
       expectedSha256: 'a'.repeat(64),
-      runVersion: async () => '1.1.0',
+      runVersion: async () => '1.3.1',
     });
     verifier.current();
     await verifier.settled();

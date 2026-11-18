@@ -217,7 +217,7 @@ describe('D75 own computer opt-in', () => {
   test('a set agent-desktop path reports the host; a binary off the pinned digest omits ownComputer', async () => {
     const dir = testTempDir('tampered-agent-desktop-');
     const binary = join(dir, 'agent-desktop');
-    writeFileSync(binary, '#!/bin/sh\necho \'{"ok":true,"data":{"version":"1.1.0"}}\'\n', {
+    writeFileSync(binary, '#!/bin/sh\necho \'{"ok":true,"data":{"version":"1.3.1"}}\'\n', {
       mode: 0o755,
     });
     const caps = await report({ CAIRN_AGENT_DESKTOP: binary });

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { recordId } from '../records/common.js';
 import type { RemoteToolDef } from './chief-tools.js';
 
-export const AGENT_DESKTOP_VERSION = '1.1.0';
+export const AGENT_DESKTOP_VERSION = '1.3.1';
 export const AGENT_DESKTOP_HELPER = 'agent-desktop-macos-helper';
 
 export interface AgentDesktopRelease {
@@ -16,13 +16,13 @@ const RELEASE_BASE = `https://github.com/vercel-labs/agent-desktop/releases/down
 export const AGENT_DESKTOP_RELEASES: Readonly<Record<'arm64' | 'x64', AgentDesktopRelease>> = {
   arm64: {
     url: `${RELEASE_BASE}/agent-desktop-v${AGENT_DESKTOP_VERSION}-aarch64-apple-darwin.tar.gz`,
-    archiveSha256: '3048e00aa0741bf25ffe0326f78c966408be4490ce13513f3f94ecf2a0b5270d',
-    binarySha256: 'a89c781a3b2cf29bc0467c30a4e1063b6f564858540f2dc58a75c79ce2c9d9f3',
+    archiveSha256: '9b7b7cfc74892eab46c2c85d6cb7dc4863bf8dab0a222cfcfb8ae4604c69c86c',
+    binarySha256: '9a6b0829736a486da532a9d1ceed1e07192fa8967326c7b27125646adab6baf7',
   },
   x64: {
     url: `${RELEASE_BASE}/agent-desktop-v${AGENT_DESKTOP_VERSION}-x86_64-apple-darwin.tar.gz`,
-    archiveSha256: 'b6352ac66aa49e0280c6f690de791dc03c827623a838950856b20ddbebcdc382',
-    binarySha256: 'bfbb387446e615687dfe345158f7ac1e37197f5de203fa36bb621e474e016d77',
+    archiveSha256: '469da10cfb68928c58caff88b92b30526e0ca895ac06bc86b7f533b1d9b309b3',
+    binarySha256: 'f762f8ed6a14b114f8a50b902205d3ecb6bcf554d8031f67abd7938af88663cb',
   },
 };
 

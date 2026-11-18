@@ -50,7 +50,7 @@ In the Computers panel, a `…` menu on the Coordinator computer with:
 Design first (states, approval rows, failure paths), following Rakazo "Use your own computer".
 
 - E1. Settings, Computers section, has a switch that lets the agent use this Mac, off by default, with the warning that the agent can read files and run programs as the owner.
-- E2. Turning it on installs the pinned `agent-desktop` 1.1.0 into the Runner's tools folder and walks the owner to System Settings for Accessibility and Screen Recording; the panel shows which grant is missing.
+- E2. Turning it on installs the pinned `agent-desktop` 1.3.1 into the Runner's tools folder and walks the owner to System Settings for Accessibility and Screen Recording; the panel shows which grant is missing.
 - E3. The first time the agent uses an app (e.g. Finder), the chat shows an approval card: allow once / allow in this conversation / deny. Nothing reaches the app before approval.
 - E4. Only owner-started Coordinator conversations can use it; routines and other people's messages are refused with a reason.
 - E5. Turning the switch off stops further calls immediately.

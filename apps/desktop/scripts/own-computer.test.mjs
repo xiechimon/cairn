@@ -20,7 +20,7 @@ import {
   registerOwnComputerIpc,
 } from '../src/own-computer.ts';
 
-const VERSION = '1.1.0';
+const VERSION = '1.3.1';
 const HELPER = 'agent-desktop-macos-helper';
 
 function scratch() {
@@ -30,7 +30,7 @@ function scratch() {
 function archive({ version = VERSION, helper = true, nested = false } = {}) {
   const dir = scratch();
   const content = join(dir, 'content');
-  const inner = nested ? join(content, 'agent-desktop-v1.1.0') : content;
+  const inner = nested ? join(content, 'agent-desktop-v1.3.1') : content;
   mkdirSync(inner, { recursive: true });
   const cli = join(inner, 'agent-desktop');
   writeFileSync(
@@ -161,9 +161,23 @@ test('a changed existing install is replaced', async () => {
   rmSync(toolsRoot, { recursive: true, force: true });
 });
 
+test('an existing 1.1.0 install needs the upgrade and 1.3.1 installs beside it', async () => {
+  const toolsRoot = scratch();
+  const oldDir = join(toolsRoot, 'agent-desktop', '1.1.0');
+  mkdirSync(oldDir, { recursive: true });
+  writeFileSync(join(oldDir, 'agent-desktop'), '#!/bin/sh\necho old\n');
+  const made = archive();
+  const { opts, downloads } = options(toolsRoot, made);
+  assert.equal(existsSync(finalBinary(toolsRoot)), false);
+  assert.deepEqual(await installAgentDesktop(opts), { ok: true, binary: finalBinary(toolsRoot) });
+  assert.equal(downloads(), 1);
+  assert.equal(existsSync(join(oldDir, 'agent-desktop')), true);
+  assert.equal(existsSync(finalBinary(toolsRoot)), true);
+});
+
 test('the runner env carries the tools path and the host shell on macOS only', () => {
   assert.deepEqual(ownComputerRunnerEnv('/runner', 'darwin', VERSION), {
-    CAIRN_AGENT_DESKTOP: '/runner/tools/agent-desktop/1.1.0/agent-desktop',
+    CAIRN_AGENT_DESKTOP: '/runner/tools/agent-desktop/1.3.1/agent-desktop',
     CAIRN_OWN_COMPUTER: '1',
   });
   assert.deepEqual(ownComputerRunnerEnv('/runner', 'linux', VERSION), {});
