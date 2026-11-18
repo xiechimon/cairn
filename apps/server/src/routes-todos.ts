@@ -4,14 +4,12 @@ import {
   IN_PROGRESS_PHASES,
   isStartedTodo,
   needsYouQuerySchema,
-  phaseSchema,
   runTodoOnBodySchema,
   type TodoRecord,
   tasksQuerySchema,
   threadMessageBodySchema,
 } from '@cairn/shared';
 import type { Hono } from 'hono';
-import { z } from 'zod';
 import type { AppContext } from './context.js';
 import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
@@ -42,7 +40,6 @@ import {
   deleteTodo,
   getTodo,
   listTodos,
-  resetTodo,
   retrySelfIssueCreate,
   setTodoArchived,
   updateTodo,
@@ -135,9 +132,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       prior.phase !== 'closed' &&
       isStartedTodo(prior)
     ) {
-      throw conflict(
-        `这张卡已经开始过，挪回待开始要重置（清空构建历史）：POST /api/todos/${id}/reset`,
-      );
+      throw conflict(`这张卡已经开始过，不能挪回待开始。`);
     }
     let record: TodoRecord | null;
     try {
@@ -225,34 +220,6 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     }
     if (!record) throw notFound(`todo ${id}`);
     return c.json({ state: 'done' as const, todo: record });
-  });
-
-  const resetTodoBodySchema = z.object({
-    expectedPhase: phaseSchema.optional(),
-    expectedBuildId: z.string().nullable().optional(),
-  });
-
-  app.post('/api/todos/:id/reset', async (c) => {
-    const id = c.req.param('id');
-    const body = parseWith(resetTodoBodySchema, await jsonBody(c), 'body');
-    const result = resetTodo(
-      svc,
-      id,
-      body.expectedPhase !== undefined || body.expectedBuildId !== undefined
-        ? { phase: body.expectedPhase, buildId: body.expectedBuildId }
-        : undefined,
-    );
-    if (!result) throw notFound(`todo ${id}`);
-    if (result.stale) {
-      return c.json(
-        {
-          error: '任务在你确认前发生了变化（构建已推进），请按最新状态重新确认。',
-          record: result.record,
-        },
-        409,
-      );
-    }
-    return c.json(result.record);
   });
 
   app.delete('/api/todos/:id', (c) => {

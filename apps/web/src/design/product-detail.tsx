@@ -1,5 +1,4 @@
 import { PHASE_VALUES } from '@cairn/shared';
-import { cn } from 'cn';
 import { useState } from 'react';
 import { TaskRefRow } from '../chief/chief-task-ref-row.js';
 import { ComposerAttachmentTile } from '../components/composer-attachment-tile.js';
@@ -13,16 +12,8 @@ import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
 import { WorkTrace } from '../detail/work-trace.js';
 import { useI18n } from '../i18n/provider.js';
 import { serializeMention } from '../overlay/mention-token.js';
-import type { DocView } from '../overlay/plan-dropdown.js';
 import { PHASE_UI } from '../phase.js';
-import {
-  CHANGES,
-  MENTION_GROUPS,
-  NOW,
-  PLAN_DOC,
-  sharedTodo,
-  TRANSCRIPT_WORK,
-} from './product-fixtures.js';
+import { MENTION_GROUPS, PLAN_DOC, sharedTodo, TRANSCRIPT_WORK } from './product-fixtures.js';
 import { Cell, Labeled, Section, Specimen } from './specimen.js';
 
 const READ_ONLY_REASON = '此任务为只读，请在实时工作区中打开后继续。';
@@ -55,12 +46,10 @@ function ComposerSpecimen() {
         <div className="w-160 pt-2">
           <Composer
             placeholder={PHASE_UI.review.placeholder ?? ''}
-            aiReview
             streaming={false}
             editable
             mentionGroups={MENTION_GROUPS}
             onSend={(text) => setSent((all) => [...all, text])}
-            onReview={() => setSent((all) => [...all, '/review'])}
             onAttachment={(files) => files.map((f) => f.name)}
           />
         </div>
@@ -69,12 +58,10 @@ function ComposerSpecimen() {
         <div className="w-160 pt-2">
           <Composer
             placeholder={PHASE_UI.review.placeholder ?? ''}
-            aiReview
             streaming={false}
             editable
             draft="Why does this crash on start?"
             onDraftChange={noop}
-            onReview={noop}
             onAttachment={(files) => files.map((f) => f.name)}
           />
         </div>
@@ -83,7 +70,6 @@ function ComposerSpecimen() {
         <div className="w-160 pt-2">
           <Composer
             placeholder={PHASE_UI.review.placeholder ?? ''}
-            aiReview={false}
             streaming={false}
             editable
             draft={ATTACHED_DRAFT}
@@ -123,7 +109,6 @@ function ComposerSpecimen() {
         <div className="w-160 pt-2">
           <Composer
             placeholder={PHASE_UI.building.placeholder ?? ''}
-            aiReview={false}
             streaming
             editable
             mentionGroups={MENTION_GROUPS}
@@ -136,7 +121,6 @@ function ComposerSpecimen() {
         <div className="w-160 pt-12">
           <Composer
             placeholder={PHASE_UI.confirm.placeholder ?? ''}
-            aiReview={false}
             streaming={false}
             editable
             draft={MENTION_DRAFT}
@@ -146,37 +130,21 @@ function ComposerSpecimen() {
       </Cell>
       <Cell label="Read only: secondary background, no tools, one sentence on how to continue">
         <div className="w-160">
-          <Composer placeholder={READ_ONLY_REASON} aiReview={false} streaming={false} readOnly />
+          <Composer placeholder={READ_ONLY_REASON} streaming={false} readOnly />
         </div>
       </Cell>
     </Specimen>
   );
 }
 
-function PaneSpecimen({ mode }: { mode: 'plan' | 'changes' }) {
-  const [view, setView] = useState<DocView>(mode === 'plan' ? 'plan' : 'changes');
+function PaneSpecimen() {
   return (
-    <div
-      className={cn(
-        'flex w-full overflow-hidden rounded-(--radius-card) bg-background ring-1 ring-border',
-        mode === 'plan' ? 'h-240' : 'h-110',
-      )}
-    >
+    <div className="flex h-240 w-full overflow-hidden rounded-(--radius-card) bg-background ring-1 ring-border">
       <div className="flex min-w-0 flex-1 flex-col items-center justify-center text-meta text-content-tertiary">
         Conversation column
       </div>
       <div className="flex w-120 flex-none flex-col shadow-[inset_1px_0_0_var(--border)]">
-        <DocPane
-          mode={view}
-          doc={PLAN_DOC}
-          changes={CHANGES}
-          now={NOW}
-          onDocView={setView}
-          planVersions={[
-            { v: 'v2', at: NOW - 600_000 },
-            { v: 'v1', at: NOW - 3_600_000 },
-          ]}
-        />
+        <DocPane doc={PLAN_DOC} />
       </div>
     </div>
   );
@@ -326,7 +294,6 @@ export function ProductDetailSection() {
         <div className="w-160 pt-2">
           <Composer
             placeholder={PHASE_UI.building.placeholder ?? ''}
-            aiReview={false}
             streaming
             editable
             queuedMessages={queued}
@@ -417,17 +384,14 @@ export function ProductDetailSection() {
         ))}
       </Specimen>
       <Specimen
-        id="plan-and-changes"
-        title="Plan and changes"
-        note="DocPane, as the project page hosts it. Switch plan and changes from the pane title or header buttons."
+        id="plan-doc"
+        title="Plan document"
+        note="DocPane, as the project page hosts it."
         stage="canvas"
         className="flex-col"
       >
         <Labeled label="Plan">
-          <PaneSpecimen mode="plan" />
-        </Labeled>
-        <Labeled label="Changes">
-          <PaneSpecimen mode="changes" />
+          <PaneSpecimen />
         </Labeled>
       </Specimen>
       <DialogsSpecimen />

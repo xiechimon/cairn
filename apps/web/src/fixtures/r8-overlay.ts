@@ -230,13 +230,6 @@ const R8_CONFIRM_TRANSCRIPT: TranscriptItem[] = [
       ],
     ],
   },
-  {
-    kind: 'plan',
-    title: '方案 · v1',
-    preview:
-      'Context r3-lifecycle 是一个纯静态单页仓库（index.html + README.md，无构建/测试/CI）。历史上每一轮 rN 探针任务（r3、r5b、r6、r7，见 README.md 现有内容及对应 commit 2f47b62、386b8e4、1cecf83、2cceb9d）都遵循…',
-    seconds: 161,
-  },
 ];
 
 export const boardR8Overlay: FixtureSet = {

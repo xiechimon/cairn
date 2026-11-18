@@ -4,7 +4,7 @@ import { mapTranscript, type MessageRow } from '../src/api/mappers.js';
 import { todo } from './helpers.js';
 
 function render(messages: MessageRow[]) {
-  return mapTranscript({ messages, steps: [], plans: [], build: null, todo: todo(12, 'done'), machineName: null, userName: 'Ian', liveText: '' });
+  return mapTranscript({ messages, steps: [], build: null, todo: todo(12, 'done'), machineName: null, userName: 'Ian', liveText: '' });
 }
 
 function call(id: string, name: string, args: Record<string, unknown>, at: number, timing?: Pick<ToolCallRecord, 'startedAt' | 'endedAt'>): MessageRow {
@@ -72,7 +72,6 @@ test('a skill summary does not split historical calls from live thinking', () =>
   const items = mapTranscript({
     messages: [call('skill', 'read', { path: '/skills/verify/SKILL.md' }, 1000)],
     steps: [{ id: 'step', buildId: 'build', kind: 'build', machineId: null, createdAt: 500, status: 'claimed', checkpointCommit: null, skillInjection: null }],
-    plans: [],
     build: { id: 'build', todoId: 'todo', withPlan: false, prevPhase: null, triggerSource: 'user', planDocId: null, errorMessage: null, prUrl: null, prNumber: null, diffHash: null, createdAt: 500 },
     todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '', liveThinking: 'Choosing verification',
   });
@@ -88,7 +87,7 @@ test('a skill summary does not split historical calls from live thinking', () =>
 
 test('a call left without a result only spins while its step is still running', () => {
   const unfinished: MessageRow = { id: 'cut', role: 'assistant', createdAt: 1000, content: { kind: 'toolcall', call: { id: 'cut', name: 'Bash', arguments: { command: 'sleep 60' } } } };
-  const at = (status: 'claimed' | 'stopped') => mapTranscript({ messages: [unfinished], steps: [{ id: 'step', buildId: 'build', kind: 'build' as const, machineId: null, createdAt: 500, status, checkpointCommit: null, skillInjection: null }], plans: [], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '' });
+  const at = (status: 'claimed' | 'stopped') => mapTranscript({ messages: [unfinished], steps: [{ id: 'step', buildId: 'build', kind: 'build' as const, machineId: null, createdAt: 500, status, checkpointCommit: null, skillInjection: null }], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '' });
   expect(at('claimed')[0]).toMatchObject({ steps: [{ running: true, unfinished: false }] });
   expect(at('stopped')[0]).toMatchObject({ steps: [{ running: false, unfinished: true }] });
 });
@@ -99,7 +98,7 @@ test('backend search tools count as searches', () => {
 
 test('a running call with only a start time shows no duration instead of the gap before it', () => {
   const live: MessageRow = { id: 'live', role: 'assistant', createdAt: 9000, content: { kind: 'toolcall', call: { id: 'live', name: 'Bash', arguments: { command: 'pnpm test' }, startedAt: 8500 } } };
-  const items = mapTranscript({ messages: [{ id: 'think', role: 'assistant', content: [{ type: 'thinking', thinking: 'plan' }], createdAt: 1000 }, live], steps: [{ id: 'step', buildId: 'build', kind: 'build', machineId: null, createdAt: 500, status: 'claimed', checkpointCommit: null, skillInjection: null }], plans: [], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '' });
+  const items = mapTranscript({ messages: [{ id: 'think', role: 'assistant', content: [{ type: 'thinking', thinking: 'plan' }], createdAt: 1000 }, live], steps: [{ id: 'step', buildId: 'build', kind: 'build', machineId: null, createdAt: 500, status: 'claimed', checkpointCommit: null, skillInjection: null }], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '' });
   expect(items[0]).toMatchObject({ steps: [{ kind: 'think' }, { running: true, seconds: null }] });
 });
 
@@ -112,7 +111,7 @@ test('a call cut off in an earlier step stays unfinished when the same build res
       { id: 'failed', buildId: 'build', kind: 'build', machineId: null, createdAt: 500, status: 'failed', checkpointCommit: null, skillInjection: null },
       { id: 'resumed', buildId: 'build', kind: 'build', machineId: null, createdAt: 5000, status: 'claimed', checkpointCommit: null, skillInjection: null },
     ],
-    plans: [], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '',
+    build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '',
   });
   expect(items[0]).toMatchObject({ steps: [{ running: false, unfinished: true }, { running: true, unfinished: false }] });
 });
@@ -128,7 +127,7 @@ test('only calls interrupted by a stopped step are labelled cancelled after cont
       { id: 'stopped', buildId: 'build', kind: 'build', status: 'stopped', machineId: null, createdAt: 500, checkpointCommit: null, skillInjection: null },
       { id: 'next', buildId: 'build', kind: 'build', status: 'claimed', machineId: null, createdAt: 5000, checkpointCommit: null, skillInjection: null },
     ],
-    plans: [], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Owner', liveText: '',
+    build: null, todo: todo(12, 'building'), machineName: null, userName: 'Owner', liveText: '',
   });
   expect(items[0]).toMatchObject({ steps: [{ cancelled: true, running: false }, { cancelled: false }, { cancelled: false, running: true }] });
 });

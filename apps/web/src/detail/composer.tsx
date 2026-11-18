@@ -27,7 +27,7 @@ import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
-import { Lock, Paperclip, Plus, SearchPlus } from '../icons/index.js';
+import { Lock, Paperclip, Plus } from '../icons/index.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
 import { useFileDrop } from '../overlay/file-drop.js';
@@ -44,7 +44,6 @@ const COMPOSER_INPUT =
 
 interface ComposerProps {
   placeholder: string;
-  aiReview: boolean;
   streaming: boolean;
   onSend?: (text: string) => void | Promise<void>;
   onQueue?: (text: string) => void | Promise<void>;
@@ -57,7 +56,6 @@ interface ComposerProps {
   mentionGroups?: MentionGroups;
   mentionFiles?: FileMentionEntry[];
   onStop?: () => void;
-  onReview?: () => void;
   queuedMessages?: QueuedCapsule[] | undefined;
   onSendQueuedNow?: ((id: string, content: string) => Promise<unknown>) | undefined;
   onRemoveQueued?: ((id: string, content: string) => Promise<unknown>) | undefined;
@@ -68,7 +66,6 @@ interface ComposerProps {
 
 export function Composer({
   placeholder,
-  aiReview,
   streaming,
   onSend,
   onQueue,
@@ -81,7 +78,6 @@ export function Composer({
   mentionGroups,
   mentionFiles,
   onStop,
-  onReview,
   queuedMessages,
   onSendQueuedNow,
   onRemoveQueued,
@@ -145,9 +141,7 @@ export function Composer({
     mentionGroups,
     mentionFiles,
     slash: {
-      reviewAvailable: aiReview && onReview !== undefined,
       stopAvailable: streaming && onStop !== undefined,
-      ...(onReview !== undefined ? { onReview } : {}),
       ...(onStop !== undefined ? { onStop } : {}),
     },
     growCap: 384,
@@ -203,12 +197,6 @@ export function Composer({
           <Paperclip width={20} height={20} />
           {t('添加附件')}
         </KeyedMenuItem>
-        {aiReview && (
-          <KeyedMenuItem shortcut="R" onClick={onReview}>
-            <SearchPlus width={20} height={20} />
-            {t('审阅')}
-          </KeyedMenuItem>
-        )}
         {narrow && menuMeter != null && (
           <>
             <DropdownMenuSeparator />

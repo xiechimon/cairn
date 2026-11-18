@@ -40,7 +40,7 @@ describe('manual drop matrix (#753): done source', () => {
     expect(await res.json()).toHaveProperty('error');
   });
 
-  test('done->todo: never started = 200; changed (already started) = 409 pointing at /reset (#1486)', async () => {
+  test('done->todo: never started = 200; changed (already started) = 409 (#1486)', async () => {
     const fresh = await setup('done');
     const res = await patchPhase(fresh.s, fresh.id, 'todo');
     expect(res.status).toBe(200);
@@ -76,7 +76,7 @@ describe('manual drop matrix (#753): awaiting source', () => {
     }
   });
 
-  test('confirm/review->todo = 200 (reference site: started cards drag back to to-do; reset semantics separate ticket)', async () => {
+  test('confirm/review->todo = 200 (reference site: unstarted cards can return to to-do)', async () => {
     for (const phase of ['confirm', 'review'] as const) {
       const { s, id } = await setup(phase);
       const res = await patchPhase(s, id, 'todo');
@@ -126,7 +126,7 @@ describe('manual drop matrix (#753): to-do/in-progress sources and non-landing p
     expect((await patchPhase(s, id, 'review')).status).toBe(409);
   });
 
-  test('building->done = 200; building->todo = 409 pointing at /reset (in-progress is already started, #1486)', async () => {
+  test('building->done = 200; building->todo = 409 (in-progress is already started, #1486)', async () => {
     const a = await setup('building');
     expect((await patchPhase(a.s, a.id, 'todo')).status).toBe(409);
     const b = await setup('building');

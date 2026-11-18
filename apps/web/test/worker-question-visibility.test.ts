@@ -20,7 +20,6 @@ test('worker question rows reach the task transcript', () => {
   const items = mapTranscript({
     messages: [{ id: 'ask-12345678', role: 'assistant', content: QUESTION, createdAt: NOW }],
     steps: [],
-    plans: [],
     build: null,
     todo: todo(1, 'needs_input'),
     machineName: null,

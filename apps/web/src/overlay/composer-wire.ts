@@ -65,9 +65,7 @@ export interface ComposerWireOptions {
   mentionGroups?: MentionGroups;
   mentionFiles?: FileMentionEntry[];
   slash?: {
-    reviewAvailable: boolean;
     stopAvailable: boolean;
-    onReview?: () => void;
     onStop?: () => void;
   };
   growCap?: number;
@@ -301,7 +299,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     return buildSlashSections({
       query: slashRange.query,
       available: {
-        review: slashOptions?.reviewAvailable === true,
         stop: slashOptions?.stopAvailable === true,
       },
       skills: (mentionGroups?.skill ?? []).map((s) => ({
@@ -320,7 +317,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       buildSlashSections({
         query: '',
         available: {
-          review: slashOptions?.reviewAvailable === true,
           stop: slashOptions?.stopAvailable === true,
         },
         skills: [],
@@ -538,9 +534,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
         break;
       case 'attach':
         openFilePicker();
-        break;
-      case 'review':
-        slashOptions?.onReview?.();
         break;
       case 'stop':
         slashOptions?.onStop?.();

@@ -34,7 +34,6 @@ function transcript(liveThinking: string, steps: StepJournalRow[]) {
   return mapTranscript({
     messages: [],
     steps,
-    plans: [],
     build: BUILD,
     todo: todo(9, 'building'),
     machineName: null,

@@ -24,7 +24,7 @@ export function slashFilter<T>(
 
 export type SlashRowKind = 'insert' | 'execute';
 
-export type BuiltinSlashName = 'clear' | 'attach' | 'review' | 'stop' | 'help';
+export type BuiltinSlashName = 'clear' | 'attach' | 'stop' | 'help';
 
 export interface BuiltinSlashDef {
   name: BuiltinSlashName;
@@ -36,7 +36,6 @@ export interface BuiltinSlashDef {
 export const BUILTIN_SLASH_COMMANDS: BuiltinSlashDef[] = [
   { name: 'clear', aliases: ['new'], descKey: '清空输入', kind: 'execute' },
   { name: 'attach', aliases: [], descKey: '添加附件', kind: 'execute' },
-  { name: 'review', aliases: [], descKey: '发起 AI 审核', kind: 'execute' },
   { name: 'stop', aliases: ['cancel'], descKey: '停止当前运行', kind: 'execute' },
   { name: 'help', aliases: [], descKey: '查看命令说明', kind: 'execute' },
 ];
@@ -48,7 +47,6 @@ export interface SkillEntry {
 }
 
 export interface AvailableSlash {
-  review: boolean;
   stop: boolean;
 }
 
@@ -91,7 +89,6 @@ export function buildSlashSections({
   const builtinNames = new Set(BUILTIN_SLASH_COMMANDS.map((c) => c.name.toLowerCase()));
   const builtinRows: SlashRow[] = [];
   for (const def of BUILTIN_SLASH_COMMANDS) {
-    if (def.name === 'review' && !available.review) continue;
     if (def.name === 'stop' && !available.stop) continue;
     if (!matches([def.name, ...def.aliases])) continue;
     builtinRows.push({ name: def.name, kind: 'execute', builtin: def.name, descKey: def.descKey });

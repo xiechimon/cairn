@@ -5,7 +5,7 @@ import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { LiveRow, LiveSignal, TaskBlockedRow, TaskLiveRow } from '../components/chat/live-row.js';
+import { TaskBlockedRow, TaskLiveRow } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
@@ -20,7 +20,7 @@ import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
+import { Clock } from '../icons/index.js';
 import { inlineSegments } from '../lib/markdown.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, TaskCard } from './chat-markdown.js';
 import { failFactsText } from './fail-facts.js';
@@ -28,22 +28,9 @@ import { Segments } from './segments.js';
 import { shouldExpandLastWork } from './work-expansion.js';
 import { WorkTrace } from './work-trace.js';
 
-export interface LiveStep {
-  step: string;
-  machine: string | null;
-}
-
 interface TranscriptProps {
   transcript: TranscriptItem[];
-  liveStep?: LiveStep | null;
-  agent?: { displayName: string; avatarUrl: string | null } | null;
-  onOpenPlan?: () => void;
   result?: ReactNode;
-}
-
-function formatElapsed(seconds: number, t: TFunc): string {
-  const elapsed = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-  return t('完成 {elapsed}', { elapsed });
 }
 
 const ROW_BASE = 'flex items-start';
@@ -86,41 +73,6 @@ const FINDING_SEVERITY_LABEL = {
   suggestion: '可改进',
   info: '备注',
 } as const;
-
-function ActionRow({
-  seconds,
-  bare,
-  copy,
-  t,
-}: {
-  seconds?: number;
-  bare?: boolean;
-  copy: string;
-  t: TFunc;
-}) {
-  return (
-    <div
-      className="chat-row-icons mt-1.5 flex items-center gap-3.5 text-(--text-tertiary)"
-      data-testid="msg-actions"
-    >
-      {(seconds != null || bare === true) && (
-        <span className="text-meta whitespace-nowrap text-(--text-tertiary)">
-          {seconds != null ? formatElapsed(seconds, t) : t('完成')}
-        </span>
-      )}
-      <Button
-        variant="ghost"
-        className="chat-copy h-auto justify-start rounded-none border-none bg-transparent p-0 hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit [&_svg:not([class*='size-'])]:size-auto"
-        aria-label={t('复制')}
-        onClick={() => {
-          void navigator.clipboard.writeText(copy);
-        }}
-      >
-        <Copy width={13} height={13} />
-      </Button>
-    </div>
-  );
-}
 
 function RowTools({
   placement,
@@ -181,9 +133,6 @@ function Row({
   item,
   prev,
   t,
-  onOpenPlan,
-  agent,
-  liveStep,
   defaultExpanded,
   entering,
   enteringUser,
@@ -191,9 +140,6 @@ function Row({
   item: TranscriptItem;
   prev: TranscriptItem | undefined;
   t: TFunc;
-  onOpenPlan?: () => void;
-  agent: { displayName: string; avatarUrl: string | null } | null;
-  liveStep: LiveStep | null;
   defaultExpanded: boolean;
   entering: Set<string>;
   enteringUser: string | null;
@@ -276,7 +222,7 @@ function Row({
             {t('由定时发起')}
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <Transcript transcript={item.items} agent={agent} onOpenPlan={onOpenPlan} />
+            <Transcript transcript={item.items} />
           </CollapsibleContent>
         </Collapsible>
       );
@@ -374,84 +320,20 @@ function Row({
     case 'streaming':
       return (
         <div className={`${AGENT_ROW} ${margin} [&>*]:max-w-full`} data-row="agent">
-          {liveStep == null ? (
-            item.blocked === true ? (
-              <TaskBlockedRow
-                text={t(item.label, item.labelVars)}
-                actions={<CoordinatorFixLinks kind={item.blockedKind} />}
-              />
-            ) : (
-              <TaskLiveRow
-                testId="live-row"
-                label={t(item.label, item.labelVars)}
-                seconds={item.seconds}
-                startedAt={item.startedAt}
-              />
-            )
+          {item.blocked === true ? (
+            <TaskBlockedRow
+              text={t(item.label, item.labelVars)}
+              actions={<CoordinatorFixLinks kind={item.blockedKind} />}
+            />
           ) : (
-            <LiveRow
-              variant="detail"
-              label={item.label}
-              labelVars={item.labelVars}
-              disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
-            >
-              <div className="mt-1 flex flex-col gap-0.5 text-meta text-(--text-tertiary)">
-                <span className="[overflow-wrap:anywhere]">
-                  {t('本步：{n}', { n: liveStep.step })}
-                </span>
-                {liveStep.machine != null && (
-                  <span className="[overflow-wrap:anywhere]">
-                    {t('执行机：{n}', { n: liveStep.machine })}
-                  </span>
-                )}
-                {(item.skills ?? []).map((s) => (
-                  <span
-                    key={`${s.name}:${s.denied ? 'x' : 'r'}`}
-                    className="[overflow-wrap:anywhere]"
-                    data-testid="skill-line"
-                  >
-                    {s.denied
-                      ? t('✕ 技能：{n}（已挡下）', { n: s.name })
-                      : t('读取技能：{n}', { n: s.name })}
-                  </span>
-                ))}
-                <LiveSignal at={item.signalAt} className="[overflow-wrap:anywhere]" />
-              </div>
-            </LiveRow>
+            <TaskLiveRow
+              testId="live-row"
+              label={t(item.label, item.labelVars)}
+              seconds={item.seconds}
+              startedAt={item.startedAt}
+            />
           )}
         </div>
-      );
-    case 'plan':
-      return (
-        <>
-          <div className="chat-plan mt-3.5 flex items-center text-meta text-foreground [&_svg]:text-(--text-tertiary)">
-            <FileTab width={16} height={16} />
-            <span className="chat-plan-title ml-1.5">{item.title}</span>
-            {onOpenPlan != null ? (
-              <Button
-                variant="ghost"
-                className="ml-auto mr-1.5 flex h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-[length:inherit] leading-[inherit] font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto"
-                aria-label={t('打开方案')}
-                onClick={onOpenPlan}
-              >
-                <ExternalLink width={12} height={12} />
-              </Button>
-            ) : (
-              <span className="ml-auto mr-1.5 flex">
-                <ExternalLink width={12} height={12} />
-              </span>
-            )}
-          </div>
-          <div className="mt-2 max-h-10 flex-none overflow-hidden pr-6 text-meta leading-5 text-foreground [mask-image:linear-gradient(to_bottom,black_50%,transparent)]">
-            {item.preview}
-          </div>
-          <ActionRow
-            seconds={item.seconds}
-            bare={item.seconds == null}
-            copy={`${item.title}\n${item.preview}`}
-            t={t}
-          />
-        </>
       );
     case 'work':
       return <WorkTrace item={item} defaultExpanded={defaultExpanded} entering={entering} t={t} />;
@@ -464,8 +346,6 @@ function Row({
           ].join(' · ')}
         </StatusLine>
       );
-    case 'elapsed':
-      return null;
     case 'review':
       return (
         <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
@@ -745,13 +625,7 @@ function verifyCopyText(item: Extract<TranscriptItem, { kind: 'verify' }>): stri
   ].join('\n');
 }
 
-export function Transcript({
-  transcript,
-  agent = null,
-  onOpenPlan,
-  liveStep = null,
-  result,
-}: TranscriptProps) {
+export function Transcript({ transcript, result }: TranscriptProps) {
   const { t } = useI18n();
   const previous = useRef<{ live: boolean; ids: Set<string> }>({ live: false, ids: new Set() });
   const live = transcript.some(
@@ -800,9 +674,6 @@ export function Transcript({
           item={item}
           prev={transcript[index - 1]}
           t={t}
-          onOpenPlan={onOpenPlan}
-          agent={agent}
-          liveStep={liveStep}
           defaultExpanded={item === lastWork || (item.kind === 'work' && item.expanded === true)}
           entering={entering}
           enteringUser={enteringUser}

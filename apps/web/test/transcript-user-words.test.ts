@@ -66,7 +66,6 @@ function render(overrides: {
   return mapTranscript({
     messages: overrides.messages,
     steps: overrides.steps ?? [],
-    plans: [],
     build: overrides.build === undefined ? BUILD : overrides.build,
     todo: overrides.todo ?? { ...base, title: TITLE, spec: SPEC },
     machineName: null,

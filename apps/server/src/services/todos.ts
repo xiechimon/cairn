@@ -20,7 +20,6 @@ import {
   githubIssueSourceRef,
   IN_PROGRESS_PHASES,
   isBackendRuntimeId,
-  isStartedTodo,
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
@@ -33,9 +32,7 @@ import {
   build,
   machine,
   message,
-  plan as planTable,
   schedule,
-  steerPending,
   step,
   stepUsage,
   stopPending,
@@ -925,76 +922,6 @@ export function settleSplitOnDone(deps: TodoDeps, childId: string): void {
   if (parent.latestBuildId !== null) {
     insertGateAnnouncement(deps, parent.latestBuildId, DONE_ANNOUNCEMENT, 'Coordinator');
   }
-}
-
-export function resetTodo(
-  deps: TodoDeps & { convHub?: ConversationStreamHub },
-  id: string,
-  expected?: { phase?: Phase; buildId?: string | null },
-): { stale: boolean; record: TodoRecord } | null {
-  const { db, hub } = deps;
-  const row = getRow(deps, id);
-  if (!row) return null;
-  const current = getTodo(deps, id);
-  if (!current) return null;
-  if (expected?.phase !== undefined && expected.phase !== row.phase) {
-    return { stale: true, record: current };
-  }
-  if (expected?.buildId !== undefined && expected.buildId !== row.latestBuildId) {
-    return { stale: true, record: current };
-  }
-  if (!isStartedTodo(row)) return { stale: false, record: current };
-
-  const buildRows = db.select().from(build).where(eq(build.todoId, id)).all();
-  const buildIds = buildRows.map((b) => b.id);
-  if (buildIds.length > 0) {
-    for (const b of buildRows) {
-      const active = db
-        .select()
-        .from(step)
-        .where(and(eq(step.buildId, b.id), inArray(step.status, ['pending', 'claimed'])))
-        .orderBy(asc(step.createdAt))
-        .all()
-        .at(-1);
-      if (active?.status === 'claimed') {
-        db.insert(stopPending)
-          .values({ conversationId: b.id, stepId: active.id, discard: false, createdAt: nowMs() })
-          .onConflictDoUpdate({
-            target: stopPending.conversationId,
-            set: { stepId: active.id, discard: false, createdAt: nowMs() },
-          })
-          .run();
-        deps.machineHub?.stopSignal(row.teamId, active.id);
-      }
-    }
-    db.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
-    db.delete(steerPending).where(inArray(steerPending.conversationId, buildIds)).run();
-    db.delete(step).where(inArray(step.buildId, buildIds)).run();
-    db.delete(message).where(inArray(message.conversationId, buildIds)).run();
-    db.delete(planTable).where(inArray(planTable.buildId, buildIds)).run();
-    db.delete(build).where(eq(build.todoId, id)).run();
-    for (const bid of buildIds) deps.convHub?.clearConversationBuffer(bid);
-  }
-  const resetAt = nowMs();
-  db.update(todo)
-    .set({
-      phase: 'todo',
-      phaseAt: resetAt,
-      ...archiveWithPhase(row, 'todo', resetAt),
-      hasPlan: false,
-      hasChanges: false,
-      latestBuildId: null,
-      lastRunAt: null,
-      userMessageAttachmentIds: [],
-      v: row.v + 1,
-    })
-    .where(eq(todo.id, id))
-    .run();
-
-  const record = getTodo(deps, id);
-  if (!record) return null;
-  hub.publishTodoDoc(record.teamId, record);
-  return { stale: false, record };
 }
 
 export function deleteTodo(deps: TodoDeps, id: string): boolean {

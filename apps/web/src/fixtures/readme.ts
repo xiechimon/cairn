@@ -236,13 +236,6 @@ function readmeFixture(copy: Copy): FixtureSet {
   const exportTranscript: TranscriptItem[] = [
     { kind: 'user', text: copy.askExport, createdAt: at(DAY, 9, 31) },
     {
-      kind: 'plan',
-      title: copy.plan.title,
-      preview: copy.plan.preview,
-      seconds: 48,
-      createdAt: at(DAY, 9, 33),
-    },
-    {
       kind: 'work',
       id: 'readme-work',
       expanded: true,

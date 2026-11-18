@@ -584,14 +584,6 @@ describe('F7 the existing delete paths succeed with gate rows present', () => {
     });
   }
 
-  test('resetting a todo (steps deleted first, then builds)', async () => {
-    const { s, todoId, buildId } = await started();
-    const res = await req(s.app, 'POST', `/api/todos/${todoId}/reset`, {});
-    expect(res.status).toBe(200);
-    expectGone(s, buildId);
-    s.dispose();
-  });
-
   test('deleting a todo (todo -> build cascade)', async () => {
     const { s, todoId, buildId } = await started();
     const res = await req(s.app, 'DELETE', `/api/todos/${todoId}`);

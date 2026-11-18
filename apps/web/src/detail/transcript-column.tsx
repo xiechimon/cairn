@@ -22,7 +22,7 @@ import type { TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
 import { openingAnchor } from './scroll-anchor.js';
-import { type LiveStep, Transcript } from './transcript.js';
+import { Transcript } from './transcript.js';
 
 const ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const VIEWPORT_CLS = 'chat-col pt-3 pl-4 pr-[calc(1rem-var(--scrollbar-gutter,0px))]';
@@ -35,9 +35,6 @@ export interface TranscriptColumnHandle {
 
 interface TranscriptColumnProps {
   transcript: TranscriptItem[];
-  liveStep: LiveStep | null;
-  agent: { displayName: string; avatarUrl: string | null } | null;
-  onOpenPlan?: () => void;
   lead?: ReactNode;
   result?: ReactNode;
   autoScroll: boolean;
@@ -66,9 +63,6 @@ export const TranscriptColumn = forwardRef<TranscriptColumnHandle, TranscriptCol
 
 function TranscriptColumnInner({
   transcript,
-  liveStep,
-  agent,
-  onOpenPlan,
   lead,
   result,
   running,
@@ -143,14 +137,7 @@ function TranscriptColumnInner({
       >
         <MessageScrollerContent ref={setRows} className={CONTENT_CLS}>
           {lead}
-          <Transcript
-            key={threadKey}
-            transcript={transcript}
-            liveStep={liveStep}
-            agent={agent}
-            onOpenPlan={onOpenPlan}
-            result={result}
-          />
+          <Transcript key={threadKey} transcript={transcript} result={result} />
         </MessageScrollerContent>
       </FadeScrollerViewport>
       <JumpToLatestButton label={t('滚动到最新')}>

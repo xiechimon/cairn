@@ -30,7 +30,7 @@ async function setup(phase: Phase, history: History = {}): Promise<{ s: TestServ
 const row = (s: TestServer, id: string) =>
   s.db.select().from(todoTable).where(eq(todoTable.id, id)).get();
 
-describe('the PATCH phase=todo reset gate (#1486)', () => {
+describe('the PATCH phase=todo gate for started cards (#1486)', () => {
   test.each<[Phase, History]>([
     ['done', { hasChanges: true }],
     ['review', { latestBuildId: 'build-1' }],
@@ -39,13 +39,13 @@ describe('the PATCH phase=todo reset gate (#1486)', () => {
     ['queued', {}],
     ['planning', {}],
     ['building', {}],
-  ])('失败方式 1：已开始的 %s 卡 %j → 409 指向 /reset，卡不动', async (phase, history) => {
+  ])('失败方式 1：已开始的 %s 卡 %j → 409，卡不动', async (phase, history) => {
     const { s, id } = await setup(phase, history);
     const before = row(s, id);
     const res = await req(s.app, 'PATCH', `/api/todos/${id}`, { phase: 'todo' });
     expect(res.status).toBe(409);
     const body = (await res.json()) as { error: string };
-    expect(body.error).toContain(`/api/todos/${id}/reset`);
+    expect(body.error).toContain('已经开始过');
     expect(row(s, id)).toEqual(before);
   });
 

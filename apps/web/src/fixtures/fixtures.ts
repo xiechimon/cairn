@@ -90,12 +90,9 @@ export { projectFixture } from './projects.js';
 export {
   agentTodoLive,
   boardFailed,
-  compareMenuV2,
   detailFailed12,
   detailFailed15Set,
   detailV3Collapsed,
-  diffV1V2,
-  diffV2V3,
   history12,
   history15,
   mdToolout,
@@ -107,9 +104,6 @@ export {
   revisionChain,
   revisionStreaming,
   skillsRouting,
-  versionCompareWithChanges,
-  versionMenuV2,
-  versionMenuV3,
 } from './r8-dynamic.js';
 export {
   boardR8Overlay,

@@ -619,7 +619,7 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
     expect(unknown.status).toBe(410);
   });
 
-  test('#1488 card reset deletes the running steps -> heartbeat 410; steps this machine still holds -> 200', async () => {
+  test('#1488 card deletion removes the running steps -> heartbeat 410; steps this machine still holds -> 200', async () => {
     const w = await setupWorld({ claimHoldMs: 200 });
     await w.startBuild(true);
     const { body } = await w.claim();
@@ -630,8 +630,8 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
         body: {},
       });
     expect((await beat()).status).toBe(200);
-    expect((await call(w.s.app, 'POST', `/api/todos/${w.todoId}/reset`, { body: {} })).status).toBe(
-      200,
+    expect((await call(w.s.app, 'DELETE', `/api/todos/${w.todoId}`, { body: {} })).status).toBe(
+      204,
     );
     const gone = await beat();
     expect(gone.status).toBe(410);

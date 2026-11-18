@@ -75,7 +75,6 @@ function render(messages: MessageRow[], phase: 'failed' | 'building' = 'failed')
   return mapTranscript({
     messages,
     steps: [],
-    plans: [],
     build: FAILED_BUILD,
     todo: todo(1, phase),
     machineName: null,
@@ -220,7 +219,6 @@ describe('task thread hierarchy', () => {
     const items = mapTranscript({
       messages: rows([['system', legacy]]),
       steps: [],
-      plans: [],
       build: { ...FAILED_BUILD, errorMessage: reason },
       todo: todo(1, 'failed'),
       machineName: null,
@@ -244,7 +242,6 @@ describe('task thread hierarchy', () => {
     const items = mapTranscript({
       messages: rows([['system', offline]]),
       steps: [],
-      plans: [],
       build: { ...FAILED_BUILD, errorMessage: 'request timed out talking to the model' },
       todo: todo(1, 'failed'),
       machineName: null,

@@ -99,13 +99,6 @@ const PROBE_CONFIRM_TRANSCRIPT: TranscriptItem[] = [
       [{ text: '任务简单明确:在 README.md 末尾追加一行新文本,文件已有末尾换行行,直接追加即可。' }],
     ],
   },
-  {
-    kind: 'plan',
-    title: '方案 · v1',
-    preview:
-      'Context: 仓库根目录的 README.md 当前末尾一行为 "r6 rebaseline probe"(文件以换行符结尾)。需求是在文件末尾追加新的一行 "r7 rebaseline probe"。  Changes: README.md:在文件末尾追加一行新内容 "r7 rebaseline probe",保持与现有行一致的格式(纯文本行,行尾换行符),不改动文件中已有的其他内容。',
-    seconds: 21,
-  },
 ];
 
 export const PROBE_BUILD_OPEN: TranscriptItem[] = [
@@ -538,7 +531,6 @@ const LEGACY_NOW_TRANSCRIPT: TranscriptItem[] = [
     kind: 'robot',
     paragraphs: [[{ text: '已在 README.md 末尾追加了一行「r3 lifecycle probe」。' }]],
   },
-  { kind: 'elapsed', seconds: 25 },
 ];
 
 export function detailLegacyNow(freeze: Pick<FixtureSet, 'overlay' | 'ui'>): FixtureSet {

@@ -34,7 +34,7 @@ cairn opens one GitHub issue per task in a GitHub-linked project (`sourceKind = 
 
 ### Write paths
 
-- **Task state:** `setTodoPhase`, `updateAutonomousTodo`, `setTodoArchived` and `resetTodo` write phase or `archivedAt`, and so does every future path that writes them directly. None of them call the reconciler. The sweep selects every self-issue row whose desired state differs from `issueState`, using a database query only.
+- **Task state:** `setTodoPhase`, `updateAutonomousTodo` and `setTodoArchived` write phase or `archivedAt`, and so does every future path that writes them directly. None of them call the reconciler. The sweep selects every self-issue row whose desired state differs from `issueState`, using a database query only.
 - **Issue link:** `runSelfIssueCreate`, on first creation or a retry, sets `sourceRef` and `issueState = 'open'`. A task cancelled before creation finished is therefore picked up by the next sweep.
 - **Supersede:** `archive_todos` with `supersededBy` stores the successor id on the archived rows. When the successor's own issue is still being created, the sweep waits for it.
 - **Delete:** `deleteTodo` writes the tombstone in the same transaction that deletes the row. When a task is deleted while its issue is still being created, `runSelfIssueCreate` finds no row and writes a tombstone for the new issue.
@@ -63,7 +63,7 @@ The sweep runs with the PR watch, once a minute. A change on the board reaches G
 - failed stays open;
 - delete, and delete during creation, close through the tombstone;
 - cancel then reopen settles open;
-- reset reopens;
+- reopening a closed task reopens its issue;
 - a creation retry after cancel closes;
 - supersede links the successor;
 - the negative control: a path that writes `todo.phase = 'closed'` straight into the database, with no service call, still gets reconciled by the next sweep.

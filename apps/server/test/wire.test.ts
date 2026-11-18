@@ -129,7 +129,6 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/chief/threads/{tid}/stop',
   'POST /api/todos/{id}/orchestrate',
   'POST /api/todos/{id}/stop-and-done',
-  'POST /api/todos/{id}/reset',
   'POST /api/todos/{id}/archive',
   'POST /api/todos/{id}/unarchive',
   'GET /api/needs-you',

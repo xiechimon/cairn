@@ -6,7 +6,6 @@ import { nowMs } from '../src/lib/ids.js';
 import { rewindChiefThread, upsertChiefMessage } from '../src/services/chief.js';
 import { searchHistory } from '../src/services/chief-history.js';
 import { updateRequestTodo } from '../src/services/coordinator-request.js';
-import { resetTodo } from '../src/services/todos.js';
 import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { seedOwnerMessage } from './owner-message.js';
 
@@ -112,7 +111,19 @@ describe('synthetic transcript rows never authorize owner words', () => {
           : updateRequestTodo(toolDeps(), ctx(), params);
       };
       for (const started of [true, false]) {
-        if (!started) resetTodo(toolDeps(), created.id);
+        if (!started) {
+          H.s.db
+            .update(todo)
+            .set({
+              phase: 'todo',
+              latestBuildId: null,
+              lastRunAt: null,
+              hasChanges: false,
+              hasPlan: false,
+            })
+            .where(eq(todo.id, created.id))
+            .run();
+        }
         const before = H.s.db.select().from(todo).where(eq(todo.id, created.id)).get();
         const stepsBefore = H.s.db.select().from(step).all();
         expect(before?.phase).toBe(started ? 'queued' : 'todo');

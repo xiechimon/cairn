@@ -218,7 +218,7 @@ describe('#1445 closing a card cancels an in-flight stop-and-done reservation', 
 });
 
 describe('#1447 / #1486 raw PATCH cannot move a queued card back to to-do', () => {
-  test('queued -> todo: 409 pointing at /reset, card and pending step unchanged', async () => {
+  test('queued -> todo: 409, card and pending step unchanged', async () => {
     const w = makeWorld({ phase: 'queued', stepStatus: 'pending' });
     const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'todo' });
     expect(res.status).toBe(409);
@@ -252,7 +252,7 @@ describe('#1445 after a card leaves in-progress, a stop report no longer changes
     expect(todoPhase(w)).toBe('review');
   });
 
-  test('raw PATCH planning -> todo: 409 pointing at /reset, no stop sent (#1486)', async () => {
+  test('raw PATCH planning -> todo: 409, no stop sent (#1486)', async () => {
     const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
     const events: { type: string }[] = [];
     w.s.machineHub.subscribe(w.teamId, (ev) => {

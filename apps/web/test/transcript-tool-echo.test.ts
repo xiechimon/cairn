@@ -50,7 +50,6 @@ function render(messages: MessageRow[]): TranscriptItem[] {
   return mapTranscript({
     messages,
     steps: [],
-    plans: [],
     build: null,
     todo: todo(12, 'done'),
     machineName: null,

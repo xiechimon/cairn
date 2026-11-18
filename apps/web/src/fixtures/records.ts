@@ -26,7 +26,6 @@ import {
   type RouteOverride,
   type RunnerOfflineContent,
   type SecretListEntry,
-  type SkillFact,
   type StepPromptOrigin,
   type StepQueueBlocked,
   type TaskRequest,
@@ -429,13 +428,10 @@ export type TranscriptItem =
       startedAt?: number;
       label: string;
       labelVars?: Record<string, string | number>;
-      signalAt?: number;
-      skills?: SkillFact[];
       blocked?: true;
       blockedKind?: StepQueueBlocked['kind'];
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
-  | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }
   | {
       kind: 'work';
       id: string;
@@ -445,7 +441,6 @@ export type TranscriptItem =
       startedAt?: number;
       createdAt?: number;
     }
-  | { kind: 'elapsed'; seconds: number }
   | {
       kind: 'note';
       text: string;
@@ -555,38 +550,9 @@ export interface DetailContent {
   doc?: DocBlock[];
   changes?: ChangesContent;
   userMenuOpen?: boolean;
-  planVersions?: PlanVersion[];
-  versionMenu?: 'versions' | 'compare';
-  planDiff?: PlanDiffContent;
-  compareTarget?: PlanDiffContent;
-  revision?: RevisionStep;
   usage?: { rows: TokenUsage[]; machines: string[] };
   engineRun?: EngineRun;
   engineStage?: EngineRunStage;
-}
-
-export interface PlanVersion {
-  v: string;
-  at: number;
-}
-
-export interface PlanDiffContent {
-  from: string;
-  to: string;
-  files: DiffFile[];
-  expanded: boolean;
-}
-
-export interface RevisionStep {
-  feedback: string;
-  streaming: { seconds: number; label: string };
-  planDiff?: PlanDiffContent;
-  landed: {
-    planVersions: PlanVersion[];
-    doc: DocBlock[];
-    transcriptTail: TranscriptItem[];
-    planDiff: PlanDiffContent;
-  };
 }
 
 export interface ChiefSegment {

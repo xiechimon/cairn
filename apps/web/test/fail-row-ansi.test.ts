@@ -45,7 +45,6 @@ describe('mapTranscript failure row (#1262 fallback)', () => {
     const items = mapTranscript({
       messages: [],
       steps: [],
-      plans: [],
       build: POLLUTED_BUILD,
       todo: FAILED_CARD,
       machineName: null,
@@ -60,7 +59,6 @@ describe('mapTranscript failure row (#1262 fallback)', () => {
     const items = mapTranscript({
       messages: [],
       steps: [],
-      plans: [],
       build: { ...POLLUTED_BUILD, errorMessage: CLEAN },
       todo: FAILED_CARD,
       machineName: null,

@@ -398,7 +398,6 @@ function ThreadBody({
   onChangesOpen,
   origin,
   onJumpToOrigin,
-  onOpenPlan,
   onClose,
   usage,
   engine,
@@ -411,7 +410,6 @@ function ThreadBody({
   onChangesOpen: (open: boolean) => void;
   origin: ThreadOrigin | null;
   onJumpToOrigin: () => void;
-  onOpenPlan: (() => void) | undefined;
   onClose: () => void;
   usage: ThreadUsageView | null;
   engine: EngineRunView | undefined;
@@ -436,14 +434,11 @@ function ThreadBody({
         <ReportThreadContext.Provider value={reportThread}>
           <TranscriptColumn
             transcript={[
-              ...chat.transcript.filter((item) => item.kind !== 'plan'),
+              ...chat.transcript,
               ...(engine === undefined || engine.eventsInTranscript === true
                 ? []
                 : engineTranscript(engine.run)),
             ]}
-            liveStep={null}
-            agent={null}
-            onOpenPlan={onOpenPlan}
             lead={
               <ThreadLead
                 todo={todo}
@@ -511,7 +506,6 @@ function ThreadBody({
       {!archived && (
         <Composer
           placeholder={chat.started ? t('回复这个任务') : t('开始后才能回复')}
-          aiReview={false}
           streaming={chat.running}
           editable={chat.send !== undefined}
           readOnly={chat.locked}
@@ -771,7 +765,6 @@ function ReadyThread({
         onChangesOpen={onChangesOpen}
         origin={origin}
         onJumpToOrigin={jumpToOrigin}
-        onOpenPlan={openPlan}
         onClose={onClose}
         engine={engine}
         usage={
@@ -808,15 +801,7 @@ function ReadyThread({
               <ThreadUpdatesBlock updates={updates} />
             </div>
           )}
-          {chat.planDoc !== undefined && (
-            <DocPane
-              mode="plan"
-              doc={chat.planDoc}
-              changes={undefined}
-              now={now}
-              planVersions={chat.planVersions}
-            />
-          )}
+          {chat.planDoc !== undefined && <DocPane doc={chat.planDoc} />}
         </div>
       </DialogShell>
     </>

@@ -1,49 +1,14 @@
 import type { DiffFileContent } from '@cairn/shared';
 import { cn } from 'cn';
-import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { useBuildChangeFile } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { joinMeta, relativeTime } from '../board/rel-time.js';
-import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
-import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
-import type {
-  ChangesContent,
-  DiffFile,
-  DocBlock,
-  PlanDiffContent,
-  PlanVersion,
-} from '../fixtures/records.js';
+import type { DiffFile, DocBlock } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronDown, ChevronRight, Restore, UnfoldVertical } from '../icons/index.js';
-import {
-  type DocTypeLabel,
-  type DocView,
-  PaneTitle,
-  PaneViewButtons,
-} from '../overlay/plan-dropdown.js';
+import { ChevronDown, ChevronRight, UnfoldVertical } from '../icons/index.js';
 import { Segments } from './segments.js';
 import { computeHunkWordDiff } from './word-diff.js';
-
-interface DocPaneProps {
-  mode: 'plan' | 'changes' | 'diff';
-  doc: DocBlock[] | undefined;
-  changes: ChangesContent | undefined;
-  now: number;
-  onDocView?: (view: DocView) => void;
-  sections?: ReactNode;
-  planVersions?: PlanVersion[];
-  versionMenu?: 'versions' | 'compare';
-  onVersionMenu?: (menu: 'versions' | 'compare' | undefined) => void;
-  onCompare?: () => void;
-  onBase?: () => void;
-  planDiff?: PlanDiffContent;
-  onToggleExpand?: () => void;
-  buildId?: string | null;
-  emptyMeta?: ReactNode;
-  hideVersion?: boolean;
-}
 
 const HUNK_RANGE = /^@@ -(\d+)(?:,(\d+))? /;
 
@@ -70,8 +35,6 @@ function dirName(path: string): string {
   return path.slice(0, Math.max(0, path.lastIndexOf('/')));
 }
 
-const PANE_HEAD = 'flex h-10 flex-none items-center gap-1 px-2.5 text-meta text-(--text-secondary)';
-const PANE_SELECT = 'doc-pane-select ml-0 font-normal text-(--text-tertiary)';
 const DIFF_LINE =
   'flex items-center font-mono text-code leading-5 text-(--foreground) [font-variant-ligatures:none]';
 const DIFF_NO = 'w-8 flex-none pr-2 text-right text-(--text-tertiary) select-none';
@@ -278,116 +241,6 @@ export function DiffFileBody({
   );
 }
 
-function VersionMenu({
-  versions,
-  menu,
-  now,
-  diffOpen,
-  diffFrom,
-  onMenu,
-  onCompare,
-  onBase,
-}: {
-  versions: PlanVersion[];
-  menu: 'versions' | 'compare';
-  now: number;
-  diffOpen: boolean;
-  diffFrom?: string;
-  onMenu: (menu: 'versions' | 'compare' | undefined) => void;
-  onCompare: () => void;
-  onBase: () => void;
-}) {
-  const { t } = useI18n();
-  if (menu === 'compare') {
-    return (
-      <KeyedMenuContent align="end" side="bottom" sideOffset={8} className="w-auto min-w-17">
-        <KeyedMenuItem shortcut="P" onClick={onCompare}>
-          {t('上一版本')}
-        </KeyedMenuItem>
-      </KeyedMenuContent>
-    );
-  }
-  return (
-    <KeyedMenuContent align="end" side="bottom" sideOffset={8} className="w-53">
-      {versions.map((row, i) => (
-        <KeyedMenuItem
-          key={row.v}
-          shortcut={i < 9 ? String(i + 1) : undefined}
-          className={i === 0 ? 'font-semibold' : undefined}
-          onClick={() => onMenu(undefined)}
-        >
-          <span className="flex-1">{joinMeta([String(row.v), relativeTime(row.at, now, t)])}</span>
-          <Restore width={13} height={13} className="text-(--text-tertiary)" />
-        </KeyedMenuItem>
-      ))}
-      <KeyedMenuItem shortcut="C" closeOnClick={false} onClick={() => onMenu('compare')}>
-        <span className="flex-1">{t('与其他版本对比…')}</span>
-        {diffOpen && diffFrom != null && <span className="text-(--text-tertiary)">{diffFrom}</span>}
-      </KeyedMenuItem>
-      {diffOpen && (
-        <KeyedMenuItem shortcut="B" onClick={onBase}>
-          <span>{t('回到与基准版本对比')}</span>
-        </KeyedMenuItem>
-      )}
-    </KeyedMenuContent>
-  );
-}
-
-function VersionControl({
-  range,
-  label,
-  planVersions,
-  versionMenu,
-  now,
-  onVersionMenu,
-  onCompare,
-  onBase,
-}: {
-  range?: { from: string; to: string };
-  label?: string;
-  planVersions?: PlanVersion[];
-  versionMenu?: 'versions' | 'compare';
-  now: number;
-  onVersionMenu?: (menu: 'versions' | 'compare' | undefined) => void;
-  onCompare?: () => void;
-  onBase?: () => void;
-}) {
-  return (
-    <span className="relative inline-flex">
-      <DropdownMenu
-        open={versionMenu != null}
-        onOpenChange={(next: boolean) => onVersionMenu?.(next ? 'versions' : undefined)}
-      >
-        {range != null ? (
-          <DropdownMenuTrigger render={<Button variant="outline" size="xs" />}>
-            {range.from} → {range.to}
-            <ChevronDown width={12} height={12} />
-          </DropdownMenuTrigger>
-        ) : (
-          <DropdownMenuTrigger
-            render={<Button variant="ghost" size="xs" className={PANE_SELECT} />}
-          >
-            {label}
-            <ChevronDown width={12} height={12} />
-          </DropdownMenuTrigger>
-        )}
-        {onVersionMenu != null && planVersions != null && (
-          <VersionMenu
-            versions={planVersions}
-            menu={versionMenu ?? 'versions'}
-            now={now}
-            diffOpen={range != null}
-            diffFrom={range?.from}
-            onMenu={onVersionMenu}
-            onCompare={() => onCompare?.()}
-            onBase={() => onBase?.()}
-          />
-        )}
-      </DropdownMenu>
-    </span>
-  );
-}
-
 function docBlockClass(kind: string, first: boolean): string {
   const base = 'text-card-title break-words text-(--foreground)';
   if (kind === 'para') return `${base}${first ? '' : ' mt-2'}`;
@@ -395,153 +248,33 @@ function docBlockClass(kind: string, first: boolean): string {
   return `${base} ${first ? 'mt-0' : 'mt-6'} mb-1.5 text-meta font-medium text-(--text-tertiary)`;
 }
 
-export function DocPane({
-  mode,
-  doc,
-  changes,
-  now,
-  onDocView,
-  sections,
-  planVersions,
-  versionMenu,
-  onVersionMenu,
-  onCompare,
-  onBase,
-  planDiff,
-  onToggleExpand,
-  buildId,
-  emptyMeta,
-  hideVersion = false,
-}: DocPaneProps) {
+export function DocPane({ doc }: { doc: DocBlock[] | undefined }) {
   const { t } = useI18n();
-  const versionLabel = (): string => {
-    const latest = planVersions?.[0];
-    return latest == null ? 'v1' : joinMeta([String(latest.v), relativeTime(latest.at, now, t)]);
-  };
-  const headStart = (docLabel: DocTypeLabel) =>
-    onDocView !== undefined && <PaneTitle docLabel={docLabel} onDocView={onDocView} />;
-  const headEnd = (docLabel: DocTypeLabel) =>
-    onDocView !== undefined && (
-      <div className="ml-auto">
-        <PaneViewButtons docLabel={docLabel} onDocView={onDocView} />
-      </div>
-    );
-  if (mode === 'changes' || mode === 'diff') {
-    const hasData = mode === 'diff' ? planDiff != null : changes != null;
-    const files = mode === 'diff' ? (planDiff?.files ?? []) : (changes?.files ?? []);
-    const expanded = mode === 'diff' ? (planDiff?.expanded ?? false) : (changes?.expanded ?? false);
-    const fileCount = files.length;
-    const added = files.reduce((sum, f) => sum + f.added, 0);
-    const removed = files.reduce((sum, f) => sum + (f.removed ?? 0), 0);
-    return (
-      <section className="doc-pane flex min-h-0 flex-1 flex-col" data-testid="doc-pane">
-        <header className={PANE_HEAD}>
-          {headStart(mode === 'diff' ? '方案' : '变更')}
-          {hasData &&
-            !hideVersion &&
-            (mode === 'diff' && planDiff != null ? (
-              <VersionControl
-                range={{ from: planDiff.from, to: planDiff.to }}
-                planVersions={planVersions}
-                versionMenu={versionMenu}
-                now={now}
-                onVersionMenu={onVersionMenu}
-                onCompare={onCompare}
-                onBase={onBase}
-              />
-            ) : (
-              <VersionControl
-                label={versionLabel()}
-                planVersions={planVersions}
-                versionMenu={versionMenu}
-                now={now}
-                onVersionMenu={onVersionMenu}
-                onCompare={onCompare}
-                onBase={onBase}
-              />
-            ))}
-          {headEnd(mode === 'diff' ? '方案' : '变更')}
-        </header>
-        {hasData && (
-          <div className="flex h-8 flex-none items-center border-b border-(--border) pr-2 pl-4 text-meta text-(--text-tertiary)">
-            <span>
-              {t('{n} 个文件改动', { n: fileCount })}{' '}
-              <span className="text-(--diff-add-fg)">+{added}</span>
-              {removed > 0 && <span className="text-(--destructive)"> −{removed}</span>}
-            </span>
-            <Button
-              variant="ghost"
-              size="xs"
-              className="ml-auto text-(--text-tertiary)"
-              onClick={onToggleExpand}
-            >
-              {expanded ? t('全部收起') : t('全部展开')}
-            </Button>
-          </div>
-        )}
-        {hasData ? (
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="w-max min-w-full">
-              {files.map((file) => (
-                <DiffFileBlock
-                  key={file.path}
-                  file={file}
-                  expanded={expanded}
-                  buildId={mode === 'changes' ? (buildId ?? null) : null}
-                />
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="static flex flex-1 items-center justify-center text-meta text-(--text-tertiary)">
-            {t('暂无可显示的变更')}
-          </div>
-        )}
-      </section>
-    );
-  }
-
   return (
     <section className="doc-pane flex min-h-0 flex-1 flex-col" data-testid="doc-pane">
-      <header className={PANE_HEAD}>
-        {headStart('方案')}
-        {doc != null && (
-          <VersionControl
-            label={versionLabel()}
-            planVersions={planVersions}
-            versionMenu={versionMenu}
-            now={now}
-            onVersionMenu={onVersionMenu}
-            onCompare={onCompare}
-            onBase={onBase}
-          />
-        )}
-        {headEnd('方案')}
-      </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="px-3.5 pt-2 pb-4" data-testid="doc-body">
-          {doc == null
-            ? (emptyMeta ?? (
-                <div className="flex h-24 items-center justify-center text-meta text-(--text-tertiary)">
-                  {t('暂无方案')}
-                </div>
-              ))
-            : doc.map((block, i) => (
-                <p
-                  key={i}
-                  className={cn(`doc-block--${block.kind}`, docBlockClass(block.kind, i === 0))}
-                >
-                  {block.kind === 'bullet' && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute top-2.5 left-1 size-1 rounded-full bg-(--text-tertiary)"
-                    />
-                  )}
-                  <Segments segments={block.segments} codeClassName="doc-code" />
-                </p>
-              ))}
+          {doc == null ? (
+            <div className="flex h-24 items-center justify-center text-meta text-(--text-tertiary)">
+              {t('暂无方案')}
+            </div>
+          ) : (
+            doc.map((block, i) => (
+              <p
+                key={i}
+                className={cn(`doc-block--${block.kind}`, docBlockClass(block.kind, i === 0))}
+              >
+                {block.kind === 'bullet' && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-2.5 left-1 size-1 rounded-full bg-(--text-tertiary)"
+                  />
+                )}
+                <Segments segments={block.segments} codeClassName="doc-code" />
+              </p>
+            ))
+          )}
         </div>
-        {sections}
       </div>
     </section>
   );

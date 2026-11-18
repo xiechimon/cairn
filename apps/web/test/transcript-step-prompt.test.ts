@@ -53,7 +53,6 @@ function render(messages: MessageRow[], steps: StepJournalRow[]): TranscriptItem
   return mapTranscript({
     messages,
     steps,
-    plans: [],
     build: BUILD,
     todo: { ...todo(1, 'building'), title: '公开内容闸门', spec: '拦住非英文的公开内容。' },
     machineName: null,

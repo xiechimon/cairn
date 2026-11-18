@@ -495,7 +495,7 @@
     {
       "id": "threads",
       "name": "Threads",
-      "summary": "A thread is one piece of work with its own session: created, continued, archived, reset and counted by phase.",
+      "summary": "A thread is one piece of work with its own session: created, continued, archived and counted by phase.",
       "states": "Running, waiting on the user, done or archived; the thread opens in the side panel with its actions menu. Tasks reads include recent archives and pending standalone Coordinator questions; section is derived on every read.",
       "centrality": 1,
       "status": "shipped",
@@ -521,7 +521,6 @@
           "/api/todos/:id",
           "/api/todos/:id/archive",
           "/api/todos/:id/unarchive",
-          "/api/todos/:id/reset",
           "/api/todos/:id/stop-and-done",
           "/api/builds/:id/merge",
           "/api/projects/:id/todos",

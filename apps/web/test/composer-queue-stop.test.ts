@@ -23,7 +23,7 @@ function composer() {
   const onQueue = vi.fn();
   const onStop = vi.fn();
   const onDraftChange = vi.fn();
-  const wire = useComposerWire({ editable: true, draft: 'Next message', onDraftChange, onSend, onQueue, onStopAndSend: onQueue, slash: { reviewAvailable: false, stopAvailable: true, onStop } });
+  const wire = useComposerWire({ editable: true, draft: 'Next message', onDraftChange, onSend, onQueue, onStopAndSend: onQueue, slash: { stopAvailable: true, onStop } });
   return { ...wire, onSend, onQueue, onStop, onDraftChange };
 }
 

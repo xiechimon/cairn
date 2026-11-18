@@ -47,7 +47,6 @@ function render(overrides: {
   return mapTranscript({
     messages: overrides.messages ?? [],
     steps: overrides.steps ?? [],
-    plans: [],
     build: BUILD,
     todo: todo(9, 'building'),
     machineName: null,
@@ -66,7 +65,7 @@ function tail(items: TranscriptItem[]) {
 }
 
 describe('mapTranscript activity phase (#905)', () => {
-  test('running activity takes over the label, signalAt/labelVars come along', () => {
+  test('running activity takes over the label, labelVars come along', () => {
     const running = step('claimed');
     const items = render({
       steps: [running],
@@ -76,18 +75,16 @@ describe('mapTranscript activity phase (#905)', () => {
       kind: 'streaming',
       label: '正在执行工具：{n}',
       labelVars: { n: 'bash' },
-      signalAt: NOW - 2_000,
     });
   });
 
-  test('W1: stepId mismatch (stale step phase) → base label unchanged, no signalAt', () => {
+  test('W1: stepId mismatch (stale step phase) → base label unchanged', () => {
     const running = step('claimed');
     const items = render({
       steps: [running],
       activity: act('step-previous-run', 'thinking'),
     });
     expect(tail(items)).toMatchObject({ kind: 'streaming', label: '处理中...' });
-    expect(tail(items)?.signalAt).toBeUndefined();
   });
 
   test('W4: stopping wins — `正在停止…` is not hijacked by the activity label', () => {
@@ -98,7 +95,6 @@ describe('mapTranscript activity phase (#905)', () => {
       activity: act(running.id, 'thinking'),
     });
     expect(tail(items)).toMatchObject({ kind: 'streaming', label: '正在停止…' });
-    expect(tail(items)?.signalAt).toBeUndefined();
   });
 
   test('W5: no activity signal → existing labels verbatim unchanged (including the pending-plan preparation workspace)', () => {
@@ -106,7 +102,6 @@ describe('mapTranscript activity phase (#905)', () => {
     const items = render({ steps: [pendingPlan], activity: null });
     expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区...' });
     expect(tail(items)?.labelVars).toBeUndefined();
-    expect(tail(items)?.signalAt).toBeUndefined();
   });
 
   test('W6: all 8 vocab phase words have labels (exhaustive)', () => {
@@ -162,25 +157,6 @@ describe('mapTranscript skill facts (#918)', () => {
     return items.find((i) => i.kind === 'skills');
   }
 
-  test('W8: skills of the running activity come along; stale steps (stepId mismatch) do not cross over', () => {
-    const running = step('claimed');
-    const facts = [
-      { name: 'to-spec', denied: false },
-      { name: 'extra-skill', denied: true },
-    ];
-    const items = render({
-      steps: [running],
-      activity: act(running.id, 'tool', { tool: 'skill: to-spec', skills: facts }),
-    });
-    expect(tail(items)).toMatchObject({ kind: 'streaming', skills: facts });
-
-    const stale = render({
-      steps: [running],
-      activity: act('step-previous-run', 'tool', { skills: facts }),
-    });
-    expect(tail(stale)?.skills).toBeUndefined();
-  });
-
   test('W9: summary derives from stored rows — first-seen order, dedup, denied sticky across the two mutually exclusive columns', () => {
     const items = render({
       messages: [
@@ -206,9 +182,7 @@ describe('mapTranscript skill facts (#918)', () => {
       ],
     });
     expect(summary(plain)).toBeUndefined();
-    const running = step('claimed');
-    const noSkills = render({ steps: [running], activity: act(running.id, 'thinking') });
-    expect(tail(noSkills)?.skills).toBeUndefined();
+
   });
 
   test('W11: half-run rows (no result) do not count into the summary; after the final state covers them they do', () => {
@@ -282,7 +256,6 @@ describe('mapChief activity phase (#905 W7)', () => {
     expect(chiefOf(act('step-chief-1', 'thinking')).stream?.at(-1)).toMatchObject({
       kind: 'streaming',
       label: '模型思考中...',
-      signalAt: NOW - 2_000,
     });
   });
 
@@ -374,7 +347,6 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
       kind: 'streaming',
       label: '排队中：等空闲执行机（前面 {ahead} 个）',
     });
-    expect(tail(items)?.signalAt).toBeUndefined();
   });
 
   test('Q5: claimed step → `处理中` (current behavior locked)', () => {

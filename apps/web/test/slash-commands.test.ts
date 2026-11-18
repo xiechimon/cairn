@@ -14,7 +14,7 @@
 //     F4 empty query = caller order, capped at 15
 //   registry + sections (D1: no placeholders):
 //     R2 skill rows are insert kind; builtins execute kind
-//     R3 availability gating: review/stop vanish when unavailable
+//     R3 availability gating: stop vanishes when unavailable
 //     R4 name collision: builtin wins, same-named skill hidden
 //   accept resolution (approved semantics):
 //     A1 message-start + Enter + execute = run
@@ -47,7 +47,7 @@ const detect = (value: string, caret: number): CompletionRange | null =>
 const skills = (...names: string[]): SkillEntry[] =>
   names.map((name, i) => ({ id: `s${i}`, name, description: `${name} does things` }));
 
-const allAvailable: AvailableSlash = { review: true, stop: true };
+const allAvailable: AvailableSlash = { stop: true };
 
 describe('SLASH_COMPLETION_SPEC trigger (S1-S4)', () => {
   test('row head triggers with empty + non-empty query (S1)', () => {
@@ -94,7 +94,7 @@ describe('SLASH_COMPLETION_SPEC trigger (S1-S4)', () => {
 });
 
 describe('slashFilter word-prefix matcher (F1-F4)', () => {
-  const names = ['clear', 'attach', 'review', 'stop', 'help'];
+  const names = ['clear', 'attach', 'stop', 'help'];
 
   test('prefix + separator-stripped word prefix + alias (F1)', () => {
     expect(slashFilter('cl', names, String)).toEqual(['clear']);
@@ -122,11 +122,10 @@ describe('slashFilter word-prefix matcher (F1-F4)', () => {
 });
 
 describe('registry + sections (R1-R4)', () => {
-  test('five builtins, all execute, each with descKey (R1)', () => {
+  test('four builtins, all execute, each with descKey (R1)', () => {
     expect(BUILTIN_SLASH_COMMANDS.map((c) => c.name)).toEqual([
       'clear',
       'attach',
-      'review',
       'stop',
       'help',
     ]);
@@ -147,7 +146,6 @@ describe('registry + sections (R1-R4)', () => {
     expect(sections[0]?.rows.map((r) => r.name)).toEqual([
       'clear',
       'attach',
-      'review',
       'stop',
       'help',
     ]);
@@ -156,10 +154,10 @@ describe('registry + sections (R1-R4)', () => {
     expect(sections[1]?.rows.every((r) => r.kind === 'insert')).toBe(true);
   });
 
-  test('unavailable review/stop vanish instead of going dead (R3)', () => {
+  test('unavailable stop vanishes instead of going dead (R3)', () => {
     const sections = buildSlashSections({
       query: '',
-      available: { review: false, stop: false },
+      available: { stop: false },
       skills: [],
     });
     expect(sections[0]?.rows.map((r) => r.name)).toEqual(['clear', 'attach', 'help']);

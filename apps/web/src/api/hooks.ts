@@ -28,7 +28,6 @@ import type {
   CreateScheduleBody,
   CreateSkillBody,
   DiffFileContent,
-  DocumentDiff,
   DocumentDiffFile,
   FsListResult,
   FsPickResult,
@@ -432,20 +431,6 @@ export function useRunHistoryTokens(buildIds: string[], enabled: boolean) {
     return byBuild;
   }, [buildIds, queries]);
 }
-
-export const useDocumentDiff = (
-  documentId: string | null,
-  againstVersion: number | null,
-  enabled = true,
-) =>
-  useQuery({
-    queryKey: ['documentDiff', documentId, againstVersion],
-    queryFn: () =>
-      api.get<DocumentDiff & { documentId: string }>(
-        `/api/documents/${documentId}/diff${againstVersion != null ? `?againstVersion=${againstVersion}` : ''}`,
-      ),
-    enabled: enabled && documentId != null,
-  });
 
 export const useSchedules = (enabled: boolean) =>
   useQuery({
@@ -972,14 +957,6 @@ export function useApiMutations(teamId: string | undefined) {
         ),
       onSuccess: invalidateAll,
       onError: invalidateAll,
-    }),
-    resetTodo: useMutation({
-      mutationFn: (input: { id: string; expectedPhase: string; expectedBuildId: string | null }) =>
-        api.post<TodoRecord>(`/api/todos/${input.id}/reset`, {
-          expectedPhase: input.expectedPhase,
-          expectedBuildId: input.expectedBuildId,
-        }),
-      onSuccess: invalidateAll,
     }),
     setTodoArchived: useMutation({
       mutationFn: (input: { id: string; archived: boolean }) =>

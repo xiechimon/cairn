@@ -75,7 +75,7 @@ export interface ComposerSurfaceProps {
   onAttachment?: ((files: File[]) => string[] | Promise<string[]>) | undefined;
   mentionGroups?: MentionGroups | undefined;
   onPickProject?: ((project: { id: string }) => void) | undefined;
-  slash?: { reviewAvailable: boolean; stopAvailable: boolean; onStop: () => void } | undefined;
+  slash?: { stopAvailable: boolean; onStop: () => void } | undefined;
   onAdvance?: (() => void) | undefined;
   send?: ComposerSend | undefined;
   active?: boolean;

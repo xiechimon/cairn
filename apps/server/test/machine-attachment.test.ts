@@ -190,8 +190,8 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId} (#730)', () => {
       expect(steer.status).toBe(201);
       expect((await download()).status).toBe(200);
       expect(JSON.parse(await worker()).id).toBe(id);
-      const reset = await req(w.s.app, 'POST', `/api/todos/${w.todoId}/reset`, {});
-      expect(reset.status).toBe(200);
+      const deleted = await req(w.s.app, 'DELETE', `/api/todos/${w.todoId}`, {});
+      expect(deleted.status).toBe(204);
       expect((await download()).status).toBe(404);
       await expect(worker()).rejects.toMatchObject({ status: 404 });
     } finally {

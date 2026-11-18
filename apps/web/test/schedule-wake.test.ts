@@ -49,7 +49,6 @@ function render(status: 'done' | 'claimed' | 'failed') {
       },
       { id: 'result', role: 'assistant', content: 'Scheduled result', createdAt: NOW + 1000 },
     ],
-    plans: [],
     machineName: null,
     userName: 'Owner',
     liveText: '',

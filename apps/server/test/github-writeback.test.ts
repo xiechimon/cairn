@@ -909,9 +909,9 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     setRow(s, id, { phase: 'done', lastRunAt: 5 });
     await sync.sweep();
     expect(s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()?.issueState).toBeNull();
-    expect((await call(s.app, 'POST', `/api/todos/${id}/reset`, { body: {} })).status).toBeLessThan(
-      300,
-    );
+    expect(
+      (await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'queued' } })).status,
+    ).toBeLessThan(300);
     await sync.sweep();
     expect(writes(mock)).toEqual([{ state: 'open', state_reason: 'reopened' }]);
     s.dispose();
@@ -1073,16 +1073,16 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     s.dispose();
   });
 
-  test('resetting a started task archived before it finished reopens its issue', async () => {
+  test('reopening a started task archived before it finished reopens its issue', async () => {
     const mock = lifecycleMock();
     const { s, id, sync } = await startedTask(mock);
     setRow(s, id, { lastRunAt: 5 });
     await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'closed' } });
     await sync.sweep();
     mock.set(`GET ${issuePath(101)}`, { status: 200, body: { ...CREATED_ISSUE, state: 'closed' } });
-    expect((await call(s.app, 'POST', `/api/todos/${id}/reset`, { body: {} })).status).toBeLessThan(
-      300,
-    );
+    expect(
+      (await call(s.app, 'PATCH', `/api/todos/${id}`, { body: { phase: 'todo' } })).status,
+    ).toBeLessThan(300);
     await sync.sweep();
     expect(writes(mock)).toEqual([
       { state: 'closed', state_reason: 'not_planned' },

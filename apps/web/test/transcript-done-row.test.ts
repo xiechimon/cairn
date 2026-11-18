@@ -13,7 +13,6 @@ function notesFor(verified: boolean | undefined): string[] {
   const items: TranscriptItem[] = mapTranscript({
     messages: [doneMessage()],
     steps: [],
-    plans: [],
     build: null,
     todo: verified === undefined ? base : { ...base, verified },
     machineName: null,

@@ -1,6 +1,5 @@
 import { Play } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
-import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { Button } from '../components/ui/button.js';
 import { DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Kbd } from '../components/ui/kbd.js';
@@ -12,7 +11,6 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import { MoreMenu } from '../overlay/more-menu.js';
-import { type DocView, PaneTitle, PaneViewButtons } from '../overlay/plan-dropdown.js';
 import { type SearchContext, SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { BUILTIN_SLASH_COMMANDS, type SlashRow } from '../overlay/slash-commands.js';
 import { SlashMenu } from '../overlay/slash-menu.js';
@@ -252,13 +250,12 @@ const MENU_STAGE =
 
 function MenusSpecimen() {
   const [moreOpen, setMoreOpen] = useState(false);
-  const [view, setView] = useState<DocView>('plan');
   const [last, setLast] = useState<string | null>(null);
   return (
     <Specimen
       id="menus-and-popovers"
       title="Menus and popovers"
-      note={last ?? 'MoreMenu, PaneTitle, PaneViewButtons, the status menu and the agent picker'}
+      note={last ?? 'MoreMenu, the status menu and the agent picker'}
       stage="canvas"
     >
       <Cell label="MoreMenu">
@@ -278,12 +275,6 @@ function MenusSpecimen() {
           onArchive={() => setLast('Archive')}
           onDiscard={() => setLast('Discard changes')}
         />
-      </Cell>
-      <Cell label={`PaneTitle: ${view}`}>
-        <PaneTitle docLabel={view === 'plan' ? '方案' : '变更'} onDocView={setView} />
-      </Cell>
-      <Cell label="PaneViewButtons">
-        <PaneViewButtons docLabel={view === 'plan' ? '方案' : '变更'} onDocView={setView} />
       </Cell>
       <Cell label="Status menu, Planning">
         <div className={MENU_STAGE}>
@@ -319,8 +310,6 @@ function ConfirmsSpecimen() {
   const triggers = [
     ['delete', 'Delete task'],
     ['delete-project', 'Delete project'],
-    ['reset', 'Move back to To start'],
-    ['reset-stale', 'Reset, stale'],
   ] as const;
   return (
     <Specimen
@@ -347,13 +336,6 @@ function ConfirmsSpecimen() {
         open={open === 'delete-project'}
         onClose={close}
         onConfirm={() => done('project deleted')}
-      />
-      <ResetConfirmDialog open={open === 'reset'} onClose={close} onConfirm={() => done('reset')} />
-      <ResetConfirmDialog
-        open={open === 'reset-stale'}
-        onClose={close}
-        onConfirm={() => done('reset')}
-        stale
       />
     </Specimen>
   );

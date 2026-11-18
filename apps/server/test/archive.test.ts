@@ -35,7 +35,7 @@ import { projectAtInFlightCap } from '../src/services/issue-intake.js';
 import { claimStep, fetchStop, finishStep } from '../src/services/machines.js';
 import { deleteProject } from '../src/services/projects.js';
 import { inFlightIssues } from '../src/services/scheduling/sweep.js';
-import { deleteTodo, getTodo, resetTodo } from '../src/services/todos.js';
+import { deleteTodo, getTodo } from '../src/services/todos.js';
 import { bootServer, insertMachine, req, seedSessionRoute } from './helpers.js';
 
 const files: DocumentDiffFile[] = [{ path: 'retained.ts', additions: 1, deletions: 0, hunks: [] }];
@@ -545,34 +545,33 @@ test.each(['building', 'review'] as const)(
   },
 );
 
-test.each([
-  'stop',
-  'failure',
-  'complete',
-  'abandon',
-  'reset',
-  'delete-task',
-  'delete-project',
-] as const)('archive stop cleanup survives without triggers through %s', async (path) => {
-  const { s, deps, now } = world();
-  await action(s, 'archive');
-  requestStop(deps, 'build-archive', { discard: false }, { actor: 'person', reason: 'test stop' });
-  const row = s.db.select().from(step).where(eq(step.id, 'step-archive')).get()!;
-  if (path === 'stop') applyStoppedStep(deps, row.id);
-  else if (path === 'failure') applyStepFailure(deps, row, 'Late failure');
-  else if (path === 'complete') completeStep(deps, row.id);
-  else if (path === 'abandon') sweepAbandonedBuildSteps(deps, now + 300_000);
-  else if (path === 'reset') resetTodo(deps, 'todo-archive');
-  else if (path === 'delete-task') deleteTodo(deps, 'todo-archive');
-  else {
-    s.db.update(step).set({ status: 'stopped' }).where(eq(step.id, row.id)).run();
-    deleteProject(deps, 'project-archive');
-  }
-  expect(s.db.select().from(stopPending).all()).toEqual([]);
-  const remaining = s.db.select().from(step).where(eq(step.id, row.id)).get();
-  expect(remaining?.archiveStop ?? null).toBeNull();
-  expect(remaining?.status).not.toBe('claimed');
-});
+test.each(['stop', 'failure', 'complete', 'abandon', 'delete-task', 'delete-project'] as const)(
+  'archive stop cleanup survives without triggers through %s',
+  async (path) => {
+    const { s, deps, now } = world();
+    await action(s, 'archive');
+    requestStop(
+      deps,
+      'build-archive',
+      { discard: false },
+      { actor: 'person', reason: 'test stop' },
+    );
+    const row = s.db.select().from(step).where(eq(step.id, 'step-archive')).get()!;
+    if (path === 'stop') applyStoppedStep(deps, row.id);
+    else if (path === 'failure') applyStepFailure(deps, row, 'Late failure');
+    else if (path === 'complete') completeStep(deps, row.id);
+    else if (path === 'abandon') sweepAbandonedBuildSteps(deps, now + 300_000);
+    else if (path === 'delete-task') deleteTodo(deps, 'todo-archive');
+    else {
+      s.db.update(step).set({ status: 'stopped' }).where(eq(step.id, row.id)).run();
+      deleteProject(deps, 'project-archive');
+    }
+    expect(s.db.select().from(stopPending).all()).toEqual([]);
+    const remaining = s.db.select().from(step).where(eq(step.id, row.id)).get();
+    expect(remaining?.archiveStop ?? null).toBeNull();
+    expect(remaining?.status).not.toBe('claimed');
+  },
+);
 
 test('deleting a project with a claimed step refuses and leaves the stop pending', () => {
   const { s, deps } = world();

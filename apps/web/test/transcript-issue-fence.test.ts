@@ -68,7 +68,6 @@ function render(todo: TodoRecord, texts: string[]): TranscriptItem[] {
   return mapTranscript({
     messages: texts.map((t, i) => msg(t, NOW - 50_000 + i * 1_000)),
     steps: [],
-    plans: [],
     build: BUILD,
     todo,
     machineName: null,

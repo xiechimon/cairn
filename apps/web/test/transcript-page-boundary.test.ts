@@ -33,7 +33,6 @@ const input = (hasEarlier: boolean): TranscriptInput => ({
       skillInjection: null,
     },
   ],
-  plans: [{ id: 'plan-1', buildId: 'build', version: 1, createdAt: PLAN_STEP_AT, content: '# Plan' }],
   build: {
     id: 'build',
     todoId: 'todo',
@@ -57,13 +56,12 @@ const input = (hasEarlier: boolean): TranscriptInput => ({
 const kinds = (hasEarlier: boolean) => mapTranscript(input(hasEarlier)).map((item) => item.kind);
 
 describe('mapTranscript keeps synthetic rows inside the loaded page', () => {
-  test('older plan and confirmation rows wait until their part of the history is loaded', () => {
-    expect(kinds(true)).not.toContain('plan');
+  test('older confirmation rows wait until their part of the history is loaded', () => {
     expect(kinds(true)).not.toContain('user');
     expect(kinds(true)).not.toContain('run');
   });
 
-  test('the full history keeps the run, plan and confirmation rows', () => {
-    expect(kinds(false)).toEqual(expect.arrayContaining(['run', 'plan', 'user']));
+  test('the full history keeps the run and confirmation rows', () => {
+    expect(kinds(false)).toEqual(expect.arrayContaining(['run', 'user']));
   });
 });

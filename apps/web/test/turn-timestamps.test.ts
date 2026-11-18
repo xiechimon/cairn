@@ -39,28 +39,19 @@ const BUILD = {
 } as const;
 
 describe.each([false, true])('terminal timestamps with a preceding tool: %s', (withTool) => {
-  test.each(['plan', 'review', 'verify', 'report', 'fail'] as const)(
+  test.each(['review', 'verify', 'report', 'fail'] as const)(
     '%s completion supplies the finish timestamp',
     (kind) => {
       const input: TranscriptInput = {
         messages: [OPENING, ...(withTool ? [TOOL] : [])],
         steps: [],
-        plans: [],
         build: null,
         todo: { ...todo(12, 'done'), phaseAt: FINISH },
         machineName: null,
         userName: 'User',
         liveText: '',
       };
-      if (kind === 'plan') {
-        input.steps = [{
-          id: 'plan-step', buildId: 'build', kind: 'plan', machineId: null,
-          createdAt: START, status: 'done', checkpointCommit: null, skillInjection: null,
-        }];
-        input.plans = [{
-          id: 'plan', buildId: 'build', version: 1, content: '# Plan', createdAt: FINISH,
-        }];
-      } else if (kind === 'fail') {
+      if (kind === 'fail') {
         input.build = { ...BUILD, errorMessage: 'Timed out' };
         input.todo = { ...input.todo, phase: 'failed' };
       } else {
@@ -86,7 +77,7 @@ test('a synthetic confirmation supplies the real build-step start time', () => {
       id: 'build-step', buildId: 'build', kind: 'build', machineId: null,
       createdAt: START, status: 'done', checkpointCommit: null, skillInjection: null,
     }],
-    plans: [], build: { ...BUILD, withPlan: true }, todo: todo(12, 'done'),
+    build: { ...BUILD, withPlan: true }, todo: todo(12, 'done'),
     machineName: null, userName: 'User', liveText: '',
   });
   const confirmation = items.find((item) => item.kind === 'user' && item.text.includes('确认'));

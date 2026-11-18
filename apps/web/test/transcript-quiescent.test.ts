@@ -40,7 +40,6 @@ function render(overrides: {
   return mapTranscript({
     messages: [],
     steps: overrides.steps ?? [],
-    plans: [],
     build: overrides.build === undefined ? BUILD : overrides.build,
     todo: overrides.todo,
     machineName: null,
@@ -113,7 +112,6 @@ describe('mapTranscript quiescent live tail (#471)', () => {
       const items = mapTranscript({
         messages: [],
         steps: [step(status)],
-        plans: [],
         build: BUILD,
         todo: todo(9, 'review'),
         machineName: null,

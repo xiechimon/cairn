@@ -234,7 +234,6 @@ export const homeC: FixtureSet = {
         transcript: [],
       }),
       doc: planDetail?.doc,
-      planVersions: planDetail?.planVersions,
     },
     'home-c-working-a': {
       ...(detailBuilding(true).detail ?? { transcript: [] }),

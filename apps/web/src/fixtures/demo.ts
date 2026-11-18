@@ -197,12 +197,6 @@ function demoFixtureOf(): FixtureSet {
         footer: { seconds: 12 },
       },
       {
-        kind: 'plan',
-        title: '方案 · v3',
-        preview: '登录成功事件触发异步合并，按 SKU 合并数量，两边都有的行保留低价。',
-        seconds: 29,
-      },
-      {
         kind: 'review',
         conclusion: 'AI 审核：v1 的合并逻辑会用正式购物车单价覆盖促销价，需修复后再确认。',
         findings: [
@@ -238,10 +232,6 @@ function demoFixtureOf(): FixtureSet {
       },
     ],
     doc: CART_DOC,
-    planVersions: [
-      { v: 'v3', at: at(DEMO_DAY, 14, 31) },
-      { v: 'v2', at: at(DEMO_DAY, 12, 20) },
-    ],
   };
 
   const RATE_CHANGES: ChangesContent = {
@@ -452,7 +442,6 @@ function demoFixtureOf(): FixtureSet {
         paragraphs: [[{ text: '页面与最优券计算都完成了，结算流 e2e 全绿。' }]],
         footer: { seconds: 26 },
       },
-      { kind: 'elapsed', seconds: 26 },
     ],
     changes: {
       expanded: false,

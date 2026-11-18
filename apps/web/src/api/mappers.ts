@@ -102,8 +102,6 @@ import type {
   MachineRow,
   McpRow,
   ModelOption,
-  PlanDiffContent,
-  PlanVersion,
   ReviewFinding,
   RunHistoryRow,
   SkillRow,
@@ -116,7 +114,7 @@ import { dateTimeFormat } from '../lib/date-format.js';
 import { inlineSegments } from '../lib/markdown.js';
 import { activityLabel } from './activity.js';
 import type { MachineProvider } from './claude-accounts.js';
-import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
+import type { ApiKeyRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
   'sandbox-unavailable': '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
@@ -599,25 +597,6 @@ export function mapDiffFiles(files: DocumentDiffFile[]): DiffFile[] {
   }));
 }
 
-export function mapPlanDiff(diff: {
-  fromVersion: number;
-  toVersion: number;
-  files: DocumentDiffFile[];
-  toContent?: string;
-}): PlanDiffContent {
-  const files = mapDiffFiles(diff.files);
-  const first = files[0];
-  if (diff.toContent !== undefined && first !== undefined) {
-    first.fullContent = diff.toContent;
-  }
-  return {
-    from: `v${diff.fromVersion}`,
-    to: `v${diff.toVersion}`,
-    files,
-    expanded: false,
-  };
-}
-
 interface ToolEntry {
   kind: '__work__';
   step: WorkStep;
@@ -631,7 +610,6 @@ interface TimelineEntry {
 export interface TranscriptInput {
   messages: MessageRow[];
   steps: StepRow[];
-  plans: PlanRow[];
   build: BuildRecord | null;
   todo: DisplayTodo;
   machineName: string | null;
@@ -673,7 +651,6 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   const {
     messages,
     steps,
-    plans,
     build,
     todo,
     machineName,
@@ -874,24 +851,6 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       });
   }
 
-  const planSteps = steps.filter((s) => s.kind === 'plan');
-  plans.forEach((p, i) => {
-    const step = planSteps[i];
-    const preview =
-      p.content
-        .split('\n')
-        .map((l) => l.replace(/^#+\s*/, '').replace(/`/g, ''))
-        .find((l) => l.trim() !== '') ?? '';
-    entries.push({
-      at: (step?.createdAt ?? p.createdAt) + 1,
-      item: {
-        kind: 'plan',
-        title: `方案 · v${p.version}`,
-        createdAt: p.createdAt,
-        preview: preview.length > 90 ? `${preview.slice(0, 90)}…` : preview,
-      },
-    });
-  });
   if (build?.withPlan === true) {
     const confirmations = messages.filter(
       (m) => m.role === 'user' && textOfContent(m.content).trim() === CONFIRM_ANNOUNCEMENT,
@@ -1042,12 +1001,6 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
             : actLabel?.vars !== undefined
               ? { labelVars: actLabel.vars }
               : {}),
-        ...(queued == null && quota == null && actLabel != null && act != null
-          ? { signalAt: act.at }
-          : {}),
-        ...(queued == null && quota == null && act?.skills !== undefined && act.skills.length > 0
-          ? { skills: act.skills }
-          : {}),
       });
     }
   } else if (
@@ -2255,10 +2208,6 @@ export function mapOrchestrationFeedback(
       : 'Coordinator 没有派发这个任务，也没有说明原因。点「开始」再试一次。',
   });
   return items;
-}
-
-export function mapPlanVersions(plans: PlanRow[]): PlanVersion[] {
-  return [...plans].reverse().map((p) => ({ v: `v${p.version}`, at: p.createdAt }));
 }
 
 export { relativeTime };

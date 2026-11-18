@@ -1,4 +1,3 @@
-import { diffLines } from 'diff';
 import {
   at,
   MACHINE_NAME,
@@ -13,11 +12,8 @@ import {
 import { PROBE_BUILD_OPEN, PROBE_BUILD_RESULT, probeChanges } from './detail.js';
 import type {
   ChangesContent,
-  DiffHunk,
-  DiffLine,
   DocBlock,
   FixtureSet,
-  PlanDiffContent,
   TodoRecord,
   TranscriptItem,
 } from './records.js';
@@ -249,83 +245,7 @@ const DOC_V1 = planDoc(DYNAMIC, false, MSG_DYNAMIC);
 const DOC_V2 = planDoc(DYNAMIC, true, MSG_DYNAMIC);
 const DOC_V3 = planDoc(MANUAL, true, MSG_MANUAL);
 
-const R8_PLAN_PREVIEW =
-  'Context 仓库根目录的 README.md 目前内容为逐行累积的"探针记录"（r3 lifecycle probe、r6 rebaseline probe、r7 rebaseline probe 等），每次任务在文件末尾新增一行文字，文件以换行符结尾。本次任务按同样的惯例，在文件末尾…';
-
-function planLines(w: string, msg: string | null): string[] {
-  return [
-    '## Context',
-    `仓库根目录的 README.md 目前内容为逐行累积的"探针记录"（r3 lifecycle probe、r6 rebaseline probe、r7 rebaseline probe 等），每次任务在文件末尾新增一行文字，文件以换行符结尾。本次任务按同样的惯例，在文件末尾追加一行 ${w}。`,
-    '',
-    '## 改动',
-    `- README.md: 在文件末尾追加新的一行 ${w}，保持文件以换行符结尾（与现有各行格式一致），不修改任何已有内容。`,
-    ...(msg != null
-      ? [
-          `- 提交：改动完成后需创建一次 commit，遵循仓库历史惯例（如 docs(readme): append r7 rebaseline probe line），本次 commit message 使用 ${msg}。`,
-        ]
-      : []),
-    '',
-    '## 验证',
-    `- 执行 cat README.md 或 tail -1 README.md，确认最后一行为 ${w}。`,
-    `- 执行 git diff README.md，确认只新增了一行 +${w}，没有改动其他内容。`,
-  ];
-}
-
-const NO_NEWLINE = '\\ No newline at end of file';
-
-function planHunk(from: string[], to: string[]): DiffHunk {
-  const lines: DiffLine[] = [];
-  let oldNo = 0;
-  let newNo = 0;
-  for (const part of diffLines(from.join('\n'), to.join('\n'))) {
-    const rows = part.value.split('\n');
-    if (rows[rows.length - 1] === '') rows.pop();
-    for (const text of rows) {
-      if (part.added === true) {
-        newNo++;
-        lines.push({ kind: 'add', text, newNo });
-      } else if (part.removed === true) {
-        oldNo++;
-        lines.push({ kind: 'del', text, oldNo });
-      } else {
-        oldNo++;
-        newNo++;
-        lines.push({ kind: 'context', text, oldNo, newNo });
-      }
-    }
-  }
-  const lastDel = lines.findLastIndex((l) => l.kind === 'del');
-  const firstAdd = lines.findIndex((l) => l.kind === 'add');
-  if (lastDel !== -1 && lastDel > firstAdd) {
-    lines.splice(lastDel + 1, 0, { kind: 'marker', text: NO_NEWLINE });
-  }
-  return {
-    header: `@@ -1,${from.length} +1,${to.length} @@`,
-    lines: [...lines, { kind: 'marker', text: NO_NEWLINE }],
-  };
-}
-
-function planDiff(
-  fromV: string,
-  toV: string,
-  from: string[],
-  to: string[],
-  expanded: boolean,
-): PlanDiffContent {
-  const hunk = planHunk(from, to);
-  const added = hunk.lines.filter((l) => l.kind === 'add').length;
-  const removed = hunk.lines.filter((l) => l.kind === 'del').length;
-  return {
-    from: fromV,
-    to: toV,
-    expanded,
-    files: [{ path: 'plan.md', added, removed, hunks: [hunk], fullContent: to.join('\n') }],
-  };
-}
-
-const LINES_V1 = planLines(DYNAMIC, null);
-const LINES_V2 = planLines(DYNAMIC, MSG_DYNAMIC);
-const LINES_V3 = planLines(MANUAL, MSG_MANUAL);
+('Context 仓库根目录的 README.md 目前内容为逐行累积的"探针记录"（r3 lifecycle probe、r6 rebaseline probe、r7 rebaseline probe 等），每次任务在文件末尾新增一行文字，文件以换行符结尾。本次任务按同样的惯例，在文件末尾…');
 
 const REVIEW_MESSAGE: TranscriptItem = {
   kind: 'robot',
@@ -409,33 +329,15 @@ const RUN1_TO_V2: TranscriptItem[] = [
       },
     ],
   },
-  { kind: 'plan', title: '方案 · v1', preview: R8_PLAN_PREVIEW, seconds: 31 },
   { kind: 'note', text: '{name} 发起了 AI 审核', vars: { name: 'Xmon Dai' } },
   REVIEW_MESSAGE,
   ADJUST_V2_MESSAGE,
-  { kind: 'plan', title: '方案 · v2', preview: R8_PLAN_PREVIEW, seconds: 29 },
 ];
-
-function detailV2(now: number): FixtureSet {
-  return {
-    todos: [failed12, review13, probe15('confirm', r8(23, 53))],
-    now,
-    detail: {
-      transcript: RUN1_TO_V2,
-      doc: DOC_V2,
-      planVersions: [
-        { v: 'v2', at: r8(23, 53) },
-        { v: 'v1', at: r8(23, 44) },
-      ],
-    },
-  };
-}
 
 const RUN1_TO_V3: TranscriptItem[] = [
   ...RUN1_TO_V2,
   { kind: 'user', text: REJECT_FEEDBACK },
   ADJUST_V3_MESSAGE,
-  { kind: 'plan', title: '方案 · v3', preview: R8_PLAN_PREVIEW, seconds: 49 },
 ];
 
 function detailV3(now: number): FixtureSet {
@@ -445,12 +347,6 @@ function detailV3(now: number): FixtureSet {
     detail: {
       transcript: RUN1_TO_V3,
       doc: DOC_V3,
-      planVersions: [
-        { v: 'v3', at: r8(23, 56) },
-        { v: 'v2', at: r8(23, 53) },
-        { v: 'v1', at: r8(23, 44) },
-      ],
-      planDiff: planDiff('v1', 'v3', LINES_V1, LINES_V3, false),
     },
   };
 }
@@ -497,7 +393,6 @@ const REUSED_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'run', at: '00:02' },
   { kind: 'user', text: '开始执行任务', seq: 15, title: R8_TITLE },
   { kind: 'robot', paragraphs: [{ segments: [{ text: '复用了上一次运行的方案。' }] }] },
-  { kind: 'plan', title: '方案 · v1', preview: R8_PLAN_PREVIEW },
   { kind: 'run', machine: MACHINE_NAME },
   { kind: 'user', text: '确认' },
   { kind: 'streaming', seconds: 1, label: '连接执行机...' },
@@ -523,15 +418,6 @@ const REUSED_REVIEW_TRANSCRIPT: TranscriptItem[] = [
     footer: { seconds: 49 },
   },
 ];
-
-function withDetail(
-  base: FixtureSet,
-  patch: Partial<NonNullable<FixtureSet['detail']>>,
-): FixtureSet {
-  const detail = base.detail;
-  if (detail == null) return base;
-  return { ...base, detail: { ...detail, ...patch } };
-}
 
 export const detailFailed12: FixtureSet = {
   todos: [failed12, review13],
@@ -560,11 +446,7 @@ export const planOpenReview: FixtureSet = {
   todos: [probeTodo('review', r7(13, 37))],
   now: r7(13, 40),
   detail: {
-    transcript: [
-      { kind: 'plan', title: '方案 · v1', preview: R8_PLAN_PREVIEW },
-      ...PROBE_BUILD_OPEN,
-      PROBE_BUILD_RESULT,
-    ],
+    transcript: [...PROBE_BUILD_OPEN, PROBE_BUILD_RESULT],
     doc: DOC_V2,
     changes: probeChanges(true),
   },
@@ -687,27 +569,6 @@ export const skillsRouting: FixtureSet = {
   },
 };
 
-export const versionMenuV2: FixtureSet = withDetail(detailV2(r8(23, 54)), {
-  versionMenu: 'versions',
-  compareTarget: planDiff('v1', 'v2', LINES_V1, LINES_V2, false),
-});
-
-export const versionCompareWithChanges: FixtureSet = withDetail(detailV2(r8(23, 54)), {
-  changes: probeChanges(true),
-  compareTarget: planDiff('v1', 'v2', LINES_V1, LINES_V2, false),
-});
-
-export const compareMenuV2: FixtureSet = withDetail(detailV2(r8(23, 54)), {
-  versionMenu: 'compare',
-  compareTarget: planDiff('v1', 'v2', LINES_V1, LINES_V2, false),
-});
-
-export function diffV1V2(expanded: boolean): FixtureSet {
-  return withDetail(detailV2(r8(23, 55)), {
-    planDiff: planDiff('v1', 'v2', LINES_V1, LINES_V2, expanded),
-  });
-}
-
 export const revisionStreaming: FixtureSet = {
   todos: [failed12, review13, probe15('planning', r8(23, 55))],
   now: r8(23, 55),
@@ -718,26 +579,10 @@ export const revisionStreaming: FixtureSet = {
       { kind: 'streaming', seconds: 1, label: '处理中...' },
     ],
     doc: DOC_V2,
-    planVersions: [
-      { v: 'v2', at: r8(23, 53) },
-      { v: 'v1', at: r8(23, 44) },
-    ],
-    planDiff: planDiff('v1', 'v2', LINES_V1, LINES_V2, true),
   },
 };
 
 export const detailV3Collapsed: FixtureSet = detailV3(r8(23, 58));
-
-export const versionMenuV3: FixtureSet = withDetail(detailV3(r8(23, 58)), {
-  versionMenu: 'versions',
-  compareTarget: planDiff('v2', 'v3', LINES_V2, LINES_V3, false),
-});
-
-export function diffV2V3(expanded: boolean): FixtureSet {
-  return withDetail(detailV3(r8(23, 58)), {
-    planDiff: planDiff('v2', 'v3', LINES_V2, LINES_V3, expanded),
-  });
-}
 
 export const detailFailed15Set: FixtureSet = detailFailed15(r8n(0, 1));
 
@@ -770,27 +615,5 @@ export const revisionChain: FixtureSet = {
   detail: {
     transcript: RUN1_TO_V2.slice(0, 4),
     doc: DOC_V1,
-    planVersions: [{ v: 'v1', at: r8(23, 44) }],
-    revision: {
-      feedback: REJECT_FEEDBACK,
-      streaming: { seconds: 1, label: '处理中...' },
-      landed: {
-        planVersions: [
-          { v: 'v2', at: r8(23, 45) },
-          { v: 'v1', at: r8(23, 44) },
-        ],
-        doc: DOC_V2,
-        transcriptTail: [
-          ADJUST_V2_MESSAGE,
-          {
-            kind: 'plan',
-            title: '方案 · v2',
-            preview: R8_PLAN_PREVIEW,
-            seconds: 29,
-          },
-        ],
-        planDiff: planDiff('v1', 'v2', LINES_V1, LINES_V2, false),
-      },
-    },
   },
 };
