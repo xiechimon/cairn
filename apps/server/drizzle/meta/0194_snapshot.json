@@ -2,7 +2,7 @@
   "version": "6",
   "dialect": "sqlite",
   "id": "7a773a8a-3df6-4d8a-96c8-620be1103c66",
-  "prevId": "13dde193-854e-442e-bc7d-b27124fd2d28",
+  "prevId": "22af0e7c-154a-40bd-a052-c9bf0264af26",
   "tables": {
     "action_journal": {
       "name": "action_journal",
