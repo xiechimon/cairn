@@ -1745,7 +1745,6 @@ export const EN: Record<string, string> = {
   在这台执行机上运行: 'Run on this Runner:',
   已登录: 'Signed in',
   已过期: 'Expired',
-  '最近 24 小时': 'Last 24 hours',
   最近使用: 'Last used',
   构建: 'Build',
   状态未知: 'Unknown',
