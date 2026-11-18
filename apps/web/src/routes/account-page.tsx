@@ -128,7 +128,7 @@ export function AccountPage() {
               </SelectContent>
             </Select>
           </SettingsRow>
-          <SettingsRow label={t('对外动作')} hint={t('项目默认跟随这里的全局设置')}>
+          <SettingsRow label={t('对外动作')} hint={t('项目未单独设置时，跟随此项')}>
             <Select
               value={actionTier}
               disabled={

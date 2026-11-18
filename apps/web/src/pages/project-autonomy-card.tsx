@@ -111,7 +111,7 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
         </SettingsRow>
         <SettingsRow
           label={t('对外动作')}
-          hint={t('发送、发布等对外动作，先问过再跑或完全交给它。')}
+          hint={t('发送、发布等对外动作，会先问过再跑，或完全交给它。')}
         >
           <Select
             value={data.actionTierOverride ?? 'follow'}

@@ -196,7 +196,6 @@ export const EN: Record<string, string> = {
   中断: 'Interrupted',
   终端: 'Terminal',
   电脑离线: 'Computer offline',
-  'Coordinator 在这台': 'Coordinator runs here',
   放大: 'Enlarge',
   缩小: 'Shrink',
   接管: 'Take control',
@@ -908,9 +907,9 @@ export const EN: Record<string, string> = {
   完全放手: 'Full access',
   跟随全局: 'Follow global',
   '跟随全局（{tier}）': 'Follow global ({tier})',
-  项目默认跟随这里的全局设置: 'Projects follow this global setting by default',
-  '发送、发布等对外动作，先问过再跑或完全交给它。':
-    'Send, publish and other external-output actions ask first — or run entirely on their own.',
+  '项目未单独设置时，跟随此项': 'Projects without their own setting follow this',
+  '发送、发布等对外动作，会先问过再跑，或完全交给它。':
+    'Send, publish and other external actions ask first — or run entirely on their own.',
   '有人在用时让路（分钟）': 'Yield while someone is active (minutes)',
   '同类任务冷却（分钟）': 'Cooldown between runs (minutes)',
   '每日预算（USD）': 'Daily budget (USD)',

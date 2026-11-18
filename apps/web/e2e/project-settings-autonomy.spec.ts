@@ -144,7 +144,7 @@ test('autonomy card: decision tier selector shows the override and patches the t
   const tier = card.getByTestId('autonomy-tier');
   await expect(tier).toBeVisible();
   await expect(tier).toContainText('先问我');
-  await expect(card.getByText('发送、发布等对外动作，先问过再跑或完全交给它。')).toBeVisible();
+  await expect(card.getByText('发送、发布等对外动作，会先问过再跑，或完全交给它。')).toBeVisible();
   await tier.click();
   await page.getByRole('option', { name: '完全放手' }).click();
   await expect.poll(() => stub.patches.length).toBe(1);
