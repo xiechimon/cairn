@@ -291,6 +291,64 @@ describe('quiet by default for event-triggered Coordinator turns (#1784)', () =>
     ]);
   });
 
+  test('an ask_user retry re-announces the existing question card', async () => {
+    const w = await setup();
+    const streamed: object[] = [];
+    w.s.convHub.subscribe(w.threadId, {
+      nextSeq: () => 1,
+      send: (payload: object) => {
+        streamed.push(payload);
+        return Promise.resolve();
+      },
+    });
+    w.wake(watchProvenance('todo-a'));
+    const wake = await w.claim();
+    const ask = {
+      requestId: 'ask-00000000-0009',
+      questions: [QUESTION],
+      provenance: watchProvenance('todo-a'),
+    };
+    expect((await w.ask(wake.step.id, ask)).status).toBe(200);
+    const published = streamed.filter((payload) =>
+      JSON.stringify(payload).includes('ask-00000000-0009'),
+    );
+    expect(published).toHaveLength(1);
+    expect((await w.ask(wake.step.id, ask)).status).toBe(200);
+    const republished = streamed.filter((payload) =>
+      JSON.stringify(payload).includes('ask-00000000-0009'),
+    );
+    expect(republished).toHaveLength(2);
+  });
+
+  test('an ask_user relay retry re-announces the existing question card', async () => {
+    const w = await setup();
+    const streamed: object[] = [];
+    w.s.convHub.subscribe(w.threadId, {
+      nextSeq: () => 1,
+      send: (payload: object) => {
+        streamed.push(payload);
+        return Promise.resolve();
+      },
+    });
+    w.wake(watchProvenance('todo-a'));
+    const wake = await w.claim();
+    const params = {
+      requestId: 'ask-00000000-000a',
+      questions: [QUESTION],
+      provenance: watchProvenance('todo-a'),
+    };
+    expect((await w.tool(wake.step.id, 'ask_user', params)).status).toBe(200);
+    const published = streamed.filter((payload) =>
+      JSON.stringify(payload).includes('ask-00000000-000a'),
+    );
+    expect(published).toHaveLength(1);
+    expect((await w.tool(wake.step.id, 'ask_user', params)).status).toBe(200);
+    const republished = streamed.filter((payload) =>
+      JSON.stringify(payload).includes('ask-00000000-000a'),
+    );
+    expect(republished).toHaveLength(2);
+  });
+
   test('answering a pending card with its recommended option resumes the thread and fires nothing else', async () => {
     const w = await setup();
     w.wake(watchProvenance('todo-a'));

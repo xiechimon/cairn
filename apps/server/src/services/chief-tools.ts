@@ -66,6 +66,7 @@ import {
   APPROVAL_CARD_ID_PREFIX,
   announceQuestion,
   askUserQuestionsOfParams,
+  type ChiefQuestionDeps,
   createOrGetQuestion,
 } from './chief-questions.js';
 import { suggestQuickReplies } from './chief-quick-replies.js';
@@ -1015,22 +1016,21 @@ export async function executeChiefTool(
           'invalid params.requestId: approval cards are written by the server',
         );
       }
-      const { content } = createOrGetQuestion(
-        {
-          db,
-          hub: deps.hub,
-          user: deps.user,
-          vapidKeys: deps.vapidKeys,
-          ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-        },
-        {
-          threadId: ctx.threadId,
-          requestId,
-          questions,
-          provenance,
-          askedFor: [...(ctx.turnMessageIds ?? [])],
-        },
-      );
+      const questionDeps: ChiefQuestionDeps = {
+        db,
+        hub: deps.hub,
+        user: deps.user,
+        vapidKeys: deps.vapidKeys,
+        ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
+      };
+      const { content, created } = createOrGetQuestion(questionDeps, {
+        threadId: ctx.threadId,
+        requestId,
+        questions,
+        provenance,
+        askedFor: [...(ctx.turnMessageIds ?? [])],
+      });
+      if (!created) announceQuestion(questionDeps, ctx.threadId, requestId);
       return json({
         status: content.status,
         requestId,

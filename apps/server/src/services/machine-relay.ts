@@ -23,6 +23,7 @@ import { NotFoundError } from './builds.js';
 import { requireTurnProvenance } from './chief.js';
 import {
   ASK_HOLD_MS,
+  announceQuestion,
   type ChiefQuestionDeps,
   createOrGetQuestion,
   holdForQuestion,
@@ -93,13 +94,14 @@ export async function machineAsk(
     ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
   };
   const provenance = requireTurnProvenance(row.prompt, body.provenance, 'ask_user');
-  const { content } = createOrGetQuestion(qDeps, {
+  const { content, created } = createOrGetQuestion(qDeps, {
     threadId: row.buildId,
     requestId: body.requestId,
     questions: body.questions,
     provenance,
     askedFor: row.ownerMessageIds ?? [],
   });
+  if (!created) announceQuestion(qDeps, row.buildId, body.requestId);
   const final =
     content.status === 'pending'
       ? await holdForQuestion(qDeps, {
