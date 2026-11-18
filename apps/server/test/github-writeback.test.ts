@@ -6,12 +6,14 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
+  externalEffect as externalEffectTable,
   taskIssueClose as taskIssueCloseTable,
   team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { transitionTodos } from '../src/services/chief-tools.js';
+import { EFFECT_CLAIM_STALE_MS, effectDedupeKey } from '../src/services/external-effects.js';
 import {
   deleteGithubConnection,
   upsertGithubConnection,
@@ -171,7 +173,10 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     expect(published.some((r) => r.sourceRef === `github:${REPO}#101`)).toBe(true);
     const posts = mock.callsTo('POST', ISSUES_PATH);
     expect(posts).toHaveLength(1);
-    expect(JSON.parse(posts[0]!.body!)).toEqual({ title: '给登录页加图形验证码', body: spec });
+    expect(JSON.parse(posts[0]!.body!)).toEqual({
+      title: '给登录页加图形验证码',
+      body: `${spec}\n\n<!-- cairn:todo ${created.id} -->`,
+    });
     expect(posts[0]!.headers.authorization).toBe(`Bearer ${TOKEN}`);
     expect(posts[0]!.url).not.toContain(TOKEN);
     s.dispose();
@@ -399,6 +404,75 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     expect(record.sourceKind).toBe('github-issue');
     await flushSelfIssueWrites();
     expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(0);
+    s.dispose();
+  });
+
+  const markCrashedSend = (s: TestServer, todoId: string): void => {
+    const key = effectDedupeKey('github-issue-create', s.team.id, todoId, 'octo', 'alpha');
+    const stale = Date.now() - EFFECT_CLAIM_STALE_MS - 1_000;
+    const n = s.db
+      .update(externalEffectTable)
+      .set({ state: 'sending', claimFence: stale, claimedAt: stale })
+      .where(eq(externalEffectTable.dedupeKey, key))
+      .run().changes;
+    expect(n, 'expected a pending effect row to mark crashed').toBe(1);
+  };
+
+  test('a crashed create whose issue reached GitHub is probed and replayed without a second POST', async () => {
+    const mock = ghMock({
+      [`POST ${ISSUES_PATH}`]: { status: 410, body: { message: 'Issues are disabled' } },
+      [`GET ${ISSUES_PATH}`]: { status: 200, body: [] },
+    });
+    const s = bootServer({ githubFetch: mock.impl });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    await flushSelfIssueWrites();
+    expect((await getTodo(s.app, created.id)).sourceRef).toBeNull();
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
+    markCrashedSend(s, created.id);
+    mock.set(`GET ${ISSUES_PATH}`, {
+      status: 200,
+      body: [
+        {
+          number: 9,
+          title: 'x',
+          state: 'open',
+          labels: [],
+          body: `spec\n\n<!-- cairn:todo ${created.id} -->`,
+          user: { login: 'octo-bot' },
+          author_association: 'NONE',
+          created_at: '2026-11-18T00:00:00Z',
+          updated_at: '2026-11-18T00:00:00Z',
+        },
+      ],
+    });
+    const retry = await call(s.app, 'POST', `/api/todos/${created.id}/github-issue/retry`);
+    expect(retry.status).toBe(200);
+    expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#9`);
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
+    expect(s.db.select().from(externalEffectTable).all()[0]?.state).toBe('delivered');
+    s.dispose();
+  });
+
+  test('a crashed create with no matching issue resends exactly once', async () => {
+    const mock = ghMock({
+      [`POST ${ISSUES_PATH}`]: { status: 410, body: { message: 'Issues are disabled' } },
+      [`GET ${ISSUES_PATH}`]: { status: 200, body: [] },
+    });
+    const s = bootServer({ githubFetch: mock.impl });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    await flushSelfIssueWrites();
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
+    markCrashedSend(s, created.id);
+    mock.set(`POST ${ISSUES_PATH}`, { status: 201, body: CREATED_ISSUE });
+    const retry = await call(s.app, 'POST', `/api/todos/${created.id}/github-issue/retry`);
+    expect(retry.status).toBe(200);
+    expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#101`);
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(2);
+    expect(s.db.select().from(externalEffectTable).all()[0]?.state).toBe('delivered');
     s.dispose();
   });
 });

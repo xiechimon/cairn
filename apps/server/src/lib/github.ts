@@ -701,6 +701,7 @@ export type GithubListResult<T> =
   | { ok: false; failure: GithubListFailure };
 
 export interface GithubIssueListEntry extends GithubIssueSummary {
+  body: string | null;
   author: string | null;
   authorAssociation: string | null;
   createdAt: string | null;
@@ -829,6 +830,7 @@ export async function githubListIssues(
     if (issue === null) return null;
     return {
       ...issue,
+      body: optString(raw.body),
       author: loginOf(raw.user),
       authorAssociation: optString(raw.author_association),
       createdAt: optString(raw.created_at),

@@ -46,6 +46,7 @@ import {
   sweepCoordinatorTurnSnapshots,
 } from './coordinator-turn-snapshot.js';
 import { createDueRunner, type DueClock } from './due-events.js';
+import { drainEffects, effectRegistry, reconcileEffects } from './external-effects.js';
 import { projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
@@ -229,6 +230,7 @@ export function createScheduler(
   let digestSweeping = false;
   let lastResearchFailure: string | null = null;
   let alertsSweeping = false;
+  let effectsSweeping = false;
   const ciPoller =
     ci !== undefined && ci !== null
       ? createCiPoller(deps, {
@@ -500,6 +502,19 @@ export function createScheduler(
         })
         .finally(() => {
           alertsSweeping = false;
+        });
+    }
+    if (!effectsSweeping) {
+      effectsSweeping = true;
+      void (async () => {
+        await reconcileEffects(deps.db, effectRegistry, now);
+        await drainEffects(deps.db, effectRegistry, { now });
+      })()
+        .catch(() => {
+          process.stderr.write('External effects recovery failed\n');
+        })
+        .finally(() => {
+          effectsSweeping = false;
         });
     }
     for (const row of dueSchedules(deps, now)) pending.push(runSchedule(row, now));

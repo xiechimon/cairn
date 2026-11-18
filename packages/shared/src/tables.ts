@@ -80,6 +80,9 @@ export const DB_TABLES = [
   'im_connection',
   'im_pairing_request',
   'team_top_models',
+  'external_effect',
+  'im_seen_inbound',
+  'im_turn_origin',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -147,4 +150,7 @@ export const INTERNAL_ONLY_TABLES = [
   'data_migration',
   'task_issue_close',
   'deploy_lease',
+  'external_effect',
+  'im_seen_inbound',
+  'im_turn_origin',
 ] as const;

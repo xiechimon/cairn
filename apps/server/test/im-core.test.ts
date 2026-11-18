@@ -1,6 +1,6 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { imConnection, imPairingRequest, step } from '../src/db/schema.js';
+import { externalEffect, imConnection, imPairingRequest, step } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { createImService, type ImService } from '../src/services/im/core.js';
 import { ImSendError } from '../src/services/im/errors.js';
@@ -347,7 +347,7 @@ describe('inbound turns and origin scoping', () => {
 });
 
 describe('restart and send queue', () => {
-  test('origins are memory-only: a restarted service sends nothing', async () => {
+  test('a restarted service still answers the origin chat', async () => {
     await connectAndPair('55');
     sessions[0]?.handlers.onMessage(inbound('55', 'ping'));
     const stepRow = latestChiefStep();
@@ -362,7 +362,69 @@ describe('restart and send queue', () => {
         id: 'asst-3',
         threadId: stepRow.buildId,
         role: 'assistant',
-        content: 'lost reply',
+        content: 'durable reply',
+        createdAt: nowMs() + 1,
+      },
+    );
+    await service.shutdown();
+    const restarted = createImService({
+      db: s.db,
+      hub: s.hub,
+      machineHub: s.machineHub,
+      convHub: s.convHub,
+      box: s.secretBox,
+      user: s.user,
+      env: env(),
+      adapters: { telegram: adapter },
+    });
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
+    restarted.runtime.turnFinished(stepById(stepRow.id));
+    await restarted.resume();
+    await vi.waitFor(() => {
+      expect(
+        sessions.flatMap((session) => session.sent).some((m) => m.text === 'durable reply'),
+      ).toBe(true);
+    });
+  });
+
+  test('a replayed inbound message is deduped durably across restarts', async () => {
+    await connectAndPair('55');
+    const msg = inbound('55', 'ping');
+    sessions[0]?.handlers.onMessage(msg);
+    sessions[0]?.handlers.onMessage(msg);
+    await service.shutdown();
+    const restarted = createImService({
+      db: s.db,
+      hub: s.hub,
+      machineHub: s.machineHub,
+      convHub: s.convHub,
+      box: s.secretBox,
+      user: s.user,
+      env: env(),
+      adapters: { telegram: adapter },
+    });
+    await restarted.resume();
+    sessions[sessions.length - 1]?.handlers.onMessage(msg);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(s.db.select().from(step).where(eq(step.kind, 'chief')).all()).toHaveLength(1);
+  });
+
+  test('a send queued while the session is offline drains on reconnect once', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage(inbound('55', 'ping'));
+    const stepRow = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    upsertChiefRow(
+      { db: s.db },
+      {
+        id: 'asst-3b',
+        threadId: stepRow.buildId,
+        role: 'assistant',
+        content: 'offline reply',
         createdAt: nowMs() + 1,
       },
     );
@@ -380,7 +442,45 @@ describe('restart and send queue', () => {
     s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
     restarted.runtime.turnFinished(stepById(stepRow.id));
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(sessions[0]?.sent.filter((msg) => msg.text === 'lost reply')).toHaveLength(0);
+    expect(sessions[sessions.length - 1]?.sent ?? []).toHaveLength(0);
+    await restarted.resume();
+    await vi.waitFor(() => {
+      const sent = sessions.flatMap((session) => session.sent);
+      expect(sent.filter((msg) => msg.text === 'offline reply')).toHaveLength(1);
+    });
+    const delivered = s.db
+      .select()
+      .from(externalEffect)
+      .where(and(eq(externalEffect.kind, 'im-send'), eq(externalEffect.state, 'delivered')))
+      .all();
+    expect(delivered.length).toBeGreaterThan(0);
+  });
+
+  test('an outward-acted im send is never re-run when the turn finishes twice', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage(inbound('55', 'ping'));
+    const stepRow = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    upsertChiefRow(
+      { db: s.db },
+      {
+        id: 'asst-3c',
+        threadId: stepRow.buildId,
+        role: 'assistant',
+        content: 'exactly once',
+        createdAt: nowMs() + 1,
+      },
+    );
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
+    service.runtime.turnFinished(stepById(stepRow.id));
+    await vi.waitFor(() => expect(sessions[0]?.sent).toHaveLength(1));
+    service.runtime.turnFinished(stepById(stepRow.id));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(sessions[0]?.sent.filter((msg) => msg.text === 'exactly once')).toHaveLength(1);
   });
 
   test('retry-class sends back off and then surface as failed', async () => {

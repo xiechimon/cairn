@@ -1709,3 +1709,68 @@ export const imPairingRequest = sqliteTable(
     check('im_pairing_request_status', sql`${t.status} in ('pending', 'approved', 'rejected')`),
   ],
 );
+
+export const imSeenInbound = sqliteTable(
+  'im_seen_inbound',
+  {
+    connId: text('connId')
+      .notNull()
+      .references(() => imConnection.id, { onDelete: 'cascade' }),
+    messageId: text('messageId').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.connId, t.messageId] }),
+    index('im_seen_inbound_conn_idx').on(t.connId, t.createdAt),
+  ],
+);
+
+export const imTurnOrigin = sqliteTable('im_turn_origin', {
+  stepId: text('stepId').primaryKey(),
+  connId: text('connId')
+    .notNull()
+    .references(() => imConnection.id, { onDelete: 'cascade' }),
+  chatKey: text('chatKey').notNull(),
+  senderId: text('senderId').notNull(),
+  threadId: text('threadId').notNull(),
+  createdAt: epochMs('createdAt').notNull(),
+});
+
+export const externalEffect = sqliteTable(
+  'external_effect',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    scopeKind: text('scopeKind')
+      .$type<'todo' | 'build' | 'step' | 'chiefThread' | 'mailEvent' | 'imConnection'>()
+      .notNull(),
+    scopeId: text('scopeId').notNull(),
+    stepId: text('stepId'),
+    claimGeneration: epochMs('claimGeneration'),
+    kind: text('kind').notNull(),
+    dedupeKey: text('dedupeKey').notNull(),
+    payload: json<unknown>('payload').notNull(),
+    state: text('state')
+      .$type<'pending' | 'sending' | 'delivered' | 'failed' | 'interrupted' | 'cancelled'>()
+      .notNull(),
+    dueAt: epochMs('dueAt').notNull(),
+    claimedAt: epochMs('claimedAt'),
+    claimFence: epochMs('claimFence'),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('lastError'),
+    receipt: json<unknown>('receipt'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('external_effect_dedupe_idx').on(t.dedupeKey),
+    index('external_effect_state_due_idx').on(t.state, t.dueAt),
+    index('external_effect_scope_idx').on(t.scopeKind, t.scopeId),
+    check(
+      'external_effect_state',
+      sql`${t.state} in ('pending', 'sending', 'delivered', 'failed', 'interrupted', 'cancelled')`,
+    ),
+  ],
+);

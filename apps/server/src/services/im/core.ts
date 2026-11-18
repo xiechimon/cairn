@@ -11,8 +11,11 @@ import { and, desc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import {
   chiefMessage,
   coordinatorInput,
+  externalEffect,
   imConnection,
   imPairingRequest,
+  imSeenInbound,
+  imTurnOrigin,
   step,
 } from '../../db/schema.js';
 import { HttpError } from '../../lib/errors.js';
@@ -25,6 +28,17 @@ import {
   ensureChief,
   extractText,
 } from '../chief.js';
+import {
+  cancelPendingEffects,
+  drainEffects,
+  effectDedupeKey,
+  effectRegistry,
+  failEffect,
+  recordEffect,
+  retryEffect,
+  runEffectRow,
+  waitEffect,
+} from '../external-effects.js';
 import { asSendError } from './errors.js';
 import type { ImRuntimeHooks, ImStepRow } from './runtime.js';
 import type { ImAdapter, ImEnv, ImInboundMessage, ImOutboundMessage } from './types.js';
@@ -87,14 +101,35 @@ function sendBackoffMs(attempt: number): number {
   return Math.min(5000 * 2 ** attempt, 30_000);
 }
 
+function imSendConnId(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const connId = (payload as Record<string, unknown>).connId;
+  return typeof connId === 'string' ? connId : null;
+}
+
+function imSendPayload(payload: unknown): { connId: string; message: ImOutboundMessage } | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const raw = payload as Record<string, unknown>;
+  if (typeof raw.connId !== 'string' || typeof raw.chatKey !== 'string') return null;
+  if (typeof raw.text !== 'string') return null;
+  return {
+    connId: raw.connId,
+    message: {
+      chatKey: raw.chatKey,
+      text: raw.text,
+      ...(typeof raw.replyToMessageId === 'string'
+        ? { replyToMessageId: raw.replyToMessageId }
+        : {}),
+    },
+  };
+}
+
 export function createImService(deps: ImServiceDeps): ImService {
   const live = new Map<string, LiveSession>();
-  const origins = new Map<string, Origin>();
   const mixed = new Set<string>();
   const imOwnedMessageIds = new Set<string>();
   const queueChains = new Map<string, Promise<void>>();
   const sendErrors = new Map<string, string>();
-  const seenInbound = new Map<string, Set<string>>();
 
   const connRow = (connId: string): ConnectionRow | undefined =>
     deps.db.select().from(imConnection).where(eq(imConnection.id, connId)).get();
@@ -141,38 +176,130 @@ export function createImService(deps: ImServiceDeps): ImService {
       .run();
   };
 
-  const deliver = async (connId: string, msg: ImOutboundMessage): Promise<void> => {
+  const deliverOnce = async (
+    connId: string,
+    msg: ImOutboundMessage,
+  ): Promise<'delivered' | 'dropped' | 'permanent' | 'failed' | 'offline'> => {
     const session = live.get(connId);
-    if (session === undefined) return;
+    if (session === undefined) return 'offline';
     for (let attempt = 0; attempt < SEND_ATTEMPTS; attempt += 1) {
       try {
         await session.send(msg);
         sendErrors.delete(connId);
-        return;
+        return 'delivered';
       } catch (err) {
         const sendErr = asSendError(err);
         if (sendErr.authExpired) markStatus(connId, 'expired', sendErr.message);
-        if (sendErr.kind === 'drop') return;
-        if (sendErr.kind === 'permanent' || attempt === SEND_ATTEMPTS - 1) {
+        if (sendErr.kind === 'drop') return 'dropped';
+        if (sendErr.kind === 'permanent') {
           sendErrors.set(connId, sendErr.message);
-          return;
+          return 'permanent';
+        }
+        if (attempt === SEND_ATTEMPTS - 1) {
+          sendErrors.set(connId, sendErr.message);
+          return 'failed';
         }
         await deps.env.sleep(sendErr.retryAfterMs ?? sendBackoffMs(attempt));
       }
     }
+    return 'failed';
   };
 
-  const enqueueSend = (connId: string, msg: ImOutboundMessage): void => {
+  effectRegistry.set('im-send', {
+    policy: 'unsafe',
+    scopeGone: (_db, effectRow) => {
+      const connId = imSendConnId(effectRow.payload);
+      return connId === null || connRow(connId) === undefined;
+    },
+    send: async (effectRow) => {
+      const msg = imSendPayload(effectRow.payload);
+      if (msg === null) throw failEffect('im-send payload is malformed');
+      const outcome = await deliverOnce(msg.connId, msg.message);
+      if (outcome === 'delivered') return { sent: true };
+      if (outcome === 'offline') throw waitEffect('im session offline');
+      if (outcome === 'permanent' || outcome === 'dropped')
+        throw failEffect(`im send refused (${outcome})`);
+      throw retryEffect('im send attempts exhausted');
+    },
+  });
+
+  const enqueueSend = (
+    connId: string,
+    msg: ImOutboundMessage,
+    scope?: {
+      kind: 'step' | 'imConnection';
+      id: string;
+      stepId?: string;
+      claimGeneration?: number;
+      dedupe: string;
+    },
+  ): void => {
+    const conn = connRow(connId);
+    if (conn === undefined) return;
+    const { row } = recordEffect(deps.db, {
+      teamId: conn.teamId,
+      scopeKind: scope?.kind ?? 'imConnection',
+      scopeId: scope?.id ?? connId,
+      stepId: scope?.stepId,
+      claimGeneration: scope?.claimGeneration,
+      kind: 'im-send',
+      dedupeKey: effectDedupeKey(
+        'im-send',
+        connId,
+        msg.chatKey,
+        scope?.dedupe ?? '',
+        msg.text,
+        msg.replyToMessageId ?? '',
+      ),
+      payload: {
+        connId,
+        chatKey: msg.chatKey,
+        text: msg.text,
+        replyToMessageId: msg.replyToMessageId ?? null,
+      },
+    });
+    if (row.state !== 'pending') return;
     const key = `${connId}\n${msg.chatKey}`;
     const prev = queueChains.get(key) ?? Promise.resolve();
-    const next = prev.then(() => deliver(connId, msg)).catch(() => {});
+    const next = prev
+      .then(async () => {
+        await runEffectRow(deps.db, effectRegistry, row.id);
+      })
+      .catch(() => {});
     queueChains.set(key, next);
   };
 
-  const sendToOrigin = (origin: Origin, text: string): void => {
+  const sendToOrigin = (
+    origin: Origin,
+    text: string,
+    stepRef: { id: string; claimedAt?: number | null },
+  ): void => {
     const trimmed = text.trim();
     if (trimmed === '') return;
-    enqueueSend(origin.connId, { chatKey: origin.chatKey, text: trimmed });
+    enqueueSend(
+      origin.connId,
+      { chatKey: origin.chatKey, text: trimmed },
+      {
+        kind: 'step',
+        id: stepRef.id,
+        stepId: stepRef.id,
+        ...(stepRef.claimedAt !== null && stepRef.claimedAt !== undefined
+          ? { claimGeneration: stepRef.claimedAt }
+          : {}),
+        dedupe: stepRef.id,
+      },
+    );
+  };
+
+  const originOf = (stepId: string): Origin | undefined => {
+    const row = deps.db.select().from(imTurnOrigin).where(eq(imTurnOrigin.stepId, stepId)).get();
+    if (row === undefined) return undefined;
+    return {
+      connId: row.connId,
+      chatKey: row.chatKey,
+      senderId: row.senderId,
+      threadId: row.threadId,
+    };
   };
 
   const turnOwners = (stepId: string): Set<string> => {
@@ -247,16 +374,30 @@ export function createImService(deps: ImServiceDeps): ImService {
   };
 
   const rememberInbound = (connId: string, messageId: string): boolean => {
-    let seen = seenInbound.get(connId);
-    if (seen === undefined) {
-      seen = new Set();
-      seenInbound.set(connId, seen);
-    }
-    if (seen.has(messageId)) return false;
-    seen.add(messageId);
-    if (seen.size > 500) {
-      const oldest = seen.values().next();
-      if (oldest.done === false) seen.delete(oldest.value);
+    const res = deps.db
+      .insert(imSeenInbound)
+      .values({ connId, messageId, createdAt: nowMs() })
+      .onConflictDoNothing()
+      .run();
+    if (res.changes === 0) return false;
+    const cutoff = deps.db
+      .select({ createdAt: imSeenInbound.createdAt })
+      .from(imSeenInbound)
+      .where(eq(imSeenInbound.connId, connId))
+      .orderBy(desc(imSeenInbound.createdAt), desc(imSeenInbound.messageId))
+      .limit(1)
+      .offset(500)
+      .get();
+    if (cutoff !== undefined) {
+      deps.db
+        .delete(imSeenInbound)
+        .where(
+          and(
+            eq(imSeenInbound.connId, connId),
+            sql`${imSeenInbound.createdAt} < ${cutoff.createdAt}`,
+          ),
+        )
+        .run();
     }
     return true;
   };
@@ -294,11 +435,15 @@ export function createImService(deps: ImServiceDeps): ImService {
         updatedAt: now,
       })
       .run();
-    enqueueSend(row.id, {
-      chatKey: msg.chat.key,
-      text: PAIRING_REQUESTED_TEXT,
-      replyToMessageId: msg.messageId,
-    });
+    enqueueSend(
+      row.id,
+      {
+        chatKey: msg.chat.key,
+        text: PAIRING_REQUESTED_TEXT,
+        replyToMessageId: msg.messageId,
+      },
+      { kind: 'imConnection', id: row.id, dedupe: `pairing:${msg.sender.id}` },
+    );
   };
 
   const onMessage = (connId: string, msg: ImInboundMessage): void => {
@@ -320,12 +465,18 @@ export function createImService(deps: ImServiceDeps): ImService {
       provenance: `im:${row.platform}:${connId}:${msg.chat.key}`,
       ownerMessageIds: [],
     });
-    origins.set(stepId, {
-      connId,
-      chatKey: msg.chat.key,
-      senderId: msg.sender.id,
-      threadId: threadRow.id,
-    });
+    deps.db
+      .insert(imTurnOrigin)
+      .values({
+        stepId,
+        connId,
+        chatKey: msg.chat.key,
+        senderId: msg.sender.id,
+        threadId: threadRow.id,
+        createdAt: nowMs(),
+      })
+      .onConflictDoNothing()
+      .run();
   };
 
   const onStatus = (connId: string, status: ImConnectionStatus, detail?: string): void => {
@@ -383,6 +534,7 @@ export function createImService(deps: ImServiceDeps): ImService {
       return;
     }
     live.set(connId, session);
+    void drainEffects(deps.db, effectRegistry).catch(() => {});
   };
 
   const service: ImService = {
@@ -396,29 +548,28 @@ export function createImService(deps: ImServiceDeps): ImService {
           )
           .all();
         for (const row of claimed) {
-          const origin = origins.get(row.id);
+          const origin = originOf(row.id);
           if (origin !== undefined && turnIsImOnly(row.id)) {
-            sendToOrigin(origin, text);
+            sendToOrigin(origin, text, row);
           }
         }
       },
 
       turnFinished(stepRow: ImStepRow): void {
         if (stepRow.kind !== 'chief') return;
-        const origin = origins.get(stepRow.id);
+        const origin = originOf(stepRow.id);
         if (origin === undefined) return;
-        origins.delete(stepRow.id);
+        deps.db.delete(imTurnOrigin).where(eq(imTurnOrigin.stepId, stepRow.id)).run();
         if (!turnIsImOnly(stepRow.id)) {
           mixed.add(stepRow.id);
           return;
         }
-        if (live.get(origin.connId) === undefined) return;
         if (stepRow.status === 'failed') {
-          sendToOrigin(origin, TURN_FAILED_TEXT);
+          sendToOrigin(origin, TURN_FAILED_TEXT, stepRow);
           return;
         }
         const text = lastAssistantText(stepRow);
-        if (text !== null) sendToOrigin(origin, text);
+        if (text !== null) sendToOrigin(origin, text, stepRow);
       },
     },
 
@@ -487,14 +638,21 @@ export function createImService(deps: ImServiceDeps): ImService {
       requireConn(teamId, connId);
       const session = live.get(connId);
       live.delete(connId);
-      seenInbound.delete(connId);
       sendErrors.delete(connId);
-      for (const [stepId, origin] of origins) {
-        if (origin.connId === connId) {
-          origins.delete(stepId);
-          mixed.add(stepId);
-        }
-      }
+      const connOrigins = deps.db
+        .select({ stepId: imTurnOrigin.stepId })
+        .from(imTurnOrigin)
+        .where(eq(imTurnOrigin.connId, connId))
+        .all();
+      for (const origin of connOrigins) mixed.add(origin.stepId);
+      deps.db.delete(imTurnOrigin).where(eq(imTurnOrigin.connId, connId)).run();
+      cancelPendingEffects(
+        deps.db,
+        and(
+          eq(externalEffect.kind, 'im-send'),
+          sql`json_extract(${externalEffect.payload}, '$.connId') = ${connId}`,
+        ),
+      );
       deps.db.delete(imPairingRequest).where(eq(imPairingRequest.connId, connId)).run();
       deps.db.delete(imConnection).where(eq(imConnection.id, connId)).run();
       if (session !== undefined) await session.stop().catch(() => {});
@@ -579,10 +737,14 @@ export function createImService(deps: ImServiceDeps): ImService {
         }
       });
       if (decision === 'approved') {
-        enqueueSend(found.conn.id, {
-          chatKey: found.request.chatKey,
-          text: PAIRING_APPROVED_TEXT,
-        });
+        enqueueSend(
+          found.conn.id,
+          {
+            chatKey: found.request.chatKey,
+            text: PAIRING_APPROVED_TEXT,
+          },
+          { kind: 'imConnection', id: found.conn.id, dedupe: `paired:${found.request.senderId}` },
+        );
       }
       const row = deps.db
         .select()
@@ -612,12 +774,12 @@ export function createImService(deps: ImServiceDeps): ImService {
       for (const row of rows) {
         await startConnection(row.id).catch(() => {});
       }
+      await drainEffects(deps.db, effectRegistry).catch(() => {});
     },
 
     async shutdown(): Promise<void> {
       const sessions = [...live.values()];
       live.clear();
-      origins.clear();
       for (const session of sessions) {
         await session.stop().catch(() => {});
       }

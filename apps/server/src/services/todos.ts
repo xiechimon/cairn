@@ -44,7 +44,7 @@ import {
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
+import { githubCreateIssue, githubListIssues, githubUpdateIssueTitle } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { checkBlockedBy, holdBlockedBuild, releaseBlockedSteps } from './blockers.js';
@@ -55,6 +55,20 @@ import { assertCorrectionDone } from './correction.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import {
+  claimEffect,
+  type EffectProbeVerdict,
+  type EffectRow,
+  effectAttemptOutcome,
+  effectDedupeKey,
+  effectRegistry,
+  failEffect,
+  markEffectAttempt,
+  markEffectDelivered,
+  recordEffect,
+  retryEffect,
+  settleEffectRow,
+} from './external-effects.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
 import { hasGithubConnection, userTokenOrNull } from './github-connection.js';
@@ -990,8 +1004,129 @@ function scheduleSelfIssueCreate(deps: TodoDeps, todoId: string): void {
   selfIssueInFlight.set(todoId, pending);
 }
 
+const selfIssueMarker = (todoId: string) => `<!-- cairn:todo ${todoId} -->`;
+
+const SELF_ISSUE_PROBE_PAGES = 3;
+
+interface SelfIssuePayload {
+  todoId: string;
+  owner: string;
+  repo: string;
+  title: string;
+  body: string;
+}
+
+function selfIssuePayloadOf(row: EffectRow): SelfIssuePayload | null {
+  const p = row.payload as Record<string, unknown> | null;
+  if (p === null) return null;
+  if (
+    typeof p.todoId !== 'string' ||
+    typeof p.owner !== 'string' ||
+    typeof p.repo !== 'string' ||
+    typeof p.title !== 'string' ||
+    typeof p.body !== 'string'
+  )
+    return null;
+  return { todoId: p.todoId, owner: p.owner, repo: p.repo, title: p.title, body: p.body };
+}
+
+function issueNumberOfReceipt(receipt: unknown): number | null {
+  if (typeof receipt !== 'object' || receipt === null) return null;
+  const n = (receipt as { number?: unknown }).number;
+  return typeof n === 'number' ? n : null;
+}
+
+function applyCreatedIssue(
+  deps: TodoDeps,
+  row: TodoRow,
+  repoRef: GithubRepoRef,
+  number: number,
+): TodoRecord | null {
+  const { db, hub } = deps;
+  const ref = githubIssueSourceRef(repoRef.owner, repoRef.repo, number);
+  const fresh = getRow(deps, row.id);
+  if (!fresh) {
+    queueIssueClose(db, row.teamId, ref, DELETED_TASK_ISSUE_COMMENT);
+    return null;
+  }
+  if (fresh.sourceRef !== row.sourceRef) return null;
+  db.update(todo)
+    .set({ sourceRef: ref, issueState: 'open', v: fresh.v + 1 })
+    .where(eq(todo.id, row.id))
+    .run();
+  const record = getTodo(deps, row.id);
+  if (record) hub.publishTodoDoc(record.teamId, record);
+  if (row.sourceRef !== null && parseGithubIssueSourceRef(row.sourceRef) !== null) {
+    queueIssueClose(
+      db,
+      row.teamId,
+      row.sourceRef,
+      `Cairn：这个任务挪到了 ${repoRef.owner}/${repoRef.repo}#${number}，这里的 issue 关闭。`,
+    );
+  }
+  return record;
+}
+
+async function sendSelfIssueEffect(
+  deps: TodoDeps,
+  effectRow: EffectRow,
+): Promise<{ number: number }> {
+  const p = selfIssuePayloadOf(effectRow);
+  if (p === null) throw failEffect('github-issue-create payload is malformed');
+  const row = getRow(deps, p.todoId);
+  if (row === undefined) throw failEffect('github-issue-create scope is gone');
+  const repoRef = { owner: p.owner, repo: p.repo };
+  const token = await autonomousToken(deps, row.teamId, repoRef);
+  if (token === null) throw retryEffect('github connection not found');
+  const { number } = await githubCreateIssue(deps.githubFetch ?? fetch, token, p.owner, p.repo, {
+    title: row.title,
+    body: `${row.spec}\n\n${selfIssueMarker(p.todoId)}`,
+  });
+  applyCreatedIssue(deps, row, repoRef, number);
+  return { number };
+}
+
+async function probeSelfIssueCreated(
+  deps: TodoDeps,
+  effectRow: EffectRow,
+): Promise<EffectProbeVerdict> {
+  const p = selfIssuePayloadOf(effectRow);
+  if (p === null) return { verdict: 'unknown' };
+  const token = await autonomousToken(deps, effectRow.teamId, { owner: p.owner, repo: p.repo });
+  if (token === null) return { verdict: 'unknown' };
+  const marker = selfIssueMarker(p.todoId);
+  for (let page = 1; page <= SELF_ISSUE_PROBE_PAGES; page += 1) {
+    const res = await githubListIssues(deps.githubFetch ?? fetch, token, p.owner, p.repo, {
+      state: 'all',
+      page,
+      perPage: 100,
+      timeoutMs: 15_000,
+    });
+    if (!res.ok) return { verdict: 'unknown' };
+    for (const issue of res.items) {
+      if (issue.body?.includes(marker)) {
+        return { verdict: 'delivered', receipt: { number: issue.number } };
+      }
+    }
+    if (!res.hasMore) break;
+  }
+  return { verdict: 'unsent' };
+}
+
+function registerSelfIssueCreateKind(deps: TodoDeps): void {
+  effectRegistry.set('github-issue-create', {
+    policy: 'probe',
+    scopeGone: (_db, effectRow) => {
+      const p = selfIssuePayloadOf(effectRow);
+      return p === null || getRow(deps, p.todoId) === undefined;
+    },
+    probe: (effectRow) => probeSelfIssueCreated(deps, effectRow),
+    send: (effectRow) => sendSelfIssueEffect(deps, effectRow),
+  });
+}
+
 async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoRecord | null> {
-  const { db, hub, box } = deps;
+  const { db, box } = deps;
   const row = getRow(deps, todoId);
   if (row?.sourceKind !== 'github-issue-self') return null;
   const repoRef = githubRepoOfProject(projectOfTodo(db, row));
@@ -1008,33 +1143,52 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
     deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
   )(row.teamId, repoRef);
   if (token === null) throw new HttpError(404, 'github connection not found');
-  const { owner, repo } = repoRef;
-  const { number } = await githubCreateIssue(deps.githubFetch ?? fetch, token, owner, repo, {
-    title: row.title,
-    body: row.spec,
-  });
-  const fresh = getRow(deps, todoId);
-  const ref = githubIssueSourceRef(owner, repo, number);
-  if (!fresh) {
-    queueIssueClose(db, row.teamId, ref, DELETED_TASK_ISSUE_COMMENT);
-    return null;
-  }
-  if (fresh.sourceRef !== row.sourceRef) return null;
-  db.update(todo)
-    .set({ sourceRef: ref, issueState: 'open', v: fresh.v + 1 })
-    .where(eq(todo.id, todoId))
-    .run();
-  const record = getTodo(deps, todoId);
-  if (record) hub.publishTodoDoc(record.teamId, record);
-  if (replaced !== null && row.sourceRef !== null) {
-    queueIssueClose(
-      db,
+  registerSelfIssueCreateKind(deps);
+  const body = `${row.spec}\n\n${selfIssueMarker(todoId)}`;
+  const intent = recordEffect(db, {
+    teamId: row.teamId,
+    scopeKind: 'todo',
+    scopeId: todoId,
+    kind: 'github-issue-create',
+    dedupeKey: effectDedupeKey(
+      'github-issue-create',
       row.teamId,
-      row.sourceRef,
-      `Cairn：这个任务挪到了 ${owner}/${repo}#${number}，这里的 issue 关闭。`,
-    );
+      todoId,
+      repoRef.owner,
+      repoRef.repo,
+    ),
+    payload: { todoId, owner: repoRef.owner, repo: repoRef.repo, title: row.title, body },
+  });
+  const settled = await settleEffectRow(db, effectRegistry, intent.row);
+  if (settled.state === 'delivered') {
+    const number = issueNumberOfReceipt(settled.receipt);
+    return number === null ? null : applyCreatedIssue(deps, row, repoRef, number);
   }
-  return record;
+  if (settled.state !== 'pending') return null;
+  const claimed = claimEffect(db, settled.id);
+  if (claimed === null) return null;
+  try {
+    const { number } = await githubCreateIssue(
+      deps.githubFetch ?? fetch,
+      token,
+      repoRef.owner,
+      repoRef.repo,
+      {
+        title: row.title,
+        body,
+      },
+    );
+    markEffectDelivered(db, claimed.id, claimed.claimFence ?? nowMs(), { number });
+    return applyCreatedIssue(deps, row, repoRef, number);
+  } catch (err) {
+    markEffectAttempt(
+      db,
+      claimed.id,
+      claimed.claimFence ?? nowMs(),
+      effectAttemptOutcome(err, claimed.attempts, nowMs()),
+    );
+    throw err;
+  }
 }
 
 export async function retrySelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoRecord> {

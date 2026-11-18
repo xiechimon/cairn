@@ -36,6 +36,7 @@ import { computerScreensOf } from './services/computer-screen.js';
 import { setCoordinatorInServer, setCoordinatorWake } from './services/coordinator-context.js';
 import { runDataMigrationOnce } from './services/data-migrations.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
+import { drainEffects, effectRegistry, reconcileEffects } from './services/external-effects.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { createImService } from './services/im/core.js';
@@ -349,6 +350,11 @@ const drainHttp = createHttpDrain(server);
 const computerScreens = computerScreensOf({ db, machineHub, secretBox });
 computerScreens.recover();
 sweepComputerHandoffs(db, Date.now());
+void reconcileEffects(db, effectRegistry)
+  .then(() => drainEffects(db, effectRegistry))
+  .catch((error: unknown) => {
+    logger.warn({ err: error }, 'external effects could not be reconciled');
+  });
 computerScreens.attach(server);
 
 if (config.authToken !== null) {

@@ -10104,6 +10104,9 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "im_connection",
   "im_pairing_request",
   "team_top_models",
+  "external_effect",
+  "im_seen_inbound",
+  "im_turn_origin",
 ]
 `;
 

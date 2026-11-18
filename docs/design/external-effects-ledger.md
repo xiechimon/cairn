@@ -1,6 +1,6 @@
 # External effects ledger
 
-Status: proposal for the owner's review. Nothing here is built. Baseline `e541ed535` on `origin/main`. Prior art already in this repo: `docs/reliability/effect-paths-audit.md` (#2492) inventories every decision-commit-versus-side-effect path, classifies each kill window as lost or dup, and names fix slice one "an `effect` outbox table, after-commit executor, sweeper and per-kind failure counter". This page is that slice's contract. Scope is assignment-tree work: a Coordinator chief tree that suspends on `ask_user` cards, fans out child todos through `todo.sourceTodo`, and wakes once when children finish (`settleSplitOnDone` in `apps/server/src/services/todos.ts`, `triggerChiefWakes` in `apps/server/src/services/chief.ts`).
+Status: first slice built (`external_effect` + drainer + reconciler in `apps/server/src/services/external-effects.ts`, `im-send` and `github-issue-create` wired). Prior art already in this repo: `docs/reliability/effect-paths-audit.md` (#2492) inventories every decision-commit-versus-side-effect path, classifies each kill window as lost or dup, and names fix slice one "an `effect` outbox table, after-commit executor, sweeper and per-kind failure counter". This page is that slice's contract. Scope is assignment-tree work: a Coordinator chief tree that suspends on `ask_user` cards, fans out child todos through `todo.sourceTodo`, and wakes once when children finish (`settleSplitOnDone` in `apps/server/src/services/todos.ts`, `triggerChiefWakes` in `apps/server/src/services/chief.ts`).
 
 ## Problem
 
@@ -50,3 +50,13 @@ Restart reconciliation: at startup (`index.ts`, beside the IM resume and compute
 ## Out of scope
 
 Daemon-side effects, a UI for `interrupted` rows beyond the minimal surfacing, and any change to push/IM/GitHub provider clients beyond the receipt write-back.
+
+## As built (first slice)
+
+Wired kinds: `im-send` (`unsafe`; also the `PAIRING_REQUESTED`/`PAIRING_APPROVED` notices — dedupe keys `pairing:<sender>`/`paired:<sender>`) and `github-issue-create` (`probe` — created issue bodies carry a `<!-- cairn:todo <todoId> -->` marker so the probe can prove delivered-vs-unsent by listing repo issues).
+
+- `apps/server/src/services/external-effects.ts` owns the row lifecycle: `recordEffect` (intent + dedupe attach), `claimEffect`/`markEffectDelivered`/`markEffectAttempt` (fence-checked), `drainEffects` (per-db serialization), `reconcileEffects`/`settleEffectRow` (stale `sending` policy settle + `scopeGone` cancel), `effectDedupeKey`, and the `retryEffect`/`waitEffect`/`failEffect` outcome helpers. `waitEffect` returns a row to `pending` without burning an attempt — an offline IM session is an unexecuted wait, not a failed send, so queued replies survive overnight connectivity gaps.
+- IM turn state that lived in process maps is durable: `im_turn_origin` (step → connection/chat/sender/thread), `im_seen_inbound` (`(connId, messageId)` dedupe, ~500-row retention per connection). A restarted `createImService` still answers the origin chat and still drops replayed inbound messages; `deleteConnection` cancels the connection's pending `im-send` effects in the same call.
+- `github-issue-create` dedupe is `(teamId, todoId, owner, repo)` — a repo move is a new intent; a repeated create attaches and replays the stored `number` receipt. `runSelfIssueCreate` settles an attached `interrupted`/stale `sending` row through the probe before sending, so a crash after GitHub accepted the issue yields `delivered` via the list-issues probe and zero second `POST /issues`; a confirmed miss re-sends exactly once.
+- Startup (`index.ts`) and the scheduler tick run `reconcileEffects` then `drainEffects`, guarded by an `effectsSweeping` flag like the push-alert sweep. Rows whose kind is not yet registered are skipped, never `interrupted` — a lazily registered kind settles on the next tick.
+- Channels that already carry a durable ledger stay on it (single path, no double accounting): `push_delivery`/`sendMustReachAlert`, `client_message` dedupe, `task_issue_close` tombstones + `issueState` convergence, `deliverMailEvent`, `coordinatorInput`/outbox dedupe, `computer_call`, merge write-ahead admission. Migrating any of them onto `external_effect` is a later slice per kind.
