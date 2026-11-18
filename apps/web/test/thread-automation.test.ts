@@ -17,7 +17,9 @@ function schedule(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
     id: 'schedule-1', teamId: 'team-1', projectId: 'project-1', todoId: 'todo-1',
     kind: 'daily', cron: '0 9 * * *', prompt: 'Run the tests', enabled: true,
     at: Date.UTC(2026, 10, 4, 1), tz: 'Asia/Shanghai', nextRunAt: NOW + 60_000,
-    lastRunAt: NOW - 86_400_000, lastRunStatus: 'completed', pausedReason: null, createdBy: 'user-1',
+    lastRunAt: NOW - 86_400_000, lastRunStatus: 'completed', pausedReason: null,
+    triggerSpec: null, webhookMasked: null, webhookLastUsedAt: null, missedRunWindowMs: null,
+    createdAt: NOW - 172_800_000, createdBy: 'user-1',
     todo: { seqNum: 9, title: 'Tests', phase: 'building', projectName: 'cairn', ownerId: 'user-1' },
     ...overrides,
   };

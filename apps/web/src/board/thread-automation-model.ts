@@ -19,6 +19,8 @@ export function automationFinished(schedule: ScheduleRecord): boolean {
 }
 
 export function automationCadence(schedule: ScheduleRecord, locale: string, t: TFunc): string {
+  if (schedule.kind === 'event') return t('On build completion');
+  if (schedule.kind === 'webhook') return t('On webhook call');
   if (schedule.kind === 'cron') {
     const weekdays = /^(\d{1,2}) (\d{1,2}) \* \* 1-5$/.exec(schedule.cron ?? '');
     if (weekdays !== null) {

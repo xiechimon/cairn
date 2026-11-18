@@ -1100,7 +1100,11 @@ export function useApiMutations(teamId: string | undefined) {
       onError: invalidateAll,
     }),
     createSchedule: useMutation({
-      mutationFn: (body: CreateScheduleBody) => api.post<ScheduleRecord>('/api/schedules', body),
+      mutationFn: (body: CreateScheduleBody) =>
+        api.post<ScheduleRecord & { webhookToken?: string; webhookUrl?: string }>(
+          '/api/schedules',
+          body,
+        ),
       onSuccess: invalidateAll,
     }),
     patchSchedule: useMutation({

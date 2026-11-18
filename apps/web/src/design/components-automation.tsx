@@ -19,6 +19,11 @@ const ACTIVE: ScheduleRecord = {
   lastRunAt: NOW - 21 * 3_600_000,
   lastRunStatus: 'completed',
   pausedReason: null,
+  triggerSpec: null,
+  webhookMasked: null,
+  webhookLastUsedAt: null,
+  missedRunWindowMs: null,
+  createdAt: NOW - 86_400_000,
   createdBy: 'user-1',
   todo: {
     seqNum: 9,

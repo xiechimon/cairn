@@ -11,7 +11,12 @@ import {
 } from '../components/ui/select.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
-import { cronHasFiveFields, type ScheduleDraft, type ScheduleTrigger } from './schedule-model.js';
+import {
+  cronHasFiveFields,
+  isTriggerSchedule,
+  type ScheduleDraft,
+  type ScheduleTrigger,
+} from './schedule-model.js';
 
 const TRIGGER_LABELS: Record<ScheduleTrigger, string> = {
   once: '单次',
@@ -20,6 +25,8 @@ const TRIGGER_LABELS: Record<ScheduleTrigger, string> = {
   weekdays: '工作日',
   weekly: '每周',
   custom: '自定义',
+  event: '事件',
+  webhook: 'Webhook',
 };
 const HOURS = Array.from({ length: 24 }, (_, value) => String(value).padStart(2, '0'));
 const MINUTES = ['00', '15', '30', '45'];
@@ -72,13 +79,21 @@ export function ScheduleFields({
           label={t('频率')}
           value={value.trigger}
           onChange={(trigger) => onChange({ ...value, trigger })}
-          options={(['once', 'hourly', 'daily', 'weekdays', 'weekly', 'custom'] as const).map(
-            (trigger) => ({ value: trigger, label: t(TRIGGER_LABELS[trigger]), disabled }),
-          )}
+          options={(
+            ['once', 'hourly', 'daily', 'weekdays', 'weekly', 'custom', 'event', 'webhook'] as const
+          ).map((trigger) => ({ value: trigger, label: t(TRIGGER_LABELS[trigger]), disabled }))}
           className="grid h-auto w-full grid-cols-3 pointer-coarse:h-auto dark:[--seg-active:color-mix(in_oklch,var(--popover),white_10%)] [&_button]:w-full [&_button]:px-2 pointer-coarse:[&_button]:h-11"
         />
       </div>
-      {value.trigger === 'custom' ? (
+      {isTriggerSchedule(value.trigger) ? (
+        <p className="m-0 text-meta text-content-tertiary">
+          {t(
+            value.trigger === 'event'
+              ? '任务上的一次构建完成后运行一次。'
+              : '保存后会生成一个 Webhook 地址，外部请求打到它就运行一次。',
+          )}
+        </p>
+      ) : value.trigger === 'custom' ? (
         <FormField
           label={t('Cron 表达式')}
           htmlFor={`${id}-cron`}

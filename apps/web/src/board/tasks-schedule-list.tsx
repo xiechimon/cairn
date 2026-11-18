@@ -46,9 +46,7 @@ export function TasksScheduleList({
   const listRef = useRef<HTMLDivElement>(null);
   const fixture = resolveScenario(searchParams);
   const listed = withoutDeleted(
-    live
-      ? (query.data ?? []).map((row) => ({ ...row, at: row.at ?? now }))
-      : withCreatedSchedules(fixture.schedules ?? []),
+    live ? (query.data ?? []) : withCreatedSchedules(fixture.schedules ?? []),
   ).filter((row) => projectId === null || row.projectId === projectId);
   const scheduled = new Set(listed.map((row) => row.todoId));
   const editingDeleted = editing !== null && !listed.some((row) => row.todoId === editing.todoId);

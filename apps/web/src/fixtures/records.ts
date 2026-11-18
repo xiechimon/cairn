@@ -179,8 +179,8 @@ export interface ScheduleRecord {
   teamId: string;
   projectId: string;
   todoId: string;
-  kind: 'hourly' | 'daily' | 'weekly' | 'once' | 'cron';
-  at: number;
+  kind: 'hourly' | 'daily' | 'weekly' | 'once' | 'cron' | 'event' | 'webhook';
+  at: number | null;
   tz: string;
   nextRunAt: number | null;
   cron?: string | null;
@@ -188,6 +188,11 @@ export interface ScheduleRecord {
   lastRunAt?: number | null;
   lastRunStatus?: string | null;
   lastRunError?: string | null;
+  triggerSpec?: { topic: 'todo.build.completed' } | null;
+  webhookMasked?: string | null;
+  webhookLastUsedAt?: number | null;
+  missedRunWindowMs?: number | null;
+  createdAt?: number | null;
   createdBy: string;
   enabled?: boolean;
   pausedReason?: string | null;

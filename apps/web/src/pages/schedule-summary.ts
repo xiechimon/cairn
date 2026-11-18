@@ -63,7 +63,9 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const WEEKDAY_KEYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
 export function scheduleCadence(schedule: ScheduleRecord, t: TFunc): string {
-  const anchor = clockParts(schedule.at, schedule.tz);
+  if (schedule.kind === 'event') return t('事件触发');
+  if (schedule.kind === 'webhook') return t('Webhook 触发');
+  const anchor = clockParts(schedule.at ?? 0, schedule.tz);
   const time = `${anchor.hour}:${anchor.minute}`;
   if (schedule.kind === 'daily') return t('每天 {time}', { time });
   if (schedule.kind === 'weekly') {
@@ -85,8 +87,10 @@ export function scheduleWhen(at: number, tz: string, now: number, t: TFunc): str
 }
 
 export function scheduleNext(schedule: ScheduleRecord, now: number, t: TFunc): string {
-  if (schedule.nextRunAt === null || schedule.nextRunAt === 0)
+  if (schedule.nextRunAt === null || schedule.nextRunAt === 0) {
+    if (schedule.kind === 'event' || schedule.kind === 'webhook') return t('等待触发');
     return t(schedule.kind === 'once' ? 'No upcoming runs' : 'Next run unavailable');
+  }
   return t('下次 {when}', { when: scheduleWhen(schedule.nextRunAt, schedule.tz, now, t) });
 }
 

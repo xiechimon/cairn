@@ -11,6 +11,7 @@ import { FormField } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../components/ui/popover.js';
+import { toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
@@ -19,6 +20,7 @@ import { scheduleWhen } from '../pages/schedule-summary.js';
 import { ScheduleFields } from './schedule-fields.js';
 import {
   cronHasFiveFields,
+  isTriggerSchedule,
   scheduleBody,
   scheduleDraft,
   schedulePauseReason,
@@ -128,6 +130,7 @@ function ScheduleEditor({
   const [draft, setDraft] = useState(() => scheduleDraft(record, now, tz));
   const [todoId, setTodoId] = useState(schedule?.todoId ?? candidates[0]?.id ?? '');
   const [error, setError] = useState<string | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState<string | null>(null);
   const target =
     schedule === null
       ? candidates.find((candidate) => candidate.id === todoId)
@@ -147,7 +150,7 @@ function ScheduleEditor({
     }
     setError(null);
     try {
-      await mutations.createSchedule.mutateAsync(
+      const created = await mutations.createSchedule.mutateAsync(
         scheduleBody(
           draft,
           {
@@ -159,7 +162,8 @@ function ScheduleEditor({
           now,
         ),
       );
-      onDone();
+      if (created.webhookUrl === undefined) onDone();
+      else setWebhookUrl(created.webhookUrl);
     } catch (failure) {
       setError(failure instanceof Error ? t(failure.message) : t('定时没能保存，请重试。'));
     }
@@ -168,9 +172,14 @@ function ScheduleEditor({
   const nextRun =
     record === null
       ? null
-      : deleted || state === 'finished' || record.nextRunAt === null || !record.enabled
+      : deleted ||
+          state === 'finished' ||
+          !record.enabled ||
+          (record.nextRunAt === null && !isTriggerSchedule(record.kind))
         ? t('没有下一次')
-        : scheduleWhen(record.nextRunAt, record.tz, now, t);
+        : record.nextRunAt === null
+          ? t('等待触发')
+          : scheduleWhen(record.nextRunAt, record.tz, now, t);
   const lastRun =
     record === null
       ? null
@@ -261,8 +270,37 @@ function ScheduleEditor({
             )}
           </dl>
         )}
-        {(schedule !== null || candidates.length > 0) && (
-          <ScheduleFields value={draft} onChange={setDraft} tz={tz} disabled={busy || deleted} />
+        {webhookUrl !== null ? (
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex items-center gap-2 rounded-(--radius-control) bg-muted px-3 py-2">
+              <code
+                data-testid="schedule-webhook-url"
+                className="min-w-0 flex-1 break-all font-mono text-meta text-foreground"
+              >
+                {webhookUrl}
+              </code>
+              <Button
+                variant="outline"
+                size="xs"
+                className="shrink-0 px-2 pointer-coarse:h-11 pointer-coarse:px-3.5"
+                onClick={() =>
+                  void navigator.clipboard.writeText(webhookUrl).then(
+                    () => toastSuccess(t('已复制')),
+                    () => {},
+                  )
+                }
+              >
+                {t('复制')}
+              </Button>
+            </div>
+            <p className="m-0 text-meta text-content-tertiary">
+              {t('这个地址只显示这一次，请立即保存。外部 POST 请求打到它就运行一次。')}
+            </p>
+          </div>
+        ) : (
+          (schedule !== null || candidates.length > 0) && (
+            <ScheduleFields value={draft} onChange={setDraft} tz={tz} disabled={busy || deleted} />
+          )
         )}
         {error !== null && (
           <p role="alert" className="m-0 break-words text-meta text-destructive">
@@ -292,9 +330,9 @@ function ScheduleEditor({
           className={`${blocker === null ? 'ml-auto' : ''} ${DIALOG_TEXT_BUTTON} pointer-coarse:h-11 dark:bg-(--menu-hover) dark:hover:bg-(--sidebar-press)`}
           onClick={onDone}
         >
-          {deleted ? t('关闭') : t('取消')}
+          {deleted ? t('关闭') : webhookUrl !== null ? t('完成') : t('取消')}
         </Button>
-        {!deleted && (
+        {!deleted && webhookUrl === null && (
           <Button
             size="sm"
             className="text-ui pointer-coarse:h-11 dark:disabled:bg-(--menu-hover)/50"

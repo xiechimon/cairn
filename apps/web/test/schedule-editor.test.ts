@@ -14,6 +14,8 @@ const record: ScheduleRecord = {
   cron: '0 9 * * *', prompt: 'Review the release', enabled: true, at: Date.UTC(2026, 10, 4, 1),
   tz: 'Asia/Shanghai', nextRunAt: NOW + 86_400_000, lastRunAt: NOW - 86_400_000,
   lastRunStatus: 'completed', pausedReason: null, createdBy: 'user-1',
+  triggerSpec: null, webhookMasked: null, webhookLastUsedAt: null, missedRunWindowMs: null,
+  createdAt: NOW - 172_800_000,
   todo: { seqNum: 1, title: 'Release review', phase: 'done', projectName: 'cairn', ownerId: 'user-1' },
 };
 
@@ -121,4 +123,86 @@ describe('schedule editor wire values', () => {
     expect(scheduleDraft({ ...record, kind: 'cron', at: null, tz: 'America/New_York' }, saturdayLate).date).toBe('2026-03-09');
   });
 
+  test('an event schedule maps its trigger and posts the build-completion spec without a time anchor', () => {
+    const triggered: ScheduleRecord = {
+      ...record,
+      kind: 'event',
+      at: null,
+      cron: null,
+      nextRunAt: null,
+      triggerSpec: { topic: 'todo.build.completed' },
+    };
+    const draft = scheduleDraft(triggered, NOW);
+    expect(draft.trigger).toBe('event');
+    expect(
+      scheduleBody(
+        draft,
+        { todoId: 'todo-1', projectId: 'project-1', tz: 'UTC', enabled: true },
+        NOW,
+      ),
+    ).toEqual({
+      todoId: 'todo-1',
+      projectId: 'project-1',
+      tz: 'UTC',
+      prompt: 'Review the release',
+      enabled: true,
+      kind: 'event',
+      triggerSpec: { topic: 'todo.build.completed' },
+    });
+    expect(scheduleViewState(triggered)).toBe('active');
+  });
+
+  test('a webhook schedule maps its trigger and posts a bare webhook body', () => {
+    const hooked: ScheduleRecord = {
+      ...record,
+      kind: 'webhook',
+      at: null,
+      cron: null,
+      nextRunAt: null,
+      triggerSpec: null,
+      webhookMasked: 'cairn-wh-abc…wxyz',
+    };
+    const draft = scheduleDraft(hooked, NOW);
+    expect(draft.trigger).toBe('webhook');
+    expect(
+      scheduleBody(
+        draft,
+        { todoId: 'todo-1', projectId: 'project-1', tz: 'UTC', enabled: true },
+        NOW,
+      ),
+    ).toEqual({
+      todoId: 'todo-1',
+      projectId: 'project-1',
+      tz: 'UTC',
+      prompt: 'Review the release',
+      enabled: true,
+      kind: 'webhook',
+    });
+  });
+
+  test('trigger summaries name the trigger and read waiting instead of a missing date', () => {
+    const [eventRow] = mapSchedules([
+      {
+        ...record,
+        kind: 'event',
+        at: null,
+        cron: null,
+        nextRunAt: null,
+        triggerSpec: { topic: 'todo.build.completed' },
+      },
+    ]);
+    const [hookRow] = mapSchedules([
+      {
+        ...record,
+        kind: 'webhook',
+        at: null,
+        cron: null,
+        nextRunAt: null,
+        triggerSpec: null,
+      },
+    ]);
+    expect(scheduleSummary(eventRow as DisplaySchedule, NOW, t)).toBe('事件触发 · 等待触发');
+    expect(scheduleSummary(hookRow as DisplaySchedule, NOW, t)).toBe('Webhook 触发 · 等待触发');
+    expect(scheduleSummary(eventRow as DisplaySchedule, NOW, t)).not.toContain('1月1日');
+  });
 });

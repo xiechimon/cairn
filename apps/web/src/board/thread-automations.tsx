@@ -198,7 +198,11 @@ function AutomationItem({
     : schedule.enabled
       ? [
           schedule.nextRunAt === null
-            ? t('No upcoming runs')
+            ? t(
+                schedule.kind === 'event' || schedule.kind === 'webhook'
+                  ? 'Waiting for trigger'
+                  : 'No upcoming runs',
+              )
             : automationNextRun(schedule.nextRunAt, now, t),
           lastRun,
         ]

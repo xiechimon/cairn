@@ -2,7 +2,19 @@ import type { CreateScheduleBody, ScheduleRecord } from '@cairn/shared';
 import type { ScheduleRecord as DisplaySchedule } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
 
-export type ScheduleTrigger = 'once' | 'hourly' | 'daily' | 'weekdays' | 'weekly' | 'custom';
+export type ScheduleTrigger =
+  | 'once'
+  | 'hourly'
+  | 'daily'
+  | 'weekdays'
+  | 'weekly'
+  | 'custom'
+  | 'event'
+  | 'webhook';
+
+export function isTriggerSchedule(trigger: ScheduleTrigger | string): boolean {
+  return trigger === 'event' || trigger === 'webhook';
+}
 export interface ScheduleDraft {
   trigger: ScheduleTrigger;
   hour: string;
@@ -125,6 +137,9 @@ export function scheduleBody(
   }
   if (draft.trigger === 'weekdays')
     return { ...base, kind: 'cron', cron: `${Number(draft.minute)} ${Number(draft.hour)} * * 1-5` };
+  if (draft.trigger === 'event')
+    return { ...base, kind: 'event', triggerSpec: { topic: 'todo.build.completed' } };
+  if (draft.trigger === 'webhook') return { ...base, kind: 'webhook' };
   const at = scheduleTime(draft.date, draft.hour, draft.minute, schedule.tz);
   if (at === null) throw new Error('请选择这个时区里有效的日期和时间。');
   if (draft.trigger === 'once' && at <= now) throw new Error('单次定时要选一个将来的时间。');
@@ -177,5 +192,11 @@ export function toWireSchedule(schedule: DisplaySchedule): ScheduleRecord {
     pausedReason: schedule.pausedReason ?? null,
     lastRunAt: schedule.lastRunAt ?? null,
     lastRunStatus: schedule.lastRunStatus ?? null,
+    lastRunError: schedule.lastRunError ?? null,
+    triggerSpec: schedule.triggerSpec ?? null,
+    webhookMasked: schedule.webhookMasked ?? null,
+    webhookLastUsedAt: schedule.webhookLastUsedAt ?? null,
+    missedRunWindowMs: schedule.missedRunWindowMs ?? null,
+    createdAt: schedule.createdAt ?? null,
   };
 }
