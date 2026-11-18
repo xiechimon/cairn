@@ -82,6 +82,7 @@ import {
   trayPopoverBounds,
 } from './tray-popover.js';
 import { createUpdater, removeLeftoverUpdates } from './updater.js';
+import { createWakeAhead, earliestScheduleNextRunAt } from './wake-ahead.js';
 
 const LOOPBACK = '127.0.0.1';
 const READY_TIMEOUT_MS = 60_000;
@@ -338,6 +339,7 @@ function openFromTray(target: unknown): void {
 interface TrayControls {
   runner: () => DesktopRunnerState;
   setRunner: (on: boolean) => Promise<void>;
+  nextRunAt?: () => Promise<number | null>;
 }
 
 function createTrayPopover(origin: string): BrowserWindow {
@@ -402,6 +404,9 @@ function showTray(origin: string, controls: TrayControls): Tray {
   const awakeIcon = trayIcon('trayAwakeTemplate.png');
   const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
   const created = new Tray(keepAwake.isOn() ? awakeIcon : idleIcon);
+  const refreshIcon = (): void => {
+    created.setImage(keepAwake.isOn() ? awakeIcon : idleIcon);
+  };
   const fallbackMenu = (): Menu =>
     Menu.buildFromTemplate(
       trayMenuTemplate(new URL(origin).host, keepAwake.isOn(), {
@@ -413,9 +418,21 @@ function showTray(origin: string, controls: TrayControls): Tray {
   created.setToolTip(`Cairn · ${new URL(origin).host}`);
   const setKeepAwake = (on: boolean): void => {
     keepAwake.set(on);
-    created.setImage(on ? awakeIcon : idleIcon);
+    refreshIcon();
     if (!IS_MAC) created.setContextMenu(fallbackMenu());
   };
+  if (controls.nextRunAt !== undefined) {
+    const nextRunAt = controls.nextRunAt;
+    const wakeAhead = createWakeAhead({
+      nextRunAt,
+      onWindow: (active) => {
+        keepAwake.setWakeAhead(active);
+        refreshIcon();
+      },
+    });
+    wakeAhead.start();
+    powerMonitor.on('resume', () => void wakeAhead.pollNow());
+  }
   const newTaskKey = globalShortcut.register(NEW_TASK_SHORTCUT, () =>
     sendToWindow('desktop-menu', 'new-task'),
   )
@@ -706,6 +723,7 @@ async function boot(): Promise<void> {
         if (on) await bringRunnerUp();
         else await runner?.stop();
       },
+      nextRunAt: () => earliestScheduleNextRunAt(origin, ownerToken),
     });
     powerMonitor.on('resume', () => {
       if (runnerWanted) void bringRunnerUp();

@@ -8,6 +8,7 @@ export interface SleepBlocker {
 export interface KeepAwake {
   isOn(): boolean;
   set(on: boolean): void;
+  setWakeAhead(on: boolean): void;
 }
 
 function savedChoice(path: string): boolean {
@@ -20,19 +21,27 @@ function savedChoice(path: string): boolean {
 
 export function createKeepAwake(blocker: SleepBlocker, path: string): KeepAwake {
   let blockId: number | null = null;
-  const apply = (on: boolean): void => {
+  let manual = savedChoice(path);
+  let wakeAhead = false;
+  const apply = (): void => {
+    const on = manual || wakeAhead;
     if (on && blockId === null) blockId = blocker.start('prevent-app-suspension');
     if (!on && blockId !== null) {
       blocker.stop(blockId);
       blockId = null;
     }
   };
-  apply(savedChoice(path));
+  apply();
   return {
     isOn: () => blockId !== null,
     set(on) {
+      manual = on;
       writeFileSync(path, on ? 'on\n' : 'off\n');
-      apply(on);
+      apply();
+    },
+    setWakeAhead(on) {
+      wakeAhead = on;
+      apply();
     },
   };
 }
