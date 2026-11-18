@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { type SessionOpts, type StepEvent, toolCallRecordSchema } from '@cairn/shared';
-import { afterEach, describe, expect, test, vi } from 'vitest';
-import { configuredAcpBackends, createAcpBackend } from '../src/backend/acp.js';
+import { describe, expect, test, vi } from 'vitest';
+import { createAcpBackend } from '../src/backend/acp.js';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 
 const fixture = fileURLToPath(new URL('./fixtures/acp-agent.mjs', import.meta.url));
@@ -14,9 +14,9 @@ const opts: SessionOpts = {
   prompt: 'Hello',
 };
 
-function adapter(scenario = 'complete') {
+function adapter(scenario = 'complete', harness: 'claude-code' | 'codex' = 'codex') {
   return createAcpBackend({
-    harness: 'codex',
+    harness,
     command: process.execPath,
     args: [fixture, scenario],
     initializeTimeoutMs: scenario === 'hang-init' ? 300 : 3_000,
@@ -29,8 +29,6 @@ async function collect(events: AsyncIterable<StepEvent>): Promise<StepEvent[]> {
   for await (const event of events) result.push(event);
   return result;
 }
-
-afterEach(() => vi.unstubAllEnvs());
 
 describe('ACP spike with a real scripted stdio child', () => {
   test.each(['claude-code', 'codex'] as const)(
@@ -58,18 +56,13 @@ describe('ACP spike with a real scripted stdio child', () => {
         { type: 'done', usage: [] },
       ];
       const run = async (acp: boolean) => {
-        vi.stubEnv(
-          'CAIRN_ACP_AGENTS',
-          acp
-            ? JSON.stringify({ a1: { harness, command: process.execPath, args: [fixture] } })
-            : '',
-        );
         const api = new FakeMachineApi();
         if (harness === 'claude-code') api.claudeSubscriptionToken = 'acp-subscription-token';
+        const acpBackend = acp ? adapter('complete', harness) : null;
         const { handle } = await boot({
           api,
-          backend: fakeBackend(events).backend,
-          claudeCodeBackend: fakeBackend(events).backend,
+          backend: acpBackend ?? fakeBackend(events).backend,
+          claudeCodeBackend: acpBackend ?? fakeBackend(events).backend,
         });
         try {
           await waitFor(() => api.parked !== null);
@@ -122,25 +115,6 @@ describe('ACP spike with a real scripted stdio child', () => {
       );
     },
   );
-
-  test('default and unrelated agent routing stay on the existing backend', async () => {
-    vi.stubEnv(
-      'CAIRN_ACP_AGENTS',
-      JSON.stringify({ other: { harness: 'codex', command: 'must-not-spawn' } }),
-    );
-    const { backend, created } = fakeBackend([{ type: 'done', usage: [] }]);
-    const { handle, api } = await boot({ backend });
-    try {
-      await waitFor(() => api.parked !== null);
-      api.parked?.(CLAIMED);
-      await waitFor(() => api.doneBodies.length === 1);
-      expect(created).toHaveLength(1);
-      expect(api.doneBodies[0]?.body.status).toBe('success');
-    } finally {
-      await handle.stop();
-      await handle.done;
-    }
-  });
 
   test.each([
     'refusal',
@@ -356,10 +330,6 @@ describe('ACP spike with a real scripted stdio child', () => {
   test.each(['claude-code', 'codex'] as const)(
     '%s leaves unsupported steering queued through the daemon and runner',
     async (harness) => {
-      vi.stubEnv(
-        'CAIRN_ACP_AGENTS',
-        JSON.stringify({ a1: { harness, command: process.execPath, args: [fixture, 'cancel'] } }),
-      );
       const api = new FakeMachineApi();
       let pending: string | null = 'Keep this instruction queued';
       const fetchSteer = vi.spyOn(api, 'steer').mockImplementation(async () => {
@@ -373,7 +343,7 @@ describe('ACP spike with a real scripted stdio child', () => {
         api.onStreamEvent?.({ type: 'steer', stepId });
         return token(stepId);
       });
-      const { handle, lines } = await boot({ api });
+      const { handle, lines } = await boot({ api, backend: adapter('cancel', harness) });
       try {
         await waitFor(() => api.parked !== null);
         api.parked?.({
@@ -422,11 +392,9 @@ describe('ACP spike with a real scripted stdio child', () => {
   test.each([{ mcpServers: [] }, { mcpServers: ['host'] }])(
     'fails the daemon step for external MCP policy $mcpServers',
     async ({ mcpServers }) => {
-      vi.stubEnv(
-        'CAIRN_ACP_AGENTS',
-        JSON.stringify({ a1: { harness: 'codex', command: 'must-not-spawn' } }),
-      );
-      const { api, handle } = await boot({});
+      const { api, handle } = await boot({
+        backend: createAcpBackend({ harness: 'codex', command: 'must-not-spawn' }),
+      });
       try {
         await waitFor(() => api.parked !== null);
         api.parked?.({ ...CLAIMED, mcpServers });
@@ -486,12 +454,5 @@ describe('ACP spike with a real scripted stdio child', () => {
         remoteTools: [{ name: 'remote', description: 'Remote' }],
       }),
     ).rejects.toThrow('relay');
-  });
-
-  test('validates configuration without shell execution', () => {
-    expect(configuredAcpBackends(undefined).size).toBe(0);
-    expect(() => configuredAcpBackends('{')).toThrow();
-    expect(() => configuredAcpBackends('{"a1":{"harness":"grok","command":"grok"}}')).toThrow();
-    expect(() => configuredAcpBackends('{"a1":{"harness":"codex","command":""}}')).toThrow();
   });
 });

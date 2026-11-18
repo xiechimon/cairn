@@ -22,7 +22,7 @@ import {
   osPlatformOf,
 } from '@cairn/shared';
 import { AgentReachProbe } from './agent-reach.js';
-import { configuredAcpBackends, createAcpBackend, createGeminiBackend } from './backend/acp.js';
+import { createAcpBackend, createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { createSessionConfiner, type Launch } from './backend/confine-session.js';
@@ -185,7 +185,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     handoffDirectories: [paths.plansDir],
     serverUrl: config.serverUrl,
   });
-  const acpBackends = configuredAcpBackends(process.env.CAIRN_ACP_AGENTS, confine ?? undefined);
   loadOrCreateDeviceJson(paths);
   const proxyHandle = setupProxy(logger, opts.proxyEnv ?? process.env, config.serverUrl);
 
@@ -352,15 +351,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let devinBackend: AgentBackend | null = null;
   let claudeAnnounced = false;
   let geminiAnnounced = false;
-  const backendFor = (
-    agentProviderId: string | null | undefined,
-    agentId?: string,
-  ): AgentBackend => {
-    const acp = agentId !== undefined ? acpBackends.get(agentId) : undefined;
-    if (acp) {
-      logger.machine(`ACP adapter ${acp.capabilities.name} selected for agent ${agentId}`);
-      return acp;
-    }
+  const backendFor = (agentProviderId: string | null | undefined): AgentBackend => {
     if (agentProviderId === 'devin') {
       const install = devinManaged.current();
       if (install === null) {

@@ -51,7 +51,7 @@ import {
 export interface RunStepDeps {
   client: MachineApi;
   journal: StepJournal;
-  backendFor: (agentProviderId: string | null | undefined, agentId?: string) => AgentBackend;
+  backendFor: (agentProviderId: string | null | undefined) => AgentBackend;
   devinHome?: () => string | undefined;
   logger: DaemonLogger;
   paths: StatePaths;
@@ -280,7 +280,7 @@ async function runClaimedStep(
     await failStep(deps, heartbeat, stepId, refusal);
     return;
   }
-  const backend = deps.backendFor(agent?.provider, agent.id);
+  const backend = deps.backendFor(agent?.provider);
   deps.stepSteeringSupport?.set(stepId, backend.capabilities.steering !== false);
   const modelKey = `${provider?.providerId ?? agent.provider}/${agent.modelId}`;
   logger.raw(`using model ${modelKey}`);

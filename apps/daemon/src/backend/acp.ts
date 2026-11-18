@@ -31,7 +31,6 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
-import { z } from 'zod';
 import { DAEMON_VERSION } from '../version.js';
 import { openAcpTools } from './acp-tools.js';
 import type { SessionConfiner } from './confine-session.js';
@@ -784,30 +783,4 @@ export function createAcpBackend(options: AcpBackendOptions): AgentBackend {
     ...(options.confine ? { confine: options.confine } : {}),
     ...(options.spawnProcess ? { spawnProcess: options.spawnProcess } : {}),
   });
-}
-
-export function configuredAcpBackends(
-  raw: string | undefined,
-  confine?: SessionConfiner,
-): Map<string, AgentBackend> {
-  if (!raw) return new Map();
-  const configuration = z
-    .record(
-      z.string().min(1),
-      z
-        .object({
-          harness: z.enum(['claude-code', 'codex', 'devin']),
-          command: z.string().min(1),
-          args: z.array(z.string()).optional(),
-          permissions: z.enum(['deny', 'allow-once']).optional(),
-        })
-        .strict(),
-    )
-    .parse(JSON.parse(raw));
-  return new Map(
-    Object.entries(configuration).map(([id, options]) => [
-      id,
-      createAcpBackend(confine !== undefined ? { ...options, confine } : options),
-    ]),
-  );
 }
