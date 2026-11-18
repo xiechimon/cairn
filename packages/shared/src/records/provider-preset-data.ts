@@ -1,4 +1,4 @@
-import type { ProviderPresetDefaults } from '@cairn/shared';
+import type { ProviderPresetDefaults } from './provider-presets.js';
 
 export const PROVIDER_PRESET_DEFAULTS: Readonly<Record<string, ProviderPresetDefaults>> = {
   xai: {

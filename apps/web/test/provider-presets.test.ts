@@ -7,19 +7,19 @@ import {
   derivePresetDefaults,
   MAX_DEFAULT_PICKS,
   PROVIDER_OAUTH_PRESET_IDS,
+  PROVIDER_PRESET_DEFAULTS,
   PROVIDER_PRESET_IDS,
   type PresetCatalog,
   type PresetCatalogModel,
   providerModelSchema,
 } from '@cairn/shared';
-import { PROVIDER_PRESET_DEFAULTS } from '../src/resources/provider-preset-data.js';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const CATALOG_DIR = join(
   REPO_ROOT,
   'apps/daemon/node_modules/@earendil-works/pi-ai/dist/providers/data',
 );
-const DATA_FILE = join(REPO_ROOT, 'apps/web/src/resources/provider-preset-data.ts');
+const DATA_FILE = join(REPO_ROOT, 'packages/shared/src/records/provider-preset-data.ts');
 
 function installedCatalogs(): PresetCatalog[] {
   return readdirSync(CATALOG_DIR)
@@ -44,7 +44,7 @@ describe('provider preset defaults', () => {
   if (process.env.UPDATE_PROVIDER_PRESETS === '1') {
     writeFileSync(
       DATA_FILE,
-      `import type { ProviderPresetDefaults } from '@cairn/shared';\n\nexport const PROVIDER_PRESET_DEFAULTS: Readonly<Record<string, ProviderPresetDefaults>> = ${JSON.stringify(derived, null, 2)};\n`,
+      `import type { ProviderPresetDefaults } from './provider-presets.js';\n\nexport const PROVIDER_PRESET_DEFAULTS: Readonly<Record<string, ProviderPresetDefaults>> = ${JSON.stringify(derived, null, 2)};\n`,
     );
   }
 

@@ -2,6 +2,7 @@ import {
   OAUTH_FAMILIES,
   PROVIDER_CODEX_PRESET,
   PROVIDER_OAUTH_PRESET_IDS,
+  PROVIDER_PRESET_DEFAULTS,
   PROVIDER_PRESET_IDS,
   PROVIDER_XAI_PRESET,
   type ProviderApi,
@@ -27,7 +28,6 @@ import { ChevronLeft, PlusSmall, Search } from '../icons/index.js';
 import { LOBEHUB_MONO } from '../icons/lobehub-mono.js';
 import { ProviderConnectionDisclosure } from './provider-connection-disclosure.js';
 import { ProviderModelChips, pickedModels } from './provider-model-list.js';
-import { PROVIDER_PRESET_DEFAULTS } from './provider-preset-data.js';
 import { ProviderPresetIcon } from './provider-preset-icon.js';
 
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';

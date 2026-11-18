@@ -32,17 +32,20 @@ describe('the provider of a claimed Coordinator step', () => {
   });
 
   it.each([
-    { input: undefined, expected: ['text'] },
-    { input: ['text'] as ('text' | 'image')[], expected: ['text'] },
-    { input: ['text', 'image'] as ('text' | 'image')[], expected: ['text', 'image'] },
+    { id: 'claude-sonnet-5-5', input: undefined, expected: ['text', 'image'] },
+    { id: 'deepseek-v4.1-flash', input: undefined, expected: ['text'] },
+    { id: 'claude-sonnet-5-5', input: ['text'] as ('text' | 'image')[], expected: ['text'] },
+    {
+      id: 'deepseek-v4.1-flash',
+      input: ['text', 'image'] as ('text' | 'image')[],
+      expected: ['text', 'image'],
+    },
   ])(
-    'preserves declared input capabilities and treats an unspecified model as text-only: $input',
-    ({ input, expected }) => {
+    'resolves image input from the saved model, else the preset catalog, else text-only: $id $input',
+    ({ id, input, expected }) => {
       const models = createCoordinatorModels();
-      models.useStepProvider({ ...config, models: [{ ...config.models[0]!, input }] });
-      expect(models.models.getModel(config.providerId, config.models[0]!.id)?.input).toEqual(
-        expected,
-      );
+      models.useStepProvider({ ...config, models: [{ id, name: id, input }] });
+      expect(models.models.getModel(config.providerId, id)?.input).toEqual(expected);
     },
   );
 

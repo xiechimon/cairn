@@ -5,6 +5,7 @@ import {
   type ProviderFailure,
   type ProviderRecord,
   type ProviderTestResult,
+  resolveModelInput,
   type UpstreamModelsResult,
 } from '@cairn/shared';
 import { cn } from 'cn';
@@ -506,7 +507,7 @@ export function TeamProviderEditor({
                 dead={deadModels.has(model.id)}
                 check={checks[model.id]}
                 busy={savingModels}
-                seesImages={model.input?.includes('image') === true}
+                seesImages={resolveModelInput(model).includes('image')}
                 {...(actions.patch === undefined
                   ? {}
                   : { onSeesImagesChange: (next: boolean) => setSeesImages(model.id, next) })}

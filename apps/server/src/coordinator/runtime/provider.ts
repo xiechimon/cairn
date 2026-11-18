@@ -1,4 +1,4 @@
-import type { ProviderConfig } from '@cairn/shared';
+import { type ProviderConfig, resolveModelInput } from '@cairn/shared';
 import type { Api, Model, Provider, ProviderStreams } from '@earendil-works/pi-ai';
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy';
 import { openAICodexResponsesApi } from '@earendil-works/pi-ai/api/openai-codex-responses.lazy';
@@ -57,7 +57,7 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
     api,
     provider: config.providerId,
     baseUrl,
-    input: m.input ?? ['text'],
+    input: resolveModelInput(m),
     cost: m.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     reasoning: subscription,
     contextWindow: m.contextWindow ?? catalogContextWindow(config.providerId, m.id),

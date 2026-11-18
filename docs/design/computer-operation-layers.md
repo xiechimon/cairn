@@ -14,11 +14,10 @@ Order of use: layer 1 for anything in a browser, layer 2 for a native window, la
 
 ## How image capability is known
 
-The capability is the model's declared `input` in its provider model record (`ProviderModel.input`, persisted with the provider).
+The capability resolves in one place, `resolveModelInput` in `packages/shared`, used by the server and the provider editor: the saved model's `input`, else the `input` the preset catalog declares for the same model id (`PROVIDER_PRESET_DEFAULTS`, shared so the server reads the same table as the UI), else text-only. Saved models usually carry no `input`, so the catalog lookup is what keeps Claude and other known vision models image-capable.
 
-- A preset keeps the `input` its catalog declares.
-- A custom provider model with no declared `input` is text-only. The old default (`['text','image']`) made text-only gateway models receive full-screen base64 PNGs, and the gateway hung until it timed out.
-- The owner ticks the "supports images" checkbox of a custom model in the provider editor (Settings, Models, provider); that writes `input: ['text','image']` into the model record, unmarking writes `['text']`.
+- A model id unknown to the catalog and without a saved `input` is text-only. The old default (`['text','image']`) made text-only gateway models receive full-screen base64 PNGs, and the gateway hung until it timed out.
+- The owner ticks the "supports images" checkbox of a custom model in the provider editor (Settings, Models, provider); that writes `input: ['text','image']` into the model record, unticking writes `['text']`; an explicit value always wins over the catalog.
 - At tool time the tool reads the current model of the conversation (`api.agent()` then `api.models.getModel`), so a model switch mid-thread takes effect on the next call.
 
 ## What a text-only model gets
