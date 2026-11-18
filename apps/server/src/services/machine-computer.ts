@@ -1054,6 +1054,68 @@ export async function manageComputer(
   throw new HttpError(409, row?.errorMessage ?? 'The computer action did not finish');
 }
 
+const CARD_TAB_CLOSE_TIMEOUT_MS = 15_000;
+
+export function browserTabScope(
+  stepRow: Pick<typeof step.$inferSelect, 'kind' | 'buildId'>,
+): string {
+  return stepRow.kind === 'chief' ? 'coordinator' : `card-${stepRow.buildId}`;
+}
+
+export function closeInfoCardTab(
+  deps: PendingDeps,
+  stepRow: Pick<typeof step.$inferSelect, 'id' | 'kind' | 'buildId'>,
+): void {
+  if (stepRow.kind === 'chief') return;
+  const { db } = deps;
+  const thread = computerThreadOf(db, stepRow);
+  if (thread === null) return;
+  const owned = db
+    .select()
+    .from(computer)
+    .where(eq(computer.scopeKey, `chief:${thread.chiefId}`))
+    .get();
+  if (owned === undefined || !deps.machineHub.isConnected(owned.machineId)) return;
+  const toolCallId = 'tab-close';
+  const callId = computerCallId(stepRow.id, toolCallId);
+  const now = nowMs();
+  const deadlineAt = now + CARD_TAB_CLOSE_TIMEOUT_MS;
+  try {
+    db.insert(computerCall)
+      .values({
+        id: callId,
+        teamId: thread.teamId,
+        stepId: stepRow.id,
+        toolCallId,
+        machineId: owned.machineId,
+        computerId: owned.id,
+        tool: 'browser_close_tab',
+        replaySafe: true,
+        params: {},
+        state: 'dispatched',
+        deadlineAt,
+        createdAt: now,
+      })
+      .run();
+  } catch {
+    return;
+  }
+  const call: ComputerCall = {
+    callId,
+    stepId: stepRow.id,
+    tool: 'browser_close_tab',
+    params: {},
+    deadlineAt,
+    scopeKey: owned.scopeKey,
+    tabScope: browserTabScope(stepRow),
+  };
+  if (!deps.machineHub.pushComputer(owned.machineId, call)) {
+    db.delete(computerCall).where(eq(computerCall.id, callId)).run();
+    return;
+  }
+  void openPending(deps, call).result;
+}
+
 export async function forwardComputerCall(
   deps: MachineDeps,
   machineId: string | null,
@@ -1077,6 +1139,8 @@ export async function forwardComputerCall(
 
   const tool = body.name;
   if (tool === 'computer_manage') throw new HttpError(400, COMPUTER_MANAGE_PANEL_ONLY);
+  if (tool === 'browser_close_tab')
+    throw new HttpError(400, 'browser_close_tab is sent by the server when a step ends');
   let own: Extract<GateResult, { kind: 'granted' }> | null = null;
   if (isOwnComputerTool(tool)) {
     const chiefRow =
@@ -1306,6 +1370,7 @@ export async function forwardComputerCall(
     params: body.params,
     deadlineAt,
     ...('scopeKey' in target && target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
+    ...(isComputerBrowserTool(tool) ? { tabScope: browserTabScope(stepRow) } : {}),
     ...(own === null ? {} : { ownComputerGrant: own.stamp }),
   };
   try {

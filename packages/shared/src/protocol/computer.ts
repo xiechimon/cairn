@@ -16,6 +16,7 @@ export const COMPUTER_TOOLS = [
   'browser_navigate',
   'browser_snapshot',
   'browser_act',
+  'browser_close_tab',
   'request_takeover',
   'install_packages',
   'computer_manage',
@@ -115,6 +116,10 @@ export const computerCallSchema = z.object({
   params: z.record(z.string(), z.unknown()),
   deadlineAt: epochMs,
   scopeKey: z.string().min(1).optional(),
+  tabScope: z
+    .string()
+    .regex(/^[A-Za-z0-9_:-]{1,96}$/)
+    .optional(),
   browserSecrets: z
     .array(
       z.strictObject({

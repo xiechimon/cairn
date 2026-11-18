@@ -56,6 +56,19 @@ Cairn already has the Rakazo shape for one agent: the in-server Coordinator runt
 
 **Concurrency.** Shell and file calls from the Coordinator and any info card run in parallel (separate `container exec`). Browser: one Chromium session per scope; each step gets its own tab, and the server serializes browser calls per scope (the lock is held for one call, which first selects the caller's tab). Owner priority is unchanged: while the owner holds the control lease (`ComputerInputFence`, `hold(scope,'control')`), browser calls are refused with a fixed `主人正在使用电脑` result and the agent continues with shell/files or waits; a `handoff` screen still swaps browsers per [computer-login-handoff](computer-login-handoff.md). Idle stop counts any running info step as activity.
 
+**Browser tabs (one per scope).** The browser session is per computer (`chief:<id>`), so every caller shares one profile and its logins, and a plain `open` navigates whatever tab is active; two workers alternating would overwrite each other's page. A scope is the Coordinator or one info card build. The server stamps each browser call with `tabScope` (`coordinator` or `card-<buildId>`); the daemon turns it into the agent-browser tab label `cairn-<scope>` and, as the first command of every browser call, lists the session's tabs (`tab list --json`, which reports `label` and `active`) and selects the scope's tab (`tab <label>`) or opens it (`tab new --label <label>`, which switches to it). Everything after that, including the existing active-tab guard (`refuseOffBoundTab`), runs against that tab. Checked against agent-browser 0.41.2: `tab new/close/<label>`, labels unique per session, the closed tab's neighbor becomes active.
+
+| State | Who | Transition |
+|---|---|---|
+| none | daemon, first browser call of a scope | `tab new --label`; the scope's tab exists and is active |
+| open | daemon, each later call | `tab <label>` before the call; no other scope's tab is touched |
+| open | server, `finishStep` of an info card step that is not re-queued (done, failed, stopped, or the runtime's failure path) | pushes `browser_close_tab` with the scope; the daemon runs `tab close <label>`, then re-selects the Coordinator tab if the closed tab was the active one |
+| open, card | daemon | a `cairn-card-*` tab unused for 30 minutes is closed by the next browser call of any scope; a tab not seen since a daemon restart is stamped on first sight and ages from then |
+
+The Coordinator tab is one per computer and is never closed (the computer has one Coordinator at a time, and the owner's login handoff happens in it). The close call is not issued if the Runner is offline or the card never made a browser call in this daemon process (it must not start the VM or the stealth browser); the idle sweep is the backstop.
+
+What the owner sees: the machine card's screen shows whichever tab was selected last, so while a card runs it follows that card's page and flips back to the Coordinator's when it makes the next call; when a card ends its tab disappears and the Coordinator's tab comes back. On a step crash nothing special runs in the browser: the runtime's failure path ends the step through `finishStep` (tab closed); if the server or Runner died instead, the tab stays until the idle sweep. Stealth (`-stealth`) sessions follow the same rules inside their own browser.
+
 **Failure and fallback.**
 
 | Host / condition | Behavior |

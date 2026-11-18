@@ -3254,6 +3254,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "stepId": {
               "type": "string",
             },
+            "tabScope": {
+              "pattern": "^[A-Za-z0-9_:-]{1,96}$",
+              "type": "string",
+            },
             "tool": {
               "enum": [
                 "shell",
@@ -3268,6 +3272,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "browser_navigate",
                 "browser_snapshot",
                 "browser_act",
+                "browser_close_tab",
                 "request_takeover",
                 "install_packages",
                 "computer_manage",

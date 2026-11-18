@@ -273,6 +273,7 @@ function parseLoginSignals(output: string): LoginSignal[] | null {
 export interface BrowserRunOptions {
   signal: AbortSignal;
   session?: string;
+  tabScope?: string;
   binary?: string;
   deadlineAt?: number;
   timeoutMs?: number;
@@ -286,6 +287,45 @@ const CAIRN_PAGE_REFUSAL =
   'is Cairn itself; the agent browser never opens or operates Cairn, so approvals stay with the owner';
 
 export const STEALTH_SESSION_SUFFIX = '-stealth';
+
+const SCOPE_TAB_PREFIX = 'cairn-';
+const CARD_TAB_PREFIX = `${SCOPE_TAB_PREFIX}card-`;
+const COORDINATOR_TAB_LABEL = `${SCOPE_TAB_PREFIX}coordinator`;
+export const CARD_TAB_IDLE_MS = 30 * 60_000;
+
+const scopeTabUse = new Map<string, number>();
+
+function scopeTabLabel(tabScope: string): string {
+  return `${SCOPE_TAB_PREFIX}${tabScope.replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 64)}`;
+}
+
+function scopeTabKey(session: string, label: string): string {
+  return `${session}\u0000${label}`;
+}
+
+interface BrowserTab {
+  label: string | null;
+  targetId: string | null;
+  active: boolean;
+}
+
+function parseTabList(output: string): BrowserTab[] | null {
+  try {
+    const tabs = (
+      JSON.parse(output.trim().split('\n').at(-1) ?? '') as {
+        data?: { tabs?: { active?: unknown; label?: unknown; targetId?: unknown }[] };
+      }
+    ).data?.tabs;
+    if (!Array.isArray(tabs)) return null;
+    return tabs.map((tab) => ({
+      label: typeof tab.label === 'string' ? tab.label : null,
+      targetId: typeof tab.targetId === 'string' ? tab.targetId : null,
+      active: tab.active === true,
+    }));
+  } catch {
+    return null;
+  }
+}
 
 export function browserSessionName(scopeKey: string | undefined, stealth = false): string {
   const cleaned = (scopeKey ?? '')
@@ -684,18 +724,36 @@ export async function runBrowserTool(
   const activeTab = async (): Promise<string | null> => {
     const answer = await read([...prefix, '--json', 'tab', 'list']);
     if (answer.code !== 0) return null;
-    try {
-      const tabs = (
-        JSON.parse(answer.text.trim().split('\n').at(-1) ?? '') as {
-          data?: { tabs?: { active?: unknown; targetId?: unknown }[] };
-        }
-      ).data?.tabs;
-      const active = tabs?.find((tab) => tab.active === true)?.targetId;
-      return typeof active === 'string' ? active : null;
-    } catch {
-      return null;
+    return parseTabList(answer.text)?.find((tab) => tab.active)?.targetId ?? null;
+  };
+  const selectScopeTab = async (tabScope: string): Promise<void> => {
+    const label = scopeTabLabel(tabScope);
+    const listed = await read([...prefix, '--json', 'tab', 'list']);
+    const tabs = listed.code === 0 ? parseTabList(listed.text) : null;
+    if (tabs === null) refuse(`${tool} refused: the browser tabs could not be listed`, started);
+    const clock = options.now ?? Date.now;
+    for (const tab of tabs) {
+      if (tab.label === null || !tab.label.startsWith(CARD_TAB_PREFIX) || tab.label === label)
+        continue;
+      const key = scopeTabKey(session, tab.label);
+      const lastUsed = scopeTabUse.get(key);
+      if (lastUsed === undefined) scopeTabUse.set(key, clock());
+      else if (clock() - lastUsed > CARD_TAB_IDLE_MS) {
+        await read([...prefix, 'tab', 'close', tab.label]);
+        scopeTabUse.delete(key);
+      }
+    }
+    scopeTabUse.set(scopeTabKey(session, label), clock());
+    const selected = await read(
+      tabs.some((tab) => tab.label === label)
+        ? [...prefix, 'tab', label]
+        : [...prefix, 'tab', 'new', '--label', label],
+    );
+    if (selected.code !== 0 && selected.code !== null) {
+      refuse(`${tool} refused: this task's browser tab could not be selected`, started);
     }
   };
+  if (options.tabScope !== undefined) await selectScopeTab(options.tabScope);
   await blockCairn(tool);
   const boundTab = cairnOrigins.length === 0 ? null : await activeTab();
   if (cairnOrigins.length > 0 && boundTab === null) {
@@ -894,4 +952,45 @@ export async function runBrowserTool(
     lines.push(result.text || `${action.kind} ok`);
   }
   return { text: lines.join('\n') };
+}
+
+export async function closeScopeTab(
+  provider: ComputerProvider,
+  options: BrowserRunOptions & { tabScope: string },
+): Promise<string> {
+  const label = scopeTabLabel(options.tabScope);
+  const binary = options.binary ?? AGENT_BROWSER_BINARY;
+  const deadlineAt = browserDeadlineAt(options);
+  const timed = { ...options, deadlineAt };
+  let closed = 0;
+  for (const stealth of [false, true]) {
+    const session = browserSessionName(options.session, stealth);
+    const key = scopeTabKey(session, label);
+    if (!scopeTabUse.has(key)) continue;
+    scopeTabUse.delete(key);
+    const prefix = [binary, ...sessionFlag(session)];
+    const listed = await collectExecute(
+      provider,
+      [...prefix, '--json', 'tab', 'list'],
+      timed,
+      false,
+    );
+    const tab =
+      listed.code === 0 ? parseTabList(listed.text)?.find((t) => t.label === label) : null;
+    if (tab === null || tab === undefined) continue;
+    const done = await collectExecute(provider, [...prefix, 'tab', 'close', label], timed, false);
+    if (done.code !== 0 && done.code !== null) refuse(`closing tab ${label} failed`, true);
+    closed += 1;
+    if (tab.active) {
+      const back = await collectExecute(
+        provider,
+        [...prefix, '--json', 'tab', 'list'],
+        timed,
+        false,
+      );
+      if (parseTabList(back.text)?.some((t) => t.label === COORDINATOR_TAB_LABEL))
+        await collectExecute(provider, [...prefix, 'tab', COORDINATOR_TAB_LABEL], timed, false);
+    }
+  }
+  return closed === 0 ? 'no tab to close' : `closed ${closed} tab`;
 }

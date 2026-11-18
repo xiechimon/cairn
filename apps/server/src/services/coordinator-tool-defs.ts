@@ -37,6 +37,7 @@ export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorC
     browser_navigate: { offered: 'always' },
     browser_snapshot: { offered: 'always' },
     browser_act: { offered: 'always' },
+    browser_close_tab: { withheld: 'the server closes a card tab when its step ends' },
     request_takeover: { offered: 'always' },
     install_packages: { offered: 'when_machine_reports_vm_computer' },
     computer_manage: {

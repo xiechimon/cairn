@@ -16,6 +16,7 @@ import {
   AUTO_STEALTH_NOTE,
   type BrowserToolName,
   type BrowserToolResult,
+  closeScopeTab,
   runBrowserTool,
 } from './browser.js';
 import { DesktopScreen } from './desktop-screen.js';
@@ -214,7 +215,8 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
           }
         : NO_COMPUTER_PROVIDER_MESSAGE;
     }
-    if (!ORB_TOOLS.has(call.tool) || !options.orb) return NO_COMPUTER_PROVIDER_MESSAGE;
+    if ((!ORB_TOOLS.has(call.tool) && call.tool !== 'browser_close_tab') || !options.orb)
+      return NO_COMPUTER_PROVIDER_MESSAGE;
     if (!call.scopeKey) return NO_COMPUTER_SCOPE_MESSAGE;
     return {
       provider: options.orb.forScope(
@@ -464,6 +466,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         now,
         signal: controller.signal,
         session: call.scopeKey,
+        ...(call.tabScope === undefined ? {} : { tabScope: call.tabScope }),
         cairnOrigins: options.cairnOrigins,
         browserSecrets: call.browserSecrets,
       });
@@ -495,6 +498,38 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       text: boundBrowserText(result.text),
       ...(result.loginForm ? { loginForm: result.loginForm } : {}),
     });
+  }
+
+  async function handleCloseTab(
+    call: ComputerCall,
+    route: Route,
+    controller: AbortController,
+  ): Promise<void> {
+    if (call.tabScope === undefined) {
+      await refuse(call, 'browser_close_tab needs a tab scope');
+      return;
+    }
+    const poster = posterFor(call, controller);
+    try {
+      const text = await closeScopeTab(route.provider, {
+        deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
+        now,
+        signal: controller.signal,
+        session: call.scopeKey,
+        tabScope: call.tabScope,
+        cairnOrigins: [],
+      });
+      await poster.finish({ kind: 'done', text });
+    } catch (error) {
+      await poster.finish({
+        kind: 'error',
+        message:
+          error instanceof ComputerRefusal
+            ? boundBrowserError(error.message)
+            : 'Closing the tab failed',
+        delivery: 'unknown',
+      });
+    }
   }
 
   async function handleInstall(call: ComputerCall, controller: AbortController): Promise<void> {
@@ -623,6 +658,8 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     if (call.tool === 'shell' || call.tool === 'user_computer_shell') {
       await handleShell(call, route, controller);
+    } else if (call.tool === 'browser_close_tab') {
+      await handleCloseTab(call, route, controller);
     } else if (BROWSER_TOOLS.has(call.tool)) {
       await handleBrowser(call, route, controller);
     } else {

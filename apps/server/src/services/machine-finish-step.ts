@@ -61,7 +61,7 @@ import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTod
 import { githubReadToken } from './github-autonomous-token.js';
 import { acceptedInfoReport } from './info-card.js';
 import { applyLocalMergeReport } from './local-merge.js';
-import { stopStepComputer } from './machine-computer.js';
+import { closeInfoCardTab, stopStepComputer } from './machine-computer.js';
 import {
   deliverableManifestOf,
   failUnpublishedDeliverables,
@@ -216,6 +216,7 @@ export async function finishStep(
   await finishStepReport(deps, machineId, stepId, body);
   stopStepComputer(deps, stepId);
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  if (row && row.status !== 'pending') closeInfoCardTab(deps, row);
   if (row && row.kind !== 'review' && row.kind !== 'verify' && !isChiefConversation(row.buildId))
     await drainTaskMessageQueue(deps, row.buildId);
 }
