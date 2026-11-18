@@ -330,7 +330,7 @@ describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.st
   });
 
   test.each([true, false])(
-    'degraded step (#1671, initial image=%s): steering annotates unread images without downloading them',
+    'degraded step (#1671, initial image=%s): steering materializes unread images for a text-only model',
     async (initialImage) => {
       const transcriptRows: { role: string; content: unknown }[] = [];
       const api = Object.assign(new FakeMachineApi(), {
@@ -387,15 +387,16 @@ describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.st
       api.parked?.(claimed);
       await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
       if (initialImage)
-        await waitFor(() => lines.some((l) => l.includes('image attachment skipped')));
-      expect(api.attachmentCalls).toHaveLength(0);
+        await waitFor(() => lines.some((l) => l.includes('image attachment not delivered inline')));
+      expect(api.attachmentCalls).toHaveLength(initialImage ? 1 : 0);
       api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
       await waitFor(() => steered.length === 1);
       expect(steered[0]!.text).toContain(token);
-      expect(steered[0]!.text).toContain('[图片附件 t1/id1.png 未被模型读取 — 该图片未下载]');
+      expect(steered[0]!.text).toContain('已保存为本地文件');
+      expect(steered[0]!.text).toContain('tesseract');
       expect(steered[0]!.text).not.toContain('[image attached:');
       expect(steered[0]!.images ?? []).toHaveLength(0);
-      expect(api.attachmentCalls).toHaveLength(0);
+      expect(api.attachmentCalls).toHaveLength(initialImage ? 2 : 1);
       expect(transcriptRows).toContainEqual(
         expect.objectContaining({
           role: 'system',

@@ -9,6 +9,8 @@ import type {
   AgentTokenUsage,
   BriefChannel,
   DeliveredImage,
+  DescribableImage,
+  ImageDescription,
   McpEndpoint,
   ModelUsage,
   ProviderCompat,
@@ -55,6 +57,7 @@ import type { Launch, SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
 import { EventQueue } from './event-queue.js';
 import { probeModelImageSupport, rememberNoVision } from './image-support.js';
+import { describeImageWithModels } from './image-text.js';
 import { connectFailedLine } from './mcp-config.js';
 import { PiStepSpanSink, runtimeChildEnv } from './otel.js';
 import { openPiHostSession } from './pi-host-client.js';
@@ -956,6 +959,20 @@ export class PiBackend implements AgentBackend {
 
   rememberNoVision(provider: ProviderConfig, modelId: string): void {
     rememberNoVision(provider.providerId, modelId);
+  }
+
+  async describeImage(
+    provider: ProviderConfig,
+    image: DescribableImage,
+  ): Promise<ImageDescription | undefined> {
+    const runtime = await ModelRuntime.create({
+      authPath: join(this.opts.agentDir, 'auth.json'),
+      modelsPath: join(this.opts.agentDir, 'models.json'),
+    });
+    if (provider.apiKey) {
+      await runtime.setRuntimeApiKey(provider.providerId, provider.apiKey);
+    }
+    return describeImageWithModels(runtime, provider.providerId, image);
   }
 
   private async open(opts: SessionOpts, resumeFile: string | null): Promise<AgentSessionHandle> {

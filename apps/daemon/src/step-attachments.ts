@@ -1,6 +1,11 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
-import type { DeliveredImage, MachineAttachmentResponse } from '@cairn/shared';
+import type {
+  DeliveredImage,
+  DescribableImage,
+  ImageDescription,
+  MachineAttachmentResponse,
+} from '@cairn/shared';
 import {
   ATTACHMENT_TOKEN_LINE,
   isImageAttachmentExt,
@@ -104,6 +109,7 @@ export interface ResolveStepImagesOpts {
   materializeDir: string;
   log: (line: string) => void;
   imageSupport?: boolean | null;
+  describeImage?: (image: DescribableImage) => Promise<ImageDescription | undefined>;
 }
 
 export interface ResolvedStepImages {
@@ -145,8 +151,7 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
   for (const ref of refs) {
     let outcome: Outcome;
     if (opts.imageSupport === false && isImageAttachmentExt(ref.ext)) {
-      opts.log(`attachment not delivered (model does not support images): ${ref.key}`);
-      outcome = { kind: 'noVision', note: `[图片附件 ${ref.key} 未被模型读取 — 该图片未下载]` };
+      outcome = await resolveNoVision(ref, opts);
     } else {
       outcome = await resolveOne(ref, opts);
     }
@@ -194,6 +199,55 @@ function unavailable(
   const reason = err instanceof Error ? err.message : String(err);
   log(`attachment ${stage} failed: ${key} — ${reason}`);
   return { kind: 'unavailable', note: `[图片附件 ${key} 不可用：${reason} — 该图片未交付]` };
+}
+
+async function resolveNoVision(
+  ref: { line: string; label: string; key: string; attachmentId: string; ext: string },
+  opts: ResolveStepImagesOpts,
+): Promise<Outcome> {
+  let res: MachineAttachmentResponse;
+  try {
+    res = await opts.client.attachment(opts.stepId, ref.attachmentId, ref.key.split('/')[0] ?? '');
+  } catch (err) {
+    return unavailable(ref.key, 'download', err, opts.log);
+  }
+  const image: DescribableImage = {
+    data: res.contentBase64,
+    mimeType: res.mimeType,
+    fileName: res.fileName,
+  };
+  const described = await opts.describeImage?.(image).catch((err: unknown) => {
+    opts.log(
+      `attachment describe failed (model does not support images): ${ref.key} — ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return undefined;
+  });
+  if (described !== undefined) {
+    opts.log(`attachment read by ${described.attribution} for a text-only model: ${res.fileName}`);
+    return {
+      kind: 'noVision',
+      note: `[图片附件 ${res.fileName} — 当前模型看不到图片，已由视觉模型 ${described.attribution} 转录为文字：\n${described.text}]`,
+    };
+  }
+  const bytes = Buffer.from(res.contentBase64, 'base64');
+  let path: string;
+  try {
+    path = materializeFile(
+      opts.materializeDir,
+      opts.stepId,
+      withMimeExt(res.fileName, res.mimeType),
+      bytes,
+    );
+  } catch (err) {
+    return unavailable(ref.key, 'materialize', err, opts.log);
+  }
+  opts.log(`attachment materialized for a text-only model: ${res.fileName} → ${path}`);
+  return {
+    kind: 'noVision',
+    note: `[图片附件 ${res.fileName} — 当前模型看不到图片，已保存为本地文件：${path}；如需文字内容，可用 bash 运行 tesseract "${path}" stdout 转录]`,
+  };
 }
 
 async function resolveOne(

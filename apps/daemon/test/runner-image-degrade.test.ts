@@ -298,13 +298,14 @@ describe('runner probe-driven degrade (#1671 slice 1)', () => {
     });
     const { client, lines } = await runImageStep(claimed, backend);
 
-    expect(client.attachmentCalls).toHaveLength(0);
+    expect(client.attachmentCalls).toEqual(['img1']);
     expect(created[0]?.opts.promptImages).toBeUndefined();
     expect(created[0]?.opts.prompt).toContain(SPEC_TOKEN);
-    expect(created[0]?.opts.prompt).toContain('[图片附件 t1/img1.png 未被模型读取 — 该图片未下载]');
+    expect(created[0]?.opts.prompt).toContain('已保存为本地文件');
+    expect(created[0]?.opts.prompt).toContain('tesseract');
     expect(client.doneBodies[0]?.body.status).toBe('success');
     expect(systemRows(client).some((c) => c.includes('图片未被模型读取'))).toBe(true);
-    expect(lines.join('\n')).toContain('image attachment skipped');
+    expect(lines.join('\n')).toContain('image attachment not delivered inline');
   });
 
   test('undeclared model (probe null): images still delivered (regression red line)', async () => {
@@ -449,7 +450,8 @@ describe('runner 400-signal one-time degrade retry (#1671 slice 2)', () => {
     expect(created[0]?.opts.promptImages).toHaveLength(1);
     expect(created[1]?.opts.promptImages).toBeUndefined();
     expect(created[1]?.opts.prompt).toContain(SPEC_TOKEN);
-    expect(created[1]?.opts.prompt).toContain('[图片附件 t1/img1.png 未被模型读取 — 该图片未下载]');
+    expect(created[1]?.opts.prompt).toContain('已保存为本地文件');
+    expect(created[1]?.opts.prompt).toContain('tesseract');
     expect(script.rememberNoVisionCalls).toEqual([
       { providerId: 'stub-gw', modelId: 'stub-model' },
     ]);
@@ -493,7 +495,7 @@ describe('runner 400-signal one-time degrade retry (#1671 slice 2)', () => {
       },
       claimed2,
     );
-    expect(secondClient.attachmentCalls).toHaveLength(0);
+    expect(secondClient.attachmentCalls).toEqual(['img1']);
     expect(script.rememberNoVisionCalls).toHaveLength(0);
   });
 
@@ -564,7 +566,7 @@ describe('runner 400-signal one-time degrade retry (#1671 slice 2)', () => {
     expect(actions).toEqual(['continue', 'create']);
     expect(created[1]?.opts.prompt).toContain(TASK.spec);
     expect(created[1]?.opts.promptImages).toBeUndefined();
-    expect(created[1]?.opts.prompt).toContain('[图片附件 t1/img1.png 未被模型读取 — 该图片未下载]');
+    expect(created[1]?.opts.prompt).toContain('已保存为本地文件');
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
@@ -639,7 +641,7 @@ test('a fresh text-only session after a resume miss reports skipped task images'
   };
   const { client } = await runImageStep(claimed, backend);
   expect(created).toHaveLength(1);
-  expect(client.attachmentCalls).toHaveLength(0);
+  expect(client.attachmentCalls).toEqual(['img1']);
   expect(created[0]?.opts.prompt).toContain(SPEC_TOKEN);
   expect(systemRows(client).join('\n')).toContain('图片未被模型读取');
   expect(client.doneBodies[0]?.body.status).toBe('success');

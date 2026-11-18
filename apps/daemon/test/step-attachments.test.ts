@@ -310,6 +310,11 @@ describe('imageSupport=false degrade mode (#1671)', () => {
   async function resolveDegrade(
     text: string,
     attachments: Record<string, MachineAttachmentResponse | Error>,
+    describeImage?: (image: {
+      data: string;
+      mimeType: string;
+      fileName?: string;
+    }) => Promise<{ text: string; attribution: string } | undefined>,
   ) {
     const s = setup();
     const { client, requested } = fakeClient(attachments);
@@ -320,40 +325,83 @@ describe('imageSupport=false degrade mode (#1671)', () => {
       materializeDir: s.materializeDir,
       log: s.log,
       imageSupport: false,
+      ...(describeImage === undefined ? {} : { describeImage }),
     });
     return { out, requested, s };
   }
 
-  test('png token → zero downloads, token kept verbatim, no-vision annotation, skippedNoVision=1', async () => {
+  test('png token + vision describer → captioned text delivered inline in the prompt', async () => {
     const token = formatAttachmentToken('shot.png', 't1/id1.png');
-    const { out, requested } = await resolveDegrade(`任务\n\n${token}\n\n后文`, {
-      id1: pngResponse(),
-    });
-    expect(requested).toHaveLength(0);
+    const { out, requested } = await resolveDegrade(
+      `任务\n\n${token}\n\n后文`,
+      { id1: pngResponse() },
+      async () => ({ text: '三条任务，中间一条 failed', attribution: 'vis/vm' }),
+    );
+    expect(requested).toEqual(['id1']);
     expect(out.images).toHaveLength(0);
     expect(out.skippedNoVision).toBe(1);
-    expect(out.text).toContain(token);
-    expect(out.text).toContain('[图片附件 t1/id1.png 未被模型读取 — 该图片未下载]');
+    expect(out.text).toContain('shot.png');
+    expect(out.text).toContain('vis/vm');
+    expect(out.text).toContain('三条任务，中间一条 failed');
+    expect(out.text).toContain('后文');
+    expect(out.text).not.toContain('未下载');
+  });
+
+  test('png token + no describer → downloaded and materialized with a tesseract hint', async () => {
+    const token = formatAttachmentToken('shot.png', 't1/id1.png');
+    const { out, requested, s } = await resolveDegrade(`任务\n\n${token}\n\n后文`, {
+      id1: pngResponse(),
+    });
+    expect(requested).toEqual(['id1']);
+    expect(out.images).toHaveLength(0);
+    expect(out.skippedNoVision).toBe(1);
+    const path = join(s.materializeDir, 's1', 'shot.png');
+    expect(existsSync(path)).toBe(true);
+    expect(readFileSync(path)).toEqual(PNG_BYTES);
+    expect(out.text).toContain(path);
+    expect(out.text).toContain('tesseract');
     expect(out.text).toContain('后文');
   });
 
-  test('svg token → neither downloaded nor materialized to disk', async () => {
-    const token = formatAttachmentToken('diagram.svg', 't1/id1.svg');
-    const s = setup();
-    const { client, requested } = fakeClient({ id1: new Error('must not be called') });
-    const out = await resolveStepImages({
-      text: token,
-      stepId: 's1',
-      client,
-      materializeDir: s.materializeDir,
-      log: s.log,
-      imageSupport: false,
-    });
-    expect(requested).toHaveLength(0);
+  test('png token + describer that returns nothing → falls back to materialize', async () => {
+    const token = formatAttachmentToken('shot.png', 't1/id1.png');
+    const { out, requested, s } = await resolveDegrade(
+      token,
+      { id1: pngResponse() },
+      async () => undefined,
+    );
+    expect(requested).toEqual(['id1']);
+    expect(existsSync(join(s.materializeDir, 's1', 'shot.png'))).toBe(true);
     expect(out.skippedNoVision).toBe(1);
+    expect(out.text).toContain('tesseract');
+  });
+
+  test('png token + failing download → unavailable note, nothing written', async () => {
+    const token = formatAttachmentToken('shot.png', 't1/id1.png');
+    const { out, requested, s } = await resolveDegrade(token, { id1: new Error('boom') });
+    expect(requested).toEqual(['id1']);
+    expect(out.skippedNoVision).toBe(0);
     expect(existsSync(join(s.materializeDir, 's1'))).toBe(false);
     expect(out.text).toContain(token);
-    expect(out.text).toContain('[图片附件 t1/id1.svg 未被模型读取 — 该图片未下载]');
+    expect(out.text).toContain('不可用');
+    expect(out.text).toContain('未交付');
+  });
+
+  test('svg token → downloaded and materialized under the no-vision path', async () => {
+    const token = formatAttachmentToken('diagram.svg', 't1/id1.svg');
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>');
+    const { out, requested, s } = await resolveDegrade(token, {
+      id1: {
+        fileName: 'diagram.svg',
+        mimeType: 'image/svg+xml',
+        sizeBytes: svg.byteLength,
+        contentBase64: svg.toString('base64'),
+      },
+    });
+    expect(requested).toEqual(['id1']);
+    expect(out.skippedNoVision).toBe(1);
+    expect(existsSync(join(s.materializeDir, 's1', 'diagram.svg'))).toBe(true);
+    expect(out.text).toContain('tesseract');
   });
 
   test('md/pdf tokens stay byte for byte (text model can still read them)', async () => {
@@ -367,13 +415,13 @@ describe('imageSupport=false degrade mode (#1671)', () => {
   test('mixed png + md: only the png degrades, md untouched', async () => {
     const pngToken = formatAttachmentToken('shot.png', 't1/id1.png');
     const mdToken = '![notes](attachment:t1/id2.md)';
-    const { out, requested } = await resolveDegrade(`${pngToken}\n${mdToken}`, {
+    const { out, requested, s } = await resolveDegrade(`${pngToken}\n${mdToken}`, {
       id1: pngResponse(),
     });
-    expect(requested).toHaveLength(0);
+    expect(requested).toEqual(['id1']);
     expect(out.skippedNoVision).toBe(1);
     expect(out.text).toContain(pngToken);
-    expect(out.text).toContain('[图片附件 t1/id1.png 未被模型读取 — 该图片未下载]');
+    expect(out.text).toContain(join(s.materializeDir, 's1', 'shot.png'));
     expect(out.text).toContain(mdToken);
   });
 
@@ -381,11 +429,11 @@ describe('imageSupport=false degrade mode (#1671)', () => {
     const GH = { sourceKind: 'github-issue', sourceRef: 'github:octo/alpha#7' };
     const token = formatAttachmentToken('shot.png', 't1/id1.png');
     const fencedText = buildTaskPromptText('改圆角', `见下图。\n\n${token}`, GH);
-    const { out, requested } = await resolveDegrade(fencedText, { id1: pngResponse() });
-    expect(requested).toHaveLength(0);
+    const { out, s } = await resolveDegrade(fencedText, { id1: pngResponse() });
     expect(out.skippedNoVision).toBe(1);
     expect(out.text).toContain(`> ${token}`);
-    expect(out.text).toContain('> [图片附件 t1/id1.png 未被模型读取 — 该图片未下载]');
+    expect(out.text).toContain(`> [图片附件 shot.png`);
+    expect(out.text).toContain(join(s.materializeDir, 's1', 'shot.png'));
   });
 
   test('imageSupport omitted and null keep today behavior (regression baseline: download still happens)', async () => {
@@ -772,7 +820,7 @@ describe('resolveDeliveredPrompt', () => {
     expect(delivered).toEqual({ text: 'plain prompt', images: undefined, skippedNoVision: 0 });
   });
 
-  test('counts images skipped for a model without vision', async () => {
+  test('counts images degraded for a model without vision', async () => {
     const s = setup();
     const { client, requested } = fakeClient({ id1: pngResponse() });
     const text = formatAttachmentToken('shot.png', 'team-a/id1.png');
@@ -786,6 +834,7 @@ describe('resolveDeliveredPrompt', () => {
     });
     expect(delivered.images).toBeUndefined();
     expect(delivered.skippedNoVision).toBe(1);
-    expect(requested).toEqual([]);
+    expect(requested).toEqual(['id1']);
+    expect(delivered.text).toContain('tesseract');
   });
 });

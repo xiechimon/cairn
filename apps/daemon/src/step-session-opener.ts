@@ -101,6 +101,11 @@ export class StepSessionOpener {
       materializeDir: input.stepAttachmentsDir,
       log: (line) => logger.step(line),
       imageSupport: false,
+      ...(input.backend.describeImage === undefined
+        ? {}
+        : {
+            describeImage: input.backend.describeImage.bind(input.backend, sessionOpts.provider),
+          }),
     });
     sessionOpts.prompt = degraded.text;
     this.continueId = null;
@@ -111,7 +116,7 @@ export class StepSessionOpener {
     input.transcript.upsert({
       id: `image-skip-${stepId}`,
       role: 'system',
-      content: `图片未被模型读取：模型 ${modelKey} 拒绝了图片输入（${failureText.slice(0, 200)}），已去掉图片重试本步骤`,
+      content: `图片未被模型读取：模型 ${modelKey} 拒绝了图片输入（${failureText.slice(0, 200)}），已将图片改为文字转录或本地文件交付并重试本步骤`,
       createdAt: input.now(),
     });
     input.forgetHandle();
@@ -149,6 +154,14 @@ export class StepSessionOpener {
           materializeDir: input.stepAttachmentsDir,
           log: (line) => logger.step(line),
           imageSupport: this.imageSupport,
+          ...(input.backend.describeImage === undefined
+            ? {}
+            : {
+                describeImage: input.backend.describeImage.bind(
+                  input.backend,
+                  sessionOpts.provider,
+                ),
+              }),
         });
         delivery = resolved.text;
         images = resolved.images;
@@ -156,7 +169,7 @@ export class StepSessionOpener {
           transcript.upsert({
             id: `image-skip-${stepId}`,
             role: 'system',
-            content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${resolved.skippedNoVision} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
+            content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${resolved.skippedNoVision} 张图片已改用文字转录或本地文件交付`,
             createdAt: now(),
           });
         }

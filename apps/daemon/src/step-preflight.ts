@@ -99,10 +99,13 @@ export async function prepareStepPromptDelivery(input: {
     materializeDir: input.materializeDir,
     log,
     imageSupport,
+    ...(input.backend.describeImage === undefined
+      ? {}
+      : { describeImage: input.backend.describeImage.bind(input.backend, input.provider) }),
   });
   if (resolved.skippedNoVision > 0) {
     log(
-      `image attachment skipped: model ${input.modelKey} does not support images (${resolved.skippedNoVision} image(s) not delivered)`,
+      `image attachment not delivered inline: model ${input.modelKey} does not support images (${resolved.skippedNoVision} image(s) delivered as text or file instead)`,
     );
   }
   return {

@@ -196,6 +196,17 @@ export interface BriefChannel {
   composeBody(opts: SessionOpts, base: string | undefined): string;
 }
 
+export interface DescribableImage {
+  data: string;
+  mimeType: string;
+  fileName?: string;
+}
+
+export interface ImageDescription {
+  text: string;
+  attribution: string;
+}
+
 export interface AgentBackend {
   readonly capabilities: AgentBackendCapabilities;
   readonly brief?: BriefChannel;
@@ -204,6 +215,10 @@ export interface AgentBackend {
   adaptProviderCompat?(provider: ProviderConfig, errorMessage: string): ProviderConfig | null;
   modelSupportsImages?(provider: ProviderConfig, modelId: string): Promise<boolean | null>;
   rememberNoVision?(provider: ProviderConfig, modelId: string): void;
+  describeImage?(
+    provider: ProviderConfig,
+    image: DescribableImage,
+  ): Promise<ImageDescription | undefined>;
 }
 
 export const BACKEND_RUNTIME_IDS = ['claude-code', 'gemini', 'devin'] as const;

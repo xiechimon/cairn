@@ -29,7 +29,7 @@ export function seedStepTranscript(
     transcript.upsert({
       id: `image-skip-${stepId}`,
       role: 'system',
-      content: `图片未被模型读取：模型 ${seed.modelKey} 不支持图片输入，${seed.skippedNoVisionCount} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
+      content: `图片未被模型读取：模型 ${seed.modelKey} 不支持图片输入，${seed.skippedNoVisionCount} 张图片已改用文字转录或本地文件交付`,
       createdAt: now(),
     });
   }

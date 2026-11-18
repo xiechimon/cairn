@@ -840,7 +840,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           const row = {
             id: `image-skip-steer-${stepId}-${randomUUID()}`,
             role: 'system' as const,
-            content: `图片未被模型读取：追加消息中的 ${resolved.skippedNoVision} 张图片未交付，当前模型不支持图片输入。步骤继续执行。`,
+            content: `图片未被模型读取：追加消息中的 ${resolved.skippedNoVision} 张图片未以图片形式交付（当前模型不支持图片输入），已改用文字转录或本地文件交付`,
             createdAt: Date.now(),
           };
           stepTranscripts.get(stepId)?.upsert(row);
