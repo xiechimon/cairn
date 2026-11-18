@@ -14,6 +14,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { useComputerGrantsRow } from './computer-grants-panel.js';
 import { useFolderGrantsRow } from './folder-grants-panel.js';
 import { useOwnComputerRow } from './own-computer-panel.js';
 
@@ -35,6 +36,7 @@ export function MachineRowView({
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const ownComputer = useOwnComputerRow(machine);
+  const computerGrants = useComputerGrantsRow(machine);
   const folders = useFolderGrantsRow(machine);
 
   const makeDefault = () => {
@@ -118,6 +120,7 @@ export function MachineRowView({
               {online ? t('在线') : t('离线')}
             </span>
             {ownComputer.meta}
+            {computerGrants.meta}
             {folders.meta}
           </div>
         </div>
@@ -163,6 +166,7 @@ export function MachineRowView({
         </DropdownMenu>
       </div>
       {ownComputer.drawer}
+      {computerGrants.drawer}
       {folders.drawer}
       <DeleteConfirm
         open={confirmOpen}

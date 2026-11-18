@@ -815,6 +815,35 @@ export const folderGrantsStates: FixtureSet = {
   },
 };
 
+export const computerGrantsStates: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    machines: [
+      ownMac('cg-default', 'capable-mac', {}, { computer: true, browser: true }),
+      ownMac(
+        'cg-browser-off',
+        'no-browser-mac',
+        { browserOverride: false },
+        { computer: true, browser: true },
+      ),
+      ownMac(
+        'cg-desktop-off',
+        'no-desktop-mac',
+        { desktopOverride: false },
+        { computer: true, browser: true },
+      ),
+      ownMac(
+        'cg-explicit-on',
+        'pinned-mac',
+        { browserOverride: true, desktopOverride: true },
+        { computer: true, browser: true },
+      ),
+      ownMac('cg-plain', 'plain-mac', {}),
+    ],
+  },
+};
+
 const MAIL_ACCOUNT: import('@cairn/shared').MailAccountRecord = {
   id: 'mail-qq',
   address: 'ian.xie@qq.com',

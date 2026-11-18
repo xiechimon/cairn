@@ -334,6 +334,8 @@ export interface MachineRow {
   providers?: MachineProvider[];
   ownComputerEnabled?: boolean;
   ownComputerFixture?: OwnComputerFixture;
+  browserOverride?: boolean | null;
+  desktopOverride?: boolean | null;
   folderGrants?: MachineFolderGrants | null;
 }
 

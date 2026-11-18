@@ -112,6 +112,7 @@ export {
   detailR8Fresh,
 } from './r8-overlay.js';
 export {
+  computerGrantsStates,
   folderGrantsStates,
   machinesDuplicateNames,
   machinesMasterDetail,
