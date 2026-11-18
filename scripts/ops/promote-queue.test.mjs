@@ -41,6 +41,16 @@ test('cancelled or failed run never counts as green', () => {
   assert.equal(evaluate({ ...base, ciRuns: [run({ conclusion: 'failure' })] }).action, 'reject');
 });
 
+test('a check skipped by classification counts the same as the ruleset does', () => {
+  const skipped = checks.map((c) =>
+    c.name === 'pack-smoke' ? { ...c, conclusion: 'skipped' } : c,
+  );
+  assert.deepEqual(evaluate({ ...base, checkRuns: skipped }), {
+    action: 'promote',
+    sha: SHA,
+  });
+});
+
 test('stale candidate that no longer contains main is refused', () => {
   assert.equal(evaluate({ ...base, candidateContainsMain: false }).action, 'reject');
 });

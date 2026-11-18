@@ -15,7 +15,9 @@ export function evaluate({ queueHead, ciRuns, checkRuns, mainTip, candidateConta
     return { action: 'wait', reason: run ? `run ${run.status}` : 'no ci run yet' };
   if (run.conclusion !== 'success') return { action: 'reject', reason: `ci ${run.conclusion}` };
   const byName = new Map(checkRuns.map((c) => [c.name, c.conclusion]));
-  const missing = REQUIRED_CHECKS.filter((name) => byName.get(name) !== 'success');
+  const missing = REQUIRED_CHECKS.filter(
+    (name) => !['success', 'skipped'].includes(byName.get(name) ?? ''),
+  );
   if (missing.length > 0)
     return { action: 'wait', reason: `checks pending: ${missing.join(', ')}` };
   void mainTip;
