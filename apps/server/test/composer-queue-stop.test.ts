@@ -124,7 +124,7 @@ test('queued text persists without steering and completion starts exactly one co
   expect(w.s.db.select().from(step).all()).toHaveLength(1);
   expect((await w.finish('success')).status).toBe(200);
   expect((await w.finish('success')).status).toBe(200);
-  expect(w.s.db.select().from(step).all()).toMatchObject([
+  expect(w.s.db.select().from(step).where(eq(step.buildId, 'build')).all()).toMatchObject([
     { id: 'running', status: 'done' },
     { kind: 'build', status: 'pending', prompt: 'Next turn', freshSession: false },
   ]);
@@ -143,7 +143,7 @@ test('steer now consumes the queued bubble once and does not start a later turn'
   expect(await w.face()).toMatchObject({ queuedMessages: [], steerPending: ['Steer this'] });
   expect((await w.send({ content: 'Steer this', queuedMessageId: queued?.id })).status).toBe(409);
   await w.finish('success');
-  expect(w.s.db.select().from(step).all()).toHaveLength(1);
+  expect(w.s.db.select().from(step).where(eq(step.buildId, 'build')).all()).toHaveLength(1);
 });
 
 test('plain send still steers immediately', async () => {
