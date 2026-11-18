@@ -1,6 +1,5 @@
 import type { MailAccountStatus, MailErrorCode } from '@cairn/shared';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
-import type { Db } from '../db/client.js';
 import { mailAccount, mailEvent, mailRule } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -12,8 +11,8 @@ import {
   transitionMailAccount,
 } from './mail.js';
 import {
-  type MailboxMessage,
   MailAuthError,
+  type MailboxMessage,
   type MailboxSession,
   type OpenMailbox,
   openImapMailbox,

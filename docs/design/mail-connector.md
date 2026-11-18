@@ -4,7 +4,7 @@ Status: v1 is IMAP IDLE only and is being built (ian, 2026-11-19). The Gmail wat
 
 ## v1 for the desktop install
 
-Cairn mostly runs as the owner's Mac desktop app with the server on 127.0.0.1. A Gmail Pub/Sub push needs a public `https` endpoint and an owner-set public origin, and the desktop install has neither. IMAP IDLE needs only an outbound socket, so v1 builds that one path for every IMAP mailbox: QQ Mail with its authorization code (授权码), Gmail and Outlook with an app password. Gmail OAuth and Pub/Sub are out of v1 because they add an unauthenticated inbound endpoint, a Google verifier, watch renewal and an OAuth app review, none of which the owner needs to read mail on his Mac. `mail_account.provider` keeps the `gmail` value for later.
+Cairn mostly runs as the owner's Mac desktop app with the server on 127.0.0.1. A Gmail Pub/Sub push needs a public `https` endpoint and an owner-set public origin, and the desktop install has neither. IMAP IDLE needs only an outbound socket, so v1 builds that one path for every IMAP mailbox: QQ Mail with its authorization code, Gmail and Outlook with an app password. Gmail OAuth and Pub/Sub are out of v1 because they add an unauthenticated inbound endpoint, a Google verifier, watch renewal and an OAuth app review, none of which the owner needs to read mail on his Mac. `mail_account.provider` keeps the `gmail` value for later.
 
 Decisions that close the open items for v1:
 

@@ -2682,6 +2682,57 @@
         "apps/server/test/im-core.test.ts",
         "apps/server/test/im-routes.test.ts"
       ]
+    },
+    {
+      "id": "mail-connector",
+      "name": "Mailbox connector",
+      "summary": "The owner connects an IMAP mailbox (QQ Mail authorization code, Gmail or Outlook app password). One held IDLE connection per mailbox turns new mail into a mail-provenance Coordinator turn with the mail fenced as untrusted data; replies go out over SMTP only after an approval card.",
+      "states": "An empty mailbox list, connecting, connected, error (rejected login or unreachable server, with the reason), a last-mail time, wake rules (all new mail or matching sender/subject), and an approval card for every reply.",
+      "centrality": 3,
+      "status": "partial",
+      "code": {
+        "web": [
+          "apps/web/src/routes/mail-page.tsx"
+        ],
+        "server": [
+          "apps/server/src/services/mail.ts",
+          "apps/server/src/services/mail-accounts.ts",
+          "apps/server/src/services/mail-connector.ts",
+          "apps/server/src/services/mail-imap.ts",
+          "apps/server/src/services/mail-smtp.ts",
+          "apps/server/src/routes-mail.ts"
+        ],
+        "other": [
+          "packages/shared/src/mail.ts"
+        ]
+      },
+      "routes": {
+        "web": [
+          "settings:mail"
+        ],
+        "server": [
+          "/api/teams/:id/mail/accounts",
+          "/api/teams/:id/mail/accounts/:accountId",
+          "/api/teams/:id/mail/accounts/:accountId/rules",
+          "/api/teams/:id/mail/accounts/:accountId/rules/:ruleId"
+        ]
+      },
+      "reach": [
+        "settings mail"
+      ],
+      "research": {
+        "na": "the binding contract is docs/design/mail-connector.md; no reference product is copied"
+      },
+      "frontendDesign": [
+        "docs/design/references/settings"
+      ],
+      "backendDesign": [
+        "docs/design/mail-connector.md"
+      ],
+      "evidence": [
+        "apps/server/test/mail-imap.test.ts",
+        "apps/server/test/mail-connector.test.ts"
+      ]
     }
   ]
 }

@@ -20,12 +20,12 @@ import { proposalCardId } from './action-proposals.js';
 import { executeAction } from './action-registry.js';
 import { announceQuestion } from './chief-questions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { type SendMail, sendSmtpMail } from './mail-smtp.js';
 import {
   callConnectorTool,
   connectorEndpointBySlug,
   type McpConnectorDeps,
 } from './mcp-servers.js';
-import { type SendMail, sendSmtpMail } from './mail-smtp.js';
 import type { VapidKeys } from './push.js';
 import { openMailPassword } from './secrets.js';
 

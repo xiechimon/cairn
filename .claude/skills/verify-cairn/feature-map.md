@@ -21,6 +21,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
 | `im` | `设置` (Settings) › `消息` (Messages) › `IM` | [IM connections](#im-connections) |
+| `mail` | `设置` (Settings) › `消息` (Messages) › `邮箱` (Mailbox) | [Mailbox connector](#mail-connector) |
 
 ## Features
 
@@ -845,6 +846,25 @@ Reach:
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/design/im-connections.md](../../../docs/design/im-connections.md)
 - Evidence: `apps/server/test/im-telegram.test.ts`, `apps/server/test/im-wechat.test.ts`, `apps/server/test/im-slack.test.ts`, `apps/server/test/im-core.test.ts`, `apps/server/test/im-routes.test.ts`
+
+### mail-connector
+
+**Mailbox connector** (partial, centrality 3). The owner connects an IMAP mailbox (QQ Mail authorization code, Gmail or Outlook app password). One held IDLE connection per mailbox turns new mail into a mail-provenance Coordinator turn with the mail fenced as untrusted data; replies go out over SMTP only after an approval card.
+
+States: An empty mailbox list, connecting, connected, error (rejected login or unreachable server, with the reason), a last-mail time, wake rules (all new mail or matching sender/subject), and an approval card for every reply.
+
+Reach:
+
+1. `settings mail`
+
+- Web routes: none
+- Settings: `设置` (Settings) › `消息` (Messages) › `邮箱` (Mailbox)
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `mail-account-*`, `mail-accounts`, `mail-add`, `mail-address-input`, `mail-connect-submit`, `mail-empty`, `mail-imap-host-input`, `mail-imap-port-input`, `mail-password-input`, `mail-remove-*`, `mail-rule-*`, `mail-rule-add`, `mail-rule-pattern-input`, `mail-rule-remove-*`, `mail-rules-*`, `mail-smtp-host-input`, `mail-smtp-port-input`
+- Research: n/a: the binding contract is docs/design/mail-connector.md; no reference product is copied
+- Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
+- Backend design: [docs/design/mail-connector.md](../../../docs/design/mail-connector.md)
+- Evidence: `apps/server/test/mail-imap.test.ts`, `apps/server/test/mail-connector.test.ts`
 
 ### mcp-servers
 

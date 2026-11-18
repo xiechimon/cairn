@@ -15,11 +15,11 @@
 
 | Item | Count |
 |---|---|
-| Features | 55 |
+| Features | 56 |
 | status shipped | 45 |
-| status partial | 8 |
+| status partial | 9 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 27 |
+| research, frontend design and backend design all present or not applicable | 28 |
 | Research gaps | 13 |
 | Frontend design gaps | 15 |
 | Backend design gaps | 18 |
@@ -71,6 +71,7 @@
 | [Built-in git hosting](#git-hosting) | 3 | shipped | gap | n/a | gap | B11 |
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [IM connections](#im-connections) | 3 | partial | n/a | yes | yes |  |
+| [Mailbox connector](#mail-connector) | 3 | partial | n/a | yes | yes |  |
 | [MCP servers](#mcp-servers) | 3 | shipped | yes | yes | yes |  |
 | [Projects](#projects) | 3 | shipped | yes | yes | yes |  |
 | [Quota wait](#quota-wait) | 3 | shipped | yes | gap | gap | B9 |
@@ -531,6 +532,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: n/a: the binding contract is docs/design/im-connections.md; no reference product is copied
 - Frontend design: [docs/design/references/settings](design/references/settings)
 - Backend design: [docs/design/im-connections.md](design/im-connections.md)
+
+### mail-connector
+
+**Mailbox connector** (partial). The owner connects an IMAP mailbox (QQ Mail authorization code, Gmail or Outlook app password). One held IDLE connection per mailbox turns new mail into a mail-provenance Coordinator turn with the mail fenced as untrusted data; replies go out over SMTP only after an approval card.
+
+- Research: n/a: the binding contract is docs/design/mail-connector.md; no reference product is copied
+- Frontend design: [docs/design/references/settings](design/references/settings)
+- Backend design: [docs/design/mail-connector.md](design/mail-connector.md)
 
 ### mcp-servers
 

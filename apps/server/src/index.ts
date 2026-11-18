@@ -40,7 +40,6 @@ import { drainEffects, effectRegistry, reconcileEffects } from './services/exter
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { createImService } from './services/im/core.js';
-import { createMailConnector } from './services/mail-connector.js';
 import { liveImEnv } from './services/im/env.js';
 import { setImRuntime } from './services/im/runtime.js';
 import { createSlackAdapter } from './services/im/slack.js';
@@ -48,6 +47,7 @@ import { createTelegramAdapter } from './services/im/telegram.js';
 import { wechatAdapter } from './services/im/wechat.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
+import { createMailConnector } from './services/mail-connector.js';
 import { adoptGithubConnectorGrants } from './services/mcp-github-connector.js';
 import { newMcpOAuthState } from './services/mcp-servers.js';
 import { seedOwnerCheckpoints } from './services/owner.js';

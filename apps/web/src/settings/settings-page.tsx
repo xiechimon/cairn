@@ -1,6 +1,7 @@
 import {
   KeyRound,
   type LucideIcon,
+  Mail,
   MessageCircle,
   Monitor,
   Moon,
@@ -57,6 +58,7 @@ import { VaultPage } from '../resources/vault-page.js';
 import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
 import { ImConnectionsPage } from '../routes/im-page.js';
+import { MailPage } from '../routes/mail-page.js';
 import { RemoteAccessPage } from '../routes/remote-access-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type ThemePreference } from '../theme.js';
@@ -200,6 +202,13 @@ const GROUPS: Group[] = [
         Icon: MessageCircle,
         keywords: ['telegram', 'slack', 'im', 'message', '聊天', '微信', 'wechat'],
         element: () => <ImConnectionsPage />,
+      },
+      {
+        id: 'mail',
+        label: '邮箱',
+        Icon: Mail,
+        keywords: ['mail', 'email', 'imap', 'qq', '邮件', '授权码', 'gmail', 'outlook'],
+        element: () => <MailPage />,
       },
     ],
   },

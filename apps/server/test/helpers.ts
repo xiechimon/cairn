@@ -38,10 +38,10 @@ import { createClaudeSubscription } from '../src/services/claude-subscriptions.j
 import { createDevinSubscription } from '../src/services/devin-subscriptions.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { teamAutonomyPaused } from '../src/services/github-autonomy-brake.js';
+import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { createMailConnector } from '../src/services/mail-connector.js';
 import type { OpenMailbox } from '../src/services/mail-imap.js';
 import type { SendMail } from '../src/services/mail-smtp.js';
-import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { newMcpOAuthState } from '../src/services/mcp-servers.js';
 import type { VapidKeys } from '../src/services/push.js';
 import { setTodoPhase } from '../src/services/todos.js';

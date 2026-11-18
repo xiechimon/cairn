@@ -358,6 +358,7 @@ export interface ResourcesContent {
   accounts?: AccountsContent;
   routingSettings?: import('@cairn/shared').TeamRoutingSettings;
   topModels?: import('@cairn/shared').TopModel[] | null;
+  mailAccounts?: import('@cairn/shared').MailAccountRecord[];
 }
 
 export interface DocSegment {

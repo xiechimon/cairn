@@ -814,3 +814,65 @@ export const folderGrantsStates: FixtureSet = {
     ],
   },
 };
+
+const MAIL_ACCOUNT: import('@cairn/shared').MailAccountRecord = {
+  id: 'mail-qq',
+  address: 'ian.xie@qq.com',
+  imapHost: 'imap.qq.com',
+  imapPort: 993,
+  smtpHost: 'smtp.qq.com',
+  smtpPort: 465,
+  status: 'watching',
+  lastError: null,
+  lastMailAt: Date.UTC(2026, 10, 19, 9, 42),
+  wakeMode: 'all',
+  rules: [],
+};
+
+export const resourcesMailEmpty: FixtureSet = {
+  ...resourcesDefault,
+  resources: { ...RESOURCES, mailAccounts: [] },
+};
+
+export const resourcesMailConnected: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    mailAccounts: [
+      MAIL_ACCOUNT,
+      {
+        ...MAIL_ACCOUNT,
+        id: 'mail-gmail',
+        address: 'ian@gmail.com',
+        imapHost: 'imap.gmail.com',
+        smtpHost: 'smtp.gmail.com',
+        status: 'connecting',
+        lastMailAt: null,
+        wakeMode: 'rules',
+        rules: [
+          { id: 'r1', matchKind: 'sender_allow', pattern: 'dana@corp.example' },
+          { id: 'r2', matchKind: 'subject_contains', pattern: '发票' },
+        ],
+      },
+    ],
+  },
+};
+
+export const resourcesMailError: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    mailAccounts: [
+      { ...MAIL_ACCOUNT, status: 'revoked', lastError: 'auth-rejected' },
+      {
+        ...MAIL_ACCOUNT,
+        id: 'mail-163',
+        address: 'ian@163.com',
+        imapHost: 'imap.163.com',
+        smtpHost: 'smtp.163.com',
+        status: 'degraded',
+        lastError: 'timeout',
+      },
+    ],
+  },
+};

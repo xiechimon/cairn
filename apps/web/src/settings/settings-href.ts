@@ -12,6 +12,7 @@ export const SETTINGS_SECTION_IDS = [
   'api-keys',
   'remote',
   'im',
+  'mail',
 ] as const;
 
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];

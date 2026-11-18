@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import { mailAccount, mailEvent, pushDigestItem, secret, step } from '../src/db/schema.js';
 import { answerProposal } from '../src/services/action-proposals.js';
+import { executeRelayToolCall } from '../src/services/machine-relay.js';
 import { createMailAccount } from '../src/services/mail-accounts.js';
 import { createMailConnector } from '../src/services/mail-connector.js';
 import {
@@ -14,7 +15,6 @@ import {
   type OpenMailbox,
 } from '../src/services/mail-imap.js';
 import type { OutgoingMail, SendMail, SmtpConfig } from '../src/services/mail-smtp.js';
-import { executeRelayToolCall } from '../src/services/machine-relay.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const PASSWORD = 'qq-auth-code-7Hk2mPz9';

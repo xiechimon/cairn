@@ -45,6 +45,10 @@ import type {
   ImWechatLoginPoll,
   ImWechatLoginStart,
   MachineRecord,
+  MailAccountCreateBody,
+  MailAccountRecord,
+  MailRuleCreateBody,
+  MailWakeMode,
   McpConnectorRecord,
   McpServerRecord,
   MemoryEditBody,
@@ -783,6 +787,52 @@ export function useImMutations(teamId: string | undefined) {
           }`,
           {},
         ),
+      onSuccess: invalidate,
+    }),
+  };
+}
+
+const MAIL_POLL_MS = 5_000;
+
+export const useMailAccounts = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['mailAccounts', teamId],
+    queryFn: () => api.get<{ accounts: MailAccountRecord[] }>(`/api/teams/${teamId}/mail/accounts`),
+    enabled: enabled && teamId !== undefined,
+    refetchInterval: MAIL_POLL_MS,
+  });
+
+export function useMailMutations(teamId: string | undefined) {
+  const queryClient = useQueryClient();
+  const base = `/api/teams/${teamId}/mail/accounts`;
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['mailAccounts', teamId] });
+  };
+  return {
+    connect: useMutation({
+      mutationFn: (body: MailAccountCreateBody) =>
+        api.post<{ account: MailAccountRecord }>(base, body),
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({
+      mutationFn: (id: string) => api.del<void>(`${base}/${encodeURIComponent(id)}`),
+      onSuccess: invalidate,
+    }),
+    setWakeMode: useMutation({
+      mutationFn: ({ id, wakeMode }: { id: string; wakeMode: MailWakeMode }) =>
+        api.patch<{ account: MailAccountRecord }>(`${base}/${encodeURIComponent(id)}`, {
+          wakeMode,
+        }),
+      onSuccess: invalidate,
+    }),
+    addRule: useMutation({
+      mutationFn: ({ id, rule }: { id: string; rule: MailRuleCreateBody }) =>
+        api.post<{ account: MailAccountRecord }>(`${base}/${encodeURIComponent(id)}/rules`, rule),
+      onSuccess: invalidate,
+    }),
+    removeRule: useMutation({
+      mutationFn: ({ id, ruleId }: { id: string; ruleId: string }) =>
+        api.del<void>(`${base}/${encodeURIComponent(id)}/rules/${encodeURIComponent(ruleId)}`),
       onSuccess: invalidate,
     }),
   };
