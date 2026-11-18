@@ -38,7 +38,7 @@ export function machineRuntimeAvailable(
   runtime: MachineRuntime,
 ): boolean {
   if (runtime === 'pi') return true;
-  if (runtime === 'gemini') return false;
+  if (runtime === 'gemini') return true;
   if (runtime === 'devin') return machineRow.capabilities?.devin?.installed === true;
   return (
     machineRow.claudeCodeReport?.installed === true || machineRow.capabilities?.executor === 'orb'
@@ -93,9 +93,6 @@ export function codexProviderKeyed(db: Pick<Db, 'select'>, teamId: string): bool
 }
 
 function runtimeMissingReason(name: string, runtime: MachineRuntime): string {
-  if (runtime === 'gemini') {
-    return `执行机 ${name} 不能运行 Gemini：它的权限请求还没接入命令闸。`;
-  }
   if (runtime === 'devin') {
     return `执行机 ${name} 还没装好 Devin（托管下载失败或未上线）：等它上线或重启执行机。`;
   }

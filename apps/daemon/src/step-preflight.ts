@@ -33,9 +33,6 @@ export function agentStepRefusal(input: {
     return claudeCodeSubscriptionMissingMessage();
   }
   if (input.runtimeId === 'devin') {
-    if (!['build', 'session', 'plan', 'merge', 'chief'].includes(input.stepKind)) {
-      return `Devin 运行时暂不支持「${input.stepKind}」步骤（支持 build/session/plan/merge/chief），请改用其他运行时或拆分任务`;
-    }
     if (input.hasDevinToken !== true) {
       return devinSubscriptionMissingMessage();
     }

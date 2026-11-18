@@ -422,14 +422,12 @@ describe('ACP spike with a real scripted stdio child', () => {
     await expect(adapter(scenario).createSession(opts)).rejects.toThrow();
   });
 
-  test.each([
-    { readOnly: true },
-    { remoteToolsOnly: true },
-    { skillsAllowlist: [] },
-    { injectedSkills: ['private'] },
-  ])('rejects unsupported session policy %j', async (policy) => {
-    await expect(adapter().createSession({ ...opts, ...policy })).rejects.toThrow('unsupported');
-  });
+  test.each([{ skillsAllowlist: [] }, { injectedSkills: ['private'] }])(
+    'rejects unsupported session policy %j',
+    async (policy) => {
+      await expect(adapter().createSession({ ...opts, ...policy })).rejects.toThrow('unsupported');
+    },
+  );
 
   test('relays declared local and remote tools through authenticated MCP and closes the listener', async () => {
     const remote = vi.fn(async () => 'remote output');

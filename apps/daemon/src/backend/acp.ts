@@ -32,7 +32,15 @@ import type {
   ToolCallRecord,
 } from '@cairn/shared';
 import { DAEMON_VERSION } from '../version.js';
+import {
+  type AcpToolCall,
+  acpTurnPolicy,
+  claudeAcpSessionMeta,
+  decideAcpPermission,
+  restrictiveAcpMode,
+} from './acp-permission-gate.js';
 import { openAcpTools } from './acp-tools.js';
+import type { FolderGateContext, PermissionRule } from './command-gate.js';
 import type { SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
@@ -73,17 +81,12 @@ export interface GeminiSessionValidation {
   prompt?: string;
   promptImages?: readonly unknown[];
   imageCapability?: boolean;
-  remoteTools?: readonly unknown[];
-  localTools?: readonly unknown[];
 }
 
 export function validateGeminiSession(opts: GeminiSessionValidation): {
   prompt: string | undefined;
   resumeId: string | undefined;
 } {
-  if ((opts.remoteTools?.length ?? 0) > 0 || (opts.localTools?.length ?? 0) > 0) {
-    throw new Error('gemini ACP backend: remoteTools and localTools are unsupported (fail-closed)');
-  }
   if ((opts.promptImages?.length ?? 0) > 0 && !opts.imageCapability) {
     throw new Error('gemini ACP backend: image capability is not advertised');
   }
@@ -155,6 +158,7 @@ class AcpSession implements AgentSessionHandle {
   private text = '';
   private readonly calls = new Map<string, ToolCallRecord>();
   private readonly toolOutputs = new Map<string, unknown>();
+  private readonly rawCalls = new Map<string, AcpToolCall>();
   private cancelTimer: ReturnType<typeof setTimeout> | undefined;
   private midTurnPrompt: Promise<{ stopReason?: string }> | null = null;
   private readonly normalizer?: (update: SessionUpdate) => AcpUpdateNormalization;
@@ -266,7 +270,37 @@ class AcpSession implements AgentSessionHandle {
     for (const waiter of this.waiters.splice(0)) waiter({ done: true, value: undefined });
   }
 
+  describeToolCall(requested: AcpToolCall): AcpToolCall {
+    const merged: Record<string, unknown> = { ...this.rawCalls.get(requested.toolCallId) };
+    for (const [key, value] of Object.entries(requested)) {
+      if (value !== undefined && value !== null) merged[key] = value;
+    }
+    return merged as AcpToolCall;
+  }
+
+  recordRejection(toolCall: AcpToolCall, reason: string): void {
+    if (this.stopped) return;
+    const previous = this.calls.get(toolCall.toolCallId);
+    const call: ToolCallRecord = {
+      id: toolCall.toolCallId,
+      name: toolCall.name ?? toolCall.title ?? previous?.name ?? 'unknown',
+      arguments: toolCall.rawInput ?? previous?.arguments ?? {},
+      result: reason,
+      isError: true,
+      ...(previous?.parent !== undefined ? { parent: previous.parent } : {}),
+    };
+    this.calls.set(call.id, call);
+    this.push({ type: 'toolcall_end', call });
+  }
+
   onAcpUpdate(raw: SessionUpdate): void {
+    if (raw.sessionUpdate === 'tool_call' || raw.sessionUpdate === 'tool_call_update') {
+      const kept: Record<string, unknown> = { ...this.rawCalls.get(raw.toolCallId) };
+      for (const [key, value] of Object.entries(raw)) {
+        if (key !== 'sessionUpdate' && value !== undefined && value !== null) kept[key] = value;
+      }
+      this.rawCalls.set(raw.toolCallId, kept as AcpToolCall);
+    }
     if (this.stopped || (this.adapter && !this.promptStarted)) return;
     let update = raw;
     let parent: string | undefined;
@@ -402,7 +436,14 @@ class AcpSession implements AgentSessionHandle {
   }
 }
 
+export interface AcpGateOptions {
+  rules?: readonly PermissionRule[];
+  folderRoots?: () => readonly string[];
+  log?: (message: string) => void;
+}
+
 export interface GeminiBackendOptions {
+  gate?: AcpGateOptions;
   executablePath?: string;
   confine?: SessionConfiner;
   spawnProcess?: (
@@ -459,14 +500,13 @@ class AcpBackend implements AgentBackend {
       throw new Error(
         'ACP mcpServers policy is unsupported: adapter host MCP configuration is not isolated',
       );
-    if (adapter && opts.remoteToolsOnly)
-      throw new Error(
-        `${adapter.harness} cannot switch off its built-in tools, so a turn that must run on relay tools only is unsupported on it (fail-closed): route this turn to Claude Code or an API model`,
-      );
+    const policy = acpTurnPolicy(opts);
+    const hostToolNames = [...(opts.remoteTools ?? []), ...(opts.localTools ?? [])].map(
+      (tool) => tool.name,
+    );
     if (
       adapter &&
-      (opts.readOnly ||
-        opts.skillsAllowlist !== undefined ||
+      (opts.skillsAllowlist !== undefined ||
         (opts.injectedSkills?.length ?? 0) > 0 ||
         (opts.tools?.length ?? 0) > 0 ||
         (opts.thinkingLevel !== undefined && opts.thinkingLevel !== 'off'))
@@ -477,11 +517,8 @@ class AcpBackend implements AgentBackend {
       modelId: opts.modelId,
       ...(resumeId !== undefined ? { resumeId } : {}),
       ...(opts.prompt !== undefined ? { prompt: opts.prompt } : {}),
-
-      ...(!adapter && opts.remoteTools !== undefined ? { remoteTools: opts.remoteTools } : {}),
-      ...(!adapter && opts.localTools !== undefined ? { localTools: opts.localTools } : {}),
     });
-    const hostTools = adapter ? await openAcpTools(opts) : null;
+    const hostTools = await openAcpTools(opts);
     const spawnProcess = this.options.spawnProcess ?? spawn;
     let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
     try {
@@ -514,11 +551,34 @@ class AcpBackend implements AgentBackend {
       stderr = (stderr + chunk.toString()).slice(-8192);
     });
     const app = client({ name: 'cairn' });
+    const gateOptions = this.options.gate;
     app.onRequest(methods.client.session.requestPermission, ({ params }) => {
-      const allow =
-        adapter?.permissions === 'allow-once' &&
-        session?.acceptingPermissions &&
-        params.sessionId === session.sessionId;
+      const accepting =
+        session?.acceptingPermissions === true && params.sessionId === session.sessionId;
+      const toolCall = session ? session.describeToolCall(params.toolCall) : params.toolCall;
+      const decision = accepting
+        ? decideAcpPermission({
+            policy,
+            toolCall,
+            hostToolNames,
+            normal: {
+              mode: adapter ? (adapter.permissions ?? 'deny') : 'gate',
+              ...(gateOptions?.rules ? { rules: gateOptions.rules } : {}),
+              folders: (): FolderGateContext => ({
+                cwd: opts.cwd,
+                roots: gateOptions?.folderRoots?.() ?? [],
+              }),
+            },
+          })
+        : {
+            allow: false,
+            reason: 'Cairn permission gate rejected: the session is not accepting permissions',
+          };
+      const allow = decision.allow;
+      if (!allow) {
+        session?.recordRejection(toolCall, decision.reason);
+        gateOptions?.log?.(`reject: policy=${policy} ${decision.reason}`);
+      }
       const option = params.options
         .filter((value) => value.optionId !== 'plan_bypass')
         .find((value) => value.kind === (allow ? 'allow_once' : 'reject_once'));
@@ -605,8 +665,11 @@ class AcpBackend implements AgentBackend {
       if (adapter && resumeId && !caps?.sessionCapabilities?.resume && !caps?.loadSession) {
         throw new Error('ACP resume is unsupported by this adapter');
       }
+      const sessionMeta =
+        adapter?.harness === 'claude-code' ? claudeAcpSessionMeta(policy) : undefined;
       const request = {
         cwd: opts.cwd,
+        ...(sessionMeta !== undefined ? { _meta: sessionMeta } : {}),
         mcpServers: [
           ...(adapter?.allowHostMcp === true
             ? (opts.mcpServers ?? []).flatMap(
@@ -706,8 +769,22 @@ class AcpBackend implements AgentBackend {
           `Gemini ACP: no model configuration advertised; using the CLI default instead of ${opts.modelId}\n`,
         );
       }
-      if (adapter?.harness === 'codex' && this.options.confine !== undefined) {
-        const modes = 'modes' in response ? response.modes : null;
+      const modes = 'modes' in response ? response.modes : null;
+      if (policy !== 'normal') {
+        if (modes) {
+          const target = restrictiveAcpMode(modes);
+          if (target !== null) {
+            await connection.agent.request(methods.agent.session.setMode, {
+              sessionId,
+              modeId: target,
+            });
+          }
+        } else if (adapter?.harness === 'devin' || adapter?.harness === 'codex') {
+          throw new Error(
+            `${adapter.harness} ACP did not report its modes: refusing a locked turn (fail-closed)`,
+          );
+        }
+      } else if (adapter?.harness === 'codex' && this.options.confine !== undefined) {
         if (!modes?.availableModes.some((mode) => mode.id === 'full-access'))
           throw new Error('Codex ACP did not offer full-access mode under confinement');
         await connection.agent.request(methods.agent.session.setMode, {
@@ -715,8 +792,7 @@ class AcpBackend implements AgentBackend {
           modeId: 'full-access',
         });
       }
-      if (adapter?.harness === 'devin') {
-        const modes = 'modes' in response ? response.modes : null;
+      if (adapter?.harness === 'devin' && policy === 'normal') {
         if (!modes?.availableModes.some((mode) => mode.id === 'bypass'))
           throw new Error('Devin ACP did not offer bypass mode for unattended steps');
         await connection.agent.request(methods.agent.session.setMode, {
@@ -769,6 +845,7 @@ export interface AcpBackendOptions {
   command: string;
   args?: string[];
   permissions?: 'deny' | 'allow-once';
+  gate?: AcpGateOptions;
   steering?: 'mid-turn';
   sessionResume?: boolean;
   allowHostMcp?: boolean;
@@ -783,6 +860,7 @@ export interface AcpBackendOptions {
 export function createAcpBackend(options: AcpBackendOptions): AgentBackend {
   return new AcpBackend({
     adapter: options,
+    ...(options.gate ? { gate: options.gate } : {}),
     ...(options.confine ? { confine: options.confine } : {}),
     ...(options.spawnProcess ? { spawnProcess: options.spawnProcess } : {}),
   });

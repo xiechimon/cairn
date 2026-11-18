@@ -187,18 +187,8 @@ describe('devin credential delivery', () => {
     ).toBeNull();
   });
 
-  test('devin refuses step kinds outside build/session/plan/merge/chief', () => {
-    for (const stepKind of ['review', 'verify']) {
-      const refusal = agentStepRefusal({
-        stepKind,
-        agentTools: undefined,
-        runtimeId: 'devin',
-        hasSubscriptionToken: false,
-        hasDevinToken: true,
-      });
-      expect(refusal).toContain('暂不支持');
-    }
-    for (const stepKind of ['build', 'session', 'plan', 'merge', 'chief']) {
+  test('devin accepts every step kind once its token is present', () => {
+    for (const stepKind of ['build', 'session', 'plan', 'merge', 'chief', 'review', 'verify']) {
       expect(
         agentStepRefusal({
           stepKind,

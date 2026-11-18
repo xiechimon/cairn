@@ -3,6 +3,11 @@ import { createInterface } from 'node:readline';
 
 const scenario = process.argv[2] ?? 'complete';
 const devin = scenario.startsWith('devin');
+const gate = scenario.endsWith('gate');
+const ask = scenario === 'ask-gate';
+const gateWaiters = new Map();
+let mode = null;
+let sessionMeta = null;
 const sessionId = 'acp-session-2290';
 const send = (value) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...value })}\n`);
 const update = (value, id = sessionId) =>
@@ -14,6 +19,11 @@ if (['ignore-term', 'descendant'].includes(scenario)) process.on('SIGTERM', () =
 
 for await (const line of createInterface({ input: process.stdin })) {
   const { id, method, params, result } = JSON.parse(line);
+  if (method === undefined && gateWaiters.has(id)) {
+    gateWaiters.get(id)(result);
+    gateWaiters.delete(id);
+    continue;
+  }
   if (method === 'initialize') {
     if (scenario === 'hang-init') continue;
     send({
@@ -35,15 +45,28 @@ for await (const line of createInterface({ input: process.stdin })) {
       update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'history' } });
     }
     host = params.mcpServers[0];
+    sessionMeta = params._meta ?? null;
     send({
       id,
       result: {
         sessionId,
         modes: {
-          currentModeId: 'read-only',
-          availableModes: devin
-            ? [{ id: 'bypass', name: 'Bypass' }]
-            : [{ id: 'full-access', name: 'Full access' }],
+          currentModeId: ask ? 'default' : gate ? (devin ? 'bypass' : 'full-access') : 'read-only',
+          availableModes: ask
+            ? [{ id: 'default', name: 'Default' }]
+            : gate
+            ? devin
+              ? [
+                  { id: 'bypass', name: 'Bypass' },
+                  { id: 'normal', name: 'Normal' },
+                ]
+              : [
+                  { id: 'full-access', name: 'Full access' },
+                  { id: 'read-only', name: 'Read only' },
+                ]
+            : devin
+              ? [{ id: 'bypass', name: 'Bypass' }]
+              : [{ id: 'full-access', name: 'Full access' }],
         },
         configOptions:
           scenario === 'no-model'
@@ -80,7 +103,8 @@ for await (const line of createInterface({ input: process.stdin })) {
       },
     });
   } else if (method === 'session/set_mode') {
-    if (params.modeId !== (devin ? 'bypass' : 'full-access')) throw new Error('Wrong mode');
+    if (!gate && params.modeId !== (devin ? 'bypass' : 'full-access')) throw new Error('Wrong mode');
+    mode = params.modeId;
     send({ id, result: {} });
   } else if (method === 'session/set_config_option') {
     if (params.value !== 'stub-model') throw new Error('Wrong model');
@@ -167,6 +191,74 @@ for await (const line of createInterface({ input: process.stdin })) {
         },
       });
       send({ id, result: { stopReason: 'end_turn' } });
+      continue;
+    }
+    if (gate) {
+      const calls = JSON.parse(text.slice(text.indexOf('[')));
+      const startMode = mode ?? (ask ? 'default' : devin ? 'bypass' : 'full-access');
+      void (async () => {
+        const outcomes = { __mode: startMode, __disallowed: sessionMeta?.claudeCode?.options?.disallowedTools ?? null };
+        const executed = [];
+        for (const [index, call] of calls.entries()) {
+          const { hostTool, exec, ...toolCall } = call;
+          update({ sessionUpdate: 'tool_call', status: 'pending', ...toolCall });
+          const blocked = (sessionMeta?.claudeCode?.options?.disallowedTools ?? []).includes(call.title);
+          if (blocked) {
+            outcomes[call.toolCallId] = 'blocked-by-config';
+            update({ sessionUpdate: 'tool_call_update', toolCallId: call.toolCallId, status: 'failed', rawOutput: 'disallowed' });
+            continue;
+          }
+          if (startMode === 'bypass' || startMode === 'full-access') {
+            if (exec) executed.push(call.toolCallId);
+            outcomes[call.toolCallId] = 'no-prompt';
+            update({ sessionUpdate: 'tool_call_update', toolCallId: call.toolCallId, status: 'completed', rawOutput: 'ran' });
+            continue;
+          }
+          const requestId = `gate-${index}`;
+          const answered = new Promise((resolve) => gateWaiters.set(requestId, resolve));
+          send({
+            id: requestId,
+            method: 'session/request_permission',
+            params: {
+              sessionId,
+              toolCall,
+              options: [
+                { optionId: 'always', name: 'Always', kind: 'allow_always' },
+                { optionId: 'allow', name: 'Allow', kind: 'allow_once' },
+                { optionId: 'deny', name: 'Deny', kind: 'reject_once' },
+              ],
+            },
+          });
+          const answer = await answered;
+          const picked = answer.outcome.outcome === 'selected' ? answer.outcome.optionId : 'cancelled';
+          outcomes[call.toolCallId] = picked;
+          if (picked !== 'allow') continue;
+          if (exec) executed.push(call.toolCallId);
+          if (hostTool) {
+            const rpc = (method, params = {}) =>
+              fetch(host.url, {
+                method: 'POST',
+                headers: {
+                  'content-type': 'application/json',
+                  accept: 'application/json, text/event-stream',
+                  ...Object.fromEntries(host.headers.map(({ name, value }) => [name, value])),
+                },
+                body: JSON.stringify({ jsonrpc: '2.0', id: 'host', method, params }),
+              }).then((response) => response.json());
+            await rpc('initialize', {
+              protocolVersion: '2025-11-25',
+              capabilities: {},
+              clientInfo: { name: 'fake-acp', version: '1' },
+            });
+            const called = await rpc('tools/call', { name: hostTool, arguments: {} });
+            outcomes[`${call.toolCallId}:tool`] = called.result.content[0].text;
+          }
+          update({ sessionUpdate: 'tool_call_update', toolCallId: call.toolCallId, status: 'completed', rawOutput: 'ok' });
+        }
+        outcomes.__executed = executed;
+        update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: JSON.stringify(outcomes) } });
+        send({ id, result: { stopReason: 'end_turn' } });
+      })();
       continue;
     }
     if (scenario === 'host-tools') {

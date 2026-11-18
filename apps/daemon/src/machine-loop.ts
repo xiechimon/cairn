@@ -377,6 +377,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           }
         },
         createUpdateNormalizer: createDevinUpdateNormalizer,
+        gate: { log: (msg) => logger.gate(msg) },
         ...(confine !== null && confine !== undefined ? { confine } : {}),
       });
       return devinBackend;
@@ -387,7 +388,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         geminiAnnounced = true;
       }
       if (geminiBackend === null)
-        geminiBackend = createGeminiBackend(confine !== null ? { confine } : undefined);
+        geminiBackend = createGeminiBackend({
+          gate: { folderRoots: () => folderPins.roots(), log: (msg) => logger.gate(msg) },
+          ...(confine !== null ? { confine } : {}),
+        });
       return geminiBackend;
     }
     if (!isBackendRuntimeId(agentProviderId)) {

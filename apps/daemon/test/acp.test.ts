@@ -53,15 +53,6 @@ describe('Gemini ACP bridge', () => {
     ).toThrow('image capability');
   });
 
-  test('failure mode 8: non-empty tool set fails closed', () => {
-    expect(() =>
-      validateGeminiSession({ cwd: '/tmp', modelId: 'gemini', remoteTools: [{ name: 'x' }] }),
-    ).toThrow('fail-closed');
-    expect(() =>
-      validateGeminiSession({ cwd: '/tmp', modelId: 'gemini', localTools: [{ name: 'x' }] }),
-    ).toThrow('fail-closed');
-  });
-
   test('failure mode 9: cancellation error maps to message_stop', () => {
     expect(mapAcpUpdate({ kind: 'cancelled' })).toEqual({
       type: 'message_stop',
