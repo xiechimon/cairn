@@ -27,7 +27,12 @@ const pull = (number, action = 'synchronize') => ({
   ref: `refs/pull/${number}/merge`,
   event: { action, pull_request: { number } },
 });
-const push = (ref) => ({ event_name: 'push', ref, event: {} });
+const push = (ref, sha = '1111111111111111111111111111111111111111') => ({
+  event_name: 'push',
+  ref,
+  sha,
+  event: {},
+});
 
 function decision(name, context) {
   const { group, cancel } = concurrencyOf(name);
@@ -42,19 +47,25 @@ test('ci runs one group per pull request and cancels a superseded head', () => {
   assert.equal(decision('ci', pull(7, 'opened')).group, first.group);
 });
 
-test('ci main pushes share one group and never cancel a running main run', () => {
-  const main = decision('ci', push('refs/heads/main'));
-  assert.equal(main.group, 'ci-main');
-  assert.equal(main.cancel, false);
+test('ci main pushes get per-commit concurrency groups and never cancel running commits', () => {
+  const first = decision('ci', push('refs/heads/main', 'aaaaaaa'));
+  const second = decision('ci', push('refs/heads/main', 'bbbbbbb'));
+  assert.equal(first.group, 'ci-push-refs/heads/main-aaaaaaa');
+  assert.equal(second.group, 'ci-push-refs/heads/main-bbbbbbb');
+  assert.notEqual(first.group, second.group);
+  assert.equal(first.cancel, false);
+  assert.equal(second.cancel, false);
 });
 
-test('prototype pushes are keyed by ref, apart from main and from each other, and never cancel', () => {
-  const a = decision('ci', push('refs/heads/prototype/a'));
-  const b = decision('ci', push('refs/heads/prototype/b'));
-  assert.notEqual(a.group, 'ci-main');
-  assert.notEqual(a.group, b.group);
-  assert.equal(a.cancel, false);
-  assert.equal(b.cancel, false);
+test('non-pr fallback refs stay separate from main pushes and never cancel', () => {
+  const main = decision('ci', push('refs/heads/main', 'aaaaaaa'));
+  const manual = decision('ci', {
+    event_name: 'workflow_dispatch',
+    ref: 'refs/heads/main',
+    event: {},
+  });
+  assert.notEqual(manual.group, main.group);
+  assert.equal(manual.cancel, false);
 });
 
 test('a pull request never shares a group with a main push', () => {

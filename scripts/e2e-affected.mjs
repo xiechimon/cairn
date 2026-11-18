@@ -27,7 +27,12 @@ function git(args) {
 }
 
 function changedPaths(explicit) {
-  const base = git(['merge-base', 'HEAD', 'origin/main']).trim();
+  const target = process.env.PREPUSH_BASE_SHA || 'origin/main';
+  if (/^0{40}$/.test(target)) {
+    if (explicit.length > 0) return { paths: explicit, source: 'explicit', base: '' };
+    return { paths: ['package.json'], source: `initial push fallback (${target})`, base: '' };
+  }
+  const base = git(['merge-base', 'HEAD', target]).trim();
   if (explicit.length > 0) return { paths: explicit, source: 'explicit', base };
   const paths = new Set();
   for (const line of git(['status', '--porcelain=v1']).split('\n')) {
@@ -39,8 +44,14 @@ function changedPaths(explicit) {
     for (const p of git(['diff', '--name-only', `${base}..HEAD`]).split('\n')) {
       if (p !== '') paths.add(p);
     }
+  } else if (paths.size === 0) {
+    paths.add('package.json');
   }
-  return { paths: [...paths], source: 'git (working tree + branch vs origin/main)', base };
+  const source =
+    target === 'origin/main'
+      ? 'git (working tree + branch vs origin/main)'
+      : `git (working tree + branch vs ${target})`;
+  return { paths: [...paths], source, base };
 }
 
 function readAtBase(base, path) {

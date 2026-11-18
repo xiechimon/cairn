@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { prepushModules } from './prepush.mjs';
+import { scrubGateEnv } from './scrub-git-env.mjs';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 const jobs = new Map(
@@ -75,13 +79,12 @@ const events = {
   }),
   'push to main': githubContext({ event: 'push' }),
 };
-const fullTier = new Set(['push to main']);
 
-function plan(github, hasCode, webUi = 'false') {
+function plan(github, hasCode, e2eTier = 'none') {
   const changes = { 'needs.changes.outputs.has-code': hasCode };
   changes['needs.changes.outputs.e2e-tier'] = evaluate(tierExpression, {
     ...github,
-    'steps.classify.outputs.web-ui': webUi,
+    'steps.classify.outputs.e2e-tier': e2eTier,
   });
   const context = { ...github, ...changes };
   return {
@@ -122,41 +125,37 @@ function gatePasses(scenarios) {
   return statuses.map((status) => status === '0');
 }
 
-test('the full 4-shard e2e runs exactly on pushes', () => {
+test('the full 4-shard e2e and 2-shard e2e-affected match classifier tiers unless draft overrides', () => {
   assert.ok(tierExpression);
   assert.match(job('e2e'), /shard: \[1, 2, 3, 4\]/);
   assert.match(job('e2e'), /run: pnpm prepush --e2e-shard \$\{\{ matrix.shard \}\}\/4/);
+  assert.match(job('e2e-affected'), /shard: \[1, 2\]/);
   assert.match(job('e2e-affected'), /run: pnpm --filter @cairn\/web e2e:affected --shard=/);
   assert.match(job('e2e-affected'), /fetch-depth: 0/);
+  assert.match(
+    job('e2e-affected'),
+    /PREPUSH_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.before \}\}/,
+  );
   assert.doesNotMatch(job('e2e-affected'), /prepush --e2e-shard/);
   for (const [name, github] of Object.entries(events)) {
-    const full = fullTier.has(name);
-    const { tier, e2e, 'e2e-affected': affected } = plan(github, 'true');
-    assert.equal(tier, full ? 'full' : 'none', name);
-    assert.equal(e2e, full, `${name}: e2e`);
-    assert.equal(affected, false, `${name}: e2e-affected`);
+    const isDraft = name === 'draft PR by a person';
+    for (const classified of ['none', 'affected', 'full']) {
+      const { tier, e2e, 'e2e-affected': affected } = plan(github, 'true', classified);
+      const expected = isDraft ? 'none' : classified;
+      assert.equal(tier, expected, `${name}: ${classified}`);
+      assert.equal(e2e, expected === 'full', `${name}: e2e (${classified})`);
+      assert.equal(affected, expected === 'affected', `${name}: e2e-affected (${classified})`);
+    }
   }
-});
-
-test('a ready pull request that changes web source runs the affected tier, nothing else does', () => {
-  for (const [name, github] of Object.entries(events)) {
-    const { tier, e2e, 'e2e-affected': affected } = plan(github, 'true', 'true');
-    const ready =
-      github['github.event_name'] === 'pull_request' &&
-      github['github.event.pull_request.draft'] === false;
-    const expected = fullTier.has(name) ? 'full' : ready ? 'affected' : 'none';
-    assert.equal(tier, expected, name);
-    assert.equal(e2e, tier === 'full', `${name}: e2e`);
-    assert.equal(affected, tier === 'affected', `${name}: e2e-affected`);
-  }
-  assert.equal(plan(events['ordinary PR'], 'true', 'false').tier, 'none');
 });
 
 test('no e2e tier runs when the classifier found nothing left to test', () => {
   for (const [name, github] of Object.entries(events)) {
-    const { e2e, 'e2e-affected': affected } = plan(github, 'false');
-    assert.equal(e2e, false, `${name}: e2e`);
-    assert.equal(affected, false, `${name}: e2e-affected`);
+    for (const classified of ['none', 'affected', 'full']) {
+      const { e2e, 'e2e-affected': affected } = plan(github, 'false', classified);
+      assert.equal(e2e, false, `${name}: e2e (${classified})`);
+      assert.equal(affected, false, `${name}: e2e-affected (${classified})`);
+    }
   }
 });
 
@@ -175,12 +174,13 @@ test('e2e-gate passes only when the tier it picked ran and succeeded', () => {
   const outcomes = ['success', 'failure', 'cancelled'];
   const scenarios = [];
   for (const [name, github] of Object.entries(events))
-    for (const [hasCode, webUi] of [
-      ['true', 'false'],
-      ['true', 'true'],
-      ['false', 'false'],
+    for (const [hasCode, classified] of [
+      ['true', 'none'],
+      ['true', 'affected'],
+      ['true', 'full'],
+      ['false', 'none'],
     ]) {
-      const ran = plan(github, hasCode, webUi);
+      const ran = plan(github, hasCode, classified);
       for (const e2e of ran.e2e ? outcomes : ['skipped'])
         for (const affected of ran['e2e-affected'] ? outcomes : ['skipped'])
           scenarios.push({
@@ -236,7 +236,7 @@ test('both e2e tiers run the CSS mechanism gate after a fixture build', () => {
   }
 });
 
-test('gates runs on every push including docs-only PRs unless cancelled', () => {
+test('gates runs only when gates-needed is not false and not cancelled', () => {
   assert.match(job('gates'), /^ {4}needs: changes$/m);
   assert.match(
     job('changes'),
@@ -254,8 +254,168 @@ test('gates runs on every push including docs-only PRs unless cancelled', () => 
           });
           assert.equal(
             runs,
-            !cancelled,
+            !cancelled && needed !== 'false',
             `${name}: ${JSON.stringify({ result, needed, cancelled })}`,
           );
         }
+});
+
+test('changes classify script sets outputs across push and pull_request diffs in a real git repo', () => {
+  const classifyScript = job('changes')
+    .match(/run: \|\n([\s\S]*)/)[1]
+    .replace(/^ {10}/gm, '');
+  const outer = makeTestTempDir('ci-tiers-classify-');
+  const repo = join(outer, 'repo');
+  const outputFile = join(outer, 'github-output');
+  try {
+    mkdirSync(repo, { recursive: true });
+    for (const rel of prepushModules) {
+      mkdirSync(dirname(join(repo, rel)), { recursive: true });
+      copyFileSync(rel, join(repo, rel));
+    }
+    mkdirSync(join(repo, '.claude/skills/verify-cairn'), { recursive: true });
+    writeFileSync(join(repo, '.claude/skills/verify-cairn/feature-map.json'), '{}\n');
+    writeFileSync(join(repo, 'scripts/fixture.test.mjs'), 'export {};\n');
+    writeFileSync(join(repo, 'package.json'), '{"name":"cairn-test"}\n');
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    git('init', '-q');
+    git('config', 'user.name', 'Test');
+    git('config', 'user.email', 'test@example.com');
+    git('add', '.');
+    git('commit', '-q', '-m', 'base');
+    const baseSha = git('rev-parse', 'HEAD').trim();
+
+    const runClassify = (files, baseOverride = baseSha) => {
+      for (const [rel, content] of Object.entries(files)) {
+        mkdirSync(dirname(join(repo, rel)), { recursive: true });
+        writeFileSync(join(repo, rel), content);
+      }
+      git('add', '.');
+      git('commit', '-q', '-m', 'change');
+      writeFileSync(outputFile, '');
+      const run = spawnSync('bash', ['-e', '-c', classifyScript], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { ...scrubGateEnv(), PREPUSH_BASE_SHA: baseOverride, GITHUB_OUTPUT: outputFile },
+      });
+      assert.equal(run.status, 0, run.stderr);
+      const outputs = Object.fromEntries(
+        readFileSync(outputFile, 'utf8')
+          .trim()
+          .split('\n')
+          .map((line) => line.split('=')),
+      );
+      git('checkout', '-q', '-B', 'case', baseSha);
+      return outputs;
+    };
+
+    assert.deepEqual(runClassify({ 'docs/research/note.md': 'note\n' }), {
+      'has-code': 'false',
+      'has-sidecar': 'false',
+      'gates-needed': 'false',
+      'ops-selftests': 'false',
+      'connect-do': 'false',
+      'connect-relay': 'false',
+      'e2e-tier': 'none',
+    });
+
+    assert.deepEqual(runClassify({ 'apps/web/src/foo.test.ts': 'export {};\n' }), {
+      'has-code': 'true',
+      'has-sidecar': 'false',
+      'gates-needed': 'true',
+      'ops-selftests': 'false',
+      'connect-do': 'false',
+      'connect-relay': 'false',
+      'e2e-tier': 'none',
+    });
+
+    assert.deepEqual(runClassify({ 'apps/daemon/src/worker.ts': 'export const a = 1;\n' }), {
+      'has-code': 'true',
+      'has-sidecar': 'false',
+      'gates-needed': 'true',
+      'ops-selftests': 'false',
+      'connect-do': 'false',
+      'connect-relay': 'false',
+      'e2e-tier': 'none',
+    });
+
+    assert.deepEqual(runClassify({ 'apps/server/src/routes.ts': 'export const r = 1;\n' }), {
+      'has-code': 'true',
+      'has-sidecar': 'false',
+      'gates-needed': 'true',
+      'ops-selftests': 'false',
+      'connect-do': 'false',
+      'connect-relay': 'false',
+      'e2e-tier': 'affected',
+    });
+
+    assert.deepEqual(runClassify({ 'apps/web/src/pages/Home.tsx': 'export const h = 1;\n' }), {
+      'has-code': 'true',
+      'has-sidecar': 'false',
+      'gates-needed': 'true',
+      'ops-selftests': 'false',
+      'connect-do': 'false',
+      'connect-relay': 'false',
+      'e2e-tier': 'affected',
+    });
+
+    assert.deepEqual(
+      runClassify({ 'apps/web/src/components/Button.tsx': 'export const b = 1;\n' }),
+      {
+        'has-code': 'true',
+        'has-sidecar': 'false',
+        'gates-needed': 'true',
+        'ops-selftests': 'false',
+        'connect-do': 'false',
+        'connect-relay': 'false',
+        'e2e-tier': 'full',
+      },
+    );
+
+    assert.deepEqual(runClassify({ 'packages/shared/src/index.ts': 'export const s = 1;\n' }), {
+      'has-code': 'true',
+      'has-sidecar': 'false',
+      'gates-needed': 'true',
+      'ops-selftests': 'true',
+      'connect-do': 'false',
+      'connect-relay': 'false',
+      'e2e-tier': 'full',
+    });
+
+    assert.deepEqual(runClassify({ 'apps/tsnet-sidecar/main.go': 'package main\n' }), {
+      'has-code': 'true',
+      'has-sidecar': 'true',
+      'gates-needed': 'true',
+      'ops-selftests': 'false',
+      'connect-do': 'false',
+      'connect-relay': 'false',
+      'e2e-tier': 'none',
+    });
+
+    assert.deepEqual(runClassify({ 'scripts/ops/connect-relay/index.ts': 'export {}\n' }), {
+      'has-code': 'true',
+      'has-sidecar': 'false',
+      'gates-needed': 'true',
+      'ops-selftests': 'true',
+      'connect-do': 'false',
+      'connect-relay': 'true',
+      'e2e-tier': 'none',
+    });
+
+    assert.deepEqual(
+      runClassify({ 'docs/research/note2.md': 'x\n' }, '0000000000000000000000000000000000000000'),
+      {
+        'has-code': 'true',
+        'has-sidecar': 'true',
+        'gates-needed': 'true',
+        'ops-selftests': 'true',
+        'connect-do': 'true',
+        'connect-relay': 'true',
+        'e2e-tier': 'full',
+      },
+    );
+  } finally {
+    releaseTestTempDir(outer);
+  }
 });

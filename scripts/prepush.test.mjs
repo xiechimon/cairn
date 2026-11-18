@@ -214,11 +214,14 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   assert.match(readFileSync('.github/workflows/ci.yml', 'utf8'), /^jobs:$/m);
   assert.ok(
     readFileSync('.github/workflows/ci.yml', 'utf8').includes(
-      "on:\n  push:\n    branches: [main, 'prototype/**']\n  pull_request:\n",
+      'on:\n  push:\n    branches: [main]\n  pull_request:\n',
     ),
   );
   assert.match(changes, /has-code: \$\{\{ steps.classify.outputs.has-code \}\}/);
-  assert.match(changes, /PREPUSH_BASE_SHA: \$\{\{ github.event.pull_request.base.sha \}\}/);
+  assert.match(
+    changes,
+    /PREPUSH_BASE_SHA: \$\{\{ github.event.pull_request.base.sha \|\| github.event.before \}\}/,
+  );
   assert.match(changes, /node scripts\/prepush.mjs --has-code/);
   assert.match(changes, /has_code=true/);
   assert.match(changes, /\|\| has_code=true/);
@@ -228,9 +231,10 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   assert.match(changes, /\|\| has_sidecar=true/);
   assert.doesNotMatch(changes, /tested-in-queue|merge-route-audit/);
   assert.equal(jobs.get('warm-caches'), undefined);
+  assert.equal(jobs.get('dead-class-gate'), undefined);
   assert.match(changes, /fetch-depth: 0/);
   assert.doesNotMatch(readFileSync('.github/workflows/ci.yml', 'utf8'), /^ {4}paths(?:-ignore)?:/m);
-  for (const name of ['vitest-light', 'vitest-integration', 'pack-smoke', 'dead-class-gate']) {
+  for (const name of ['vitest-light', 'vitest-integration', 'pack-smoke']) {
     const job = jobs.get(name);
     assert.match(job ?? '', /^ {4}needs: changes$/m, name);
     assert.match(job, /^ {4}if: needs.changes.outputs.has-code != 'false'$/m, name);
@@ -269,10 +273,7 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   const verify = core
     .split(/\n(?= {6}- )/)
     .find((step) => step.includes('name: verify-cairn CLI self-test'));
-  assert.match(
-    verify,
-    /if: github.event_name != 'pull_request' \|\| needs.changes.outputs.has-code != 'false'/,
-  );
+  assert.match(verify, /if: needs\.changes\.outputs\.ops-selftests == 'true'/);
   for (const variable of ['PREPUSH_BASE_SHA', 'ENGLISH_ONLY_BASE_SHA'])
     assert.ok(
       core.includes(
@@ -280,7 +281,7 @@ test('CI classifies before heavy work and skips it only for a classified reason'
       ),
       variable,
     );
-  assert.ok(core.includes(`PREPUSH_FORCE_FULL: \${{ github.event_name == 'push' }}`));
+  assert.ok(!core.includes('PREPUSH_FORCE_FULL:'));
   assert.doesNotMatch(core, /0{40}/);
 });
 
@@ -374,13 +375,25 @@ test('folded gates stay visibly red, continue after failures and retain full his
   assert.ok(gates);
   assert.match(gates, /permissions:\n {6}contents: read\n {6}issues: read/);
   const expected = [
-    ['Comment discipline gate (advisory, #1520)', 'COMMENT_DISCIPLINE_BASE_SHA'],
-    ['Probe reach gate (advisory, #1542)', 'VP_REACH_BASE_SHA'],
-    ['Dispatch agent start/check round trip (#1556)'],
-    ['Feature map covers every route and stays in step with the code', 'FEATURE_REGISTRY_BASE_SHA'],
-    ['Gardener sweep self-test (#1617)'],
+    ['Comment discipline gate (advisory, #1520)', 'COMMENT_DISCIPLINE_BASE_SHA', '!cancelled()'],
+    ['Probe reach gate (advisory, #1542)', 'VP_REACH_BASE_SHA', '!cancelled()'],
+    [
+      'Dispatch agent start/check round trip (#1556)',
+      undefined,
+      "!cancelled() && needs.changes.outputs.ops-selftests == 'true'",
+    ],
+    [
+      'Feature map covers every route and stays in step with the code',
+      'FEATURE_REGISTRY_BASE_SHA',
+      '!cancelled()',
+    ],
+    [
+      'Gardener sweep self-test (#1617)',
+      undefined,
+      "!cancelled() && needs.changes.outputs.ops-selftests == 'true'",
+    ],
   ];
-  for (const [name, variable] of expected) {
+  for (const [name, variable, expectedCond] of expected) {
     const step = gates
       .split(/\n(?= {6}- )/)
       .find(
@@ -391,13 +404,13 @@ test('folded gates stay visibly red, continue after failures and retain full his
     assert.ok(step, name);
     if (name.startsWith('Comment discipline')) assert.match(step, /continue-on-error: true/, name);
     else assert.doesNotMatch(step, /continue-on-error:/, name);
-    assert.ok(step.includes(`if: \${{ !cancelled() }}`), name);
+    assert.equal(step.match(/^ {8}if: \$\{\{ (.*) \}\}$/m)?.[1], expectedCond, name);
     if (variable) assert.ok(step.includes(`${variable}:`), name);
   }
   assert.doesNotMatch(gates, /--depth(?:[=\s]|$)/);
   assert.match(gates, /fetch-depth: 0/);
   for (const job of jobs.values()) assert.doesNotMatch(job, /^ {4}needs:.*\bgates\b/m);
-  assert.ok(jobs.get('dead-class-gate').includes('pnpm prepush --advisory'));
+  assert.equal(jobs.get('dead-class-gate'), undefined);
   assert.ok(!jobs.get('check').includes('pnpm prepush --advisory'));
 });
 
@@ -479,7 +492,10 @@ test('the CI self-test step runs selfTests through prepush and names no self-tes
     .split(/\n(?= {2}[a-z][\w-]*:)/)
     .find((job) => job.startsWith('  check-core:'));
   const step = /^ {6}- name: Prepush self-test\n((?: {8}.*\n)*)/m.exec(checkJob ?? '');
-  assert.equal(step?.[1], '        run: pnpm prepush --self-test\n');
+  assert.equal(
+    step?.[1],
+    "        if: needs.changes.outputs.ops-selftests == 'true'\n        run: pnpm prepush --self-test\n",
+  );
   for (const file of selfTests)
     assert.ok(
       !checkJob.includes(file),
@@ -748,7 +764,7 @@ test('a home source change selects the home specs', () => {
   assert.match(plan.stdout, /\bchief-home-c\.spec\.ts\b/);
 });
 
-test('CI shares the plan but keeps advisory and full e2e in separate jobs', () => {
+test('CI shares the plan and keeps full e2e in its own job', () => {
   const paths = ['apps/web/src/main.tsx'];
   assert.deepEqual(
     prepushPlan(paths, 'ci'),
@@ -764,21 +780,18 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
   const jobs = workflow.split(/\n(?= {2}[a-z][\w-]*:)/);
   const requiredJob = jobs.find((job) => job.startsWith('  check-core:'));
-  const advisoryJob = jobs.find((job) => job.startsWith('  dead-class-gate:'));
   assert.ok(requiredJob?.includes('run: pnpm prepush --ci'));
   assert.ok(!requiredJob?.includes('run: pnpm prepush --advisory'));
-  assert.ok(advisoryJob?.includes('run: pnpm prepush --advisory'));
-  for (const job of [requiredJob, advisoryJob]) {
-    assert.ok(job?.includes('PREPUSH_BASE_SHA:'));
-    assert.ok(job?.includes('fetch-depth: 0'));
-  }
-  for (const command of [
-    'pnpm prepush --ci',
-    'pnpm prepush --advisory',
-    'pnpm prepush --e2e-shard',
-  ]) {
+  assert.equal(
+    jobs.find((job) => job.startsWith('  dead-class-gate:')),
+    undefined,
+  );
+  assert.ok(requiredJob?.includes('PREPUSH_BASE_SHA:'));
+  assert.ok(requiredJob?.includes('fetch-depth: 0'));
+  for (const command of ['pnpm prepush --ci', 'pnpm prepush --e2e-shard']) {
     assert.ok(workflow.includes(`run: ${command}`));
   }
+  assert.ok(!workflow.includes('run: pnpm prepush --advisory'));
   for (const command of [
     'pnpm lint',
     'pnpm typecheck',

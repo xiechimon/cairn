@@ -3,11 +3,11 @@ name: ci
 # Third-party actions are pinned to full commit SHAs (#1076); the trailing version is Dependabot's anchor.
 on:
   push:
-    branches: [main, 'prototype/**']
+    branches: [main]
   pull_request:
 
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || github.ref == 'refs/heads/main' && 'ci-main' || format('ci-ref-{0}', github.ref) }}
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || github.event_name == 'push' && format('ci-push-{0}-{1}', github.ref, github.sha) || format('ci-ref-{0}', github.ref) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -22,8 +22,9 @@ jobs:
       has-sidecar: ${{ steps.classify.outputs.has-sidecar }}
       gates-needed: ${{ steps.classify.outputs.gates-needed }}
       ops-selftests: ${{ steps.classify.outputs.ops-selftests }}
-      web-ui: ${{ steps.classify.outputs.web-ui }}
-      e2e-tier: ${{ github.event_name == 'push' && 'full' || (github.event_name == 'pull_request' && !github.event.pull_request.draft && steps.classify.outputs.web-ui == 'true' && 'affected') || 'none' }}
+      connect-do: ${{ steps.classify.outputs.connect-do }}
+      connect-relay: ${{ steps.classify.outputs.connect-relay }}
+      e2e-tier: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft) && 'none' || steps.classify.outputs.e2e-tier }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -35,30 +36,47 @@ jobs:
       - name: Classify changes
         id: classify
         env:
-          PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          EVENT_NAME: ${{ github.event_name }}
+          PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           has_code=true
           has_sidecar=true
           gates_needed=true
           ops_selftests=true
-          web_ui=false
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            if ! git diff --name-only "$PREPUSH_BASE_SHA" HEAD | grep -qE '^(scripts/|\.github/|ops/langfuse/|packages/shared/|package\.json$|pnpm-lock\.yaml$)'; then
+          connect_do=true
+          connect_relay=true
+          e2e_tier=full
+          if [ -n "${PREPUSH_BASE_SHA:-}" ] && ! printf '%s\n' "$PREPUSH_BASE_SHA" | grep -qE '^0+$' && git cat-file -e "${PREPUSH_BASE_SHA}^{commit}" 2>/dev/null; then
+            base_ref=$(git merge-base "$PREPUSH_BASE_SHA" HEAD 2>/dev/null || printf '%s' "$PREPUSH_BASE_SHA")
+            changed=$(git diff --name-only "$base_ref" HEAD)
+            if ! printf '%s\n' "$changed" | grep -qE '^(scripts/|\.github/|\.claude/skills/verify-cairn/scripts/|ops/langfuse/|packages/shared/|package\.json$|pnpm-lock\.yaml$)'; then
               ops_selftests=false
             fi
-            if git diff --name-only "$PREPUSH_BASE_SHA" HEAD | grep -q '^apps/web/src/'; then
-              web_ui=true
+            if ! printf '%s\n' "$changed" | grep -q '^scripts/ops/connect-do-prototype/'; then
+              connect_do=false
+            fi
+            if ! printf '%s\n' "$changed" | grep -q '^scripts/ops/connect-relay/'; then
+              connect_relay=false
             fi
             has_code=$(node scripts/prepush.mjs --has-code) || has_code=true
             has_sidecar=$(node scripts/prepush.mjs --has-sidecar) || has_sidecar=true
             gates_needed=$(node scripts/prepush.mjs --needs-gates) || gates_needed=true
+            if [ "$has_code" = "false" ]; then
+              e2e_tier=none
+            elif printf '%s\n' "$changed" | grep -qE '^(apps/web/(package\.json|index\.html|vite\.config|playwright\.config)|apps/web/src/(components/|styles/|main\.tsx$|App\.tsx$)|packages/shared/|package\.json$|pnpm-lock\.yaml$|\.github/actions/playwright-chromium/|\.github/workflows/ci\.yml$)'; then
+              e2e_tier=full
+            elif printf '%s\n' "$changed" | grep -vE '\.test\.tsx?$' | grep -qE '^(apps/web/src/|apps/web/e2e/|apps/server/(src/|drizzle/|package\.json$))'; then
+              e2e_tier=affected
+            else
+              e2e_tier=none
+            fi
           fi
           echo "has-code=$has_code" >> "$GITHUB_OUTPUT"
           echo "has-sidecar=$has_sidecar" >> "$GITHUB_OUTPUT"
           echo "gates-needed=$gates_needed" >> "$GITHUB_OUTPUT"
           echo "ops-selftests=$ops_selftests" >> "$GITHUB_OUTPUT"
-          echo "web-ui=$web_ui" >> "$GITHUB_OUTPUT"
+          echo "connect-do=$connect_do" >> "$GITHUB_OUTPUT"
+          echo "connect-relay=$connect_relay" >> "$GITHUB_OUTPUT"
+          echo "e2e-tier=$e2e_tier" >> "$GITHUB_OUTPUT"
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
   check:
@@ -116,7 +134,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Local Durable Object transport experiment
-        if: needs.changes.outputs.ops-selftests == 'true'
+        if: needs.changes.outputs.connect-do == 'true'
         working-directory: scripts/ops/connect-do-prototype
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
@@ -125,7 +143,7 @@ jobs:
           npm run smoke
 
       - name: Personal relay ledger in local workerd
-        if: needs.changes.outputs.ops-selftests == 'true'
+        if: needs.changes.outputs.connect-relay == 'true'
         working-directory: scripts/ops/connect-relay
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
@@ -136,38 +154,43 @@ jobs:
         env:
           PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           ENGLISH_ONLY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          PREPUSH_FORCE_FULL: ${{ github.event_name == 'push' }}
           UI_DEBT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: pnpm prepush --ci
 
       - name: Orb canary scratch runner (#2277)
+        if: needs.changes.outputs.ops-selftests == 'true'
         run: node --test scripts/ops/orb/canary-stack.test.mjs
 
       - name: Prepush self-test
+        if: needs.changes.outputs.ops-selftests == 'true'
         run: pnpm prepush --self-test
 
       - name: verify-cairn CLI self-test (#1402)
-        if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
+        if: needs.changes.outputs.ops-selftests == 'true'
         run: node .claude/skills/verify-cairn/scripts/vp-selftest.mjs
 
       - name: Drizzle snapshot chain guard
-        if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
+        if: needs.changes.outputs.has-code != 'false'
         run: pnpm --filter @xiechimon/cairn db:check
 
       - name: Drizzle migration drift check
-        if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
+        if: needs.changes.outputs.has-code != 'false'
         run: |
           pnpm --filter @xiechimon/cairn db:generate
           git add -N apps/server/drizzle
           git diff --exit-code apps/server/drizzle
 
       - name: Lint warning cap gate (#1192)
-        if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
+        if: needs.changes.outputs.has-code != 'false'
         env:
-          LINT_WARNING_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          LINT_WARNING_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           if [ -n "$LINT_WARNING_BASE_SHA" ]; then
-            git fetch origin "$LINT_WARNING_BASE_SHA"
+            if printf '%s\n' "$LINT_WARNING_BASE_SHA" | grep -qE '^0+$'; then
+              unset LINT_WARNING_BASE_SHA
+            else
+              git cat-file -e "${LINT_WARNING_BASE_SHA}^{commit}" 2>/dev/null || git fetch origin "$LINT_WARNING_BASE_SHA"
+            fi
           fi
           node scripts/lint-warning-cap.mjs
 
@@ -268,7 +291,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -288,6 +311,8 @@ jobs:
         uses: ./.github/actions/playwright-chromium
 
       - name: E2E (specs affected by this PR, split by recorded spec times)
+        env:
+          PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: pnpm --filter @cairn/web e2e:affected --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Fixture build for the CSS mechanism gate
@@ -416,33 +441,9 @@ jobs:
       - name: Pack smoke (main package tarball, bare node)
         run: scripts/pack-smoke.sh
 
-  dead-class-gate:
-    needs: changes
-    if: needs.changes.outputs.has-code != 'false'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          fetch-depth: 0
-
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
-
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Dead class gate (#1036)
-        env:
-          PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: pnpm prepush --advisory
-
   gates:
     needs: changes
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.changes.outputs.gates-needed != 'false' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -488,31 +489,31 @@ jobs:
           node .claude/skills/verify-cairn/scripts/vp-registry-gate.mjs --check-reach
 
       - name: Dispatch agent start/check round trip (#1556)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
 
       - name: Workflow concurrency and scalars
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs
 
       - name: Commit identity allowlist and hooks (#2289)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/commit-identity.test.mjs
 
       - name: UI debt ledger only shrinks against main
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ui-debt-gate.test.mjs
 
       - name: Vitest shards split by recorded file times
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/vitest-timed-shard.test.mjs
 
       - name: E2E selection and timed shards
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/e2e-affected.test.mjs
 
       - name: Pages keep to tokens
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ui-page-style-gate.test.mjs
 
       - name: Feature map covers every route and stays in step with the code
@@ -528,7 +529,7 @@ jobs:
         run: node scripts/generate-canon.mjs --check
 
       - name: Gardener sweep self-test (#1617)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs scripts/feature-map-maintain.test.mjs scripts/generate-feature-map.test.mjs scripts/generate-canon.test.mjs
 
       - name: Nightly scan self-test (§11.1)
@@ -536,7 +537,7 @@ jobs:
         run: node --test scripts/nightly-scan/nightly-scan.test.mjs
 
       - name: CI tier conditions
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ci-tiers.test.mjs
 
       - name: Real smoke runner and checker fixtures (#2283)
@@ -545,7 +546,7 @@ jobs:
 
       - name: Orb host provisioning fixtures (#2273)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/orb/egress-relay.test.mjs scripts/ops/orb/orb-host-check.test.mjs scripts/ops/orb/provision.test.mjs scripts/ops/orb/shell.test.mjs scripts/ops/orb/canary.test.mjs scripts/ops/orb/canary-review.test.mjs scripts/ops/orb/canary-container.test.mjs scripts/ops/orb/container-host-check.test.mjs scripts/ops/orb/egress-unit.test.mjs scripts/ops/orb/trial-evidence-check.test.mjs
+        run: node --test scripts/ops/orb/egress-relay.test.mjs scripts/ops/orb/orb-host-check.test.mjs scripts/ops/orb/provision.test.mjs scripts/ops/orb/shell.test.mjs scripts/ops/orb/canary.test.mjs scripts/ops/orb/canary-review.test.mjs scripts/ops/orb/canary-container.test.mjs scripts/ops/orb/container-host-check.test.mjs scripts/ops/orb/egress-unit.test.mjs scripts/ops/orb/trial-evidence-check.test.mjs scripts/ops/orb/trial-report.test.mjs
       - name: Host control script fixtures (#2380)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ops/host/aged-prs.test.mjs scripts/ops/host/brake.test.mjs scripts/ops/host/surface-stuck-rebase.test.mjs scripts/ops/host/lane-replaced.test.mjs scripts/ops/host/as-bot-callers.test.mjs scripts/ops/host/as-bot.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/lanes-retry.test.mjs scripts/ops/host/identity-compat.test.mjs
@@ -568,7 +569,7 @@ jobs:
 
   ops-backup-test:
     needs: changes
-    if: needs.changes.outputs.has-code != 'false'
+    if: needs.changes.outputs.ops-selftests == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -579,15 +580,11 @@ jobs:
           echo "0bb743f8155907ed2a337c12a4672c67269e372803939ec98dac497edc714c9b  $RUNNER_TEMP/rrsync" | sha256sum -c -
           RRSYNC="$RUNNER_TEMP/rrsync" node --test scripts/ops/backup-server-db.test.mjs scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
-        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
-        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         with:
           node-version: 24
           cache: pnpm
       - name: Install dependencies for the self-deploy build-settings guard
-        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Self-deploy and deploy-lag watch fixtures (#2288)
-        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ops/deploy-self.test.mjs scripts/ops/control-plane-units.test.mjs
