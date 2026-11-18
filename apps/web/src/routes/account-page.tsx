@@ -53,6 +53,7 @@ const NOTIFY_SOUND_OPTIONS: { value: DesktopNotifySound; label: string }[] = [
   { value: 'Glass', label: 'Glass' },
   { value: 'Ping', label: 'Ping' },
   { value: 'Pop', label: 'Pop' },
+  { value: 'Purr', label: 'Purr' },
   { value: 'none', label: '无声' },
 ];
 
