@@ -66,11 +66,11 @@ for (const theme of ['light', 'dark'] as const) {
         expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await page.screenshot({ path: testInfo.outputPath(`pair-${theme}-${width}.png`), fullPage: true });
-        const descriptor = await page.evaluate(async () => {
-          const response = await fetch('/api/remote/descriptor');
-          return { status: response.status, body: await response.json() as { environmentId: string; version: number } };
+        const remoteRoutes = await page.evaluate(async () => {
+          const response = await fetch('/api/remote/routes');
+          return { status: response.status, body: await response.json() as Record<string, unknown> };
         });
-        expect(descriptor.status).toBe(401);
+        expect(remoteRoutes.status).toBe(401);
         const transcript = testInfo.outputPath('calls.txt');
         writeFileSync(transcript, [
           'Isolated live server; synthetic sidecar metadata and HTTPS identity proxy.',
@@ -79,9 +79,9 @@ for (const theme of ['light', 'dark'] as const) {
           'GET /api/teams',
           `HTTP ${(await teams).status()}`,
           '',
-          'GET /api/remote/descriptor',
-          `HTTP ${descriptor.status}`,
-          JSON.stringify(descriptor.body),
+          'GET /api/remote/routes',
+          `HTTP ${remoteRoutes.status}`,
+          JSON.stringify(remoteRoutes.body),
           '',
           'Pair page shown. Tailscale identity did not sign the browser in.',
         ].join('\n'));
