@@ -1,5 +1,5 @@
 import type { RemoteToolDef } from './chief-tools.js';
-import { COMPUTER_REMOTE_TOOLS } from './computer-tools.js';
+import { COMPUTER_REMOTE_TOOLS, SHELL_TOOL_PARAMETERS } from './computer-tools.js';
 
 export const INFO_SUBMIT_REPORT_TOOL = 'submit_report';
 export const INFO_TASK_ROOT = '/home/agent/tasks';
@@ -27,14 +27,7 @@ const INFO_FILE_TOOLS: readonly RemoteToolDef[] = [
     name: 'shell',
     description:
       'Run a shell command in your own Debian computer (not the owner Mac). Use it for downloads, scripts and data work. Work under your task folder.',
-    parameters: {
-      type: 'object',
-      properties: {
-        command: str('Shell command.'),
-        cwd: str('Working directory; defaults to the computer home.'),
-      },
-      required: ['command'],
-    },
+    parameters: SHELL_TOOL_PARAMETERS,
   },
   {
     name: 'list_files',

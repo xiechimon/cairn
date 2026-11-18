@@ -23,6 +23,8 @@ const MIN_BUDGET_MS = 1_000;
 const SNAPSHOT_TIMEOUT_MS = '8000';
 const FIND_LIMIT = 50;
 const READ_MAX_CHARS = 4_000;
+const WINDOW_NOT_FOUND = 'WINDOW_NOT_FOUND';
+const ACTION_NOT_SUPPORTED = 'ACTION_NOT_SUPPORTED';
 const CAIRN_WINDOW_REFUSAL = 'This window shows the cairn web app; it is never driven';
 const MODIFIER_NAMES = { cmd: 'ctrl', ctrl: 'ctrl', alt: 'alt', option: 'alt', shift: 'shift' };
 
@@ -74,12 +76,14 @@ interface UiWindow {
   accessible?: boolean;
   minimized?: boolean;
   visible?: boolean;
+  is_focused?: boolean;
 }
 
 interface Target {
   app: string;
   windowId: string;
   title: string;
+  windowCount: number;
 }
 
 interface Budget {
@@ -87,7 +91,10 @@ interface Budget {
 }
 
 class Stop extends Error {
-  constructor(readonly outcome: Extract<ScreenOutcome, { kind: 'error' }>) {
+  constructor(
+    readonly outcome: Extract<ScreenOutcome, { kind: 'error' }>,
+    readonly code?: string,
+  ) {
     super(outcome.message);
   }
 }
@@ -108,7 +115,7 @@ export interface DesktopAccessibilityOptions {
 export class DesktopAccessibility {
   private readonly now: () => number;
   private readonly hosts: string[];
-  private readonly snapshots = new Map<string, { id: string; windowId: string }>();
+  private readonly snapshots = new Map<string, { id: string; title: string }>();
   private readonly cairnWindows = new Set<string>();
 
   constructor(options: DesktopAccessibilityOptions = {}) {
@@ -170,7 +177,11 @@ export class DesktopAccessibility {
       });
       const budget = this.budget(call);
       const run = new Runner(provider, call, budget, this.now);
-      const target = await this.target(run, app);
+      const target = await this.target(
+        run,
+        app,
+        this.snapshots.get(`${scopeKey}\0${app.toLowerCase()}`)?.title,
+      );
       for (const action of actions) if ('element' in action) this.ref(scopeKey, target, action);
       const done: string[] = [];
       for (const [index, action] of actions.entries()) {
@@ -227,7 +238,7 @@ export class DesktopAccessibility {
     return `Open apps with windows; call desktop_snapshot with one of these app names:\n${lines.join('\n')}`;
   }
 
-  private async target(run: Runner, appName: string): Promise<Target> {
+  private async target(run: Runner, appName: string, preferTitle?: string): Promise<Target> {
     const windows = await this.windows(run);
     const wanted = appName.toLowerCase();
     const matching = windows.filter((window) => window.app_name.toLowerCase() === wanted);
@@ -242,7 +253,12 @@ export class DesktopAccessibility {
     const usable = matching.filter(
       (window) => window.accessible !== false && window.visible !== false && !window.minimized,
     );
-    const window = usable.find((candidate) => !this.cairnWindows.has(candidate.id)) ?? usable[0];
+    const window =
+      usable.find(
+        (candidate) => candidate.title === preferTitle && !this.cairnWindows.has(candidate.id),
+      ) ??
+      usable.find((candidate) => !this.cairnWindows.has(candidate.id)) ??
+      usable[0];
     if (!window) throw refuse(`${matching[0]?.app_name ?? appName} has no visible window to drive`);
     const title = window.title ?? '';
     if (
@@ -251,20 +267,85 @@ export class DesktopAccessibility {
     ) {
       throw refuse(CAIRN_WINDOW_REFUSAL);
     }
-    return { app: window.app_name, windowId: window.id, title };
+    return { app: window.app_name, windowId: window.id, title, windowCount: usable.length };
+  }
+
+  private async relocate(run: Runner, target: Target): Promise<UiWindow> {
+    const wanted = target.app.toLowerCase();
+    const usable = (await this.windows(run)).filter(
+      (window) =>
+        window.app_name.toLowerCase() === wanted &&
+        window.accessible !== false &&
+        window.visible !== false &&
+        !window.minimized,
+    );
+    const window =
+      usable.find((candidate) => candidate.id === target.windowId) ??
+      usable.find((candidate) => (candidate.title ?? '') === target.title) ??
+      (usable.length === 1 ? usable[0] : undefined);
+    if (!window) {
+      throw refuse(
+        `The ${target.app} window${target.title ? ` "${target.title}"` : ''} is gone or changed; call desktop_snapshot for ${target.app} again. Nothing ran`,
+      );
+    }
+    if (this.cairnWindows.has(window.id)) throw refuse(CAIRN_WINDOW_REFUSAL);
+    target.windowId = window.id;
+    return window;
+  }
+
+  private async onWindow<T>(
+    run: Runner,
+    target: Target,
+    command: (windowId: string) => string[],
+    send: (args: string[]) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await send(command(target.windowId));
+    } catch (error) {
+      if (!(error instanceof Stop) || error.code !== WINDOW_NOT_FOUND) throw error;
+      await this.relocate(run, target);
+      return send(command(target.windowId));
+    }
+  }
+
+  private async focusWindow(
+    run: Runner,
+    target: Target,
+    label: string,
+    ran: number,
+  ): Promise<void> {
+    if ((await this.relocate(run, target)).is_focused === true) return;
+    await this.onWindow(
+      run,
+      target,
+      (windowId) => ['focus-window', '--headed', '--window-id', windowId],
+      (args) => run.step(args, label, ran),
+    );
+    if ((await this.relocate(run, target)).is_focused !== true) {
+      throw new Stop({
+        kind: 'error',
+        message: `${label} was not sent: ${target.app} did not come to the front, so input would have gone to another window. Nothing was typed`,
+        delivery: ran > 0 ? 'unknown' : 'not_delivered',
+      });
+    }
   }
 
   private async assertNotCairn(run: Runner, target: Target): Promise<void> {
-    const data = (await run.read([
-      'snapshot',
-      '--window-id',
-      target.windowId,
-      '--timeout-ms',
-      SNAPSHOT_TIMEOUT_MS,
-      '--compact',
-      '--max-depth',
-      '40',
-    ])) as { tree?: AccessibilityNode } | null;
+    const data = (await this.onWindow(
+      run,
+      target,
+      (windowId) => [
+        'snapshot',
+        '--window-id',
+        windowId,
+        '--timeout-ms',
+        SNAPSHOT_TIMEOUT_MS,
+        '--compact',
+        '--max-depth',
+        '40',
+      ],
+      (args) => run.read(args),
+    )) as { tree?: AccessibilityNode } | null;
     const rows = accessibilityRows(data?.tree ? [data.tree] : [], '', false);
     if (showsCairn(rows.strings, ['cairn', ...this.hosts])) {
       this.cairnWindows.add(target.windowId);
@@ -278,11 +359,16 @@ export class DesktopAccessibility {
     target: Target,
     query?: string,
   ): Promise<string> {
-    const scope = ['--window-id', target.windowId, '--timeout-ms', SNAPSHOT_TIMEOUT_MS];
-    const data = ((await run.read(
-      query
-        ? ['find', ...scope, '--text', query, '--limit', String(FIND_LIMIT)]
-        : ['snapshot', ...scope, '--compact', '--max-depth', '40'],
+    const data = ((await this.onWindow(
+      run,
+      target,
+      (windowId) => {
+        const scope = ['--window-id', windowId, '--timeout-ms', SNAPSHOT_TIMEOUT_MS];
+        return query
+          ? ['find', ...scope, '--text', query, '--limit', String(FIND_LIMIT)]
+          : ['snapshot', ...scope, '--compact', '--max-depth', '40'];
+      },
+      (args) => run.read(args),
     )) ?? {}) as {
       snapshot_id?: string;
       complete?: boolean;
@@ -294,7 +380,7 @@ export class DesktopAccessibility {
     if (snapshotId) {
       this.snapshots.set(`${scopeKey}\0${target.app.toLowerCase()}`, {
         id: snapshotId,
-        windowId: target.windowId,
+        title: target.title,
       });
     }
     const rows = accessibilityRows(
@@ -321,9 +407,14 @@ export class DesktopAccessibility {
     action: Extract<DesktopUiAction, { element: number }>,
   ): string {
     const snapshot = this.snapshots.get(`${scopeKey}\0${target.app.toLowerCase()}`);
-    if (!snapshot || snapshot.windowId !== target.windowId) {
+    if (!snapshot) {
       throw refuse(
         `Call desktop_snapshot for ${target.app} before using element numbers; nothing ran`,
+      );
+    }
+    if (snapshot.title !== target.title && target.windowCount > 1) {
+      throw refuse(
+        `${target.app} has several windows and the one snapshotted ("${snapshot.title}") is no longer there; call desktop_snapshot for ${target.app} again; nothing ran`,
       );
     }
     return `@${snapshot.id}:e${action.element}`;
@@ -338,7 +429,20 @@ export class DesktopAccessibility {
     ran: number,
   ): Promise<string> {
     const label = `Action ${index + 1} (${action.kind})`;
-    const go = (...args: string[]) => run.step(args, label, ran);
+    const go = (...args: string[]) =>
+      run.step(args, label, ran).catch((error: unknown) => {
+        if (error instanceof Stop && error.code === WINDOW_NOT_FOUND) {
+          throw new Stop(
+            {
+              kind: 'error',
+              message: `${label}: agent-desktop no longer finds the window these element numbers belong to; call desktop_snapshot for ${target.app} again and use its new numbers`,
+              delivery: ran > 0 ? 'unknown' : 'not_delivered',
+            },
+            WINDOW_NOT_FOUND,
+          );
+        }
+        throw error;
+      });
     const delivered = `${index + 1}. ${action.kind}: delivered`;
     switch (action.kind) {
       case 'click': {
@@ -349,23 +453,46 @@ export class DesktopAccessibility {
         return delivered;
       }
       case 'type':
+        await this.focusWindow(run, target, label, ran);
         await go('type', '--headed', '--', this.ref(scopeKey, target, action), action.text);
         return delivered;
-      case 'set':
-        await go('set-value', '--', this.ref(scopeKey, target, action), action.value);
-        return delivered;
+      case 'set': {
+        const ref = this.ref(scopeKey, target, action);
+        try {
+          await go('set-value', '--', ref, action.value);
+          return delivered;
+        } catch (error) {
+          if (!(error instanceof Stop) || error.code !== ACTION_NOT_SUPPORTED) throw error;
+        }
+        await this.focusWindow(run, target, label, ran);
+        await go('focus', '--headed', '--', ref);
+        await this.onWindow(
+          run,
+          target,
+          (windowId) => ['press', '--headed', '--window-id', windowId, '--', 'ctrl+a'],
+          (args) => run.step(args, label, ran),
+        );
+        await go('type', '--headed', '--', ref, action.value);
+        return `${index + 1}. set: delivered by typing (this field has no set-value)`;
+      }
       case 'key': {
         const modifiers = [
           ...new Set((action.modifiers ?? []).map((name) => MODIFIER_NAMES[name])),
         ];
         const key = action.key.length === 1 ? action.key.toLowerCase() : action.key;
-        await go(
-          'press',
-          '--headed',
-          '--window-id',
-          target.windowId,
-          '--',
-          [...modifiers, key].join('+'),
+        await this.focusWindow(run, target, label, ran);
+        await this.onWindow(
+          run,
+          target,
+          (windowId) => [
+            'press',
+            '--headed',
+            '--window-id',
+            windowId,
+            '--',
+            [...modifiers, key].join('+'),
+          ],
+          (args) => run.step(args, label, ran),
         );
         return delivered;
       }
@@ -421,8 +548,16 @@ class Runner {
 
   async read(args: readonly string[]): Promise<unknown> {
     const envelope = await this.execute(args, `agent-desktop ${args[0]}`, 0);
-    if (!envelope.ok)
-      throw refuse(clip(JSON.stringify(envelope.error), SCREEN_ERROR_MESSAGE_MAX_CHARS));
+    if (!envelope.ok) {
+      throw new Stop(
+        {
+          kind: 'error',
+          message: clip(JSON.stringify(envelope.error), SCREEN_ERROR_MESSAGE_MAX_CHARS),
+          delivery: 'not_delivered',
+        },
+        envelope.error?.code,
+      );
+    }
     return envelope.data;
   }
 
@@ -431,14 +566,17 @@ class Runner {
     if (envelope.ok) return envelope.data;
     const retry = envelope.error?.disposition?.retry;
     const completed = ran > 0 ? ` ${ran} earlier action(s) already ran.` : '';
-    throw new Stop({
-      kind: 'error',
-      message: clip(
-        `${label} was refused by agent-desktop.${completed} agent-desktop said: ${JSON.stringify(envelope.error)}`,
-        SCREEN_ERROR_MESSAGE_MAX_CHARS,
-      ),
-      delivery: retry === 'safe' && ran === 0 ? 'not_delivered' : 'unknown',
-    });
+    throw new Stop(
+      {
+        kind: 'error',
+        message: clip(
+          `${label} was refused by agent-desktop.${completed} agent-desktop said: ${JSON.stringify(envelope.error)}`,
+          SCREEN_ERROR_MESSAGE_MAX_CHARS,
+        ),
+        delivery: retry === 'safe' && ran === 0 ? 'not_delivered' : 'unknown',
+      },
+      envelope.error?.code,
+    );
   }
 
   private async execute(args: readonly string[], label: string, ran: number): Promise<Envelope> {

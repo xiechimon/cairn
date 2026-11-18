@@ -123,6 +123,7 @@ export function isCoordinatorComputerTool(name: string): boolean {
     isComputerBrowserTool(name) ||
     name === 'request_takeover' ||
     name === INSTALL_PACKAGES_TOOL ||
+    name === 'shell' ||
     name === 'computer_observe' ||
     name === 'computer_act' ||
     name === 'desktop_snapshot' ||

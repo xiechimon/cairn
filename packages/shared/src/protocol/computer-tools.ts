@@ -127,7 +127,7 @@ export const COMPUTER_DESKTOP_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'desktop_act',
     description:
-      "Your VM computer, not the owner's Mac. Act on one app with element numbers from the latest desktop_snapshot of that app, then return a fresh snapshot. Prefer browser_* tools for web pages.",
+      "Your VM computer, not the owner's Mac. Act on one app with element numbers from the latest desktop_snapshot of that app, then return a fresh snapshot. type and key bring the app window to the front first and stop without typing when it cannot be focused. To fill a text field use type; set replaces the whole value and falls back to typing it when the field has no set-value. Prefer browser_* tools for web pages.",
     parameters: obj(
       {
         app: str('App name exactly as desktop_snapshot listed it.'),
@@ -167,7 +167,21 @@ export const TAKEOVER_HANDED_BACK =
 export const REQUEST_CLOAK_LICENSE_TOOL = 'request_cloak_license';
 export const INSTALL_PACKAGES_TOOL = 'install_packages';
 
+export const SHELL_TOOL_PARAMETERS = obj(
+  {
+    command: str('Shell command.'),
+    cwd: str('Working directory inside the computer home; defaults to the computer home.'),
+  },
+  ['command'],
+);
+
 export const COMPUTER_VM_TOOLS: readonly RemoteToolDef[] = [
+  {
+    name: 'shell',
+    description:
+      "Your VM computer, not the owner's Mac (user_computer_shell is the Mac). Run a shell command in the Coordinator computer: scripts, downloads, checking files, starting apps. Output is bounded: the first 16 KiB and last 48 KiB are kept. For apps with a window, desktop_snapshot reads them afterwards.",
+    parameters: SHELL_TOOL_PARAMETERS,
+  },
   {
     name: REQUEST_CLOAK_LICENSE_TOOL,
     description:

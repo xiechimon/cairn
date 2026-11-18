@@ -49,6 +49,18 @@ describe('Coordinator computer tool offers', () => {
       );
   });
 
+  test('the Coordinator shell is offered with a VM computer, runs there, and is not the Mac shell', () => {
+    expect(computerNames(true, false)).not.toContain('shell');
+    expect(computerNames(true, true)).toContain('shell');
+    const defs = coordinatorToolDefs({ desktopTools: true, vmComputer: true, ownComputer: true });
+    expect(defs.find((def) => def.name === 'shell')?.description).toMatch(
+      /^Your VM computer, not the owner's Mac/,
+    );
+    expect(defs.find((def) => def.name === 'user_computer_shell')?.description).toMatch(
+      /^The owner's own Mac/,
+    );
+  });
+
   test('install_packages is offered only with a VM computer', () => {
     expect(computerNames(true, false)).not.toContain('install_packages');
     expect(computerNames(true, true)).toContain('install_packages');

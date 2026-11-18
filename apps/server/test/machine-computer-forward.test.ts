@@ -20,6 +20,8 @@ import {
   COMPUTER_BUSY,
   COMPUTER_EXECUTION_LEASE_MS,
   COMPUTER_NOT_CONNECTED,
+  COMPUTER_SCREEN_DEADLINE_MS,
+  COMPUTER_START_ALLOWANCE_MS,
   COMPUTER_USER_CONTROL,
   computerCallId,
   computerDeadlineMs,
@@ -221,6 +223,68 @@ describe('Coordinator desktop tools', () => {
     ]);
     expect(await result).toEqual({ text: 'screen 1600x1000', images: [image] });
   });
+});
+
+describe('Coordinator shell and desktop start-up', () => {
+  test('the Coordinator shell runs in its own computer through the relay and keeps the shell output bounds', async () => {
+    const { s, deps, chiefId } = boot();
+    addMachine(s, 'omarchy', { computer: true });
+    const calls = connect(s, 'omarchy');
+    s.db.update(stepTable).set({ machineId: null }).where(eq(stepTable.id, 'step-a')).run();
+    const result = createCoordinatorServerApi(deps).relayTool(
+      'step-a',
+      'shell',
+      { command: 'echo hi' },
+      'tc-shell',
+    );
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({
+      tool: 'shell',
+      scopeKey: `chief:${chiefId}`,
+      params: { command: 'echo hi' },
+    });
+    expect(calls[0]?.ownComputerGrant).toBeUndefined();
+    receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1, '', 0)]);
+    expect(await result).toBe('');
+  });
+
+  test.each([
+    ['starting', COMPUTER_SCREEN_DEADLINE_MS + COMPUTER_START_ALLOWANCE_MS],
+    ['running', COMPUTER_SCREEN_DEADLINE_MS],
+  ] as const)(
+    'desktop_snapshot on a %s computer gets a %i ms deadline',
+    async (state, deadlineMs) => {
+      const { s, deps, chiefId } = boot();
+      addMachine(s, 'omarchy', { computer: true });
+      s.db
+        .insert(computerTable)
+        .values({
+          id: 'cold-computer',
+          teamId: s.team.id,
+          scopeKey: `chief:${chiefId}`,
+          machineId: 'omarchy',
+          providerRef: 'cold',
+          state,
+          createdAt: 1,
+          updatedAt: 1,
+        })
+        .run();
+      const calls = connect(s, 'omarchy');
+      const before = Date.now();
+      const pending = forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'desktop_snapshot',
+        toolCallId: 'snap-cold',
+        params: {},
+      });
+      await vi.waitFor(() => expect(calls).toHaveLength(1));
+      const granted = calls[0]!.deadlineAt - before;
+      expect(granted).toBeGreaterThanOrEqual(deadlineMs);
+      expect(granted).toBeLessThan(deadlineMs + 5_000);
+      receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1, 'ok')]);
+      await pending;
+    },
+  );
 });
 
 describe('forwardComputerCall target and presence', () => {
@@ -645,6 +709,7 @@ describe('forwardComputerCall daemon errors and deadlines', () => {
       5 * 60_000 + 30_000,
     );
     expect(computerDeadlineMs('computer_act', {})).toBe(120_000);
+    expect(computerDeadlineMs('computer_act', {}, true)).toBe(120_000 + 5 * 60_000);
     expect(computerDeadlineMs('open_path', {})).toBe(120_000);
     expect(computerDeadlineMs('read_file', {})).toBe(600_000);
     expect(computerDeadlineMs('browser_navigate', {})).toBe(600_000);

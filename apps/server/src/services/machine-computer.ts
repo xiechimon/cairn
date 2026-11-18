@@ -90,6 +90,7 @@ export const COMPUTER_SHELL_COMMAND_TIMEOUT_DEFAULT_MS = 5 * 60_000;
 export const COMPUTER_SHELL_COMMAND_TIMEOUT_MAX_MS = 60 * 60_000;
 export const COMPUTER_SHELL_DEADLINE_SLACK_MS = 30_000;
 export const COMPUTER_SCREEN_DEADLINE_MS = 2 * 60_000;
+export const COMPUTER_START_ALLOWANCE_MS = 5 * 60_000;
 export const COMPUTER_OTHER_DEADLINE_MS = 10 * 60_000;
 export const COMPUTER_EXECUTION_LEASE_MS = 5 * 60_000;
 export const COMPUTER_STORED_PARAM_CHARS = 8 * 1024;
@@ -413,7 +414,11 @@ export function computerVmName(scopeKey: string): string {
   return `cairn-computer-${createHash('sha256').update(scopeKey).digest('hex').slice(0, 24)}`;
 }
 
-export function computerDeadlineMs(tool: ComputerTool, params: Record<string, unknown>): number {
+export function computerDeadlineMs(
+  tool: ComputerTool,
+  params: Record<string, unknown>,
+  computerStarting = false,
+): number {
   if (SHELL_TOOLS.has(tool)) {
     const asked = params.timeoutMs;
     const timeout =
@@ -425,7 +430,10 @@ export function computerDeadlineMs(tool: ComputerTool, params: Record<string, un
         : COMPUTER_SHELL_COMMAND_TIMEOUT_DEFAULT_MS;
     return timeout + COMPUTER_SHELL_DEADLINE_SLACK_MS;
   }
-  return SCREEN_TOOLS.has(tool) ? COMPUTER_SCREEN_DEADLINE_MS : COMPUTER_OTHER_DEADLINE_MS;
+  if (!SCREEN_TOOLS.has(tool)) return COMPUTER_OTHER_DEADLINE_MS;
+  return computerStarting
+    ? COMPUTER_SCREEN_DEADLINE_MS + COMPUTER_START_ALLOWANCE_MS
+    : COMPUTER_SCREEN_DEADLINE_MS;
 }
 
 function isFinalState(state: ComputerCallState): boolean {
@@ -1372,7 +1380,10 @@ export async function forwardComputerCall(
       text: `尚未代填。网站授权卡已发给用户（${pendingApprovals.join(', ')}），请等用户在卡片上批准。批准后先 browser_snapshot，再用新的 ref 重试；不要索取密码。`,
     };
   const now = nowMs();
-  const deadlineAt = now + computerDeadlineMs(tool, body.params);
+  const computerStarting =
+    target.computerId !== null &&
+    db.select().from(computer).where(eq(computer.id, target.computerId)).get()?.state !== 'running';
+  const deadlineAt = now + computerDeadlineMs(tool, body.params, computerStarting);
   const browserTool = isComputerBrowserTool(tool);
   if (target.computerId !== null) {
     if (browserTool)

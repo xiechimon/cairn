@@ -25,7 +25,7 @@ export type CoordinatorComputerToolOffer =
 
 export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorComputerToolOffer> =
   {
-    shell: { withheld: 'the Coordinator delegates shell work to threads' },
+    shell: { offered: 'when_machine_reports_vm_computer' },
     list_files: { withheld: 'the Coordinator delegates file work to threads' },
     read_file: { withheld: 'the Coordinator delegates file work to threads' },
     write_file: { withheld: 'the Coordinator delegates file work to threads' },
