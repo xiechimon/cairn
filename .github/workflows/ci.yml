@@ -3,7 +3,7 @@ name: ci
 # Third-party actions are pinned to full commit SHAs (#1076); the trailing version is Dependabot's anchor.
 on:
   push:
-    branches: [main]
+    branches: [main, 'queue/**']
   pull_request:
 
 concurrency:

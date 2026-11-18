@@ -214,7 +214,7 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   assert.match(readFileSync('.github/workflows/ci.yml', 'utf8'), /^jobs:$/m);
   assert.ok(
     readFileSync('.github/workflows/ci.yml', 'utf8').includes(
-      'on:\n  push:\n    branches: [main]\n  pull_request:\n',
+      "on:\n  push:\n    branches: [main, 'queue/**']\n  pull_request:\n",
     ),
   );
   assert.match(changes, /has-code: \$\{\{ steps.classify.outputs.has-code \}\}/);

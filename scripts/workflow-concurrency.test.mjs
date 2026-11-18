@@ -73,3 +73,12 @@ test('a pull request never shares a group with a main push', () => {
   assert.notEqual(pr.group, decision('ci', push('refs/heads/main')).group);
   assert.match(pr.group, /^ci-pr-\d+$/);
 });
+
+test('queue candidates get per-commit groups so a stacked push never cancels a running candidate', () => {
+  const first = decision('ci', push('refs/heads/queue/main', 'aaaaaaa'));
+  const second = decision('ci', push('refs/heads/queue/main', 'bbbbbbb'));
+  assert.equal(first.group, 'ci-push-refs/heads/queue/main-aaaaaaa');
+  assert.notEqual(first.group, second.group);
+  assert.equal(first.cancel, false);
+  assert.equal(second.cancel, false);
+});
