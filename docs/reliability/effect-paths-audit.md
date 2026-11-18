@@ -54,7 +54,7 @@ None for effects. Nearest: the in-memory `ProviderHealthTracker` (degraded after
 
 ## Not verified
 
-Daemon behavior on repeated claim after a lost wake; `ci-loop.ts` reconcile in full; `apps/coordinator`; whether `queuePushDigest` has a producer outside `apps/server/src`.
+Daemon behavior on repeated claim after a lost wake, and `ci-loop.ts` reconcile in full. Two earlier entries resolved: `apps/coordinator` does not exist (the coordinator runtime is `apps/server/src/coordinator/`, whose tool paths are rows 1, 2, 6, 7 and 8), and `queuePushDigest`'s only producer is `mail.ts` (row 18's at-least-once digest).
 
 ## Fix slices (one problem per PR)
 
