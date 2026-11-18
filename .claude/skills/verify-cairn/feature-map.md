@@ -648,9 +648,9 @@ Reach:
 
 ### account-and-team
 
-**Account and team** (shipped, centrality 3). The user's account, language and device notification preferences.
+**Account and team** (shipped, centrality 3). The user's account, language, global external-actions tier and device notification preferences.
 
-States: Account details, language selection and device push enabled or disabled.
+States: Account details, language selection, the team-wide external-actions tier projects follow by default, and device push enabled or disabled.
 
 Reach:
 
@@ -659,7 +659,7 @@ Reach:
 - Web routes: `/app/account`
 - Settings: `设置` (Settings) › `账号` (Account)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: none
+- Test ids in its code: `team-autonomy-tier`
 - Verify recipes: [.claude/skills/verify-cairn/features/avatars.md](features/avatars.md)
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
@@ -888,7 +888,7 @@ Reach:
 
 **Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.
 
-States: A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted.
+States: A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.
 
 Reach:
 

@@ -204,7 +204,12 @@ test('probe: every control on the account page has an observable effect on click
       })),
     );
 
-  expect(descriptors.map((d) => d.name)).toEqual(['编辑名称', '语言', '推送通知']);
+  expect(descriptors.map((d) => d.name)).toEqual([
+    '编辑名称',
+    '语言',
+    '对外动作',
+    '推送通知',
+  ]);
 
   for (const d of descriptors) {
 

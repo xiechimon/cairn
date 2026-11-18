@@ -61,6 +61,7 @@ import type {
   PatchProjectBody,
   PatchProviderBody,
   PatchScheduleBody,
+  PatchTeamAutonomyBody,
   PatchTeamBody,
   PatchUserBody,
   PlanResponse as PlanRow,
@@ -82,6 +83,7 @@ import type {
   StartMcpConnectorOAuthBody,
   StepJournalRow,
   TailscaleAccess,
+  TeamAutonomy,
   TeamMember,
   TeamRecord,
   ThreadMessageResult,
@@ -162,6 +164,13 @@ export const useProjectAutonomy = (projectId: string | undefined, enabled: boole
     queryKey: ['project-autonomy', projectId],
     queryFn: () => api.get<AutonomyRecord>(`/api/projects/${projectId}/autonomy`),
     enabled: enabled && projectId !== undefined,
+  });
+
+export const useTeamAutonomy = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['team-autonomy', teamId],
+    queryFn: () => api.get<TeamAutonomy>(`/api/teams/${teamId}/autonomy`),
+    enabled: enabled && teamId !== undefined,
   });
 
 export function useSearchResults(query: string, enabled: boolean) {
@@ -1088,6 +1097,14 @@ export function useApiMutations(teamId: string | undefined) {
         api.patch<AutonomyRecord>(`/api/projects/${input.id}/autonomy`, input.body),
       onSuccess: (record, input) => {
         qc.setQueryData(['project-autonomy', input.id], record);
+        invalidateAll();
+      },
+    }),
+    patchTeamAutonomy: useMutation({
+      mutationFn: (body: PatchTeamAutonomyBody) =>
+        api.patch<TeamAutonomy>(`/api/teams/${teamId}/autonomy`, body),
+      onSuccess: (record) => {
+        qc.setQueryData(['team-autonomy', teamId], record);
         invalidateAll();
       },
     }),

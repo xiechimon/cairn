@@ -5,6 +5,7 @@ import {
   type GithubIssueEcho,
   type ProjectRecord,
   type TodoRecord as SharedTodoRecord,
+  type TeamAutonomy,
 } from '@cairn/shared';
 import type { ChiefQuestionItem } from '../chief/question-chips.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
@@ -412,6 +413,10 @@ export const QUESTION_CANCELLED: ChiefQuestionItem = {
   status: 'cancelled',
 };
 
+export const TEAM_AUTONOMY: TeamAutonomy = {
+  actionTier: 'guarded',
+};
+
 export const AUTONOMY: AutonomyRecord = {
   settings: {
     enabled: true,
@@ -420,6 +425,7 @@ export const AUTONOMY: AutonomyRecord = {
     dailyBudgetUsd: 10,
     actionTier: 'guarded',
   },
+  actionTierOverride: null,
   spentTodayUsd: 3.42,
   kinds: [
     {

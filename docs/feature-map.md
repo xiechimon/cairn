@@ -457,7 +457,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### account-and-team
 
-**Account and team** (shipped). The user's account, language and device notification preferences.
+**Account and team** (shipped). The user's account, language, global external-actions tier and device notification preferences.
 
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](design/references/settings)

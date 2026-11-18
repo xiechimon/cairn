@@ -1,10 +1,10 @@
 import type {
+  ActionTier,
   ActiveRun,
   AutonomyGateReason,
   AutonomyKind,
   AutonomyPauseMarker,
   AutonomyPauseSource,
-  AutonomySettings,
   BlockerHandoffRecord,
   BuildEvidence,
   BuildStop,
@@ -60,6 +60,7 @@ import type {
   SplitPolicy,
   StepKind,
   StepPromptOrigin,
+  StoredAutonomySettings,
   TaskDecision,
   TaskRequest,
   TodoOutputKind,
@@ -104,6 +105,7 @@ export const team = sqliteTable('team', {
   firstPrReportPromptFirstPrNumber: integer('firstPrReportPromptFirstPrNumber'),
   namedPrompts: json<NamedPromptOverrides | null>('namedPrompts'),
   defaultMachineId: text('defaultMachineId'),
+  actionTier: text('actionTier').$type<ActionTier>().notNull().default('full'),
 });
 
 export const autonomyPause = sqliteTable(
@@ -150,7 +152,7 @@ export const project = sqliteTable('project', {
   archivedAt: epochMs('archivedAt'),
   modelOverrides: json<ProjectModelOverrides>('modelOverrides'),
   autonomy: json<
-    (AutonomySettings & Partial<ProjectMergeConfig> & { shipRoute?: ShipRoute }) | null
+    (StoredAutonomySettings & Partial<ProjectMergeConfig> & { shipRoute?: ShipRoute }) | null
   >('autonomy'),
   personalOwnerId: text('personalOwnerId').references(() => user.id),
 });

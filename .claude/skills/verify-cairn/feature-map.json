@@ -1582,7 +1582,7 @@
       "id": "projects",
       "name": "Projects",
       "summary": "Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.",
-      "states": "A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted.",
+      "states": "A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2277,8 +2277,8 @@
     {
       "id": "account-and-team",
       "name": "Account and team",
-      "summary": "The user's account, language and device notification preferences.",
-      "states": "Account details, language selection and device push enabled or disabled.",
+      "summary": "The user's account, language, global external-actions tier and device notification preferences.",
+      "states": "Account details, language selection, the team-wide external-actions tier projects follow by default, and device push enabled or disabled.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2298,6 +2298,7 @@
           "/api/user/me",
           "/api/teams",
           "/api/teams/:id",
+          "/api/teams/:id/autonomy",
           "/api/teams/:id/members"
         ]
       },

@@ -904,10 +904,13 @@ export const EN: Record<string, string> = {
   后台自动任务: 'Background tasks',
   允许后台自动开跑: 'Allow background runs',
   对外动作: 'External actions',
-  '先问过我（默认）': 'Ask me first (default)',
-  自动做: 'Run automatically',
-  '发送、发布等对外动作先问过再跑；其余动作自动。':
-    'Send, publish and other external-output actions ask first; everything else runs automatically.',
+  先问我: 'Ask me first',
+  完全放手: 'Full access',
+  跟随全局: 'Follow global',
+  '跟随全局（{tier}）': 'Follow global ({tier})',
+  项目默认跟随这里的全局设置: 'Projects follow this global setting by default',
+  '发送、发布等对外动作，先问过再跑或完全交给它。':
+    'Send, publish and other external-output actions ask first — or run entirely on their own.',
   '有人在用时让路（分钟）': 'Yield while someone is active (minutes)',
   '同类任务冷却（分钟）': 'Cooldown between runs (minutes)',
   '每日预算（USD）': 'Daily budget (USD)',

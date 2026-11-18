@@ -7,10 +7,21 @@ import {
   type AutonomySettings,
   DEFAULT_AUTONOMY_SETTINGS,
   type PatchAutonomyBody,
+  type PatchTeamAutonomyBody,
+  type StoredAutonomySettings,
+  type TeamAutonomy,
 } from '@cairn/shared';
 import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { autonomyState, build, memberActivity, project, todo, tokenUsage } from '../db/schema.js';
+import {
+  autonomyState,
+  build,
+  memberActivity,
+  project,
+  team,
+  todo,
+  tokenUsage,
+} from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 
 const MINUTE_MS = 60_000;
@@ -61,19 +72,37 @@ export function utcDayStart(now: number): number {
   return Math.floor(now / DAY_MS) * DAY_MS;
 }
 
-export function autonomySettingsOf(row: { autonomy: AutonomySettings | null }): AutonomySettings {
-  return { ...DEFAULT_AUTONOMY_SETTINGS, ...(row.autonomy ?? {}) };
+export function autonomySettingsOf(row: {
+  autonomy: StoredAutonomySettings | null;
+}): AutonomySettings {
+  return {
+    ...DEFAULT_AUTONOMY_SETTINGS,
+    ...(row.autonomy ?? {}),
+    actionTier: row.autonomy?.actionTier ?? DEFAULT_AUTONOMY_SETTINGS.actionTier,
+  };
+}
+
+export function teamActionTierOf(db: Db, teamId: string): ActionTier {
+  const row = db
+    .select({ actionTier: team.actionTier })
+    .from(team)
+    .where(eq(team.id, teamId))
+    .get();
+  return row?.actionTier ?? DEFAULT_AUTONOMY_SETTINGS.actionTier;
 }
 
 export function actionTierOf(db: Db, teamId: string, projectId: string | null): ActionTier {
-  if (projectId === null) return DEFAULT_AUTONOMY_SETTINGS.actionTier;
-  const row = db
-    .select({ autonomy: project.autonomy, teamId: project.teamId })
-    .from(project)
-    .where(eq(project.id, projectId))
-    .get();
-  if (row === undefined || row.teamId !== teamId) return DEFAULT_AUTONOMY_SETTINGS.actionTier;
-  return autonomySettingsOf(row).actionTier;
+  if (projectId !== null) {
+    const row = db
+      .select({ autonomy: project.autonomy, teamId: project.teamId })
+      .from(project)
+      .where(eq(project.id, projectId))
+      .get();
+    if (row !== undefined && row.teamId === teamId && row.autonomy?.actionTier != null) {
+      return row.autonomy.actionTier;
+    }
+  }
+  return teamActionTierOf(db, teamId);
 }
 
 export function spentForGate(
@@ -89,7 +118,7 @@ export function spentForGate(
 
 export function evaluateRequestedRun(
   db: Db,
-  row: { id: string; autonomy: AutonomySettings | null },
+  row: { id: string; autonomy: StoredAutonomySettings | null },
   now: number,
 ): AutonomyGateResult {
   const settings = autonomySettingsOf(row);
@@ -206,7 +235,7 @@ export function recordAutonomyStart(
 
 export function readAutonomy(db: Db, projectId: string, now: number): AutonomyRecord {
   const row = db
-    .select({ autonomy: project.autonomy })
+    .select({ autonomy: project.autonomy, teamId: project.teamId })
     .from(project)
     .where(eq(project.id, projectId))
     .get();
@@ -216,8 +245,10 @@ export function readAutonomy(db: Db, projectId: string, now: number): AutonomyRe
     .from(autonomyState)
     .where(eq(autonomyState.projectId, projectId))
     .all();
+  const actionTier = row.autonomy?.actionTier ?? teamActionTierOf(db, row.teamId);
   return {
-    settings: autonomySettingsOf(row),
+    settings: { ...autonomySettingsOf(row), actionTier },
+    actionTierOverride: row.autonomy?.actionTier ?? null,
     spentTodayUsd: autonomySpentToday(db, projectId, now),
     kinds: AUTONOMY_KINDS.map((kind) => {
       const s = states.find((x) => x.kind === kind);
@@ -243,7 +274,22 @@ export function patchAutonomy(
     .where(eq(project.id, projectId))
     .get();
   if (row === undefined) throw notFound('project');
-  const next: AutonomySettings = { ...autonomySettingsOf(row), ...body };
+  const next = { ...(row.autonomy ?? {}), ...body };
   db.update(project).set({ autonomy: next }).where(eq(project.id, projectId)).run();
   return readAutonomy(db, projectId, now);
+}
+
+export function readTeamAutonomy(db: Db, teamId: string): TeamAutonomy {
+  return { actionTier: teamActionTierOf(db, teamId) };
+}
+
+export function patchTeamAutonomy(
+  db: Db,
+  teamId: string,
+  body: PatchTeamAutonomyBody,
+): TeamAutonomy {
+  if (body.actionTier !== undefined) {
+    db.update(team).set({ actionTier: body.actionTier }).where(eq(team.id, teamId)).run();
+  }
+  return readTeamAutonomy(db, teamId);
 }

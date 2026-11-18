@@ -1,7 +1,6 @@
 import {
   ACTIVE_STEP_STATUSES,
   type CreateProjectBody,
-  DEFAULT_AUTONOMY_SETTINGS,
   DEFAULT_SHIP_ROUTE,
   type PatchProjectBody,
   type ProjectMergeConfig,
@@ -73,7 +72,7 @@ export function updateProjectMergeConfig(
   const patch = patchProjectMergeConfigSchema.parse(input);
   const current = projectMergeConfigOf(row);
   const next = projectMergeConfigSchema.parse({ ...current, ...patch });
-  const autonomy = { ...DEFAULT_AUTONOMY_SETTINGS, ...(row.autonomy ?? {}), ...next };
+  const autonomy = { ...(row.autonomy ?? {}), ...next };
   db.update(project).set({ autonomy }).where(eq(project.id, row.id)).run();
   return next;
 }
@@ -86,7 +85,7 @@ export function updateProjectShipRoute(db: Db, row: ProjectRow, shipRoute: ShipR
   if (shipRoute === 'local-merge' && row.repoKind !== 'local') {
     throw new HttpError(409, 'local-merge requires a local repository project');
   }
-  const autonomy = { ...DEFAULT_AUTONOMY_SETTINGS, ...(row.autonomy ?? {}), shipRoute };
+  const autonomy = { ...(row.autonomy ?? {}), shipRoute };
   db.update(project).set({ autonomy }).where(eq(project.id, row.id)).run();
   return shipRoute;
 }

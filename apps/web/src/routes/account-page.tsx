@@ -1,6 +1,7 @@
+import type { ActionTier } from '@cairn/shared';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useApiMutations } from '../api/hooks.js';
+import { useApiMutations, useTeamAutonomy } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNotificationPermission } from '../board/notify-banner.js';
 import { type NotifyPref, persistNotifyPref, readNotifyPref } from '../board/notify-pref.js';
@@ -24,6 +25,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
+import { TIER_LABELS } from '../pages/project-autonomy-card.js';
 import { PageShell } from '../pages/shell.js';
 import {
   currentDeviceSubscription,
@@ -40,6 +42,20 @@ export function AccountPage() {
   const fixture = resolveScenario(searchParams);
   const { live, teamId, user } = useLiveData();
   const mutations = useApiMutations(teamId);
+  const teamAutonomy = useTeamAutonomy(teamId, live);
+  const [fixtureTier, setFixtureTier] = useState<ActionTier>('full');
+  const actionTier = live ? (teamAutonomy.data?.actionTier ?? 'full') : fixtureTier;
+  const commitTier = (next: ActionTier) => {
+    if (!live) {
+      if (blockDemoWrite()) return;
+      setFixtureTier(next);
+      return;
+    }
+    mutations.patchTeamAutonomy.mutate(
+      { actionTier: next },
+      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+    );
+  };
   const [fixtureName, setFixtureName] = useState<string | null>(null);
   const userName = live ? user.displayName : (fixtureName ?? user.displayName);
   const commitName = (next: string) => {
@@ -109,6 +125,29 @@ export function AccountPage() {
                     {LOCALE_NAMES[code]}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+          <SettingsRow label={t('对外动作')} hint={t('项目默认跟随这里的全局设置')}>
+            <Select
+              value={actionTier}
+              disabled={
+                live && (teamAutonomy.data === undefined || mutations.patchTeamAutonomy.isPending)
+              }
+              onValueChange={(next) => {
+                if (next !== null) commitTier(next as ActionTier);
+              }}
+            >
+              <SelectTrigger
+                aria-label={t('对外动作')}
+                className={SETTINGS_SELECT_TRIGGER_CLS}
+                data-testid="team-autonomy-tier"
+              >
+                <SelectValue>{t(TIER_LABELS[actionTier])}</SelectValue>
+              </SelectTrigger>
+              <SelectContent aria-label={t('对外动作')} align="end" alignItemWithTrigger={false}>
+                <SelectItem value="guarded">{t('先问我')}</SelectItem>
+                <SelectItem value="full">{t('完全放手')}</SelectItem>
               </SelectContent>
             </Select>
           </SettingsRow>

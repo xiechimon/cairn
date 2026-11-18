@@ -19,7 +19,7 @@ export function defaultOwnerName(): string {
 }
 
 export function seed(db: Db): SeedResult {
-  const existingTeam = db.select().from(team).all()[0];
+  const existingTeam = db.select(teamRecordColumns).from(team).all()[0];
   const existingUser = db.select(userRecordColumns).from(user).all()[0];
   if (existingTeam && existingUser) {
     if (existingUser.displayName === 'Owner') {
@@ -36,21 +36,16 @@ export function seed(db: Db): SeedResult {
   const teamId = newRecordId();
   const createdAt = nowMs();
   const displayName = defaultOwnerName();
+  const teamName = `${displayName}'s team`;
   db.run(
     sql`insert into ${user} (${sql.identifier(user.id.name)}, ${sql.identifier(user.displayName.name)}) values (${userId}, ${displayName})`,
   );
-  db.insert(team)
-    .values({
-      id: teamId,
-      name: `${displayName}'s team`,
-      createdAt,
-      plan: 'free',
-      avatarStyle: 'notionist',
-    })
-    .run();
+  db.run(
+    sql`insert into ${team} (${sql.identifier(team.id.name)}, ${sql.identifier(team.name.name)}, ${sql.identifier(team.createdAt.name)}, ${sql.identifier(team.plan.name)}, ${sql.identifier(team.avatarStyle.name)}) values (${teamId}, ${teamName}, ${createdAt}, 'free', 'notionist')`,
+  );
 
   const userRow = db.select(userRecordColumns).from(user).where(eq(user.id, userId)).get();
-  const teamRow = db.select().from(team).where(eq(team.id, teamId)).get();
+  const teamRow = db.select(teamRecordColumns).from(team).where(eq(team.id, teamId)).get();
   if (!userRow || !teamRow) throw new Error('seed failed: rows missing after insert');
   return { user: toUserRecord(userRow), team: toTeamRecord(teamRow) };
 }
@@ -59,6 +54,16 @@ const userRecordColumns = {
   id: user.id,
   displayName: user.displayName,
   avatarUrl: user.avatarUrl,
+};
+
+const teamRecordColumns = {
+  id: team.id,
+  name: team.name,
+  createdAt: team.createdAt,
+  plan: team.plan,
+  avatarStyle: team.avatarStyle,
+  maxAutonomousMergesPerDay: team.maxAutonomousMergesPerDay,
+  defaultMachineId: team.defaultMachineId,
 };
 
 export function toUserRecord(row: {
@@ -70,7 +75,7 @@ export function toUserRecord(row: {
 }
 
 export function toTeamRecord(
-  row: typeof team.$inferSelect,
+  row: Pick<typeof team.$inferSelect, keyof typeof teamRecordColumns>,
   pauses?: AutonomyPauseEntry[],
 ): TeamRecord {
   return {

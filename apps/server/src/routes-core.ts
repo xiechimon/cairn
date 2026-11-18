@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   dailyUsageQuerySchema,
   patchRoutingRuleBodySchema,
+  patchTeamAutonomyBodySchema,
   patchTeamBodySchema,
   patchUserBodySchema,
   patchWorkPolicyBodySchema,
@@ -22,6 +23,7 @@ import { loopbackOwnerOriginOf } from './lib/loopback-owner.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { isOpenRemotePath, pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
+import { patchTeamAutonomy, readTeamAutonomy } from './services/autonomy-gates.js';
 import { readBackupHealth } from './services/backup-status.js';
 import {
   AUTH_COOKIE,
@@ -195,6 +197,19 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       known.defaultSkill = filterKnownSkillIds(ctx.skillsDir, [body.defaultSkill])[0] ?? null;
     }
     return c.json(upsertWorkPolicy(ctx.db, id, use, known));
+  });
+
+  app.get('/api/teams/:id/autonomy', (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    return c.json(readTeamAutonomy(ctx.db, id));
+  });
+
+  app.patch('/api/teams/:id/autonomy', async (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    const body = parseWith(patchTeamAutonomyBodySchema, await jsonBody(c), 'body');
+    return c.json(patchTeamAutonomy(ctx.db, id, body));
   });
 
   app.patch('/api/teams/:id', async (c) => {

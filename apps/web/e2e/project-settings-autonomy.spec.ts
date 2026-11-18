@@ -24,14 +24,17 @@ const PROJECTS = [
   },
 ];
 
+type Tier = 'guarded' | 'full';
+
 interface Autonomy {
   settings: {
     enabled: boolean;
-    actionTier: 'guarded' | 'full';
+    actionTier: Tier;
     quietMinutes: number;
     cooldownMinutes: number;
     dailyBudgetUsd: number;
   };
+  actionTierOverride: Tier | null;
   spentTodayUsd: number | null;
   kinds: Array<{
     kind: string;
@@ -50,6 +53,7 @@ function initialAutonomy(): Autonomy {
       cooldownMinutes: 15,
       dailyBudgetUsd: 10,
     },
+    actionTierOverride: 'guarded',
     spentTodayUsd: 3.5,
     kinds: [
       {
@@ -65,17 +69,27 @@ function initialAutonomy(): Autonomy {
 
 interface Stub {
   patches: Record<string, unknown>[];
+  teamPatches: Record<string, unknown>[];
 }
 
 async function stubWorld(page: Page, failNext = false): Promise<Stub> {
-  const stub: Stub = { patches: [] };
+  const stub: Stub = { patches: [], teamPatches: [] };
   let autonomy = initialAutonomy();
+  let teamTier: Tier = 'guarded';
   let fail = failNext;
   await page.route('**/api/**', (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
   });
   await page.route('**/api/teams', (route) => route.fulfill({ json: [TEAM] }));
+  await page.route('**/api/teams/*/autonomy', (route, request) => {
+    if (request.method() === 'GET') return route.fulfill({ json: { actionTier: teamTier } });
+    if (request.method() !== 'PATCH') return route.fallback();
+    const body = JSON.parse(request.postData() ?? '{}') as Record<string, unknown>;
+    stub.teamPatches.push(body);
+    if (typeof body.actionTier === 'string') teamTier = body.actionTier as Tier;
+    return route.fulfill({ json: { actionTier: teamTier } });
+  });
   await page.route('**/api/user/me', (route) => route.fulfill({ json: USER }));
   await page.route('**/api/projects?*', (route) => route.fulfill({ json: PROJECTS }));
   await page.route('**/api/projects/*/autonomy', (route, request) => {
@@ -88,6 +102,14 @@ async function stubWorld(page: Page, failNext = false): Promise<Stub> {
       return route.fulfill({ status: 500, json: { error: 'stub: autonomy write rejected' } });
     }
     autonomy = { ...autonomy, settings: { ...autonomy.settings, ...body } };
+    if (body.actionTier !== undefined) {
+      const override = body.actionTier as Tier | null;
+      autonomy = {
+        ...autonomy,
+        actionTierOverride: override,
+        settings: { ...autonomy.settings, actionTier: override ?? teamTier },
+      };
+    }
     return route.fulfill({ json: autonomy });
   });
   return stub;
@@ -113,7 +135,7 @@ test('autonomy card: github project shows thresholds and the last verdict per ki
   await expect(card.getByTestId('autonomy-state-scheduling')).toHaveText('最近一次放行');
 });
 
-test('autonomy card: decision tier selector defaults to ask and patches the tier at once', async ({
+test('autonomy card: decision tier selector shows the override and patches the tier at once', async ({
   page,
 }) => {
   const stub = await stubWorld(page);
@@ -121,13 +143,40 @@ test('autonomy card: decision tier selector defaults to ask and patches the tier
   const card = page.getByRole('region', { name: '后台自动任务' });
   const tier = card.getByTestId('autonomy-tier');
   await expect(tier).toBeVisible();
-  await expect(tier).toContainText('先问过我');
-  await expect(card.getByText('发送、发布等对外动作先问过再跑；其余动作自动。')).toBeVisible();
+  await expect(tier).toContainText('先问我');
+  await expect(card.getByText('发送、发布等对外动作，先问过再跑或完全交给它。')).toBeVisible();
   await tier.click();
-  await page.getByRole('option', { name: '自动做' }).click();
+  await page.getByRole('option', { name: '完全放手' }).click();
   await expect.poll(() => stub.patches.length).toBe(1);
   expect(stub.patches[0]).toEqual({ actionTier: 'full' });
-  await expect(tier).toContainText('自动做');
+  await expect(tier).toContainText('完全放手');
+});
+
+test('autonomy card: following the global tier sends actionTier null and shows the global value', async ({
+  page,
+}) => {
+  const stub = await stubWorld(page);
+  await page.goto(`/app/project/${GITHUB_PROJECT_ID}/settings`);
+  const card = page.getByRole('region', { name: '后台自动任务' });
+  const tier = card.getByTestId('autonomy-tier');
+  await tier.click();
+  await page.getByRole('option', { name: '跟随全局（先问我）' }).click();
+  await expect.poll(() => stub.patches.length).toBe(1);
+  expect(stub.patches[0]).toEqual({ actionTier: null });
+  await expect(tier).toContainText('跟随全局（先问我）');
+});
+
+test('account settings: the global external-actions tier patches the team', async ({ page }) => {
+  const stub = await stubWorld(page);
+  await page.goto('/app/account');
+  const tier = page.getByTestId('team-autonomy-tier');
+  await expect(tier).toBeVisible();
+  await expect(tier).toContainText('先问我');
+  await tier.click();
+  await page.getByRole('option', { name: '完全放手' }).click();
+  await expect.poll(() => stub.teamPatches.length).toBe(1);
+  expect(stub.teamPatches[0]).toEqual({ actionTier: 'full' });
+  await expect(tier).toContainText('完全放手');
 });
 
 test('autonomy card: local project has no card', async ({ page }) => {

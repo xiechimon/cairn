@@ -4,10 +4,11 @@ import type {
   AutonomyKind,
   AutonomyRecord,
   AutonomySettings,
+  PatchAutonomyBody,
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
-import { useApiMutations, useProjectAutonomy } from '../api/hooks.js';
+import { useApiMutations, useProjectAutonomy, useTeamAutonomy } from '../api/hooks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import {
   SETTINGS_ROW_CLS,
@@ -47,9 +48,9 @@ const REASON_LABELS: Record<AutonomyGateReason, string> = {
   'budget-unreadable': '花费读不到，先不跑',
 };
 
-const TIER_LABELS: Record<ActionTier, string> = {
-  guarded: '先问过我（默认）',
-  full: '自动做',
+export const TIER_LABELS: Record<ActionTier, string> = {
+  guarded: '先问我',
+  full: '完全放手',
 };
 
 type NumberKey = 'quietMinutes' | 'cooldownMinutes' | 'dailyBudgetUsd';
@@ -63,12 +64,18 @@ const NUMBER_FIELDS: Array<{ key: NumberKey; label: string; step: string }> = [
 export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; teamId: string }) {
   const { t } = useI18n();
   const q = useProjectAutonomy(projectId, true);
+  const teamQ = useTeamAutonomy(teamId, true);
   const mutations = useApiMutations(teamId);
   const [draft, setDraft] = useState<Partial<Record<NumberKey, string>>>({});
   const data: AutonomyRecord | undefined = q.data;
   if (data === undefined) return null;
   const settings = data.settings;
-  const save = (body: Partial<AutonomySettings>, onSuccess?: () => void) =>
+  const teamTier = teamQ.data?.actionTier;
+  const followLabel =
+    teamTier === undefined
+      ? t('跟随全局')
+      : t('跟随全局（{tier}）', { tier: t(TIER_LABELS[teamTier]) });
+  const save = (body: PatchAutonomyBody, onSuccess?: () => void) =>
     mutations.patchAutonomy.mutate(
       { id: projectId, body },
       {
@@ -104,23 +111,30 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
         </SettingsRow>
         <SettingsRow
           label={t('对外动作')}
-          hint={t('发送、发布等对外动作先问过再跑；其余动作自动。')}
+          hint={t('发送、发布等对外动作，先问过再跑或完全交给它。')}
         >
           <Select
-            value={settings.actionTier}
+            value={data.actionTierOverride ?? 'follow'}
             disabled={mutations.patchAutonomy.isPending}
-            onValueChange={(tier) => save({ actionTier: tier as ActionTier })}
+            onValueChange={(tier) =>
+              save({ actionTier: tier === 'follow' ? null : (tier as ActionTier) })
+            }
           >
             <SelectTrigger
               aria-label={t('对外动作')}
-              className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
+              className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-52')}
               data-testid="autonomy-tier"
             >
-              <SelectValue>{t(TIER_LABELS[settings.actionTier])}</SelectValue>
+              <SelectValue>
+                {data.actionTierOverride === null
+                  ? followLabel
+                  : t(TIER_LABELS[data.actionTierOverride])}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="guarded">{t('先问过我（默认）')}</SelectItem>
-              <SelectItem value="full">{t('自动做')}</SelectItem>
+              <SelectItem value="follow">{followLabel}</SelectItem>
+              <SelectItem value="guarded">{t('先问我')}</SelectItem>
+              <SelectItem value="full">{t('完全放手')}</SelectItem>
             </SelectContent>
           </Select>
         </SettingsRow>

@@ -1317,6 +1317,13 @@
       "when": 1794934486436,
       "tag": "0192_giant_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 193,
+      "version": "6",
+      "when": 1794968647916,
+      "tag": "0193_next_demogoblin",
+      "breakpoints": true
     }
   ]
 }

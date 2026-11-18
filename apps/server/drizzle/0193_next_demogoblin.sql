@@ -1,0 +1,1 @@
+ALTER TABLE `team` ADD `actionTier` text DEFAULT 'full' NOT NULL;

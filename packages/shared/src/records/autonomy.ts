@@ -29,16 +29,28 @@ export const autonomySettingsSchema = z.object({
 });
 export type AutonomySettings = z.infer<typeof autonomySettingsSchema>;
 
+export const storedAutonomySettingsSchema = autonomySettingsSchema
+  .omit({ actionTier: true })
+  .partial()
+  .extend({ actionTier: actionTierSchema.nullish() });
+export type StoredAutonomySettings = z.infer<typeof storedAutonomySettingsSchema>;
+
 export const DEFAULT_AUTONOMY_SETTINGS: AutonomySettings = {
   enabled: true,
   quietMinutes: 10,
   cooldownMinutes: 15,
   dailyBudgetUsd: 10,
-  actionTier: 'guarded',
+  actionTier: 'full',
 };
 
-export const patchAutonomyBodySchema = autonomySettingsSchema.partial().strict();
+export const patchAutonomyBodySchema = storedAutonomySettingsSchema.strict();
 export type PatchAutonomyBody = z.infer<typeof patchAutonomyBodySchema>;
+
+export const teamAutonomySchema = z.object({ actionTier: actionTierSchema });
+export type TeamAutonomy = z.infer<typeof teamAutonomySchema>;
+
+export const patchTeamAutonomyBodySchema = teamAutonomySchema.partial().strict();
+export type PatchTeamAutonomyBody = z.infer<typeof patchTeamAutonomyBodySchema>;
 
 export const autonomyKindStateSchema = z.object({
   kind: autonomyKindSchema,
@@ -50,6 +62,7 @@ export type AutonomyKindState = z.infer<typeof autonomyKindStateSchema>;
 
 export const autonomyRecordSchema = z.object({
   settings: autonomySettingsSchema,
+  actionTierOverride: actionTierSchema.nullable(),
   spentTodayUsd: z.number().nullable(),
   kinds: z.array(autonomyKindStateSchema),
 });

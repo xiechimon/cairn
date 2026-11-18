@@ -14,6 +14,7 @@ import {
   chiefThread,
   project as projectTable,
   step,
+  team as teamTable,
   todo,
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
@@ -53,6 +54,7 @@ const noted: ActionEntry = {
 
 function world() {
   const s = bootServer();
+  s.db.update(teamTable).set({ actionTier: 'guarded' }).run();
   s.db.insert(projectTable).values({ id: 'project-a', teamId: s.team.id, name: 'Alpha' }).run();
   s.db
     .insert(chief)
@@ -818,7 +820,7 @@ describe('send and submit action classes', () => {
         .get()?.content,
     );
 
-  test('a send-class action asks with a parked card on the default tier and runs nothing', () => {
+  test('a send-class action asks with a parked card on the guarded tier and runs nothing', () => {
     const s = world();
     const proposed = call(s, sendMessage, sendInput);
     expect(proposed.status).toBe('pending');
@@ -836,14 +838,14 @@ describe('send and submit action classes', () => {
     s.dispose();
   });
 
-  test('a submit-class action asks on the default tier', () => {
+  test('a submit-class action asks on the guarded tier', () => {
     const s = world();
     const proposed = call(s, submitForm, { host: 'jobs.example.com', formId: 'apply' });
     expect(proposed.status).toBe('pending');
     s.dispose();
   });
 
-  test('non-send actions pass without asking on the default tier', () => {
+  test('non-send actions pass without asking on the guarded tier', () => {
     const s = world();
     const archived = executeAction(
       { db: s.db, reposDir: s.reposDir },

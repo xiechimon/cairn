@@ -10,12 +10,21 @@ import {
 } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
-import { AUTONOMY, BRANCHES, FS_ROOT, fsListing, ISSUE_ECHO } from './product-fixtures.js';
+import {
+  AUTONOMY,
+  BRANCHES,
+  FS_ROOT,
+  fsListing,
+  ISSUE_ECHO,
+  TEAM_AUTONOMY,
+} from './product-fixtures.js';
 
 function fixtureFor(key: QueryKey): unknown {
   switch (key[0]) {
     case 'project-autonomy':
       return AUTONOMY;
+    case 'team-autonomy':
+      return TEAM_AUTONOMY;
     case 'fs-list':
       return fsListing(typeof key[1] === 'string' ? key[1] : FS_ROOT);
     case 'memories':
