@@ -9,7 +9,7 @@ export const IM_CONNECTION_STATUSES = [
 ] as const;
 export type ImConnectionStatus = (typeof IM_CONNECTION_STATUSES)[number];
 
-export const IM_PLATFORMS = ['telegram', 'wechat'] as const;
+export const IM_PLATFORMS = ['telegram', 'wechat', 'slack'] as const;
 export type ImPlatform = (typeof IM_PLATFORMS)[number];
 
 export const IM_PAIRING_REQUEST_STATUSES = ['pending', 'approved', 'rejected'] as const;
@@ -52,6 +52,14 @@ export const imTelegramConnectBodySchema = z
   .object({ botToken: z.string().min(1).max(256) })
   .strict();
 export type ImTelegramConnectBody = z.infer<typeof imTelegramConnectBodySchema>;
+
+export const imSlackConnectBodySchema = z
+  .object({
+    appToken: z.string().min(1).max(256),
+    botToken: z.string().min(1).max(256),
+  })
+  .strict();
+export type ImSlackConnectBody = z.infer<typeof imSlackConnectBodySchema>;
 
 export const imWechatLoginStartSchema = z.object({
   loginId: z.string().min(1),

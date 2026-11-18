@@ -741,6 +741,11 @@ export function useImMutations(teamId: string | undefined) {
         }),
       onSuccess: invalidate,
     }),
+    connectSlack: useMutation({
+      mutationFn: (fields: { appToken: string; botToken: string }) =>
+        api.post<{ connection: ImConnectionRecord }>(`/api/teams/${teamId}/im/slack`, fields),
+      onSuccess: invalidate,
+    }),
     startWechatLogin: useMutation({
       mutationFn: () => api.post<ImWechatLoginStart>(`/api/teams/${teamId}/im/wechat/login`, {}),
     }),

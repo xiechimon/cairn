@@ -1,3 +1,4 @@
+import { liveImEnv } from './env.js';
 import { asSendError, ImSendError } from './errors.js';
 import type {
   ImAdapter,
@@ -12,12 +13,6 @@ const POLL_TIMEOUT_SECONDS = 50;
 const MESSAGE_MAX_CHARS = 4096;
 const TOKEN_PATTERN = /^\d+:[A-Za-z0-9_-]{20,}$/;
 const TOKEN_MASK = /^(\d+:)[A-Za-z0-9_-]+$/;
-
-export const liveImEnv: ImEnv = {
-  fetch: globalThis.fetch.bind(globalThis),
-  now: () => Date.now(),
-  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-};
 
 interface TgUser {
   id: number;

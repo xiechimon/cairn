@@ -4,7 +4,7 @@ import type {
   ImPlatform,
   ImWechatLoginStart,
 } from '@cairn/shared';
-import { MessageCircle, Send } from 'lucide-react';
+import { Hash, MessageCircle, Send } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
@@ -14,6 +14,7 @@ import {
   useImWechatLoginPoll,
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { FormField, FormStack } from '../components/form-layout.js';
 import { QrCode } from '../components/qr-code.js';
 import { SettingsFlat, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -46,7 +47,7 @@ const STATUS_LABEL: Record<ImConnectionStatus, string> = {
 };
 
 const platformLabel = (platform: ImPlatform, t: (key: string) => string): string =>
-  platform === 'wechat' ? t('微信') : 'Telegram';
+  platform === 'wechat' ? t('微信') : platform === 'slack' ? 'Slack' : 'Telegram';
 
 function ConnectDialog({
   onClose,
@@ -82,6 +83,69 @@ function ConnectDialog({
         autoComplete="off"
         data-testid="im-token-input"
       />
+    </DialogShell>
+  );
+}
+
+function SlackConnectDialog({
+  onClose,
+  onSubmit,
+  pending,
+}: {
+  onClose: () => void;
+  onSubmit: (appToken: string, botToken: string) => void;
+  pending: boolean;
+}) {
+  const { t } = useI18n();
+  const [appToken, setAppToken] = useState('');
+  const [botToken, setBotToken] = useState('');
+  const ready = appToken.trim() !== '' && botToken.trim() !== '';
+  return (
+    <DialogShell
+      title={t('连接 Slack')}
+      subtitle={t('建一个 Slack App 并打开 Socket Mode，把两个 token 粘到这里。')}
+      onClose={onClose}
+      footer={
+        <Button
+          className={DIALOG_PRIMARY_BUTTON}
+          disabled={pending || !ready}
+          onClick={() => onSubmit(appToken.trim(), botToken.trim())}
+          data-testid="im-connect-submit"
+        >
+          {t('连接 Slack')}
+        </Button>
+      }
+    >
+      <FormStack>
+        <FormField
+          label="App-Level Token"
+          htmlFor="im-app-token"
+          help={t('Basic Information → App-Level Tokens 里生成，scope 选 connections:write。')}
+        >
+          <Input
+            id="im-app-token"
+            value={appToken}
+            onChange={(event) => setAppToken(event.target.value)}
+            placeholder="xapp-…"
+            autoComplete="off"
+            data-testid="im-app-token-input"
+          />
+        </FormField>
+        <FormField
+          label="Bot Token"
+          htmlFor="im-bot-token"
+          help={t('OAuth & Permissions 里的 Bot User OAuth Token。')}
+        >
+          <Input
+            id="im-bot-token"
+            value={botToken}
+            onChange={(event) => setBotToken(event.target.value)}
+            placeholder="xoxb-…"
+            autoComplete="off"
+            data-testid="im-bot-token-input"
+          />
+        </FormField>
+      </FormStack>
     </DialogShell>
   );
 }
@@ -185,6 +249,8 @@ function ImCard({
 const platformIcon = (platform: ImPlatform) =>
   platform === 'wechat' ? (
     <MessageCircle className="size-5 text-content-secondary" aria-hidden="true" />
+  ) : platform === 'slack' ? (
+    <Hash className="size-5 text-content-secondary" aria-hidden="true" />
   ) : (
     <Send className="size-5 text-content-secondary" aria-hidden="true" />
   );
@@ -198,6 +264,7 @@ export function ImConnectionsPage() {
   const requestsQ = useImPairingRequests(teamId, live);
   const mutations = useImMutations(teamId);
   const [connecting, setConnecting] = useState(false);
+  const [connectingSlack, setConnectingSlack] = useState(false);
   const [wechatLogin, setWechatLogin] = useState<ImWechatLoginStart | null>(null);
   const connections = connectionsQ.data?.connections ?? [];
   const requests = (requestsQ.data?.requests ?? []).filter((row) => row.status === 'pending');
@@ -214,7 +281,12 @@ export function ImConnectionsPage() {
       testId={`im-connection-${conn.id}`}
       icon={platformIcon(conn.platform)}
       name={
-        conn.accountLabel ?? (conn.platform === 'wechat' ? t('WeChat 账号') : t('Telegram 机器人'))
+        conn.accountLabel ??
+        (conn.platform === 'wechat'
+          ? t('WeChat 账号')
+          : conn.platform === 'slack'
+            ? 'Slack'
+            : t('Telegram 机器人'))
       }
       status={
         <StatusChip tone={STATUS_TONE[conn.status]}>{t(STATUS_LABEL[conn.status])}</StatusChip>
@@ -330,7 +402,9 @@ export function ImConnectionsPage() {
           )}
           <SettingsSection
             title={t('可接入')}
-            description={t('连接 Telegram 机器人或微信后，就能直接用手机和 Coordinator 对话。')}
+            description={t(
+              '连接 Telegram 机器人、微信或 Slack 后，就能直接用手机和 Coordinator 对话。',
+            )}
             testId="im-catalog"
           >
             <CardGrid>
@@ -353,6 +427,29 @@ export function ImConnectionsPage() {
                       data-testid="im-connect-telegram"
                     >
                       {t('连接 Telegram')}
+                    </Button>
+                  ) : undefined
+                }
+              />
+              <ImCard
+                testId="im-platform-slack"
+                icon={platformIcon('slack')}
+                name="Slack"
+                status={
+                  connectedPlatforms.has('slack') ? (
+                    <StatusChip tone="done">{t('已连接')}</StatusChip>
+                  ) : undefined
+                }
+                description={t('Socket Mode 直连，在私聊里和 Coordinator 对话。')}
+                action={
+                  live ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConnectingSlack(true)}
+                      data-testid="im-connect-slack"
+                    >
+                      {t('连接 Slack')}
                     </Button>
                   ) : undefined
                 }
@@ -394,6 +491,21 @@ export function ImConnectionsPage() {
               onSuccess: () => setConnecting(false),
               onError: (error) => toastError(t('连接失败，请重试。'), error),
             })
+          }
+        />
+      )}
+      {connectingSlack && (
+        <SlackConnectDialog
+          pending={mutations.connectSlack.isPending}
+          onClose={() => setConnectingSlack(false)}
+          onSubmit={(appToken, botToken) =>
+            mutations.connectSlack.mutate(
+              { appToken, botToken },
+              {
+                onSuccess: () => setConnectingSlack(false),
+                onError: (error) => toastError(t('连接失败，请重试。'), error),
+              },
+            )
           }
         />
       )}

@@ -1,6 +1,6 @@
 # IM connections: Telegram and WeChat as entries
 
-Status: first slice landed 2026-11-17 (pair → receive → text reply, Telegram + WeChat iLink; decision-card buttons are the next slice). Owner decisions recorded 2026-11-17: first adapters are **Telegram and personal WeChat (Tencent iLink)**; IM is the future "C class" entry pulled forward (spec 18 §3.5/§4); monetization deferred — users first, no paid surfaces.
+Status: first slice landed 2026-11-17 (pair → receive → text reply, Telegram + WeChat iLink; decision-card buttons are the next slice). Slack slice landed 2026-11-18 (Socket Mode adapter, DM-only inbound, Block Kit buttons outbound). Owner decisions recorded 2026-11-17: first adapters are **Telegram and personal WeChat (Tencent iLink)**; IM is the future "C class" entry pulled forward (spec 18 §3.5/§4); monetization deferred — users first, no paid surfaces.
 
 Unblocked by: #1607 (`docs/research/1607-acp-execution-surface.md`) concluded — ACP covers external-agent onboarding, so the IM entry is free to be designed on its own.
 
@@ -16,8 +16,9 @@ Prior art walked: DS-Bot (8 adapters as its entire mobile story, no native mobil
 |---|---|---|---|---|---|
 | **Telegram** | Bot API | bot token from BotFather, no approval | long poll, outbound only | inline keyboards (buttons) | mainstream for personal bots; reaching it is the user's own network concern |
 | **WeChat (iLink)** | Tencent iLink (`ilinkai.weixin.qq.com`) | QR scan in WeChat binds a Tencent-side bot to the scanning account; no developer registration | long poll, outbound only | **none — text only; numbered replies** | owner-accepted risk: the endpoint is Tencent's own but the protocol is unpublished (community port via MIT `dsh-im`, clients identify as a reference client version); ~1,800-char chunks; replies only within a window after the user's message; session can expire → re-scan; Tencent can cut it any time |
+| **Slack** | Web API + Socket Mode | user creates a Slack app: app-level token (`xapp-`, `connections:write`) + bot token (`xoxb-`) | outbound WebSocket | Block Kit `actions` buttons | DM-only inbound (`channel_type === "im"`, no `subtype`); every envelope is ACKed; `disconnect` envelopes and socket drops re-open via `apps.connections.open` |
 
-Not now: **Feishu** (open.feishu.cn self-built app, WebSocket long conn, richest cards — kept as the documented fallback if iLink dies, and the China-reachable option for users who will not accept iLink's risk); Slack and Discord (same outbound-only shape, add by user demand); WeCom and DingTalk (corporate-entity registration); QQ (approval + guild scope + reply window); ntfy/Matrix/Gotify (open but thin two-way — revisit only if a push-only interim is wanted).
+Not now: **Feishu** (open.feishu.cn self-built app, WebSocket long conn, richest cards — kept as the documented fallback if iLink dies, and the China-reachable option for users who will not accept iLink's risk); Discord (same outbound-only shape, add by user demand); WeCom and DingTalk (corporate-entity registration); QQ (approval + guild scope + reply window); ntfy/Matrix/Gotify (open but thin two-way — revisit only if a push-only interim is wanted).
 
 ## 3. Rules taken from DS-Bot (source-read 2026-11-17)
 
@@ -51,7 +52,7 @@ Not now: **Feishu** (open.feishu.cn self-built app, WebSocket long conn, richest
 
 ## 6. Not doing in the first adapters
 
-Group-chat routing beyond @-mentions, voice/image ingestion (Telegram voice transcripts are free — optional follow-up), creating threads from group chats, any Feishu/Slack/Discord/QQ/WeCom/DingTalk adapter, any platform needing a public webhook.
+Group-chat routing beyond @-mentions, voice/image ingestion (Telegram voice transcripts are free — optional follow-up), creating threads from group chats, any Feishu/Discord/QQ/WeCom/DingTalk adapter, any platform needing a public webhook. Slack interactive button presses are ACKed but not routed until core gains an inbound button path (same stage as Telegram).
 
 ## 7. Open questions before build — decided 2026-11-17
 

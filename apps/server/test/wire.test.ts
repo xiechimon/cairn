@@ -74,6 +74,7 @@ const INFERRED_ROUTES = [
   'GET /api/teams/{id}/providers/{pid}/upstream-models',
   'GET /api/teams/{id}/im/connections',
   'POST /api/teams/{id}/im/telegram',
+  'POST /api/teams/{id}/im/slack',
   'POST /api/teams/{id}/im/wechat/login',
   'GET /api/teams/{id}/im/wechat/login/{loginId}',
   'DELETE /api/teams/{id}/im/connections/{connId}',

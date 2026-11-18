@@ -43,8 +43,10 @@ import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { createImService } from './services/im/core.js';
+import { liveImEnv } from './services/im/env.js';
 import { setImRuntime } from './services/im/runtime.js';
-import { createTelegramAdapter, liveImEnv } from './services/im/telegram.js';
+import { createSlackAdapter } from './services/im/slack.js';
+import { createTelegramAdapter } from './services/im/telegram.js';
 import { wechatAdapter } from './services/im/wechat.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
@@ -190,7 +192,11 @@ const im = createImService({
   box: secretBox,
   user: seeded.user,
   env: liveImEnv,
-  adapters: { telegram: createTelegramAdapter(), wechat: wechatAdapter },
+  adapters: {
+    telegram: createTelegramAdapter(),
+    wechat: wechatAdapter,
+    slack: createSlackAdapter(),
+  },
 });
 setImRuntime(im.runtime);
 const app = createApp(

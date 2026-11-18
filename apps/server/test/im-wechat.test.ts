@@ -66,6 +66,9 @@ function makeEnv(handle: (call: RecordedCall) => ScriptEntry | Promise<ScriptEnt
     sleep: async (ms: number) => {
       sleeps.push(ms);
     },
+    connectSocket: () => {
+      throw new Error('offline');
+    },
   };
   return { env, calls, sleeps, state };
 }

@@ -1,7 +1,22 @@
+import type { ImPlatform } from '@cairn/shared';
+
+export interface ImSocketHandlers {
+  onOpen?(): void;
+  onMessage(text: string): void;
+  onClose(code: number, reason: string): void;
+  onError?(): void;
+}
+
+export interface ImSocket {
+  send(text: string): void;
+  close(): void;
+}
+
 export interface ImEnv {
   fetch: typeof fetch;
   now(): number;
   sleep(ms: number): Promise<void>;
+  connectSocket(url: string, handlers: ImSocketHandlers): ImSocket;
 }
 
 export interface ImInboundMessage {
@@ -29,7 +44,7 @@ export interface ImConnectionHandlers {
 }
 
 export interface ImAdapter {
-  platform: 'telegram' | 'wechat';
+  platform: ImPlatform;
   check(
     fields: Record<string, string>,
   ): Promise<{ ok: true; accountLabel: string } | { ok: false; reason: string }>;

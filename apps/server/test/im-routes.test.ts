@@ -1,3 +1,4 @@
+import type { ImPlatform } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { openMemoryDb } from '../src/db/client.js';
 import { seed } from '../src/db/seed.js';
@@ -23,6 +24,24 @@ const adapter: ImAdapter = {
     fields.botToken === 'bad-token'
       ? { ok: false, reason: 'telegram refused the token' }
       : { ok: true, accountLabel: '@cairn_test_bot' },
+  connect: async (_fields, handlers, _env) => {
+    const session = { handlers, sent: [] as ImOutboundMessage[] };
+    sessions.push(session);
+    return {
+      send: async (msg) => {
+        session.sent.push(msg);
+      },
+      stop: async () => {},
+    };
+  },
+};
+
+const slackAdapterFake: ImAdapter = {
+  platform: 'slack',
+  check: async (fields) =>
+    fields.appToken === 'bad-app' || fields.botToken === 'bad-bot'
+      ? { ok: false, reason: 'slack refused the tokens' }
+      : { ok: true, accountLabel: 'Cairn HQ' },
   connect: async (_fields, handlers, _env) => {
     const session = { handlers, sent: [] as ImOutboundMessage[] };
     sessions.push(session);
@@ -72,6 +91,9 @@ const env: ImEnv = {
   fetch: (() => Promise.reject(new Error('offline'))) as typeof fetch,
   now: () => Date.now(),
   sleep: async () => {},
+  connectSocket: () => {
+    throw new Error('offline');
+  },
 };
 
 let seq = 0;
@@ -91,7 +113,7 @@ let s: TestServer;
 let service: ImService;
 let teamId: string;
 
-let adapters: Partial<Record<'telegram' | 'wechat', ImAdapter>>;
+let adapters: Partial<Record<ImPlatform, ImAdapter>>;
 
 beforeEach(() => {
   sessions.length = 0;
@@ -194,6 +216,31 @@ describe('im routes', () => {
       `/api/teams/${teamId}/im/pairing-requests/${rejectId}/approve`,
     );
     expect(again.status).toBe(409);
+  });
+
+  test('create a slack connection with app and bot tokens', async () => {
+    adapters.slack = slackAdapterFake;
+    const created = await req(s.app, 'POST', `/api/teams/${teamId}/im/slack`, {
+      appToken: 'xapp-good',
+      botToken: 'xoxb-good',
+    });
+    expect(created.status).toBe(200);
+    const { connection } = (await created.json()) as {
+      connection: { platform: string; accountLabel: string };
+    };
+    expect(connection.platform).toBe('slack');
+    expect(connection.accountLabel).toBe('Cairn HQ');
+
+    const refused = await req(s.app, 'POST', `/api/teams/${teamId}/im/slack`, {
+      appToken: 'bad-app',
+      botToken: 'xoxb-good',
+    });
+    expect(refused.status).toBe(400);
+
+    const malformed = await req(s.app, 'POST', `/api/teams/${teamId}/im/slack`, {
+      appToken: 'xapp-good',
+    });
+    expect(malformed.status).toBe(400);
   });
 
   test('another team sees nothing', async () => {

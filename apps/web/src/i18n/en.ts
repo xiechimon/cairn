@@ -2449,10 +2449,19 @@ export const EN: Record<string, string> = {
   消息: 'Messages',
   '连接 Telegram': 'Connect Telegram',
   '连接 Telegram 机器人': 'Connect a Telegram bot',
+  '连接 Slack': 'Connect Slack',
   '在 @BotFather 里创建机器人，把 bot token 粘到这里。':
     'Create a bot in @BotFather and paste the bot token here.',
-  '连接 Telegram 机器人或微信后，就能直接用手机和 Coordinator 对话。':
-    'Connect a Telegram bot or WeChat and talk to the Coordinator from your phone.',
+  '建一个 Slack App 并打开 Socket Mode，把两个 token 粘到这里。':
+    'Create a Slack app, turn on Socket Mode and paste the two tokens here.',
+  'Basic Information → App-Level Tokens 里生成，scope 选 connections:write。':
+    'Create one under Basic Information → App-Level Tokens with the connections:write scope.',
+  'OAuth & Permissions 里的 Bot User OAuth Token。':
+    'The Bot User OAuth Token under OAuth & Permissions.',
+  'Socket Mode 直连，在私聊里和 Coordinator 对话。':
+    'Direct Socket Mode connection — talk to the Coordinator in DMs.',
+  '连接 Telegram 机器人、微信或 Slack 后，就能直接用手机和 Coordinator 对话。':
+    'Connect a Telegram bot, WeChat or Slack and talk to the Coordinator from your phone.',
   待处理: 'Needs attention',
   '官方 Bot API：按钮和回复都支持。': 'Official Bot API — buttons and replies supported.',
   '扫码登录，在平时的聊天里和 Coordinator 对话。':

@@ -189,7 +189,7 @@ const GROUPS: Group[] = [
         id: 'im',
         label: 'IM',
         Icon: MessageCircle,
-        keywords: ['telegram', 'im', 'message', '聊天', '微信', 'wechat'],
+        keywords: ['telegram', 'slack', 'im', 'message', '聊天', '微信', 'wechat'],
         element: () => <ImConnectionsPage />,
       },
     ],

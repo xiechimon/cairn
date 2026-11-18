@@ -45,6 +45,9 @@ function fakeTelegramEnv(): FakeTelegram {
         );
       });
     },
+    connectSocket: () => {
+      throw new Error('offline');
+    },
   };
   return {
     env,

@@ -1872,7 +1872,7 @@ export const imConnection = sqliteTable(
   },
   (t) => [
     index('im_connection_team_idx').on(t.teamId),
-    check('im_connection_platform', sql`${t.platform} in ('telegram', 'wechat')`),
+    check('im_connection_platform', sql`${t.platform} in ('telegram', 'wechat', 'slack')`),
     check(
       'im_connection_status',
       sql`${t.status} in ('connecting', 'ready', 'degraded', 'expired', 'error')`,

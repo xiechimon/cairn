@@ -1331,6 +1331,13 @@
       "tag": "0194_clever_leper_queen",
       "breakpoints": true,
       "when": 1794972330252
+    },
+    {
+      "idx": 195,
+      "version": "6",
+      "when": 1794973181726,
+      "tag": "0195_short_ma_gnuci",
+      "breakpoints": true
     }
   ]
 }

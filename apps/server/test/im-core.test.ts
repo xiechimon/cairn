@@ -108,6 +108,9 @@ const env = (): ImEnv => ({
   sleep: async (ms) => {
     slept.push(ms);
   },
+  connectSocket: () => {
+    throw new Error('offline');
+  },
 });
 
 let messageSeq = 0;
