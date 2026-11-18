@@ -31,9 +31,9 @@ The capability resolves in one place, `resolveModelInput` in `packages/shared`, 
 
 When only a screenshot would help and the model cannot see images, the model calls the existing `request_takeover` (the handoff path: the owner gets control, hands it back, the model continues from a fresh `browser_snapshot`). The tool result names this explicitly so the model never retries silently.
 
-## Optional computer-use model (next slice, not built here)
+## No separate computer-use model
 
-A separate vision model setting, "computer-use model", unset by default. When set, layer 3 sends the screenshot to that model and returns its text description and target coordinates to the main model, so a text-only main model can still use layer 3. When unset: a main model that can see images handles layer 3 itself, otherwise it asks the owner to take over. The setting needs its own persisted field, provider picker and cost accounting; none of that exists in this slice.
+Decided by ian on 2026-11-18: no separate vision "computer-use model" setting. Layers 1 and 2 (agent-browser, agent-desktop) carry the work in text. When only layer 3 would help, a main model that can see images uses it; a text-only main model asks the owner to take over. Revisit only if real runs show text-only models blocked on screenshot-only steps often.
 
 ## Failure paths
 
