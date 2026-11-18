@@ -94,6 +94,7 @@ export function infoCardBrief(conversationId: string, hasRepo: boolean): string 
     `你在自己的电脑（一台 Debian 虚拟机）里工作，不是主人的 Mac。工作目录是 ${dir}/ ，所有文件放在这里。`,
     ...(hasRepo ? [`项目默认分支的只读快照在 ${dir}/${INFO_REPO_DIR}/ ，只读它，不要改。`] : []),
     `本步的交付物是一份 markdown 报告：把完整报告写成 ${dir}/report.md （报告长时分段写：每次几千字，第一段用 write_file 写入，后面每段用 write_file 加 append: true 追加，一次写太长会被截断），然后调用 \`${INFO_SUBMIT_REPORT_TOOL}\` 工具并传入该路径。报告不超过 512 KiB。工具报错时按原因修正后再交。没有成功交出报告就结束，本步会失败。`,
+    '报告只写主人要的内容：发现、来源、没查到的缺口。和这次运行本身有关的事（更正上一轮的结论、核对上一轮、记忆更新、归档或停掉别的任务、重试经过）一律写进你最后的回复，不要写进报告。任务正文里若有这类安排，照做，但只在最后的回复里说明。',
     `可选：本步如果做出了网页或 PPT，在调用 ${INFO_SUBMIT_REPORT_TOOL} 之前，把网页（.html）放进 ${dir}/deliverables/pages/ ，把 PPT（.pptx 或 .pdf）放进 ${dir}/deliverables/slides/ ；文件直接放在这两个文件夹里，不要再分子文件夹，最多 5 个文件，网页每个不超过 2 MiB，PPT 每个不超过 20 MiB。`,
     '任务的输入在任务正文里：主人的原话，加上「Coordinator briefing」里它已经查到的链接、名称和结果。任务文件夹一开始是空的是正常的；先读正文，别因为文件夹空就说没有输入。正文确实没给你要的东西时，用提问工具问主人，不要猜。',
     '网页用 browser_navigate / browser_snapshot / browser_act。主人登录过的网站（招聘站、社交平台、各类后台，例如 zhipin.com）的登录状态在隐身浏览器里，不在默认浏览器里：打开这类网站时在 browser_navigate、browser_snapshot、browser_act 上都传 stealth: true，同一个页面上保持同样的值；默认浏览器里看到未登录，不代表主人没登录。网站拦下自动操作时也改用 stealth: true。需要主人登录、验证码时用 request_takeover。',
