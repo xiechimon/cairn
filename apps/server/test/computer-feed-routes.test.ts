@@ -2,15 +2,18 @@ import { chiefIdFormat } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
+  build as buildTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   computerCall as computerCallTable,
   computer as computerTable,
   machine as machineTable,
+  project as projectTable,
   step as stepTable,
   team as teamTable,
   user as userTable,
 } from '../src/db/schema.js';
+import { createTodo } from '../src/services/todos.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const FAKE_TOKEN = `ghp_${'a1B2c3D4e5'.repeat(3)}`;
@@ -132,7 +135,64 @@ async function commands(s: TestServer, id: string, query = '') {
   return { status: res.status, body: (await res.json()) as { commands: { callId: string }[] } };
 }
 
+async function activityOf(s: TestServer) {
+  const body = (await (await req(s.app, 'GET', '/api/computers')).json()) as {
+    computers: { activity: unknown }[];
+  };
+  return body.computers[0]?.activity;
+}
+
 describe('computer feed routes', () => {
+  test('activity names the claimed task on the machine, else the Coordinator thread, else the last user', async () => {
+    const s = boot();
+    addMachine(s, s.team.id, 'm1');
+    addComputer(s, s.team.id, 'c1', 'm1');
+    expect(await activityOf(s)).toBeNull();
+    addCall(s, s.team.id, 'c1', 'm1', 5, { state: 'running', finishedAt: null });
+    expect(await activityOf(s)).toEqual({
+      inUse: true,
+      title: null,
+      todoId: null,
+      threadId: 'chief-thread-c1',
+      at: 5,
+    });
+    s.db.update(computerCallTable).set({ state: 'done', finishedAt: 9 }).run();
+    expect(await activityOf(s)).toMatchObject({ inUse: false, threadId: 'chief-thread-c1', at: 9 });
+    const projectId = 'p1';
+    s.db.insert(projectTable).values({ id: projectId, name: 'demo', teamId: s.team.id }).run();
+    const task = createTodo(s.svc, {
+      teamId: s.team.id,
+      projectId,
+      title: 'BOSS report',
+      spec: '',
+      createdBy: s.user.id,
+      ownerId: s.user.id,
+    });
+    s.db
+      .insert(buildTable)
+      .values({ id: 'b1', todoId: task.id, triggerSource: 'user', withPlan: false, createdAt: 1 })
+      .run();
+    s.db
+      .insert(stepTable)
+      .values({
+        id: 'task-step',
+        buildId: 'b1',
+        kind: 'build',
+        status: 'claimed',
+        machineId: 'm1',
+        claimedAt: 50,
+        createdAt: 1,
+      })
+      .run();
+    expect(await activityOf(s)).toEqual({
+      inUse: true,
+      title: 'BOSS report',
+      todoId: task.id,
+      threadId: null,
+      at: 50,
+    });
+  });
+
   test('history applies the stored owner rule to foreign-step and missing-owner calls', async () => {
     const s = boot();
     addMachine(s, s.team.id, 'm1');
@@ -167,6 +227,7 @@ describe('computer feed routes', () => {
           kind: 'host',
           download: null,
           machine: { id: 'm1', name: 'name-m1', online: false },
+          activity: null,
         },
       ],
     });

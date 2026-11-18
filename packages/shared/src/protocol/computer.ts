@@ -237,6 +237,15 @@ export const computerCommandSchema = z.object({
 });
 export type ComputerCommand = z.infer<typeof computerCommandSchema>;
 
+export const computerActivitySchema = z.object({
+  inUse: z.boolean(),
+  title: z.string().nullable(),
+  todoId: recordId.nullable(),
+  threadId: z.string().nullable(),
+  at: epochMs,
+});
+export type ComputerActivity = z.infer<typeof computerActivitySchema>;
+
 export const computerRecordSchema = z.object({
   id: recordId,
   scopeKey: z.string(),
@@ -247,6 +256,7 @@ export const computerRecordSchema = z.object({
   kind: z.enum(['host', 'vm']),
   download: vmDownloadSchema.nullable(),
   machine: z.object({ id: z.string(), name: z.string(), online: z.boolean() }),
+  activity: computerActivitySchema.nullable(),
 });
 export type ComputerRecord = z.infer<typeof computerRecordSchema>;
 

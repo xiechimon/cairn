@@ -22,6 +22,7 @@ const computer = (online = true, state: 'running' | 'stopped' | 'failed' = 'runn
   kind: 'host' as const,
   download: null,
   machine: { id: 'm1', name: 'omarchy', online },
+  activity: null,
 });
 
 describe('machine computer capability badges', () => {

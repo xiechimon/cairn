@@ -25,13 +25,13 @@ import {
   computerActionNoteText,
   useComputerActions,
 } from './computer-actions-menu.js';
-import { CommandFeed } from './computer-feed.js';
 import { MachineScreenSurface } from './computer-screen.js';
 import { ComputerScreenDialog } from './computer-screen-dialog.js';
 import { fleetStatus, fleetStatusLine, machineStateLabel } from './fleet-status.js';
 import { desktopControlOnline } from './machine-capabilities.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { useScreenHoverControl } from './screen-hover-control.js';
+import { ThreadLink } from './thread-link.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
   return (
@@ -274,6 +274,54 @@ function VmDownloadSurface({
   );
 }
 
+function MachineActivity({
+  machine,
+  computer,
+}: {
+  machine: MachineRow;
+  computer: ComputerRecord | null;
+}) {
+  const { t } = useI18n();
+  const activity = computer?.activity ?? null;
+  if (machine.online !== true || activity === null) return null;
+  const time = relativeTime(activity.at, Date.now(), t);
+  const linkCls =
+    'min-w-0 truncate rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50';
+  const subject =
+    activity.todoId === null ? (
+      <Link to="/app" className={linkCls}>
+        {t('Coordinator')}
+      </Link>
+    ) : (
+      <ThreadLink todoId={activity.todoId} className={linkCls}>
+        {activity.title}
+      </ThreadLink>
+    );
+  return (
+    <p
+      data-testid="machine-activity"
+      data-activity={activity.inUse ? 'using' : 'idle'}
+      className={cn(
+        'm-0 flex min-w-0 items-baseline gap-1.5 px-5 py-2.5 text-meta',
+        activity.inUse ? 'text-content-secondary' : 'text-content-tertiary',
+      )}
+    >
+      {activity.inUse ? (
+        <>
+          {subject}
+          <span className="flex-none">{t('· 正在用 · {time}', { time })}</span>
+        </>
+      ) : (
+        <>
+          <span className="flex-none">{t('空闲 · 上次')}</span>
+          {subject}
+          <span className="flex-none">{t('· {time}', { time })}</span>
+        </>
+      )}
+    </p>
+  );
+}
+
 function MachineCard({
   machine,
   computer,
@@ -401,7 +449,7 @@ function MachineCard({
           )}
         </>
       )}
-      {computer !== null && <CommandFeed computerId={computer.id} />}
+      <MachineActivity machine={machine} computer={computer} />
     </div>
   );
 }
@@ -453,17 +501,18 @@ export function MachinesPanel({
           errorTitle={t('电脑没能加载')}
           empty={null}
         >
-          <ListCard outlined className="flex-none">
+          <div className="flex flex-none flex-col gap-3">
             {ordered.map((machine) => (
-              <MachineCard
-                key={keyOf(machine)}
-                machine={machine}
-                computer={computerFor(machine)}
-                teamId={teamId}
-                openScreen={linkedMachine !== null && keyOf(machine) === linkedMachine}
-              />
+              <ListCard key={keyOf(machine)} outlined className="flex-none">
+                <MachineCard
+                  machine={machine}
+                  computer={computerFor(machine)}
+                  teamId={teamId}
+                  openScreen={linkedMachine !== null && keyOf(machine) === linkedMachine}
+                />
+              </ListCard>
             ))}
-          </ListCard>
+          </div>
         </QueryBoundary>
         <div className="flex h-11 flex-none items-center justify-between pr-2 pl-2.5 text-meta text-content-tertiary">
           <span>{t('{time} 检查过', { time: clockTime(checkedAt) })}</span>

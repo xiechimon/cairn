@@ -31,7 +31,7 @@ export function ScreenPlaceholder({ online, label }: { online: boolean; label: s
   return (
     <div
       data-testid="machine-screen"
-      className={`grid place-items-center bg-(--surface-1) px-6 text-center text-meta text-content-tertiary ${online ? 'aspect-[16/10]' : 'h-16'}`}
+      className={`grid place-items-center bg-(--surface-1) px-6 text-center text-meta text-content-tertiary ${online ? 'aspect-[16/10] max-h-36' : 'h-16'}`}
     >
       <span className={`flex items-center gap-2 ${online ? 'flex-col' : ''}`}>
         <MonitorSmartphone aria-hidden="true" className="size-5.5 opacity-60" />
@@ -154,7 +154,7 @@ export function MachineScreenSurface({
       data-interactive={interactive ? 'true' : 'false'}
       data-fill={fill ? 'true' : 'false'}
       {...pointer}
-      className={`relative overflow-hidden ${fill ? 'h-full w-full' : 'aspect-[16/10] bg-(--surface-1)'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
+      className={`relative overflow-hidden ${fill ? 'h-full w-full' : 'aspect-[16/10] max-h-36 bg-(--surface-1)'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
     >
       {status !== 'connected' && lastFrame !== null && (
         <img

@@ -22,7 +22,6 @@ import { safeLocalStorage } from '../safe-storage.js';
 import { activityStore } from './activity.js';
 import { agentTodoStore } from './agent-todo.js';
 import { useAuth } from './auth.js';
-import { computerFeedStore } from './computer-feed.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import {
   attachConnection,
@@ -61,10 +60,7 @@ export function useTeamStream(teamId: string | undefined, enabled: boolean): voi
   const qc = useQueryClient();
   const auth = useAuth();
   useEffect(() => {
-    if (teamId === undefined || !enabled || auth.gateOpen) {
-      computerFeedStore.clear();
-      return;
-    }
+    if (teamId === undefined || !enabled || auth.gateOpen) return;
     const stop = startTeamStream(teamId, qc, auth.generation, null, () =>
       streamUrl(`/api/teams/${teamId}/stream`),
     );
@@ -81,10 +77,8 @@ export function startTeamStream(
   ticket: string | null = null,
   resolvePath: (() => Promise<string>) | null = null,
 ): () => void {
-  computerFeedStore.clear();
   const resync = () => {
     detachConnection();
-    computerFeedStore.clear();
     resyncConversations();
     void invalidateConverged(qc);
   };
@@ -108,11 +102,7 @@ export function startTeamStream(
         notePatchedEvent(qc, teamId);
       }
       if (ev.type === 'computer.command') {
-        const prior = computerFeedStore.snapshot();
-        computerFeedStore.push(ev.command);
-        if (computerFeedStore.snapshot() !== prior) {
-          void invalidateConverged(qc, { queryKey: ['computers', teamId] });
-        }
+        void invalidateConverged(qc, { queryKey: ['computers', teamId] });
       }
       if (ev.type === 'notification') {
         fireDesktopNotification(ev.notification as NotificationRecord);
@@ -122,17 +112,14 @@ export function startTeamStream(
     {
       inFlight: () => guards.inFlight() || conversationsInFlight(),
       reconcile: () => {
-        computerFeedStore.clear();
         void reconcileConversations(() => guards.reconcile());
         void invalidateConverged(qc, { queryKey: ['computers', teamId] });
-        void invalidateConverged(qc, { queryKey: ['computer-commands'] });
       },
     },
   );
   return () => {
     disconnect();
     detachConnection();
-    computerFeedStore.clear();
     for (const queryKey of Object.values(computerQueryKeys(teamId, generation))) {
       qc.removeQueries({ queryKey });
     }

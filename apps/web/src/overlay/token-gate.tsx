@@ -73,7 +73,7 @@ export function TokenGate() {
           </label>
           <Input
             id="cairn-pair-input"
-            className="token-gate-input h-9 border-(--border) bg-(--card) px-3 py-0 text-sm text-foreground transition-[color,background-color,border-color] dark:bg-(--card)"
+            className="h-9 border-(--border) bg-(--card) px-3 py-0 text-sm text-foreground transition-[color,background-color,border-color] dark:bg-(--card)"
             type="password"
             value={value}
             autoComplete="off"
@@ -86,7 +86,7 @@ export function TokenGate() {
           )}
           <Button
             type="submit"
-            className="token-gate-submit border-0 rounded-md px-3 text-[13px] font-normal"
+            className="border-0 rounded-md px-3 text-[13px] font-normal"
             disabled={probing || value.trim() === ''}
           >
             {t('进入')}

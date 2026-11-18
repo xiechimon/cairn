@@ -117,7 +117,7 @@ The per-task orb differentiator and the execution targets : how a user sees and 
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [The agent's computer](#agent-computer) | 1 | Frontend design: the computer feed, screen view and control handover have no design |
+| [The agent's computer](#agent-computer) | 1 | Frontend design: the screen view and control handover have no design |
 | [Per-task orb isolation](#orb-isolation) | 1 | Frontend design: nothing shows whether a thread ran in an orb or how to turn orbs on for a machine |
 | [Own-key cloud sandboxes](#own-key-sandboxes) | 2 | Research: no note comparing E2B and Daytona against the dispatch contract<br>Frontend design: no design for adding a sandbox provider and its key<br>Backend design: no design for the E2B and Daytona providers, key injection and teardown |
 
@@ -204,7 +204,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 **The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.
 
 - Research: [docs/research/coordinator-computer.md](research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](research/user-computer-model-2026-11-08.md) (not on main), [docs/research/resident-cloakbrowser-2026-11-16.md](research/resident-cloakbrowser-2026-11-16.md)
-- Frontend design: **gap**: the computer feed, screen view and control handover have no design
+- Frontend design: **gap**: the screen view and control handover have no design
 - Backend design: [docs/design/computer-login-handoff.md](design/computer-login-handoff.md), [docs/design/cloakbrowser-computer.md](design/cloakbrowser-computer.md), [docs/design/own-mac-computer.md](design/own-mac-computer.md)
 
 ### coordinator-chat

@@ -16,6 +16,7 @@ import {
   ownedPrivateComputer,
   privateComputerWhere,
 } from './computer-access.js';
+import { computerActivity } from './computer-activity.js';
 import { computerMachineName, feedOf } from './machine-computer.js';
 
 export function clampCommandsLimit(raw: string | undefined): number {
@@ -76,6 +77,7 @@ export function listComputers(db: Db, teamId: string, userId: string): ComputerR
       download:
         host.capabilities?.computerKind === 'vm' ? (host.capabilities.vmDownload ?? null) : null,
       machine: { id: row.machineId, name: machineName, online: machineOnline },
+      activity: computerActivity(db, teamId, userId, row.id, row.machineId),
     }));
 }
 

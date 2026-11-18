@@ -12,7 +12,6 @@ import type {
   CloakLicenseSaved,
   CodexDevicePollResponse,
   CodexDeviceStartResponse,
-  ComputerCommandsResponse,
   ComputerManageAction,
   ComputerManageResult,
   ComputerRecord,
@@ -496,17 +495,6 @@ export function useRevokeOwnComputerGrant(machineId: string | undefined) {
       qc.setQueryData<OwnComputerGrant[]>(ownComputerGrantsKey(machineId), (rows) =>
         (rows ?? []).filter((row) => row.proposalId !== proposalId),
       ),
-  });
-}
-
-export function useComputerCommands(teamId: string | undefined, computerId: string | undefined) {
-  const auth = useAuth();
-  return useQuery({
-    queryKey: [...computerQueryKeys(teamId, auth.generation).commands, computerId],
-    queryFn: async () =>
-      (await api.get<ComputerCommandsResponse>(`/api/computers/${computerId}/commands?limit=50`))
-        .commands,
-    enabled: teamId !== undefined && computerId !== undefined && !auth.gateOpen,
   });
 }
 
