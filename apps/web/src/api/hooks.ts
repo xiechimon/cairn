@@ -1073,7 +1073,7 @@ export function useApiMutations(teamId: string | undefined) {
         qc.setQueryData<MachineRecord[]>(['machines', teamId], (rows) =>
           (rows ?? []).map((m) => {
             if (m.id !== input.id) return m;
-            const { maxConcurrent, ...rest } = input.body;
+            const { maxConcurrent, folderPins: _folderPins, ...rest } = input.body;
             if (maxConcurrent === null) {
               return {
                 ...m,

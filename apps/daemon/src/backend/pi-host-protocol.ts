@@ -63,6 +63,7 @@ export const parentFrameSchema = z.discriminatedUnion('t', [
     sessionDir: z.string(),
     skills: z.object({ skillsDir: z.string(), cwd: z.string() }).optional(),
     machineName: z.string().optional(),
+    folderRoots: z.array(z.string()).max(64).optional(),
     resumeFile: z.string().nullable(),
     session: sessionSchema,
   }),

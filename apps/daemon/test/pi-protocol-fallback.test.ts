@@ -195,7 +195,9 @@ class FakeClient implements MachineApi {
   async me(): Promise<never> {
     throw new Error('unused');
   }
-  async presence() {}
+  async presence() {
+    return { ok: true as const };
+  }
   async recover() {
     return { steps: [] };
   }

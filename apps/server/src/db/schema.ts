@@ -27,6 +27,7 @@ import type {
   ImPlatform,
   INTAKE_SOURCE_KIND,
   MachineCapabilities,
+  MachineFolderGrants,
   MailAccountStatus,
   MailEventStatus,
   MailRank,
@@ -925,6 +926,7 @@ export const machine = sqliteTable(
     browserOverride: bool('browserOverride'),
     desktopOverride: bool('desktopOverride'),
     ownComputerEnabled: bool('ownComputerEnabled').notNull().default(false),
+    folderGrants: json<MachineFolderGrants | null>('folderGrants'),
   },
   (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
 );

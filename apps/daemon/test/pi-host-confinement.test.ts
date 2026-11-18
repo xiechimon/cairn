@@ -158,8 +158,9 @@ describe.runIf(process.platform === 'darwin')('pi session confinement on macOS',
       .filter((message) => message.role === 'tool')
       .map((message) => JSON.stringify(message.content));
     expect(results).toHaveLength(script.length);
-    for (const denied of results.slice(0, -1)) expect(denied).toMatch(/not permitted/i);
-    expect(results.at(-1)).not.toMatch(/not permitted/i);
+    for (const denied of results.slice(0, -1))
+      expect(denied).toMatch(/not permitted|folder-grant/i);
+    expect(results.at(-1)).not.toMatch(/not permitted|folder-grant/i);
     for (const body of model.bodies) expect(body).not.toContain(SENTINEL);
     expect(existsSync(escapeFile)).toBe(false);
     expect(readFileSync(token, 'utf8')).toBe(SENTINEL);

@@ -2976,7 +2976,101 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         },
       ],
     },
+    "folders": {
+      "additionalProperties": false,
+      "properties": {
+        "bindsGrants": {
+          "const": true,
+          "type": "boolean",
+        },
+        "pins": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "canonicalPath": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string",
+              },
+              "pin": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string",
+              },
+              "status": {
+                "enum": [
+                  "confirmed",
+                  "rejected",
+                  "absent",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "pin",
+              "status",
+            ],
+            "type": "object",
+          },
+          "maxItems": 64,
+          "type": "array",
+        },
+        "workspacesDir": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
   },
+  "type": "object",
+}
+`;
+
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machinePresenceResponse > machinePresenceResponse.json 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "folderPins": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+          },
+          "path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string",
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "confirmed",
+            ],
+            "type": "string",
+          },
+        },
+        "required": [
+          "path",
+          "status",
+          "enabled",
+        ],
+        "type": "object",
+      },
+      "maxItems": 64,
+      "type": "array",
+    },
+    "ok": {
+      "const": true,
+      "type": "boolean",
+    },
+  },
+  "required": [
+    "ok",
+  ],
   "type": "object",
 }
 `;
@@ -12079,6 +12173,63 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         "type": "string",
       },
       "type": "array",
+    },
+    "folderGrants": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "bindsGrants": {
+              "const": true,
+              "type": "boolean",
+            },
+            "pins": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                  },
+                  "path": {
+                    "maxLength": 4096,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "status": {
+                    "enum": [
+                      "pending",
+                      "confirmed",
+                      "rejected",
+                      "absent",
+                    ],
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "path",
+                  "status",
+                  "enabled",
+                ],
+                "type": "object",
+              },
+              "maxItems": 64,
+              "type": "array",
+            },
+            "workspacesDir": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "pins",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
     },
     "hostname": {
       "type": "string",

@@ -11,6 +11,7 @@ import {
   evacuateMachineBodySchema,
   githubReposResponseSchema,
   importSkillBodySchema,
+  type MachineFolderGrants,
   type MachineRunningThread,
   PHASE_VALUES,
   patchMachineBodySchema,
@@ -94,6 +95,7 @@ import {
 import { adoptGithubProfile } from './services/github-profile.js';
 import { isOwner } from './services/instance-owner.js';
 import { pendingComputerOutputRelease, settleComputerCall } from './services/machine-computer.js';
+import { applyFolderPinOps } from './services/machine-folders.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
 import {
   machineConcurrencyPatch,
@@ -303,10 +305,16 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       const cancelled = setOwnComputerEnabled(ctx, row, body.ownComputerEnabled);
       for (const callId of cancelled) settleComputerCall(ctx.db, callId, ctx.hub);
     }
+    let folderGrantsPatch: { folderGrants: MachineFolderGrants } | undefined;
+    if (body.folderPins !== undefined) {
+      if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
+      folderGrantsPatch = { folderGrants: applyFolderPinOps(row.folderGrants, body.folderPins) };
+    }
     const patch = {
       ...(body.browserOverride !== undefined ? { browserOverride: body.browserOverride } : {}),
       ...(body.desktopOverride !== undefined ? { desktopOverride: body.desktopOverride } : {}),
       ...(body.maxConcurrent !== undefined ? machineConcurrencyPatch(row, body.maxConcurrent) : {}),
+      ...(folderGrantsPatch !== undefined ? folderGrantsPatch : {}),
     };
     if (Object.keys(patch).length > 0) {
       ctx.db.update(machine).set(patch).where(eq(machine.id, id)).run();

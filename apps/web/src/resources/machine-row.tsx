@@ -19,6 +19,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { useFolderGrantsRow } from './folder-grants-panel.js';
 import { useOwnComputerRow } from './own-computer-panel.js';
 
 export function MachineRowView({
@@ -45,6 +46,7 @@ export function MachineRowView({
   const [deleting, setDeleting] = useState(false);
 
   const ownComputer = useOwnComputerRow(machine);
+  const folders = useFolderGrantsRow(machine);
   const pickedTarget = others.find((m) => m.id === evacuateTarget);
   const evacuate = async () => {
     if (evacuateTarget === null) return;
@@ -166,6 +168,7 @@ export function MachineRowView({
               {online ? t('在线') : t('离线')}
             </span>
             {ownComputer.meta}
+            {folders.meta}
           </div>
         </div>
         {ownComputer.control}
@@ -218,6 +221,7 @@ export function MachineRowView({
         </DropdownMenu>
       </div>
       {ownComputer.drawer}
+      {folders.drawer}
       <AlertDialogShell
         title={t('整机迁移')}
         subtitle={t('把固定在这台执行机上的路由规则一起迁到另一台执行机。')}

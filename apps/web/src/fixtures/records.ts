@@ -7,6 +7,7 @@ import {
   type DailyUsage,
   type GithubRepoSummary,
   type MachineExecutor,
+  type MachineFolderGrants,
   type MachineHardware,
   type MachineOsPlatform,
   type MemoryRecord,
@@ -334,6 +335,7 @@ export interface MachineRow {
   providers?: MachineProvider[];
   ownComputerEnabled?: boolean;
   ownComputerFixture?: OwnComputerFixture;
+  folderGrants?: MachineFolderGrants | null;
 }
 
 export interface OwnComputerFixture {

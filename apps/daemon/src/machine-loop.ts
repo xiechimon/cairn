@@ -57,6 +57,7 @@ import { createComputerScreenProvider } from './computer/screen-provider.js';
 import { VmDesktops } from './computer/vm-desktop.js';
 import { VmRuntime } from './computer/vm-runtime.js';
 import type { DaemonConfig } from './config.js';
+import { FolderPins } from './folder-pins.js';
 import { createHostPermissionsProbe, type HostPermissionsProbe } from './host-permissions.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -409,6 +410,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           agentDir: paths.agentRuntimeDir,
           sessionDir: paths.chatSessionsDir,
           skills: { skillsDir: config.skillsDir, cwd: config.home },
+          folderRoots: () => folderPins.roots(),
           resolveSessionFile: (sid) => resolveSessionFile(paths, sid),
           onSession: (sid, file) => {
             if (file) recordSession(paths, sid, file);
@@ -512,6 +514,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     log: (msg) => logger.machine(msg),
   });
 
+  const folderPins = new FolderPins(config.workspacesDir);
   let networkFailures = 0;
   let connectionId: string | null = null;
   const presenceReporter = new ComputerPresenceReporter({
@@ -521,9 +524,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       cliVersion: DAEMON_VERSION,
       claudeCode: claudeReport(),
       capabilities: capabilitiesReport(),
+      folders: {
+        workspacesDir: folderPins.workspacesRoot(),
+        pins: folderPins.report(),
+      },
     }),
     timeoutMs: opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS,
-    send: (body, signal) => client.presence(body, signal),
+    send: async (body, signal) => {
+      const response = await client.presence(body, signal);
+      folderPins.setPins(response.folderPins ?? []);
+    },
     onSuccess: () => {
       networkFailures = 0;
     },

@@ -53,6 +53,7 @@ import {
   upsertChiefRow,
   upsertMessage,
 } from './machine-deps.js';
+import { applyFolderReport } from './machine-folders.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
@@ -200,6 +201,7 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     desktopOverride: row.desktopOverride,
     ownComputerEnabled: row.ownComputerEnabled,
     ...(login.success ? { claudeLogin: login.data } : {}),
+    folderGrants: row.folderGrants,
   });
 }
 
@@ -506,6 +508,8 @@ export function markPresence(
   const capabilities =
     parseCapabilitiesField(body.capabilities) ??
     (row.capabilities?.confinement ? { ...row.capabilities, confinement: undefined } : undefined);
+  const folderGrants =
+    body.folders !== undefined ? applyFolderReport(row.folderGrants, body.folders) : undefined;
   db.update(machine)
     .set({
       ...(admitOnline ? { online: true } : {}),
@@ -513,6 +517,7 @@ export function markPresence(
       ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
       ...(capabilities !== undefined ? reportedConcurrencyPatch(row, capabilities) : {}),
+      ...(folderGrants !== undefined ? { folderGrants } : {}),
     })
     .where(eq(machine.id, machineId))
     .run();

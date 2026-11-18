@@ -679,3 +679,35 @@ export const ownComputerStates: FixtureSet = {
     ],
   },
 };
+
+export const folderGrantsStates: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    machines: [
+      ownMac('fg-bound', 'folders-mac', {
+        folderGrants: {
+          workspacesDir: '/Users/ian/cairn/workspaces',
+          bindsGrants: true,
+          pins: [
+            { path: '/Users/ian/Code', status: 'confirmed', enabled: true },
+            { path: '/Users/ian/Documents', status: 'confirmed', enabled: false },
+            { path: '/opt/shared', status: 'pending', enabled: false },
+            { path: '/etc/secret', status: 'rejected', enabled: false },
+            { path: '/Users/ian/gone', status: 'absent', enabled: false },
+          ],
+        },
+      }),
+      ownMac('fg-unbound', 'plain-mac', {
+        folderGrants: {
+          workspacesDir: '/srv/agent/workspaces',
+          pins: [
+            { path: '/srv/data', status: 'confirmed', enabled: false },
+            { path: '/var/tmp/staging', status: 'pending', enabled: false },
+          ],
+        },
+      }),
+      ownMac('fg-none', 'bare-mac', {}),
+    ],
+  },
+};

@@ -81,6 +81,7 @@ export async function runPiHost(): Promise<void> {
       sessionDir: frame.sessionDir,
       ...(frame.skills !== undefined ? { skills: frame.skills } : {}),
       ...(frame.machineName !== undefined ? { machineName: frame.machineName } : {}),
+      folderRoots: () => frame.folderRoots ?? [],
       onMcpLog: log('mcp'),
       onSkillsLog: log('skills'),
       onGateLog: log('gate'),

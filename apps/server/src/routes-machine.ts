@@ -39,7 +39,7 @@ import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
 import type { Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { AppContext } from './context.js';
-import { build, type machine as machineTable, step, todo } from './db/schema.js';
+import { build, machine as machineTable, step, todo } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
@@ -51,6 +51,7 @@ import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
+import { folderPinsForPresence } from './services/machine-folders.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import { receiveRepoArchive, receiveRepoArchiveFailure } from './services/machine-repo-archive.js';
 import {
@@ -370,7 +371,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         const body = parseWith(machinePresenceBodySchema, decoded ?? {}, 'body');
         const admission = ctx.machineHub.admitPresence(row.id, body.connectionId);
         if (admission !== 'ignore') markPresence(deps, row.id, body, admission === 'online');
-        return c.json({ ok: true as const });
+        const current = ctx.db.select().from(machineTable).where(eq(machineTable.id, row.id)).get();
+        const folderPins = folderPinsForPresence(current?.folderGrants ?? null);
+        return c.json({ ok: true as const, ...(folderPins !== undefined ? { folderPins } : {}) });
       },
     );
   });

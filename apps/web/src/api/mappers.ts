@@ -1344,6 +1344,7 @@ export function mapMachines(
     ...(m.claudeLogin !== undefined ? { claudeLogin: m.claudeLogin } : {}),
     ...(m.providers !== undefined ? { providers: m.providers } : {}),
     ...(m.ownComputerEnabled !== undefined ? { ownComputerEnabled: m.ownComputerEnabled } : {}),
+    ...(m.folderGrants !== undefined ? { folderGrants: m.folderGrants } : {}),
   }));
 }
 

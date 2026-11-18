@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   DEFAULT_BASH_PATTERNS,
   decideBashCommand,
@@ -312,5 +315,99 @@ describe('tool_call blocking handler (#929 hook; F4 unattended)', () => {
     expect(log).toHaveBeenCalledTimes(2);
     expect(log.mock.calls[0]?.[0]).toContain('ask-rm-rf-root');
     expect(log.mock.calls[1]?.[0]).toContain('deny-echo');
+  });
+});
+
+describe('folder grants bound where tool calls can reach', () => {
+  let scratch: string | undefined;
+  afterEach(() => {
+    if (scratch !== undefined) releaseTestTempDir(scratch);
+    scratch = undefined;
+  });
+
+  function folders(extraRoots: string[] = []) {
+    if (scratch === undefined) scratch = makeTestTempDir('cairn-gate-');
+    const cwd = join(scratch, 'work');
+    const outside = join(scratch, 'outside');
+    mkdirSync(cwd, { recursive: true });
+    mkdirSync(outside, { recursive: true });
+    return { ctx: { cwd, roots: extraRoots }, cwd, outside };
+  }
+
+  it('paths inside the cwd and an enabled root stay allowed', () => {
+    const { ctx, cwd } = folders();
+    writeFileSync(join(cwd, 'note.txt'), 'hi');
+    expect(decideBashCommand('cat ./note.txt', undefined, ctx).action).toBe('allow');
+    expect(decideBashCommand('cat note.txt', undefined, ctx).action).toBe('allow');
+    expect(decideBashCommand('echo hi > out.txt', undefined, ctx).action).toBe('allow');
+    const extra = join(scratch ?? '', 'extra');
+    mkdirSync(extra, { recursive: true });
+    const widened = { cwd: ctx.cwd, roots: [extra] };
+    expect(decideBashCommand(`cat ${extra}/data`, undefined, widened).action).toBe('allow');
+  });
+
+  it('absolute, traversal and symlink-escaping paths are rejected with folder-grant', () => {
+    const { ctx, cwd, outside } = folders();
+    const cases = [
+      `cat ${outside}/secret`,
+      'cat ../escape',
+      `cat ${cwd}/../escape`,
+      'cp a ../../b',
+      `head ${outside}/../outside/secret`,
+      'cat $SECRET/dir',
+    ];
+    for (const command of cases) {
+      const d = decideBashCommand(command, undefined, ctx);
+      expect(`${command} → ${d.ruleId}`).toBe(`${command} → folder-grant`);
+      expect(d.action).toBe('reject');
+    }
+    writeFileSync(join(outside, 'secret'), 'x');
+    symlinkSync(join(outside, 'secret'), join(cwd, 'linked'));
+    expect(decideBashCommand('cat ./linked', undefined, ctx).ruleId).toBe('folder-grant');
+  });
+
+  it('redirect targets are checked, and /dev/null stays usable', () => {
+    const { ctx, outside } = folders();
+    expect(decideBashCommand(`echo hi > ${outside}/log`, undefined, ctx).ruleId).toBe(
+      'folder-grant',
+    );
+    expect(decideBashCommand('echo hi > /dev/null', undefined, ctx).action).toBe('allow');
+    expect(decideBashCommand('cat /dev/null', undefined, ctx).action).toBe('allow');
+  });
+
+  it('empty roots deny everything outside the cwd', () => {
+    const { ctx, outside } = folders();
+    expect(decideToolCall('read', { path: `${outside}/f` }, undefined, ctx)).toEqual({
+      action: 'reject',
+      ruleId: 'folder-grant',
+    });
+  });
+
+  it('pi file tools resolve paths against the step cwd and the enabled roots', () => {
+    const { ctx, cwd, outside } = folders();
+    writeFileSync(join(cwd, 'a.txt'), 'x');
+    for (const tool of ['read', 'edit', 'write', 'grep', 'find', 'ls']) {
+      expect(decideToolCall(tool, { path: `${outside}/f` }, undefined, ctx)?.ruleId).toBe(
+        'folder-grant',
+      );
+      expect(decideToolCall(tool, { path: 'a.txt' }, undefined, ctx)).toBeUndefined();
+      expect(decideToolCall(tool, { path: '../escape' }, undefined, ctx)?.ruleId).toBe(
+        'folder-grant',
+      );
+    }
+    expect(
+      decideToolCall('mcp__demo__echo', { path: `${outside}/f` }, undefined, ctx),
+    ).toBeUndefined();
+    expect(decideToolCall('read', { path: `${outside}/f` }, undefined)).toBeUndefined();
+  });
+
+  it('the handler blocks an outside path with the refusal wording', async () => {
+    const { ctx, outside } = folders();
+    const handler = gateToolCallHandler({ folders: ctx });
+    const read = await handler(toolEvent('read', { path: `${outside}/f` }));
+    expect(read?.block).toBe(true);
+    expect(read?.reason).toContain('folder-grant');
+    expect((await handler(bashEvent(`cat ${outside}/f`)))?.reason).toContain('folder-grant');
+    expect(await handler(toolEvent('read', { path: 'a.txt' }))).toBeUndefined();
   });
 });

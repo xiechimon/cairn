@@ -887,6 +887,7 @@ export interface PiBackendOpts {
   machineName?: string;
   confine?: SessionConfiner;
   hostLaunch?: () => Launch;
+  folderRoots?: () => readonly string[];
 }
 
 export function piHostLaunch(cliPath: string): Launch {
@@ -1053,6 +1054,7 @@ export class PiBackend implements AgentBackend {
           gateToolCallHandler({
             ...(this.opts.gateRules ? { rules: this.opts.gateRules } : {}),
             ...(this.opts.onGateLog ? { log: this.opts.onGateLog } : {}),
+            folders: { cwd: opts.cwd, roots: this.opts.folderRoots?.() ?? [] },
           }),
         );
       },

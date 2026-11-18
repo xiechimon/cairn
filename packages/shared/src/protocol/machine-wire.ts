@@ -4,7 +4,11 @@ import { agentTodoReportSchema } from '../agent-todo.js';
 import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
-import { machineRecordSchema } from '../records/machine.js';
+import {
+  MACHINE_FOLDER_PATH_MAX,
+  MACHINE_FOLDER_PINS_LIMIT,
+  machineRecordSchema,
+} from '../records/machine.js';
 import { confinementIdentitySchema } from '../records/machine-capabilities.js';
 import {
   answerDeliveryViaSchema,
@@ -100,15 +104,42 @@ export const machineClosedOrbsResponseSchema = z
   .array(recordId)
   .max(MACHINE_ORB_CONVERSATIONS_LIMIT);
 
+export const machineFolderPinReportSchema = z.object({
+  pin: z.string().min(1).max(MACHINE_FOLDER_PATH_MAX),
+  status: z.enum(['confirmed', 'rejected', 'absent']),
+  canonicalPath: z.string().min(1).max(MACHINE_FOLDER_PATH_MAX).optional(),
+});
+export type MachineFolderPinReport = z.infer<typeof machineFolderPinReportSchema>;
+
+export const machineFoldersReportSchema = z.object({
+  workspacesDir: z.string().min(1).max(MACHINE_FOLDER_PATH_MAX).optional(),
+  bindsGrants: z.literal(true).optional(),
+  pins: z.array(machineFolderPinReportSchema).max(MACHINE_FOLDER_PINS_LIMIT).optional(),
+});
+export type MachineFoldersReport = z.infer<typeof machineFoldersReportSchema>;
+
 export const machinePresenceBodySchema = z.object({
   computers: computerPresenceListSchema.optional(),
   cliVersion: z.string().optional(),
   claudeCode: claudeCodeReportSchema.optional(),
   capabilities: z.unknown().optional(),
   connectionId: z.string().min(1).max(64).nullable().optional(),
+  folders: machineFoldersReportSchema.optional(),
 });
 export type MachinePresenceBody = z.infer<typeof machinePresenceBodySchema>;
 export const machineOkResponseSchema = z.object({ ok: z.literal(true) });
+
+export const machinePresencePinSchema = z.object({
+  path: z.string().min(1).max(MACHINE_FOLDER_PATH_MAX),
+  status: z.enum(['pending', 'confirmed']),
+  enabled: z.boolean(),
+});
+export type MachinePresencePin = z.infer<typeof machinePresencePinSchema>;
+
+export const machinePresenceResponseSchema = machineOkResponseSchema.extend({
+  folderPins: z.array(machinePresencePinSchema).max(MACHINE_FOLDER_PINS_LIMIT).optional(),
+});
+export type MachinePresenceResponse = z.infer<typeof machinePresenceResponseSchema>;
 
 export const machineOfflineBodySchema = z.object({ connectionId: z.string().min(1).max(64) });
 export type MachineOfflineBody = z.infer<typeof machineOfflineBodySchema>;
@@ -662,7 +693,7 @@ export const MACHINE_WIRE = [
     method: 'POST',
     path: '/api/machine/presence',
     request: machinePresenceBodySchema,
-    response: machineOkResponseSchema,
+    response: machinePresenceResponseSchema,
   },
   {
     method: 'POST',

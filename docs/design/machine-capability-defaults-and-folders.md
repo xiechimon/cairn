@@ -1,6 +1,6 @@
 # Machine capability defaults and folder grants
 
-Status: proposal for the owner's review. Nothing here is built. Owner route. Baseline `7299c658e` on `origin/main`. Does not edit #3924. Prior art already in this repo: `docs/research/user-computer-model-2026-11-08.md`, `docs/design/linux-harness-confinement.md`, and class three in `docs/design/ai-native-actions.md` (the agent does not change its own boundary). No new research file: this page is the ask, checked against that baseline.
+Status: the G2 folder slice is implemented (`machine.folderGrants`, presence pin round-trip, owner `PATCH` ops, the pi command-gate predicate and the Runner-row display). Enable of an extra root stays 409 until step launch confinement can bind it, exactly as below; the browser, desktop and own-computer parts of this page are still proposals. Baseline `7299c658e` on `origin/main`. Does not edit #3924. Prior art already in this repo: `docs/research/user-computer-model-2026-11-08.md`, `docs/design/linux-harness-confinement.md`, and class three in `docs/design/ai-native-actions.md` (the agent does not change its own boundary). No new research file: this page is the ask, checked against that baseline.
 
 ## Problem
 

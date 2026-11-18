@@ -7,6 +7,7 @@ import type {
   MachineCapabilities,
   MachineDoneBody,
   MachinePresenceBody,
+  MachinePresencePin,
   MachineSteerAckBody,
   MachineStreamEvent,
   SteerAnswer,
@@ -122,9 +123,15 @@ export class FakeMachineApi implements MachineApi {
       ...this.mePatch,
     });
   }
+  presencePins: MachinePresencePin[] | undefined;
+
   async presence(body?: { cliVersion?: string; claudeCode?: unknown }) {
     this.calls.push('presence');
     this.presenceBodies.push(body);
+    return {
+      ok: true as const,
+      ...(this.presencePins !== undefined ? { folderPins: this.presencePins } : {}),
+    };
   }
   async recover() {
     this.calls.push('recover');

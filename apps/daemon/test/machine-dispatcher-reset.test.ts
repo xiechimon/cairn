@@ -16,7 +16,7 @@ class ScriptedPresenceApi extends FakeMachineApi {
     if (outcome === 'network') throw new TypeError('fetch failed');
     if (outcome === 'http') throw new MachineApiError(502, 'bad gateway');
     if (outcome === 'hang') await new Promise<never>(() => {});
-    await super.presence(body);
+    return super.presence(body);
   }
 }
 

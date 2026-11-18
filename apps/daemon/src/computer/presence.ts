@@ -8,7 +8,7 @@ export interface ComputerPresenceSource {
 interface ComputerPresenceReporterOptions {
   source?: ComputerPresenceSource;
   body(): MachinePresenceBody;
-  send(body: MachinePresenceBody, signal: AbortSignal): Promise<void>;
+  send(body: MachinePresenceBody, signal: AbortSignal): Promise<unknown>;
   timeoutMs?: number;
   probeTimeoutMs?: number;
   onError?(error: unknown): void;

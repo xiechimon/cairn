@@ -11,7 +11,7 @@ class GoodbyeApi extends FakeMachineApi {
   override async presence(body?: { cliVersion?: string; claudeCode?: unknown }) {
     this.calls.push('presence-start');
     await new Promise((r) => setTimeout(r, 30));
-    await super.presence(body);
+    return super.presence(body);
   }
 
   async offline(body: MachineOfflineBody, signal?: AbortSignal): Promise<MachineOfflineResponse> {
