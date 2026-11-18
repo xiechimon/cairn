@@ -150,6 +150,7 @@ export async function messageTodo(
   teamId: string,
   todoId: string,
   content: string,
+  clientMessageId?: string,
 ) {
   const row = deps.db
     .select()
@@ -168,7 +169,7 @@ export async function messageTodo(
   const result = await sendBuildSteer(
     deps,
     row.latestBuildId,
-    { content },
+    { content, ...(clientMessageId !== undefined ? { clientMessageId } : {}) },
     { allowReviewContinuation: true },
   );
   return {

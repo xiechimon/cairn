@@ -56,6 +56,7 @@ export const THREAD_TOOL_SCHEMAS = {
     projectId: nonblank.optional(),
     mode: z.enum(['queue', 'steer']).optional(),
     requestId: nonblank.optional(),
+    clientMessageId: nonblank.optional(),
     answers: askUserAnswerBodySchema.shape.answers.optional(),
   },
   thread_pull_requests: { threadId: nonblank },
@@ -416,8 +417,8 @@ export async function executeThreadMcpTool(
       if (conversationId === null)
         throw new HttpError(409, 'Thread has no run; ask the Coordinator to start work first');
       return input.mode === 'steer'
-        ? messageTodo(deps, teamId, input.threadId, input.content)
-        : queueTaskMessage(deps, conversationId, input.content);
+        ? messageTodo(deps, teamId, input.threadId, input.content, input.clientMessageId)
+        : queueTaskMessage(deps, conversationId, input.content, false, input.clientMessageId);
     }
     case 'thread_pull_requests': {
       const { threadId } = z.object(THREAD_TOOL_SCHEMAS.thread_pull_requests).parse(args);

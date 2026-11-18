@@ -9,6 +9,7 @@ import {
   step,
   todo,
 } from '../src/db/schema.js';
+import { messageTodo } from '../src/services/builds.js';
 import { bootServer, postProject, req, type TestServer } from './helpers.js';
 
 interface Sent {
@@ -316,5 +317,15 @@ describe('queueing a message with a client message id', () => {
     expect(second.body).toEqual(first.body);
     expect(messagesOf(w.s, 'one', 'idle')).toHaveLength(1);
     expect(stepsOf(w.s, 'one').filter((row) => row.status === 'pending')).toHaveLength(1);
+  });
+
+  test('messageTodo replays the stored response when a caller-supplied key repeats', async () => {
+    const { s } = await running();
+    const signal = vi.spyOn(s.machineHub, 'steerSignal');
+    const first = await messageTodo(s.svc, s.team.id, 'todo-one', 'steer', 'mcp-key-1');
+    const second = await messageTodo(s.svc, s.team.id, 'todo-one', 'steer', 'mcp-key-1');
+    expect(second).toEqual(first);
+    expect(messagesOf(s, 'one', 'steer')).toHaveLength(1);
+    expect(signal).toHaveBeenCalledTimes(1);
   });
 });

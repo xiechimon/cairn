@@ -62,7 +62,7 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
     spec: s.optional(),
     platform: updatePlatform.optional(),
   },
-  message_todo: { todoId: s, content: s },
+  message_todo: { todoId: s, content: s, clientMessageId: s.optional() },
   confirm_builds: { buildIds: sArr },
   merge_builds: { buildIds: sArr },
   cancel_builds: { buildIds: sArr, reason: s.optional() },
@@ -266,7 +266,15 @@ export async function executeMcpTool(
       return json(getTodo(svc, todoId));
     }
     case 'message_todo': {
-      return json(await messageTodo(deps, ctx.teamId, str(args, 'todoId'), str(args, 'content')));
+      return json(
+        await messageTodo(
+          deps,
+          ctx.teamId,
+          str(args, 'todoId'),
+          str(args, 'content'),
+          optStr(args, 'clientMessageId'),
+        ),
+      );
     }
     case 'confirm_builds': {
       const buildIds = strArrOf(args, 'buildIds');
