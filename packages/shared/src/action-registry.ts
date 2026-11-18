@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { INSTALL_PACKAGES_TOOL } from './protocol/computer-tools.js';
 
 export const ACTION_CLASSES = ['free', 'confirm-once', 'send', 'submit', 'owner-only'] as const;
 export type ActionClass = (typeof ACTION_CLASSES)[number];
@@ -179,45 +178,21 @@ export function connectorActionEntry(
   };
 }
 
-export const COMPUTER_ACTION_PREFIX = 'computer.';
-
 export const COMPUTER_OBSERVE_TOOLS: readonly string[] = [
   'browser_snapshot',
   'computer_observe',
   'desktop_snapshot',
 ];
 
-export const COMPUTER_OUTBOUND_TOOLS: readonly string[] = [
+export const COMPUTER_DIRECT_TOOLS: readonly string[] = [
   'shell',
   'browser_navigate',
   'browser_act',
   'computer_act',
   'desktop_act',
-  INSTALL_PACKAGES_TOOL,
 ];
 
-export function isComputerActionId(id: string): boolean {
-  return id.startsWith(COMPUTER_ACTION_PREFIX);
-}
-
-export function computerActionEntry(tool: string): ActionEntry<Record<string, unknown>, unknown> {
-  return {
-    id: `${COMPUTER_ACTION_PREFIX}${tool}`,
-    toolName: tool,
-    inputSchema: connectorInputSchema,
-    outputSchema: connectorOutputSchema,
-    scope: 'team',
-    class: 'send',
-    standingGrant: false,
-    inverse: null,
-    surfaces: ['coordinator'],
-    targetOf: (input) => `${tool}#${inputDigest(input)}`,
-  };
-}
-
 export function connectorActionForId(actionId: string): ActionEntry | undefined {
-  if (isComputerActionId(actionId))
-    return computerActionEntry(actionId.slice(COMPUTER_ACTION_PREFIX.length));
   if (!isConnectorActionId(actionId)) return undefined;
   const rest = actionId.slice(CONNECTOR_ACTION_PREFIX.length);
   const split = rest.indexOf('.');

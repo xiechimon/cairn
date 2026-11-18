@@ -4,7 +4,6 @@ import {
   type ActionSurface,
   type AskUserQuestion,
   type ExternalActionClass,
-  isComputerActionId,
   isConnectorActionId,
   isExternalActionClass,
   projectArchiveAction,
@@ -202,18 +201,12 @@ function describeCall(input: unknown): string {
 }
 
 function outboundCallCard(entry: ActionEntry, input: unknown): AskUserQuestion[] {
-  const connector = isConnectorActionId(entry.id);
-  const subject = connector
-    ? entry.id.slice('connector.'.length).replace('.', ' · ')
-    : entry.toolName;
-  const verb = connector ? '对外发送' : '对外执行';
+  const subject = entry.id.slice('connector.'.length).replace('.', ' · ');
   return [
     {
       header: '审批',
-      question: `${verb}：${cardText(subject, CARD_TARGET_MAX_CHARS)}\n${describeCall(input)}\n\n只会按上面的内容发出，发出后无法收回。`,
-      options: connector
-        ? [{ label: SEND_CHOICE }, { label: DECLINE_SEND_CHOICE }]
-        : [{ label: APPROVE_CHOICE }, { label: REFUSE_CHOICE }],
+      question: `对外发送：${cardText(subject, CARD_TARGET_MAX_CHARS)}\n${describeCall(input)}\n\n只会按上面的内容发出，发出后无法收回。`,
+      options: [{ label: SEND_CHOICE }, { label: DECLINE_SEND_CHOICE }],
     },
   ];
 }
@@ -238,8 +231,7 @@ function bindProposal(db: Db, entry: ActionEntry, input: unknown, teamId: string
   const targetId = entry.targetOf(input);
   if (isExternalActionClass(entry.class)) {
     if (entry.scope === 'project') requireOwnedProject(db, targetId, teamId);
-    if (isConnectorActionId(entry.id) || isComputerActionId(entry.id))
-      return { input, card: outboundCallCard(entry, input) };
+    if (isConnectorActionId(entry.id)) return { input, card: outboundCallCard(entry, input) };
     return { input, card: externalCard(entry, targetId) };
   }
   requireOwnedProject(db, targetId, teamId);

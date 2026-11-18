@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import {
   CHIEF_TOOL_CATEGORIES,
+  COMPUTER_DIRECT_TOOLS,
   COMPUTER_OBSERVE_TOOLS,
-  COMPUTER_OUTBOUND_TOOLS,
   CONNECTOR_TOOL_PREFIX,
   REPORT_ACK_KIND,
   type ReportAckContent,
@@ -46,15 +46,12 @@ const MAIL_TURN_OPEN_TOOLS: ReadonlySet<string> = new Set([
   ...CHIEF_TOOL_CATEGORIES.read.filter((name) => name !== 'secrets'),
   'create_todo',
   ...COMPUTER_OBSERVE_TOOLS,
+  ...COMPUTER_DIRECT_TOOLS,
 ]);
 const ACTION_WAKE_PROVENANCE_PREFIX = 'action-proposal:';
 
 function mailTurnAllows(name: string): boolean {
-  return (
-    MAIL_TURN_OPEN_TOOLS.has(name) ||
-    COMPUTER_OUTBOUND_TOOLS.includes(name) ||
-    name.startsWith(CONNECTOR_TOOL_PREFIX)
-  );
+  return MAIL_TURN_OPEN_TOOLS.has(name) || name.startsWith(CONNECTOR_TOOL_PREFIX);
 }
 
 function proposalFromUntrustedTurn(db: Db, proposalId: string): boolean {

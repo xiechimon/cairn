@@ -168,7 +168,7 @@ function validateAgainstSchema(schema: unknown, value: unknown, path: string): s
   return null;
 }
 
-export function gateOutboundAction(
+function gateOutboundAction(
   deps: Pick<ConnectorBrokerDeps, 'db' | 'reposDir' | 'hub' | 'convHub' | 'user' | 'vapidKeys'>,
   ctx: ConnectorCallContext,
   entry: ActionEntry,
