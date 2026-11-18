@@ -65,15 +65,11 @@ describe('team event → invalidation keys', () => {
     }
   });
 
-  it('machine_presence carries board todo invalidation (#1257 suspended-state derived); branch_sync single key as usual', () => {
-
+  it('machine_presence carries board todo invalidation (#1257 suspended-state derived)', () => {
     expect(keysOf({ type: 'machine_presence', machineId: 'm-1', online: true })).toEqual([
       `machines/${TEAM}`,
       `computers/${TEAM}`,
       `model-routing/${TEAM}`,
-    ]);
-    expect(keysOf({ type: 'branch_sync', sync: { buildId: 'build-1' } })).toEqual([
-      'branchSync/build-1',
     ]);
   });
 

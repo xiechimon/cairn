@@ -345,7 +345,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### thread-pr-panel
 
-**Thread PR panel and auto-fix** (shipped). The thread that opens a PR owns it until merge: the PR panel with changes and checks, branch sync, and wakes on CI, conflicts and review comments.
+**Thread PR panel and auto-fix** (shipped). The thread that opens a PR owns it until merge: the PR panel with changes and checks, and wakes on CI, conflicts and review comments.
 
 - Research: [docs/research/thread-pr-placement-2026-11-06.md](research/thread-pr-placement-2026-11-06.md) (not on main), [docs/research/review-findings-before-ready-2026-11-07.md](research/review-findings-before-ready-2026-11-07.md)
 - Frontend design: [docs/design/references/thread-review](design/references/thread-review)

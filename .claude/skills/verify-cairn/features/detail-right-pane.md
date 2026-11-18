@@ -9,7 +9,7 @@ The detail route `/app/todo/:id` is a three-pane abutting layout: 240 sidebar | 
 - `no-detail-tabs` the document|chat tab group does not exist on any of the nine phase surfaces (the PHASE_UI.tabs field is deleted).
 - `pane-view-select` the type-picker button opens a 4-row listbox (the document row = phase-derived `方案`/`变更` + the three section rows), a row click switches the view and closes it (the lang-dropdown rule); a todo with no build payload lists only the document row (no dead rows left).
 - `doc-surface` the DocPane plan/changes/diff behavior is unchanged (version chip / compare menu / show full file); the head always renders (the empty state enters the body), the type-picker button is always reachable.
-- `branch-section` the `分支与 PR` section = the original dialog sync-tab field components shared (BranchSyncFields/SyncButton) + the PR rows merged into the tail; the live discriminant is the same as branch-sync.md.
+- `branch-section` the `分支与 PR` section = the original dialog sync-tab field components shared + the PR rows merged into the tail (the sync half was retired with branch-sync; the section's live surface no longer exists in apps/web/src).
 - `token-section` the `Token 用量` section: total / model / four statistic rows rendered statically.
 - `history-section` the `运行历史` section: run rows (glyph + current chip + meta); the original dialog footer's rerun close-stub is out of the ledger (the failed-phase header primary button carries the real action).
 - `fresh-no-right-pane` fresh phases do not render the right column at all (XMON-55 P0 #563: all three sections need a build payload, and the document surface is only an empty placeholder without a build); the three-column geometry is pinned on the thread surface.
@@ -31,12 +31,12 @@ Preconditions:
 1. `launch.mjs` brings the isolated stack up, `doctor.mjs` fully PASS. **No daemon needed** — the structural surfaces are unrelated to step execution (without a daemon the build stays queued, enough to drive all views).
 
 - **How to run.** `node <skill>/scripts/drive-detail-pane.mjs` (self-contained seed: the API directly creates provider/agent/project/todo, verifies the fresh surface first, then POSTs a build to verify the thread surface).
-- **Truth.** All checks green: the fresh surface's left-center abutment + no right column + the header single icon, the thread surface's three-column geometry (240/488/abutting), the tab group's non-existence, the 4-row listbox, the branch section's live discriminant (`button[aria-haspopup=listbox]` picker + `getByLabel('同步目录')` + the branch name conv-<buildId>; since #951 the .dlg-machine-picker/.dlg-dir--input class hooks are retired), zero `.dlg` modals across the whole run, the API's `todo.latestBuildId` + SQLite todo/build rows dual truth; screenshots 01-06.
+- **Truth.** All checks green: the fresh surface's left-center abutment + no right column + the header single icon, the thread surface's three-column geometry (240/488/abutting), the tab group's non-existence, the 4-row listbox, the branch section's live discriminant (retired: the branch section no longer renders in apps/web/src, so the `three-pane` case is stale in vp-registry), zero `.dlg` modals across the whole run, the API's `todo.latestBuildId` + SQLite todo/build rows dual truth; screenshots 01-06.
 - **The fixture surface** (the r7-16/17b/23 scenario frozen surfaces + the composer card geometry) belongs to the apps/web e2e `detail-3pane.spec.ts`, not this harness.
 
 ## Gotchas
 
-- The branch section's live/fixture discriminant shares branch-sync.md's pitfall: a call site omitting buildId silently falls back to the placeholder UI, and the UI shows no error.
+- The branch section's live/fixture discriminant had a pitfall: a call site omitting buildId silently falls back to the placeholder UI, and the UI shows no error (moot now — the section is retired).
 - Without a daemon the phase stays queued -> the composer does not render (PHASE_UI[queued].placeholder = null) — the composer geometry is pinned by the fixture e2e, this probe does not pin it.
 - For worktree lanes pass `VERIFY_REPO_ROOT` (the stack runs the worktree's code); the evidence landing and archive discipline are in SKILL.md.
 - vite's `preview.proxy` inherits `server.proxy` by default: when the fixture e2e runs a route without a scenario parameter, if another lane's dev server is on the local 8787, the live queries hit it and contaminate the empty-state assertions (#366 measured the api-keys empty state being displaced by a real key list). Isolation method: start playwright with `CAIRN_DEV_SERVER_PORT=<a free port>` so the proxy points at nothing.

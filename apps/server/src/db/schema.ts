@@ -384,31 +384,6 @@ export const autonomousMergeAdmission = sqliteTable(
   ],
 );
 
-export const branchSync = sqliteTable('branch_sync', {
-  id: text('id').primaryKey(),
-  buildId: text('buildId')
-    .notNull()
-    .references(() => build.id, { onDelete: 'cascade' }),
-  machineId: text('machineId')
-    .notNull()
-    .references(() => machine.id),
-  teamId: text('teamId')
-    .notNull()
-    .references(() => team.id),
-  directory: text('directory').notNull(),
-  ref: text('ref').notNull(),
-  commit: text('commit').notNull(),
-  force: integer('force', { mode: 'boolean' }).notNull().default(false),
-  status: text('status')
-    .$type<'pending' | 'running' | 'synced' | 'failed'>()
-    .notNull()
-    .default('pending'),
-  errorMessage: text('errorMessage'),
-  createdAt: epochMs('createdAt').notNull(),
-  startedAt: epochMs('startedAt'),
-  finishedAt: epochMs('finishedAt'),
-});
-
 export const computer = sqliteTable(
   'computer',
   {

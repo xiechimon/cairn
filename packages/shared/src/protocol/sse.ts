@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { agentTodoSchema } from '../agent-todo.js';
-import { branchSyncRecordSchema } from '../records/branch-sync.js';
 import { buildRecordSchema } from '../records/build.js';
 import { recordId } from '../records/common.js';
 import { transcriptRowSchema } from '../records/message.js';
@@ -14,7 +13,7 @@ export const SSE_CHANNELS = [
     id: 'team',
     endpoint: '/api/teams/{id}/stream',
     audience: 'browser',
-    note: '团队流（每个标签页唯一的浏览器流）：hello/ping/machine_presence/todo/build/notification/branch_sync，以及承载已订阅会话事件的 conversation 信封；会话订阅由 PUT /api/streams/{connectionId}/conversations 设定',
+    note: '团队流（每个标签页唯一的浏览器流）：hello/ping/machine_presence/todo/build/notification，以及承载已订阅会话事件的 conversation 信封；会话订阅由 PUT /api/streams/{connectionId}/conversations 设定',
   },
   {
     id: 'conversation',
@@ -61,12 +60,6 @@ export const notificationEventSchema = z.object({
   type: z.literal('notification'),
   notification: notificationRecordSchema,
 });
-
-export const branchSyncEventSchema = z.object({
-  type: z.literal('branch_sync'),
-  sync: branchSyncRecordSchema,
-});
-export type BranchSyncEvent = z.infer<typeof branchSyncEventSchema>;
 
 export const computerStateEventSchema = z.object({
   type: z.literal('computer.state'),
@@ -148,7 +141,6 @@ export const teamStreamEventSchema = z.discriminatedUnion('type', [
   todoDocEventSchema,
   buildDocEventSchema,
   notificationEventSchema,
-  branchSyncEventSchema,
   computerStateEventSchema,
   streamHelloEventSchema,
   conversationEnvelopeEventSchema,

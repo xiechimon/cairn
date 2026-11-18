@@ -4,15 +4,8 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import {
-  build as buildTable,
-  machine as machineTable,
-  project as projectTable,
-  team as teamTable,
-  todo as todoTable,
-} from '../src/db/schema.js';
+import { machine as machineTable, team as teamTable } from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
-import { createBranchSync } from '../src/services/branch-sync.js';
 import { MACHINE_OFFLINE_GRACE_MS, MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { sweepStaleMachines } from '../src/services/machines.js';
 import { bootServer, type TestServer } from './helpers.js';
@@ -509,52 +502,12 @@ describe('Runner offline grace (docs/design/runner-offline-grace.md)', () => {
     expect(machineRow(s, m.machineId).online).toBe(true);
     expect(s.machineHub.isConnected(m.machineId)).toBe(false);
     expect(
-      s.machineHub.pushSync(m.machineId, {
-        syncId: 'sync-1',
-        buildId: 'b',
-        projectId: 'p',
-        cloneUrl: '',
+      s.machineHub.pushRepoArchive(m.machineId, {
+        stepId: 'step-1',
         directory: '/tmp/x',
         ref: 'main',
-        commit: 'a'.repeat(40),
-        force: false,
+        maxBytes: 1024,
       }),
     ).toBe(false);
-    s.db.insert(projectTable).values({ id: 'proj-g', name: 'g', teamId: s.team.id }).run();
-    s.db
-      .insert(todoTable)
-      .values({
-        id: 'todo-g',
-        teamId: s.team.id,
-        projectId: 'proj-g',
-        title: 'g',
-        phase: 'building',
-        phaseAt: 1,
-        seqNum: 1,
-      })
-      .run();
-    s.db
-      .insert(buildTable)
-      .values({
-        id: 'build-g',
-        todoId: 'todo-g',
-        withPlan: false,
-        triggerSource: 'user',
-        createdAt: 1,
-      })
-      .run();
-    expect(() =>
-      createBranchSync(s.svc, {
-        buildId: 'build-g',
-        machineId: m.machineId,
-        teamId: s.team.id,
-        projectId: 'proj-g',
-        cloneUrl: null,
-        directory: '/tmp/g',
-        ref: 'main',
-        commit: 'a'.repeat(40),
-        force: false,
-      }),
-    ).toThrow('machine stream disconnected');
   });
 });

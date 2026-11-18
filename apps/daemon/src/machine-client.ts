@@ -25,7 +25,6 @@ import {
   type MachineSteerResponse,
   type MachineStopResponse,
   type MachineStreamEvent,
-  type MachineSyncResultBody,
   type MachineTokenResponse,
   type MachineUploadUrlsResponse,
   machineAskResponseSchema,
@@ -45,7 +44,6 @@ import {
   machineSteerResponseSchema,
   machineStopResponseSchema,
   machineStreamEventSchema,
-  machineSyncResultResponseSchema,
   machineTokenResponseSchema,
   machineUploadUrlsResponseSchema,
   REMOTE_TOOL_RETRY_DELAYS_MS,
@@ -148,7 +146,6 @@ export interface MachineApi {
   steer(stepId: string): Promise<MachineSteerResponse | null>;
   steerAck?(stepId: string, body?: MachineSteerAckBody): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
-  syncResult(syncId: string, body: MachineSyncResultBody): Promise<void>;
   computerFrames?(
     callId: string,
     body: MachineComputerFramesBody,
@@ -574,13 +571,6 @@ export class MachineClient implements MachineApi {
       { parse: (raw) => machineStopResponseSchema.parse(raw) },
     );
     return res.discard;
-  }
-
-  async syncResult(syncId: string, body: MachineSyncResultBody): Promise<void> {
-    await this.request('POST', `/api/machine/sync-result/${syncId}`, {
-      body,
-      parse: (raw) => machineSyncResultResponseSchema.parse(raw),
-    });
   }
 
   async computerFrames(

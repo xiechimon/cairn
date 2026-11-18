@@ -85,7 +85,6 @@ import {
 import { resolveStepImages, sweepStepAttachments } from './step-attachments.js';
 import { resumePendingUpload } from './step-final-upload.js';
 import { StepStops } from './step-stops.js';
-import { performSync } from './sync.js';
 import { DAEMON_VERSION } from './version.js';
 import { agentReachEnabled, readScrapling, ScraplingProbe } from './web-tools.js';
 import { WorkspaceManager } from './workspace.js';
@@ -915,9 +914,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(capEnv.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
     ],
   });
-  const deliverSync = async (cmd: import('@cairn/shared').MachineSyncCommand): Promise<void> => {
-    await performSync({ client, logger }, cmd);
-  };
   void (async () => {
     let backoff = 1_000;
     let announced = false;
@@ -931,7 +927,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'shutdown') void stop();
             if (ev.type === 'steer') void deliverSteer(ev.stepId);
             if (ev.type === 'stop') void deliverStop(ev.stepId);
-            if (ev.type === 'sync') void deliverSync(ev.sync);
             if (ev.type === 'repo.archive') {
               void performRepoArchive({ client, logger }, ev.archive);
             }

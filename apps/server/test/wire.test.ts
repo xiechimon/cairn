@@ -156,8 +156,6 @@ const INFERRED_ROUTES = [
   'GET /api/teams/{id}/drafts/{scope}',
   'PUT /api/teams/{id}/drafts/{scope}',
   'POST /api/builds/{id}/stop',
-  'POST /api/builds/{id}/branch-sync',
-  'GET /api/builds/{id}/branch-sync',
   'GET /api/teams/{id}/model-sources',
   'PATCH /api/machines/{id}',
   'GET /api/github/repos',

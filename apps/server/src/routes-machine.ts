@@ -21,7 +21,6 @@ import {
   machineOfflineBodySchema,
   machinePresenceBodySchema,
   machineSteerAckBodySchema,
-  machineSyncResultBodySchema,
   machineThinkingDeltaBodySchema,
   machineToolBodySchema,
   machineToolRelayBodySchema,
@@ -47,7 +46,6 @@ import { openSseStream } from './lib/sse-headers.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { isLoopbackPeer, pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody } from './routes-helpers.js';
-import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
@@ -729,26 +727,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       );
     },
   );
-
-  app.post('/api/machine/sync-result/:syncId', async (c) => {
-    return executeMachineCommand(
-      c,
-      () => jsonBody(c),
-      async (row, decoded) => {
-        const body = parseWith(machineSyncResultBodySchema, decoded, 'body');
-        transitionBranchSync(
-          { db: ctx.db, hub: ctx.hub },
-          {
-            syncId: c.req.param('syncId'),
-            machineId: row.id,
-            status: body.status,
-            ...(body.errorMessage !== undefined ? { errorMessage: body.errorMessage } : {}),
-          },
-        );
-        return c.json({ ok: true as const });
-      },
-    );
-  });
 
   app.post(
     '/api/machine/computer/:callId',

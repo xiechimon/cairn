@@ -1,6 +1,5 @@
 import type {
   AgentTodo,
-  BranchSyncRecord,
   BuildRecord,
   ConversationMessageEvent,
   ConversationStepEvent,
@@ -45,10 +44,6 @@ export class TeamStreamHub {
 
   publishNotification(teamId: string, record: NotificationRecord): void {
     this.publish(teamId, () => ({ type: 'notification', notification: record }));
-  }
-
-  publishBranchSync(teamId: string, record: BranchSyncRecord): void {
-    this.publish(teamId, () => ({ type: 'branch_sync', sync: record }));
   }
 
   publishPrivate(

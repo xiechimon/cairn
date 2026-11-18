@@ -529,11 +529,6 @@ export const gitPrim = {
     return r.code === 0 && r.stdout.trim() !== '' ? r.stdout.trim() : null;
   },
 
-  async checkout(dir: string, ref: string, force: boolean): Promise<void> {
-    const args = force ? ['checkout', '--force', ref, '--'] : ['checkout', ref, '--'];
-    await runGitOk(args, { cwd: dir, timeoutMs: META_TIMEOUT_MS });
-  },
-
   async resetHard(dir: string, commit: string): Promise<void> {
     const oid = await runGitOk(
       ['rev-parse', '--verify', '--end-of-options', `${commit}^{commit}`],

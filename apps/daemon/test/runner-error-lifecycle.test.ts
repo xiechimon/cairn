@@ -135,7 +135,6 @@ class FakeClient implements MachineApi {
   async stop() {
     return null;
   }
-  async syncResult() {}
   async attachment(): Promise<never> {
     throw new Error('unused');
   }

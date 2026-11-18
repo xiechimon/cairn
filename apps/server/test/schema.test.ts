@@ -23,7 +23,7 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
     expect(names).toContain('thread_conversation');
     expect(names).toContain('thread_entry');
     expect(names).toContain('attachment');
-    expect(names).toContain('branch_sync');
+    expect(names).not.toContain('branch_sync');
     expect(names).toContain('github_connection');
     expect(names).toContain('schedule');
     expect(names).toContain('schedule_report');

@@ -161,7 +161,6 @@ class FakeClient implements MachineApi {
   async stop() {
     return null;
   }
-  async syncResult(_syncId: string, _body: { status: string; errorMessage?: string }) {}
   attachments: Record<
     string,
     { fileName: string; mimeType: string; sizeBytes: number; contentBase64: string }

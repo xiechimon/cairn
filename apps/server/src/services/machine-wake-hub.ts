@@ -4,7 +4,6 @@ import type {
   ComputerScreenRequest,
   MachineRepoArchiveCommand,
   MachineStreamEvent,
-  MachineSyncCommand,
 } from '@cairn/shared';
 
 export const MACHINE_OFFLINE_GRACE_MS = 45_000;
@@ -203,17 +202,6 @@ export class MachineWakeHub {
     try {
       entry.close();
     } catch {}
-  }
-
-  pushSync(machineId: string, cmd: MachineSyncCommand): boolean {
-    const entry = this.streamsByMachine.get(machineId);
-    if (!entry) return false;
-    try {
-      entry.send({ type: 'sync', sync: cmd });
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   pushRepoArchive(machineId: string, cmd: MachineRepoArchiveCommand): boolean {

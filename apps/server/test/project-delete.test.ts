@@ -270,14 +270,6 @@ const runningCases = [
     "insert into step (id, buildId, kind, status, createdAt) values ('work', 'build', 'build', 'waiting_quota', 1)",
   ],
   [
-    'branch-sync pending',
-    "insert into branch_sync (id, buildId, machineId, teamId, directory, ref, `commit`, status, createdAt) values ('work', 'build', 'machine', :team, '/repo', 'main', 'abc', 'pending', 1)",
-  ],
-  [
-    'branch-sync running',
-    "insert into branch_sync (id, buildId, machineId, teamId, directory, ref, `commit`, status, createdAt) values ('work', 'build', 'machine', :team, '/repo', 'main', 'abc', 'running', 1)",
-  ],
-  [
     'chief-thread',
     'update chief_thread set activeRun = \'{"phase":"chief"}\' where id = \'thread\'',
   ],
@@ -359,15 +351,13 @@ describe('project deletion running guard', () => {
       expect((await req(s.app, 'DELETE', `/api/projects/${other}`)).status).toBe(204);
       const terminal = kind.startsWith('step ')
         ? "update step set status = 'done'"
-        : kind.startsWith('branch-sync ')
-          ? "update branch_sync set status = 'synced'"
-          : kind === 'chief-thread'
-            ? 'update chief_thread set activeRun = null'
-            : kind.startsWith('computer-call ')
-              ? "update computer_call set state = 'done'"
-              : kind.startsWith('computer ')
-                ? "update computer set state = 'stopped'"
-                : "update autonomous_merge_admission set state = 'merged'";
+        : kind === 'chief-thread'
+          ? 'update chief_thread set activeRun = null'
+          : kind.startsWith('computer-call ')
+            ? "update computer_call set state = 'done'"
+            : kind.startsWith('computer ')
+              ? "update computer set state = 'stopped'"
+              : "update autonomous_merge_admission set state = 'merged'";
       s.db.run(sql.raw(terminal));
       expect((await req(s.app, 'DELETE', `/api/projects/${projectId}`)).status).toBe(204);
       s.dispose();

@@ -154,7 +154,6 @@ class FakeClient implements MachineApi {
   async stop() {
     return null;
   }
-  async syncResult(_syncId: string, _body: { status: string; errorMessage?: string }) {}
   async attachment(_stepId: string, attachmentId: string) {
     this.attachmentCalls.push(attachmentId);
     const hit = this.attachments[attachmentId];

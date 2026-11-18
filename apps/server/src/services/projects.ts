@@ -137,13 +137,6 @@ function projectRunningWork(db: ProjectReader, projectId: string): string[] {
         sql`, `,
       )})
       union all
-      select 'branch-sync ' || branch_sync.id || ' ' || branch_sync.status || ' on build ' || branch_sync.buildId,
-        2, branch_sync.id
-      from branch_sync
-      inner join build on build.id = branch_sync.buildId
-      inner join todo on todo.id = build.todoId
-      where todo.projectId = ${projectId} and branch_sync.status in ('pending', 'running')
-      union all
       select 'chief-thread ' || id, 3, id
       from chief_thread
       where projectId = ${projectId} and activeRun is not null

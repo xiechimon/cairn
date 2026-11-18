@@ -270,24 +270,6 @@
         }
       }
     },
-    "branch-sync": {
-      "recipe": "features/branch-sync.md",
-      "cases": {
-        "sync-ui": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-branch-sync.mjs",
-          "args": [],
-          "needsArgs": true,
-          "needs": [
-            "stack",
-            "daemon"
-          ],
-          "status": "stale",
-          "purpose": "Branch sync from the detail right pane resets the dirty target dir to the commit (POST, SQLite row, stream event, git state)",
-          "usage": "<todoId> <buildId>",
-          "note": "Needs a todo from setup-branch-sync-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
-        }
-      }
-    },
     "chief-dispatch-judgment": {
       "recipe": "features/chief-dispatch-judgment.md",
       "cases": {

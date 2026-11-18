@@ -137,7 +137,6 @@ class RecordingClient implements MachineApi {
   async stop() {
     return null;
   }
-  async syncResult() {}
   async shellPrecheck(): Promise<never> {
     throw new Error('unused');
   }

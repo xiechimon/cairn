@@ -77,7 +77,6 @@ test.each([
   'enroll',
   'enrollStart',
   'enrollPoll',
-  'syncResult',
   'stream',
   'constructor',
   '__proto__',

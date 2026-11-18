@@ -380,7 +380,7 @@ Reach:
 
 ### thread-pr-panel
 
-**Thread PR panel and auto-fix** (shipped, centrality 1). The thread that opens a PR owns it until merge: the PR panel with changes and checks, branch sync, and wakes on CI, conflicts and review comments.
+**Thread PR panel and auto-fix** (shipped, centrality 1). The thread that opens a PR owns it until merge: the PR panel with changes and checks, and wakes on CI, conflicts and review comments.
 
 States: No PR yet, open with checks running or failing, conflicts, merged, or a load error; changes open file by file.
 
@@ -392,7 +392,6 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `thread-pr-error`, `thread-pr-panel`
-- Verify recipes: [.claude/skills/verify-cairn/features/branch-sync.md](features/branch-sync.md)
 - Research: [docs/research/thread-pr-placement-2026-11-06.md](../../../docs/research/thread-pr-placement-2026-11-06.md) (not on main), [docs/research/review-findings-before-ready-2026-11-07.md](../../../docs/research/review-findings-before-ready-2026-11-07.md)
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review)
 - Backend design: [docs/research/thread-pr-autofix.md](../../../docs/research/thread-pr-autofix.md)

@@ -29,10 +29,6 @@ export function teamEventInvalidations(
         ['computers', teamId],
         ['model-routing', teamId],
       ];
-    case 'branch_sync': {
-      const rec = ev.sync as { buildId: string };
-      return [['branchSync', rec.buildId]];
-    }
     default:
       return [];
   }

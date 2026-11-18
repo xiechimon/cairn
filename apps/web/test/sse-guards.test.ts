@@ -75,7 +75,6 @@ describe('reconcile action: invalidation face', () => {
       'chiefThreads',
       'chief',
       'machines',
-      'branchSync',
       'messages',
       'plans',
       'changes',

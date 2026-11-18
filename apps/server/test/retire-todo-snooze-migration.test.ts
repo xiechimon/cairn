@@ -10,14 +10,16 @@ const journal = JSON.parse(readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.j
   entries: { idx: number; tag: string; when: number }[];
 };
 
-const DROP_TAG = journal.entries.at(-1)?.tag ?? '';
+const dropIndex = journal.entries.findIndex((entry) => entry.tag.endsWith('_retire_todo_snooze'));
+const DROP_TAG = journal.entries[dropIndex]?.tag ?? '';
+const PREV_TAG = journal.entries[dropIndex - 1]?.tag ?? '';
 
 test('upgrade migration drops snoozedUntil and snoozeMode and keeps existing todo rows', () => {
   expect(DROP_TAG.endsWith('_retire_todo_snooze')).toBe(true);
   const directory = makeTestTempDir('cairn-retire-snooze-migration-');
   const sqlite = new Database(join(directory, 'db.sqlite'));
   try {
-    migrateUpTo(sqlite, directory, journal.entries.at(-2)?.tag ?? '');
+    migrateUpTo(sqlite, directory, PREV_TAG);
     sqlite.exec("INSERT INTO team (id, name, createdAt) VALUES ('retained', 'Retained', 1)");
     sqlite.exec("INSERT INTO project (id, teamId, name) VALUES ('project', 'retained', 'Project')");
     sqlite.exec(

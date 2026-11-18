@@ -4,7 +4,6 @@ import {
   buildStepActionBodySchema,
   buildStopBodySchema,
   conversationMessagesQuerySchema,
-  createBranchSyncBodySchema,
   planResponseSchema,
   prPanelListSchema,
   prPanelQuerySchema,
@@ -19,12 +18,7 @@ import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
-import { jsonBody, requestOrigin, requireProject, svcOf } from './routes-helpers.js';
-import {
-  createBranchSync,
-  latestBranchSyncForBuild,
-  type MachineSyncHub,
-} from './services/branch-sync.js';
+import { jsonBody, requireProject, svcOf } from './routes-helpers.js';
 import {
   applyBuildStepAction,
   buildMergePermission,
@@ -39,12 +33,7 @@ import {
 import { getChiefThread } from './services/chief.js';
 import { ClientMessageConflict, findClientMessage } from './services/client-message.js';
 import { createSerialConnection } from './services/events.js';
-import {
-  projectOfTodo,
-  projectRepoRef,
-  readBuildChangeFile,
-  readBuildChanges,
-} from './services/git.js';
+import { readBuildChangeFile, readBuildChanges } from './services/git.js';
 import { isChiefConversation } from './services/machines.js';
 import { readMergeGateState } from './services/merge-gate-run.js';
 import { newestMessagePage } from './services/message-page.js';
@@ -189,54 +178,6 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;
     }
-  });
-
-  app.post('/api/builds/:id/branch-sync', async (c) => {
-    const buildId = c.req.param('id');
-    const buildRow = getBuild(svc, buildId);
-    if (!buildRow) throw notFound(`build ${buildId}`);
-    const todoRow = ctx.db
-      .select({ teamId: todo.teamId, projectId: todo.projectId })
-      .from(todo)
-      .where(eq(todo.id, buildRow.todoId))
-      .get();
-    if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
-    let cloneUrl: string | null = null;
-    let projectId: string | null = null;
-    if (todoRow.projectId !== null) {
-      const projRow = projectOfTodo(ctx.db, todoRow);
-      if (projRow) {
-        projectId = projRow.id;
-        const ref = projectRepoRef(projRow, requestOrigin(c));
-        if (ref !== null && ref.kind !== 'local') cloneUrl = ref.cloneUrl;
-      }
-    }
-    const body = parseWith(createBranchSyncBodySchema, await jsonBody(c), 'body');
-    const record = createBranchSync(
-      {
-        db: ctx.db,
-        hub: ctx.hub,
-        machineHub: ctx.machineHub as unknown as MachineSyncHub,
-      },
-      {
-        buildId,
-        machineId: body.machineId,
-        teamId: todoRow.teamId,
-        projectId,
-        cloneUrl,
-        directory: body.directory,
-        ref: body.ref,
-        commit: body.commit,
-        force: body.force,
-      },
-    );
-    return c.json(record, 201);
-  });
-
-  app.get('/api/builds/:id/branch-sync', (c) => {
-    const buildId = c.req.param('id');
-    if (!getBuild(svc, buildId)) throw notFound(`build ${buildId}`);
-    return c.json(latestBranchSyncForBuild({ db: ctx.db }, buildId));
   });
 
   app.post('/api/builds/:id/steps', async (c) => {

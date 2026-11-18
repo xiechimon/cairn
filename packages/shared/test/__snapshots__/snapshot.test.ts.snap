@@ -3219,60 +3219,6 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     {
       "additionalProperties": false,
       "properties": {
-        "sync": {
-          "additionalProperties": false,
-          "properties": {
-            "buildId": {
-              "type": "string",
-            },
-            "cloneUrl": {
-              "type": "string",
-            },
-            "commit": {
-              "type": "string",
-            },
-            "directory": {
-              "type": "string",
-            },
-            "force": {
-              "type": "boolean",
-            },
-            "projectId": {
-              "type": "string",
-            },
-            "ref": {
-              "type": "string",
-            },
-            "syncId": {
-              "type": "string",
-            },
-          },
-          "required": [
-            "syncId",
-            "buildId",
-            "projectId",
-            "cloneUrl",
-            "directory",
-            "ref",
-            "commit",
-            "force",
-          ],
-          "type": "object",
-        },
-        "type": {
-          "const": "sync",
-          "type": "string",
-        },
-      },
-      "required": [
-        "type",
-        "sync",
-      ],
-      "type": "object",
-    },
-    {
-      "additionalProperties": false,
-      "properties": {
         "archive": {
           "additionalProperties": false,
           "properties": {
@@ -8571,109 +8517,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
     {
       "additionalProperties": false,
       "properties": {
-        "sync": {
-          "additionalProperties": false,
-          "properties": {
-            "buildId": {
-              "type": "string",
-            },
-            "commit": {
-              "type": "string",
-            },
-            "createdAt": {
-              "maximum": 9007199254740991,
-              "minimum": -9007199254740991,
-              "type": "integer",
-            },
-            "directory": {
-              "type": "string",
-            },
-            "errorMessage": {
-              "type": [
-                "string",
-                "null",
-              ],
-            },
-            "finishedAt": {
-              "anyOf": [
-                {
-                  "maximum": 9007199254740991,
-                  "minimum": -9007199254740991,
-                  "type": "integer",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-            "force": {
-              "type": "boolean",
-            },
-            "id": {
-              "type": "string",
-            },
-            "machineId": {
-              "type": "string",
-            },
-            "ref": {
-              "type": "string",
-            },
-            "startedAt": {
-              "anyOf": [
-                {
-                  "maximum": 9007199254740991,
-                  "minimum": -9007199254740991,
-                  "type": "integer",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-            "status": {
-              "enum": [
-                "pending",
-                "running",
-                "synced",
-                "failed",
-              ],
-              "type": "string",
-            },
-            "teamId": {
-              "type": "string",
-            },
-          },
-          "required": [
-            "id",
-            "buildId",
-            "machineId",
-            "teamId",
-            "directory",
-            "ref",
-            "commit",
-            "force",
-            "status",
-            "errorMessage",
-            "createdAt",
-            "startedAt",
-            "finishedAt",
-          ],
-          "type": "object",
-        },
-        "type": {
-          "const": "branch_sync",
-          "type": "string",
-        },
-      },
-      "required": [
-        "type",
-        "sync",
-      ],
-      "type": "object",
-    },
-    {
-      "additionalProperties": false,
-      "properties": {
         "computerId": {
           "type": "string",
         },
@@ -9626,7 +9469,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > SSE's three chann
     "audience": "browser",
     "endpoint": "/api/teams/{id}/stream",
     "id": "team",
-    "note": "团队流（每个标签页唯一的浏览器流）：hello/ping/machine_presence/todo/build/notification/branch_sync，以及承载已订阅会话事件的 conversation 信封；会话订阅由 PUT /api/streams/{connectionId}/conversations 设定",
+    "note": "团队流（每个标签页唯一的浏览器流）：hello/ping/machine_presence/todo/build/notification，以及承载已订阅会话事件的 conversation 信封；会话订阅由 PUT /api/streams/{connectionId}/conversations 设定",
   },
   {
     "audience": "ios",
@@ -10239,7 +10082,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief_thread",
   "chief_message",
   "attachment",
-  "branch_sync",
   "github_connection",
   "claude_subscription",
   "devin_subscription",

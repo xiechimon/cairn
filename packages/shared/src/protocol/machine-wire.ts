@@ -305,18 +305,6 @@ export const machineClaimResponseSchema = z.object({
 });
 export type MachineClaimResponse = z.infer<typeof machineClaimResponseSchema>;
 
-export const machineSyncCommandSchema = z.object({
-  syncId: recordId,
-  buildId: recordId,
-  projectId: recordId,
-  cloneUrl: z.string(),
-  directory: z.string(),
-  ref: z.string(),
-  commit: z.string(),
-  force: z.boolean(),
-});
-export type MachineSyncCommand = z.infer<typeof machineSyncCommandSchema>;
-
 export const REPO_ARCHIVE_FILE_NAME = 'repo-archive.b64';
 export const REPO_ARCHIVE_FAILED_FILE_NAME = 'repo-archive-failed.txt';
 
@@ -328,21 +316,12 @@ export const machineRepoArchiveCommandSchema = z.object({
 });
 export type MachineRepoArchiveCommand = z.infer<typeof machineRepoArchiveCommandSchema>;
 
-export const machineSyncResultBodySchema = z.object({
-  status: z.enum(['running', 'synced', 'failed']),
-  errorMessage: z.string().optional(),
-});
-export type MachineSyncResultBody = z.infer<typeof machineSyncResultBodySchema>;
-
-export const machineSyncResultResponseSchema = machineOkResponseSchema;
-
 export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('wake') }),
   z.object({ type: z.literal('hello'), connectionId: z.string().min(1).max(64) }),
   z.object({ type: z.literal('shutdown') }),
   z.object({ type: z.literal('steer'), stepId: recordId }),
   z.object({ type: z.literal('stop'), stepId: recordId }),
-  z.object({ type: z.literal('sync'), sync: machineSyncCommandSchema }),
   z.object({ type: z.literal('repo.archive'), archive: machineRepoArchiveCommandSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.cancel'), callId: computerCallIdSchema }),
@@ -660,12 +639,6 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'GET',
     path: '/api/machine/session/{stepId}',
     reason: '[设计] #1512 按 stepId 取回步收尾上传的原始会话 JSONL（session.jsonl）',
-  },
-  {
-    method: 'POST',
-    path: '/api/machine/sync-result/{syncId}',
-    reason:
-      '[设计] M7 #319 分支对话框「同步到机器」daemon 回写结果（08 册附录 B；状态机 pending→running→synced/failed）',
   },
 ] as const;
 

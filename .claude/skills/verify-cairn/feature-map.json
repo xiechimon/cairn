@@ -710,7 +710,7 @@
     {
       "id": "thread-pr-panel",
       "name": "Thread PR panel and auto-fix",
-      "summary": "The thread that opens a PR owns it until merge: the PR panel with changes and checks, branch sync, and wakes on CI, conflicts and review comments.",
+      "summary": "The thread that opens a PR owns it until merge: the PR panel with changes and checks, and wakes on CI, conflicts and review comments.",
       "states": "No PR yet, open with checks running or failing, conflicts, merged, or a load error; changes open file by file.",
       "centrality": 1,
       "status": "shipped",
@@ -723,25 +723,21 @@
           "apps/server/src/services/thread-pr.ts",
           "apps/server/src/services/pr-watch.ts",
           "apps/server/src/services/pr-wakes.ts",
-          "apps/server/src/services/ci-loop.ts",
-          "apps/server/src/services/branch-sync.ts"
+          "apps/server/src/services/ci-loop.ts"
         ]
       },
       "routes": {
         "server": [
           "/api/prs",
           "/api/builds/:id/changes",
-          "/api/builds/:id/changes/file",
-          "/api/builds/:id/branch-sync"
+          "/api/builds/:id/changes/file"
         ]
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:thread-pr-panel"
       ],
-      "verify": [
-        ".claude/skills/verify-cairn/features/branch-sync.md"
-      ],
+      "verify": [],
       "research": [
         "docs/research/thread-pr-placement-2026-11-06.md",
         "docs/research/review-findings-before-ready-2026-11-07.md"

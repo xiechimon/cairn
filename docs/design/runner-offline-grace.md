@@ -65,8 +65,8 @@ These are age thresholds checked by timers and a 15 s scheduler tick, so each ca
 - One deliberate change: when the grace expires the Runner is offline, and its later presence on the old id does not revive it. Today presence alone kept it online until `lastSeenAt` went stale. So a claim whose step heartbeat has also been silent for 120 s, on a Runner whose stream stays down more than 45 s, is released at the first sweep after the grace expires; today it stays claimed for as long as presence keeps arriving. A running step keeps its own heartbeat fresh, so this releases only steps that have stopped reporting.
 - After a server restart the hub has no grace, so recovery reads plain `online` and the stale sweep is the fallback, as today.
 - Routing reads (`targetUnavailable`, `fallbackMachineId`, `platformFallbackMachineId`, `namedMachineForStart`, `step-queue`, Coordinator home) see the Runner as online during grace. An unpinned task routed to it can wait up to 45 s more before fallback. Pinned and default-Runner tasks wait for the Runner or a person's reroute, as #4596 decided; grace does not change that. `runner-offline` notices still wait 2 min after `lastSeenAt`.
-- Pushed commands (branch sync, computer calls) check the live connection, which grace does not fake: during grace `pushSync` and `pushComputer` find no current connection and fail at once, so `branch-sync` returns 409 as it does today for an offline Runner.
-- Existing limitation, not fixed here: `pushSync` returns true when the event is queued, and the stream route swallows a failed write. A sync queued just before a drop can stay `pending` or `running` with no timeout. Grace neither causes nor fixes this; it gets its own issue.
+- Pushed commands (repo archives, computer calls) check the live connection, which grace does not fake: during grace `pushRepoArchive` and `pushComputer` find no current connection and fail at once, so the caller reports the command undeliverable as it does today for an offline Runner.
+- Existing limitation, not fixed here: a push returns true when the event is queued, and the stream route swallows a failed write. A command queued just before a drop can stay unanswered with no timeout. Grace neither causes nor fixes this; it gets its own issue.
 
 ## Security boundary
 
@@ -94,7 +94,7 @@ Server, Vitest with fake timers, through the HTTP routes. Each is a new behavior
 11. Build and Coordinator steps with a 119 s old heartbeat when the stream drops: with no presence after the drop they are released at the same sweep as on the baseline; with presence 1 s after the drop, on the grace id or with no `connectionId` field, they are kept, as on the baseline; after expiry with no new stream and a heartbeat older than 120 s they are released.
 12. Restart: a new server with the machine online in the database. Presence with a pre-restart id writes nothing; a new stream marks it online; with no stream it turns offline only after 150 s without presence.
 13. Presence without a `connectionId` field keeps today's behavior, including marking an offline Runner online.
-14. During grace, branch sync returns 409 and computer calls fail.
+14. During grace, pushed commands (repo archive) find no connection and fail at once.
 
 Daemon, Vitest: presence sends `null` before `hello` and the last id after it; `stop()` waits for `presenceReporter.close()` before goodbye and sends the last id; a goodbye that times out after 2 s or fails does not block shutdown; a daemon that received no `hello` sends no goodbye.
 

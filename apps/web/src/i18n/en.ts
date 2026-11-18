@@ -1170,8 +1170,6 @@ export const EN: Record<string, string> = {
     'No price source: the model declares no rates, or the run reported no cost',
   当前: 'Current',
   重跑: 'Rerun',
-  同步: 'Sync',
-  // #319 分支对话框「同步到机器」结果卡四态 + 机器选择占位
   // run-history rows: fixture-carried chrome (exact-value keys)
   '第 1 次运行': 'Run 1',
   '第 2 次运行': 'Run 2',
