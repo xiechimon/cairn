@@ -137,7 +137,6 @@ export class EngineTerminal {
     } else if (seq === '\x1bc') {
       this.reset();
     } else if (seq === '\x1b=' || seq === '\x1b>') {
-      // keypad mode — ignored
     } else if (seq.length > 1) {
       return;
     }
