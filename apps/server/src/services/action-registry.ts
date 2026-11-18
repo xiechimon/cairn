@@ -132,8 +132,18 @@ const CALL_FIELD_LABELS: Record<string, string> = {
   command: '命令',
 };
 const CALL_FIELD_ORDER = ['收件人', '抄送', '密送', '主题', '标题', '网址', '命令', '正文', '内容'];
+const CALL_RECIPIENT_KEY =
+  /^(to|cc|bcc|email|emails|recipient|recipients|attendee|attendees)$|recipient|attendee|_emails?$|_list$|^to_/i;
 const CALL_VALUE_MAX_CHARS = 4000;
+const CALL_KEY_MAX_CHARS = 60;
 const CALL_TOTAL_MAX_CHARS = 8000;
+
+function tooLongToReview(what: string): HttpError {
+  return new HttpError(
+    400,
+    `${what} is too long for the owner to review on one approval card, so nothing was parked or sent. Shorten the call or split it into smaller sends.`,
+  );
+}
 
 function callValueText(value: unknown): string {
   const raw = typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
@@ -146,39 +156,49 @@ function callValueText(value: unknown): string {
     .trim();
 }
 
-function callFieldLine(label: string, value: unknown): string {
+function callKeyText(key: string): string {
+  const text = key
+    .normalize('NFKC')
+    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text.length > CALL_KEY_MAX_CHARS)
+    throw tooLongToReview(`argument name "${text.slice(0, 20)}…"`);
+  return text;
+}
+
+function quoted(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n');
+}
+
+function callFieldLines(key: string, value: unknown): string {
   const text = callValueText(value);
-  const clipped =
-    text.length > CALL_VALUE_MAX_CHARS
-      ? `${text.slice(0, CALL_VALUE_MAX_CHARS)}…（已截断，原文共 ${text.length} 字）`
-      : text;
-  if (clipped.includes('\n') || clipped.length > 80) {
-    return `${label}：\n${clipped
-      .split('\n')
-      .map((line) => `> ${line}`)
-      .join('\n')}`;
-  }
-  return `${label}：${clipped}`;
+  if (text.length > CALL_VALUE_MAX_CHARS) throw tooLongToReview(`argument "${callKeyText(key)}"`);
+  const label = CALL_FIELD_LABELS[key];
+  if (label === undefined) return `参数：\n${quoted(`${callKeyText(key)}：${text}`)}`;
+  return text.includes('\n') || text.length > 80
+    ? `${label}：\n${quoted(text)}`
+    : `${label}：${text}`;
 }
 
 function describeCall(input: unknown): string {
-  if (typeof input !== 'object' || input === null) return callFieldLine('内容', input);
-  const fields = Object.entries(input as Record<string, unknown>)
-    .filter(([, value]) => value !== undefined && value !== null && value !== '')
-    .map(([key, value]) => ({
-      label: CALL_FIELD_LABELS[key] ?? callValueText(key).slice(0, 40),
-      value,
-    }));
-  const rank = (label: string) => {
-    const at = CALL_FIELD_ORDER.indexOf(label);
-    return at < 0 ? CALL_FIELD_ORDER.length : at;
+  if (typeof input !== 'object' || input === null) return callFieldLines('content', input);
+  const rank = (key: string) => {
+    const at = CALL_FIELD_ORDER.indexOf(CALL_FIELD_LABELS[key] ?? '');
+    if (CALL_RECIPIENT_KEY.test(key)) return at < 0 ? 0 : at;
+    return at < 0 ? 100 : at + 10;
   };
-  const lines = fields
-    .map((field, index) => ({ ...field, index }))
-    .sort((a, b) => rank(a.label) - rank(b.label) || a.index - b.index)
-    .map((field) => callFieldLine(field.label, field.value));
-  const text = lines.join('\n');
-  return text.length > CALL_TOTAL_MAX_CHARS ? `${text.slice(0, CALL_TOTAL_MAX_CHARS)}…` : text;
+  const text = Object.entries(input as Record<string, unknown>)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value], index) => ({ key, value, index }))
+    .sort((a, b) => rank(a.key) - rank(b.key) || a.index - b.index)
+    .map((field) => callFieldLines(field.key, field.value))
+    .join('\n');
+  if (text.length > CALL_TOTAL_MAX_CHARS) throw tooLongToReview('the call');
+  return text;
 }
 
 function outboundCallCard(entry: ActionEntry, input: unknown): AskUserQuestion[] {

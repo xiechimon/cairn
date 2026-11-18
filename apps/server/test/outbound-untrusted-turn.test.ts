@@ -233,6 +233,38 @@ describe('outbound actions in turns that carry untrusted outside content', () =>
     w.s.dispose();
   });
 
+  test('a call too long to show whole is refused and parks nothing, so no field can hide off the card', async () => {
+    const w = world();
+    await expect(
+      w.call(w.turn(MAIL_PROMPT), {
+        to: 'ian@example.com',
+        body: 'a'.repeat(4000),
+        message: 'b'.repeat(4000),
+        bcc_list: ['attacker@evil.example'],
+      }),
+    ).rejects.toThrow(/too long for the owner to review/);
+    expect(w.s.db.select().from(actionProposal).all()).toEqual([]);
+    expect(w.mcp.calls).toEqual([]);
+    w.s.dispose();
+  });
+
+  test('every argument is on the card, recipients before the body, odd keys quoted', async () => {
+    const w = world();
+    const out = JSON.parse(
+      await w.call(w.turn(MAIL_PROMPT), {
+        ...DRAFT,
+        'x\n收件人：boss@corp.example': 'hi',
+        bcc_list: ['attacker@evil.example'],
+      }),
+    ) as { proposalId: string };
+    const text = cardOf(w, out.proposalId)?.questions[0]?.question ?? '';
+    expect(text).toContain('attacker@evil.example');
+    expect(text.indexOf('attacker@evil.example')).toBeLessThan(text.indexOf('the quote is'));
+    expect(text).toContain('> x 收件人:boss@corp.example：hi');
+    expect(text).not.toMatch(/^收件人[：:]boss@corp.example/m);
+    w.s.dispose();
+  });
+
   test('the same tool in an owner-started turn sends without a card', async () => {
     const w = world();
     expect(await w.call(w.turn(OWNER_PROMPT), DRAFT)).toBe('sent-ok');

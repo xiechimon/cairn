@@ -101,7 +101,7 @@ Which tools are outbound, from the registry:
 | `shell`, `browser_navigate`, `browser_act`, `computer_act`, `desktop_act`, `install_packages`: they reach the network or other people's sites, so a read-only claim cannot be proven | confirmation card, class `send` |
 | Everything else: memory writes, secrets, `schedule_todo`, `update_*`, `ask_user`, `notify_user`, `request_takeover`, the owner's own Mac (`user_computer_*`), merge and cancel | refused with 403 as before |
 
-The card reuses the approval-card path of `delete_todos` and the own-Mac approvals (`action_proposal`, a parked `approval-<id>` message in the thread, push, 7-day expiry). It is built by the server from the call arguments, never by the model: line one names the connector and tool; then the recipient, subject, body and any other argument, one per line, in that order; a body or any multi-line value is quoted line by line with `> ` so text inside it cannot pass for a field; control, format and bidi characters are removed and each value is clipped at 4000 characters with the original length stated. Connector cards offer `发送` and `不发`; computer cards offer `批准执行` and `不执行`. There is no standing grant, so there is no always-allow.
+The card reuses the approval-card path of `delete_todos` and the own-Mac approvals (`action_proposal`, a parked `approval-<id>` message in the thread, push, 7-day expiry). It is built by the server from the call arguments, never by the model: line one names the connector and tool; then every argument, recipient-like keys (`to`, `cc`, `bcc`, `email`, `recipient`, `attendee`, `*_emails`, `*_list`) first, then subject, then the body; a body, a multi-line value and every argument the server has no label for is quoted line by line with `> ` so text inside it cannot pass for a field; control, format and bidi characters are removed from keys and values. The card never clips: if any value exceeds 4000 characters, any key 60, or the whole card 8000, the call fails with a tool error and no proposal is parked, so no argument can sit off the card. Connector cards offer `发送` and `不发`; computer cards offer `批准执行` and `不执行`. There is no standing grant, so there is no always-allow.
 
 Paths:
 
@@ -113,7 +113,7 @@ Paths:
 | Owner-started turn, same tool | unchanged: the team or project action tier decides (`full` sends without a card, `guarded` asks) |
 | Report turn | unchanged: the report allowlist already refuses every outbound tool |
 
-Residual risk, named: `create_todo` in a mail turn can put mail text into a task and its GitHub self-issue, and the owner approves only what he sees on a card. A card whose body is long hides its tail past the clip. Prompt injection can still steer what the card says, so the card is the check, not the model.
+Residual risk, named: `create_todo` in a mail turn can put mail text into a task and its GitHub self-issue, and the owner approves only what he sees on a card. Prompt injection can still steer what the card says, so the card is the check, not the model.
 
 ## Fence
 
