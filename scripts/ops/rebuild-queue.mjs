@@ -17,16 +17,22 @@ export function planRebuild({ chain, dropSha }) {
     : { action: 'rebuild', keep, dropSha };
 }
 
-const git = (args, cwd) =>
-  execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
-export function queueChain(repoDir, mainRef = 'origin/main', queueRef = `origin/${QUEUE_REF.replace('refs/heads/', '')}`) {
+export function queueChain(
+  repoDir,
+  mainRef = 'origin/main',
+  queueRef = `origin/${QUEUE_REF.replace('refs/heads/', '')}`,
+) {
   return git(['rev-list', '--reverse', `${mainRef}..${queueRef}`], repoDir)
     .split('\n')
     .filter(Boolean);
 }
 
-export function rebuild(repoDir, { dropSha, remoteQueueRef = `origin/${QUEUE_REF.replace('refs/heads/', '')}` }) {
+export function rebuild(
+  repoDir,
+  { dropSha, remoteQueueRef = `origin/${QUEUE_REF.replace('refs/heads/', '')}` },
+) {
   const oldHead = git(['rev-parse', remoteQueueRef], repoDir);
   const work = mkdtempSync(join(tmpdir(), 'rebuild-queue-'));
   try {
