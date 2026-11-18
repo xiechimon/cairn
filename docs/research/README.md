@@ -57,6 +57,8 @@ Thirty-two notes that nothing outside this directory referenced, and their index
 | [github-auth-two-surfaces-2026-11-17.md](github-auth-two-surfaces-2026-11-17.md) | none | Whether cairn's two GitHub grants (team connection vs MCP connector) should share: prior art across VS Code/Copilot, Claude Code, Cursor, Devin, Windsurf, Zed; separate is the norm, sharing exists only on first-party paths |
 | [github-shared-grant-design-2026-11-18.md](github-shared-grant-design-2026-11-18.md) | none | How shared-grant products structure the sharing: bearer resolved at call time from the credential owner, exactly one refresh writer (rotation kills both halves), revoke degrades to re-auth; cairn fits VS Code's declared-provider model with `github_connection` as owner |
 | [review-gate-prior-art-2026-11-11.md](review-gate-prior-art-2026-11-11.md) | none | Why `review-gate` exists, how other teams gate on AI review, and what the 13 PRs on the night of 2026-11-11 actually cost. Recommendation only |
+| [ds-bot-vs-cairn-2026-11-17.md](ds-bot-vs-cairn-2026-11-17.md) | none | First-hand comparison of DS-Bot vs Cairn across positioning, architecture, IM adapters, memory relevance/pin/expiry, and threat-model doc discipline |
+| [personal-agent-monetization-2026-11-17.md](personal-agent-monetization-2026-11-17.md) | none | Landscape of personal-agent monetization models (usage allowances, BYOK + hosted-compute hybrids, pure-OSS outcomes, and takeaways for Cairn) |
 
 ### Recovered research (2026-11-06 to 2026-11-09)
 
