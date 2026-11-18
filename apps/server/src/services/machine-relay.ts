@@ -55,7 +55,7 @@ import {
   newMcpOAuthState,
   publicOAuthFetch,
 } from './mcp-servers.js';
-import { isOwnComputerTool } from './own-computer.js';
+import { isOwnComputerTool, OWN_COMPUTER_TOOL_NAMES } from './own-computer.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { refuseRestrictedTurnTool, turnForcesOutboundApproval } from './report-turn.js';
 import {
@@ -186,6 +186,12 @@ export async function executeRelayToolCall(
       .text;
   }
   refuseRestrictedTurnTool(deps.db, row.prompt, name, params, row.ownerMessageIds ?? []);
+  if (name.startsWith('user_computer_')) {
+    throw new HttpError(
+      400,
+      `unknown own-Mac tool ${name}; the own-Mac tools are ${OWN_COMPUTER_TOOL_NAMES.join(', ')}`,
+    );
+  }
   if (isThreadScheduleTool(name)) {
     if (row.kind !== 'plan' && !isBuildStepKind(row.kind)) {
       throw new HttpError(400, 'schedule tools require a plan or build step');

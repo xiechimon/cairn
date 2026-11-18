@@ -34,6 +34,7 @@ import {
   teamOffersDesktop,
 } from '../src/services/machine-computer.js';
 import type { MachineDeps } from '../src/services/machine-deps.js';
+import { executeRelayToolCall } from '../src/services/machine-relay.js';
 import { markPresence } from '../src/services/machines.js';
 import { bootServer, seedRoute, type TestServer } from './helpers.js';
 
@@ -1065,5 +1066,23 @@ describe('private computer events and redaction', () => {
       ]),
     );
     expect(stranger).toEqual([]);
+  });
+});
+
+describe('Coordinator tool-name errors', () => {
+  test('a mistyped own-Mac tool names the valid tools instead of unknown chief tool', async () => {
+    const { deps } = boot();
+    const err = await executeRelayToolCall(deps, 'sidecar', 'step-a', 'user_computer_click', {
+      x: 1,
+    }).then(
+      () => {
+        throw new Error('expected a refusal');
+      },
+      (e: unknown) => e as Error,
+    );
+    expect(err.message).not.toContain('unknown chief tool');
+    expect(err.message).toContain('user_computer_shell');
+    expect(err.message).toContain('user_computer_observe');
+    expect(err.message).toContain('user_computer_act');
   });
 });
