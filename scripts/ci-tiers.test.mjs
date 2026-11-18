@@ -286,7 +286,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
     git('commit', '-q', '-m', 'base');
     const baseSha = git('rev-parse', 'HEAD').trim();
 
-    const runClassify = (files, baseOverride = baseSha) => {
+    const runClassify = (files, { baseOverride = baseSha, env = {} } = {}) => {
       for (const [rel, content] of Object.entries(files)) {
         mkdirSync(dirname(join(repo, rel)), { recursive: true });
         writeFileSync(join(repo, rel), content);
@@ -297,7 +297,12 @@ test('changes classify script sets outputs across push and pull_request diffs in
       const run = spawnSync('bash', ['-e', '-c', classifyScript], {
         cwd: repo,
         encoding: 'utf8',
-        env: { ...scrubGateEnv(), PREPUSH_BASE_SHA: baseOverride, GITHUB_OUTPUT: outputFile },
+        env: {
+          ...scrubGateEnv(),
+          PREPUSH_BASE_SHA: baseOverride,
+          GITHUB_OUTPUT: outputFile,
+          ...env,
+        },
       });
       assert.equal(run.status, 0, run.stderr);
       const outputs = Object.fromEntries(
@@ -315,6 +320,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'false',
       'ops-selftests': 'false',
+      'needs-integration': 'false',
       'e2e-tier': 'none',
     });
 
@@ -323,6 +329,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'true',
       'ops-selftests': 'false',
+      'needs-integration': 'false',
       'e2e-tier': 'none',
     });
 
@@ -331,6 +338,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'true',
       'ops-selftests': 'false',
+      'needs-integration': 'true',
       'e2e-tier': 'none',
     });
 
@@ -339,6 +347,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'true',
       'ops-selftests': 'false',
+      'needs-integration': 'true',
       'e2e-tier': 'affected',
     });
 
@@ -347,6 +356,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'true',
       'ops-selftests': 'false',
+      'needs-integration': 'false',
       'e2e-tier': 'affected',
     });
 
@@ -357,6 +367,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
         'has-sidecar': 'false',
         'gates-needed': 'true',
         'ops-selftests': 'false',
+        'needs-integration': 'false',
         'e2e-tier': 'full',
       },
     );
@@ -366,6 +377,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'false',
       'gates-needed': 'true',
       'ops-selftests': 'true',
+      'needs-integration': 'true',
       'e2e-tier': 'full',
     });
 
@@ -374,19 +386,63 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'has-sidecar': 'true',
       'gates-needed': 'true',
       'ops-selftests': 'false',
+      'needs-integration': 'false',
       'e2e-tier': 'none',
     });
 
     assert.deepEqual(
-      runClassify({ 'docs/research/note2.md': 'x\n' }, '0000000000000000000000000000000000000000'),
+      runClassify(
+        { 'docs/research/note2.md': 'x\n' },
+        { baseOverride: '0000000000000000000000000000000000000000' },
+      ),
       {
         'has-code': 'true',
         'has-sidecar': 'true',
         'gates-needed': 'true',
         'ops-selftests': 'true',
+        'needs-integration': 'true',
         'e2e-tier': 'full',
       },
     );
+
+    {
+      git('update-ref', 'refs/remotes/origin/main', baseSha);
+      mkdirSync(join(repo, 'apps/server/src'), { recursive: true });
+      writeFileSync(join(repo, 'apps/server/src/routes.ts'), 'export const r = 1;\n');
+      mkdirSync(join(repo, 'docs/research'), { recursive: true });
+      writeFileSync(join(repo, 'docs/research/queue-note.md'), 'note\n');
+      git('add', '.');
+      git('commit', '-qm', 'lane server change');
+      git('commit', '-qm', 'docs on top', '--allow-empty');
+      writeFileSync(outputFile, '');
+      const run = spawnSync('bash', ['-e', '-c', classifyScript], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...scrubGateEnv(),
+          PREPUSH_BASE_SHA: 'deadbeef000000000000000000000000000000',
+          GITHUB_REF: 'refs/heads/queue/main',
+          GITHUB_OUTPUT: outputFile,
+        },
+      });
+      assert.equal(run.status, 0, run.stderr);
+      const stacked = Object.fromEntries(
+        readFileSync(outputFile, 'utf8')
+          .trim()
+          .split('\n')
+          .map((line) => line.split('=')),
+      );
+      assert.deepEqual(stacked, {
+        'has-code': 'true',
+        'has-sidecar': 'false',
+        'gates-needed': 'true',
+        'ops-selftests': 'false',
+        'needs-integration': 'true',
+        'e2e-tier': 'affected',
+      });
+      git('checkout', '-q', '-B', 'case', baseSha);
+      git('update-ref', '-d', 'refs/remotes/origin/main');
+    }
   } finally {
     releaseTestTempDir(outer);
   }

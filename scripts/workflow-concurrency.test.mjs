@@ -14,8 +14,13 @@ function concurrencyOf(name) {
 
 function evaluate(text, context) {
   const format = (template, ...values) => template.replace(/\{(\d+)\}/g, (_, i) => values[i]);
+  const startsWith = (value, prefix) => String(value).startsWith(prefix);
   const run = (expression) =>
-    new Function('github', 'format', `return (${expression});`)(context, format);
+    new Function('github', 'format', 'startsWith', `return (${expression});`)(
+      context,
+      format,
+      startsWith,
+    );
   const whole = /^\$\{\{\s*([\s\S]*?)\s*\}\}$/.exec(text);
   if (whole) return run(whole[1]);
   if (!text.includes('${{')) return run(text);
@@ -74,11 +79,20 @@ test('a pull request never shares a group with a main push', () => {
   assert.match(pr.group, /^ci-pr-\d+$/);
 });
 
-test('queue candidates get per-commit groups so a stacked push never cancels a running candidate', () => {
+test('queue pushes share one ref group and a newer head cancels the stale run', () => {
   const first = decision('ci', push('refs/heads/queue/main', 'aaaaaaa'));
   const second = decision('ci', push('refs/heads/queue/main', 'bbbbbbb'));
-  assert.equal(first.group, 'ci-push-refs/heads/queue/main-aaaaaaa');
-  assert.notEqual(first.group, second.group);
-  assert.equal(first.cancel, false);
-  assert.equal(second.cancel, false);
+  assert.equal(first.group, 'ci-queue-refs/heads/queue/main');
+  assert.equal(first.group, second.group);
+  assert.equal(first.cancel, true);
+  assert.equal(second.cancel, true);
+});
+
+test('queue cancellation does not leak into main or other branches', () => {
+  const main = decision('ci', push('refs/heads/main', 'aaaaaaa'));
+  assert.equal(main.group, 'ci-push-refs/heads/main-aaaaaaa');
+  assert.equal(main.cancel, false);
+  const other = decision('ci', push('refs/heads/feature-x', 'bbbbbbb'));
+  assert.equal(other.group, 'ci-push-refs/heads/feature-x-bbbbbbb');
+  assert.equal(other.cancel, false);
 });

@@ -20,8 +20,7 @@ head). Rejected candidates never move `main`; the lane rebases and re-queues.
 `scripts/ops/promote-queue.mjs` promotes `queue/main` head SHA `S` when all hold:
 
 - a `ci` workflow run for `S` exists with conclusion `success` (in-progress,
-  queued and cancelled runs are not evidence — the per-SHA concurrency group
-  guarantees a completed run arrives);
+  queued and cancelled runs are not evidence);
 - inside that run, jobs `check`, `pack-smoke` and `e2e-gate` all succeeded —
   the three names `deploy-watch.sh` used as its green predicate. The watcher
   was torn down on 2026-11-18 (`docs/ops/self-deploy.md`) and
@@ -50,8 +49,19 @@ any future green-checking watcher or ruleset would consume.
   `queue/main` onto main and re-queues.
 - promoter exits early (ctrl-C, machine sleep): state lives in git refs and
   GitHub runs, not in the process; rerunning re-evaluates the current head.
-- queue ref deleted or rewound by hand: next push recreates it; the predicate
-  only ever reads the head.
+- queue ref deleted or rewound: next push recreates it; the predicate only
+  ever reads the head. `scripts/ops/rebuild-queue.mjs <sha>` is the surgical
+  tool for dropping a confirmed-broken candidate mid-chain — it replays the
+  candidates above the dropped sha in a scratch worktree and force-pushes with
+  `--force-with-lease` pinned to the old head, so a lane that pushed in the
+  meantime is not clobbered.
+- only the head's run matters: queue pushes share one per-ref concurrency
+  group with `cancel-in-progress`, so a newer candidate cancels the stale
+  run instead of letting it burn compute nobody will read.
+- classification evaluates the candidate's whole stacked diff: the classify
+  step merge-bases `origin/main` for queue pushes rather than diffing the
+  incremental push, so a docs-only push on top of broken code cannot skip
+  the e2e/integration tiers and green-wash the stack.
 
 ## Enforcement phase (separate flip, owner's call)
 
@@ -79,7 +89,10 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
 - `promote-queue.test.mjs`: predicate matrix — green run promotes; running,
   cancelled, failed or missing runs do not; stale base refuses; the three job
   names are required, not any aggregate conclusion.
-- `workflow-concurrency.test.mjs`: queue refs share the per-SHA group so a
-  queued candidate's run always completes.
+- `workflow-concurrency.test.mjs`: queue pushes share one per-ref group with
+  cancellation; main and other refs keep per-SHA groups that never cancel.
+- `rebuild-queue.test.mjs`: mid-chain drop replays successors in order,
+  head drop lands on the commit below, single-candidate drop deletes the
+  ref, unknown sha refuses.
 - Self-test: push the change itself as `queue/main`, watch its run, promote it
   with the script — the mechanism lands itself.

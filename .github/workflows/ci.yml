@@ -7,8 +7,8 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || github.event_name == 'push' && format('ci-push-{0}-{1}', github.ref, github.sha) || format('ci-ref-{0}', github.ref) }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || github.event_name == 'push' && startsWith(github.ref, 'refs/heads/queue/') && format('ci-queue-{0}', github.ref) || github.event_name == 'push' && format('ci-push-{0}-{1}', github.ref, github.sha) || format('ci-ref-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' && startsWith(github.ref, 'refs/heads/queue/') }}
 
 jobs:
   changes:
@@ -40,16 +40,30 @@ jobs:
           has_sidecar=true
           gates_needed=true
           ops_selftests=true
+          needs_integration=true
           e2e_tier=full
-          if [ -n "${PREPUSH_BASE_SHA:-}" ] && ! printf '%s\n' "$PREPUSH_BASE_SHA" | grep -qE '^0+$' && git cat-file -e "${PREPUSH_BASE_SHA}^{commit}" 2>/dev/null; then
-            base_ref=$(git merge-base "$PREPUSH_BASE_SHA" HEAD 2>/dev/null || printf '%s' "$PREPUSH_BASE_SHA")
+          base_ref=""
+          case "$GITHUB_REF" in
+            refs/heads/queue/*)
+              base_ref=$(git merge-base origin/main HEAD 2>/dev/null || true)
+              ;;
+            *)
+              if [ -n "${PREPUSH_BASE_SHA:-}" ] && ! printf '%s\n' "$PREPUSH_BASE_SHA" | grep -qE '^0+$' && git cat-file -e "${PREPUSH_BASE_SHA}^{commit}" 2>/dev/null; then
+                base_ref=$(git merge-base "$PREPUSH_BASE_SHA" HEAD 2>/dev/null || printf '%s' "$PREPUSH_BASE_SHA")
+              fi
+              ;;
+          esac
+          if [ -n "$base_ref" ]; then
             changed=$(git diff --name-only "$base_ref" HEAD)
             if ! printf '%s\n' "$changed" | grep -qE '^(scripts/|\.github/|\.claude/skills/verify-cairn/scripts/|ops/langfuse/|packages/shared/|package\.json$|pnpm-lock\.yaml$)'; then
               ops_selftests=false
             fi
-            has_code=$(node scripts/prepush.mjs --has-code) || has_code=true
-            has_sidecar=$(node scripts/prepush.mjs --has-sidecar) || has_sidecar=true
-            gates_needed=$(node scripts/prepush.mjs --needs-gates) || gates_needed=true
+            if ! printf '%s\n' "$changed" | grep -qE '^(apps/server/|apps/daemon/|integration/|packages/shared/|scripts/|\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'; then
+              needs_integration=false
+            fi
+            has_code=$(PREPUSH_BASE_SHA="$base_ref" node scripts/prepush.mjs --has-code) || has_code=true
+            has_sidecar=$(PREPUSH_BASE_SHA="$base_ref" node scripts/prepush.mjs --has-sidecar) || has_sidecar=true
+            gates_needed=$(PREPUSH_BASE_SHA="$base_ref" node scripts/prepush.mjs --needs-gates) || gates_needed=true
             if [ "$has_code" = "false" ]; then
               e2e_tier=none
             elif printf '%s\n' "$changed" | grep -qE '^(apps/web/(package\.json|index\.html|vite\.config|playwright\.config)|apps/web/src/(components/|styles/|main\.tsx$|App\.tsx$)|packages/shared/|package\.json$|pnpm-lock\.yaml$|\.github/actions/playwright-chromium/|\.github/workflows/ci\.yml$)'; then
@@ -64,6 +78,7 @@ jobs:
           echo "has-sidecar=$has_sidecar" >> "$GITHUB_OUTPUT"
           echo "gates-needed=$gates_needed" >> "$GITHUB_OUTPUT"
           echo "ops-selftests=$ops_selftests" >> "$GITHUB_OUTPUT"
+          echo "needs-integration=$needs_integration" >> "$GITHUB_OUTPUT"
           echo "e2e-tier=$e2e_tier" >> "$GITHUB_OUTPUT"
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
@@ -75,12 +90,19 @@ jobs:
       - name: Aggregate check parts
         run: |
           [ "${{ needs.changes.result }}" = "success" ]
-          for result in "${{ needs.check-core.result }}" "${{ needs.vitest-light.result }}" "${{ needs.vitest-integration.result }}"; do
+          for result in "${{ needs.check-core.result }}" "${{ needs.vitest-light.result }}"; do
             if [ "$result" = "success" ]; then
               continue
             fi
             [ "${{ needs.changes.outputs.has-code }}" = "false" ] && [ "$result" = "skipped" ] || exit 1
           done
+          vi_result="${{ needs.vitest-integration.result }}"
+          if [ "$vi_result" != "success" ]; then
+            [ "$vi_result" = "skipped" ] &&
+              { [ "${{ needs.changes.outputs.has-code }}" = "false" ] ||
+                [ "${{ needs.changes.outputs.needs-integration }}" = "false" ]; } ||
+              exit 1
+          fi
           for result in "${{ needs.tsnet-sidecar-test.result }}" "${{ needs.tsnet-sidecar-build.result }}"; do
             if [ "$result" = "success" ]; then
               continue
@@ -158,7 +180,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -179,7 +201,7 @@ jobs:
 
   vitest-integration:
     needs: changes
-    if: needs.changes.outputs.has-code != 'false'
+    if: needs.changes.outputs.has-code != 'false' && needs.changes.outputs.needs-integration != 'false'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
