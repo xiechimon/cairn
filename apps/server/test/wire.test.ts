@@ -184,6 +184,8 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/github/connection/device',
   'POST /api/teams/{id}/github/connection/device/{attempt}',
   'DELETE /api/teams/{id}/github/connection/device/{attempt}',
+  'POST /api/teams/{id}/github/webhook',
+  'DELETE /api/teams/{id}/github/webhook',
   'POST /api/fs/pick',
   'GET /api/fs/list',
   'POST /api/projects/{id}/github/issues/import',
