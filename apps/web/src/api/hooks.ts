@@ -1193,7 +1193,24 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<ProjectRecord>(
           `/api/projects/${input.id}/${input.archived ? 'archive' : 'unarchive'}`,
         ),
-      onSuccess: invalidateAll,
+      onMutate: async (input) => {
+        await qc.cancelQueries({ queryKey: ['projects', teamId] });
+        const previous = qc.getQueryData<ProjectRecord[]>(['projects', teamId]);
+        const archivedAt = input.archived ? Date.now() : null;
+        qc.setQueryData<ProjectRecord[]>(['projects', teamId], (records) =>
+          records?.map((record) => (record.id === input.id ? { ...record, archivedAt } : record)),
+        );
+        return { previous };
+      },
+      onSuccess: (record) => {
+        qc.setQueryData<ProjectRecord[]>(['projects', teamId], (records) =>
+          records?.map((row) => (row.id === record.id ? record : row)),
+        );
+        invalidateAll();
+      },
+      onError: (_error, input, context) => {
+        qc.setQueryData(['projects', teamId], context?.previous);
+      },
     }),
     deleteProject: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/projects/${id}`),
