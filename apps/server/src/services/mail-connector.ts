@@ -32,6 +32,7 @@ export interface MailConnectorOptions {
   mailDeps: MailDeps;
   openMailbox?: OpenMailbox;
   backoff?: { initialMs: number; maxMs: number };
+  pollIntervalMs?: number;
   log?: MailConnectorLog;
 }
 
@@ -67,6 +68,7 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
   const { db } = options.secrets;
   const open = options.openMailbox ?? openImapMailbox;
   const backoff = options.backoff ?? { initialMs: 5_000, maxMs: 5 * 60_000 };
+  const pollIntervalMs = options.pollIntervalMs ?? 60_000;
   const runners = new Map<string, Runner>();
 
   const account = (id: string) => db.select().from(mailAccount).where(eq(mailAccount.id, id)).get();
@@ -243,7 +245,12 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
         delay = backoff.initialMs;
         for (;;) {
           await until(drain(accountId, generation, session), signal);
-          await until(session.waitForChange(), signal);
+          await until(
+            session.supportsIdle
+              ? session.waitForChange()
+              : Promise.race([session.waitForChange(), sleep(pollIntervalMs, signal)]),
+            signal,
+          );
         }
       } catch (error) {
         if (error instanceof Stopped || signal.aborted) return;

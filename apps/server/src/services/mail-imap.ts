@@ -20,6 +20,7 @@ export interface MailboxMessage {
 export interface MailboxSession {
   uidValidity: string;
   uidNext: number;
+  supportsIdle: boolean;
   fetchAfter(uid: number): Promise<MailboxMessage[]>;
   waitForChange(): Promise<void>;
   close(): Promise<void>;
@@ -83,6 +84,7 @@ export const openImapMailbox: OpenMailbox = async (config) => {
   return {
     uidValidity: String(mailbox.uidValidity),
     uidNext: mailbox.uidNext,
+    supportsIdle: client.capabilities.has('IDLE'),
     async fetchAfter(uid) {
       const found = await client.search({ uid: `${uid + 1}:*` }, { uid: true });
       const uids = (found || []).filter((value) => value > uid).slice(0, FETCH_BATCH);

@@ -43,6 +43,7 @@ function fakeMailbox(initial: MailboxMessage[] = [], options: { replayAll?: bool
     const session: MailboxSession = {
       uidValidity: '7',
       uidNext: Math.max(0, ...mails.map((m) => m.uid)) + 1,
+      supportsIdle: true,
       fetchAfter: async (uid) => mails.filter((m) => options.replayAll === true || m.uid > uid),
       waitForChange: () =>
         new Promise<void>((resolve) => {
@@ -245,6 +246,35 @@ describe('mailbox ingestion over IMAP', () => {
     box.deliver(mail(2));
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(s.db.select().from(mailEvent).all()).toHaveLength(1);
+  });
+
+  test('a server without IDLE still gets new mail through periodic polling', async () => {
+    const mails = [mail(1)];
+    const s = bootServer();
+    const created = createMailAccount(
+      { db: s.db, box: s.secretBox },
+      { teamId: s.team.id, userId: s.user.id, body: { ...BODY, wakeMode: 'all' } as never },
+    );
+    const connector = createMailConnector({
+      secrets: { db: s.db, box: s.secretBox },
+      mailDeps: { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, vapidKeys: null },
+      openMailbox: async () => ({
+        uidValidity: '7',
+        uidNext: 2,
+        supportsIdle: false,
+        fetchAfter: async (uid) => mails.filter((m) => m.uid > uid),
+        waitForChange: () => new Promise<void>(() => {}),
+        close: async () => {},
+      }),
+      pollIntervalMs: 20,
+    });
+    connector.connect(created.id);
+    await vi.waitFor(async () => {
+      expect((await listAccounts(s)).find((a) => a.id === created.id)?.status).toBe('watching');
+    });
+    mails.push(mail(2));
+    await vi.waitFor(() => expect(s.db.select().from(mailEvent).all()).toHaveLength(1));
+    await connector.shutdown();
   });
 
   test('the password is sealed at rest and never appears in responses, errors or logs', async () => {
