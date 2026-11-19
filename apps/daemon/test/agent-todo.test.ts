@@ -128,6 +128,16 @@ describe('parseAgentTodoText (pi text channel: `- [ ]` lines → cairn format)',
     ]);
   });
 
+  test('T3b: prose after the last run keeps that run (an update followed by its next step)', () => {
+    const items = parseAgentTodoText(
+      ['- [x] 写 temp.py', '- [ ] 写测试', '', '接下来写测试：'].join('\n'),
+    );
+    expect(items).toEqual([
+      { text: '写 temp.py', state: 'done' },
+      { text: '写测试', state: 'todo' },
+    ]);
+  });
+
   test('T4: task lines inside fences do not count (same rule as web rendering)', () => {
     const items = parseAgentTodoText(
       ['```md', '- [ ] 围栏里的假清单', '```', '', '- [x] 真清单'].join('\n'),

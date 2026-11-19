@@ -44,6 +44,7 @@ const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
 
 export function parseAgentTodoText(text: string): AgentTodoItem[] | null {
   let run: AgentTodoItem[] | null = null;
+  let closed: AgentTodoItem[] | null = null;
   let inFence = false;
   for (const raw of text.split('\n')) {
     if (FENCE_OPEN.test(raw)) {
@@ -53,6 +54,7 @@ export function parseAgentTodoText(text: string): AgentTodoItem[] | null {
     if (inFence) continue;
     const m = AGENT_TODO_LINE_RE.exec(raw);
     if (m === null) {
+      if (run !== null) closed = run;
       run = null;
       continue;
     }
@@ -65,7 +67,8 @@ export function parseAgentTodoText(text: string): AgentTodoItem[] | null {
       run.push({ text: content, state });
     }
   }
-  return run !== null && run.length > 0 ? run : null;
+  const last = run ?? closed;
+  return last !== null && last.length > 0 ? last : null;
 }
 
 export function todoFromTodoWrite(name: unknown, input: unknown): AgentTodoItem[] | null {
