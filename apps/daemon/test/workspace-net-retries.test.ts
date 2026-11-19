@@ -2,9 +2,25 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { commitEnv, gitPrim, runGitOk } from '../src/git.js';
+import { commitEnv, GIT_NET_RETRY_DELAYS_MS, gitPrim, runGitOk } from '../src/git.js';
 import { createDaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
+
+const RETRY_DELAYS_MS = new Set<number>(GIT_NET_RETRY_DELAYS_MS);
+
+function skipNetRetryDelays() {
+  const realSetTimeout = globalThis.setTimeout;
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+    handler: (...args: unknown[]) => void,
+    timeoutMs?: number,
+    ...args: unknown[]
+  ) =>
+    realSetTimeout(
+      handler,
+      RETRY_DELAYS_MS.has(timeoutMs ?? -1) ? 0 : timeoutMs,
+      ...args,
+    )) as typeof setTimeout);
+}
 
 let root: string;
 let origin: string;
@@ -23,10 +39,10 @@ beforeEach(async () => {
     env: commitEnv({ name: 'Fixture', email: 'fixture@example.test' }),
   });
   workspace = new WorkspaceManager({ logger: createDaemonLogger({ logFile }) });
+  skipNetRetryDelays();
 });
 
 afterEach(() => {
-  vi.useRealTimers();
   vi.restoreAllMocks();
   releaseTestTempDir(root);
 });
@@ -92,12 +108,9 @@ test.each(['Authentication failed', 'repository not found'])(
 );
 
 test('exhaustion logs exactly four retries with the actual backoff delays', async () => {
-  vi.useFakeTimers();
   const clone = vi.spyOn(gitPrim, 'clone').mockRejectedValue(new Error('connection reset'));
-  const rejected = expect(workspace.prepare(input())).rejects.toThrow('connection reset');
 
-  await vi.runAllTimersAsync();
-  await rejected;
+  await expect(workspace.prepare(input())).rejects.toThrow('connection reset');
 
   expect(clone).toHaveBeenCalledTimes(5);
   expect(
