@@ -42,7 +42,7 @@ import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubAppUserRepos, githubUserRepos, isGithubAppUserToken } from './lib/github.js';
 import { nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
-import { newScheduleWebhookToken } from './lib/webhook-token.js';
+import { newWebhookToken } from './lib/webhook-token.js';
 import {
   createApiKeyBodySchema,
   githubAppOf,
@@ -249,7 +249,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/schedules', async (c) => {
     const body = parseWith(createScheduleBodySchema, await jsonBody(c), 'body');
-    const webhookToken = body.kind === 'webhook' ? newScheduleWebhookToken() : null;
+    const webhookToken = body.kind === 'webhook' ? newWebhookToken() : null;
     const record = createSchedule(
       svc,
       {

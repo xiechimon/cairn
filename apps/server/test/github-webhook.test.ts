@@ -370,4 +370,87 @@ describe('receiveGithubWebhook', () => {
     expect(res.status).toBe(401);
     expect(((await res.json()) as { error: string }).error).not.toBe('Unauthorized');
   });
+
+  test('the repository match is case-insensitive', async () => {
+    const { s } = await makeWorld({ githubRepo: 'XiechiMon/Cairn' });
+    const { token } = await mint(s);
+    const res = await deliver(s, token, { event: 'issues', deliveryId: 'd-case' });
+    expect((await delivered(res)).result).toBe('created');
+  });
+
+  test('a labeled event whose issue no longer carries the label answers ignored', async () => {
+    const gh = githubFake(REPO, {
+      issues: [{ ...structuredClone(ISSUE), labels: [{ name: 'other-label' }] }],
+      permissions: [[OWNER, { body: permissionBody(OWNER, 'admin', 'admin') }]],
+    });
+    const s = bootServer({ githubFetch: gh.impl });
+    servers.push(s);
+    seedConnection(s);
+    seedChief(s);
+    await postGithubProject(s);
+    const { token } = await mint(s);
+    const res = await deliver(s, token, { event: 'issues', deliveryId: 'd-nolabel' });
+    expect(res.status).toBe(202);
+    expect((await delivered(res)).result).toBe('ignored');
+    expect(s.db.select().from(todoTable).all()).toHaveLength(0);
+  });
+
+  test('concurrent deliveries for different issues still honor the in-flight cap', async () => {
+    const gh = githubFake(REPO, {
+      issues: [structuredClone(ISSUE), { ...structuredClone(ISSUE), number: 8 }],
+      permissions: [[OWNER, { body: permissionBody(OWNER, 'admin', 'admin') }]],
+    });
+    const s = bootServer({ githubFetch: gh.impl });
+    servers.push(s);
+    seedConnection(s);
+    seedChief(s);
+    const projectId = await postGithubProject(s);
+    for (const n of [101, 102]) {
+      s.db
+        .insert(todoTable)
+        .values({
+          id: `seed-issue-${n}`,
+          teamId: s.team.id,
+          projectId,
+          title: `seed ${n}`,
+          spec: '',
+          phase: 'todo',
+          phaseAt: Date.now(),
+          seqNum: n,
+          sourceKind: 'github-issue',
+          sourceRef: githubIssueSourceRef('xiechimon', 'cairn', n),
+          createdBy: CHIEF_AGENT_ID,
+        })
+        .run();
+    }
+    const { token } = await mint(s);
+    const [first, second] = await Promise.all([
+      deliver(s, token, {
+        event: 'issues',
+        deliveryId: 'd-cap-1',
+        body: issuesEvent({ issue: { number: 7 } }),
+      }).then(delivered),
+      deliver(s, token, {
+        event: 'issues',
+        deliveryId: 'd-cap-2',
+        body: issuesEvent({ issue: { number: 8 } }),
+      }).then(delivered),
+    ]);
+    expect([first.result, second.result].sort()).toEqual(['created', 'ignored']);
+    expect(
+      s.db.select().from(todoTable).where(eq(todoTable.sourceKind, 'github-issue')).all(),
+    ).toHaveLength(3);
+  });
+
+  test('an oversized body is refused before the token check', async () => {
+    const gh = githubFake(REPO);
+    const s = bootServer({ githubFetch: gh.impl });
+    servers.push(s);
+    const res = await s.app.request(`/api/webhook/github/cairn-wh-${'0'.repeat(48)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ padding: 'x'.repeat(300 * 1024) }),
+    });
+    expect(res.status).toBe(413);
+  });
 });

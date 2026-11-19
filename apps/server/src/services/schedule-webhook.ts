@@ -3,7 +3,7 @@ import type { Db } from '../db/client.js';
 import { schedule, todo } from '../db/schema.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { scheduleWebhookTokenMatches } from '../lib/webhook-token.js';
+import { webhookTokenMatches } from '../lib/webhook-token.js';
 import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
 import { updateNextRunAt } from './schedules.js';
@@ -32,7 +32,7 @@ export function fireScheduleWebhook(
   if (
     row === undefined ||
     row.webhookTokenHash === null ||
-    !scheduleWebhookTokenMatches(row.webhookTokenHash, token)
+    !webhookTokenMatches(row.webhookTokenHash, token)
   ) {
     return { result: 'unknown', deliveryId: null };
   }

@@ -53,10 +53,12 @@ Answers `202` for every known token:
   sourceRef `github:owner/repo#N` already exists (caught by
   `importGithubIssue`'s 409 → reported as duplicate, not an error).
 - `ignored` — ping event, non-`issues` event, action other than
-  `labeled`, label other than the intake label, missing/malformed
-  sender, sender below triage permission, or the project is at the
-  in-flight cap. The generic `{result, detail}` body never leaks which
-  check failed; the reason is logged server-side.
+  `labeled`, label other than the intake label, the intake label absent
+  from the fetched issue, missing/malformed sender, sender below triage
+  permission, or the project is at the in-flight cap. Sender-permission
+  refusals carry a generic detail; other checks report their reason so
+  the delivery log on the GitHub side stays debuggable — the detail is
+  visible only to whoever already holds the unguessable URL.
 - `misconfigured` — no project binds `repository.full_name`, or the
   team's GitHub connection cannot produce a read token.
 

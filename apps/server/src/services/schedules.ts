@@ -17,7 +17,7 @@ import type { Db } from '../db/client.js';
 import { build, message, project, schedule, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { newScheduleWebhookToken, scheduleWebhookSecretOf } from '../lib/webhook-token.js';
+import { newWebhookToken, webhookSecretOf } from '../lib/webhook-token.js';
 import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
 import { notifyScheduleRun } from './notifications.js';
@@ -191,7 +191,7 @@ export function createSchedule(
   const cron = cronExpressionFor(input.kind, at, tz, input.cron ?? null);
   const webhook =
     input.kind === 'webhook'
-      ? scheduleWebhookSecretOf(options.webhookToken ?? newScheduleWebhookToken().token)
+      ? webhookSecretOf(options.webhookToken ?? newWebhookToken().token)
       : null;
   const nextRunAt = isTriggerKind(input.kind)
     ? null

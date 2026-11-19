@@ -14,7 +14,7 @@ import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { type FetchLike, GithubRateLimitedError } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
-import { newScheduleWebhookToken, scheduleWebhookTokenMatches } from '../lib/webhook-token.js';
+import { newWebhookToken, webhookTokenMatches } from '../lib/webhook-token.js';
 import {
   evaluateRequestedRun,
   recordAutonomyStart,
@@ -56,7 +56,7 @@ export function verifyGithubWebhookToken(
     .where(eq(githubConnection.webhookTokenHash, sha256Hex(token)))
     .get();
   if (row === undefined || row.webhookTokenHash === null) return null;
-  return scheduleWebhookTokenMatches(row.webhookTokenHash, token) ? row : null;
+  return webhookTokenMatches(row.webhookTokenHash, token) ? row : null;
 }
 
 export function mintGithubWebhook(
@@ -69,7 +69,7 @@ export function mintGithubWebhook(
     .where(eq(githubConnection.teamId, teamId))
     .get();
   if (row === undefined) return null;
-  const secret = newScheduleWebhookToken();
+  const secret = newWebhookToken();
   deps.db
     .update(githubConnection)
     .set({
@@ -183,14 +183,9 @@ export async function receiveGithubWebhook(
   const repoRow = deps.db
     .select()
     .from(project)
-    .where(
-      and(
-        eq(project.teamId, tokenRow.teamId),
-        eq(project.repoKind, 'github'),
-        eq(project.githubRepo, payload.repository.full_name),
-      ),
-    )
-    .get();
+    .where(and(eq(project.teamId, tokenRow.teamId), eq(project.repoKind, 'github')))
+    .all()
+    .find((row) => row.githubRepo?.toLowerCase() === payload.repository.full_name.toLowerCase());
   if (!repoRow) {
     return respond(logger, {
       result: 'misconfigured',
@@ -198,7 +193,35 @@ export async function receiveGithubWebhook(
       detail: `no github project for ${payload.repository.full_name}`,
     });
   }
+  return projectIntakeLocked(repoRow.id, () =>
+    importLabeledIssue(deps, tokenRow, repoRow, payload, deliveryId, logger),
+  );
+}
 
+const projectIntakeChains = new Map<string, Promise<void>>();
+
+function projectIntakeLocked<T>(projectId: string, fn: () => Promise<T>): Promise<T> {
+  const previous = projectIntakeChains.get(projectId) ?? Promise.resolve();
+  const run = previous.then(fn);
+  const tracked: Promise<void> = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  projectIntakeChains.set(projectId, tracked);
+  void tracked.finally(() => {
+    if (projectIntakeChains.get(projectId) === tracked) projectIntakeChains.delete(projectId);
+  });
+  return run;
+}
+
+async function importLabeledIssue(
+  deps: WebhookDeps,
+  tokenRow: GithubConnectionRow,
+  repoRow: typeof project.$inferSelect,
+  payload: GithubIssuesEvent,
+  deliveryId: string,
+  logger: Logger | undefined,
+): Promise<WebhookReceiverResponse> {
   const fullName = payload.repository.full_name;
   const issueNumber = payload.issue.number;
   const sender = payload.sender?.login ?? '';
@@ -309,9 +332,17 @@ export async function receiveGithubWebhook(
   try {
     const record = await importGithubIssue({ ...deps, githubFetch }, repoRow, issueNumber, {
       createdBy,
+      requiredLabel: WEBHOOK_TRIGGER_LABEL,
     });
     todoId = record.id;
   } catch (err) {
+    if (err instanceof HttpError && err.status === 422) {
+      return respond(logger, {
+        result: 'ignored',
+        deliveryId,
+        detail: `issue ${fullName}#${issueNumber} does not carry ${WEBHOOK_TRIGGER_LABEL}`,
+      });
+    }
     if (err instanceof HttpError && err.status === 409) {
       return respond(logger, {
         result: 'duplicate',

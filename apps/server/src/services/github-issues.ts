@@ -82,7 +82,7 @@ export async function importGithubIssue(
   deps: ImportGithubIssueDeps,
   row: ProjectRow,
   issueNumber: number,
-  opts: { createdBy?: string } = {},
+  opts: { createdBy?: string; requiredLabel?: string } = {},
 ): Promise<TodoRecord> {
   const { owner, repo } = requireGithubRepo(row);
   const fetchImpl = deps.githubFetch ?? fetch;
@@ -98,6 +98,12 @@ export async function importGithubIssue(
   try {
     const token = await requireToken(deps, row.teamId, { owner, repo });
     const detail = await githubRepoIssue(fetchImpl, token, owner, repo, issueNumber);
+    if (
+      opts.requiredLabel !== undefined &&
+      !detail.labels.some((label) => label.name === opts.requiredLabel)
+    ) {
+      throw new HttpError(422, `issue ${ref} does not carry ${opts.requiredLabel}`);
+    }
     const repoLabels = await githubRepoLabels(fetchImpl, token, owner, repo);
     syncGithubLabels(deps.db, row.id, [...repoLabels, ...detail.labels]);
     const names = [...new Set(detail.labels.map((l) => l.name))];
