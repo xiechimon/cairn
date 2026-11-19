@@ -14,7 +14,15 @@ export function evaluate({ queueHead, ciRuns, checkRuns, mainTip, candidateConta
   if (run?.status !== 'completed')
     return { action: 'wait', reason: run ? `run ${run.status}` : 'no ci run yet' };
   if (run.conclusion !== 'success') return { action: 'reject', reason: `ci ${run.conclusion}` };
-  const byName = new Map(checkRuns.map((c) => [c.name, c.conclusion]));
+  const byName = new Map(
+    checkRuns
+      .toSorted(
+        (a, b) =>
+          (Date.parse(a.completed_at ?? a.started_at) || 0) -
+            (Date.parse(b.completed_at ?? b.started_at) || 0) || (a.id ?? 0) - (b.id ?? 0),
+      )
+      .map((c) => [c.name, c.conclusion]),
+  );
   const missing = REQUIRED_CHECKS.filter(
     (name) => !['success', 'skipped'].includes(byName.get(name) ?? ''),
   );

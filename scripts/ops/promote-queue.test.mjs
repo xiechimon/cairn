@@ -24,6 +24,53 @@ test('green run on the queue head promotes that exact sha', () => {
   assert.deepEqual(evaluate(base), { action: 'promote', sha: SHA });
 });
 
+test('requeued sha uses the latest check result regardless of response order', () => {
+  const older = '2026-11-19T07:08:53Z';
+  const newer = '2026-11-19T07:33:42Z';
+  for (const [oldTiming, newTiming] of [
+    [
+      { completed_at: older, id: 9 },
+      { completed_at: newer, id: 1 },
+    ],
+    [
+      { started_at: older, id: 9 },
+      { started_at: newer, id: 1 },
+    ],
+    [
+      { completed_at: older, id: 9 },
+      { completed_at: null, started_at: newer, id: 1 },
+    ],
+    [{ id: 1 }, { id: 9 }],
+    [
+      { completed_at: newer, id: 1 },
+      { completed_at: newer, id: 9 },
+    ],
+  ]) {
+    for (const conclusion of ['success', 'skipped', 'failure', 'cancelled', null]) {
+      const latest = checks.map((check) => ({ ...check, ...newTiming, conclusion }));
+      const previous = checks.map((check, index) => ({
+        ...check,
+        ...oldTiming,
+        conclusion:
+          conclusion === 'success' || conclusion === 'skipped'
+            ? ['failure', 'cancelled', 'failure'][index]
+            : 'success',
+      }));
+      for (const checkRuns of [
+        [...latest, ...previous],
+        [...previous, ...latest],
+      ]) {
+        assert.deepEqual(
+          evaluate({ ...base, checkRuns }),
+          conclusion === 'success' || conclusion === 'skipped'
+            ? { action: 'promote', sha: SHA }
+            : { action: 'wait', reason: 'checks pending: check, pack-smoke, e2e-gate' },
+        );
+      }
+    }
+  }
+});
+
 test('no run, running run or pending check waits', () => {
   assert.equal(evaluate({ ...base, ciRuns: [] }).action, 'wait');
   assert.equal(
