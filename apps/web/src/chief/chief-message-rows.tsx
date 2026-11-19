@@ -34,6 +34,7 @@ import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { settingsHref } from '../settings/settings-href.js';
+import { isApprovalRequest } from './approval-card-model.js';
 import { ChiefReportMessage } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import type { TaskRef } from './chief-task-refs.js';
@@ -41,7 +42,7 @@ import { CloakLicenseCard } from './cloak-license-card.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
 import { PackageInstallCard } from './package-install-card.js';
-import { QuestionAnsweredLine, QuestionAsked } from './question-answered-line.js';
+import { ApprovalAnswered, QuestionAnsweredLine, QuestionAsked } from './question-answered-line.js';
 import { answerLines } from './question-lifecycle.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import {
@@ -825,6 +826,16 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
             <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
               <QuestionAnsweredLine item={item} />
+            </MessageContent>
+          </Message>
+        </MessageScrollerItem>
+      );
+    if (isApprovalRequest(item.requestId))
+      return (
+        <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
+          <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
+            <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+              <ApprovalAnswered item={item} />
             </MessageContent>
           </Message>
         </MessageScrollerItem>

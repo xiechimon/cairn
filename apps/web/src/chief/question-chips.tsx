@@ -275,6 +275,12 @@ export function QuestionChips({
   };
   const showSubmitChip = multi || (question.options.length === 0 && !bound);
   const approval = isApprovalRequest(item.requestId) ? approvalCardOf(question, t) : null;
+  const submittedIndex =
+    submitting && draft?.kind === 'choices'
+      ? question.options.findIndex((option) => option.label === draft.picked[0])
+      : -1;
+  const submittingAction =
+    submittedIndex < 0 ? null : `chief-question-option-${step}-${submittedIndex}`;
 
   if (approval !== null)
     return (
@@ -289,14 +295,13 @@ export function QuestionChips({
           data-tools-root=""
           className="group/message flex max-w-full min-w-0 flex-col items-start"
         >
-          <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
+          <div className={cn(REPLY_BLOCK_CLS, 'max-w-full')} data-slot="reply-block">
             <ApprovalCard
               card={approval}
-              waiting
               disabled={!pending || blockedByUpload}
+              busy={submittingAction}
               actions={question.options.map((option, oi) => ({
                 label: option.label,
-                primary: oi === 0,
                 testId: `chief-question-option-${step}-${oi}`,
                 onClick: () => choose(oi),
               }))}

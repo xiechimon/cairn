@@ -1,3 +1,4 @@
+import { isApprovalRequest } from './approval-card-model.js';
 import { answerLines } from './question-lifecycle.js';
 import type { GroupedRow } from './thread-activity.js';
 import { needsTimeDivider } from './time-dividers.js';
@@ -12,11 +13,13 @@ type Author = 'user' | 'robot' | null;
 function opensAs(item: GroupedRow['item']): Author {
   if (item.kind === 'user') return 'user';
   if (item.kind === 'robot') return 'robot';
+  if (item.kind === 'question' && isApprovalRequest(item.requestId)) return null;
   if (item.kind === 'question' && item.status === 'answered') return 'robot';
   return null;
 }
 
 function closesAs(item: GroupedRow['item']): Author {
+  if (item.kind === 'question' && isApprovalRequest(item.requestId)) return null;
   if (item.kind === 'question') return answerLines(item).length > 0 ? 'user' : null;
   return opensAs(item);
 }

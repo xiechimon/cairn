@@ -31,6 +31,8 @@ const ALLOWLIST: Record<string, string> = {
   'chief/approval-card-model.ts::审批': 'matches the server-generated approval card text verbatim, not UI copy',
   'chief/approval-card-model.ts::对外发送：': 'matches the server-generated approval card text verbatim, not UI copy',
   'chief/approval-card-model.ts::参数': 'matches the server-generated approval card text verbatim, not UI copy',
+  'chief/approval-card-model.ts::收件人': 'matches the server-generated approval card text verbatim, not UI copy',
+  'chief/approval-card-model.ts::正文': 'matches the server-generated approval card text verbatim, not UI copy',
 };
 
 /** Dict keys assembled at module scope (exact-value fixture chrome; the

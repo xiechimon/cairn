@@ -3,8 +3,8 @@ import { Ban, CircleCheck } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
-import { ApprovalCard } from './approval-card.js';
-import { approvalCardOf, isApprovalRequest } from './approval-card-model.js';
+import { ApprovalHistoryLine } from './approval-card.js';
+import { approvalCardOf } from './approval-card-model.js';
 import { MessageToolbar } from './message-toolbar.js';
 import type { ChiefQuestionItem } from './question-chips.js';
 
@@ -33,8 +33,6 @@ export function QuestionAsked({
   item: ChiefQuestionItem;
   onCopy?: ((text: string) => void) | undefined;
 }) {
-  const { t } = useI18n();
-  const approval = isApprovalRequest(item.requestId);
   return (
     <div
       data-testid="chief-question-asked"
@@ -43,9 +41,7 @@ export function QuestionAsked({
       className="flex w-full max-w-full min-w-0 flex-col items-start gap-1"
     >
       {item.questions.map((question, n) => {
-        const bubble = approval ? (
-          <ApprovalCard card={{ ...approvalCardOf(question, t), note: null }} waiting={false} />
-        ) : (
+        const bubble = (
           <div
             data-slot="reply-bubble"
             data-testid="chief-reply-bubble"
@@ -56,7 +52,7 @@ export function QuestionAsked({
         );
         return (
           <div key={n} className={REPLY_BLOCK_CLS} data-slot="reply-block">
-            {question.header === '' || approval ? (
+            {question.header === '' ? (
               bubble
             ) : (
               <Tooltip>
@@ -86,5 +82,31 @@ export function QuestionAsked({
         />
       )}
     </div>
+  );
+}
+
+export function ApprovalAnswered({ item }: { item: ChiefQuestionItem }) {
+  const { t } = useI18n();
+  const question = item.questions[0];
+  if (question === undefined) return null;
+  const choice = item.answers?.[0]?.choices?.[0] ?? null;
+  const index = choice === null ? -1 : question.options.findIndex((o) => o.label === choice);
+  const declined = index > 0 && index === question.options.length - 1;
+  const status =
+    index === 0
+      ? t('已批准')
+      : declined
+        ? t('已拒绝')
+        : choice !== null && index > 0
+          ? choice
+          : t('已回答');
+  const Icon = declined ? Ban : CircleCheck;
+  return (
+    <ApprovalHistoryLine
+      card={approvalCardOf(question, t)}
+      status={status}
+      outcome={index === 0 ? 'approved' : declined ? 'declined' : 'answered'}
+      icon={<Icon strokeWidth={1.75} className="size-4 text-content-tertiary" />}
+    />
   );
 }

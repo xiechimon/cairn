@@ -1,3 +1,4 @@
+import { Ban, CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
@@ -5,21 +6,34 @@ import { useLiveData } from '../api/provider.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ApprovalCard } from './approval-card.js';
+import { ApprovalCard, ApprovalHistoryLine } from './approval-card.js';
+import { installCardOf } from './approval-card-model.js';
 
 type PackageInstallItem = Extract<ChiefStreamItem, { kind: 'package-install' }>;
 
 type Decision = 'approve' | 'decline';
 type Problem = 'owner-only' | 'closed' | 'failed' | null;
 
+const APPROVE_TEST_ID = 'chief-package-install-approve';
+const DECLINE_TEST_ID = 'chief-package-install-decline';
+const HISTORY_ICON_CLS = 'size-4 text-content-tertiary';
+
 export function PackageInstallCard({ item }: { item: PackageInstallItem }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { teamId } = useLiveData();
   const { decidePackageInstall } = useApiMutations(teamId);
   const [decided, setDecided] = useState<Decision | null>(null);
   const [problem, setProblem] = useState<Problem>(null);
   const waiting = item.outcome === 'waiting';
   const asking = waiting && decided === null;
+  const list = (items: readonly string[]) =>
+    items.length < 2
+      ? items.join('')
+      : t('{rest} 和 {last}', {
+          rest: items.slice(0, -1).join(locale === 'zh' ? '、' : ', '),
+          last: items[items.length - 1] ?? '',
+        });
+  const card = installCardOf(item.packages, t, list);
 
   const decide = (decision: Decision) => {
     setProblem(null);
@@ -39,28 +53,6 @@ export function PackageInstallCard({ item }: { item: PackageInstallItem }) {
     );
   };
 
-  const title = waiting
-    ? decided === 'approve'
-      ? t('正在安装系统软件')
-      : decided === 'decline'
-        ? t('没有安装')
-        : t('Coordinator 想安装系统软件')
-    : item.outcome === 'installed'
-      ? t('已安装系统软件')
-      : t('没有安装');
-
-  const meta = waiting
-    ? decided === null
-      ? t('批准后以 root 装进它的电脑，电脑更新或恢复后会自动重装。')
-      : null
-    : item.outcome === 'declined'
-      ? t('你拒绝了这次安装。')
-      : item.outcome === 'not-answered'
-        ? t('没有等到批准，这一步已停止。')
-        : item.outcome === 'failed'
-          ? t('安装没有完成，Coordinator 会说明原因。')
-          : null;
-
   const problemText =
     problem === 'owner-only'
       ? t('只有这台 Cairn 的所有者能批准安装。')
@@ -70,40 +62,70 @@ export function PackageInstallCard({ item }: { item: PackageInstallItem }) {
           ? t('没能提交，请稍后重试。')
           : null;
 
+  const outcome = waiting && decided !== null ? `${decided}d` : item.outcome;
+  const history =
+    outcome === 'approved'
+      ? {
+          status: t('正在安装'),
+          icon: <LoaderCircle strokeWidth={1.75} className={`${HISTORY_ICON_CLS} animate-spin`} />,
+        }
+      : outcome === 'installed'
+        ? {
+            status: t('已安装'),
+            icon: <CircleCheck strokeWidth={1.75} className={HISTORY_ICON_CLS} />,
+          }
+        : outcome === 'declined'
+          ? { status: t('已拒绝'), icon: <Ban strokeWidth={1.75} className={HISTORY_ICON_CLS} /> }
+          : outcome === 'not-answered'
+            ? {
+                status: t('没有等到批准'),
+                icon: <Ban strokeWidth={1.75} className={HISTORY_ICON_CLS} />,
+              }
+            : outcome === 'failed'
+              ? {
+                  status: t('安装没有完成'),
+                  icon: <CircleAlert strokeWidth={1.75} className={HISTORY_ICON_CLS} />,
+                }
+              : null;
+
   return (
     <MessageScrollerItem style={{ contentVisibility: 'visible' }} className="mt-5">
-      <ApprovalCard
-        testId="chief-package-install"
-        outcome={waiting && decided !== null ? `${decided}d` : item.outcome}
-        waiting={asking}
-        card={{
-          title,
-          summary: null,
-          fields: [{ label: t('软件包'), value: item.packages.join(' '), mono: true }],
-          details: [],
-          note: meta,
-        }}
-        disabled={decidePackageInstall.isPending}
-        actions={
-          asking
-            ? [
-                {
-                  label: t('批准安装'),
-                  primary: true,
-                  testId: 'chief-package-install-approve',
-                  onClick: () => decide('approve'),
-                },
-                {
-                  label: t('拒绝'),
-                  primary: false,
-                  testId: 'chief-package-install-decline',
-                  onClick: () => decide('decline'),
-                },
-              ]
-            : []
-        }
-        problem={problemText}
-      />
+      {asking || history === null ? (
+        <ApprovalCard
+          testId="chief-package-install"
+          outcome={outcome}
+          card={card}
+          disabled={decidePackageInstall.isPending}
+          busy={
+            decidePackageInstall.isPending
+              ? decidePackageInstall.variables?.decision === 'decline'
+                ? DECLINE_TEST_ID
+                : APPROVE_TEST_ID
+              : null
+          }
+          actions={
+            asking
+              ? [
+                  {
+                    label: t('批准安装'),
+                    testId: APPROVE_TEST_ID,
+                    onClick: () => decide('approve'),
+                  },
+                  { label: t('拒绝'), testId: DECLINE_TEST_ID, onClick: () => decide('decline') },
+                ]
+              : []
+          }
+          problem={problemText}
+        />
+      ) : (
+        <ApprovalHistoryLine
+          testId="chief-package-install"
+          outcome={outcome}
+          card={card}
+          status={history.status}
+          icon={history.icon}
+        />
+      )}
     </MessageScrollerItem>
   );
 }

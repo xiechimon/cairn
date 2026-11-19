@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
+import { ApprovalAnswered } from '../src/chief/question-answered-line.js';
 import { type ChiefQuestionItem, QuestionChips } from '../src/chief/question-chips.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
@@ -23,25 +24,29 @@ const MAIL_CARD = [
   '只会按上面的内容发出，发出后无法收回。',
 ].join('\n');
 
-function mailItem(question = MAIL_CARD): ChiefQuestionItem {
+function mailItem(
+  question = MAIL_CARD,
+  status: ChiefQuestionItem['status'] = 'pending',
+  answers: ChiefQuestionItem['answers'] = null,
+): ChiefQuestionItem {
   return {
     kind: 'question',
     id: 'approval-p1',
     requestId: 'approval-p1',
-    status: 'pending',
+    status,
     questions: [{ header: '审批', question, options: [{ label: '发送' }, { label: '不发' }] }],
-    answers: null,
+    answers,
   };
 }
 
-function render(item: ChiefQuestionItem): string {
+function inI18n(child: ReturnType<typeof createElement>): string {
   return renderToStaticMarkup(
-    createElement(I18nProvider, {
-      initialLocale: 'zh',
-      children: createElement(QuestionChips, { item, onAnswer: () => {}, onCancel: () => {} }),
-    }),
+    createElement(I18nProvider, { initialLocale: 'zh', children: child }),
   );
 }
+
+const render = (item: ChiefQuestionItem) =>
+  inI18n(createElement(QuestionChips, { item, onAnswer: () => {}, onCancel: () => {} }));
 
 const textOf = (html: string) =>
   html
@@ -53,7 +58,7 @@ const textOf = (html: string) =>
 function elements(html: string, testId: string): { tag: string; text: string }[] {
   const pattern = new RegExp(`<(\\w+)([^>]*data-testid="${testId}"[^>]*)>([\\s\\S]*?)</\\1>`, 'g');
   return [...html.matchAll(pattern)].map((match) => ({
-    tag: match[2] ?? '',
+    tag: `<${match[1]}${match[2] ?? ''}>`,
     text: textOf(match[3] ?? ''),
   }));
 }
@@ -61,39 +66,61 @@ function elements(html: string, testId: string): { tag: string; text: string }[]
 const texts = (html: string, testId: string) => elements(html, testId).map((node) => node.text);
 
 describe('an outbound approval card', () => {
-  test('names the action and lists recipient, subject and body under their labels', () => {
+  test('says the action in one sentence with the account and subject under it', () => {
     const doc = render(mailItem());
-    expect(texts(doc, 'approval-card-title')).toEqual(['发送邮件']);
-    expect(texts(doc, 'approval-field-label')).toEqual(['收件人', '主题', '正文']);
-    const values = texts(doc, 'approval-field-value');
-    expect(values[0]).toBe('lena.hoffmann@example.com');
-    expect(values[2]).toContain('the quote is 4200 EUR');
-    expect(values[2]).not.toContain('>');
+    expect(texts(doc, 'approval-card-title')).toEqual(['发送邮件给 lena.hoffmann@example.com']);
+    expect(texts(doc, 'approval-card-context')).toEqual([
+      '从 ian@example.com 发出 · 主题「Re: Quote for the migration」',
+    ]);
   });
 
-  test('keeps internal ids out of sight until details are opened', () => {
+  test('quotes the body that will go out', () => {
     const doc = render(mailItem());
-    const [toggle] = elements(doc, 'approval-details-toggle');
-    expect(toggle?.text).toBe('详情');
-    expect(toggle?.tag).toContain('aria-expanded="false"');
+    const [quote] = elements(doc, 'approval-card-quote');
+    expect(quote?.tag.startsWith('<blockquote')).toBe(true);
+    expect(quote?.text).toContain('the quote is 4200 EUR');
+    expect(quote?.text).not.toContain('>');
+  });
+
+  test('keeps raw arguments closed and puts the risk next to decline then send', () => {
+    const doc = render(mailItem());
     expect(textOf(doc)).not.toContain('mail_01JX8K2QF7ZC4V9N3T6W');
-    expect(textOf(doc)).not.toContain('inReplyTo');
-  });
-
-  test('ends with the warning and enabled send and decline buttons', () => {
-    const doc = render(mailItem());
+    expect(texts(doc, 'approval-details-toggle')).toEqual(['原始参数']);
     expect(texts(doc, 'approval-card-note')).toEqual(['只会按上面的内容发出，发出后无法收回。']);
-    const [send] = elements(doc, 'chief-question-option-0-0');
-    const [decline] = elements(doc, 'chief-question-option-0-1');
-    expect(send?.text).toBe('发送');
-    expect(decline?.text).toBe('不发');
-    expect(send?.tag).not.toContain('disabled=""');
-    expect(decline?.tag).not.toContain('disabled=""');
+    const send = doc.indexOf('data-testid="chief-question-option-0-0"');
+    const decline = doc.indexOf('data-testid="chief-question-option-0-1"');
+    expect(decline).toBeGreaterThan(0);
+    expect(send).toBeGreaterThan(decline);
+    expect(elements(doc, 'chief-question-option-0-0')[0]?.tag).not.toContain('disabled=""');
   });
 
-  test('folds a long body behind show all', () => {
+  test('folds a long body and says how many lines it holds', () => {
     const body = Array.from({ length: 12 }, (_, i) => `> line ${i + 1} of the quote`).join('\n');
     const doc = render(mailItem(MAIL_CARD.replace(/正文：\n(> .*\n)+/, `正文：\n${body}\n`)));
-    expect(texts(doc, 'approval-field-more')).toEqual(['展开全文']);
+    expect(texts(doc, 'approval-field-more')).toEqual(['展开全文 · 共 12 行']);
+  });
+
+  test('collapses into one history line once answered', () => {
+    const doc = inI18n(
+      createElement(ApprovalAnswered, {
+        item: mailItem(MAIL_CARD, 'answered', [{ header: '审批', choices: ['发送'] }]),
+      }),
+    );
+    expect(texts(doc, 'approval-history-text')).toEqual([
+      '已批准 · 发送邮件给 lena.hoffmann@example.com',
+    ]);
+    expect(doc).not.toContain('data-testid="chief-question-option-0-0"');
+    expect(doc).not.toContain('data-testid="approval-card-quote"');
+  });
+
+  test('a declined answer reads as declined', () => {
+    const doc = inI18n(
+      createElement(ApprovalAnswered, {
+        item: mailItem(MAIL_CARD, 'answered', [{ header: '审批', choices: ['不发'] }]),
+      }),
+    );
+    expect(texts(doc, 'approval-history-text')).toEqual([
+      '已拒绝 · 发送邮件给 lena.hoffmann@example.com',
+    ]);
   });
 });

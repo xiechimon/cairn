@@ -41,13 +41,17 @@ test.describe('package install approval card in the Coordinator chat', () => {
   test('the card names the packages and approving sends exactly them', async ({ page }) => {
     const { card, decisions } = await open(page, installRow());
     await expect(card).toHaveAttribute('data-outcome', 'waiting');
-    await expect(card).toContainText('Coordinator 想安装系统软件');
+    await expect(card.getByTestId('approval-card-title')).toHaveText(
+      '在 Coordinator 的电脑上安装 ffmpeg 和 libpq-dev',
+    );
     await expect(card.getByTestId('approval-field-value')).toHaveText(/ffmpeg\s*libpq-dev/);
     await card.scrollIntoViewIfNeeded();
     await evidencePanelShot(page, 'package-install-card-waiting.png', card);
     await card.getByTestId('chief-package-install-approve').click();
     await expect(card).toHaveAttribute('data-outcome', 'approved');
-    await expect(card).toContainText('正在安装系统软件');
+    await expect(card.getByTestId('approval-history-text')).toHaveText(
+      '正在安装 · 在 Coordinator 的电脑上安装 ffmpeg 和 libpq-dev',
+    );
     await expect(card.getByTestId('chief-package-install-approve')).toHaveCount(0);
     expect(decisions).toEqual([{ packages: ['ffmpeg', 'libpq-dev'], decision: 'approve' }]);
   });
@@ -65,7 +69,9 @@ test.describe('package install approval card in the Coordinator chat', () => {
       installRow('Installed with the owner approval: ffmpeg libpq-dev.\nSetting up ffmpeg'),
     );
     await expect(card).toHaveAttribute('data-outcome', 'installed');
-    await expect(card).toContainText('已安装系统软件');
+    await expect(card.getByTestId('approval-history-text')).toHaveText(
+      '已安装 · 在 Coordinator 的电脑上安装 ffmpeg 和 libpq-dev',
+    );
     await expect(card.getByTestId('chief-package-install-approve')).toHaveCount(0);
     await evidencePanelShot(page, 'package-install-card-installed.png', card);
   });

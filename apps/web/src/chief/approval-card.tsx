@@ -1,100 +1,99 @@
 import { cn } from 'cn';
-import { Fragment, useState } from 'react';
+import { Box, CircleAlert, LoaderCircle, Mail, Send } from 'lucide-react';
+import { type ComponentType, Fragment, type ReactNode, type SVGProps, useState } from 'react';
+import { NoticeBanner } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '../components/ui/collapsible.js';
-import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronRight } from '../icons/index.js';
-import type { ApprovalCardModel, ApprovalField } from './approval-card-model.js';
+import { Monitor, Terminal } from '../icons/index.js';
+import type { ApprovalCardModel, ApprovalField, ApprovalKind } from './approval-card-model.js';
 
 export interface ApprovalAction {
   label: string;
-  primary: boolean;
   testId: string;
   onClick: () => void;
 }
 
 export interface ApprovalCardProps {
   card: ApprovalCardModel;
-  waiting: boolean;
   actions?: readonly ApprovalAction[];
+  busy?: string | null;
   disabled?: boolean;
   problem?: string | null;
   testId?: string;
   outcome?: string;
 }
 
-const FOLD_LINES = 6;
+const KIND_ICON: Record<ApprovalKind, ComponentType<SVGProps<SVGSVGElement>>> = {
+  mail: Mail,
+  send: Send,
+  install: Box,
+  shell: Terminal,
+  app: Monitor,
+  other: CircleAlert,
+};
+
+const FOLD_LINES = 5;
 const FOLD_CHARS = 360;
 const ACTION_BUTTON_CLS = 'pointer-coarse:h-11 pointer-coarse:px-4';
+const INLINE_LINK_CLS = 'h-auto min-h-6 p-0 text-meta font-normal text-content-secondary';
 
-function folds(value: string): boolean {
-  return value.split('\n').length > FOLD_LINES || value.length > FOLD_CHARS;
+function variantAt(index: number, count: number): 'default' | 'outline' | 'ghost' {
+  if (index === 0) return 'default';
+  return index === count - 1 ? 'ghost' : 'outline';
 }
 
-function FieldValue({ field }: { field: ApprovalField }) {
+function Preview({ value, mono }: { value: string; mono: boolean }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const foldable = folds(field.value);
-  const text = (
-    <span
-      data-testid="approval-field-value"
-      className={cn(
-        'block whitespace-pre-wrap wrap-anywhere',
-        field.mono === true && 'font-mono text-code',
-        foldable && !open && 'line-clamp-6',
-      )}
-    >
-      {field.value}
-    </span>
-  );
-  if (!foldable) return text;
+  const lines = value.split('\n').length;
+  const foldable = lines > FOLD_LINES || value.length > FOLD_CHARS;
   return (
     <>
-      {text}
-      <Button
-        type="button"
-        variant="link"
-        data-testid="approval-field-more"
-        aria-expanded={open}
-        className="h-auto min-h-6 p-0 text-meta font-normal text-content-secondary"
-        onClick={() => setOpen(!open)}
+      <blockquote
+        data-testid="approval-card-quote"
+        className="m-0 mt-2 border-s-2 border-border ps-3.5 text-ui text-foreground"
       >
-        {open ? t('收起') : t('展开全文')}
-      </Button>
+        <span
+          data-testid="approval-field-value"
+          className={cn(
+            'block whitespace-pre-wrap wrap-anywhere',
+            mono && 'font-mono text-code',
+            foldable && !open && 'line-clamp-5',
+          )}
+        >
+          {value}
+        </span>
+      </blockquote>
+      {foldable && (
+        <Button
+          type="button"
+          variant="link"
+          data-testid="approval-field-more"
+          aria-expanded={open}
+          className={cn(INLINE_LINK_CLS, 'ms-4 mt-1')}
+          onClick={() => setOpen(!open)}
+        >
+          {open
+            ? t('收起')
+            : lines > FOLD_LINES
+              ? t('展开全文 · 共 {n} 行', { n: lines })
+              : t('展开全文')}
+        </Button>
+      )}
     </>
   );
 }
 
-function FieldRows({ fields, detail }: { fields: readonly ApprovalField[]; detail?: boolean }) {
+function RawArguments({ fields }: { fields: readonly ApprovalField[] }) {
   return (
     <dl
-      className={cn(
-        'm-0 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1',
-        detail === true ? 'text-meta text-content-secondary' : 'text-ui text-foreground',
-      )}
+      data-testid="approval-details"
+      className="m-0 mt-2 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-md bg-muted px-3 py-2 font-mono text-meta text-content-secondary"
     >
       {fields.map((field, index) => (
         <Fragment key={`${field.label}-${index}`}>
-          <dt
-            data-testid={detail === true ? 'approval-detail-label' : 'approval-field-label'}
-            className="text-content-secondary"
-          >
-            {field.label}
-          </dt>
-          <dd className="m-0 min-w-0">
-            {detail === true ? (
-              <span className="block font-mono whitespace-pre-wrap wrap-anywhere">
-                {field.value}
-              </span>
-            ) : (
-              <FieldValue field={field} />
-            )}
-          </dd>
+          <dt data-testid="approval-detail-label">{field.label}</dt>
+          <dd className="m-0 min-w-0 whitespace-pre-wrap wrap-anywhere">{field.value}</dd>
         </Fragment>
       ))}
     </dl>
@@ -103,90 +102,138 @@ function FieldRows({ fields, detail }: { fields: readonly ApprovalField[]; detai
 
 export function ApprovalCard({
   card,
-  waiting,
   actions = [],
+  busy = null,
   disabled = false,
   problem = null,
   testId = 'approval-card',
   outcome,
 }: ApprovalCardProps) {
   const { t } = useI18n();
+  const [raw, setRaw] = useState(false);
+  const hasRaw = card.details.length > 0;
+  const footer =
+    card.note !== null || hasRaw || actions.length > 0 ? (
+      <span className="wrap-anywhere">
+        {card.note !== null && <span data-testid="approval-card-note">{card.note}</span>}
+        {card.note !== null && hasRaw && ' · '}
+        {hasRaw && (
+          <Button
+            type="button"
+            variant="link"
+            data-testid="approval-details-toggle"
+            aria-expanded={raw}
+            className={INLINE_LINK_CLS}
+            onClick={() => setRaw(!raw)}
+          >
+            {raw ? t('收起原始参数') : t('原始参数')}
+          </Button>
+        )}
+      </span>
+    ) : null;
   return (
-    <section
+    <NoticeBanner
+      tone="waiting"
+      icon={KIND_ICON[card.kind]}
       data-testid={testId}
       data-slot="approval-card"
       data-outcome={outcome}
       aria-label={card.title}
-      className={cn(REPLY_BUBBLE_CLS, 'flex min-w-0 flex-col gap-2 py-3')}
+      className="w-reply-bubble max-w-full"
+      title={
+        <span data-testid="approval-card-title" className="wrap-anywhere">
+          {card.title}
+        </span>
+      }
+      body={
+        card.context === null ? undefined : (
+          <span data-testid="approval-card-context" className="whitespace-pre-wrap wrap-anywhere">
+            {card.context}
+          </span>
+        )
+      }
+      footer={footer}
+      actions={
+        actions.length === 0
+          ? undefined
+          : actions
+              .map((action, index) => (
+                <Button
+                  key={action.testId}
+                  type="button"
+                  size="sm"
+                  variant={variantAt(index, actions.length)}
+                  className={ACTION_BUTTON_CLS}
+                  disabled={busy === null ? disabled : busy !== action.testId}
+                  aria-disabled={busy === action.testId || undefined}
+                  aria-busy={busy === action.testId || undefined}
+                  data-testid={action.testId}
+                  onClick={busy === null ? action.onClick : undefined}
+                >
+                  {busy === action.testId && <LoaderCircle aria-hidden className="animate-spin" />}
+                  {action.label}
+                </Button>
+              ))
+              .reverse()
+      }
     >
-      <p
-        data-testid="approval-card-title"
-        className="m-0 flex items-center gap-2 text-ui font-title text-foreground"
-      >
-        {waiting && (
-          <span
-            aria-hidden="true"
-            data-slot="needs-you-dot"
-            className="size-1.5 flex-none rounded-full bg-(--card-button)"
-          />
-        )}
-        {card.title}
-      </p>
-      {card.summary !== null && (
-        <p className="m-0 text-ui text-foreground whitespace-pre-wrap wrap-anywhere">
-          {card.summary}
-        </p>
-      )}
-      {card.fields.length > 0 && <FieldRows fields={card.fields} />}
-      {card.details.length > 0 && (
-        <Collapsible className="group/details">
-          <CollapsibleTrigger
-            data-testid="approval-details-toggle"
-            className="-ml-1 flex min-h-6 cursor-pointer items-center gap-1 rounded-md px-1 text-meta text-content-secondary outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            <ChevronRight
-              aria-hidden
-              className="size-4 flex-none transition-transform duration-(--dur-fast) group-data-open/details:rotate-90"
-            />
-            {t('详情')}
-          </CollapsibleTrigger>
-          <CollapsibleContent data-testid="approval-details" className="pt-1">
-            <FieldRows fields={card.details} detail />
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-      {card.note !== null && (
-        <p data-testid="approval-card-note" className="m-0 text-meta text-content-secondary">
-          {card.note}
-        </p>
-      )}
-      {actions.length > 0 && (
-        <div className="mt-1 flex flex-wrap items-center gap-3">
-          {actions.map((action) => (
-            <Button
-              key={action.testId}
-              type="button"
-              size="sm"
-              variant={action.primary ? 'default' : 'ghost'}
-              className={ACTION_BUTTON_CLS}
-              disabled={disabled}
-              data-testid={action.testId}
-              onClick={action.onClick}
-            >
-              {action.label}
-            </Button>
-          ))}
-        </div>
-      )}
+      {card.preview !== null && <Preview value={card.preview} mono={card.mono} />}
+      {raw && <RawArguments fields={card.details} />}
       {problem !== null && (
         <p
           role="alert"
           data-testid="approval-card-problem"
-          className="m-0 text-meta text-destructive"
+          className="m-0 mt-2 text-meta text-destructive"
         >
           {problem}
         </p>
       )}
-    </section>
+    </NoticeBanner>
+  );
+}
+
+export function ApprovalHistoryLine({
+  card,
+  status,
+  icon,
+  testId = 'approval-history',
+  outcome,
+}: {
+  card: ApprovalCardModel;
+  status: string;
+  icon: ReactNode;
+  testId?: string;
+  outcome?: string;
+}) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const text = `${status} · ${card.title}`;
+  return (
+    <div
+      data-testid={testId}
+      data-slot="approval-history"
+      data-outcome={outcome}
+      className="flex w-full min-w-0 flex-col gap-2"
+    >
+      <p className="m-0 flex min-w-0 items-center gap-1.5 text-meta text-content-secondary">
+        <span aria-hidden className="flex size-4 flex-none items-center justify-center">
+          {icon}
+        </span>
+        <span data-testid="approval-history-text" title={text} className="min-w-0 truncate">
+          {text}
+        </span>
+        <Button
+          type="button"
+          variant="link"
+          data-testid="approval-history-toggle"
+          aria-expanded={open}
+          className={cn(INLINE_LINK_CLS, 'flex-none')}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? t('收起') : t('详情')}
+        </Button>
+      </p>
+      {open && <ApprovalCard card={card} />}
+    </div>
   );
 }
