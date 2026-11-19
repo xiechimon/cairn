@@ -28,6 +28,9 @@ const SRC = resolve(import.meta.dirname, '../src');
 const ALLOWLIST: Record<string, string> = {
 
   'i18n/locale.ts::简体中文': 'language endonym — identical in every locale by design',
+  'chief/approval-card-model.ts::审批': 'matches the server-generated approval card text verbatim, not UI copy',
+  'chief/approval-card-model.ts::对外发送：': 'matches the server-generated approval card text verbatim, not UI copy',
+  'chief/approval-card-model.ts::参数': 'matches the server-generated approval card text verbatim, not UI copy',
 };
 
 /** Dict keys assembled at module scope (exact-value fixture chrome; the
