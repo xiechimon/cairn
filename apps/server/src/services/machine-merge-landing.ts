@@ -2,7 +2,6 @@ import { eq } from 'drizzle-orm';
 import { build, type step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
-import { quickLaneRefusal } from './coordinator-request.js';
 import { projectOfTodo, repoDirFor } from './git.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import type { MachineDeps } from './machine-deps.js';
@@ -74,9 +73,6 @@ export async function applyMergeLanding(
     current.baseBranch !== target.configuredBaseBranch
   )
     return 'merge landing refused: project base changed — rerun the task';
-  const latestTodo = deps.db.select().from(todo).where(eq(todo.id, todoRow.id)).get();
-  const laneRefusal = latestTodo ? quickLaneRefusal(deps.db, latestTodo) : null;
-  if (laneRefusal !== null) return `merge landing refused: ${laneRefusal}`;
   await systemGitOps.updateBranchRef(dir, branch, commit);
   return null;
 }
@@ -87,8 +83,6 @@ export const SPACE_NO_BASE_TEXT =
   '这次的改动和任务开始时的空间版本对不上，没有存进个人空间。请重新运行任务。';
 export const SPACE_BASE_MOVED_TEXT =
   '这期间空间里的文件被别的任务改过，这次的改动没有存进去，原来的文件都还在。请重新运行任务。';
-export const SPACE_REQUEST_CHANGED_TEXT =
-  '提出这个请求的原话已经改了，这次的改动没有存进个人空间。';
 
 export type SpaceStepLanding = { error: string } | { note: string } | null;
 
@@ -106,7 +100,6 @@ export async function applySpaceLanding(
   if (mergeCardLeftReview(deps, stepRow)) return null;
   if (commit === null) return { error: SPACE_NO_COMMIT_TEXT };
   if (buildRow.baseSha === null) return { error: SPACE_NO_BASE_TEXT };
-  if (quickLaneRefusal(deps.db, todoRow) !== null) return { error: SPACE_REQUEST_CHANGED_TEXT };
   let landing: SpaceLanding;
   try {
     landing = await landSpaceCommit(deps, space, {

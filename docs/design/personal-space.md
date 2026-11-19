@@ -1,6 +1,6 @@
 # Personal space: a default place for files that belong to no project
 
-Status: approved on 2026-11-16, not built yet. The owner chose to build it and decided four things: there is no separate entry (`不用，该放哪里就放哪里就行了`), and space files show by kind in the existing Results panel groups; a task writes notes, the Coordinator gets no write tool; when the team has no project, a personal request goes to the space without a question. The owner approved implementation on 2026-11-16. Companion design: `quick-lane.md`.
+Status: approved on 2026-11-16, not built yet. The owner chose to build it and decided four things: there is no separate entry (`不用，该放哪里就放哪里就行了`), and space files show by kind in the existing Results panel groups; a task writes notes, the Coordinator gets no write tool; when the team has no project, a personal request goes to the space without a question. The owner approved implementation on 2026-11-16. Its companion design `quick-lane.md` was revoked on 2026-11-19.
 
 ## Problem
 
@@ -35,7 +35,7 @@ A request like "note this down" or "write me a weekly report template" has no de
 
 | # | Path | Check | Writes | On failure |
 |---|---|---|---|---|
-| P1 | Coordinator `create_todo` with a space `projectId` | owner turn (as quick lane L1); `personalOwnerId` equals the author of the cited owner segments | task | `400`, nothing written |
+| P1 | Coordinator `create_todo` with a space `projectId` | owner turn (every cited message is in `step.ownerMessageIds`); `personalOwnerId` equals the author of the cited owner segments | task | `400`, nothing written |
 | P2 | Claim | as P1; the clone URL is valid only for this build | step | not dispatched; task in needs-you |
 | P3 | `direct` landing | owner segments still valid; regular files only; no symlink, submodule or instruction path; size limit; base not moved | default branch, one commit, result index | refused; the report names each refused file and why |
 | P4 | `/git/*` (`routes-git-hosting.ts`) | a space repo answers only the step git key of a claimed step whose task is in that space; the repo sets `receive.hideRefs=refs/heads/main`, so a push cannot move the default branch | none | `401` without credentials (git's challenge, as for any hosted repo), then `404` for any other key; a push to `main` is rejected by git. The wider problem for ordinary hosted repos is #5161 |
@@ -68,7 +68,7 @@ One per row P1 to P11, including: a user A channel creating into B's space retur
 ## Acceptance
 
 - With no project, `帮我写一份周报模板` gets zero questions and the file appears under `文档` with `我的空间`.
-- A person who has not read the repository installs Cairn on a fresh `CAIRN_HOME` and, following only the screen, reaches that result and then a quick-lane change on a hosted project. Record stalls (target 0), Coordinator questions (target at most 1) and trips to a terminal.
+- A person who has not read the repository installs Cairn on a fresh `CAIRN_HOME` and, following only the screen, reaches that result and then a code change on a hosted project. Record stalls (target 0), Coordinator questions (target at most 1) and trips to a terminal.
 
 ## PR order
 

@@ -189,10 +189,10 @@ test('a merge step enqueued while requestMerge awaits the hosted branch listing 
   }
 });
 
-test('landing refuses a quick task whose destination no longer checks out (quick-lane.md L5)', async () => {
+test('a stored card that still carries the retired quick lane lands like an ordinary task', async () => {
   const w = await mergeWorld();
   try {
-    const request: TaskRequest = {
+    const request = {
       segments: [
         {
           source: { kind: 'chat', threadId: 'chief-gone', messageId: 'm-gone', span: 'whole' },
@@ -207,14 +207,14 @@ test('landing refuses a quick task whose destination no longer checks out (quick
       titleSourceRef: null,
       lane: 'quick',
       projectBasis: { kind: 'channel', threadId: 'chief-gone' },
-    };
+    } as unknown as TaskRequest;
     w.s.db
       .update(todo)
-      .set({ sourceKind: 'orchestration', sourceRef: 'chief:gone', request })
+      .set({ sourceKind: 'github-issue-self', sourceRef: 'acme/pinned#1', request })
       .where(eq(todo.id, 'task'))
       .run();
-    expect(await applyMergeLanding(w.deps, w.merge, w.commit)).toContain('quick lane');
-    expect(await systemGitOps.resolveCommit(w.dir, 'refs/heads/dev')).toBe(w.main);
+    expect(await applyMergeLanding(w.deps, w.merge, w.commit)).toBeNull();
+    expect(await systemGitOps.resolveCommit(w.dir, 'refs/heads/dev')).toBe(w.commit);
   } finally {
     w.s.dispose();
   }

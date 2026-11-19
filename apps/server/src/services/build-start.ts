@@ -1,5 +1,5 @@
 import type { BuildRecord, TriggerSource } from '@cairn/shared';
-import { type RouteOverride, sessionBriefFor } from '@cairn/shared';
+import { type RouteOverride, SESSION_BRIEF } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { build, machine, project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -140,9 +140,7 @@ export function startBuilds(
         id,
         'session',
         todoRecord.teamId,
-        [sessionBriefFor(todoRecord.request), input.prompt, lessons]
-          .filter((part) => part != null)
-          .join('\n\n'),
+        [SESSION_BRIEF, input.prompt, lessons].filter((part) => part != null).join('\n\n'),
       );
       setTodoPhase(deps, todoId, 'queued', {
         ...(routeOverride !== undefined ? { routeOverride } : {}),

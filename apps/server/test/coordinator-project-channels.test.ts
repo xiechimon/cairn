@@ -357,7 +357,7 @@ describe('Coordinator project channels (docs/design/coordinator-project-channels
     ]);
   });
 
-  test('a retried channel task still reports to its channel (quick-lane.md L6)', async () => {
+  test('a retried channel task still reports to its channel', async () => {
     const channel = await openChannel();
     const created = (await relay(
       'create_todo',

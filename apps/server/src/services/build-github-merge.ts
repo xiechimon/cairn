@@ -25,7 +25,6 @@ import {
   NotFoundError,
   STEP_KIND_TEXT,
 } from './builds.js';
-import { quickLaneRefusal } from './coordinator-request.js';
 import { projectOfTodo } from './git.js';
 import { teamUserToken } from './github-connection.js';
 import { githubText } from './github-text.js';
@@ -74,8 +73,6 @@ function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; faile
       `本任务还有一个${STEP_KIND_TEXT[busy]}步在排队或在跑，它收尾时还会推送提交：等它跑完再合并。`,
     );
   }
-  const laneRefusal = quickLaneRefusal(deps.db, todoRow);
-  if (laneRefusal !== null) throw new HttpError(409, laneRefusal);
   return { todoRow, failed };
 }
 

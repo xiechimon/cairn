@@ -62,20 +62,7 @@ export const taskSegmentSchema = z.object({
 });
 export type TaskSegment = z.infer<typeof taskSegmentSchema>;
 
-export const TASK_REQUEST_LANES = ['quick'] as const;
 export const TASK_BRIEFING_MAX_CHARS = 20_000;
-
-export const projectBasisSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('channel'), threadId: z.string().min(1) }),
-  z.object({ kind: z.literal('composer'), messageId: z.string().min(1) }),
-  z.object({
-    kind: z.literal('owner-named'),
-    segment: z.number().int().min(0),
-    name: z.string().min(2),
-  }),
-  z.object({ kind: z.literal('owner-answer'), segment: z.number().int().min(0) }),
-]);
-export type ProjectBasis = z.infer<typeof projectBasisSchema>;
 
 export const taskRequestSchema = z.object({
   segments: z.array(taskSegmentSchema).min(1),
@@ -83,9 +70,7 @@ export const taskRequestSchema = z.object({
   difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).nullable(),
   titleSource: z.enum(['owner', 'third-party', 'worker', 'coordinator']),
   titleSourceRef: z.string().nullable(),
-  lane: z.enum(TASK_REQUEST_LANES).optional(),
   briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
-  projectBasis: projectBasisSchema.optional(),
 });
 export type TaskRequest = z.infer<typeof taskRequestSchema>;
 

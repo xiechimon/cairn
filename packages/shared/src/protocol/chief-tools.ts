@@ -10,7 +10,6 @@ import {
 import {
   TASK_BRIEFING_MAX_CHARS,
   TASK_REQUEST_DIFFICULTIES,
-  TASK_REQUEST_LANES,
   TASK_REQUEST_PRIORITIES,
 } from '../records/task-request.js';
 import { isInfoOutput, todoOutputSchema } from '../records/todo.js';
@@ -194,7 +193,6 @@ export const coordinatorCreateTodoParamsSchema = z
     difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).optional(),
     output: todoOutputSchema.optional(),
     platform: runnerOsSchema.optional(),
-    lane: z.enum(TASK_REQUEST_LANES).optional(),
     briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
     codeChangeQuote: z.string().trim().min(1).optional(),
   })
@@ -523,9 +521,6 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         ),
         codeChangeQuote: str(
           "Only when sourceTodoId is an info card and output is not an info kind: the owner's exact words in this turn that explicitly ask for a code change. Without them the call is refused; research and report work stays an info card.",
-        ),
-        lane: str(
-          'Optional "quick", only in an owner turn whose words state the outcome and whose project has a basis the server can check: this channel\'s project, the composer\'s picked project, a project the owner named, or one the owner chose in ask_user. The todo still runs in a thread through a PR and the merge gate; its session skips tests for data or copy edits. A basis that does not check out returns 400 and writes nothing; create it again without lane. Never in event turns ([wake:…]).',
         ),
       },
       ['title'],

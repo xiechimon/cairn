@@ -5,7 +5,7 @@ import {
   buildReworkNewBranchNote,
   buildReworkReuseNote,
   conversationBranch,
-  sessionBriefFor,
+  SESSION_BRIEF,
   withRetryLessons,
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
@@ -230,9 +230,7 @@ export async function restartFailedBuild(
       newId,
       'session',
       todoRecord.teamId,
-      [sessionBriefFor(todoRecord.request), restartPrompt, priorLessons]
-        .filter((part) => part != null)
-        .join('\n\n'),
+      [SESSION_BRIEF, restartPrompt, priorLessons].filter((part) => part != null).join('\n\n'),
       false,
       origin === 'person',
     );

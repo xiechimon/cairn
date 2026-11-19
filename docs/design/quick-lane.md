@@ -1,6 +1,8 @@
 # Quick lane for small tasks with a known destination
 
-Status: approved on 2026-11-16, not built yet. The owner chose to build it (`两个都要，按这个边界继续出方案，先不改代码`) and decided that the quick lane skips the GitHub overlap check. The owner approved implementation on 2026-11-16. Companion design: `personal-space.md`. Builds on `coordinator-routes-verbatim.md` (owner segments, `step.ownerMessageIds`) and `coordinator-project-channels.md` (a task's reports return to the channel that created it, #5136).
+Status: revoked on 2026-11-19 by the owner (ian, mon X). The quick lane is removed: `create_todo` no longer takes `lane` or `projectBasis`, the server no longer re-checks a task's destination at creation, claim or merge, and `QUICK_SESSION_BRIEF` and the Coordinator prompt rule are gone. Reason: it added a second kind of task with its own re-check at three server points, and the check could not hold on projects connected to GitHub, where a task's `sourceKind` is `github-issue-self` instead of `orchestration`, so claiming it failed with `quick lane refused: the task has no checkable owner request` and the task failed outright. Only one kind of task remains. A stored task whose `request` still holds `lane: quick` runs as an ordinary task. The text below is kept as history only.
+
+Original status: approved on 2026-11-16, not built yet. The owner chose to build it (`两个都要，按这个边界继续出方案，先不改代码`) and decided that the quick lane skips the GitHub overlap check. The owner approved implementation on 2026-11-16. Companion design: `personal-space.md`. Builds on `coordinator-routes-verbatim.md` (owner segments, `step.ownerMessageIds`) and `coordinator-project-channels.md` (a task's reports return to the channel that created it, #5136).
 
 ## Problem
 

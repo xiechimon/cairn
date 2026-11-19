@@ -56,7 +56,6 @@ import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-sub
 import { teamHasVmBrowser, teamHasVmComputer } from './cloak-license.js';
 import { connectorToolDefsForTeam } from './connector-broker.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
-import { quickLaneRefusal } from './coordinator-request.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
@@ -506,11 +505,6 @@ async function tryClaim(
     )
       continue;
     if (!stillAuthorized()) return null;
-    const laneRefusal = quickLaneRefusal(db, cand.todoRow);
-    if (laneRefusal !== null) {
-      failStepWithEvents(deps, cand.stepRow, laneRefusal);
-      continue;
-    }
     const localMerge = parseLocalMergeInstruction(cand.stepRow.prompt);
     if (localMerge !== null) {
       const project = projectOfTodo(db, cand.todoRow);
@@ -627,7 +621,7 @@ async function tryClaim(
         if (claimRuntimeIsDevin && boundDevinId !== enabledDevinId) return false;
         if (claimRuntimeIsAntigravity && boundAntigravityId !== enabledAntigravityId) return false;
         const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
-        if (latestTodo === undefined || quickLaneRefusal(db, latestTodo) !== null) return false;
+        if (latestTodo === undefined) return false;
         if (
           cand.stepRow.kind === 'merge' &&
           (latestTodo.latestBuildId !== cand.buildRow.id ||

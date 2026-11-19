@@ -14,7 +14,6 @@ import {
   NotFoundError,
   restoreFailedReview,
 } from './builds.js';
-import { quickLaneRefusal } from './coordinator-request.js';
 import { projectOfTodo, repoDirFor } from './git.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { enqueueLocalMerge } from './local-merge.js';
@@ -37,8 +36,6 @@ export async function requestMerge(
   if (!['done', 'review', 'failed'].includes(todoRow.phase))
     throw new HttpError(409, 'Finish the task before requesting a merge');
   assertDeliveredBuild(deps, row);
-  const laneRefusal = quickLaneRefusal(deps.db, todoRow);
-  if (laneRefusal !== null) throw new HttpError(409, laneRefusal);
   assertNoMergeStepInFlight(deps, buildId);
   const projectRow = projectOfTodo(deps.db, todoRow);
   const pr = githubPrOf(deps, todoRow, row.prNumber);

@@ -7,9 +7,6 @@ import {
   isIssueSourcedTask,
   orchestratedTodoIdOf,
   PLACEHOLDER_TITLE_FALLBACK,
-  type ProjectBasis,
-  parseOrchestrationSourceRef,
-  parseReplyQuote,
   quoteSegments,
   RequestQuoteError,
   renderTaskText,
@@ -22,12 +19,10 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chiefMessage, chiefThread, project, todo } from '../db/schema.js';
+import { chiefMessage, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
-import { parseChiefTrigger } from './chief.js';
 import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
-import { listedProjects } from './personal-space.js';
 import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
 
@@ -37,109 +32,12 @@ export interface RequestCtx {
   teamId: string;
   threadId: string;
   turnMessageIds?: readonly string[];
-  turnPrompt?: string | null;
 }
-
-type ProjectRow = typeof project.$inferSelect;
 
 function sourceIdOf(segment: TaskSegment): string | null {
   if (segment.source.kind === 'chat') return segment.source.messageId;
   if (segment.source.kind === 'answer') return segment.source.requestId;
   return null;
-}
-
-function namesOf(row: ProjectRow): string[] {
-  return [row.name, row.repoName, row.githubRepo, row.githubRepo?.split('/').at(-1)]
-    .map((name) => (name ?? '').normalize('NFC').trim().toLowerCase())
-    .filter((name) => name.length >= 2);
-}
-
-const NAME_CHAR = /[A-Za-z0-9_\-/]/;
-
-function namesWord(words: string, name: string): boolean {
-  for (let at = words.indexOf(name); at !== -1; at = words.indexOf(name, at + 1)) {
-    const before = words[at - 1] ?? '';
-    const after = words[at + name.length] ?? '';
-    if (!NAME_CHAR.test(before) && !NAME_CHAR.test(after)) return true;
-  }
-  return false;
-}
-
-function ownerBodies(cited: readonly CitedSegment[]): Map<string, string> {
-  return new Map(
-    cited.flatMap(({ segment }) => {
-      const id = sourceIdOf(segment);
-      if (id === null || segment.author !== 'owner') return [];
-      const body = parseReplyQuote(segment.text)?.body ?? segment.text;
-      return [[id, body.normalize('NFC').toLowerCase()] as const];
-    }),
-  );
-}
-
-function quickLaneBasis(
-  db: Db,
-  ctx: RequestCtx,
-  projectId: string,
-  cited: readonly CitedSegment[],
-  segments: readonly TaskSegment[],
-): ProjectBasis {
-  const target = db
-    .select()
-    .from(project)
-    .where(and(eq(project.id, projectId), listedProjects(ctx.teamId)))
-    .get();
-  if (target === undefined) throw new HttpError(404, `project ${projectId}`);
-  const turn = new Set(ctx.turnMessageIds ?? []);
-  const ownerTurn =
-    parseChiefTrigger(ctx.turnPrompt ?? null) === 'user' &&
-    segments.every((segment) => {
-      const id = sourceIdOf(segment);
-      return segment.author === 'owner' && id !== null && turn.has(id);
-    });
-  if (!ownerTurn) {
-    throw new HttpError(
-      400,
-      "lane quick needs an owner turn: cite only the owner's messages of this turn",
-    );
-  }
-  const threadRow = db
-    .select({ projectId: chiefThread.projectId })
-    .from(chiefThread)
-    .where(eq(chiefThread.id, ctx.threadId))
-    .get();
-  if (threadRow?.projectId === target.id) return { kind: 'channel', threadId: ctx.threadId };
-  const chatIds = segments.flatMap((segment) =>
-    segment.source.kind === 'chat' ? [segment.source.messageId] : [],
-  );
-  const picked =
-    chatIds.length > 0
-      ? db
-          .select({ id: chiefMessage.id })
-          .from(chiefMessage)
-          .where(
-            and(
-              eq(chiefMessage.threadId, ctx.threadId),
-              inArray(chiefMessage.id, chatIds),
-              eq(chiefMessage.projectId, target.id),
-            ),
-          )
-          .get()
-      : undefined;
-  if (picked !== undefined) return { kind: 'composer', messageId: picked.id };
-  const names = namesOf(target);
-  const bodies = ownerBodies(cited);
-  for (const [index, segment] of segments.entries()) {
-    const words = bodies.get(sourceIdOf(segment) ?? '') ?? '';
-    const name = names.find((candidate) => namesWord(words, candidate));
-    if (name === undefined) continue;
-    return segment.source.kind === 'answer'
-      ? { kind: 'owner-answer', segment: index }
-      : { kind: 'owner-named', segment: index, name };
-  }
-  throw new HttpError(
-    400,
-    `lane quick needs a checkable destination for project ${target.id}: create it in that project's channel, or have the owner name it or pick it; otherwise ask_user which project`,
-  );
 }
 
 export function refuseInfoCardReplacedByCode(
@@ -342,47 +240,6 @@ function requireUnboundMessages(
   }
 }
 
-export function quickLaneRefusal(
-  db: Db,
-  row: Pick<TodoRow, 'teamId' | 'projectId' | 'sourceKind' | 'sourceRef' | 'request'>,
-): string | null {
-  const request = row.request;
-  if (request === null || (request.lane === undefined && request.projectBasis === undefined)) {
-    return null;
-  }
-  const threadId =
-    row.sourceKind === 'orchestration' && row.sourceRef !== null
-      ? parseOrchestrationSourceRef(row.sourceRef)?.threadId
-      : undefined;
-  const ids = request.segments.flatMap((segment) => sourceIdOf(segment) ?? []);
-  if (
-    request.projectBasis === undefined ||
-    threadId === undefined ||
-    ids.length !== request.segments.length
-  ) {
-    return 'quick lane refused: the task has no checkable owner request';
-  }
-  const ctx: RequestCtx = { teamId: row.teamId, threadId, turnMessageIds: ids, turnPrompt: null };
-  try {
-    const cited = citedMessages(db, ctx, [...new Set(ids)]);
-    const changed = request.segments.some((segment) => {
-      const now = cited.find((c) => sourceIdOf(c.segment) === sourceIdOf(segment))?.segment.text;
-      return segment.source.span === 'whole'
-        ? now !== segment.text
-        : !now?.normalize('NFC').includes(segment.text.normalize('NFC'));
-    });
-    if (changed) return "quick lane refused: the owner's cited words changed";
-    const basis = quickLaneBasis(db, ctx, row.projectId, cited, request.segments);
-    if (JSON.stringify(basis) !== JSON.stringify(request.projectBasis)) {
-      return 'quick lane refused: the destination basis no longer matches';
-    }
-  } catch (error) {
-    if (error instanceof HttpError) return `quick lane refused: ${error.message}`;
-    throw error;
-  }
-  return null;
-}
-
 const CANDIDATE_PREVIEW_CHARS = 80;
 
 function defaultQuoteIds(db: Db, ctx: RequestCtx): string[] {
@@ -449,9 +306,6 @@ export function createRequestTodo(
   if (params.sourceTodoId === undefined && messageIds.length === 0) {
     throw new HttpError(400, NO_OWNER_WORDS);
   }
-  if (params.lane === 'quick' && params.sourceTodoId !== undefined) {
-    throw new HttpError(400, "lane quick cites the owner's messages, not sourceTodoId");
-  }
   const cited =
     params.sourceTodoId !== undefined
       ? citedTodo(db, ctx, params.sourceTodoId)
@@ -462,10 +316,6 @@ export function createRequestTodo(
     requireUnboundMessages(db, ctx, segments);
   }
   requireTeamTodos(db, ctx.teamId, params.dependsOn ?? []);
-  const projectBasis =
-    params.lane === 'quick'
-      ? quickLaneBasis(db, ctx, params.projectId, cited, segments)
-      : undefined;
   const keys = new Set(cited.map((c) => segmentKey(c.quoteSource)));
   const siblings = params.quotes === undefined ? [] : splitSiblings(db, ctx.teamId, keys);
   const summaryTitle = params.title === undefined ? '' : derivePlaceholderTitle(params.title);
@@ -476,7 +326,6 @@ export function createRequestTodo(
     titleSource: summaryTitle !== '' ? 'coordinator' : (segments[0]?.author ?? 'owner'),
     titleSourceRef: summaryTitle !== '' ? null : (segments[0]?.sourceRef ?? null),
     ...(params.briefing !== undefined ? { briefing: params.briefing } : {}),
-    ...(projectBasis !== undefined ? { lane: 'quick', projectBasis } : {}),
   };
   const record = createAutonomousTodo(deps, {
     teamId: ctx.teamId,
