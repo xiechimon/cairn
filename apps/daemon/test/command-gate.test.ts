@@ -190,7 +190,26 @@ describe('shell syntax does not hide a gated command', () => {
   });
 });
 
+describe('command heads that collide with Object.prototype members', () => {
+  for (const head of ['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__']) {
+    it(`${head} --flag decides as an unknown command instead of crashing the gate`, () => {
+      expect(decideBashCommand(`${head} --force ls`).action).toBe('allow');
+    });
+  }
+  it('a fake wrapper head with a single-dash flag decides instead of crashing', () => {
+    expect(decideBashCommand('constructor -x ls').action).toBe('allow');
+    expect(decideBashCommand('/usr/bin/constructor -x ls').action).toBe('allow');
+  });
+});
+
 describe('rule table is programmable (caller-provided table wins over the default)', () => {
+  it('a rule slot naming an Object.prototype member reads as absent, not as the inherited member', () => {
+    const custom: PermissionRule[] = [
+      { id: 'slot-lit', tool: '*', matches: { toString: 'literal' }, action: 'reject' },
+    ];
+    expect(decideBashCommand('ls', custom).action).toBe('allow');
+    expect(decideToolCall('read_mcp_resource', { uri: 'secret://x' }, custom)).toBeUndefined();
+  });
   it('custom table hit → verdict per the custom table', () => {
     const custom: PermissionRule[] = [
       { id: 'deny-test', tool: 'Bash', matches: { command: '*test*' }, action: 'reject' },

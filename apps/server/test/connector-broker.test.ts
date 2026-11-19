@@ -229,6 +229,85 @@ describe('executeConnectorToolCall validation', () => {
     expect(journalRows(s).filter((row) => row.kind === 'error')).toHaveLength(3);
     s.dispose();
   });
+
+  test.each(['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__'])(
+    'rejects the extra key %s under additionalProperties:false instead of reading it off the prototype',
+    async (extra) => {
+      const { s, mcp, deps, ctx } = world();
+      insertConnector(s);
+      const params = JSON.parse(`{"to":"a@b.c","${extra}":{}}`) as Record<string, unknown>;
+      await expectHttpError(
+        () => executeConnectorToolCall(deps, ctx, 'connector_gmail__GMAIL_SEND', params),
+        400,
+        new RegExp(`unexpected ${extra}`),
+      );
+      expect(mcp.calls).toHaveLength(0);
+      s.dispose();
+    },
+  );
+
+  test.each(['toString', 'constructor', '__proto__'])(
+    'rejects a call that never sent the required key %s instead of seeing the inherited member',
+    async (required) => {
+      const { s, mcp, deps, ctx } = world();
+      insertConnector(s, {
+        toolsJson: [
+          {
+            name: 'PING',
+            description: 'ping',
+            inputSchema: {
+              type: 'object',
+              required: ['to', required],
+              properties: {
+                to: { type: 'string' },
+                [required]: { type: 'string' },
+              },
+              additionalProperties: false,
+            },
+            annotations: { readOnlyHint: true },
+          },
+        ],
+      });
+      await expectHttpError(
+        () => executeConnectorToolCall(deps, ctx, 'connector_gmail__PING', { to: 'a@b.c' }),
+        400,
+        new RegExp(`missing ${required}`),
+      );
+      expect(mcp.calls).toHaveLength(0);
+      s.dispose();
+    },
+  );
+
+  test('the extra-key check also applies inside a nested object property', async () => {
+    const { s, mcp, deps, ctx } = world();
+    insertConnector(s, {
+      toolsJson: [
+        {
+          name: 'PING',
+          description: 'ping',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              cfg: {
+                type: 'object',
+                properties: { x: { type: 'string' } },
+                additionalProperties: false,
+              },
+            },
+            additionalProperties: false,
+          },
+          annotations: { readOnlyHint: true },
+        },
+      ],
+    });
+    await expectHttpError(
+      () => executeConnectorToolCall(deps, ctx, 'connector_gmail__PING', { cfg: { toString: 1 } }),
+      400,
+      /unexpected toString/,
+    );
+    expect(mcp.calls).toHaveLength(0);
+    s.dispose();
+  });
 });
 
 describe('executeConnectorToolCall dispatch', () => {

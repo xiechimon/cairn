@@ -865,7 +865,7 @@ function emitSimple(
       if (script?.text) collected.scripts.push(script.text);
       return;
     }
-    const spec = WRAPPERS[base];
+    const spec = Object.hasOwn(WRAPPERS, base) ? WRAPPERS[base] : undefined;
     if (spec) {
       if (base === 'flock') {
         for (let at = index + 1; at < words.length; at += 1) {
@@ -1130,7 +1130,7 @@ export function decideToolCall(
   folders?: FolderGateContext,
 ): GateDecision | undefined {
   if (customRules !== undefined && customRules.length > 0) {
-    const slots: Record<string, string> = {};
+    const slots: Record<string, string> = Object.create(null);
     for (const [key, value] of Object.entries(params)) {
       slots[key] = typeof value === 'string' ? value : '';
     }

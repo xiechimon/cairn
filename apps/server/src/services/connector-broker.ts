@@ -199,14 +199,14 @@ function validateAgainstSchema(schema: unknown, value: unknown, path: string): s
       ? spec.required.filter((k): k is string => typeof k === 'string')
       : [];
     for (const key of required) {
-      if (!(key in record)) return `${path}: missing ${key}`;
+      if (!Object.hasOwn(record, key)) return `${path}: missing ${key}`;
     }
     const properties =
       typeof spec.properties === 'object' && spec.properties !== null
         ? (spec.properties as Record<string, unknown>)
         : {};
     for (const [key, item] of Object.entries(record)) {
-      const sub = properties[key];
+      const sub = Object.hasOwn(properties, key) ? properties[key] : undefined;
       if (sub === undefined) {
         if (spec.additionalProperties === false) return `${path}: unexpected ${key}`;
         continue;

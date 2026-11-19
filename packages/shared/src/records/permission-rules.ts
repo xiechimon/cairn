@@ -34,7 +34,8 @@ export function matchPermissionRule(
     const slots = rule.matches ?? {};
     let hit = true;
     for (const [slot, pattern] of Object.entries(slots)) {
-      if (!matchGlob(pattern, params[slot] ?? '')) {
+      const value = Object.hasOwn(params, slot) ? params[slot] : undefined;
+      if (!matchGlob(pattern, typeof value === 'string' ? value : '')) {
         hit = false;
         break;
       }

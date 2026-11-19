@@ -39,6 +39,31 @@ describe('first hit wins (order is priority)', () => {
     expect(matchPermissionRule(r, 'Bash', { command: 'rm x' })?.id).toBeUndefined();
     expect(matchPermissionRule(r, 'Bash', { command: 'rm x', cwd: '/tmp/a' })?.id).toBe('both');
   });
+  it('slots naming Object.prototype members read as absent, not as the inherited member', () => {
+    const r: PermissionRule[] = [
+      { id: 'lit', tool: 'Bash', matches: { toString: 'literal' }, action: 'reject' },
+      {
+        id: 'proto',
+        tool: 'Bash',
+        matches: JSON.parse('{"__proto__":"literal"}') as Record<string, string>,
+        action: 'reject',
+      },
+    ];
+    expect(matchPermissionRule(r, 'Bash', { command: 'ls' })).toBeUndefined();
+  });
+  it('an own param named like an Object.prototype member still matches its value', () => {
+    const r: PermissionRule[] = [
+      { id: 'own', tool: 'Bash', matches: { toString: 'x*' }, action: 'ask' },
+    ];
+    expect(matchPermissionRule(r, 'Bash', { toString: 'xyz' })?.id).toBe('own');
+  });
+  it('a non-string own value reads as absent instead of crashing the gate', () => {
+    const r: PermissionRule[] = [
+      { id: 'lit', tool: 'Bash', matches: { command: 'literal' }, action: 'reject' },
+    ];
+    const params = { command: 42 as unknown as string };
+    expect(matchPermissionRule(r, 'Bash', params)).toBeUndefined();
+  });
   it('missing parameter slots match as empty string (* matches all, literal does not)', () => {
     const star: PermissionRule[] = [
       { id: 's', tool: 'Bash', matches: { cwd: '*' }, action: 'ask' },
