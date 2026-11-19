@@ -15,8 +15,8 @@ const end = '2026-10-02T00:00:00Z';
 const day = 24 * 60 * 60 * 1000;
 
 function fixture(t, prefix = 'escape-candidates-', parentEnv = process.env) {
-  const cwd = mkdtempSync(join(tmpdir(), prefix));
-  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const cwd = makeTestTempDir(prefix);
+  t.after(() => releaseTestTempDir(cwd));
   const gitEnv = testGitEnv(parentEnv);
   const git = (args, env = {}) =>
     execFileSync('git', args, {
