@@ -105,6 +105,48 @@ export function createInputReceipts(
     }
   };
 
+  const pull = async (): Promise<void> => {
+    const harness = currentHarness;
+    const store = storeId;
+    if (harness === null || store === undefined) return;
+    for (const batch of await channel.list(threadId)) {
+      if (batch.state !== 'pending' || batch.conversationId === null) continue;
+      const bound = parseCoordinatorConversationKey(batch.conversationId);
+      if (bound === null || bound.storeId !== store) continue;
+      let record: SubmissionRecord | undefined;
+      try {
+        record = await harness.commit(
+          (tx) => tx.submissionByRequest(Number(bound.conversationId) as ConversationId, batch.id),
+          context,
+        );
+      } catch (error) {
+        report(error);
+        continue;
+      }
+      if (record?.type !== 'input') continue;
+      if (record.requestId !== batch.id) {
+        report(new InputAuthorityError(`Coordinator receipt mismatch for ${batch.id}`));
+        continue;
+      }
+      const entryId = record.entry;
+      if (entryId === undefined && record.status !== 'unanswered') continue;
+      const seen = submissions.get(record.id);
+      if (seen?.status === record.status && seen?.entry === record.entry) continue;
+      let placedAt: number | undefined;
+      if (entryId !== undefined) {
+        try {
+          const entry = await harness.commit((tx) => tx.entry(entryId), context);
+          const message = entry?.model?.[0];
+          if (message?.role === 'user') placedAt = message.timestamp;
+        } catch (error) {
+          report(error);
+        }
+      }
+      submissions.set(record.id, record);
+      pending.push({ kind: 'receipt', record, placedAt });
+    }
+  };
+
   const barrier = async (signal?: AbortSignal): Promise<void> => {
     for (;;) {
       signal?.throwIfAborted();
@@ -116,7 +158,10 @@ export function createInputReceipts(
       }
       try {
         await draining;
-        if (pending.length === 0) return;
+        if (pending.length === 0) {
+          await pull();
+          if (pending.length === 0) return;
+        }
       } catch (error) {
         report(error);
         if (stopping || error instanceof InputAuthorityError) throw error;
