@@ -77,7 +77,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   {
     id: 'sentry',
     name: 'Sentry',
-    description: '错误与性能问题（测试版）',
+    description: '错误与性能问题',
     url: 'https://mcp.sentry.dev/mcp',
     docsUrl: 'https://docs.sentry.io/product/sentry-mcp/',
     auth: ['oauth'],
@@ -86,7 +86,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   {
     id: 'supabase',
     name: 'Supabase',
-    description: '数据库、函数与项目管理（测试版）',
+    description: '数据库、函数与项目管理',
     url: 'https://mcp.supabase.com/mcp',
     docsUrl: 'https://supabase.com/docs/guides/getting-started/mcp',
     auth: ['oauth', 'token'],

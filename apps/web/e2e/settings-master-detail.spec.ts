@@ -17,7 +17,7 @@ test('the breadcrumb is the only page title: no second heading repeats it', asyn
 test('other sections keep one heading for the page, the breadcrumb', async ({ page }) => {
   for (const [section, label] of [
     ['skills', '技能'],
-    ['mcp', 'MCP'],
+    ['mcp', '应用'],
   ] as const) {
     await page.goto(`/app/settings/${section}?scenario=providers-fleet`);
     await expect(settings(page).getByTestId('settings-head')).toHaveText(label);

@@ -2424,8 +2424,8 @@ export const EN: Record<string, string> = {
   '边缘函数、域名解析与对象存储': 'Edge functions, DNS and object storage',
   '议题、项目与迭代周期': 'Issues, projects and cycles',
   页面与数据库: 'Pages and databases',
-  '错误与性能问题（测试版）': 'Errors and performance issues (beta)',
-  '数据库、函数与项目管理（测试版）': 'Databases, functions and project management (beta)',
+  错误与性能问题: 'Errors and performance issues',
+  '数据库、函数与项目管理': 'Databases, functions and project management',
   '模型、数据集与演示应用': 'Models, datasets and demo apps',
   个人访问令牌: 'Personal access token',
   'API 令牌': 'API token',
@@ -2453,28 +2453,18 @@ export const EN: Record<string, string> = {
   '没能连上 {name}': 'Could not connect {name}',
   '没能开始登录，稍后再试。': 'Could not start the sign-in. Try again later.',
   应用: 'Apps',
-  '通过 Composio 把 Gmail、Linear 这类外部应用的工具交给 Coordinator 用。授权在 Composio 的页面里完成，Cairn 不保存各应用的令牌。':
-    'Give the Coordinator tools from external apps like Gmail and Linear through Composio. Authorization happens on Composio pages; Cairn stores no per-app tokens.',
   'Composio API key': 'Composio API key',
   '已保存，加密存储，不会再显示。': 'Saved, encrypted, and never shown again.',
-  '在 Composio 控制台创建一把 API key 粘贴到这里，用它接入各应用。':
-    'Create an API key in the Composio console and paste it here to connect apps.',
-  '粘贴 API key': 'Paste an API key',
   '这把 key 没有通过检查，确认完整复制后再保存。':
     'That key failed validation. Copy it in full and save again.',
   '没能移除，稍后重试。': 'Could not remove it. Try again later.',
   还没接入: 'Not connected',
-  '等待授权，完成后这里自动更新。': 'Waiting for authorization; this updates when done.',
   需要授权: 'Needs authorization',
   继续授权: 'Continue authorization',
   授权: 'Authorize',
-  'Composio 上的授权已收回，重新连接才能再用。':
-    'The Composio authorization was taken back; reconnect to use it again.',
   '没能接入 {name}，稍后重试。': 'Could not connect {name}. Try again later.',
   '没能开始 {name} 的授权，稍后重试。':
     'Could not start authorization for {name}. Try again later.',
-  '没能移除 {name}，稍后重试。': 'Could not remove {name}. Try again later.',
-  'Composio 没有返回可接入的应用。': 'Composio returned no apps to connect.',
   '这个标识已经被占用，先删掉旧的连接或换个名字。':
     'This identifier is taken. Delete the old connection or pick another name.',
   '{name} 不支持浏览器登录，改用令牌或请求头连接。':
@@ -2739,4 +2729,31 @@ export const EN: Record<string, string> = {
   '连接失败，请检查填写的内容。': 'Could not connect. Check what you entered.',
   '添加规则失败，请重试。': 'Could not add the rule. Try again.',
   邮件: 'Mail',
+  等待授权: 'Waiting for authorization',
+  授权已收回: 'Authorization revoked',
+  '没能断开 {name}，稍后重试。': 'Could not disconnect {name}. Try again later.',
+  断开: 'Disconnect',
+  'key 已保存，经 Composio 接入的应用都用它授权':
+    'Key saved. Apps connected through Composio authorize with it',
+  更多应用: 'More apps',
+  'Slack、Google 日历等上千个应用，用你自己的 Composio 账号接入，要另注册':
+    'Slack, Google Calendar and thousands more, through your own Composio account (separate sign-up)',
+  '用 Composio 接入更多应用': 'Connect more apps with Composio',
+  'key 已保存，加密存储，不会再显示。': 'Key saved and encrypted. It will not be shown again.',
+  'Slack、Google 日历、Todoist 等上千个应用，经你自己的 Composio 账号交给 Coordinator。':
+    'Slack, Google Calendar, Todoist and thousands more, handed to the Coordinator through your own Composio account.',
+  '移除 key': 'Remove key',
+  '更换 key': 'Replace key',
+  保存并列出应用: 'Save and list apps',
+  '列表里其他应用不需要它，直接点「接入」。':
+    'The other apps in the list do not need it; just click Connect.',
+  '要另注册一个 Composio 账号。免费版每月可调用托管应用 2 万次，个人用一般够。':
+    'You need a separate Composio account. The free plan includes 20,000 managed-app calls a month, usually enough for one person.',
+  '授权页上显示的是 Composio：各应用的登录令牌存在 Composio，不在这台电脑上。':
+    "The sign-in page shows Composio: each app's tokens are stored at Composio, not on this computer.",
+  '新的 Composio API key': 'New Composio API key',
+  '在 Composio 控制台的 Settings → API Keys 新建一把，以 ak_ 开头。':
+    'Create one under Settings → API Keys in the Composio dashboard; it starts with ak_.',
+  '打开 Composio 控制台': 'Open the Composio dashboard',
+  '自定义 MCP 服务器': 'Custom MCP server',
 };

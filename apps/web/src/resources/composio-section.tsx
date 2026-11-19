@@ -1,54 +1,35 @@
 import type { ComposioAppEntry, ComposioApps, McpConnectorRecord } from '@cairn/shared';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
-import { FORM_CONTROL_CLS } from '../components/form-layout.js';
-import { SettingsRow, SettingsSection } from '../components/settings-list.js';
+import { FORM_CONTROL_CLS, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
-import { Input } from '../components/ui/input.js';
-import { useI18n } from '../i18n/provider.js';
-import { McpConnectorIcon } from './mcp-connector-icon.js';
 import {
-  ResourceList,
-  ResourceRow,
-  RowDesc,
-  RowLine,
-  RowMeta,
-  RowText,
-  RowTitle,
-} from './parts.js';
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
+import { Input } from '../components/ui/input.js';
+import { toastError } from '../components/ui/toaster.js';
+import { useI18n } from '../i18n/provider.js';
+import { Grid2x2 } from '../icons/index.js';
+import { McpConnectorIcon } from './mcp-connector-icon.js';
+import { type AppItem, RowNote } from './parts.js';
 
 const AUTH_POLL_MS = 2_500;
 const AUTH_POLL_MAX_ATTEMPTS = 90;
 
 type Translate = (text: string, vars?: Record<string, string | number>) => string;
 
-function appStatus(
-  t: Translate,
-  record: McpConnectorRecord | null,
-  authorizing: boolean,
-): { line: string; desc?: string } {
-  if (record === null) return { line: t('还没接入') };
-  if (authorizing) return { line: t('等待授权，完成后这里自动更新。') };
-  switch (record.status) {
-    case 'connected':
-      return {
-        line:
-          record.toolCount !== null
-            ? t('已连接 · {n} 个工具', { n: record.toolCount })
-            : t('已连接'),
-      };
-    case 'revoked':
-      return { line: t('已撤销'), desc: t('Composio 上的授权已收回，重新连接才能再用。') };
-    case 'error':
-      return { line: t('连不上') };
-    case 'needs_auth':
-      return record.statusReason === 'authorizing'
-        ? { line: t('等待授权，完成后这里自动更新。') }
-        : { line: t('需要授权') };
-    default:
-      return { line: t('还没检查') };
-  }
+export type AppsView = 'available' | 'connected';
+
+function appNote(t: Translate, record: McpConnectorRecord, authorizing: boolean): ReactNode {
+  if (authorizing || (record.status === 'needs_auth' && record.statusReason === 'authorizing'))
+    return <RowNote>{t('等待授权')}</RowNote>;
+  if (record.status === 'needs_auth') return <RowNote>{t('需要授权')}</RowNote>;
+  if (record.status === 'revoked') return <RowNote danger>{t('授权已收回')}</RowNote>;
+  if (record.status === 'error') return <RowNote danger>{t('连不上')}</RowNote>;
+  return undefined;
 }
 
 function keyError(t: Translate, error: unknown): string {
@@ -57,7 +38,18 @@ function keyError(t: Translate, error: unknown): string {
   return t('没能保存，稍后重试。');
 }
 
-export function ComposioSection({
+export function ComposioMark() {
+  return (
+    <span
+      aria-hidden
+      className="flex size-5 flex-none items-center justify-center text-content-secondary"
+    >
+      <Grid2x2 width={18} height={18} />
+    </span>
+  );
+}
+
+export function useComposioRows({
   live,
   teamId,
   data,
@@ -68,8 +60,6 @@ export function ComposioSection({
 }) {
   const { t } = useI18n();
   const {
-    saveComposioKey,
-    deleteComposioKey,
     connectComposioApp,
     authorizeComposioApp,
     reconnectComposioApp,
@@ -77,12 +67,10 @@ export function ComposioSection({
     deleteMcpConnector,
   } = useApiMutations(teamId);
   const configured = data?.configured === true;
-  const apps = data?.apps ?? [];
-  const [keyDraft, setKeyDraft] = useState('');
-  const [keyEditing, setKeyEditing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const all = configured ? (data?.apps ?? []) : [];
   const [busy, setBusy] = useState<string | null>(null);
   const [authorizingId, setAuthorizingId] = useState<string | null>(null);
+  const [keyDialog, setKeyDialog] = useState(false);
 
   useEffect(() => {
     if (!live || authorizingId === null) return;
@@ -110,28 +98,6 @@ export function ComposioSection({
     };
   }, [live, authorizingId, pollComposioApp.mutateAsync]);
 
-  const saveKey = () => {
-    setError(null);
-    saveComposioKey.mutate(
-      { key: keyDraft.trim() },
-      {
-        onSuccess: () => {
-          setKeyDraft('');
-          setKeyEditing(false);
-        },
-        onError: (err) => setError(keyError(t, err)),
-      },
-    );
-  };
-
-  const removeKey = () => {
-    if (!live) return;
-    setError(null);
-    deleteComposioKey.mutate(undefined, {
-      onError: () => setError(t('没能移除，稍后重试。')),
-    });
-  };
-
   const openAuth = async (connectorId: string, reconnect: boolean) => {
     const result = reconnect
       ? await reconnectComposioApp.mutateAsync(connectorId)
@@ -148,10 +114,9 @@ export function ComposioSection({
 
   const run = (key: string, work: () => Promise<void>, failure: string) => {
     if (!live || busy !== null) return;
-    setError(null);
     setBusy(key);
     work()
-      .catch(() => setError(failure))
+      .catch((error: unknown) => toastError(failure, error))
       .finally(() => setBusy(null));
   };
 
@@ -175,188 +140,259 @@ export function ComposioSection({
   const remove = (connector: McpConnectorRecord) => {
     if (!live) return;
     deleteMcpConnector.mutate(connector.id, {
-      onError: () => setError(t('没能移除 {name}，稍后重试。', { name: connector.label })),
+      onError: (error) =>
+        toastError(t('没能断开 {name}，稍后重试。', { name: connector.label }), error),
     });
   };
 
-  const keyInput = (
-    <span className="flex min-w-0 flex-auto items-center gap-2">
-      <Input
-        className={FORM_CONTROL_CLS}
-        type="password"
-        autoComplete="off"
-        placeholder={t('粘贴 API key')}
-        value={keyDraft}
-        onChange={(event) => setKeyDraft(event.target.value)}
-        data-testid="composio-key-input"
-      />
-      <Button
-        size="sm"
-        disabled={keyDraft.trim() === '' || saveComposioKey.isPending}
-        onClick={saveKey}
-        data-testid="composio-key-save"
-      >
-        {t('保存')}
-      </Button>
-      {configured && (
+  const action = (app: ComposioAppEntry) => {
+    const connector = app.connector;
+    const pending = busy === app.slug || busy === connector?.id;
+    if (connector === null)
+      return (
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
-          onClick={() => {
-            setKeyDraft('');
-            setKeyEditing(false);
-          }}
+          disabled={busy !== null}
+          onClick={() => connect(app)}
+          data-testid={`composio-connect-${app.slug}`}
         >
-          {t('取消')}
+          {pending ? t('正在连接…') : t('接入')}
         </Button>
-      )}
-    </span>
-  );
-
-  return (
-    <SettingsSection
-      title={t('应用')}
-      description={t(
-        '通过 Composio 把 Gmail、Linear 这类外部应用的工具交给 Coordinator 用。授权在 Composio 的页面里完成，Cairn 不保存各应用的令牌。',
-      )}
-      testId="mcp-composio"
-    >
-      <ResourceList className="mt-0">
-        <SettingsRow
-          label="Composio API key"
-          hint={
-            configured
-              ? t('已保存，加密存储，不会再显示。')
-              : t('在 Composio 控制台创建一把 API key 粘贴到这里，用它接入各应用。')
-          }
-          labelTestId="composio-key-label"
+      );
+    if (connector.status === 'needs_auth') {
+      const waiting = authorizingId === connector.id || connector.statusReason === 'authorizing';
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy !== null || authorizingId === connector.id}
+          onClick={() => authorize(connector, false)}
+          data-testid={`composio-authorize-${app.slug}`}
         >
-          {configured && !keyEditing ? (
-            <>
-              <span className="text-meta text-content-secondary">{t('已保存')}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setKeyEditing(true)}
-                data-testid="composio-key-change"
-              >
-                {t('更换')}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive"
-                onClick={removeKey}
-                disabled={deleteComposioKey.isPending}
-                data-testid="composio-key-remove"
-              >
-                {t('移除')}
-              </Button>
-            </>
-          ) : (
-            keyInput
+          {pending ? t('正在连接…') : waiting ? t('继续授权') : t('授权')}
+        </Button>
+      );
+    }
+    if (connector.status === 'error' || connector.status === 'revoked')
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy !== null}
+          onClick={() => authorize(connector, true)}
+          data-testid={`composio-reconnect-${app.slug}`}
+        >
+          {t('重新连接')}
+        </Button>
+      );
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={deleteMcpConnector.isPending}
+        onClick={() => remove(connector)}
+        data-testid={`composio-remove-${app.slug}`}
+      >
+        {t('断开')}
+      </Button>
+    );
+  };
+
+  const keyItem: AppItem = {
+    key: 'composio-key',
+    testId: 'mcp-composio',
+    icon: <ComposioMark />,
+    name: 'Composio',
+    description: t('key 已保存，经 Composio 接入的应用都用它授权'),
+    action: (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setKeyDialog(true)}
+        data-testid="composio-key-change"
+      >
+        {t('管理')}
+      </Button>
+    ),
+  };
+
+  const setupItem: AppItem = {
+    key: 'composio-setup',
+    testId: 'composio-setup-card',
+    icon: <ComposioMark />,
+    name: t('更多应用'),
+    description: t('Slack、Google 日历等上千个应用，用你自己的 Composio 账号接入，要另注册'),
+    action: (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setKeyDialog(true)}
+        data-testid="composio-setup-open"
+      >
+        {t('设置')}
+      </Button>
+    ),
+  };
+
+  const items = (view: AppsView): AppItem[] => {
+    if (data === undefined) return [];
+    if (!configured) return view === 'available' ? [setupItem] : [];
+    const list = all
+      .filter((app) => (view === 'connected') === (app.connector !== null))
+      .map(
+        (app): AppItem => ({
+          key: `composio-${app.slug}`,
+          testId: `composio-app-${app.slug}`,
+          icon:
+            app.logoUrl !== null ? (
+              <img
+                src={app.logoUrl}
+                alt=""
+                aria-hidden
+                className="size-5 flex-none rounded-sm object-cover"
+              />
+            ) : (
+              <McpConnectorIcon catalogId={null} />
+            ),
+          name: app.name,
+          description:
+            app.description !== null && app.description !== '' ? app.description : app.slug,
+          ...(app.connector !== null
+            ? { status: appNote(t, app.connector, authorizingId === app.connector.id) }
+            : {}),
+          action: action(app),
+        }),
+      );
+    return view === 'connected' ? [...list, keyItem] : list;
+  };
+
+  return {
+    items,
+    connectedCount: all.filter((app) => app.connector !== null).length,
+    dialog: keyDialog ? (
+      <ComposioKeyDialog
+        live={live}
+        teamId={teamId}
+        configured={configured}
+        onClose={() => setKeyDialog(false)}
+      />
+    ) : null,
+  };
+}
+
+function ComposioKeyDialog({
+  live,
+  teamId,
+  configured,
+  onClose,
+}: {
+  live: boolean;
+  teamId: string | undefined;
+  configured: boolean;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const { saveComposioKey, deleteComposioKey } = useApiMutations(teamId);
+  const [key, setKey] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const save = () => {
+    setError(null);
+    saveComposioKey.mutate(
+      { key: key.trim() },
+      { onSuccess: onClose, onError: (err) => setError(keyError(t, err)) },
+    );
+  };
+  const removeKey = () => {
+    if (!live) return onClose();
+    setError(null);
+    deleteComposioKey.mutate(undefined, {
+      onSuccess: onClose,
+      onError: () => setError(t('没能移除，稍后重试。')),
+    });
+  };
+  return (
+    <DialogShell
+      title={configured ? 'Composio' : t('用 Composio 接入更多应用')}
+      subtitle={
+        configured
+          ? t('key 已保存，加密存储，不会再显示。')
+          : t(
+              'Slack、Google 日历、Todoist 等上千个应用，经你自己的 Composio 账号交给 Coordinator。',
+            )
+      }
+      onClose={onClose}
+      footer={
+        <div className="flex w-full items-center gap-2">
+          {configured && (
+            <Button
+              variant="ghost"
+              className={`${DIALOG_TEXT_BUTTON} text-destructive`}
+              onClick={removeKey}
+              disabled={deleteComposioKey.isPending}
+              data-testid="composio-key-remove"
+            >
+              {t('移除 key')}
+            </Button>
           )}
-        </SettingsRow>
-        {configured &&
-          apps.map((app) => {
-            const connector = app.connector;
-            const authorizing = authorizingId !== null && authorizingId === connector?.id;
-            const status = appStatus(t, connector, authorizing);
-            const pending = busy === app.slug || busy === connector?.id;
-            return (
-              <ResourceRow mcp key={app.slug} data-composio-app={app.slug}>
-                {app.logoUrl !== null ? (
-                  <img
-                    src={app.logoUrl}
-                    alt=""
-                    aria-hidden
-                    className="size-5 flex-none rounded-sm object-cover"
-                  />
-                ) : (
-                  <McpConnectorIcon catalogId={null} />
-                )}
-                <RowText>
-                  <RowLine>
-                    <RowTitle>{app.name}</RowTitle>
-                    <RowMeta>{status.line}</RowMeta>
-                  </RowLine>
-                  <RowDesc>
-                    {status.desc ??
-                      (app.description !== null && app.description !== ''
-                        ? app.description
-                        : app.slug)}
-                  </RowDesc>
-                </RowText>
-                <span className="flex flex-none items-center gap-1">
-                  {connector === null && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={busy !== null}
-                      onClick={() => connect(app)}
-                      data-testid={`composio-connect-${app.slug}`}
-                    >
-                      {pending ? t('正在连接…') : t('接入')}
-                    </Button>
-                  )}
-                  {connector !== null && connector.status === 'needs_auth' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={busy !== null || authorizing}
-                      onClick={() => authorize(connector, false)}
-                      data-testid={`composio-authorize-${app.slug}`}
-                    >
-                      {pending
-                        ? t('正在连接…')
-                        : connector.statusReason === 'authorizing' || authorizing
-                          ? t('继续授权')
-                          : t('授权')}
-                    </Button>
-                  )}
-                  {connector !== null &&
-                    (connector.status === 'connected' ||
-                      connector.status === 'error' ||
-                      connector.status === 'revoked') && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={busy !== null}
-                        onClick={() => authorize(connector, true)}
-                        data-testid={`composio-reconnect-${app.slug}`}
-                      >
-                        {t('重新连接')}
-                      </Button>
-                    )}
-                  {connector !== null && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      disabled={deleteMcpConnector.isPending}
-                      onClick={() => remove(connector)}
-                      data-testid={`composio-remove-${app.slug}`}
-                    >
-                      {t('移除')}
-                    </Button>
-                  )}
-                </span>
-              </ResourceRow>
-            );
-          })}
-        {configured && apps.length === 0 && (
-          <ResourceRow mcp>
-            <RowText>
-              <RowDesc>{t('Composio 没有返回可接入的应用。')}</RowDesc>
-            </RowText>
-          </ResourceRow>
+          <span className="flex-1" />
+          <Button
+            className={DIALOG_PRIMARY_BUTTON}
+            disabled={key.trim() === '' || saveComposioKey.isPending}
+            onClick={save}
+            data-testid="composio-key-save"
+          >
+            {configured ? t('更换 key') : t('保存并列出应用')}
+          </Button>
+        </div>
+      }
+    >
+      <FormStack>
+        {!configured && (
+          <ul className="m-0 flex list-disc flex-col gap-2 pl-5 text-ui text-content-secondary">
+            <li>{t('列表里其他应用不需要它，直接点「接入」。')}</li>
+            <li>
+              {t('要另注册一个 Composio 账号。免费版每月可调用托管应用 2 万次，个人用一般够。')}
+            </li>
+            <li>
+              {t('授权页上显示的是 Composio：各应用的登录令牌存在 Composio，不在这台电脑上。')}
+            </li>
+          </ul>
         )}
-      </ResourceList>
-      {error !== null && (
-        <p role="alert" className="m-0 text-meta text-destructive">
-          {error}
-        </p>
-      )}
-    </SettingsSection>
+        <FormField
+          label={configured ? t('新的 Composio API key') : 'Composio API key'}
+          htmlFor="composio-key"
+          help={
+            <>
+              {t('在 Composio 控制台的 Settings → API Keys 新建一把，以 ak_ 开头。')}{' '}
+              <a
+                href="https://dashboard.composio.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground underline underline-offset-2"
+              >
+                {t('打开 Composio 控制台')}
+              </a>
+            </>
+          }
+        >
+          <Input
+            id="composio-key"
+            className={FORM_CONTROL_CLS}
+            type="password"
+            autoComplete="off"
+            placeholder="ak_…"
+            value={key}
+            onChange={(event) => setKey(event.target.value)}
+            data-testid="composio-key-input"
+          />
+        </FormField>
+        {error !== null && (
+          <p role="alert" className="m-0 text-meta text-destructive">
+            {error}
+          </p>
+        )}
+      </FormStack>
+    </DialogShell>
   );
 }

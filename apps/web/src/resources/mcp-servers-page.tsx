@@ -6,7 +6,7 @@ import {
   startMcpConnectorOAuthBodySchema,
 } from '@cairn/shared';
 import { Mail } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
 import {
@@ -23,17 +23,15 @@ import { NoticeBanner } from '../components/notice-banner.js';
 import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { SettingsFlat, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import { Card } from '../components/ui/card.js';
 import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { Ban, Plus } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
-import { ComposioSection } from './composio-section.js';
+import { useComposioRows } from './composio-section.js';
 import { MCP_HREF } from './hrefs.js';
 import { useMailConnectors } from './mail-connectors.js';
 import {
-  ConnectorStatus,
   McpConnectorDialog,
   type McpDialogTarget,
   type McpOAuthRequest,
@@ -43,11 +41,15 @@ import {
 import { McpConnectorIcon } from './mcp-connector-icon.js';
 import { GithubDeviceDialog } from './mcp-github-device-dialog.js';
 import {
+  AppCard,
+  type AppItem,
+  CardGrid,
   ResourceList,
   ResourceRow,
   RowDesc,
   RowLine,
   RowMeta,
+  RowNote,
   RowText,
   RowTitle,
 } from './parts.js';
@@ -204,6 +206,85 @@ export function McpServersPage() {
   const mailAvailable = mail.cards.filter((card) => !card.connected);
   const connectedCatalog = new Set(connectors.map((c) => c.catalogId));
   const available = MCP_CATALOG.filter((entry) => !connectedCatalog.has(entry.id));
+  const composio = useComposioRows({ live, teamId, data: composioApps });
+  const _connectedCount = connectors.length + mailConnected.length + composio.connectedCount;
+  const connectButton = (label: string, onClick: () => void, busy = false) => (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={busy}
+      onClick={onClick}
+      aria-label={t('接入 {name}', { name: label })}
+    >
+      {busy ? t('正在准备…') : t('接入')}
+    </Button>
+  );
+  const manageButton = (label: string, onClick: () => void) => (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      aria-label={t('管理 {name}', { name: label })}
+    >
+      {t('管理')}
+    </Button>
+  );
+  const connectedItems: AppItem[] = [
+    ...connectors.map((record): AppItem => {
+      const entry = MCP_CATALOG.find((e) => e.id === record.catalogId);
+      return {
+        key: record.id,
+        icon: <McpConnectorIcon catalogId={record.catalogId} />,
+        name: record.label,
+        description: entry !== undefined ? t(entry.description) : hostOf(record.url),
+        ...(record.status === 'needs_auth'
+          ? { status: <RowNote>{t('需要重新授权')}</RowNote> }
+          : record.status === 'error'
+            ? { status: <RowNote danger>{t('连不上')}</RowNote> }
+            : record.status === 'unchecked'
+              ? { status: <RowNote>{t('还没检查')}</RowNote> }
+              : {}),
+        action: manageButton(record.label, () => setDialog({ kind: 'manage', connector: record })),
+      };
+    }),
+    ...mailConnected.map(
+      (card): AppItem => ({
+        key: card.provider,
+        testId: `mail-card-${card.provider}`,
+        icon: <MailIcon />,
+        name: t(card.name),
+        description: mail.summaryOf(card.provider),
+        ...(card.needsAttention ? { status: <RowNote danger>{t('需要处理')}</RowNote> } : {}),
+        action: manageButton(t(card.name), card.open),
+      }),
+    ),
+    ...composio.items('connected'),
+  ];
+  const availableItems: AppItem[] = [
+    ...available.map(
+      (entry): AppItem => ({
+        key: entry.id,
+        icon: <McpConnectorIcon catalogId={entry.id} />,
+        name: entry.name,
+        description: t(entry.description),
+        ...(authorizing === entry.id
+          ? { status: <RowNote>{t('正在找到 {name} 的登录地址…', { name: entry.name })}</RowNote> }
+          : {}),
+        action: connectButton(entry.name, () => connect(entry), authorizing === entry.id),
+      }),
+    ),
+    ...mailAvailable.map(
+      (card): AppItem => ({
+        key: card.provider,
+        testId: `mail-card-${card.provider}`,
+        icon: <MailIcon />,
+        name: t(card.name),
+        description: t(card.description),
+        action: connectButton(t(card.name), card.open),
+      }),
+    ),
+    ...composio.items('available'),
+  ];
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');
@@ -300,7 +381,7 @@ export function McpServersPage() {
   return (
     <PageShell
       route={MCP_HREF}
-      title={t('MCP 服务器')}
+      title={t('应用')}
       selected={MCP_HREF}
       actions={
         <Button
@@ -309,7 +390,7 @@ export function McpServersPage() {
           data-testid="mcp-add-server"
         >
           <Plus aria-hidden strokeWidth={1.75} className="size-4" />
-          {t('添加 MCP 服务器')}
+          {t('自定义 MCP 服务器')}
         </Button>
       }
       fixture={fixture}
@@ -350,110 +431,24 @@ export function McpServersPage() {
                 }
               />
             )}
-            {(connectors.length > 0 || mailConnected.length > 0) && (
+            {connectedItems.length > 0 && (
               <SettingsSection title={t('已接入')} testId="mcp-connected">
                 <CardGrid>
-                  {connectors.map((record) => {
-                    const entry = MCP_CATALOG.find((e) => e.id === record.catalogId);
-                    return (
-                      <ConnectorCard
-                        key={record.id}
-                        catalogId={record.catalogId}
-                        name={record.label}
-                        description={
-                          entry !== undefined ? t(entry.description) : hostOf(record.url)
-                        }
-                        status={<ConnectorStatus record={record} />}
-                        action={
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDialog({ kind: 'manage', connector: record })}
-                            aria-label={t('管理 {name}', { name: record.label })}
-                          >
-                            {t('管理')}
-                          </Button>
-                        }
-                      />
-                    );
-                  })}
-                  {mailConnected.map((card) => (
-                    <ConnectorCard
-                      key={card.provider}
-                      testId={`mail-card-${card.provider}`}
-                      catalogId={null}
-                      icon={<MailIcon />}
-                      name={t(card.name)}
-                      description={mail.summaryOf(card.provider)}
-                      status={<MailStatus attention={card.needsAttention} />}
-                      action={
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={card.open}
-                          aria-label={t('管理 {name}', { name: t(card.name) })}
-                        >
-                          {t('管理')}
-                        </Button>
-                      }
-                    />
+                  {connectedItems.map(({ key, ...item }) => (
+                    <AppCard key={key} {...item} />
                   ))}
                 </CardGrid>
               </SettingsSection>
             )}
-            {(available.length > 0 || mailAvailable.length > 0) && (
+            {availableItems.length > 0 && (
               <SettingsSection title={t('可接入')} testId="mcp-catalog">
                 <CardGrid>
-                  {available.map((entry) => (
-                    <ConnectorCard
-                      key={entry.id}
-                      catalogId={entry.id}
-                      name={entry.name}
-                      description={t(entry.description)}
-                      status={
-                        authorizing === entry.id ? (
-                          <span className="text-meta text-content-tertiary">
-                            {t('正在找到 {name} 的登录地址…', { name: entry.name })}
-                          </span>
-                        ) : undefined
-                      }
-                      action={
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={authorizing === entry.id}
-                          onClick={() => connect(entry)}
-                          aria-label={t('接入 {name}', { name: entry.name })}
-                        >
-                          {authorizing === entry.id ? t('正在准备…') : t('接入')}
-                        </Button>
-                      }
-                    />
-                  ))}
-                  {mailAvailable.map((card) => (
-                    <ConnectorCard
-                      key={card.provider}
-                      testId={`mail-card-${card.provider}`}
-                      catalogId={null}
-                      icon={<MailIcon />}
-                      name={t(card.name)}
-                      description={t(card.description)}
-                      action={
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={card.open}
-                          aria-label={t('接入 {name}', { name: t(card.name) })}
-                        >
-                          {t('接入')}
-                        </Button>
-                      }
-                    />
+                  {availableItems.map(({ key, ...item }) => (
+                    <AppCard key={key} {...item} />
                   ))}
                 </CardGrid>
               </SettingsSection>
             )}
-            <ComposioSection live={live} teamId={teamId} data={composioApps} />
           </SettingsFlat>
           {local.length > 0 && (
             <SettingsSection
@@ -481,6 +476,7 @@ export function McpServersPage() {
         </div>
       </QueryBoundary>
       {mail.dialogs}
+      {composio.dialog}
       <McpConnectorDialog
         target={dialog}
         live={live}
@@ -538,10 +534,6 @@ function attemptKey({ body }: SignInAttempt): string {
 
 const hostOf = (url: string) => (URL.canParse(url) ? new URL(url).host : url);
 
-function CardGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>;
-}
-
 function MailIcon() {
   return (
     <span
@@ -550,55 +542,5 @@ function MailIcon() {
     >
       <Mail size={18} strokeWidth={1.75} />
     </span>
-  );
-}
-
-function MailStatus({ attention }: { attention: boolean }) {
-  const { t } = useI18n();
-  return attention ? (
-    <span className="inline-flex items-center gap-1.5 text-meta text-destructive">
-      <span aria-hidden className="size-1.5 flex-none rounded-full bg-destructive" />
-      {t('需要处理')}
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1.5 text-meta text-content-secondary">
-      <span aria-hidden className="size-1.5 flex-none rounded-full bg-running" />
-      {t('已连接')}
-    </span>
-  );
-}
-
-function ConnectorCard({
-  testId,
-  icon,
-  catalogId,
-  name,
-  description,
-  status,
-  action,
-}: {
-  testId?: string;
-  icon?: ReactNode;
-  catalogId: string | null;
-  name: string;
-  description: string;
-  status?: ReactNode;
-  action: ReactNode;
-}) {
-  return (
-    <Card
-      size="sm"
-      data-connector-card={catalogId ?? name}
-      data-testid={testId}
-      className="gap-2 rounded-(--radius-card) px-4 ring-border"
-    >
-      <div className="flex items-center gap-3">
-        {icon ?? <McpConnectorIcon catalogId={catalogId} />}
-        <span className="min-w-0 flex-1 truncate text-ui font-medium text-foreground">{name}</span>
-        {action}
-      </div>
-      <p className="m-0 line-clamp-2 text-meta text-content-secondary">{description}</p>
-      {status !== undefined && <div className="mt-auto flex">{status}</div>}
-    </Card>
   );
 }

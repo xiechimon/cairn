@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
+import { Card } from '../components/ui/card.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronRight } from '../icons/index.js';
 
@@ -118,5 +119,51 @@ export function OnlineStatus({ on }: { on: boolean }) {
       />
       {on ? t('在线') : t('离线')}
     </span>
+  );
+}
+
+export function RowNote({ danger = false, children }: { danger?: boolean; children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        'flex-none text-meta whitespace-nowrap',
+        danger ? 'text-destructive' : 'text-content-secondary',
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export interface AppItem {
+  key: string;
+  testId?: string;
+  icon: ReactNode;
+  name: string;
+  description: string;
+  status?: ReactNode;
+  action: ReactNode;
+}
+
+export function CardGrid({ children }: { children: ReactNode }) {
+  return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>;
+}
+
+export function AppCard({ testId, icon, name, description, status, action }: Omit<AppItem, 'key'>) {
+  return (
+    <Card
+      size="sm"
+      data-connector-card={name}
+      data-testid={testId}
+      className="gap-2 rounded-(--radius-card) px-4 ring-border"
+    >
+      <div className="flex items-center gap-3">
+        {icon}
+        <span className="min-w-0 flex-1 truncate text-ui font-medium text-foreground">{name}</span>
+        {action}
+      </div>
+      <p className="m-0 line-clamp-2 text-meta text-content-secondary">{description}</p>
+      {status !== undefined && <div className="mt-auto flex">{status}</div>}
+    </Card>
   );
 }

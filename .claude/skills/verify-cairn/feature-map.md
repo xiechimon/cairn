@@ -15,7 +15,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `routing` | `设置` (Settings) › `模型` (Model) › `模型` (Model) | [Model and work routing](#routing) |
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
-| `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
+| `mcp` | `设置` (Settings) › `执行环境` (Execution) › `应用` (Apps) | [MCP servers](#mcp-servers) |
 | `secrets` | `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars) | [Secrets](#secrets) |
 | `vault` | `设置` (Settings) › `安全` (Security) › `保险库` (Vault) | [Secrets](#secrets) |
 | `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
@@ -857,7 +857,7 @@ Reach:
 1. `settings mcp`
 
 - Web routes: none
-- Settings: `设置` (Settings) › `执行环境` (Execution) › `MCP`
+- Settings: `设置` (Settings) › `执行环境` (Execution) › `应用` (Apps)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `mail-account-*`, `mail-add`, `mail-address-input`, `mail-connect-submit`, `mail-imap-host-input`, `mail-imap-port-input`, `mail-password-input`, `mail-remove-*`, `mail-rule-*`, `mail-rule-add`, `mail-rule-pattern-input`, `mail-rule-remove-*`, `mail-rules-*`, `mail-smtp-host-input`, `mail-smtp-port-input`
 - Research: n/a: the binding contract is docs/design/mail-connector.md; no reference product is copied
@@ -877,9 +877,9 @@ Reach:
 2. `click testid:resource-row`
 
 - Web routes: `/app/resources/mcp-servers`
-- Settings: `设置` (Settings) › `执行环境` (Execution) › `MCP`
+- Settings: `设置` (Settings) › `执行环境` (Execution) › `应用` (Apps)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composio-authorize-*`, `composio-connect-*`, `composio-key-change`, `composio-key-input`, `composio-key-remove`, `composio-key-save`, `composio-reconnect-*`, `composio-remove-*`, `mail-card-*`, `mcp-add-server`, `mcp-catalog`, `mcp-composio`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
+- Test ids in its code: `composio-authorize-*`, `composio-connect-*`, `composio-key-change`, `composio-key-input`, `composio-key-remove`, `composio-key-save`, `composio-reconnect-*`, `composio-remove-*`, `composio-setup-open`, `mcp-add-server`, `mcp-catalog`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
 - Verify recipes: [.claude/skills/verify-cairn/features/mcp-servers.md](features/mcp-servers.md)
 - Research: [docs/research/mcp-connectors-2026-11-15.md](../../../docs/research/mcp-connectors-2026-11-15.md)
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md), [docs/design/connector-fabric.md](../../../docs/design/connector-fabric.md)
