@@ -86,6 +86,14 @@ describe('assembleStepEnv', () => {
     expect(env).toEqual({ CAIRN_ORB: '1', CLAUDE_CODE_OAUTH_TOKEN: 'step' });
   });
 
+  test('only a Claude Code Coordinator step gets the idle-compaction threshold', () => {
+    expect(assembleStepEnv(input({ claudeCodeCoordinator: true })).env).toEqual({
+      CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS: '100000',
+    });
+    expect(assembleStepEnv(input({ claudeCodeCoordinator: false })).env).toEqual({});
+    expect(assembleStepEnv(input()).env).toEqual({});
+  });
+
   test('a managed devin step replaces HOME and the token', () => {
     const { env } = assembleStepEnv(
       input({

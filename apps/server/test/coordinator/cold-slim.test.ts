@@ -61,13 +61,13 @@ describe('cacheTtlMsFor', () => {
     expect(cacheTtlMsFor('short', 'openai/gpt-5.6-terra')).toBe(30 * 60_000);
     expect(cacheTtlMsFor('short', 'openai/gpt-5.5')).toBeNull();
     expect(cacheTtlMsFor('short', 'openai/gpt-4o')).toBeNull();
+    expect(cacheTtlMsFor('long', 'openai/gpt-6.1-sol')).toBe(30 * 60_000);
   });
 
   it('reports no lifetime for providers that do not guarantee one', () => {
     expect(cacheTtlMsFor('short', 'openai-codex/gpt-6.1-sol')).toBeNull();
     expect(cacheTtlMsFor('short', 'deepseek/deepseek-v4.1-flash')).toBeNull();
     expect(cacheTtlMsFor('short', 'google/gemini-4-carbon')).toBeNull();
-    expect(cacheTtlMsFor('long', 'openai/gpt-6.1-sol')).toBeNull();
   });
 
   it('reads the Claude Code tier from its one-hour cache writes', () => {

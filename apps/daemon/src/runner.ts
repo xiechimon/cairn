@@ -401,6 +401,7 @@ async function runClaimedStep(
       readonlyGit: attachmentVerify,
       claudeSubscriptionToken:
         runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
+      claudeCodeCoordinator: isChief && runtimeId === 'claude-code',
       devinToken: runtimeId === 'devin' ? creds.devinToken : undefined,
       devinHome: runtimeId === 'devin' ? deps.devinHome?.() : undefined,
       antigravityToken: runtimeId === 'antigravity' ? creds.antigravityToken : undefined,

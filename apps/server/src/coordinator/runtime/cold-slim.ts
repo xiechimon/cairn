@@ -24,7 +24,7 @@ export interface TurnUsageSnapshot {
 export function resolveCacheRetentionTier(
   env: NodeJS.ProcessEnv = process.env,
 ): CacheRetentionTier {
-  return env[ENV_VARS.piCacheRetention] === 'long' ? 'long' : 'short';
+  return env[ENV_VARS.piCacheRetention] === 'short' ? 'short' : 'long';
 }
 
 export function cacheTtlMsFor(
@@ -40,7 +40,7 @@ export function cacheTtlMsFor(
     return tier === 'long' ? ANTHROPIC_LONG_TTL_MS : ANTHROPIC_SHORT_TTL_MS;
   }
   if (providerId === 'openai') {
-    return tier === 'short' && OPENAI_30M_MODEL.test(modelId) ? OPENAI_DEFAULT_TTL_MS : null;
+    return OPENAI_30M_MODEL.test(modelId) ? OPENAI_DEFAULT_TTL_MS : null;
   }
   if (providerId === 'claude-code') {
     if (cacheWrite.oneHour > 0) return ANTHROPIC_LONG_TTL_MS;

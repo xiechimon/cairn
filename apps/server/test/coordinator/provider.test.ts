@@ -68,4 +68,41 @@ describe('the provider of a claimed Coordinator step', () => {
     models.useStepProvider({ kind: 'api_key', providerId: 'claude-code' });
     expect(models.models.getProviders()).toHaveLength(0);
   });
+
+  it('asks Anthropic for one-hour cache writes on session requests, unless the operator opts out', async () => {
+    const cacheControls: (string | null)[] = [];
+    const sendTurn = async (sessionId: string | undefined) => {
+      const models = createCoordinatorModels();
+      models.useStepProvider(config);
+      await models.setApiKey('anthropic-byok', 'sk-step');
+      const model = models.models.getModel('anthropic-byok', 'claude-haiku-5-5');
+      if (model === undefined) throw new Error('model missing');
+      const abort = new AbortController();
+      await models.models
+        .streamSimple(
+          model,
+          { messages: [{ role: 'user', content: 'hi', timestamp: 1 }] },
+          {
+            ...(sessionId !== undefined ? { sessionId } : {}),
+            signal: abort.signal,
+            onPayload: (payload) => {
+              cacheControls.push(
+                JSON.stringify(payload).match(/"cache_control":\{[^}]*\}/)?.[0] ?? null,
+              );
+              abort.abort();
+              return payload;
+            },
+          },
+        )
+        .result();
+    };
+    await sendTurn('session-a');
+    process.env.CAIRN_PI_CACHE_RETENTION = 'short';
+    await sendTurn('session-a');
+    delete process.env.CAIRN_PI_CACHE_RETENTION;
+    await sendTurn(undefined);
+    expect(cacheControls[0]).toContain('"ttl":"1h"');
+    expect(cacheControls[1]).not.toContain('"ttl"');
+    expect(cacheControls[2]).not.toContain('"ttl"');
+  });
 });

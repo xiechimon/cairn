@@ -11,6 +11,7 @@ import {
   type Provider,
 } from '@earendil-works/pi-ai';
 import { createModels, type MutableModels } from '@earendil-works/pi-ai/models';
+import { resolveCacheRetentionTier } from './cold-slim.js';
 import { type KeyResolver, stepProvider } from './provider.js';
 
 export const IMAGE_REQUEST_TIMEOUT_MS = 90_000;
@@ -198,6 +199,7 @@ export function createCoordinatorModels(
     const onPayload = options.onPayload;
     const guarded = {
       ...options,
+      cacheRetention: options.cacheRetention ?? resolveCacheRetentionTier(),
       onPayload: async (payload: unknown, payloadModel: typeof model) =>
         binding.apply(key, (await onPayload?.(payload, payloadModel)) ?? payload),
     };

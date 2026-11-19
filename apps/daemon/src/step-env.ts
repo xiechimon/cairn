@@ -17,6 +17,7 @@ export interface StepEnvInput {
   appCredential: { env(): Record<string, string> } | null;
   readonlyGit: boolean;
   claudeSubscriptionToken: string | undefined;
+  claudeCodeCoordinator?: boolean;
   devinToken?: string;
   devinHome?: string;
   antigravityToken?: string;
@@ -52,6 +53,7 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
     delete env.CAIRN_GIT_CRED_PASSWORD;
   }
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
+  if (input.claudeCodeCoordinator === true) env.CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS = '100000';
   if (input.claudeSubscriptionToken !== undefined) {
     env.CLAUDE_CODE_OAUTH_TOKEN = input.claudeSubscriptionToken;
     if (input.inherited?.CAIRN_ORB !== '1') env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
