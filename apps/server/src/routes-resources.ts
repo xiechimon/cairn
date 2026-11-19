@@ -271,7 +271,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       {
         ...record,
         webhookToken: webhookToken.token,
-        webhookUrl: `${new URL(c.req.url).origin}/api/webhook/schedule/${webhookToken.token}`,
+        webhookUrl: `${requestOrigin(c)}/api/webhook/schedule/${webhookToken.token}`,
       },
       201,
     );
