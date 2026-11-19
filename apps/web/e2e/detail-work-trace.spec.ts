@@ -105,6 +105,7 @@ async function stubWorld(
       if (path === '/api/teams') return route.fulfill(json([TEAM]));
       if (path === '/api/user/me') return route.fulfill(json(USER));
       if (path === '/api/projects') return route.fulfill(json([PROJECT]));
+      if (path === '/api/prs') return route.fulfill(json([]));
       if (path === '/api/todos') return route.fulfill(json([card]));
       if (path === `/api/todos/${CARD_ID}`) return route.fulfill(json(card));
       if (path === `/api/teams/${TEAM_ID}/members`) {
