@@ -99,14 +99,24 @@ export function SettingsTabStrip({
     });
   };
   useEffect(() => {
-    measure();
     const el = scroller.current;
-    el?.querySelector('[aria-current="page"]')?.scrollIntoView({
-      inline: 'center',
-      block: 'nearest',
+    if (el === null) return;
+    const scrollCurrentIntoView = () => {
+      const active = el.querySelector('[aria-current="page"]');
+      if (active === null) return;
+      const item = active.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
+      if (item.left < box.left || item.right > box.right) {
+        active.scrollIntoView({ inline: 'center', block: 'nearest' });
+      }
+    };
+    measure();
+    scrollCurrentIntoView();
+    const observer = new ResizeObserver(() => {
+      measure();
+      scrollCurrentIntoView();
     });
-    const observer = new ResizeObserver(measure);
-    if (el !== null) observer.observe(el);
+    observer.observe(el);
     return () => observer.disconnect();
   }, [current]);
   const scrollBy = (direction: 1 | -1) => {
