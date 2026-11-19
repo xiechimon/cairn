@@ -70,10 +70,17 @@ export function taskRowCopy(entry: TaskEntry, pr?: PrPanelRow): TaskRowCopy {
         what: { key: threadCopy(todo).reason },
         where: null,
       };
-    case 'needs_input':
+    case 'needs_input': {
       if (todo.phase === 'confirm')
         return { ...base, word: '待回答', what: { key: '计划写好了' }, where: '到任务里批准计划' };
-      return { ...base, word: '待回答', what: { key: '在问你一个问题' }, where: '到任务里回答' };
+      if (todo.phase === 'needs_input')
+        return { ...base, word: '待回答', what: { key: '在问你一个问题' }, where: '到任务里回答' };
+      const what: Phrase =
+        (todo.blockedBy?.length ?? 0) > 0
+          ? { key: '被阻塞了，等你处理。' }
+          : { key: threadCopy(todo).reason };
+      return { ...base, word: '待处理', what, where: '到任务里处理' };
+    }
     case 'working': {
       const running = todo.phase === 'planning' || todo.phase === 'building';
       const what: Phrase =

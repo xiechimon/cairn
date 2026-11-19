@@ -18,7 +18,8 @@ describe('sectionOf first-match table', () => {
   const cases: {
     phase: Phase;
     owner: TodoOwner;
-    reason?: 'question' | 'confirm' | 'review' | 'failed';
+    reason?: 'question' | 'confirm' | 'review' | 'failed' | 'handoff';
+    from?: 'question' | 'failed' | 'review' | 'blocked';
     section: string;
   }[] = [
     { phase: 'todo', owner: null, section: 'up_next' },
@@ -33,13 +34,41 @@ describe('sectionOf first-match table', () => {
     { phase: 'building', owner: 'owner', reason: 'question', section: 'needs_input' },
     { phase: 'todo', owner: 'owner', reason: 'question', section: 'needs_input' },
     { phase: 'review', owner: 'owner', reason: 'review', section: 'ready_for_review' },
+    {
+      phase: 'review',
+      owner: 'owner',
+      reason: 'handoff',
+      from: 'review',
+      section: 'ready_for_review',
+    },
+    {
+      phase: 'needs_input',
+      owner: 'owner',
+      reason: 'handoff',
+      from: 'question',
+      section: 'needs_input',
+    },
+    {
+      phase: 'failed',
+      owner: 'owner',
+      reason: 'handoff',
+      from: 'failed',
+      section: 'needs_input',
+    },
+    {
+      phase: 'building',
+      owner: 'owner',
+      reason: 'handoff',
+      from: 'blocked',
+      section: 'needs_input',
+    },
     { phase: 'done', owner: null, section: 'resolved' },
     { phase: 'closed', owner: null, section: 'resolved' },
   ];
   for (const entry of cases) {
     for (const archived of [false, true]) {
       for (const age of [0, WEEK, WEEK + 1]) {
-        test(`${entry.phase}/${entry.owner}/${entry.reason} archived=${archived} age=${age}`, () => {
+        test(`${entry.phase}/${entry.owner}/${entry.reason}${entry.from === undefined ? '' : `:${entry.from}`} archived=${archived} age=${age}`, () => {
           const terminal = entry.phase === 'done' || entry.phase === 'closed';
           const expected = terminal
             ? age > WEEK
@@ -54,6 +83,7 @@ describe('sectionOf first-match table', () => {
               : ({
                   owner: entry.owner,
                   reason: entry.reason,
+                  from: entry.from,
                   workKey: 'test',
                 } as ownership.Ownership);
           expect(

@@ -88,6 +88,25 @@ describe('a needs-you row says what is waiting and where to act', () => {
     expect(taskRowCopy(entry(1, 'needs_input', 'needs_input')).where).toBe('到任务里回答');
   });
 
+  test('a failed task handed to the owner says it failed and where to handle it', () => {
+    expect(taskRowCopy(entry(1, 'failed', 'needs_input'))).toMatchObject({
+      word: '待处理',
+      what: { key: '失败了，打开它重试。' },
+      where: '到任务里处理',
+      waiting: true,
+    });
+  });
+
+  test('a blocked task handed to the owner says it is blocked', () => {
+    expect(
+      taskRowCopy(entry(1, 'building', 'needs_input', { blockedBy: ['todo-blocker'] })),
+    ).toMatchObject({
+      word: '待处理',
+      what: { key: '被阻塞了，等你处理。' },
+      where: '到任务里处理',
+    });
+  });
+
   test('a standalone Coordinator question points at the question card', () => {
     expect(questionRowCopy()).toMatchObject({ waiting: true, where: '在对话里回答' });
   });

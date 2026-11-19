@@ -211,7 +211,8 @@ export function sectionOf(
   }
   if (row.archivedAt !== null) return null;
   if (ownership?.owner === 'owner') {
-    return ownership.reason === 'review' ? 'ready_for_review' : 'needs_input';
+    const reason = ownership.reason === 'handoff' ? ownership.from : ownership.reason;
+    return reason === 'review' ? 'ready_for_review' : 'needs_input';
   }
   return row.phase === 'todo' ? 'up_next' : 'working';
 }
