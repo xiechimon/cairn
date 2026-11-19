@@ -247,8 +247,8 @@ function Prototype() {
           >
             <Textarea
               rows={1}
-              aria-label={t('告诉 Coordinator 要改什么')}
-              placeholder={t('告诉 Coordinator 要改什么')}
+              aria-label={t('告诉 Coordinator 要记住或改什么')}
+              placeholder={t('告诉 Coordinator 要记住或改什么')}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               className="max-h-30 min-h-0 resize-none rounded-none border-0 bg-transparent px-0.5 py-1 text-ui shadow-none placeholder:text-content-tertiary focus-visible:ring-0 md:text-ui dark:bg-transparent"

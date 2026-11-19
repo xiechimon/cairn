@@ -203,7 +203,10 @@ export function MemoryEditComposer({
   return (
     <div
       data-testid="memory-edit-composer"
-      className={cn(embedded ? 'w-full' : 'sticky bottom-4 mx-auto w-full max-w-160', 'z-1')}
+      className={cn(
+        embedded ? 'w-full' : 'sticky bottom-0 -mx-3 mt-auto bg-dialog-surface px-3 pt-4 pb-4',
+        'z-1',
+      )}
     >
       <div
         className={cn(
@@ -250,8 +253,8 @@ export function MemoryEditComposer({
                   send();
                 }
               }}
-              placeholder={t('告诉 Coordinator 要改什么')}
-              aria-label={t('告诉 Coordinator 要改什么')}
+              placeholder={t('告诉 Coordinator 要记住或改什么')}
+              aria-label={t('告诉 Coordinator 要记住或改什么')}
             />
           </div>
           {working ? (

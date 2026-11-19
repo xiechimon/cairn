@@ -16,7 +16,7 @@ Baseline `bc4ead8dd`. The page layout follows the #3666 restyle: a `每个线程
 
 | Moment | What the owner sees |
 |---|---|
-| Input | A composer pinned under the page, placeholder `告诉 Coordinator 要改什么`. It is the Coordinator composer surface without attachments, mentions or slash commands. In a file's detail dialog the same composer sits in the footer, scoped to that file. |
+| Input | A composer pinned under the page, placeholder `告诉 Coordinator 要记住或改什么`. It is the Coordinator composer surface without attachments, mentions or slash commands. In a file's detail dialog the same composer sits in the footer, scoped to that file. |
 | Working | A card attached above the composer, like the question card (#3580). It shows the owner's sentence and `Coordinator 正在改记忆 · 0:04`. Stop takes the send slot. |
 | Applied | The page refreshes in place: changed lines and files show `刚刚更新`. The card shows `已按你的话改了 N 处` and a read-only word diff of each change (the `MEMORY.md` lines and files touched). The card has no buttons. It stays until the next sentence or until the owner leaves the page. |
 | Question back | When the instruction is ambiguous, the card shows the Coordinator's short question. Persisted status is `awaiting_input`; the next sentence continues the same edit record in a fresh execution attempt. |

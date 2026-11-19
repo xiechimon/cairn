@@ -267,7 +267,7 @@ test('Coordinator settings lists team memory only, with no scope headings or cou
     /代码风格/,
   ]);
   await expect(list.getByRole('list').getByRole('textbox')).toHaveCount(0);
-  await expect(page.getByPlaceholder('告诉 Coordinator 要改什么')).toHaveCount(1);
+  await expect(page.getByPlaceholder('告诉 Coordinator 要记住或改什么')).toHaveCount(1);
 
   const verify = memoryRow(page, '验证命令');
   await expect(verify).toContainText('推送代码前先跑受影响的测试。');
@@ -632,7 +632,7 @@ test('edits made while instructions are saving remain a draft', async ({ page })
 
 test('memory edit composer submits an instruction and shows the applied result', async ({ page }) => {
   const control = await openMemory(page);
-  const input = page.getByPlaceholder('告诉 Coordinator 要改什么');
+  const input = page.getByPlaceholder('告诉 Coordinator 要记住或改什么');
   await input.fill('把验证命令改成只跑 vitest');
   await page.getByRole('button', { name: '发送' }).click();
   expect(control.editPosts).toHaveLength(1);
@@ -648,7 +648,7 @@ test('memory edit composer submits an instruction and shows the applied result',
 
 test('memory edit composer keeps the draft when the post fails', async ({ page }) => {
   await openMemory(page, { editReply: 'fail' });
-  const input = page.getByPlaceholder('告诉 Coordinator 要改什么');
+  const input = page.getByPlaceholder('告诉 Coordinator 要记住或改什么');
   await input.fill('这条会失败');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByText('没有发出去，内容还在输入框里，再试一次。')).toBeVisible();
@@ -658,7 +658,7 @@ test('memory edit composer keeps the draft when the post fails', async ({ page }
 
 test('memory edit composer shows a clarification request', async ({ page }) => {
   await openMemory(page, { editReply: 'clarify' });
-  const input = page.getByPlaceholder('告诉 Coordinator 要改什么');
+  const input = page.getByPlaceholder('告诉 Coordinator 要记住或改什么');
   await input.fill('改一下端口');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByText('要改哪一条？')).toBeVisible();
@@ -703,3 +703,61 @@ test('import card dismisses itself and stays dismissed', async ({ page }) => {
     .poll(() => page.evaluate(() => localStorage.getItem('cairn:memory-import-dismissed:t1')))
     .toBe('1');
 });
+
+const MANY = Array.from({ length: 24 }, (_, index) =>
+  row(`m-many-${index}`, `发布节奏 ${index + 1}`, '每周四晚上 8 点发 B 站。', 'p-notes', NOV_8 - index * DAY),
+);
+
+for (const memories of [[], MANY]) {
+  test(`project memory has one composer pinned under the content, memories=${memories.length}`, async ({ page }) => {
+    await openProjectMemory(page, { memories });
+    const body = page.getByTestId('project-settings-body');
+    const instructions = body.getByRole('textbox', { name: '项目说明' });
+    await expect(instructions).toBeVisible();
+    await expect(body.getByRole('textbox')).toHaveCount(2);
+    const composer = body.getByRole('textbox', { name: '告诉 Coordinator 要记住或改什么' });
+    await expect(composer).toBeVisible();
+    const box = async () => {
+      const [outer, field, inner] = await Promise.all([
+        body.boundingBox(),
+        page.getByTestId('memory-edit-composer').locator('> div').boundingBox(),
+        instructions.boundingBox(),
+      ]);
+      return { outer: outer!, field: field!, inner: inner! };
+    };
+    const top = await box();
+    expect(Math.abs(top.outer.y + top.outer.height - 16 - (top.field.y + top.field.height))).toBeLessThan(2);
+    expect(Math.abs(top.field.x - top.inner.x)).toBeLessThan(2);
+    expect(Math.abs(top.field.width - top.inner.width)).toBeLessThan(2);
+    await body.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    const end = await box();
+    expect(Math.abs(end.outer.y + end.outer.height - 16 - (end.field.y + end.field.height))).toBeLessThan(2);
+  });
+}
+
+const MANY_TEAM = MANY.map((memory) => ({ ...memory, projectId: null }));
+
+for (const memories of [[], MANY_TEAM]) {
+  test(`Coordinator memory has one composer pinned to the bottom, memories=${memories.length}`, async ({ page }) => {
+    await openMemory(page, { memories });
+    const col = page.getByTestId('chief-settings-col');
+    await expect(col.getByRole('textbox')).toHaveCount(1);
+    await expect(col.getByRole('textbox', { name: '告诉 Coordinator 要记住或改什么' })).toBeVisible();
+    const scroller = col.locator('xpath=..');
+    const box = async () => {
+      const [outer, field, inner] = await Promise.all([
+        scroller.boundingBox(),
+        page.getByTestId('memory-edit-composer').locator('> div').boundingBox(),
+        col.boundingBox(),
+      ]);
+      return { outer: outer!, field: field!, inner: inner! };
+    };
+    const top = await box();
+    expect(Math.abs(top.outer.y + top.outer.height - 16 - (top.field.y + top.field.height))).toBeLessThan(2);
+    expect(Math.abs(top.field.x - top.inner.x)).toBeLessThan(2);
+    expect(Math.abs(top.field.width - top.inner.width)).toBeLessThan(2);
+    await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    const end = await box();
+    expect(Math.abs(end.outer.y + end.outer.height - 16 - (end.field.y + end.field.height))).toBeLessThan(2);
+  });
+}

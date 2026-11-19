@@ -1504,7 +1504,7 @@ export const EN: Record<string, string> = {
     'Offline. Memories are read-only until you reconnect.',
   '离线中。重新连接后才能让 Coordinator 修改。':
     'Offline. Reconnect before the Coordinator can change memory.',
-  '告诉 Coordinator 要改什么': 'Tell the Coordinator what to change',
+  '告诉 Coordinator 要记住或改什么': 'Tell the Coordinator what to remember or change',
   '你：{text}': 'You: {text}',
   'Coordinator 正在改记忆{elapsed}': 'The Coordinator is updating memory{elapsed}',
   'Coordinator 看过了，记忆没有要改的。': 'The Coordinator looked and found nothing to change.',
@@ -2696,17 +2696,6 @@ export const EN: Record<string, string> = {
   '可选。写下这个项目的目标，Coordinator 拆任务时会参考。':
     'Optional. Write down what this project is for; the Coordinator uses it when it splits work into tasks.',
   保存想做什么: 'Save the goal',
-  '改一下这个项目的记忆：{text}': "Update this project's memory: {text}",
-  '没有发出去，请重试。': 'It was not sent. Try again.',
-  '让 agent 改记忆': 'Ask the agent to change memory',
-  '告诉 agent 记住什么，例如：周四晚上 8 点发 B 站':
-    'Tell the agent what to remember, such as: post on Bilibili Thursdays at 8 pm',
-  '告诉 agent 怎么改，例如：发布时间改成周二':
-    'Tell the agent what to change, such as: move posting day to Tuesday',
-  '已改 {title}': 'Updated {title}',
-  'Coordinator 正在改记忆…': 'The Coordinator is updating memory…',
-  '已交给 Coordinator，改完会出现在上面。':
-    'Sent to the Coordinator. The change shows up above when it is done.',
   通用: 'General',
   跟随团队默认: 'Team default',
   名称和图标: 'Name and icon',

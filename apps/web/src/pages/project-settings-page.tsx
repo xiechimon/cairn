@@ -10,7 +10,7 @@ import { cn } from 'cn';
 import { Archive, ArchiveRestore, BookText, FolderSearch, Settings2 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { type To, useParams, useSearchParams } from 'react-router';
-import { useApiMutations, useMemories, useModelSources, useProjects } from '../api/hooks.js';
+import { useApiMutations, useModelSources, useProjects } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
@@ -49,7 +49,6 @@ import { RouteDialog } from '../overlay/route-dialog.js';
 import { RuleRow } from '../resources/routing-settings-page.js';
 import { ProjectAutonomyCard } from './project-autonomy-card.js';
 import { ProjectBaseBranchSelect } from './project-base-branch-select.js';
-import { ProjectMemoryAsk } from './project-memory-ask.js';
 
 const SECTIONS = [
   { id: 'general', label: '通用', Icon: Settings2 },
@@ -166,7 +165,6 @@ export function ProjectSettingsPage() {
   const [repoError, setRepoError] = useState<string | null>(null);
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
-  const memoriesQ = useMemories(teamId, live);
   const mutations = useApiMutations(teamId);
   const wireProject = live ? (projectsQ.data ?? []).find((p) => p.id === id) : undefined;
   const project: ProjectContent | undefined = live
@@ -193,7 +191,6 @@ export function ProjectSettingsPage() {
       ? undefined
       : { id, description: project?.description ?? undefined };
   const memoryProject = live ? wireProject : { id: id ?? '', name: project?.name ?? '' };
-  const memories = memoriesQ.data ?? [];
   const repoKind = live ? wireProject?.repoKind : project?.hosted ? 'hosted' : project?.repoKind;
   const archived = wireProject?.archivedAt != null;
   const patch = (body: Parameters<typeof mutations.patchProject.mutate>[0]['body']) => {
@@ -521,18 +518,7 @@ export function ProjectSettingsPage() {
       </div>
     )
   ) : section === 'memory' ? (
-    <>
-      <MemoryPanel live={live} teamId={teamId} project={memoryProject ?? null} />
-      {id !== undefined && (
-        <ProjectMemoryAsk
-          live={live}
-          teamId={teamId}
-          projectId={id}
-          memories={memories}
-          empty={!memories.some((memory) => memory.projectId === id)}
-        />
-      )}
-    </>
+    <MemoryPanel live={live} teamId={teamId} project={memoryProject ?? null} />
   ) : (
     general
   );
@@ -552,7 +538,14 @@ export function ProjectSettingsPage() {
           data-testid="project-settings-body"
           className="min-h-0 min-w-0 flex-auto overflow-y-auto px-6 pt-5 max-md:px-4 max-md:pt-3"
         >
-          <div className="mx-auto w-full max-w-170">{body}</div>
+          <div
+            className={cn(
+              'mx-auto w-full max-w-170',
+              section === 'memory' && !loading && 'flex min-h-full flex-col',
+            )}
+          >
+            {body}
+          </div>
         </div>
       </div>
     </RouteDialog>

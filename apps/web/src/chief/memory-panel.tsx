@@ -333,7 +333,7 @@ export function MemoryPanel({
     );
   })();
   return (
-    <div ref={listRef} data-testid="memory-list">
+    <div ref={listRef} data-testid="memory-list" className="flex flex-auto flex-col">
       {usageRows}
       {project !== null && live && (
         <div className="mt-6">

@@ -75,8 +75,14 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
           {t('Coordinator 设置')}
         </h1>
       </header>
-      <div className="flex-1 overflow-x-hidden overflow-y-auto px-4">
-        <div data-testid="chief-settings-col" className="mx-auto w-192 max-w-full pt-4 pb-6">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto px-4 [--dialog-surface:var(--background)]">
+        <div
+          data-testid="chief-settings-col"
+          className={cn(
+            'mx-auto w-192 max-w-full pt-4',
+            tab === 'memory' ? 'flex min-h-full flex-col' : 'pb-6',
+          )}
+        >
           <SegmentedTabs
             slide
             value={tab}
