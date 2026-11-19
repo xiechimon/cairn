@@ -143,6 +143,7 @@ describe('deferred coordinator tools', () => {
     }
     expect(seenResults[0]).toContain('merge_builds');
     expect(seenResults[0]).toContain('buildIds');
+    expect(seenResults[0]!.match(/## /g)).toHaveLength(1);
     expect(api.tools).toEqual([
       { stepId: 'step-deferred', name: 'merge_builds', params: { buildIds: ['b1'] } },
     ]);
