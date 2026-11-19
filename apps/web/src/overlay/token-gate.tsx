@@ -55,7 +55,7 @@ export function TokenGate() {
     });
   };
 
-  const cellCount = Math.max(PAIR_CODE_CELLS, value.length + 1);
+  const cellCount = Math.max(PAIR_CODE_CELLS, value.length);
   const errCell = Math.min(value.length, cellCount - 1);
   const pickCell = (event: MouseEvent<HTMLInputElement>): void => {
     event.preventDefault();
