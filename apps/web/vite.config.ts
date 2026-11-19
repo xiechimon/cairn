@@ -1,7 +1,13 @@
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
 const devWebPort = Number(process.env.CAIRN_DEV_WEB_PORT) || 5173;
+const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
+const insideClaudeDir = (file: string) =>
+  file.startsWith(repoRoot)
+    ? file.slice(repoRoot.length).includes('/.claude/')
+    : file.includes('/.claude/');
 
 function previewApiReject(): Plugin {
   const PREFIXES = ['/api', '/git'];
@@ -38,7 +44,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     port: devWebPort,
     strictPort: true,
-    watch: { ignored: ['**/.claude/**'] },
+    watch: { ignored: insideClaudeDir },
     proxy: {
       '/api/computer-screen': {
         target: `http://127.0.0.1:${process.env.CAIRN_DEV_SERVER_PORT ?? 8787}`,
