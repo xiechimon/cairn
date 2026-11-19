@@ -1,4 +1,4 @@
-import { BUILD_FAILURE_ROW_KIND, systemRowOf } from '@cairn/shared';
+import { BUILD_FAILURE_ROW_KIND, failureReasonKey, systemRowOf } from '@cairn/shared';
 import { and, desc, eq, gte, inArray } from 'drizzle-orm';
 import { message, step, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -18,7 +18,10 @@ export function hasFailureRow(deps: BuildDeps, buildId: string, reason: string):
     .all()
     .some((row) => {
       const parsed = systemRowOf(row.content);
-      return parsed?.kind === BUILD_FAILURE_ROW_KIND && parsed.reason === reason;
+      return (
+        parsed?.kind === BUILD_FAILURE_ROW_KIND &&
+        failureReasonKey(parsed.reason) === failureReasonKey(reason)
+      );
     });
 }
 

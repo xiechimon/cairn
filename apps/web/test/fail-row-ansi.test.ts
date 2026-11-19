@@ -70,6 +70,34 @@ describe('mapTranscript failure row (#1262 fallback)', () => {
   });
 });
 
+describe('mapTranscript failure dedup', () => {
+  const LEGACY_REPORT = (reason: string) =>
+    [
+      '构建步兜底报告：本步异常结束，以下由系统根据已知记录生成。',
+      `- 失败原因：${reason}`,
+      '- 已知改动：没有改动记录',
+      '- 下一步：看过失败原因后带反馈重跑。',
+    ].join('\n');
+
+  test.each([CLEAN, `${CLEAN}\n`, ` ${CLEAN}  `])(
+    'a stored row reason %j is not duplicated by the fallback when errorMessage matches loosely',
+    (storedError) => {
+      const items = mapTranscript({
+        messages: [
+          { id: 'm1', role: 'system' as const, content: LEGACY_REPORT(CLEAN), createdAt: 1 },
+        ],
+        steps: [],
+        build: { ...POLLUTED_BUILD, errorMessage: storedError },
+        todo: FAILED_CARD,
+        machineName: null,
+        userName: 'Xmon Dai',
+        liveText: '',
+      });
+      expect(items.filter((i) => i.kind === 'fail')).toHaveLength(1);
+    },
+  );
+});
+
 describe('mapRunHistory run history (#1262 fallback)', () => {
   test('R2: polluted errorMessage → meta plain text (no escape fragments)', () => {
     const rows = mapRunHistory(FAILED_WIRE_CARD, [POLLUTED_BUILD], NOW);

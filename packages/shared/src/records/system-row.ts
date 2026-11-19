@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { stripAnsiEscapes } from '../ansi.js';
 import type { GitCredentialSource } from '../git-ops.js';
 import type { WorkspaceHookNoteData } from '../protocol/executor.js';
 
@@ -74,6 +75,10 @@ export function buildFailureRowContent(args: {
     pr: args.pr,
   };
   return JSON.stringify(row);
+}
+
+export function failureReasonKey(reason: string): string {
+  return stripAnsiEscapes(reason).trim();
 }
 
 const LEGACY_HOOK =

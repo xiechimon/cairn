@@ -41,6 +41,7 @@ import {
   conversationBranch,
   DONE_ROW,
   derivePlaceholderTitle,
+  failureReasonKey,
   GATE_ANNOUNCEMENTS,
   GIT_CREDENTIAL_ROW_KIND,
   INSTALL_PACKAGES_TOOL,
@@ -1038,7 +1039,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     build?.errorMessage &&
     todo.phase === 'failed' &&
     !items.some(
-      (item) => item.kind === 'fail' && item.raw === stripAnsiEscapes(build.errorMessage ?? ''),
+      (item) =>
+        item.kind === 'fail' &&
+        item.raw !== undefined &&
+        failureReasonKey(item.raw) === failureReasonKey(build.errorMessage ?? ''),
     )
   ) {
     items.push({
