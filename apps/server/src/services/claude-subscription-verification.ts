@@ -1,7 +1,8 @@
 import { type ExecFileException, execFile } from 'node:child_process';
+import { accessSync, constants, statSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
+import { delimiter, join } from 'node:path';
 import type { ClaudeSubscriptionVerifyResult } from '@cairn/shared';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -48,9 +49,28 @@ function runClaude(
   home: string,
   timeoutMs: number,
 ): Promise<ClaudeSubscriptionVerifyResult> {
+  const explicit = process.env.CLAUDE_BIN || process.env.CAIRN_CLAUDE_BIN;
+  const command =
+    explicit ||
+    [
+      ...(process.env.PATH ?? '').split(delimiter).filter(Boolean),
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+      join(homedir(), '.local', 'bin'),
+    ]
+      .map((dir) => join(dir, 'claude'))
+      .find((path) => {
+        try {
+          accessSync(path, constants.X_OK);
+          return statSync(path).isFile();
+        } catch {
+          return false;
+        }
+      }) ||
+    'claude';
   return new Promise((resolve) => {
     const child = execFile(
-      process.env.CLAUDE_BIN || 'claude',
+      command,
       ['-p', 'Reply with OK', '--output-format', 'json', '--no-session-persistence', '--tools', ''],
       {
         cwd: home,

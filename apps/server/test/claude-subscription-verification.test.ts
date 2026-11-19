@@ -1,9 +1,22 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { verifyClaudeSubscription } from '../src/services/claude-subscription-verification.js';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    accessSync: (...args: Parameters<typeof actual.accessSync>) => {
+      if (args[0] === '/opt/homebrew/bin/claude' || args[0] === '/usr/local/bin/claude') {
+        throw new Error('No system Claude installation in this fixture');
+      }
+      return actual.accessSync(...args);
+    },
+  };
+});
 
 const TOKEN = `sk-ant-oat01-verification-test-token-${'z'.repeat(60)}`;
 
@@ -88,6 +101,27 @@ describe('verifyClaudeSubscription', () => {
     const dir = fixtureDir();
     vi.stubEnv('CLAUDE_BIN', join(dir, 'does-not-exist'));
     expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: false, reason: 'unavailable' });
+  });
+
+  test('a desktop launch finds the native install outside its minimal PATH', async () => {
+    const dir = fixtureDir();
+    const binDir = join(dir, '.local', 'bin');
+    mkdirSync(binDir, { recursive: true });
+    fakeClaude(binDir, 'exit 0');
+    vi.stubEnv('HOME', dir);
+    vi.stubEnv('PATH', join(dir, 'empty-bin'));
+    vi.stubEnv('CLAUDE_BIN', '');
+    vi.stubEnv('CAIRN_CLAUDE_BIN', '');
+    expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: true });
+  });
+
+  test('verification honors the same explicit Claude executable as the Runner', async () => {
+    const dir = fixtureDir();
+    vi.stubEnv('HOME', dir);
+    vi.stubEnv('PATH', '/usr/bin:/bin');
+    vi.stubEnv('CLAUDE_BIN', '');
+    vi.stubEnv('CAIRN_CLAUDE_BIN', fakeClaude(dir, 'exit 0'));
+    expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: true });
   });
 
   test('the child gets a clean environment and a throwaway HOME', async () => {

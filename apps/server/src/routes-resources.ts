@@ -593,7 +593,20 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
-    return c.json(await verifySubscriptionConnection(keysvc, teamId, c.req.param('cid')));
+    const subscriptionId = c.req.param('cid');
+    const started = performance.now();
+    const result = await verifySubscriptionConnection(keysvc, teamId, subscriptionId);
+    ctx.logger?.info(
+      {
+        teamId,
+        subscriptionId,
+        ok: result.ok,
+        reason: result.reason ?? null,
+        durationMs: Math.round(performance.now() - started),
+      },
+      'Claude subscription verification completed',
+    );
+    return c.json(result);
   });
 
   app.get('/api/teams/:id/devin-subscriptions', (c) => {

@@ -84,7 +84,7 @@ describe('Claude subscription connections', () => {
     script('exit 0');
     expect(await (await req(s.app, 'POST', `${path}/${id}/verify`)).json()).toEqual({ ok: true });
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
-    script(`echo "401 ${TOKEN}" >&2\nexit 1`);
+    script(`echo "401 ${TOKEN} private-upstream-response" >&2\nexit 1`);
     const rejected = await req(s.app, 'POST', `${path}/${id}/verify`);
     expect(await rejected.json()).toEqual({ ok: false, reason: 'auth' });
     clock.mockReturnValue(Date.now() + 10_000);
@@ -92,9 +92,25 @@ describe('Claude subscription connections', () => {
     const failed = await req(s.app, 'POST', `${path}/${id}/verify`);
     expect(await failed.json()).toEqual({ ok: false, reason: 'unavailable' });
     expect(logs.join('')).not.toContain(TOKEN);
+    expect(logs.join('')).not.toContain('private-upstream-response');
     expect(
       (await req(s.app, 'POST', `/api/teams/other/claude-subscriptions/${id}/verify`)).status,
     ).toBe(404);
+    const diagnostics = logs
+      .map((line) => JSON.parse(line))
+      .filter((entry) => entry.msg === 'Claude subscription verification completed');
+    expect(diagnostics).toMatchObject(
+      [
+        { ok: true, reason: null },
+        { ok: false, reason: 'auth' },
+        { ok: false, reason: 'unavailable' },
+      ].map((outcome) => ({
+        ...outcome,
+        teamId: s.team.id,
+        subscriptionId: id,
+        durationMs: expect.any(Number),
+      })),
+    );
     expect(readFileSync(runs, 'utf8').trim().split('\n')).toHaveLength(2);
     expect(fetchStub).not.toHaveBeenCalled();
   });
