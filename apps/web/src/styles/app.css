@@ -534,6 +534,86 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   }
 }
 
+@keyframes task-ref-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes task-ref-tile-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+@keyframes task-ref-char-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+@keyframes task-ref-echo {
+  25% {
+    stroke: var(--tint-working-ink);
+  }
+}
+
+[data-slot="task-ref-guide"] {
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+
+[data-slot="task-ref-line"][data-hl] [data-slot="task-ref-guide"] {
+  color: var(--tint-working-ink);
+}
+
+[data-slot="task-mention"][data-hl] {
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slot="task-ref-line"][data-grow] [data-slot="task-ref-trunk"],
+  [data-slot="task-ref-line"][data-grow] [data-slot="task-ref-elbow"] {
+    stroke-dasharray: 1 2;
+    animation: task-ref-draw 220ms var(--ease-standard) both;
+    animation-delay: calc(var(--grow-delay, 0ms) + 110ms);
+  }
+
+  [data-slot="task-ref-line"][data-grow] [data-slot="task-ref-trunk"] {
+    animation-duration: 150ms;
+    animation-timing-function: linear;
+    animation-delay: var(--grow-delay, 0ms);
+  }
+
+  [data-slot="task-ref-line"][data-grow] [data-slot="task-ref-elbow"][data-end] {
+    animation-duration: 320ms;
+    animation-delay: var(--grow-delay, 0ms);
+  }
+
+  [data-slot="task-ref-line"][data-echo] [data-slot="task-ref-elbow"],
+  [data-slot="task-ref-line"][data-echo] [data-slot="task-ref-trunk"] {
+    animation: task-ref-echo 900ms var(--ease-standard);
+  }
+}
+
+@utility task-ref-tile-grow {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: task-ref-tile-in 200ms var(--ease-out-expo) both;
+    animation-delay: calc(var(--grow-delay, 0ms) + 260ms);
+  }
+}
+
+@utility task-ref-char-grow {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: task-ref-char-in 160ms var(--ease-standard) both;
+    animation-delay: calc(var(--grow-delay, 0ms) + 330ms + var(--char) * 18ms);
+  }
+}
+
 @keyframes spiral-trace {
   from {
     stroke-dashoffset: 1;

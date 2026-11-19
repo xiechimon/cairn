@@ -99,6 +99,18 @@ function stableList(owner: object, next: readonly string[]): readonly string[] {
   return next;
 }
 
+export function isLiveRow(item: GroupedRow['item']): boolean {
+  return item.kind === 'streaming' || (item.kind === 'robot' && item.typing === true);
+}
+
+function liveRowAfter(rows: readonly GroupedRow[], from: number): GroupedRow['item'] | undefined {
+  for (const { item } of rows.slice(from + 1)) {
+    if (item.kind === 'user') return undefined;
+    if (isLiveRow(item)) return item;
+  }
+  return undefined;
+}
+
 export function foldTaskCards(
   rows: readonly GroupedRow[],
   glances: ReadonlyMap<string, TodoGlance>,
@@ -106,18 +118,19 @@ export function foldTaskCards(
   const kept: GroupedRow[] = [];
   const started = new Map<GroupedRow['item'], string[]>();
   let reply: GroupedRow['item'] | undefined;
-  for (const row of rows) {
+  rows.forEach((row, n) => {
     if (row.item.kind === 'task-card') {
-      if (reply !== undefined && glances.has(row.item.todoId)) {
-        started.set(reply, [...(started.get(reply) ?? []), row.item.todoId]);
+      const owner = (glances.has(row.item.todoId) && liveRowAfter(rows, n)) || reply;
+      if (owner !== undefined && glances.has(row.item.todoId)) {
+        started.set(owner, [...(started.get(owner) ?? []), row.item.todoId]);
       } else {
         kept.push(row);
       }
-      continue;
+      return;
     }
     reply = row.item.kind === 'robot' ? row.item : undefined;
     kept.push(row);
-  }
+  });
   return {
     rows: kept,
     startedBy: new Map([...started].map(([reply, ids]) => [reply, stableList(reply, ids)])),
@@ -143,7 +156,7 @@ export function placeTaskRefs(
   const placed = new Map<GroupedRow['item'], readonly TaskRef[]>();
   for (const { item } of rows) {
     if (item.kind === 'task-card') seen.add(item.todoId);
-    if (item.kind !== 'robot' || item.typing === true) continue;
+    if (item.kind !== 'robot' && item.kind !== 'streaming') continue;
     const refs = taskRefsOf({}, glances, startedBy.get(item) ?? []).filter(
       (ref) => !seen.has(ref.todoId) && glances.get(ref.todoId)?.internal !== true,
     );

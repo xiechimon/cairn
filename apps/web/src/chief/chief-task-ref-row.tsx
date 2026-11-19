@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { useContext } from 'react';
+import { type CSSProperties, useContext } from 'react';
 import { useMachines, useProjects, useSteps } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ThreadLink } from '../board/thread-link.js';
@@ -16,11 +16,13 @@ export function TaskRefRow({
   elbow = true,
   nested = false,
   guide = true,
+  grow = false,
 }: {
   taskRef: TaskRef;
   elbow?: boolean;
   nested?: boolean;
   guide?: boolean;
+  grow?: boolean;
 }) {
   const { t } = useI18n();
   const unread = useThreadUnread(taskRef.todoId);
@@ -65,9 +67,19 @@ export function TaskRefRow({
             />
           </svg>
         )}
-        <TodoStatusTile phase={taskRef.phase} />
-        <span className="min-w-0 truncate group-hover/ref:underline">
-          {taskRef.title ?? t('任务')}
+        <TodoStatusTile phase={taskRef.phase} className={grow ? 'task-ref-tile-grow' : undefined} />
+        <span className="min-w-0 truncate group-hover/ref:underline group-data-[hl]/line:underline">
+          {grow
+            ? Array.from(taskRef.title ?? t('任务'), (char, n) => (
+                <span
+                  key={n}
+                  className="task-ref-char-grow"
+                  style={{ '--char': Math.min(n, 40) } as CSSProperties}
+                >
+                  {char}
+                </span>
+              ))
+            : (taskRef.title ?? t('任务'))}
         </span>
         {unread && (
           <span

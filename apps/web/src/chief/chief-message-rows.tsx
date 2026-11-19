@@ -1,5 +1,13 @@
 import { parseReplyQuote, type RunnerOfflineContent, type StepQueueBlocked } from '@cairn/shared';
-import { type CSSProperties, memo, type ReactNode, useContext, useState } from 'react';
+import {
+  type ComponentProps,
+  type CSSProperties,
+  memo,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -46,6 +54,7 @@ import { channelHref, useChannelOf } from './report-route.js';
 import { ResearchReportLine, ResearchReportRow } from './research-report.js';
 import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
+import { growDelays, hoverTaskRef, markGrown, useTaskRefSignal } from './task-ref-signal.js';
 import type { ChannelMirror } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
 import { TurnFailureLine } from './turn-failure.js';
@@ -146,12 +155,23 @@ function TaskChip({ todoId, label }: { todoId: string; label: string }) {
   );
 }
 
-function TaskRefRows({ refs }: { refs: readonly TaskRef[] }) {
+function TaskRefRows({ refs, live = false }: { refs: readonly TaskRef[]; live?: boolean }) {
+  const [present] = useState(() => new Set(refs.map((ref) => ref.todoId)));
   if (refs.length === 0) return null;
+  const delays = growDelays(
+    refs.map((ref) => ref.todoId).filter((id) => !present.has(id)),
+    live,
+  );
   return (
     <div className="mb-1.5 flex flex-col" data-testid="chief-task-refs">
       {refs.map((ref, index) => (
-        <TaskRefLine key={ref.todoId} taskRef={ref} first={index === 0} />
+        <TaskRefLine
+          key={ref.todoId}
+          taskRef={ref}
+          first={index === 0}
+          live={live}
+          growDelay={delays.get(ref.todoId)}
+        />
       ))}
     </div>
   );
@@ -180,8 +200,17 @@ interface GuideBranch {
   rise?: boolean;
 }
 
-function TreeGuideSvg({ rails, branch }: { rails: readonly number[]; branch?: GuideBranch }) {
+function TreeGuideSvg({
+  rails,
+  branch,
+  grow = false,
+}: {
+  rails: readonly number[];
+  branch?: GuideBranch;
+  grow?: boolean;
+}) {
   const through = branch !== undefined && !branch.end ? [...rails, branch.x] : rails;
+  const drawn = grow ? { pathLength: 1 } : {};
   const into = branch?.rise === true ? ROW_MID + BEND : ROW_MID - BEND;
   return (
     <svg
@@ -193,11 +222,19 @@ function TreeGuideSvg({ rails, branch }: { rails: readonly number[]; branch?: Gu
       strokeWidth="1.5"
     >
       {through.map((x) => (
-        <line key={x} data-slot="task-ref-trunk" x1={x} x2={x} y1="0" y2="100%" />
+        <line
+          key={x}
+          data-slot="task-ref-trunk"
+          x1={x}
+          x2={x}
+          {...(grow ? { y1: '100%', y2: '0', ...drawn } : { y1: '0', y2: '100%' })}
+        />
       ))}
       {branch !== undefined && (
         <path
           data-slot="task-ref-elbow"
+          data-end={branch.end ? '' : undefined}
+          {...drawn}
           strokeLinecap="round"
           d={`${branch.end ? `M${branch.x} ${branch.rise === true ? ROW_H : 0}V${into}` : `M${branch.x} ${into}`}A${BEND} ${BEND} 0 0 ${branch.rise === true ? 1 : 0} ${branch.x + BEND} ${ROW_MID}H${branch.to}`}
         />
@@ -209,16 +246,19 @@ function TreeGuideSvg({ rails, branch }: { rails: readonly number[]; branch?: Gu
 function GuidedRow({
   rails,
   branch,
+  grow = false,
   children,
+  ...rest
 }: {
   rails: readonly number[];
   branch?: GuideBranch;
+  grow?: boolean;
   children: ReactNode;
-}) {
+} & Omit<ComponentProps<'div'>, 'children'>) {
   return (
-    <div className="relative flex flex-col">
+    <div className="group/line relative flex flex-col" {...rest}>
       {(rails.length > 0 || branch !== undefined) && (
-        <TreeGuideSvg rails={rails} {...(branch !== undefined ? { branch } : {})} />
+        <TreeGuideSvg rails={rails} grow={grow} {...(branch !== undefined ? { branch } : {})} />
       )}
       {children}
     </div>
@@ -230,19 +270,37 @@ function TaskRefLine({
   elbow = true,
   first = true,
   reportsBelow = false,
+  live = false,
+  growDelay,
 }: {
   taskRef: TaskRef;
   elbow?: boolean;
   first?: boolean;
   reportsBelow?: boolean;
+  live?: boolean;
+  growDelay?: number | undefined;
 }) {
+  const [delay] = useState(growDelay);
+  const grow = delay !== undefined;
+  const signal = useTaskRefSignal(taskRef.todoId);
+  useEffect(() => {
+    if (live) markGrown(taskRef.todoId);
+  }, [live, taskRef.todoId]);
   return (
     <>
       <GuidedRow
         rails={[]}
+        grow={grow}
+        data-slot="task-ref-line"
+        data-grow={grow ? '' : undefined}
+        data-hl={signal.hovered ? '' : undefined}
+        data-echo={live && signal.echo ? '' : undefined}
+        style={grow ? ({ '--grow-delay': `${delay}ms` } as CSSProperties) : undefined}
+        onPointerEnter={() => hoverTaskRef(taskRef.todoId)}
+        onPointerLeave={() => hoverTaskRef(null)}
         {...(elbow ? { branch: { x: TOP_X, end: first, to: 28, rise: true } } : {})}
       >
-        <TaskRefRow taskRef={taskRef} elbow={elbow} guide={false} />
+        <TaskRefRow taskRef={taskRef} elbow={elbow} guide={false} grow={grow} />
       </GuidedRow>
       {reportsBelow && (
         <GuidedRow rails={elbow ? [TOP_X] : []}>
@@ -365,6 +423,8 @@ function HandoffRow({ todoId }: { todoId: string }) {
   );
 }
 
+const LIVE_TURN_KEY = 'live-turn';
+
 export function chiefStreamRowKey(
   item: ChiefStreamItem | ChannelMirror,
   index: number,
@@ -372,7 +432,10 @@ export function chiefStreamRowKey(
   switch (item.kind) {
     case 'user':
       return item.outboxKey != null ? `outbox-${item.outboxKey}` : (item.id ?? index);
+    case 'streaming':
+      return LIVE_TURN_KEY;
     case 'robot':
+      return item.id ?? (item.typing === true ? LIVE_TURN_KEY : index);
     case 'thinking':
     case 'question':
     case 'handoff':
@@ -764,6 +827,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
           <MessageContent className={MSG_COL_LIVE_CLS}>
+            <TaskRefRows refs={taskRefs} live />
             <LiveRow
               variant="chief"
               label={item.label}
@@ -816,7 +880,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         data-run={runAttr(joinsPrev, joinsNext)}
       >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-          <TaskRefRows refs={taskRefs} />
+          <TaskRefRows refs={taskRefs} live={!settled} />
           <div
             className={BUBBLE_WRAP_CLS}
             data-testid="chief-reply"

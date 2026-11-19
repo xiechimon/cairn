@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { foldTaskCards, taskRefsOf } from '../src/chief/chief-task-refs.js';
+import { foldTaskCards, placeTaskRefs, taskRefsOf } from '../src/chief/chief-task-refs.js';
+import { growDelays, markGrown } from '../src/chief/task-ref-signal.js';
 import type { GroupedRow } from '../src/chief/thread-activity.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
 
@@ -85,10 +86,54 @@ describe('foldTaskCards', () => {
     expect(folded.startedBy.get(reply)).toEqual(['a1']);
   });
 
+  test('cards of a turn still running hang on its live row, not on the previous reply', () => {
+    const earlier: ChiefStreamItem = { kind: 'robot', id: 'r0', seconds: '', markdown: 'Earlier.' };
+    const live: ChiefStreamItem = { kind: 'streaming', label: '处理中...' };
+    const list = rows(user, earlier, card('a1'), card('b2'), live);
+    const folded = foldTaskCards(list, glances);
+    expect(folded.rows.map((row) => row.item.kind)).toEqual(['user', 'robot', 'streaming']);
+    expect(folded.startedBy.get(live)).toEqual(['a1', 'b2']);
+    expect(folded.startedBy.has(earlier)).toBe(false);
+    expect(placeTaskRefs(folded.rows, folded.startedBy, glances, new Set()).get(live)?.map((r) => r.todoId)).toEqual([
+      'a1',
+      'b2',
+    ]);
+  });
+
+  test('cards before a typing reply hang on that reply', () => {
+    const typing: ChiefStreamItem = { kind: 'robot', seconds: '', markdown: 'Started', typing: true };
+    const folded = foldTaskCards(rows(user, card('a1'), typing), glances);
+    expect(folded.rows.map((row) => row.item.kind)).toEqual(['user', 'robot']);
+    expect(folded.startedBy.get(typing)).toEqual(['a1']);
+  });
+
+  test('a live row after a later user message does not take an earlier turn\'s cards', () => {
+    const live: ChiefStreamItem = { kind: 'streaming', label: '处理中...' };
+    const next: ChiefStreamItem = { kind: 'user', id: 'u2', text: 'more' };
+    const folded = foldTaskCards(rows(user, reply, card('a1'), next, live), glances);
+    expect(folded.startedBy.get(reply)).toEqual(['a1']);
+    expect(folded.startedBy.has(live)).toBe(false);
+  });
+
   test('an unchanged fold hands the reply the same list, so its row does not re-render', () => {
     const list = rows(user, reply, card('a1'));
     expect(foldTaskCards(list, glances).startedBy.get(reply)).toBe(
       foldTaskCards(list, glances).startedBy.get(reply),
     );
+  });
+});
+
+describe('growDelays', () => {
+  test('only tasks new to a live turn grow, staggered in order, and never twice', () => {
+    expect([...growDelays(['g1', 'g2'], false)]).toEqual([]);
+    expect([...growDelays(['g1', 'g2'], true)]).toEqual([
+      ['g1', 0],
+      ['g2', 350],
+    ]);
+    markGrown('g1');
+    expect([...growDelays(['g1', 'g2', 'g3'], true)]).toEqual([
+      ['g2', 0],
+      ['g3', 350],
+    ]);
   });
 });

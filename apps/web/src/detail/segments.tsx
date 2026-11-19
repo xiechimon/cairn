@@ -1,7 +1,8 @@
 import { cn } from 'cn';
-import { createContext, Fragment, type ReactNode, useContext } from 'react';
+import { createContext, Fragment, type ReactNode, useContext, useEffect } from 'react';
 import { Link } from 'react-router';
 import { useThreadHref } from '../board/thread-link.js';
+import { echoTaskRef, hoverTaskRef, useTaskRefSignal } from '../chief/task-ref-signal.js';
 import { MachineName } from '../components/machine-label.js';
 import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import type { DocSegment, Phase } from '../fixtures/records.js';
@@ -161,12 +162,19 @@ export function TodoStatus({ phase }: { phase: Phase }) {
   );
 }
 
-export function TodoStatusTile({ phase }: { phase: Phase }) {
+export function TodoStatusTile({
+  phase,
+  className,
+}: {
+  phase: Phase;
+  className?: string | undefined;
+}) {
   return (
     <span
       className={cn(
         'grid size-5 flex-none place-items-center rounded-sm',
         TONE_CLASS[CONVERSATION_STATUS[phase].tone].tile,
+        className,
       )}
     >
       <TodoStatus phase={phase} />
@@ -184,6 +192,10 @@ function MentionChip({ seg }: { seg: DocSegment }) {
   const phase = glance?.phase;
   const label =
     todoId != null && TASK_NUMBER_LABEL.test(seg.text) ? (glance?.title ?? t('任务')) : seg.text;
+  const signal = useTaskRefSignal(todoId);
+  useEffect(() => {
+    if (todoId != null) echoTaskRef(todoId);
+  }, [todoId]);
   if (seg.mentionKind === 'agent') return <span data-slot="agent-mention">{label}</span>;
   return href != null ? (
     <>
@@ -197,6 +209,13 @@ function MentionChip({ seg }: { seg: DocSegment }) {
         to={href}
         data-phase={phase}
         data-slot="task-mention"
+        data-hl={signal.hovered ? '' : undefined}
+        {...(todoId != null
+          ? {
+              onPointerEnter: () => hoverTaskRef(todoId),
+              onPointerLeave: () => hoverTaskRef(null),
+            }
+          : {})}
       >
         {phase != null && (
           <span className="mr-1.5 inline-flex align-[-0.125em]">
