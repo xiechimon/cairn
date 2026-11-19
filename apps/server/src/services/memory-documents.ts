@@ -17,6 +17,7 @@ import {
   validateMemoryText,
 } from './memory.js';
 import { listedProjects } from './personal-space.js';
+import { guardTeamMemory, syncTeamMemoryEntries } from './team-memory.js';
 
 export { memoryDocumentVersion } from './memory.js';
 
@@ -24,6 +25,7 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type Row = typeof agentMemory.$inferSelect;
 export type MemoryDocumentOwner = Pick<Row, 'teamId' | 'agentId' | 'projectId'> &
   Partial<Pick<Row, 'sourceTodoId' | 'sourceBuildId' | 'source'>> & {
+    sourceMessageId?: string | null;
     teamScoped?: boolean;
     workerScope?: boolean;
   };
@@ -328,6 +330,8 @@ export function executeMemoryDocumentTool(
     const title = edit.renameTo ?? row.title;
     if (row.layer !== 'core') reserve(tx, destination, title, row.id);
     validateMemoryText(title, content);
+    const teamIndex = row.layer === 'core' && ns.projectId === null && owner.teamScoped !== false;
+    if (teamIndex) guardTeamMemory(tx, owner.teamId, memoryIndexText(row), content);
     const successor = tx
       .insert(agentMemory)
       .values({
@@ -356,6 +360,12 @@ export function executeMemoryDocumentTool(
       .run();
     if (row.layer !== 'core')
       rewriteMemoryReferences(tx, row, [{ before: row, after: successor }], now);
+    if (teamIndex)
+      syncTeamMemoryEntries(tx, owner.teamId, content, {
+        now,
+        source: owner.source,
+        sourceMessageId: owner.sourceMessageId,
+      });
     return result(successor);
   });
 }

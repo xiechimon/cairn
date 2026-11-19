@@ -645,6 +645,20 @@ export const agentMemory = sqliteTable('agent_memory', {
   updatedAt: epochMs('updatedAt').notNull(),
 });
 
+export const teamMemoryEntry = sqliteTable(
+  'team_memory_entry',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId').notNull(),
+    line: text('line').notNull(),
+    source: text('source'),
+    sourceMessageId: text('sourceMessageId'),
+    writtenAt: epochMs('writtenAt').notNull(),
+    lastUsedAt: epochMs('lastUsedAt').notNull(),
+  },
+  (t) => [uniqueIndex('team_memory_entry_line_idx').on(t.teamId, t.line)],
+);
+
 export const dataMigration = sqliteTable('data_migration', {
   id: text('id').primaryKey(),
   doneAt: epochMs('doneAt').notNull(),

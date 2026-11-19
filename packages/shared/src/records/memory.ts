@@ -9,6 +9,10 @@ export const MEMORY_INDEX_ID_PREFIX = 'memory-index:';
 
 export const MEMORY_TOOLS = ['save_memory', 'update_memory', 'delete_memory', 'memories'] as const;
 
+export const TEAM_MEMORY_MAX_CHARS = 2_000;
+export const TEAM_MEMORY_RETIRE_AFTER_DAYS = 90;
+export const TEAM_MEMORY_RETIRE_MAX_SHARE = 0.25;
+
 export const memoryRecordSchema = z.object({
   id: recordId,
   agentId: recordId,

@@ -1123,6 +1123,7 @@ export async function executeChiefTool(
         projectId: ctx.turnScopeProjectId ?? null,
         source: 'Coordinator',
         sourceBuildId: ctx.conversationId,
+        sourceMessageId: ctx.turnMessageIds?.at(-1) ?? null,
       };
       const editId = memoryEditIdOfPrompt(ctx.turnPrompt ?? null);
       if (editId !== null) {

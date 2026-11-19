@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import { agentMemory } from '../src/db/schema.js';
+import { agentMemory, teamMemoryEntry } from '../src/db/schema.js';
 import { ensureMemoryIndex, listStoredMemoryEntries } from '../src/services/memory.js';
 import { executeMemoryDocumentTool } from '../src/services/memory-documents.js';
 import { deleteProject } from '../src/services/projects.js';
@@ -435,4 +435,47 @@ test('startup reference rewrites preserve independent and project indexes', asyn
       file: 'MEMORY.md',
     }),
   ).toMatchObject({ content });
+});
+
+test('team preferences stay under the cap, keep project facts out, and record provenance', async () => {
+  const line = (n: number) => `- 偏好${n}：${'字'.repeat(90)}`;
+  const full = Array.from({ length: 20 }, (_, i) => line(i)).join('\n');
+  await writeIndex('team', full);
+  const over = writeIndex('team', `${full}\n${line(99)}`);
+  await expect(over).rejects.toMatchObject({ status: 400 });
+  await expect(over).rejects.toThrow('先合并或删掉旧条目');
+  await expect(
+    writeIndex('team', [full, ...Array.from({ length: 4 }, (_, i) => line(50 + i))].join('\n')),
+  ).rejects.toThrow('先合并或删掉旧条目');
+  const shrunk = full.split('\n').slice(1).join('\n');
+  expect(await writeIndex('team', shrunk)).toMatchObject({ content: shrunk });
+
+  await expect(writeIndex('team', `${shrunk}\n- 发版：Demo 的发版走 tag`)).rejects.toThrow(
+    `scope 填 ${H.projectId}`,
+  );
+  expect(await writeIndex('team', `${shrunk}\n- 演示：demonstrate 时先截图`)).toMatchObject({
+    scope: 'team',
+  });
+  const project = await writeIndex(H.projectId, '- 发版：demo 的发版走 tag');
+  expect(project).toMatchObject({ scope: H.projectId });
+
+  const { baseVersion } = await read('Coordinator');
+  executeMemoryDocumentTool(
+    H.s.db,
+    { ...owner(), sourceMessageId: 'msg-remember' },
+    'update_memory',
+    {
+      scope: 'team',
+      file: 'MEMORY.md',
+      baseVersion,
+      old_str: line(1),
+      new_str: '- 回复语言：回复用中文',
+    },
+  );
+  const entries = H.s.db.select().from(teamMemoryEntry).all();
+  expect(entries).toHaveLength(20);
+  expect(entries.find((e) => e.line === '- 回复语言：回复用中文')).toMatchObject({
+    sourceMessageId: 'msg-remember',
+  });
+  expect(entries.some((e) => e.line === line(1))).toBe(false);
 });

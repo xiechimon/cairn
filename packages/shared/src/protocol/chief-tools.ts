@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { RUNNER_OS, runnerOsSchema } from '../records/machine-capabilities.js';
-import { memoryToolParamsSchemas } from '../records/memory.js';
+import { memoryToolParamsSchemas, TEAM_MEMORY_MAX_CHARS } from '../records/memory.js';
 import { THREAD_REPORT_LINE_MAX } from '../records/message.js';
 import {
   QUICK_REPLIES_MAX,
@@ -299,6 +299,22 @@ export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     replaySafe: true,
   },
 ];
+
+const COORDINATOR_UPDATE_MEMORY_DESCRIPTION = [
+  '在团队偏好里新增、修改或删除一条。只在用户说"记住"或纠正你时调用。',
+  '写之前问自己：一个月后这条还对、还值得读吗？任务进度、状态、项目列表、能用工具查到的事、只和这次对话有关的事都不写，哪怕用户明说过。',
+  '写陈述句，用 YYYY-MM-DD 格式的绝对日期，不写"今天""最近"。',
+  '和已有条目重复或冲突时改那一条，不另写一条。属于某个项目的事写进那个项目的记忆：scope 填项目 id；团队偏好里新写的一行提到项目名会被拒。',
+  `偏好总长不能超过 ${TEAM_MEMORY_MAX_CHARS.toLocaleString('en-US')} 字；超了会写入失败，先合并或删掉旧条目。`,
+  '用法：先用 memories 读 scope 的 MEMORY.md 拿到 baseVersion；传 content 整体替换，或传一段唯一的原文 old_str 和 new_str。restoreVersion 恢复保留的旧版本；记忆文件可以 renameTo 或 moveTo，MEMORY.md 不能。baseVersion 过期返回 409。',
+].join('\n');
+
+export const COORDINATOR_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] =
+  WORKER_MEMORY_REMOTE_TOOLS.map((tool) =>
+    tool.name === 'update_memory'
+      ? { ...tool, description: COORDINATOR_UPDATE_MEMORY_DESCRIPTION }
+      : tool,
+  );
 
 export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
@@ -761,7 +777,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
       'message',
     ]),
   },
-  ...WORKER_MEMORY_REMOTE_TOOLS,
+  ...COORDINATOR_MEMORY_REMOTE_TOOLS,
   {
     name: 'watch_todos',
     description: 'Watch todos so the chief is woken when they park at a gate, settle or fail.',

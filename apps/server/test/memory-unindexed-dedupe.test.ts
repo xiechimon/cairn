@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
-import { agentMemory } from '../src/db/schema.js';
+import { agentMemory, project, team } from '../src/db/schema.js';
 import { injectMemoryDocuments } from '../src/services/memory.js';
 import {
   appendMemoryIndex,
@@ -27,19 +27,23 @@ test.each(cases)(
     const dir = makeTestTempDir('unindexed-dedupe-');
     let opened = openDbWithHandle(join(dir, 'memory.sqlite'));
     try {
-      const owner = { teamId: `${detail}-${initial.length}`, agentId: 'agent', projectId: null };
+      const teamId = `${detail}-${initial.length}`;
+      const scope = `project-${teamId}`;
+      opened.db.insert(team).values({ id: teamId, name: 'team', createdAt: 1 }).run();
+      opened.db.insert(project).values({ id: scope, teamId, name: 'project' }).run();
+      const owner = { teamId, agentId: 'agent', projectId: scope };
       const saved = executeMemoryDocumentTool(opened.db, owner, 'save_memory', {
-        scope: 'team',
+        scope,
         file: 'standalone file.md',
         content: detail,
       }) as { id: string };
       const readIndex = () =>
         executeMemoryDocumentTool(opened.db, owner, 'memories', {
-          scope: 'team',
+          scope,
           file: 'MEMORY.md',
         }) as { baseVersion: string; content: string };
       executeMemoryDocumentTool(opened.db, owner, 'update_memory', {
-        scope: 'team',
+        scope,
         file: 'MEMORY.md',
         baseVersion: readIndex().baseVersion,
         content: initial,
@@ -50,7 +54,11 @@ test.each(cases)(
           : rememberMemoryFile(opened.db, owner, 'another title', detail);
       const before = opened.db.select().from(agentMemory).all();
       const result = write();
-      const injected = injectMemoryDocuments(opened.db, { ...owner, recordUse: false });
+      const injected = injectMemoryDocuments(opened.db, {
+        ...owner,
+        projectOnly: true,
+        recordUse: false,
+      });
       expect(injected.memories[0]!.content).toContain('](standalone%20file.md)');
       expect(result).toEqual(
         path === 'append'
@@ -75,7 +83,8 @@ test.each(cases)(
       opened.close();
       opened = openDbWithHandle(join(dir, 'memory.sqlite'));
       expect(
-        injectMemoryDocuments(opened.db, { ...owner, recordUse: false }).memories[0]!.content,
+        injectMemoryDocuments(opened.db, { ...owner, projectOnly: true, recordUse: false })
+          .memories[0]!.content,
       ).toContain('](standalone%20file.md)');
     } finally {
       opened.close();

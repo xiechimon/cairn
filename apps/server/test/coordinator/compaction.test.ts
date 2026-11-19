@@ -115,7 +115,7 @@ describe('C2 summary through beforeCompact', () => {
     });
     expect(summary).toBe(`summary ${batches.length}`);
     expect(prompts[0]).toContain(COORDINATOR_SUMMARY_PROMPT_HEAD);
-    expect(prompts[0]).toContain("Keep ian's verdicts");
+    expect(prompts[0]).toContain("Keep the user's verdicts");
     expect(prompts[0]).toContain('Earlier summary:\nearlier');
     expect(prompts[1]).toContain('Earlier summary:\nsummary 1');
   });

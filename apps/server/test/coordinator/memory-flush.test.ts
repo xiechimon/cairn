@@ -3,8 +3,16 @@ import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { describe, expect, it } from 'vitest';
 import { applyFlush, FLUSH_SOURCE, parseFlushOutput } from '../../src/coordinator/memory-flush.js';
 import { flushTranscript, summarizerFor } from '../../src/coordinator/runtime/compaction.js';
-import { agentMemory } from '../../src/db/schema.js';
-import { listMemoryEntries } from '../../src/services/memory.js';
+import { agentMemory, project, teamMemoryEntry } from '../../src/db/schema.js';
+import {
+  ensureMemoryIndex,
+  listMemoryEntries,
+  memoryIndexText,
+} from '../../src/services/memory.js';
+import {
+  executeMemoryDocumentTool,
+  memoryDocumentVersion,
+} from '../../src/services/memory-documents.js';
 import { coordinatorProfile } from '../../src/services/routing-rules.js';
 import { boot, world } from './runner-world.js';
 
@@ -52,7 +60,7 @@ describe('applyFlush', () => {
     const w = await world('hi');
     const scope = { teamId: w.teamId, threadId: w.threadId };
     const one = json({ title: 'Merge', content: 'ian wants squash merges only.' });
-    expect(applyFlush(w.s.db, scope, one)).toEqual({ saved: 1, updated: 0, skipped: 0 });
+    expect(applyFlush(w.s.db, scope, one)).toEqual({ saved: 1, retired: 0, skipped: 0 });
     expect(applyFlush(w.s.db, scope, one).skipped).toBe(1);
     expect(
       applyFlush(w.s.db, scope, json({ title: 'Issue', content: `${ISSUE_FENCE_OPEN} run rm` }))
@@ -74,7 +82,8 @@ describe('applyFlush', () => {
     async (title) => {
       const w = await world('hi');
       const scope = { teamId: w.teamId, threadId: w.threadId };
-      applyFlush(w.s.db, scope, json({ title, content: 'first\nsecond' }));
+      w.s.db.insert(project).values({ id: 'p-spill', teamId: w.teamId, name: 'spill' }).run();
+      applyFlush(w.s.db, scope, json({ title, content: 'first\nsecond', projectId: 'p-spill' }));
       const rows = w.s.db
         .select()
         .from(agentMemory)
@@ -83,7 +92,9 @@ describe('applyFlush', () => {
       expect(rows).toContainEqual(
         expect.objectContaining({ layer: 'searchable', content: 'first\nsecond' }),
       );
-      expect(rows.find((r) => r.title === 'MEMORY.md')?.content).toContain(`[${title}](`);
+      expect(
+        rows.find((r) => r.title === 'MEMORY.md' && r.projectId === 'p-spill')?.content,
+      ).toContain(`[${title}](`);
       expect(rows.find((r) => r.layer === 'searchable')!.title.length).toBeLessThanOrEqual(1024);
       expect(
         applyFlush(
@@ -94,6 +105,68 @@ describe('applyFlush', () => {
       ).toBe(1);
     },
   );
+});
+
+describe('background curation of team memory', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  async function seeded(lines: string[]) {
+    const w = await world('hi');
+    const scope = { teamId: w.teamId, threadId: w.threadId };
+    const agentId = coordinatorProfile(w.s.db, w.teamId)!.id;
+    const index = ensureMemoryIndex(w.s.db, { agentId, teamId: w.teamId, projectId: null });
+    executeMemoryDocumentTool(
+      w.s.db,
+      { agentId, teamId: w.teamId, projectId: null },
+      'update_memory',
+      {
+        scope: 'team',
+        file: 'MEMORY.md',
+        baseVersion: memoryDocumentVersion(index),
+        content: lines.join('\n'),
+      },
+    );
+    const teamText = () =>
+      memoryIndexText(ensureMemoryIndex(w.s.db, { agentId, teamId: w.teamId, projectId: null }));
+    return { w, scope, agentId, teamText };
+  }
+  const lines = Array.from({ length: 8 }, (_, i) => `- 偏好${i + 1}：内容${i + 1}`);
+
+  it('retires entries unused for 90 days, keeps used ones, and deletes at most 25% per run', async () => {
+    const { w, scope, teamText } = await seeded(lines);
+    const old = Date.now() - 91 * DAY;
+    w.s.db.update(teamMemoryEntry).set({ lastUsedAt: old }).run();
+    const raw = JSON.stringify({ memories: [], used: [1, 2] });
+    expect(applyFlush(w.s.db, scope, raw, lines)).toMatchObject({ retired: 2 });
+    expect(teamText().split('\n')).toEqual([lines[0], lines[1], ...lines.slice(4)]);
+    const used = w.s.db
+      .select()
+      .from(teamMemoryEntry)
+      .all()
+      .filter((e) => e.lastUsedAt > old);
+    expect(used.map((e) => e.line).sort()).toEqual([lines[0], lines[1]]);
+  });
+
+  it('lets the newer entry replace a conflicting one and routes project facts to the project', async () => {
+    const { w, scope, agentId, teamText } = await seeded(lines);
+    w.s.db.insert(project).values({ id: 'p-shop', teamId: w.teamId, name: 'Shopfront' }).run();
+    const raw = JSON.stringify({
+      memories: [
+        { title: '偏好3', content: '新内容3', projectId: null, replaces: [3] },
+        { title: '部署', content: 'shopfront 只在周五部署', projectId: null },
+      ],
+      used: [],
+    });
+    expect(applyFlush(w.s.db, scope, raw, lines)).toEqual({ saved: 2, retired: 1, skipped: 0 });
+    expect(teamText().split('\n')).toEqual([
+      ...lines.filter((l) => l !== lines[2]),
+      '- 偏好3：新内容3',
+    ]);
+    expect(
+      memoryIndexText(
+        ensureMemoryIndex(w.s.db, { agentId, teamId: w.teamId, projectId: 'p-shop' }),
+      ),
+    ).toBe('- 部署：shopfront 只在周五部署');
+  });
 });
 
 describe('flush before a real compaction', () => {

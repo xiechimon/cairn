@@ -244,7 +244,7 @@ describe('chief envelope; PATCH /chief is gone', () => {
     for (const jargon of ['核销', '围栏', 'wake 轮', '运行位', 'ADR 0026', '配额 100']) {
       expect(prompt, jargon).not.toContain(jargon);
     }
-    expect(prompt.match(/save_memory/g)?.length).toBe(2);
+    expect(prompt.match(/save_memory/g)?.length).toBe(1);
   });
 
   test('systemPrompt lists each project with its description and carries the project-attribution rule (#1920)', () => {

@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { applyFlush, flushPrompt } from '../src/coordinator/memory-flush.js';
 import { agentMemory, memoryCandidate, project } from '../src/db/schema.js';
@@ -202,18 +203,21 @@ test('injected revision is accepted by the document API', () => {
 test.each(['MEMORY.md', 'duplicate.md', 'bad\nname\0.md', 'x'.repeat(1200), 'cut \uD83D'])(
   'internal callers allocate reachable files for %s',
   (title) => {
-    const owner = { teamId: H.teamId, agentId: AGENT_ID, projectId: null };
+    const owner = { teamId: H.teamId, agentId: AGENT_ID, projectId: H.projectId };
     const first = rememberMemoryFile(H.s.db, owner, title, 'first file');
     expect(appendMemoryIndex(H.s.db, owner, title, 'second\nfile')).toBe(true);
     expect(appendMemoryIndex(H.s.db, owner, title, 'second\nfile')).toBe(false);
     const { documents } = executeMemoryDocumentTool(H.s.db, owner, 'memories', {
-      scope: 'team',
+      scope: H.projectId,
     }) as { documents: Document[] };
     expect(new Set(documents.map((row) => row.file)).size).toBe(documents.length);
     expect(documents.some((row) => row.id === first.id)).toBe(true);
     for (const row of documents.filter((row) => row.file !== 'MEMORY.md')) {
       expect(
-        executeMemoryDocumentTool(H.s.db, owner, 'memories', { scope: 'team', file: row.file }),
+        executeMemoryDocumentTool(H.s.db, owner, 'memories', {
+          scope: H.projectId,
+          file: row.file,
+        }),
       ).toMatchObject({ id: row.id });
     }
   },
@@ -248,11 +252,11 @@ test('curation returns a file id that survives document reads and injection fold
 test.each(['append', 'remember'] as const)(
   'spilled references stay injected for %s at either load bound',
   async (path) => {
-    const owner = { teamId: H.teamId, agentId: AGENT_ID, projectId: null };
+    const owner = { teamId: H.teamId, agentId: AGENT_ID, projectId: H.projectId };
     for (const content of [Array(200).fill('existing').join('\n'), 'x'.repeat(25 * 1024)]) {
-      const index = await read('Coordinator');
+      const index = await read('Coordinator', 'MEMORY.md', H.projectId);
       await relay('update_memory', {
-        scope: 'team',
+        scope: H.projectId,
         file: 'MEMORY.md',
         baseVersion: index.baseVersion,
         content,
@@ -260,32 +264,35 @@ test.each(['append', 'remember'] as const)(
       const title = `new-${content.length}.md`;
       if (path === 'append') appendMemoryIndex(H.s.db, owner, title, `detail-${content.length}`);
       else rememberMemoryFile(H.s.db, owner, title, `detail-${content.length}`);
-      const injected = injectMemoryDocuments(H.s.db, owner).memories[0]!;
+      const injected = injectMemoryDocuments(H.s.db, { ...owner, projectOnly: true }).memories[0]!;
       expect(injected.content).toContain(`](${title})`);
-      const current = await read('Coordinator');
+      const current = await read('Coordinator', 'MEMORY.md', H.projectId);
       const stored = H.s.db
         .select()
         .from(agentMemory)
         .all()
         .find((row) => row.id === current.id)!;
       expect(stored.content).toContain(content);
-      expect(await read('Coordinator', title)).toMatchObject({
+      expect(await read('Coordinator', title, H.projectId)).toMatchObject({
         content: `detail-${content.length}`,
       });
     }
   },
 );
 
-test('flush prompt retains project scopes and a prefix of an oversized team index', async () => {
-  for (const scope of ['team', H.projectId]) {
-    const index = await read('Coordinator', 'MEMORY.md', scope);
-    await relay('update_memory', {
-      scope,
-      file: 'MEMORY.md',
-      baseVersion: index.baseVersion,
-      content: scope === 'team' ? `TEAM-PREFIX\n${'x'.repeat(9000)}` : 'PROJECT-COVERED-FACT',
-    });
-  }
+test('flush prompt retains project scopes and a prefix of an oversized legacy team index', async () => {
+  const projectIndex = await read('Coordinator', 'MEMORY.md', H.projectId);
+  await relay('update_memory', {
+    scope: H.projectId,
+    file: 'MEMORY.md',
+    baseVersion: projectIndex.baseVersion,
+    content: 'PROJECT-COVERED-FACT',
+  });
+  H.s.db
+    .update(agentMemory)
+    .set({ content: `TEAM-PREFIX\n- ${'x'.repeat(9000)}` })
+    .where(eq(agentMemory.id, (await read('Coordinator')).id))
+    .run();
   const prompt = flushPrompt(H.s.db, { teamId: H.teamId, threadId: H.threadId }, 'transcript');
   const existing = prompt.split('Existing memories:\n')[1]!.split('\n\nProjects:')[0]!;
   expect(existing).toContain('TEAM-PREFIX');
