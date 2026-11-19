@@ -16,9 +16,13 @@ export function ChiefMemoryDialog({ open, onClose }: { open: boolean; onClose: (
       subtitle={t('Coordinator 的长期记忆')}
       initialFocus={contentRef}
       width="var(--settings-w)"
-      className="h-(--settings-h)"
+      className="h-(--settings-h) [&_[data-testid=dialog-body]]:pb-0"
     >
-      <div ref={contentRef} tabIndex={-1} className="mx-auto w-192 max-w-full outline-none">
+      <div
+        ref={contentRef}
+        tabIndex={-1}
+        className="mx-auto flex min-h-full w-192 max-w-full flex-col outline-none"
+      >
         <MemoryPanel live={live} teamId={teamId} project={null} />
       </div>
     </DialogShell>

@@ -761,3 +761,30 @@ for (const memories of [[], MANY_TEAM]) {
     expect(Math.abs(end.outer.y + end.outer.height - 16 - (end.field.y + end.field.height))).toBeLessThan(2);
   });
 }
+
+for (const memories of [[], MANY_TEAM]) {
+  test(`sidebar memory dialog has one composer pinned to the bottom, memories=${memories.length}`, async ({ page }) => {
+    await mockMemory(page, { memories });
+    await page.goto('/app');
+    await page.locator('aside').getByText('Coordinator', { exact: true }).first().hover();
+    await page.getByTestId('sidebar-coordinator-memory').click();
+    const body = page.getByRole('dialog').getByTestId('dialog-body');
+    await expect(body.getByRole('textbox')).toHaveCount(1);
+    await expect(body.getByRole('textbox', { name: '告诉 Coordinator 要记住或改什么' })).toBeVisible();
+    const box = async () => {
+      const [outer, field, inner] = await Promise.all([
+        body.boundingBox(),
+        page.getByTestId('memory-edit-composer').locator('> div').boundingBox(),
+        page.getByTestId('memory-list').boundingBox(),
+      ]);
+      return { outer: outer!, field: field!, inner: inner! };
+    };
+    const top = await box();
+    expect(Math.abs(top.outer.y + top.outer.height - 16 - (top.field.y + top.field.height))).toBeLessThan(2);
+    expect(Math.abs(top.field.x - top.inner.x)).toBeLessThan(2);
+    expect(Math.abs(top.field.width - top.inner.width)).toBeLessThan(2);
+    await body.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    const end = await box();
+    expect(Math.abs(end.outer.y + end.outer.height - 16 - (end.field.y + end.field.height))).toBeLessThan(2);
+  });
+}
