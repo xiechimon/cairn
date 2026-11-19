@@ -56,9 +56,9 @@ function render(overrides: {
 }
 
 function todoItems(items: TranscriptItem[]) {
-  return items.filter(
-    (i): i is Extract<TranscriptItem, { kind: 'agent-todo' }> => i.kind === 'agent-todo',
-  );
+  return items
+    .filter((i): i is Extract<TranscriptItem, { kind: 'agent-todo' }> => i.kind === 'agent-todo')
+    .map(({ kind, items: todo }) => ({ kind, items: todo }));
 }
 
 describe('mapTranscript agent todo list (#1524)', () => {

@@ -25,7 +25,6 @@ import { inlineSegments } from '../lib/markdown.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, TaskCard } from './chat-markdown.js';
 import { failFactsText } from './fail-facts.js';
 import { Segments } from './segments.js';
-import { shouldExpandLastWork } from './work-expansion.js';
 import { WorkTrace } from './work-trace.js';
 
 interface TranscriptProps {
@@ -669,7 +668,6 @@ export function Transcript({ transcript, result }: TranscriptProps) {
     shownBefore.current = { lastUserId, rows: transcript.length };
     if (before.lastUserId !== lastUserId && before.rows > 0) setEnteringUser(lastUserId);
   }, [lastUserId, transcript.length]);
-  const lastWork = shouldExpandLastWork(workItems) ? workItems.at(-1) : undefined;
   const tailItem = transcript.at(-1);
   const hasLiveTail =
     tailItem?.kind === 'streaming' || (tailItem?.kind === 'work' && tailItem.running === true);
@@ -683,7 +681,7 @@ export function Transcript({ transcript, result }: TranscriptProps) {
           item={item}
           prev={transcript[index - 1]}
           t={t}
-          defaultExpanded={item === lastWork || (item.kind === 'work' && item.expanded === true)}
+          defaultExpanded={item.kind === 'work' && item.expanded === true}
           entering={entering}
           enteringUser={enteringUser}
         />

@@ -57,23 +57,24 @@ function HeadingTag({ level, segments }: { level: number; segments: DocSegment[]
 
 const TASK_ICON_BOX = 'mt-0.5 flex size-4 flex-none items-center justify-center rounded-full';
 
+const TASK_FADE =
+  'transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none';
+
 function TaskIcon({ state }: { state: TaskState }) {
-  if (state === 'done') {
-    return (
-      <span className={`${TASK_ICON_BOX} bg-(--text-tertiary) text-(--card)`}>
+  return (
+    <span className={`${TASK_ICON_BOX} relative`} data-task-icon={state}>
+      <span
+        className={`absolute inset-0 rounded-full border-[1.5px] border-dashed border-(--text-tertiary) ${TASK_FADE} ${state === 'todo' ? 'opacity-100' : 'opacity-0'}`}
+      />
+      <span
+        className={`absolute inset-0 rounded-full border-[1.5px] border-(--border) border-t-(--text-secondary) ${TASK_FADE} ${state === 'doing' ? 'animate-spin opacity-100 motion-reduce:animate-none' : 'opacity-0'}`}
+      />
+      <span
+        className={`absolute inset-0 flex items-center justify-center rounded-full bg-(--text-tertiary) text-(--card) ${TASK_FADE} ${state === 'done' ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}`}
+      >
         <Check width={10} height={10} />
       </span>
-    );
-  }
-  if (state === 'doing') {
-    return (
-      <span
-        className={`${TASK_ICON_BOX} animate-spin border-[1.5px] border-(--border) border-t-(--text-secondary) motion-reduce:animate-none`}
-      />
-    );
-  }
-  return (
-    <span className={`${TASK_ICON_BOX} border-[1.5px] border-dashed border-(--text-tertiary)`} />
+    </span>
   );
 }
 
@@ -88,10 +89,10 @@ export function TaskCard({ items }: { items: TaskItem[] }) {
           <div className="flex items-start gap-3">
             <TaskIcon state={item.state} />
             <span
-              className={`min-w-0 ${
+              className={`min-w-0 line-through transition-[color,text-decoration-color] duration-200 ease-out motion-reduce:transition-none ${
                 item.state === 'done'
-                  ? 'text-(--text-tertiary) line-through'
-                  : 'text-(--foreground)'
+                  ? 'text-(--text-tertiary) decoration-(--text-tertiary)'
+                  : 'text-(--foreground) decoration-transparent'
               }`}
             >
               <Segments segments={item.segments} codeClassName="chat-code" />

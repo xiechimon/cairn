@@ -171,7 +171,7 @@ function WorkStepRow({
   enter: boolean;
   t: TFunc;
 }) {
-  const [open, setOpen] = useState(step.kind === 'call' && step.error);
+  const [open, setOpen] = useState(false);
   const [animate] = useState(enter);
   const call = step.kind === 'call' ? step : null;
   const lines = call

@@ -270,6 +270,8 @@ function rowProject(row: MessageRow): { projectId?: string | null } {
   return row.projectId === undefined ? {} : { projectId: row.projectId };
 }
 
+const CD_PREFIX = /^cd\s+(?:"[^"]*"|'[^']*'|\S+)\s*(?:&&|;)\s*/;
+
 export function shownTaskTitle(title: string, ownerWords?: string): string {
   if (replyQuoteText(title) === title) return title;
   return (
@@ -996,7 +998,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const liveTodo = agentTodo != null && agentTodo.stepId === running.id ? agentTodo : null;
     const shownTodo = liveTodo?.items ?? persistedTodo;
     if (shownTodo !== null && shownTodo.length > 0) {
-      items.push({ kind: 'agent-todo', items: shownTodo });
+      items.push({ kind: 'agent-todo', id: 'agent-todo', items: shownTodo });
     }
     const actLabel = act != null && !stopping ? activityLabel(act) : null;
     const queued =
@@ -1072,6 +1074,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   ) {
     items.push({
       kind: 'agent-todo',
+      id: 'agent-todo',
       items: persistedTodo.map((it) =>
         it.state === 'doing' ? { ...it, state: 'todo' as const } : it,
       ),
@@ -1255,7 +1258,9 @@ function workCall(
   if (name === 'bash') {
     const command = typeof args.command === 'string' ? args.command : '';
     const description =
-      typeof args.description === 'string' ? args.description : (command.split('\n')[0] ?? '');
+      typeof args.description === 'string'
+        ? args.description
+        : (command.replace(CD_PREFIX, '').split('\n')[0] ?? '');
     return {
       ...base,
       action: /^(grep|rg|find|git grep)\b/.test(command.trim()) ? 'search' : 'run',

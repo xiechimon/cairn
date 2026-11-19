@@ -84,11 +84,14 @@ test('a finished run keeps time and cost in the usage popover and offers no take
   await expect(page.getByTestId('thread-usage')).toContainText('$0.21');
 });
 
-test('a failed run opens the failed command with its output', async ({ page }) => {
+test('a failed run stays folded and opens the failed command with its output on click', async ({ page }) => {
   await open(page, 'failed');
-  await expect(page.getByTestId('work-summary').last()).toHaveAttribute('aria-expanded', 'true');
+  const summary = page.getByTestId('work-summary').last();
+  await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  await summary.click();
   const failed = lastSteps(page).last();
-  await expect(failed).toHaveAttribute('aria-expanded', 'true');
+  await expect(failed).toHaveAttribute('aria-expanded', 'false');
+  await failed.click();
   await expect(failed).toContainText('pnpm test:upload');
   await expect(page.getByTestId('tool-output')).toContainText('Tests  1 failed | 30 passed (31)');
   await expect(await menuItem(page, '原始输出')).toBeVisible();

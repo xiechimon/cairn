@@ -510,7 +510,7 @@ export type TranscriptItem =
       text: string;
       id?: string;
     }
-  | { kind: 'agent-todo'; items: AgentTodoItem[] };
+  | { kind: 'agent-todo'; id?: string; items: AgentTodoItem[] };
 
 export interface ReviewFinding {
   id: string;

@@ -204,7 +204,7 @@ test('a run folds its thinking, calls and narration into one block that stays co
   await page.screenshot({ path: testInfo.outputPath('work-trace-current.png') });
 });
 
-test('the last work block auto-expands when it contains a failed call', async ({ page }) => {
+test('a block whose last call failed stays collapsed and its rows open only on click', async ({ page }) => {
   await stubWorld(page, 'stopped', 'failed', [
     msg('user', TASK_PROMPT, 1000),
     msg(
@@ -214,7 +214,7 @@ test('the last work block auto-expands when it contains a failed call', async ({
         call: {
           id: 'fail-last',
           name: 'Bash',
-          arguments: { command: 'pnpm test' },
+          arguments: { command: 'cd /repo && pnpm test' },
           result: 'FAIL 1 test',
           isError: true,
           startedAt: 2000,
@@ -225,7 +225,13 @@ test('the last work block auto-expands when it contains a failed call', async ({
     ),
   ]);
   const summary = page.getByTestId('work-summary').last();
-  await expect(summary).toHaveAttribute('aria-expanded', 'true');
+  await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  await summary.click();
+  const row = page.getByTestId('work-block').last().getByTestId('work-call');
+  await expect(row).toHaveAttribute('aria-expanded', 'false');
+  await expect(row).toContainText('pnpm test');
+  await expect(row).not.toContainText('cd /repo');
+  await row.click();
   await expect(page.getByTestId('work-block').last().getByTestId('tool-output')).toContainText('FAIL 1 test');
 });
 
@@ -252,7 +258,8 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await expect(block.getByTestId('work-call').filter({ hasText: 'docs · lookup' })).toHaveCount(1);
   const failed = block.getByTestId('work-call').filter({ hasText: 'src/other.ts' });
   await expect(failed.getByText('失败')).toBeVisible();
-  await expect(failed).toHaveAttribute('aria-expanded', 'true');
+  await expect(failed).toHaveAttribute('aria-expanded', 'false');
+  await failed.click();
   await expect(block.getByTestId('edit-error')).toHaveText('old_string not found in src/other.ts');
 });
 
@@ -344,6 +351,9 @@ test('returning to the bottom after expanding resumes following', async ({ page 
   if (box == null) throw new Error('work-call not visible');
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(row).toHaveAttribute('aria-expanded', 'true');
+  await expect
+    .poll(() => page.evaluate(() => document.getAnimations().filter((a) => a instanceof CSSTransition).length))
+    .toBe(0);
   await expect.poll(gap).toBeGreaterThan(0);
   await col.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
   await expect.poll(gap).toBeLessThanOrEqual(1);

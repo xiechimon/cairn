@@ -1,6 +1,5 @@
 import type { BuildRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { shouldExpandLastWork } from '../src/detail/work-expansion.js';
 import { type MessageRow, mapTranscript } from '../src/api/mappers.js';
 import { inlineSegments } from '../src/lib/markdown.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';
@@ -276,82 +275,6 @@ describe('task thread hierarchy', () => {
     );
     const fails = render(rows([['system', legacy]])).filter((item) => item.kind === 'fail');
     expect(fails[0]).toMatchObject({ facts: { commits: ['a1cfe71e8', 'b2d4f6a8c'] } });
-  });
-
-  test('a work group made only of setup rows is not expanded by default', () => {
-    const setupOnly = render(
-      rows([
-        ['user', '哪个 pr'],
-        ['system', STRUCTURED_HOOK],
-        ['system', STRUCTURED_CREDENTIAL],
-        ['assistant', [{ type: 'text', text: '还没有 PR。' }]],
-      ]),
-      'failed',
-    ).filter((item) => item.kind === 'work');
-    expect(setupOnly).toHaveLength(1);
-    expect(shouldExpandLastWork(setupOnly)).toBe(false);
-  });
-
-  test('the last work group stays collapsed unless one of its calls failed', () => {
-    const withCall = render(
-      rows([
-        ['system', STRUCTURED_HOOK],
-        [
-          'assistant',
-          {
-            kind: 'toolcall',
-            call: { id: 'c1', name: 'Bash', arguments: { command: 'ls' }, result: 'x', startedAt: 0, endedAt: 100 },
-          },
-        ],
-      ]),
-      'building',
-    ).filter((item) => item.kind === 'work');
-    expect(shouldExpandLastWork(withCall)).toBe(false);
-
-    const withFailedCall = render(
-      rows([
-        ['system', STRUCTURED_HOOK],
-        [
-          'assistant',
-          {
-            kind: 'toolcall',
-            call: {
-              id: 'c2',
-              name: 'Bash',
-              arguments: { command: 'pnpm test' },
-              result: 'exit 1',
-              isError: true,
-              startedAt: 0,
-              endedAt: 100,
-            },
-          },
-        ],
-      ]),
-      'failed',
-    ).filter((item) => item.kind === 'work');
-    expect(shouldExpandLastWork(withFailedCall)).toBe(true);
-
-    const recovered = render(
-      rows([
-        [
-          'assistant',
-          {
-            kind: 'toolcall',
-            call: { id: 'c3', name: 'Bash', arguments: { command: 'pnpm test' }, result: 'exit 1', isError: true, startedAt: 0, endedAt: 100 },
-          },
-        ],
-        [
-          'assistant',
-          {
-            kind: 'toolcall',
-            call: { id: 'c4', name: 'Bash', arguments: { command: 'pnpm test' }, result: 'ok', startedAt: 200, endedAt: 300 },
-          },
-        ],
-      ]),
-      'failed',
-    ).filter((item) => item.kind === 'work');
-    expect(recovered).toHaveLength(1);
-    expect(shouldExpandLastWork(recovered)).toBe(false);
   });
 
   test('a failed build without a failure row still shows its error once', () => {
