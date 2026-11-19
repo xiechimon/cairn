@@ -222,6 +222,7 @@ export const SHARED_SURFACE_ONLY = [
   'color-freeze',
   'fixture-mode-chip',
   'orientation-variants',
+  'shared-controls-a11y',
 ];
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 

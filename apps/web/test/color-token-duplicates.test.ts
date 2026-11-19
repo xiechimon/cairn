@@ -14,7 +14,7 @@ const DISTINCT_ROLES_SHARING_A_VALUE = [
   ['--accent', '--muted', '--secondary'],
   ['--muted-foreground', '--text-secondary'],
   ['--running-track', '--surface-tertiary'],
-  ['--page-preview', '--qr-light', '--switch-thumb', '--text-on-veil'],
+  ['--page-preview', '--qr-light', '--text-on-veil'],
 ].map((group) => group.join(' '));
 
 function hexTokens(block: string): Map<string, string> {

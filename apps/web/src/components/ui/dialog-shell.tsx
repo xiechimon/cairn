@@ -39,14 +39,14 @@ export const DIALOG_HEAD_CLS = 'flex items-start gap-3 pt-4 pr-13 pb-1 pl-4';
 export const DIALOG_TITLE_CLS =
   'font-heading text-heading leading-[1.4] font-semibold text-foreground';
 
-export const DIALOG_SUBTITLE_CLS = 'mt-0.5 text-meta text-content-tertiary';
+export const DIALOG_SUBTITLE_CLS = 'mt-1 text-meta text-content-tertiary';
 
 export const DIALOG_CLOSE_CLS =
   'absolute top-4 right-4 text-content-tertiary hover:text-foreground pointer-coarse:top-2 pointer-coarse:right-2 pointer-coarse:size-11';
 
-export const DIALOG_BODY_CLS = 'min-h-0 overflow-y-auto px-4 pt-3 pb-4';
+export const DIALOG_BODY_CLS = 'min-h-0 overflow-y-auto px-4 pt-4 pb-4';
 
-export const DIALOG_FOOT_CLS = 'flex items-center gap-3 px-4 pt-3 pb-4';
+export const DIALOG_FOOT_CLS = 'flex items-center gap-3 px-4 pt-4 pb-4';
 
 export const DIALOG_HINT_CLS =
   'flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary [&_svg]:size-3 [&_svg]:flex-none';
@@ -60,10 +60,10 @@ export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?:
   );
 }
 
-export const DIALOG_PRIMARY_BUTTON = 'rounded-md text-ui';
+export const DIALOG_PRIMARY_BUTTON = 'rounded-md text-ui pointer-coarse:h-11';
 
 export const DIALOG_TEXT_BUTTON =
-  'gap-1.5 rounded-md bg-secondary px-3 text-ui font-normal text-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] disabled:text-content-tertiary disabled:opacity-100 dark:hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]';
+  'gap-1.5 rounded-md bg-secondary px-3 text-ui font-normal text-foreground pointer-coarse:h-11 hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] disabled:text-content-tertiary disabled:opacity-100 dark:hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]';
 
 export const PICKER_ROW_SELECTED =
   'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';
