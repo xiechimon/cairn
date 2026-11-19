@@ -1,6 +1,6 @@
 ---
 name: design-cairn
-description: Use when a task, brief or PR touches apps/web/src (new screen, UI fix, copy, layout, state handling). Carries the cairn UI brief template (references, component x state list, compare-to-reference acceptance), the draft-first rule for the five main surfaces and the seed-missing-states rule. Use together with the global design skill.
+description: Use when a task or brief touches apps/web/src (new screen, UI fix, copy, layout, state handling). Carries the cairn UI brief template (references, component x state list, compare-to-reference acceptance), the draft-first rule for the five main surfaces and the seed-missing-states rule. Use together with the global design skill.
 ---
 
 # design-cairn: UI work in cairn
@@ -13,6 +13,10 @@ Read `apps/web/DESIGN-RULES.md` first (rules with ids), then `apps/web/DESIGN.md
 | Settings | Amp and t3code |
 | Thread progress, review and diff | t3code and Amp |
 | First run and connection state | Amp |
+
+## Order of work
+
+The owner's order for UI work (mon X 2026-11-19): 1. the owner says the idea; 2. a prototype the owner opens and judges (a replayable visual; no recording needed at this step); 3. implement; 4. show the real result, as a recording when it moves or a screenshot when it does not; 5. land through `queue/main`. Do not push before step 4 when the owner asked to see it.
 
 ## Draft first
 
@@ -36,10 +40,10 @@ References (open before coding; paths in the repo):
 
 Draft: <link to the sketch or mock the owner picked, or "exempt: backend-only / single setting">
 
-Component x state list (every cell is produced and screenshotted):
-| Component | empty | loading | error | offline | long content | pending question | 390px | dark |
-|---|---|---|---|---|---|---|---|---|
-| <component> | <how produced: live / seeded / fixture> | ... | | | | | | |
+Component x state list (every cell is produced and screenshotted; the transition cell is recorded, DESIGN-RULES P3):
+| Component | empty | loading | error | offline | long content | pending question | 390px | dark | transition |
+|---|---|---|---|---|---|---|---|---|---|
+| <component> | <how produced: live / seeded / fixture> | ... | | | | | | | <recording: appear, update, settle, reopened> |
 Seed any state the stack cannot reach on its own (verify-cairn seeds or fixtures). Mark fixture cells as fixture. Do not mark a cell "n/a" without a reason.
 
 Acceptance (done means all of these):
@@ -52,10 +56,10 @@ Acceptance (done means all of these):
 
 ## Seed missing states
 
-A state nobody has seen is not done. For every cell of the list that the live stack cannot produce (pending question, offline machine, quota, long content, error), seed it: write a fixture scenario or seed data, then screenshot it and label it fixture in the coverage table. Report the cells you could not produce as `Not covered` in the PR, with the reason. The coverage table is part of Proof.
+A state nobody has seen is not done. For every cell of the list that the live stack cannot produce (pending question, offline machine, quota, long content, error), seed it: write a fixture scenario or seed data, then screenshot it and label it fixture in the coverage table. Report the cells you could not produce as `Not covered` in the wrap-up, with the reason. The coverage table is part of the evidence.
 
 ## After the build
 
-Put the reference-versus-ours rows in the PR Proof (see `.claude/skills/pr-cairn/SKILL.md`, "UI reference comparison") and capture with `.claude/skills/verify-cairn/SKILL.md` ("UI reference comparison").
+Put the reference-versus-ours rows and the transition recordings in the wrap-up shown to the owner, and capture with `.claude/skills/verify-cairn/SKILL.md` ("UI reference comparison"). There are no pull requests; work lands through `queue/main` (AGENTS.md, Ship).
 
 When a new reference is needed, operate the product (use the `walk` skill), save real screenshots under `docs/design/references/<surface>/`, remove personal data, and add rows to the references README. Do not send messages or start runs on the owner's accounts without asking.

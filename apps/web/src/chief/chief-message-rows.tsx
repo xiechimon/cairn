@@ -452,6 +452,23 @@ function MacActivityRow({ item }: { item: Extract<ChiefStreamItem, { kind: 'mac-
 
 const LIVE_TURN_KEY = 'live-turn';
 
+export function chiefStreamRowKeys(
+  rows: readonly { item: ChiefStreamItem | ChannelMirror; i: number }[],
+): (string | number)[] {
+  let turn: string | number | null = null;
+  let slot = 0;
+  return rows.map(({ item, i }) => {
+    const key = chiefStreamRowKey(item, i);
+    if (item.kind === 'user') {
+      turn = key;
+      slot = 0;
+      return key;
+    }
+    if (turn === null || (item.kind !== 'robot' && item.kind !== 'streaming')) return key;
+    return `${turn}:reply-${slot++}`;
+  });
+}
+
 export function chiefStreamRowKey(
   item: ChiefStreamItem | ChannelMirror,
   index: number,
