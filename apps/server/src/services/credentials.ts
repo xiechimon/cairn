@@ -129,8 +129,10 @@ export function resolveStepCredentials(
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;
-  const providerId = stepRow.fallback?.model?.provider ?? agentRow?.provider ?? null;
-  const modelId = stepRow.fallback?.model?.modelId ?? agentRow?.modelId ?? null;
+  const providerId =
+    stepRow.fallback?.model?.provider ?? stepRow.ranModel?.provider ?? agentRow?.provider ?? null;
+  const modelId =
+    stepRow.fallback?.model?.modelId ?? stepRow.ranModel?.modelId ?? agentRow?.modelId ?? null;
   if (agentRow && providerId) {
     const opened = openProviderKey(boxDeps, todoRow.teamId, providerId);
     if (opened) {
@@ -161,19 +163,19 @@ export function resolveStepCredentials(
     claudeSubscriptionToken: openClaudeSubscription(
       deps,
       todoRow.teamId,
-      stepRow.fallback?.model?.provider ?? agentRow?.provider,
+      stepRow.fallback?.model?.provider ?? stepRow.ranModel?.provider ?? agentRow?.provider,
       stepRow.claudeSubscriptionId,
     ),
     devinToken: openDevinSubscription(
       deps,
       todoRow.teamId,
-      stepRow.fallback?.model?.provider ?? agentRow?.provider,
+      stepRow.fallback?.model?.provider ?? stepRow.ranModel?.provider ?? agentRow?.provider,
       stepRow.devinSubscriptionId,
     ),
     antigravityToken: openAntigravitySubscription(
       deps,
       todoRow.teamId,
-      stepRow.fallback?.model?.provider ?? agentRow?.provider,
+      stepRow.fallback?.model?.provider ?? stepRow.ranModel?.provider ?? agentRow?.provider,
       stepRow.antigravitySubscriptionId,
     ),
   };
@@ -188,7 +190,7 @@ export interface ChiefBoundSubscriptions {
 export function resolveChiefStepCredentials(
   deps: CredentialsDeps,
   threadId: string,
-  providerId?: string | null,
+  model?: { provider: string; modelId: string } | null,
   boundSubscriptionId?: string | null | ChiefBoundSubscriptions,
 ): StepCredentialBundle {
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
@@ -198,7 +200,7 @@ export function resolveChiefStepCredentials(
   const agentRow = coordinatorProfile(deps.db, threadRow.teamId, threadRow.projectId);
   if (!agentRow) throw notFound(`coordinator routing rule for ${threadId}`);
 
-  const effectiveProvider = providerId === undefined ? agentRow.provider : providerId;
+  const effectiveProvider = model === undefined ? agentRow.provider : model?.provider;
   const boundClaudeId =
     typeof boundSubscriptionId === 'object' && boundSubscriptionId !== null
       ? boundSubscriptionId.claudeSubscriptionId
@@ -226,7 +228,7 @@ export function resolveChiefStepCredentials(
         compat: opened.row.compat,
         apiKey: opened.apiKey,
         models: opened.row.models,
-        modelId: agentRow.modelId,
+        modelId: model?.modelId ?? agentRow.modelId,
       };
     }
   }

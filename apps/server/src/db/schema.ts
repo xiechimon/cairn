@@ -291,6 +291,10 @@ export interface StepFallbackRow {
   zeroUsageRetried: boolean;
 }
 
+export interface StepRanModel extends ModelRef {
+  thinkingLevel?: string | null;
+}
+
 export const step = sqliteTable(
   'step',
   {
@@ -305,6 +309,7 @@ export const step = sqliteTable(
     archiveStop: text('archiveStop').$type<'requested' | 'acknowledged' | null>(),
     quotaBlock: json<QuotaWaitRow>('quotaBlock'),
     fallback: json<StepFallbackRow>('fallback'),
+    ranModel: json<StepRanModel>('ranModel'),
     sessionId: text('sessionId'),
     scheduleId: text('scheduleId'),
     scheduledBy: text('scheduledBy'),

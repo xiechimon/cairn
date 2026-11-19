@@ -84,7 +84,7 @@ export async function stepToken(
     deps,
     todoRow?.teamId,
     bundle.provider,
-    stepRow?.fallback?.model?.provider ?? agentRow?.provider,
+    stepRow?.fallback?.model?.provider ?? stepRow?.ranModel?.provider ?? agentRow?.provider,
   );
   return {
     commitIdentity: softwareCommitIdentity(deps),
@@ -265,7 +265,7 @@ async function chiefStepToken(
   const bundle = resolveChiefStepCredentials(
     { db: deps.db, box: deps.box },
     threadId,
-    stepRow?.fallback?.model?.provider,
+    stepRow === undefined ? undefined : (stepRow.fallback?.model ?? stepRow.ranModel ?? undefined),
     {
       claudeSubscriptionId: stepRow?.claudeSubscriptionId ?? null,
       devinSubscriptionId: stepRow?.devinSubscriptionId ?? null,
@@ -281,7 +281,7 @@ async function chiefStepToken(
       deps,
       threadRow?.teamId,
       bundle.provider,
-      stepRow?.fallback?.model?.provider ?? agentRow?.provider,
+      stepRow?.fallback?.model?.provider ?? stepRow?.ranModel?.provider ?? agentRow?.provider,
     ),
     secrets: bundle.secrets,
     ...(claimed && bundle.claudeSubscriptionToken !== undefined

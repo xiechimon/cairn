@@ -40,15 +40,17 @@ function heldBatch() {
 test('native batch ownership blocks both claim platforms even if its hold tag is lost', () => {
   const b = heldBatch();
   H.s.db.update(step).set({ holdReason: null }).where(eq(step.id, b.id)).run();
-  expect(claimPendingChiefStep(H.s.db, row(b.id), null)).toBeNull();
-  expect(claimPendingChiefStep(H.s.db, row(b.id), 'daemon')).toBeNull();
+  expect(claimPendingChiefStep(H.s.db, row(b.id), { machineId: null })).toBeNull();
+  expect(claimPendingChiefStep(H.s.db, row(b.id), { machineId: null, bind: 'daemon' })).toBeNull();
 });
 
 test('legacy holds without a native batch keep their existing claim behavior', () => {
   const b = heldBatch();
   const legacy = { ...row(b.id), id: 'legacy-held' };
   H.s.db.insert(step).values(legacy).run();
-  expect(claimPendingChiefStep(H.s.db, row(legacy.id), 'daemon')).toMatchObject({
+  expect(
+    claimPendingChiefStep(H.s.db, row(legacy.id), { machineId: null, bind: 'daemon' }),
+  ).toMatchObject({
     id: 'legacy-held',
     status: 'claimed',
   });

@@ -75,11 +75,17 @@ function waitingByMachine(db: Db): Map<string, Map<string, PendingRow>> {
 }
 
 function sessionStarted(db: Db, row: PendingRow): boolean {
-  const prior = priorSessionOf(db, row.stepRow, row.buildRow, {
-    claude: enabledSubscriptionId({ db }, row.todoRow.teamId),
-    devin: enabledDevinSubscriptionId({ db }, row.todoRow.teamId),
-    antigravity: enabledAntigravitySubscriptionId({ db }, row.todoRow.teamId),
-  });
+  const prior = priorSessionOf(
+    db,
+    row.stepRow,
+    row.buildRow,
+    {
+      claude: enabledSubscriptionId({ db }, row.todoRow.teamId),
+      devin: enabledDevinSubscriptionId({ db }, row.todoRow.teamId),
+      antigravity: enabledAntigravitySubscriptionId({ db }, row.todoRow.teamId),
+    },
+    profileForStep(db, row.todoRow, row.stepRow.kind, row.stepRow.id)?.provider ?? null,
+  );
   return !prior.freshSession && prior.priorSessionId !== null;
 }
 

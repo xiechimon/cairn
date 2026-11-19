@@ -61,6 +61,19 @@ export function effectiveModel(
   return stepRow.fallback?.model ?? { provider: agentRow.provider, modelId: agentRow.modelId };
 }
 
+export function ranModel(
+  agentRow: Pick<AgentRow, 'provider' | 'modelId'> | null | undefined,
+  stepRow: Pick<StepRow, 'ranModel' | 'fallback'>,
+): { provider: string | null; modelId: string | null } {
+  return (
+    stepRow.ranModel ??
+    stepRow.fallback?.model ?? {
+      provider: agentRow?.provider ?? null,
+      modelId: agentRow?.modelId ?? null,
+    }
+  );
+}
+
 export function fallbackTriggerOf(outcome: MachineDoneBody): FallbackTrigger | null {
   if (outcome.status !== 'failed') return null;
   if (outcome.quotaBlock !== undefined) {
@@ -136,7 +149,7 @@ export function planModelFallback(
     .all();
   if (hosts.length === 0) return null;
   const primary: ModelRef = { provider: agentRow.provider, modelId: agentRow.modelId };
-  const from = stepRow.fallback?.model ?? primary;
+  const from = stepRow.ranModel ?? stepRow.fallback?.model ?? primary;
   const tried = new Set(stepRow.fallback?.tried ?? [modelKey(primary)]);
   tried.add(modelKey(from));
   const to = chain.find(

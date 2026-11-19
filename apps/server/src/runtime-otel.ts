@@ -200,7 +200,7 @@ export function emitRuntimeStepSpan(
     !isTurn && row.machineId !== null
       ? db.select({ name: machine.name }).from(machine).where(eq(machine.id, row.machineId)).get()
       : undefined;
-  const model = isTurn ? undefined : row.fallback?.model;
+  const model = isTurn ? undefined : (row.ranModel ?? row.fallback?.model);
   const errorMessage =
     row.status === 'failed'
       ? (stepFailureReason(db, row) ?? otelErrorMessage(buildRow?.errorMessage))

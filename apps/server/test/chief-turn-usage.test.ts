@@ -183,7 +183,7 @@ describe('chief turns record their own usage per step', () => {
     const pending = H.s.db.select().from(stepTable).where(eq(stepTable.id, 'turn-quota')).get();
     expect(pending?.status).toBe('pending');
     expect(
-      claimPendingChiefStep(H.s.db, pending as NonNullable<typeof pending>, machineId)?.status,
+      claimPendingChiefStep(H.s.db, pending as NonNullable<typeof pending>, { machineId })?.status,
     ).toBe('claimed');
     const retryAt = Date.now();
     await finishStep(deps(), machineId, 'turn-quota', {

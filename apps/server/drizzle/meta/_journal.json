@@ -1562,6 +1562,20 @@
       "when": 1795106915515,
       "tag": "0227_lively_landau",
       "breakpoints": true
+    },
+    {
+      "idx": 228,
+      "version": "7",
+      "when": 1795138000000,
+      "tag": "0228_fresh_mandrill",
+      "breakpoints": true
+    },
+    {
+      "idx": 229,
+      "version": "7",
+      "when": 1795138100000,
+      "tag": "0229_odd_roughhouse",
+      "breakpoints": true
     }
   ]
 }

@@ -34,7 +34,7 @@ import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
 import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
 import { coordinatorToolDefs } from '../services/coordinator-tool-defs.js';
 import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
-import { serverTakesTurn } from '../services/machine-claim.js';
+import { serverTurnModel } from '../services/machine-claim.js';
 import { teamOffersDesktop } from '../services/machine-computer.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
 import { ownComputerOffered } from '../services/own-computer.js';
@@ -392,9 +392,10 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     if (STEER_HOLDS.includes(head.holdReason ?? '')) return null;
     if (head.holdUntil !== null && head.holdUntil > nowMs()) return null;
     const teamId = threadTeam(threadId);
-    if (teamId === null || !serverTakesTurn(db, teamId, head)) return null;
+    const model = teamId === null ? null : serverTurnModel(db, teamId, head);
+    if (model === null) return null;
     if (hasEarlierLiveChiefStep(db, head)) return null;
-    const claimed = claimPendingChiefStep(db, head, null);
+    const claimed = claimPendingChiefStep(db, head, { machineId: null, model });
     if (claimed === null) return null;
     freshClaims.add(head.id);
     publishStepStatus(machine, head.id);
@@ -592,6 +593,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       { db, box: machine.box },
       teamId,
       threadProject(row.buildId),
+      row.ranModel ?? row.fallback?.model ?? null,
     );
     const keyed = [providers?.router.provider, providers?.summary.provider].filter(
       (id): id is string => id !== undefined,

@@ -80,6 +80,7 @@ export function priorSessionOf(
     devin: string | null;
     antigravity?: string | null;
   },
+  intentProvider: string | null = null,
 ): {
   priorSessionId: string | null;
   priorMachineId: string | null;
@@ -91,6 +92,7 @@ export function priorSessionOf(
       sessionId: step.sessionId,
       machineId: step.machineId,
       fallback: step.fallback,
+      ranModel: step.ranModel,
       subscriptionId: step.claudeSubscriptionId,
       devinSubscriptionId: step.devinSubscriptionId,
       antigravitySubscriptionId: step.antigravitySubscriptionId,
@@ -111,9 +113,13 @@ export function priorSessionOf(
     .orderBy(asc(step.createdAt))
     .all();
   const latestPrior = prior[prior.length - 1] ?? null;
+  const priorProvider =
+    latestPrior?.ranModel?.provider ?? latestPrior?.fallback?.model?.provider ?? null;
   const priorRow =
     latestPrior !== null &&
-    (latestPrior.fallback?.model?.provider ?? null) === (stepRow.fallback?.model?.provider ?? null)
+    (priorProvider === null
+      ? stepRow.fallback?.model == null
+      : priorProvider === (stepRow.fallback?.model?.provider ?? intentProvider))
       ? latestPrior
       : null;
   const planHandoffMissing =

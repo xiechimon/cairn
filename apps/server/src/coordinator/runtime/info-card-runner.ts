@@ -115,6 +115,7 @@ export function startInfoCardRunner(options: InfoCardRunnerOptions): InfoCardRun
           lastHeartbeatAt: claimedAt,
           holdReason: null,
           holdUntil: null,
+          ranModel: { provider: plan.provider, modelId: plan.modelId },
         })
         .where(and(eq(step.id, stepRow.id), eq(step.status, 'pending')))
         .run();

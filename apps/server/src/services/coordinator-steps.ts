@@ -17,6 +17,7 @@ import {
   coordinatorInput,
   devinSubscription,
   provider,
+  type StepRanModel,
   step,
   stepUsage,
   tokenUsage,
@@ -46,6 +47,7 @@ import {
 import { injectMemoryDocuments } from './memory.js';
 import { settleMemoryEditTurn } from './memory-edit-turns.js';
 import { recallMemorySection } from './memory-recall.js';
+import { ranModel } from './model-fallback.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContextTraced } from './project-instructions.js';
 import { coordinatorProfile } from './routing-rules.js';
@@ -64,20 +66,23 @@ export interface ChiefSubscriptionBind {
 export function claimPendingChiefStep(
   db: MachineDeps['db'],
   stepRow: StepRow,
-  machineId: string | null,
-  bindSubscription: ChiefSubscriptionBind | string | null = null,
+  options: {
+    machineId: string | null;
+    bind?: ChiefSubscriptionBind | string | null;
+    model?: StepRanModel | null;
+  },
 ): StepRow | null {
   const bind =
-    typeof bindSubscription === 'string'
-      ? { runtime: 'claude-code' as const, teamId: bindSubscription }
-      : bindSubscription;
+    typeof options.bind === 'string'
+      ? { runtime: 'claude-code' as const, teamId: options.bind }
+      : (options.bind ?? null);
   const claimedAt = nowMs();
   const claimed = db.transaction(() => {
     const res = db
       .update(step)
       .set({
         status: 'claimed',
-        machineId,
+        machineId: options.machineId,
         claudeSubscriptionId:
           bind?.runtime === 'claude-code'
             ? sql<
@@ -100,6 +105,7 @@ export function claimPendingChiefStep(
         lastHeartbeatAt: claimedAt,
         holdReason: null,
         holdUntil: null,
+        ranModel: options.model ?? null,
       })
       .where(
         and(
@@ -381,25 +387,21 @@ function turnErrorFacts(deps: MachineDeps, stepRow: StepRow) {
       .where(eq(chiefThread.id, stepRow.buildId))
       .get()?.projectId ?? null;
   const profile = coordinatorProfile(deps.db, teamId, projectId);
-  const ran = stepRow.fallback?.model ?? {
-    provider: profile?.provider ?? null,
-    modelId: profile?.modelId ?? null,
-  };
-  if (ran.provider == null) return elapsed;
+  const ran = ranModel(profile, stepRow);
+  if (ran.provider === null) return elapsed;
   const row = deps.db
     .select({ id: provider.id, label: provider.label, models: provider.models })
     .from(provider)
     .where(and(eq(provider.teamId, teamId), eq(provider.providerId, ran.provider)))
     .get();
-  if (row === undefined) return elapsed;
   const modelId = ran.modelId ?? null;
   return {
     ...elapsed,
-    providerId: row.id,
-    provider: row.label,
+    ...(row === undefined ? {} : { providerId: row.id }),
+    provider: row?.label ?? ran.provider,
     ...(modelId === null
       ? {}
-      : { model: row.models.find((m) => m.id === modelId)?.name || modelId }),
+      : { model: row?.models.find((m) => m.id === modelId)?.name || modelId }),
   };
 }
 

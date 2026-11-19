@@ -53,10 +53,21 @@ export function coordinatorProviders(
   deps: CredentialDeps,
   teamId: string,
   projectId: string | null = null,
+  stepModel: { provider: string; modelId: string; thinkingLevel?: string | null } | null = null,
 ): CoordinatorProviders | null {
   const rule = coordinatorRoute(deps.db, teamId, projectId);
-  if (rule === null) return null;
-  const router = routeOf(deps, teamId, rule.provider, rule.modelId, rule.thinkingLevel ?? null);
+  const router =
+    stepModel !== null
+      ? routeOf(
+          deps,
+          teamId,
+          stepModel.provider,
+          stepModel.modelId,
+          stepModel.thinkingLevel ?? null,
+        )
+      : rule === null
+        ? null
+        : routeOf(deps, teamId, rule.provider, rule.modelId, rule.thinkingLevel ?? null);
   if (router === null) return null;
   const storedCompaction = deps.db
     .select()

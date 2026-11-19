@@ -34,7 +34,7 @@ import {
   routeTargets,
   teamDefaultMachineId,
 } from './machine-routing.js';
-import { effectiveModel } from './model-fallback.js';
+import { ranModel } from './model-fallback.js';
 import { notifyQuotaWait } from './notifications.js';
 import { publishStepRow } from './quota-wait.js';
 import { coordinatorProfile, profileForStep, type RouteProfile } from './routing-rules.js';
@@ -45,9 +45,9 @@ type AgentRow = RouteProfile;
 
 function usesClaudeCode(
   agentRow: Pick<AgentRow, 'provider' | 'modelId'>,
-  stepRow: Pick<StepRow, 'fallback'>,
+  stepRow: Pick<StepRow, 'ranModel' | 'fallback'>,
 ): boolean {
-  return stepRuntimeFor(effectiveModel(agentRow, stepRow).provider) === 'claude-code';
+  return stepRuntimeFor(ranModel(agentRow, stepRow).provider) === 'claude-code';
 }
 
 function claudeQuotaRow(
@@ -138,11 +138,17 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
             priorSubscriptionId: null,
             freshSession: true,
           }
-        : priorSessionOf(deps.db, stepRow, buildRow, {
-            claude: enabledId,
-            devin: enabledDevinId,
-            antigravity: enabledAntigravityId,
-          });
+        : priorSessionOf(
+            deps.db,
+            stepRow,
+            buildRow,
+            {
+              claude: enabledId,
+              devin: enabledDevinId,
+              antigravity: enabledAntigravityId,
+            },
+            agentRow.provider,
+          );
     const sessionId =
       !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null;
     const namedId = routeTargets(sessionId, agentRow.machineId)[0]?.machineId ?? null;

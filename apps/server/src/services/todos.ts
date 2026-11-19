@@ -455,11 +455,17 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
             priorSubscriptionId: null,
             freshSession: true,
           }
-        : priorSessionOf(deps.db, s, buildRow, {
-            claude: enabledSubscriptionId(deps, row.teamId),
-            devin: enabledDevinSubscriptionId(deps, row.teamId),
-            antigravity: enabledAntigravitySubscriptionId(deps, row.teamId),
-          });
+        : priorSessionOf(
+            deps.db,
+            s,
+            buildRow,
+            {
+              claude: enabledSubscriptionId(deps, row.teamId),
+              devin: enabledDevinSubscriptionId(deps, row.teamId),
+              antigravity: enabledAntigravitySubscriptionId(deps, row.teamId),
+            },
+            agentRow.provider,
+          );
     const named =
       !prior.freshSession && prior.priorSessionId !== null
         ? prior.priorMachineId

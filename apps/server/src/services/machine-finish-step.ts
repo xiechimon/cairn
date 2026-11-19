@@ -85,10 +85,10 @@ import {
   mergeCardLeftReview,
 } from './machine-merge-landing.js';
 import {
-  effectiveModel,
   isZeroUsageSilentSuccess,
   modelKey,
   planModelFallback,
+  ranModel,
   recordProviderOutcome,
   ZERO_USAGE_FAILURE,
   ZERO_USAGE_RETRY_NOTE,
@@ -468,7 +468,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     if (worker?.agentRow)
       recordProviderOutcome(
         stepTeamId(deps, stepRow),
-        effectiveModel(worker.agentRow, stepRow).provider,
+        ranModel(worker.agentRow, stepRow).provider,
         outcome,
         false,
       );
@@ -483,7 +483,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     if (worker.agentRow)
       recordProviderOutcome(
         stepTeamId(deps, stepRow),
-        effectiveModel(worker.agentRow, stepRow).provider,
+        ranModel(worker.agentRow, stepRow).provider,
         outcome,
         isZeroUsageSilentSuccess(stepRow.kind, outcome),
       );
@@ -497,7 +497,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   if (worker?.agentRow) {
     recordProviderOutcome(
       stepTeamId(deps, stepRow),
-      effectiveModel(worker.agentRow, stepRow).provider,
+      ranModel(worker.agentRow, stepRow).provider,
       outcome,
       zeroUsage,
     );
@@ -507,35 +507,18 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     releaseUnconsumedSteer(db, stepRow);
     recordProviderOutcome(
       stepTeamId(deps, stepRow),
-      effectiveModel(chiefAgent, stepRow).provider,
+      ranModel(chiefAgent, stepRow).provider,
       outcome,
       false,
     );
-    const plan = planModelFallback(db, stepRow, chiefAgent, outcome);
-    if (plan !== null) {
-      if (plan.trigger === 'model_unavailable') {
-        const teamId = stepTeamId(deps, stepRow);
-        if (teamId !== null) markModelDead(teamId, plan.from.provider, plan.from.modelId);
-      }
-      const content: ChiefModelFallbackContent = {
-        kind: CHIEF_MODEL_FALLBACK_KIND,
-        from: modelKey(plan.from),
-        to: modelKey(plan.to),
-        stepId: stepRow.id,
-      };
-      requeueStep(deps, stepRow, plan.row, {
-        id: `chief-fallback-${stepRow.id}-${plan.row.tried.length}`,
-        content: JSON.stringify(content),
-      });
-      return;
-    }
   }
+  if (requeueChiefStepOnFallback(deps, stepRow, chiefAgent, outcome)) return;
   if (
     worker !== null &&
     outcome.status === 'failed' &&
     classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable'
   ) {
-    const ran = worker.agentRow ? effectiveModel(worker.agentRow, stepRow) : null;
+    const ran = worker.agentRow ? ranModel(worker.agentRow, stepRow) : null;
     if (ran?.provider && ran.modelId) {
       const teamId = stepTeamId(deps, stepRow);
       if (teamId !== null) markModelDead(teamId, ran.provider, ran.modelId);
@@ -580,7 +563,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     classifyStepFailure(outcome.errorMessage ?? '') === 'capacity'
   ) {
     const ranAgent = worker?.agentRow ?? chiefAgent;
-    const ran = ranAgent ? effectiveModel(ranAgent, stepRow) : null;
+    const ran = ranAgent ? ranModel(ranAgent, stepRow) : null;
     applyQuotaWaitStep(deps, stepRow, {
       kind: 'capacity',
       providerId: ran?.provider ?? '',
@@ -593,7 +576,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable'
   ) {
     const ranAgent = worker?.agentRow ?? chiefAgent;
-    const ran = ranAgent ? effectiveModel(ranAgent, stepRow) : { provider: null, modelId: null };
+    const ran = ranAgent ? ranModel(ranAgent, stepRow) : { provider: null, modelId: null };
     if (ran.provider && ran.modelId) {
       const teamId = stepTeamId(deps, stepRow);
       if (teamId !== null) markModelDead(teamId, ran.provider, ran.modelId);
@@ -757,7 +740,36 @@ function requeueStep(
   publishStepStatus(deps, stepRow.id);
 }
 
-function chiefStepAgent(deps: MachineDeps, stepRow: typeof step.$inferSelect): RouteProfile | null {
+export function requeueChiefStepOnFallback(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+  agentRow: RouteProfile | null,
+  outcome: MachineDoneBody,
+): boolean {
+  if (agentRow === null) return false;
+  const plan = planModelFallback(deps.db, stepRow, agentRow, outcome);
+  if (plan === null) return false;
+  if (plan.trigger === 'model_unavailable') {
+    const teamId = stepTeamId(deps, stepRow);
+    if (teamId !== null) markModelDead(teamId, plan.from.provider, plan.from.modelId);
+  }
+  const content: ChiefModelFallbackContent = {
+    kind: CHIEF_MODEL_FALLBACK_KIND,
+    from: modelKey(plan.from),
+    to: modelKey(plan.to),
+    stepId: stepRow.id,
+  };
+  requeueStep(deps, stepRow, plan.row, {
+    id: `chief-fallback-${stepRow.id}-${plan.row.tried.length}`,
+    content: JSON.stringify(content),
+  });
+  return true;
+}
+
+export function chiefStepAgent(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+): RouteProfile | null {
   if (stepRow.kind !== 'chief' || !isChiefConversation(stepRow.buildId)) return null;
   const thread = deps.db
     .select({ teamId: chiefThread.teamId, projectId: chiefThread.projectId })

@@ -35,6 +35,7 @@ import {
   chiefThread,
   machine,
   routingRule,
+  type StepRanModel,
   skillAudit,
   step,
   todo,
@@ -187,16 +188,35 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     .filter((row) => !serverTakesTurn(deps.db, teamId, row.stepRow));
 }
 
+export function serverTurnModel(
+  db: MachineDeps['db'],
+  teamId: string,
+  stepRow: typeof step.$inferSelect,
+): StepRanModel | null {
+  if (!coordinatorInServerEnabled() || stepRow.kind !== 'chief') return null;
+  const route = coordinatorRoute(db, teamId, chiefThreadProject(db, stepRow.buildId));
+  const pin = stepRow.fallback?.model ?? null;
+  const model = pin ?? route;
+  if (
+    model === null ||
+    model.provider === null ||
+    model.modelId === null ||
+    stepRuntimeFor(model.provider) !== 'pi'
+  )
+    return null;
+  return {
+    provider: model.provider,
+    modelId: model.modelId,
+    thinkingLevel: pin === null ? (route?.thinkingLevel ?? null) : null,
+  };
+}
+
 export function serverTakesTurn(
   db: MachineDeps['db'],
   teamId: string,
   stepRow: typeof step.$inferSelect,
 ): boolean {
-  return (
-    coordinatorInServerEnabled() &&
-    stepRow.kind === 'chief' &&
-    coordinatorRoute(db, teamId, chiefThreadProject(db, stepRow.buildId)) !== null
-  );
+  return serverTurnModel(db, teamId, stepRow) !== null;
 }
 
 function chiefThreadProject(db: MachineDeps['db'], threadId: string): string | null {
@@ -286,7 +306,18 @@ function buildChiefClaim(
     runtime === 'claude-code' || runtime === 'devin' || runtime === 'antigravity'
       ? { runtime, teamId: threadRow.teamId }
       : null;
-  const claimed = claimPendingChiefStep(deps.db, stepRow, machineId, bindSubscription);
+  const claimed = claimPendingChiefStep(deps.db, stepRow, {
+    machineId,
+    bind: bindSubscription,
+    model:
+      model.provider === null || model.modelId === null
+        ? null
+        : {
+            provider: model.provider,
+            modelId: model.modelId,
+            thinkingLevel: stepRow.fallback?.model ? null : agentRow.thinkingLevel,
+          },
+  });
   if (claimed === null) return null;
   return chiefClaimPayload(deps, machineId, claimed, threadRow, agentRow, machineRow);
 }
@@ -442,7 +473,7 @@ function claimChiefTurn(
     ) {
       continue;
     }
-    const chiefRuntime = stepRuntimeFor(cand.agentRow.provider);
+    const chiefRuntime = stepRuntimeFor(effectiveModel(cand.agentRow, cand.stepRow).provider);
     if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
     const sole = fallbackMachineId(
       db
@@ -535,6 +566,10 @@ async function tryClaim(
     }
     if (!agentRow.modelId) continue;
     const model = effectiveModel(agentRow, cand.stepRow);
+    const pinnedModel =
+      model.provider !== null && model.modelId !== null
+        ? { provider: model.provider, modelId: model.modelId }
+        : null;
     const now = nowMs();
     const facts: WorkerStepFacts = {
       agentRow,
@@ -558,11 +593,17 @@ async function tryClaim(
     const enabledId = enabledSubscriptionId({ db }, teamId);
     const enabledDevinId = enabledDevinSubscriptionId({ db }, teamId);
     const enabledAntigravityId = enabledAntigravitySubscriptionId({ db }, teamId);
-    const prior = priorSessionOf(db, cand.stepRow, cand.buildRow, {
-      claude: enabledId,
-      devin: enabledDevinId,
-      antigravity: enabledAntigravityId,
-    });
+    const prior = priorSessionOf(
+      db,
+      cand.stepRow,
+      cand.buildRow,
+      {
+        claude: enabledId,
+        devin: enabledDevinId,
+        antigravity: enabledAntigravityId,
+      },
+      model.provider,
+    );
     const { priorSessionId, priorMachineId, freshSession } = prior;
     if (claimRuntimeIsClaudeCode && accountHeld(cand.stepRow, prior, enabledId)) continue;
     const sessionOnOtherMachine =
@@ -610,11 +651,17 @@ async function tryClaim(
         const boundAntigravityId = enabledAntigravitySubscriptionId({ db: tx }, teamId);
         if (claimRuntimeIsClaudeCode) {
           if (boundId !== enabledId) return false;
-          const fresh = priorSessionOf(tx, cand.stepRow, cand.buildRow, {
-            claude: boundId,
-            devin: boundDevinId,
-            antigravity: boundAntigravityId,
-          });
+          const fresh = priorSessionOf(
+            tx,
+            cand.stepRow,
+            cand.buildRow,
+            {
+              claude: boundId,
+              devin: boundDevinId,
+              antigravity: boundAntigravityId,
+            },
+            model.provider,
+          );
           if (accountHeld(cand.stepRow, fresh, boundId)) return false;
         }
         if (claimRuntimeIsDevin && boundDevinId !== enabledDevinId) return false;
@@ -655,6 +702,7 @@ async function tryClaim(
             antigravitySubscriptionId: claimRuntimeIsAntigravity ? boundAntigravityId : null,
             holdReason: null,
             holdUntil: null,
+            ranModel: pinnedModel,
           })
           .where(
             and(

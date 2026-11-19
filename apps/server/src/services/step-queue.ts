@@ -192,11 +192,17 @@ export function stepQueueProjector(db: Db, teamId: string) {
     };
     const unavailable = (id: string) =>
       targetUnavailable(db, machineRowOf(id), teamId, facts, catalog, now);
-    const prior = priorSessionOf(db, row, row.buildRow, {
-      claude: enabledId,
-      devin: enabledDevinId,
-      antigravity: enabledAntigravityId,
-    });
+    const prior = priorSessionOf(
+      db,
+      row,
+      row.buildRow,
+      {
+        claude: enabledId,
+        devin: enabledDevinId,
+        antigravity: enabledAntigravityId,
+      },
+      facts.model.provider,
+    );
     const need = agentRow.requiredCapabilities?.os;
     const sole = platformFallbackMachineId(db, teamMachines, defaultMachineId, need);
     const verdict = routeVerdict({

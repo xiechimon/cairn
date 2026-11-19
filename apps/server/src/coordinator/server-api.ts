@@ -25,7 +25,13 @@ import {
 import { bindCoordinatorRun, coordinatorRuns } from '../services/coordinator-runs.js';
 import { finishCoordinatorTurn, recordStepUsage } from '../services/coordinator-steps.js';
 import { stopStepComputer } from '../services/machine-computer.js';
-import { isChiefConversation, type MachineDeps, ownedStep } from '../services/machine-deps.js';
+import {
+  isChiefConversation,
+  type MachineDeps,
+  ownedStep,
+  stepTeamId,
+} from '../services/machine-deps.js';
+import { chiefStepAgent, requeueChiefStepOnFallback } from '../services/machine-finish-step.js';
 import { executeRelayToolCall, machineAsk, relayComputerTool } from '../services/machine-relay.js';
 import {
   fetchStop,
@@ -33,6 +39,7 @@ import {
   reportTranscriptDelta,
   reportTranscriptRow,
 } from '../services/machines.js';
+import { ranModel, recordProviderOutcome } from '../services/model-fallback.js';
 import { publishStepRow } from '../services/quota-wait.js';
 import { InputAuthorityError } from './runtime/input-channel.js';
 import type { MachineApi } from './runtime/machine-api.js';
@@ -262,6 +269,19 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
       recordStepUsage(deps, owned, body.usage ?? []);
       deps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
       releaseUnconsumedSteer(deps.db, owned);
+      const chiefAgent = chiefStepAgent(deps, owned);
+      if (chiefAgent !== null) {
+        recordProviderOutcome(
+          stepTeamId(deps, owned),
+          ranModel(chiefAgent, owned).provider,
+          body,
+          false,
+        );
+      }
+      if (requeueChiefStepOnFallback(deps, owned, chiefAgent, body)) {
+        stopStepComputer(deps, stepId);
+        return;
+      }
       finishCoordinatorTurn(deps, owned, body, observation);
       stopStepComputer(deps, stepId);
     },

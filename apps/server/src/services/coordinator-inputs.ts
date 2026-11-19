@@ -106,7 +106,7 @@ export function prepareCoordinatorInput(
   if (prior !== undefined) {
     if (prior.kind !== 'initial' || prior.conversationId !== conversationId)
       throw new HttpError(409, 'Coordinator input identity changed');
-    return prior;
+    if (prior.state === 'pending') return prior;
   }
   const row = db.select().from(step).where(eq(step.id, stepId)).get();
   if (row?.kind !== 'chief' || row.machineId !== null || row.status !== 'claimed')
@@ -143,7 +143,22 @@ export function prepareCoordinatorInput(
     successorStepId: null,
     createdAt: nowMs(),
   };
-  db.insert(coordinatorInput).values(input).run();
+  if (prior === undefined) {
+    db.insert(coordinatorInput).values(input).run();
+  } else {
+    db.update(coordinatorInput)
+      .set({
+        id: input.id,
+        ownerMessageIds: input.ownerMessageIds,
+        content: input.content,
+        state: 'pending',
+        entryId: null,
+        successorStepId: null,
+        createdAt: input.createdAt,
+      })
+      .where(eq(coordinatorInput.id, prior.id))
+      .run();
+  }
   return input;
 }
 

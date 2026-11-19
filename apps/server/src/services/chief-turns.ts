@@ -146,10 +146,11 @@ export function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
   const latest = parked.stepRow;
   const chiefRow = db.select().from(chief).where(eq(chief.id, chiefId)).get();
   const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId, parked.projectId) : null;
-  const ran = latest.fallback?.model ?? {
-    provider: agentRow?.provider ?? null,
-    modelId: agentRow?.modelId ?? null,
-  };
+  const ran = latest.ranModel ??
+    latest.fallback?.model ?? {
+      provider: agentRow?.provider ?? null,
+      modelId: agentRow?.modelId ?? null,
+    };
   return {
     reason: latest.status === 'waiting_quota' ? (latest.quotaBlock?.kind ?? 'quota') : 'quota',
     model: modelLabel(ran),
