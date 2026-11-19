@@ -1,4 +1,4 @@
-import { todoRecordSchema } from '@cairn/shared';
+import { ASK_USER_QUESTION_KIND, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
@@ -371,6 +371,22 @@ test('a worker schedule stays paused while the task waits for an answer', async 
   const s = await world();
   const before = s.db.select().from(step).all().length;
   s.db.update(todo).set({ phase: 'needs_input' }).where(eq(todo.id, s.todoId)).run();
+  s.db
+    .insert(message)
+    .values({
+      id: 'pending-question',
+      conversationId: s.buildId,
+      role: 'assistant',
+      createdAt: Date.now(),
+      content: {
+        kind: ASK_USER_QUESTION_KIND,
+        requestId: 'pending-question',
+        status: 'pending',
+        questions: [{ header: 'Decision', question: 'Which option?', options: [] }],
+        answers: null,
+      },
+    })
+    .run();
   await s.scheduler.tick(s.due);
   expect(s.db.select().from(step).all()).toHaveLength(before);
   expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.phase).toBe('needs_input');

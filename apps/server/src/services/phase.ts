@@ -10,7 +10,7 @@ export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
   review: ['done', 'failed', 'queued', 'planning', 'closed'],
   done: ['queued'],
   failed: ['queued', 'closed', 'review'],
-  stopped: ['queued', 'todo', 'done', 'closed'],
+  stopped: ['queued', 'done', 'closed'],
   closed: ['todo'],
 };
 
