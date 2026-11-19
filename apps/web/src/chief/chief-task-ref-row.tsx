@@ -1,9 +1,10 @@
 import { cn } from 'cn';
-import { type CSSProperties, useContext } from 'react';
+import { useContext } from 'react';
 import { useMachines, useProjects, useSteps } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { useThreadUnread } from '../board/use-thread-unread.js';
+import { GrowText } from '../components/growth.js';
 import { POPUP_STILL, useWarmHoverCard } from '../components/thread/task-pr-line.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { TodoGlanceContext, TodoStatusTile } from '../detail/segments.js';
@@ -26,6 +27,7 @@ export function TaskRefRow({
 }) {
   const { t } = useI18n();
   const unread = useThreadUnread(taskRef.todoId);
+  const waits = useStartsAfter(taskRef);
   const card = useWarmHoverCard();
   return (
     <Popover {...card.root}>
@@ -67,20 +69,30 @@ export function TaskRefRow({
             />
           </svg>
         )}
-        <TodoStatusTile phase={taskRef.phase} className={grow ? 'task-ref-tile-grow' : undefined} />
-        <span className="min-w-0 truncate group-hover/ref:underline group-data-[hl]/line:underline">
-          {grow
-            ? Array.from(taskRef.title ?? t('任务'), (char, n) => (
-                <span
-                  key={n}
-                  className="task-ref-char-grow"
-                  style={{ '--char': Math.min(n, 40) } as CSSProperties}
-                >
-                  {char}
-                </span>
-              ))
-            : (taskRef.title ?? t('任务'))}
+        <TodoStatusTile
+          phase={taskRef.phase}
+          className={cn(
+            'transition-colors duration-(--dur-fast)',
+            grow && 'grow-pop',
+            waits !== undefined && 'border border-dashed border-content-tertiary bg-transparent',
+          )}
+        />
+        <span
+          className={cn(
+            'min-w-0 truncate transition-colors duration-(--dur-fast) group-hover/ref:underline group-data-[hl]/line:underline',
+            waits !== undefined && 'text-content-tertiary',
+          )}
+        >
+          {grow ? <GrowText text={taskRef.title ?? t('任务')} /> : (taskRef.title ?? t('任务'))}
         </span>
+        {waits !== undefined && (
+          <span
+            data-slot="task-ref-waits"
+            className={cn('flex-none text-meta text-content-tertiary', grow && 'grow-enter')}
+          >
+            {waits}
+          </span>
+        )}
         {unread && (
           <span
             role="img"
@@ -103,6 +115,19 @@ export function TaskRefRow({
   );
 }
 
+function useStartsAfter(taskRef: TaskRef): string | undefined {
+  const { t } = useI18n();
+  const glances = useContext(TodoGlanceContext);
+  if (taskRef.phase === 'done' || taskRef.phase === 'failed') return undefined;
+  const waitingFor = (glances?.get(taskRef.todoId)?.blockedBy ?? []).filter(
+    (id) => glances?.get(id)?.phase !== 'done',
+  );
+  if (waitingFor.length === 0) return undefined;
+  return waitingFor.length === 1
+    ? t('等「{title}」', { title: glances?.get(waitingFor[0] ?? '')?.title ?? t('任务') })
+    : t('等 {n} 个任务', { n: waitingFor.length });
+}
+
 function TaskRefPlace({ taskRef }: { taskRef: TaskRef }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -113,14 +138,7 @@ function TaskRefPlace({ taskRef }: { taskRef: TaskRef }) {
   const machineId = steps.findLast((step) => step.machineId != null)?.machineId;
   const machine = useMachines(teamId, live).data?.find((m) => m.id === machineId)?.name;
   const folder = project?.repoKind === 'local' ? project.localPath : undefined;
-  const waitingFor = (glance?.blockedBy ?? []).filter((id) => glances?.get(id)?.phase !== 'done');
-  const firstBlocker = glances?.get(waitingFor[0] ?? '')?.title;
-  const startsAfter =
-    waitingFor.length === 0
-      ? undefined
-      : waitingFor.length === 1
-        ? t('等「{title}」', { title: firstBlocker ?? t('任务') })
-        : t('等 {n} 个任务', { n: waitingFor.length });
+  const startsAfter = useStartsAfter(taskRef);
   const rows: [string, string, string][] = [
     ...(project !== undefined
       ? [['project', t('项目'), project.name] as [string, string, string]]

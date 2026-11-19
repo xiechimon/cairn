@@ -333,6 +333,8 @@ test('a split request shows research and code as flat sibling rows; the code row
   await expect(rows).toHaveText([/^Research export formats/, new RegExp(`^${TASK.title}`)]);
   const lefts = await rows.evaluateAll((all) => all.map((row) => row.getBoundingClientRect().left));
   expect(lefts[1]).toBe(lefts[0]);
+  await expect(refs.locator('[data-slot="task-ref-waits"]')).toHaveText(['等「Research export formats」']);
+  await expect(page.locator('[data-grow]')).toHaveCount(0);
   await rows.nth(1).hover();
   await expect(
     page.getByTestId('chief-task-ref-hover').locator('[data-slot="task-ref-starts-after"]'),
@@ -389,6 +391,7 @@ test('a research report is one card under its research row; hover shows a summar
   await expect(card).toHaveCount(1);
   await expect(card).toHaveText('Research export formats');
   await expect(card).toHaveAttribute('data-stage', 'draft');
+  await expect(card).not.toHaveAttribute('data-grow');
   await expect(page.getByTestId('chief-question-report')).toHaveCount(0);
 
   await card.hover();

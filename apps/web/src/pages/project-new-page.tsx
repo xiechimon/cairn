@@ -25,6 +25,7 @@ import { SETUP_HREF, useFirstRunSetup } from '../board/first-run-setup.js';
 import { PROJECT_ICON_COMPONENTS } from '../board/project-icon-map.js';
 import { ProjectIconPicker } from '../board/project-icon-picker.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
+import { noteCreatedHere } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
@@ -383,6 +384,7 @@ export function ProjectNewPage() {
     if (repoSel === 'local') setSubmittedPath(localPath.trim());
     mutations.createProject.mutate(body, {
       onSuccess: (p) => {
+        noteCreatedHere(p.id);
         if (icon !== null) {
           mutations.patchProject.mutate(
             { id: p.id, body: { icon } },

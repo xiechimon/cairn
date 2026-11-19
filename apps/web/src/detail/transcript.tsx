@@ -312,6 +312,7 @@ function Row({
       return (
         <div className="mt-3.5 agent-measure" data-testid="agent-todo">
           <TaskCard
+            live
             items={item.items.map((it) => ({
               state: it.state,
               segments: inlineSegments(it.text),

@@ -18,6 +18,7 @@ import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
+import { useArrivals } from '../components/growth.js';
 import { MachineName } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
 import { Marker } from '../components/ui/marker.js';
@@ -178,11 +179,12 @@ function TaskRefRows({ refs, live = false }: { refs: readonly TaskRef[]; live?: 
 }
 
 function BubbleReports({ todoIds }: { todoIds: readonly string[] }) {
+  const arrived = useArrivals(todoIds);
   if (todoIds.length === 0) return null;
   return (
     <div data-slot="bubble-reports" className="mt-1 flex flex-col">
       {todoIds.map((todoId) => (
-        <ResearchReportLine key={todoId} todoId={todoId} />
+        <ResearchReportLine key={todoId} todoId={todoId} grow={arrived.has(todoId)} />
       ))}
     </div>
   );

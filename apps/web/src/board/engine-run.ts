@@ -206,7 +206,7 @@ export function engineTranscript(run: EngineRun): TranscriptItem[] {
   }
   flush('end');
   if (run.plan.length > 0) {
-    const todoRow: TranscriptItem = { kind: 'agent-todo', items: run.plan };
+    const todoRow: TranscriptItem = { kind: 'agent-todo', id: 'agent-todo', items: run.plan };
     const tail = items.at(-1);
     if (tail?.kind === 'work' && tail.running === true) {
       items.splice(items.length - 1, 0, todoRow);

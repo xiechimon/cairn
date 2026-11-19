@@ -6,8 +6,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
+import { useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -60,7 +62,7 @@ const TASK_ICON_BOX = 'mt-0.5 flex size-4 flex-none items-center justify-center 
 const TASK_FADE =
   'transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none';
 
-function TaskIcon({ state }: { state: TaskState }) {
+function TaskIcon({ state, grow = false }: { state: TaskState; grow?: boolean }) {
   return (
     <span className={`${TASK_ICON_BOX} relative`} data-task-icon={state}>
       <span
@@ -70,7 +72,7 @@ function TaskIcon({ state }: { state: TaskState }) {
         className={`absolute inset-0 rounded-full border-[1.5px] border-(--border) border-t-(--text-secondary) ${TASK_FADE} ${state === 'doing' ? 'animate-spin opacity-100 motion-reduce:animate-none' : 'opacity-0'}`}
       />
       <span
-        className={`absolute inset-0 flex items-center justify-center rounded-full bg-(--text-tertiary) text-(--card) ${TASK_FADE} ${state === 'done' ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}`}
+        className={`absolute inset-0 flex items-center justify-center rounded-full bg-(--text-tertiary) text-(--card) ${TASK_FADE} ${state === 'done' ? 'scale-100 opacity-100' : 'scale-50 opacity-0'} ${grow ? 'grow-check' : ''}`}
       >
         <Check width={10} height={10} />
       </span>
@@ -78,24 +80,57 @@ function TaskIcon({ state }: { state: TaskState }) {
   );
 }
 
-export function TaskCard({ items }: { items: TaskItem[] }) {
+const taskKey = (item: TaskItem) => item.segments.map((segment) => segment.text).join('');
+
+function useJustDone(items: TaskItem[], live: boolean): ReadonlySet<string> {
+  const seen = useRef(new Map<string, TaskState>());
+  const doneAt = useRef(new Map<string, number>());
+  const now = Date.now();
+  for (const item of items) {
+    const key = taskKey(item);
+    const before = seen.current.get(key);
+    if (live && before !== undefined && before !== 'done' && item.state === 'done')
+      doneAt.current.set(key, now);
+    seen.current.set(key, item.state);
+  }
+  return new Set([...doneAt.current].filter(([, at]) => now - at < 1500).map(([key]) => key));
+}
+
+export function TaskCard({ items, live = false }: { items: TaskItem[]; live?: boolean }) {
+  const keys = items.map(taskKey);
+  const arrived = useArrivals(live ? keys : []);
+  const justDone = useJustDone(items, live);
   return (
     <ul
       className="flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 font-sans font-normal shadow-sm"
       data-testid="md-tasks"
     >
       {items.map((item, i) => (
-        <li key={i} className="flex flex-col text-ui" data-testid="md-task" data-state={item.state}>
+        <li
+          key={i}
+          className={cn('flex flex-col text-ui', arrived.has(keys[i] ?? '') && 'grow-enter')}
+          data-testid="md-task"
+          data-state={item.state}
+          data-grow={arrived.has(keys[i] ?? '') ? '' : undefined}
+        >
           <div className="flex items-start gap-3">
-            <TaskIcon state={item.state} />
+            <TaskIcon state={item.state} grow={justDone.has(keys[i] ?? '')} />
             <span
-              className={`min-w-0 line-through transition-[color,text-decoration-color] duration-200 ease-out motion-reduce:transition-none ${
+              className={cn(
+                'min-w-0 line-through transition-[color,text-decoration-color] duration-200 ease-out motion-reduce:transition-none',
                 item.state === 'done'
                   ? 'text-(--text-tertiary) decoration-(--text-tertiary)'
-                  : 'text-(--foreground) decoration-transparent'
-              }`}
+                  : 'text-(--foreground) decoration-transparent',
+                justDone.has(keys[i] ?? '') && item.state === 'done' && 'decoration-transparent',
+              )}
             >
-              <Segments segments={item.segments} codeClassName="chat-code" />
+              <span
+                className={cn(
+                  justDone.has(keys[i] ?? '') && item.state === 'done' && 'grow-strike',
+                )}
+              >
+                <Segments segments={item.segments} codeClassName="chat-code" />
+              </span>
             </span>
           </div>
           {item.blocks.length > 0 && (

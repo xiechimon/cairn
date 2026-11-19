@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { settleTransitions } from './helpers.js';
+import { remounts, watchRemounts } from './live-stability.js';
 
 const open = (page: Page, state: string) =>
   page.goto(`/app?scenario=home-c-engine&thread=home-c-engine-${state}&player`);
@@ -267,4 +268,21 @@ test('a row that appears while the run plays keeps its enter animation through l
   await player.getByRole('button', { name: '下一步' }).click();
   await expect(player).toContainText('事件 3 / 8');
   await expect(work).toHaveClass(/\brow-enter\b/);
+});
+
+test('the plan keeps its card as the run advances and the item just finished draws its check @motion', async ({
+  page,
+}) => {
+  await open(page, 'running');
+  await expect.poll(() => planStates(page)).toEqual(['done', 'done', 'doing', 'todo']);
+  await watchRemounts(page, ['agent-todo']);
+  await page.getByRole('button', { name: '下一步' }).click();
+  await page.getByRole('button', { name: '下一步' }).click();
+  await page.getByRole('button', { name: '允许这一次' }).click();
+  await expect.poll(() => planStates(page)).toEqual(['done', 'done', 'done', 'doing']);
+  const third = page.getByTestId('agent-todo').last().getByTestId('md-task').nth(2);
+  expect(await third.locator('path').first().evaluate((node) => getComputedStyle(node).animationName)).toBe(
+    'grow-check-draw',
+  );
+  expect(await remounts(page)).toEqual([]);
 });

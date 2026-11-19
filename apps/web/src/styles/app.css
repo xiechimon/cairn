@@ -543,17 +543,36 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   }
 }
 
-@keyframes task-ref-tile-in {
+@keyframes grow-pop-in {
   from {
     opacity: 0;
     transform: scale(0.4);
   }
 }
 
-@keyframes task-ref-char-in {
+@keyframes grow-fade-in {
   from {
     opacity: 0;
     transform: translateY(2px);
+  }
+}
+
+@keyframes grow-guide-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+
+@keyframes grow-decoration-in {
+  from {
+    text-decoration-color: transparent;
+  }
+}
+
+@keyframes grow-flash {
+  20% {
+    color: var(--tint-working-ink);
   }
 }
 
@@ -600,17 +619,87 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   }
 }
 
-@utility task-ref-tile-grow {
+@utility grow-pop {
   @media (prefers-reduced-motion: no-preference) {
-    animation: task-ref-tile-in 200ms var(--ease-out-expo) both;
-    animation-delay: calc(var(--grow-delay, 0ms) + 260ms);
+    animation: grow-pop-in 200ms var(--ease-out-expo) both;
+    animation-delay: calc(var(--grow-delay, 0ms) + var(--pop-at, 260ms));
   }
 }
 
-@utility task-ref-char-grow {
+@keyframes grow-check-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+}
+
+@keyframes grow-check-fill {
+  from,
+  45% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--text-secondary);
+  }
+}
+
+@keyframes grow-strike-sweep {
+  from {
+    background-size: 0 1px;
+  }
+}
+
+@utility grow-check {
   @media (prefers-reduced-motion: no-preference) {
-    animation: task-ref-char-in 160ms var(--ease-standard) both;
+    animation: grow-check-fill 400ms var(--ease-standard) both;
+    & path {
+      stroke-dasharray: 24;
+      animation: grow-check-draw 260ms var(--ease-standard) 380ms both;
+    }
+  }
+}
+
+@utility grow-strike {
+  text-decoration-line: line-through;
+  @media (prefers-reduced-motion: no-preference) {
+    text-decoration-line: none;
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 55%;
+    background-size: 100% 1px;
+    animation: grow-strike-sweep 360ms var(--ease-standard) 420ms both;
+  }
+}
+
+@utility grow-char {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: grow-fade-in 160ms var(--ease-standard) both;
     animation-delay: calc(var(--grow-delay, 0ms) + 330ms + var(--char) * 18ms);
+  }
+}
+
+@utility grow-enter {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: grow-fade-in 160ms var(--ease-standard) both;
+    animation-delay: var(--grow-delay, 0ms);
+  }
+}
+
+@utility grow-guide {
+  transform-origin: top left;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: grow-guide-in 220ms var(--ease-standard) both;
+    animation-delay: var(--grow-delay, 0ms);
+  }
+}
+
+@utility grow-decoration {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: grow-decoration-in 240ms var(--ease-standard) both;
+    animation-delay: var(--grow-delay, 0ms);
+  }
+}
+
+@utility grow-flash {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: grow-flash 900ms var(--ease-standard);
   }
 }
 

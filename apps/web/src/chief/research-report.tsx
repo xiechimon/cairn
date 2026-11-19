@@ -1,8 +1,17 @@
 import { infoReportMessageSchema } from '@cairn/shared';
 import { cn } from 'cn';
-import { createContext, type ReactNode, useContext, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  createContext,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useConversationMessages } from '../api/hooks.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
+import { GrowText } from '../components/growth.js';
 import { Button } from '../components/ui/button.js';
 import { DialogTitle } from '../components/ui/dialog.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -63,10 +72,12 @@ export function ResearchReportCard({
   report,
   className,
   inline = false,
+  grow = false,
 }: {
   report: ResearchReport;
   className?: string;
   inline?: boolean;
+  grow?: boolean;
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
@@ -88,15 +99,32 @@ export function ResearchReportCard({
             data-testid="research-report-card"
             data-variant="inline"
             data-stage={stageAttr}
+            data-grow={grow ? '' : undefined}
             onClick={() => setOpen(true)}
             className={cn(
               'flex max-w-full cursor-pointer items-center gap-1.5 bg-transparent p-0 text-left text-ui leading-5 text-foreground outline-none',
               className,
             )}
           >
-            <FileText aria-hidden="true" className="size-4 flex-none text-content-secondary" />
-            <span className="min-w-0 truncate text-(--chat-link) underline decoration-(--chat-link)/40 underline-offset-3 hover:decoration-(--chat-link)">
-              {report.title}
+            <FileText
+              aria-hidden="true"
+              className={cn('size-4 flex-none text-content-secondary', grow && 'grow-pop')}
+              style={grow ? ({ '--pop-at': '0ms' } as CSSProperties) : undefined}
+            />
+            <span
+              className={cn(
+                'min-w-0 truncate text-(--chat-link) underline decoration-(--chat-link)/40 underline-offset-3 hover:decoration-(--chat-link)',
+                grow && 'grow-decoration',
+              )}
+              style={
+                grow
+                  ? ({
+                      '--grow-delay': `${330 + Math.min(report.title.length, 40) * 18}ms`,
+                    } as CSSProperties)
+                  : undefined
+              }
+            >
+              {grow ? <GrowCharsFrom text={report.title} /> : report.title}
             </span>
           </PopoverTrigger>
         ) : (
@@ -260,8 +288,17 @@ export function ResearchReportRow({ todoId, indent }: { todoId: string; indent: 
   return <ResearchReportCard report={report} className={cn('my-1', indent)} />;
 }
 
-export function ResearchReportLine({ todoId }: { todoId: string }) {
+export function ResearchReportLine({ todoId, grow = false }: { todoId: string; grow?: boolean }) {
   const report = useResearchReport(todoId);
+  const [arrived] = useState(grow);
   if (report === null) return null;
-  return <ResearchReportCard report={report} inline className="mt-1" />;
+  return <ResearchReportCard report={report} inline grow={arrived} className="mt-1" />;
+}
+
+function GrowCharsFrom({ text }: { text: string }) {
+  return (
+    <span style={{ '--grow-delay': '0ms' } as CSSProperties}>
+      <GrowText text={text} />
+    </span>
+  );
 }

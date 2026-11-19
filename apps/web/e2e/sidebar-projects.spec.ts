@@ -352,3 +352,24 @@ test.describe('on a touch screen', () => {
     expect(boxes.name.right).toBeLessThanOrEqual(boxes.menu.left);
   });
 });
+
+test('a project that arrives from elsewhere grows into the sidebar; the ones there at load do not @motion', async ({
+  page,
+}) => {
+  const projects = [project('proj-1', 'cairn')];
+  await open(page, projects);
+  await expect(rows(page)).toHaveCount(1);
+  projects.push(project('proj-2', 'relay'));
+  await page.waitForFunction(() => window.__es.some((es) => es.url.includes('/api/teams/t1/stream')));
+  await page.evaluate(() =>
+    (
+      window.__es.find((es) => es.url.includes('/api/teams/t1/stream')) as unknown as {
+        onerror: () => void;
+      }
+    ).onerror(),
+  );
+  await expect(rows(page)).toHaveCount(2);
+  const grown = sidebar(page).locator('[data-grow]');
+  await expect(grown).toHaveCount(1);
+  await expect(grown).toContainText('relay');
+});
