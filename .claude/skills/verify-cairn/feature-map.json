@@ -225,12 +225,11 @@
       "id": "memory",
       "name": "Memory",
       "summary": "Team and project memories the Coordinator reads, writes and injects into later turns and threads. Oversized indexes prompt normal-turn maintenance; no daily tidy pass runs. Owners edit memory conversationally through a durable memory-edit request run on a dedicated chief-memory side thread restricted to the four memory tools, with receipts and before/after diffs. A first-run import card offers CLAUDE.md/AGENTS.md files as unverified searchable memory.",
-      "states": "Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Composer states: input, working, applied, awaiting input (CLARIFY), partial, stopped, error and offline; page and focused-file composers; receipt diff cards; import candidates card with per-file Import and dismiss.",
+      "states": "Shipped: the sidebar Memory dialog lists team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Composer states: input, working, applied, awaiting input (CLARIFY), partial, stopped, error and offline; page and focused-file composers; receipt diff cards; import candidates card with per-file Import and dismiss.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/chief-settings.tsx",
           "apps/web/src/chief/memory-panel.tsx",
           "apps/web/src/chief/memory-dialog.tsx",
           "apps/web/src/chief/memory-list.ts",
@@ -257,7 +256,7 @@
       },
       "reach": [
         "open /app",
-        "click label:Coordinator 设置"
+        "click label:记忆"
       ],
       "research": [
         "docs/research/personal-agent-memory-2026-11-07.md",

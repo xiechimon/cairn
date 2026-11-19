@@ -38,12 +38,7 @@ import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { chiefDefault } from '../fixtures/chief.js';
 import type { ChiefContent, FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import {
-  type ChiefView,
-  ensureGestureKeys,
-  type GestureEvent,
-  getGestureStore,
-} from '../overlay/gesture-machine.js';
+import { ensureGestureKeys } from '../overlay/gesture-machine.js';
 import { settingsHref } from '../settings/settings-href.js';
 import {
   type CoordinatorLoad,
@@ -65,14 +60,10 @@ import {
   questionSubmitStore,
 } from './question-drafts.js';
 
-export type { ChiefView };
-
 export interface ChiefSurface {
   load: CoordinatorLoad;
   earlier?: EarlierPages;
   retry: () => void;
-  chiefView: ChiefView;
-  setChiefView: (view: ChiefView) => void;
   chiefData: ChiefContent;
   chiefUnread: number;
   chiefBusy: boolean;
@@ -122,16 +113,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const mutations = useApiMutations(teamId);
 
   const chief = fixture.chief;
-  getGestureStore(chief?.view ?? 'none');
-  const chiefView = useSyncExternalStore(
-    (listener) => getGestureStore().subscribe(listener),
-    () => getGestureStore().getState().chief,
-    () => getGestureStore().getState().chief,
-  );
-  const setChiefView = useCallback((view: ChiefView) => {
-    const type: GestureEvent['type'] = view === 'settings' ? 'chief/settings' : 'chief/minimize';
-    getGestureStore().dispatch({ type });
-  }, []);
   useLayoutEffect(() => {
     ensureGestureKeys();
   }, []);
@@ -170,26 +151,12 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const deepLinkId = deepLink.threadId;
   const onDeepLinkConsumed = deepLink.onConsumed;
   useEffect(() => {
-    if (deepLinkId === 'settings') {
-      setChiefView('settings');
-      onDeepLinkConsumed();
-      return;
-    }
     if (!live || deepLinkId === null || !chiefThreadsQ.isSuccess) return;
     if (liveThreads.some((thread) => thread.id === deepLinkId)) {
       setLinked({ threadId: deepLinkId, place });
-      setChiefView('none');
     }
     onDeepLinkConsumed();
-  }, [
-    live,
-    deepLinkId,
-    chiefThreadsQ.isSuccess,
-    liveThreads,
-    onDeepLinkConsumed,
-    setChiefView,
-    place,
-  ]);
+  }, [live, deepLinkId, chiefThreadsQ.isSuccess, liveThreads, onDeepLinkConsumed, place]);
   const [shownChannel, setShownChannel] = useState(channel);
   const [newestPageOnly, setNewestPageOnly] = useState(false);
   const { query: chiefMessagesQ, messages: loadedChiefMessages } = useConversationMessages(
@@ -526,8 +493,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     load: channelLoad,
     earlier,
     retry,
-    chiefView,
-    setChiefView,
     chiefData,
     chiefUnread,
     chiefBusy,

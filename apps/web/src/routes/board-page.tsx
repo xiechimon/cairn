@@ -45,7 +45,6 @@ import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useCloseThread } from '../board/thread-link.js';
 import { useTasksView } from '../board/use-tasks-view.js';
 import { useChiefRoot } from '../chief/chief-root.js';
-import { ChiefSettings } from '../chief/chief-settings.js';
 import { todoGlanceOf } from '../chief/chief-task-refs.js';
 import { toastError } from '../components/ui/toaster.js';
 import { TodoGlanceContext } from '../detail/segments.js';
@@ -67,7 +66,6 @@ export function BoardPage() {
   const { t } = useI18n();
   const archiveEdits = useFixtureArchiveEdits();
   const { surface: chief } = useChiefRoot();
-  const { chiefView, setChiefView, chiefData } = chief;
 
   const todosQ = useTodos(teamId, live);
   const tasksQ = useTasks(teamId, live);
@@ -238,7 +236,6 @@ export function BoardPage() {
   }, [setupHome, setupDecision]);
   const homeShown =
     !showSetup &&
-    chiefView !== 'settings' &&
     projectLookup !== 'loading' &&
     projectLookup !== 'failed' &&
     !(projectLookup === 'unknown' && homeProjectId !== null);
@@ -263,16 +260,14 @@ export function BoardPage() {
       <AppSidebar
         fixture={fixture}
         todos={todos}
-        selected={chiefView === 'settings' ? 'none' : 'board'}
+        selected="board"
         searchPanel={false}
         onSearch={() => search.setOpen(true)}
         menuTrigger={!homeShown}
       />
       <div className={`board-sheet ${SHEET_PANEL}`}>
         <div className="relative flex min-h-0 min-w-0 flex-1">
-          {chiefView === 'settings' ? (
-            <ChiefSettings chief={chiefData} onBack={() => setChiefView('none')} />
-          ) : projectLookup === 'loading' ? (
+          {projectLookup === 'loading' ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <ProjectsLoading />
             </div>
@@ -332,7 +327,10 @@ export function BoardPage() {
                 (!live && todos.length === 1 ? todos[0] : undefined)
               }
               now={live ? Date.now() : fixture.now}
-              chatStream={{ items: chiefData.stream ?? [], at: chiefData.streamAt ?? [] }}
+              chatStream={{
+                items: chief.chiefData.stream ?? [],
+                at: chief.chiefData.streamAt ?? [],
+              }}
               onClose={closeThread}
             />
           </TodoGlanceContext.Provider>

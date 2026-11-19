@@ -34,7 +34,6 @@ export {
   chiefQuestion,
   chiefReady,
   chiefScrollLong,
-  chiefSettings,
   chiefStreaming,
   chiefThread,
   chiefThreadsLong,

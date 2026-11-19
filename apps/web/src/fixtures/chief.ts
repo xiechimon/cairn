@@ -1,7 +1,6 @@
 import { at, legacyDone, legacyReview, MACHINE_NAME, R3_DAY, r7 } from './core.js';
 import type {
   ChiefContent,
-  ChiefSettingsTab,
   ChiefStreamItem,
   ChiefThreadRef,
   FixtureSet,
@@ -31,7 +30,6 @@ export const chiefGated: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'none',
     bound: false,
     threadTitle: '新主题',
     draft: CHIEF_DRAFT,
@@ -42,7 +40,6 @@ export const chiefReady: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '新主题',
@@ -54,7 +51,6 @@ export const chiefStreaming: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '我想做一个能在浏览器里直…',
@@ -96,7 +92,6 @@ export const chiefThread: FixtureSet = {
   todos: [legacyReview, legacyDone, contributingGuide],
   now: r7(13, 14),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '帮 r3-lifecycle 写一份…',
@@ -139,7 +134,6 @@ export const chiefThreadsOpen: FixtureSet = {
   todos: [legacyReview, legacyDone, { ...contributingGuide, phase: 'review' }],
   now: r7(13, 14),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '给 r3-lifecycle 做三件小事…',
@@ -206,7 +200,6 @@ export const chiefThreadsLong: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '给 r3-lifecycle 做三件小事…',
@@ -241,7 +234,6 @@ export const chiefScrollLong: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '滚动保留探针…',
@@ -271,7 +263,6 @@ export const chiefMarkdown: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '验证一下凭证链路…',
@@ -333,7 +324,6 @@ export const chiefMarkdownRef: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(14, 52),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '输出表格和其他 Markdown…',
@@ -398,7 +388,6 @@ export const chiefCode: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '读取记录的函数…',
@@ -432,7 +421,6 @@ export const chiefQuestion: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '给贪吃蛇小游戏定难度…',
@@ -503,16 +491,7 @@ export const chiefQuestion: FixtureSet = {
   },
 };
 
-export function chiefSettings(tab: ChiefSettingsTab): FixtureSet {
-  return {
-    todos: [legacyReview, legacyDone],
-    now: r7(13, 14),
-    chief: { view: 'settings', tab, bound: false, threadTitle: '新主题' },
-  };
-}
-
 export const chiefDefault: ChiefContent = {
-  view: 'none',
   bound: false,
   threadTitle: '新主题',
 };

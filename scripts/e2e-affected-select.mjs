@@ -261,7 +261,7 @@ export const FILE_RULES = new Map([
   ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-', 'api-key-']],
   ['apps/web/src/routes/api-keys-page.tsx', ['user-menu-', 'api-key-']],
   ['apps/web/src/routes/machine-authorize-page.tsx', ['machine-']],
-  ['apps/web/src/components/model-select-core.tsx', [...AGENT, 'chief-settings']],
+  ['apps/web/src/components/model-select-core.tsx', AGENT],
   [
     'apps/web/src/components/filter-picker.tsx',
     [

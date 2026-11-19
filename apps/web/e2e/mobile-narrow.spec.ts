@@ -86,13 +86,12 @@ for (const width of [360, 390]) {
         '/app/resources/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_',
         '/app/resources/providers?scenario=10',
         '/app/settings/work-routing?scenario=12',
-        '/app?scenario=101',
       ];
       for (const url of pages) {
         await page.goto(url);
-        await page.locator('.settings-card, [data-testid="machine-item"], [data-testid="routing-settings-empty"], [data-testid="chief-settings-col"]').first().waitFor();
+        await page.locator('.settings-card, [data-testid="machine-item"], [data-testid="routing-settings-empty"]').first().waitFor();
         const report = await page.evaluate(() => {
-          const col = document.querySelector('[data-testid="page-col"], [data-testid="chief-settings-col"]');
+          const col = document.querySelector('[data-testid="page-col"]');
           const problems: string[] = [];
           for (const el of col?.querySelectorAll('*') ?? []) {
             const box = el.getBoundingClientRect();

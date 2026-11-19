@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import { matchPath, useLocation, useNavigate } from 'react-router';
-import { getGestureStore } from '../overlay/gesture-machine.js';
 import { FILE_NAME_PARAM, FILE_PARAM } from './file-pane.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 import { PANE_PARAM, TASKS_TAB_PARAM } from './work-panel.js';
@@ -62,8 +61,6 @@ export function useOpenComposer(): (projectId?: string | null) => void {
       }
       const query = params.toString();
       const target = query === '' ? '' : `?${query}`;
-      const gestures = getGestureStore();
-      if (gestures.getState().chief === 'settings') gestures.dispatch({ type: 'chief/minimize' });
       const state: ComposeState = { compose: Date.now() };
       navigate(
         { pathname: '/app', search: target },

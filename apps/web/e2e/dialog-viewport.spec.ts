@@ -72,17 +72,6 @@ test('machine: disclosure expanded (tallest content state) bottom link stays in 
   await expect(keylink).toBeInViewport();
 });
 
-test('charter: `取消`/save charter stay in the viewport', async ({ page }) => {
-  await page.goto('/app?scenario=102');
-
-  await page.getByRole('button', { name: '编辑' }).click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await expectShellCapped(dialog);
-  await expect(dialog.getByRole('button', { name: '取消' })).toBeInViewport();
-  await expect(dialog.getByRole('button', { name: '保存章程' })).toBeInViewport();
-});
-
 test('schedules `新建定时` editor (900×420): capped to the viewport, its body scrolls inside to reach `取消`/save (#1037)', async ({
   page,
 }) => {

@@ -6,12 +6,6 @@
   "scope": "apps/web/src consumer points minus components/ui/ (#1054/#1055, ADR 0012 D1). Two ledgers in one review face. squareBoxes: every line the shape gate flags (visible square box: bare rounded-none + unconditional paint, or enclosing border + fill with no radius declared) must match an entry {file, anchor, kind, basis?, reason} — anchor = literal substring of the flagged line. kind deviation = deliberate non-registry geometry with reason; kind rides-primitive = radius comes through from the underlying registry component (basis names it); kind state-surface = state tint painted over an already-ruled box (line-level scan cannot see the base class). brandInkText: every consumer text-role use of the brand ink (--card-button/--focus-ring as text-(...) or CSS color:) must match an entry {file, anchor, role, reason, contrast} — role in selection-mark | indicator | badge-glyph | action-link (#987: brand ink is spot emphasis only, never body/label/button-text ink; action-link = the board card accent text link, DESIGN.md 按钮). Solid-fill (bg-) uses are the slot's canonical role and are not policed. Full disposition inventory incl. wave-1 attribution: docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md.",
   "squareBoxes": [
     {
-      "file": "apps/web/src/chief/chief-settings.tsx",
-      "anchor": "rounded-none border-0 text-left",
-      "kind": "deviation",
-      "reason": "Coordinator settings Model and machine row: a full-width Button deep-link inside the settings card. The Button's transparent border would hide the card's divide-y rule on a multi-row card, and a radius on the button would curl the card corners, so the box stays square. The card's --radius-card corners stay the visible shape."
-    },
-    {
       "file": "apps/web/src/resources/parts.tsx",
       "anchor": "rounded-none border-0 border-b border-border",
       "kind": "deviation",

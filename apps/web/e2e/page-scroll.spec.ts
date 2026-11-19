@@ -50,16 +50,6 @@ async function expectScrollerReachesBottom(page: Page, probe: Locator, last: Loc
 
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
-const PROJECT = {
-  id: 'proj-1',
-  name: 'cairn',
-  teamId: 'team-1',
-  repoKind: 'hosted',
-  repoName: 'cairn',
-  githubRepo: null,
-  localPath: null,
-};
-
 async function stubLiveBoot(page: Page) {
   await page.route('**/api/**', (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
@@ -68,106 +58,6 @@ async function stubLiveBoot(page: Page) {
   await page.route('**/api/teams', (route) => route.fulfill({ json: [TEAM] }));
   await page.route('**/api/user/me', (route) => route.fulfill({ json: USER }));
 }
-
-const AGENT_ACTOR = {
-  id: 'agent-1',
-  displayName: '记忆代理',
-  description: null,
-  status: 'active',
-  avatarUrl: null,
-  provider: null,
-  modelId: null,
-  thinkingLevel: null,
-  tools: [],
-  secrets: [],
-  defaultSkill: null,
-  skillsAllowlist: null,
-  mcpServers: [],
-};
-
-const MEMORY_LINE = '这是一段足够长的记忆内容，用来把设置面的记忆列表撑出真实滚动。';
-
-function wireChief(charter: string, watchCount: number) {
-  return {
-    chief: {
-      id: 'chief-user-1-team-1',
-      userId: 'user-1',
-      teamId: 'team-1',
-      agent: { agentId: 'agent-1' },
-      charter,
-      lastTurnAt: null,
-      createdAt: 0,
-      tz: 'Asia/Shanghai',
-    },
-    agentActor: AGENT_ACTOR,
-    context: null,
-    watches: Array.from({ length: watchCount }, (_, i) => ({
-      todoId: `todo-w${i}`,
-      projectId: 'proj-1',
-      seqNum: i + 1,
-      title: `关注条目 ${i}`,
-      projectName: 'cairn',
-      phase: 'building',
-      reason: 'Dispatched by the Coordinator: report back when it parks at a gate or settles.',
-      createdAt: 0,
-      threadId: `chief-thread-${i}`,
-      threadTitle: '滚动探针线程',
-    })),
-    wakes: [],
-  };
-}
-
-const MEMORIES = Array.from({ length: 40 }, (_, i) => ({
-  id: `mem-${i}`,
-  agentId: 'agent-1',
-  teamId: 'team-1',
-  title: `记忆条目 ${i}`,
-  content: `第 ${i} 条沉淀：${MEMORY_LINE}`,
-  projectId: null,
-  sourceTodoId: null,
-  sourceBuildId: null,
-  createdAt: 0,
-  updatedAt: 0,
-}));
-
-async function openChiefSettings(page: Page) {
-  await page.goto('/app?chief=settings');
-  await expect(page.getByRole('heading', { name: 'Coordinator 设置' })).toBeVisible();
-}
-
-test('all three long-content tabs of chief settings scroll to the bottom (#1032)', async ({ page }) => {
-  await stubLiveBoot(page);
-  const longCharter = Array.from({ length: 60 }, (_, i) => `章程第 ${i} 行：${MEMORY_LINE}`).join(
-    '\n',
-  );
-  await page.route('**/api/teams/team-1/chief', (route) =>
-    route.fulfill({ json: wireChief(longCharter, 30) }),
-  );
-  await page.route('**/api/teams/team-1/memories', (route) =>
-    route.fulfill({ json: MEMORIES }),
-  );
-  await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
-  await openChiefSettings(page);
-
-  await page.getByRole('tab', { name: '记忆' }).click();
-  const autoMemory = page.getByRole('heading', { name: '自动记忆' });
-  await expect(autoMemory).toBeVisible();
-  await expectScrollerReachesBottom(page, autoMemory, page.getByText('记忆条目 39'));
-
-  await page.getByRole('tab', { name: '关注与提醒' }).click();
-  const firstWatch = page.getByText('关注条目 0', { exact: true });
-  await expect(firstWatch).toBeVisible();
-  await expectScrollerReachesBottom(page, firstWatch, page.getByText('关注条目 29', { exact: true }));
-
-  await page.getByRole('tab', { name: '章程' }).click();
-  const charterHead = page.getByText('章程第 0 行', { exact: false }).first();
-  await expect(charterHead).toBeVisible();
-  await expectScrollerReachesBottom(
-    page,
-    charterHead,
-    page.getByRole('button', { name: '编辑' }),
-  );
-});
 
 function wireSchedule(i: number) {
   return {

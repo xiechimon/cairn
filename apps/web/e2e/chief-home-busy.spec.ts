@@ -224,7 +224,7 @@ test.describe('chief unavailable (T4)', () => {
     );
     await evidenceShot(page, 'outage-desktop.png');
     await banner.getByRole('button', { name: '给 Coordinator 换模型' }).click();
-    await expect(page.getByTestId('chief-settings-col')).toBeVisible();
+    await expect(page).toHaveURL(/\/app\/settings\/routing#route-coordinator$/);
   });
 
   test('withdrawing a held message deletes it and puts the text back in the composer', async ({

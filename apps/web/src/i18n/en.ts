@@ -1024,25 +1024,13 @@ export const EN: Record<string, string> = {
   // —— chief drawer / settings (r5 100–116) ——
   主题: 'Thread',
   新主题: 'New thread',
-  'Coordinator 设置': 'Coordinator settings',
   '请先在工作路由里配置 Coordinator。': 'Configure the Coordinator in work routing first.',
   '有什么可以帮你的？': 'How can I help?',
-  章程: 'Charter',
   记忆: 'Memory',
   记忆已更新: 'Memory updated',
   技能已更新: 'Skill updated',
-  关注与提醒: 'Watches & reminders',
   未设置: 'Not set',
-  'Cairn 默认规则': 'Cairn default rule',
-  '你提需求、做架构决策。调研和其余决定由 Cairn 自己完成：先找同类开源实现、读源码，再带着方案回来，只把真正要你定的事交给你。所有团队都生效，章程不能关掉它。':
-    'You state needs and make architecture decisions. Cairn does the research and makes the other calls itself: it finds similar open-source implementations, reads their source, and comes back with a proposal, bringing you only the decisions that are really yours. It applies to every team, and a charter cannot turn it off.',
-  '尚无章程。点击编辑，为 Coordinator 添加常设指示。':
-    'No charter yet. Click edit to give the Coordinator standing instructions.',
   编辑: 'Edit',
-  '暂无跟进事项。Coordinator 关注某个任务，或约定到点回头核实时，会按主题列在这里。':
-    'Nothing being watched yet. When the Coordinator watches a todo, or promises to check back at a set time, it is listed here by thread.',
-  // #811 关注 tab：无备注 wake 行的回退文案（有备注显示备注原文）。
-  到点提醒: 'Scheduled check-in',
   // #182 设置面接线：选择总管 Agent dialog + 章程编辑弹窗；换绑二次确认
   // copy 走 shared CHIEF_REBIND_CONFIRM_COPY canon（<agent> 占位，显示层替换，
   // i18n-coverage COMPUTED_KEYS 登记）。
@@ -1077,16 +1065,6 @@ export const EN: Record<string, string> = {
   '建议：{body}': 'Suggestion: {body}',
   '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。':
     "Switch the Coordinator's Agent? The Coordinator's memory lives on the Agent it runs on. After switching to <agent>, the memory becomes <agent>'s — the current memory is not migrated.",
-  编辑章程: 'Edit charter',
-  保存章程: 'Save charter',
-  '章程里不能有这一行：{marker}。这是 Cairn 自己用的分隔标记，删掉它再保存。':
-    'The charter cannot contain this line: {marker}. Cairn uses it as its own separator. Delete it, then save.',
-  '章程最多 {max} 个字，现在有 {n} 个字。删短一些再保存。':
-    'A charter can be at most {max#1 character|# characters}; this one has {n}. Shorten it, then save.',
-  '章程没有保存，你写的内容还在编辑框里。':
-    'The charter was not saved. Your text is still in the editor.',
-  '长期指令：模型路由规则（何种任务使用何种模型）、优先级、偏好…':
-    'Long-term instructions: model routing rules (which model for which work), priorities, preferences…',
   // #209 编辑分配接线：chip-popover「编辑分配」→ agent 选择弹层（#182 家族
   // 形态复用）；弹层内容 r2 C.18 从未捕获，文案 [设计]，<agent> 占位显示层
   // 替换。
@@ -1522,7 +1500,6 @@ export const EN: Record<string, string> = {
   '这些仓库里有给代理看的说明文件，可以导入成可检索记忆；导入后不会自动注入。':
     'These repositories contain instruction files for agents. Import them as searchable memory; they will not auto-inject.',
   以后再说: 'Not now',
-  模型与执行机: 'Model & Runner',
 
   '搜索记忆…': 'Search memories…',
   // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
@@ -1936,7 +1913,6 @@ export const EN: Record<string, string> = {
   向左滚动: 'Scroll left',
   向右滚动: 'Scroll right',
   '还有 {n} 项': '{n} more',
-  路由规则: 'Routing rules',
   需要处理的规则: 'Rules that need attention',
   '{use}：{problem}': '{use}: {problem}',
   '没有执行机启用 {runtime}': 'No Runner has {runtime} on',
@@ -1956,8 +1932,6 @@ export const EN: Record<string, string> = {
   '这条规则刚被改过，已重新读取，请再看一眼。':
     'This rule just changed and has been reloaded. Take another look.',
   不填则沿用规则的执行机: 'Leave empty to keep the rule Runner',
-  '跟随 Coordinator 路由规则，在路由设置里调整。':
-    'Follows the coordinator routing rules; adjust them in routing settings.',
   首选执行机: 'Preferred Runner',
   不固定: 'Any machine',
   '当前默认：Claude Code（因为团队有 Claude 订阅，执行机也装了 Claude Code）':

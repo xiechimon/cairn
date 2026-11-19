@@ -1,13 +1,8 @@
-export type ChiefView = 'none' | 'settings';
-
 export interface GestureState {
-  chief: ChiefView;
   escStack: readonly string[];
 }
 
 export type GestureEvent =
-  | { type: 'chief/minimize' }
-  | { type: 'chief/settings' }
   | { type: 'esc/push'; id: string }
   | { type: 'esc/drop'; id: string }
   | { type: 'escape' };
@@ -19,17 +14,8 @@ export interface GestureResult {
 
 const idle = (state: GestureState): GestureResult => ({ state, dismissed: null });
 
-function withChief(state: GestureState, chief: ChiefView): GestureResult {
-  if (state.chief === chief) return idle(state);
-  return { state: { ...state, chief }, dismissed: null };
-}
-
 export function reduceGesture(state: GestureState, event: GestureEvent): GestureResult {
   switch (event.type) {
-    case 'chief/minimize':
-      return withChief(state, 'none');
-    case 'chief/settings':
-      return withChief(state, 'settings');
     case 'esc/push': {
       if (state.escStack.includes(event.id)) {
         const rest = state.escStack.filter((id) => id !== event.id);
@@ -111,9 +97,9 @@ export function createGestureStore(initial: GestureState): GestureStore {
 
 let singleton: GestureStore | null = null;
 
-export function getGestureStore(initialChief?: ChiefView): GestureStore {
+export function getGestureStore(): GestureStore {
   if (singleton === null) {
-    singleton = createGestureStore({ chief: initialChief ?? 'none', escStack: [] });
+    singleton = createGestureStore({ escStack: [] });
   }
   return singleton;
 }

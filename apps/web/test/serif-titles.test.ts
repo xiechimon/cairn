@@ -69,7 +69,6 @@ describe('the serif voice follows claude.ai (DESIGN.md Typography)', () => {
     expect(read('components/title-menu-trigger.tsx')).toMatch(/page: '[^']*voice-title text-page/);
     expect(read('pages/shell.tsx')).toContain('voice-title text-page');
     expect(read('components/settings-list.tsx')).toContain('voice-title text-page');
-    expect(read('chief/chief-settings.tsx')).toContain('voice-title text-page');
     expect(read('board/sidebar.tsx')).toMatch(/sidebar-team-name[^"]*voice-title text-brand/);
   });
 

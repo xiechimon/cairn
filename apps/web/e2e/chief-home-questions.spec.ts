@@ -153,9 +153,6 @@ test('the header carries no question pill on any page', async ({ page }) => {
   await page.goto('/app/settings/account');
   await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible();
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
-  await page.goto('/app?chief=settings');
-  await expect(page.getByTestId('chief-settings-topbar')).toBeVisible();
-  await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
 });
 
 test('a chip answers at once and the badge drops; the next question takes its place', async ({

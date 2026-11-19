@@ -224,10 +224,19 @@ async function mockMemory(page: Page, options: MockOptions = {}) {
   };
 }
 
+async function openMemoryDialog(page: Page) {
+  const narrow = (page.viewportSize()?.width ?? 1440) < 640;
+  if (narrow) await page.getByTestId('narrow-menu').click();
+  const nav = narrow ? page.getByRole('dialog', { name: '侧边栏' }) : page.locator('aside');
+  await nav.getByText('Coordinator', { exact: true }).first().hover();
+  await nav.getByTestId('sidebar-coordinator-memory').click();
+  await expect(page.getByRole('dialog', { name: '记忆' })).toBeVisible();
+}
+
 async function openMemory(page: Page, options: MockOptions = {}) {
   const control = await mockMemory(page, options);
-  await page.goto('/app?chief=settings');
-  await page.getByRole('tab', { name: '记忆' }).click();
+  await page.goto('/app');
+  await openMemoryDialog(page);
   return control;
 }
 
@@ -251,7 +260,7 @@ const settled = (page: Page) =>
 const memoryRow = (page: Page, title: string) =>
   page.getByRole('button', { name: `打开记忆：${title}` });
 
-test('Coordinator settings lists team memory only, with no scope headings or count', async ({
+test('the memory dialog lists team memory only, with no scope headings or count', async ({
   page,
 }) => {
   await openMemory(page);
@@ -274,7 +283,7 @@ test('Coordinator settings lists team memory only, with no scope headings or cou
   await expect(verify).not.toContainText('单测用');
   await expect(verify).toContainText('更新于 11月8日');
   await expect(
-    page.getByTestId('chief-settings-col').locator('[data-slot="list-card"], [data-slot="card"]'),
+    page.getByTestId('memory-list').locator('[data-slot="list-card"], [data-slot="card"]'),
   ).toHaveCount(0);
 
   const geometry = await verify.evaluate((el) => {
@@ -384,7 +393,7 @@ test('delete confirms first, then removes the row and closes both dialogs', asyn
   await evidenceShot(page, 'memory-delete-confirm.png');
   await confirm.getByRole('button', { name: '删除记忆' }).click();
   await expect(confirm).toBeHidden();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: '评审交接' })).toHaveCount(0);
   expect(deleted).toEqual(['m-review']);
   await expect(memoryRow(page, '评审交接')).toHaveCount(0);
 });
@@ -543,7 +552,7 @@ for (const last of [false, true]) {
     const refresh = new Promise<void>(resolve => { release = resolve; });
     await openMemory(page, { memories: MEMORIES.slice(0, last ? 1 : 2), refresh });
     await memoryRow(page, '验证命令').click();
-    await page.getByRole('dialog').getByRole('button', { name: '删除…' }).click();
+    await page.getByRole('dialog', { name: '验证命令' }).getByRole('button', { name: '删除…' }).click();
     const refreshed = page.waitForRequest(request => request.method() === 'GET' && new URL(request.url()).pathname === '/api/teams/t1/memories');
     await page.getByRole('alertdialog').getByRole('button', { name: '删除记忆' }).click();
     await refreshed;
@@ -558,7 +567,7 @@ for (const last of [false, true]) {
   test(`a failed post-delete refresh cannot restore a deleted row, last=${last}`, async ({ page }) => {
     const { deleted } = await openMemory(page, { memories: MEMORIES.slice(0, last ? 1 : 2), refreshFails: true });
     await memoryRow(page, '验证命令').click();
-    await page.getByRole('dialog').getByRole('button', { name: '删除…' }).click();
+    await page.getByRole('dialog', { name: '验证命令' }).getByRole('button', { name: '删除…' }).click();
     const failed = page.waitForResponse(response => response.request().method() === 'GET' && new URL(response.url()).pathname === '/api/teams/t1/memories' && response.status() === 500);
     await page.getByRole('alertdialog').getByRole('button', { name: '删除记忆' }).click();
     await failed;
@@ -695,8 +704,7 @@ test('import card dismisses itself and stays dismissed', async ({ page }) => {
   await page.getByRole('button', { name: '以后再说' }).click();
   await expect(page.getByText('从仓库导入记忆')).toHaveCount(0);
   await page.reload();
-  await page.goto('/app?chief=settings');
-  await page.getByRole('tab', { name: '记忆' }).click();
+  await openMemoryDialog(page);
   await expect(page.getByTestId('memory-list')).toBeVisible();
   await expect(page.getByText('从仓库导入记忆')).toHaveCount(0);
   await expect
@@ -738,39 +746,12 @@ for (const memories of [[], MANY]) {
 const MANY_TEAM = MANY.map((memory) => ({ ...memory, projectId: null }));
 
 for (const memories of [[], MANY_TEAM]) {
-  test(`Coordinator memory has one composer pinned to the bottom, memories=${memories.length}`, async ({ page }) => {
-    await openMemory(page, { memories });
-    const col = page.getByTestId('chief-settings-col');
-    await expect(col.getByRole('textbox')).toHaveCount(1);
-    await expect(col.getByRole('textbox', { name: '告诉 Coordinator 要记住或改什么' })).toBeVisible();
-    const scroller = col.locator('xpath=..');
-    const box = async () => {
-      const [outer, field, inner] = await Promise.all([
-        scroller.boundingBox(),
-        page.getByTestId('memory-edit-composer').locator('> div').boundingBox(),
-        col.boundingBox(),
-      ]);
-      return { outer: outer!, field: field!, inner: inner! };
-    };
-    const top = await box();
-    expect(Math.abs(top.outer.y + top.outer.height - 16 - (top.field.y + top.field.height))).toBeLessThan(2);
-    expect(Math.abs(top.field.x - top.inner.x)).toBeLessThan(2);
-    expect(Math.abs(top.field.width - top.inner.width)).toBeLessThan(2);
-    await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
-    const end = await box();
-    expect(Math.abs(end.outer.y + end.outer.height - 16 - (end.field.y + end.field.height))).toBeLessThan(2);
-  });
-}
-
-for (const memories of [[], MANY_TEAM]) {
   test(`sidebar memory dialog has one composer pinned to the bottom, memories=${memories.length}`, async ({ page }) => {
-    await mockMemory(page, { memories });
-    await page.goto('/app');
-    await page.locator('aside').getByText('Coordinator', { exact: true }).first().hover();
-    await page.getByTestId('sidebar-coordinator-memory').click();
-    const body = page.getByRole('dialog').getByTestId('dialog-body');
+    await openMemory(page, { memories });
+    const body = page.getByRole('dialog', { name: '记忆' }).getByTestId('dialog-body');
     await expect(body.getByRole('textbox')).toHaveCount(1);
     await expect(body.getByRole('textbox', { name: '告诉 Coordinator 要记住或改什么' })).toBeVisible();
+    await settled(page);
     const box = async () => {
       const [outer, field, inner] = await Promise.all([
         body.boundingBox(),

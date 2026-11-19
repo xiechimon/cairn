@@ -176,7 +176,6 @@ export const chiefAgentChip: FixtureSet = {
   resources: SECRETS_BASE,
   todos: [legacyReview, legacyDone],
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '验证一下凭证链路…',
@@ -205,7 +204,6 @@ export const chiefAgentChip: FixtureSet = {
 };
 
 const FAB_AVATAR_CHIEF: ChiefContent = {
-  view: 'none',
   bound: true,
   modelSlot: 'claude-sonnet-5 · 默认',
   threadTitle: '新主题',

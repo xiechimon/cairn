@@ -2140,7 +2140,6 @@ export function mapChief(
           runningStepId: opts.activity?.stepId ?? null,
         });
   return {
-    view: 'none',
     bound,
     ...(bound && env.agentActor
       ? {

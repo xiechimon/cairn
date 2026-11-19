@@ -10,7 +10,7 @@ import {
 
 const webRoot = fileURLToPath(new URL('..', import.meta.url));
 
-const closed: GestureState = { chief: 'none', escStack: [] };
+const closed: GestureState = { escStack: [] };
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -23,21 +23,13 @@ function walk(dir: string): string[] {
 }
 
 describe('reduceGesture', () => {
-  test('settings opens and minimize returns to the conversation', () => {
-    const settings = reduceGesture(closed, { type: 'chief/settings' });
-    expect(settings.state.chief).toBe('settings');
-    expect(reduceGesture(settings.state, { type: 'chief/settings' }).state).toBe(settings.state);
-    expect(reduceGesture(settings.state, { type: 'chief/minimize' }).state.chief).toBe('none');
-  });
-
-  test('Escape pops only the top layer and leaves the Coordinator view alone', () => {
-    let state: GestureState = { chief: 'settings', escStack: [] };
+  test('Escape pops only the top layer', () => {
+    let state: GestureState = closed;
     state = reduceGesture(state, { type: 'esc/push', id: 'a' }).state;
     state = reduceGesture(state, { type: 'esc/push', id: 'b' }).state;
 
     const first = reduceGesture(state, { type: 'escape' });
     expect(first.dismissed).toBe('b');
-    expect(first.state.chief).toBe('settings');
     expect(first.state.escStack).toEqual(['a']);
 
     const second = reduceGesture(first.state, { type: 'escape' });
@@ -52,14 +44,13 @@ describe('reduceGesture', () => {
 
 describe('gesture store', () => {
   test('Escape runs the top closer and a later drop is a no-op', () => {
-    const store = createGestureStore({ chief: 'settings', escStack: [] });
+    const store = createGestureStore({ escStack: [] });
     const log: string[] = [];
     const outer = store.pushLayer(() => log.push('outer'));
     store.pushLayer(() => log.push('inner'));
 
     store.dispatch({ type: 'escape' });
     expect(log).toEqual(['inner']);
-    expect(store.getState().chief).toBe('settings');
     expect(store.getState().escStack).toEqual([outer]);
 
     store.dropLayer(outer);

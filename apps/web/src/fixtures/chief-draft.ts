@@ -22,7 +22,6 @@ export const chiefDraft: FixtureSet = {
   now: r7(11, 22) + 42_000,
   projectNames: { [CAIRN_PROJECT]: 'cairn', [PROJECT_ID]: 'r3-lifecycle' },
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: 'Coordinator',

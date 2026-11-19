@@ -92,7 +92,6 @@ function askedIn(todo: TodoRecord, messageId: string, text: string, quoted = fal
 
 const conversation: ChiefContent = {
   ...chiefDefault,
-  view: 'none',
   bound: true,
   threadTitle: 'Coordinator',
   threadId: 'chief-global',

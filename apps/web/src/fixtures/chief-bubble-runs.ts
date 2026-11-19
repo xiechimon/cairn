@@ -5,7 +5,6 @@ export const chiefBubbleRuns: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(15, 10),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '连邮箱',

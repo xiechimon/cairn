@@ -31,6 +31,7 @@ import { SubtreeErrorBoundary } from '../components/subtree-error-boundary.js';
 import { Button } from '../components/ui/button.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import {
   ARCHIVED_PROJECT_WRITE_REASON,
   ArchivedProjectBar,
@@ -625,7 +626,7 @@ export function HomeC({
                 onStop={archived === null ? surface.onStop : undefined}
                 composerReplacement={archivedBar}
                 earlier={surface.earlier}
-                onSettings={() => surface.setChiefView('settings')}
+                onSettings={() => navigate(COORDINATOR_ROUTING_HREF)}
                 showBindGate={!live}
                 todoGlances={todoGlances}
                 prefill={prefill}

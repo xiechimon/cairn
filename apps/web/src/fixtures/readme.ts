@@ -164,7 +164,6 @@ function todo(
 function readmeFixture(copy: Copy): FixtureSet {
   const conversation: ChiefContent = {
     ...chiefDefault,
-    view: 'none',
     bound: true,
     threadTitle: 'Coordinator',
     threadId: 'readme-chief',

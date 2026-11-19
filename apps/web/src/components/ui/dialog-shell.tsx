@@ -1,6 +1,6 @@
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { cn } from 'cn';
-import { type ReactNode, useCallback, useEffect, useRef } from 'react';
+import { type ReactNode, useCallback, useEffect, useId, useRef } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { X } from '../../icons/index.js';
 import { Button } from './button.js';
@@ -93,6 +93,7 @@ interface DialogShellProps {
 }
 
 function useReturnFocus(open: boolean) {
+  const shellId = useId();
   const origin = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (open) return;
@@ -101,7 +102,7 @@ function useReturnFocus(open: boolean) {
       if (
         el instanceof HTMLElement &&
         el !== document.body &&
-        el.closest('[data-slot="dialog-content"]') == null
+        el.closest(`[data-shell-id="${CSS.escape(shellId)}"]`) == null
       ) {
         origin.current = el;
       }
@@ -109,11 +110,11 @@ function useReturnFocus(open: boolean) {
     record();
     document.addEventListener('focusin', record);
     return () => document.removeEventListener('focusin', record);
-  }, [open]);
+  }, [open, shellId]);
   const restore = useCallback(() => {
     origin.current?.focus();
   }, []);
-  return { restore };
+  return { shellId, restore };
 }
 
 export function DialogShell({
@@ -140,7 +141,7 @@ export function DialogShell({
   stacked = false,
 }: DialogShellProps) {
   const { t } = useI18n();
-  const { restore } = useReturnFocus(open);
+  const { shellId, restore } = useReturnFocus(open);
 
   const handleOpenChange = (next: boolean, details?: { reason?: string; event?: Event }) => {
     if (next) return;
@@ -172,6 +173,7 @@ export function DialogShell({
             data-slot="dialog-content"
             initialFocus={initialFocus}
             finalFocus={restore}
+            data-shell-id={shellId}
             className={
               viewportRoot
                 ? `${VIEWPORT_MECHANISM_CLS} group/dlgvp${className != null ? ` ${className}` : ''}`
@@ -206,6 +208,7 @@ export function DialogShell({
       <DialogContent
         initialFocus={initialFocus}
         finalFocus={restore}
+        data-shell-id={shellId}
         showCloseButton={false}
         aria-label={title}
         data-size={size}

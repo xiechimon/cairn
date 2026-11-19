@@ -634,7 +634,6 @@ html:has([data-slot="demo-banner"]) .app-drawer {
 
 @media (max-width: 640px) {
   [data-testid="page-topbar"],
-  [data-testid="chief-settings-topbar"],
   .side-panel [data-panel-head] {
     padding-left: 52px;
   }

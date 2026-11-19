@@ -71,7 +71,6 @@ const IMAGE_SRC = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
 
 function filesChief(stream: ChiefStreamItem[], composerFiles?: ComposerFileSeed[]): ChiefContent {
   return {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: 'Coordinator',

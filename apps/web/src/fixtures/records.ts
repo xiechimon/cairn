@@ -706,8 +706,6 @@ export interface ChiefThreadRef {
   active?: boolean;
 }
 
-export type ChiefSettingsTab = 'routing' | 'charter' | 'memory' | 'watches';
-
 export interface ModelOption {
   runtime: string;
   provider: string;
@@ -728,8 +726,6 @@ export interface ChiefContextUsage {
 }
 
 export interface ChiefContent {
-  view: 'settings' | 'none';
-  tab?: ChiefSettingsTab;
   bound: boolean;
   modelSlot?: string;
   agent?: { id?: string; displayName: string; avatarUrl: string | null };

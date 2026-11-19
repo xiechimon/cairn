@@ -591,7 +591,6 @@ function demoFixtureOf(): FixtureSet {
       machines: DEMO_MACHINES,
     },
     chief: {
-      view: 'none',
       bound: true,
       modelSlot: 'claude-sonnet-5 · 默认',
       threadTitle: '把购物车相关的事排一下…',

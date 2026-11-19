@@ -5,7 +5,6 @@ export const chiefQuickReplies: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(11, 22),
   chief: {
-    view: 'none',
     bound: true,
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '看一遍 cairn 仓库',
