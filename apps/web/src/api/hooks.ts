@@ -110,6 +110,7 @@ import type {
 import {
   backupHealthSchema,
   backupNotice,
+  IN_PROGRESS_PHASES,
   SKILL_ENTRY_FILE,
   tasksQuerySchema,
 } from '@cairn/shared';
@@ -132,6 +133,7 @@ import { api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import { cacheUserMessage } from './message-cache.js';
 import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
+import { cachedTodo, optimisticTodo } from './team-stream-cache.js';
 import { keepNewerTasks, keepNewerTodo, keepNewerTodos } from './todo-freshness.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
@@ -1003,6 +1005,14 @@ export function useApiMutations(teamId: string | undefined) {
           routeOverride?: RouteOverride | null;
         };
       }) => api.patch<TodoRecord>(`/api/todos/${input.id}`, input.body),
+      onMutate: (input) =>
+        optimisticTodo(qc, teamId ?? '', input.id, {
+          ...(input.body.title === undefined ? {} : { title: input.body.title }),
+          ...(input.body.spec === undefined ? {} : { spec: input.body.spec }),
+          ...(input.body.projectId === undefined ? {} : { projectId: input.body.projectId }),
+          ...(input.body.orderIndex === undefined ? {} : { orderIndex: input.body.orderIndex }),
+        }),
+      onError: (_error, _input, rollback) => rollback?.(),
       onSuccess: invalidateAll,
     }),
     runTodoOn: useMutation({
@@ -1016,8 +1026,21 @@ export function useApiMutations(teamId: string | undefined) {
           `/api/todos/${id}/stop-and-done`,
           {},
         ),
+      onMutate: (id) => {
+        const phase = cachedTodo(qc, teamId ?? '', id)?.phase;
+        if (phase === undefined || (IN_PROGRESS_PHASES as readonly string[]).includes(phase))
+          return undefined;
+        return optimisticTodo(qc, teamId ?? '', id, {
+          phase: 'done',
+          phaseAt: Date.now(),
+          section: 'resolved',
+        });
+      },
       onSuccess: invalidateAll,
-      onError: invalidateAll,
+      onError: (_error, _id, rollback) => {
+        rollback?.();
+        invalidateAll();
+      },
     }),
     setTodoArchived: useMutation({
       mutationFn: (input: { id: string; archived: boolean }) =>

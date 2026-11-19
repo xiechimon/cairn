@@ -39,6 +39,54 @@ function patchTaskEntries(data: TasksQuery | undefined, doc: TodoRecord): TasksQ
   };
 }
 
+function applyTodoDoc(qc: QueryClient, teamId: string, doc: TodoRecord): void {
+  qc.setQueryData<TodoRecord>(['todo', doc.id], doc);
+  qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) => patchTodo(records, doc));
+  qc.setQueryData<TasksQuery>(['tasks', teamId], (data) => patchTaskEntries(data, doc));
+}
+
+export function cachedTodo(qc: QueryClient, teamId: string, id: string): TodoRecord | undefined {
+  const entry = qc
+    .getQueryData<TasksQuery>(['tasks', teamId])
+    ?.entries.find((row) => row.kind === 'todo' && row.id === id);
+  return (
+    (entry?.kind === 'todo' ? (entry as TodoRecord) : undefined) ??
+    qc.getQueryData<TodoRecord[]>(['todos', teamId])?.find((row) => row.id === id) ??
+    qc.getQueryData<TodoRecord>(['todo', id])
+  );
+}
+
+export async function optimisticTodo(
+  qc: QueryClient,
+  teamId: string,
+  id: string,
+  patch: Partial<TodoRecord>,
+): Promise<() => void> {
+  const keys = [
+    ['todo', id],
+    ['todos', teamId],
+    ['tasks', teamId],
+  ];
+  await Promise.all(keys.map((queryKey) => qc.cancelQueries({ queryKey })));
+  const before = keys.map((queryKey) => [queryKey, qc.getQueryData(queryKey)] as const);
+  qc.setQueryData<TodoRecord>(['todo', id], (record) => record && { ...record, ...patch });
+  qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) =>
+    records?.map((row) => (row.id === id ? { ...row, ...patch } : row)),
+  );
+  qc.setQueryData<TasksQuery>(['tasks', teamId], (data) =>
+    data === undefined
+      ? data
+      : {
+          entries: data.entries.map((entry) =>
+            entry.kind === 'todo' && entry.id === id ? { ...entry, ...patch } : entry,
+          ),
+        },
+  );
+  return () => {
+    for (const [queryKey, data] of before) qc.setQueryData(queryKey, data);
+  };
+}
+
 export function applyTeamStreamEvent(
   qc: QueryClient,
   teamId: string,
@@ -47,10 +95,7 @@ export function applyTeamStreamEvent(
   if (ev.type === 'todo') {
     const parsed = todoRecordSchema.safeParse(ev.doc);
     if (!parsed.success) return false;
-    const doc = parsed.data;
-    qc.setQueryData<TodoRecord>(['todo', doc.id], doc);
-    qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) => patchTodo(records, doc));
-    qc.setQueryData<TasksQuery>(['tasks', teamId], (data) => patchTaskEntries(data, doc));
+    applyTodoDoc(qc, teamId, parsed.data);
     return true;
   }
   if (ev.type === 'build') {

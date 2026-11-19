@@ -45,12 +45,9 @@ export function MoveToProjectSub({ todo }: { todo: TodoRecord }) {
       return;
     }
     const name = targets.find((target) => target.id === projectId)?.name ?? '';
-    mutations.patchTodo.mutate(
-      { id: todo.id, body: { projectId } },
-      {
-        onSuccess: () => toastSuccess(t('任务已移到 {project}', { project: name })),
-        onError: (error) => toastError(t('移动任务失败，请重试。'), error),
-      },
+    mutations.patchTodo.mutateAsync({ id: todo.id, body: { projectId } }).then(
+      () => toastSuccess(t('任务已移到 {project}', { project: name })),
+      (error: unknown) => toastError(t('移动任务失败，请重试。'), error),
     );
   };
   return (

@@ -21,7 +21,7 @@ import { PageThumb, primaryPage, THUMB_MAX_BYTES, usePageHtml } from './made-fil
 import { MADE_GROUP_LABEL, type MadeGroupKey } from './made-groups.js';
 
 const CARD_CLS =
-  'relative flex h-38 w-full flex-col overflow-hidden rounded-(--radius-card) bg-background px-4 pt-3.5 pb-3 shadow-(--e1-lift)';
+  'relative flex h-38 w-full flex-col overflow-hidden rounded-(--radius-card) bg-background px-4 pt-3.5 pb-3 shadow-(--e1-lift) dark:bg-card';
 
 const CAROUSEL_CLS =
   '-mt-px mr-2.5 mb-0 ml-2.5 grid list-none auto-cols-[calc((100cqw-var(--spacing)*19)/2)] grid-flow-col gap-3 overflow-x-auto overscroll-x-contain scroll-px-1.5 px-1.5 pt-0.5 pb-1 snap-x snap-mandatory data-next:mr-10.5 data-prev:ml-10.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
@@ -130,7 +130,7 @@ export function MadeCard({
           )}
           <span
             data-testid="made-card-meta"
-            className="min-w-0 flex-1 truncate text-meta text-content-tertiary"
+            className="min-w-0 flex-1 truncate text-meta tabular-nums text-content-tertiary"
           >
             {meta}
           </span>
@@ -154,12 +154,12 @@ export function MadeSkeleton() {
   }, []);
   if (!shown) return null;
   return (
-    <div data-testid="made-skeleton" aria-hidden="true" className="pt-5">
+    <div data-testid="made-skeleton" aria-hidden="true" className="pt-7">
       <Skeleton className={`mx-4 mb-2.5 h-3.5 w-14 ${BAR}`} />
       <div className="@container">
         <div className={CAROUSEL_CLS}>
           {[0, 1].map((key) => (
-            <div key={key} className={CARD_CLS}>
+            <div key={key} data-slot="made-skeleton-card" className={CARD_CLS}>
               <Skeleton className={`h-3.5 w-4/5 ${BAR}`} />
               <Skeleton className={`mt-3 h-2.5 w-full ${BAR}`} />
               <Skeleton className={`mt-2 h-2.5 w-2/3 ${BAR}`} />

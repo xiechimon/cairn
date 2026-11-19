@@ -419,7 +419,7 @@ function MachineCard({
               data-testid="machine-line"
               data-line={line.kind}
               title={line.title}
-              className={cn('flex min-w-0 truncate text-meta', LINE_INK[line.kind])}
+              className={cn('flex min-w-0 truncate text-meta tabular-nums', LINE_INK[line.kind])}
             >
               {line.node}
             </span>

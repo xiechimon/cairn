@@ -31,3 +31,6 @@ export async function offsetFrom(anchor: Locator, target: Locator): Promise<numb
   const [a, b] = await Promise.all([anchor.boundingBox(), target.boundingBox()]);
   return Math.round((b?.y ?? 0) - (a?.y ?? 0));
 }
+
+export const tops = (rows: Locator) =>
+  rows.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));

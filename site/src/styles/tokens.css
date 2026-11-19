@@ -57,7 +57,7 @@
 :root[data-theme="dark"] {
   --canvas: #1b1c1b;
   --sheet: #151615;
-  --card: #1c1d1c;
+  --card: #1f201f;
   --secondary: #222322;
   --hover: rgb(255 255 255 / 0.075);
   --line: rgb(255 255 255 / 0.1);

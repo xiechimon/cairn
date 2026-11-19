@@ -34,15 +34,15 @@ export function useMarkDone(todo: TodoRecord): { markDone: () => void; dialogs: 
       blockDemoWrite();
       return;
     }
-    mutations.stopAndDoneTodo.mutate(todo.id, {
-      onSuccess: (result) =>
+    mutations.stopAndDoneTodo.mutateAsync(todo.id).then(
+      (result) =>
         toastSuccess(
           result.state === 'stopping'
             ? t('已通知停止，执行端确认后任务会标记为完成。')
             : t('任务已标记完成。'),
         ),
-      onError: (error) => toastError(stopAndDoneErrorCopy(error, t), null),
-    });
+      (error: unknown) => toastError(stopAndDoneErrorCopy(error, t), null),
+    );
   };
   const markDone = () => {
     if ((IN_PROGRESS_PHASES as readonly string[]).includes(todo.phase)) setDialog('stop');

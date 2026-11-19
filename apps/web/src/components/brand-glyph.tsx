@@ -1,6 +1,8 @@
 import type { SVGProps } from 'react';
 import { BRAND_GLYPH, type BrandGlyphSize } from '../lib/brand-mark.js';
 
+const SMALL_OPTICAL_DROP = 3.6;
+
 export function BrandGlyphMark({
   optical = 'small',
   busy = false,
@@ -9,6 +11,7 @@ export function BrandGlyphMark({
   busy?: boolean;
 }) {
   const { box, scale, offset, band, d } = BRAND_GLYPH[optical];
+  const drop = optical === 'small' ? SMALL_OPTICAL_DROP : 0;
   const stroke = {
     d,
     pathLength: 1,
@@ -19,7 +22,7 @@ export function BrandGlyphMark({
   } as const;
   return (
     <g
-      transform={`translate(${box / 2} ${box / 2}) scale(${scale}) translate(${offset[0]} ${offset[1]})`}
+      transform={`translate(${box / 2} ${box / 2}) scale(${scale}) translate(${offset[0]} ${offset[1] + drop})`}
     >
       <path {...stroke} opacity={busy ? 0.28 : 1} />
       {busy && <path className="spiral-trace" {...stroke} />}

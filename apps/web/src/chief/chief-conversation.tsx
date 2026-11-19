@@ -685,7 +685,7 @@ export function ChiefConversation({
           <MessageScrollerItem style={VISIBLE_ITEM_STYLE}>
             <div
               data-testid="chief-time-divider"
-              className="mt-5 text-center text-caption text-(--text-tertiary)"
+              className="mt-5 text-center text-caption tabular-nums text-(--text-tertiary)"
             >
               <time dateTime={new Date(at).toISOString()}>
                 {timeDividerLabel(at, clock, locale, t)}

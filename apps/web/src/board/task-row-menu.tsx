@@ -50,13 +50,10 @@ export function RenameDialog({
       onClose();
       return;
     }
-    mutations.patchTodo.mutate(
-      { id: todo.id, body: { title: trimmed } },
-      {
-        onSuccess: onClose,
-        onError: (error) => toastError(t('重命名失败，请重试。'), error),
-      },
-    );
+    onClose();
+    mutations.patchTodo
+      .mutateAsync({ id: todo.id, body: { title: trimmed } })
+      .catch((error: unknown) => toastError(t('重命名失败，请重试。'), error));
   };
   return (
     <DialogShell

@@ -16,7 +16,7 @@ export function ListCard({
       data-outlined={outlined || undefined}
       className={cn(
         'flex flex-col divide-y divide-border overflow-hidden rounded-(--radius-card)',
-        outlined ? 'bg-background shadow-(--e1-lift)' : 'bg-card shadow-(--e1)',
+        outlined ? 'bg-background shadow-(--e1-lift) dark:bg-card' : 'bg-card shadow-(--e1)',
         className,
       )}
     >

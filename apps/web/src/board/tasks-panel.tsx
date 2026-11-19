@@ -16,6 +16,7 @@ import type { GlyphKind } from '../components/status-glyph.js';
 import { TaskPrLine, TaskPrLineSkeleton } from '../components/thread/task-pr-line.js';
 import { TaskRow } from '../components/thread/task-row.js';
 import { Button } from '../components/ui/button.js';
+import { Skeleton } from '../components/ui/skeleton.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { ACCENT_INK } from '../phase.js';
@@ -55,6 +56,29 @@ export const PANEL_TITLE = 'text-heading font-normal';
 const PANEL_TABS = 'h-7.5 gap-0.5 group-data-horizontal/tabs:h-7.5';
 const PANEL_TAB =
   'h-7.5 px-2.5 text-ui text-foreground data-active:font-normal dark:text-foreground';
+
+const SKELETON_BAR = 'animate-none rounded-sm bg-border';
+
+function TasksSkeleton() {
+  return (
+    <div data-testid="tasks-skeleton" aria-hidden="true" className="flex flex-col gap-0.5">
+      <div className="flex h-8 items-center px-2.5">
+        <Skeleton className={`h-3 w-14 ${SKELETON_BAR}`} />
+      </div>
+      {[0.6, 0.45, 0.7].map((width) => (
+        <div key={width} className="flex h-14 items-start gap-4 px-2.5 py-2">
+          <span className="flex size-7 flex-none items-center justify-center">
+            <Skeleton className={`size-4 rounded-full ${SKELETON_BAR}`} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-2.5 pt-1.5">
+            <Skeleton className={`h-3 ${SKELETON_BAR}`} style={{ width: `${width * 100}%` }} />
+            <Skeleton className={`h-2.5 w-1/3 ${SKELETON_BAR}`} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const MOVE_FRESH_MS = 1500;
 
@@ -532,6 +556,7 @@ export function TasksPanel({
             query={query}
             isEmpty={empty !== null}
             loadingLabel={t('正在加载任务')}
+            skeleton={<TasksSkeleton />}
             errorTitle={t('任务没能加载')}
             empty={body}
           >

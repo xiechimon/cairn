@@ -1,3 +1,4 @@
+import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useLiveData } from '../api/provider.js';
@@ -81,7 +82,7 @@ export function QueryBoundary({
       <div
         data-testid="query-loading"
         aria-busy="true"
-        className={`flex flex-col gap-3 pt-2 ${className ?? ''}`}
+        className={cn('flex flex-col', skeleton === undefined && 'gap-3 pt-2', className)}
       >
         <span role="status" className="sr-only">
           {loadingLabel}

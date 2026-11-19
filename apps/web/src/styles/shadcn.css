@@ -174,7 +174,7 @@
   --canvas: #1b1c1b;
   --background: #151615;
   --foreground: #ecebe6;
-  --card: #1c1d1c;
+  --card: #1f201f;
   --card-foreground: #ecebe6;
   --popover: #2c2d2c;
   --popover-foreground: #ecebe6;
@@ -194,7 +194,7 @@
   --sidebar-active: rgb(255 255 255 / 0.15);
   --sidebar-press: rgb(255 255 255 / 0.12);
   --sidebar-ink: var(--text-secondary);
-  --tree-line: #424342;
+  --tree-line: #5c5d5c;
   --surface-tertiary: #262726;
   --text-secondary: #bbbab7;
   --text-tertiary: #9c9b98;

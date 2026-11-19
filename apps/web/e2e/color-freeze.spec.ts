@@ -5,7 +5,7 @@ const FROZEN_HEX: Record<'dark' | 'light', Record<string, string>> = {
     canvas: '#1b1c1b',
     background: '#151615',
     foreground: '#ecebe6',
-    card: '#1c1d1c',
+    card: '#1f201f',
     'card-foreground': '#ecebe6',
     popover: '#2c2d2c',
     'popover-foreground': '#ecebe6',

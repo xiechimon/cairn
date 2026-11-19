@@ -90,10 +90,19 @@ const STATE_ICON = {
 
 const CHIP = 'inline-flex min-w-0 items-center gap-1.5 outline-none';
 
-function PrGlyph({ state }: { state: PrPanelRow['state'] }) {
+const OPTICAL_NUDGE: Partial<Record<PrPanelRow['state'], string>> = {
+  draft: '0.5px -0.25px',
+  merged: '1px -1px',
+};
+
+export function PrGlyph({ state }: { state: PrPanelRow['state'] }) {
   const Icon = STATE_ICON[state];
   return (
-    <Icon aria-hidden className={cn('size-4 flex-none stroke-2!', TONE_INK[GLYPH_TONE[state]])} />
+    <Icon
+      aria-hidden
+      className={cn('size-4 flex-none stroke-2!', TONE_INK[GLYPH_TONE[state]])}
+      style={{ translate: OPTICAL_NUDGE[state] }}
+    />
   );
 }
 

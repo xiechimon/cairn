@@ -1,6 +1,9 @@
 import { cn } from 'cn';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import designDoc from '../../DESIGN.md?raw';
+import { BrandGlyph } from '../components/brand-glyph.js';
+import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
+import { PrGlyph } from '../components/thread/task-pr-line.js';
 import { Button } from '../components/ui/button.js';
 import { docChecks, type GalleryTheme, parseFrontmatter } from './design-doc.js';
 import {
@@ -361,6 +364,61 @@ export function TypeSection() {
   );
 }
 
+const STATUS_KINDS: readonly GlyphKind[] = [
+  'todo',
+  'queued',
+  'ring',
+  'attention',
+  'quarter',
+  'half',
+  'three-quarter',
+  'done',
+  'failed',
+  'closed',
+];
+
+const ALIGNMENT_GLYPHS: readonly { name: string; glyph: ReactNode }[] = [
+  ...STATUS_KINDS.map((kind) => ({ name: kind, glyph: <StatusGlyph kind={kind} /> })),
+  ...STATUS_KINDS.filter((kind) => kind === 'failed').map((kind) => ({
+    name: `${kind} outlined`,
+    glyph: <StatusGlyph kind={kind} outlined />,
+  })),
+  { name: 'coordinator', glyph: <BrandGlyph className="size-4 flex-none" /> },
+  ...(['open', 'draft', 'merged', 'closed'] as const).map((state) => ({
+    name: `pr ${state}`,
+    glyph: <PrGlyph state={state} />,
+  })),
+];
+
+function GlyphAlignmentSheet() {
+  return (
+    <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+      {ALIGNMENT_GLYPHS.map(({ name, glyph }) => (
+        <figure
+          key={name}
+          data-glyph-cell={name}
+          className="m-0 flex flex-col items-center gap-1.5"
+        >
+          <span className="relative grid size-12 place-items-center rounded-md bg-background text-foreground">
+            <span
+              aria-hidden
+              className="absolute inset-x-0 top-1/2 h-px bg-(--focus-ring) opacity-50"
+            />
+            <span
+              aria-hidden
+              className="absolute inset-y-0 left-1/2 w-px bg-(--focus-ring) opacity-50"
+            />
+            <span data-glyph-box="" className="relative grid size-4 place-items-center">
+              {glyph}
+            </span>
+          </span>
+          <figcaption className="text-caption text-content-tertiary">{name}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 export function ShapeSection() {
   const pad = Number.parseFloat(computedLength('var(--menu-pad)'));
   const menu = Number.parseFloat(computedLength('var(--radius-popover)'));
@@ -394,6 +452,13 @@ export function ShapeSection() {
               </div>
             ))}
           </div>
+        </Specimen>
+        <Specimen
+          id="glyph-alignment"
+          title="Glyph alignment"
+          note="Every state and mark on one crosshair; CI measures each glyph's ink centre against its box"
+        >
+          <GlyphAlignmentSheet />
         </Specimen>
         <Specimen id="radius-scale" title="Radius scale">
           <div className="-my-3 w-full divide-y divide-border">

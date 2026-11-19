@@ -44,3 +44,13 @@ it.each(['--background', '--surface-tertiary', '--accent', '--border'])(
     expect(contrast(hex('--text-tertiary'), surfaceColor(surface))).toBeGreaterThanOrEqual(4.5);
   },
 );
+
+it('dark surfaces step up in lightness from page to card to popover, so layers read without a stroke', () => {
+  const steps = ['--background', '--card', '--popover'].map((name) => hex(name));
+  expect(contrast(steps[1] ?? '', steps[0] ?? '')).toBeGreaterThanOrEqual(1.1);
+  expect(contrast(steps[2] ?? '', steps[1] ?? '')).toBeGreaterThanOrEqual(1.1);
+});
+
+it('the dark tree line reaches 2.5:1 on the page', () => {
+  expect(contrast(hex('--tree-line'), hex('--background'))).toBeGreaterThanOrEqual(2.5);
+});

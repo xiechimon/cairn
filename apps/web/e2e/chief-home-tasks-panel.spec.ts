@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive, TASK, taskEntry, THREAD } from './chief-home-mock';
+import { tops } from './live-stability';
 
 const HOME = '/app?scenario=home-c';
 
@@ -984,3 +985,72 @@ test('a schedule deleted while its editor is open says so and cannot be saved', 
   await expect(editor).toHaveCount(0);
   await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(0);
 });
+
+test('the loading skeleton has the shape of the list, so nothing moves when the tasks arrive', async ({ page }) => {
+  const tasks = ['A', 'B', 'C'].map((title, n) =>
+    taskEntry({ id: `todo-${n}`, title, seqNum: n + 1, section: 'working' }),
+  );
+  let release = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await mockLive(page, { threads: [THREAD], messages: [], tasks }, (path, _route, json) =>
+    path === '/api/tasks' ? held.then(() => json({ entries: tasks })) : undefined,
+  );
+  await page.goto('/app?pane=tasks');
+  const skeleton = panel(page).getByTestId('tasks-skeleton');
+  await expect(skeleton).toBeVisible();
+  const before = await tops(skeleton.locator(':scope > div'));
+  release();
+  await expect(panel(page).getByTestId('tasks-section')).toHaveCount(1);
+  const after = await tops(panel(page).locator('[data-testid="tasks-section"] > h3, [data-slot="task-row-frame"]'));
+  expect(after).toEqual(before);
+});
+
+test('the Made skeleton cards sit where the cards land', async ({ page }) => {
+  const research = { ...TASK, id: 'todo-research', seqNum: 10, title: 'Research export formats', phase: 'needs_input', output: 'info' };
+  let release = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await mockLive(page, { threads: [THREAD], messages: [], todos: [research] }, (path, _route, json) =>
+    path === '/api/todos' ? held.then(() => json([research])) : undefined,
+  );
+  await page.goto('/app?pane=made');
+  const ghost = madePanel(page).locator('[data-slot="made-skeleton-card"]').first();
+  await expect(ghost).toBeVisible();
+  const [before] = await tops(ghost);
+  release();
+  await expect(madePanel(page).getByTestId('made-card')).toHaveCount(1);
+  expect(await tops(madePanel(page).getByTestId('made-card'))).toEqual([before]);
+});
+
+for (const outcome of ['lands', 'fails'] as const) {
+  test(`Mark done moves the row before the server answers, and ${outcome === 'lands' ? 'keeps it there' : 'puts it back with an error when the request fails'}`, async ({
+    page,
+  }) => {
+    const review = taskEntry({ id: 'todo-1', title: 'Fold finished turns', phase: 'review', section: 'ready_for_review' });
+    const other = taskEntry({ id: 'todo-2', title: 'Sweep dependencies', seqNum: 12, section: 'working' });
+    const state = { threads: [THREAD], messages: [], tasks: [review, other] };
+    let release = () => {};
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    await mockLive(page, state, (path, route, json) => {
+      if (path !== '/api/todos/todo-1/stop-and-done' || route.request().method() !== 'POST') return undefined;
+      return held.then(() => {
+        if (outcome === 'fails') return json({ error: 'boom' }, 500);
+        state.tasks = [{ ...review, phase: 'done', section: 'resolved', v: 2 }, other];
+        return json({ state: 'done', todo: { ...review, phase: 'done', v: 2 } });
+      });
+    });
+    await page.goto('/app?pane=tasks');
+    const row = panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: 'Fold finished turns' });
+    await row.hover();
+    await row.getByTestId('task-row-menu-button').click();
+    await page.getByRole('menuitem', { name: /标记完成/ }).click();
+    await expect(panel(page).locator('[data-section="ready_for_review"]')).toHaveCount(0);
+    release();
+    if (outcome === 'lands') {
+      await expect(page.getByText('任务已标记完成。')).toBeVisible();
+      await expect(panel(page).locator('[data-section="ready_for_review"]')).toHaveCount(0);
+    } else {
+      await expect(page.getByText('标记完成没有成功，请重试。')).toBeVisible();
+      await expect(panel(page).locator('[data-section="ready_for_review"]').getByText('Fold finished turns')).toBeVisible();
+    }
+  });
+}

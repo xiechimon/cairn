@@ -107,7 +107,7 @@ function StatusLine({
   return (
     <p
       data-testid="side-chat-status"
-      className="m-0 flex min-w-0 items-center gap-1 text-meta text-content-tertiary"
+      className="m-0 flex min-w-0 items-center gap-1 text-meta tabular-nums text-content-tertiary"
     >
       <span
         className={cn(
