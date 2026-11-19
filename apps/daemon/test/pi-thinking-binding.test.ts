@@ -38,7 +38,7 @@ function anthropicStream(text: string): string {
     .join('');
 }
 
-test('a resumed Claude task session drops thinking signed under an earlier prefix', async () => {
+test('a resumed Claude task session recovers when Anthropic rejects thinking bound to an earlier prefix', async () => {
   const directory = testTempDir('pi-thinking-binding-');
   const sessionDir = join(directory, 'sessions');
   const manager = SessionManager.create(directory, sessionDir);
@@ -109,7 +109,7 @@ test('a resumed Claude task session drops thinking signed under an earlier prefi
   const events: StepEvent[] = [];
   try {
     for await (const event of handle.events) events.push(event);
-    expect(statuses).toEqual([200]);
+    expect(statuses).toEqual([400, 200]);
     expect(events.filter((event) => event.type === 'error')).toEqual([]);
     expect(events.at(-1)?.type).toBe('done');
   } finally {

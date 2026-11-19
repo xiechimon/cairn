@@ -1,10 +1,13 @@
-import type { ProviderConfig } from '@cairn/shared';
+import { createThinkingBindingGuard, type ProviderConfig } from '@cairn/shared';
 import {
+  type Api,
   type AssistantMessage,
   type AssistantMessageEvent,
+  type AssistantMessageEventStream,
   type Context,
   createAssistantMessageEventStream,
   InMemoryCredentialStore,
+  type Model,
   type Provider,
 } from '@earendil-works/pi-ai';
 import { createModels, type MutableModels } from '@earendil-works/pi-ai/models';
@@ -43,6 +46,58 @@ function withoutImages(context: Context): Context {
       };
     }) as Context['messages'],
   };
+}
+
+function failedStream(model: Model<Api>, error: unknown): AssistantMessage {
+  return {
+    role: 'assistant',
+    content: [],
+    api: model.api,
+    provider: model.provider,
+    model: model.id,
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: 'error',
+    errorMessage: String(error),
+    timestamp: Date.now(),
+  };
+}
+
+function retriedBeforeContent(
+  model: Model<Api>,
+  start: () => AssistantMessageEventStream,
+  retry: (error: AssistantMessage) => boolean,
+): AssistantMessageEventStream {
+  const out = createAssistantMessageEventStream();
+  const run = async () => {
+    const held: AssistantMessageEvent[] = [];
+    let streaming = false;
+    for await (const event of start()) {
+      if (event.type === 'error' && !streaming) {
+        if (retry(event.error)) {
+          for await (const next of start()) out.push(next);
+          return;
+        }
+        for (const earlier of held) out.push(earlier);
+        out.push(event);
+        return;
+      }
+      if (!streaming && carriesContent(event)) {
+        streaming = true;
+        for (const earlier of held.splice(0)) out.push(earlier);
+      }
+      if (streaming) out.push(event);
+      else held.push(event);
+    }
+  };
+  void run().catch((error) => out.end(failedStream(model, error)));
+  return out;
 }
 
 interface ResponseTiming {
@@ -127,32 +182,35 @@ export function createCoordinatorModels(
         else held.push(event);
       }
     };
-    void run().catch((error) => {
-      out.end({
-        role: 'assistant',
-        content: [],
-        api: model.api,
-        provider: model.provider,
-        model: model.id,
-        usage: {
-          input: 0,
-          output: 0,
-          cacheRead: 0,
-          cacheWrite: 0,
-          totalTokens: 0,
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-        },
-        stopReason: 'error',
-        errorMessage: String(error),
-        timestamp: Date.now(),
-      });
-    });
+    void run().catch((error) => out.end(failedStream(model, error)));
     return out;
+  };
+  const binding = createThinkingBindingGuard();
+  const boundStream = (...[model, context, options]: StreamArgs) => {
+    if (
+      model.api !== 'anthropic-messages' ||
+      options?.sessionId === undefined ||
+      options.cacheRetention === 'none'
+    ) {
+      return streamSimple(model, context, options);
+    }
+    const key = `${options.sessionId}\n${model.provider}/${model.id}`;
+    const onPayload = options.onPayload;
+    const guarded = {
+      ...options,
+      onPayload: async (payload: unknown, payloadModel: typeof model) =>
+        binding.apply(key, (await onPayload?.(payload, payloadModel)) ?? payload),
+    };
+    return retriedBeforeContent(
+      model,
+      () => streamSimple(model, context, guarded),
+      (error) => binding.reject(key, error.errorMessage ?? ''),
+    );
   };
   models.streamSimple = (...args) => {
     const at = Date.now();
     const started = performance.now();
-    const stream = streamSimple(...args);
+    const stream = boundStream(...args);
     const push = stream.push.bind(stream);
     const end = stream.end.bind(stream);
     let firstTokenAt: number | undefined;

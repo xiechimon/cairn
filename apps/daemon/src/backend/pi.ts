@@ -28,7 +28,15 @@ import {
   THINKING_LEVELS,
   contextTokensOf as usageContextTokens,
 } from '@cairn/shared';
-import { getSystemMessageText } from '@earendil-works/pi-ai';
+import {
+  type Api,
+  type AssistantMessage,
+  type AssistantMessageEvent,
+  type AssistantMessageEventStream,
+  createAssistantMessageEventStream,
+  getSystemMessageText,
+  type Model,
+} from '@earendil-works/pi-ai';
 import {
   type BuiltinProvider,
   getAllBuiltinModels,
@@ -1020,17 +1028,16 @@ export class PiBackend implements AgentBackend {
     runtime.streamSimple = (requestModel, context, options) => {
       const at = Date.now();
       const summary = options?.cacheRetention === 'none';
+      const bindingKey = `${requestModel.provider}/${requestModel.id}`;
       const onPayload = options?.onPayload;
-      const guarded =
-        summary || requestModel.api !== 'anthropic-messages'
-          ? options
-          : {
-              ...options,
-              onPayload: async (payload: unknown, payloadModel: typeof requestModel) => {
-                const replaced = (await onPayload?.(payload, payloadModel)) ?? payload;
-                return binding.apply(`${payloadModel.provider}/${payloadModel.id}`, replaced);
-              },
-            };
+      const bound = !summary && requestModel.api === 'anthropic-messages';
+      const guarded = bound
+        ? {
+            ...options,
+            onPayload: async (payload: unknown, payloadModel: typeof requestModel) =>
+              binding.apply(bindingKey, (await onPayload?.(payload, payloadModel)) ?? payload),
+          }
+        : options;
       const input =
         spans === undefined || summary
           ? undefined
@@ -1043,7 +1050,12 @@ export class PiBackend implements AgentBackend {
                 })),
               ),
             })[LANGFUSE_ATTR.input];
-      const stream = streamSimple(requestModel, context, { ...guarded, fetch: ceilingFetch });
+      const start = () => streamSimple(requestModel, context, { ...guarded, fetch: ceilingFetch });
+      const stream = bound
+        ? retriedBeforeContent(requestModel, start, (error) =>
+            binding.reject(bindingKey, error.errorMessage ?? ''),
+          )
+        : start();
       if (spans !== undefined && requestModel.api !== 'pi-virtual') {
         void stream.result().then((message) => {
           spans.chat(at, {
@@ -1286,6 +1298,61 @@ export class PiBackend implements AgentBackend {
     }
     return handle;
   }
+}
+
+function carriesContent(event: AssistantMessageEvent): boolean {
+  if (event.type === 'done' || event.type === 'toolcall_start') return true;
+  return 'delta' in event && event.delta.length > 0;
+}
+
+function retriedBeforeContent(
+  model: Model<Api>,
+  start: () => AssistantMessageEventStream,
+  retry: (error: AssistantMessage) => boolean,
+): AssistantMessageEventStream {
+  const out = createAssistantMessageEventStream();
+  const run = async () => {
+    const held: AssistantMessageEvent[] = [];
+    let streaming = false;
+    for await (const event of start()) {
+      if (event.type === 'error' && !streaming) {
+        if (retry(event.error)) {
+          for await (const next of start()) out.push(next);
+          return;
+        }
+        for (const earlier of held) out.push(earlier);
+        out.push(event);
+        return;
+      }
+      if (!streaming && carriesContent(event)) {
+        streaming = true;
+        for (const earlier of held.splice(0)) out.push(earlier);
+      }
+      if (streaming) out.push(event);
+      else held.push(event);
+    }
+  };
+  void run().catch((error) =>
+    out.end({
+      role: 'assistant',
+      content: [],
+      api: model.api,
+      provider: model.provider,
+      model: model.id,
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'error',
+      errorMessage: String(error),
+      timestamp: Date.now(),
+    }),
+  );
+  return out;
 }
 
 function mergedCompat(provider: ProviderConfig): ProviderCompat | undefined {

@@ -8,14 +8,31 @@ interface AnthropicPayload {
   readonly messages: readonly PayloadMessage[];
 }
 
+interface Position {
+  message: number;
+  block: number;
+}
+
+interface SentMessage {
+  role: string;
+  blocks: string[];
+  ids: (string | undefined)[];
+}
+
 interface Sent {
   head: string;
-  messages: { role: string; blocks: string[] }[];
+  messages: SentMessage[];
   dropped: Set<string>;
 }
 
+const BINDING_ERROR =
+  /messages\.(\d+)\.content\.(\d+): Invalid `[a-z_]+` in `(?:redacted_)?thinking` block\. The block is bound to a different conversation/;
+const FIRST_CHANGE = /first at `messages\.(\d+)\.content\.(\d+)`/;
+const HEAD_CHANGE = /The `(?:system|tools)`/;
+
 export interface ThinkingBindingGuard {
   apply<T>(key: string, payload: T): T;
+  reject(key: string, errorMessage: string): boolean;
 }
 
 export function createThinkingBindingGuard(): ThinkingBindingGuard {
@@ -30,46 +47,72 @@ export function createThinkingBindingGuard(): ThinkingBindingGuard {
         blocksOf(message.content).filter((block) => !dropped.has(bindingId(block) ?? '')),
       );
       const cut =
-        previous === undefined || previous.head !== head
-          ? { message: 0, block: 0 }
-          : firstChange(previous.messages, payload.messages, visible);
+        previous === undefined
+          ? null
+          : previous.head !== head
+            ? { message: 0, block: 0 }
+            : firstChange(previous.messages, payload.messages, visible);
       const kept = visible.map((blocks, message) =>
         blocks.filter((block, at) => {
           const id = bindingId(block);
-          if (id === undefined || cut === null) return true;
-          if (message < cut.message || (message === cut.message && at < cut.block)) return true;
+          if (id === undefined || cut === null || before({ message, block: at }, cut)) return true;
           dropped.add(id);
           return false;
         }),
       );
       const messages = payload.messages.flatMap((message, index) => {
         const blocks = kept[index] ?? [];
-        const original = blocksOf(message.content);
-        if (blocks.length === original.length) return [message];
+        if (blocks.length === blocksOf(message.content).length) return [message];
         if (blocks.length === 0 && message.role === 'assistant') return [];
         return [{ ...message, content: blocks }];
       });
       sent.set(key, {
         head,
-        messages: messages.map((message) => ({
-          role: message.role,
-          blocks: blocksOf(message.content).map(canonical),
-        })),
+        messages: messages.map((message) => {
+          const blocks = blocksOf(message.content);
+          return { role: message.role, blocks: blocks.map(canonical), ids: blocks.map(bindingId) };
+        }),
         dropped,
       });
-      const unchanged = messages.every((message, index) => message === payload.messages[index]);
-      return unchanged && messages.length === payload.messages.length
+      return messages.length === payload.messages.length &&
+        messages.every((message, index) => message === payload.messages[index])
         ? payload
         : ({ ...payload, messages } as typeof payload);
+    },
+    reject: (key, errorMessage) => {
+      const invalid = BINDING_ERROR.exec(errorMessage);
+      const last = sent.get(key);
+      if (invalid === null || last === undefined) return false;
+      const first = FIRST_CHANGE.exec(errorMessage);
+      const cut = HEAD_CHANGE.test(errorMessage)
+        ? { message: 0, block: 0 }
+        : { message: Number((first ?? invalid)[1]), block: Number((first ?? invalid)[2]) };
+      let added = false;
+      last.messages.forEach((message, index) => {
+        message.ids.forEach((id, block) => {
+          if (id === undefined || before({ message: index, block }, cut) || last.dropped.has(id))
+            return;
+          last.dropped.add(id);
+          added = true;
+        });
+      });
+      return added;
     },
   };
 }
 
+function before(position: Position, cut: Position): boolean {
+  return (
+    position.message < cut.message ||
+    (position.message === cut.message && position.block < cut.block)
+  );
+}
+
 function firstChange(
-  previous: Sent['messages'],
+  previous: SentMessage[],
   messages: readonly PayloadMessage[],
   visible: Block[][],
-): { message: number; block: number } | null {
+): Position | null {
   for (const [index, sentMessage] of previous.entries()) {
     const message = messages[index];
     const blocks = visible[index];

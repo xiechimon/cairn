@@ -497,7 +497,7 @@ describe('replayed thinking keeps the prefix it was signed with', () => {
     }
   });
 
-  it('drops thinking it can no longer vouch for after the runtime restarts', async () => {
+  it('recovers a conversation whose saved thinking no longer matches by acting on the 400', async () => {
     const dir = makeTestTempDir('coord-binding-restart-');
     dirs.push(dir);
     const anthropic = await anthropicWithThinkingBinding();
@@ -511,9 +511,12 @@ describe('replayed thinking keeps the prefix it was signed with', () => {
         'should this go in AGENTS.md?',
         '## 项目记忆（Cairn）\n- two',
       );
-      expect(anthropic.requests.map((request) => request.status)).toEqual([200, 200]);
-      expect(second.status).not.toBe('failed');
-      expect(thinkingIn(anthropic.requests[1])).toHaveLength(0);
+      const third = await after.turn('s3', 'test', '## 项目记忆（Cairn）\n- two');
+      expect(anthropic.requests.map((request) => request.status)).toEqual([200, 400, 200, 200]);
+      expect([second.status, third.status]).not.toContain('failed');
+      expect(thinkingIn(anthropic.requests[1])).toHaveLength(1);
+      expect(thinkingIn(anthropic.requests[2])).toHaveLength(0);
+      expect(thinkingIn(anthropic.requests[3])).toHaveLength(1);
       await after.harness.close(ctx);
     } finally {
       await anthropic.close();

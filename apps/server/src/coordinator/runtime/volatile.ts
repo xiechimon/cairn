@@ -1,9 +1,4 @@
-import {
-  createThinkingBindingGuard,
-  shortEvent,
-  transcriptPromptRowId,
-  withHistoryMarker,
-} from '@cairn/shared';
+import { shortEvent, transcriptPromptRowId, withHistoryMarker } from '@cairn/shared';
 import type { Message } from '@earendil-works/pi-ai';
 import { defineExtension, GenerationTask, hook } from '@earendil-works/pi-durable';
 import {
@@ -105,7 +100,6 @@ export function volatileContextExtension(
     options.reuseMs ??
     (resolveCacheRetentionTier() === 'long' ? ANTHROPIC_LONG_TTL_MS : ANTHROPIC_SHORT_TTL_MS);
   const sent = new Map<string, SentRequest>();
-  const binding = createThinkingBindingGuard();
   return defineExtension({
     name: 'cairn-coordinator-volatile',
     hooks: [
@@ -138,15 +132,6 @@ export function volatileContextExtension(
           });
           return { messages };
         },
-        beforeProviderRequest: ({ model, payload }, api) =>
-          model.api === 'anthropic-messages'
-            ? {
-                payload: binding.apply(
-                  `${String(api.conversationId)}\n${model.provider}/${model.id}`,
-                  payload,
-                ),
-              }
-            : undefined,
       }),
     ],
   });
