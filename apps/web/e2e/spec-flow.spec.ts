@@ -104,16 +104,21 @@ test('2. brief card scrolls away with the flow: out of the viewport at the botto
   await page.goto(`/app/todo/${FLOW_ID}`);
   const list = page.locator('.chat-col');
   const spec = page.locator('.chat-col .spec-block');
+  await expect(list).toBeVisible();
   await expect(spec).toBeAttached();
   const chatTop = (await list.boundingBox())!.y;
 
   await list.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await expect
+    .poll(() => spec.evaluate((el) => el.getBoundingClientRect().top))
+    .toBeLessThan(chatTop);
   const bottomTop = await spec.evaluate((el) => el.getBoundingClientRect().top);
-  expect(bottomTop).toBeLessThan(chatTop);
 
   await list.evaluate((el) => el.scrollTo({ top: 0 }));
+  await expect
+    .poll(() => spec.evaluate((el) => el.getBoundingClientRect().top))
+    .toBeGreaterThanOrEqual(chatTop - 1);
   const topTop = await spec.evaluate((el) => el.getBoundingClientRect().top);
-  expect(topTop).toBeGreaterThanOrEqual(chatTop - 1);
   expect(Math.abs(topTop - bottomTop)).toBeGreaterThan(200);
 });
 
