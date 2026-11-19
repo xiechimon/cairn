@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { agentTodoItemSchema } from '../agent-todo.js';
 import { activeRunSchema } from './chief.js';
 import { epochMs, recordId } from './common.js';
 
@@ -441,6 +442,7 @@ export const conversationMessagesResponseSchema = z.object({
       }),
     )
     .optional(),
+  agentTodo: z.array(agentTodoItemSchema).nullable().optional(),
   activeRun: activeRunSchema,
   nextCursor: z.unknown(),
 });

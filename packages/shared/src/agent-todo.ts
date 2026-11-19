@@ -84,3 +84,28 @@ export function todoFromTodoWrite(name: unknown, input: unknown): AgentTodoItem[
   }
   return items.length > 0 ? items : null;
 }
+
+export function agentTodoOfContent(content: unknown): AgentTodoItem[] | null {
+  if (content !== null && typeof content === 'object' && !Array.isArray(content)) {
+    const c = content as {
+      kind?: unknown;
+      call?: { name?: unknown; arguments?: unknown; todo?: AgentTodoItem[]; isError?: boolean };
+    };
+    if (c.kind !== 'toolcall' || c.call == null || c.call.isError === true) return null;
+    const items = c.call.todo ?? todoFromTodoWrite(c.call.name, c.call.arguments);
+    return items !== null && items.length > 0 ? items : null;
+  }
+  const text =
+    typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content
+            .map((b: unknown) => {
+              if (typeof b === 'string') return b;
+              const block = b as { type?: unknown; text?: unknown } | null;
+              return block?.type === 'text' && typeof block.text === 'string' ? block.text : '';
+            })
+            .join('')
+        : '';
+  return parseAgentTodoText(text.trim());
+}

@@ -4,6 +4,7 @@ import {
   type SpawnOptionsWithoutStdio,
   spawn,
 } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { Readable, Writable } from 'node:stream';
 import {
   type ContentBlock,
@@ -33,6 +34,7 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
+import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES } from '@cairn/shared';
 import { DAEMON_VERSION } from '../version.js';
 import {
   type AcpToolCall,
@@ -406,6 +408,24 @@ class AcpSession implements AgentSessionHandle {
         this.calls.set(call.id, call);
         this.push({ type: 'toolcall_end', call });
       }
+    } else if (update.sessionUpdate === 'plan') {
+      const todo = update.entries.flatMap((entry) => {
+        const state = CLAUDE_TODO_STATUS_STATES[entry.status];
+        return entry.content.trim() !== '' && state !== undefined
+          ? [{ text: entry.content.trim(), state }]
+          : [];
+      });
+      this.push({
+        type: 'toolcall_end',
+        call: {
+          id: `plan-${randomUUID()}`,
+          name: 'plan',
+          arguments: { entries: update.entries },
+          result: '',
+          isError: false,
+          todo: todo.slice(0, AGENT_TODO_MAX_ITEMS),
+        },
+      });
     } else {
       const event = mapAcpUpdate(update);
       if (event) this.push(event);

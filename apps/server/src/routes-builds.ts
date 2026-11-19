@@ -35,7 +35,7 @@ import { ClientMessageConflict, findClientMessage } from './services/client-mess
 import { createSerialConnection } from './services/events.js';
 import { readBuildChangeFile, readBuildChanges } from './services/git.js';
 import { isChiefConversation } from './services/machines.js';
-import { newestMessagePage } from './services/message-page.js';
+import { latestAgentTodo, newestMessagePage } from './services/message-page.js';
 import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
@@ -104,6 +104,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
       historyEpoch: 0,
       steerPending: readSteerPending(ctx.db, conversationId),
       queuedMessages: readQueuedMessages(ctx.db, conversationId),
+      agentTodo: query.before === undefined ? latestAgentTodo(ctx.db, conversationId) : null,
       activeRun: null,
       nextCursor: page.hasEarlier ? (page.messages[0]?.id ?? null) : null,
     });

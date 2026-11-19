@@ -76,11 +76,11 @@ No new table and no migration (`message.content` is JSON). Sub-agent tool calls 
 2. Server: `reportAgentTodo` keeps publishing the live SSE event for a fast first paint but stores nothing.
 3. Server: `GET /api/builds/:id/messages` returns `agentTodo`, the latest snapshot computed with a query over the conversation's rows, so it does not depend on which page the web has loaded.
 
-**Paths that read.** `mapTranscript` uses, in order: the live `agent_todo` event for the running step, else the page's `agentTodo`. `liveEngineRun.plan` uses the same value. After step end the list stays at the tail while any item is open (`doing` shown as `todo`, as today); when all items are done it collapses to `N/N 已完成`.
+**Paths that read.** `mapTranscript` uses, in order: the live `agent_todo` event for the running step, else the page's `agentTodo`. `liveEngineRun.plan` uses the same value. After step end the list stays at the tail while any item is open (`doing` shown as `todo`, as today) and disappears when all items are done, because `DESIGN-RULES.md` C14 forbids a `已完成` line on a finished task.
 
 **Failures.** Server restart, reload, older pages not loaded: the list comes from SQLite. A malformed tool argument yields no snapshot and the previous one stands. A snapshot with zero items is a cleared list.
 
-**Tests.** server: messages page returns the latest snapshot across steps and pages, and none when there is none. daemon: ACP `plan` becomes a `toolcall` row with `todo`. web: list survives reload with an empty live store; collapses when all done; `lastAgentTodo` replay removed (existing catch-up test updated).
+**Tests.** server: messages page returns the latest snapshot across steps and pages, and none when there is none. daemon: ACP `plan` becomes a `toolcall` row with `todo`. web: list survives reload with an empty live store; synthetic `plan` rows stay out of the work trace; `lastAgentTodo` replay removed (existing catch-up test updated).
 
 ## Decisions
 

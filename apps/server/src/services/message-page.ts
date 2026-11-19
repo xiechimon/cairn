@@ -1,4 +1,9 @@
-import { quickRepliesRowId, transcriptPromptRowId } from '@cairn/shared';
+import {
+  type AgentTodoItem,
+  agentTodoOfContent,
+  quickRepliesRowId,
+  transcriptPromptRowId,
+} from '@cairn/shared';
 import { and, desc, eq, gt, inArray, lt, lte, or, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, message, step } from '../db/schema.js';
@@ -163,4 +168,24 @@ export function newestMessagePage<T extends PagedTable>(
         : messages,
     hasEarlier: rows.length > query.limit,
   };
+}
+
+const TODO_SCAN_BATCH = 200;
+
+export function latestAgentTodo(db: Db, conversationId: string): AgentTodoItem[] | null {
+  for (let offset = 0; ; offset += TODO_SCAN_BATCH) {
+    const rows = db
+      .select({ content: message.content })
+      .from(message)
+      .where(and(eq(message.conversationId, conversationId), eq(message.role, 'assistant')))
+      .orderBy(desc(message.createdAt), sql`rowid desc`)
+      .limit(TODO_SCAN_BATCH)
+      .offset(offset)
+      .all();
+    for (const row of rows) {
+      const items = agentTodoOfContent(row.content);
+      if (items !== null) return items;
+    }
+    if (rows.length < TODO_SCAN_BATCH) return null;
+  }
 }

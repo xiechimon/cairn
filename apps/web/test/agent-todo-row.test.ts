@@ -1,4 +1,4 @@
-import type { AgentTodo, BuildRecord, StepJournalRow } from '@cairn/shared';
+import type { AgentTodo, AgentTodoItem, BuildRecord, StepJournalRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { type MessageRow, mapTranscript } from '../src/api/mappers.js';
 import type { TodoRecord, TranscriptItem } from '../src/fixtures/records.js';
@@ -39,6 +39,7 @@ function render(overrides: {
   messages?: MessageRow[];
   steps?: StepJournalRow[];
   agentTodo?: AgentTodo | null;
+  pageTodo?: AgentTodoItem[] | null;
   build?: BuildRecord | null;
 }): TranscriptItem[] {
   return mapTranscript({
@@ -50,6 +51,7 @@ function render(overrides: {
     userName: 'Xmon Dai',
     liveText: '',
     ...(overrides.agentTodo !== undefined ? { agentTodo: overrides.agentTodo } : {}),
+    ...(overrides.pageTodo !== undefined ? { pageTodo: overrides.pageTodo } : {}),
   });
 }
 
@@ -173,6 +175,55 @@ describe('mapTranscript agent todo list (#1524)', () => {
       steps: [{ ...runningStep('s1'), status: 'done' }],
     });
     expect(todoItems(items)).toHaveLength(0);
+  });
+
+  test('reload mid-step: an empty live store and no loaded snapshot fall back to the page todo', () => {
+    const page: AgentTodoItem[] = [
+      { text: '读配置', state: 'done' },
+      { text: '改接口', state: 'doing' },
+    ];
+    expect(todoItems(render({ steps: [runningStep('s1')], pageTodo: page }))).toEqual([
+      { kind: 'agent-todo', items: page },
+    ]);
+    expect(
+      todoItems(render({ steps: [{ ...runningStep('s1'), status: 'done' }], pageTodo: page })),
+    ).toEqual([
+      {
+        kind: 'agent-todo',
+        items: [
+          { text: '读配置', state: 'done' },
+          { text: '改接口', state: 'todo' },
+        ],
+      },
+    ]);
+  });
+
+  test('a snapshot in the loaded rows is newer than the page todo, and plan rows stay out of the trace', () => {
+    const plan: MessageRow = {
+      id: 'm-plan',
+      role: 'assistant',
+      createdAt: NOW - 5_000,
+      content: {
+        kind: 'toolcall',
+        call: {
+          id: 'plan-1',
+          name: 'plan',
+          arguments: {},
+          result: '',
+          isError: false,
+          todo: [{ text: '跑测试', state: 'doing' }],
+        },
+      },
+    };
+    const items = render({
+      messages: [plan],
+      steps: [runningStep('s1')],
+      pageTodo: [{ text: '旧计划', state: 'todo' }],
+    });
+    expect(items.some((item) => item.kind === 'work')).toBe(false);
+    expect(todoItems(items)).toEqual([
+      { kind: 'agent-todo', items: [{ text: '跑测试', state: 'doing' }] },
+    ]);
   });
 
   test('settled work sits above agent-todo while an active running work block sits below it', () => {

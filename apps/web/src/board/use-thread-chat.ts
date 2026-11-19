@@ -222,6 +222,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       stopping,
       activity,
       agentTodo,
+      pageTodo: newest?.agentTodo ?? null,
     });
   }, [
     live,
@@ -240,6 +241,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     stopping,
     activity,
     agentTodo,
+    newest?.agentTodo,
   ]);
 
   const awaitingStart = wire?.phase === 'todo' || wire?.phase === 'failed';
@@ -264,8 +266,17 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   );
 
   const liveRun = useMemo(
-    () => (live ? liveEngineRun({ messages, steps, agentTodo, build: buildQ.data ?? null }) : null),
-    [live, messages, steps, agentTodo, buildQ.data],
+    () =>
+      live
+        ? liveEngineRun({
+            messages,
+            steps,
+            agentTodo,
+            pageTodo: newest?.agentTodo ?? null,
+            build: buildQ.data ?? null,
+          })
+        : null,
+    [live, messages, steps, agentTodo, newest?.agentTodo, buildQ.data],
   );
 
   const load: ThreadChatLoad = !live

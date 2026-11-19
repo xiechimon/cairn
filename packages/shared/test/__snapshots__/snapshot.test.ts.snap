@@ -4970,6 +4970,38 @@ exports[`body/envelope schema snapshots > conversationMessagesResponse > convers
         },
       ],
     },
+    "agentTodo": {
+      "anyOf": [
+        {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "enum": [
+                  "todo",
+                  "doing",
+                  "done",
+                ],
+                "type": "string",
+              },
+              "text": {
+                "minLength": 1,
+                "type": "string",
+              },
+            },
+            "required": [
+              "text",
+              "state",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "chips": {},
     "historyEpoch": {
       "maximum": 9007199254740991,

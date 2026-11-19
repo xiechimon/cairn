@@ -124,6 +124,17 @@ function backend(env: Record<string, string> = {}) {
             status: 'completed',
             content: [{ type: 'content', content: { type: 'text', text: 'file content' } }],
           });
+          if (params.prompt[0].text === 'plan') {
+            update({
+              sessionUpdate: 'plan',
+              entries: [
+                { content: 'Read the config', priority: 'high', status: 'completed' },
+                { content: 'Fix the parser', priority: 'medium', status: 'in_progress' },
+                { content: '  ', priority: 'low', status: 'pending' },
+                { content: 'Run the tests', priority: 'low', status: 'pending' },
+              ],
+            });
+          }
           send({ id, result: { stopReason: env.ACP_STOP ?? 'end_turn' } });
         } else if (method === 'session/cancel')
           send({
@@ -165,6 +176,20 @@ describe('Gemini stdio execution', () => {
         result: expect.any(Array),
       }),
     });
+  });
+
+  test('an ACP plan update becomes a toolcall carrying the agent todo', async () => {
+    const handle = await backend().createSession({ ...opts, prompt: 'plan' });
+    const plans = (await collect(handle.events)).flatMap((event) =>
+      event.type === 'toolcall_end' && event.call.name === 'plan' ? [event.call] : [],
+    );
+    expect(plans).toHaveLength(1);
+    expect(plans[0]?.isError).toBe(false);
+    expect(plans[0]?.todo).toEqual([
+      { text: 'Read the config', state: 'done' },
+      { text: 'Fix the parser', state: 'doing' },
+      { text: 'Run the tests', state: 'todo' },
+    ]);
   });
 
   test.each(['load', 'resume'])(

@@ -478,55 +478,13 @@ describe('hub agent todo list (#1524)', () => {
     return conn.frames.filter((f) => (f as { type: string }).type === 'agent_todo');
   }
 
-  test('multiple lists during zero-subscriber period -> catch-up carries only the last, frames pass the vocabulary', () => {
+  test('the list reaches live subscribers but is never replayed: a reload reads it from the messages page', () => {
     const hub = new ConversationStreamHub();
-    hub.publishAgentTodo('c1', { ...list(100), items: [{ text: '旧', state: 'todo' }] });
-    hub.publishAgentTodo('c1', list(200));
-    const conn = new FakeConn();
-    hub.subscribe('c1', conn);
-    const frames = todoFrames(conn);
-    expect(frames).toHaveLength(1);
-    expect(frames[0]).toEqual({ type: 'agent_todo', todo: list(200) });
-    expect(conversationStreamEventSchema.parse(frames[0])).toBeTruthy();
-    hub.publishAgentTodo('c1', { ...list(300), items: [{ text: '新', state: 'doing' }] });
-    expect(todoFrames(conn)).toHaveLength(2);
-  });
-
-  test('step terminal (done/failed/stopped) clears the list slot; claimed does not', () => {
-    for (const status of ['done', 'failed', 'stopped'] as const) {
-      const hub = new ConversationStreamHub();
-      hub.publishAgentTodo('c1', list(100));
-      hub.publishStep('c1', stepRow('c1', status));
-      expect(todoFrames(subscribeFresh(hub, 'c1'))).toHaveLength(0);
-    }
-    const hub = new ConversationStreamHub();
+    const live = subscribeFresh(hub, 'c1');
     hub.publishAgentTodo('c1', list(100));
-    hub.publishStep('c1', stepRow('c1', 'claimed'));
-    expect(todoFrames(subscribeFresh(hub, 'c1'))).toHaveLength(1);
-  });
-
-  test('clearConversationBuffer (rewind channel) also clears the list slot', () => {
-    const hub = new ConversationStreamHub();
-    hub.publishAgentTodo('c1', list(100));
-    hub.clearConversationBuffer('c1');
+    expect(todoFrames(live)).toEqual([{ type: 'agent_todo', todo: list(100) }]);
+    expect(conversationStreamEventSchema.parse(todoFrames(live)[0])).toBeTruthy();
     expect(todoFrames(subscribeFresh(hub, 'c1'))).toHaveLength(0);
-  });
-
-  test('cross-session isolation -- A list does not enter B catch-up or live stream', () => {
-    const hub = new ConversationStreamHub();
-    hub.publishAgentTodo('cA', list(100));
-    const b = subscribeFresh(hub, 'cB');
-    expect(todoFrames(b)).toHaveLength(0);
-    hub.publishAgentTodo('cA', list(200));
-    expect(todoFrames(b)).toHaveLength(0);
-  });
-
-  test('buffer session-count cap evicts the list single slot by the same law (unbounded-memory defense)', () => {
-    const hub = new ConversationStreamHub();
-    for (let i = 0; i <= CONV_TEXT_BUFFER_MAX_CONVS; i++) {
-      hub.publishAgentTodo(`c${i}`, list(i));
-    }
-    expect(todoFrames(subscribeFresh(hub, 'c0'))).toHaveLength(0);
-    expect(todoFrames(subscribeFresh(hub, `c${CONV_TEXT_BUFFER_MAX_CONVS}`))).toHaveLength(1);
+    expect(todoFrames(subscribeFresh(hub, 'c2'))).toHaveLength(0);
   });
 });

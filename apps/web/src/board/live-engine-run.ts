@@ -1,5 +1,7 @@
 import {
   type AgentTodo,
+  type AgentTodoItem,
+  agentTodoOfContent,
   type BuildRecord,
   isActiveStepStatus,
   STOP_MESSAGE,
@@ -20,6 +22,7 @@ export interface LiveEngineRunInput {
   messages: readonly MessageRow[];
   steps: readonly StepJournalRow[];
   agentTodo: AgentTodo | null;
+  pageTodo?: AgentTodoItem[] | null;
   build?: Pick<BuildRecord, 'errorMessage'> | null;
 }
 
@@ -146,10 +149,21 @@ function liveState(steps: readonly StepJournalRow[], buildError: string | null):
   return 'finished';
 }
 
+function rowsTodo(messages: LiveEngineRunInput['messages']): AgentTodoItem[] | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m?.role !== 'assistant') continue;
+    const items = agentTodoOfContent(m.content);
+    if (items !== null) return items;
+  }
+  return null;
+}
+
 export function liveEngineRun({
   messages,
   steps,
   agentTodo,
+  pageTodo = null,
   build,
 }: LiveEngineRunInput): EngineRun | null {
   const engineSteps = steps.filter((step) => step.route?.harness != null);
@@ -165,7 +179,7 @@ export function liveEngineRun({
     plan:
       agentTodo !== null && steps.some((step) => step.id === agentTodo.stepId)
         ? agentTodo.items
-        : [],
+        : (rowsTodo(messages) ?? pageTodo ?? []),
     events,
     rawOutput: events.map(rawOf).join('\n'),
     stepId: claimed?.id ?? engineSteps.at(-1)?.id,

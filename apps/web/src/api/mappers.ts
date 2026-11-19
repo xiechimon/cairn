@@ -638,6 +638,7 @@ export interface TranscriptInput {
   stopping?: boolean;
   activity?: StepActivity | null;
   agentTodo?: AgentTodo | null;
+  pageTodo?: AgentTodoItem[] | null;
   hasEarlier?: boolean;
 }
 
@@ -679,6 +680,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     stopping = false,
     activity = null,
     agentTodo = null,
+    pageTodo = null,
     hasEarlier = false,
   } = input;
   const head = hasEarlier ? [] : transcriptHead(messages, steps, build, machineName);
@@ -721,7 +723,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       if (callTodo !== null && callTodo.length > 0 && call.isError !== true) {
         todoSnapshots.push({ at: m.createdAt, order: msgIndex, items: callTodo });
       }
-      if (call.name === 'TodoWrite' && call.isError !== true) continue;
+      if ((call.name === 'TodoWrite' || call.todo !== undefined) && call.isError !== true) continue;
       const owner = steps
         .filter((s) => s.createdAt <= m.createdAt)
         .sort((a, b) => a.createdAt - b.createdAt)
@@ -941,7 +943,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   }
 
   const persistedTodo =
-    todoSnapshots.sort((a, b) => a.at - b.at || a.order - b.order).at(-1)?.items ?? null;
+    todoSnapshots.sort((a, b) => a.at - b.at || a.order - b.order).at(-1)?.items ??
+    (pageTodo !== null && pageTodo.length > 0 ? pageTodo : null);
   const running = steps.find(
     (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
   );

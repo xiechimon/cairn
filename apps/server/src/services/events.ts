@@ -160,7 +160,6 @@ export class ConversationStreamHub {
   private readonly textBuffers = new Map<string, string>();
   private readonly thinkingBuffers = new Map<string, string>();
   private readonly lastActivity = new Map<string, StepActivity>();
-  private readonly lastAgentTodo = new Map<string, AgentTodo>();
 
   subscribe(conversationId: string, conn: TeamStreamConnection): () => void {
     let set = this.byConv.get(conversationId);
@@ -180,10 +179,6 @@ export class ConversationStreamHub {
     const activity = this.lastActivity.get(conversationId);
     if (activity !== undefined) {
       void conn.send({ type: 'activity', activity });
-    }
-    const agentTodo = this.lastAgentTodo.get(conversationId);
-    if (agentTodo !== undefined) {
-      void conn.send({ type: 'agent_todo', todo: agentTodo });
     }
     return () => {
       set?.delete(conn);
@@ -270,12 +265,6 @@ export class ConversationStreamHub {
   }
 
   publishAgentTodo(conversationId: string, todo: AgentTodo): void {
-    this.lastAgentTodo.delete(conversationId);
-    this.lastAgentTodo.set(conversationId, todo);
-    if (this.lastAgentTodo.size > CONV_TEXT_BUFFER_MAX_CONVS) {
-      const oldest = this.lastAgentTodo.keys().next().value;
-      if (oldest !== undefined) this.lastAgentTodo.delete(oldest);
-    }
     this.publish(conversationId, { type: 'agent_todo', todo });
   }
 
@@ -290,7 +279,6 @@ export class ConversationStreamHub {
     this.textBuffers.delete(conversationId);
     this.thinkingBuffers.delete(conversationId);
     this.lastActivity.delete(conversationId);
-    this.lastAgentTodo.delete(conversationId);
   }
 
   publish(conversationId: string, payload: object): void {

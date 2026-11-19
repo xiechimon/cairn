@@ -161,6 +161,26 @@ describe('liveEngineRun', () => {
     ).toEqual([]);
   });
 
+  test('without a live todo the plan comes from the newest persisted snapshot, then the page', () => {
+    const running = step('claimed');
+    const page = [{ text: '旧计划', state: 'todo' as const }];
+    expect(liveEngineRun({ messages: [], steps: [running], agentTodo: null, pageTodo: page })?.plan).toEqual(page);
+    const run = liveEngineRun({
+      messages: [
+        call({ name: 'plan', todo: [{ text: '改编码', state: 'done' }] }),
+        text('- [x] 改编码\n- [~] 跑测试'),
+        text('- [ ] owner line', 'user'),
+      ],
+      steps: [running],
+      agentTodo: null,
+      pageTodo: page,
+    });
+    expect(run?.plan).toEqual([
+      { text: '改编码', state: 'done' },
+      { text: '跑测试', state: 'doing' },
+    ]);
+  });
+
   test('synthesizes the raw log from the same events, in the fixture format', () => {
     const run = liveEngineRun({
       messages: [
