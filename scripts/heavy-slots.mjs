@@ -252,7 +252,14 @@ export async function acquireSlot({ env = process.env, wait = true, log = consol
     server.close();
   };
   process.once('exit', closeProbe);
-  const record = { pid: process.pid, cwd: process.cwd(), namespace: PID_NAMESPACE, probe, token };
+  const record = {
+    pid: process.pid,
+    cwd: process.cwd(),
+    namespace: PID_NAMESPACE,
+    probe,
+    token,
+    count,
+  };
   let claimed = false;
   const claim = async () => {
     for (let slot = 1; slot <= count; slot++) {
@@ -328,18 +335,29 @@ export async function acquireSlot({ env = process.env, wait = true, log = consol
       for (const name of readdirSync(dir)) {
         const ticketOwner = /^queue-\d+-(\d+)(?:-[a-f0-9-]+)?$/.exec(name);
         if (!ticketOwner) continue;
-        if ((await holderState(join(dir, name), Number(ticketOwner[1]))).state !== 'stale')
-          waiting.push(name);
+        const holder = await holderState(join(dir, name), Number(ticketOwner[1]));
+        if (holder.state !== 'stale')
+          waiting.push({
+            name,
+            count: Number.isInteger(holder.count) ? holder.count : undefined,
+          });
         else
           try {
             unlinkSync(join(dir, name));
           } catch {}
       }
-      const position = waiting.sort().indexOf(ticket) + 1;
-      let freeSlots = 0;
-      for (let slot = 1; slot <= count; slot++)
-        if ((await holderState(slotPath(slot))).state !== 'held') freeSlots++;
-      if (position <= freeSlots) {
+      waiting.sort((a, b) => a.name.localeCompare(b.name));
+      const position = waiting.findIndex((entry) => entry.name === ticket) + 1;
+      const horizon = Math.max(count, ...waiting.map((entry) => entry.count ?? count));
+      const free = new Set();
+      for (let slot = 1; slot <= horizon; slot++)
+        if ((await holderState(slotPath(slot))).state !== 'held') free.add(slot);
+      for (const entry of waiting) {
+        if (entry.name === ticket) break;
+        const reach = entry.count ?? horizon;
+        for (let slot = 1; slot <= reach; slot++) if (free.delete(slot)) break;
+      }
+      if ([...free].some((slot) => slot <= count)) {
         const lease = await claim();
         if (lease) return lease;
       }

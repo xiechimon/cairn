@@ -293,6 +293,23 @@ test('waiters see their queue position and are served first-come first-served', 
   }
 });
 
+test('a queued waiter that can never use a free higher slot does not head-block the queue', async () => {
+  const { env, cleanup } = sandbox(2);
+  try {
+    const narrow = { ...env, CAIRN_HEAVY_SLOTS: '1' };
+    const holder = startHolder(narrow);
+    await until(holder, 'out', /SLOT 1/);
+    const narrowWaiter = startHolder(narrow, { lingerMs: 15_000 });
+    await until(narrowWaiter, 'err', /queued, position 1/);
+    const wideWaiter = startHolder(env, { lingerMs: 15_000 });
+    await until(wideWaiter, 'out', /SLOT 2/, 5_000);
+    assert.doesNotMatch(narrowWaiter.out, /SLOT/);
+    await until(narrowWaiter, 'err', /queued, position 1/);
+  } finally {
+    cleanup();
+  }
+});
+
 test('kill -9 on the holder frees the slot for the queued process within 5 seconds', async () => {
   const { env, cleanup } = sandbox(1);
   try {
