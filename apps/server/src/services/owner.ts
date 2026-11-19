@@ -101,14 +101,19 @@ function failedOwnership(db: Db, row: TodoRow): Ownership | null {
   return { owner: 'coordinator', reason: 'failed', workKey: `failed:${phaseWork(row)}` };
 }
 
+export function heldByBlockers(db: Db, row: Pick<TodoRow, 'latestBuildId'>): boolean {
+  if (row.latestBuildId === null) return false;
+  return (
+    db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, row.latestBuildId), eq(step.holdReason, BLOCKED_BY_HOLD)))
+      .get() !== undefined
+  );
+}
+
 function blockedOwnership(db: Db, row: TodoRow): Ownership | null {
-  if (row.latestBuildId === null) return null;
-  const held = db
-    .select({ id: step.id })
-    .from(step)
-    .where(and(eq(step.buildId, row.latestBuildId), eq(step.holdReason, BLOCKED_BY_HOLD)))
-    .get();
-  if (held === undefined) return null;
+  if (!heldByBlockers(db, row)) return null;
   const blocker = deadEndBlocker(db, row);
   if (blocker === null) return null;
   return {
@@ -206,6 +211,7 @@ export function sectionOf(
   row: Pick<TodoRow, 'phase' | 'phaseAt' | 'archivedAt'>,
   ownership: Ownership | null,
   now = Date.now(),
+  waitsOnBlockers = false,
 ): TodoSection | null {
   if (isEndedPhase(row.phase)) {
     return row.phaseAt >= now - TASKS_RECENT_MS ? 'resolved' : null;
@@ -215,6 +221,7 @@ export function sectionOf(
     const reason = ownership.reason === 'handoff' ? ownership.from : ownership.reason;
     return reason === 'review' ? 'ready_for_review' : 'needs_input';
   }
+  if (ownership === null && waitsOnBlockers) return 'up_next';
   return row.phase === 'todo' ? 'up_next' : 'working';
 }
 

@@ -12,6 +12,7 @@ import {
   type TaskSection,
   taskRowCopy,
 } from '../src/board/tasks-sections.js';
+import { threadCopy } from '../src/board/thread-copy.js';
 import type { TodoRecord } from '../src/fixtures/records.js';
 import { todo } from './helpers.js';
 
@@ -50,6 +51,31 @@ const pr = (
   lastReadAt: 0,
   ...over,
   checks: { passed: 41, failed: 0, running: 0, total: 41, failedNames: [], ...over.checks },
+});
+
+describe('a task waiting on another task reads as waiting on it, not on a Runner', () => {
+  const blocker = entry(1, 'building', 'working', { title: 'Build the forecast API' }).todo;
+  const waiting = entry(2, 'queued', 'up_next', { blockedBy: [blocker.id], section: 'up_next' });
+  const lookup = (id: string) => (id === blocker.id ? blocker : undefined);
+
+  test('the up-next row names the task it waits for', () => {
+    expect(taskRowCopy(waiting, undefined, lookup)).toMatchObject({
+      word: '待开始',
+      what: { key: '等「{title}」', params: { title: 'Build the forecast API' } },
+    });
+  });
+
+  test('a blocker the panel does not list is counted, not named', () => {
+    expect(taskRowCopy(waiting, undefined, () => undefined).what).toEqual({
+      key: '等 {n} 个任务',
+      params: { n: 1 },
+    });
+  });
+
+  test('its status line no longer says it waits for a Runner', () => {
+    expect(taskRowCopy(waiting, undefined, lookup).what.key).not.toBe('排队等执行机。');
+    expect(threadCopy(waiting.todo).reason).toBe('等前置任务完成。');
+  });
 });
 
 describe('a needs-you row says what is waiting and where to act', () => {

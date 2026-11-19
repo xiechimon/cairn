@@ -10,6 +10,7 @@ export const STATUS_WORDS = {
   stopped: '已停止',
   archived: '已归档',
   idle: '空闲',
+  waiting: '待开始',
 } as const;
 
 export type StatusWord = (typeof STATUS_WORDS)[keyof typeof STATUS_WORDS];

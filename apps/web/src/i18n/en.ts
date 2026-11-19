@@ -1827,6 +1827,7 @@ export const EN: Record<string, string> = {
   '已就绪，等你审阅。': 'Ready for your review.',
   '失败了，打开它重试。': 'Failed. Open it to retry.',
   '排队等执行机。': 'Waiting for a Runner.',
+  '等前置任务完成。': 'Waits for the task it depends on.',
   '正在写计划。': 'Writing the plan.',
   '正在动手。': 'Working on it.',
   '还没开始。': 'Not started.',

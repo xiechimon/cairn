@@ -2,7 +2,7 @@ import type { TasksQuery } from '@cairn/shared';
 import { and, asc, eq, gte, isNull, or } from 'drizzle-orm';
 import { chiefMessage, chiefThread, todo } from '../db/schema.js';
 import { askQuestionContentOf } from './chief-questions.js';
-import { ownershipOf, sectionOf, TASKS_RECENT_MS } from './owner.js';
+import { heldByBlockers, ownershipOf, sectionOf, TASKS_RECENT_MS } from './owner.js';
 import { type TodoDeps, toTodoRecords } from './todos.js';
 
 export function listTasks(
@@ -22,7 +22,9 @@ export function listTasks(
     .orderBy(asc(todo.seqNum), asc(todo.id))
     .all()
     .filter(
-      (row) => !sectionedOnly || sectionOf(row, ownershipOf(deps.db, row, now), now) !== null,
+      (row) =>
+        !sectionedOnly ||
+        sectionOf(row, ownershipOf(deps.db, row, now), now, heldByBlockers(deps.db, row)) !== null,
     );
   const todos = toTodoRecords(deps, rows, now).map((record) => ({
     kind: 'todo' as const,

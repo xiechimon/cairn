@@ -12,6 +12,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
+import { BLOCKED_BY_HOLD } from '../src/services/blockers.js';
 import { RUNNER_OFFLINE_NOTICE_MS, sweepOfflineRunners } from '../src/services/runner-offline.js';
 import { NO_MACHINE_ALERT_MS, sweepUnplaceableSteps } from '../src/services/unplaceable-steps.js';
 import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
@@ -255,6 +256,23 @@ describe('an offline Runner with waiting tasks raises one Coordinator notice per
     expect(extra).toBeUndefined();
     expect(notice?.machineName).toBe('omarchy');
     expect(notice?.todos.filter((t) => t.state === 'waiting')).toHaveLength(10);
+  });
+
+  test('a task held behind another task is not counted as waiting for the Runner', async () => {
+    const w = await world();
+    const omarchy = await machineOf(w, 'omarchy', { online: false });
+    routeOf(w, omarchy);
+    pendingStep(w);
+    const held = pendingStep(w);
+    w.s.db
+      .update(stepTable)
+      .set({ holdReason: BLOCKED_BY_HOLD, holdUntil: Date.now() + 60_000 })
+      .where(eq(stepTable.id, held))
+      .run();
+    const now = Date.now();
+    lastSeen(w, omarchy, now - RUNNER_OFFLINE_NOTICE_MS - 1_000);
+    sweepOfflineRunners(w.s.svc, now);
+    expect(notices(w)[0]?.todos.filter((t) => t.state === 'waiting')).toHaveLength(1);
   });
 
   test('a return marks waiting tasks started, and a second offline period gets a new notice', async () => {

@@ -70,7 +70,9 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
     case 'failed':
       return { state: STATUS_WORDS.failed, reason: '失败了，打开它重试。' };
     case 'queued':
-      return { state: STATUS_WORDS.running, reason: '排队等执行机。' };
+      return todo.section === 'up_next'
+        ? { state: STATUS_WORDS.waiting, reason: '等前置任务完成。' }
+        : { state: STATUS_WORDS.running, reason: '排队等执行机。' };
     case 'planning':
       return { state: STATUS_WORDS.running, reason: '正在写计划。' };
     case 'building':

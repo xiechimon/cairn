@@ -203,6 +203,7 @@ function unfinishableLead(todo: TaskEntry['todo']): { glyph: GlyphKind; why: str
 
 function PanelTaskRow({
   entry,
+  lookup,
   place,
   prs,
   prsArrived,
@@ -218,6 +219,7 @@ function PanelTaskRow({
   open: boolean;
   onToggle: () => void;
   entry: TaskEntry;
+  lookup: (id: string) => TaskEntry['todo'] | undefined;
   place: string | undefined;
   prs: readonly PrPanelRow[];
   prsArrived: ReadonlySet<string>;
@@ -229,7 +231,11 @@ function PanelTaskRow({
   const { t } = useI18n();
   const { markDone, dialogs } = useMarkDone(entry.todo);
   const prefetch = usePrefetchThread();
-  const copy: TaskRowCopy = taskRowCopy(entry, prs.find((pr) => pr.state !== 'merged') ?? prs[0]);
+  const copy: TaskRowCopy = taskRowCopy(
+    entry,
+    prs.find((pr) => pr.state !== 'merged') ?? prs[0],
+    lookup,
+  );
   const open = () => onOpenThread(entry.todo.id);
   const unfinishable = canMarkDone(entry.todo) ? null : unfinishableLead(entry.todo);
   return (
@@ -311,6 +317,7 @@ export function TasksPanel({
     if (newTaskAt !== null) setAdding(true);
   }, [newTaskAt]);
   const groups = bySection(entries);
+  const listed = new Map(entries.map((entry) => [entry.todo.id, entry.todo]));
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const selectedTodos = entries
     .filter((entry) => picked.has(entry.todo.id) && canMarkDone(entry.todo))
@@ -370,6 +377,7 @@ export function TasksPanel({
     <PanelTaskRow
       key={entry.todo.id}
       entry={entry}
+      lookup={(id) => listed.get(id)}
       place={placeOf(entry)}
       prs={prsOf.get(entry.todo.id) ?? []}
       prsArrived={prsArrived}

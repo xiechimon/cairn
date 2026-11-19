@@ -59,7 +59,24 @@ export function isWaiting(section: TaskSection): boolean {
   return WAITING.has(section);
 }
 
-export function taskRowCopy(entry: TaskEntry, pr?: PrPanelRow): TaskRowCopy {
+function waitsForPhrase(
+  todo: TodoRecord,
+  lookup: (id: string) => TodoRecord | undefined,
+): Phrase | null {
+  if (todo.phase === 'todo') return null;
+  const open = (todo.blockedBy ?? []).filter((id) => lookup(id)?.phase !== 'done');
+  if (open.length === 0) return null;
+  const only = open.length === 1 ? lookup(open[0] ?? '') : undefined;
+  return only === undefined
+    ? { key: '等 {n} 个任务', params: { n: open.length } }
+    : { key: '等「{title}」', params: { title: only.title } };
+}
+
+export function taskRowCopy(
+  entry: TaskEntry,
+  pr?: PrPanelRow,
+  lookup: (id: string) => TodoRecord | undefined = () => undefined,
+): TaskRowCopy {
   const { todo, section } = entry;
   const base = { waiting: isWaiting(section), running: false };
   switch (section) {
@@ -103,7 +120,12 @@ export function taskRowCopy(entry: TaskEntry, pr?: PrPanelRow): TaskRowCopy {
       return { ...base, word, what: { key: threadCopy(todo).reason }, where: null };
     }
     case 'up_next':
-      return { ...base, word: '待开始', what: { key: '还没开始' }, where: null };
+      return {
+        ...base,
+        word: '待开始',
+        what: waitsForPhrase(todo, lookup) ?? { key: '还没开始' },
+        where: null,
+      };
   }
 }
 

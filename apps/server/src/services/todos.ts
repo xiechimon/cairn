@@ -50,7 +50,12 @@ import { githubCreateIssue, githubListIssues, githubUpdateIssueTitle } from '../
 import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
-import { checkBlockedBy, holdBlockedBuild, releaseBlockedSteps } from './blockers.js';
+import {
+  BLOCKED_BY_HOLD,
+  checkBlockedBy,
+  holdBlockedBuild,
+  releaseBlockedSteps,
+} from './blockers.js';
 import { triggerChiefWakes } from './chief.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { contextWindowOf } from './coordinator-context.js';
@@ -85,7 +90,7 @@ import { priorSessionOf, soleOnlineMachineId, teamDefaultMachineId } from './mac
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
-import { ownershipOf, reconcileOwners, sectionOf } from './owner.js';
+import { heldByBlockers, ownershipOf, reconcileOwners, sectionOf } from './owner.js';
 import { isPersonalSpace } from './personal-space.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
@@ -380,7 +385,7 @@ function todoRecordOf(
     sourceRef: row.sourceRef,
     output: row.output,
     owner: ownership?.owner ?? null,
-    section: sectionOf(row, ownership, now),
+    section: sectionOf(row, ownership, now, heldByBlockers(deps.db, row)),
     ...(waitingOn !== undefined ? { waitingOn } : {}),
     quotaWait,
     ...(lastProgressAt !== undefined ? { lastProgressAt } : {}),
@@ -424,7 +429,8 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
     .select()
     .from(step)
     .where(and(eq(step.buildId, row.latestBuildId), eq(step.status, 'pending')))
-    .all();
+    .all()
+    .filter((s) => s.holdReason !== BLOCKED_BY_HOLD);
   if (pendingSteps.length === 0) return undefined;
   const held = pendingSteps.find((s) => s.holdReason === 'quota');
   if (held !== undefined) {

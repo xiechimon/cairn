@@ -102,12 +102,16 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     const id = await create({ blockedBy: [blocker] });
     expect(row(id).blockedBy).toEqual([blocker]);
     expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
+    expect(getTodo(toolDeps(), id)).toMatchObject({ section: 'up_next' });
+    expect(getTodo(toolDeps(), id)?.waitingOn).toBeUndefined();
+    expect(getTodo(toolDeps(), blocker)).toMatchObject({ section: 'working' });
     releaseBlockedSteps(toolDeps());
     expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);
     finish(blocker, 'done');
     releaseBlockedSteps(toolDeps());
     expect(sessions(id)[0]?.holdReason).toBeNull();
     expect(sessions(id)[0]?.holdUntil).toBeNull();
+    expect(getTodo(toolDeps(), id)).toMatchObject({ section: 'working' });
   });
 
   test('dependsOn and blockedBy both hold the automatically started session', async () => {

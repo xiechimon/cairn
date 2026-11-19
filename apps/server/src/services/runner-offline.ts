@@ -11,6 +11,7 @@ import { build, chiefMessage, machine, step, todo } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
+import { BLOCKED_BY_HOLD } from './blockers.js';
 import { type ChiefDeps, coordinatorThreadRow, ensureChief } from './chief.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
@@ -52,7 +53,7 @@ function waitingByMachine(db: Db): Map<string, Map<string, PendingRow>> {
   const projectors = new Map<string, ReturnType<typeof stepQueueProjector>>();
   const waiting = new Map<string, Map<string, PendingRow>>();
   for (const row of rows) {
-    if (row.stepRow.holdReason === 'quota') continue;
+    if (row.stepRow.holdReason === 'quota' || row.stepRow.holdReason === BLOCKED_BY_HOLD) continue;
     const projector =
       projectors.get(row.todoRow.teamId) ?? stepQueueProjector(db, row.todoRow.teamId);
     projectors.set(row.todoRow.teamId, projector);
