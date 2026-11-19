@@ -5,6 +5,7 @@ import { and, eq, like } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
+  chief,
   chiefThread,
   dueEvent,
   gateState,
@@ -16,6 +17,7 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import type { BuildDeps } from '../src/services/builds.js';
+import { recoverGateWake } from '../src/services/chief.js';
 import { executeChiefTool, transitionTodos } from '../src/services/chief-tools.js';
 import { listNeedsYou } from '../src/services/needs-you.js';
 import {
@@ -538,7 +540,7 @@ describe('reconcileOwners (#3512)', () => {
     expect(wakes(w).filter((prompt) => prompt.startsWith('[wake:failed]'))).toHaveLength(1);
   });
 
-  test('the first sweep after the migration seeds checkpoints without waking anyone', () => {
+  test('the first sweep after the migration seeds checkpoints without notifying, and repairs a coordinator-owned row into a live turn', () => {
     const w = openWorld({ phase: 'failed', failure: 'parked' });
     const other = newRecordId(8);
     w.s.db
@@ -558,7 +560,7 @@ describe('reconcileOwners (#3512)', () => {
     seedOwnerCheckpoints(w.s.db);
     reconcileOwners(w.deps);
     reconcileOwners(w.deps);
-    expect(wakes(w)).toHaveLength(0);
+    expect(wakes(w).filter((prompt) => prompt.startsWith('[wake:failed]'))).toHaveLength(1);
     expect(w.notified()).toBe(before);
     const seeded = w.s.db.select().from(todoTable).all();
     expect(seeded.every((row) => row.lastNotifiedOwner !== null)).toBe(true);
@@ -802,6 +804,150 @@ describe('a Coordinator turn that changes nothing hands the task to the owner (t
     }
     expect(prompt).toMatch(/update_todo.*blockedBy.*message_thread/);
     expect(prompt).not.toContain('否则不发消息');
+  });
+
+  describe('wake persistence stays atomic (#3669)', () => {
+    const lastNotified = (w: World) =>
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.lastNotifiedOwner;
+
+    const turnOf = (w: World) =>
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.coordinatorTurn;
+
+    test('a wake enqueue that cannot complete writes no checkpoint at all', () => {
+      const w = openWorld({ phase: 'review', output: 'info' });
+      w.s.db
+        .update(buildTable)
+        .set({ reportAttachmentId: 'att-dead' })
+        .where(eq(buildTable.id, w.buildId))
+        .run();
+      const chiefId = `chief-${w.todoId}`;
+      w.s.db
+        .insert(chief)
+        .values({
+          id: chiefId,
+          userId: w.s.user.id,
+          teamId: w.s.team.id,
+          watches: [
+            {
+              todoId: w.todoId,
+              projectId: w.projectId,
+              seqNum: 1,
+              title: 'Task',
+              projectName: 'owner',
+              phase: 'review',
+              reason: 'test',
+              createdAt: nowMs(),
+              threadId: 'gone-thread',
+              threadTitle: 'gone',
+            },
+          ],
+          createdAt: nowMs(),
+        })
+        .run();
+      reconcileOwners(w.deps);
+      expect(lastNotified(w)).toBe('none');
+      expect(turnOf(w)).toBeNull();
+      w.s.db
+        .update(buildTable)
+        .set({ reportAttachmentId: null })
+        .where(eq(buildTable.id, w.buildId))
+        .run();
+      reconcileOwners(w.deps);
+      expect(lastNotified(w)).toBe('coordinator');
+      expect(wakeStep(w)).toHaveLength(1);
+    });
+
+    test('a torn write that lost only the turn pointer is adopted, not duplicated', () => {
+      const w = failedWorld();
+      const wake = wakeStep(w)[0]!;
+      w.s.db
+        .update(todoTable)
+        .set({ coordinatorTurn: null })
+        .where(eq(todoTable.id, w.todoId))
+        .run();
+      w.s.db
+        .delete(dueEvent)
+        .where(eq(dueEvent.id, ownershipHandoffEventId(wake.id)))
+        .run();
+      reconcileOwners(w.deps);
+      expect(turnOf(w)?.stepId).toBe(wake.id);
+      expect(handoffEvent(w, wake.id)).toBeDefined();
+      expect(wakeStep(w)).toHaveLength(1);
+      expect(ownerNow(w)).toBe('coordinator');
+    });
+
+    test('a torn write that lost the whole wake is re-enqueued on reconcile', () => {
+      const w = failedWorld();
+      for (const row of wakeStep(w)) {
+        w.s.db.delete(stepTable).where(eq(stepTable.id, row.id)).run();
+      }
+      w.s.db
+        .update(todoTable)
+        .set({ coordinatorTurn: null })
+        .where(eq(todoTable.id, w.todoId))
+        .run();
+      reconcileOwners(w.deps);
+      const wake = wakeStep(w)[0];
+      expect(wake).toBeDefined();
+      expect(turnOf(w)?.stepId).toBe(wake!.id);
+      expect(handoffEvent(w, wake!.id)).toBeDefined();
+    });
+
+    test('a gate retry that outlived its torn pointer is adopted, not handed off early', () => {
+      const w = openWorld({ phase: 'review', output: 'info' });
+      reconcileOwners(w.deps);
+      const wake = wakeStep(w)[0]!;
+      expect(wake.prompt).toMatch(/^\[wake:gate\]/);
+      w.s.db
+        .update(stepTable)
+        .set({ status: 'failed', finishedAt: nowMs() })
+        .where(eq(stepTable.id, wake.id))
+        .run();
+      const retryId = newRecordId();
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: retryId,
+          buildId: wake.buildId,
+          kind: 'chief',
+          status: 'pending',
+          prompt: (wake.prompt ?? '').replace(/attempt=0$/, 'attempt=1'),
+          createdAt: nowMs(),
+        })
+        .run();
+      const before = w.notified();
+      reconcileOwners(w.deps);
+      expect(ownerNow(w)).toBe('coordinator');
+      expect(turnOf(w)?.stepId).toBe(retryId);
+      expect(handoffEvent(w, retryId)).toBeDefined();
+      expect(w.notified()).toBe(before);
+      expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, retryId)).get()?.status).toBe(
+        'pending',
+      );
+    });
+
+    test('recoverGateWake persists the retry, the new pointer and the deadline together', () => {
+      const w = openWorld({ phase: 'review', output: 'info' });
+      reconcileOwners(w.deps);
+      const wake = wakeStep(w)[0]!;
+      w.s.db
+        .update(stepTable)
+        .set({ status: 'failed', finishedAt: nowMs() })
+        .where(eq(stepTable.id, wake.id))
+        .run();
+      recoverGateWake(
+        w.deps,
+        w.s.db.select().from(stepTable).where(eq(stepTable.id, wake.id)).get()!,
+      );
+      const retry = wakeStep(w).find(
+        (row) => row.id !== wake.id && row.prompt?.includes('attempt=1'),
+      );
+      expect(retry).toBeDefined();
+      expect(turnOf(w)?.stepId).toBe(retry!.id);
+      expect(handoffEvent(w, retry!.id)).toBeDefined();
+      expect(handoffEvent(w, wake.id)).toBeUndefined();
+      expect(ownerNow(w)).toBe('coordinator');
+    });
   });
 });
 

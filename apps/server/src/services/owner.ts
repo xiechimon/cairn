@@ -6,21 +6,39 @@ import {
   type TodoSection,
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
-import { and, eq, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  or,
+  type SQL,
+  sql,
+  TransactionRollbackError,
+} from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, dueEvent, message, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { BLOCKED_BY_HOLD, deadEndBlocker } from './blockers.js';
 import { planAwaitsAutoConfirm } from './builds.js';
-import { type ChiefDeps, enqueueOwnershipWake } from './chief.js';
+import {
+  type ChiefDeps,
+  enqueueOwnershipWake,
+  parseChiefTrigger,
+  watchProvenance,
+} from './chief.js';
 import { settleChiefActiveRun } from './chief-turns.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
 import { notifyOwnership } from './notifications.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { publishStepRow } from './quota-wait.js';
 import { getTodo } from './todos.js';
+import { reportProvenance, turnProvenance } from './turn-provenance.js';
 
 type TodoRow = typeof todo.$inferSelect;
+type StepRow = typeof step.$inferSelect;
 
 export type CoordinatorReason = 'question' | 'failed' | 'review' | 'blocked';
 
@@ -101,6 +119,31 @@ function blockedOwnership(db: Db, row: TodoRow): Ownership | null {
 
 type TurnState = 'running' | 'ended' | 'never-started';
 
+const OWNERSHIP_WAKE_TRIGGERS: Record<CoordinatorReason, string> = {
+  question: 'wake',
+  blocked: 'wake',
+  failed: 'failed',
+  review: 'gate',
+};
+
+function liveOwnershipWakes(db: Db, todoId: string): StepRow[] {
+  const provs = new Set([watchProvenance(todoId), reportProvenance(todoId)]);
+  return db
+    .select()
+    .from(step)
+    .where(
+      and(eq(step.kind, 'chief'), inArray(step.status, [...UNSTARTED_STEP_STATUSES, 'claimed'])),
+    )
+    .orderBy(asc(step.createdAt), sql`rowid`)
+    .all()
+    .filter((row) => {
+      const trigger = parseChiefTrigger(row.prompt);
+      if (trigger !== 'wake' && trigger !== 'gate' && trigger !== 'failed') return false;
+      const provenance = turnProvenance(row.prompt);
+      return provenance !== null && provs.has(provenance);
+    });
+}
+
 function coordinatorTurnState(db: Db, row: TodoRow, workKey: string, now: number): TurnState {
   const turn = row.coordinatorTurn;
   if (turn === null || turn.workKey !== workKey) return 'running';
@@ -109,9 +152,14 @@ function coordinatorTurnState(db: Db, row: TodoRow, workKey: string, now: number
     .from(step)
     .where(eq(step.id, turn.stepId))
     .get();
-  if (wake === undefined || ENDED_STEP.has(wake.status)) return 'ended';
+  const liveSibling =
+    wake === undefined || wake.status !== 'claimed'
+      ? liveOwnershipWakes(db, row.id).some((live) => live.id !== turn.stepId)
+      : false;
+  if (wake === undefined || ENDED_STEP.has(wake.status)) return liveSibling ? 'running' : 'ended';
   if (wake.status === 'claimed') return 'running';
-  return now - wake.createdAt >= COORDINATOR_TURN_DEADLINE_MS ? 'never-started' : 'running';
+  if (now - wake.createdAt < COORDINATOR_TURN_DEADLINE_MS) return 'running';
+  return liveSibling ? 'running' : 'never-started';
 }
 
 export function ownershipOf(db: Db, row: TodoRow, now = nowMs()): Ownership | null {
@@ -229,44 +277,76 @@ function cancelUnstartedWake(deps: OwnerDeps, row: TodoRow): void {
   publishStepRow(deps, stopped);
 }
 
+function wakeTurnIntact(db: Db, row: TodoRow, workKey: string): boolean {
+  const turn = row.coordinatorTurn;
+  if (turn === null || turn.workKey !== workKey) return false;
+  const wake = db.select({ status: step.status }).from(step).where(eq(step.id, turn.stepId)).get();
+  if (wake === undefined || ENDED_STEP.has(wake.status)) return false;
+  return (
+    db
+      .select({ id: dueEvent.id })
+      .from(dueEvent)
+      .where(eq(dueEvent.id, ownershipHandoffEventId(turn.stepId)))
+      .get() !== undefined
+  );
+}
+
+function adoptWakeStepId(db: Db, row: TodoRow, reason: CoordinatorReason): string | null {
+  const trigger = OWNERSHIP_WAKE_TRIGGERS[reason];
+  return (
+    liveOwnershipWakes(db, row.id).find((wake) => parseChiefTrigger(wake.prompt) === trigger)?.id ??
+    null
+  );
+}
+
 function reconcileRow(deps: OwnerDeps, row: TodoRow): void {
   const ownership = ownershipOf(deps.db, row);
   const owner = ownership?.owner ?? NOBODY;
   const workKey = ownership?.workKey ?? '';
-  if (row.lastNotifiedOwner === owner && row.lastNotifiedWork === workKey) return;
-  if (!claimCheckpoint(deps.db, row, owner, workKey)) return;
+  const checkpointMatch = row.lastNotifiedOwner === owner && row.lastNotifiedWork === workKey;
+  if (checkpointMatch && (owner !== 'coordinator' || wakeTurnIntact(deps.db, row, workKey))) return;
+  if (ownership?.owner === 'coordinator') {
+    let stepId: string;
+    try {
+      stepId = deps.db.transaction((tx) => {
+        if (!claimCheckpoint(deps.db, row, owner, workKey)) return tx.rollback();
+        const adopted = checkpointMatch ? adoptWakeStepId(deps.db, row, ownership.reason) : null;
+        const stepId = adopted ?? enqueueOwnershipWake(deps, row, ownership.reason);
+        if (stepId === null) return tx.rollback();
+        deps.db
+          .update(todo)
+          .set({ coordinatorTurn: { stepId, workKey } })
+          .where(eq(todo.id, row.id))
+          .run();
+        const queued = deps.db
+          .select({ createdAt: step.createdAt })
+          .from(step)
+          .where(eq(step.id, stepId))
+          .get();
+        if (queued !== undefined)
+          deps.db
+            .insert(dueEvent)
+            .values({
+              id: ownershipHandoffEventId(stepId),
+              kind: OWNERSHIP_HANDOFF_KIND,
+              dueAt: queued.createdAt + COORDINATOR_TURN_DEADLINE_MS,
+            })
+            .onConflictDoNothing()
+            .run();
+        return stepId;
+      });
+    } catch (err) {
+      if (err instanceof TransactionRollbackError) return;
+      throw err;
+    }
+  } else if (!claimCheckpoint(deps.db, row, owner, workKey)) return;
   if (row.lastNotifiedOwner !== owner) {
     const record = getTodo(deps, row.id);
     if (record !== null) deps.hub.publishTodoDoc(record.teamId, record);
   }
-  if (ownership === null) return;
-  if (ownership.owner === 'owner') {
-    if (ownership.reason === 'handoff') cancelUnstartedWake(deps, row);
-    notifyOwner(deps, row, ownership.reason);
-    return;
-  }
-  const stepId = enqueueOwnershipWake(deps, row, ownership.reason);
-  if (stepId === null) return;
-  deps.db
-    .update(todo)
-    .set({ coordinatorTurn: { stepId, workKey: ownership.workKey } })
-    .where(eq(todo.id, row.id))
-    .run();
-  const queued = deps.db
-    .select({ createdAt: step.createdAt })
-    .from(step)
-    .where(eq(step.id, stepId))
-    .get();
-  if (queued === undefined) return;
-  deps.db
-    .insert(dueEvent)
-    .values({
-      id: ownershipHandoffEventId(stepId),
-      kind: OWNERSHIP_HANDOFF_KIND,
-      dueAt: queued.createdAt + COORDINATOR_TURN_DEADLINE_MS,
-    })
-    .onConflictDoNothing()
-    .run();
+  if (ownership === null || ownership.owner !== 'owner') return;
+  if (ownership.reason === 'handoff') cancelUnstartedWake(deps, row);
+  notifyOwner(deps, row, ownership.reason);
 }
 
 export function rescheduleOwnershipHandoff(db: Db, fromStepId: string, toStepId: string): void {

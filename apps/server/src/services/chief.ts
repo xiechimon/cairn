@@ -123,7 +123,6 @@ import {
   type ReportRef,
   reportAnsweredIn,
   reportLine,
-  reportProvenance,
   reportRefCurrent,
   reportRefOfPrompt,
 } from './report-turn.js';
@@ -137,7 +136,7 @@ import { type LocalSkill, scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo } from './todos.js';
 import { insertMessageRow } from './transcript.js';
-import { turnProvenance, WAKE_PROMPT_PREFIX } from './turn-provenance.js';
+import { reportProvenance, turnProvenance, WAKE_PROMPT_PREFIX } from './turn-provenance.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
 export interface ChiefDeps {
@@ -1670,16 +1669,17 @@ export function recoverGateWake(deps: ChiefDeps, failedStep: typeof step.$inferS
   )
     return;
   if (match[4] === '0') {
-    const retryId = enqueueGateWake(deps, thread.id, record, true, newRecordId(), report);
-    const row = deps.db.select().from(todo).where(eq(todo.id, record.id)).get();
-    if (row?.coordinatorTurn?.stepId === failedStep.id) {
+    deps.db.transaction(() => {
+      const retryId = enqueueGateWake(deps, thread.id, record, true, newRecordId(), report);
+      const row = deps.db.select().from(todo).where(eq(todo.id, record.id)).get();
+      if (row?.coordinatorTurn?.stepId !== failedStep.id) return;
       deps.db
         .update(todo)
         .set({ coordinatorTurn: { ...row.coordinatorTurn, stepId: retryId } })
         .where(eq(todo.id, record.id))
         .run();
       rescheduleOwnershipHandoff(deps.db, failedStep.id, retryId);
-    }
+    });
     return;
   }
   if (record.latestBuildId)

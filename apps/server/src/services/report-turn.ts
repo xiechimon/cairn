@@ -16,7 +16,7 @@ import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { insertChiefMessageOnce } from './chief.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
-import { turnProvenance } from './turn-provenance.js';
+import { REPORT_PROVENANCE_PREFIX, reportProvenance, turnProvenance } from './turn-provenance.js';
 
 export interface ReportRef {
   todoId: string;
@@ -26,7 +26,6 @@ export interface ReportRef {
   originThreadId: string | null;
 }
 
-const REPORT_PROVENANCE_PREFIX = 'report:';
 const REPORT_LINE_RE =
   /\nReport todo=(\S+) build=(\S+) attachment=(\S+) thread=(\S+) origin=(none|thread:\S+)\nGate todo=\S+ build=\S* phase=\w+ attempt=[01]$/;
 const REPORT_OPEN_TOOLS = new Set([
@@ -77,10 +76,6 @@ export function turnForcesOutboundApproval(db: Db, prompt: string | null): boole
     provenance.startsWith(ACTION_WAKE_PROVENANCE_PREFIX) &&
     proposalFromUntrustedTurn(db, provenance.slice(ACTION_WAKE_PROVENANCE_PREFIX.length))
   );
-}
-
-export function reportProvenance(todoId: string): string {
-  return `${REPORT_PROVENANCE_PREFIX}${todoId}`;
 }
 
 export function reportLine(ref: ReportRef): string {
