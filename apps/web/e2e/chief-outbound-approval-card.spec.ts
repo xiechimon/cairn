@@ -2,13 +2,17 @@ import { expect, test } from '@playwright/test';
 import { mockLive, THREAD } from './chief-home-mock';
 
 const QUESTION = [
-  '对外发送：gmail · GMAIL_SEND_EMAIL',
+  '对外发送：cairn-mail send',
   '收件人：lena.hoffmann@example.com',
   '主题：Re: Quote for the migration',
   '正文：',
   '> Hi Lena,',
   '> the quote is 4200 EUR, valid until Friday.',
   '> Best, Ian',
+  '参数：',
+  '> inReplyTo：mail_01JX8K2QF7ZC4V9N3T6W',
+  '参数：',
+  '> from：ian@example.com',
   '',
   '只会按上面的内容发出，发出后无法收回。',
 ].join('\n');
@@ -31,23 +35,41 @@ const CARD = {
 
 test.use({ colorScheme: 'light', viewport: { width: 1440, height: 900 } });
 
-test('an outbound approval card shows the recipient and the whole draft with send and decline', async ({
+test('an outbound approval card lists the mail under labels, folds internal ids and sends on click', async ({
   page,
 }) => {
-  await mockLive(page, {
-    threads: [THREAD],
-    messages: [
-      { id: 'm1', role: 'user', content: 'Reply to Lena about the quote', createdAt: 10 },
-      CARD,
-    ],
-    todos: [],
-  });
+  const answers: unknown[] = [];
+  await mockLive(
+    page,
+    {
+      threads: [THREAD],
+      messages: [
+        { id: 'm1', role: 'user', content: 'Reply to Lena about the quote', createdAt: 10 },
+        CARD,
+      ],
+      todos: [],
+    },
+    (path, route, json) => {
+      if (!path.endsWith('/questions/approval-p1/answer')) return undefined;
+      answers.push(route.request().postDataJSON());
+      return json({ ok: true });
+    },
+  );
   await page.goto('/app');
-  const question = page.getByTestId('chief-stream').getByTestId('chief-question');
-  const text = question.getByTestId('chief-question-text');
-  await expect(text).toContainText('lena.hoffmann@example.com');
-  await expect(text).toContainText('the quote is 4200 EUR, valid until Friday.');
-  await expect(question.getByTestId('chief-question-option-0-0')).toContainText('发送');
-  await expect(question.getByTestId('chief-question-option-0-1')).toContainText('不发');
-  if (process.env.OUTBOUND_SHOT) await page.screenshot({ path: process.env.OUTBOUND_SHOT });
+  const card = page.getByTestId('chief-stream').getByTestId('approval-card');
+  await expect(card.getByTestId('approval-card-title')).toHaveText('发送邮件');
+  await expect(card.getByTestId('approval-field-label')).toHaveText(['收件人', '主题', '正文']);
+  await expect(card.getByTestId('approval-field-value').first()).toHaveText(
+    'lena.hoffmann@example.com',
+  );
+  await expect(card).toContainText('the quote is 4200 EUR, valid until Friday.');
+  await expect(card).not.toContainText('inReplyTo');
+  await card.getByTestId('approval-details-toggle').click();
+  await expect(card.getByTestId('approval-details')).toContainText('mail_01JX8K2QF7ZC4V9N3T6W');
+  await expect(card.getByTestId('approval-card-note')).toHaveText(
+    '只会按上面的内容发出，发出后无法收回。',
+  );
+  await expect(card.getByTestId('chief-question-option-0-1')).toHaveText('不发');
+  await card.getByTestId('chief-question-option-0-0').click();
+  await expect.poll(() => answers).toEqual([{ answers: [{ header: '审批', choices: ['发送'] }] }]);
 });

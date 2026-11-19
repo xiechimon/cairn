@@ -3,6 +3,8 @@ import { Ban, CircleCheck } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
+import { ApprovalCard } from './approval-card.js';
+import { approvalCardOf, isApprovalRequest } from './approval-card-model.js';
 import { MessageToolbar } from './message-toolbar.js';
 import type { ChiefQuestionItem } from './question-chips.js';
 
@@ -31,6 +33,8 @@ export function QuestionAsked({
   item: ChiefQuestionItem;
   onCopy?: ((text: string) => void) | undefined;
 }) {
+  const { t } = useI18n();
+  const approval = isApprovalRequest(item.requestId);
   return (
     <div
       data-testid="chief-question-asked"
@@ -39,7 +43,9 @@ export function QuestionAsked({
       className="flex w-full max-w-full min-w-0 flex-col items-start gap-1"
     >
       {item.questions.map((question, n) => {
-        const bubble = (
+        const bubble = approval ? (
+          <ApprovalCard card={{ ...approvalCardOf(question, t), note: null }} waiting={false} />
+        ) : (
           <div
             data-slot="reply-bubble"
             data-testid="chief-reply-bubble"
@@ -50,7 +56,7 @@ export function QuestionAsked({
         );
         return (
           <div key={n} className={REPLY_BLOCK_CLS} data-slot="reply-block">
-            {question.header === '' ? (
+            {question.header === '' || approval ? (
               bubble
             ) : (
               <Tooltip>

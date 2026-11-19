@@ -42,7 +42,7 @@ test.describe('package install approval card in the Coordinator chat', () => {
     const { card, decisions } = await open(page, installRow());
     await expect(card).toHaveAttribute('data-outcome', 'waiting');
     await expect(card).toContainText('Coordinator 想安装系统软件');
-    await expect(card.getByTestId('chief-package-install-names')).toHaveText(/ffmpeg\s*libpq-dev/);
+    await expect(card.getByTestId('approval-field-value')).toHaveText(/ffmpeg\s*libpq-dev/);
     await card.scrollIntoViewIfNeeded();
     await evidencePanelShot(page, 'package-install-card-waiting.png', card);
     await card.getByTestId('chief-package-install-approve').click();
@@ -73,7 +73,7 @@ test.describe('package install approval card in the Coordinator chat', () => {
   test('a paired device that is not the owner is told who can approve', async ({ page }) => {
     const { card } = await open(page, installRow(), 403);
     await card.getByTestId('chief-package-install-approve').click();
-    await expect(card.getByTestId('chief-package-install-problem')).toHaveText(
+    await expect(card.getByTestId('approval-card-problem')).toHaveText(
       '只有这台 Cairn 的所有者能批准安装。',
     );
     await expect(card).toHaveAttribute('data-outcome', 'waiting');

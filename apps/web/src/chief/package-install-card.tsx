@@ -1,13 +1,11 @@
-import { cn } from 'cn';
 import { useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { ApprovalCard } from './approval-card.js';
 
 type PackageInstallItem = Extract<ChiefStreamItem, { kind: 'package-install' }>;
 
@@ -74,66 +72,38 @@ export function PackageInstallCard({ item }: { item: PackageInstallItem }) {
 
   return (
     <MessageScrollerItem style={{ contentVisibility: 'visible' }} className="mt-5">
-      <section
-        data-testid="chief-package-install"
-        data-outcome={waiting && decided !== null ? `${decided}d` : item.outcome}
-        aria-label={t('安装系统软件')}
-        className={cn(REPLY_BUBBLE_CLS, 'flex flex-col gap-1 py-3')}
-      >
-        <p className="m-0 flex items-center gap-2 text-ui font-title text-foreground">
-          {asking && (
-            <span
-              aria-hidden="true"
-              data-slot="needs-you-dot"
-              className="size-1.5 flex-none rounded-full bg-(--card-button)"
-            />
-          )}
-          {title}
-        </p>
-        <p
-          className="m-0 flex flex-wrap gap-x-2 gap-y-1 text-meta text-foreground"
-          data-testid="chief-package-install-names"
-        >
-          {item.packages.map((name) => (
-            <code key={name}>{name}</code>
-          ))}
-        </p>
-        {meta !== null && <p className="m-0 text-meta text-content-secondary">{meta}</p>}
-        {asking && (
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              size="sm"
-              className="pointer-coarse:h-11 pointer-coarse:px-4"
-              disabled={decidePackageInstall.isPending}
-              data-testid="chief-package-install-approve"
-              onClick={() => decide('approve')}
-            >
-              {t('批准安装')}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="pointer-coarse:h-11 pointer-coarse:px-4"
-              disabled={decidePackageInstall.isPending}
-              data-testid="chief-package-install-decline"
-              onClick={() => decide('decline')}
-            >
-              {t('拒绝')}
-            </Button>
-          </div>
-        )}
-        {problemText !== null && (
-          <p
-            role="alert"
-            className="m-0 text-meta text-destructive"
-            data-testid="chief-package-install-problem"
-          >
-            {problemText}
-          </p>
-        )}
-      </section>
+      <ApprovalCard
+        testId="chief-package-install"
+        outcome={waiting && decided !== null ? `${decided}d` : item.outcome}
+        waiting={asking}
+        card={{
+          title,
+          summary: null,
+          fields: [{ label: t('软件包'), value: item.packages.join(' '), mono: true }],
+          details: [],
+          note: meta,
+        }}
+        disabled={decidePackageInstall.isPending}
+        actions={
+          asking
+            ? [
+                {
+                  label: t('批准安装'),
+                  primary: true,
+                  testId: 'chief-package-install-approve',
+                  onClick: () => decide('approve'),
+                },
+                {
+                  label: t('拒绝'),
+                  primary: false,
+                  testId: 'chief-package-install-decline',
+                  onClick: () => decide('decline'),
+                },
+              ]
+            : []
+        }
+        problem={problemText}
+      />
     </MessageScrollerItem>
   );
 }

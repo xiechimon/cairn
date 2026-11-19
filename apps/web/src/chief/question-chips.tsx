@@ -19,6 +19,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { ApprovalCard } from './approval-card.js';
+import { approvalCardOf, isApprovalRequest } from './approval-card-model.js';
 import { MessageToolbar } from './message-toolbar.js';
 import { answerKeyOf, questionDockState } from './question-dock-state.js';
 import {
@@ -265,6 +267,51 @@ export function QuestionChips({
     );
   };
   const showSubmitChip = multi || (question.options.length === 0 && !bound);
+  const approval = isApprovalRequest(item.requestId) ? approvalCardOf(question, t) : null;
+
+  if (approval !== null)
+    return (
+      <div
+        ref={blockRef}
+        data-testid="chief-question-chips"
+        data-status={item.status}
+        data-request-id={item.requestId}
+        className="flex min-w-0 flex-col items-start gap-1"
+      >
+        <div
+          data-tools-root=""
+          className="group/message flex max-w-full min-w-0 flex-col items-start"
+        >
+          <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
+            <ApprovalCard
+              card={approval}
+              waiting
+              disabled={!pending || blockedByUpload}
+              actions={question.options.map((option, oi) => ({
+                label: option.label,
+                primary: oi === 0,
+                testId: `chief-question-option-${step}-${oi}`,
+                onClick: () => choose(oi),
+              }))}
+            />
+            <MessageToolbar
+              placement="right"
+              testId="chief-question-tools"
+              stamp={null}
+              onCopy={() => copyText(question.question)}
+              onDismiss={pending && onCancel !== undefined ? dismiss : undefined}
+            />
+          </div>
+          <MessageToolbar
+            placement="below-start"
+            testId="chief-question-tools-touch"
+            stamp={null}
+            onCopy={() => copyText(question.question)}
+            onDismiss={pending && onCancel !== undefined ? dismiss : undefined}
+          />
+        </div>
+      </div>
+    );
 
   return (
     <div
