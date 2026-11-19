@@ -67,6 +67,7 @@ const mailSendArgsSchema = z
       .regex(/^[^\r\n]+$/, 'subject must be one line'),
     body: z.string().min(1).max(20_000),
     inReplyTo: z.string().min(1).max(64).optional(),
+    from: z.string().optional(),
   })
   .strict();
 
@@ -275,6 +276,8 @@ async function executeMailSend(
   const account =
     accounts.find((row) => row.id === replied?.accountId) ?? (replied ? undefined : accounts[0]);
   if (account === undefined) throw new HttpError(409, 'no connected mailbox can send this');
+  if (args.from !== undefined && args.from !== account.address)
+    throw new HttpError(409, 'from must be the connected mailbox that sends this');
   const gated = { ...args, from: account.address };
   const parked = gateOutboundAction(deps, ctx, entry, gated);
   if (parked !== null) return parked;

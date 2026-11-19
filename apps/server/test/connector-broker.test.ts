@@ -6,10 +6,11 @@ import {
   actionProposal,
   chief,
   chiefThread,
+  step,
   team as teamTable,
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
-import { answerProposal } from '../src/services/action-proposals.js';
+import { answerProposal, dispatchActionWakes } from '../src/services/action-proposals.js';
 import {
   type ConnectorBrokerDeps,
   type ConnectorCallContext,
@@ -251,6 +252,38 @@ describe('executeConnectorToolCall dispatch', () => {
     expect(out).toBe('deleted-ok');
     expect(mcp.calls).toMatchObject([{ name: 'GMAIL_DELETE', args: { id: 'm1' } }]);
     expect(journalRows(s).filter((row) => row.kind === 'run')).toHaveLength(1);
+    s.dispose();
+  });
+
+  test('the wake after approval hands back the approved arguments so the retry sends without a second card', async () => {
+    const { s, mcp, deps, ctx } = world({ tier: 'guarded' });
+    insertConnector(s);
+    const draft = { to: 'a@b.c', body: '收到，回信测试通过。' };
+    const parked = JSON.parse(
+      await executeConnectorToolCall(deps, ctx, 'connector_gmail__GMAIL_SEND', draft),
+    ) as { proposalId: string };
+    answerProposal(
+      { db: s.db, reposDir: s.reposDir, hub: s.hub, user: s.user },
+      {
+        proposalId: parked.proposalId,
+        teamId: s.team.id,
+        decision: 'allow-once',
+        decidedBy: s.user.id,
+        viaCard: true,
+      },
+    );
+    dispatchActionWakes(s);
+    const prompt = s.db.select().from(step).get()?.prompt ?? '';
+    const copied = /已批准的参数：(\{.*\})/.exec(prompt)?.[1];
+    const retry =
+      copied === undefined
+        ? { ...draft, body: draft.body.normalize('NFKC') }
+        : (JSON.parse(copied) as Record<string, unknown>);
+
+    const out = await executeConnectorToolCall(deps, ctx, 'connector_gmail__GMAIL_SEND', retry);
+    expect(out).toBe('sent-ok');
+    expect(mcp.calls).toMatchObject([{ name: 'GMAIL_SEND', args: draft }]);
+    expect(s.db.select().from(actionProposal).all()).toHaveLength(1);
     s.dispose();
   });
 

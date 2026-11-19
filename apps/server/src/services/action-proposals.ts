@@ -557,6 +557,18 @@ function markWake(db: Db, id: string, state: 'delivered' | 'undeliverable') {
   db.update(actionWakeOutbox).set({ state }).where(eq(actionWakeOutbox.id, id)).run();
 }
 
+function approvedArguments(row: ProposalRow | undefined): unknown {
+  if (row === undefined) return null;
+  const stored = JSON.parse(row.inputJson) as unknown;
+  if (stored === null || typeof stored !== 'object' || Array.isArray(stored)) return stored;
+  const {
+    cardDigest: _card,
+    untrustedTurn: _untrusted,
+    ...arguments_
+  } = stored as Record<string, unknown>;
+  return arguments_;
+}
+
 export function dispatchActionWakes(deps: ChiefDeps & { registry?: readonly ActionEntry[] }): {
   delivered: number;
   undeliverable: number;
@@ -584,13 +596,10 @@ export function dispatchActionWakes(deps: ChiefDeps & { registry?: readonly Acti
       continue;
     }
     const approved = row.outcome === 'executed';
-    const actionId = approved
-      ? deps.db
-          .select({ actionId: actionProposal.actionId })
-          .from(actionProposal)
-          .where(eq(actionProposal.id, row.proposalId))
-          .get()?.actionId
+    const proposal = approved
+      ? deps.db.select().from(actionProposal).where(eq(actionProposal.id, row.proposalId)).get()
       : undefined;
+    const actionId = proposal?.actionId;
     const entry =
       actionId === undefined
         ? undefined
@@ -598,7 +607,7 @@ export function dispatchActionWakes(deps: ChiefDeps & { registry?: readonly Acti
           connectorActionForId(actionId));
     const prompt = approved
       ? entry !== undefined && isExternalActionClass(entry.class)
-        ? `审批 ${row.proposalId} 已由用户批准：以已批准的输入重新发起该动作即会执行。`
+        ? `审批 ${row.proposalId} 已由用户批准：以已批准的输入重新发起该动作即会执行。审批卡上的文字经过规整，不能照卡重写参数；必须逐字复制下面的参数，任何标点、空白的改动都会被当成新的动作重新审批。\n已批准的参数：${JSON.stringify(approvedArguments(proposal))}`
         : `审批 ${row.proposalId} 已由用户批准，服务端已执行。`
       : `审批 ${row.proposalId} 的结果是 ${row.outcome}：没有执行。除非用户重新要求，不要再次发起同一动作。`;
     try {
