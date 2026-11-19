@@ -333,6 +333,7 @@ export const stepQueueBlockedSchema = z.object({
     'coordinator-provider-missing',
     'coordinator-provider-no-key',
     'no-computer',
+    'blocked-by',
   ]),
   missing: z.array(z.string()),
   platform: runnerOsSchema.optional(),

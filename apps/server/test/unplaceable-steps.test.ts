@@ -192,6 +192,20 @@ describe('D71 a pending step that no online machine can run raises one inbox ite
     expect(alerts(w)[0]?.snippet).toContain('MCP server "figma"');
   });
 
+  test('a step held behind another task never raises a no-machine alert', async () => {
+    const w = await world();
+    const mac = await machineOf(w, 'mac');
+    routeOf(w, mac, { mcpServers: ['figma'] });
+    const held = pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
+    w.s.db
+      .update(stepTable)
+      .set({ holdReason: BLOCKED_BY_HOLD, holdUntil: null })
+      .where(eq(stepTable.id, held))
+      .run();
+    sweepUnplaceableSteps(w.s.svc, Date.now());
+    expect(alerts(w)).toHaveLength(0);
+  });
+
   test('a read alert is not raised again for the same wait', async () => {
     const w = await world();
     const mac = await machineOf(w, 'mac');

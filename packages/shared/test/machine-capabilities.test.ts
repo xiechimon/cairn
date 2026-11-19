@@ -257,6 +257,21 @@ describe('queue projection blocked bit (#1251 visible pending reason)', () => {
     expect(parsed.queue?.blocked?.kind).toBe('machine-offline');
   });
 
+  it('blocked-by: the queue names the task the step waits on, not a machine', () => {
+    const parsed = stepJournalRowSchema.parse({
+      ...rowBase,
+      queue: {
+        position: 1,
+        waitingFor: null,
+        blocked: { kind: 'blocked-by', missing: ['Write the spec'] },
+      },
+    });
+    expect(parsed.queue?.blocked).toEqual({
+      kind: 'blocked-by',
+      missing: ['Write the spec'],
+    });
+  });
+
   it('kinds outside the vocabulary = rejected', () => {
     expect(
       stepJournalRowSchema.safeParse({

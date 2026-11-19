@@ -315,6 +315,52 @@ test('a queued info card waiting for a computer shows no stage stepper and no ty
   );
 });
 
+test('a task queued behind another task names it instead of blaming a machine', async ({
+  page,
+}) => {
+  await useTheme(page, 'light');
+  await stubSurface(page, { ...INFO_CARD, phase: 'queued' });
+  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route) =>
+    route.fulfill({
+      json: {
+        messages: [TASK_ROW],
+        chips: null,
+        historyEpoch: 0,
+        steerPending: [],
+        activeRun: null,
+        nextCursor: null,
+      },
+    }),
+  );
+  await page.route(`**/api/builds/${BUILD_ID}/steps`, (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 'step-blocked-by',
+          buildId: BUILD_ID,
+          kind: 'session',
+          machineId: null,
+          createdAt: 1000,
+          status: 'pending',
+          checkpointCommit: null,
+          skillInjection: null,
+          queue: {
+            position: 1,
+            waitingFor: null,
+            blocked: { kind: 'blocked-by', missing: ['调研登录页 agent 轨迹'] },
+          },
+        },
+      ],
+    }),
+  );
+
+  await page.goto(`/app/todo/${INFO_CARD_ID}`);
+  const blocked = page.locator('.side-panel').getByTestId('queue-blocked');
+  await expect(blocked).toBeVisible();
+  await expect(blocked).toContainText('等「调研登录页 agent 轨迹」');
+  await expect(blocked).not.toContainText('执行机');
+});
+
 test('a delivered code card has no completion or merge choice', async ({ page }) => {
   await useTheme(page, 'dark');
   await stubSurface(page, { ...CODE_CARD, phase: 'done' });

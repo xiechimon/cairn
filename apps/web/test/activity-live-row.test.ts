@@ -376,6 +376,62 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
     );
   });
 
+  test('a step held behind another task names the task, not a machine', () => {
+    const items = render({
+      steps: [
+        queuedStep({
+          position: 1,
+          waitingFor: null,
+          blocked: { kind: 'blocked-by', missing: ['Write the spec'] },
+        }),
+      ],
+    });
+    const row = tail(items) as {
+      blocked?: boolean;
+      blockedKind?: string;
+      label: string;
+      labelVars: Record<string, string | number>;
+    };
+    expect(row.blocked).toBe(true);
+    expect(row.blockedKind).toBe('blocked-by');
+    expect(row.label).toBe('等「{title}」');
+    expect(row.labelVars).toEqual({ title: 'Write the spec' });
+    expect(translate('en', EN, row.label, row.labelVars)).toBe('Waits for “Write the spec”');
+  });
+
+  test('several unfinished blockers read as a count, like the task row', () => {
+    const items = render({
+      steps: [
+        queuedStep({
+          position: 1,
+          waitingFor: null,
+          blocked: { kind: 'blocked-by', missing: ['Write the spec', 'Cut the release'] },
+        }),
+      ],
+    });
+    expect(tail(items)).toMatchObject({
+      kind: 'streaming',
+      label: '等 {n} 个任务',
+      labelVars: { n: 2 },
+    });
+  });
+
+  test('a held step whose blockers just resolved falls back to the generic wait', () => {
+    const items = render({
+      steps: [
+        queuedStep({
+          position: 1,
+          waitingFor: null,
+          blocked: { kind: 'blocked-by', missing: [] },
+        }),
+      ],
+    });
+    expect(tail(items)).toMatchObject({
+      kind: 'streaming',
+      label: '等前置任务完成。',
+    });
+  });
+
   test('Q3: projection absent (old server) → existing labels verbatim unchanged', () => {
     const firstPlan = step('pending', 'plan');
     const items = render({ steps: [firstPlan] });

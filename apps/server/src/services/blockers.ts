@@ -60,6 +60,12 @@ export function blockedNow(db: Db, row: Pick<TodoRow, 'blockedBy'>): boolean {
   );
 }
 
+export function unmetBlockerTitles(db: Db, row: Pick<TodoRow, 'blockedBy'>): string[] {
+  return blockersOf(db, row)
+    .filter((blocker) => !satisfied(db, blocker))
+    .map((blocker) => blocker.title);
+}
+
 export function deadEndBlocker(
   db: Db,
   row: Pick<TodoRow, 'blockedBy'>,

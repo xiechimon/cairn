@@ -16,6 +16,7 @@ import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, routingRule, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
+import { BLOCKED_BY_HOLD, unmetBlockerTitles } from './blockers.js';
 import { accountHeld } from './claude-account-hold.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
@@ -294,6 +295,16 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const pool = queue.filter((r) => r.home === target.homeMachineId);
     const position = pool.findIndex((r) => r.id === target.id) + 1;
     if (position === 0) return null;
+    if (target.holdReason === BLOCKED_BY_HOLD) {
+      return {
+        position,
+        waitingFor: null,
+        blocked: {
+          kind: 'blocked-by',
+          missing: 'todoRow' in queueRow ? unmetBlockerTitles(db, queueRow.todoRow) : [],
+        },
+      };
+    }
     const infoPlan =
       'todoRow' in queueRow &&
       isBuildStepKind(queueRow.kind) &&

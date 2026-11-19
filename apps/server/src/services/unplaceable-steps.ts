@@ -1,6 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { build, machine, notification, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { BLOCKED_BY_HOLD } from './blockers.js';
 import { waitingSince } from './machine-routing.js';
 import { type NotificationDeps, notifyNoMachine } from './notifications.js';
 import { profileForStep } from './routing-rules.js';
@@ -19,7 +20,7 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
   const projectors = new Map<string, ReturnType<typeof stepQueueProjector>>();
   let raised = 0;
   for (const { stepRow, todoRow } of rows) {
-    if (stepRow.holdReason === 'quota') continue;
+    if (stepRow.holdReason === 'quota' || stepRow.holdReason === BLOCKED_BY_HOLD) continue;
     const since = waitingSince(stepRow);
     const waited = now - since;
     if (waited < NO_MACHINE_ALERT_MS) continue;

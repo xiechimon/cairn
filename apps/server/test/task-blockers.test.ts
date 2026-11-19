@@ -8,7 +8,7 @@ import {
   BLOCKED_STEP_KINDS,
   releaseBlockedSteps,
 } from '../src/services/blockers.js';
-import { applyBuildStepAction, enqueueStep } from '../src/services/builds.js';
+import { applyBuildStepAction, enqueueStep, listSteps } from '../src/services/builds.js';
 import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
 import { claimStep, heartbeatStep } from '../src/services/machines.js';
 import { reconcileOwners } from '../src/services/owner.js';
@@ -112,6 +112,19 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     expect(sessions(id)[0]?.holdReason).toBeNull();
     expect(sessions(id)[0]?.holdUntil).toBeNull();
     expect(getTodo(toolDeps(), id)).toMatchObject({ section: 'working' });
+  });
+
+  test('the queue of a held session names the blocking task, not a machine', async () => {
+    const blocker = await create();
+    const id = await create({ blockedBy: [blocker] });
+    const session = listSteps(toolDeps(), row(id).latestBuildId!).find(
+      (entry) => entry.kind === 'session',
+    );
+    expect(session?.queue?.blocked).toEqual({
+      kind: 'blocked-by',
+      missing: [row(blocker).title],
+    });
+    expect(session?.queue?.waitingFor).toBeNull();
   });
 
   test('dependsOn and blockedBy both hold the automatically started session', async () => {

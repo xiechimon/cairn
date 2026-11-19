@@ -169,6 +169,12 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
       vars: { time: clockTime(queue.hold.retryAt) },
     };
   }
+  if (queue.blocked?.kind === 'blocked-by') {
+    const titles = queue.blocked.missing;
+    if (titles.length === 1) return { label: '等「{title}」', vars: { title: titles[0] ?? '' } };
+    if (titles.length > 1) return { label: '等 {n} 个任务', vars: { n: titles.length } };
+    return { label: '等前置任务完成。', vars: {} };
+  }
   const platform = queue.blocked?.platform;
   if (
     platform !== undefined &&
