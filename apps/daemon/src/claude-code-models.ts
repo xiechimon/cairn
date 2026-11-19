@@ -27,6 +27,18 @@ export function toWireAuth(probe: ClaudeCodeAuthProbe): ClaudeAuthStateWire {
   return { state: probe.state, reason: probe.reason };
 }
 
+function usesCustomBackend(raw: string | undefined): boolean {
+  if (raw === undefined) return false;
+  try {
+    const env = (JSON.parse(raw) as { env?: unknown }).env;
+    if (typeof env !== 'object' || env === null) return false;
+    const baseUrl = (env as Record<string, unknown>).ANTHROPIC_BASE_URL;
+    return typeof baseUrl === 'string' && baseUrl.trim() !== '';
+  } catch {
+    return false;
+  }
+}
+
 export function readClaudeCodeReport(
   homeDir: string = homedir(),
   extra: ClaudeCodeReportExtra = {},
@@ -39,13 +51,18 @@ export function readClaudeCodeReport(
   }
   const source = parseClaudeCodeModelSource(raw ?? null, hostname());
   const binaryFound = extra.bin != null;
+  const settingsIds = new Set(source.models.map((model) => model.id));
+  const builtins =
+    binaryFound && !usesCustomBackend(raw)
+      ? DEFAULT_CLAUDE_CODE_MODELS.filter((model) => !settingsIds.has(model.id))
+      : [];
   return {
     installed: source.installed || binaryFound,
     hostname: source.hostname,
     models:
       binaryFound && source.models.length === 0
         ? DEFAULT_CLAUDE_CODE_MODELS.map((model) => ({ ...model }))
-        : source.models,
+        : [...source.models, ...builtins.map((model) => ({ ...model }))],
     ...(extra.bin !== undefined ? { bin: extra.bin } : {}),
     ...(extra.auth ? { auth: toWireAuth(extra.auth) } : {}),
     ...(extra.login !== undefined ? { login: extra.login } : {}),
