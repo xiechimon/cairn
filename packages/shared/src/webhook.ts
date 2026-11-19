@@ -8,6 +8,7 @@ export const githubIssuesEventSchema = z.object({
   action: z.string(),
   issue: z.object({
     number: z.number().int().positive(),
+    pull_request: z.unknown().optional(),
   }),
   label: z
     .object({

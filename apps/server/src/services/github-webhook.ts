@@ -22,6 +22,7 @@ import {
 } from './autonomy-gates.js';
 import { chiefBinding } from './chief.js';
 import { githubRepoOfProject } from './git.js';
+import { githubReadToken } from './github-autonomous-token.js';
 import { teamGithubToken } from './github-connection.js';
 import { importGithubIssue } from './github-issues.js';
 import { hasRepoTriage, ISSUE_INTAKE_IN_FLIGHT_CAP, projectAtInFlightCap } from './issue-intake.js';
@@ -179,6 +180,13 @@ export async function receiveGithubWebhook(
       detail: `action ${payload.action} / label not ${WEBHOOK_TRIGGER_LABEL}`,
     });
   }
+  if (payload.issue.pull_request !== undefined) {
+    return respond(logger, {
+      result: 'ignored',
+      deliveryId,
+      detail: 'issues event carries a pull request',
+    });
+  }
 
   const repoRow = deps.db
     .select()
@@ -282,26 +290,28 @@ async function importLabeledIssue(
       gate: gate.reason,
     });
   }
-  const access = await teamGithubToken(deps, tokenRow.teamId);
-  if ('reason' in access) {
+  const githubFetch = deps.githubFetch ?? fetch;
+  const readToken = await githubReadToken({ ...deps, githubFetch }, tokenRow.teamId, repoRef);
+  if (readToken === null) {
+    const access = await teamGithubToken(deps, tokenRow.teamId);
+    const reason = 'reason' in access ? access.reason : 'no-github-connection';
     return refuse(
-      access.reason,
+      reason,
       'misconfigured',
-      access.reason === 'token-unreadable'
+      reason === 'token-unreadable'
         ? 'github token unreadable'
-        : access.reason === 'github-disconnected'
+        : reason === 'github-disconnected'
           ? 'github connection disconnected (refresh failed); reconnect GitHub'
           : 'github connection not found',
     );
   }
-  const githubFetch = deps.githubFetch ?? fetch;
   const now = nowMs();
   let trusted: boolean | null;
   try {
     trusted = await hasRepoTriage(
       githubFetch,
       tokenRow.teamId,
-      access.token,
+      readToken,
       repoRef.owner,
       repoRef.repo,
       sender,
@@ -365,6 +375,18 @@ async function importLabeledIssue(
         'misconfigured',
         `issue ${fullName}#${issueNumber} not found on GitHub (or not visible to the team token)`,
       );
+    }
+    if (err instanceof GithubRateLimitedError) {
+      const retryAt = err.retryAt(now);
+      return refuse('github-rate-limited', 'ignored', 'github api rate limited while importing', {
+        status: err.status,
+        resetAt: retryAt === null ? null : new Date(retryAt).toISOString(),
+      });
+    }
+    if (err instanceof HttpError) {
+      return refuse('github-upstream', 'ignored', `github api http ${err.status} while importing`, {
+        status: err.status,
+      });
     }
     throw err;
   }

@@ -53,9 +53,12 @@ Answers `202` for every known token:
   sourceRef `github:owner/repo#N` already exists (caught by
   `importGithubIssue`'s 409 → reported as duplicate, not an error).
 - `ignored` — ping event, non-`issues` event, action other than
-  `labeled`, label other than the intake label, the intake label absent
-  from the fetched issue, missing/malformed sender, sender below triage
-  permission, or the project is at the in-flight cap. Sender-permission
+  `labeled`, label other than the intake label, an `issues` event
+  carrying a pull request (GitHub fires `issues` for PR label changes),
+  the intake label absent from the fetched issue, missing/malformed
+  sender, sender below triage permission, the project at the in-flight
+  cap, or a transient upstream failure during the import (the label
+  stays on GitHub, so the poller recovers it). Sender-permission
   refusals carry a generic detail; other checks report their reason so
   the delivery log on the GitHub side stays debuggable — the detail is
   visible only to whoever already holds the unguessable URL.
@@ -72,8 +75,13 @@ On `issues` + `labeled` + intake label (`ready-for-agent`):
 1. Token lookup by hash (unique index) → `github_connection` row → team.
 2. Dedup: delivery id in `webhookDeliveries` → `duplicate`.
 3. Sender triage: reuse `hasRepoTriage` (shared 15-min cache with the
-   poller) with `githubReadToken`/`autonomousToken`.
-4. Cap: reuse `projectAtInFlightCap`.
+   poller) with `githubReadToken` (app token first, user token fallback).
+4. Cap: reuse `projectAtInFlightCap`; the autonomy check uses
+   `evaluateRequestedRun` on purpose — a person applying the intake
+   label is an explicit request, so the poller's member-quiet and
+   cooldown windows for autonomous discovery do not apply. The
+   in-flight cap still binds, and `recordAutonomyStart` keeps the
+   poller's cooldown honest.
 5. `importGithubIssue(deps, projectRow, issue.number, { createdBy })`
    then `orchestrateTodo` — identical to the poller, so the poller's
    own 409 backstop dedupes webhook-vs-poller races both directions.

@@ -465,4 +465,37 @@ describe('receiveGithubWebhook', () => {
     });
     expect(res.status).toBe(413);
   });
+
+  test('a labeled pull request is ignored without touching github or the intake path', async () => {
+    const { s, gh } = await makeWorld();
+    const { token } = await mint(s);
+    const res = await deliver(s, token, {
+      event: 'issues',
+      deliveryId: 'd-pr',
+      body: issuesEvent({
+        issue: { number: ISSUE.number, pull_request: { url: 'https://api.github.com/pr/7' } },
+      }),
+    });
+    expect(res.status).toBe(202);
+    expect((await delivered(res)).result).toBe('ignored');
+    expect(gh.permissionReads(OWNER)).toHaveLength(0);
+    expect(
+      s.db.select().from(todoTable).where(eq(todoTable.sourceKind, 'github-issue')).all(),
+    ).toHaveLength(0);
+  });
+
+  test('an upstream github failure during import answers 202 ignored, not a 5xx', async () => {
+    const { s, gh } = await makeWorld();
+    gh.overrides.set(`/repos/${REPO}/issues/${ISSUE.number}`, async () => ({
+      status: 502,
+      body: { message: 'Bad Gateway' },
+    }));
+    const { token } = await mint(s);
+    const res = await deliver(s, token, { event: 'issues', deliveryId: 'd-upstream' });
+    expect(res.status).toBe(202);
+    expect((await delivered(res)).result).toBe('ignored');
+    expect(
+      s.db.select().from(todoTable).where(eq(todoTable.sourceKind, 'github-issue')).all(),
+    ).toHaveLength(0);
+  });
 });
