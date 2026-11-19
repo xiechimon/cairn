@@ -1,6 +1,7 @@
 import {
   bindGithubConnectorBodySchema,
   capabilitiesResponseSchema,
+  claudeSubscriptionTestSchema,
   cloakLicenseBodySchema,
   composioConnectBodySchema,
   composioKeyBodySchema,
@@ -69,12 +70,14 @@ import {
   revokeBrowserPasswordGrant,
 } from './services/browser-passwords.js';
 import {
+  claudeSubscriptionUpstreamModels,
   createClaudeSubscription,
   deleteClaudeSubscription,
   disableClaudeSubscription,
   enableClaudeSubscription,
   listClaudeSubscriptions,
-  renameClaudeSubscription,
+  testClaudeSubscriptionModel,
+  updateClaudeSubscription,
   verifySubscriptionConnection,
 } from './services/claude-subscriptions.js';
 import { saveCloakLicense } from './services/cloak-license.js';
@@ -554,7 +557,24 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     const body = parseWith(renameClaudeSubscriptionSchema, await jsonBody(c), 'body');
-    return c.json(renameClaudeSubscription(keysvc, teamId, c.req.param('cid'), body.label));
+    return c.json(updateClaudeSubscription(keysvc, teamId, c.req.param('cid'), body));
+  });
+
+  app.post('/api/teams/:id/claude-subscriptions/:cid/upstream-models', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(claudeSubscriptionUpstreamModels(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/claude-subscriptions/:cid/test', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const body = parseWith(claudeSubscriptionTestSchema, await jsonBody(c), 'body');
+    return c.json(
+      await testClaudeSubscriptionModel(keysvc, teamId, c.req.param('cid'), body.model),
+    );
   });
 
   app.post('/api/teams/:id/claude-subscriptions/:cid/enable', async (c) => {

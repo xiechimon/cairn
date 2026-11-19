@@ -3,6 +3,7 @@ import type {
   ClaudeSubscriptionQuotaWindow,
   DevinSubscriptionModel,
   MachineRecord,
+  SubscriptionCheck,
 } from '@cairn/shared';
 
 export const ACCOUNT_STATES = ['ok', 'cooling', 'exhausted', 'expired'] as const;
@@ -27,6 +28,7 @@ export interface SubscriptionAccount {
   windows: QuotaWindow[];
   lastUsedAt: number | null;
   stepsLast24h: number | null;
+  lastCheck: SubscriptionCheck | null;
   models?: SubscriptionModel[];
 }
 
@@ -50,6 +52,8 @@ export function toClaudeAccount(
     windows: Array.isArray(wire.windows) ? wire.windows : [],
     lastUsedAt: wire.lastUsedAt ?? null,
     stepsLast24h: typeof wire.stepsLast24h === 'number' ? wire.stepsLast24h : null,
+    lastCheck: wire.lastCheck ?? null,
+    ...(Array.isArray(wire.models) ? { models: wire.models } : {}),
   };
 }
 

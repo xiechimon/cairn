@@ -95,73 +95,60 @@ const status = (page: Page) => page.getByTestId('subscription-status');
 const verify = (page: Page) => page.getByTestId('subscription-verify');
 const feedback = (page: Page) => page.getByTestId('subscription-verify-feedback');
 
-test('a settled account reads one status, never available next to verifying', async ({ page }) => {
+test('an unchecked account reads 未验证 until a check passes, and the result stays in place', async ({ page }) => {
   const mode = { current: 'slow' as Verify };
   await open(page, mode);
-  await expect(row(page)).toContainText('订阅 · 3 个模型 · 可用');
-  await expect(status(page)).toHaveText('可用');
+  await expect(row(page)).toContainText('订阅 · 3 个模型 · 未验证');
+  await expect(status(page)).toHaveText('未验证');
+  await expect(feedback(page)).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await shot(page, 'available-with-quota');
+  await shot(page, 'unverified-with-quota');
 
   await verify(page).click();
   await expect(status(page)).toHaveText('验证中…');
   await expect(row(page)).toContainText('验证中…');
-  await expect(row(page)).not.toContainText('可用');
   await expect(page.getByTestId('subscription-detail')).not.toContainText('可用');
   await expect(verify(page)).toBeDisabled();
-  await expect(feedback(page)).toHaveAttribute('data-phase', 'verifying');
-  await expect(feedback(page)).toHaveText('正在用这个订阅发一次模型请求');
   await shot(page, 'verifying');
 
   await expect(status(page)).toHaveText('可用');
   await expect(feedback(page)).toHaveAttribute('data-phase', 'passed');
-  await expect(feedback(page)).toHaveText('这个订阅刚完成了一次模型请求。');
-  await expect(page.getByTestId('subscription-reason')).toHaveCount(0);
-  await expect(row(page)).not.toContainText('验证中');
+  await expect(feedback(page)).toContainText('Claude 回复了这次模型请求，订阅能用。');
+  await expect(row(page)).toContainText('订阅 · 3 个模型 · 可用');
   await shot(page, 'passed');
-
-  await page.keyboard.press('Escape');
-  await expect(feedback(page)).toHaveCount(0);
-  await expect(verify(page)).toBeFocused();
 });
 
-const FAILURES: { mode: Verify; reason: string; shot: string }[] = [
-  { mode: 'auth', reason: '这个订阅的登录已失效。先移除它，再在终端运行 claude setup-token，把新的 token 添加回来。', shot: 'failed-auth' },
-  { mode: 'timeout', reason: '验证超时，请重试', shot: 'failed-timeout' },
-  { mode: 'unavailable', reason: '服务器上找不到 claude 命令', shot: 'failed-unavailable' },
-  { mode: 'quota', reason: '模型额度已用尽，请等待额度恢复后重试。', shot: 'failed-quota' },
-  { mode: 'rate-limited', reason: '验证太频繁，请 10 秒后重试', shot: 'failed-rate-limited' },
-  { mode: 'reset', reason: '连接中断，服务器可能正在重启，请重试', shot: 'failed-connection-dropped' },
-  { mode: 'restart', reason: '连接中断，服务器可能正在重启，请重试', shot: 'failed-server-restarting' },
+const FAILURES: { mode: Verify; label: string; reason: string; shot: string }[] = [
+  { mode: 'auth', label: '登录失效', reason: '这个订阅的登录已失效。先移除它，再在终端运行 claude setup-token，把新的 token 添加回来。', shot: 'failed-auth' },
+  { mode: 'timeout', label: '验证超时', reason: '验证超时，请重试', shot: 'failed-timeout' },
+  { mode: 'unavailable', label: '没法验证', reason: '服务器上找不到 claude 命令', shot: 'failed-unavailable' },
+  { mode: 'quota', label: '额度用尽', reason: '模型额度已用尽，请等待额度恢复后重试。', shot: 'failed-quota' },
+  { mode: 'rate-limited', label: '验证太频繁', reason: '验证太频繁，请 10 秒后重试', shot: 'failed-rate-limited' },
+  { mode: 'reset', label: '连接中断', reason: '连接中断，服务器可能正在重启，请重试', shot: 'failed-connection-dropped' },
+  { mode: 'restart', label: '连接中断', reason: '连接中断，服务器可能正在重启，请重试', shot: 'failed-server-restarting' },
 ];
 
 for (const failure of FAILURES) {
-  test(`verify ends as ${failure.mode}: one failed status with its reason, then Retry passes`, async ({
+  test(`verify ends as ${failure.mode}: one failed status, its reason in place, then a recheck passes`, async ({
     page,
   }) => {
     const mode = { current: failure.mode };
     await open(page, mode);
     await verify(page).click();
-    await expect(status(page)).toHaveText('验证失败');
+    await expect(status(page)).toHaveText(failure.label);
     await expect(feedback(page)).toHaveAttribute('data-phase', 'failed');
-    await expect(feedback(page)).toHaveText(failure.reason);
-    await expect(row(page)).toContainText('订阅 · 3 个模型 · 验证失败');
-    await expect(page.getByTestId('subscription-detail')).not.toContainText(failure.reason);
+    await expect(feedback(page)).toContainText(failure.reason);
+    await expect(row(page)).toContainText(`订阅 · 3 个模型 · ${failure.label}`);
     await expect(row(page)).not.toContainText('可用');
-    await expect(page.getByText('验证失败', { exact: true })).toHaveCount(1);
-    await expect(verify(page)).toHaveText('重试');
+    await expect(verify(page)).toHaveText('重新验证');
     await expect(verify(page)).toBeEnabled();
     await expect(row(page)).toHaveAttribute('data-tone', 'fail');
     await shot(page, failure.shot);
-    await page.keyboard.press('Escape');
-    await expect(feedback(page)).toHaveCount(0);
-    await status(page).click();
-    await expect(feedback(page)).toHaveText(failure.reason);
 
     mode.current = 'ok';
     await verify(page).click();
     await expect(status(page)).toHaveText('可用');
-    await expect(row(page)).not.toContainText('验证失败');
+    await expect(row(page)).not.toContainText(failure.label);
   });
 }
 

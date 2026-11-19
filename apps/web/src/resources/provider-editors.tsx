@@ -80,7 +80,7 @@ export function CommitInput({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <span className="text-meta text-content-tertiary">{label}</span>
@@ -148,12 +148,12 @@ export interface ProviderEditActions {
   remove?: () => void;
 }
 
-type ModelCheck =
+export type ModelCheck =
   | { phase: 'running' }
   | { phase: 'done'; result: ProviderTestResult }
   | { phase: 'unavailable' };
 
-const FAILURE_SHORT: Record<ProviderFailure, string> = {
+export const FAILURE_SHORT: Record<ProviderFailure, string> = {
   auth: 'key 无效',
   'not-found': '模型不存在',
   'rate-limit': '限流',
@@ -164,7 +164,7 @@ const FAILURE_SHORT: Record<ProviderFailure, string> = {
   'no-model': '没有模型',
 };
 
-const FAILURE_SENTENCE: Record<ProviderFailure, string> = {
+export const FAILURE_SENTENCE: Record<ProviderFailure, string> = {
   auth: 'API key 无效或没有这个模型的权限',
   'not-found': '上游没有这个模型',
   'rate-limit': '上游限流了，稍后再测',
@@ -177,7 +177,7 @@ const FAILURE_SENTENCE: Record<ProviderFailure, string> = {
 
 const TEST_CONCURRENCY = 3;
 
-function failureOf(check: ModelCheck | undefined): ProviderFailure | 'unavailable' | null {
+export function failureOf(check: ModelCheck | undefined): ProviderFailure | 'unavailable' | null {
   if (check?.phase === 'unavailable') return 'unavailable';
   if (check?.phase === 'done' && check.result.status === 'failed') {
     return check.result.failure ?? 'upstream';
@@ -185,16 +185,22 @@ function failureOf(check: ModelCheck | undefined): ProviderFailure | 'unavailabl
   return null;
 }
 
-function ModelChip({
+export function ModelChip({
   id,
   dead,
   check,
   busy,
+  meta,
+  testId = 'provider-model',
+  failureShort = FAILURE_SHORT,
   onTest,
   onRemove,
 }: {
   id: string;
   dead: boolean;
+  meta?: ReactNode;
+  failureShort?: Record<ProviderFailure, string>;
+  testId?: string;
   check: ModelCheck | undefined;
   busy: boolean;
   onTest?: () => void;
@@ -205,7 +211,7 @@ function ModelChip({
   const latency = check?.phase === 'done' ? check.result.latencyMs : null;
   return (
     <span
-      data-testid="provider-model"
+      data-testid={testId}
       data-model-id={id}
       data-liveness={dead ? 'dead' : 'alive'}
       data-check={
@@ -227,6 +233,7 @@ function ModelChip({
       >
         {id}
       </span>
+      {meta}
       {dead && <span className="flex-none text-meta text-content-tertiary">{t('已下架')}</span>}
       {check?.phase === 'running' && (
         <Spinner aria-label={t('测试中')} className="size-3.5 flex-none text-content-tertiary" />
@@ -250,7 +257,7 @@ function ModelChip({
             ? `${latency ?? 0} ms`
             : failure === 'unavailable'
               ? t('没测完')
-              : t(FAILURE_SHORT[failure])}
+              : t(failureShort[failure])}
         </span>
       )}
       {onTest !== undefined && (

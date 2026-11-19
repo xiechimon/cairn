@@ -1576,6 +1576,13 @@
       "when": 1795138100000,
       "tag": "0229_odd_roughhouse",
       "breakpoints": true
+    },
+    {
+      "idx": 230,
+      "version": "6",
+      "when": 1795141814005,
+      "tag": "0230_subscription_last_check",
+      "breakpoints": true
     }
   ]
 }

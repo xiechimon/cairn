@@ -2,24 +2,56 @@ import type {
   ClaudeRateLimitWindow,
   ClaudeSubscription,
   ClaudeSubscriptionListEntry,
+  ClaudeSubscriptionModel,
   ClaudeSubscriptionQuotaWindow,
   ClaudeSubscriptionVerifyResult,
   CreateClaudeSubscription,
+  PatchClaudeSubscription,
+  ProviderFailure,
+  ProviderTestResult,
   SecretBox,
+  UpstreamModelsResult,
 } from '@cairn/shared';
-import { claudeRateBlock } from '@cairn/shared';
+import { claudeRateBlock, DEFAULT_CLAUDE_CODE_MODELS } from '@cairn/shared';
 import { and, count, desc, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { claudeSubscription, machine, step } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { verifyClaudeSubscription } from './claude-subscription-verification.js';
+import {
+  claudeCheckCommand,
+  verifyClaudeSubscription,
+} from './claude-subscription-verification.js';
+import { timedCheck } from './subscription-check.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
 
 type Deps = { db: Db; box: SecretBox };
 type Row = typeof claudeSubscription.$inferSelect;
 
 const verificationWindows = new WeakMap<Db, Map<string, number>>();
+const modelTestWindows = new WeakMap<Db, Map<string, number>>();
+
+function claimRateWindow(
+  store: WeakMap<Db, Map<string, number>>,
+  db: Db,
+  key: string,
+  action: string,
+  windowMs = 10_000,
+): void {
+  const now = nowMs();
+  const windows = store.get(db) ?? new Map<string, number>();
+  for (const [id, retryAt] of windows) {
+    if (retryAt <= now) windows.delete(id);
+  }
+  if (windows.has(key)) {
+    throw new HttpError(
+      429,
+      `Please wait ${windowMs / 1000} seconds between ${action} for this connection.`,
+    );
+  }
+  windows.set(key, now + windowMs);
+  store.set(db, windows);
+}
 
 function toRecord(row: Row): ClaudeSubscription {
   return {
@@ -29,6 +61,7 @@ function toRecord(row: Row): ClaudeSubscription {
     expiresAt: row.expiresAt,
     enabled: row.enabledAt !== null,
     enabledAt: row.enabledAt,
+    models: row.models,
     createdAt: row.createdAt,
   };
 }
@@ -72,19 +105,58 @@ function refuseWhileRunning(db: Pick<Db, 'select'>, row: Row, action: string): v
   }
 }
 
-export function renameClaudeSubscription(
+export function updateClaudeSubscription(
   deps: Deps,
   teamId: string,
   id: string,
-  label: string,
+  patch: PatchClaudeSubscription,
 ): ClaudeSubscription {
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Claude subscription connection');
-  if (label.includes(deps.box.open(row.tokenCipher))) {
+  const token = deps.box.open(row.tokenCipher);
+  if (patch.label?.includes(token)) {
     throw new HttpError(400, 'Connection label must not contain the token');
   }
-  deps.db.update(claudeSubscription).set({ label }).where(eq(claudeSubscription.id, id)).run();
-  return toRecord({ ...row, label });
+  if (patch.models?.some((model) => model.id.includes(token) || model.name.includes(token))) {
+    throw new HttpError(400, 'Model names must not contain the token');
+  }
+  const models =
+    patch.models === undefined || patch.models === null
+      ? patch.models
+      : [...new Map(patch.models.map((model) => [model.id, model])).values()];
+  const changes = {
+    ...(patch.label !== undefined ? { label: patch.label } : {}),
+    ...(models !== undefined ? { models } : {}),
+  };
+  deps.db.update(claudeSubscription).set(changes).where(eq(claudeSubscription.id, id)).run();
+  return toRecord({ ...row, ...changes });
+}
+
+export function claudeSubscriptionUpstreamModels(
+  deps: Deps,
+  teamId: string,
+  id: string,
+): UpstreamModelsResult {
+  if (!subscriptionRow(deps.db, teamId, id)) throw notFound('Claude subscription connection');
+  const reported = deps.db
+    .select({ report: machine.claudeCodeReport })
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .all()
+    .flatMap((row) => (row.report?.installed ? row.report.models : []));
+  const byId = new Map<string, { id: string; name: string }>();
+  for (const model of [...DEFAULT_CLAUDE_CODE_MODELS, ...reported]) {
+    if (model.id !== '' && !byId.has(model.id))
+      byId.set(model.id, { id: model.id, name: model.name });
+  }
+  return { status: 'ok', models: [...byId.values()] };
+}
+
+export function enabledClaudeSubscriptionModels(
+  deps: { db: Pick<Db, 'select'> },
+  teamId: string,
+): ClaudeSubscriptionModel[] | null {
+  return activeSubscriptionRow(deps, teamId)?.models ?? null;
 }
 
 export async function enableClaudeSubscription(
@@ -205,6 +277,7 @@ export function listClaudeSubscriptions(deps: Deps, teamId: string): ClaudeSubsc
     return {
       ...toRecord(row),
       windows: stored.map(quotaWindowWire).filter((window) => window !== null),
+      lastCheck: row.lastCheck,
       ...(block !== null ? { state: 'exhausted' as const, cooldownUntil: block.until } : {}),
       lastUsedAt: stats?.lastUsedAt ?? null,
       stepsLast24h: stats?.stepsLast24h ?? null,
@@ -228,6 +301,8 @@ export function createClaudeSubscription(
     expiresAt: body.expiresAt ?? null,
     enabledAt: null as number | null,
     quotaWindows: null,
+    models: null,
+    lastCheck: null,
     createdAt: now,
   };
   deps.db.transaction((tx) => {
@@ -260,24 +335,80 @@ export async function verifySubscriptionConnection(
     .get();
   if (!row) throw notFound('Claude subscription connection');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false };
-  const now = nowMs();
-  const windows = verificationWindows.get(deps.db) ?? new Map<string, number>();
-  for (const [connectionId, retryAt] of windows) {
-    if (retryAt <= now) windows.delete(connectionId);
+  claimRateWindow(verificationWindows, deps.db, row.id, 'verification attempts');
+  const result = await timedCheck(
+    () =>
+      Promise.resolve()
+        .then(() => verifyClaudeSubscription(deps.box.open(row.tokenCipher)))
+        .catch((): ClaudeSubscriptionVerifyResult => ({ ok: false, reason: 'failed' })),
+    { check: 'model-request', command: claudeCheckCommand(null), model: null },
+  );
+  deps.db
+    .update(claudeSubscription)
+    .set({ lastCheck: result.check })
+    .where(eq(claudeSubscription.id, row.id))
+    .run();
+  return result;
+}
+
+const TEST_FAILURE: Record<
+  NonNullable<ClaudeSubscriptionVerifyResult['reason']>,
+  ProviderFailure
+> = {
+  auth: 'auth',
+  timeout: 'timeout',
+  quota: 'rate-limit',
+  unavailable: 'upstream',
+  failed: 'upstream',
+};
+
+export async function testClaudeSubscriptionModel(
+  deps: Deps,
+  teamId: string,
+  id: string,
+  model: string,
+): Promise<ProviderTestResult> {
+  const row = subscriptionRow(deps.db, teamId, id);
+  if (!row) throw notFound('Claude subscription connection');
+  if (row.expiresAt !== null && row.expiresAt <= nowMs()) {
+    return {
+      status: 'failed',
+      reason: 'auth',
+      failure: 'auth',
+      httpStatus: null,
+      detail: null,
+      latencyMs: null,
+    };
   }
-  if (windows.has(row.id)) {
-    throw new HttpError(
-      429,
-      'Please wait 10 seconds between verification attempts for this connection.',
-    );
+  const known = claudeSubscriptionUpstreamModels(deps, teamId, id);
+  if (known.status !== 'ok' || !known.models.some((entry) => entry.id === model)) {
+    throw new HttpError(400, 'Unknown model for this subscription');
   }
-  windows.set(row.id, now + 10_000);
-  verificationWindows.set(deps.db, windows);
-  try {
-    return await verifyClaudeSubscription(deps.box.open(row.tokenCipher));
-  } catch {
-    return { ok: false, reason: 'failed' };
-  }
+  claimRateWindow(modelTestWindows, deps.db, `${row.id}:${model}`, 'tests of this model', 30_000);
+  const result = await timedCheck(
+    () =>
+      Promise.resolve()
+        .then(() => verifyClaudeSubscription(deps.box.open(row.tokenCipher), { model }))
+        .catch((): ClaudeSubscriptionVerifyResult => ({ ok: false, reason: 'failed' })),
+    { check: 'model-request', command: claudeCheckCommand(model), model },
+  );
+  return result.ok
+    ? {
+        status: 'ok',
+        reason: null,
+        failure: null,
+        httpStatus: null,
+        detail: null,
+        latencyMs: result.check.durationMs,
+      }
+    : {
+        status: 'failed',
+        reason: result.reason ?? 'failed',
+        failure: TEST_FAILURE[result.reason ?? 'failed'],
+        httpStatus: null,
+        detail: null,
+        latencyMs: null,
+      };
 }
 
 export function openClaudeSubscription(

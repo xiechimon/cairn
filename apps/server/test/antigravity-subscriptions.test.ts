@@ -125,7 +125,7 @@ describe('antigravity subscriptions REST & model sources', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
     );
     expect(okVerify.status).toBe(200);
-    expect(await okVerify.json()).toEqual({ ok: true });
+    expect(await okVerify.json()).toMatchObject({ ok: true });
 
     const createdSecond = await req(
       s.app,
@@ -259,7 +259,7 @@ describe('antigravity token verification via Google API', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
+    expect(await res.json()).toMatchObject({ ok: true });
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models');
@@ -283,7 +283,7 @@ describe('antigravity token verification via Google API', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: false, reason: 'auth' });
+    expect(await res.json()).toMatchObject({ ok: false, reason: 'auth' });
   });
 
   test('treats a network failure as unavailable', async () => {
@@ -306,7 +306,28 @@ describe('antigravity token verification via Google API', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: false, reason: 'unavailable' });
+    expect(await res.json()).toMatchObject({ ok: false, reason: 'unavailable' });
+  });
+
+  test('a key that no longer decrypts reads as a failed check, not a server error', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const created = await req(s.app, 'POST', path, {
+      label: 'Tampered Key',
+      token: `AIzaSyA${'t'.repeat(28)}`,
+    });
+    const sub = (await created.json()) as { id: string };
+    s.db
+      .update(antigravitySubscription)
+      .set({ tokenCipher: 'v1:tampered' })
+      .where(eq(antigravitySubscription.id, sub.id))
+      .run();
+    const res = await req(s.app, 'POST', `${path}/${sub.id}/verify`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: false, reason: 'failed' });
+    const list = (await (await req(s.app, 'GET', path)).json()) as { lastCheck: unknown }[];
+    expect(list[0]?.lastCheck).toMatchObject({ ok: false, reason: 'failed' });
   });
 });
 

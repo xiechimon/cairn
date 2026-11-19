@@ -20,10 +20,13 @@ import {
   toClaudeAccount,
 } from '../api/claude-accounts.js';
 import {
+  fetchClaudeUpstreamModels,
+  testClaudeSubscriptionModel,
   useClaudeSubscriptions,
   useDeleteClaudeSubscription,
   useRenameClaudeSubscription,
   useSubscriptionVerification,
+  useUpdateClaudeSubscriptionModels,
 } from '../api/claude-subscriptions.js';
 import {
   fetchDevinUpstreamModels,
@@ -56,6 +59,7 @@ import {
   TeamProviderEditor,
 } from './provider-editors.js';
 import {
+  QuotaMiniBars,
   type SubscriptionActions,
   SubscriptionDetail,
   subscriptionModels,
@@ -141,16 +145,16 @@ function subscriptionEntries(
       deps.clock,
     );
     const runtimeLiveness = new Map(deps.models.map((model) => [model.id, model.liveness]));
-    const picked =
-      account.vendor === 'devin' || account.vendor === 'antigravity'
-        ? (account.models ?? [])
-        : undefined;
-    const pickedWithLiveness = picked?.map((model) => ({
+    const picked = account.models ?? [];
+    const shown: SubscriptionModel[] = (
+      picked.length > 0
+        ? picked
+        : deps.models.map((model): SubscriptionModel => ({ id: model.id, name: model.name }))
+    ).map((model) => ({
       ...model,
       liveness: runtimeLiveness.get(model.id) === 'dead' ? 'dead' : model.liveness,
     }));
-    const rowModels =
-      picked !== undefined && picked.length > 0 ? (picked as ModelSourceModel[]) : deps.models;
+    const rowModels = shown as ModelSourceModel[];
     return {
       item: {
         id: `subscription:${account.id}`,
@@ -158,13 +162,14 @@ function subscriptionEntries(
         Mark: VENDORS[account.vendor].Mark,
         status: subscriptionSummary(account, view, rowModels, deps.now, deps.t),
         tone: subscriptionRowTone(view, rowModels),
+        aside: <QuotaMiniBars windows={account.windows} />,
       },
       editor: (
         <SubscriptionDetail
           key={account.id}
           account={account}
-          models={deps.models}
-          picked={pickedWithLiveness}
+          models={shown}
+          fallback={picked.length === 0}
           now={deps.now}
           view={view}
           verification={verification}
@@ -195,6 +200,7 @@ export function ProvidersSection() {
   const renameDevinSubscription = useRenameDevinSubscription(teamId);
   const updateDevinModels = useUpdateDevinSubscriptionModels(teamId);
   const updateAntigravityModels = useUpdateAntigravitySubscriptionModels(teamId);
+  const updateClaudeModels = useUpdateClaudeSubscriptionModels(teamId);
   const renameAntigravitySubscription = useRenameAntigravitySubscription(teamId);
   const verification = useSubscriptionVerification(teamId);
   const devinVerification = useDevinSubscriptionVerification(teamId);
@@ -287,7 +293,9 @@ export function ProvidersSection() {
         ? updateDevinModels
         : account.vendor === 'antigravity'
           ? updateAntigravityModels
-          : null;
+          : account.vendor === 'claude'
+            ? updateClaudeModels
+            : null;
     update?.mutate(
       { id: account.id, models },
       {
@@ -328,6 +336,8 @@ export function ProvidersSection() {
     void (verifyByVendor[ref.vendor] ?? verification.verify)(ref.id);
   };
 
+  const claudeModels = subscriptionModels(sources, 'claude');
+
   const subscriptionActionsFor = (account: SubscriptionAccount): SubscriptionActions => {
     const rename = renameByVendor[account.vendor] ?? renameSubscription;
     const apiIds = apiIdsByVendor[account.vendor] ?? subscriptionApiIds;
@@ -343,18 +353,32 @@ export function ProvidersSection() {
                       { id: account.id, label },
                       { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
                     ),
-                  ...(account.vendor === 'devin' || account.vendor === 'antigravity'
+                  ...(account.vendor === 'devin' ||
+                  account.vendor === 'antigravity' ||
+                  account.vendor === 'claude'
                     ? {
                         onPickUpstream: () => setPickingSubscription(account),
                         onRemoveModel: (id: string) =>
                           saveSubscriptionModels(
                             account,
-                            (account.models ?? []).filter((model) => model.id !== id),
+                            ((account.models ?? []).length === 0
+                              ? subscriptionModels(sources, account.vendor).map((model) => ({
+                                  id: model.id,
+                                  name: model.name,
+                                }))
+                              : (account.models ?? [])
+                            ).filter((model) => model.id !== id),
                           ),
                         modelsBusy:
-                          account.vendor === 'devin'
-                            ? updateDevinModels.isPending
-                            : updateAntigravityModels.isPending,
+                          updateDevinModels.isPending ||
+                          updateAntigravityModels.isPending ||
+                          updateClaudeModels.isPending,
+                      }
+                    : {}),
+                  ...(account.vendor === 'claude' && teamId !== undefined
+                    ? {
+                        onTestModel: (model: string) =>
+                          testClaudeSubscriptionModel(teamId, account.id, model),
                       }
                     : {}),
                 }
@@ -378,7 +402,7 @@ export function ProvidersSection() {
   const entries = [
     ...subscriptionEntries(subscriptions, {
       ...subscriptionDeps,
-      models: subscriptionModels(sources, 'claude'),
+      models: claudeModels,
     }),
     ...subscriptionEntries(devinSubscriptions, {
       ...subscriptionDeps,
@@ -477,16 +501,27 @@ export function ProvidersSection() {
       {pickingSubscription !== null && live && teamId !== undefined && (
         <UpstreamModelPicker
           endpoint={`${pickingSubscription.vendor} · ${pickingSubscription.label}`}
-          selected={(pickingSubscription.models ?? []).map((model) => model.id)}
-          groupModels={
-            pickingSubscription.vendor === 'devin' ? groupDevinUpstream : groupAntigravityUpstream
-          }
+          selected={(pickingSubscription.vendor === 'claude' &&
+          (pickingSubscription.models ?? []).length === 0
+            ? subscriptionModels(sources, 'claude')
+            : (pickingSubscription.models ?? [])
+          ).map((model) => model.id)}
+          {...(pickingSubscription.vendor === 'claude'
+            ? {}
+            : {
+                groupModels:
+                  pickingSubscription.vendor === 'devin'
+                    ? groupDevinUpstream
+                    : groupAntigravityUpstream,
+              })}
           testable={false}
           load={async () => {
             const result =
               pickingSubscription.vendor === 'devin'
                 ? await fetchDevinUpstreamModels(teamId, pickingSubscription.id)
-                : await fetchAntigravityUpstreamModels(teamId, pickingSubscription.id);
+                : pickingSubscription.vendor === 'claude'
+                  ? await fetchClaudeUpstreamModels(teamId, pickingSubscription.id)
+                  : await fetchAntigravityUpstreamModels(teamId, pickingSubscription.id);
             if (result.status === 'ok')
               upstreamCatalogRef.current = new Map(result.models.map((model) => [model.id, model]));
             return result;

@@ -15,6 +15,7 @@ import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { fetchDevinSubscriptionModels } from './devin-subscription-models.js';
 import { verifyDevinSubscription } from './devin-subscription-verification.js';
+import { timedCheck } from './subscription-check.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
 
 type Deps = { db: Db; box: SecretBox };
@@ -230,6 +231,7 @@ export function listDevinSubscriptions(deps: Deps, teamId: string): DevinSubscri
       ...toRecord(row),
       lastUsedAt: stats?.lastUsedAt ?? null,
       stepsLast24h: stats?.stepsLast24h ?? null,
+      lastCheck: row.lastCheck,
     };
   });
 }
@@ -250,6 +252,7 @@ export function createDevinSubscription(
     expiresAt: body.expiresAt ?? null,
     enabledAt: null as number | null,
     models: [] as Row['models'],
+    lastCheck: null,
     createdAt: now,
   };
   deps.db.transaction((tx) => {
@@ -283,11 +286,19 @@ export async function verifyDevinSubscriptionConnection(
   if (!row) throw notFound('Devin subscription connection');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false };
   claimRateWindow(verificationWindows, deps.db, row.id, 'verification attempts');
-  try {
-    return await verifyDevinSubscription(deps.box.open(row.tokenCipher));
-  } catch {
-    return { ok: false, reason: 'failed' };
-  }
+  const result = await timedCheck(
+    () =>
+      Promise.resolve()
+        .then(() => verifyDevinSubscription(deps.box.open(row.tokenCipher)))
+        .catch((): DevinSubscriptionVerifyResult => ({ ok: false, reason: 'failed' })),
+    { check: 'sign-in', command: 'devin acp · authenticate', model: null },
+  );
+  deps.db
+    .update(devinSubscription)
+    .set({ lastCheck: result.check })
+    .where(eq(devinSubscription.id, row.id))
+    .run();
+  return result;
 }
 
 const UPSTREAM_MODELS_FAILURE: Record<

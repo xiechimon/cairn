@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { modelSourceModelSchema } from './records/model-source.js';
+import { subscriptionCheckSchema } from './subscription-check.js';
 
 export const devinSubscriptionModelSchema = z.object({
   id: z.string().min(1).max(256),
@@ -55,6 +56,7 @@ export type PatchDevinSubscription = z.infer<typeof renameDevinSubscriptionSchem
 export const devinSubscriptionVerifyResultSchema = z.object({
   ok: z.boolean(),
   reason: z.enum(['auth', 'timeout', 'unavailable', 'failed']).optional(),
+  check: subscriptionCheckSchema.optional(),
 });
 
 export type DevinSubscriptionVerifyResult = z.infer<typeof devinSubscriptionVerifyResultSchema>;

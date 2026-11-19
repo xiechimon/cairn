@@ -10,7 +10,7 @@ import {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MANAGED_ROOT = join(homedir(), '.local', 'share', 'cairn', 'antigravity');
-const GOOGLE_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+export const ANTIGRAVITY_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const FORWARDED_ENV = [
   'HTTPS_PROXY',
   'HTTP_PROXY',
@@ -199,7 +199,7 @@ export async function verifyAntigravitySubscription(
   options: { timeoutMs?: number } = {},
 ): Promise<AntigravitySubscriptionVerifyResult> {
   try {
-    const response = await fetch(GOOGLE_MODELS_URL, {
+    const response = await fetch(ANTIGRAVITY_MODELS_URL, {
       headers: { 'x-goog-api-key': token },
       signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     });

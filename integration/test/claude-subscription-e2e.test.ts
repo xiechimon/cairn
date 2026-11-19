@@ -121,7 +121,11 @@ describe('one setup-token, stored once, runs a Claude Code task on a host machin
       'POST',
       `/api/teams/${server.teamId}/claude-subscriptions/${wrongId}/verify`,
     );
-    expect(bad.body).toEqual({ ok: false, reason: 'auth' });
+    expect(bad.body).toMatchObject({
+      ok: false,
+      reason: 'auth',
+      check: { ok: false, reason: 'auth' },
+    });
     await api(server.url, 'DELETE', `/api/teams/${server.teamId}/claude-subscriptions/${wrongId}`);
 
     const created = await api(
@@ -138,7 +142,7 @@ describe('one setup-token, stored once, runs a Claude Code task on a host machin
       'POST',
       `/api/teams/${server.teamId}/claude-subscriptions/${id}/verify`,
     );
-    expect(verified.body).toEqual({ ok: true });
+    expect(verified.body).toMatchObject({ ok: true, check: { ok: true, reason: null } });
 
     const machines = (await (
       await api(server.url, 'GET', `/api/teams/${server.teamId}/machines`)

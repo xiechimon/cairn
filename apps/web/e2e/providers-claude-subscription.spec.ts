@@ -60,9 +60,11 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
   const detail = page.getByTestId('subscription-detail');
   const feedback = page.getByTestId('subscription-verify-feedback');
   await expect(feedback).toHaveAttribute('data-phase', 'passed');
-  await expect(feedback).toHaveText(locale === 'zh' ? '这个订阅刚完成了一次模型请求。' : 'This subscription just completed a model request.');
-  await page.keyboard.press('Escape');
-  await expect(feedback).toHaveCount(0);
+  await expect(feedback).toContainText(
+    locale === 'zh'
+      ? 'Claude 回复了这次模型请求，订阅能用。'
+      : 'Claude answered the model request; the subscription works.',
+  );
   await expect(detail.getByLabel(locale === 'zh' ? '名称' : 'Name')).toBeVisible();
 
   const remove = locale === 'zh' ? '移除' : 'Remove';
@@ -81,3 +83,57 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
 });
 
 }
+
+test('a Claude subscription picks Opus 5.5 from upstream and a failed model test reads as its expired sign-in', async ({ page }) => {
+  const record: ClaudeSubscriptionListEntry = {
+    id: 'subscription-1',
+    kind: 'claude-subscription',
+    label: 'Personal Claude',
+    expiresAt: Date.now() + 300 * 24 * 60 * 60 * 1000,
+    createdAt: Date.now(),
+    models: null,
+  };
+  const patches: unknown[] = [];
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/claude-subscriptions') return json([record]);
+    if (path === '/api/teams/t1/claude-subscriptions/subscription-1/upstream-models')
+      return json({
+        status: 'ok',
+        models: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'].map((id) => ({ id, name: id })),
+      });
+    if (path === '/api/teams/t1/claude-subscriptions/subscription-1' && route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON();
+      patches.push(body);
+      record.models = body.models;
+      return json(record);
+    }
+    if (path === '/api/teams/t1/claude-subscriptions/subscription-1/test') {
+      const { model } = route.request().postDataJSON();
+      return json(
+        model === 'claude-opus-5-5'
+          ? { status: 'ok', reason: null, failure: null, httpStatus: null, detail: null, latencyMs: 2100 }
+          : { status: 'failed', reason: 'auth', failure: 'auth', httpStatus: null, detail: null, latencyMs: null },
+      );
+    }
+  });
+  await page.goto('/app/resources/providers');
+  const detail = page.getByTestId('subscription-detail');
+  await detail.getByTestId('subscription-pick-upstream').click();
+  const picker = page.getByRole('dialog', { name: '从上游选择模型' });
+  const rows = picker.getByTestId('upstream-model');
+  await rows.filter({ has: page.locator('code', { hasText: 'claude-opus-5-5' }) }).click();
+  await rows.filter({ has: page.locator('code', { hasText: 'claude-sonnet-5-5' }) }).click();
+  await picker.getByTestId('upstream-save').click();
+  await expect.poll(() => patches).toHaveLength(1);
+  const chip = (id: string) => detail.locator(`[data-testid="subscription-model"][data-model-id="${id}"]`);
+  await expect(chip('claude-opus-5-5')).toBeVisible();
+
+  await detail.getByTestId('subscription-test-all').click();
+  await expect(chip('claude-opus-5-5')).toHaveAttribute('data-check', 'ok');
+  await expect(chip('claude-sonnet-5-5')).toHaveAttribute('data-check', 'failed');
+  await expect(chip('claude-sonnet-5-5')).toContainText('登录失效');
+  await expect(detail.getByTestId('subscription-model-failures')).toContainText('订阅的登录已失效');
+  await expect(detail).not.toContainText('key 无效');
+});

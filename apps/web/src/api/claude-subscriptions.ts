@@ -1,12 +1,20 @@
 import type {
   ClaudeSubscription,
   ClaudeSubscriptionListEntry,
+  ClaudeSubscriptionModel,
   ClaudeSubscriptionVerifyResult,
   CreateClaudeSubscription,
+  ProviderTestResult,
+  UpstreamModelsResult,
 } from '@cairn/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
+import {
+  runVerification,
+  type Verification,
+  type VerifyOutcome,
+  verificationOf,
+} from './account-verification.js';
 import { api } from './client.js';
 
 export function useClaudeSubscriptions(teamId: string | undefined, live: boolean) {
@@ -58,7 +66,41 @@ export function useRenameClaudeSubscription(teamId: string | undefined) {
   });
 }
 
+export function useUpdateClaudeSubscriptionModels(teamId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; models: ClaudeSubscriptionModel[] }) =>
+      api.patch<ClaudeSubscription>(`/api/teams/${teamId}/claude-subscriptions/${input.id}`, {
+        models: input.models,
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['claude-subscriptions', teamId] });
+      void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
+    },
+  });
+}
+
+export function fetchClaudeUpstreamModels(
+  teamId: string,
+  id: string,
+): Promise<UpstreamModelsResult> {
+  return api.post<UpstreamModelsResult>(
+    `/api/teams/${teamId}/claude-subscriptions/${id}/upstream-models`,
+  );
+}
+
+export function testClaudeSubscriptionModel(
+  teamId: string,
+  id: string,
+  model: string,
+): Promise<ProviderTestResult> {
+  return api.post<ProviderTestResult>(`/api/teams/${teamId}/claude-subscriptions/${id}/test`, {
+    model,
+  });
+}
+
 export function useSubscriptionVerification(teamId: string | undefined) {
+  const client = useQueryClient();
   const [states, setStates] = useState<Record<string, Verification>>({});
   const inFlight = useRef(new Set<string>());
   const verify = async (id: string): Promise<VerifyOutcome | null> => {
@@ -75,9 +117,10 @@ export function useSubscriptionVerification(teamId: string | undefined) {
       const { [id]: _settled, ...rest } = current;
       return {
         ...rest,
-        [id]: outcome.ok ? { phase: 'passed' } : { phase: 'failed', reason: outcome.reason },
+        [id]: verificationOf(outcome),
       };
     });
+    void client.invalidateQueries({ queryKey: ['claude-subscriptions', teamId] });
     return outcome;
   };
   return { states, verify };

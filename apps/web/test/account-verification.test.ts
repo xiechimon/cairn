@@ -51,7 +51,7 @@ describe('runVerification', () => {
 });
 
 describe('accountStatusOf', () => {
-  const ok = { state: 'ok' } as const;
+  const ok = { state: 'ok', lastCheck: null } as const;
 
   it('shows one status: verifying replaces available', () => {
     expect(accountStatusOf(ok, { phase: 'verifying' })).toEqual({ kind: 'verifying' });
@@ -64,23 +64,49 @@ describe('accountStatusOf', () => {
     });
   });
 
-  it('falls back to the account state when nothing is being verified', () => {
-    expect(accountStatusOf(ok, undefined)).toEqual({ kind: 'account', state: 'ok' });
-    expect(accountStatusOf({ state: 'cooling' }, undefined)).toEqual({
+  it('never calls an unchecked account available', () => {
+    expect(accountStatusOf(ok, undefined)).toEqual({ kind: 'unverified' });
+  });
+
+  it('reads the stored check when this page has not verified', () => {
+    const check = {
+      at: 1,
+      ok: true,
+      reason: null,
+      check: 'model-request',
+      command: 'claude -p',
+      model: null,
+      durationMs: 10,
+    } as const;
+    expect(accountStatusOf({ state: 'ok', lastCheck: check }, undefined)).toEqual({
+      kind: 'verified',
+      at: 1,
+    });
+    expect(
+      accountStatusOf({ state: 'ok', lastCheck: { ...check, ok: false, reason: 'auth' } }, undefined),
+    ).toEqual({ kind: 'verify-failed', reason: 'auth' });
+    expect(accountStatusOf({ state: 'ok', lastCheck: null }, { phase: 'passed' })).toEqual({
+      kind: 'verified',
+      at: null,
+    });
+  });
+
+  it('keeps the account state when it is not ok', () => {
+    expect(accountStatusOf({ state: 'cooling', lastCheck: null }, undefined)).toEqual({
       kind: 'account',
       state: 'cooling',
     });
   });
 
   it('a passed check leaves the summary to the account, so an exhausted account stays exhausted', () => {
-    expect(accountStatusOf({ state: 'exhausted' }, { phase: 'passed' })).toEqual({
+    expect(accountStatusOf({ state: 'exhausted', lastCheck: null }, { phase: 'passed' })).toEqual({
       kind: 'account',
       state: 'exhausted',
     });
   });
 
   it('keeps an expired account expired, not a stale verification failure', () => {
-    expect(accountStatusOf({ state: 'expired' }, { phase: 'failed', reason: 'auth' })).toEqual({
+    expect(accountStatusOf({ state: 'expired', lastCheck: null }, { phase: 'failed', reason: 'auth' })).toEqual({
       kind: 'account',
       state: 'expired',
     });

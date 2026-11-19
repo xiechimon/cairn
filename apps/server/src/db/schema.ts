@@ -14,6 +14,7 @@ import type {
   ChiefWatch,
   ClaudeCodeReport,
   ClaudeRateLimitWindow,
+  ClaudeSubscriptionModel,
   ComputerCallState,
   ComputerControlHolder,
   ComputerImage,
@@ -62,6 +63,7 @@ import type {
   StepKind,
   StepPromptOrigin,
   StoredAutonomySettings,
+  SubscriptionCheck,
   TaskDecision,
   TaskRequest,
   TodoOutputKind,
@@ -1429,6 +1431,8 @@ export const claudeSubscription = sqliteTable(
     expiresAt: epochMs('expiresAt'),
     enabledAt: epochMs('enabledAt'),
     quotaWindows: json<ClaudeRateLimitWindow[] | null>('quotaWindows'),
+    models: json<ClaudeSubscriptionModel[] | null>('models'),
+    lastCheck: json<SubscriptionCheck | null>('lastCheck'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [
@@ -1450,6 +1454,7 @@ export const devinSubscription = sqliteTable(
     expiresAt: epochMs('expiresAt'),
     enabledAt: epochMs('enabledAt'),
     models: json<DevinSubscriptionModel[]>('models').notNull().default(sql`'[]'`),
+    lastCheck: json<SubscriptionCheck | null>('lastCheck'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [
@@ -1471,6 +1476,7 @@ export const antigravitySubscription = sqliteTable(
     expiresAt: epochMs('expiresAt'),
     enabledAt: epochMs('enabledAt'),
     models: json<AntigravitySubscriptionModel[]>('models').notNull().default(sql`'[]'`),
+    lastCheck: json<SubscriptionCheck | null>('lastCheck'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [
