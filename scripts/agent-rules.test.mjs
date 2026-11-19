@@ -17,7 +17,10 @@ test('AGENTS.md lands work through queue/main without force and keeps the deploy
     agents,
     /published by the `desktop-release` workflow on every push whose app sources moved/,
   );
-  assert.match(agents, /stop and ask ian before pushing/);
+  assert.match(
+    agents,
+    /resolve it so both sides. intent survives, rerun step 4, and push without asking/,
+  );
   assert.match(agents, /watch CI on your commit/);
 });
 
