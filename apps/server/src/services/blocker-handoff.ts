@@ -35,14 +35,22 @@ export async function blockerHandoffForClaim(
   todoRow: typeof todo.$inferSelect,
 ): Promise<BlockerHandoffRecord | null> {
   if (stepRow.kind !== 'plan' && !isBuildStepKind(stepRow.kind)) return null;
-  const snapshot = deps.db
+  const blockerIds = todoRow.blockedBy ?? [];
+  const snapshots = deps.db
     .select({ blockerHandoff: step.blockerHandoff })
     .from(step)
     .where(and(eq(step.buildId, stepRow.buildId), isNotNull(step.blockerHandoff)))
     .orderBy(asc(step.createdAt), sql`rowid`)
-    .get();
-  if (snapshot?.blockerHandoff) return snapshot.blockerHandoff;
-  const blockerIds = todoRow.blockedBy ?? [];
+    .all();
+  for (const snapshot of snapshots) {
+    const handoff = snapshot.blockerHandoff;
+    if (
+      handoff !== null &&
+      handoff.blockers.length === blockerIds.length &&
+      handoff.blockers.every((entry, index) => entry.todoId === blockerIds[index])
+    )
+      return handoff;
+  }
   if (blockerIds.length === 0) return null;
   const blockerRows = new Map(
     deps.db

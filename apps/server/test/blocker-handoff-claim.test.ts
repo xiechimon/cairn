@@ -16,6 +16,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
+import { updateAutonomousTodo } from '../src/services/todos.js';
 import {
   bootServer,
   issueApiKey,
@@ -419,6 +420,146 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
         createdAt: 1,
       })
       .run();
+    const got = await claim(w);
+    expect(got.todo?.blockerHandoff).toEqual(snapshot);
+    expect(w.mock.requests).toEqual([]);
+  });
+
+  test('S12 swapping blockedBy through update_todo rebuilds the handoff for the new blocker', async () => {
+    const w = await setupWorld({ github: false });
+    const a = await seedDoneBlocker(w, {
+      title: '旧前置',
+      head: HEAD_B,
+      messages: [{ role: 'assistant', content: text('A 完成总结') }],
+    });
+    const b = await seedDoneBlocker(w, {
+      title: '新前置',
+      head: 'c'.repeat(40),
+      files: ['src/new.ts'],
+      messages: [{ role: 'assistant', content: text('B 完成总结') }],
+    });
+    const childId = await startChild(w, '后置', [a]);
+    const childBuild = w.s.db.select().from(todoTable).where(eq(todoTable.id, childId)).get()!
+      .latestBuildId!;
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'step-first',
+        buildId: childBuild,
+        kind: 'plan',
+        status: 'done',
+        blockerHandoff: {
+          blockers: [
+            {
+              todoId: a,
+              title: '旧前置快照',
+              phase: 'done' as const,
+              delivery: null,
+              changedFiles: [],
+              omittedFiles: 0,
+              summary: null,
+            },
+          ],
+        },
+        createdAt: 1,
+      })
+      .run();
+    updateAutonomousTodo(w.s.svc, childId, { blockedBy: [b] });
+    const got = await claim(w);
+    expect(got.todo?.blockerHandoff?.blockers.map((e) => e.todoId)).toEqual([b]);
+    expect(got.todo?.blockerHandoff?.blockers[0]?.summary).toBe('B 完成总结');
+    const buildStep = w.s.db.select().from(stepTable).where(eq(stepTable.id, got.step.id)).get()!;
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'done', finishedAt: Date.now() })
+      .where(eq(stepTable.id, buildStep.id))
+      .run();
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'step-second',
+        buildId: childBuild,
+        kind: 'build',
+        status: 'pending',
+        createdAt: Date.now(),
+      })
+      .run();
+    const again = await claim(w);
+    expect(again.step.id).toBe('step-second');
+    expect(again.todo?.blockerHandoff?.blockers.map((e) => e.todoId)).toEqual([b]);
+  });
+
+  test('S13 removing the dependency drops the stored handoff entirely', async () => {
+    const w = await setupWorld({ github: false });
+    const a = await seedDoneBlocker(w, { title: '前置', head: HEAD_B });
+    const childId = await startChild(w, '后置', [a]);
+    const childBuild = w.s.db.select().from(todoTable).where(eq(todoTable.id, childId)).get()!
+      .latestBuildId!;
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'step-first',
+        buildId: childBuild,
+        kind: 'plan',
+        status: 'done',
+        blockerHandoff: {
+          blockers: [
+            {
+              todoId: a,
+              title: '旧前置快照',
+              phase: 'done' as const,
+              delivery: null,
+              changedFiles: [],
+              omittedFiles: 0,
+              summary: null,
+            },
+          ],
+        },
+        createdAt: 1,
+      })
+      .run();
+    updateAutonomousTodo(w.s.svc, childId, { blockedBy: [] });
+    const got = await claim(w);
+    expect(got.todo?.blockerHandoff).toBeUndefined();
+  });
+
+  test('S14 re-writing the same dependency list keeps the stored snapshot', async () => {
+    const w = await setupWorld({
+      github: true,
+      pulls: { 5: { state: 'closed', merged: true, title: 'live title' } },
+    });
+    const a = await seedDoneBlocker(w, {
+      title: '前置',
+      pr: { number: 5, url: 'https://github.com/octo/alpha/pull/5' },
+    });
+    const childId = await startChild(w, '后置', [a]);
+    const childBuild = w.s.db.select().from(todoTable).where(eq(todoTable.id, childId)).get()!
+      .latestBuildId!;
+    const snapshot = {
+      blockers: [
+        {
+          todoId: a,
+          title: '首次快照',
+          phase: 'done' as const,
+          delivery: null,
+          changedFiles: [],
+          omittedFiles: 0,
+          summary: null,
+        },
+      ],
+    };
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'step-first',
+        buildId: childBuild,
+        kind: 'plan',
+        status: 'done',
+        blockerHandoff: snapshot,
+        createdAt: 1,
+      })
+      .run();
+    updateAutonomousTodo(w.s.svc, childId, { blockedBy: [a] });
     const got = await claim(w);
     expect(got.todo?.blockerHandoff).toEqual(snapshot);
     expect(w.mock.requests).toEqual([]);
