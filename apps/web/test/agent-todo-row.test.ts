@@ -344,3 +344,86 @@ describe('mapTranscript running turn (Claude Code parity, mon X 2026-11-19)', ()
     expect(work?.kind === 'work' && work.steps.map((s) => s.kind)).toEqual(['call', 'say', 'call']);
   });
 });
+
+describe('mapTranscript background tasks (docs/design/task-panel-live-row-subagents-todo.md B)', () => {
+  const call = (id: string, at: number, extra: Record<string, unknown> = {}): MessageRow => ({
+    id,
+    role: 'assistant',
+    createdAt: at,
+    content: {
+      kind: 'toolcall',
+      call: { id, name: 'Bash', arguments: { command: `echo ${id}` }, result: id, ...extra },
+    },
+  });
+  const bg = (taskId: string, status: string, extra: Record<string, unknown> = {}): MessageRow => ({
+    id: `bg-s1-${taskId}`,
+    role: 'assistant',
+    createdAt: NOW - 20_000,
+    content: {
+      kind: 'bg_task',
+      task: { taskId, type: 'agent', description: `survey ${taskId}`, status, startedAt: NOW - 20_000, ...extra },
+    },
+  });
+  const spawn: MessageRow = {
+    id: 'toolu_spawn',
+    role: 'assistant',
+    createdAt: NOW - 20_000,
+    content: {
+      kind: 'toolcall',
+      call: { id: 'toolu_spawn', name: 'Agent', arguments: { description: 'survey a' }, result: 'launched' },
+    },
+  };
+  const workCalls = (items: TranscriptItem[]) =>
+    items.flatMap((item) =>
+      item.kind === 'work'
+        ? item.steps.flatMap((step) =>
+            step.kind === 'call'
+              ? [{ id: step.id, background: step.background, description: step.description }]
+              : [],
+          )
+        : [],
+    );
+
+  test('sub-agent calls leave the main trace and land on their task; the spawning call is named by the task', () => {
+    const items = render({
+      steps: [runningStep('s1')],
+      messages: [
+        spawn,
+        bg('a', 'running', { toolCallId: 'toolu_spawn', toolUses: 1 }),
+        call('child-1', NOW - 15_000, { parent: 'toolu_spawn' }),
+        call('main-1', NOW - 10_000),
+      ],
+    });
+    expect(workCalls(items)).toEqual([
+      { id: 'toolu_spawn', background: true, description: 'survey a' },
+      { id: 'main-1', background: undefined, description: 'echo main-1' },
+    ]);
+    const group = items.find((i) => i.kind === 'bg-tasks');
+    expect(group).toMatchObject({
+      buildId: 'build-1',
+      tasks: [{ taskId: 'a', status: 'running', toolUses: 1, steps: [{ kind: 'call', id: 'child-1' }] }],
+    });
+  });
+
+  test('the group sits above the todo, which counts the running tasks on itself; no running task means no group', () => {
+    const agentTodo = todoUpdate('s1', [{ text: '汇总调研', state: 'doing' }]);
+    const items = render({
+      steps: [runningStep('s1')],
+      messages: [bg('a', 'running'), bg('b', 'running'), bg('c', 'done', { endedAt: NOW - 5_000 })],
+      agentTodo,
+    });
+    const kinds = items.map((i) => i.kind);
+    expect(kinds.indexOf('bg-tasks')).toBeLessThan(kinds.indexOf('agent-todo'));
+    expect(items.find((i) => i.kind === 'bg-tasks')).toMatchObject({
+      tasks: [{ taskId: 'a' }, { taskId: 'b' }, { taskId: 'c', status: 'done' }],
+    });
+    expect(items.find((i) => i.kind === 'agent-todo')).toMatchObject({ backgroundRunning: 2 });
+    const settled = render({
+      steps: [runningStep('s1')],
+      messages: [bg('c', 'done', { endedAt: NOW - 5_000 })],
+      agentTodo,
+    });
+    expect(settled.some((i) => i.kind === 'bg-tasks')).toBe(false);
+    expect(settled.find((i) => i.kind === 'agent-todo')).not.toHaveProperty('backgroundRunning');
+  });
+});

@@ -1,5 +1,6 @@
 import {
   type AgentTodoReport,
+  type BackgroundTask,
   type ClaimedStep,
   type ClaudeCodeReport,
   type ClaudeRateLimitReport,
@@ -110,6 +111,7 @@ export interface MachineApi {
   transcriptRow?(stepId: string, row: TranscriptRow): Promise<void>;
   activity?(stepId: string, activity: StepActivityReport): Promise<void>;
   agentTodo?(stepId: string, todo: AgentTodoReport): Promise<void>;
+  backgroundTask?(stepId: string, task: BackgroundTask): Promise<void>;
   relayTool(
     stepId: string,
     name: string,
@@ -338,6 +340,13 @@ export class MachineClient implements MachineApi {
   async agentTodo(stepId: string, todo: AgentTodoReport): Promise<void> {
     await this.request('POST', `/api/machine/tool/${stepId}`, {
       body: { kind: 'agent_todo' as const, todo },
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
+  }
+
+  async backgroundTask(stepId: string, task: BackgroundTask): Promise<void> {
+    await this.request('POST', `/api/machine/tool/${stepId}`, {
+      body: { kind: 'bg_task' as const, task },
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }

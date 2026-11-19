@@ -1,5 +1,6 @@
 import {
   type AgentTodoItem,
+  type BackgroundTask,
   type ChiefReportContent,
   type ChiefTurnErrorContent,
   type ClaudeLogin,
@@ -401,8 +402,21 @@ export type WorkStep =
       unfinished: boolean;
       cancelled?: boolean;
       localized?: boolean;
+      background?: true;
       seconds: number | null;
     };
+
+export interface BackgroundTaskView {
+  taskId: string;
+  type: 'agent' | 'shell';
+  description: string;
+  prompt?: string;
+  status: BackgroundTask['status'];
+  startedAt: number;
+  endedAt?: number;
+  toolUses?: number;
+  steps: WorkStep[];
+}
 
 export type TranscriptItem =
   | { kind: 'run'; at?: string; machine?: string; cancelled?: boolean }
@@ -501,7 +515,8 @@ export type TranscriptItem =
       text: string;
       id?: string;
     }
-  | { kind: 'agent-todo'; id?: string; items: AgentTodoItem[] };
+  | { kind: 'agent-todo'; id?: string; items: AgentTodoItem[]; backgroundRunning?: number }
+  | { kind: 'bg-tasks'; buildId: string; tasks: BackgroundTaskView[] };
 
 export interface ReviewFinding {
   id: string;

@@ -7,6 +7,7 @@ export * from './antigravity-local.js';
 export * from './antigravity-subscription.js';
 export * from './attachment-token.js';
 export * from './attachment-types.js';
+export * from './background-task.js';
 export * from './blocker-handoff.js';
 export * from './blocker-handoff-record.js';
 export * from './brand.js';

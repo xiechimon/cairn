@@ -133,6 +133,14 @@ export function TaskCard({ items, live = false }: { items: TaskItem[]; live?: bo
               </span>
             </span>
           </div>
+          {item.note !== undefined && (
+            <div
+              className="pl-7 text-meta leading-5 text-(--text-tertiary)"
+              data-testid="md-task-note"
+            >
+              {item.note}
+            </div>
+          )}
           {item.blocks.length > 0 && (
             <div className="mt-1 min-w-0 pl-7 text-(--foreground)" data-testid="md-task-children">
               <MarkdownBlocks blocks={item.blocks} depth={1} flow="list" />

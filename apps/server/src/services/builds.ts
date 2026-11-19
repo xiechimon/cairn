@@ -50,6 +50,7 @@ export {
 export {
   cancelBuild,
   prepareStopForDone,
+  requestBackgroundTaskStop,
   requestStop,
   type StopAndMarkDoneResult,
   stopActiveStepsAfterExit,

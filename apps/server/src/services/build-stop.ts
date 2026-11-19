@@ -1,13 +1,14 @@
 import type { Phase } from '@cairn/shared';
 import {
   ACTIVE_STEP_STATUSES,
+  backgroundTaskMessageId,
   STOP_MESSAGE,
   type StopAttribution,
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, step, stopPending, todo } from '../db/schema.js';
+import { build, message, step, stopPending, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
@@ -112,6 +113,26 @@ export function requestStop(
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (todoRow) deps.machineHub?.stopSignal(todoRow.teamId, active.id);
   return { delegated: true };
+}
+
+export function requestBackgroundTaskStop(deps: BuildDeps, buildId: string, taskId: string): void {
+  const active = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, buildId), eq(step.status, 'claimed')))
+    .orderBy(asc(step.createdAt))
+    .all()
+    .at(-1);
+  if (active?.machineId == null) throw new HttpError(409, 'no running step on this build');
+  const row = deps.db
+    .select({ content: message.content })
+    .from(message)
+    .where(eq(message.id, backgroundTaskMessageId(active.id, taskId)))
+    .get();
+  if ((row?.content as { task?: { status?: string } } | undefined)?.task?.status !== 'running')
+    throw new HttpError(409, 'background task is not running');
+  if (deps.machineHub?.pushTaskStop(active.machineId, active.id, taskId) !== true)
+    throw new HttpError(409, 'the computer running this task is not connected');
 }
 
 function stopFallbackPhase(db: Db, buildRow: BuildRow): Phase {

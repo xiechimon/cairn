@@ -273,6 +273,17 @@ export class MachineWakeHub {
     }
   }
 
+  pushTaskStop(machineId: string, stepId: string, taskId: string): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send({ type: 'task.stop', stepId, taskId });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   releaseMachine(machineId: string): void {
     if (this.streamsByMachine.delete(machineId)) {
       for (const listener of this.disconnectListeners) listener(machineId);

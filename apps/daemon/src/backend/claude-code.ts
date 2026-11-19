@@ -43,6 +43,7 @@ import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-aut
 import { credentialRedactor } from '../credential-output.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
+import { BackgroundTaskRows } from './claude-background-tasks.js';
 import { type ClaudeTelemetryCapture, captureClaudeTelemetry } from './claude-telemetry.js';
 import type { Launch, SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
@@ -222,8 +223,10 @@ export function toUsageRows(
 }
 
 export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEvent[] {
+  const parent = (msg as { parent_tool_use_id?: string | null }).parent_tool_use_id ?? undefined;
   switch (msg.type) {
     case 'stream_event': {
+      if (parent !== undefined) return [];
       const event = (
         msg as {
           event?: { type?: string; delta?: { type?: string; text?: string; thinking?: string } };
@@ -293,7 +296,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
           input?: unknown;
         };
         if (b.type === 'thinking' && b.thinking !== undefined) {
-          out.push({ type: 'thinking', text: b.thinking });
+          if (parent === undefined) out.push({ type: 'thinking', text: b.thinking });
         } else if (b.type === 'tool_use' && typeof b.id === 'string') {
           const todo = todoFromTodoWrite(b.name, b.input);
           const name = b.name ?? '';
@@ -301,13 +304,15 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
             id: b.id,
             name: name.startsWith(HOST_TOOL_PREFIX) ? name.slice(HOST_TOOL_PREFIX.length) : name,
             arguments: b.input,
-            ...(todo !== null ? { todo } : {}),
+            ...(parent !== undefined ? { parent } : {}),
+            ...(todo !== null && parent === undefined ? { todo } : {}),
           };
           state.calls.set(call.id, call);
           state.runningTools.add(call.id);
           out.push({ type: 'toolcall_end', call });
         }
       }
+      if (parent !== undefined) return out;
       out.push({
         type: 'message_end',
         message: {
@@ -567,6 +572,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private stopping = false;
   private inputEnded = false;
   private readonly background = new BackgroundSubagents();
+  private readonly rows = new BackgroundTaskRows();
   private heldDone: StepEvent | null = null;
   private waitCallId: string | null = null;
   private waitTimer: NodeJS.Timeout | null = null;
@@ -624,6 +630,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
           }
         }
         this.background.note(msg);
+        for (const task of this.rows.note(msg)) this.queue.push({ type: 'bg_task', task });
         if (this.heldDone !== null && isMainAgentTurnFrame(msg)) {
           this.closeWait('A new turn started before the background subagents finished.');
           this.heldDone = null;
@@ -663,14 +670,14 @@ class ClaudeSessionHandle implements AgentSessionHandle {
         }
         this.flushSteers();
       }
-      if (finished !== undefined) this.queue.push(finished);
+      if (finished !== undefined) this.pushDone(finished);
     } catch (err) {
       if (this.stopping) {
         return;
       }
       if (this.heldDone !== null) return;
       if (finished !== undefined && !turnAfterFinish) {
-        this.queue.push(finished);
+        this.pushDone(finished);
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
@@ -740,7 +747,17 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     if (done === null) return;
     this.heldDone = null;
     this.closeWait(reason);
+    this.pushDone(done);
+  }
+
+  private pushDone(done: StepEvent): void {
+    this.settleRows();
     this.queue.push(done);
+  }
+
+  private settleRows(): void {
+    for (const task of this.rows.settleRunning(this.stopping ? 'stopped' : 'orphaned'))
+      this.queue.push({ type: 'bg_task', task });
   }
 
   private closeWait(result: string): void {
@@ -764,6 +781,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     for (const pending of this.transmittedSteers.values())
       pending.reject(new Error('claude-code session closed before steer consumption'));
     this.transmittedSteers.clear();
+    this.settleRows();
     this.input.end();
     this.queue.end();
     if (!this.abort.signal.aborted) this.abort.abort();
@@ -804,12 +822,17 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   }
 
   async stop(): Promise<void> {
-    this.releaseHeldDone('The session was stopped while it waited for background subagents.');
     this.stopping = true;
+    this.releaseHeldDone('The session was stopped while it waited for background subagents.');
     this.state.interrupted = true;
     this.input.end();
     this.q.interrupt().catch(() => {});
     this.finish();
+  }
+
+  async stopTask(taskId: string): Promise<void> {
+    if (this.closed) return;
+    await this.q.stopTask(taskId);
   }
 
   usage(): AgentTokenUsage {

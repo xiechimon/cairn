@@ -24,8 +24,10 @@ import type {
 import {
   ASK_USER_QUESTION_KIND,
   askUserQuestionContentSchema,
+  type BackgroundTask,
   BRAND,
   BUILD_FAILURE_ROW_KIND,
+  backgroundTaskSchema,
   CHIEF_TURN_ERROR_KIND,
   CLOAK_LICENSE_SAVED,
   CONFIRM_ANNOUNCEMENT,
@@ -444,6 +446,14 @@ export function thinkingOfContent(content: unknown): string | null {
   return parts.join('');
 }
 
+function backgroundTaskOfContent(content: unknown): BackgroundTask | null {
+  if (content === null || typeof content !== 'object' || Array.isArray(content)) return null;
+  const c = content as { kind?: string; task?: unknown };
+  if (c.kind !== 'bg_task') return null;
+  const parsed = backgroundTaskSchema.safeParse(c.task);
+  return parsed.success ? parsed.data : null;
+}
+
 export function toolCallOfContent(content: unknown): ToolCallRecord | null {
   if (content !== null && typeof content === 'object' && !Array.isArray(content)) {
     const c = content as { kind?: string; call?: ToolCallRecord };
@@ -722,6 +732,19 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       toolNameByResult.set(pairedText, paired.name);
   }
 
+  const backgroundTasks = messages
+    .flatMap((m) => {
+      const task = backgroundTaskOfContent(m.content);
+      return task === null ? [] : [task];
+    })
+    .sort((a, b) => a.startedAt - b.startedAt);
+  const backgroundBySpawn = new Map(
+    backgroundTasks.flatMap((task) =>
+      task.toolCallId !== undefined ? [[task.toolCallId, task] as const] : [],
+    ),
+  );
+  const childSteps = new Map<string, WorkStep[]>();
+
   const scheduledStepIds = new Set(
     messages.flatMap((m) => {
       if (m.role !== 'system' || systemKindOf(m.content) !== 'schedule-wake') return [];
@@ -745,7 +768,16 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const seconds =
       previousAt !== null && m.createdAt > previousAt ? (m.createdAt - previousAt) / 1000 : null;
     previousAt = m.createdAt;
+    if (backgroundTaskOfContent(m.content) !== null) continue;
     const call = toolCallOfContent(m.content);
+    if (call?.parent !== undefined) {
+      const siblings = childSteps.get(call.parent) ?? [];
+      siblings.push(
+        workCall(call, seconds, claimedSince !== null && m.createdAt >= claimedSince, false),
+      );
+      childSteps.set(call.parent, siblings);
+      continue;
+    }
     if (call !== null) {
       const callTodo = call.todo ?? todoFromTodoWrite(call.name, call.arguments);
       if (callTodo !== null && callTodo.length > 0 && call.isError !== true) {
@@ -756,16 +788,21 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         .filter((s) => s.createdAt <= m.createdAt)
         .sort((a, b) => a.createdAt - b.createdAt)
         .at(-1);
+      const step = workCall(
+        call,
+        seconds,
+        claimedSince !== null && m.createdAt >= claimedSince,
+        owner?.status === 'stopped',
+      );
+      const spawned = backgroundBySpawn.get(call.id);
       entries.push({
         at: m.createdAt,
         item: {
           kind: '__work__',
-          step: workCall(
-            call,
-            seconds,
-            claimedSince !== null && m.createdAt >= claimedSince,
-            owner?.status === 'stopped',
-          ),
+          step:
+            spawned !== undefined && step.kind === 'call'
+              ? { ...step, background: true, description: spawned.description }
+              : step,
         },
       });
       continue;
@@ -1033,13 +1070,39 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     if (shownReply !== null) items.push(shownReply);
     const liveTodo = agentTodo != null && agentTodo.stepId === running.id ? agentTodo : null;
     const shownTodo = liveTodo?.items ?? persistedTodo;
-    if (shownTodo !== null && shownTodo.length > 0) {
-      const todoRow: TranscriptItem = { kind: 'agent-todo', id: 'agent-todo', items: shownTodo };
-      const anchor = turnWork ?? (hasActiveTailWork ? tailWork : null);
+    const backgroundRunning = backgroundTasks.filter((task) => task.status === 'running').length;
+    const anchor = turnWork ?? (hasActiveTailWork ? tailWork : null);
+    const placeAboveWork = (row: TranscriptItem) => {
       const workAt = anchor == null ? -1 : items.indexOf(anchor);
-      if (workAt === -1) items.push(todoRow);
-      else items.splice(workAt, 0, todoRow);
-    }
+      if (workAt === -1) items.push(row);
+      else items.splice(workAt, 0, row);
+    };
+    if (backgroundRunning > 0)
+      placeAboveWork({
+        kind: 'bg-tasks',
+        buildId: build.id,
+        tasks: backgroundTasks
+          .filter((task) => task.status === 'running' || (task.endedAt ?? 0) >= running.createdAt)
+          .map((task) => ({
+            taskId: task.taskId,
+            type: task.type,
+            description: task.description,
+            ...(task.prompt !== undefined ? { prompt: task.prompt } : {}),
+            status: task.status,
+            startedAt: task.startedAt,
+            ...(task.endedAt !== undefined ? { endedAt: task.endedAt } : {}),
+            ...(task.toolUses !== undefined ? { toolUses: task.toolUses } : {}),
+            steps:
+              (task.toolCallId !== undefined ? childSteps.get(task.toolCallId) : undefined) ?? [],
+          })),
+      });
+    if (shownTodo !== null && shownTodo.length > 0)
+      placeAboveWork({
+        kind: 'agent-todo',
+        id: 'agent-todo',
+        items: shownTodo,
+        ...(backgroundRunning > 0 ? { backgroundRunning } : {}),
+      });
     const actLabel = act != null && !stopping ? activityLabel(act) : null;
     const queued =
       running.status === 'pending' && running.queue != null ? queueLabel(running.queue) : null;

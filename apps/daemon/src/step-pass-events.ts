@@ -287,6 +287,16 @@ export async function consumeStepPassEvent(
     case 'usage':
       activity.noteUsage(ev.usage);
       break;
+    case 'bg_task': {
+      const ok = await withRetries(
+        async () => client.backgroundTask?.(stepId, ev.task),
+        REMOTE_TOOL_RETRY_DELAYS_MS,
+        logger,
+        `background task relay ${ev.task.taskId}`,
+      );
+      if (ok === null) logger.step(`background task relay failed for ${ev.task.taskId}`);
+      break;
+    }
     case 'auto_retry_start':
       s.lastError = null;
       s.zeroProgressRetries += 1;

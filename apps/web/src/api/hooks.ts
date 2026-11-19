@@ -944,6 +944,20 @@ export function usePatchProject(teamId: string | undefined) {
   });
 }
 
+export function useStopBackgroundTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { buildId: string; taskId: string }) =>
+      api.post<{ ok: true }>(
+        `/api/builds/${input.buildId}/tasks/${encodeURIComponent(input.taskId)}/stop`,
+        {},
+      ),
+    onSettled: () => {
+      void qc.invalidateQueries();
+    },
+  });
+}
+
 export function useApiMutations(teamId: string | undefined) {
   const qc = useQueryClient();
   const invalidateAll = () => {

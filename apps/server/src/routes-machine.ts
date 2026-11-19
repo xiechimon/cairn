@@ -9,6 +9,7 @@ import {
   machineActivityBodySchema,
   machineAgentTodoBodySchema,
   machineAskBodySchema,
+  machineBackgroundTaskBodySchema,
   machineClaimBodySchema,
   machineClosedOrbsBodySchema,
   machineComputerFramesBodySchema,
@@ -83,6 +84,7 @@ import {
   recoverSteps,
   reportActivity,
   reportAgentTodo,
+  reportBackgroundTask,
   reportThinkingDelta,
   reportTool,
   reportTranscriptDelta,
@@ -97,6 +99,15 @@ function isComputerRelayBody(raw: unknown): boolean {
 
 function isRelayBody(raw: unknown): boolean {
   return raw !== null && typeof raw === 'object' && 'params' in raw && !('id' in raw);
+}
+
+function isBackgroundTaskBody(raw: unknown): boolean {
+  return (
+    raw !== null &&
+    typeof raw === 'object' &&
+    'kind' in raw &&
+    (raw as { kind: unknown }).kind === 'bg_task'
+  );
 }
 
 function isTranscriptRowBody(raw: unknown): boolean {
@@ -545,6 +556,11 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         if (isAgentTodoBody(raw)) {
           const body = parseWith(machineAgentTodoBodySchema, raw, 'body');
           reportAgentTodo(deps, row.id, c.req.param('stepId'), body.todo);
+          return c.json({ ok: true as const });
+        }
+        if (isBackgroundTaskBody(raw)) {
+          const body = parseWith(machineBackgroundTaskBodySchema, raw, 'body');
+          reportBackgroundTask(deps, row.id, c.req.param('stepId'), body.task);
           return c.json({ ok: true as const });
         }
         if (isTranscriptRowBody(raw)) {

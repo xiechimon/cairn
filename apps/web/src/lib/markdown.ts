@@ -6,7 +6,12 @@ import { ATTACHMENT_LINE } from '../overlay/attachment-paste.js';
 
 export type TableAlign = 'left' | 'center' | 'right' | null;
 export type TaskState = AgentTodoItem['state'];
-export type TaskItem = { state: TaskState; segments: DocSegment[]; blocks: ChatBlock[] };
+export type TaskItem = {
+  state: TaskState;
+  segments: DocSegment[];
+  blocks: ChatBlock[];
+  note?: string;
+};
 export type ListItem = { checked: boolean | null; blocks: ChatBlock[] };
 
 export type ChatBlock =

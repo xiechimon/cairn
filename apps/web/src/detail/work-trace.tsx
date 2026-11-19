@@ -200,7 +200,9 @@ function WorkStepRow({
   const verb =
     call === null
       ? t(running ? '正在思考' : open ? '思考' : '思考了')
-      : t(running ? RUNNING_VERBS[call.action] : DONE_VERBS[call.action]);
+      : call.background === true
+        ? t('后台')
+        : t(running ? RUNNING_VERBS[call.action] : DONE_VERBS[call.action]);
   const preview = step.kind === 'think' ? step.text.trim().split('\n')[0] : undefined;
   return (
     <div

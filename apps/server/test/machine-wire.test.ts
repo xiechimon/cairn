@@ -18,7 +18,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { loadConfig } from '../src/config.js';
 import {
@@ -575,6 +575,78 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
     expect(buildRow.errorMessage).toBe('模型连接失败');
     const stepRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, claimed.step.id)).get()!;
     expect(stepRow.status).toBe('failed');
+  });
+
+  test('background task rows upsert in place, and rows still running when the step ends become orphaned while settled ones stay', async () => {
+    const w = await setupWorld({ claimHoldMs: 200 });
+    await w.startBuild(true);
+    const { body } = await w.claim();
+    const stepId = claimedStepSchema.parse(body.step).step.id;
+    const report = (task: Record<string, unknown>) =>
+      call(w.s.app, 'POST', `/api/machine/tool/${stepId}`, {
+        cred: w.token,
+        body: { kind: 'bg_task', task: { type: 'shell', startedAt: 1, ...task } },
+      });
+    expect(
+      (await report({ taskId: 't1', description: 'npm run dev', status: 'running' })).status,
+    ).toBe(200);
+    expect(
+      (await report({ taskId: 't1', description: 'npm run dev', status: 'running', toolUses: 3 }))
+        .status,
+    ).toBe(200);
+    await report({ taskId: 't2', description: 'sleep 1', status: 'done', endedAt: 5 });
+    const rows = () =>
+      w.s.db
+        .select()
+        .from(messageTable)
+        .all()
+        .filter((row) => (row.content as { kind?: string }).kind === 'bg_task')
+        .map((row) => ({
+          id: row.id,
+          task: (row.content as { task: { status: string; toolUses?: number } }).task,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    expect(rows().map((row) => [row.id, row.task.status, row.task.toolUses])).toEqual([
+      [`bg-${stepId}-t1`, 'running', 3],
+      [`bg-${stepId}-t2`, 'done', undefined],
+    ]);
+    await call(w.s.app, 'POST', `/api/machine/done/${stepId}`, {
+      cred: w.token,
+      body: { status: 'failed', errorMessage: 'daemon lost' },
+    });
+    expect(rows().map((row) => [row.id, row.task.status])).toEqual([
+      [`bg-${stepId}-t1`, 'orphaned'],
+      [`bg-${stepId}-t2`, 'done'],
+    ]);
+    await report({ taskId: 't3', description: 'late retry', status: 'running' });
+    expect(rows().find((row) => row.id === `bg-${stepId}-t3`)?.task.status).toBe('orphaned');
+  });
+
+  test('stopping one background task signals the computer running its step; a settled task or a disconnected computer is 409', async () => {
+    const w = await setupWorld({ claimHoldMs: 200 });
+    const { buildId } = await w.startBuild(true);
+    const { body } = await w.claim();
+    const stepId = claimedStepSchema.parse(body.step).step.id;
+    for (const [taskId, status] of [
+      ['live', 'running'],
+      ['over', 'done'],
+    ])
+      await call(w.s.app, 'POST', `/api/machine/tool/${stepId}`, {
+        cred: w.token,
+        body: {
+          kind: 'bg_task',
+          task: { taskId, type: 'agent', description: taskId, status, startedAt: 1 },
+        },
+      });
+    const stop = (taskId: string) =>
+      call(w.s.app, 'POST', `/api/builds/${buildId}/tasks/${taskId}/stop`);
+    expect((await stop('live')).status).toBe(409);
+    const push = vi.spyOn(w.s.machineHub, 'pushTaskStop').mockReturnValue(true);
+    expect((await stop('live')).status).toBe(202);
+    expect(push).toHaveBeenCalledWith(w.machineId, stepId, 'live');
+    expect((await stop('over')).status).toBe(409);
+    expect((await stop('missing')).status).toBe(409);
+    expect(push).toHaveBeenCalledTimes(1);
   });
 
   test('recover returns this machine claimed unfinished steps (journal restores the server-side truth)', async () => {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { modelUsageSchema, providerConfigSchema, toolCallRecordSchema } from '../agent-backend.js';
 import { agentTodoReportSchema } from '../agent-todo.js';
+import { backgroundTaskSchema } from '../background-task.js';
 import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
@@ -322,6 +323,11 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('shutdown') }),
   z.object({ type: z.literal('steer'), stepId: recordId }),
   z.object({ type: z.literal('stop'), stepId: recordId }),
+  z.object({
+    type: z.literal('task.stop'),
+    stepId: recordId,
+    taskId: backgroundTaskSchema.shape.taskId,
+  }),
   z.object({ type: z.literal('repo.archive'), archive: machineRepoArchiveCommandSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
@@ -401,6 +407,12 @@ export const machineAgentTodoBodySchema = z.object({
 });
 export type MachineAgentTodoBody = z.infer<typeof machineAgentTodoBodySchema>;
 
+export const machineBackgroundTaskBodySchema = z.object({
+  kind: z.literal('bg_task'),
+  task: backgroundTaskSchema,
+});
+export type MachineBackgroundTaskBody = z.infer<typeof machineBackgroundTaskBodySchema>;
+
 export const machineToolBodySchema = z.union([
   toolCallRecordSchema,
   machineToolRelayBodySchema,
@@ -409,6 +421,7 @@ export const machineToolBodySchema = z.union([
   machineActivityBodySchema,
   machineTranscriptRowBodySchema,
   machineAgentTodoBodySchema,
+  machineBackgroundTaskBodySchema,
 ]);
 
 export const machineToolResponseSchema = z.union([

@@ -996,6 +996,17 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'shutdown') void stop();
             if (ev.type === 'steer') void deliverSteer(ev.stepId);
             if (ev.type === 'stop') void deliverStop(ev.stepId);
+            if (ev.type === 'task.stop') {
+              logger.step(`background task stop requested step=${ev.stepId} task=${ev.taskId}`);
+              void sessionHandles
+                .get(ev.stepId)
+                ?.stopTask?.(ev.taskId)
+                .catch((err: unknown) =>
+                  logger.step(
+                    `background task stop failed: ${err instanceof Error ? err.message : String(err)}`,
+                  ),
+                );
+            }
             if (ev.type === 'repo.archive') {
               void performRepoArchive({ client, logger }, ev.archive);
             }

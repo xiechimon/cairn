@@ -3015,6 +3015,29 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     {
       "additionalProperties": false,
       "properties": {
+        "stepId": {
+          "type": "string",
+        },
+        "taskId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": {
+          "const": "task.stop",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "stepId",
+        "taskId",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
         "archive": {
           "additionalProperties": false,
           "properties": {
@@ -3994,6 +4017,91 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       ],
       "type": "object",
     },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "bg_task",
+          "type": "string",
+        },
+        "task": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "maxLength": 2000,
+              "type": "string",
+            },
+            "endedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "prompt": {
+              "maxLength": 2000,
+              "type": "string",
+            },
+            "startedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "status": {
+              "enum": [
+                "running",
+                "done",
+                "failed",
+                "stopped",
+                "orphaned",
+              ],
+              "type": "string",
+            },
+            "summary": {
+              "maxLength": 2000,
+              "type": "string",
+            },
+            "taskId": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string",
+            },
+            "tokens": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "toolCallId": {
+              "maxLength": 200,
+              "type": "string",
+            },
+            "toolUses": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "type": {
+              "enum": [
+                "agent",
+                "shell",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "taskId",
+            "type",
+            "description",
+            "status",
+            "startedAt",
+          ],
+          "type": "object",
+        },
+      },
+      "required": [
+        "kind",
+        "task",
+      ],
+      "type": "object",
+    },
   ],
 }
 `;
@@ -4526,6 +4634,91 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "required": [
         "type",
         "usage",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "task": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "maxLength": 2000,
+              "type": "string",
+            },
+            "endedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "prompt": {
+              "maxLength": 2000,
+              "type": "string",
+            },
+            "startedAt": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "status": {
+              "enum": [
+                "running",
+                "done",
+                "failed",
+                "stopped",
+                "orphaned",
+              ],
+              "type": "string",
+            },
+            "summary": {
+              "maxLength": 2000,
+              "type": "string",
+            },
+            "taskId": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string",
+            },
+            "tokens": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "toolCallId": {
+              "maxLength": 200,
+              "type": "string",
+            },
+            "toolUses": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "type": {
+              "enum": [
+                "agent",
+                "shell",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "taskId",
+            "type",
+            "description",
+            "status",
+            "startedAt",
+          ],
+          "type": "object",
+        },
+        "type": {
+          "const": "bg_task",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "task",
       ],
       "type": "object",
     },

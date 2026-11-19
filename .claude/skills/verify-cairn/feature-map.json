@@ -708,7 +708,8 @@
           "/api/teams/:id/chief/threads/:tid/messages/:mid/steer",
           "/api/todos/:id/messages",
           "/api/todos/:id/stop-and-done",
-          "/api/builds/:id/stop"
+          "/api/builds/:id/stop",
+          "/api/builds/:id/tasks/:taskId/stop"
         ]
       },
       "reach": [

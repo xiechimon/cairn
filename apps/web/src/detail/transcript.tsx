@@ -22,6 +22,7 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Clock } from '../icons/index.js';
 import { inlineSegments } from '../lib/markdown.js';
+import { BackgroundTasks } from './background-tasks.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, TaskCard } from './chat-markdown.js';
 import { failFactsText } from './fail-facts.js';
 import { Segments } from './segments.js';
@@ -317,10 +318,15 @@ function Row({
               state: it.state,
               segments: inlineSegments(it.text),
               blocks: [],
+              ...(it.state === 'doing' && item.backgroundRunning !== undefined
+                ? { note: t('{n} 个后台任务进行中', { n: item.backgroundRunning }) }
+                : {}),
             }))}
           />
         </div>
       );
+    case 'bg-tasks':
+      return <BackgroundTasks item={item} t={t} />;
     case 'fail':
       return <FailRow item={item} margin={margin} t={t} />;
     case 'streaming':

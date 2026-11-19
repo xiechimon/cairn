@@ -48,6 +48,7 @@ describe('machines.ts facade', () => {
       'recoverSteps',
       'reportActivity',
       'reportAgentTodo',
+      'reportBackgroundTask',
       'reportThinkingDelta',
       'reportTool',
       'reportTranscriptDelta',

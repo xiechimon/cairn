@@ -66,7 +66,10 @@ function fakeCli(script: (cli: Cli) => Promise<void>): string[] {
         wake = null;
       }
     })();
-    return Object.assign(messages, { interrupt: vi.fn(async () => {}) }) as unknown as Query;
+    return Object.assign(messages, {
+      interrupt: vi.fn(async () => {}),
+      stopTask: vi.fn(async () => {}),
+    }) as unknown as Query;
   });
   return prompts;
 }
@@ -272,4 +275,58 @@ test('a subagent that never finishes releases the turn after the wait limit', as
   const waits = waitCalls(events);
   expect(waits).toHaveLength(2);
   expect(String(waits[1]?.result)).toContain('stuck survey');
+});
+
+test('background rows are reported as they change, and a shell still running when the step ends is orphaned before done', async () => {
+  fakeCli(async (cli) => {
+    await cli.nextPrompt();
+    cli.emit({ ...started('bash-1', 'local_bash', 'npm run dev'), tool_use_id: 'toolu_bash' });
+    cli.emit({
+      type: 'system',
+      subtype: 'task_progress',
+      task_id: 'bash-1',
+      usage: { total_tokens: 0, tool_uses: 0, duration_ms: 5 },
+      session_id: 's1',
+    });
+    cli.emit(assistant('Dev server is up.'));
+    cli.emit(result);
+  });
+  const events = await run();
+  const rows = events.flatMap((event, index) =>
+    event.type === 'bg_task'
+      ? [{ index, status: event.task.status, call: event.task.toolCallId }]
+      : [],
+  );
+  const done = events.findIndex((event) => event.type === 'done');
+  expect(rows.map((row) => row.status)).toEqual(['running', 'running', 'orphaned']);
+  expect(rows.every((row) => row.call === 'toolu_bash')).toBe(true);
+  expect(rows[2]?.index).toBeLessThan(done);
+});
+
+test('stopping one background task asks the CLI to stop that task; stopping the run marks the rest stopped', async () => {
+  fakeCli(async (cli) => {
+    await cli.nextPrompt();
+    cli.emit(started('agent-1', 'local_agent', 'Survey ops docs'));
+    await new Promise(() => {});
+  });
+  const handle = await createClaudeCodeBackend({}).createSession({
+    provider: { kind: 'http', providerId: 'fake-claude' },
+    modelId: 'fake-model',
+    cwd: '/tmp',
+    prompt: 'Survey.',
+  });
+  const events: StepEvent[] = [];
+  const drained = (async () => {
+    for await (const event of handle.events) events.push(event);
+  })();
+  await vi.waitFor(() => expect(events.some((event) => event.type === 'bg_task')).toBe(true));
+  await handle.stopTask?.('agent-1');
+  const q = vi.mocked(query).mock.results[0]?.value as Query;
+  expect(q.stopTask).toHaveBeenCalledWith('agent-1');
+  await handle.stop();
+  await drained;
+  expect(events.flatMap((event) => (event.type === 'bg_task' ? [event.task.status] : []))).toEqual([
+    'running',
+    'stopped',
+  ]);
 });

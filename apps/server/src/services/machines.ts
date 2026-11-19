@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
 import type {
   AgentTodoReport,
+  BackgroundTask,
   ClaudeCodeReport,
   MachineAttachmentResponse,
   MachineCapabilities,
@@ -15,6 +16,7 @@ import type {
   TranscriptRow,
 } from '@cairn/shared';
 import {
+  backgroundTaskMessageId,
   claudeLoginSchema,
   confinementEnforced,
   isActiveStepStatus,
@@ -621,6 +623,33 @@ export function reportTool(
     role: 'assistant' as const,
     content: { kind: 'toolcall', call },
     createdAt: call.endedAt ?? nowMs(),
+  };
+  if (isChiefConversation(row.buildId)) {
+    upsertChiefRow(deps, { ...messageRow, threadId: row.buildId });
+    return;
+  }
+  upsertMessage(deps, { ...messageRow, conversationId: row.buildId });
+}
+
+export function reportBackgroundTask(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+  task: BackgroundTask,
+): void {
+  const row = ownedStep(deps, machineId, stepId);
+  markProgress(deps, row);
+  const messageRow = {
+    id: backgroundTaskMessageId(row.id, task.taskId),
+    role: 'assistant' as const,
+    content: {
+      kind: 'bg_task',
+      task:
+        row.status !== 'claimed' && task.status === 'running'
+          ? { ...task, status: 'orphaned', endedAt: nowMs() }
+          : task,
+    },
+    createdAt: task.startedAt,
   };
   if (isChiefConversation(row.buildId)) {
     upsertChiefRow(deps, { ...messageRow, threadId: row.buildId });

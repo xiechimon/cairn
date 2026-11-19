@@ -26,6 +26,7 @@ import {
   listSteps,
   planAutoApproveAt,
   readSteerPending,
+  requestBackgroundTaskStop,
   requestMerge,
   requestStop,
   startBuilds,
@@ -203,6 +204,13 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     });
     if (!result.delegated) await drainTaskMessageQueue(svc, c.req.param('id'));
     return c.json(result, result.delegated ? 202 : 200);
+  });
+
+  app.post('/api/builds/:id/tasks/:taskId/stop', (c) => {
+    const id = c.req.param('id');
+    if (!getBuild(svc, id)) throw notFound(`build ${id}`);
+    requestBackgroundTaskStop(svc, id, c.req.param('taskId'));
+    return c.json({ ok: true as const }, 202);
   });
 
   app.get('/api/builds/:id/plans', (c) => {

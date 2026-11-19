@@ -316,6 +316,59 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
     expect(state.usage).toEqual([]);
   });
 
+  test('sub-agent frames keep only their tool calls, tagged with the spawning call; their text never reaches the main agent', () => {
+    const sub = { parent_tool_use_id: 'toolu_spawn' };
+    const { events } = feed([
+      { ...TEXT_DELTA, ...sub } as SDKMessage,
+      { ...THINKING_DELTA, ...sub } as SDKMessage,
+      {
+        type: 'assistant',
+        ...sub,
+        message: {
+          id: 'msg_sub',
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'sub thinks' },
+            { type: 'text', text: 'sub says' },
+            { type: 'tool_use', id: 'toolu_child', name: 'Bash', input: { command: 'ls' } },
+          ],
+        },
+      } as unknown as SDKMessage,
+      {
+        type: 'user',
+        ...sub,
+        message: {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'toolu_child', content: 'a\nb' }],
+        },
+      } as unknown as SDKMessage,
+      TEXT_DELTA,
+    ]);
+    expect(events).toEqual([
+      {
+        type: 'toolcall_end',
+        call: {
+          id: 'toolu_child',
+          name: 'Bash',
+          arguments: { command: 'ls' },
+          parent: 'toolu_spawn',
+        },
+      },
+      {
+        type: 'toolcall_end',
+        call: {
+          id: 'toolu_child',
+          name: 'Bash',
+          arguments: { command: 'ls' },
+          parent: 'toolu_spawn',
+          result: 'a\nb',
+          isError: false,
+        },
+      },
+      { type: 'text_delta', text: '方案' },
+    ]);
+  });
+
   test('the usage row carries the last top-level request as contextTokens, so the composer context ring has data', () => {
     const call = (
       id: string,

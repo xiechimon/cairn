@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { agentTodoItemSchema } from './agent-todo.js';
+import { backgroundTaskSchema } from './background-task.js';
 import type { BriefBackendId } from './brief-file.js';
 import type { StepOtelContext } from './otel.js';
 import type { ClaudeRateLimitNotice } from './records/claude-rate-limit.js';
@@ -121,6 +122,7 @@ export const stepEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('auto_retry_end'), attempt: z.number().int() }),
   z.object({ type: z.literal('steer'), text: z.string() }),
   z.object({ type: z.literal('usage'), usage: agentTokenUsageSchema }),
+  z.object({ type: z.literal('bg_task'), task: backgroundTaskSchema }),
   z.object({ type: z.literal('done'), usage: agentTokenUsageSchema }),
   z.object({
     type: z.literal('error'),
@@ -188,6 +190,7 @@ export interface AgentSessionHandle {
   readonly events: AsyncIterable<StepEvent>;
   steer(text: string, images?: readonly DeliveredImage[]): Promise<void>;
   stop(): Promise<void>;
+  stopTask?(taskId: string): Promise<void>;
   usage(): AgentTokenUsage;
 }
 

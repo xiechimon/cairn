@@ -42,6 +42,7 @@ test.each(['fresh', 'upgrade'])(
       expect(
         sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name").all(),
       ).toEqual([
+        { name: 'step_bg_task_orphan_on_release' },
         { name: 'step_git_key_revoke_on_delete' },
         { name: 'step_git_key_revoke_on_release' },
       ]);
