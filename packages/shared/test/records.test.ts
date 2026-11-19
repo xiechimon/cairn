@@ -238,6 +238,11 @@ describe('schedule record (r3 §8.3 measured verbatim)', () => {
     lastRunAt: null,
     lastRunStatus: null,
     pausedReason: null,
+    triggerSpec: null,
+    webhookMasked: null,
+    webhookLastUsedAt: null,
+    missedRunWindowMs: null,
+    createdAt: 1758260000000,
     createdBy: 'usr_mon',
     todo: {
       seqNum: 1,
@@ -257,6 +262,26 @@ describe('schedule record (r3 §8.3 measured verbatim)', () => {
       expect(scheduleRecordSchema.safeParse({ ...sample, kind }).success).toBe(true);
     }
     expect(scheduleRecordSchema.safeParse({ ...sample, kind: 'minutely' }).success).toBe(false);
+  });
+
+  it('parses the observed event and webhook records (seq 31)', () => {
+    const event = {
+      ...sample,
+      kind: 'event',
+      at: null,
+      nextRunAt: null,
+      triggerSpec: { topic: 'todo.build.completed' },
+    };
+    expect(scheduleRecordSchema.parse(event)).toEqual(event);
+    const webhook = {
+      ...sample,
+      kind: 'webhook',
+      at: null,
+      nextRunAt: null,
+      webhookMasked: 'cairn-wh-c42…1923',
+      webhookLastUsedAt: 1758263500000,
+    };
+    expect(scheduleRecordSchema.parse(webhook)).toEqual(webhook);
   });
 });
 

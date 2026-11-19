@@ -185,7 +185,9 @@ test('schedule row `更多` opens a menu and its delete asks through the confirm
   page,
 }) => {
   await page.goto('/app?scenario=r3-93&pane=tasks&tab=scheduled');
-  const frame = page.locator('[data-slot="schedule-row-frame"]');
+  const frame = page.locator('[data-slot="schedule-row-frame"]', {
+    hasText: 'r3 lifecycle probe2',
+  });
   await expect(frame).toHaveCount(1);
   const more = frame.getByTestId('schedule-row-menu-button');
   await frame.hover();
