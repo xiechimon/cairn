@@ -254,3 +254,17 @@ for (const theme of ['light', 'dark'] as const) {
     expect(violations.map((v) => `${v.id}: ${v.nodes[0]?.target.join(' ')}`)).toEqual([]);
   });
 }
+
+test('a row that appears while the run plays keeps its enter animation through later renders', async ({ page }) => {
+  await open(page, 'running');
+  const player = page.getByTestId('engine-player');
+  await player.getByRole('button', { name: '重来' }).click();
+  await expect(player).toContainText('事件 1 / 8');
+  const work = transcript(page).locator('[data-message-id="engine-work-end"]');
+  await expect(work).toHaveCount(0);
+  await player.getByRole('button', { name: '下一步' }).click();
+  await expect(work).toHaveClass(/\brow-enter\b/);
+  await player.getByRole('button', { name: '下一步' }).click();
+  await expect(player).toContainText('事件 3 / 8');
+  await expect(work).toHaveClass(/\brow-enter\b/);
+});

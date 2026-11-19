@@ -41,6 +41,7 @@ function render(overrides: {
   agentTodo?: AgentTodo | null;
   pageTodo?: AgentTodoItem[] | null;
   build?: BuildRecord | null;
+  liveText?: string;
 }): TranscriptItem[] {
   return mapTranscript({
     messages: overrides.messages ?? [],
@@ -49,7 +50,7 @@ function render(overrides: {
     todo: todo(9, 'building') as TodoRecord,
     machineName: null,
     userName: 'Xmon Dai',
-    liveText: '',
+    liveText: overrides.liveText ?? '',
     ...(overrides.agentTodo !== undefined ? { agentTodo: overrides.agentTodo } : {}),
     ...(overrides.pageTodo !== undefined ? { pageTodo: overrides.pageTodo } : {}),
   });
@@ -226,7 +227,7 @@ describe('mapTranscript agent todo list (#1524)', () => {
     ]);
   });
 
-  test('a running turn is one running work block with the agent-todo right below it', () => {
+  test('a running turn is one running work block with the agent-todo right above it', () => {
     const settledCall: MessageRow = {
       id: 'm-read',
       role: 'assistant',
@@ -263,7 +264,7 @@ describe('mapTranscript agent todo list (#1524)', () => {
     expect(works).toHaveLength(1);
     expect(works[0]?.running).toBe(true);
     const workAt = items.findIndex((i) => i.kind === 'work');
-    expect(items[workAt + 1]?.kind).toBe('agent-todo');
+    expect(items[workAt - 1]?.kind).toBe('agent-todo');
     expect(items.some((i) => i.kind === 'streaming')).toBe(false);
   });
 });
@@ -288,6 +289,28 @@ describe('mapTranscript running turn (Claude Code parity, mon X 2026-11-19)', ()
       expect.objectContaining({ running: true }),
     ]);
     expect(items.some((i) => i.kind === 'streaming')).toBe(false);
+  });
+
+  test('prose after a call stays inside the running block, persisted or streaming', () => {
+    const persisted = render({
+      messages: [
+        read('a', NOW - 20_000),
+        { id: 'mid', role: 'assistant', createdAt: NOW - 15_000, content: '读完 a，再看看 b。' },
+      ],
+      steps: [runningStep('s1')],
+      liveText: '先看 b 的导出',
+    });
+    expect(persisted.some((i) => i.kind === 'robot')).toBe(false);
+    const work = persisted.find((i) => i.kind === 'work');
+    expect(work?.kind === 'work' && work.running).toBe(true);
+    expect(work?.kind === 'work' && work.steps.map((s) => s.kind)).toEqual(['call', 'say', 'say']);
+    expect(persisted.some((i) => i.kind === 'streaming')).toBe(false);
+  });
+
+  test('streaming text before the first call of the step stays prose', () => {
+    const items = render({ steps: [runningStep('s1')], liveText: '我按这三步来。' });
+    expect(items.some((i) => i.kind === 'robot')).toBe(true);
+    expect(items.some((i) => i.kind === 'work')).toBe(false);
   });
 
   test('the narration before the first call stays prose above the work block', () => {

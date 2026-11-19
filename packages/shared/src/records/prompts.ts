@@ -234,7 +234,7 @@ export function transcriptPromptRowId(stepId: string): string {
 
 export const SESSION_BRIEF = [
   'You own this task end to end in one session. Work in this order:',
-  '1. Plan: read the task and the code it touches, then write a short plan in your own notes (what changes, which edge cases, how you will check it). Do not wait for approval; decide from the repository and state the assumptions you made.',
+  '1. Plan: read the task and the code it touches, then post the plan as a Markdown checklist, one `- [ ]` line per step (what changes, which edge cases, how you will check it), before your first change; each time a step starts or finishes, post the whole checklist again with `- [~]` on the step in progress and `- [x]` on finished steps. Do not wait for approval; decide from the repository and state the assumptions you made.',
   '2. Write tests first: add or update tests that fail for the right reason before you change behavior.',
   '3. Implement: make the smallest change that passes the tests, commit on the work branch and push as your instructions say.',
   '4. Self-check with evidence: run the checks named in the task and the project instructions, run the new tests, and exercise the changed behavior the way a user would. Quote the commands and their results in your final message; do not claim a check you did not run.',

@@ -270,6 +270,11 @@ function rowProject(row: MessageRow): { projectId?: string | null } {
   return row.projectId === undefined ? {} : { projectId: row.projectId };
 }
 
+function lastWorkAt(items: readonly TranscriptItem[]): number | null {
+  const last = items.at(-1);
+  return last?.kind === 'work' ? (last.createdAt ?? Number.NEGATIVE_INFINITY) : null;
+}
+
 const CD_PREFIX = /^cd\s+(?:"[^"]*"|'[^']*'|\S+)\s*(?:&&|;)\s*/;
 
 export function shownTaskTitle(title: string, ownerWords?: string): string {
@@ -896,6 +901,9 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     ? (messages[0]?.createdAt ?? Number.POSITIVE_INFINITY)
     : Number.NEGATIVE_INFINITY;
   const loaded = entries.filter((entry) => entry.at >= loadedFrom).sort((a, b) => a.at - b.at);
+  const running = steps.find(
+    (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
+  );
   const items: TranscriptItem[] = [...head];
   const workAhead: boolean[] = [];
   for (let index = loaded.length - 1, ahead = false; index >= 0; index--) {
@@ -910,8 +918,11 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     if (
       entry.item.kind === 'robot' &&
       entry.item.markdown !== undefined &&
-      workAhead[index] === true &&
-      items.at(-1)?.kind === 'work'
+      lastWorkAt(items) !== null &&
+      (workAhead[index] === true ||
+        (running !== undefined &&
+          entry.at >= running.createdAt &&
+          (lastWorkAt(items) ?? Number.NEGATIVE_INFINITY) >= running.createdAt))
     ) {
       const id = entry.item.id ?? `say-${entry.at}`;
       const say: WorkStep = { kind: 'say', id, text: entry.item.markdown };
@@ -956,9 +967,6 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   const persistedTodo =
     todoSnapshots.sort((a, b) => a.at - b.at || a.order - b.order).at(-1)?.items ??
     (pageTodo !== null && pageTodo.length > 0 ? pageTodo : null);
-  const running = steps.find(
-    (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
-  );
   const liveReply: TranscriptItem | null =
     liveText.trim() === ''
       ? null
@@ -979,9 +987,18 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       if (previous?.kind === 'work') previous.steps.push(step);
       else items.push({ kind: 'work', id: step.id, steps: [step] });
     }
+    const sayTail = items.at(-1);
+    const turnWork =
+      sayTail?.kind === 'work' &&
+      (sayTail.createdAt ?? Number.NEGATIVE_INFINITY) >= running.createdAt
+        ? sayTail
+        : null;
+    const shownReply = turnWork !== null ? null : liveReply;
+    if (liveReply !== null && turnWork !== null)
+      turnWork.steps.push({ kind: 'say', id: 'live-say', text: liveText });
     const tailWork = items.at(-1);
     const hasActiveTailWork =
-      liveReply === null &&
+      shownReply === null &&
       tailWork?.kind === 'work' &&
       (tailWork.steps.some(
         (step) =>
@@ -994,11 +1011,15 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       tailWork.startedAt = running.createdAt;
       if (runOutput !== null) tailWork.outputTokens = runOutput;
     }
-    if (liveReply !== null) items.push(liveReply);
+    if (shownReply !== null) items.push(shownReply);
     const liveTodo = agentTodo != null && agentTodo.stepId === running.id ? agentTodo : null;
     const shownTodo = liveTodo?.items ?? persistedTodo;
     if (shownTodo !== null && shownTodo.length > 0) {
-      items.push({ kind: 'agent-todo', id: 'agent-todo', items: shownTodo });
+      const todoRow: TranscriptItem = { kind: 'agent-todo', id: 'agent-todo', items: shownTodo };
+      const anchor = turnWork ?? (hasActiveTailWork ? tailWork : null);
+      const workAt = anchor == null ? -1 : items.indexOf(anchor);
+      if (workAt === -1) items.push(todoRow);
+      else items.splice(workAt, 0, todoRow);
     }
     const actLabel = act != null && !stopping ? activityLabel(act) : null;
     const queued =
@@ -1022,7 +1043,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
             ? queued.label
             : quota != null
               ? quota.label
-              : liveReply !== null && !stopping
+              : shownReply !== null && !stopping
                 ? ''
                 : actLabel != null
                   ? actLabel.label
@@ -1035,7 +1056,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
           ? { labelVars: queued.vars }
           : quota != null
             ? { labelVars: quota.vars }
-            : actLabel?.vars !== undefined && liveReply === null
+            : actLabel?.vars !== undefined && shownReply === null
               ? { labelVars: actLabel.vars }
               : {}),
       });

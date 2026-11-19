@@ -633,6 +633,27 @@ function verifyCopyText(item: Extract<TranscriptItem, { kind: 'verify' }>): stri
   ].join('\n');
 }
 
+function EnteringItem({
+  enter,
+  messageId,
+  children,
+}: {
+  enter: boolean;
+  messageId: string | undefined;
+  children: ReactNode;
+}) {
+  const [entered] = useState(enter);
+  return (
+    <MessageScrollerItem
+      messageId={messageId}
+      style={SCROLLER_ITEM_STYLE}
+      className={entered ? 'row-enter' : undefined}
+    >
+      {children}
+    </MessageScrollerItem>
+  );
+}
+
 export function Transcript({ transcript, result }: TranscriptProps) {
   const { t } = useI18n();
   const previous = useRef<{ live: boolean; ids: Set<string> }>({ live: false, ids: new Set() });
@@ -654,8 +675,16 @@ export function Transcript({ transcript, result }: TranscriptProps) {
         entering.add(step.id);
     }
   }
+  const rowIds = new Set(
+    transcript.flatMap((item) => ('id' in item && item.id != null ? [item.id] : [])),
+  );
+  const seenRows = useRef<Set<string> | null>(null);
+  const enteringRows = new Set(
+    seenRows.current === null ? [] : [...rowIds].filter((id) => !seenRows.current?.has(id)),
+  );
   useEffect(() => {
     previous.current = { live, ids };
+    seenRows.current = rowIds;
   });
   const lastUserId =
     transcript
@@ -676,7 +705,11 @@ export function Transcript({ transcript, result }: TranscriptProps) {
     const id =
       ('id' in item ? item.id : undefined) ?? (item.kind === 'user' ? `user-${index}` : undefined);
     return (
-      <MessageScrollerItem key={id ?? index} messageId={id} style={SCROLLER_ITEM_STYLE}>
+      <EnteringItem
+        key={id ?? index}
+        messageId={id}
+        enter={id !== undefined && enteringRows.has(id)}
+      >
         <Row
           item={item}
           prev={transcript[index - 1]}
@@ -685,7 +718,7 @@ export function Transcript({ transcript, result }: TranscriptProps) {
           entering={entering}
           enteringUser={enteringUser}
         />
-      </MessageScrollerItem>
+      </EnteringItem>
     );
   });
 

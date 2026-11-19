@@ -131,7 +131,12 @@ export function TraceGroupSummary({
         </span>
       )}
       <span className="min-w-0 truncate" data-trace-summary="" title={summaryTitle}>
-        <span className={cn(running && 'shimmer motion-reduce:shimmer-none')}>{summary}</span>
+        <span
+          key={running ? summaryTitle : undefined}
+          className={cn(running && 'text-swap shimmer motion-reduce:shimmer-none')}
+        >
+          {summary}
+        </span>
       </span>
       {failed != null && (
         <span className="-ml-1 flex-none text-destructive" data-trace-failed="">
