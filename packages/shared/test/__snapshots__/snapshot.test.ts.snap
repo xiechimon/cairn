@@ -5976,6 +5976,11 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
           ],
           "type": "string",
         },
+        "missedRunWindowMs": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
+        },
         "projectId": {
           "type": "string",
         },
@@ -5984,6 +5989,9 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
         },
         "todoId": {
           "type": "string",
+        },
+        "triggerSpec": {
+          "not": {},
         },
         "tz": {
           "type": "string",
@@ -6013,6 +6021,11 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
           "const": "cron",
           "type": "string",
         },
+        "missedRunWindowMs": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
+        },
         "projectId": {
           "type": "string",
         },
@@ -6022,6 +6035,9 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
         "todoId": {
           "type": "string",
         },
+        "triggerSpec": {
+          "not": {},
+        },
         "tz": {
           "type": "string",
         },
@@ -6030,6 +6046,105 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
         "todoId",
         "kind",
         "cron",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "null",
+        },
+        "cron": {
+          "not": {},
+        },
+        "enabled": {
+          "type": "boolean",
+        },
+        "kind": {
+          "const": "event",
+          "type": "string",
+        },
+        "missedRunWindowMs": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
+        },
+        "projectId": {
+          "type": "string",
+        },
+        "prompt": {
+          "type": "string",
+        },
+        "todoId": {
+          "type": "string",
+        },
+        "triggerSpec": {
+          "additionalProperties": false,
+          "properties": {
+            "topic": {
+              "enum": [
+                "todo.build.completed",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "topic",
+          ],
+          "type": "object",
+        },
+        "tz": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "todoId",
+        "kind",
+        "triggerSpec",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "null",
+        },
+        "cron": {
+          "not": {},
+        },
+        "enabled": {
+          "type": "boolean",
+        },
+        "kind": {
+          "const": "webhook",
+          "type": "string",
+        },
+        "missedRunWindowMs": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
+        },
+        "projectId": {
+          "type": "string",
+        },
+        "prompt": {
+          "type": "string",
+        },
+        "todoId": {
+          "type": "string",
+        },
+        "triggerSpec": {
+          "not": {},
+        },
+        "tz": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "todoId",
+        "kind",
       ],
       "type": "object",
     },
@@ -10520,6 +10635,10 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     ],
   },
   {
+    "method": "POST",
+    "path": "/api/webhook/schedule/{token}",
+  },
+  {
     "method": "GET",
     "note": "spec 13 #367：每次请求现扫本地技能目录，无缓存不入库",
     "path": "/api/skills",
@@ -12989,6 +13108,18 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
         },
       ],
     },
+    "createdAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "createdBy": {
       "type": "string",
     },
@@ -13011,6 +13142,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
         "daily",
         "weekly",
         "cron",
+        "event",
+        "webhook",
       ],
       "type": "string",
     },
@@ -13036,6 +13169,18 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
       "type": [
         "string",
         "null",
+      ],
+    },
+    "missedRunWindowMs": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
     "nextRunAt": {
@@ -13110,8 +13255,48 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
     "todoId": {
       "type": "string",
     },
+    "triggerSpec": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "topic": {
+              "enum": [
+                "todo.build.completed",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "topic",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "tz": {
       "type": "string",
+    },
+    "webhookLastUsedAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "webhookMasked": {
+      "type": [
+        "string",
+        "null",
+      ],
     },
   },
   "required": [
@@ -13129,6 +13314,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
     "lastRunAt",
     "lastRunStatus",
     "pausedReason",
+    "triggerSpec",
+    "webhookMasked",
+    "webhookLastUsedAt",
+    "missedRunWindowMs",
+    "createdAt",
     "createdBy",
     "todo",
   ],
