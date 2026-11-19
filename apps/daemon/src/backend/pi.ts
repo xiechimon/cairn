@@ -21,6 +21,7 @@ import type {
 } from '@cairn/shared';
 import {
   classifyStepFailure,
+  createThinkingBindingGuard,
   ENV_VARS,
   LANGFUSE_ATTR,
   observationAttributes,
@@ -1015,9 +1016,21 @@ export class PiBackend implements AgentBackend {
           )
         : undefined;
     const streamSimple = runtime.streamSimple.bind(runtime);
+    const binding = createThinkingBindingGuard();
     runtime.streamSimple = (requestModel, context, options) => {
       const at = Date.now();
       const summary = options?.cacheRetention === 'none';
+      const onPayload = options?.onPayload;
+      const guarded =
+        summary || requestModel.api !== 'anthropic-messages'
+          ? options
+          : {
+              ...options,
+              onPayload: async (payload: unknown, payloadModel: typeof requestModel) => {
+                const replaced = (await onPayload?.(payload, payloadModel)) ?? payload;
+                return binding.apply(`${payloadModel.provider}/${payloadModel.id}`, replaced);
+              },
+            };
       const input =
         spans === undefined || summary
           ? undefined
@@ -1030,7 +1043,7 @@ export class PiBackend implements AgentBackend {
                 })),
               ),
             })[LANGFUSE_ATTR.input];
-      const stream = streamSimple(requestModel, context, { ...options, fetch: ceilingFetch });
+      const stream = streamSimple(requestModel, context, { ...guarded, fetch: ceilingFetch });
       if (spans !== undefined && requestModel.api !== 'pi-virtual') {
         void stream.result().then((message) => {
           spans.chat(at, {
