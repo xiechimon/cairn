@@ -31,7 +31,6 @@ async function open(page: Page, world: World) {
             userId: 'u1',
             teamId: 't1',
             agent: world.bound ? { agentId: 'agent-1' } : null,
-            charter: null,
             lastTurnAt: null,
             createdAt: 0,
             tz: null,

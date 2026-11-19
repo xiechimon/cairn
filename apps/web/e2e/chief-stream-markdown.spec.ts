@@ -121,7 +121,6 @@ function mockChiefLiveApi(
             userId: 'u1',
             teamId: 't1',
             agent: { agentId: 'agent-1' },
-            charter: null,
             lastTurnAt: null,
             createdAt: 0,
             tz: null,

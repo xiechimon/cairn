@@ -98,7 +98,7 @@ function addThread(s: TestServer, id: string, userId: string) {
   const chiefId = `chief-${userId}-${s.team.id}`;
   s.db
     .insert(chiefTable)
-    .values({ id: chiefId, userId, teamId: s.team.id, charter: '', createdAt: 1 })
+    .values({ id: chiefId, userId, teamId: s.team.id, createdAt: 1 })
     .onConflictDoNothing()
     .run();
   s.db

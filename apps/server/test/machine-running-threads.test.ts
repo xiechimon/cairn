@@ -270,7 +270,6 @@ describe('G3 running threads on a machine', () => {
         id: chiefId,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        charter: '',
         createdAt: now,
       })
       .run();

@@ -141,7 +141,6 @@ function insertChief(s: TestServer, machineId: string, provider: string): string
       id: chiefId,
       userId: s.svc.user.id,
       teamId: s.team.id,
-      charter: '',
       createdAt: 1,
     })
     .run();

@@ -157,7 +157,6 @@ function insertPendingChiefStep(s: TestServer, opts: { createdAt?: number } = {}
         id: `chief-${s.svc.user.id}-${s.team.id}`,
         userId: s.svc.user.id,
         teamId: s.team.id,
-        charter: '',
         createdAt: now,
       })
       .run();

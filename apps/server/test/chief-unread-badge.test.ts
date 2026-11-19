@@ -244,7 +244,6 @@ describe('idle chief unread sweep (#1303)', () => {
           id: chiefId,
           userId: s.user.id,
           teamId: s.team.id,
-          charter: '',
           watches: [],
           wakes: [],
           lastTurnAt: null,

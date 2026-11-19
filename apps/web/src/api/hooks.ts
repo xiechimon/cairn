@@ -66,7 +66,6 @@ import type {
   PairedDevice,
   PairingCodeResponse,
   PatchAutonomyBody,
-  PatchChiefBody,
   PatchMachineBody,
   PatchMcpConnectorBody,
   PatchMemoryBody,
@@ -1325,11 +1324,6 @@ export function useApiMutations(teamId: string | undefined) {
           `/api/teams/${teamId}/chief/threads/${input.threadId}/questions/${input.requestId}/cancel`,
           {},
         ),
-      onSuccess: invalidateAll,
-    }),
-    patchChief: useMutation({
-      mutationFn: (body: PatchChiefBody) =>
-        api.patch<ChiefGetResponse>(`/api/teams/${teamId}/chief`, body),
       onSuccess: invalidateAll,
     }),
     createProvider: useMutation({

@@ -99,7 +99,6 @@ export function seedChiefThread(): void {
       id: H.chiefId,
       userId: H.userId,
       teamId: H.teamId,
-      charter: '',
       watches: [],
       wakes: [],
       createdAt: now,

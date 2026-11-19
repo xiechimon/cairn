@@ -256,7 +256,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   },
   { method: 'POST', path: '/api/schedules' },
   { method: 'PATCH', path: '/api/teams/{id}/providers/{pid}' },
-  { method: 'PATCH', path: '/api/teams/{id}/chief', note: '绑定 Agent（r5 §2 抓包）' },
   {
     method: 'POST',
     path: '/api/teams/{id}/providers/oauth/{preset}/authorize',

@@ -157,7 +157,6 @@ async function mockLive(page: Page, opts: { projects?: typeof PROJECTS } = {}) {
           userId: 'u1',
           teamId: 't1',
           agent: { agentId: 'agent-1' },
-          charter: null,
           lastTurnAt: null,
           createdAt: 0,
           tz: null,

@@ -408,7 +408,6 @@ describe('#1251 claim capability gate', () => {
         id: chiefId,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        charter: '',
         createdAt: now,
       })
       .run();

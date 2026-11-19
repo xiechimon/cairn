@@ -301,7 +301,6 @@ describe('#1260 chief step delivery = coordinator rule home machine', () => {
         id: chiefId,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        charter: '',
         createdAt: Date.now(),
       })
       .run();

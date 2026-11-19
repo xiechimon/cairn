@@ -81,16 +81,6 @@ describe('composeWorkerSystemPrompt project instructions (D74 P1)', () => {
     expect(text?.indexOf('Never force push.')).toBeLessThan(text?.indexOf('remembered') ?? -1);
   });
 
-  it('adds the team charter before the project instructions, so the project can narrow it', () => {
-    const text = composeWorkerSystemPrompt('builder', undefined, {
-      charter: 'Read source before choosing a dependency.',
-      project: { name: 'cairn', instructions: 'Never force push.' },
-    });
-    expect(text).toContain('## 团队章程\nRead source before choosing a dependency.');
-    expect(text?.indexOf('## 团队章程')).toBeLessThan(text?.indexOf('## 项目说明') ?? -1);
-    expect(composeWorkerSystemPrompt(undefined, undefined, { charter: '' })).toBeUndefined();
-  });
-
   it('adds nothing when the project has no instructions', () => {
     expect(
       composeWorkerSystemPrompt(undefined, undefined, { project: { name: 'cairn' } }),

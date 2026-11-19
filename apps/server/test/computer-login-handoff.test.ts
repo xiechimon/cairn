@@ -82,7 +82,7 @@ function boot(authToken: string | null = null) {
   seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model', machineId: 'sidecar' });
   s.db
     .insert(chiefTable)
-    .values({ id: chiefId, userId: s.svc.user.id, teamId: s.team.id, charter: '', createdAt: 1 })
+    .values({ id: chiefId, userId: s.svc.user.id, teamId: s.team.id, createdAt: 1 })
     .onConflictDoNothing()
     .run();
   s.db

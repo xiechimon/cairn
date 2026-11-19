@@ -185,7 +185,6 @@ test.each([
       id: 'chief-availability',
       userId: w.s.user.id,
       teamId: w.s.team.id,
-      charter: '',
       createdAt: 2,
     })
     .run();

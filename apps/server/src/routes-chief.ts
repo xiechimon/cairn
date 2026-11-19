@@ -4,7 +4,6 @@ import {
   chiefRewindBodySchema,
   chiefSendMessageBodySchema,
   OWN_COMPUTER_ACTIONS,
-  patchChiefBodySchema,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -31,7 +30,6 @@ import {
   getChiefThread,
   listChiefThreads,
   openProjectChannel,
-  patchChief,
   retryProjectGreeting,
   rewindChiefThread,
   sendChiefMessageFromComposer,
@@ -86,13 +84,6 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const threadId = c.req.query('threadId');
     return c.json(getChiefEnvelope(svc, teamId, threadId));
-  });
-
-  app.patch('/api/teams/:id/chief', async (c) => {
-    const teamId = c.req.param('id');
-    requireTeam(ctx, teamId);
-    const body = parseWith(patchChiefBodySchema, await jsonBody(c), 'body');
-    return c.json(patchChief(svc, teamId, body));
   });
 
   app.get('/api/teams/:id/chief/threads', (c) => {

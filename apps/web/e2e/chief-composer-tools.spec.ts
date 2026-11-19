@@ -394,7 +394,6 @@ async function openChiefThread(page: Page) {
           userId: USER.id,
           teamId: TEAM_ID,
           agent: { agentId: 'agent-1' },
-          charter: null,
           lastTurnAt: null,
           createdAt: 0,
           tz: null,

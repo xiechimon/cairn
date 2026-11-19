@@ -25,7 +25,6 @@ import {
   orchestrationSourceRef,
   PROVIDER_PRESET_IDS,
   parseOrchestrationSourceRef,
-  patchChiefBodySchema,
   providerRecordSchema,
   scheduleRecordSchema,
   searchResponseSchema,
@@ -570,7 +569,6 @@ describe('chief (02 §4.3, r5 §2/§3 measured)', () => {
         userId: 'usr_mon',
         teamId: 'BoZYfvqKSGanlxsXVbXSa',
         agent: { agentId: 'TVv0DxUu3jTIhYpeWh6mn' },
-        charter: null,
         lastTurnAt: 1758532000000,
         createdAt: 1758531000000,
       },
@@ -602,7 +600,6 @@ describe('chief (02 §4.3, r5 §2/§3 measured)', () => {
         userId: 'usr_mon',
         teamId: 'BoZYfvqKSGanlxsXVbXSa',
         agent: { agentId: 'TVv0DxUu3jTIhYpeWh6mn' },
-        charter: null,
         lastTurnAt: 1758532000000,
         createdAt: 1758531000000,
       },
@@ -616,28 +613,6 @@ describe('chief (02 §4.3, r5 §2/§3 measured)', () => {
       },
     };
     expect(chiefGetResponseSchema.parse(sample)).toEqual(sample);
-  });
-
-  it('parses the PATCH chief body verbatim (r5 §2 capture; from #1260 thinkingLevel override keys stripped)', () => {
-    expect(
-      patchChiefBodySchema.parse({
-        agent: { agentId: 'TVv0DxUu3jTIhYpeWh6mn', thinkingLevel: null },
-      }),
-    ).toEqual({ agent: { agentId: 'TVv0DxUu3jTIhYpeWh6mn' } });
-  });
-
-  it('PATCH chief body retired slots (#1260): machineId/model/compactionModel stripped; a body with only retired slots is rejected by refine', () => {
-    expect(patchChiefBodySchema.parse({ charter: '常设指示' })).toEqual({ charter: '常设指示' });
-    expect(
-      patchChiefBodySchema.parse({
-        charter: 'x',
-        machineId: 'm-1',
-        model: { provider: 'pi', modelId: 'm' },
-      }),
-    ).toEqual({ charter: 'x' });
-    expect(patchChiefBodySchema.safeParse({ machineId: 'm-1' }).success).toBe(false);
-    expect(patchChiefBodySchema.safeParse({ compactionModel: null }).success).toBe(false);
-    expect(patchChiefBodySchema.safeParse({}).success).toBe(false);
   });
 });
 

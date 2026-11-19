@@ -11,7 +11,6 @@ import type {
   ChiefWakeKind,
   ChiefWatch,
   MachineDoneBody,
-  PatchChiefBody,
   Phase,
   ProjectRepoKind,
   ThreadReportContent,
@@ -166,7 +165,6 @@ export function ensureChief(deps: ChiefDeps, teamId: string): ChiefRow {
       id,
       userId: deps.user.id,
       teamId,
-      charter: '',
       watches: [],
       wakes: [],
       lastTurnAt: null,
@@ -185,7 +183,6 @@ function toChiefRecord(row: ChiefRow, profile: RouteProfile | null): ChiefGetRes
     userId: row.userId,
     teamId: row.teamId,
     agent: profile !== null ? { agentId: profile.id } : null,
-    charter: row.charter,
     lastTurnAt: row.lastTurnAt,
     createdAt: row.createdAt,
     tz: row.tz,
@@ -283,26 +280,6 @@ export function getChiefEnvelope(
     orchestration: chiefOrchestration(deps, teamId),
     outage: chiefOutage(deps.db, row.id),
   };
-}
-
-export function patchChief(
-  deps: ChiefDeps,
-  teamId: string,
-  body: PatchChiefBody,
-): ChiefGetResponse {
-  const row = ensureChief(deps, teamId);
-  const sets: Partial<ChiefRow> = {};
-  if (body.agent !== undefined) {
-    throw new HttpError(
-      410,
-      'Binding the Coordinator to an agent was removed under D60. Set the coordinator routing rule instead (PATCH /api/teams/:id/routing-rules/coordinator).',
-    );
-  }
-  if (body.charter !== undefined) sets.charter = body.charter ?? '';
-  if (Object.keys(sets).length > 0) {
-    deps.db.update(chief).set(sets).where(eq(chief.id, row.id)).run();
-  }
-  return getChiefEnvelope(deps, teamId);
 }
 
 export function chiefToolDefHashes(): Record<string, string> {
@@ -1905,7 +1882,7 @@ export function buildChiefSystemPrompt(
   teamId: string,
   threadId?: string,
 ): ChiefSystemPrompt {
-  const chiefRow = ensureChief(deps, teamId);
+  ensureChief(deps, teamId);
   const coordinator = coordinatorProfile(deps.db, teamId);
   const memoryOwner = coordinatorMemoryOwner(deps.db, teamId);
   const projects = deps.db.select().from(project).where(listedProjects(teamId)).all();
@@ -1932,9 +1909,6 @@ export function buildChiefSystemPrompt(
 
   const staticLines: string[] = [
     '你是「Coordinator」：每个「用户×团队」一个的路由与对话代理。你理解用户的请求，用 create_todo 建任务并自动启动一条 thread，再根据 thread 的状态回答用户。plan、写测试、实现、自检都由 thread 自己完成；你只路由，不写方案、不选模型、不亲手做事；唯一的例外是用户要你直接操作电脑，见「电脑操作」。',
-    '',
-    '## 章程',
-    chiefRow.charter !== '' ? chiefRow.charter : '（尚无章程）',
     '',
     '## 工作约定',
     '',

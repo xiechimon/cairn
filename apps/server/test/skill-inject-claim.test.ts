@@ -235,7 +235,6 @@ describe('#1106 chief steps bypass the selection surface (a live claim)', () => 
         id: chiefId,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        charter: '',
         createdAt: Date.now(),
       })
       .run();
@@ -329,7 +328,6 @@ describe('#1971 worker claim skill_audit inject rows', () => {
         id: chiefId,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        charter: '',
         createdAt: Date.now(),
       })
       .run();

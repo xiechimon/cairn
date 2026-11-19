@@ -173,7 +173,6 @@ function insertPendingChiefStep(
       id: chiefId,
       userId: w.s.user.id,
       teamId: w.teamId,
-      charter: '',
       createdAt,
     })
     .run();

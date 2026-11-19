@@ -50,7 +50,6 @@ async function setup() {
       id: chiefId,
       userId: s.svc.user.id,
       teamId: s.team.id,
-      charter: '',
       createdAt: 1,
     })
     .onConflictDoNothing()

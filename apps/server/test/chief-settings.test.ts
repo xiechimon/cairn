@@ -2,9 +2,7 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
-  agentMemory,
   chiefMessage,
-  chief as chiefTable,
   chiefThread,
   machine as machineTable,
   project as projectTable,
@@ -13,7 +11,6 @@ import {
 import {
   composeChiefSystemPrompt,
   getChiefEnvelope,
-  patchChief,
   sendChiefMessage,
 } from '../src/services/chief.js';
 import { AGENT_ID, AGENT2_ID, H, registerChiefHarness, relay } from './chief-harness.js';
@@ -21,8 +18,8 @@ import { issueApiKey, req, seedRoute } from './helpers.js';
 
 registerChiefHarness();
 
-describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
-  test('GET /chief envelope four fields map one-to-one to the 4 tabs (agent/charter/watches/wakes)', async () => {
+describe('chief envelope; PATCH /chief is gone', () => {
+  test('GET /chief envelope carries agent, watches and wakes, and no charter', async () => {
     const res = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief`);
     expect(res.status).toBe(200);
     const env = getChiefEnvelope(
@@ -31,65 +28,26 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     );
     expect(env.chief.agent).toEqual({ agentId: AGENT_ID });
     expect(env.agentActor?.id).toBe(AGENT_ID);
-    expect(typeof env.chief.charter).toBe('string');
+    expect('charter' in env.chief).toBe(false);
     expect(Array.isArray(env.watches)).toBe(true);
     expect(Array.isArray(env.wakes)).toBe(true);
     const wire = (await res.json()) as typeof env;
     expect(wire.chief.id).toBe(H.chiefId);
   });
 
-  test('PATCH /chief refuses binding an Agent: the Coordinator model is the coordinator routing rule (D60)', async () => {
-    await relay('save_memory', { scope: 'team', file: '旧记忆', content: '属于原 Agent' });
-    const res = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
-      agent: { agentId: AGENT2_ID, thinkingLevel: null },
-    });
-    expect(res.status).toBe(410);
-    const mems = H.s.db.select().from(agentMemory).all();
-    expect(mems.every((m) => m.agentId === AGENT_ID)).toBe(true);
-  });
-
-  test('PATCH /chief charter slot persisted (charter tab save surface [inferred])', async () => {
-    const res = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
-      charter: '模型路由：文档任务用 scribe。',
-    });
-    expect(res.status).toBe(200);
-    const env = (await res.json()) as { chief: { charter: string } };
-    expect(env.chief.charter).toContain('模型路由');
-    const patched = patchChief(
-      { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
-      H.teamId,
-      { charter: '' },
-    );
-    expect(patched.chief.charter).toBe('');
-  });
-
-  test('PATCH /chief no longer accepts retired slots (#903 dispatchWithPlan; #1260 machineId/model/compactionModel)', async () => {
-    type Env = { chief: Record<string, unknown> };
-    const lone = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
-      dispatchWithPlan: false,
-    });
-    expect(lone.status).toBe(400);
-    for (const retired of [
-      { machineId: 'm-x' },
+  test('PATCH /chief no longer exists: no charter, agent binding or retired slot is accepted', async () => {
+    for (const body of [
+      { charter: '章程' },
+      { agent: { agentId: AGENT2_ID } },
       { model: { provider: 'stub-gw', modelId: 'm-x' } },
-      { compactionModel: { provider: 'stub-gw', modelId: 'm-x' } },
     ]) {
-      const res = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, retired);
-      expect(res.status).toBe(400);
+      const res = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, body);
+      expect(res.status).toBe(404);
     }
-    const withCharter = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
-      charter: '章程照常',
-      dispatchWithPlan: false,
-    });
-    expect(withCharter.status).toBe(200);
-    const patched = (await withCharter.json()) as Env;
-    expect(patched.chief.charter).toBe('章程照常');
-    expect('dispatchWithPlan' in patched.chief).toBe(false);
-    const got = (await (await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief`)).json()) as Env;
-    expect('dispatchWithPlan' in got.chief).toBe(false);
-    expect('machineId' in got.chief).toBe(false);
-    expect('model' in got.chief).toBe(false);
-    expect('compactionModel' in got.chief).toBe(false);
+    const got = (await (await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief`)).json()) as {
+      chief: Record<string, unknown>;
+    };
+    expect('charter' in got.chief).toBe(false);
   });
 
   test('chief step claim payload always = the coordinator rule model (#1260 no inherited state)', async () => {
@@ -134,7 +92,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     const override = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
       model: { provider: 'stub-gw', modelId: 'm-override' },
     });
-    expect(override.status).toBe(400);
+    expect(override.status).toBe(404);
     H.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.status, 'claimed')).run();
     const send2 = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
       content: '覆盖已退役回合。',
@@ -195,17 +153,6 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(missing.status).toBe(404);
   });
 
-  test('PATCH /chief compactionModel bare string/missing field -> 400 (#203)', async () => {
-    const bare = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
-      compactionModel: 'm-fast',
-    });
-    expect(bare.status).toBe(400);
-    const partial = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
-      compactionModel: { provider: 'stub-gw' },
-    });
-    expect(partial.status).toBe(400);
-  });
-
   test('memory tab = the team shared storage (GET teams/{id}/memories)', async () => {
     await relay('save_memory', {
       scope: 'team',
@@ -218,12 +165,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(mems.some((m) => m.title === '共用记忆')).toBe(true);
   });
 
-  test('systemPrompt composition includes charter + resource list + memories (02 section 4.3 input contract)', () => {
-    H.s.db
-      .update(chiefTable)
-      .set({ charter: '优先文档 Agent' })
-      .where(eq(chiefTable.id, H.chiefId))
-      .run();
+  test('systemPrompt composition includes the resource list + memories and no charter section (02 section 4.3 input contract)', () => {
     const prompt = composeChiefSystemPrompt(
       {
         db: H.s.db,
@@ -234,7 +176,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
       },
       H.teamId,
     );
-    expect(prompt).toContain('优先文档 Agent');
+    expect(prompt).not.toContain('## 章程');
     expect(prompt).toContain('### 项目');
     expect(prompt).toContain('代码任务成功后就完成，分支和 PR 保留');
     expect(prompt).toContain('只有用户在对话里明确要求合并时才用 merge_builds 合并当前交付');
@@ -273,7 +215,6 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
       H.teamId,
     );
     const headings = [
-      '## 章程',
       '## 工作约定',
       '### 路由',
       '### 决策边界',
@@ -349,11 +290,5 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).not.toContain('withPlan:false');
     expect(prompt).not.toContain('dispatchReason');
     expect(prompt).not.toContain('派发模式（团队设置');
-
-    patchChief(deps, H.teamId, { charter: '用户自己的章程' });
-    const after = composeChiefSystemPrompt(deps, H.teamId);
-    expect(after).toContain('用户自己的章程');
-    expect(after).toContain('plan、写测试、实现、自检都由 thread 自己完成');
-    expect(after).not.toContain('withPlan:false');
   });
 });

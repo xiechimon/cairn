@@ -24,7 +24,6 @@ test('a final assistant reply renders two loaded screenshots and opens each in a
       userId: 'user-1',
       teamId: 'team-1',
       agent: null,
-      charter: null,
       lastTurnAt: null,
       createdAt: 0,
       tz: null,

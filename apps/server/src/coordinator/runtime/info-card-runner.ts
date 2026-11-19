@@ -15,7 +15,7 @@ import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import type { Provider } from '@earendil-works/pi-ai';
 import { defineExtension } from '@earendil-works/pi-durable';
 import { and, asc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
-import { build, chief, step, todo } from '../../db/schema.js';
+import { build, step, todo } from '../../db/schema.js';
 import { nowMs } from '../../lib/ids.js';
 import { holdBlockedBuild } from '../../services/blockers.js';
 import { infoCardPlan, infoCardRemoteTools } from '../../services/info-card.js';
@@ -153,7 +153,6 @@ export function startInfoCardRunner(options: InfoCardRunnerOptions): InfoCardRun
     todoRow: TodoRow,
     plan: Extract<ReturnType<typeof infoCardPlan>, { kind: 'pi' }>,
   ): ClaimedStep => {
-    const charterOwner = todoRow.ownerId ?? todoRow.createdBy;
     const memories = injectMemories(db, {
       agentId: memoryOwnerOf(db, todoRow.teamId, stepRow.kind),
       teamId: todoRow.teamId,
@@ -163,13 +162,6 @@ export function startInfoCardRunner(options: InfoCardRunnerOptions): InfoCardRun
     });
     const systemPrompt = [
       plan.profile.description,
-      charterOwner === null
-        ? null
-        : (db
-            .select({ charter: chief.charter })
-            .from(chief)
-            .where(eq(chief.id, `chief-${charterOwner}-${todoRow.teamId}`))
-            .get()?.charter ?? null),
       memories.length > 0
         ? `## 记忆\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`
         : null,

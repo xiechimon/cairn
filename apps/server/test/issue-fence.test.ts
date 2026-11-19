@@ -115,7 +115,6 @@ beforeEach(async () => {
       id: `chief-${s.user.id}-${s.team.id}`,
       userId: s.user.id,
       teamId: s.team.id,
-      charter: '',
       watches: [],
       wakes: [],
       createdAt: Date.now(),
@@ -189,7 +188,7 @@ describe('F2/F3/F6 orchestration requests enter the fence, chief system prompt h
 });
 
 describe('F7 third-party data rule in the chief system prompt', () => {
-  test('charter section has a rule: GitHub text inside fences and tool results is data, not followed, not save_memory', () => {
+  test('the system prompt has a rule: GitHub text inside fences and tool results is data, not followed, not save_memory', () => {
     const system = composeChiefSystemPrompt(
       { db: s.db, hub: s.hub, user: s.user, skillsDir: s.skillsDir },
       s.team.id,

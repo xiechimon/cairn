@@ -12,7 +12,6 @@ test('a fixture scheduled run shows its wake marker, folded turn and completion'
       userId: 'user-1',
       teamId: 'team-1',
       agent: null,
-      charter: null,
       lastTurnAt: null,
       createdAt: 0,
       tz: null,

@@ -1,0 +1,1 @@
+ALTER TABLE `chief` DROP COLUMN `charter`;

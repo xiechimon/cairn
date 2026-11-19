@@ -379,7 +379,6 @@ describe('a Coordinator turn after a switch', () => {
         id: 'chief-hold',
         userId: s.svc.user.id,
         teamId: s.team.id,
-        charter: '',
         createdAt: 1,
       })
       .run();

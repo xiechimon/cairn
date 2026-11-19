@@ -31,7 +31,6 @@ async function stubBoot(page: Page) {
           userId: USER.id,
           teamId: TEAM_ID,
           agent: null,
-          charter: '',
           lastTurnAt: null,
           createdAt: 0,
           tz: null,

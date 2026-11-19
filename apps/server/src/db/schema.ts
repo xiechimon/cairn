@@ -1067,7 +1067,6 @@ export const chief = sqliteTable('chief', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
-  charter: text('charter').notNull().default(''),
   watches: json<ChiefWatch[]>('watches').notNull().default(sql`'[]'`),
   wakes: json<Record<string, unknown>[]>('wakes').notNull().default(sql`'[]'`),
   lastTurnAt: epochMs('lastTurnAt'),

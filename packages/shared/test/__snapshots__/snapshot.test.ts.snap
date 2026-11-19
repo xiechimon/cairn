@@ -113,9 +113,6 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
-    "charter": {
-      "type": "string",
-    },
     "chief": {
       "additionalProperties": false,
       "properties": {
@@ -1200,9 +1197,6 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "type": "string",
               },
               "type": "array",
-            },
-            "charter": {
-              "type": "string",
             },
             "chief": {
               "additionalProperties": false,
@@ -6394,46 +6388,6 @@ exports[`body/envelope schema snapshots > notificationsResponse > notificationsR
 }
 `;
 
-exports[`body/envelope schema snapshots > patchChiefBody > patchChiefBody.json 1`] = `
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "agent": {
-      "anyOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "agentId": {
-              "type": "string",
-            },
-          },
-          "required": [
-            "agentId",
-          ],
-          "type": "object",
-        },
-        {
-          "type": "null",
-        },
-      ],
-    },
-    "charter": {
-      "anyOf": [
-        {
-          "maxLength": 16000,
-          "type": "string",
-        },
-        {
-          "type": "null",
-        },
-      ],
-    },
-  },
-  "type": "object",
-}
-`;
-
 exports[`body/envelope schema snapshots > planResponse > planResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -10796,11 +10750,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/teams/{id}/providers/{pid}",
   },
   {
-    "method": "PATCH",
-    "note": "绑定 Agent（r5 §2 抓包）",
-    "path": "/api/teams/{id}/chief",
-  },
-  {
     "method": "POST",
     "note": "#231 [设计]：签发授权 URL（state 入册，TTL 10min 单次核销）",
     "path": "/api/teams/{id}/providers/oauth/{preset}/authorize",
@@ -11225,12 +11174,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
         },
       ],
     },
-    "charter": {
-      "type": [
-        "string",
-        "null",
-      ],
-    },
     "createdAt": {
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
@@ -11269,7 +11212,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
     "userId",
     "teamId",
     "agent",
-    "charter",
     "lastTurnAt",
     "createdAt",
   ],

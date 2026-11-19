@@ -278,7 +278,6 @@ describe('#1108 queue projection (position + waiting target + read-surface mount
         id: `chief-${w.s.user.id}-${w.s.team.id}`,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        charter: '',
         createdAt: now,
       })
       .run();

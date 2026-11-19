@@ -154,7 +154,6 @@ export async function stubCoordinatorChief(page: Page, teamId: string, userId: s
           userId,
           teamId,
           agent: null,
-          charter: '',
           lastTurnAt: null,
           createdAt: 0,
           tz: null,

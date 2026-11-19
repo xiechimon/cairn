@@ -12,7 +12,6 @@ test('a completed task accepts a follow-up and shows its user bubble and running
       userId: 'user-1',
       teamId: 'team-1',
       agent: null,
-      charter: null,
       lastTurnAt: null,
       createdAt: 0,
       tz: null,

@@ -5,7 +5,6 @@ import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { stepQueueBlockedSchema } from './machine-capabilities.js';
 import { contextCacheSchema } from './token-usage.js';
-import { workerBriefTextSchema } from './worker-brief-text.js';
 
 export const chiefIdFormat = (userId: string, teamId: string) => `chief-${userId}-${teamId}`;
 
@@ -48,7 +47,6 @@ export const chiefRecordSchema = z.object({
   userId: recordId,
   teamId: recordId,
   agent: z.object({ agentId: recordId }).nullable(),
-  charter: z.string().nullable(),
   lastTurnAt: epochMs.nullable(),
   createdAt: epochMs,
   tz: z.string().nullable().optional(),
@@ -190,20 +188,6 @@ export const chiefThreadSchema = z.object({
 });
 export type ChiefThread = z.infer<typeof chiefThreadSchema>;
 
-export const patchChiefBodySchema = z
-  .object({
-    agent: z
-      .object({
-        agentId: recordId,
-      })
-      .nullish(),
-    charter: workerBriefTextSchema.nullish(),
-  })
-  .refine((b) => b.agent !== undefined || b.charter !== undefined, {
-    message: 'expected agent and/or charter',
-  });
-export type PatchChiefBody = z.infer<typeof patchChiefBodySchema>;
-
 export const chiefSendMessageBodySchema = z.object({
   threadId: z.string().nullable(),
   content: z.string().min(1),
@@ -260,11 +244,6 @@ export function chiefThreadTitle(firstMessage: string): string {
 
 export const CHIEF_REBIND_CONFIRM_COPY =
   '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。';
-
-export const CHIEF_SETTINGS_TABS = ['Agent', '章程', '记忆', '关注与提醒'] as const;
-
-export const CHIEF_WATCHES_EMPTY_COPY =
-  '暂无跟进事项。Coordinator 关注某个任务，或约定到点回头核实时，会按主题列在这里。';
 
 export const CHIEF_INPUT_PLACEHOLDER = '有什么可以帮你的？';
 export const CHIEF_INPUT_PLACEHOLDER_STEERING = '插进这一轮 · ⌘↵ 排队';

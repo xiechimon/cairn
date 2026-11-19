@@ -271,7 +271,6 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
       ['POST', '/api/teams/{id}/mcp-servers'],
       ['POST', '/api/schedules'],
       ['PATCH', '/api/teams/{id}/providers/{pid}'],
-      ['PATCH', '/api/teams/{id}/chief'],
     ] as const) {
       expect(has(method, path), `${method} ${path}`).toBe(true);
     }

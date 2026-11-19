@@ -74,7 +74,6 @@ async function setupWorld(
       id: chiefId,
       userId: s.svc.user.id,
       teamId: s.team.id,
-      charter: '',
       createdAt: 1,
     })
     .run();
@@ -314,16 +313,8 @@ describe('#1260 slot occupancy: chief steps are ordinary consumers of the machin
 });
 
 describe('#1260 retired-slot wire surface', () => {
-  test('failure mode 6: PATCH carrying only machineId/model/compactionModel -> 400; GET chief record has none of the three keys; orchestration.homeMachineId = coordinator rule home machine', async () => {
+  test('failure mode 6: GET chief record has no machineId/model/compactionModel; orchestration.homeMachineId = coordinator rule home machine', async () => {
     const w = await setupWorld();
-    for (const body of [
-      { machineId: w.machineBId },
-      { model: { provider: 'pi', modelId: 'x' } },
-      { compactionModel: { provider: 'pi', modelId: 'x' } },
-    ]) {
-      const res = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, body);
-      expect(res.status).toBe(400);
-    }
     const res = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/chief`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
@@ -333,14 +324,6 @@ describe('#1260 retired-slot wire surface', () => {
     expect('compactionModel' in chiefRec).toBe(false);
     const orch = body.orchestration as { homeMachineId: string | null };
     expect(orch.homeMachineId).toBe(w.machineAId);
-  });
-
-  test('PATCH binding an agent to the Coordinator answers 410 removed under D60', async () => {
-    const w = await setupWorld();
-    const res = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
-      agent: { agentId: 'any-agent' },
-    });
-    expect(res.status).toBe(410);
   });
 });
 

@@ -39,7 +39,6 @@ const ENV: ChiefGetResponse = {
     userId: 'u1',
     teamId: 't1',
     agent: { agentId: 'agent-1' },
-    charter: null,
     lastTurnAt: null,
     createdAt: NOW,
     tz: null,

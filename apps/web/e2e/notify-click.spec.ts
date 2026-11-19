@@ -157,7 +157,6 @@ function mockLiveApi(page: Page) {
             userId: 'u1',
             teamId: 't1',
             agent: null,
-            charter: null,
             lastTurnAt: null,
             createdAt: 0,
             tz: null,

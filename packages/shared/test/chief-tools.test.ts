@@ -5,14 +5,12 @@ import {
   CHIEF_ROUTER_THREADS_PAGE,
   CHIEF_ROUTER_TOOL_NAMES,
   CHIEF_ROUTER_TOOLS,
-  CHIEF_SETTINGS_TABS,
   CHIEF_TOOL_CATEGORIES,
   CHIEF_TOOL_COUNT,
   CHIEF_TOOL_NAMES,
   CHIEF_TOOLS_ADDED,
   CHIEF_TOOLS_REMOVED,
   CHIEF_TOOLS_REMOVED_UNDER_D60,
-  CHIEF_WATCHES_EMPTY_COPY,
   chiefIdFormat,
   GITHUB_READ_PER_PAGE_MAX,
   githubReadToolParamsSchemas,
@@ -336,19 +334,11 @@ describe('relay wire (bundle extraction verbatim, r5 §3.1 raw)', () => {
 });
 
 describe('settings-gear canon + id seam (r5 §2/§3.6, AC3 backend half)', () => {
-  it("4 tabs correspond to the Coordinator record's four fields (agent/charter/watches/wakes)", () => {
-    expect(CHIEF_SETTINGS_TABS).toEqual(['Agent', '章程', '记忆', '关注与提醒']);
-  });
-
   it('rebind second-confirmation notice = r5 §2 verbatim (memory does not migrate)', () => {
     expect(CHIEF_REBIND_CONFIRM_COPY).toBe(
       '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。',
     );
     expect(CHIEF_REBIND_CONFIRM_COPY).toContain('当前记忆不会迁移');
-  });
-
-  it('focus and reminder empty states canon (r5 §2)', () => {
-    expect(CHIEF_WATCHES_EMPTY_COPY).toContain('暂无跟进事项');
   });
 
   it('chief id form = chief-<userId>-<teamId>; conversation id discrimination single source', () => {

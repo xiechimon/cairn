@@ -5,7 +5,6 @@ import {
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
-  chiefIdFormat,
   claudeRateBlock,
   confinementDispatchReady,
   confinementEnforced,
@@ -28,7 +27,6 @@ import {
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
   WORKER_THREAD_REPORT_TOOL,
-  workerBriefTextSchema,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import {
@@ -722,15 +720,6 @@ async function tryClaim(
           ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
         };
     const projectRow = projectOfTodo(db, cand.todoRow);
-    const charterOwner = cand.todoRow.ownerId ?? cand.todoRow.createdBy;
-    const charter =
-      charterOwner !== null
-        ? db
-            .select({ charter: chief.charter })
-            .from(chief)
-            .where(eq(chief.id, chiefIdFormat(charterOwner, teamId)))
-            .get()?.charter
-        : undefined;
     const repoRef = infoCard ? null : projectRepoRef(projectRow, origin);
     const mergeTarget =
       cand.stepRow.kind === 'merge' ? parseHostedMergeInstruction(cand.stepRow.prompt) : null;
@@ -810,7 +799,6 @@ async function tryClaim(
         ...(projectRow?.instructions != null ? { instructions: projectRow.instructions } : {}),
         repo,
       },
-      ...(charter && workerBriefTextSchema.safeParse(charter).success ? { charter } : {}),
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,

@@ -37,7 +37,7 @@ describe('the Coordinator tool table is the same on the in-server runtime and on
     });
     s.db
       .insert(chiefTable)
-      .values({ id: 'c1', userId: s.svc.user.id, teamId: s.team.id, charter: '', createdAt: 1 })
+      .values({ id: 'c1', userId: s.svc.user.id, teamId: s.team.id, createdAt: 1 })
       .run();
     s.db
       .insert(chiefThreadTable)

@@ -38,7 +38,6 @@ function seedAgentAndChief(): void {
       id: chiefId,
       userId,
       teamId,
-      charter: '',
       watches: [],
       wakes: [],
       createdAt: now,
