@@ -48,6 +48,7 @@ export * from './subscription-list.js';
 export * from './tables.js';
 export * from './task-failure.js';
 export * from './task-meta.js';
+export * from './thinking-binding.js';
 export * from './token-estimate.js';
 export * from './tool-result.js';
 export * from './trajectory-pack.js';

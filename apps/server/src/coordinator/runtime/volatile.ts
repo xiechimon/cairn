@@ -1,7 +1,17 @@
-import { shortEvent, transcriptPromptRowId, withHistoryMarker } from '@cairn/shared';
+import {
+  createThinkingBindingGuard,
+  shortEvent,
+  transcriptPromptRowId,
+  withHistoryMarker,
+} from '@cairn/shared';
 import type { Message } from '@earendil-works/pi-ai';
 import { defineExtension, GenerationTask, hook } from '@earendil-works/pi-durable';
-import { projectWarmMessages } from './cold-slim.js';
+import {
+  ANTHROPIC_LONG_TTL_MS,
+  ANTHROPIC_SHORT_TTL_MS,
+  projectWarmMessages,
+  resolveCacheRetentionTier,
+} from './cold-slim.js';
 
 export interface VolatileContext {
   set(conversationId: string, text: string | null): void;
@@ -73,20 +83,70 @@ export function shortenEarlierEvents(
   });
 }
 
-export function volatileContextExtension(volatile: VolatileContext) {
+interface SentRequest {
+  sources: string[];
+  messages: Message[];
+  at: number;
+  section?: { text: string; index: number };
+}
+
+function sharedLength(a: readonly string[], b: readonly string[]): number {
+  let length = 0;
+  while (length < a.length && length < b.length && a[length] === b[length]) length++;
+  return length;
+}
+
+export function volatileContextExtension(
+  volatile: VolatileContext,
+  options: { now?: () => number; reuseMs?: number } = {},
+) {
+  const now = options.now ?? Date.now;
+  const reuseMs =
+    options.reuseMs ??
+    (resolveCacheRetentionTier() === 'long' ? ANTHROPIC_LONG_TTL_MS : ANTHROPIC_SHORT_TTL_MS);
+  const sent = new Map<string, SentRequest>();
+  const binding = createThinkingBindingGuard();
   return defineExtension({
     name: 'cairn-coordinator-volatile',
     hooks: [
       hook(GenerationTask, {
         beforeRequest: (request, api) => {
           const conversationId = String(api.conversationId);
+          const at = now();
+          const sources = request.messages.map((message) => JSON.stringify(message));
+          const prior = sent.get(conversationId);
+          const reused = prior !== undefined && at - prior.at < reuseMs ? prior : undefined;
+          const frozen = reused === undefined ? 0 : sharedLength(reused.sources, sources);
           const section = volatile.get(conversationId);
           const shortened = shortenEarlierEvents(request.messages, volatile.step(conversationId));
           const projected = projectWarmMessages(shortened);
-          return {
-            messages: section === undefined ? projected : withVolatileSection(projected, section),
-          };
+          const latestUser = projected.findLastIndex((message) => message.role === 'user');
+          const sentSection =
+            reused?.section !== undefined && reused.section.index < frozen
+              ? reused.section
+              : undefined;
+          const attach =
+            section !== undefined && latestUser >= frozen && sentSection?.text !== section;
+          const fresh = attach ? withVolatileSection(projected, section) : projected;
+          const messages = [...(reused?.messages.slice(0, frozen) ?? []), ...fresh.slice(frozen)];
+          const recorded = attach ? { text: section, index: latestUser } : sentSection;
+          sent.set(conversationId, {
+            sources,
+            messages,
+            at,
+            ...(recorded === undefined ? {} : { section: recorded }),
+          });
+          return { messages };
         },
+        beforeProviderRequest: ({ model, payload }, api) =>
+          model.api === 'anthropic-messages'
+            ? {
+                payload: binding.apply(
+                  `${String(api.conversationId)}\n${model.provider}/${model.id}`,
+                  payload,
+                ),
+              }
+            : undefined,
       }),
     ],
   });
