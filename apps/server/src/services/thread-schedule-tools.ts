@@ -8,6 +8,7 @@ import {
   computeNextRunAt,
   createSchedule,
   cronExpressionFor,
+  isTriggerKind,
   isWorkerSchedule,
   parseThreadCadence,
   pauseSchedule,
@@ -67,6 +68,13 @@ export function executeThreadScheduleTool(
   const where = and(eq(schedule.todoId, todoRow.id), eq(schedule.teamId, todoRow.teamId));
   if (name === 'schedule_create') {
     const body = parseWith(createSchema, params, 'params');
+    const existing = deps.db.select().from(schedule).where(where).get();
+    if (existing !== undefined && isTriggerKind(existing.kind)) {
+      throw new HttpError(
+        409,
+        'task already has a trigger schedule; clear it with schedule_clear or ask the owner',
+      );
+    }
     createSchedule(
       deps,
       {
@@ -103,6 +111,11 @@ export function executeThreadScheduleTool(
             ),
             enabled: true,
             pausedReason: null,
+            triggerSpec: null,
+            webhookTokenHash: null,
+            webhookMasked: null,
+            webhookDeliveries: null,
+            webhookLastUsedAt: null,
           };
     deps.db
       .update(schedule)

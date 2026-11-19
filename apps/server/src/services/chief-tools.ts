@@ -984,7 +984,8 @@ export async function executeChiefTool(
       const todoId = str(params, 'todoId');
       requireTeamTodo(db, todoId, ctx.teamId);
       const rows = db.select().from(schedule).where(eq(schedule.todoId, todoId)).all();
-      for (const r of rows) deleteSchedule({ db, hub: deps.hub, user: deps.user }, r.id);
+      for (const r of rows)
+        deleteSchedule({ db, hub: deps.hub, user: deps.user }, r.id, ctx.teamId);
       return json({ todoId, removed: rows.length });
     }
 

@@ -2,8 +2,10 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import { schedule as scheduleTable, step, todo } from '../src/db/schema.js';
 import { completeStep, enqueueStep, listSteps, startBuilds } from '../src/services/builds.js';
+import { fireScheduleWebhook } from '../src/services/schedule-webhook.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { createSchedule } from '../src/services/schedules.js';
+import { createSchedule, deleteSchedule, setScheduleEnabled } from '../src/services/schedules.js';
+import { executeThreadScheduleTool } from '../src/services/thread-schedule-tools.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, insertMachine, postProject, req, type TestServer } from './helpers.js';
 
@@ -367,5 +369,117 @@ describe('event schedule dispatch (seq 31)', () => {
     setTodoPhase(s.svc, todoId, 'building');
     completeStep(s.svc, listSteps(s.svc, started?.id as string)[0]?.id as string);
     expect(stored(s, body.id)?.nextRunAt).toBeNull();
+  });
+});
+
+describe('trigger claim races and isolation (seq 31 review)', () => {
+  test('a webhook delivery claimed during an in-flight run survives the run finishing', async () => {
+    const s = boot();
+    const { projectId, todoId } = await makeTodo(s, 'inflight-claim');
+    const [started] = startBuilds(s.svc, { projectId, todoIds: [todoId] });
+    s.db
+      .update(step)
+      .set({ status: 'done', finishedAt: Date.now() })
+      .where(eq(step.buildId, started?.id as string))
+      .run();
+    s.db
+      .update(todo)
+      .set({ phase: 'confirm', latestBuildId: started?.id })
+      .where(eq(todo.id, todoId))
+      .run();
+    const created = await req(s.app, 'POST', '/api/schedules', { todoId, kind: 'webhook' });
+    const body = (await created.json()) as { id: string; webhookToken: string };
+    expect((await hook(s, body.webhookToken, 'del-1')).status).toBe(202);
+
+    const hub = s.svc.hub as unknown as {
+      publishBuildDoc: (teamId: string, doc: unknown) => void;
+    };
+    const original = hub.publishBuildDoc.bind(s.svc.hub);
+    let armed = false;
+    hub.publishBuildDoc = (teamId: string, doc: unknown) => {
+      original(teamId, doc);
+      if (armed) return;
+      armed = true;
+      fireScheduleWebhook({ db: s.db, hub: s.svc.hub }, body.webhookToken, 'del-2');
+    };
+    const scheduler = createScheduler(s.svc, { tickMs: 15_000 });
+    try {
+      await scheduler.tick();
+    } finally {
+      hub.publishBuildDoc = original;
+    }
+    const row = stored(s, body.id);
+    expect(row?.webhookDeliveries).toEqual(['del-1', 'del-2']);
+    expect(row?.nextRunAt).not.toBeNull();
+    const firstRun = routineSteps(s, body.id);
+    expect(firstRun).toHaveLength(1);
+    s.db
+      .update(step)
+      .set({ status: 'done', finishedAt: Date.now() })
+      .where(eq(step.id, firstRun[0]!.id))
+      .run();
+    s.db.update(todo).set({ phase: 'confirm' }).where(eq(todo.id, todoId)).run();
+    await scheduler.tick();
+    expect(routineSteps(s, body.id)).toHaveLength(2);
+  });
+
+  test('worker schedule_create refuses to overwrite a trigger schedule', async () => {
+    const s = boot();
+    const { todoId } = await makeTodo(s, 'guard-routine');
+    const record = createSchedule(
+      s.svc,
+      { todoId, kind: 'webhook', teamId: s.team.id, createdBy: s.user.id },
+      { webhookToken: 'cairn-wh-guarded-token' },
+    );
+    const todoRow = s.db.select().from(todo).where(eq(todo.id, todoId)).get();
+    expect(() =>
+      executeThreadScheduleTool(s.svc, todoRow!, 'worker:test', 'schedule_create', {
+        cadence: 'in 30 minutes',
+        prompt: 'check in',
+      }),
+    ).toThrowError(/trigger schedule/);
+    const row = stored(s, record.id);
+    expect(row?.webhookTokenHash).not.toBeNull();
+    expect(row?.kind).toBe('webhook');
+  });
+
+  test('schedule_update with a cadence clears trigger-only columns', async () => {
+    const s = boot();
+    const { todoId } = await makeTodo(s, 'rekind');
+    const record = createSchedule(
+      s.svc,
+      { todoId, kind: 'webhook', teamId: s.team.id, createdBy: s.user.id },
+      { webhookToken: 'cairn-wh-rekind-token' },
+    );
+    const todoRow = s.db.select().from(todo).where(eq(todo.id, todoId)).get();
+    executeThreadScheduleTool(s.svc, todoRow!, 'worker:test', 'schedule_update', {
+      cadence: 'in 30 minutes',
+    });
+    const row = stored(s, record.id);
+    expect(row?.kind).toBe('once');
+    expect(row?.webhookTokenHash).toBeNull();
+    expect(row?.webhookMasked).toBeNull();
+    expect(row?.webhookDeliveries).toBeNull();
+    expect(row?.webhookLastUsedAt).toBeNull();
+    expect(row?.triggerSpec).toBeNull();
+    expect(row?.nextRunAt).not.toBeNull();
+  });
+
+  test('schedule enable and delete are scoped to the owning team', async () => {
+    const s = boot();
+    const { todoId } = await makeTodo(s, 'team-scope');
+    const record = createSchedule(s.svc, {
+      todoId,
+      kind: 'once',
+      at: quarterAligned(Date.now() + 60 * 60_000),
+      tz: 'UTC',
+      teamId: s.team.id,
+      createdBy: s.user.id,
+    });
+    expect(setScheduleEnabled(s.svc, record.id, { enabled: false }, 'other-team')).toBeNull();
+    expect(stored(s, record.id)?.enabled).toBe(true);
+    expect(deleteSchedule({ ...s.svc, user: s.user }, record.id, 'other-team')).toBe(false);
+    expect(stored(s, record.id)).toBeDefined();
+    expect(deleteSchedule({ ...s.svc, user: s.user }, record.id, s.team.id)).toBe(true);
   });
 });

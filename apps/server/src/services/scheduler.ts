@@ -81,6 +81,7 @@ import {
   recordScheduleFailure,
   setScheduleClockListener,
   updateNextRunAt,
+  updateNextRunAtIfUnmoved,
   WORKER_SCHEDULE_MIN_INTERVAL_MS,
   WORKER_SCHEDULE_RUN_LIMIT,
   workerScheduleRunHistory,
@@ -430,7 +431,7 @@ export function createScheduler(
       })
       .where(eq(schedule.id, row.id))
       .run();
-    updateNextRunAt(deps, row.id, isRecurring(row.kind) ? nextRunAt : null);
+    updateNextRunAtIfUnmoved(deps, row.id, row.nextRunAt, isRecurring(row.kind) ? nextRunAt : null);
   }
 
   function runSchedule(row: ReturnType<typeof dueSchedules>[number], now: number): Promise<void> {

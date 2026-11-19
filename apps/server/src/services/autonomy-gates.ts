@@ -156,7 +156,14 @@ export function autonomySpentToday(db: Db, projectId: string, now: number): numb
   }
 }
 
-const NON_MEMBER_API_PREFIXES = ['/api/machine', '/api/mcp', '/api/oauth/callback'];
+const NON_MEMBER_API_PREFIXES = [
+  '/api/machine',
+  '/api/mcp',
+  '/api/oauth/callback',
+  '/api/webhook',
+  '/api/auth',
+  '/api/remote',
+];
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 export function countsAsMemberWrite(method: string, pathname: string, status: number): boolean {

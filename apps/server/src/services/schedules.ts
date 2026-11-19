@@ -235,9 +235,13 @@ export function createSchedule(
   return record;
 }
 
-export function deleteSchedule(deps: ScheduleDeps & { user: UserRecord }, id: string): boolean {
+export function deleteSchedule(
+  deps: ScheduleDeps & { user: UserRecord },
+  id: string,
+  teamId: string,
+): boolean {
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
-  if (!row) return false;
+  if (!row || row.teamId !== teamId) return false;
   deps.db.delete(schedule).where(eq(schedule.id, id)).run();
   notifyScheduleClock();
   return true;
@@ -247,9 +251,10 @@ export function setScheduleEnabled(
   deps: ScheduleDeps,
   id: string,
   body: PatchScheduleBody,
+  teamId: string,
 ): ScheduleRecord | null {
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
-  if (!row) return null;
+  if (!row || row.teamId !== teamId) return null;
   if (row.enabled !== body.enabled) {
     if (body.enabled) {
       const now = nowMs();
@@ -306,6 +311,25 @@ function notifyScheduleClock(): void {
 
 export function updateNextRunAt(deps: ScheduleDeps, id: string, nextRunAt: number | null): void {
   deps.db.update(schedule).set({ nextRunAt }).where(eq(schedule.id, id)).run();
+  notifyScheduleClock();
+}
+
+export function updateNextRunAtIfUnmoved(
+  deps: ScheduleDeps,
+  id: string,
+  expected: number | null,
+  nextRunAt: number | null,
+): void {
+  deps.db
+    .update(schedule)
+    .set({ nextRunAt })
+    .where(
+      and(
+        eq(schedule.id, id),
+        expected === null ? isNull(schedule.nextRunAt) : eq(schedule.nextRunAt, expected),
+      ),
+    )
+    .run();
   notifyScheduleClock();
 }
 
@@ -510,7 +534,7 @@ export function applyMissedRunWindow(deps: ScheduleDeps, row: ScheduleRow, now: 
     })
     .where(eq(schedule.id, row.id))
     .run();
-  updateNextRunAt(deps, row.id, nextRunAt);
+  updateNextRunAtIfUnmoved(deps, row.id, row.nextRunAt, nextRunAt);
   return true;
 }
 

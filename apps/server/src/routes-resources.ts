@@ -280,14 +280,14 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.patch('/api/schedules/:id', async (c) => {
     const id = c.req.param('id');
     const body = parseWith(patchScheduleBodySchema, await jsonBody(c), 'body');
-    const record = setScheduleEnabled(svc, id, body);
+    const record = setScheduleEnabled(svc, id, body, ctx.team.id);
     if (!record) throw notFound(`schedule ${id}`);
     return c.json(record);
   });
 
   app.delete('/api/schedules/:id', (c) => {
     const id = c.req.param('id');
-    if (!deleteSchedule(svc, id)) throw notFound(`schedule ${id}`);
+    if (!deleteSchedule(svc, id, ctx.team.id)) throw notFound(`schedule ${id}`);
     return c.body(null, 204);
   });
 
