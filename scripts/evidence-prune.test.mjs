@@ -4,12 +4,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { scrubGitEnv } from './scrub-git-env.mjs';
+import { testGitEnv } from './test-git-env.mjs';
 
 const script = resolve(import.meta.dirname, 'evidence-prune.mjs');
 const NOW = '2026-10-25T12:00:00Z';
 const daysAgo = (days) => new Date(Date.parse(NOW) - days * 86400000).toISOString();
-const env = scrubGitEnv({ ...process.env });
+const env = testGitEnv();
 
 const fixture = () => {
   const cwd = mkdtempSync(join(tmpdir(), 'evidence-prune-'));

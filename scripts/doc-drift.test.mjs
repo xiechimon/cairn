@@ -4,10 +4,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
+import { testGitEnv } from './test-git-env.mjs';
 
 const script = resolve(import.meta.dirname, 'doc-drift.mjs');
 const NOW = '2026-10-24T12:00:00Z';
 const date = NOW.slice(0, 10);
+const env = testGitEnv();
 
 const fixture = () => {
   const cwd = mkdtempSync(join(tmpdir(), 'doc-drift-'));
@@ -16,7 +18,7 @@ const fixture = () => {
       cwd,
       stdio: 'pipe',
       encoding: 'utf8',
-      env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+      env: { ...env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
     });
   git(NOW, 'init', '-b', 'main');
   git(NOW, 'config', 'user.email', 'test@example.com');
@@ -26,7 +28,7 @@ const fixture = () => {
     commit: (tree, message = 'change') => {
       for (const [path, content] of Object.entries(tree)) {
         if (content === null) {
-          execFileSync('git', ['rm', '-q', path], { cwd, stdio: 'pipe' });
+          execFileSync('git', ['rm', '-q', path], { cwd, stdio: 'pipe', env });
           continue;
         }
         mkdirSync(dirname(join(cwd, path)), { recursive: true });
@@ -39,6 +41,7 @@ const fixture = () => {
       spawnSync(process.execPath, [script, '--now', NOW, ...args], {
         cwd,
         encoding: 'utf8',
+        env,
       }),
   };
 };

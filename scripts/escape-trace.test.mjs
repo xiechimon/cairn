@@ -1,25 +1,28 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { collectCandidates, parseDiffGitPaths, resolveTraces } from './escape-trace.mjs';
 import { prepushPlan } from './prepush.mjs';
+import { testGitEnv } from './test-git-env.mjs';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const cli = resolve('scripts/escape-trace.mjs');
 const start = '2026-10-01T00:00:00Z';
 const end = '2026-10-02T00:00:00Z';
 const day = 24 * 60 * 60 * 1000;
 
-function fixture(t, prefix = 'escape-candidates-') {
+function fixture(t, prefix = 'escape-candidates-', parentEnv = process.env) {
   const cwd = mkdtempSync(join(tmpdir(), prefix));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const gitEnv = testGitEnv(parentEnv);
   const git = (args, env = {}) =>
     execFileSync('git', args, {
       cwd,
       encoding: 'utf8',
-      env: { ...process.env, ...env },
+      env: { ...gitEnv, ...env },
       stdio: 'pipe',
     }).trim();
   git(['init', '-q']);
@@ -47,6 +50,36 @@ function fixture(t, prefix = 'escape-candidates-') {
 function isoPlus(base, ms) {
   return new Date(new Date(base).getTime() + ms).toISOString().replace(/\.000Z$/, 'Z');
 }
+
+test('fixture commits ignore inherited Git configuration and hooks', (t) => {
+  const home = makeTestTempDir('escape-user-config-');
+  t.after(() => releaseTestTempDir(home));
+  const hooks = join(home, 'hooks');
+  mkdirSync(hooks);
+  const hook = join(hooks, 'prepare-commit-msg');
+  writeFileSync(hook, '#!/bin/sh\nprintf "\\nAmp-Thread-ID: unwanted-trailer\\n" >> "$1"\n');
+  chmodSync(hook, 0o755);
+  const config = join(home, 'gitconfig');
+  writeFileSync(config, `[core]\n\thooksPath = ${hooks}\n[commit]\n\tgpgSign = true\n`);
+  const { git, commit } = fixture(t, 'escape-isolated-', {
+    ...process.env,
+    GIT_CONFIG: config,
+    GIT_CONFIG_GLOBAL: config,
+    GIT_CONFIG_SYSTEM: config,
+    GIT_CONFIG_NOSYSTEM: '0',
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'core.hooksPath',
+    GIT_CONFIG_VALUE_0: hooks,
+    GIT_CONFIG_PARAMETERS: `'core.hooksPath=${hooks}'`,
+  });
+  git(['config', 'core.hooksPath', hooks]);
+  commit('fix: exact fixture message');
+  assert.equal(git(['log', '-1', '--format=%B']), 'fix: exact fixture message');
+  assert.equal(
+    readFileSync(config, 'utf8'),
+    `[core]\n\thooksPath = ${hooks}\n[commit]\n\tgpgSign = true\n`,
+  );
+});
 
 test('CLI uses origin/main, preserves full records, and recognizes only candidate syntax', (t) => {
   const { git, commit, run } = fixture(t);
@@ -100,7 +133,7 @@ test('CLI does not truncate more than 200 qualifying commits', (t) => {
       cwd,
       encoding: 'utf8',
       env: {
-        ...process.env,
+        ...testGitEnv(),
         GIT_AUTHOR_DATE: start,
         GIT_COMMITTER_DATE: start,
         GIT_AUTHOR_NAME: 'Candidate test',

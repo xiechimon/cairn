@@ -5,10 +5,12 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { PATTERNS, rankBaselines } from './gardener-weekly.mjs';
+import { testGitEnv } from './test-git-env.mjs';
 
 const script = resolve(import.meta.dirname, 'gardener-weekly.mjs');
 const NOW = '2026-10-24T12:00:00Z';
 const daysAgo = (days) => new Date(Date.parse(NOW) - days * 86400000).toISOString();
+const env = testGitEnv();
 
 const allowlist = (n) =>
   Array.from({ length: n }, (_, i) => ({ path: 'a.ts', line: `// ${i}`, reason: 'external' }));
@@ -28,7 +30,7 @@ const fixture = () => {
       cwd,
       stdio: 'pipe',
       encoding: 'utf8',
-      env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+      env: { ...env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
     });
   git(daysAgo(30), 'init', '-b', 'main');
   git(daysAgo(30), 'config', 'user.email', 'test@example.com');
@@ -47,7 +49,7 @@ const fixture = () => {
       git(date, 'commit', '-m', message);
     },
     run: (...args) =>
-      spawnSync(process.execPath, [script, '--now', NOW, ...args], { cwd, encoding: 'utf8' }),
+      spawnSync(process.execPath, [script, '--now', NOW, ...args], { cwd, encoding: 'utf8', env }),
   };
 };
 
@@ -115,10 +117,11 @@ test('refuses a shallow clone, whose history would fake every delta as growth', 
   try {
     commit(daysAgo(20), baselineFiles({ controls: 3, comments: 2 }));
     commit(daysAgo(1), { 'README.md': 'x' });
-    execFileSync('git', ['clone', '--depth', '1', `file://${cwd}`, clone], { stdio: 'pipe' });
+    execFileSync('git', ['clone', '--depth', '1', `file://${cwd}`, clone], { stdio: 'pipe', env });
     const result = spawnSync(process.execPath, [script, '--now', NOW], {
       cwd: clone,
       encoding: 'utf8',
+      env,
     });
     assert.equal(result.status, 2);
     assert.match(result.stderr, /shallow/);
@@ -197,10 +200,10 @@ test('with --drift the report appends the spec drift section and writes the JSON
       },
       'add doc',
     );
-    execFileSync('git', ['rm', '-q', 'apps/server/src/services/gone.ts'], { cwd });
+    execFileSync('git', ['rm', '-q', 'apps/server/src/services/gone.ts'], { cwd, env });
     execFileSync('git', ['commit', '-m', 'delete gone'], {
       cwd,
-      env: { ...process.env, GIT_AUTHOR_DATE: daysAgo(1), GIT_COMMITTER_DATE: daysAgo(1) },
+      env: { ...env, GIT_AUTHOR_DATE: daysAgo(1), GIT_COMMITTER_DATE: daysAgo(1) },
     });
     const result = run('--drift', '--out', '.gardener');
     assert.equal(result.status, 0, result.stderr);
