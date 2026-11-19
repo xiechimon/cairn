@@ -24,6 +24,16 @@ test('AGENTS.md lands work through queue/main without force and keeps the deploy
   assert.match(agents, /watch CI on your commit/);
 });
 
+test('AGENTS.md holds one candidate on queue/main and drops a candidate that fails twice', () => {
+  const agents = read('AGENTS.md');
+  assert.ok(agents.includes('`node scripts/ops/push-queue.mjs`'));
+  assert.match(agents, /holds one candidate at a time/);
+  assert.match(agents, /rerun once/);
+  assert.match(agents, /cancelled jobs do not count/);
+  assert.match(agents, /Consecutive commits with the same `Amp-Thread-ID` stay or go together/);
+  assert.match(agents, /Never touch another lane's live candidate/);
+});
+
 test('AGENTS.md keeps the safety rules the ship flow relies on', () => {
   const agents = read('AGENTS.md');
   assert.match(agents, /Never force push/);

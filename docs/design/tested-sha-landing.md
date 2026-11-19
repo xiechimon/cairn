@@ -11,6 +11,10 @@ and are diagnosed later. Prior art and mechanics are in
 push is rejected, so a second lane rebases onto the current queue head and its
 candidate stacks behind the first — order is the ref itself.
 
+Since 2026-11-19 (pilot, mon X) the queue holds one candidate at a time; see
+"One candidate at a time" below. Where this document describes lanes stacking
+behind each other, that behavior is retired.
+
 A candidate moves QUEUED (pushed, no run) → TESTING (ci running on its SHA) →
 GREEN → PROMOTED, or → REJECTED at any point (red run, stale base, replaced
 head). Rejected candidates never move `main`; the lane rebases and re-queues.
@@ -55,13 +59,42 @@ any future green-checking watcher or ruleset would consume.
   candidates above the dropped sha in a scratch worktree and force-pushes with
   `--force-with-lease` pinned to the old head, so a lane that pushed in the
   meantime is not clobbered.
-- only the head's run matters: queue pushes share one per-ref concurrency
-  group with `cancel-in-progress`, so a newer candidate cancels the stale
-  run instead of letting it burn compute nobody will read.
+- only one candidate runs: the queue guard refuses stacked pushes instead of
+  cancelling the running candidate.
 - classification evaluates the candidate's whole stacked diff: the classify
   step merge-bases `origin/main` for queue pushes rather than diffing the
   incremental push, so a docs-only push on top of broken code cannot skip
   the e2e/integration tiers and green-wash the stack.
+
+## One candidate at a time (pilot, 2026-11-19)
+
+Problem: stacked candidates cancelled each other's `ci` run, so only the chain
+head was ever tested; a red head blocked every lane and only its owner could
+remove it, by hand, once with the wrong commit dropped.
+
+- `ci` no longer cancels queue runs: queue pushes use the per-SHA group like
+  `main`, so a refused stacked push cannot cancel the running candidate.
+- `queue-guard.yml` runs on every push to `queue/main`. When the previous head
+  has not landed on `main` and the new head contains it, it resets the ref to
+  the previous head, comments on the refused commit with what it waits on and
+  who owns it, and cancels the refused commit's `ci` run.
+  `scripts/ops/push-queue.mjs` gives the same answer before the push.
+- `promote-queue.mjs --enforce` (used by `promote.yml`): when the head's run
+  concluded `failure` and a job failed or timed out (cancelled jobs do not
+  count), the failed jobs are rerun once (`rerun-failed-jobs`). If the
+  rerun, `run_attempt` 2, still has a failed job, the candidate is dropped.
+- Drop plan: the commits at the tip with the same `Amp-Thread-ID` go
+  together; commits below them from other threads stay and the ref moves
+  back to the last of those; with no thread marker the unmarked commits drop
+  alone. The ref moves with `--force-with-lease` pinned to the failed head, so
+  a lane that pushed in the meantime is not clobbered. A commit comment and
+  the run summary name the failing run and the owner threads.
+- Notification limit: the workflow has no Amp credential, so it cannot message
+  a thread. The owner learns from the push refusal text, the commit comment
+  and the `promote` run summary.
+- Metrics for the pilot: median queue-to-main time, cancelled `ci` runs,
+  total red-stuck time, repairs and reverts after landing, measured over seven
+  days before and after.
 
 ## Enforcement phase (separate flip, owner's call)
 
@@ -99,8 +132,12 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
 - `promote-queue.test.mjs`: predicate matrix — green run promotes; running,
   cancelled, failed or missing runs do not; stale base refuses; the three job
   names are required, not any aggregate conclusion.
-- `workflow-concurrency.test.mjs`: queue pushes share one per-ref group with
-  cancellation; main and other refs keep per-SHA groups that never cancel.
+- `workflow-concurrency.test.mjs`: queue, main and other refs use per-SHA
+  groups that never cancel.
+- `guard-queue.test.mjs`, `push-queue.test.mjs`: refuse a stacked push, allow
+  creation, deletion, rewrite and a push after landing, and the wait message.
+- `promote-queue.test.mjs` also covers rerun-once, drop, cancelled jobs, owner
+  grouping and the drop notice.
 - `rebuild-queue.test.mjs`: mid-chain drop replays successors in order,
   head drop lands on the commit below, single-candidate drop deletes the
   ref, unknown sha refuses.

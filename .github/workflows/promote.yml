@@ -16,7 +16,7 @@ concurrency:
 jobs:
   promote:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
     # Reuses the cairn-release app identity: GITHUB_TOKEN pushes cannot carry
     # commits that touch .github/workflows and do not re-trigger downstream
     # workflows (desktop-release), so the app token does the write while the
@@ -24,7 +24,7 @@ jobs:
     environment: desktop-release
     permissions:
       contents: read
-      actions: read
+      actions: write
       checks: read
     steps:
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -43,13 +43,14 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
-      - name: Promote the queue head if its checks are green
+      - name: Promote the queue head if green; rerun a red one once, then drop it
         env:
           GH_TOKEN: ${{ github.token }}
+          QUEUE_WRITE_TOKEN: ${{ steps.app-token.outputs.token }}
           PROMOTE_WAIT_SECONDS: 180
         run: |
           set +e
-          node scripts/ops/promote-queue.mjs --wait
+          node scripts/ops/promote-queue.mjs --wait --enforce
           code=$?
           set -e
           # 2 = verdict wait: an older SHA finished while the head still runs;

@@ -79,22 +79,13 @@ test('a pull request never shares a group with a main push', () => {
   assert.match(pr.group, /^ci-pr-\d+$/);
 });
 
-test('queue pushes share one ref group and a newer head cancels the stale run', () => {
+test('queue pushes get per-commit groups so a refused stacked push cannot cancel the running candidate', () => {
   const first = decision('ci', push('refs/heads/queue/main', 'aaaaaaa'));
   const second = decision('ci', push('refs/heads/queue/main', 'bbbbbbb'));
-  assert.equal(first.group, 'ci-queue-refs/heads/queue/main');
-  assert.equal(first.group, second.group);
-  assert.equal(first.cancel, true);
-  assert.equal(second.cancel, true);
-});
-
-test('queue cancellation does not leak into main or other branches', () => {
-  const main = decision('ci', push('refs/heads/main', 'aaaaaaa'));
-  assert.equal(main.group, 'ci-push-refs/heads/main-aaaaaaa');
-  assert.equal(main.cancel, false);
-  const other = decision('ci', push('refs/heads/feature-x', 'bbbbbbb'));
-  assert.equal(other.group, 'ci-push-refs/heads/feature-x-bbbbbbb');
-  assert.equal(other.cancel, false);
+  assert.equal(first.group, 'ci-push-refs/heads/queue/main-aaaaaaa');
+  assert.notEqual(first.group, second.group);
+  assert.equal(first.cancel, false);
+  assert.equal(second.cancel, false);
 });
 
 test('promote listens for completed ci runs on queue refs and serializes promotions', () => {

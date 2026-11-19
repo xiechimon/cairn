@@ -1,0 +1,36 @@
+name: queue-guard
+
+# queue/main holds one candidate at a time. A push that stacks on a candidate
+# which has not landed is put back and its ci run cancelled; the commit gets a
+# comment naming what it has to wait for.
+on:
+  push:
+    branches: [queue/main]
+
+concurrency:
+  group: queue-guard
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Refuse a push that stacks on an unlanded candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: node scripts/ops/guard-queue.mjs
