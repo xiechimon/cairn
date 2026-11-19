@@ -54,7 +54,7 @@ any future green-checking watcher or ruleset would consume.
 - promoter exits early (ctrl-C, machine sleep): state lives in git refs and
   GitHub runs, not in the process; rerunning re-evaluates the current head.
 - queue ref deleted or rewound: next push recreates it; the predicate only
-  ever reads the head. `scripts/ops/rebuild-queue.mjs <sha>` is the surgical
+  ever reads the head. `scripts/ops/rebuild-queue.mjs <sha>` is the operator's surgical
   tool for dropping a confirmed-broken candidate mid-chain — it replays the
   candidates above the dropped sha in a scratch worktree and force-pushes with
   `--force-with-lease` pinned to the old head, so a lane that pushed in the
@@ -70,28 +70,62 @@ any future green-checking watcher or ruleset would consume.
 
 Problem: stacked candidates cancelled each other's `ci` run, so only the chain
 head was ever tested; a red head blocked every lane and only its owner could
-remove it, by hand, once with the wrong commit dropped.
+remove it, by hand, once with the wrong commit dropped. The first week of the
+pilot added a second problem: sessions that did not know the owner of the red
+candidate deleted `queue/main` and pushed onto the empty ref, which skipped the
+rerun and the one-candidate rule (2026-11-19 15:14 and 15:43 UTC, a Claude Code
+session on the Mac following the old "delete your own dead candidate" step).
+The same hour showed that `promote` never saw the red runs: it picked the
+first run for the head SHA, which was the `queue-guard` run (green), so it
+waited on `check` forever and the rerun and drop never ran.
 
 - `ci` no longer cancels queue runs: queue pushes use the per-SHA group like
   `main`, so a refused stacked push cannot cancel the running candidate.
-- `queue-guard.yml` runs on every push to `queue/main`. When the previous head
-  has not landed on `main` and the new head contains it, it resets the ref to
-  the previous head, comments on the refused commit with what it waits on and
-  who owns it, and cancels the refused commit's `ci` run.
-  `scripts/ops/push-queue.mjs` gives the same answer before the push.
-- `promote-queue.mjs --enforce` (used by `promote.yml`): when the head's run
-  concluded `failure` and a job failed or timed out (cancelled jobs do not
-  count), the failed jobs are rerun once (`rerun-failed-jobs`). If the
-  rerun, `run_attempt` 2, still has a failed job, the candidate is dropped.
-- Drop plan: the commits at the tip with the same `Amp-Thread-ID` go
-  together; commits below them from other threads stay and the ref moves
-  back to the last of those; with no thread marker the unmarked commits drop
-  alone. The ref moves with `--force-with-lease` pinned to the failed head, so
-  a lane that pushed in the meantime is not clobbered. A commit comment and
-  the run summary name the failing run and the owner threads.
-- Notification limit: the workflow has no Amp credential, so it cannot message
-  a thread. The owner learns from the push refusal text, the commit comment
-  and the `promote` run summary.
+- Only `push-queue.mjs` touches `queue/main`. It refuses while a candidate is
+  live, names the commit, its `ci` state and its owner, and stamps
+  `Lane: <host>/<worktree>` on commits that carry no `Amp-Thread-ID` or `Lane`
+  trailer, so Claude Code sessions and Cairn tasks have an owner too.
+- A candidate is live while it has not landed on `main` and has no
+  `queue/main release:` comment. `queue-guard.yml` keeps the live candidate in
+  `queue-state/main`, a branch that no workflow watches and that keeps the
+  commit reachable after `queue/main` is deleted.
+- Guard on `push` to `queue/main`: when a live candidate exists and the push
+  is not the promoter's, the push is refused whether it stacks on the
+  candidate, replaces it, or recreates the ref after a deletion. `queue/main`
+  is put back to the live candidate, the refused commit gets a comment naming
+  what it waits on, and its `ci` run is cancelled.
+- Guard on `delete` of `queue/main`: a live candidate is recreated at once, the
+  candidate gets a comment, and `promote` is dispatched when the candidate's
+  `ci` run already finished (its own completion event may have come and gone).
+  Deleting and pushing a few seconds later is therefore undone twice over:
+  whichever event runs first restores, the other finds the ref already right.
+- The promoter is the only actor allowed to remove a live candidate, because
+  it acts as `cairn-release[bot]`. `state` follows the guard's last allowed
+  change, with `before` of the push as a fallback so the first run after
+  rollout still protects a candidate that was pushed before it existed.
+- Operator hatch: a comment starting `queue/main release:` on the live commit
+  makes the candidate not live. `rebuild-queue.mjs` posts it before it rewrites
+  or deletes the ref. A plain deletion by hand gets restored.
+- A deletion that nobody follows with a push is undone as well, so a lane
+  cannot clear a red candidate it dislikes; the `promote` workflow reruns and
+  drops it.
+- `promote-queue.mjs --enforce` (used by `promote.yml`): the head's `ci` run
+  (matched by workflow name, never another run on the same SHA) that ended
+  `failure` with a failed or timed out job gets those jobs rerun once
+  (`rerun-failed-jobs`); a run that ended `cancelled`, or `failure` with only
+  cancelled jobs, is rerun whole once. After the rerun (`run_attempt` 2) the
+  candidate is dropped when it is still not green. A candidate that does not
+  contain `main` (a direct push moved it) is dropped at once. A missing queue
+  is idle, not an error.
+- Drop plan: the commits at the tip with the same owner (`Amp-Thread-ID` or
+  `Lane`) go together; commits below them from other owners stay and the ref
+  moves back to the last of those; commits without an owner drop together. The
+  ref moves with `--force-with-lease` pinned to the failed head, so a lane that
+  pushed in the meantime is not clobbered. A commit comment and the run
+  summary name the reason, the failing run and the owners.
+- Notification limit: Actions has no credential for Amp threads, Claude Code
+  sessions or Cairn tasks. The owner learns from the push refusal text, the
+  commit comment and the `promote` run summary.
 - Metrics for the pilot: median queue-to-main time, cancelled `ci` runs,
   total red-stuck time, repairs and reverts after landing, measured over seven
   days before and after.
@@ -134,10 +168,12 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
   names are required, not any aggregate conclusion.
 - `workflow-concurrency.test.mjs`: queue, main and other refs use per-SHA
   groups that never cancel.
-- `guard-queue.test.mjs`, `push-queue.test.mjs`: refuse a stacked push, allow
-  creation, deletion, rewrite and a push after landing, and the wait message.
-- `promote-queue.test.mjs` also covers rerun-once, drop, cancelled jobs, owner
-  grouping and the drop notice.
+- `guard-queue.test.mjs`, `push-queue.test.mjs`: refuse a stacked, replacing or
+  recreating push, restore a deleted live candidate, let only the promoter
+  remove one, owner stamping and the wait message.
+- `promote-queue.test.mjs` also covers rerun-once, drop, cancelled runs, a
+  second workflow run on the same SHA, stale and missing queue, owner trailers
+  and grouping, and the drop notice.
 - `rebuild-queue.test.mjs`: mid-chain drop replays successors in order,
   head drop lands on the commit below, single-candidate drop deletes the
   ref, unknown sha refuses.

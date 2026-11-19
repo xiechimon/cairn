@@ -10,7 +10,7 @@ const read = (file) => readFileSync(join(ROOT, file), 'utf8');
 test('AGENTS.md lands work through queue/main without force and keeps the deploy as the safety net', () => {
   const agents = read('AGENTS.md');
   assert.match(agents, /^## Ship$/m);
-  assert.ok(agents.includes('`git push origin HEAD:queue/main`'));
+  assert.ok(agents.includes('`node scripts/ops/push-queue.mjs`'));
   assert.match(agents, /green-main` ruleset/);
   assert.match(agents, /Push without force/);
   assert.match(
@@ -24,14 +24,17 @@ test('AGENTS.md lands work through queue/main without force and keeps the deploy
   assert.match(agents, /watch CI on your commit/);
 });
 
-test('AGENTS.md holds one candidate on queue/main and drops a candidate that fails twice', () => {
+test('AGENTS.md holds one candidate on queue/main, drops a candidate that fails twice and never lets an agent delete it', () => {
   const agents = read('AGENTS.md');
-  assert.ok(agents.includes('`node scripts/ops/push-queue.mjs`'));
   assert.match(agents, /holds one candidate at a time/);
   assert.match(agents, /rerun once/);
   assert.match(agents, /cancelled jobs do not count/);
-  assert.match(agents, /Consecutive commits with the same `Amp-Thread-ID` stay or go together/);
-  assert.match(agents, /Never touch another lane's live candidate/);
+  assert.match(agents, /Consecutive commits with the same owner/);
+  assert.match(agents, /`Lane: <host>\/<worktree>` trailer/);
+  assert.match(agents, /never write a loop that deletes or recreates `queue\/main`/);
+  assert.match(agents, /you never remove one, not even one you think is yours or dead/);
+  assert.match(agents, /whatever tool made the commits \(Amp, Claude Code, a Cairn task/);
+  assert.doesNotMatch(agents, /delete your own dead candidate/);
 });
 
 test('AGENTS.md keeps the safety rules the ship flow relies on', () => {

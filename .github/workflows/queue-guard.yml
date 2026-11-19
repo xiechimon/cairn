@@ -1,18 +1,18 @@
 name: queue-guard
 
-# queue/main holds one candidate at a time. A push that stacks on a candidate
-# which has not landed is put back and its ci run cancelled; the commit gets a
-# comment naming what it has to wait for.
+# queue/main holds one candidate at a time, and only the promote workflow
+# removes one. The guard keeps the live candidate in queue-state/main and puts
+# it back when a push stacks on it or replaces it, or when the ref is deleted
+# and recreated by anyone but the promoter. A delete event always runs the
+# default branch copy of this file.
 on:
   push:
     branches: [queue/main]
-
-concurrency:
-  group: queue-guard
-  cancel-in-progress: false
+  delete:
 
 jobs:
   guard:
+    if: github.event_name == 'push' || (github.event.ref_type == 'branch' && github.event.ref == 'queue/main')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -21,6 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -28,9 +29,11 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
-      - name: Refuse a push that stacks on an unlanded candidate
+      - name: Keep one live candidate on queue/main
         env:
           GH_TOKEN: ${{ github.token }}
+          GUARD_EVENT: ${{ github.event_name }}
+          GUARD_ACTOR: ${{ github.actor }}
           BEFORE: ${{ github.event.before }}
-          AFTER: ${{ github.sha }}
+          AFTER: ${{ github.event.after }}
         run: node scripts/ops/guard-queue.mjs

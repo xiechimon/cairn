@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { RELEASE_MARKER } from './guard-queue.mjs';
 
 export const QUEUE_REF = 'refs/heads/queue/main';
 
@@ -16,6 +17,20 @@ export function planRebuild({ chain, dropSha }) {
     ? { action: 'delete', reason: 'queue becomes empty' }
     : { action: 'rebuild', keep, dropSha };
 }
+
+const release = (sha, reason) =>
+  execFileSync(
+    'gh',
+    [
+      'api',
+      '--method',
+      'POST',
+      `repos/${process.env.CAIRN_REPO ?? 'xiechimon/cairn'}/commits/${sha}/comments`,
+      '-f',
+      `body=${RELEASE_MARKER} ${reason}`,
+    ],
+    { stdio: 'inherit' },
+  );
 
 const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
@@ -62,10 +77,12 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     process.exit(1);
   }
   if (plan.action === 'delete') {
+    release(chain.at(-1), `operator rebuild dropped ${resolved}`);
     execFileSync('git', ['push', 'origin', `:${QUEUE_REF}`], { stdio: 'inherit' });
     console.log('[rebuild-queue] dropped the only candidate; queue ref deleted');
     process.exit(0);
   }
+  release(chain.at(-1), `operator rebuild dropped ${resolved}`);
   const { oldHead, newHead } = rebuild('.', { dropSha: resolved });
   execFileSync(
     'git',

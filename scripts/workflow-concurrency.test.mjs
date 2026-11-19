@@ -98,3 +98,15 @@ test('promote listens for completed ci runs on queue refs and serializes promoti
   assert.equal(group, 'promote-main');
   assert.equal(cancel, 'false');
 });
+
+test('queue-guard runs on queue/main pushes and on deletions, without a concurrency group that could drop a pending event', () => {
+  const text = readFileSync(join(WORKFLOWS, 'queue-guard.yml'), 'utf8');
+  assert.match(text, /push:\s*\n\s*branches: \[queue\/main\]\s*\n\s*delete:/);
+  assert.match(text, /github\.event\.ref == 'queue\/main'/);
+  assert.doesNotMatch(text, /^concurrency:/m);
+});
+
+test('promote can be dispatched so the guard can restart it for a restored candidate', () => {
+  const text = readFileSync(join(WORKFLOWS, 'promote.yml'), 'utf8');
+  assert.match(text, /^ {2}workflow_dispatch:/m);
+});

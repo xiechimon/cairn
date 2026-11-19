@@ -8,6 +8,7 @@ on:
     workflows: [ci]
     types: [completed]
     branches: ['queue/**']
+  workflow_dispatch:
 
 concurrency:
   group: promote-main
