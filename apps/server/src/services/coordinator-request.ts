@@ -25,6 +25,7 @@ import { attachmentIdsInUserText } from './attachment-authorization.js';
 import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
 import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
+import { frequentModelFor } from './top-models.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -302,6 +303,8 @@ export function createRequestTodo(
       params.codeChangeQuote,
     );
   }
+  const model =
+    params.model === undefined ? undefined : frequentModelFor(db, ctx.teamId, params.model);
   const messageIds = params.messageIds ?? defaultQuoteIds(db, ctx);
   if (params.sourceTodoId === undefined && messageIds.length === 0) {
     throw new HttpError(400, NO_OWNER_WORDS);
@@ -326,6 +329,7 @@ export function createRequestTodo(
     titleSource: summaryTitle !== '' ? 'coordinator' : (segments[0]?.author ?? 'owner'),
     titleSourceRef: summaryTitle !== '' ? null : (segments[0]?.sourceRef ?? null),
     ...(params.briefing !== undefined ? { briefing: params.briefing } : {}),
+    ...(model !== undefined ? { model } : {}),
   };
   const record = createAutonomousTodo(deps, {
     teamId: ctx.teamId,

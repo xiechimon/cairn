@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import {
   useApiMutations,
@@ -28,10 +28,6 @@ import {
   FirstRunSetup,
   firstRunRemembered,
   rememberFirstRun,
-  SETUP_PARAM,
-  SetupResumeBanner,
-  setupResumeStep,
-  setupSkipped,
   useFirstRunSetup,
 } from '../board/first-run-setup.js';
 import { type HomeBannerKind, pickHomeBanners } from '../board/home-banners.js';
@@ -62,7 +58,7 @@ import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 
 export function BoardPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { live, teamId } = useLiveData();
   const fixture = resolveScenario(searchParams);
   const { t } = useI18n();
@@ -169,27 +165,7 @@ export function BoardPage() {
   const devinLoginWarnings = useDevinLoginWarnings(now);
   const antigravityLoginWarnings = useAntigravityLoginWarnings(now);
   const setup = useFirstRunSetup();
-  const [skipped, setSkipped] = useState(setupSkipped);
-  const resumeStep = live ? setupResumeStep(setup) : null;
   const bannerCandidates: { kind: HomeBannerKind; node: ReactNode }[] = [
-    ...(resumeStep !== null
-      ? [
-          {
-            kind: 'setup' as const,
-            node: (
-              <SetupResumeBanner
-                key="setup"
-                step={resumeStep}
-                onResume={() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.set(SETUP_PARAM, '1');
-                  setSearchParams(params);
-                }}
-              />
-            ),
-          },
-        ]
-      : []),
     ...(backupWarning != null
       ? [{ kind: 'backup' as const, node: <BackupBanner key="backup" notice={backupWarning} /> }]
       : []),
@@ -230,8 +206,6 @@ export function BoardPage() {
   const setupDecision = setupShown({
     projects: setup.projects,
     progress: setup.progress,
-    skipped,
-    requested: searchParams.get(SETUP_PARAM) === '1',
   });
   const showSetup = setupHome && setupDecision === true;
   useEffect(() => {
@@ -268,17 +242,7 @@ export function BoardPage() {
     return <FirstRunFrame />;
   }
   if (showSetup) {
-    return (
-      <FirstRunSetup
-        setup={setup}
-        onSkip={() => {
-          setSkipped(true);
-          const params = new URLSearchParams(searchParams);
-          params.delete(SETUP_PARAM);
-          setSearchParams(params, { replace: true });
-        }}
-      />
-    );
+    return <FirstRunSetup setup={setup} />;
   }
   return (
     <div className="board-shell flex h-full overflow-hidden bg-(--surface-1)" data-route="board">

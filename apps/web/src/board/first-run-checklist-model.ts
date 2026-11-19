@@ -71,7 +71,7 @@ export interface SetupProgress {
 
 export function modelsConfirmed(settings: TeamRoutingSettings): boolean {
   const saved = new Set(settings.rules.map((rule) => rule.use));
-  return saved.has('coordinator') && saved.has('session');
+  return saved.has('coordinator');
 }
 
 export function setupOpenStep(progress: SetupProgress): SetupStepId | null {
@@ -82,14 +82,11 @@ export function setupOpenStep(progress: SetupProgress): SetupStepId | null {
 export function setupShown(input: {
   projects: number | undefined;
   progress: SetupProgress | undefined;
-  skipped: boolean;
-  requested: boolean;
 }): boolean | undefined {
   if (input.projects === undefined) return undefined;
   if (input.projects > 0) return false;
   if (input.progress === undefined) return undefined;
-  if (setupOpenStep(input.progress) === null) return false;
-  return input.requested || !input.skipped;
+  return setupOpenStep(input.progress) !== null;
 }
 
 export function projectCreationBlocked(input: {

@@ -23,10 +23,9 @@ test('a fresh install creates the coordinator rule in the UI and the Coordinator
   const composer = () => page.getByTestId('home-c').getByTestId('chief-composer-input');
 
   await page.goto(`${server.base}/app`);
-  await page.locator('[data-testid="first-run-skip"]:visible').click();
-  await composer().fill('first message before any rule');
-  await composer().press('Enter');
-  await expect.poll(() => sendStatuses).toEqual([409]);
+  await expect(page.getByTestId('first-run-setup')).toBeVisible();
+  await expect(page.getByTestId('first-run-skip')).toHaveCount(0);
+  await expect(page.getByTestId('home-c')).toHaveCount(0);
 
   const teams = (await (await fetch(`${server.base}/api/teams`)).json()) as { id: string }[];
   const teamId = teams[0]?.id;
@@ -47,8 +46,8 @@ test('a fresh install creates the coordinator rule in the UI and the Coordinator
   const settings = page.getByRole('dialog', { name: '设置' });
   const creator = settings.getByTestId('routing-rule-new-coordinator');
   await expect(creator).toBeVisible();
-  await expect(settings.getByTestId('routing-rule-new-session')).toBeVisible();
-  await expect(settings.getByTestId('routing-session-default')).toContainText('e2e-model · e2e relay');
+  await expect(settings.getByTestId('routing-rule-new-session')).toHaveCount(0);
+  await expect(settings.getByTestId('frequent-models-empty')).toBeVisible();
   await expect(settings.getByTestId('routing-coordinator-default')).toContainText(
     '当前默认：e2e-model · e2e relay',
   );
@@ -68,9 +67,10 @@ test('a fresh install creates the coordinator rule in the UI and the Coordinator
   });
 
   await page.goto(`${server.base}/app`);
+  await expect(page.getByTestId('first-run-setup')).toHaveCount(0);
   await composer().fill('second message after the rule');
   await composer().press('Enter');
-  await expect.poll(() => sendStatuses.length).toBe(2);
-  expect(sendStatuses[1]).toBeLessThan(300);
+  await expect.poll(() => sendStatuses.length).toBe(1);
+  expect(sendStatuses[0]).toBeLessThan(300);
   await expect(page.getByTestId('chief-stream')).toContainText('second message after the rule');
 });

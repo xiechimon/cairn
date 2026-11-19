@@ -383,7 +383,8 @@ export const EN: Record<string, string> = {
     'Subscription saved. It will be used once Claude Code is installed on this computer. Add a provider now so the Coordinator can start.',
   '欢迎使用 Cairn': 'Welcome to Cairn',
   确认并开始对话: 'Confirm and start chatting',
-  稍后再说: 'Later',
+  '任务默认用 Coordinator 的模型。以后可以在设置里添加常用模型，让 Coordinator 按任务挑。':
+    'Tasks use the Coordinator model by default. Later you can add frequently used models in Settings and let the Coordinator pick one per task.',
   '要在 Cairn 里登录': 'Sign in within Cairn',
   密钥不在配置文件里: 'Key is not in the config file',
   'Cairn 还不支持': 'Not supported by Cairn yet',
@@ -391,11 +392,6 @@ export const EN: Record<string, string> = {
   '有 {n} 个服务商已不在这台 Mac 上': '{n} {n#provider is|providers are} no longer on this Mac',
   '导入 {name} 失败': 'Could not import {name}',
   '已导入 {n} 个服务商': 'Imported {n} {n#provider|providers}',
-  还没接入模型: 'No models connected yet',
-  模型还没确认: 'Models not confirmed yet',
-  '设置做完，Coordinator 才能开始对话。':
-    'Finish setup so the Coordinator can start talking with you.',
-  继续设置: 'Continue setup',
   '撤销导入失败，可以在设置的服务商里删除。':
     'Could not undo the import. Remove the providers in Settings, under Providers.',
   读取本机配置失败: 'Could not read the config on this Mac',
@@ -1861,7 +1857,15 @@ export const EN: Record<string, string> = {
   '{count} 个项目单独设置了模型': '{count#1 project sets|# projects set} their own models',
   项目单独设置: 'Set per project',
   '和你对话、派活': 'Talks with you and hands out work',
-  执行每个任务: 'Runs every task',
+  常用模型: 'Frequently used models',
+  '任务默认用 Coordinator 的模型。在这里加几个常用模型，Coordinator 派活时会按任务难度从中挑一个。':
+    'Tasks use the Coordinator model by default. Add a few frequently used models here and the Coordinator picks one per task, by how hard it is.',
+  '还没有常用模型。先接入服务商，再回来添加。':
+    'No frequently used models yet. Connect a provider first, then come back to add some.',
+  '还没有常用模型，所有任务都用 Coordinator 的模型。':
+    'No frequently used models yet, so every task uses the Coordinator model.',
+  '{model} 的思考强度': '{model} thinking level',
+  '删除 {model}': 'Remove {model}',
   确认设置: 'Confirm settings',
   正在加载模型: 'Loading models',
   模型没能加载: 'Models did not load',
@@ -1951,12 +1955,6 @@ export const EN: Record<string, string> = {
   不填则沿用规则的执行机: 'Leave empty to keep the rule Runner',
   首选执行机: 'Preferred Runner',
   不固定: 'Any machine',
-  '当前默认：Claude Code（因为团队有 Claude 订阅，执行机也装了 Claude Code）':
-    'Current default: Claude Code (the team has a Claude subscription and a Runner has Claude Code installed)',
-  '当前默认：{model} · {provider}（因为还没有 Claude 订阅或装了 Claude Code 的执行机，用最早添加的服务商）':
-    'Current default: {model} · {provider} (there is no Claude subscription or no Runner with Claude Code, so the first provider you added is used)',
-  '当前没有可用的默认：添加服务商，或添加 Claude 订阅并在执行机上装 Claude Code':
-    'No default yet: add a provider, or add a Claude subscription and install Claude Code on a Runner',
   '当前默认：{model} · {provider}（因为团队有 Anthropic API key）':
     'Current default: {model} · {provider} (the team has an Anthropic API key)',
   '当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）':
@@ -2458,7 +2456,6 @@ export const EN: Record<string, string> = {
   '这把 key 没有通过检查，确认完整复制后再保存。':
     'That key failed validation. Copy it in full and save again.',
   '没能移除，稍后重试。': 'Could not remove it. Try again later.',
-  还没接入: 'Not connected',
   需要授权: 'Needs authorization',
   继续授权: 'Continue authorization',
   授权: 'Authorize',

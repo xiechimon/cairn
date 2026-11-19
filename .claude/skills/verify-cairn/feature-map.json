@@ -1126,7 +1126,7 @@
     {
       "id": "routing",
       "name": "Model and work routing",
-      "summary": "Which model each kind of work uses: the Model selector page (default model for new tasks, the Coordinator and other agents with model and thinking level), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.",
+      "summary": "Which model each kind of work uses: the Model selector page (the Coordinator with model and thinking level, which tasks follow by default, and the frequently used models the Coordinator picks from per task), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.",
       "states": "A graph from each use to its provider with dashed wires for unavailable providers, an empty state, one picker row per use with runtimes no Runner enabled greyed out, and a per-thread override dialog.",
       "centrality": 1,
       "status": "shipped",
@@ -1134,11 +1134,13 @@
         "web": [
           "apps/web/src/resources/model-routing-page.tsx",
           "apps/web/src/resources/routing-settings-page.tsx",
+          "apps/web/src/resources/frequent-models-card.tsx",
           "apps/web/src/board/route-override-dialog.tsx"
         ],
         "server": [
           "apps/server/src/services/model-routing.ts",
           "apps/server/src/services/routing-rules.ts",
+          "apps/server/src/services/top-models.ts",
           "apps/server/src/services/machine-routing.ts"
         ]
       },

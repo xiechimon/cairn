@@ -194,6 +194,7 @@ export const coordinatorCreateTodoParamsSchema = z
     blockedBy: todoIdListSchema.optional(),
     priority: z.enum(TASK_REQUEST_PRIORITIES).optional(),
     difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).optional(),
+    model: z.string().trim().min(1).max(200).optional(),
     output: todoOutputSchema.optional(),
     platform: runnerOsSchema.optional(),
     briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
@@ -350,7 +351,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'models',
     description:
-      'List the model candidates for agents as rows {provider, providerLabel, modelId, modelName}. Read this before setting provider/modelId on a routing rule — only values from this list are valid.',
+      "List the model candidates for agents as rows {provider, providerLabel, modelId, modelName, frequent?}. Read this before setting provider/modelId on a routing rule — only values from this list are valid. Rows with frequent: true are the owner's frequently used models, the only valid values for create_todo model.",
     parameters: obj({}),
     replaySafe: true,
   },
@@ -536,6 +537,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         priority: str('Optional "first" (top of the project queue) or "normal" (default).'),
         difficulty: str(
           'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
+        ),
+        model: str(
+          "Optional model for this task, chosen from the owner's frequently used models (the rows marked frequent: true in models): pass its modelId, or provider/modelId when two providers share it. Pick by what the task needs, for example a fast model for small edits and a stronger one for hard work. Any other model is refused. Omit it and the task runs on the team task model, which follows the Coordinator model.",
         ),
         output: str(
           'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or one of "info", "report", "dataset", "link" (info card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment; pick the kind that names the artifact).',

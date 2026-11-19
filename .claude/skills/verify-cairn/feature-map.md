@@ -300,7 +300,7 @@ Reach:
 
 ### routing
 
-**Model and work routing** (shipped, centrality 1). Which model each kind of work uses: the Model selector page (default model for new tasks, the Coordinator and other agents with model and thinking level), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
+**Model and work routing** (shipped, centrality 1). Which model each kind of work uses: the Model selector page (the Coordinator with model and thinking level, which tasks follow by default, and the frequently used models the Coordinator picks from per task), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
 
 States: A graph from each use to its provider with dashed wires for unavailable providers, an empty state, one picker row per use with runtimes no Runner enabled greyed out, and a per-thread override dialog.
 
@@ -312,7 +312,7 @@ Reach:
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
 - Settings: `设置` (Settings) › `模型` (Model) › `模型` (Model)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-add-provider`, `routing-coordinator-default`, `routing-project-overrides`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`
+- Test ids in its code: `frequent-model-row`, `frequent-models`, `frequent-models-empty`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-add-provider`, `routing-coordinator-default`, `routing-project-overrides`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)
@@ -484,7 +484,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `composer-setup-reconnect`, `first-run-add-provider`, `first-run-confirm`, `first-run-frame`, `first-run-pick-*`, `first-run-resume`, `first-run-setup`, `first-run-skip`, `first-run-step-*`, `first-run-vm`
+- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `composer-setup-reconnect`, `first-run-add-provider`, `first-run-confirm`, `first-run-frame`, `first-run-pick-coordinator`, `first-run-setup`, `first-run-step-*`, `first-run-task-model-note`, `first-run-vm`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
 - Backend design: **gap**: no design for checklist state and the 10-minute path

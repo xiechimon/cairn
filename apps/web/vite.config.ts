@@ -37,8 +37,8 @@ export default defineConfig(({ mode }) => ({
       : {},
   resolve: {
     alias: [
-      { find: '@', replacement: new URL('./src', import.meta.url).pathname },
-      { find: /^cn$/, replacement: new URL('./src/lib/cn.ts', import.meta.url).pathname },
+      { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
+      { find: /^cn$/, replacement: fileURLToPath(new URL('./src/lib/cn.ts', import.meta.url)) },
     ],
   },
   server: {

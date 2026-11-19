@@ -59,12 +59,11 @@ test('provider records and available connections are model sources; unavailable 
   expect(modelSourceCount(undefined, [])).toBeUndefined();
 });
 
-test('models are confirmed only once both the coordinator and session rules are stored', () => {
+test('models are confirmed once the coordinator rule is stored; tasks follow it', () => {
   const rule = (use: string) => ({ use }) as never;
   expect(modelsConfirmed({ rules: [], policies: [] })).toBe(false);
-  expect(modelsConfirmed({ rules: [rule('coordinator')], policies: [] })).toBe(false);
   expect(modelsConfirmed({ rules: [rule('session'), rule('review')], policies: [] })).toBe(false);
-  expect(modelsConfirmed({ rules: [rule('coordinator'), rule('session')], policies: [] })).toBe(true);
+  expect(modelsConfirmed({ rules: [rule('coordinator')], policies: [] })).toBe(true);
 });
 
 test('the setup page opens the models step first, then confirm, then nothing', () => {
@@ -73,20 +72,16 @@ test('the setup page opens the models step first, then confirm, then nothing', (
   expect(setupOpenStep({ models: both, confirmed: true })).toBeNull();
 });
 
-test('the setup page shows only for a team with no projects until both steps are done, and skipping hides it until asked again', () => {
+test('the setup page shows for a team with no projects until both steps are done, with no way to skip it', () => {
   const progress = { models: none, confirmed: false };
-  const base = { projects: 0, progress, skipped: false, requested: false };
+  const base = { projects: 0, progress };
   expect(setupShown(base)).toBe(true);
   expect(setupShown({ ...base, projects: 1 })).toBe(false);
-  expect(setupShown({ ...base, projects: 1, requested: true })).toBe(false);
-  expect(setupShown({ ...base, skipped: true })).toBe(false);
-  expect(setupShown({ ...base, skipped: true, requested: true })).toBe(true);
   expect(setupShown({ ...base, projects: undefined })).toBeUndefined();
   expect(setupShown({ ...base, progress: undefined })).toBeUndefined();
   const done = { models: both, confirmed: true };
   expect(setupShown({ ...base, progress: { models: both, confirmed: false } })).toBe(true);
   expect(setupShown({ ...base, progress: done })).toBe(false);
-  expect(setupShown({ ...base, progress: done, requested: true })).toBe(false);
 });
 
 test('creating the first project is blocked until both steps are done; later projects never are', () => {

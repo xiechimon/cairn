@@ -3,28 +3,21 @@ import {
   type RouteUse,
   type RoutingRuleRecord,
   type RuleFix,
-  type SessionDefault,
   type TeamRoutingSettings,
   THINKING_LEVELS,
   type ThinkingLevel,
+  type TopModel,
 } from '@cairn/shared';
-import { Box, ChevronRight } from 'lucide-react';
-import { type ComponentType, type ReactNode, type SVGProps, useEffect, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
+import { useFrequentModels, useFrequentModelsMutations } from '../api/frequent-models.js';
 import { useMachines, useModelSources, useProjects } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { ROUTE_USE_LABELS } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
-import {
-  AntigravityMark,
-  ClaudeMark,
-  DevinMark,
-  GeminiMark,
-  GrokMark,
-  OpenAIMark,
-} from '../components/brand-marks.js';
 import { FilterPicker } from '../components/filter-picker.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import { QueryBoundary } from '../components/query-state.js';
@@ -41,6 +34,7 @@ import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { FrequentModelsCard, levelLabel, vendorMark } from './frequent-models-card.js';
 import { RuleIssueNotices } from './rule-issue-notices.js';
 
 const AGENT_USES: readonly RouteUse[] = ['coordinator'];
@@ -58,44 +52,6 @@ const modelKey = (option: Pick<ModelOption, 'provider' | 'modelId'>) =>
   JSON.stringify([option.provider, option.modelId]);
 
 const FOLLOW_DEFAULT = 'follow-default';
-
-const levelLabel = (level: string) => level.charAt(0).toUpperCase() + level.slice(1);
-
-function vendorMark(modelId: string): ComponentType<SVGProps<SVGSVGElement>> {
-  if (modelId.startsWith('claude')) return ClaudeMark;
-  if (modelId.startsWith('devin')) return DevinMark;
-  if (modelId.startsWith('antigravity')) return AntigravityMark;
-  if (/^(gpt|o\d|codex)/.test(modelId)) return OpenAIMark;
-  if (modelId.startsWith('gemini')) return GeminiMark;
-  if (modelId.startsWith('grok')) return GrokMark;
-  return Box;
-}
-
-function SessionDefaultHint({
-  sessionDefault,
-  options,
-}: {
-  sessionDefault: SessionDefault;
-  options: ModelOption[];
-}) {
-  const { t } = useI18n();
-  const row = options.find(
-    (o) => o.provider === sessionDefault.provider && o.modelId === sessionDefault.modelId,
-  );
-  const text =
-    sessionDefault.reason === 'claude-code'
-      ? t('当前默认：Claude Code（因为团队有 Claude 订阅，执行机也装了 Claude Code）')
-      : sessionDefault.reason === 'provider'
-        ? t(
-            '当前默认：{model} · {provider}（因为还没有 Claude 订阅或装了 Claude Code 的执行机，用最早添加的服务商）',
-            {
-              model: row?.modelName ?? sessionDefault.modelId ?? '',
-              provider: row?.providerLabel ?? sessionDefault.provider ?? '',
-            },
-          )
-        : t('当前没有可用的默认：添加服务商，或添加 Claude 订阅并在执行机上装 Claude Code');
-  return <span data-testid="routing-session-default">{text}</span>;
-}
 
 function CoordinatorDefaultHint({
   coordinatorDefault,
@@ -396,6 +352,19 @@ export function ModelRulesSection() {
   const machinesQ = useMachines(teamId, live);
   const modelSourcesQ = useModelSources(teamId, live);
   const mutations = useRoutingSettingsMutations(teamId);
+  const frequentQ = useFrequentModels(teamId, live);
+  const frequentMutations = useFrequentModelsMutations(teamId);
+  const [fixtureFrequent, setFixtureFrequent] = useState(fixture.resources?.topModels ?? []);
+  const frequent = live ? (frequentQ.data?.models ?? []) : fixtureFrequent;
+  const saveFrequent = (next: TopModel[]) => {
+    if (!live) {
+      setFixtureFrequent(next);
+      return;
+    }
+    frequentMutations.put.mutate(next, {
+      onError: (error) => toastError(t('保存失败，请重试。'), error),
+    });
+  };
   const settings = live
     ? (settingsQ.data ?? EMPTY_SETTINGS)
     : (fixture.resources?.routingSettings ?? EMPTY_SETTINGS);
@@ -436,7 +405,6 @@ export function ModelRulesSection() {
       },
     );
   };
-  const session = ruleOf('session');
   return (
     <QueryBoundary
       query={live ? settingsQ : undefined}
@@ -479,21 +447,8 @@ export function ModelRulesSection() {
               onSave={save(use)}
             />
           ))}
-          <RuleRow
-            use="session"
-            label={t('任务')}
-            hint={
-              session === null && settings.sessionDefault !== undefined ? (
-                <SessionDefaultHint sessionDefault={settings.sessionDefault} options={options} />
-              ) : (
-                t('执行每个任务')
-              )
-            }
-            rule={session}
-            options={options}
-            onSave={save('session')}
-          />
         </SettingsCard>
+        <FrequentModelsCard models={frequent} options={options} onChange={saveFrequent} />
         <ProjectOverrides options={options} />
       </div>
     </QueryBoundary>

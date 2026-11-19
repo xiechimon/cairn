@@ -311,7 +311,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### routing
 
-**Model and work routing** (shipped). Which model each kind of work uses: the Model selector page (default model for new tasks, the Coordinator and other agents with model and thinking level), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
+**Model and work routing** (shipped). Which model each kind of work uses: the Model selector page (the Coordinator with model and thinking level, which tasks follow by default, and the frequently used models the Coordinator picks from per task), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
 
 - Research: [docs/research/capability-routing-2026-11-06.md](research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](design/references/settings)

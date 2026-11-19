@@ -17,7 +17,6 @@ import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { InkSpiral, type SpiralHang } from '../components/ink-spiral.js';
-import { NoticeBanner } from '../components/notice-banner.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
@@ -29,7 +28,7 @@ import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { AddProviderFlow, type AddProviderView } from '../resources/add-provider-flow.js';
 import { ModelPicker } from '../resources/routing-settings-page.js';
-import { safeLocalStorage, safeSessionStorage } from '../safe-storage.js';
+import { safeLocalStorage } from '../safe-storage.js';
 import {
   coordinatorCanAnswer,
   modelSides,
@@ -42,13 +41,7 @@ import {
 import { LocalProviderImportCard } from './local-provider-import.js';
 import { formatDownloadBytes } from './machines-panel.js';
 
-export const SETUP_PARAM = 'setup';
-export const SETUP_HREF = `/app?${SETUP_PARAM}=1`;
-const SKIP_KEY = 'cairn.firstRunSetupSkipped';
-
-export function setupSkipped(): boolean {
-  return safeSessionStorage()?.getItem(SKIP_KEY) === '1';
-}
+export const SETUP_HREF = '/app';
 
 export const FIRST_RUN_OPEN_KEY = 'cairn.firstRunOpen';
 
@@ -73,12 +66,6 @@ export function FirstRunFrame() {
       <div className="max-lg:hidden lg:max-w-150 lg:basis-2/5 lg:border-r lg:border-border lg:bg-(--surface-1)" />
     </main>
   );
-}
-
-function skipSetup(): void {
-  try {
-    safeSessionStorage()?.setItem(SKIP_KEY, '1');
-  } catch {}
 }
 
 export function useFirstRunSetup() {
@@ -235,7 +222,7 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
 }
 
 interface Pick {
-  use: 'coordinator' | 'session';
+  use: 'coordinator';
   provider: string;
   modelId: string;
   stored: boolean;
@@ -254,12 +241,8 @@ function pickOf(
   return { use, provider: fallback.provider, modelId: fallback.modelId, stored: false };
 }
 
-function picksOf(setup: Setup): (Pick | null)[] {
-  const rules = setup.settings?.rules ?? [];
-  return [
-    pickOf('coordinator', rules, setup.settings?.coordinatorDefault),
-    pickOf('session', rules, setup.settings?.sessionDefault),
-  ];
+function coordinatorPickOf(setup: Setup): Pick | null {
+  return pickOf('coordinator', setup.settings?.rules ?? [], setup.settings?.coordinatorDefault);
 }
 
 function modelName(pick: Pick, options: readonly ModelOption[]): string {
@@ -279,40 +262,33 @@ function ConfirmBody({ setup }: { setup: Setup }) {
       (computer) => computer.kind === 'vm' && computer.download?.state === 'absent',
     ) ?? null;
   const [downloadVm, setDownloadVm] = useState(false);
-  const [changed, setChanged] = useState<Partial<Record<Pick['use'], ModelOption>>>({});
-  const suggested = picksOf(setup);
-  const picks = suggested.map((pick, i): Pick | null => {
-    const use: Pick['use'] = i === 0 ? 'coordinator' : 'session';
-    const option = changed[use];
-    if (option === undefined) return pick;
-    return { use, provider: option.provider, modelId: option.modelId, stored: false };
-  });
-  const pickFor = (use: Pick['use'], index: number) => (option: ModelOption) => {
-    const original = suggested[index];
+  const [changed, setChanged] = useState<ModelOption | null>(null);
+  const suggested = coordinatorPickOf(setup);
+  const pick: Pick | null =
+    changed === null
+      ? suggested
+      : {
+          use: 'coordinator',
+          provider: changed.provider,
+          modelId: changed.modelId,
+          stored: false,
+        };
+  const pickModel = (option: ModelOption) => {
     const same =
-      original != null &&
-      original.provider === option.provider &&
-      original.modelId === option.modelId;
-    setChanged((prev) => {
-      const { [use]: _, ...rest } = prev;
-      return same ? rest : { ...rest, [use]: option };
-    });
+      suggested != null &&
+      suggested.provider === option.provider &&
+      suggested.modelId === option.modelId;
+    setChanged(same ? null : option);
   };
-  const rows = [
-    { use: 'coordinator' as const, who: t('Coordinator'), pick: picks[0] },
-    { use: 'session' as const, who: t('任务'), pick: picks[1] },
-  ];
-  const ready = picks.every((p) => p != null);
   const confirm = async () => {
     try {
-      for (const p of picks) {
-        if (p == null || p.stored) continue;
+      if (pick != null && !pick.stored) {
         await patchRule.mutateAsync({
-          use: p.use,
-          body: { provider: p.provider, modelId: p.modelId },
+          use: pick.use,
+          body: { provider: pick.provider, modelId: pick.modelId },
         });
       }
-      setChanged({});
+      setChanged(null);
       if (downloadVm && vm !== null)
         manageComputer.mutate({ computerId: vm.id, action: 'install' });
     } catch (error) {
@@ -323,36 +299,41 @@ function ConfirmBody({ setup }: { setup: Setup }) {
     <>
       <h3 className="mx-0 mt-2 mb-1.5 text-meta font-normal text-content-tertiary">{t('模型')}</h3>
       <ul className="m-0 list-none divide-y divide-border border-y border-border p-0">
-        {rows.map(({ use, who, pick }, index) => (
-          <li
-            key={use}
-            data-testid={`first-run-pick-${use}`}
-            className="flex min-h-13 flex-wrap items-center gap-x-4 py-2"
-          >
-            <span className="w-28 flex-none font-title text-foreground">{who}</span>
-            {pick == null ? (
-              <span className="text-meta text-destructive">{t('还没有能用的模型')}</span>
-            ) : (
-              <span className="min-w-0 truncate text-foreground">
-                {modelName(pick, setup.options)}
-              </span>
-            )}
-            <span className="ml-auto">
-              <ModelPicker
-                use={use}
-                rule={pick ?? null}
-                options={setup.options}
-                onPick={pickFor(use, index)}
-                trigger={{
-                  label: t('换一个'),
-                  className:
-                    'h-6 gap-1 rounded-sm border-0 bg-transparent p-0 text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current data-[size=default]:h-6 dark:bg-transparent dark:hover:bg-transparent pointer-coarse:-my-2.5 pointer-coarse:h-11 pointer-coarse:data-[size=default]:h-11',
-                }}
-              />
+        <li
+          data-testid="first-run-pick-coordinator"
+          className="flex min-h-13 flex-wrap items-center gap-x-4 py-2"
+        >
+          <span className="w-28 flex-none font-title text-foreground">{t('Coordinator')}</span>
+          {pick == null ? (
+            <span className="text-meta text-destructive">{t('还没有能用的模型')}</span>
+          ) : (
+            <span className="min-w-0 truncate text-foreground">
+              {modelName(pick, setup.options)}
             </span>
-          </li>
-        ))}
+          )}
+          <span className="ml-auto">
+            <ModelPicker
+              use="coordinator"
+              rule={pick ?? null}
+              options={setup.options}
+              onPick={pickModel}
+              trigger={{
+                label: t('换一个'),
+                className:
+                  'h-6 gap-1 rounded-sm border-0 bg-transparent p-0 text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current data-[size=default]:h-6 dark:bg-transparent dark:hover:bg-transparent pointer-coarse:-my-2.5 pointer-coarse:h-11 pointer-coarse:data-[size=default]:h-11',
+              }}
+            />
+          </span>
+        </li>
       </ul>
+      <p
+        data-testid="first-run-task-model-note"
+        className="m-0 mt-2 text-pretty text-meta text-content-tertiary"
+      >
+        {t(
+          '任务默认用 Coordinator 的模型。以后可以在设置里添加常用模型，让 Coordinator 按任务挑。',
+        )}
+      </p>
       {vm?.download != null && (
         <>
           <h3 className="mx-0 mt-6 mb-1.5 text-meta font-normal text-content-tertiary">
@@ -386,7 +367,7 @@ function ConfirmBody({ setup }: { setup: Setup }) {
           data-testid="first-run-confirm"
           size="lg"
           className="px-4 pointer-coarse:h-11 max-lg:h-11 max-lg:w-full"
-          disabled={!ready || patchRule.isPending}
+          disabled={pick == null || patchRule.isPending}
           onClick={() => void confirm()}
         >
           {patchRule.isPending && <Spinner className="size-5" />}
@@ -412,25 +393,6 @@ function LanguageSwitch() {
         testId: `first-run-locale-${code}`,
       }))}
     />
-  );
-}
-
-function SkipLine({ onSkip, className }: { onSkip: () => void; className?: string }) {
-  const { t } = useI18n();
-  return (
-    <div className={cn('m-0', className)}>
-      <Button
-        variant="link"
-        data-testid="first-run-skip"
-        className="h-auto min-h-6 p-0 text-meta font-normal text-content-tertiary hover:text-foreground pointer-coarse:-my-3 pointer-coarse:py-3"
-        onClick={() => {
-          skipSetup();
-          onSkip();
-        }}
-      >
-        {t('稍后再说')}
-      </Button>
-    </div>
   );
 }
 
@@ -499,7 +461,7 @@ function Segments({ open }: { open: SetupStepId }) {
   );
 }
 
-export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => void }) {
+export function FirstRunSetup({ setup }: { setup: Setup }) {
   const { t } = useI18n();
   const progress = setup.progress;
   if (progress === undefined) return null;
@@ -537,7 +499,6 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
             className="mt-6 self-end max-lg:hidden [@media(max-height:700px)]:hidden"
           />
         </div>
-        <SkipLine onSkip={onSkip} className="relative max-lg:hidden" />
       </aside>
       <div className="flex flex-1 flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] lg:items-center lg:overflow-y-auto lg:px-16 lg:pt-28 lg:pb-15">
         <section
@@ -556,33 +517,7 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
             <ConfirmBody setup={setup} />
           )}
         </section>
-        <SkipLine onSkip={onSkip} className="mt-auto pt-10 lg:hidden" />
       </div>
     </main>
-  );
-}
-
-export function setupResumeStep(setup: Setup): SetupStepId | null {
-  if (setup.projects !== 0 || setup.progress === undefined) return null;
-  return setupOpenStep(setup.progress);
-}
-
-export function SetupResumeBanner({ step, onResume }: { step: SetupStepId; onResume: () => void }) {
-  const { t } = useI18n();
-  const title = step === 'models' ? t('还没接入模型') : t('模型还没确认');
-  return (
-    <NoticeBanner
-      data-testid="first-run-resume"
-      aria-label={title}
-      tone="waiting"
-      icon={KeyRound}
-      title={title}
-      body={t('设置做完，Coordinator 才能开始对话。')}
-      actions={
-        <Button size="sm" className="px-3" onClick={onResume}>
-          {t('继续设置')}
-        </Button>
-      }
-    />
   );
 }

@@ -7,8 +7,6 @@ const LAUNCH_TIMEOUT_MS = 120_000;
 const GATE_SETTLE_MS = 5_000;
 const PAIRING_INPUT = '#cairn-pair-input';
 const FIRST_RUN_SETUP = '[data-testid="first-run-setup"]';
-const FIRST_RUN_SKIP = '[data-testid="first-run-skip"]';
-const UPDATE_BUTTON = '[data-testid="desktop-update"]';
 const RUNNER_ONLINE_TIMEOUT_MS = 90_000;
 const RUNNER_ENTRY = 'Resources/runner/dist/cli.mjs';
 
@@ -50,8 +48,6 @@ try {
   assert.equal(await window.locator(PAIRING_INPUT).count(), 0, 'the pairing gate is showing');
 
   await window.locator(FIRST_RUN_SETUP).waitFor({ timeout: GATE_SETTLE_MS });
-  await window.locator(`${FIRST_RUN_SKIP}:visible`).click();
-  await window.locator(UPDATE_BUTTON).waitFor({ timeout: GATE_SETTLE_MS });
   const update = await window.evaluate(async () => {
     const bridge = window.cairnDesktop.update;
     await bridge.check();
