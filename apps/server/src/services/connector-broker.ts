@@ -8,6 +8,7 @@ import {
   type McpConnectorTool,
   parseConnectorToolName,
   type RemoteToolDef,
+  sanitizeToolParameters,
   type UserRecord,
 } from '@cairn/shared';
 import { and, asc, eq, inArray } from 'drizzle-orm';
@@ -115,11 +116,12 @@ export function connectorToolDefsForTeam(db: Db, teamId: string): RemoteToolDef[
     for (const tool of cachedTools(row)) {
       const name = connectorToolName(row.slug, tool.name);
       if (name.length > CONNECTOR_TOOL_NAME_MAX) continue;
+      const parameters = sanitizeToolParameters(tool.inputSchema);
       defs.push({
         name,
         label: `${row.label}: ${tool.name}`,
         description: tool.description ?? `${row.label} tool ${tool.name}`,
-        ...(tool.inputSchema === undefined ? {} : { parameters: tool.inputSchema }),
+        ...(parameters === undefined ? {} : { parameters }),
       });
     }
   }

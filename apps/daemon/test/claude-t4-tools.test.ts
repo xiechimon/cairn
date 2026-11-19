@@ -1,6 +1,6 @@
 import type { LocalToolDef, RemoteToolDef } from '@cairn/shared';
 import * as shared from '@cairn/shared';
-import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS, sanitizeToolParameters } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { buildHostTools, mapMcpEndpoint, parametersToShape } from '../src/backend/claude-code.js';
@@ -78,6 +78,83 @@ describe('parametersToShape (failure modes 2/3)', () => {
   test('integer slots keep their integer type', () => {
     const json = roundTrip({ type: 'object', properties: { x: { type: 'integer' } } });
     expect((json.properties as Record<string, Record<string, unknown>>).x?.type).toBe('integer');
+  });
+
+  test('real computer_act converts and keeps int semantics', () => {
+    const computerAct = must(
+      shared.COMPUTER_DESKTOP_TOOLS.find((t) => t.name === 'computer_act'),
+      'computer_act',
+    );
+    const shape = parametersToShape(computerAct.parameters, computerAct.name);
+    const params = z.object(shape);
+    expect(params.parse({ actions: [{ kind: 'click', x: 5, y: 7 }] })).toBeTruthy();
+    expect(() => params.parse({ actions: [{ kind: 'click', x: 5.5 }] })).toThrow();
+    const json = roundTrip(computerAct.parameters);
+    const actions = must(
+      (json.properties as Record<string, Record<string, unknown>>).actions,
+      'actions',
+    );
+    const itemProps = (actions.items as Record<string, unknown>).properties as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(itemProps.x).toMatchObject({ type: 'integer' });
+    expect(itemProps.ms).toMatchObject({ type: 'integer' });
+  });
+
+  test('sanitized connector schemas always fit the vocabulary', () => {
+    const schemas = [
+      {
+        type: 'object',
+        additionalProperties: false,
+        required: ['to'],
+        properties: {
+          to: { type: 'string', format: 'email', maxLength: 254 },
+          max: { type: 'integer', minimum: 1 },
+          pick: { type: 'string', enum: ['a', 'b'], default: 'a' },
+          filter: { anyOf: [{ type: 'string' }, { type: 'integer' }] },
+          cursor: { type: ['string', 'null'] },
+          nested: {
+            type: 'object',
+            additionalProperties: false,
+            properties: { flag: { type: 'boolean', default: false } },
+          },
+        },
+      },
+      { anyOf: [{ type: 'object', properties: { q: { type: 'string' } } }] },
+      { type: 'object', properties: { list: { type: 'array' }, bare: { type: 'object' } } },
+      { type: 'object', properties: { ref: { $ref: '#/$defs/T', $defs: {} } } },
+      { type: 'object', properties: { onlyNull: { type: ['null'] }, flag: { type: 'null' } } },
+      { type: 'object', anyOf: [{ type: 'null' }] },
+    ];
+    for (const schema of schemas) {
+      const parameters = sanitizeToolParameters(schema);
+      expect(() => parametersToShape(parameters, 'connector_x__y')).not.toThrow();
+    }
+  });
+
+  test('sanitized free-form and null params keep their values through conversion', () => {
+    const parameters = sanitizeToolParameters({
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        payload: { type: 'object', additionalProperties: true },
+        marker: { type: 'null' },
+        union: { type: ['null', 'string'] },
+      },
+    });
+    const shape = parametersToShape(parameters, 'connector_x__y');
+    const parsed = z.object(shape).parse({
+      payload: { arbitrary: [1, { deep: true }] },
+      marker: null,
+      union: 'x',
+    });
+    expect(parsed).toEqual({
+      payload: { arbitrary: [1, { deep: true }] },
+      marker: null,
+      union: 'x',
+    });
+    expect(parametersToShape({ type: 'object' }, 'connector_x__y')).toEqual({});
   });
 
   test('every shipped tool schema is inside the vocabulary the Claude Code backend accepts', () => {

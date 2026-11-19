@@ -995,27 +995,32 @@ function jsonSchemaToZod(schema: unknown, where: string): z.ZodType {
     case 'boolean':
       forbidKeys(['type', 'description']);
       return describe(z.boolean());
+    case 'null':
+      forbidKeys(['type', 'description']);
+      return describe(z.null());
     case 'array':
       forbidKeys(['type', 'description', 'items']);
       return describe(z.array(jsonSchemaToZod(def.items, `${where}.items`)));
     case 'object': {
       forbidKeys(['type', 'description', 'properties', 'required']);
       if (
-        def.properties === undefined ||
+        def.required !== undefined &&
+        (!Array.isArray(def.required) || def.required.some((k) => typeof k !== 'string'))
+      ) {
+        throw new Error(
+          `claude-code backend: tool schema ${where} required must be string[] (fail-closed)`,
+        );
+      }
+      if (def.properties === undefined) {
+        return describe(z.looseObject({}));
+      }
+      if (
         typeof def.properties !== 'object' ||
         def.properties === null ||
         Array.isArray(def.properties)
       ) {
         throw new Error(
           `claude-code backend: tool schema ${where} object properties must be an object (fail-closed)`,
-        );
-      }
-      if (
-        def.required !== undefined &&
-        (!Array.isArray(def.required) || def.required.some((k) => typeof k !== 'string'))
-      ) {
-        throw new Error(
-          `claude-code backend: tool schema ${where} required must be string[] (fail-closed)`,
         );
       }
       const required = new Set((def.required as string[] | undefined) ?? []);

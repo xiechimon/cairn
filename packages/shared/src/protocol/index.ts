@@ -16,3 +16,4 @@ export * from './own-computer.js';
 export * from './rest.js';
 export * from './search.js';
 export * from './sse.js';
+export * from './tool-parameters.js';

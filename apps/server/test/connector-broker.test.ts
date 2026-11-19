@@ -98,7 +98,46 @@ describe('connectorToolDefsForTeam', () => {
       'connector_gmail__GMAIL_SEND',
       'connector_gmail__GMAIL_DELETE',
     ]);
-    expect(defs[1]?.parameters).toEqual(TOOLS[1]?.inputSchema);
+    expect(defs[1]?.parameters).toEqual({
+      type: 'object',
+      required: ['to'],
+      properties: { to: { type: 'string' }, body: { type: 'string' } },
+    });
+    s.dispose();
+  });
+
+  test('sanitizes third-party inputSchema into the daemon tool vocabulary', () => {
+    const { s } = world();
+    insertConnector(s, {
+      toolsJson: [
+        {
+          name: 'GMAIL_LIST',
+          description: 'list mail',
+          inputSchema: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['label'],
+            properties: {
+              label: { type: 'string', enum: ['INBOX', 'SENT'], default: 'INBOX' },
+              max: { type: 'integer', minimum: 1 },
+              filter: { anyOf: [{ type: 'string' }, { type: 'integer' }] },
+              cursor: { type: ['string', 'null'] },
+            },
+          },
+        },
+      ],
+    });
+    const defs = connectorToolDefsForTeam(s.db, s.team.id);
+    expect(defs[0]?.parameters).toEqual({
+      type: 'object',
+      required: ['label'],
+      properties: {
+        label: { type: 'string' },
+        max: { type: 'integer' },
+        filter: { type: 'string' },
+        cursor: { type: 'string' },
+      },
+    });
     s.dispose();
   });
 });
