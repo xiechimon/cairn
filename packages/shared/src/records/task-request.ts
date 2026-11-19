@@ -102,6 +102,13 @@ export class RequestQuoteError extends Error {
   }
 }
 
+export class AmbiguousQuoteError extends RequestQuoteError {
+  constructor(quote: string) {
+    super(quote, '');
+    this.message = `quote matches cited segments with different authors: "${quote}"`;
+  }
+}
+
 const blockquote = (text: string) =>
   text
     .split('\n')
@@ -197,13 +204,19 @@ export function quoteSegments(
 ): TaskSegment[] {
   const located = quotes.map((raw) => {
     const wanted = raw.normalize('NFC').trim();
-    const index = cited.findIndex((c) => c.segment.text.normalize('NFC').includes(wanted));
-    if (index === -1 || wanted === '') {
+    const matches = cited
+      .map((c, index) => ({ c, index }))
+      .filter(({ c }) => wanted !== '' && c.segment.text.normalize('NFC').includes(wanted));
+    if (matches.length === 0) {
       const best = cited
         .map((c) => longestMatchedPrefix(c.segment.text.normalize('NFC'), wanted))
         .sort((a, b) => b.length - a.length)[0];
       throw new RequestQuoteError(raw, best ?? '');
     }
+    if (new Set(matches.map(({ c }) => c.segment.author)).size > 1) {
+      throw new AmbiguousQuoteError(raw);
+    }
+    const { index } = matches[0] as { c: CitedSegment; index: number };
     const at = cited[index]?.segment.text.normalize('NFC').indexOf(wanted) ?? 0;
     return { index, at, wanted };
   });

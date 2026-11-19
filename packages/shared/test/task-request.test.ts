@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AmbiguousQuoteError,
   buildOrchestratePrompt,
   buildTaskPromptText,
   CHIEF_REMOTE_TOOLS,
@@ -203,6 +204,29 @@ describe('quoteSegments', () => {
     expect(quotes.map((q) => [q.author, q.text, q.source.span])).toEqual([
       ['third-party', 'Fix the crash.', 'quote'],
       ['owner', '再把 README 更新。', 'quote'],
+    ]);
+  });
+
+  it('rejects a quote that lives in segments of different authors instead of guessing by order', () => {
+    const words = 'Keep the existing regression test.';
+    const correction = chat('m9', `改一下。\n${words}`);
+    const cited = [issue(`Issue body.\n${words}`), correction];
+    let caught: unknown;
+    try {
+      quoteSegments(cited, [words]);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(AmbiguousQuoteError);
+    expect((caught as Error).message).toContain(words);
+  });
+
+  it('keeps first-match behavior when duplicates share one author class', () => {
+    const first = chat('m1', 'do it. keep the test.');
+    const second = chat('m2', 'and keep the test.');
+    const quotes = quoteSegments([first, second], ['keep the test.']);
+    expect(quotes.map((q) => [q.author, q.source])).toEqual([
+      ['owner', { kind: 'chat', threadId: 'chief-t', messageId: 'm1', span: 'quote' }],
     ]);
   });
 

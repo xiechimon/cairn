@@ -272,6 +272,28 @@ describe('splitting one request', () => {
     expect(again.spec).toBe('> 只修崩溃，不动 CI。');
   });
 
+  test('a re-split quote that matches both the issue and an owner correction is refused, creating nothing', async () => {
+    const issue = issueTask('Keep the existing regression test.', 13);
+    const child = unstartedRequest({ sourceTodoId: issue.id });
+    await relay('update_todo', {
+      todoId: child.id,
+      addMessageIds: [ownerMessage('Actually: Keep the existing regression test.')],
+    });
+    const before = H.s.db.select().from(todoTable).all().length;
+    await expect(
+      relay('create_todo', {
+        projectId: H.projectId,
+        sourceTodoId: child.id,
+        quotes: ['Keep the existing regression test.'],
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(H.s.db.select().from(todoTable).all().length).toBe(before);
+    expect(row(child.id).request?.segments.map((segment) => segment.author)).toEqual([
+      'third-party',
+      'owner',
+    ]);
+  });
+
   test('R3 the orchestration prompt fences only the issue quote', async () => {
     const issue = issueTask('Fix the crash on save.', 11);
     const child = unstartedRequest({ sourceTodoId: issue.id });
