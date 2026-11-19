@@ -148,10 +148,9 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         inputTransition(() => requireCoordinatorConversation(deps.db, threadId, conversationId)),
       runs: async (threadId) => coordinatorRuns(deps.db, threadId),
       bindRun: async (threadId, conversationId, taskId, requestIds) =>
-        inputTransition(() => {
-          requireCoordinatorConversation(deps.db, threadId, conversationId);
-          bindCoordinatorRun(deps.db, threadId, conversationId, taskId, requestIds);
-        }),
+        inputTransition(() =>
+          bindCoordinatorRun(deps.db, threadId, conversationId, taskId, requestIds),
+        ),
       list: async (threadId) =>
         coordinatorInputs(deps.db, threadId).map((input) => ({
           ...input,
