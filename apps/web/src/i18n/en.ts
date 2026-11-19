@@ -2538,7 +2538,6 @@ export const EN: Record<string, string> = {
   从上游选择: 'Choose from upstream',
   全部测试: 'Test all',
   '还没选模型。从上游拉一份清单来勾选。': 'No models yet. Fetch the upstream list and pick some.',
-  获取上游模型: 'Fetch upstream models',
   '还没勾选模型，订阅按执行机上报的名单兜底。':
     'No models picked yet. The subscription falls back to the list machines report.',
   低价: 'Low cost',

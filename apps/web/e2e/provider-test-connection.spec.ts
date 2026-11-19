@@ -56,6 +56,20 @@ for (const canTestConnection of [false, undefined]) {
   });
 }
 
+test('an OAuth provider shows the same pick and test buttons', async ({ page }) => {
+  const oauth = { ...RECORD, providerId: 'github-copilot' };
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/providers')
+      return json({ presets: [], providers: [oauth], canTestConnection: true });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    return undefined;
+  });
+  await page.goto('/app/resources/providers');
+  await expect(editor(page).getByRole('button', { name: '从上游选择' })).toBeVisible();
+  await expect(editor(page).getByTestId('provider-test-all')).toBeEnabled();
+  await expect(editor(page).getByRole('button', { name: '测试 small-model' })).toBeVisible();
+});
+
 test('test all sends one request per model and shows latency or the failure kind', async ({
   page,
 }) => {
@@ -163,7 +177,8 @@ test('an empty provider offers the upstream list; a failed list falls back to ad
   });
   await page.goto('/app/resources/providers');
   await expect(editor(page)).toContainText('还没选模型');
-  await editor(page).getByRole('button', { name: '获取上游模型' }).click();
+  await expect(editor(page).getByTestId('provider-test-all')).toBeDisabled();
+  await editor(page).getByRole('button', { name: '从上游选择' }).click();
   const picker = page.getByRole('dialog', { name: '从上游选择模型' });
   await expect(picker.getByTestId('upstream-error')).toContainText('上游没有提供模型清单');
   const typed = picker.getByLabel('模型 ID');

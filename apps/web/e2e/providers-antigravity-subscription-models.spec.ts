@@ -98,7 +98,7 @@ test('the upstream picker groups by vendor and saves the picks', async ({ page }
   await mount(page, subscription([]), UPSTREAM, patches);
   await page.goto('/app/resources/providers');
   await expect(detail(page)).toContainText('还没勾选模型');
-  await detail(page).getByTestId('subscription-fetch-upstream').click();
+  await detail(page).getByTestId('subscription-pick-upstream').click();
   const picker = page.getByRole('dialog', { name: '从上游选择模型' });
   await expect(picker.getByTestId('upstream-group')).toHaveText([
     'Claude · 1',
@@ -126,7 +126,7 @@ test('a failed upstream fetch offers the by-id fallback', async ({ page }) => {
   const patches: object[] = [];
   await mount(page, subscription([]), null, patches);
   await page.goto('/app/resources/providers');
-  await detail(page).getByTestId('subscription-fetch-upstream').click();
+  await detail(page).getByTestId('subscription-pick-upstream').click();
   const picker = page.getByRole('dialog', { name: '从上游选择模型' });
   await expect(picker.getByTestId('upstream-error')).toContainText('上游返回了错误');
   const typed = picker.getByLabel('模型 ID');

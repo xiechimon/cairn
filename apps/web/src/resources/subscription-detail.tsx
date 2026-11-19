@@ -581,22 +581,9 @@ export function SubscriptionDetail({
               )}
             </div>
             {picked.length === 0 ? (
-              <div className="flex flex-col items-start gap-2.5 py-1">
-                <p className="m-0 text-ui text-content-secondary">
-                  {t('还没勾选模型，订阅按执行机上报的名单兜底。')}
-                </p>
-                {actions.onPickUpstream !== undefined && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-testid="subscription-fetch-upstream"
-                    onClick={actions.onPickUpstream}
-                  >
-                    <Download aria-hidden />
-                    {t('获取上游模型')}
-                  </Button>
-                )}
-              </div>
+              <p className="m-0 py-1 text-ui text-content-secondary">
+                {t('还没勾选模型，订阅按执行机上报的名单兜底。')}
+              </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {picked.map((model) => (

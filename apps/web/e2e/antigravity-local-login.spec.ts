@@ -122,7 +122,7 @@ test('logged-in Mac creates a host-keyring subscription with no token and shows 
   const detail = page.getByTestId('subscription-detail');
   await expect(detail.getByLabel('名称')).toBeVisible();
   await expect(detail).toContainText('还没勾选模型，订阅按执行机上报的名单兜底。');
-  await expect(detail.getByTestId('subscription-fetch-upstream')).toBeVisible();
+  await expect(detail.getByTestId('subscription-pick-upstream')).toBeVisible();
   await expect(row).toContainText('2 个模型');
   await expect(detail).not.toContainText('额度');
 });

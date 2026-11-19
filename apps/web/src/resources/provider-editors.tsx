@@ -323,7 +323,7 @@ export function TeamProviderEditor({
     setModels(record.models);
   }
   const oauth = isOAuthPreset(record.providerId);
-  const test = oauth ? undefined : actions.test;
+  const test = actions.test;
   const fire = (body: Parameters<NonNullable<ProviderEditActions['patch']>>[0]) => {
     if (body.apiKey !== undefined || body.baseUrl !== undefined) {
       generation.current += 1;
@@ -436,19 +436,19 @@ export function TeamProviderEditor({
             </span>
           )}
           <span className="ml-auto flex items-center gap-2 max-sm:w-full max-sm:justify-end">
-            {actions.listUpstream !== undefined && ids.length > 0 && (
+            {actions.listUpstream !== undefined && (
               <Button variant="outline" size="sm" onClick={() => setPicking(true)}>
                 <Download aria-hidden />
                 {t('从上游选择')}
               </Button>
             )}
-            {test !== undefined && ids.length > 0 && (
+            {test !== undefined && (
               <Button
                 variant="outline"
                 size="sm"
                 data-testid="provider-test-all"
                 className="min-w-24"
-                disabled={running > 0}
+                disabled={running > 0 || ids.length === 0}
                 onClick={() => void runTests(ids)}
               >
                 {running > 0 ? <Spinner aria-hidden /> : <Play aria-hidden />}
@@ -458,17 +458,9 @@ export function TeamProviderEditor({
           </span>
         </div>
         {ids.length === 0 ? (
-          <div className="flex flex-col items-start gap-2.5 py-1">
-            <p className="m-0 text-ui text-content-secondary">
-              {t('还没选模型。从上游拉一份清单来勾选。')}
-            </p>
-            {actions.listUpstream !== undefined && (
-              <Button variant="outline" size="sm" onClick={() => setPicking(true)}>
-                <Download aria-hidden />
-                {t('获取上游模型')}
-              </Button>
-            )}
-          </div>
+          <p className="m-0 py-1 text-ui text-content-secondary">
+            {t('还没选模型。从上游拉一份清单来勾选。')}
+          </p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {models.map((model) => (
