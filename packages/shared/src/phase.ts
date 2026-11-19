@@ -8,6 +8,7 @@ export const PHASE_VALUES = [
   'review',
   'done',
   'failed',
+  'stopped',
   'closed',
 ] as const;
 
@@ -23,6 +24,7 @@ export const PHASE_SEMANTICS: Readonly<Record<Phase, string>> = {
   review: '改动就绪等你（`待验收`≡`审核` 同 phase，CONTEXT.md 裁决）',
   done: '已接受，若选了则已合并',
   failed: 'run 停在错误上',
+  stopped: '你在它交付前停下了',
   closed: '未完成即搁置',
 };
 
@@ -32,6 +34,12 @@ export const WAITING_PHASES = ['confirm', 'needs_input', 'review'] as const;
 
 export function isWaitingPhase(phase: string): boolean {
   return (WAITING_PHASES as readonly string[]).includes(phase);
+}
+
+export const ENDED_PHASES = ['done', 'stopped', 'closed'] as const;
+
+export function isEndedPhase(phase: string): boolean {
+  return (ENDED_PHASES as readonly string[]).includes(phase);
 }
 
 export interface TodoStartState {
@@ -74,6 +82,7 @@ export function boardColumnFor(phase: Phase): BoardColumn | null {
     case 'failed':
       return '待处理';
     case 'done':
+    case 'stopped':
     case 'closed':
       return '已完成';
   }
@@ -98,7 +107,7 @@ export function canBoardDrop(from: Phase, to: Phase): boolean {
     case 'building':
       return src === '待开始' && canOrchestrate(from);
     case 'review':
-      return src === '已完成';
+      return src === '已完成' && from !== 'stopped';
     case 'done':
       return true;
     default:

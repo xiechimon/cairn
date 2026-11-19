@@ -12,7 +12,7 @@ import { build, project, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
-import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
+import { cancelBuild } from './builds.js';
 import { taskLink } from './chief.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
@@ -82,7 +82,7 @@ function tidy(text: string, max: number): string {
 
 function openThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
   const row = teamTodo(deps.db, str(params, 'todoId'), ctx.teamId);
-  if (row.latestBuildId !== null && !stoppedBeforeFirstRun(deps.db, row)) {
+  if (row.latestBuildId !== null && row.phase !== 'stopped') {
     throw new HttpError(
       409,
       `thread #${row.seqNum} is already open; use message_thread to talk to it`,

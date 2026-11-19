@@ -3,7 +3,7 @@ import { replyRouteOf } from '../src/board/use-thread-chat.js';
 
 describe('where a side chat reply goes', () => {
   it('queues onto the stopped conversation when the thread was stopped before it started', () => {
-    expect(replyRouteOf('todo', [{ status: 'stopped' }])).toBe('queue');
+    expect(replyRouteOf('stopped', [{ status: 'stopped' }])).toBe('queue');
   });
 
   it('queues while a planning or queued step waits for a machine, since nothing can take it yet', () => {

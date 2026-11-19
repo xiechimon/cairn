@@ -95,7 +95,7 @@ import { cancelPendingWorkerQuestions } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
-const QUESTION_ABANDONING_PHASES: readonly Phase[] = ['todo', 'done', 'closed'];
+const QUESTION_ABANDONING_PHASES: readonly Phase[] = ['todo', 'done', 'stopped', 'closed'];
 
 export function abandonsQuestions(to: Phase): boolean {
   return QUESTION_ABANDONING_PHASES.includes(to);
@@ -877,7 +877,7 @@ export function setTodoPhase(
   extra: Partial<
     Pick<TodoRow, 'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'routeOverride'>
   > = {},
-  options: { landedMerge?: true; silentSettleThreadId?: string } = {},
+  options: { landedMerge?: true; silentSettleThreadId?: string; cause?: 'stop' } = {},
 ): TodoRecord | null {
   const { db } = deps;
   const row = getRow(deps, id);
@@ -897,8 +897,9 @@ export function setTodoPhase(
     if (record && changed.length > 0) deps.hub.publishTodoDoc(record.teamId, record);
     return record;
   }
-  assertPhaseTransition(row.phase, to);
-  if (to === 'done' && !options.landedMerge) assertCorrectionDone(db, row);
+  assertPhaseTransition(row.phase, to, options.cause);
+  if (to === 'done' && !options.landedMerge && options.cause !== 'stop')
+    assertCorrectionDone(db, row);
   return db.transaction(() => {
     if (abandonsQuestions(to) && row.latestBuildId !== null) {
       cancelPendingWorkerQuestions(
@@ -922,15 +923,17 @@ export function setTodoPhase(
     const record = getTodo(deps, id);
     if (!record) return null;
     deps.hub.publishTodoDoc(record.teamId, record);
-    notifyPhaseEntry(
-      deps,
-      record,
-      row.phase,
-      to,
-      options.silentSettleThreadId !== undefined
-        ? { silentSettleThreadId: options.silentSettleThreadId }
-        : {},
-    );
+    if (options.cause === 'stop') reconcileOwners(deps, [record.id]);
+    else
+      notifyPhaseEntry(
+        deps,
+        record,
+        row.phase,
+        to,
+        options.silentSettleThreadId !== undefined
+          ? { silentSettleThreadId: options.silentSettleThreadId }
+          : {},
+      );
     if (to === 'done') settleSplitOnDone(deps, id);
     if (to === 'done' || to === 'review') releaseBlockedSteps(deps);
     return record;

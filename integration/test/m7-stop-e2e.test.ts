@@ -87,7 +87,7 @@ describe('M7 stop E2E: stop button → pending → signal → pull-confirm → p
     await waitFor(() => logLines().some((l) => l.includes('stop delivered step=')), 30_000);
     await waitFor(() => logLines().some((l) => l.includes('step stopped by user')), 30_000);
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'todo', 60_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'stopped', 60_000);
     const steps = await api(server.url, 'GET', `/api/builds/${buildId}/steps`);
     const stepRows = steps.body as { status: string }[];
     expect(stepRows.some((s) => s.status === 'stopped')).toBe(true);

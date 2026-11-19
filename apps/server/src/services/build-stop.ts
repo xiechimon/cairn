@@ -6,19 +6,19 @@ import {
   type StopAttribution,
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, message, step, stopPending, todo } from '../db/schema.js';
+import { build, message, queuedMessage, step, stopPending, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { settleAutonomousMerge } from './autonomous-merge.js';
 import { settleRetiredGateStep } from './build-gate-steps.js';
 import { type BuildDeps, NotFoundError, publishBuild, settleParkedStep } from './builds.js';
+import { canStopTransitionPhase, stopReturnPhase } from './phase.js';
 import { publishStepRow } from './quota-wait.js';
 import { finishScheduledStep } from './schedules.js';
-import { abandonsQuestions, getTodo, settleSplitOnDone } from './todos.js';
-import { cancelPendingWorkerQuestions } from './worker-question-store.js';
+import { setTodoPhase, settleSplitOnDone } from './todos.js';
 
 type BuildRow = typeof build.$inferSelect;
 
@@ -30,21 +30,7 @@ function recordStop(db: Db, buildId: string, by: StopAttribution): void {
 }
 
 export function hasLeftExecution(phase: Phase): boolean {
-  return phase === 'closed' || phase === 'done' || phase === 'todo';
-}
-
-function dropQuestionOnPhaseChange(
-  deps: BuildDeps,
-  todoRow: typeof todo.$inferSelect,
-  to: Phase,
-): void {
-  if (abandonsQuestions(to) && todoRow.latestBuildId !== null) {
-    cancelPendingWorkerQuestions(
-      deps,
-      todoRow.latestBuildId,
-      'The thread moved on before an answer.',
-    );
-  }
+  return phase === 'closed' || phase === 'done' || phase === 'todo' || phase === 'stopped';
 }
 
 export function settleAfterStopPhase(deps: BuildDeps, buildId: string, land?: () => void): void {
@@ -59,23 +45,12 @@ export function landReservedPhase(
   todoRow: typeof todo.$inferSelect,
   desired: Phase,
 ): void {
-  if (todoRow.phase !== desired) {
-    dropQuestionOnPhaseChange(deps, todoRow, desired);
-    deps.db
-      .update(todo)
-      .set({
-        phase: desired,
-        phaseAt: nowMs(),
-        v: todoRow.v + 1,
-      })
-      .where(eq(todo.id, todoRow.id))
-      .run();
-    const record = getTodo(deps, todoRow.id);
-    if (record) {
-      deps.hub.publishTodoDoc(record.teamId, record);
-    }
+  if (todoRow.phase === desired) {
+    if (desired === 'done') settleSplitOnDone(deps, todoRow.id);
+    return;
   }
-  if (desired === 'done') settleSplitOnDone(deps, todoRow.id);
+  if (!canStopTransitionPhase(todoRow.phase, desired)) return;
+  setTodoPhase(deps, todoRow.id, desired, {}, { cause: 'stop' });
 }
 
 export function requestStop(
@@ -143,23 +118,13 @@ function stopFallbackPhase(db: Db, buildRow: BuildRow): Phase {
     .orderBy(asc(step.createdAt))
     .all()
     .at(-1);
-  if (lastDone) return lastDone.kind === 'plan' ? 'confirm' : 'review';
-  return buildRow.prevPhase ?? 'todo';
+  return stopReturnPhase(lastDone?.kind ?? null, buildRow.prevPhase);
 }
 
-export function stoppedBeforeFirstRun(
-  db: Db,
-  row: Pick<typeof todo.$inferSelect, 'phase' | 'latestBuildId'>,
-): boolean {
-  if (row.phase !== 'todo' || row.latestBuildId === null) return false;
-  const latest = db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
-  if (latest?.errorMessage !== STOP_MESSAGE) return false;
-  const steps = db
-    .select({ status: step.status })
-    .from(step)
-    .where(eq(step.buildId, latest.id))
-    .all();
-  return steps.length > 0 && steps.every((s) => s.status === 'stopped');
+function landStopPhase(deps: BuildDeps, todoRow: typeof todo.$inferSelect, buildRow: BuildRow) {
+  const target = stopFallbackPhase(deps.db, buildRow);
+  if (todoRow.phase === target) return;
+  setTodoPhase(deps, todoRow.id, target, {}, { cause: 'stop' });
 }
 
 export function releaseUnissuedMergeAdmission(db: Db, row: typeof step.$inferSelect): void {
@@ -199,19 +164,24 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   settleAfterStopPhase(deps, buildRow.id);
   if (stepRow.archiveStop === null && desired === 'keep') return;
   if (todoRow.latestBuildId !== buildRow.id || hasLeftExecution(todoRow.phase)) return;
-  const target = stopFallbackPhase(db, buildRow);
-  if (todoRow.phase === target) return;
-  dropQuestionOnPhaseChange(deps, todoRow, target);
-  db.update(todo)
-    .set({
-      phase: target,
-      phaseAt: nowMs(),
-      v: todoRow.v + 1,
-    })
-    .where(eq(todo.id, todoRow.id))
-    .run();
-  const record = getTodo(deps, todoRow.id);
-  if (record) deps.hub.publishTodoDoc(record.teamId, record);
+  if (continuesAfterStop(db, buildRow.id)) return;
+  landStopPhase(deps, todoRow, buildRow);
+}
+
+function continuesAfterStop(db: Db, buildId: string): boolean {
+  return (
+    db
+      .select({ id: queuedMessage.id })
+      .from(queuedMessage)
+      .where(
+        and(
+          eq(queuedMessage.conversationId, buildId),
+          eq(queuedMessage.deliverAfterStop, true),
+          isNull(queuedMessage.error),
+        ),
+      )
+      .get() !== undefined
+  );
 }
 
 export function releaseZombieQueued(
@@ -226,21 +196,9 @@ export function releaseZombieQueued(
   if (buildRow.errorMessage === null) {
     db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
   }
-  const target = stopFallbackPhase(db, buildRow);
-  if (todoRow.phase === target) return;
-  dropQuestionOnPhaseChange(deps, todoRow, target);
-  db.update(todo)
-    .set({
-      phase: target,
-      phaseAt: nowMs(),
-      v: todoRow.v + 1,
-    })
-    .where(eq(todo.id, todoRow.id))
-    .run();
   const fresh = db.select().from(build).where(eq(build.id, buildRow.id)).get();
   if (fresh) publishBuild(deps, fresh);
-  const record = getTodo(deps, todoRow.id);
-  if (record) deps.hub.publishTodoDoc(record.teamId, record);
+  landStopPhase(deps, todoRow, buildRow);
 }
 
 export function cancelBuild(

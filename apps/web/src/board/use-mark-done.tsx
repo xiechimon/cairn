@@ -10,7 +10,7 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { StopAndDoneConfirm } from './stop-and-done-confirm.js';
 
-const UNFINISHABLE_PHASES: readonly string[] = ['done', 'closed', 'failed'];
+const UNFINISHABLE_PHASES: readonly string[] = ['done', 'closed', 'failed', 'stopped'];
 
 export function canMarkDone(todo: TodoRecord): boolean {
   return todo.archivedAt == null && !UNFINISHABLE_PHASES.includes(todo.phase);

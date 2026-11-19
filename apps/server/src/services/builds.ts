@@ -55,7 +55,6 @@ export {
   type StopAndMarkDoneResult,
   stopActiveStepsAfterExit,
   stopActiveStepsForArchive,
-  stoppedBeforeFirstRun,
 } from './build-stop.js';
 export { applyStoppedStep, type BuildSteerResult, sendBuildSteer, stopUnclaimedGateSteps };
 

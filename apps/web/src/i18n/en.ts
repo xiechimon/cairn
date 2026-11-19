@@ -495,6 +495,7 @@ export const EN: Record<string, string> = {
   '向 Agent 补充说明，执行过程中即可送达':
     'Add details for the Agent — delivered while the run is in progress',
   '发送消息以继续这个任务…': 'Send a message to continue this task…',
+  '发送消息以重新开始…': 'Send a message to start it again…',
   '请求修改…': 'Request changes…',
   // #701 审核关口人肉打回（更多菜单入口 + reject 弹层）
   请求修改: 'Request changes',
@@ -606,6 +607,7 @@ export const EN: Record<string, string> = {
   待回答: 'Needs input',
   '回答它的问题…': 'Answer its question…',
   '任务已完成，发送消息即可继续。': 'The task is done. Send a message to continue.',
+  '你停下了它，发送消息即可重新开始。': 'You stopped it. Send a message to start it again.',
   '任务已归档。': 'The task is archived.',
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——

@@ -1,5 +1,6 @@
 import {
   ASK_USER_QUESTION_KIND,
+  isEndedPhase,
   isInfoOutput,
   type NeedsYouReason,
   type TodoOwner,
@@ -175,7 +176,7 @@ export function ownershipOf(db: Db, row: TodoRow, now = nowMs()): Ownership | nu
 }
 
 function workOwnership(db: Db, row: TodoRow): Ownership | null {
-  if (row.archivedAt !== null || row.phase === 'done' || row.phase === 'closed') return null;
+  if (row.archivedAt !== null || isEndedPhase(row.phase)) return null;
   const pending = row.latestBuildId === null ? [] : pendingQuestionIds(db, row.latestBuildId);
   if (pending.length > 0) {
     return {
@@ -206,7 +207,7 @@ export function sectionOf(
   ownership: Ownership | null,
   now = Date.now(),
 ): TodoSection | null {
-  if (row.phase === 'done' || row.phase === 'closed') {
+  if (isEndedPhase(row.phase)) {
     return row.phaseAt >= now - TASKS_RECENT_MS ? 'resolved' : null;
   }
   if (row.archivedAt !== null) return null;

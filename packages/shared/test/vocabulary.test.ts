@@ -50,8 +50,8 @@ import {
   WORKER_MEMORY_REMOTE_TOOLS,
 } from '../src/index.js';
 
-describe('phase ten values authoritative single source (02 §4.1, locked)', () => {
-  it('is exactly the ten docs-ordered values', () => {
+describe('phase values authoritative single source (02 §4.1, locked)', () => {
+  it('is exactly the docs-ordered values', () => {
     expect(PHASE_VALUES).toEqual([
       'todo',
       'queued',
@@ -62,6 +62,7 @@ describe('phase ten values authoritative single source (02 §4.1, locked)', () =
       'review',
       'done',
       'failed',
+      'stopped',
       'closed',
     ]);
   });

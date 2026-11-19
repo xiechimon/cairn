@@ -103,8 +103,7 @@ export function replyRouteOf(
   phase: TodoRecord['phase'],
   steps: readonly { status: string }[],
 ): 'queue' | 'message' {
-  if (phase === 'todo')
-    return steps.some((step) => step.status === 'stopped') ? 'queue' : 'message';
+  if (phase === 'stopped') return 'queue';
   const waitingForMachine =
     (phase === 'queued' || phase === 'planning') &&
     !steps.some((step) => step.status === 'claimed') &&
@@ -244,7 +243,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     newest?.agentTodo,
   ]);
 
-  const awaitingStart = wire?.phase === 'todo' || wire?.phase === 'failed';
+  const awaitingStart =
+    wire?.phase === 'todo' || wire?.phase === 'stopped' || wire?.phase === 'failed';
   const chiefThreadsQ = useChiefThreads(teamId, live && awaitingStart);
   const coordinator =
     live && awaitingStart ? globalCoordinatorThread(chiefThreadsQ.data ?? []) : null;

@@ -121,6 +121,7 @@ const CONVERSATION_STATUS: Record<Phase, { glyph: GlyphKind; tone: StatusTone }>
   review: { glyph: 'attention', tone: 'wait' },
   failed: { glyph: 'failed', tone: 'fail' },
   done: { glyph: 'done', tone: 'quiet' },
+  stopped: { glyph: 'closed', tone: 'quiet' },
   closed: { glyph: 'closed', tone: 'quiet' },
 };
 

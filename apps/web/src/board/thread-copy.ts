@@ -16,6 +16,7 @@ export function threadStatus(todo: TodoRecord): ThreadStatus {
     case 'failed':
       return 'failed';
     case 'done':
+    case 'stopped':
     case 'closed':
       return 'done';
     case 'todo':
@@ -76,6 +77,8 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
       return { state: STATUS_WORDS.running, reason: '正在动手。' };
     case 'done':
       return { state: STATUS_WORDS.done, reason: '任务已完成，发送消息即可继续。' };
+    case 'stopped':
+      return { state: STATUS_WORDS.stopped, reason: '你停下了它，发送消息即可重新开始。' };
     case 'closed':
       return { state: STATUS_WORDS.archived, reason: '任务已归档。' };
     case 'todo':

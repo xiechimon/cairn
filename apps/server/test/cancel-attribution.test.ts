@@ -66,7 +66,7 @@ describe('a stop records who stopped the work and why (task stall S8)', () => {
   test('the threads view shows a stopped thread with who stopped it, so a later turn cannot call it open', async () => {
     const { todoId } = await openThread();
     await relay('stop_thread', { todoId, reason: 'priority: finish #131 first' });
-    expect(H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()?.phase).toBe('todo');
+    expect(H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()?.phase).toBe('stopped');
     const out = (await relay('threads', {})) as {
       threads: { id: string; stopped: { actor: string; reason: string } | null }[];
     };

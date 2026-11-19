@@ -42,6 +42,12 @@ export const PHASE_UI: Record<Phase, PhaseUi> = {
     action: '重跑',
     placeholder: '请求修改…',
   },
+  stopped: {
+    chip: '已停止',
+    tone: 'idle',
+    action: '重跑',
+    placeholder: '发送消息以重新开始…',
+  },
   closed: { chip: '已归档', tone: 'idle', action: null, placeholder: null },
 };
 
@@ -61,5 +67,6 @@ export const PHASE_STATUS: Record<Phase, { glyph: GlyphKind; ink: string }> = {
   review: { glyph: 'three-quarter', ink: ACCENT_INK },
   failed: { glyph: 'failed', ink: 'text-destructive' },
   done: { glyph: 'done', ink: RUNNING_INK },
+  stopped: { glyph: 'closed', ink: QUIET_INK },
   closed: { glyph: 'closed', ink: 'text-content-dim' },
 };

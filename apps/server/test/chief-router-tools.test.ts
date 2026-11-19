@@ -468,7 +468,7 @@ describe('router tools', () => {
       const { todoId, buildId } = await openThread();
       await relay('stop_thread', { todoId, reason: 'test stop' });
       const stopped = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
-      expect(stopped.phase).toBe('todo');
+      expect(stopped.phase).toBe('stopped');
       expect(stopped.latestBuildId).toBe(buildId);
       const out = (await relay('message_thread', { todoId, content: 'Try again, smaller' })) as {
         delivered: string;

@@ -7,7 +7,7 @@ import { req } from './helpers.js';
 
 registerChiefHarness();
 
-function seedGate(phase: 'confirm' | 'failed' | 'todo', buildId: string, todoId: string) {
+function seedGate(phase: 'confirm' | 'failed' | 'stopped', buildId: string, todoId: string) {
   H.s.db
     .insert(todo)
     .values({
@@ -28,7 +28,7 @@ function seedGate(phase: 'confirm' | 'failed' | 'todo', buildId: string, todoId:
       todoId,
       withPlan: phase === 'confirm',
       triggerSource: 'user',
-      ...(phase === 'todo' ? { errorMessage: STOP_MESSAGE } : {}),
+      ...(phase === 'stopped' ? { errorMessage: STOP_MESSAGE } : {}),
       createdAt: 1,
     })
     .run();
@@ -38,7 +38,7 @@ function seedGate(phase: 'confirm' | 'failed' | 'todo', buildId: string, todoId:
       id: `${buildId}-step`,
       buildId,
       kind: phase === 'confirm' ? 'plan' : 'session',
-      status: phase === 'todo' ? 'stopped' : 'done',
+      status: phase === 'stopped' ? 'stopped' : 'done',
       createdAt: 1,
     })
     .run();
@@ -93,7 +93,7 @@ test('a retry of restart returns the stored response and does not apply twice', 
 });
 
 test('a crashed start after a stop before the first run does not start another build', async () => {
-  seedGate('todo', 'stopped-build', 'stopped-todo');
+  seedGate('stopped', 'stopped-build', 'stopped-todo');
   H.s.db.run(
     sql`CREATE TRIGGER abort_stopped_phase BEFORE UPDATE OF phase ON todo BEGIN SELECT RAISE(ABORT, 'phase write failed'); END`,
   );

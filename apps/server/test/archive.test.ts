@@ -173,7 +173,7 @@ describe('archive is independent of task phase', () => {
         await (await req(s.app, 'GET', '/api/builds/build-archive/changes')).json(),
       ).toMatchObject({ files });
       expect(await action(s, 'unarchive')).toMatchObject({
-        phase: 'todo',
+        phase: 'stopped',
         archivedAt: null,
         hasChanges: true,
       });
@@ -241,7 +241,7 @@ describe('archive is independent of task phase', () => {
           createdAt: now + 1,
         })
         .run();
-      expect(await action(s, 'archive')).toMatchObject({ phase: 'todo' });
+      expect(await action(s, 'archive')).toMatchObject({ phase: 'stopped' });
       expect(
         s.db
           .select()
@@ -252,7 +252,7 @@ describe('archive is independent of task phase', () => {
       sweepZombieQueuedTodos(s.svc);
       sweepAbandonedBuildSteps(s.svc, now + 300_000);
       expect(await claimStep(deps, machineId, s.team.id, 0, 'http://localhost')).toBeNull();
-      expect(await action(s, 'unarchive')).toMatchObject({ phase: 'todo' });
+      expect(await action(s, 'unarchive')).toMatchObject({ phase: 'stopped' });
     },
   );
 
@@ -359,7 +359,7 @@ test('archive stop and acknowledgement survive a fresh server process after Undo
     expect(result).toEqual({
       first: { discard: false },
       second: { discard: null },
-      task: { phase: 'todo' },
+      task: { phase: 'stopped' },
       marker: { archiveStop: null },
     });
   } finally {
@@ -680,7 +680,7 @@ test('a failure handler captured before archive still honors the persisted stop 
   await action(s, 'unarchive');
   applyStepFailure(deps, captured, 'Failure delivered after archive');
   expect(s.db.select().from(todo).where(eq(todo.id, 'todo-archive')).get()).toMatchObject({
-    phase: 'todo',
+    phase: 'stopped',
     archivedAt: null,
   });
   expect(s.db.select().from(step).where(eq(step.id, 'step-archive')).get()).toMatchObject({

@@ -492,6 +492,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                       "review",
                       "done",
                       "failed",
+                      "stopped",
                       "closed",
                     ],
                     "type": "string",
@@ -1488,6 +1489,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                               "review",
                               "done",
                               "failed",
+                              "stopped",
                               "closed",
                             ],
                             "type": "string",
@@ -5476,6 +5478,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                           "review",
                           "done",
                           "failed",
+                          "stopped",
                           "closed",
                         ],
                         "type": "string",
@@ -6820,6 +6823,7 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
               "review",
               "done",
               "failed",
+              "stopped",
               "closed",
             ],
             "type": "string",
@@ -7095,6 +7099,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
                   "review",
                   "done",
                   "failed",
+                  "stopped",
                   "closed",
                 ],
                 "type": "string",
@@ -7871,6 +7876,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "review",
                 "done",
                 "failed",
+                "stopped",
                 "closed",
               ],
               "type": "string",
@@ -8506,6 +8512,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                     "review",
                     "done",
                     "failed",
+                    "stopped",
                     "closed",
                   ],
                   "type": "string",
@@ -9073,6 +9080,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                                   "review",
                                   "done",
                                   "failed",
+                                  "stopped",
                                   "closed",
                                 ],
                                 "type": "string",
@@ -10173,7 +10181,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
 ]
 `;
 
-exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase ten values + board columns + semantics (02 §4.1) 1`] = `
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase values + board columns + semantics (02 §4.1) 1`] = `
 {
   "BOARD_COLUMNS": [
     "待开始",
@@ -10191,6 +10199,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase ten values 
     "planning": "读仓库写计划",
     "queued": "已启动，等空闲机器",
     "review": "改动就绪等你（\`待验收\`≡\`审核\` 同 phase，CONTEXT.md 裁决）",
+    "stopped": "你在它交付前停下了",
     "todo": "已建档未开始",
   },
   "PHASE_VALUES": [
@@ -10203,6 +10212,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase ten values 
     "review",
     "done",
     "failed",
+    "stopped",
     "closed",
   ],
 }
@@ -11154,6 +11164,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > bui
             "review",
             "done",
             "failed",
+            "stopped",
             "closed",
           ],
           "type": "string",
@@ -13227,6 +13238,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
             "review",
             "done",
             "failed",
+            "stopped",
             "closed",
           ],
           "type": "string",
@@ -13868,6 +13880,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "review",
         "done",
         "failed",
+        "stopped",
         "closed",
       ],
       "type": "string",

@@ -12,13 +12,7 @@ import { build, chiefMessage, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
-import {
-  applyBuildStepAction,
-  type BuildDeps,
-  sendBuildSteer,
-  startBuilds,
-  stoppedBeforeFirstRun,
-} from './builds.js';
+import { applyBuildStepAction, type BuildDeps, sendBuildSteer, startBuilds } from './builds.js';
 import { coordinatorThreadRow, ensureChief } from './chief.js';
 import {
   claimClientMessage,
@@ -320,7 +314,7 @@ export async function messageThreadAsUser(
   return coalesceClientMessage(deps.db, row.id, body.clientMessageId, async () => {
     const again = settleStoredSend(deps, row, body, origin);
     if (again !== undefined) return again;
-    if (stoppedBeforeFirstRun(deps.db, row)) {
+    if (row.phase === 'stopped') {
       try {
         return commitStoppedRestart(deps, row, body, origin);
       } catch (error) {

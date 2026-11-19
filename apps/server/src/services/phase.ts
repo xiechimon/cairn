@@ -10,8 +10,24 @@ export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
   review: ['done', 'failed', 'queued', 'planning', 'closed'],
   done: ['queued'],
   failed: ['queued', 'closed', 'review'],
+  stopped: ['queued', 'todo', 'done', 'closed'],
   closed: ['todo'],
 };
+
+const STOP_SETTLED_PHASES: readonly Phase[] = ['todo', 'done', 'stopped', 'closed'];
+
+const STOP_RETURN_PHASES: readonly Phase[] = ['confirm', 'review', 'done', 'failed', 'stopped'];
+
+export function canStopTransitionPhase(from: Phase, to: Phase): boolean {
+  return !STOP_SETTLED_PHASES.includes(from) && STOP_RETURN_PHASES.includes(to);
+}
+
+export function stopReturnPhase(lastDoneKind: string | null, prevPhase: Phase | null): Phase {
+  if (lastDoneKind === 'plan') return 'confirm';
+  if (lastDoneKind !== null) return 'review';
+  if (prevPhase !== null && STOP_RETURN_PHASES.includes(prevPhase)) return prevPhase;
+  return 'stopped';
+}
 
 export function canTransitionPhase(from: Phase, to: Phase): boolean {
   return PHASE_TRANSITIONS[from].includes(to);
@@ -31,6 +47,8 @@ export class PhaseTransitionError extends Error {
   }
 }
 
-export function assertPhaseTransition(from: Phase, to: Phase): void {
-  if (!canTransitionPhase(from, to)) throw new PhaseTransitionError(from, to);
+export function assertPhaseTransition(from: Phase, to: Phase, cause?: 'stop'): void {
+  const allowed =
+    canTransitionPhase(from, to) || (cause === 'stop' && canStopTransitionPhase(from, to));
+  if (!allowed) throw new PhaseTransitionError(from, to);
 }

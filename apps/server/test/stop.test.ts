@@ -182,7 +182,7 @@ describe('the stop server write surface (M7 #308)', () => {
     expect(Object.keys((await late.json()) as object)).toEqual(['error']);
   });
 
-  test('failure mode 2: a pending step -> canceled by the server at once (step stopped + prevPhase falls back + canceled)', async () => {
+  test('failure mode 2: a pending step -> canceled by the server at once (step stopped + the task ends as stopped)', async () => {
     const buildId = await w.startBuild();
     const res = await w.stop(buildId, true);
     expect(res.status).toBe(200);
@@ -190,9 +190,24 @@ describe('the stop server write surface (M7 #308)', () => {
     const steps = w.stepsOf(buildId);
     expect(steps).toHaveLength(1);
     expect(steps[0]!.status).toBe('stopped');
-    expect(w.todoRow().phase).toBe('todo');
+    expect(w.todoRow().phase).toBe('stopped');
     expect(w.buildRow(buildId).errorMessage).toBe('已取消');
     expect(w.s.db.select().from(stopPendingTable).all()).toHaveLength(0);
+  });
+
+  test('a run started from an in-flight phase ends as stopped instead of that phase without a step, and starts again', async () => {
+    const buildId = await w.startBuild();
+    w.s.db
+      .update(buildTable)
+      .set({ prevPhase: 'building' })
+      .where(eq(buildTable.id, buildId))
+      .run();
+    expect((await w.stop(buildId, true)).status).toBe(200);
+    expect(w.todoRow().phase).toBe('stopped');
+    const again = await w.startBuild();
+    expect(again).not.toBe(buildId);
+    expect(w.todoRow().phase).toBe('queued');
+    expect(w.buildRow(again).prevPhase).toBe('stopped');
   });
 
   test('failure mode 3: a claimed step -> single-slot pending + an SSE stop signal + 202 delegated', async () => {
@@ -261,13 +276,13 @@ describe('the stop server write surface (M7 #308)', () => {
     expect(w.s.db.select().from(stopPendingTable).all()).toHaveLength(0);
   });
 
-  test('failure mode 6a: stopping the first-round plan step (claimed -> done(stopped)) -> prevPhase falls back', async () => {
+  test('failure mode 6a: stopping the first-round plan step (claimed -> done(stopped)) -> the task ends as stopped', async () => {
     const buildId = await w.startBuild();
     const claimed = await w.claim();
     await w.stop(buildId, true);
     await w.done(claimed.step.id, { status: 'stopped', sessionId: 'pi-s-1' });
     expect(w.stepsOf(buildId)[0]!.status).toBe('stopped');
-    expect(w.todoRow().phase).toBe('todo');
+    expect(w.todoRow().phase).toBe('stopped');
     expect(w.buildRow(buildId).errorMessage).toBe('已取消');
     const face = await call(w.s.app, 'GET', `/api/builds/${buildId}/steps`);
     expect(face.status).toBe(200);

@@ -184,14 +184,14 @@ describe('#1219 the cancelBuild funnel (claimed delegation / idempotent zombie r
 
     expect(out).toBe('released');
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
-    expect(todoRow.phase).toBe('todo');
+    expect(todoRow.phase).toBe('stopped');
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()!;
     expect(buildRow.errorMessage).toBe(buildBefore.errorMessage ?? STOP_MESSAGE);
     expect(
       cancelBuild(machineDepsOf(w.s), w.buildId, { actor: 'person', reason: 'test stop' }),
     ).toBe('released');
     const todoRow2 = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
-    expect(todoRow2.phase).toBe('todo');
+    expect(todoRow2.phase).toBe('stopped');
   });
 
   test('no active step and the todo no longer queued (a terminal card): a no-op that changes no phase', () => {
@@ -271,7 +271,7 @@ describe('#1219 sweepZombieQueuedTodos repairs legacy zombies', () => {
 
     for (const z of [zombieFailed, zombieStopped, zombieNoStep]) {
       const row = s.db.select().from(todoTable).where(eq(todoTable.id, z.todoId)).get()!;
-      expect(row.phase).toBe('todo');
+      expect(row.phase).toBe('stopped');
       const buildRow = s.db.select().from(buildTable).where(eq(buildTable.id, z.buildId)).get()!;
       expect(buildRow.errorMessage).toBe(STOP_MESSAGE);
     }

@@ -19,6 +19,7 @@ export const SERVER_SECTION: Record<TodoRecord['phase'], Pick<TodoRecord, 'secti
   review: { section: 'ready_for_review', owner: 'owner' },
   failed: { section: 'working', owner: 'coordinator' },
   done: { section: 'resolved', owner: null },
+  stopped: { section: 'resolved', owner: null },
   closed: { section: 'resolved', owner: null },
 };
 
