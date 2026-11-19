@@ -13,6 +13,12 @@ interface ProcessRow {
 }
 
 export const COMPUTER_MARKER_ENV = 'CAIRN_COMPUTER_CALL';
+export const SESSION_TREE_ENV = 'CAIRN_SESSION_TREE';
+
+export interface TreeMarker {
+  env: string;
+  value: string;
+}
 
 async function readLinuxProcesses(): Promise<ProcessRow[]> {
   const names = await readdir('/proc').catch(() => []);
@@ -52,8 +58,8 @@ async function readPortableProcesses(): Promise<ProcessRow[]> {
   return rows;
 }
 
-async function markerHolders(rows: readonly ProcessRow[], marker: string): Promise<number[]> {
-  const needle = `${COMPUTER_MARKER_ENV}=${marker}`;
+async function markerHolders(rows: readonly ProcessRow[], marker: TreeMarker): Promise<number[]> {
+  const needle = `${marker.env}=${marker.value}`;
   const found = await Promise.all(
     rows.map(async (row) => {
       const environ = await readFile(`/proc/${row.pid}/environ`, 'utf8').catch(() => '');
@@ -68,7 +74,7 @@ export class ProcessTree {
 
   constructor(
     private readonly rootPid: number,
-    private readonly marker: string,
+    private readonly marker: TreeMarker,
     private readonly graceMs: number,
   ) {}
 
@@ -122,6 +128,10 @@ export class ProcessTree {
       }
     };
     return exists(-this.rootPid) || [...this.members].some(exists);
+  }
+
+  async snapshot(): Promise<void> {
+    await this.collect();
   }
 
   async kill(): Promise<void> {

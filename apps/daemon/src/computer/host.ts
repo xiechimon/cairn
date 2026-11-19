@@ -14,10 +14,10 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { COMPUTER_MARKER_ENV, ProcessTree } from '../process-tree.js';
 import { AGENT_BROWSER_BINARY } from './browser.js';
 import { awaitWithSignal } from './cancellation.js';
 import { spawnContainedCommand } from './contained-spawn.js';
-import { COMPUTER_MARKER_ENV, ProcessTree } from './process-tree.js';
 import {
   type ComputerExecuteRequest,
   type ComputerFileEntry,
@@ -283,7 +283,9 @@ export class HostComputerProvider implements ComputerProvider {
       clearTimeout(deadlineTimer);
       throw error;
     }
-    const tree = child.pid ? new ProcessTree(child.pid, marker, this.killGraceMs) : undefined;
+    const tree = child.pid
+      ? new ProcessTree(child.pid, { env: COMPUTER_MARKER_ENV, value: marker }, this.killGraceMs)
+      : undefined;
     child.stdin?.on('error', () => {});
     child.stdin?.end(request.stdin);
     const queue = new AsyncEventQueue();

@@ -269,7 +269,7 @@ test('a subagent that never finishes releases the turn after the wait limit', as
   });
 
   const pending = run();
-  await vi.advanceTimersByTimeAsync(20 * 60_000);
+  await vi.advanceTimersByTimeAsync(20 * 60_000 + 13_000);
   const events = await pending;
 
   expect(prompts).toHaveLength(1);
@@ -311,7 +311,9 @@ test('stopping one background task asks the CLI to stop that task; stopping the 
     cli.emit(started('agent-1', 'local_agent', 'Survey ops docs'));
     await new Promise(() => {});
   });
-  const handle = await createClaudeCodeBackend({}).createSession({
+  const handle = await createClaudeCodeBackend({
+    settleTimeouts: { exitGraceMs: 50, killGraceMs: 50 },
+  }).createSession({
     provider: { kind: 'http', providerId: 'fake-claude' },
     modelId: 'fake-model',
     cwd: '/tmp',

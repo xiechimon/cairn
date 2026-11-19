@@ -160,7 +160,9 @@ async function controlledSession(messages: AsyncGenerator<SDKMessage, void>) {
     })();
     return Object.assign(stream, { interrupt }) as unknown as Query;
   });
-  const handle = await createClaudeCodeBackend({}).createSession({
+  const handle = await createClaudeCodeBackend({
+    settleTimeouts: { killGraceMs: 50 },
+  }).createSession({
     provider: { kind: 'http', providerId: 'fake-claude' },
     modelId: 'fake-model',
     cwd: '/tmp',

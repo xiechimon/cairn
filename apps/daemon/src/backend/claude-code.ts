@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -41,6 +41,7 @@ import { contextTokensOf, subscriptionKeyOf, todoFromTodoWrite } from '@cairn/sh
 import { z } from 'zod';
 import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-auth.js';
 import { credentialRedactor } from '../credential-output.js';
+import { ProcessTree, SESSION_TREE_ENV } from '../process-tree.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
 import { BackgroundTaskRows } from './claude-background-tasks.js';
@@ -550,6 +551,36 @@ interface BackgroundShellEnd {
   status: string;
 }
 
+export interface SettleTimeouts {
+  interruptMs: number;
+  exitGraceMs: number;
+  killGraceMs: number;
+}
+
+const SETTLE_TIMEOUTS: SettleTimeouts = {
+  interruptMs: 5_000,
+  exitGraceMs: 10_000,
+  killGraceMs: 3_000,
+};
+
+interface SessionProcess {
+  child: ChildProcess | null;
+  marker: string;
+}
+
+function within(work: Promise<unknown>, ms: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  return Promise.race([
+    work.then(
+      () => {},
+      () => {},
+    ),
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 function isMainAgentTurnFrame(msg: SDKMessage): boolean {
   const parent = (msg as { parent_tool_use_id?: string | null }).parent_tool_use_id;
   if (parent !== null && parent !== undefined) return false;
@@ -587,6 +618,12 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private waitTimer: NodeJS.Timeout | null = null;
   private continuations = 0;
   private endedShells: BackgroundShellEnd[] = [];
+  private readonly process: SessionProcess;
+  private readonly timeouts: SettleTimeouts;
+  private tree: ProcessTree | null = null;
+  private released: Promise<void> | null = null;
+  private readonly loopDone: Promise<void>;
+  private endLoop: () => void = () => {};
 
   constructor(
     q: Query,
@@ -597,6 +634,8 @@ class ClaudeSessionHandle implements AgentSessionHandle {
       state: ClaudeMapState;
       abort: AbortController;
       input: AsyncQueue<SDKUserMessage>;
+      process: SessionProcess;
+      timeouts: SettleTimeouts;
       onClaudeRateLimit?: (notice: ClaudeRateLimitNotice) => void;
     },
     private readonly spans?: PiStepSpanSink,
@@ -609,6 +648,11 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     this.abort = opts.abort;
     this.input = opts.input;
     this.onClaudeRateLimit = opts.onClaudeRateLimit;
+    this.process = opts.process;
+    this.timeouts = opts.timeouts;
+    this.loopDone = new Promise((resolve) => {
+      this.endLoop = resolve;
+    });
     this.events = this.queue.iterable();
     void this.pump();
   }
@@ -669,6 +713,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
           if (ev.type === 'done') {
             if (this.holdForBackground(ev)) continue;
             finished = ev;
+            await this.processTree()?.snapshot();
             this.inputEnded = true;
             this.input.end();
             continue;
@@ -701,10 +746,11 @@ class ClaudeSessionHandle implements AgentSessionHandle {
       const message = err instanceof Error ? err.message : String(err);
       this.queue.push({ type: 'error', error: { message, retryable: false, processCrash: true } });
     } finally {
+      this.endLoop();
       this.releaseHeldDone(
         'The Claude Code session ended before the background subagents finished.',
       );
-      this.finish();
+      await this.release(false);
       await this.telemetryCapture?.close();
       await this.spans?.flush();
     }
@@ -744,7 +790,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
         `Stopped waiting after ${BACKGROUND_SUBAGENT_WAIT_MS / 60_000} minutes; still running: ${this.pendingBackground().join('; ')}`,
       );
       this.stopping = true;
-      this.finish();
+      void this.release(true);
     }, BACKGROUND_SUBAGENT_WAIT_MS);
     return true;
   }
@@ -853,9 +899,52 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     this.stopping = true;
     this.releaseHeldDone('The session was stopped while it waited for background subagents.');
     this.state.interrupted = true;
+    await this.release(true);
+  }
+
+  private release(interrupt: boolean): Promise<void> {
+    this.released ??= this.settle(interrupt);
+    return this.released;
+  }
+
+  private async settle(interrupt: boolean): Promise<void> {
+    await this.processTree()?.snapshot();
+    if (interrupt && !this.inputEnded) await within(this.q.interrupt(), this.timeouts.interruptMs);
+    await this.processTree()?.snapshot();
+    this.inputEnded = true;
     this.input.end();
-    this.q.interrupt().catch(() => {});
+    const tree = this.processTree();
+    if (tree === null) this.closeQuery();
+    else {
+      await within(this.exited(), this.timeouts.exitGraceMs);
+      await tree.kill();
+    }
+    await within(this.exited(), this.timeouts.killGraceMs);
     this.finish();
+  }
+
+  private processTree(): ProcessTree | null {
+    const pid = this.process.child?.pid;
+    if (pid === undefined) return null;
+    this.tree ??= new ProcessTree(
+      pid,
+      { env: SESSION_TREE_ENV, value: this.process.marker },
+      this.timeouts.killGraceMs,
+    );
+    return this.tree;
+  }
+
+  private exited(): Promise<void> {
+    const child = this.process.child;
+    if (child === null) return this.loopDone;
+    if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+    return new Promise((resolve) => child.once('exit', () => resolve()));
+  }
+
+  private closeQuery(): void {
+    try {
+      this.q.close();
+    } catch {}
   }
 
   async stopTask(taskId: string): Promise<void> {
@@ -1261,6 +1350,7 @@ export interface ClaudeSdkOptionParts {
   env?: Record<string, string>;
   plugins?: SdkPluginConfig[];
   abortController: AbortController;
+  process?: SessionProcess;
 }
 
 const METERED_CLAUDE_AUTH_BLANK = {
@@ -1283,12 +1373,13 @@ const OAUTH_TOKEN_FD = 3;
 function spawnClaudeProcess(
   fdToken: string | undefined,
   confine: ((launch: Launch) => Launch) | undefined,
+  session: SessionProcess | undefined,
 ): (options: SpawnOptions) => SpawnedProcess {
   return ({ command, args, cwd, env, signal }) => {
     const launch = confine?.({ command, args }) ?? { command, args };
     const child = spawn(launch.command, launch.args, {
       ...(cwd !== undefined ? { cwd } : {}),
-      env,
+      env: session === undefined ? env : { ...env, [SESSION_TREE_ENV]: session.marker },
       signal,
       stdio: ['pipe', 'pipe', 'ignore', 'pipe'],
       windowsHide: true,
@@ -1301,6 +1392,7 @@ function spawnClaudeProcess(
     const { stdin, stdout } = child;
     if (stdin === null || stdout === null)
       throw new Error('Claude Code process has no stdio pipes');
+    if (session !== undefined) session.child = child;
     return Object.assign(child, { stdin, stdout });
   };
 }
@@ -1379,8 +1471,8 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       ? { pathToClaudeCodeExecutable: parts.executablePath }
       : {}),
     env,
-    ...(fdToken !== undefined || parts.confine !== undefined
-      ? { spawnClaudeCodeProcess: spawnClaudeProcess(fdToken, parts.confine) }
+    ...(fdToken !== undefined || parts.confine !== undefined || parts.process !== undefined
+      ? { spawnClaudeCodeProcess: spawnClaudeProcess(fdToken, parts.confine, parts.process) }
       : {}),
     ...(!locked && parts.plugins !== undefined && parts.plugins.length > 0
       ? { plugins: parts.plugins }
@@ -1403,6 +1495,7 @@ export interface ClaudeCodeBackendOpts {
   confine?: SessionConfiner;
   teamSkillsCacheDir?: string;
   executableVersion?: string | null;
+  settleTimeouts?: Partial<SettleTimeouts>;
 }
 
 export class ClaudeCodeBackend implements AgentBackend {
@@ -1461,6 +1554,7 @@ export class ClaudeCodeBackend implements AgentBackend {
     const append = opts.systemPrompt;
     const disallowedTools = [SDK_ASK_TOOL, ...(opts.readOnly === true ? SDK_WRITE_TOOLS : [])];
     const abort = new AbortController();
+    const sessionProcess: SessionProcess = { child: null, marker: randomUUID() };
     const sessionId = resumeId ?? randomUUID();
     const deniedSkills = collectDeniedSkillDirs(this.opts.skills, opts);
     const skillDenyRules = buildSkillDenyRules(deniedSkills);
@@ -1503,6 +1597,7 @@ export class ClaudeCodeBackend implements AgentBackend {
           }
         : {}),
       abortController: abort,
+      process: sessionProcess,
     });
     const state = createClaudeMapState({ modelId: opts.modelId });
     const input = new AsyncQueue<SDKUserMessage>();
@@ -1546,6 +1641,8 @@ export class ClaudeCodeBackend implements AgentBackend {
         state,
         abort,
         input,
+        process: sessionProcess,
+        timeouts: { ...SETTLE_TIMEOUTS, ...this.opts.settleTimeouts },
         ...(opts.onClaudeRateLimit !== undefined
           ? { onClaudeRateLimit: opts.onClaudeRateLimit }
           : {}),
