@@ -1,10 +1,6 @@
 import type { LocalToolDef, RemoteToolDef } from '@cairn/shared';
-import {
-  CHIEF_REMOTE_TOOLS,
-  CHIEF_REPLY_TOOLS,
-  CHIEF_ROUTER_TOOLS,
-  COMPUTER_REMOTE_TOOLS,
-} from '@cairn/shared';
+import * as shared from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { buildHostTools, mapMcpEndpoint, parametersToShape } from '../src/backend/claude-code.js';
@@ -79,14 +75,35 @@ describe('parametersToShape (failure modes 2/3)', () => {
     expect(parametersToShape(null, 'agents')).toEqual({});
   });
 
-  test('every Coordinator tool schema is inside the vocabulary the Claude Code backend accepts', () => {
-    for (const tool of [
-      ...CHIEF_REMOTE_TOOLS,
-      ...CHIEF_ROUTER_TOOLS,
-      ...CHIEF_REPLY_TOOLS,
-      ...COMPUTER_REMOTE_TOOLS,
-    ]) {
-      expect(() => parametersToShape(tool.parameters, tool.name), tool.name).not.toThrow();
+  test('integer slots keep their integer type', () => {
+    const json = roundTrip({ type: 'object', properties: { x: { type: 'integer' } } });
+    expect((json.properties as Record<string, Record<string, unknown>>).x?.type).toBe('integer');
+  });
+
+  test('every shipped tool schema is inside the vocabulary the Claude Code backend accepts', () => {
+    const toolLists = Object.entries(shared).filter(
+      (entry): entry is [string, RemoteToolDef[]] =>
+        Array.isArray(entry[1]) &&
+        entry[1].length > 0 &&
+        entry[1].every(
+          (item: unknown) =>
+            typeof item === 'object' && item !== null && 'name' in item && 'parameters' in item,
+        ),
+    );
+    expect(toolLists.map(([name]) => name)).toEqual(
+      expect.arrayContaining([
+        'CHIEF_REMOTE_TOOLS',
+        'COMPUTER_DESKTOP_TOOLS',
+        'OWN_COMPUTER_TOOLS',
+      ]),
+    );
+    for (const [list, tools] of toolLists) {
+      for (const tool of tools) {
+        expect(
+          () => parametersToShape(tool.parameters, tool.name),
+          `${list}.${tool.name}`,
+        ).not.toThrow();
+      }
     }
   });
 

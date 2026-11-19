@@ -989,6 +989,9 @@ function jsonSchemaToZod(schema: unknown, where: string): z.ZodType {
     case 'number':
       forbidKeys(['type', 'description']);
       return describe(z.number());
+    case 'integer':
+      forbidKeys(['type', 'description']);
+      return describe(z.number().int());
     case 'boolean':
       forbidKeys(['type', 'description']);
       return describe(z.boolean());
