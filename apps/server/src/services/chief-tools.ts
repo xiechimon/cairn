@@ -83,6 +83,7 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { effectDedupeKey } from './external-effects.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
+import { inspectRun } from './inspect-run.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import { executeMemoryDocumentTool } from './memory-documents.js';
@@ -678,6 +679,8 @@ export async function executeChiefTool(
           maxChars: num(params, 'maxChars'),
         }),
       );
+    case 'inspect_run':
+      return json(inspectRun(db, ctx.teamId, str(params, 'id')));
     case 'channel_messages':
       return json(
         await channelMessages(db, ctx, {
