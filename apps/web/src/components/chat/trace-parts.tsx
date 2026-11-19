@@ -1,6 +1,6 @@
 import { cn } from 'cn';
 import { ChevronRight } from 'lucide-react';
-import type { ComponentProps, ReactNode } from 'react';
+import { type ComponentProps, type ReactNode, useEffect, useState } from 'react';
 import type { TFunc } from '../../i18n/translate.js';
 import { Button } from '../ui/button.js';
 
@@ -118,6 +118,18 @@ export function TraceGroupSummary({
       className={cn(SUMMARY_BTN, className)}
       {...props}
     >
+      {running && (
+        <span className="inline-flex h-5 flex-none items-center gap-1" data-trace-live="">
+          {[0, 1, 2].map((n) => (
+            <span
+              key={n}
+              aria-hidden="true"
+              style={{ animationDelay: `${n * 0.15}s` }}
+              className="typing-dot block size-1.5 rounded-full bg-(--text-tertiary)"
+            />
+          ))}
+        </span>
+      )}
       <span className="min-w-0 truncate" data-trace-summary="" title={summaryTitle}>
         <span className={cn(running && 'shimmer motion-reduce:shimmer-none')}>{summary}</span>
       </span>
@@ -136,6 +148,30 @@ export function TraceGroupSummary({
       )}
       <TraceChevron open={open} />
     </Button>
+  );
+}
+
+const TRACE_COLLAPSE_MS = 200;
+
+export function TraceCollapse({ open, children }: { open: boolean; children: ReactNode }) {
+  const [mounted, setMounted] = useState(open);
+  if (open && !mounted) setMounted(true);
+  useEffect(() => {
+    if (open) return;
+    const id = setTimeout(() => setMounted(false), TRACE_COLLAPSE_MS);
+    return () => clearTimeout(id);
+  }, [open]);
+  return (
+    <div
+      data-trace-collapse={open ? 'open' : 'closed'}
+      inert={!open}
+      className={cn(
+        'grid transition-[grid-template-rows,opacity] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
+        open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+      )}
+    >
+      <div className="min-h-0 overflow-hidden">{mounted && children}</div>
+    </div>
   );
 }
 

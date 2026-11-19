@@ -4,6 +4,7 @@ import { formatLiveElapsed, liveTokensLabel, useLiveSeconds } from '../component
 import {
   EMPTY_TRACE_COUNTS,
   TraceCard,
+  TraceCollapse,
   TraceCommandBox,
   TraceFailTag,
   TraceGroupSummary,
@@ -137,6 +138,25 @@ export function workResult(steps: readonly WorkStep[], t: TFunc): string | null 
   return read.length > 0 ? t('读了 {files}', { files: fileNames(read, t) }) : null;
 }
 
+function unrecoveredFailures(steps: readonly Exclude<WorkStep, { kind: 'say' }>[]): number {
+  let failed = 0;
+  for (const step of steps.toReversed()) {
+    if (step.kind !== 'call') continue;
+    if (!step.error) break;
+    failed += 1;
+  }
+  return failed;
+}
+
+function currentAction(steps: readonly Exclude<WorkStep, { kind: 'say' }>[], t: TFunc): string {
+  const call = steps.findLast(
+    (step): step is Extract<WorkStep, { kind: 'call' }> => step.kind === 'call',
+  );
+  if (call === undefined) return t('正在思考');
+  const target = call.localized === true ? t(stepTarget(call)) : stepTarget(call);
+  return `${t(RUNNING_VERBS[call.action])} ${target}`;
+}
+
 function stepTarget(step: Extract<WorkStep, { kind: 'call' }>): string {
   if (step.description !== undefined) return step.description;
   return (step.command ?? step.target ?? '').split('\n')[0] ?? '';
@@ -231,7 +251,6 @@ function WorkStepRow({
                 aria-label={t('未完成')}
               />
             )}
-            <span className="text-caption">{formatWorkDuration(step.seconds)}</span>
             {running && (
               <span
                 role="img"
@@ -243,8 +262,8 @@ function WorkStepRow({
           </>
         }
       />
-      {open &&
-        (call === null ? (
+      <TraceCollapse open={open}>
+        {call === null ? (
           <div className="px-3 pb-3">
             <div
               className="border-l-2 border-(--border) py-0.5 pl-3 text-ui whitespace-pre-wrap text-(--text-secondary) [overflow-wrap:anywhere]"
@@ -286,7 +305,8 @@ function WorkStepRow({
               )}
             </TraceOutput>
           </div>
-        ))}
+        )}
+      </TraceCollapse>
     </div>
   );
 }
@@ -328,16 +348,17 @@ export function WorkTrace({
       else if (step.action === 'edit') editPaths.add(step.target ?? '');
       else if (step.action === 'setup') counts.setup = 1;
       else counts[step.action] += 1;
-      if (step.error) counts.failed += 1;
       if (step.running) running = true;
     }
   }
   counts.read = readPaths.size;
   counts.edit = editPaths.size;
+  counts.failed = unrecoveredFailures(traceSteps);
   const { text, failed } = traceSummary(t, counts, running);
-  const purposes = workPurposes(item.steps, running, t);
+  const purposes = running ? [] : workPurposes(item.steps, running, t);
   const result = running ? null : workResult(item.steps, t);
-  const detail = !running && purposes.length > 0 ? `${purposes.join(t('，'))} · ${text}` : text;
+  const current = running ? currentAction(traceSteps, t) : null;
+  const detail = purposes.length > 0 ? `${purposes.join(t('，'))} · ${text}` : text;
   const liveSeconds = useLiveSeconds(running ? (item.startedAt ?? null) : null);
   return (
     <div className="my-2 min-w-0" data-testid="work-block">
@@ -345,8 +366,8 @@ export function WorkTrace({
         <TraceGroupSummary
           data-testid="work-summary"
           summary={
-            running && purposes.length > 0
-              ? purposes.join(t('，'))
+            current !== null
+              ? current
               : result === null
                 ? text
                 : result.split(FILE_NAME).map((part, index) =>
@@ -359,7 +380,9 @@ export function WorkTrace({
                     ),
                   )
           }
-          summaryTitle={failed === null ? detail : `${detail} ${failed}`}
+          summaryTitle={[current, detail, failed]
+            .filter((part): part is string => part !== null && part !== '')
+            .join(' · ')}
           failed={failed}
           elapsed={running ? liveMeta(formatLiveElapsed(liveSeconds), item.outputTokens, t) : ''}
           open={expanded}
@@ -367,7 +390,7 @@ export function WorkTrace({
           onClick={() => setDisclosure({ defaultExpanded, open: !expanded })}
         />
       </div>
-      {expanded && (
+      <TraceCollapse open={expanded}>
         <TraceCard>
           {earlier > 0 && (
             <div>
@@ -394,7 +417,7 @@ export function WorkTrace({
             ),
           )}
         </TraceCard>
-      )}
+      </TraceCollapse>
     </div>
   );
 }

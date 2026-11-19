@@ -180,11 +180,12 @@ test('a run folds its thinking, calls and narration into one block that stays co
   const summaries = page.getByTestId('work-summary');
   await expect(summaries).toHaveCount(1);
   const summary = summaries.first();
-  await expect(summary.locator('[data-trace-summary]')).toHaveText('Check formatting');
+  await expect(summary.locator('[data-trace-summary]')).toHaveText('正在运行 Check formatting');
   await expect(summary).toHaveAttribute('data-trace-state', 'running');
   await expect(summary).toHaveAttribute('aria-expanded', 'false');
-  for (const count of ['正在思考', '正在读 1 个文件', '正在搜索 1 次', '正在跑 2 条命令', '正在改 2 个文件', '正在调用 1 个工具', '1 个失败'])
+  for (const count of ['正在思考', '正在读 1 个文件', '正在搜索 1 次', '正在跑 2 条命令', '正在改 2 个文件', '正在调用 1 个工具'])
     await expect(summary.locator('[data-trace-summary]')).toHaveAttribute('title', new RegExp(count));
+  await expect(summary.locator('[data-trace-summary]')).not.toHaveAttribute('title', /失败/);
   await summary.click();
   const block = page.getByTestId('work-block').first();
   await expect(block.locator('[data-slot="work-say"]')).toHaveText('The checks passed.');
@@ -194,7 +195,7 @@ test('a run folds its thinking, calls and narration into one block that stays co
   const read = block.getByTestId('work-call').first();
   await expect(read).toContainText('读');
   await expect(read).toContainText('src/main.ts L10–29');
-  await expect(read).toContainText('1.3s');
+  await expect(read).not.toContainText('1.3s');
   await expect(read).not.toContainText('/home/user');
   await read.click();
   await expect(read.locator('..').getByTestId('tool-output')).toContainText('export const ready = true;');
@@ -235,7 +236,7 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await block.getByTestId('work-earlier').click();
   const run = block.getByTestId('work-call').filter({ hasText: 'Verify changes' });
   await expect(run).toContainText('Verify changes');
-  await expect(run).toContainText('12s');
+  await expect(run).not.toContainText('12s');
   await run.click();
   const output = run.locator('..').getByTestId('tool-output');
   await expect(run.locator('..').locator('.work-code-header')).toContainText('$ pnpm test');
@@ -308,6 +309,9 @@ test('expanding a row at the bottom keeps the reading position', async ({ page }
   await page.setViewportSize({ width: 760, height: 460 });
   await stubWorld(page, 'claimed', 'building');
   await page.getByTestId('work-summary').last().click();
+  await expect
+    .poll(() => page.evaluate(() => document.getAnimations().filter((a) => a instanceof CSSTransition).length))
+    .toBe(0);
   const col = page.getByTestId('transcript-col');
   await col.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
   const gap = () => col.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
@@ -328,6 +332,9 @@ test('returning to the bottom after expanding resumes following', async ({ page 
   await page.setViewportSize({ width: 760, height: 460 });
   await stubWorld(page, 'claimed', 'building');
   await page.getByTestId('work-summary').last().click();
+  await expect
+    .poll(() => page.evaluate(() => document.getAnimations().filter((a) => a instanceof CSSTransition).length))
+    .toBe(0);
   const col = page.getByTestId('transcript-col');
   await col.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
   const gap = () => col.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);

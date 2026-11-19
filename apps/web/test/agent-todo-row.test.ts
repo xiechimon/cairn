@@ -226,7 +226,7 @@ describe('mapTranscript agent todo list (#1524)', () => {
     ]);
   });
 
-  test('settled work sits above agent-todo while an active running work block sits below it', () => {
+  test('a running turn is one running work block with the agent-todo right below it', () => {
     const settledCall: MessageRow = {
       id: 'm-read',
       role: 'assistant',
@@ -259,11 +259,50 @@ describe('mapTranscript agent todo list (#1524)', () => {
         { text: '跑测试', state: 'doing' },
       ]),
     });
-    const settledWorkAt = items.findIndex((i) => i.kind === 'work' && i.running !== true);
-    const todoAt = items.findIndex((i) => i.kind === 'agent-todo');
-    const activeWorkAt = items.findIndex((i) => i.kind === 'work' && i.running === true);
-    expect(settledWorkAt).toBeGreaterThan(-1);
-    expect(todoAt).toBeGreaterThan(settledWorkAt);
-    expect(activeWorkAt).toBeGreaterThan(todoAt);
+    const works = items.filter((i) => i.kind === 'work');
+    expect(works).toHaveLength(1);
+    expect(works[0]?.running).toBe(true);
+    const workAt = items.findIndex((i) => i.kind === 'work');
+    expect(items[workAt + 1]?.kind).toBe('agent-todo');
+    expect(items.some((i) => i.kind === 'streaming')).toBe(false);
+  });
+});
+
+describe('mapTranscript running turn (Claude Code parity, mon X 2026-11-19)', () => {
+  const read = (id: string, at: number): MessageRow => ({
+    id,
+    role: 'assistant',
+    createdAt: at,
+    content: {
+      kind: 'toolcall',
+      call: { id: `c-${id}`, name: 'Read', arguments: { file_path: `src/${id}.ts` }, result: 'ok' },
+    },
+  });
+
+  test('between two calls the turn stays one running work block and adds no status row', () => {
+    const items = render({
+      messages: [read('a', NOW - 20_000), read('b', NOW - 10_000)],
+      steps: [runningStep('s1')],
+    });
+    expect(items.filter((i) => i.kind === 'work')).toEqual([
+      expect.objectContaining({ running: true }),
+    ]);
+    expect(items.some((i) => i.kind === 'streaming')).toBe(false);
+  });
+
+  test('the narration before the first call stays prose above the work block', () => {
+    const items = render({
+      messages: [
+        { id: 'plan', role: 'assistant', createdAt: NOW - 25_000, content: '我按这三步来。' },
+        read('a', NOW - 20_000),
+        { id: 'mid', role: 'assistant', createdAt: NOW - 15_000, content: '读完 a，再读 b。' },
+        read('b', NOW - 10_000),
+      ],
+      steps: [runningStep('s1')],
+    });
+    const kinds = items.filter((i) => i.kind === 'robot' || i.kind === 'work').map((i) => i.kind);
+    expect(kinds).toEqual(['robot', 'work']);
+    const work = items.find((i) => i.kind === 'work');
+    expect(work?.kind === 'work' && work.steps.map((s) => s.kind)).toEqual(['call', 'say', 'call']);
   });
 });

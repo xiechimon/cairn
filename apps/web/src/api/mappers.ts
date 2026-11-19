@@ -908,7 +908,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     if (
       entry.item.kind === 'robot' &&
       entry.item.markdown !== undefined &&
-      workAhead[index] === true
+      workAhead[index] === true &&
+      items.at(-1)?.kind === 'work'
     ) {
       const id = entry.item.id ?? `say-${entry.at}`;
       const say: WorkStep = { kind: 'say', id, text: entry.item.markdown };
@@ -978,12 +979,14 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
     const tailWork = items.at(-1);
     const hasActiveTailWork =
+      liveReply === null &&
       tailWork?.kind === 'work' &&
-      tailWork.steps.some(
+      (tailWork.steps.some(
         (step) =>
           (step.kind === 'call' && step.running) ||
           (step.kind === 'think' && step.running === true),
-      );
+      ) ||
+        (tailWork.createdAt ?? Number.NEGATIVE_INFINITY) >= running.createdAt);
     if (hasActiveTailWork && tailWork?.kind === 'work') {
       tailWork.running = true;
       tailWork.startedAt = running.createdAt;
@@ -993,34 +996,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const liveTodo = agentTodo != null && agentTodo.stepId === running.id ? agentTodo : null;
     const shownTodo = liveTodo?.items ?? persistedTodo;
     if (shownTodo !== null && shownTodo.length > 0) {
-      const todoRow: TranscriptItem = { kind: 'agent-todo', items: shownTodo };
-      if (hasActiveTailWork && liveReply === null && tailWork?.kind === 'work') {
-        let split = tailWork.steps.findIndex(
-          (step) => (step.kind === 'call' || step.kind === 'think') && step.running === true,
-        );
-        while (split > 0 && tailWork.steps[split - 1]?.kind === 'say') split--;
-        if (split > 0) {
-          const active: TranscriptItem = {
-            ...tailWork,
-            id: tailWork.steps[split]?.id ?? tailWork.id,
-            steps: tailWork.steps.slice(split),
-          };
-          items.splice(
-            items.length - 1,
-            1,
-            {
-              kind: 'work',
-              id: tailWork.id,
-              steps: tailWork.steps.slice(0, split),
-              ...(tailWork.createdAt !== undefined ? { createdAt: tailWork.createdAt } : {}),
-            },
-            todoRow,
-            active,
-          );
-        } else items.splice(items.length - 1, 0, todoRow);
-      } else {
-        items.push(todoRow);
-      }
+      items.push({ kind: 'agent-todo', items: shownTodo });
     }
     const actLabel = act != null && !stopping ? activityLabel(act) : null;
     const queued =
@@ -1044,18 +1020,20 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
             ? queued.label
             : quota != null
               ? quota.label
-              : actLabel != null
-                ? actLabel.label
-                : stopping
-                  ? '正在停止…'
-                  : running.kind === 'plan' && steps.length === 1 && running.status === 'pending'
-                    ? '准备工作区...'
-                    : '处理中...',
+              : liveReply !== null && !stopping
+                ? ''
+                : actLabel != null
+                  ? actLabel.label
+                  : stopping
+                    ? '正在停止…'
+                    : running.kind === 'plan' && steps.length === 1 && running.status === 'pending'
+                      ? '准备工作区...'
+                      : '处理中...',
         ...(queued != null
           ? { labelVars: queued.vars }
           : quota != null
             ? { labelVars: quota.vars }
-            : actLabel?.vars !== undefined
+            : actLabel?.vars !== undefined && liveReply === null
               ? { labelVars: actLabel.vars }
               : {}),
       });
