@@ -92,8 +92,8 @@ const tokens = (page: Page) => stat(page, 1);
 const ringFace = (page: Page) =>
   ring(page).evaluate((button) => ({
     label: (button as HTMLElement).innerText.trim(),
-    arcs: button.querySelectorAll('svg path').length,
-    tracks: button.querySelectorAll('svg circle').length,
+    arcs: button.querySelectorAll('[data-slot="context-arc"]').length,
+    tracks: button.querySelectorAll('svg circle:not([data-slot])').length,
     percent: button.getAttribute('data-percent'),
   }));
 const openUsage = async (page: Page) => {

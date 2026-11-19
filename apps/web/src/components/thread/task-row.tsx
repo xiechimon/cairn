@@ -30,6 +30,7 @@ export interface TaskRowProps {
   onOpen?: () => void;
   open?: boolean;
   onIntent?: () => void;
+  grow?: boolean;
 }
 
 const LEAD_BOX = 'flex size-7 flex-none items-center justify-center';
@@ -60,6 +61,7 @@ export function TaskRow({
   onOpen,
   open,
   onIntent,
+  grow = false,
 }: TaskRowProps) {
   const descriptionId = useId();
   const checkable = check !== undefined && check !== 'none';
@@ -144,8 +146,10 @@ export function TaskRow({
   return (
     <div
       data-slot="task-row-frame"
+      data-grow={grow ? '' : undefined}
       className={cn(
         'group/task relative',
+        grow && 'grow-enter',
         below != null && 'rounded-(--radius-tile) hover:bg-(--menu-hover)',
         checkable && check.checked === true && 'rounded-(--radius-tile) bg-(--menu-hover)',
         open === true && 'rounded-(--radius-tile) bg-(--sidebar-active)',

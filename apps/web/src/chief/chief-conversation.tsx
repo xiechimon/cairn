@@ -762,7 +762,7 @@ export function ChiefConversation({
                         {renderRows(streamLayout)}
                       </>
                     )}
-                    <ChiefQuestion />
+                    <ChiefQuestion key={chief.threadId ?? ''} />
                   </ReplySourceHighlightContext.Provider>
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>

@@ -56,13 +56,50 @@ const PANEL_TABS = 'h-7.5 gap-0.5 group-data-horizontal/tabs:h-7.5';
 const PANEL_TAB =
   'h-7.5 px-2.5 text-ui text-foreground data-active:font-normal dark:text-foreground';
 
-function SectionHeader({ section, count }: { section: TaskSection; count: number }) {
+const MOVE_FRESH_MS = 1500;
+
+function useMoved(entries: readonly TaskEntry[], ready: boolean): ReadonlySet<string> {
+  const placed = useRef<Map<string, TaskSection> | null>(null);
+  const movedAt = useRef(new Map<string, number>());
+  if (!ready) return new Set();
+  const now = Date.now();
+  const before = placed.current;
+  placed.current = new Map(entries.map((entry) => [entry.todo.id, entry.section]));
+  if (before !== null)
+    for (const entry of entries) {
+      const was = before.get(entry.todo.id);
+      if (was !== undefined && was !== entry.section) movedAt.current.set(entry.todo.id, now);
+    }
+  return new Set(
+    entries
+      .map((entry) => entry.todo.id)
+      .filter((id) => now - (movedAt.current.get(id) ?? -Infinity) < MOVE_FRESH_MS),
+  );
+}
+
+function SectionHeader({
+  section,
+  count,
+  flash = false,
+}: {
+  section: TaskSection;
+  count: number;
+  flash?: boolean;
+}) {
   const { t } = useI18n();
   const accent = isWaiting(section);
   return (
     <h3 className="m-0 flex h-8 items-center gap-2 px-2.5 text-ui font-normal text-foreground">
       {t(SECTION_LABEL[section])}
-      <span className={cn('tabular-nums', accent ? ACCENT_INK : 'text-content-tertiary')}>
+      <span
+        key={flash ? count : undefined}
+        data-flash={flash ? '' : undefined}
+        className={cn(
+          'tabular-nums',
+          accent ? ACCENT_INK : 'text-content-tertiary',
+          flash && 'grow-flash',
+        )}
+      >
         {count}
       </span>
     </h3>
@@ -146,6 +183,7 @@ function PanelTaskRow({
   prs,
   prsArrived,
   prsPending,
+  moved,
   selected,
   open: expanded,
   onToggle,
@@ -160,6 +198,7 @@ function PanelTaskRow({
   prs: readonly PrPanelRow[];
   prsArrived: ReadonlySet<string>;
   prsPending: boolean;
+  moved: boolean;
   now: number;
   onOpenThread: (id: string) => void;
 }) {
@@ -204,6 +243,7 @@ function PanelTaskRow({
         onOpen={open}
         open={expanded}
         onIntent={() => prefetch(entry.todo.id)}
+        grow={moved}
       />
       {dialogs}
     </>
@@ -298,6 +338,9 @@ export function TasksPanel({
   );
   const prsOf = new Map<string, PrPanelRow[]>();
   for (const pr of prs) prsOf.set(pr.threadId, [...(prsOf.get(pr.threadId) ?? []), pr]);
+  const moved = useMoved(entries, query === undefined || !query.isPending);
+  const received = (section: TaskSection) =>
+    groups[section].some((entry) => moved.has(entry.todo.id));
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
   const row = (entry: TaskEntry) => (
     <PanelTaskRow
@@ -307,6 +350,7 @@ export function TasksPanel({
       prs={prsOf.get(entry.todo.id) ?? []}
       prsArrived={prsArrived}
       prsPending={connected && prsQuery.isPending}
+      moved={moved.has(entry.todo.id)}
       selected={picked.has(entry.todo.id)}
       open={entry.todo.id === openThreadId}
       onToggle={() => togglePicked(entry.todo.id)}
@@ -379,7 +423,7 @@ export function TasksPanel({
             data-section={section}
             className="flex flex-col gap-0.5"
           >
-            <SectionHeader section={section} count={n} />
+            <SectionHeader section={section} count={n} flash={received(section)} />
             {section === 'needs_input' && questionRows}
             {groups[section].map(row)}
           </section>
@@ -392,7 +436,7 @@ export function TasksPanel({
       quiet(emptyText)
     ) : (
       <section data-testid="tasks-section" data-section={section} className="flex flex-col gap-0.5">
-        <SectionHeader section={section} count={groups[section].length} />
+        <SectionHeader section={section} count={groups[section].length} flash={received(section)} />
         {groups[section].map(row)}
       </section>
     );

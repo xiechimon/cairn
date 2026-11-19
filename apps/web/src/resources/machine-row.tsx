@@ -109,7 +109,7 @@ export function MachineRowView({
             <span
               aria-hidden
               className={cn(
-                'size-1.5 flex-none rounded-full',
+                'grow-light size-1.5 flex-none rounded-full',
                 online ? 'bg-running' : 'bg-content-dim',
               )}
             />

@@ -148,7 +148,13 @@ export function TraceGroupSummary({
           className="flex-none text-meta tabular-nums text-(--text-tertiary)"
           data-slot="trace-elapsed"
         >
-          {elapsed}
+          {running
+            ? Array.from(elapsed, (char, n) => (
+                <span key={`${elapsed.length}-${n}-${char}`} className="grow-digit inline-block">
+                  {char}
+                </span>
+              ))
+            : elapsed}
         </span>
       )}
       <TraceChevron open={open} />

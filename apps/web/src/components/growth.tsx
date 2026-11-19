@@ -24,6 +24,17 @@ export function useArrivals(ids: readonly string[], ready = true): ReadonlySet<s
   return new Set(ids.filter((id) => now - (arrived.current.get(id) ?? -Infinity) < FRESH_MS));
 }
 
+export function RollNumber({ value }: { value: number }) {
+  const first = useRef(value);
+  const moved = useRef(false);
+  if (value !== first.current) moved.current = true;
+  return (
+    <span key={value} className={moved.current ? 'grow-digit inline-block' : undefined}>
+      {value}
+    </span>
+  );
+}
+
 export function GrowText({ text }: { text: string }) {
   return Array.from(text, (char, n) => (
     <span

@@ -9,7 +9,7 @@ test('the ring under the composer stays still while a turn runs and reads in K',
   await expect(meter).toHaveText('');
   await expect(meter).toHaveAttribute('aria-busy', 'false');
   expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
-  await expect(meter.locator('path')).toBeVisible();
+  await expect(meter.locator('[data-slot="context-arc"]')).toBeVisible();
   await expect(meter.locator('[data-compact-tick]')).toHaveCount(1);
   await expect(meter).toHaveAttribute('aria-label', 'Context 24K / 200K, 70K 时 auto-compact');
   await expect(line.getByText(/工作中 ·|Working ·/)).toHaveCount(0);
@@ -66,7 +66,7 @@ test('usage loading draws a still bare ring until the request settles', async ({
     await expect(meter).toHaveAccessibleName('正在加载用量…');
     expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
     await expect(meter.locator('circle')).toBeVisible();
-    await expect(meter.locator('path')).toHaveCount(0);
+    await expect(meter.locator('[data-slot="context-arc"]')).toHaveCount(0);
   } finally {
     release();
   }
@@ -90,5 +90,56 @@ test('usage loading stays truthful during a first reply without a reading', asyn
   await expect(meter).toHaveAccessibleName('正在加载用量…');
   await expect(meter).toHaveText('');
   expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
-  await expect(meter.locator('path')).toHaveCount(0);
+  await expect(meter.locator('[data-slot="context-arc"]')).toHaveCount(0);
+});
+
+test('a new reading grows the ring arc from the old share instead of redrawing it', async ({ page }) => {
+  let tokens = 24_000;
+  await mockLive(page, { threads: [THREAD], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/chief')
+      return json({
+        chief: { id: 'chief-u1-t1', userId: 'u1', teamId: 't1', agent: { agentId: 'agent-1' }, lastTurnAt: null, createdAt: 0, tz: null },
+        context: { tokens, contextWindow: 200_000 },
+        watches: [],
+        wakes: [],
+      });
+    return undefined;
+  });
+  await page.goto('/app');
+  const meter = page.getByTestId('home-c').getByTestId('composer-context-meter');
+  const arc = meter.locator('[data-slot="context-arc"]');
+  await expect(meter).toHaveAttribute('data-percent', '12');
+  expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
+  await page.waitForFunction(() => window.__es.some((es) => es.url.includes('/api/teams/t1/stream')));
+  tokens = 140_000;
+  await page.evaluate(() =>
+    (
+      window.__es.find((es) => es.url.includes('/api/teams/t1/stream')) as unknown as {
+        onerror: () => void;
+      }
+    ).onerror(),
+  );
+  await expect(meter).toHaveAttribute('data-percent', '70');
+  const shares = await arc.evaluate(
+    (el) =>
+      new Promise<number[]>((resolve) => {
+        const seen: number[] = [];
+        const read = () => {
+          seen.push(Number.parseFloat(getComputedStyle(el).strokeDasharray));
+          if (seen.length < 40) requestAnimationFrame(read);
+          else resolve(seen);
+        };
+        read();
+      }),
+  );
+  expect(shares.some((share) => share > 12 && share < 70)).toBe(true);
+  expect(shares.at(-1)).toBe(70);
+});
+
+test('reduced motion sets the new ring reading at once', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/app?scenario=chief-draft');
+  const arc = page.getByTestId('home-c').getByTestId('composer-context-meter').locator('[data-slot="context-arc"]');
+  await expect(arc).toBeVisible();
+  expect(await arc.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe('0s');
 });

@@ -2,6 +2,7 @@ import type { AskUserAnswer } from '@cairn/shared';
 import { cn } from 'cn';
 import { Check } from 'lucide-react';
 import {
+  type CSSProperties,
   Fragment,
   type ReactNode,
   useEffect,
@@ -42,7 +43,11 @@ export interface QuestionChipsProps {
   onCancel?: (requestId: string) => void;
   draftKey?: string;
   bound?: boolean;
+  grow?: boolean;
 }
+
+const OPTION_GROW_LEAD_MS = 120;
+const OPTION_GROW_STEP_MS = 80;
 
 const PICKED_CHIP_CLS =
   'aria-pressed:bg-(--menu-hover) aria-pressed:border-(--text-tertiary) dark:aria-pressed:bg-(--menu-hover)';
@@ -101,6 +106,7 @@ export function QuestionChips({
   onCancel,
   draftKey,
   bound = false,
+  grow = false,
 }: QuestionChipsProps) {
   const { t } = useI18n();
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
@@ -118,6 +124,7 @@ export function QuestionChips({
   const draft = drafts[step];
   const blockRef = useRef<HTMLDivElement | null>(null);
   const baseId = useId();
+  const [growStep] = useState(grow ? step : -1);
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
 
   const [localTexts, setLocalTexts] = useState<Record<number, string>>({});
@@ -380,7 +387,20 @@ export function QuestionChips({
                   aria-pressed={selected}
                   aria-describedby={describedBy}
                   data-recommended={recommended ? '' : undefined}
-                  className={cn(REPLY_CHIP_CLS, PICKED_CHIP_CLS, 'gap-1.5')}
+                  data-grow={step === growStep ? '' : undefined}
+                  style={
+                    step === growStep
+                      ? ({
+                          '--grow-delay': `${OPTION_GROW_LEAD_MS + oi * OPTION_GROW_STEP_MS}ms`,
+                        } as CSSProperties)
+                      : undefined
+                  }
+                  className={cn(
+                    REPLY_CHIP_CLS,
+                    PICKED_CHIP_CLS,
+                    'gap-1.5',
+                    step === growStep && 'grow-enter',
+                  )}
                   onClick={() => choose(oi)}
                 >
                   {multi && selected && <Check aria-hidden className="size-4" />}

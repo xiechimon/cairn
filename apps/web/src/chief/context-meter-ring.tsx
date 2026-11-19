@@ -39,21 +39,6 @@ export function contextPercentOf(
   return clampContextPercent((100 * context.tokens) / context.contextWindow);
 }
 
-export function contextMeterArcPath(percent: number, cx = CX, cy = CY, radius = RADIUS): string {
-  const filled = clampContextPercent(percent);
-  if (filled <= 0) return '';
-  const startX = cx;
-  const startY = cy - radius;
-  if (filled >= 100) {
-    return `M ${startX} ${startY} A ${radius} ${radius} 0 1 1 ${startX - 0.001} ${startY}`;
-  }
-  const angle = (filled / 100) * Math.PI * 2 - Math.PI / 2;
-  const endX = cx + radius * Math.cos(angle);
-  const endY = cy + radius * Math.sin(angle);
-  const largeArc = filled > 50 ? 1 : 0;
-  return `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY}`;
-}
-
 export type ContextMeterReading = ChiefContextUsage;
 
 export function formatContextTokens(n: number): string {
@@ -155,7 +140,6 @@ export function ContextMeterGlyph({
   compactShare?: number | undefined;
   near?: boolean;
 }) {
-  const arc = contextMeterArcPath(filled);
   const tick =
     compactShare === undefined || compactShare <= 0 || compactShare >= 1
       ? null
@@ -171,14 +155,20 @@ export function ContextMeterGlyph({
         strokeWidth={STROKE}
         opacity={0.28}
       />
-      {arc !== '' && (
-        <path
-          d={arc}
+      {clampContextPercent(filled) > 0 && (
+        <circle
+          data-slot="context-arc"
+          cx={CX}
+          cy={CY}
+          r={RADIUS}
           fill="none"
           stroke="currentColor"
           strokeWidth={STROKE}
           strokeLinecap="round"
-          className={near ? 'text-foreground' : undefined}
+          pathLength={100}
+          style={{ strokeDasharray: `${clampContextPercent(filled)} 100` }}
+          transform={`rotate(-90 ${CX} ${CY})`}
+          className={cn('grow-arc', near && 'text-foreground')}
         />
       )}
       {tick !== null && (
@@ -325,7 +315,12 @@ export function ContextMeterRing({
       className={cn(METER_BTN_CLS, openable && 'cursor-pointer aria-expanded:bg-(--menu-hover)')}
     />
   );
-  const glyph = <ContextMeterGlyph {...contextGlyphProps(context, loading ? 0 : filled)} />;
+  const glyph = (
+    <ContextMeterGlyph
+      key={loading || context == null ? 'pending' : 'read'}
+      {...contextGlyphProps(context, loading ? 0 : filled)}
+    />
+  );
   const tip = (
     <TooltipContent side="top" sideOffset={8} className="flex-col items-start gap-0.5">
       {lines.map((line, index) => (

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useId, useRef, useSyncExternalStore } from 'react';
+import { useArrivals } from '../components/growth.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { useI18n } from '../i18n/provider.js';
 import { useOptionalChiefRoot } from './chief-root.js';
@@ -77,6 +78,10 @@ export function ChiefQuestion() {
     () => pending.map(stepOf).join(','),
     () => '',
   );
+  const arrived = useArrivals(
+    pending.map((request) => request.item.requestId),
+    root?.surface.load === 'ready',
+  );
   const reveals = questionDockState.reveals();
   const itemRef = useRef<HTMLDivElement | null>(null);
   const headerId = useId();
@@ -111,6 +116,7 @@ export function ChiefQuestion() {
           item={shown.item}
           draftKey={key}
           bound
+          grow={arrived.has(shown.item.requestId)}
           onAnswer={(input) =>
             root?.surface.onAnswerQuestion?.({ ...input, threadId: shown.conversationId })
           }

@@ -53,7 +53,7 @@ function StatusDot({ online, className }: { online: boolean; className?: string 
       data-testid="machine-status-dot"
       data-online={online}
       className={cn(
-        'block size-1.5 flex-none rounded-full',
+        'grow-light block size-1.5 flex-none rounded-full',
         online ? 'bg-running' : 'rounded-full border border-content-tertiary bg-background',
         className,
       )}

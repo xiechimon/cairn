@@ -6,7 +6,6 @@ import {
   ContextMeterRing,
   type ContextMeterRingProps,
   contextCacheState,
-  contextMeterArcPath,
   contextMeterLines,
   formatContextTokens,
   contextPercentOf,
@@ -47,15 +46,6 @@ describe('contextPercentOf', () => {
   });
 });
 
-describe('contextMeterArcPath', () => {
-  test('returns an arc path without stroke-dasharray semantics', () => {
-    expect(contextMeterArcPath(0)).toBe('');
-    expect(contextMeterArcPath(5)).toMatch(/^M /);
-    expect(contextMeterArcPath(5)).toContain(' A ');
-    expect(contextMeterArcPath(100)).toContain(' A ');
-  });
-});
-
 describe('ContextMeterRing', () => {
   test('falls back to the mock fill when there is no reading', () => {
     const html = renderRing();
@@ -65,9 +55,8 @@ describe('ContextMeterRing', () => {
     expect(html).not.toContain('size-5.5');
     expect(html).toContain('data-mock=""');
     expect(html).toContain(`data-percent="${MOCK_CONTEXT_PERCENT}"`);
-    expect(html).not.toContain('stroke-dasharray');
-    expect(html).toContain('aria-label="上下文（示意）"');
-    expect(html).toContain('<path ');
+        expect(html).toContain('aria-label="上下文（示意）"');
+    expect(html).toContain('data-slot="context-arc"');
   });
 
   test('fills the ring against the model window and names used, window and the compaction point in K', () => {
@@ -92,7 +81,7 @@ describe('ContextMeterRing', () => {
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('aria-label="正在加载用量…"');
     expect(html).not.toContain('上下文（示意）');
-    expect(html).not.toContain('<path ');
+    expect(html).not.toContain('data-slot="context-arc"');
   });
 
   test('stays still with its reading while a turn runs', () => {
@@ -102,7 +91,7 @@ describe('ContextMeterRing', () => {
     });
     expect(html).toContain('aria-busy="false"');
     expect(html).not.toContain('animate-spin');
-    expect(html).toContain('<path ');
+    expect(html).toContain('data-slot="context-arc"');
     expect(html).toContain('Cache 回复中保持有效');
   });
 });

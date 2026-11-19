@@ -153,7 +153,10 @@ export function ThreadUsageRing(view: ThreadUsageView & { running?: boolean }) {
             />
           }
         >
-          <ContextMeterGlyph {...contextGlyphProps(context, percent ?? 0)} />
+          <ContextMeterGlyph
+            key={percent === null ? 'pending' : 'read'}
+            {...contextGlyphProps(context, percent ?? 0)}
+          />
           {percent !== null && <span aria-hidden="true">{`${percent}%`}</span>}
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={8} className="flex-col items-start gap-0.5">

@@ -34,11 +34,13 @@ export function StatusGlyph({
   label,
   className,
   outlined = false,
+  draw = false,
 }: {
   kind: GlyphKind;
   label?: string;
   className?: string;
   outlined?: boolean;
+  draw?: boolean;
 }) {
   const maskId = useId();
   const cut = outlined && kind === 'failed' ? undefined : CUT[kind];
@@ -63,9 +65,18 @@ export function StatusGlyph({
               strokeWidth="1.6"
               strokeLinecap="round"
               strokeLinejoin="round"
+              pathLength={draw ? 1 : undefined}
+              className={draw ? 'grow-cut' : undefined}
             />
           </mask>
-          <circle cx="7" cy="7" r="6.25" fill="currentColor" mask={`url(#${maskId})`} />
+          <circle
+            cx="7"
+            cy="7"
+            r="6.25"
+            fill="currentColor"
+            mask={`url(#${maskId})`}
+            className={draw ? 'grow-seal' : undefined}
+          />
         </>
       ) : (
         <>

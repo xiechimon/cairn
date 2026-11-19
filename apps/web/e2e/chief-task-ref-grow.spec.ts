@@ -67,3 +67,37 @@ test('under reduced motion the new branch shows drawn at once', async ({ page })
       .evaluate((node) => getComputedStyle(node).opacity),
   ).toBe('1');
 });
+
+test('a task that finishes while the page is open draws its check; one already done when it opened does not @motion', async ({
+  page,
+}) => {
+  const done = { ...SECOND, phase: 'done' };
+  const state = {
+    threads: [THREAD],
+    messages: [
+      { id: 'ask', role: 'user', content: '评估派发方式，再改模型设置', createdAt: 10 },
+      createTodoRow('create-1', TASK, 20),
+      createTodoRow('create-2', done, 21),
+      { id: 'answer', role: 'assistant', content: '开了两个任务。', createdAt: 30 },
+    ],
+    todos: [TASK, done],
+  };
+  await mockLive(page, state);
+  await page.goto('/app');
+  const tiles = page.getByTestId('home-c').getByTestId('chief-task-ref').locator('[data-sealed]');
+  await expect(page.getByTestId('home-c').getByTestId('chief-task-ref')).toHaveCount(2);
+  await expect(tiles).toHaveCount(0);
+  await page.waitForFunction(() => window.__es.some((es) => es.url.includes('/api/teams/t1/stream')));
+  state.todos = [{ ...TASK, phase: 'done' }, done];
+  await page.evaluate(() =>
+    (
+      window.__es.find((es) => es.url.includes('/api/teams/t1/stream')) as unknown as {
+        onerror: () => void;
+      }
+    ).onerror(),
+  );
+  await expect(tiles).toHaveCount(1);
+  expect(
+    await tiles.locator('mask path').evaluate((node) => getComputedStyle(node).animationName),
+  ).toBe('grow-cut-draw');
+});

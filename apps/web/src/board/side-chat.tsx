@@ -17,6 +17,7 @@ import { contextPercentOf } from '../chief/context-meter-ring.js';
 import { REPLY_SOURCE_ATTR } from '../chief/reply-source-highlight.js';
 import { isFinalReportPhase, ReportThreadContext } from '../chief/research-report.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
+import { RollNumber, useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
@@ -215,8 +216,14 @@ const CHANGES_TOOL = 'mr-1.5 flex-none text-content-tertiary pointer-coarse:size
 function ChangeCounts({ added, removed }: { added: number; removed: number }) {
   return (
     <span className="flex flex-none gap-1.5 text-meta tabular-nums">
-      <span className="text-(--diff-add-fg)">+{added}</span>
-      {removed > 0 && <span className="text-destructive">−{removed}</span>}
+      <span className="text-(--diff-add-fg)">
+        +<RollNumber value={added} />
+      </span>
+      {removed > 0 && (
+        <span className="text-destructive">
+          −<RollNumber value={removed} />
+        </span>
+      )}
     </span>
   );
 }
@@ -264,6 +271,10 @@ function ChangesCard({
   const { t } = useI18n();
   const [openFiles, setOpenFiles] = useState<ReadonlySet<string>>(new Set());
   const [fullFiles, setFullFiles] = useState<ReadonlySet<string>>(new Set());
+  const arrived = useArrivals(
+    (changes.content?.files ?? []).map((file) => file.path),
+    changes.status !== 'loading',
+  );
   if (changes.status === 'error') {
     return (
       <TraceCard className="mt-5" data-testid="side-chat-changes" data-state="error">
@@ -339,7 +350,14 @@ function ChangesCard({
               const fileOpen = openFiles.has(file.path);
               const dir = file.path.slice(0, Math.max(0, file.path.lastIndexOf('/')));
               return (
-                <div key={file.path} className="border-t border-(--border) first:border-t-0">
+                <div
+                  key={file.path}
+                  data-grow={arrived.has(file.path) ? '' : undefined}
+                  className={cn(
+                    'border-t border-(--border) first:border-t-0',
+                    arrived.has(file.path) && 'grow-enter',
+                  )}
+                >
                   <div className="flex min-h-9 items-center pointer-coarse:min-h-11">
                     <Button
                       variant="ghost"

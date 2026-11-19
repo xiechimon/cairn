@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { mockLive, THREAD } from './chief-home-mock.js';
 
 const HOME = '/app?scenario=home-c';
 const MIDDAY_IN_BEIJING = Date.UTC(2026, 10, 12, 4);
@@ -158,4 +159,35 @@ test('the reference list says what runs on an online computer and how long an of
   await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air');
   await expect(rows.nth(1)).toHaveText(/^办公室 Mac mini离线 · \d+ (分钟|小时)前$/);
   await expect(panel(page).getByRole('button', { name: /云|cloud/i })).toHaveCount(0);
+});
+
+test('a computer coming online lights its dot up instead of switching it', async ({ page }) => {
+  const state = { threads: [THREAD], messages: [], machines: [{ id: 'm-1', name: 'omarchy', online: false }] };
+  await mockLive(page, state);
+  await page.goto('/app?pane=machines');
+  const dot = panel(page).getByTestId('machine-status-dot');
+  await expect(dot).toHaveAttribute('data-online', 'false');
+  await page.waitForFunction(() => window.__es.some((es) => es.url.includes('/api/teams/t1/stream')));
+  state.machines = [{ id: 'm-1', name: 'omarchy', online: true }];
+  await page.evaluate(() =>
+    (
+      window.__es.find((es) => es.url.includes('/api/teams/t1/stream')) as unknown as {
+        onerror: () => void;
+      }
+    ).onerror(),
+  );
+  await expect(dot).toHaveAttribute('data-online', 'true');
+  const colors = await dot.evaluate(
+    (el) =>
+      new Promise<string[]>((resolve) => {
+        const seen: string[] = [];
+        const read = () => {
+          seen.push(getComputedStyle(el).backgroundColor);
+          if (seen.length < 50) requestAnimationFrame(read);
+          else resolve(seen);
+        };
+        read();
+      }),
+  );
+  expect(new Set(colors).size).toBeGreaterThan(2);
 });

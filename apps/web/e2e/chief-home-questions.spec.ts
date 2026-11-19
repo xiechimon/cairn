@@ -1175,3 +1175,28 @@ test('answer drafts per request and the thread draft stay separate through every
   }
   expect(failed).toEqual([]);
 });
+
+test('a question that arrives while you watch grows its options in one after another; a reload shows them still', async ({
+  page,
+}) => {
+  const state = structuredClone({ ...TWO, messages: TWO.messages.slice(0, 1) });
+  await mockLive(page, state);
+  await page.goto('/app');
+  await expect(page.getByText('Ship the relay fix')).toBeVisible();
+  await page.waitForFunction(() => window.__es.some((es) => es.url.includes('/stream')));
+  const late = question('ask-0000000a', A, 'Which model?', [{ label: 'First' }, { label: 'Second' }]);
+  state.messages = [...state.messages, late];
+  await page.evaluate(
+    ([u, message]) =>
+      window.__es.find((es) => es.url.includes(u as string))?.emit({ type: 'message', message }),
+    [`/api/conversations/${THREAD.id}/stream`, late] as const,
+  );
+  const options = page.getByTestId('chief-question').locator('[data-grow]');
+  await expect(options).toHaveCount(2);
+  const delays = await options.evaluateAll((els) => els.map((el) => getComputedStyle(el).animationDelay));
+  expect(delays).toEqual(['0.12s', '0.2s']);
+
+  await page.reload();
+  await expect(page.getByTestId('chief-question-option-0-0')).toBeVisible();
+  await expect(page.getByTestId('chief-question').locator('[data-grow]')).toHaveCount(0);
+});
