@@ -13,6 +13,7 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
 import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
+import { taskLink } from './chief.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { isPersonalSpace } from './personal-space.js';
@@ -182,6 +183,7 @@ function threads(db: Db, ctx: ChiefToolCtx, params: Params): string {
       id: row.id,
       seqNum: row.seqNum,
       title: tidy(row.title, TITLE_MAX),
+      link: taskLink(row.id, tidy(row.title, TITLE_MAX)),
       projectId: row.projectId,
       phase: row.phase,
       line: line === null || line === undefined ? null : tidy(line, LINE_MAX),
@@ -217,6 +219,7 @@ function needsYou(deps: ChiefToolDeps, ctx: ChiefToolCtx): string {
         todoId: row.id,
         seqNum: row.seqNum,
         title: tidy(row.title, TITLE_MAX),
+        link: taskLink(row.id, tidy(row.title, TITLE_MAX)),
         owner: ownership.owner,
         kind: ownership.reason,
         line: lineOf(row.latestBuildId),

@@ -441,15 +441,14 @@ describe('the chief tool surface (rescanned source + delete_skills struck from t
     }
   });
 
-  test('C3: the composeChiefSystemPrompt resource list contains the rescanned skills', () => {
+  test('C3: skills stay out of composeChiefSystemPrompt, so adding one keeps the prompt byte-identical', () => {
     const { s, skillsDir } = setup();
     try {
-      const prompt = composeChiefSystemPrompt(
-        { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, skillsDir },
-        s.team.id,
-      );
-      expect(prompt).toMatch(/^- deploy：部署流程$/m);
-      expect(prompt).not.toContain('"id":"deploy"');
+      const deps = { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, skillsDir };
+      const prompt = composeChiefSystemPrompt(deps, s.team.id);
+      expect(prompt).not.toContain('deploy');
+      addSkill(skillsDir, 'release', { name: 'release', description: 'release flow' });
+      expect(composeChiefSystemPrompt(deps, s.team.id)).toBe(prompt);
     } finally {
       s.dispose();
     }

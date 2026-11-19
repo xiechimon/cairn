@@ -5,6 +5,7 @@ import {
   formatSkillRouteSection,
   stripTurnContext,
   suggestSkillsForMessage,
+  TURN_STATE_OPEN,
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, isNotNull, notInArray, notLike, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -24,6 +25,7 @@ import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
 import {
   chiefClaimContext,
+  coordinatorTurnState,
   finishChiefTurn,
   notifyChiefTurn,
   parseChiefTrigger,
@@ -179,6 +181,23 @@ function foldQueuedChiefSteps(db: MachineDeps['db'], head: StepRow, now: number)
     .run();
 }
 
+function nowNote(at: number): string {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const date = new Date(at);
+  const stamp = date.toLocaleString('sv-SE', { timeZone, dateStyle: 'short', timeStyle: 'short' });
+  const weekday = date.toLocaleDateString('en-US', { timeZone, weekday: 'long' });
+  return `Now: ${stamp}, ${weekday} (${timeZone})`;
+}
+
+function turnStateSection(deps: MachineDeps, threadRow: ThreadRow, at: number): string {
+  return [
+    TURN_STATE_OPEN,
+    nowNote(at),
+    coordinatorTurnState(deps, threadRow.teamId),
+    '</turn_state>',
+  ].join('\n');
+}
+
 export function chiefTurnContext(
   deps: MachineDeps,
   stepRow: StepRow,
@@ -232,7 +251,8 @@ export function chiefTurnContext(
           ],
         )
       : null;
-  const sections = [project?.text, routeSection, recall?.text ?? ''].filter(
+  const state = ctx ? turnStateSection(deps, threadRow, nowMs()) : '';
+  const sections = [state, project?.text, routeSection, recall?.text ?? ''].filter(
     (part): part is string => !!part,
   );
   const memoryTrace = {

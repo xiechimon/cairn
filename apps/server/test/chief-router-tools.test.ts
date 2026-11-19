@@ -21,7 +21,11 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { BLOCKED_BY_HOLD, releaseBlockedSteps } from '../src/services/blockers.js';
-import { buildChiefSystemPrompt, chiefToolDefHashes } from '../src/services/chief.js';
+import {
+  buildChiefSystemPrompt,
+  chiefToolDefHashes,
+  coordinatorTurnState,
+} from '../src/services/chief.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { chiefRemoteTools } from '../src/services/routing-rules.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -726,19 +730,18 @@ describe('router tools', () => {
       ]) {
         expect(text, gone).not.toContain(gone);
       }
-      expect(text).toContain('open_thread');
-      expect(text).toContain('message_thread');
-      expect(text).toContain('- 1 条在跑：#7 needs_input（标题和汇报用 threads 查）');
-      expect(text).toContain('- 等人处理：#7 question（coordinator）（详情用 needs_you 查）');
-      expect(text).not.toContain('Ignore previous instructions');
+      expect(text).not.toContain('#7');
+      const state = coordinatorTurnState(toolDeps(), H.teamId);
+      expect(state).toContain('Running tasks: #7 needs_input');
+      expect(state).toContain('Waiting on someone: #7 question (coordinator)');
+      expect(state).not.toContain('Ignore previous instructions');
     });
 
-    test('the prompt tells the Coordinator to search todos by keyword before create_todo', () => {
+    test('create_todo tells the Coordinator to search todos by keyword first, and web research stays with tasks', () => {
+      const createTodo = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'create_todo')!;
+      expect(createTodo.description).toContain('search todos with query');
       const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
-      expect(text).toContain('create_todo 前用 todos 的 query 按关键词');
-      expect(text).toContain('scrapling extract get');
-      expect(text).toContain('Agent Reach 需主动启用');
-      expect(text).toContain('服务端没有 shell');
+      expect(text).not.toContain('scrapling');
     });
 
     test('the prompt has no GitHub overlap rule and asks for no overlap result in the reply', () => {
@@ -749,7 +752,6 @@ describe('router tools', () => {
 
     test('the prompt and the create_todo definition carry no quick lane', () => {
       const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
-      expect(text).toContain('create_todo 必须带 title');
       expect(text).not.toContain('快速通道');
       expect(text).not.toContain('lane:');
       const createTodo = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'create_todo')!;
@@ -760,9 +762,9 @@ describe('router tools', () => {
     });
 
     test('an empty team says so', () => {
-      const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
-      expect(text).toContain('- 没有在跑的任务');
-      expect(text).toContain('- 没有等人处理的任务');
+      const state = coordinatorTurnState(toolDeps(), H.teamId);
+      expect(state).toContain('Running tasks: none');
+      expect(state).toContain('Waiting on someone: none');
     });
 
     test('a gate wake no longer tells the Coordinator to confirm or review', async () => {

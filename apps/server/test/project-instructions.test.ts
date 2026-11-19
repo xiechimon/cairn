@@ -1,4 +1,9 @@
-import { BRIEF_MARKER_END, claimedStepSchema, PROJECT_INSTRUCTIONS_MAX } from '@cairn/shared';
+import {
+  BRIEF_MARKER_END,
+  claimedStepSchema,
+  PROJECT_INSTRUCTIONS_MAX,
+  stripTurnContext,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -219,7 +224,7 @@ describe('Coordinator turns scoped to a project receive its instructions (D74 P1
   test('an unscoped turn carries no project instructions', async () => {
     const id = await createProject('cairn');
     await req(s.app, 'PATCH', `/api/projects/${id}`, { instructions: RULES });
-    expect(await chiefInstruction('how is everything')).toBe('how is everything');
+    expect(stripTurnContext(await chiefInstruction('how is everything'))).toBe('how is everything');
   });
 
   test('a turn scoped to a project without instructions carries none, not another project', async () => {

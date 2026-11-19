@@ -1,3 +1,4 @@
+import { CHIEF_REMOTE_TOOLS, CHIEF_ROUTER_TOOLS, COMPUTER_REMOTE_TOOLS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -10,6 +11,7 @@ import {
 } from '../src/db/schema.js';
 import {
   composeChiefSystemPrompt,
+  coordinatorTurnState,
   getChiefEnvelope,
   sendChiefMessage,
 } from '../src/services/chief.js';
@@ -165,130 +167,91 @@ describe('chief envelope; PATCH /chief is gone', () => {
     expect(mems.some((m) => m.title === '共用记忆')).toBe(true);
   });
 
-  test('systemPrompt composition includes the resource list + memories and no charter section (02 section 4.3 input contract)', () => {
-    const prompt = composeChiefSystemPrompt(
-      {
-        db: H.s.db,
-        hub: H.s.hub,
-        machineHub: H.s.machineHub,
-        user: H.s.user,
-        skillsDir: H.s.skillsDir,
-      },
-      H.teamId,
-    );
-    expect(prompt).not.toContain('## 章程');
-    expect(prompt).toContain('### 项目');
-    expect(prompt).toContain('代码任务成功后就完成，分支和 PR 保留');
-    expect(prompt).toContain('只有用户在对话里明确要求合并时才用 merge_builds 合并当前交付');
-    expect(prompt).toContain('不主动问要不要合并，不自己决定合并');
-    expect(prompt).not.toContain('自动合并（autonomous）');
-    expect(prompt).toContain('你不写任务正文');
-    expect(prompt).toContain('摘要标题');
-    expect(prompt).toContain('quotes 填这张卡覆盖的用户原句');
-    expect(prompt).toContain('spec 不添加路由说明');
-    expect(prompt).toContain('先后顺序用 dependsOn 表达');
-    expect(prompt).toContain('唯一的例外是用户要你直接操作电脑');
-    expect(prompt).toContain('同一回合最多重试 3 次');
-    expect(prompt).toContain(
-      'browser_act 的 fill_secret（ref、secret 名称和当前网站 origin）代填密码',
-    );
-    expect(prompt).toContain('首次使用会在对话中发出网站授权卡');
-    expect(prompt).toContain('不必填写网站');
-    expect(prompt).toContain('不要读取、索取或发送明文密码');
-    expect(prompt).toContain('验证码、滑块、短信码、二次验证和设备确认仍用 request_takeover');
-    expect(prompt).toContain(
-      '不要再重试，也不要设法绕过拦截：直接用 request_takeover 请用户自己操作',
-    );
-    expect(prompt).toContain('都传 stealth: true，改用隐身浏览器');
-    expect(prompt).toContain('执行前先用 ask_user 问用户');
+  const promptDeps = () => ({
+    db: H.s.db,
+    hub: H.s.hub,
+    machineHub: H.s.machineHub,
+    user: H.s.user,
+    skillsDir: H.s.skillsDir,
   });
 
-  test('systemPrompt is one language and grouped into sections in a fixed order', () => {
-    const prompt = composeChiefSystemPrompt(
-      {
-        db: H.s.db,
-        hub: H.s.hub,
-        machineHub: H.s.machineHub,
-        user: H.s.user,
-        skillsDir: H.s.skillsDir,
-      },
-      H.teamId,
-    );
-    const headings = [
-      '## 工作约定',
-      '### 路由',
-      '### 决策边界',
-      '### 项目归属',
-      '### 回答',
-      '### 电脑操作',
-      '### 事件回合',
-      '### 记忆',
-      '### 第三方文字',
-      '### 技能',
-      '## 团队',
-      '### 项目',
-      '### 进行中的任务',
-      '### 技能',
-      '## 记忆（团队共用）',
+  test('systemPrompt is one English text in a fixed tag order with the preferences snapshot last', () => {
+    const prompt = composeChiefSystemPrompt(promptDeps(), H.teamId);
+    expect(prompt.startsWith('You are the Coordinator')).toBe(true);
+    const tags = [
+      '<how_you_work>',
+      '<asking>',
+      '<talking>',
+      '<events>',
+      '<untrusted>',
+      '<tools>',
+      '<turn_notes>',
+      '<preferences>',
     ];
-    let from = 0;
-    for (const heading of headings) {
-      const at = prompt.split('\n').indexOf(heading, from);
-      expect(at, heading).toBeGreaterThanOrEqual(from);
-      from = at + 1;
-    }
-    const englishSentences = prompt
-      .split('\n')
-      .filter((line) => /[A-Za-z]{3,}(?: [A-Za-z,;:.'"()-]+){4,}/.test(line));
-    expect(englishSentences).toEqual([]);
-    for (const jargon of ['核销', '围栏', 'wake 轮', '运行位', 'ADR 0026', '配额 100']) {
-      expect(prompt, jargon).not.toContain(jargon);
-    }
-    expect(prompt.match(/save_memory/g)?.length).toBe(1);
+    const at = tags.map((tag) => prompt.indexOf(tag));
+    expect(at.every((i) => i >= 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(prompt).toContain("Reply in the user's language");
+    expect(prompt).not.toMatch(/[\u4e00-\u9fff]/);
+    expect(prompt).not.toContain('## 章程');
   });
 
-  test('systemPrompt lists each project with its description and carries the project-attribution rule (#1920)', () => {
+  test('systemPrompt carries no live data: projects, tasks and the model go in the turn notes', () => {
     H.s.db
       .update(projectTable)
-      .set({ description: '官网 cairn.xmon.me 的静态站点' })
+      .set({ description: 'static site for the homepage' })
       .where(eq(projectTable.id, H.projectId))
       .run();
-    const prompt = composeChiefSystemPrompt(
-      {
-        db: H.s.db,
-        hub: H.s.hub,
-        machineHub: H.s.machineHub,
-        user: H.s.user,
-        skillsDir: H.s.skillsDir,
-      },
-      H.teamId,
-    );
-    expect(prompt).toMatch(/^- demo（id: [^）]+）：官网 cairn\.xmon\.me 的静态站点/m);
-    expect(prompt).not.toContain('"description"');
-    expect(prompt).toContain('项目归属');
-    expect(prompt).toContain('先查再定');
-    expect(prompt).toContain('只列仍然分不出的候选');
-    expect(prompt).toContain('每个项目一张');
-    expect(prompt).toContain('只回答，不建任务');
+    const prompt = composeChiefSystemPrompt(promptDeps(), H.teamId);
+    expect(prompt).not.toContain(H.projectId);
+    expect(prompt).not.toContain('static site for the homepage');
+    expect(prompt).not.toContain('Your model');
+    const state = coordinatorTurnState(promptDeps(), H.teamId);
+    expect(state).toMatch(/^- demo \(id: [^)]+\): static site for the homepage/m);
+    expect(state).toContain('Your model:');
+    expect(state).toContain('Running tasks: none');
   });
 
-  test('systemPrompt dispatch section: tasks go to a thread through open_thread, no agent or plan mode, static and independent of settings', () => {
-    const deps = {
-      db: H.s.db,
-      hub: H.s.hub,
-      machineHub: H.s.machineHub,
-      user: H.s.user,
-      skillsDir: H.s.skillsDir,
-    };
-    const prompt = composeChiefSystemPrompt(deps, H.teamId);
-    expect(prompt).toContain('open_thread');
-    expect(prompt).toContain('plan、写测试、实现、自检都由 thread 自己完成');
-    expect(prompt).toContain('不写方案、不选模型');
-    expect(prompt).toContain('message_thread');
-    expect(prompt).toContain('不因任务完成、CI 通过或其他事件合并');
-    expect(prompt).not.toContain('自动合并（autonomous）');
-    expect(prompt).not.toContain('withPlan:false');
-    expect(prompt).not.toContain('dispatchReason');
-    expect(prompt).not.toContain('派发模式（团队设置');
+  test('the old prompt rules live in the descriptions of the tools they govern', () => {
+    const tool = (name: string) =>
+      [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS].find(
+        (t) => t.name === name,
+      )!.description;
+    expect(tool('create_todo')).toContain('You write no task text');
+    expect(tool('create_todo')).toContain('search todos with query');
+    expect(tool('create_todo')).toContain(
+      'One message about several projects becomes one todo per project',
+    );
+    expect(tool('merge_builds')).toContain('only when the user explicitly instructed you to merge');
+    expect(tool('archive_todos')).toContain('This is the only way to end a todo');
+    expect(tool('delete_todos')).toContain(
+      'only when the owner explicitly asks for permanent deletion',
+    );
+    expect(tool('notify_user')).toContain('[wake:settle]');
+    expect(tool('message_thread')).toContain('in their own words');
+    expect(tool('browser_act')).toContain('at most 3 retries in a turn');
+    expect(tool('browser_act')).toContain('fill_secret');
+    expect(tool('browser_navigate')).toContain('stealth: true');
+    expect(tool('update_memory')).toContain('一个月后这条还对');
+    const prompt = composeChiefSystemPrompt(promptDeps(), H.teamId);
+    for (const moved of [
+      'fill_secret',
+      'merge_builds',
+      'archive_todos',
+      'stealth',
+      'supersededBy',
+    ]) {
+      expect(prompt, moved).not.toContain(moved);
+    }
+  });
+
+  test('systemPrompt is byte-identical when projects, tasks and the model change', () => {
+    const before = composeChiefSystemPrompt(promptDeps(), H.teamId);
+    H.s.db
+      .update(projectTable)
+      .set({ name: 'renamed', description: 'changed' })
+      .where(eq(projectTable.id, H.projectId))
+      .run();
+    expect(composeChiefSystemPrompt(promptDeps(), H.teamId)).toBe(before);
   });
 });

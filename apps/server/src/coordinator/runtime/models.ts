@@ -265,3 +265,24 @@ export function createCoordinatorModels(
     },
   };
 }
+
+export type DeferTools = 'native' | 'generic';
+
+export function deferToolsOf(model: Model<Api>): DeferTools {
+  const compat = (model.compat ?? {}) as Record<string, unknown>;
+  if (model.api === 'anthropic-messages')
+    return compat.supportsMidConvoSystemMessages === true &&
+      compat.supportsMidConvoToolChanges === true
+      ? 'native'
+      : 'generic';
+  if (
+    model.api === 'openai-responses' ||
+    model.api === 'openai-codex-responses' ||
+    model.api === 'azure-openai-responses'
+  )
+    return compat.supportsToolSearch === true ||
+      (compat.supportsMidConvoSystemMessages === true && compat.supportsAdditionalTools === true)
+      ? 'native'
+      : 'generic';
+  return 'generic';
+}

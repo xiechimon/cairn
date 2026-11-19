@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { stripTurnContext } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -169,7 +170,7 @@ describe('a thread that ran on the in-server runtime keeps its earlier conversat
     expect(text).not.toContain('projects');
     expect(text).not.toContain(TOKEN);
     expect(text.indexOf('> 用户：remember')).toBeLessThan(text.indexOf('when is the launch?'));
-    expect(text.endsWith('when is the launch?')).toBe(true);
+    expect(stripTurnContext(text).endsWith('when is the launch?')).toBe(true);
 
     const rows = server.db
       .select()

@@ -15,7 +15,7 @@ describe('Coordinator work beside the HTTP server', () => {
     faux.setResponses(
       Array(6).fill(() => {
         requests++;
-        return fauxAssistantMessage(`reply ${requests} ${'text '.repeat(80)}`);
+        return fauxAssistantMessage(`reply ${requests} ${'text '.repeat(3_000)}`);
       }),
     );
     const coordinator = boot(w, faux);

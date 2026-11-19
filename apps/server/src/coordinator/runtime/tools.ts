@@ -6,6 +6,7 @@ import {
   OWN_COMPUTER_TOOLS,
   type RemoteToolDef,
 } from '@cairn/shared';
+import type { ImageContent, TextContent } from '@earendil-works/pi-ai';
 import {
   defineExtension,
   defineTool,
@@ -13,6 +14,7 @@ import {
   hook,
   type ToolRegistration,
 } from '@earendil-works/pi-durable';
+import { createToolSearchTool } from '@earendil-works/pi-durable/tool-search';
 import { coordinatorToolDefs } from '../../services/coordinator-tool-defs.js';
 import { createCutOffRecovery } from './cut-off-recovery.js';
 import {
@@ -23,6 +25,7 @@ import {
 } from './image-text.js';
 import { boundCoordinatorImages, prepareCoordinatorImage } from './images.js';
 import type { MachineApi } from './machine-api.js';
+import { deferToolsOf } from './models.js';
 import { createToolArgsRepair } from './tool-args-repair.js';
 
 export class ShutdownInterrupt extends Error {
@@ -272,6 +275,157 @@ export function coordinatorTool(
   });
 }
 
+export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
+  'create_todo',
+  'todos',
+  'threads',
+  'message_thread',
+  'answer_question',
+  'needs_you',
+  'notify_user',
+  'ask_user',
+  'memories',
+  'attachment',
+]);
+
+export const TOOL_SEARCH_TOOL = 'tool_search';
+export const CALL_TOOL_TOOL = 'call_tool';
+
+function firstSentence(text: string): string {
+  const line = text.trim().split(/\r?\n/)[0] ?? '';
+  const end = line.search(/[.。](\s|$)/);
+  return end < 0 ? line : line.slice(0, end + 1);
+}
+
+export function toolSearchDescription(deferred: readonly RemoteToolDef[]): string {
+  return [
+    'Load tools that are not in your tool list yet. Search by what you want to do or by tool names; pass several names at once to load them together. The tools you can load:',
+    ...deferred.map((def) => `- ${def.name}: ${firstSentence(def.description)}`),
+    `A loaded tool is either added to your tool list from your next call, or, when the result says so, called through ${CALL_TOOL_TOOL}.`,
+  ].join('\n');
+}
+
+function toolSearchTool(deferred: readonly RemoteToolDef[]): ToolRegistration {
+  const native = createToolSearchTool();
+  return defineTool({
+    name: TOOL_SEARCH_TOOL,
+    description: toolSearchDescription(deferred),
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'What you want to do, or tool names.' },
+        limit: { type: 'number', description: 'Most tools to load, default 8.' },
+      },
+      required: ['query'],
+    },
+    replay: 'safe',
+    execute: async (args, api, context) => {
+      const { query, limit } = args as { query: string; limit?: number };
+      const agent = await api.agent(context);
+      const model =
+        agent.model === undefined
+          ? undefined
+          : api.models.getModel(agent.model.provider, agent.model.modelId);
+      const named = deferred.filter((def) => new RegExp(`\\b${def.name}\\b`).test(query));
+      const found = await native.execute(
+        { query, ...(limit === undefined ? {} : { limit }) },
+        api,
+        context,
+      );
+      const ranked = (found.details as { loaded?: string[] } | undefined)?.loaded ?? [];
+      const names = [...new Set([...named.map((def) => def.name), ...ranked])].slice(
+        0,
+        Math.max(limit ?? 8, named.length),
+      );
+      if (model !== undefined && deferToolsOf(model) === 'native') {
+        const offered = new Set(agent.tools.map((tool) => tool.name));
+        const load = names.filter((name) => !offered.has(name));
+        const text =
+          names.length === 0
+            ? 'No matching tools found.'
+            : `Available from your next call:\n${names
+                .map(
+                  (name) =>
+                    `- ${name}: ${firstSentence(deferred.find((def) => def.name === name)?.description ?? '')}`,
+                )
+                .join('\n')}`;
+        return {
+          output: [{ type: 'text', text }],
+          details: { loaded: load },
+          ...(load.length === 0 ? {} : { control: { addTools: load } }),
+        };
+      }
+      const defs = names.flatMap((name) => deferred.filter((def) => def.name === name));
+      const text =
+        defs.length === 0
+          ? 'No matching tools found.'
+          : `Call these with ${CALL_TOOL_TOOL} {name, arguments}; they are not in your tool list.\n\n${defs
+              .map(
+                (def) =>
+                  `## ${def.name}\n${def.description}\nParameters: ${JSON.stringify(def.parameters ?? EMPTY_PARAMETERS)}`,
+              )
+              .join('\n\n')}`;
+      return { output: [{ type: 'text', text }], details: { loaded: [] } };
+    },
+  });
+}
+
+function nestedOutput(value: unknown): (TextContent | ImageContent)[] {
+  if (typeof value === 'string') return [{ type: 'text', text: value }];
+  const items = Array.isArray(value) ? value : value === undefined ? [] : [value];
+  return items.flatMap((item): (TextContent | ImageContent)[] => {
+    if (typeof item === 'object' && item !== null && 'type' in item) {
+      if (item.type === 'text' || item.type === 'image')
+        return [item as TextContent | ImageContent];
+    }
+    return [{ type: 'text', text: JSON.stringify(item) }];
+  });
+}
+
+function callToolTool(deferred: readonly RemoteToolDef[]): ToolRegistration {
+  const names = new Set(deferred.map((def) => def.name));
+  return defineTool({
+    name: CALL_TOOL_TOOL,
+    description: `Call a tool that ${TOOL_SEARCH_TOOL} returned with its parameters instead of adding it to your tool list. Pass its name and its arguments as an object.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: `Tool name from ${TOOL_SEARCH_TOOL}.` },
+        arguments: { type: 'object', description: 'The tool arguments.' },
+      },
+      required: ['name'],
+    },
+    execute: async (args, api, context) => {
+      const { name, arguments: params } = args as { name: string; arguments?: unknown };
+      if (!names.has(name)) {
+        return {
+          output: [
+            {
+              type: 'text',
+              text: `${name} is not a tool ${CALL_TOOL_TOOL} can run; find one with ${TOOL_SEARCH_TOOL}.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      const result = await api.executeTool(
+        name,
+        (typeof params === 'object' && params !== null ? params : {}) as never,
+        context,
+      );
+      const output = nestedOutput(result.structuredOutput);
+      const diagnostics = result.diagnostics.map((d) => d.message).filter((m) => m !== '');
+      return {
+        output:
+          output.length > 0 || diagnostics.length === 0
+            ? output
+            : [{ type: 'text', text: diagnostics.join('\n') }],
+        isError: result.isError,
+      };
+    },
+  });
+}
+
 export function coordinatorToolsExtension(
   channel: ToolChannel,
   gate: StepResolver,
@@ -283,6 +437,7 @@ export function coordinatorToolsExtension(
     ownComputer?: boolean;
     connectorTools?: RemoteToolDef[];
     remoteTools?: readonly RemoteToolDef[];
+    loaded?: ReadonlySet<string>;
     shuttingDown?: () => boolean;
     beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>;
     storeId?: () => string | undefined;
@@ -294,6 +449,8 @@ export function coordinatorToolsExtension(
     options.remoteTools !== undefined
       ? [...options.remoteTools]
       : [...coordinatorToolDefs(options), ...(options.connectorTools ?? [])];
+  const loaded = options.loaded;
+  const deferred = loaded === undefined ? [] : defs.filter((def) => !loaded.has(def.name));
   return defineExtension({
     name: 'cairn-coordinator-tools',
     hooks: [
@@ -306,17 +463,21 @@ export function coordinatorToolsExtension(
         },
       }),
     ],
-    tools: defs.map((def) =>
-      coordinatorTool(
-        def,
-        channel,
-        gate,
-        options.shuttingDown,
-        options.beforeTool,
-        options.storeId,
-        options.ocrRunner,
-        options.imageTextCache,
-      ),
-    ),
+    tools: [
+      ...defs.map((def): ToolRegistration => {
+        const tool = coordinatorTool(
+          def,
+          channel,
+          gate,
+          options.shuttingDown,
+          options.beforeTool,
+          options.storeId,
+          options.ocrRunner,
+          options.imageTextCache,
+        );
+        return deferred.includes(def) ? { ...tool, deferred: true } : tool;
+      }),
+      ...(deferred.length > 0 ? [toolSearchTool(deferred), callToolTool(deferred)] : []),
+    ],
   });
 }

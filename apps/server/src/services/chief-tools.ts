@@ -61,6 +61,7 @@ import {
   removeChiefWatches,
   requireTurnProvenance,
   setChiefWake,
+  taskLink,
 } from './chief.js';
 import { channelMessages, readHistory, searchHistory } from './chief-history.js';
 import {
@@ -414,14 +415,21 @@ export async function executeChiefTool(
           return terms.every((term) => text.includes(term));
         });
       }
-      const todos: { id: string; seqNum: number; title: string; phase: string; summary: string }[] =
-        [];
+      const todos: {
+        id: string;
+        seqNum: number;
+        title: string;
+        link: string;
+        phase: string;
+        summary: string;
+      }[] = [];
       const response = { todos, total: records.length, nextOffset: null as number | null };
       for (const record of records.slice(offset)) {
         todos.push({
           id: record.id,
           seqNum: record.seqNum,
           title: record.title.slice(0, CHIEF_TASK_LIST_TITLE_MAX_CHARS),
+          link: taskLink(record.id, record.title.slice(0, CHIEF_TASK_LIST_TITLE_MAX_CHARS)),
           phase: record.phase,
           summary: record.spec.slice(0, CHIEF_TASK_LIST_SUMMARY_MAX_CHARS),
         });
@@ -727,7 +735,14 @@ export async function executeChiefTool(
         origin: 'coordinator',
         actor: 'Coordinator',
       });
-      return json({ ...record, ...getTodo(svc, record.id), sourceBuildId: ctx.chiefId, buildId });
+      const started = getTodo(svc, record.id);
+      return json({
+        ...record,
+        ...started,
+        link: taskLink(record.id, started?.title ?? record.title),
+        sourceBuildId: ctx.chiefId,
+        buildId,
+      });
     }
     case 'update_todo': {
       const { platform, ...body } = parseWith(coordinatorUpdateTodoParamsSchema, params, 'params');

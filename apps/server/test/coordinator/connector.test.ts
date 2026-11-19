@@ -51,7 +51,9 @@ function scriptedTurn(calls: Record<number, () => ReturnType<typeof fauxAssistan
 const sayDone = () => fauxAssistantMessage('Done.');
 
 const callConnector = (name: string, args: JsonObject) =>
-  fauxAssistantMessage([fauxToolCall(name, args)], { stopReason: 'toolUse' });
+  fauxAssistantMessage([fauxToolCall('call_tool', { name, arguments: args })], {
+    stopReason: 'toolUse',
+  });
 
 async function runTurn(w: World, coordinator: ReturnType<typeof boot>) {
   coordinator.wake(w.threadId);
@@ -72,7 +74,9 @@ describe('in-server Coordinator connector path', () => {
 
     expect(mcp.calls).toMatchObject([{ name: 'GMAIL_FETCH', args: { max: 5 } }]);
     const record = toolCallRecords(w.s).find(
-      (call) => call.name === 'connector_gmail__GMAIL_FETCH',
+      (call) =>
+        call.name === 'call_tool' &&
+        (call.arguments as { name?: string }).name === 'connector_gmail__GMAIL_FETCH',
     );
     expect(record?.isError ?? false).toBe(false);
     expect(JSON.stringify(record?.result)).toContain('inbox-ok');
@@ -100,7 +104,9 @@ describe('in-server Coordinator connector path', () => {
       { actionId: 'connector.gmail.GMAIL_DELETE', status: 'pending' },
     ]);
     const record = toolCallRecords(w.s).find(
-      (call) => call.name === 'connector_gmail__GMAIL_DELETE',
+      (call) =>
+        call.name === 'call_tool' &&
+        (call.arguments as { name?: string }).name === 'connector_gmail__GMAIL_DELETE',
     );
     expect(JSON.stringify(record?.result)).toContain('pending');
     expect(w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.status).toBe('done');
@@ -130,7 +136,9 @@ describe('in-server Coordinator connector path', () => {
 
     expect(mcp.calls).toHaveLength(0);
     const record = toolCallRecords(w.s).find(
-      (call) => call.name === 'connector_gmail__GMAIL_FETCH',
+      (call) =>
+        call.name === 'call_tool' &&
+        (call.arguments as { name?: string }).name === 'connector_gmail__GMAIL_FETCH',
     );
     expect(record?.isError).toBe(true);
     expect(JSON.stringify(record?.result)).toContain('needs_auth');

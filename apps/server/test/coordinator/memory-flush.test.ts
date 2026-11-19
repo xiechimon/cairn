@@ -189,7 +189,7 @@ describe('flush before a real compaction', () => {
           );
         }
         if (last.includes('rolling summary')) return fauxAssistantMessage('folded summary');
-        return fauxAssistantMessage('noted '.repeat(300));
+        return fauxAssistantMessage('noted '.repeat(3_000));
       }),
     );
     const coordinator = boot(w, faux);
@@ -228,7 +228,7 @@ describe('flush before a real compaction', () => {
           folded += 1;
           return fauxAssistantMessage('folded summary');
         }
-        return fauxAssistantMessage('noted '.repeat(300));
+        return fauxAssistantMessage('noted '.repeat(3_000));
       }),
     );
     const coordinator = boot(w, faux);

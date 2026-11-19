@@ -1,5 +1,5 @@
 import type { ClaimedStep } from '@cairn/shared';
-import { claimedStepSchema } from '@cairn/shared';
+import { claimedStepSchema, stripTurnContext } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
@@ -251,7 +251,7 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     await w.send('第二句');
     await w.done(first!.step.id, { status: 'success' });
     const next = await w.claim();
-    expect(next?.instruction).toBe('第二句');
+    expect(stripTurnContext(next?.instruction ?? '')).toBe('第二句');
   });
 
   test('a message from outside the composer while a turn runs waits as queued', async () => {
@@ -263,7 +263,7 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'queued' }]);
     expect(await w.fetchSteer(first!.step.id)).toBeNull();
     await w.done(first!.step.id, { status: 'success' });
-    expect((await w.claim())?.instruction).toBe('第二句');
+    expect(stripTurnContext((await w.claim())?.instruction ?? '')).toBe('第二句');
   });
 
   test('a message typed during a wake turn goes into that turn too', async () => {
@@ -412,7 +412,7 @@ describe('steer (T5): `现在插话`', () => {
     expect((await w.thread()).pending).toEqual([]);
     const next = await w.claim();
     expect(next?.step.id).toBe(queued);
-    expect(next?.instruction).toBe('改成只看 cairn 项目');
+    expect(stripTurnContext(next?.instruction ?? '')).toBe('改成只看 cairn 项目');
   });
 
   test('a steer the daemon has not fetched can be withdrawn, and the daemon never gets its text', async () => {
@@ -452,7 +452,7 @@ describe('steer (T5): `现在插话`', () => {
     await w.done(running!.step.id, { status: 'success' });
     const next = await w.claim();
     expect(next?.step.id).toBe(queued);
-    expect(next?.instruction).toBe('改成只看 cairn 项目');
+    expect(stripTurnContext(next?.instruction ?? '')).toBe('改成只看 cairn 项目');
   });
 
   test('an ack only settles the batch it acknowledges; a later steer waits for its own fetch and ack', async () => {
@@ -563,14 +563,7 @@ describe('steer (T5): `现在插话`', () => {
     expect(await res.json()).toEqual({ steered: false });
     expect(w.s.db.select().from(steerPending).all()).toHaveLength(0);
     const next = await w.claim();
-    expect(next?.instruction).toBe('补一句');
-  });
-
-  test('the chief prompt requires using a steer and saying what changed', async () => {
-    const w = await setupWorld();
-    await w.send('第一句');
-    const claimed = await w.claim();
-    expect(claimed?.chief?.systemPrompt).toContain('插话');
+    expect(stripTurnContext(next?.instruction ?? '')).toBe('补一句');
   });
 });
 
@@ -652,7 +645,7 @@ describe('stop (T5)', () => {
     await w.stop();
     await w.done(running!.step.id, { status: 'stopped' });
     const next = await w.claim();
-    expect(next?.instruction).toBe('第二句');
+    expect(stripTurnContext(next?.instruction ?? '')).toBe('第二句');
   });
 });
 
@@ -674,7 +667,7 @@ describe('chief unavailable (T4)', () => {
     expect(await w.claim()).toBeNull();
     w.s.db.update(stepTable).set({ holdUntil: 0 }).where(eq(stepTable.id, first)).run();
     const resumed = await w.claim();
-    expect(resumed?.instruction).toBe('第一句\n\n第二句');
+    expect(stripTurnContext(resumed?.instruction ?? '')).toBe('第一句\n\n第二句');
     expect(w.stepRow(second)).toBeUndefined();
     expect((await w.envelope()).outage ?? null).toBeNull();
   });

@@ -339,18 +339,20 @@ describe('request_cloak_license is offered with a VM computer or a browser-usabl
     expect(teamHasVmComputer(s.db, s.team.id)).toBe(true);
   });
 
-  test('the prompt sends a missing or rejected key to the card only with a VM computer', () => {
+  test('the card rule rides on the license tool, which only a VM team is offered, and the prompt names neither', () => {
     const { s, deps } = boot();
-    const prompt = () => composeChiefSystemPrompt(deps, s.team.id, THREAD);
-    expect(prompt()).not.toContain(REQUEST_CLOAK_LICENSE_TOOL);
-    addVmMachine(s, 'vm');
-    const withVm = prompt();
-    expect(withVm).toContain(
-      '工具说没有 CloakBrowser 许可时，调 request_cloak_license 在对话里发许可证卡',
+    const card = coordinatorToolDefs({ vmComputer: true }).find(
+      (def) => def.name === REQUEST_CLOAK_LICENSE_TOOL,
+    )!;
+    expect(card.description).toContain('instead of sending the owner to settings');
+    expect(card.description).toContain('pass its reason');
+    expect(coordinatorToolDefs({}).map((def) => def.name)).not.toContain(
+      REQUEST_CLOAK_LICENSE_TOOL,
     );
-    expect(withVm).toContain('不要让用户去设置页');
-    expect(withVm).toContain('原样重试刚才那次调用');
-    expect(withVm).toContain('把 CloakBrowser 给的原因填进 reason');
+    addVmMachine(s, 'vm');
+    expect(composeChiefSystemPrompt(deps, s.team.id, THREAD)).not.toContain(
+      REQUEST_CLOAK_LICENSE_TOOL,
+    );
   });
 
   test('the license tool is offered for a browser-usable VM even with the desktop grant off', () => {
@@ -408,8 +410,7 @@ describe('request_cloak_license is offered with a VM computer or a browser-usabl
       })
       .where(eq(machineTable.id, 'mac-vm'))
       .run();
-    const on = composeChiefSystemPrompt(deps, s.team.id, THREAD);
-    expect(on).toContain('调 request_cloak_license 在对话里发许可证卡');
-    expect(on).not.toContain('install_packages，只填 Debian 包名');
+    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(true);
+    expect(composeChiefSystemPrompt(deps, s.team.id, THREAD)).not.toContain('install_packages');
   });
 });

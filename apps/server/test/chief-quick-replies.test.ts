@@ -13,7 +13,7 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { createCoordinatorServerApi } from '../src/coordinator/server-api.js';
 import { chiefMessage } from '../src/db/schema.js';
-import { buildChiefSystemPrompt, enqueueChiefStep } from '../src/services/chief.js';
+import { enqueueChiefStep } from '../src/services/chief.js';
 import { chiefRemoteTools } from '../src/services/routing-rules.js';
 import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
@@ -225,18 +225,12 @@ describe('suggest_replies (Coordinator quick replies)', () => {
     expect(quickRows(w)).toEqual([]);
   });
 
-  test('is offered to the Coordinator and named in its working rules', async () => {
+  test('is offered to the Coordinator', async () => {
     const w = await setup();
     expect(chiefRemoteTools().map((t) => t.name)).toContain(SUGGEST_REPLIES_TOOL_NAME);
     w.userTurn('再看一下');
     const turn = await w.claim();
     expect(JSON.stringify(turn)).toContain(SUGGEST_REPLIES_TOOL_NAME);
-    const prompt = buildChiefSystemPrompt(
-      { db: w.s.db, hub: w.s.hub, user: w.s.user, skillsDir: w.s.skillsDir },
-      w.s.team.id,
-      w.threadId,
-    );
-    expect(prompt.text).toContain('suggest_replies');
   });
 
   test('stores the sanitised set on one row for the turn, streams it and delivers it in the page', async () => {

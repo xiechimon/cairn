@@ -22,6 +22,7 @@ import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
 import {
   createVolatileContext,
   shortenEarlierEvents,
+  TURN_STATE_UNCHANGED,
   volatileContextExtension,
   withVolatileSection,
 } from '../../src/coordinator/runtime/volatile.js';
@@ -97,6 +98,82 @@ describe('volatile turn context', () => {
     expect(stored.join('')).not.toContain('SECTION');
     expect(stored.join('')).toContain('first prompt');
     expect(stored.join('')).toContain('second prompt');
+    await harness.close(ctx);
+  });
+
+  it('keeps the system prompt and an unchanged turn state byte-stable while the cache is warm', async () => {
+    const dir = makeTestTempDir('coord-volatile-epoch-');
+    dirs.push(dir);
+    const requests: string[] = [];
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000 }],
+      tokensPerSecond: 1e9,
+    });
+    faux.setResponses(
+      Array(4).fill((c: unknown) => {
+        requests.push(JSON.stringify(c));
+        return fauxAssistantMessage('ok');
+      }),
+    );
+    const models = createCoordinatorModels([faux.provider]);
+    let clock = 0;
+    const volatile = createVolatileContext({ now: () => clock, reuseMs: 1_000 });
+    const harness = await openCoordinatorHarness(join(dir, 's.sqlite'), models.models, ctx, {
+      extensions: [volatileContextExtension(volatile, { now: () => clock, reuseMs: 1_000 })],
+    });
+    const deps = {
+      harness,
+      models,
+      api: fakeMachineApi(),
+      context: ctx,
+      heartbeatMs: 1000,
+      now: () => 1,
+      conversationGate: createConversationGate(),
+      volatile,
+    };
+    const state = (now: string, tasks: string) =>
+      `<turn_state>\nNow: ${now}\nRunning tasks: ${tasks}\n</turn_state>`;
+
+    await runCoordinatorTurn(
+      { ...deps, volatileText: state('10:00', 'TASKS-ONE') },
+      chiefStep('s1', 'first', 'PROMPT-V1'),
+    );
+    clock = 500;
+    await runCoordinatorTurn(
+      { ...deps, volatileText: state('10:01', 'TASKS-ONE') },
+      chiefStep('s2', 'second', 'PROMPT-V2'),
+    );
+    clock = 900;
+    await runCoordinatorTurn(
+      { ...deps, volatileText: state('10:02', 'TASKS-TWO') },
+      chiefStep('s3', 'third', 'PROMPT-V2'),
+    );
+    clock = 5_000;
+    await runCoordinatorTurn(
+      { ...deps, volatileText: state('11:00', 'TASKS-TWO') },
+      chiefStep('s4', 'fourth', 'PROMPT-V2'),
+    );
+
+    expect(requests).toHaveLength(4);
+    expect(requests[1]).toContain('PROMPT-V1');
+    expect(requests[1]).not.toContain('PROMPT-V2');
+    expect(requests[2]).not.toContain('PROMPT-V2');
+    expect(requests[1]).toContain(
+      `second\\n\\n<turn_state>\\nNow: 10:01\\n${TURN_STATE_UNCHANGED}`,
+    );
+    expect(requests[2]).toContain(
+      'third\\n\\n<turn_state>\\nNow: 10:02\\nRunning tasks: TASKS-TWO',
+    );
+    expect(requests[3]).toContain('PROMPT-V2');
+    expect(requests[3]).toContain(
+      'fourth\\n\\n<turn_state>\\nNow: 11:00\\nRunning tasks: TASKS-TWO',
+    );
+    for (let i = 1; i < 3; i++) {
+      const before = JSON.parse(requests[i - 1] as string).messages;
+      const after = JSON.parse(requests[i] as string).messages;
+      expect(after.slice(0, before.length)).toEqual(before);
+    }
     await harness.close(ctx);
   });
 

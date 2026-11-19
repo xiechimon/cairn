@@ -27,6 +27,7 @@ import { syncToRewind } from './rewind-sync.js';
 import { coordinatorStoreId } from './store-identity.js';
 import { threadStorePath } from './thread-harnesses.js';
 import {
+  CORE_COORDINATOR_TOOLS,
   type ConversationGate,
   coordinatorToolsExtension,
   createConversationGate,
@@ -132,7 +133,9 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         vmComputer: config.vmComputer?.(threadId) === true,
         vmBrowser: config.vmBrowser?.(threadId) === true,
         connectorTools: config.connectorTools?.(threadId) ?? [],
-        ...(isChiefMemoryThreadId(threadId) ? { remoteTools: WORKER_MEMORY_REMOTE_TOOLS } : {}),
+        ...(isChiefMemoryThreadId(threadId)
+          ? { remoteTools: WORKER_MEMORY_REMOTE_TOOLS }
+          : { loaded: CORE_COORDINATOR_TOOLS }),
         ownComputer: config.ownComputer?.(threadId) === true,
         shuttingDown: () => shuttingDown,
         ...(inputs === undefined

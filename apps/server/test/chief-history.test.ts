@@ -477,11 +477,10 @@ describe('cache-stable system prompt', () => {
       built.sections
         .map((s) => s.text)
         .filter((text) => text !== '')
-        .join('\n')
-        .trimEnd(),
+        .join('\n\n'),
     );
     expect(composeChiefSystemPrompt(resource(), H.teamId, H.threadId)).toBe(built.text);
-    expect(built.sections.map((s) => s.name)).toEqual(['static', 'team', 'channel']);
+    expect(built.sections.map((s) => s.name)).toEqual(['static', 'channel', 'preferences']);
     for (const section of built.sections) expect(section.hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
@@ -496,9 +495,9 @@ describe('cache-stable system prompt', () => {
     expect(after.text).not.toContain('second decision');
   });
 
-  test('static content precedes team context', () => {
+  test('the fixed rules come first and the preferences snapshot last', () => {
     const { text } = buildChiefSystemPrompt(resource(), H.teamId, H.threadId);
-    const order = ['## 工作约定', '## 团队', '## 记忆'].map((m) => text.indexOf(`\n${m}`));
+    const order = ['<how_you_work>', '<untrusted>', '<preferences>'].map((m) => text.indexOf(m));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });

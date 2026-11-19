@@ -1,5 +1,9 @@
 import { rm } from 'node:fs/promises';
-import { orchestrationSourceRef, parseOrchestrationSourceRef } from '@cairn/shared';
+import {
+  CHIEF_REMOTE_TOOLS,
+  orchestrationSourceRef,
+  parseOrchestrationSourceRef,
+} from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -371,15 +375,15 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
 });
 
 describe('B prompt surface: orchestration round splitting discipline (the r14 §5.2 guardrails in the system prompt)', () => {
-  test('B1 the system prompt contains granularity=verifications per round / split by exact owner quotes / dispatch through open_thread', () => {
+  test('B1 create_todo carries the splitting discipline: one todo per accepted outcome, exact owner quotes, order through dependsOn', () => {
+    const createTodo = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'create_todo')!;
+    expect(createTodo.description).toContain('once per independently accepted outcome');
+    expect(createTodo.description).toContain("the owner's exact sentences that todo covers");
+    expect(createTodo.description).toContain('dependsOn');
     const prompt = composeChiefSystemPrompt(
       { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, skillsDir: s.skillsDir },
       teamId,
     );
-    expect(prompt).toContain('按可独立验收的成果拆，不按执行步骤拆');
-    expect(prompt).toContain('quotes 填这张卡覆盖的用户原句');
-    expect(prompt).toContain('兄弟任务');
-    expect(prompt).toContain('open_thread');
     expect(prompt).not.toContain('withPlan:false');
   });
 });

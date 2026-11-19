@@ -393,7 +393,6 @@ describe('Coordinator router tools over the machine protocol (D60)', () => {
     );
     const names = claimed.remoteTools?.map((t) => t.name) ?? [];
     for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(names).toContain(name);
-    expect(claimed.chief?.systemPrompt).toContain('open_thread');
     expect(claimed.chief?.systemPrompt).not.toContain('派发判定');
     const stepId = claimed.step.id;
     const created = (await w.relay(stepId, 'create_todo', {

@@ -325,10 +325,10 @@ describe('Coordinator project channels (docs/design/coordinator-project-channels
   test('the channel system prompt names its project and the team-scope memory rule', async () => {
     const channel = await openChannel();
     const channelPrompt = composeChiefSystemPrompt(toolDeps(), H.teamId, channel.body.id);
-    expect(channelPrompt).toContain('## 频道');
-    expect(channelPrompt).toContain(`（id: ${H.projectId}）的频道`);
-    expect(channelPrompt).toContain('存进团队 scope 的记忆');
-    expect(composeChiefSystemPrompt(toolDeps(), H.teamId, H.threadId)).not.toContain('## 频道');
+    expect(channelPrompt).toContain('<channel>');
+    expect(channelPrompt).toContain(`(id: ${H.projectId})`);
+    expect(channelPrompt).toContain('goes into team memory');
+    expect(composeChiefSystemPrompt(toolDeps(), H.teamId, H.threadId)).not.toContain('<channel>');
   });
 
   test('a task created in a project channel reports there; the main channel mirrors only needs-you and done', async () => {

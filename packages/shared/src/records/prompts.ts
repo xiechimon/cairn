@@ -365,13 +365,6 @@ export const PRIOR_ART_METHOD = [
 
 export const PLAN_PRIOR_ART_RULE = `方案先标 Kind: feature 或 Kind: fix；未标类型按功能方案校验，只有明确的一行小修可标 Kind: fix。功能方案（拆卡、新模块、新的用户可见能力，或标了 Kind: feature）动笔前先调研：${PRIOR_ART_METHOD}plan.md 写 Prior art 小节：至少 3 条不同的带链接来源（用户看得到的功能里至少 2 条是同类产品），再加一行复用或自建的决策和理由（例如复用 croner，因为仍在维护且零依赖，而不是手写解析器）。一行缺陷修复标 Kind: fix，跳过这一步。`;
 
-export const COORDINATOR_DECISION_RULES: readonly string[] = [
-  '用户提需求、做架构决策；调研和实现细节由 thread 自己完成。thread 会先找同类开源实现、读源码，再带着方案和真正需要用户定的决策回来。',
-  '不要用 ask_user 问代码、文档或调研能查到的事实，也不要问实现细节。请求只是不够具体时直接建任务，让 thread 调研后提出方案。',
-  '只有需求本身有歧义（同一句话可能指向不同的成果），或者要用户定架构和产品方向、推翻已记录的决定、付费、凭据、不可逆或对外的动作时，才用 ask_user。',
-  'thread 问的是架构、产品方向这类真正的决策时，不要替用户回答：用 ask_user 转给用户，保留它的选项、推荐和证据链接，用户回答后用 answer_question 把回答交回那个 thread。',
-];
-
 export const WORKER_DECISION_BOUNDARY = [
   '## 决策边界（Cairn 默认规则）',
   '- 人提需求、做架构决策；其余由你自己调研、自己决定。',

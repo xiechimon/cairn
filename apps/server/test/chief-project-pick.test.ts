@@ -1,3 +1,4 @@
+import { CHIEF_REMOTE_TOOLS, PICKED_PROJECT_OPEN } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import {
@@ -9,8 +10,7 @@ import {
   team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { composeChiefSystemPrompt } from '../src/services/chief.js';
-import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { H, registerChiefHarness, relay } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
 
 registerChiefHarness();
@@ -152,11 +152,12 @@ describe('composer project chip reaches the chief (#2009)', () => {
     ).toHaveLength(0);
   });
 
-  test('the system prompt makes the chip win and offers 都不是 on a project question', () => {
-    const prompt = composeChiefSystemPrompt(toolDeps(), H.teamId);
-    expect(prompt).toContain('输入框选定项目');
-    expect(prompt).toContain('「都不是」');
-    expect(prompt).toContain('update_todo 传 projectId');
+  test('create_todo makes the chip win and offers none of these on a project question', () => {
+    const createTodo = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'create_todo')!;
+    expect(createTodo.description).toContain(PICKED_PROJECT_OPEN);
+    expect(createTodo.description).toContain('"none of these"');
+    const projects = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'projects')!;
+    expect(projects.description).toContain('update_todo projectId');
   });
 });
 

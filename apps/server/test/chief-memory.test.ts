@@ -73,6 +73,6 @@ describe('save_memory write path (r5 section 6)', () => {
       H.teamId,
       H.threadId,
     );
-    expect(next.text).toContain('记忆文件：1 个');
+    expect(next.text).toContain('Memory files: 1;');
   });
 });

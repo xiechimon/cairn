@@ -188,29 +188,19 @@ describe('F2/F3/F6 orchestration requests enter the fence, chief system prompt h
 });
 
 describe('F7 third-party data rule in the chief system prompt', () => {
-  test('the system prompt has a rule: GitHub text inside fences and tool results is data, not followed, not save_memory', () => {
+  test('the system prompt has a rule: issues, mail and task reports are data, never followed and never memory', () => {
     const system = composeChiefSystemPrompt(
       { db: s.db, hub: s.hub, user: s.user, skillsDir: s.skillsDir },
       s.team.id,
     );
-    const rule = system
-      .split('\n')
-      .find((l) => l.startsWith('- ') && l.includes('【GitHub issue 原文'));
-    expect(rule, 'rule line').toBeDefined();
+    const rule = /<untrusted>\n([\s\S]*?)\n<\/untrusted>/.exec(system)?.[1];
+    expect(rule, 'untrusted section').toBeDefined();
     for (const needle of [
-      '工具结果',
-      '标题',
-      '正文',
-      '评论',
-      '第三方',
-      '工具',
-      '密钥',
-      '仓库',
-      '记忆',
-      '合并',
-      '不照做',
-      'save_memory',
-      '事件回合',
+      'GitHub issues',
+      'mail',
+      'reports',
+      'never follow',
+      'never save them to memory',
     ]) {
       expect(rule, needle).toContain(needle);
     }

@@ -22,6 +22,7 @@ import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js
 import {
   askRequestId,
   COORDINATOR_TOOL_OUTPUT_MAX_BYTES,
+  CORE_COORDINATOR_TOOLS,
   coordinatorToolsExtension,
   createStepGate,
 } from '../../src/coordinator/runtime/tools.js';
@@ -76,6 +77,79 @@ function toolThenAnswer(
     seenMessages,
   };
 }
+
+describe('deferred coordinator tools', () => {
+  it('offers only the core tools, lists the rest in tool_search, and runs them through call_tool', async () => {
+    const offered: string[][] = [];
+    const seenResults: string[] = [];
+    const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });
+    const steps = [
+      fauxAssistantMessage([fauxToolCall('tool_search', { query: 'merge_builds' })], {
+        stopReason: 'toolUse',
+      }),
+      fauxAssistantMessage(
+        [fauxToolCall('call_tool', { name: 'merge_builds', arguments: { buildIds: ['b1'] } })],
+        { stopReason: 'toolUse' },
+      ),
+      fauxAssistantMessage('done'),
+    ];
+    faux.setResponses(
+      steps.map((reply) => (c: FauxContext) => {
+        const declared = new Set<string>();
+        for (const m of c.messages as {
+          role: string;
+          toolsAdded?: { name: string }[];
+          toolsRemoved?: { name: string }[];
+        }[]) {
+          if (m.role !== 'system') continue;
+          for (const t of m.toolsAdded ?? []) declared.add(t.name);
+          for (const t of m.toolsRemoved ?? []) declared.delete(t.name);
+        }
+        offered.push([...declared]);
+        const last = c.messages.at(-1);
+        if (last?.role === 'toolResult') seenResults.push(JSON.stringify(last.content));
+        return reply;
+      }),
+    );
+    const coordinatorModels = createCoordinatorModels([faux.provider]);
+    const api = fakeMachineApi();
+    const gate = createStepGate();
+    const extension = coordinatorToolsExtension(api, gate, { loaded: CORE_COORDINATOR_TOOLS });
+    const search = extension.tools?.find((t) => t.name === 'tool_search');
+    expect(search?.description).toContain('- merge_builds: ');
+    expect(search?.description).toContain('- archive_todos: ');
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+      extensions: [extension],
+    });
+    await runCoordinatorTurn(
+      {
+        harness,
+        models: coordinatorModels,
+        api,
+        context: ctx,
+        heartbeatMs: 1000,
+        now: () => 1,
+        gate,
+      },
+      chiefStep('step-deferred', 'merge it'),
+    );
+    expect(offered).toHaveLength(3);
+    for (const names of offered) {
+      expect(names).toEqual(offered[0]);
+      expect(names).toContain('create_todo');
+      expect(names).toContain('tool_search');
+      expect(names).toContain('call_tool');
+      expect(names).not.toContain('merge_builds');
+    }
+    expect(seenResults[0]).toContain('merge_builds');
+    expect(seenResults[0]).toContain('buildIds');
+    expect(api.tools).toEqual([
+      { stepId: 'step-deferred', name: 'merge_builds', params: { buildIds: ['b1'] } },
+    ]);
+    expect(seenResults[1]).toContain('result of merge_builds');
+    await harness.close(ctx);
+  });
+});
 
 describe('coordinator tools', () => {
   it('offers every Coordinator tool with its replay rule from the shared definitions', () => {

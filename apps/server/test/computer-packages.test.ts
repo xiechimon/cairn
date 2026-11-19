@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  COMPUTER_VM_TOOLS,
   type ComputerCall,
   type MachineStreamEvent,
   PACKAGES_DECLINED,
@@ -409,15 +410,12 @@ describe('after a server restart', () => {
 });
 
 describe('the Coordinator prompt', () => {
-  test('names install_packages and the no-approval Python and Node installs only with a VM computer', () => {
+  test('install_packages carries its own rules and the prompt never names it', () => {
     const vm = boot();
-    const withVm = composeChiefSystemPrompt(vm.deps, vm.s.team.id, THREAD);
-    expect(withVm).toContain('调 install_packages');
-    expect(withVm).toContain('pip install --user');
-    server?.dispose();
-    const host = boot({ computerKind: 'host' });
-    expect(composeChiefSystemPrompt(host.deps, host.s.team.id, THREAD)).not.toContain(
+    expect(composeChiefSystemPrompt(vm.deps, vm.s.team.id, THREAD)).not.toContain(
       'install_packages',
     );
+    const install = COMPUTER_VM_TOOLS.find((def) => def.name === 'install_packages')!;
+    expect(install.description).toContain('pip install --user');
   });
 });

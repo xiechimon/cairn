@@ -111,7 +111,7 @@ describe('coordinator turn snapshot writer', () => {
     expect(claim.memories.join('\n')).toContain('记忆文件');
     expect(claim.provider).toBe('stub');
     expect(claim.modelId).toBe('m');
-    expect(claim.volatileText).toBeNull();
+    expect(claim.volatileText).toMatch(/^<turn_state>\nNow: /);
   });
 
   it('keeps the turn successful when snapshot sealing fails and never inserts a second row', async () => {
@@ -337,7 +337,9 @@ it('does not count the repeated pre-call todo projection against the record cap'
   const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });
   faux.setResponses([
     ...Array.from({ length: 51 }, () =>
-      fauxAssistantMessage([fauxToolCall('projects', {})], { stopReason: 'toolUse' }),
+      fauxAssistantMessage([fauxToolCall('call_tool', { name: 'projects', arguments: {} })], {
+        stopReason: 'toolUse',
+      }),
     ),
     fauxAssistantMessage('all quiet'),
   ]);

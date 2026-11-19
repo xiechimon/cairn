@@ -17,13 +17,13 @@ export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'browser_navigate',
     description:
-      'Open a URL in the Coordinator computer browser. The page stays open for later browser_snapshot and browser_act calls.',
+      "Open a URL in the Coordinator computer browser. The page stays open for later browser_snapshot and browser_act calls. Use the browser yourself when the owner asks you to open, click or fill something on the web, and for work that needs this browser's logins. The default is Chromium; when a page opens blank, the tool reopens it in the stealth browser and says so, and later calls for that site pass stealth: true. When a site blocks automation (the page closes, goes blank or redirects, or says automated access is forbidden), or to log in to such a site, pass stealth: true. When the stealth browser is blocked too, or its license seats are full, do not retry or work around the block: call request_takeover and name the site.",
     parameters: obj({ url: str('Absolute http(s) URL to open.'), stealth }, ['url']),
   },
   {
     name: 'browser_snapshot',
     description:
-      'Read the current page as an accessibility tree with interactive refs (@e1, @e2, …), followed by the page text, which is cut at 12000 characters. Prefer this before browser_act. On long pages, for example a result list beside a detail pane, pass selector to read one element in full instead: a CSS selector for the section (such as the job description pane) or an @ref.',
+      'Read the current page as an accessibility tree with interactive refs (@e1, @e2, …), followed by the page text, which is cut at 12000 characters. Prefer this before browser_act; it lists interactive refs, then the page text ([page text]) to read articles and descriptions from. On long pages, for example a result list beside a detail pane, pass selector to read one element in full instead: a CSS selector for the section (such as the job description pane) or an @ref.',
     parameters: obj({
       selector: str(
         'CSS selector or @ref of one element whose full text to return instead of the page snapshot.',
@@ -35,7 +35,7 @@ export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'browser_act',
     description:
-      'Act on the current page using fresh snapshot refs. For passwords use fill_secret with the saved secret name and current website origin. First use asks the owner to approve that website in chat; wait for approval, then take a fresh snapshot and retry. Never send a plaintext password or one-time code. CAPTCHA and second factors use request_takeover.',
+      "Act on the current page using fresh snapshot refs. For passwords use fill_secret with the saved secret name and current website origin. First use asks the owner to approve that website in chat; wait for approval, then take a fresh snapshot and retry. Never send a plaintext password or one-time code. CAPTCHA and second factors use request_takeover. Find saved credentials with secrets; when none fits, ask the owner to save one on the Secrets settings page. When a step fails (the action did not run, the ref is not in the latest snapshot, the element is covered, or the page is not the target), take a fresh snapshot and try another element, scroll first, or browser_navigate to the link's URL; at most 3 retries in a turn, then report what you tried, where it stuck and which page is open. Ask the owner first with ask_user before sending messages or mail, paying, ordering, changing account settings or deleting.",
     parameters: obj(
       {
         actions: arr(
@@ -178,7 +178,7 @@ export const SHELL_TOOL_PARAMETERS = obj(
 export const CLOAK_LICENSE_TOOL: RemoteToolDef = {
   name: REQUEST_CLOAK_LICENSE_TOOL,
   description:
-    'Post a CloakBrowser license card in the chat so the owner can paste the key, which is saved as a team secret you never see. Waits until the owner saves it, then retry the stealth browser call that needed it.',
+    'Post a CloakBrowser license card in the chat so the owner can paste the key, which is saved as a team secret you never see. Call it when a stealth browser call says there is no CloakBrowser license, instead of sending the owner to settings or asking for the key in chat; when CloakBrowser rejected the saved key, pass its reason. Waits until the owner saves it, then retry the stealth browser call that needed it.',
   parameters: obj({
     reason: str(
       'Why the key is needed. When CloakBrowser rejected the saved key, its reason as the tool reported it.',

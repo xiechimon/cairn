@@ -231,7 +231,9 @@ export async function runCoordinatorTurn(
     await root.configure(
       {
         model: { provider, modelId },
-        instructions: claimed.chief.systemPrompt,
+        instructions:
+          deps.volatile?.instructions(rootKey, claimed.chief.systemPrompt) ??
+          claimed.chief.systemPrompt,
         thinkingLevel: (claimed.agent?.thinkingLevel ?? null) as ModelThinkingLevel | null,
       },
       context,

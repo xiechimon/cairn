@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { claimedStepSchema } from '@cairn/shared';
+import { claimedStepSchema, stripTurnContext } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -103,7 +103,7 @@ describe('claim-surface skill routing (#823)', () => {
     const sent = await req(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, { content });
     expect(sent.status).toBe(201);
     const claimed = await claim(await claimToken());
-    expect((claimed as { instruction?: string }).instruction).toBe(content);
+    expect(stripTurnContext((claimed as { instruction?: string }).instruction ?? '')).toBe(content);
   });
 
   test('cache prefix invariant: systemPrompt is byte-identical whether or not routing hits', async () => {
@@ -157,16 +157,13 @@ describe('claim-surface skill routing (#823)', () => {
     expect(claimed.chief?.trigger).toBe('settle');
   });
 
-  test('skills resource list carries description + routing convention line (agent self-check usable)', async () => {
+  test('skills are listed by the skills tool, not the system prompt, so a new skill keeps the prompt cached', async () => {
     const sent = await req(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
       content: '随便聊聊今天的安排',
     });
     expect(sent.status).toBe(201);
     const claimed = await claim(await claimToken());
-    const prompt = claimed.chief?.systemPrompt ?? '';
-    expect(prompt).toContain('morning-reminder');
-    expect(prompt).toContain('定时提醒与日程通知');
-    expect(prompt).toContain('「技能路由提示」一节');
-    expect(prompt).toMatch(/^- morning-reminder：定时提醒与日程通知$/m);
+    expect(claimed.chief?.systemPrompt ?? '').not.toContain('morning-reminder');
+    expect(claimed.remoteTools?.map((tool) => tool.name)).toContain('skills');
   });
 });

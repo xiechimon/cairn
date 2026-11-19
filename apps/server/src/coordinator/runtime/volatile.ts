@@ -13,12 +13,34 @@ export interface VolatileContext {
   get(conversationId: string): string | undefined;
   setStep(conversationId: string, stepId: string | null): void;
   step(conversationId: string): string | undefined;
+  sent(conversationId: string, at: number): void;
+  instructions(conversationId: string, next: string): string;
 }
 
-export function createVolatileContext(): VolatileContext {
+function defaultReuseMs(): number {
+  return resolveCacheRetentionTier() === 'long' ? ANTHROPIC_LONG_TTL_MS : ANTHROPIC_SHORT_TTL_MS;
+}
+
+export function createVolatileContext(
+  options: { now?: () => number; reuseMs?: number } = {},
+): VolatileContext {
+  const now = options.now ?? Date.now;
+  const reuseMs = options.reuseMs ?? defaultReuseMs();
   const sections = new Map<string, string>();
   const steps = new Map<string, string>();
+  const sentAt = new Map<string, number>();
+  const epochs = new Map<string, string>();
   return {
+    sent: (conversationId, at) => {
+      sentAt.set(conversationId, at);
+    },
+    instructions: (conversationId, next) => {
+      const last = sentAt.get(conversationId);
+      const frozen = epochs.get(conversationId);
+      if (frozen !== undefined && last !== undefined && now() - last < reuseMs) return frozen;
+      epochs.set(conversationId, next);
+      return next;
+    },
     setStep: (conversationId, stepId) => {
       if (stepId === null) steps.delete(conversationId);
       else steps.set(conversationId, stepId);
@@ -82,7 +104,14 @@ interface SentRequest {
   sources: string[];
   messages: Message[];
   at: number;
-  section?: { text: string; index: number };
+  section?: { text: string; index: number; state?: string };
+}
+
+export const TURN_STATE_UNCHANGED = 'Projects and tasks: unchanged since the last note.';
+const TURN_STATE = /(<turn_state>\n[^\n]*\n)([\s\S]*?)(\n<\/turn_state>)/;
+
+function turnStateOf(section: string): string | undefined {
+  return TURN_STATE.exec(section)?.[2];
 }
 
 function sharedLength(a: readonly string[], b: readonly string[]): number {
@@ -96,9 +125,7 @@ export function volatileContextExtension(
   options: { now?: () => number; reuseMs?: number } = {},
 ) {
   const now = options.now ?? Date.now;
-  const reuseMs =
-    options.reuseMs ??
-    (resolveCacheRetentionTier() === 'long' ? ANTHROPIC_LONG_TTL_MS : ANTHROPIC_SHORT_TTL_MS);
+  const reuseMs = options.reuseMs ?? defaultReuseMs();
   const sent = new Map<string, SentRequest>();
   return defineExtension({
     name: 'cairn-coordinator-volatile',
@@ -121,9 +148,24 @@ export function volatileContextExtension(
               : undefined;
           const attach =
             section !== undefined && latestUser >= frozen && sentSection?.text !== section;
-          const fresh = attach ? withVolatileSection(projected, section) : projected;
+          const state = section === undefined ? undefined : turnStateOf(section);
+          const known = state !== undefined && sentSection?.state === state;
+          const shown =
+            section !== undefined && known
+              ? section.replace(TURN_STATE, `$1${TURN_STATE_UNCHANGED}$3`)
+              : section;
+          const fresh =
+            attach && shown !== undefined ? withVolatileSection(projected, shown) : projected;
           const messages = [...(reused?.messages.slice(0, frozen) ?? []), ...fresh.slice(frozen)];
-          const recorded = attach ? { text: section, index: latestUser } : sentSection;
+          const recorded =
+            attach && section !== undefined
+              ? {
+                  text: section,
+                  index: latestUser,
+                  ...(state === undefined ? {} : { state }),
+                }
+              : sentSection;
+          volatile.sent(conversationId, at);
           sent.set(conversationId, {
             sources,
             messages,
