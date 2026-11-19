@@ -100,20 +100,17 @@ function runningRow(thread: MachineRunningThread, now: number): TrayRow {
 
 const QUEUED_TIP: Record<MachineQueuedThread['reason'], string> = {
   capacity: '这台电脑同时在跑的已经到上限，空出位置就开始',
-  strained: '这台电脑吃紧，缓过来就开始',
   quota: '额度用完了，到点自动开始',
   waiting: '等这台电脑空出来',
 };
 
 function queuedRow(thread: MachineQueuedThread): TrayRow {
   const hint: TrayText =
-    thread.reason === 'strained'
-      ? { key: '电脑吃紧' }
-      : thread.reason === 'quota'
-        ? thread.retryAt === null
-          ? { key: '等额度' }
-          : { key: '等额度 · {at}', vars: { at: clockTime(thread.retryAt) } }
-        : { key: '排队中' };
+    thread.reason === 'quota'
+      ? thread.retryAt === null
+        ? { key: '等额度' }
+        : { key: '等额度 · {at}', vars: { at: clockTime(thread.retryAt) } }
+      : { key: '排队中' };
   return {
     key: thread.threadId,
     title: thread.title,

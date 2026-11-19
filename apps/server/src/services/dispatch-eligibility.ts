@@ -8,7 +8,6 @@ import {
   type MachineHardware,
   type MachineRuntime,
   MODEL_SOURCE_RUNTIME_LABELS,
-  machineStrain,
   type RequiredCapabilities,
   type RunnerOs,
   runnerOsOf,
@@ -177,15 +176,14 @@ export function unassignedStepReason(kind: StepKind): string {
   return `${kind} step has nothing to run it: add a model provider, a Claude subscription and a Runner with Claude Code, or a Devin subscription and a Runner with Devin, in settings, then rerun the task.`;
 }
 
-export type MachineQueueReason = 'capacity' | 'strained';
+export type MachineQueueReason = 'capacity';
 
 export function machineQueueReason(
-  machineRow: { maxConcurrent: number; capabilities: Pick<MachineCapabilities, 'hardware'> | null },
+  machineRow: { maxConcurrent: number },
   running: number,
   cap: number = machineRow.maxConcurrent,
 ): MachineQueueReason | null {
   if (running >= cap) return 'capacity';
-  if (running > 0 && machineStrain(machineRow.capabilities?.hardware).length > 0) return 'strained';
   return null;
 }
 

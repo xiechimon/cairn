@@ -1754,10 +1754,8 @@ export const EN: Record<string, string> = {
     'Still running, but no new output or tool result for {n#1 minute|# minutes}',
   '这台电脑同时在跑的已经到上限，空出位置就开始':
     'This computer is running as many as it allows; this starts when a slot frees up',
-  '这台电脑吃紧，缓过来就开始': 'This computer is strained; this starts when it recovers',
   '额度用完了，到点自动开始': 'Quota is used up; this starts on its own when it resets',
   等这台电脑空出来: 'Waiting for this computer to free up',
-  电脑吃紧: 'Computer strained',
   '等额度 · {at}': 'Quota · {at}',
   负载正常: 'load normal',
   负载偏高: 'load high',

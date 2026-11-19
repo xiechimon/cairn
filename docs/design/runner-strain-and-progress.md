@@ -4,7 +4,7 @@ Backend for the tray's run overview (prototype approved by mon X, 2026-11-18): p
 
 ## Scenarios
 
-- A Mac with 16 GB runs three tasks and memory runs out. Today the claim gate only counts slots, so a fourth task starts and everything swaps. After: the fourth task waits, its queue reason says the computer is strained, and it starts on its own once memory frees.
+- A Mac with 16 GB runs three tasks and memory runs out. The tray heading turns amber and names the strain. The fourth task still starts: strain never holds a task (mon X, 2026-11-19, after a high load average made every second task queue behind the first).
 - A task's agent sits in one tool call or retry loop for twenty minutes. Today nothing distinguishes it from a healthy run: the 30-second heartbeat only says the process is alive. After: the step carries the time of its last real progress, and the tray marks the task stuck after 15 minutes without progress.
 - A task waits because its computer is already running as many tasks as it allows. Today the task says nothing (`waitingOn` only knows `machine` and `quota`). After: it says `capacity`.
 
@@ -20,15 +20,15 @@ Backend for the tray's run overview (prototype approved by mon X, 2026-11-18): p
 
 The Runner reports `loadAvg5` beside `loadAvg1` (optional on the wire; an old Runner omits it and is never load-strained). On macOS available memory comes from `kern.memorystatus_level` (the share of memory the kernel considers available, the figure behind Activity Monitor's memory pressure); `os.freemem()` there counts only completely free pages and sits near zero on a healthy Mac. If the sysctl read fails the Runner falls back to `os.freemem()`. Linux keeps `os.freemem()`, which reads `MemAvailable`.
 
-## Claim gate
+## No claim gate
 
-A strained computer claims no new task step while it runs any step. When it runs nothing it may claim one, so a computer whose memory another app holds still makes progress. Coordinator turns are not gated: a held turn would stall the conversation, and a turn is far lighter than a task. Unknown hardware is never strained.
+Strain is shown, never enforced. A strained computer claims task steps like a calm one, up to `maxConcurrent`. An earlier gate held a second task while a computer was strained and busy; it was removed on 2026-11-19 because on a busy Mac the 5-minute load stays above the core count for hours, so tasks ran one at a time with a queue label that gave no reason.
 
 ## Queue reasons
 
-`TodoRecord.waitingOn.on` gains `capacity` (the computer that would run the step is online and eligible but at `maxConcurrent`) and `strained` (it is under the cap but strained and busy). Order of checks: quota hold, no runnable computer (`machine`), `capacity`, `strained`.
+`TodoRecord.waitingOn.on` gains `capacity` (the computer that would run the step is online and eligible but at `maxConcurrent`). Order of checks: quota hold, no runnable computer (`machine`), `capacity`.
 
-`MachineRecord` gains `strain` (the reasons above, empty when fine) and `queued`, the tasks whose next step waits for this computer, each with its reason (`capacity`, `strained`, `quota` with `retryAt`, or `waiting` for a step that will be claimed on the next poll).
+`MachineRecord` gains `strain` (the reasons above, empty when fine) and `queued`, the tasks whose next step waits for this computer, each with its reason (`capacity`, `quota` with `retryAt`, or `waiting` for a step that will be claimed on the next poll).
 
 ## Last progress
 
@@ -42,11 +42,10 @@ A strained computer claims no new task step while it runs any step. When it runs
 
 ## Failure behaviour
 
-- Hardware missing or unparsable: not strained, no gate.
+- Hardware missing or unparsable: not strained.
 - Runner offline: hardware is stale but the computer claims nothing anyway.
-- Strain persists while nothing runs: one task still starts.
 - Migration adds a nullable column; old rows read as no progress yet.
 
 ## Tests
 
-One per path: memory, load and disk strain each hold a second task and the queue reason reads `strained`; a strained idle computer still claims one; a Coordinator turn claims while strained; a full computer reads `capacity`; progress reports set `lastProgressAt` and non-progress activity does not; the throttle skips a second write within 30 seconds; a strain change publishes `machine_presence` and an unchanged report does not; the macOS memory probe parses the sysctl value and falls back on failure.
+One per path: memory, load and disk strain each still let a busy computer under its cap start the next task, with the strain reported on the computer; a full computer reads `capacity`; progress reports set `lastProgressAt` and non-progress activity does not; the throttle skips a second write within 30 seconds; a strain change publishes `machine_presence` and an unchanged report does not; the macOS memory probe parses the sysctl value and falls back on failure.

@@ -19,7 +19,7 @@ export const machineQueuedThreadSchema = z.object({
   threadId: recordId,
   title: z.string(),
   projectId: recordId,
-  reason: z.enum(['capacity', 'strained', 'quota', 'waiting']),
+  reason: z.enum(['capacity', 'quota', 'waiting']),
   retryAt: epochMs.nullable(),
 });
 export type MachineQueuedThread = z.infer<typeof machineQueuedThreadSchema>;

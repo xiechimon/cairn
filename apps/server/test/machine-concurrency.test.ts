@@ -434,65 +434,26 @@ async function machineListRow(w: World) {
   return rows.find((r) => r.id === w.machineAId)!;
 }
 
-describe('runner strain gate and queue reasons (docs/design/runner-strain-and-progress.md)', () => {
+describe('machine strain never holds a task (mon X 2026-11-19)', () => {
   const strained: [string, Partial<MachineHardware>, MachineStrainReason][] = [
     ['memory below 10% available', { memoryAvailableMb: 1_500 }, 'memory'],
     ['5-minute load above the core count', { loadAvg5: 9.5 }, 'load'],
     ['disk below 5 GB free', { diskFreeMb: 4_000 }, 'disk'],
   ];
   for (const [label, patch, reason] of strained) {
-    test(`${label}: a busy computer under its cap holds the next task and says strained`, async () => {
+    test(`${label}: a busy computer under its cap still starts the next task`, async () => {
       const w = await setupWorld();
       setCap(w, 4);
       setHardware(w, { ...CALM, ...patch });
       insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
       const { stepId, todoId } = pendingTask(w);
-      expect(await claimAs(w)).toBeNull();
-      expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!.status).toBe(
-        'pending',
-      );
-      expect(toTodoRecord(w.s.svc, todoRowOf(w, todoId)).waitingOn).toEqual({
-        on: 'strained',
-        retryAt: null,
-      });
-      const listed = await machineListRow(w);
-      expect(listed.strain).toEqual([reason]);
-      expect(listed.queued).toEqual([
-        expect.objectContaining({ threadId: todoId, reason: 'strained', retryAt: null }),
-      ]);
+      expect(toTodoRecord(w.s.svc, todoRowOf(w, todoId)).waitingOn).toBeUndefined();
+      expect((await claimAs(w))?.step.id).toBe(stepId);
+      expect((await machineListRow(w)).strain).toEqual([reason]);
     });
   }
 
-  test('memory at exactly the threshold edge: 10% available is not strained', async () => {
-    const w = await setupWorld();
-    setCap(w, 4);
-    setHardware(w, { ...CALM, memoryAvailableMb: 1_639 });
-    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
-    const { stepId } = pendingTask(w);
-    expect((await claimAs(w))?.step.id).toBe(stepId);
-  });
-
-  test('a strained computer running nothing still starts one task', async () => {
-    const w = await setupWorld();
-    setCap(w, 4);
-    setHardware(w, { ...CALM, memoryAvailableMb: 200 });
-    const { stepId } = pendingTask(w);
-    pendingTask(w);
-    expect((await claimAs(w))?.step.id).toBe(stepId);
-    expect(await claimAs(w)).toBeNull();
-  });
-
-  test('an old Runner without the 5-minute load is never load-strained', async () => {
-    const w = await setupWorld();
-    setCap(w, 4);
-    const { loadAvg5: _omitted, ...legacy } = CALM;
-    setHardware(w, { ...legacy, loadAvg1: 40 });
-    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
-    const { stepId } = pendingTask(w);
-    expect((await claimAs(w))?.step.id).toBe(stepId);
-  });
-
-  test('a full computer says capacity, before strain', async () => {
+  test('a full computer says capacity', async () => {
     const w = await setupWorld();
     setCap(w, 1);
     setHardware(w, { ...CALM, memoryAvailableMb: 200 });

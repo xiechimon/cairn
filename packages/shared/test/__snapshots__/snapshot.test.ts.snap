@@ -8501,7 +8501,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                     "machine",
                     "quota",
                     "capacity",
-                    "strained",
                   ],
                   "type": "string",
                 },
@@ -12529,7 +12528,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
           "reason": {
             "enum": [
               "capacity",
-              "strained",
               "quota",
               "waiting",
             ],
@@ -14654,7 +14652,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             "machine",
             "quota",
             "capacity",
-            "strained",
           ],
           "type": "string",
         },

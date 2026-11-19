@@ -95,7 +95,6 @@ test('a computer groups its tasks: stalled first, then running oldest first, the
         running: [thread('fresh', now - 2 * MIN), thread('old', now - 30 * MIN, now - MIN), thread('hung', now - 20 * MIN, now - 16 * MIN)],
         queued: [
           { threadId: 'full', title: 'full', projectId: 'p', reason: 'capacity', retryAt: null },
-          { threadId: 'tight', title: 'tight', projectId: 'p', reason: 'strained', retryAt: null },
         ],
       }),
       machine({ id: 'idle', name: 'idle', running: [] }),
@@ -110,7 +109,6 @@ test('a computer groups its tasks: stalled first, then running oldest first, the
     ['old', '{n} 分', 30, false],
     ['fresh', '{n} 分', 2, false],
     ['full', '排队中', undefined, false],
-    ['tight', '电脑吃紧', undefined, false],
   ]);
   expect(groups[1]?.rows.map((r) => r.title)).toEqual(['loose']);
 });
