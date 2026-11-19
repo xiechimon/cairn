@@ -383,6 +383,17 @@ const CHIEF_CODE_REPLY = [
   '```',
 ].join('\n');
 
+const CHIEF_SHELL_REPLY = [
+  '4）用 shell 运行 echo ok && uname -a：结果正常',
+  '',
+  '```',
+  'ok',
+  'Linux cairn-computer-bb6faa85aec8598156e6319e 6.18.56 #1 SMP Fri Oct 16 18:41:09 UTC 2026 aarch64 GNU/Linux',
+  '```',
+  '',
+  '电脑能正常执行命令，可以继续派任务。',
+].join('\n');
+
 export const chiefCode: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
@@ -392,8 +403,27 @@ export const chiefCode: FixtureSet = {
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '读取记录的函数…',
     stream: [
-      { kind: 'user', text: '写一个读取 JSON 记录的函数' },
-      { kind: 'robot', markdown: CHIEF_CODE_REPLY, seconds: '12s' },
+      { kind: 'user', id: 'code-ask', text: '写一个读取 JSON 记录的函数', createdAt: r7(13, 10) },
+      {
+        kind: 'robot',
+        id: 'code-reply',
+        markdown: CHIEF_CODE_REPLY,
+        seconds: '12s',
+        createdAt: r7(13, 10) + 12_000,
+      },
+      {
+        kind: 'user',
+        id: 'shell-ask',
+        text: '在电脑上跑一下 echo ok && uname -a',
+        createdAt: r7(13, 13),
+      },
+      {
+        kind: 'robot',
+        id: 'shell-reply',
+        markdown: CHIEF_SHELL_REPLY,
+        seconds: '8s',
+        createdAt: r7(13, 13) + 8_000,
+      },
     ],
   },
 };

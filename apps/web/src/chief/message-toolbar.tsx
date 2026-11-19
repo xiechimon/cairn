@@ -50,6 +50,15 @@ function clipEdges(node: HTMLElement): { left: number; right: number; top: numbe
   return { left, right, top };
 }
 
+const CONTROL_SELECTOR = 'button, a[href], [role="button"], input, select, textarea';
+
+function blockControls(block: HTMLElement, toolbar: HTMLElement): DOMRect[] {
+  return [...block.querySelectorAll<HTMLElement>(CONTROL_SELECTOR)]
+    .filter((control) => !toolbar.contains(control))
+    .map((control) => control.getBoundingClientRect())
+    .filter((box) => box.width > 0 && box.height > 0);
+}
+
 function useArmed(ref: RefObject<HTMLDivElement | null>): boolean {
   const [armed, setArmed] = useState(false);
   const focusTool = useRef<string | null>(null);
@@ -97,8 +106,33 @@ function useKeepInside(ref: RefObject<HTMLDivElement | null>, placement: Toolbar
       if (shiftFor(node.getBoundingClientRect()) === 0) return;
       node.dataset.clamped = '';
       const onEdge = node.getBoundingClientRect();
-      const drop = Math.max(0, edges.top - onEdge.top);
-      node.style.transform = `translate(${shiftFor(onEdge)}px, ${drop}px)`;
+      let shift = shiftFor(onEdge);
+      let drop = Math.max(0, edges.top - onEdge.top);
+      const covered = () =>
+        blockControls(block, node).filter(
+          (control) =>
+            control.left < onEdge.right + shift &&
+            onEdge.left + shift < control.right &&
+            control.top < onEdge.bottom + drop &&
+            onEdge.top + drop < control.bottom,
+        );
+      const underToolbar = covered();
+      if (underToolbar.length > 0) {
+        shift =
+          placement === 'right'
+            ? Math.max(
+                edges.left - onEdge.left,
+                Math.min(...underToolbar.map((c) => c.left)) - EDGE_GAP - onEdge.right,
+              )
+            : Math.min(
+                edges.right - onEdge.right,
+                Math.max(...underToolbar.map((c) => c.right)) + EDGE_GAP - onEdge.left,
+              );
+        const stillUnder = covered();
+        if (stillUnder.length > 0)
+          drop = Math.max(...stillUnder.map((c) => c.bottom)) + EDGE_GAP - onEdge.top;
+      }
+      node.style.transform = `translate(${shift}px, ${drop}px)`;
     };
     block.addEventListener('pointerenter', fit);
     block.addEventListener('focusin', fit);
