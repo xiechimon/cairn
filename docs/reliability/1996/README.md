@@ -71,6 +71,7 @@ This branch lands the measurement machinery: the sample repository and its 15-ta
 | `unstaffed` | nobody was assigned to the plan slot, so no machine could ever claim the step |
 | `unclaimed` | a pinned machine held an idle slot and never claimed the step within the claim window |
 | `session-lost` | a continue step could not resume a session the machine never stored |
+| `model-config` | the step asked for a model no configured account serves (`model_not_found`, "not supported by any configured account"); retrying cannot help until the model or its provider is configured |
 | `agent-gave-up` | a session ended with zero progress and no terminal outcome |
 | `gate-or-phase-bug` | a quality gate or phase contract rejected the run's own output |
 | `stuck-waiting` | no error and no PR six hours after the build started |

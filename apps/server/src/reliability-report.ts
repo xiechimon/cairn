@@ -15,6 +15,7 @@ export const BUILD_CAUSES = [
   'unstaffed',
   'unclaimed',
   'session-lost',
+  'model-config',
   'agent-gave-up',
   'gate-or-phase-bug',
   'stuck-waiting',
@@ -55,6 +56,11 @@ const CAUSE_PATTERNS: readonly { cause: BuildCause; pattern: RegExp }[] = [
   {
     cause: 'session-lost',
     pattern: /session \S+ not found on this machine|continue session impossible/,
+  },
+  {
+    cause: 'model-config',
+    pattern:
+      /model_not_found|is not supported by any configured account|issue with the selected model|\bno_model\b|no keyed provider|\bmodel\b[^\n]{0,80}\b(?:does not exist|not found|is not supported)\b|模型未配置/i,
   },
   {
     cause: 'quota',
@@ -293,6 +299,33 @@ export function openReliabilityReportDb(dbPath: string): { db: Db; close(): void
   return { db, close: () => sqlite.close() };
 }
 
+export function failedStepResidualText(
+  db: Db,
+  failedStepIds: readonly string[],
+): Map<string, string> {
+  const residualTextByBuild = new Map<string, string>();
+  if (failedStepIds.length === 0) return residualTextByBuild;
+  const residualRows = db
+    .select({
+      conversationId: message.conversationId,
+      content: message.content,
+    })
+    .from(message)
+    .where(
+      inArray(
+        message.id,
+        failedStepIds.map((id) => `plan-residual-${id}`),
+      ),
+    )
+    .all();
+  for (const row of residualRows) {
+    const text = typeof row.content === 'string' ? row.content : String(row.content);
+    const prior = residualTextByBuild.get(row.conversationId);
+    residualTextByBuild.set(row.conversationId, prior === undefined ? text : `${prior}\n${text}`);
+  }
+  return residualTextByBuild;
+}
+
 export function buildReliabilityReport(
   db: Db,
   options: ReliabilityReportOptions,
@@ -336,28 +369,10 @@ export function buildReliabilityReport(
     else counts[row.status] += 1;
     stepsByBuild.set(row.buildId, counts);
   }
-  const failedStepIds = stepRows.filter((row) => row.status === 'failed').map((row) => row.id);
-  const residualTextByBuild = new Map<string, string>();
-  if (failedStepIds.length > 0) {
-    const residualRows = db
-      .select({
-        conversationId: message.conversationId,
-        content: message.content,
-      })
-      .from(message)
-      .where(
-        inArray(
-          message.id,
-          failedStepIds.map((id) => `plan-residual-${id}`),
-        ),
-      )
-      .all();
-    for (const row of residualRows) {
-      const text = typeof row.content === 'string' ? row.content : String(row.content);
-      const prior = residualTextByBuild.get(row.conversationId);
-      residualTextByBuild.set(row.conversationId, prior === undefined ? text : `${prior}\n${text}`);
-    }
-  }
+  const residualTextByBuild = failedStepResidualText(
+    db,
+    stepRows.filter((row) => row.status === 'failed').map((row) => row.id),
+  );
   const builds: ReliabilityBuildRow[] = [];
   for (const row of buildRows) {
     const ageMs = options.until - row.createdAt;

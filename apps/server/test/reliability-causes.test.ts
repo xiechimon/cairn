@@ -41,6 +41,29 @@ const liveMessages: Array<{ message: string; cause: BuildCause; why: string }> =
     cause: 'provider-network',
     why: 'a bare connection failure from the provider client',
   },
+  {
+    message:
+      '404: {"message":"Model \\"glm-5.3\\" is not supported by any configured account in this group","type":"model_not_found"}\nprovider response: POST https://relay.example/v1/chat/completions -> 404 application/json',
+    cause: 'model-config',
+    why: 'the step names a model no configured account serves, so every retry fails the same way',
+  },
+  {
+    message:
+      'Citation check parked: The citation checker cannot run: its model or credentials are unavailable. Last error: 404: {"message":"Model \\"glm-5.3\\" is not supported by any configured account in this group","type":"model_not_found"}',
+    cause: 'model-config',
+    why: 'a gate that parks on an unconfigured model fails for the same configuration reason',
+  },
+  {
+    message:
+      "There's an issue with the selected model (deepseek-v4.1-flash[1m]). It may not exist or you may not have access to it.",
+    cause: 'model-config',
+    why: 'Claude Code reports a model it cannot reach this way',
+  },
+  {
+    message: 'Coordinator turn ended: no_model',
+    cause: 'model-config',
+    why: 'the Coordinator had no model configured for the turn',
+  },
 ];
 
 test('every failure message observed on the live database maps to the cause it names', () => {
@@ -60,6 +83,7 @@ test('the cause vocabulary covers capacity problems, so other is only unattribut
     'unstaffed',
     'unclaimed',
     'session-lost',
+    'model-config',
     'agent-gave-up',
     'gate-or-phase-bug',
     'stuck-waiting',
@@ -77,6 +101,7 @@ test('every cause has at least one message that reaches it, and no pattern steal
     unstaffed: 'plan 步无指派 Agent：assignment 的 plan 槽为空，无人可领。',
     unclaimed: '本轮无人认领：钉选的执行机「mea」在线且有空闲并发位',
     'session-lost': 'session abc not found on this machine (continue session impossible)',
+    'model-config': 'The model `gpt-9` does not exist or you do not have access to it.',
     'agent-gave-up': 'agent session ended with zero progress and no terminal outcome',
     'gate-or-phase-bug': '方案结构不合格：plan must cite prior art',
     'stuck-waiting': 'never in the message channel',
