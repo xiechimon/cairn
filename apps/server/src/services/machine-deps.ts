@@ -1,4 +1,4 @@
-import type { GitIdentity, StepRecord, UserRecord } from '@cairn/shared';
+import type { GitIdentity, StepRecord, TranscriptUserOrigin, UserRecord } from '@cairn/shared';
 import { isChiefConversationId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -103,14 +103,20 @@ type MessageRowInput = {
 
 export function upsertMessage(
   deps: { db: Db; convHub?: ConversationStreamHub },
-  row: MessageRowInput & { conversationId: string },
+  row: MessageRowInput & { conversationId: string; origin?: TranscriptUserOrigin | null },
 ): void {
   deps.db
     .insert(message)
     .values(row)
     .onConflictDoUpdate({
       target: message.id,
-      set: { role: row.role, content: row.content, createdAt: row.createdAt, actor: null },
+      set: {
+        role: row.role,
+        content: row.content,
+        createdAt: row.createdAt,
+        actor: null,
+        origin: row.origin ?? null,
+      },
     })
     .run();
   deps.convHub?.publishMessage(row.conversationId, row);

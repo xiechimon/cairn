@@ -87,6 +87,7 @@ describe('mcp message_todo', () => {
       content: 'Include regression coverage',
       createdAt: messages[0]!.createdAt,
       actor: null,
+      origin: 'user',
     });
     expect(H.s.db.select().from(step).all()).toHaveLength(1);
   });

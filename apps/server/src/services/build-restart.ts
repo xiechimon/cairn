@@ -117,6 +117,7 @@ export async function restartFailedBuild(
           role: 'user',
           content: feedbackText,
           createdAt: now,
+          origin: 'user',
         });
       }
       if (
@@ -206,6 +207,7 @@ export async function restartFailedBuild(
         role: 'user',
         content: feedbackText,
         createdAt,
+        origin: 'user',
       });
     }
     if (prClosed !== null && reworkTarget !== null) {

@@ -536,6 +536,7 @@ export function createPrWakes(deps: BuildDeps) {
           content,
           actor: 'github',
           createdAt: now,
+          origin: 'synthetic',
         });
         const claimed = active.find((s) => s.status === 'claimed');
         if (claimed) {

@@ -67,7 +67,15 @@ export async function queueTaskMessage(
   )
     throw new HttpError(409, 'Task cannot accept a queued message');
   if (!activeStep(deps.db, conversationId))
-    return sendBuildSteer(deps, conversationId, { content, clientMessageId }, true);
+    return sendBuildSteer(
+      deps,
+      conversationId,
+      { content, clientMessageId },
+      {
+        afterTurn: true,
+        origin: 'user',
+      },
+    );
   const message = {
     id: newRecordId(),
     conversationId,

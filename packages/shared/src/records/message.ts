@@ -14,10 +14,14 @@ export const messageRecordSchema = z
   .loose();
 export type MessageRecord = z.infer<typeof messageRecordSchema>;
 
+export const TRANSCRIPT_USER_ORIGINS = ['task-prompt', 'synthetic', 'user'] as const;
+export type TranscriptUserOrigin = (typeof TRANSCRIPT_USER_ORIGINS)[number];
+
 export const transcriptRowSchema = messageRecordSchema.extend({
   id: recordId,
   createdAt: epochMs,
   actor: z.string().nullish(),
+  origin: z.enum(TRANSCRIPT_USER_ORIGINS).nullish(),
 });
 export type TranscriptRow = z.infer<typeof transcriptRowSchema>;
 

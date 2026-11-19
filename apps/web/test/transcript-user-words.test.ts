@@ -120,7 +120,10 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
   test('F1 synthesized task text rows no longer render as user bubbles (the description area is the single source)', () => {
     const items = render({
       messages: [
-        msg('user', buildTaskPromptText(TITLE, SPEC), NOW - 50_000),
+        {
+          ...msg('user', buildTaskPromptText(TITLE, SPEC), NOW - 50_000),
+          origin: 'task-prompt' as const,
+        },
         msg('assistant', [{ type: 'text', text: '收到，开始规划。' }], NOW - 40_000),
       ],
     });
@@ -132,7 +135,10 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
   test('F2 filtered task text rows do not leak firstUser to later real user rows', () => {
     const items = render({
       messages: [
-        msg('user', buildTaskPromptText(TITLE, SPEC), NOW - 50_000),
+        {
+          ...msg('user', buildTaskPromptText(TITLE, SPEC), NOW - 50_000),
+          origin: 'task-prompt' as const,
+        },
         msg('user', '另外注意移动端', NOW - 30_000),
       ],
     });
@@ -146,9 +152,18 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
   test('F3 all three CONTINUE_PROMPTS sentences filtered', () => {
     const items = render({
       messages: [
-        msg('user', CONTINUE_PROMPTS.plan, NOW - 50_000),
-        msg('user', CONTINUE_PROMPTS.build, NOW - 40_000),
-        msg('user', CONTINUE_PROMPTS.merge, NOW - 30_000),
+        {
+          ...msg('user', CONTINUE_PROMPTS.plan, NOW - 50_000),
+          origin: 'synthetic' as const,
+        },
+        {
+          ...msg('user', CONTINUE_PROMPTS.build, NOW - 40_000),
+          origin: 'synthetic' as const,
+        },
+        {
+          ...msg('user', CONTINUE_PROMPTS.merge, NOW - 30_000),
+          origin: 'synthetic' as const,
+        },
       ],
     });
     expect(userItems(items)).toHaveLength(0);
@@ -158,8 +173,14 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
     const items = render({
       messages: [
         msg('user', '标题太长了', NOW - 60_000),
-        msg('user', buildReplanPrompt('标题太长了'), NOW - 50_000),
-        msg('user', buildRestartPrompt('先跑 lint 再提交'), NOW - 40_000),
+        {
+          ...msg('user', buildReplanPrompt('标题太长了'), NOW - 50_000),
+          origin: 'synthetic' as const,
+        },
+        {
+          ...msg('user', buildRestartPrompt('先跑 lint 再提交'), NOW - 40_000),
+          origin: 'synthetic' as const,
+        },
       ],
     });
     const users = userItems(items);
@@ -171,7 +192,12 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
   test('F12 the #703 backfill-round instruction row (plan.md backfill template) filtered — continuation instructions do not pose as user words', () => {
 
     const items = render({
-      messages: [msg('user', buildPlanRewritePrompt(), NOW - 50_000)],
+      messages: [
+        {
+          ...msg('user', buildPlanRewritePrompt(), NOW - 50_000),
+          origin: 'synthetic' as const,
+        },
+      ],
     });
     expect(userItems(items)).toHaveLength(0);
   });
@@ -184,7 +210,11 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
       '## 待审核方案',
       '# plan.md 全文……',
     ].join('\n');
-    const items = render({ messages: [msg('user', reviewMaterial, NOW - 50_000)] });
+    const items = render({
+      messages: [
+        { ...msg('user', reviewMaterial, NOW - 50_000), origin: 'synthetic' as const },
+      ],
+    });
     expect(userItems(items)).toHaveLength(0);
   });
 
@@ -221,7 +251,12 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
       skillInjection: null,
     };
     const items = render({
-      messages: [msg('user', buildTaskPromptText(TITLE, SPEC), NOW - 50_000)],
+      messages: [
+        {
+          ...msg('user', buildTaskPromptText(TITLE, SPEC), NOW - 50_000),
+          origin: 'task-prompt' as const,
+        },
+      ],
       steps: [buildStep],
       build: { ...BUILD, withPlan: true },
     });
@@ -245,7 +280,10 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
     const confirmed = (actor: string) =>
       render({
         messages: [
-          msg('user', buildTaskPromptText(TITLE, SPEC), NOW - 50_000),
+          {
+            ...msg('user', buildTaskPromptText(TITLE, SPEC), NOW - 50_000),
+            origin: 'task-prompt' as const,
+          },
           { ...msg('user', CONFIRM_ANNOUNCEMENT, NOW - 21_000), actor },
         ],
         steps: [buildStep],
@@ -267,7 +305,10 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
     const items = render({
       messages: [
         msg('user', '先跑 lint 再提交', NOW - 50_000),
-        msg('user', buildRestartPrompt('先跑 lint 再提交'), NOW - 49_000),
+        {
+          ...msg('user', buildRestartPrompt('先跑 lint 再提交'), NOW - 49_000),
+          origin: 'synthetic' as const,
+        },
       ],
     });
     const users = userItems(items);
@@ -291,7 +332,7 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
     const items = render({
       messages: [
         msg('user', feedback, NOW - 50_000),
-        msg('user', composed, NOW - 49_000),
+        { ...msg('user', composed, NOW - 49_000), origin: 'task-prompt' as const },
       ],
     });
     const users = userItems(items);
@@ -301,7 +342,11 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
 
   test('F13b combo rows (task text + truncated restart instruction) retire the same way (truncation does not break recognition)', () => {
     const composed = `${buildTaskPromptText(TITLE, SPEC)}\n\n${buildRestartPrompt('返'.repeat(5000))}`;
-    const items = render({ messages: [msg('user', composed, NOW - 50_000)] });
+    const items = render({
+      messages: [
+        { ...msg('user', composed, NOW - 50_000), origin: 'task-prompt' as const },
+      ],
+    });
     expect(userItems(items)).toHaveLength(0);
   });
 
@@ -311,7 +356,7 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
     const items = render({
       messages: [
         msg('user', feedback, NOW - 50_000),
-        msg('user', composed, NOW - 49_000),
+        { ...msg('user', composed, NOW - 49_000), origin: 'task-prompt' as const },
       ],
     });
     const users = userItems(items);
@@ -331,7 +376,7 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
     const composed = `${buildTaskPromptText(TITLE, SPEC)}\n\n${buildPlanFirstRoundInstruction()}`;
     const items = render({
       messages: [
-        msg('user', composed, NOW - 50_000),
+        { ...msg('user', composed, NOW - 50_000), origin: 'task-prompt' as const },
         msg('assistant', [{ type: 'text', text: '收到，方案落盘 plan.md。' }], NOW - 40_000),
       ],
     });
@@ -361,6 +406,45 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
     const users = userItems(items);
     expect(users).toHaveLength(1);
     expect(users[0]?.text).toBe('我要的是svg样式的');
+  });
+});
+
+describe('mapTranscript user-row provenance markers (#3532)', () => {
+  test('a row marked task-prompt hides even when its text matches nothing in task metadata', () => {
+    const items = render({
+      messages: [
+        {
+          ...msg('user', '文本早就漂了，和当前任务完全对不上', NOW - 50_000),
+          origin: 'task-prompt' as const,
+        },
+        msg('user', '真人说话', NOW - 40_000),
+      ],
+    });
+    expect(userItems(items).map((item) => item.text)).toEqual(['真人说话']);
+  });
+
+  test('a row marked synthetic hides without touching its text', () => {
+    const items = render({
+      messages: [
+        { ...msg('user', '任意生成文本', NOW - 50_000), origin: 'synthetic' as const },
+      ],
+    });
+    expect(userItems(items)).toHaveLength(0);
+  });
+
+  test('a row marked user renders even when its text happens to equal the task prompt', () => {
+    const text = buildTaskPromptText(TITLE, SPEC);
+    const items = render({
+      messages: [{ ...msg('user', text, NOW - 50_000), origin: 'user' as const }],
+    });
+    expect(userItems(items).map((item) => item.text)).toEqual([text.trim()]);
+  });
+
+  test('unmarked rows fall back to user (defined fallback for legacy data)', () => {
+    const items = render({
+      messages: [msg('user', '旧库里的行没有标记', NOW - 50_000)],
+    });
+    expect(userItems(items).map((item) => item.text)).toEqual(['旧库里的行没有标记']);
   });
 });
 

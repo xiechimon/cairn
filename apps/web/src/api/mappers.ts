@@ -73,6 +73,7 @@ import {
   systemRowOf,
   TAKEOVER_HANDED_BACK,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  type TranscriptUserOrigin,
   type TurnErrorKind,
   threadMessageContentSchema,
   threadReportContentSchema,
@@ -262,6 +263,7 @@ export interface MessageRow {
   content: unknown;
   createdAt: number;
   actor?: string | null;
+  origin?: TranscriptUserOrigin | null;
   projectId?: string | null;
 }
 
@@ -783,7 +785,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         });
         continue;
       }
-      if (classifyUserText(text, todo) !== 'user') continue;
+      if (m.origin === 'task-prompt' || m.origin === 'synthetic') continue;
+      if (m.origin !== 'user' && classifyUserText(text, todo) !== 'user') continue;
       entries.push({
         at: m.createdAt,
         item: { kind: 'user', text, markdown: text, id: m.id, createdAt: m.createdAt },

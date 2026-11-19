@@ -99,6 +99,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
         content: r.content,
         createdAt: r.createdAt,
         actor: r.actor,
+        origin: r.origin,
       })),
       chips: [],
       historyEpoch: 0,

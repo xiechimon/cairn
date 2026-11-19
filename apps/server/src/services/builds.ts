@@ -140,6 +140,7 @@ export interface BuildSteerOptions {
   afterTurn?: boolean;
   human?: boolean;
   actor?: string;
+  origin?: 'user' | 'synthetic';
   schedule?: { id: string; createdBy: string; at: number };
   answer?: QuestionAnswer;
   beforeCommit?: () => void;
@@ -170,7 +171,7 @@ export async function messageTodo(
     deps,
     row.latestBuildId,
     { content, ...(clientMessageId !== undefined ? { clientMessageId } : {}) },
-    { allowReviewContinuation: true },
+    { allowReviewContinuation: true, origin: 'user' },
   );
   return {
     todoId,

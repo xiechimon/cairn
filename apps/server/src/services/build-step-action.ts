@@ -87,6 +87,7 @@ export async function applyBuildStepAction(
       role: 'user',
       content: body.feedback,
       createdAt: nowMs(),
+      origin: 'user',
     });
     beforeCommit?.();
     if (revising.phase === 'review' && buildRunsSession(deps, buildId)) {

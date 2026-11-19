@@ -4096,6 +4096,21 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "id": {
               "type": "string",
             },
+            "origin": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "task-prompt",
+                    "synthetic",
+                    "user",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
             "role": {
               "enum": [
                 "system",
@@ -5021,6 +5036,21 @@ exports[`body/envelope schema snapshots > conversationMessagesResponse > convers
           "id": {
             "type": "string",
           },
+          "origin": {
+            "anyOf": [
+              {
+                "enum": [
+                  "task-prompt",
+                  "synthetic",
+                  "user",
+                ],
+                "type": "string",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
           "role": {
             "enum": [
               "system",
@@ -5156,6 +5186,21 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
             },
             "id": {
               "type": "string",
+            },
+            "origin": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "task-prompt",
+                    "synthetic",
+                    "user",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
             },
             "role": {
               "enum": [
@@ -8833,6 +8878,21 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                     },
                     "id": {
                       "type": "string",
+                    },
+                    "origin": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "task-prompt",
+                            "synthetic",
+                            "user",
+                          ],
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
                     },
                     "role": {
                       "enum": [

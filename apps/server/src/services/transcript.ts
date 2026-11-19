@@ -1,4 +1,4 @@
-import type { ConversationMessageEvent } from '@cairn/shared';
+import type { ConversationMessageEvent, TranscriptUserOrigin } from '@cairn/shared';
 import type { Db } from '../db/client.js';
 import { message } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -13,14 +13,20 @@ export function insertMessageRow(
     content: unknown;
     createdAt: number;
     actor?: string | null;
+    origin?: TranscriptUserOrigin | null;
   },
   deliveredQueue?: ConversationMessageEvent['deliveredQueue'],
 ): void {
   deps.db
     .insert(message)
-    .values({ ...row, actor: row.actor ?? null, conversationId })
+    .values({
+      ...row,
+      actor: row.actor ?? null,
+      origin: row.origin ?? null,
+      conversationId,
+    })
     .run();
-  const published = { ...row, actor: row.actor ?? null };
+  const published = { ...row, actor: row.actor ?? null, origin: row.origin ?? null };
   const publish = () => {
     if (deliveredQueue === undefined) deps.convHub?.publishMessage(conversationId, published);
     else deps.convHub?.publishMessage(conversationId, published, deliveredQueue);

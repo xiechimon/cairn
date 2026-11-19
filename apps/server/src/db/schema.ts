@@ -66,6 +66,7 @@ import type {
   TaskRequest,
   TodoOutputKind,
   TodoSourceKind,
+  TranscriptUserOrigin,
   TriggerSource,
 } from '@cairn/shared';
 import { sql } from 'drizzle-orm';
@@ -331,6 +332,7 @@ export const message = sqliteTable(
     content: json<unknown>('content').notNull(),
     createdAt: epochMs('createdAt').notNull(),
     actor: text('actor'),
+    origin: text('origin').$type<TranscriptUserOrigin>(),
   },
   (t) => [
     index('message_createdAt_idx').on(t.createdAt),

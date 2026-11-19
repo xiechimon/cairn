@@ -6,6 +6,7 @@ import {
   REPO_ARCHIVE_FILE_NAME,
   SESSION_JSONL_MAX_BYTES,
   type TranscriptUpload,
+  transcriptPromptRowId,
 } from '@cairn/shared';
 import { desc, eq } from 'drizzle-orm';
 import { build, plan as planTable, step } from '../db/schema.js';
@@ -128,6 +129,8 @@ export function receiveUpload(
       role: m.role,
       content: m.content,
       createdAt: m.createdAt,
+      origin:
+        m.role === 'user' && m.id === transcriptPromptRowId(body.stepId) ? 'task-prompt' : null,
     });
   }
 }

@@ -227,6 +227,7 @@ export async function sendBuildSteer(
         role: 'user' as const,
         content: body.content,
         createdAt: now,
+        origin: continuationOptions.origin ?? (human ? 'user' : 'synthetic'),
       };
       if (targetBuildId !== conversationId) {
         db.insert(build)
