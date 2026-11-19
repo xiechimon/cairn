@@ -455,6 +455,7 @@ export function recordStepUsage(
             contextWindow: u.contextWindow ?? null,
             compactAt: u.compactAt ?? null,
             createdAt: nowMs(),
+            firstReportAt: nowMs(),
           })
           .onConflictDoUpdate({
             target: [chiefTurnUsage.stepId, chiefTurnUsage.model],
@@ -465,6 +466,7 @@ export function recordStepUsage(
               cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
               cacheWrite1h: sql`${chiefTurnUsage.cacheWrite1h} + ${u.cacheWrite1h ?? 0}`,
               ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
+              createdAt: nowMs(),
               ...(u.contextTokens !== undefined
                 ? {
                     contextTokens: u.contextTokens,

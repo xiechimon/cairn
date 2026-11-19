@@ -2,7 +2,7 @@ import type { MachineDoneBody } from '@cairn/shared';
 import { machineDoneBodySchema } from '@cairn/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { isColdResume } from '../src/coordinator/runtime/cold-slim.js';
+import { ANTHROPIC_SHORT_TTL_MS, isColdResume } from '../src/coordinator/runtime/cold-slim.js';
 import { compactionWindow } from '../src/coordinator/runtime/compaction.js';
 import {
   build,
@@ -21,7 +21,9 @@ import {
   lastTurnUsageForColdResume,
   setCoordinatorInServer,
 } from '../src/services/coordinator-context.js';
+import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
 import { finishStep } from '../src/services/machines.js';
+import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { insertMachine } from './helpers.js';
 
@@ -151,6 +153,52 @@ describe('chief turns record their own usage per step', () => {
     expect(turnRows()).toMatchObject([
       { stepId: 'turn-1', input: 300, output: 14, cacheRead: 200, cacheWrite: 6, ttftMs: 900 },
     ]);
+  });
+
+  test('a repeat report after a quota reclaim moves the snapshot time the cold check reads', async () => {
+    const machineId = insertMachine(H.s);
+    const anthropic = 'anthropic/claude-sonnet-5-5';
+    H.s.db
+      .update(routingRule)
+      .set({ provider: 'anthropic', modelId: 'claude-sonnet-5-5', updatedAt: Date.now() })
+      .where(eq(routingRule.use, 'coordinator'))
+      .run();
+    claimedStep(machineId, 'turn-quota');
+    await finishStep(deps(), machineId, 'turn-quota', {
+      status: 'failed',
+      errorMessage: '402: quota exceeded',
+      quotaBlock: { kind: 'quota', providerId: 'anthropic', reason: '402: quota exceeded' },
+      usage: [usage(anthropic, 100, 50, { contextTokens: 1_000 })],
+    });
+    expect(
+      H.s.db.select().from(stepTable).where(eq(stepTable.id, 'turn-quota')).get()?.status,
+    ).toBe('waiting_quota');
+    const staleAt = Date.now() - ANTHROPIC_SHORT_TTL_MS - 1;
+    H.s.db
+      .update(chiefTurnUsage)
+      .set({ createdAt: staleAt })
+      .where(eq(chiefTurnUsage.stepId, 'turn-quota'))
+      .run();
+    expect(sweepQuotaWaitSteps(H.s.svc, Date.now() + 10 * 60_000)).toBe(1);
+    const pending = H.s.db.select().from(stepTable).where(eq(stepTable.id, 'turn-quota')).get();
+    expect(pending?.status).toBe('pending');
+    expect(
+      claimPendingChiefStep(H.s.db, pending as NonNullable<typeof pending>, machineId)?.status,
+    ).toBe('claimed');
+    const retryAt = Date.now();
+    await finishStep(deps(), machineId, 'turn-quota', {
+      status: 'success',
+      usage: [usage(anthropic, 200, 150, { contextTokens: 2_000 })],
+    });
+    const row = turnRows().find((r) => r.stepId === 'turn-quota');
+    expect(row).toMatchObject({ input: 300, cacheRead: 200 });
+    expect(row?.createdAt).toBeGreaterThanOrEqual(retryAt);
+    expect(lastTurnUsageForColdResume(H.s.db, H.threadId)?.createdAt).toBeGreaterThanOrEqual(
+      retryAt,
+    );
+    const context = getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context;
+    expect(context).toMatchObject({ tokens: 2_000, resume: 'warm' });
+    expect(context?.resumeExpiresAt).toBeGreaterThan(Date.now());
   });
 
   test('a failed or stopped turn still records the tokens it spent', async () => {

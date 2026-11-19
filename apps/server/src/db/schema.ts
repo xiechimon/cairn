@@ -1001,6 +1001,7 @@ export const chiefTurnUsage = sqliteTable(
     contextWindow: integer('contextWindow'),
     compactAt: integer('compactAt'),
     createdAt: epochMs('createdAt').notNull(),
+    firstReportAt: epochMs('firstReportAt').notNull().default(0),
   },
   (t) => [
     primaryKey({ columns: [t.stepId, t.model] }),

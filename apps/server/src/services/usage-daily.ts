@@ -45,7 +45,7 @@ function usageSlots(db: Db, teamId: string, from: number, to: number): SlotRow[]
   return db.all<SlotRow>(sql`
     WITH
     chief_legacy AS (
-      SELECT ctu.threadId AS threadId, ctu.model AS model, ctu.createdAt AS at,
+      SELECT ctu.threadId AS threadId, ctu.model AS model, ctu.firstReportAt AS at,
         ctu.input AS input, ctu.output AS output, ctu.cacheRead AS cacheRead,
         ctu.cacheWrite AS cacheWrite,
         CASE WHEN ${total('ctu')} = 0 THEN 0
