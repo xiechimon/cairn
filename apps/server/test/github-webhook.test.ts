@@ -378,6 +378,19 @@ describe('receiveGithubWebhook', () => {
     expect((await delivered(res)).result).toBe('created');
   });
 
+  test('an archived project does not bind the repository', async () => {
+    const { s, projectId } = await makeWorld();
+    s.db
+      .update(projectTable)
+      .set({ archivedAt: Date.now() })
+      .where(eq(projectTable.id, projectId))
+      .run();
+    const { token } = await mint(s);
+    const res = await deliver(s, token, { event: 'issues', deliveryId: 'd-archived' });
+    expect((await delivered(res)).result).toBe('misconfigured');
+    expect(s.db.select().from(todoTable).all()).toHaveLength(0);
+  });
+
   test('a labeled event whose issue no longer carries the label answers ignored', async () => {
     const gh = githubFake(REPO, {
       issues: [{ ...structuredClone(ISSUE), labels: [{ name: 'other-label' }] }],

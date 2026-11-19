@@ -6,7 +6,7 @@ import {
   WEBHOOK_TRIGGER_LABEL,
   type WebhookReceiverResponse,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import type { Db } from '../db/client.js';
 import { githubConnection, project } from '../db/schema.js';
@@ -183,7 +183,13 @@ export async function receiveGithubWebhook(
   const repoRow = deps.db
     .select()
     .from(project)
-    .where(and(eq(project.teamId, tokenRow.teamId), eq(project.repoKind, 'github')))
+    .where(
+      and(
+        eq(project.teamId, tokenRow.teamId),
+        eq(project.repoKind, 'github'),
+        isNull(project.archivedAt),
+      ),
+    )
     .all()
     .find((row) => row.githubRepo?.toLowerCase() === payload.repository.full_name.toLowerCase());
   if (!repoRow) {
