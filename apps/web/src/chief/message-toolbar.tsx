@@ -128,6 +128,9 @@ function useKeepInside(ref: RefObject<HTMLDivElement | null>, placement: Toolbar
                 edges.right - onEdge.right,
                 Math.max(...underToolbar.map((c) => c.right)) + EDGE_GAP - onEdge.left,
               );
+        const controlsTop = Math.min(...underToolbar.map((c) => c.top));
+        const controlsBottom = Math.max(...underToolbar.map((c) => c.bottom));
+        drop = (controlsTop + controlsBottom - onEdge.top - onEdge.bottom) / 2;
         const stillUnder = covered();
         if (stillUnder.length > 0)
           drop = Math.max(...stillUnder.map((c) => c.bottom)) + EDGE_GAP - onEdge.top;

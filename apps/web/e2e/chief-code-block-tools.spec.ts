@@ -59,6 +59,18 @@ for (const scheme of ['light', 'dark'] as const) {
         }
         for (const tool of await toolButtons.all())
           expect(await hits(page, tool), `${name}: toolbar button is reachable`).toBe(true);
+        const codeBox = await code.boundingBox();
+        const headerBox = await code.locator('xpath=./div[1]').boundingBox();
+        if (codeBox === null || headerBox === null) throw new Error(`${name}: code block not laid out`);
+        for (const part of [...(await toolButtons.all()), meta]) {
+          const box = await part.boundingBox();
+          if (box === null || box.x >= codeBox.x + codeBox.width) continue;
+          for (const line of [codeBox.y, headerBox.y + headerBox.height])
+            expect(
+              box.y < line && box.y + box.height > line,
+              `${name}: toolbar sits across a code block border`,
+            ).toBe(false);
+        }
       }
     });
   }
