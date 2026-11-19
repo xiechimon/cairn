@@ -59,7 +59,6 @@ function seedChief(s: TestServer): void {
       id: `chief-${s.user.id}-${s.team.id}`,
       userId: s.user.id,
       teamId: s.team.id,
-      charter: '',
       watches: [],
       wakes: [],
       createdAt: Date.now(),
