@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
 import { type ComponentType, type SVGProps, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
+import { IconTooltip } from '../icon-tooltip.js';
 
 export interface RoutingSource {
   id: string;
@@ -21,6 +22,7 @@ export interface RoutingTarget {
   name: string;
   runtime: string;
   Mark?: ComponentType<SVGProps<SVGSVGElement>>;
+  RuntimeMark?: ComponentType<SVGProps<SVGSVGElement>>;
   unavailable?: boolean;
 }
 
@@ -200,13 +202,36 @@ export function RoutingGraph({
               hotNodes.has(target.id) && 'bg-sidebar-hover',
             )}
           >
-            {target.Mark != null && <target.Mark aria-hidden className="size-4 flex-none" />}
+            {target.Mark != null && (
+              <target.Mark
+                aria-hidden
+                className={cn(
+                  'size-4 flex-none',
+                  target.unavailable === true && 'opacity-50 grayscale',
+                )}
+              />
+            )}
             <span className="min-w-0 truncate">{target.name}</span>
-            <span className="ml-auto flex-none text-caption text-content-tertiary max-sm:hidden">
-              {target.unavailable === true
-                ? t('{runtime} · 不可用', { runtime: target.runtime })
-                : target.runtime}
-            </span>
+            {target.unavailable === true && (
+              <span className="ml-auto flex-none text-caption max-sm:hidden">{t('不可用')}</span>
+            )}
+            {target.RuntimeMark != null && (
+              <IconTooltip
+                label={target.runtime}
+                trigger={
+                  <span
+                    role="img"
+                    data-slot="routing-runtime"
+                    className={cn(
+                      'flex flex-none text-content-tertiary',
+                      target.unavailable === true ? 'max-sm:ml-auto' : 'ml-auto',
+                    )}
+                  />
+                }
+              >
+                <target.RuntimeMark aria-hidden className="size-3.5 [&_path]:fill-current" />
+              </IconTooltip>
+            )}
           </div>
         ))}
       </div>

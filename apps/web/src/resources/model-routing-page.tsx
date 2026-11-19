@@ -18,6 +18,7 @@ import {
 } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
+import { PROVIDERS } from '../components/accounts/account-parts.js';
 import { AntigravityMark, ClaudeMark, DevinMark } from '../components/brand-marks.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
@@ -33,13 +34,6 @@ import { ProvidersSection } from './providers-page.js';
 import { ModelRulesSection } from './routing-settings-page.js';
 
 const EMPTY_SETTINGS: TeamRoutingSettings = { rules: [], policies: [] };
-
-const TARGET_RUNTIMES = {
-  'claude-code': 'Claude Code',
-  devin: 'Devin',
-  antigravity: 'Antigravity',
-  pi: 'pi',
-} as const;
 
 const SUBSCRIPTION_MARKS = {
   'claude-code': ClaudeMark,
@@ -152,7 +146,8 @@ function RoutingContent() {
                 targets={targets.map((target) => ({
                   id: target.id,
                   name: target.name,
-                  runtime: TARGET_RUNTIMES[target.runtime],
+                  runtime: PROVIDERS[target.runtime].label,
+                  RuntimeMark: PROVIDERS[target.runtime].Mark,
                   Mark:
                     target.record === undefined
                       ? SUBSCRIPTION_MARKS[target.runtime === 'pi' ? 'claude-code' : target.runtime]

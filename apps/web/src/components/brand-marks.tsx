@@ -39,6 +39,36 @@ export function ClaudeMark({ width = 16, height = 16, ...props }: SVGProps<SVGSV
   );
 }
 
+export function ClaudeCodeMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
+  const mark = LOBEHUB_MONO['claude-code'];
+  return (
+    <svg aria-hidden="true" width={width} height={height} viewBox={mark.viewBox} {...props}>
+      {mark.paths.map((d) => (
+        <path key={d} fill="#D97757" fillRule="evenodd" clipRule="evenodd" d={d} />
+      ))}
+    </svg>
+  );
+}
+
+export function AnthropicMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
+  const mark = LOBEHUB_MONO.anthropic;
+  return (
+    <svg
+      aria-hidden="true"
+      width={width}
+      height={height}
+      viewBox={mark.viewBox}
+      fill="currentColor"
+      fillRule="evenodd"
+      {...props}
+    >
+      {mark.paths.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
+
 export function OpenAIMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg aria-hidden="true" width={width} height={height} viewBox="0 0 24 24" {...props}>

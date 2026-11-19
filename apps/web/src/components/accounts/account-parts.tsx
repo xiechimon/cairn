@@ -9,6 +9,7 @@ import type {
 import { useI18n } from '../../i18n/provider.js';
 import {
   AntigravityMark,
+  ClaudeCodeMark,
   ClaudeMark,
   DevinMark,
   GrokMark,
@@ -32,9 +33,9 @@ export const VENDORS: Record<AccountVendor, { label: string; short: string; Mark
 };
 
 export const PROVIDERS: Record<ProviderRuntime, { label: string; Mark: Mark }> = {
-  'claude-code': { label: 'Claude Code', Mark: ClaudeMark },
+  'claude-code': { label: 'Claude Code', Mark: ClaudeCodeMark },
   codex: { label: 'Codex', Mark: OpenAIMark },
-  pi: { label: 'pi', Mark: PiMark },
+  pi: { label: 'Pi', Mark: PiMark },
   devin: { label: 'Devin', Mark: DevinMark },
   antigravity: { label: 'Antigravity', Mark: AntigravityMark },
 };

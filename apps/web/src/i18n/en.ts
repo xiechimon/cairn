@@ -1853,7 +1853,6 @@ export const EN: Record<string, string> = {
   '所有 Claude 模型': 'All Claude models',
   '所有 Devin 模型': 'All Devin models',
   '{model} · 默认': '{model} · default',
-  '{runtime} · 不可用': '{runtime} · unavailable',
   '{use} 的模型': '{use} model',
   '{use} 的思考强度': '{use} thinking level',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',

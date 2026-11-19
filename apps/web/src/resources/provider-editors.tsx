@@ -10,7 +10,7 @@ import {
 import { cn } from 'cn';
 import { Download, Play, Server, X } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
-import { ClaudeMark, GeminiMark, GrokMark, OpenAIMark } from '../components/brand-marks.js';
+import { AnthropicMark } from '../components/brand-marks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ProviderEditorHead, type ProviderMark } from '../components/providers/provider-panel.js';
@@ -20,6 +20,7 @@ import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { useI18n } from '../i18n/provider.js';
+import { presetMarkOf } from './provider-preset-icon.js';
 import { UpstreamModelPicker } from './upstream-model-picker.js';
 
 const PROTOCOL_LABELS: Record<ProviderApi, string> = {
@@ -41,10 +42,9 @@ export function providerKind(record: ProviderRecord): string {
 }
 
 export function providerMark(record: ProviderRecord): ProviderMark {
-  if (record.api === 'anthropic-messages' || record.providerId === 'anthropic') return ClaudeMark;
-  if (record.providerId.startsWith('openai')) return OpenAIMark;
-  if (record.providerId === 'xai') return GrokMark;
-  if (record.providerId === 'google' || record.providerId.startsWith('gemini')) return GeminiMark;
+  const preset = presetMarkOf(record.providerId);
+  if (preset !== undefined) return preset;
+  if (record.api === 'anthropic-messages') return AnthropicMark;
   return Server;
 }
 
