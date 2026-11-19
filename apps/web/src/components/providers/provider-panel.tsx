@@ -50,7 +50,7 @@ export function ProviderInstanceRow({
       aria-current={selected ? 'true' : undefined}
       className={cn(
         'flex items-start gap-3 px-3.5 py-3',
-        selected ? 'bg-secondary' : 'hover:bg-menu-hover',
+        selected ? 'bg-(--sidebar-active)' : 'hover:bg-menu-hover',
       )}
     >
       <Button
