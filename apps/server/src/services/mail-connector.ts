@@ -33,6 +33,7 @@ export interface MailConnectorOptions {
   openMailbox?: OpenMailbox;
   backoff?: { initialMs: number; maxMs: number };
   pollIntervalMs?: number;
+  drainTimeoutMs?: number;
   log?: MailConnectorLog;
 }
 
@@ -50,6 +51,10 @@ interface Runner {
 }
 
 class Stopped extends Error {}
+
+class DrainTimeout extends Error {
+  readonly code = 'ETIMEDOUT';
+}
 
 function errorCode(error: unknown): MailErrorCode {
   if (error instanceof MailAuthError) return 'auth-rejected';
@@ -69,6 +74,7 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
   const open = options.openMailbox ?? openImapMailbox;
   const backoff = options.backoff ?? { initialMs: 5_000, maxMs: 5 * 60_000 };
   const pollIntervalMs = options.pollIntervalMs ?? 60_000;
+  const drainTimeoutMs = options.drainTimeoutMs ?? 2 * 60_000;
   const runners = new Map<string, Runner>();
 
   const account = (id: string) => db.select().from(mailAccount).where(eq(mailAccount.id, id)).get();
@@ -201,6 +207,22 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
     });
   }
 
+  function within<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new DrainTimeout('mailbox fetch timed out')), ms);
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error: unknown) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
+  }
+
   function until<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       if (signal.aborted) {
@@ -244,7 +266,7 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
         markMailAccount(db, accountId, generation, 'watching', null);
         delay = backoff.initialMs;
         for (;;) {
-          await until(drain(accountId, generation, session), signal);
+          await until(within(drain(accountId, generation, session), drainTimeoutMs), signal);
           await until(
             session.supportsIdle
               ? session.waitForChange()

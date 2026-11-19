@@ -277,6 +277,57 @@ describe('mailbox ingestion over IMAP', () => {
     await connector.shutdown();
   });
 
+  test('a poll-only connection that goes silent mid-fetch is dropped and reconnected, and new mail still arrives', async () => {
+    const mails = [mail(1)];
+    const s = bootServer();
+    const created = createMailAccount(
+      { db: s.db, box: s.secretBox },
+      { teamId: s.team.id, userId: s.user.id, body: { ...BODY, wakeMode: 'all' } as never },
+    );
+    let opened = 0;
+    let closedFirst = false;
+    const connector = createMailConnector({
+      secrets: { db: s.db, box: s.secretBox },
+      mailDeps: { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, vapidKeys: null },
+      openMailbox: async () => {
+        opened += 1;
+        const first = opened === 1;
+        let fetches = 0;
+        return {
+          uidValidity: '7',
+          uidNext: 2,
+          supportsIdle: false,
+          fetchAfter: async (uid) => {
+            fetches += 1;
+            if (first && fetches > 1) return new Promise<MailboxMessage[]>(() => {});
+            return mails.filter((m) => m.uid > uid);
+          },
+          waitForChange: () => new Promise<void>(() => {}),
+          close: async () => {
+            if (first) closedFirst = true;
+          },
+        };
+      },
+      pollIntervalMs: 20,
+      drainTimeoutMs: 100,
+      backoff: { initialMs: 10, maxMs: 20 },
+    });
+    connector.connect(created.id);
+    await vi.waitFor(async () => {
+      expect((await listAccounts(s)).find((a) => a.id === created.id)?.status).toBe('watching');
+    });
+    mails.push(mail(2));
+    await vi.waitFor(() => expect(s.db.select().from(mailEvent).all()).toHaveLength(1), {
+      timeout: 3000,
+    });
+    expect(opened).toBeGreaterThan(1);
+    expect(closedFirst).toBe(true);
+    await vi.waitFor(async () => {
+      expect((await listAccounts(s)).find((a) => a.id === created.id)?.status).toBe('watching');
+    });
+    await connector.shutdown();
+  });
+
   test('the password is sealed at rest and never appears in responses, errors or logs', async () => {
     const logs: string[] = [];
     const s = bootServer();
