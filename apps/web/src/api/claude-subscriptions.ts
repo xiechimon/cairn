@@ -73,7 +73,10 @@ export function useSubscriptionVerification(teamId: string | undefined) {
     inFlight.current.delete(id);
     setStates((current) => {
       const { [id]: _settled, ...rest } = current;
-      return outcome.ok ? rest : { ...rest, [id]: { phase: 'failed', reason: outcome.reason } };
+      return {
+        ...rest,
+        [id]: outcome.ok ? { phase: 'passed' } : { phase: 'failed', reason: outcome.reason },
+      };
     });
     return outcome;
   };

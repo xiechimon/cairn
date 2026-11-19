@@ -6,7 +6,8 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Download, X } from 'lucide-react';
-import type { AccountStatus, VerifyFailure } from '../api/account-verification.js';
+import { useEffect, useRef, useState } from 'react';
+import type { AccountStatus, Verification, VerifyFailure } from '../api/account-verification.js';
 import type {
   AccountVendor,
   QuotaWindow,
@@ -30,6 +31,13 @@ import {
   SettingsSection,
 } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverTrigger,
+} from '../components/ui/popover.js';
+import { Spinner } from '../components/ui/spinner.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { ACCENT_INK } from '../phase.js';
@@ -77,6 +85,7 @@ function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
     auth: AUTH_RENEWAL[vendor],
     timeout: '验证超时，请重试',
     unavailable: UNAVAILABLE_COPY[vendor],
+    quota: '模型额度已用尽，请等待额度恢复后重试。',
     failed: '验证没有通过，请重试',
     network: '连接中断，服务器可能正在重启，请重试',
     'rate-limited': '验证太频繁，请 10 秒后重试',
@@ -84,6 +93,25 @@ function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
       '执行机上还没有登录 Antigravity，请先运行 `agy acp --login` 或改用 API Key',
   };
 }
+
+const VERIFYING_COPY: Record<AccountVendor, string> = {
+  claude: '正在用这个订阅发一次模型请求',
+  codex: '正在检查这个订阅的登录',
+  grok: '正在检查这个订阅的登录',
+  devin: '正在用这个凭据登录 Devin',
+  antigravity: '正在检查 Antigravity 是否接受这个凭据',
+};
+
+const PASSED_COPY: Record<AccountVendor, string> = {
+  claude: '这个订阅刚完成了一次模型请求。',
+  codex: '这个订阅的登录有效。',
+  grok: '这个订阅的登录有效。',
+  devin: 'Devin 接受了这个凭据。',
+  antigravity: 'Antigravity 接受了这个凭据。',
+};
+
+const STATUS_CLS = 'flex items-center gap-1.5 text-meta text-content-secondary';
+const STATUS_DOT_CLS = 'size-1.5 flex-none rounded-full';
 
 export interface SubscriptionStatusView {
   tone: ProviderTone;
@@ -109,13 +137,7 @@ export function subscriptionStatusView(
   clock: (ts: number, now: number) => string,
 ): SubscriptionStatusView {
   if (status.kind === 'verifying') return { tone: 'off', label: t('验证中…'), reason: null };
-  if (status.kind === 'verify-failed') {
-    return {
-      tone: 'fail',
-      label: t('验证失败'),
-      reason: t(failureCopy(account.vendor)[status.reason]),
-    };
-  }
+  if (status.kind === 'verify-failed') return { tone: 'fail', label: t('验证失败'), reason: null };
   switch (status.state) {
     case 'ok':
       return { tone: 'ok', label: t('可用'), reason: null };
@@ -359,13 +381,42 @@ function PickedModelChip({
   );
 }
 
+function VerifyFeedback({
+  vendor,
+  verification,
+}: {
+  vendor: AccountVendor;
+  verification: Verification;
+}) {
+  const { t } = useI18n();
+  return (
+    <PopoverDescription
+      role="status"
+      className="flex items-start gap-2 text-meta text-content-secondary"
+    >
+      {verification.phase === 'verifying' && (
+        <Spinner aria-hidden className="mt-0.5 size-4 flex-none text-content-tertiary" />
+      )}
+      <span>
+        {withCodeSpans(
+          verification.phase === 'verifying'
+            ? t(VERIFYING_COPY[vendor])
+            : verification.phase === 'passed'
+              ? t(PASSED_COPY[vendor])
+              : t(failureCopy(vendor)[verification.reason]),
+        )}
+      </span>
+    </PopoverDescription>
+  );
+}
+
 export function SubscriptionDetail({
   account,
   models,
   picked,
   now,
   view,
-  verifying,
+  verification,
   actions,
 }: {
   account: SubscriptionAccount;
@@ -373,10 +424,15 @@ export function SubscriptionDetail({
   picked?: readonly SubscriptionModel[];
   now: number;
   view: SubscriptionStatusView;
-  verifying: boolean;
+  verification: Verification | undefined;
   actions: SubscriptionActions;
 }) {
   const { t } = useI18n();
+  const verifyRef = useRef<HTMLButtonElement>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(verification?.phase === 'verifying');
+  useEffect(() => {
+    if (verification?.phase === 'verifying') setFeedbackOpen(true);
+  }, [verification]);
   const neverUsed = account.lastUsedAt === null && account.stepsLast24h === null;
   const runtime = SUBSCRIPTION_RUNTIME[account.vendor];
   const runtimeLabel =
@@ -396,27 +452,49 @@ export function SubscriptionDetail({
       >
         <SettingsCard>
           <SettingsRow label={t('状态')}>
-            <span
-              data-testid="subscription-status"
-              className="flex items-center gap-1.5 text-meta text-content-secondary"
-            >
-              <span
-                aria-hidden
-                className={cn('size-1.5 flex-none rounded-full', TONE_DOT[view.tone])}
-              />
-              {view.label}
-            </span>
-            {actions.onVerify !== undefined && (
-              <Button
-                variant="outline"
-                size="sm"
-                data-testid="subscription-verify"
-                disabled={verifying}
-                onClick={actions.onVerify}
-              >
-                {view.tone === 'fail' ? t('重试') : t('验证')}
-              </Button>
-            )}
+            <Popover open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+              {verification?.phase === 'failed' ? (
+                <PopoverTrigger
+                  data-testid="subscription-status"
+                  aria-label={t('查看验证结果：{status}', { status: view.label })}
+                  className={cn(STATUS_CLS, 'rounded-sm hover:text-foreground')}
+                >
+                  <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
+                  {view.label}
+                </PopoverTrigger>
+              ) : (
+                <span data-testid="subscription-status" className={STATUS_CLS}>
+                  <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
+                  {view.label}
+                </span>
+              )}
+              {actions.onVerify !== undefined && (
+                <Button
+                  ref={verifyRef}
+                  variant="outline"
+                  size="sm"
+                  data-testid="subscription-verify"
+                  disabled={verification?.phase === 'verifying'}
+                  onClick={actions.onVerify}
+                >
+                  {view.tone === 'fail' ? t('重试') : t('验证')}
+                </Button>
+              )}
+              {verification !== undefined && (
+                <PopoverContent
+                  anchor={verifyRef}
+                  align="end"
+                  sideOffset={8}
+                  initialFocus={false}
+                  finalFocus={verifyRef}
+                  data-testid="subscription-verify-feedback"
+                  data-phase={verification.phase}
+                  className="p-3"
+                >
+                  <VerifyFeedback vendor={account.vendor} verification={verification} />
+                </PopoverContent>
+              )}
+            </Popover>
           </SettingsRow>
           {view.reason !== null && (
             <div

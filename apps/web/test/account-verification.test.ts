@@ -72,6 +72,13 @@ describe('accountStatusOf', () => {
     });
   });
 
+  it('a passed check leaves the summary to the account, so an exhausted account stays exhausted', () => {
+    expect(accountStatusOf({ state: 'exhausted' }, { phase: 'passed' })).toEqual({
+      kind: 'account',
+      state: 'exhausted',
+    });
+  });
+
   it('keeps an expired account expired, not a stale verification failure', () => {
     expect(accountStatusOf({ state: 'expired' }, { phase: 'failed', reason: 'auth' })).toEqual({
       kind: 'account',

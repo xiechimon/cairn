@@ -88,11 +88,16 @@ describe('Claude subscription connections', () => {
     const rejected = await req(s.app, 'POST', `${path}/${id}/verify`);
     expect(await rejected.json()).toEqual({ ok: false, reason: 'auth' });
     clock.mockReturnValue(Date.now() + 10_000);
+    script(`echo "You've hit your weekly limit private-quota-response ${TOKEN}" >&2\nexit 1`);
+    const exhausted = await req(s.app, 'POST', `${path}/${id}/verify`);
+    expect(await exhausted.json()).toEqual({ ok: false, reason: 'quota' });
+    clock.mockReturnValue(Date.now() + 10_000);
     vi.stubEnv('CLAUDE_BIN', join(dir, 'missing'));
     const failed = await req(s.app, 'POST', `${path}/${id}/verify`);
     expect(await failed.json()).toEqual({ ok: false, reason: 'unavailable' });
     expect(logs.join('')).not.toContain(TOKEN);
     expect(logs.join('')).not.toContain('private-upstream-response');
+    expect(logs.join('')).not.toContain('private-quota-response');
     expect(
       (await req(s.app, 'POST', `/api/teams/other/claude-subscriptions/${id}/verify`)).status,
     ).toBe(404);
@@ -103,6 +108,7 @@ describe('Claude subscription connections', () => {
       [
         { ok: true, reason: null },
         { ok: false, reason: 'auth' },
+        { ok: false, reason: 'quota' },
         { ok: false, reason: 'unavailable' },
       ].map((outcome) => ({
         ...outcome,
@@ -111,7 +117,7 @@ describe('Claude subscription connections', () => {
         durationMs: expect.any(Number),
       })),
     );
-    expect(readFileSync(runs, 'utf8').trim().split('\n')).toHaveLength(2);
+    expect(readFileSync(runs, 'utf8').trim().split('\n')).toHaveLength(3);
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
@@ -353,6 +359,7 @@ describe('switching the enabled Claude subscription', () => {
   test.each([
     ['a rejected token', 'echo "401 invalid" >&2\nexit 1', 'auth'],
     ['a server without claude', null, 'unavailable'],
+    ['an exhausted subscription', 'echo "You\'ve hit your weekly limit" >&2\nexit 1', 'quota'],
   ])('%s fails the precheck and the old account stays enabled', async (_name, script, reason) => {
     if (script === null) vi.stubEnv('CLAUDE_BIN', '/nonexistent/claude');
     else fakeClaude(script);

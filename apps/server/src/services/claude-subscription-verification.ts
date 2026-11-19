@@ -38,8 +38,12 @@ function classify(failure: ExecFileException, output: ExecOutput): ClaudeSubscri
   if (failure.killed === true || failure.code === 'ABORT_ERR') {
     return { ok: false, reason: 'timeout' };
   }
-  if (AUTH_FAILURE.test(`${output.stdout}\n${output.stderr}`)) {
+  const message = `${output.stdout}\n${output.stderr}`;
+  if (AUTH_FAILURE.test(message)) {
     return { ok: false, reason: 'auth' };
+  }
+  if (/you(?:'|’)ve hit your (?:weekly )?limit\b/i.test(message)) {
+    return { ok: false, reason: 'quota' };
   }
   return { ok: false, reason: 'failed' };
 }

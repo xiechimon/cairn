@@ -58,7 +58,11 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
   await expect(page.locator('body')).not.toContainText(TOKEN);
 
   const detail = page.getByTestId('subscription-detail');
-  await expect(page.getByText(locale === 'zh' ? '「Personal Claude」验证通过' : 'Personal Claude verified')).toBeVisible();
+  const feedback = page.getByTestId('subscription-verify-feedback');
+  await expect(feedback).toHaveAttribute('data-phase', 'passed');
+  await expect(feedback).toHaveText(locale === 'zh' ? '这个订阅刚完成了一次模型请求。' : 'This subscription just completed a model request.');
+  await page.keyboard.press('Escape');
+  await expect(feedback).toHaveCount(0);
   await expect(detail.getByLabel(locale === 'zh' ? '名称' : 'Name')).toBeVisible();
 
   const remove = locale === 'zh' ? '移除' : 'Remove';

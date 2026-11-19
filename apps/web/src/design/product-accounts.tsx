@@ -128,7 +128,7 @@ function SubscriptionPanelSpecimen() {
           models={SPECIMEN_SUBSCRIPTION_MODELS}
           now={NOW}
           view={current.view}
-          verifying={current.verification?.phase === 'verifying'}
+          verification={current.verification}
           actions={{
             onVerify: () => undefined,
             onRename: () => undefined,
@@ -152,7 +152,7 @@ function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
         models={SPECIMEN_SUBSCRIPTION_MODELS}
         now={NOW}
         view={view}
-        verifying={false}
+        verification={undefined}
         actions={{
           onVerify: () => undefined,
           onRename: () => undefined,

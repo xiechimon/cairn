@@ -13,7 +13,7 @@ test.use({
   viewport: { width: WIDTH, height: WIDTH < 500 ? 812 : 732 },
 });
 
-type Verify = 'ok' | 'auth' | 'timeout' | 'unavailable' | 'rate-limited' | 'reset' | 'restart' | 'slow';
+type Verify = 'ok' | 'auth' | 'timeout' | 'unavailable' | 'quota' | 'rate-limited' | 'reset' | 'restart' | 'slow';
 
 async function open(page: Page, verify: { current: Verify }, subscriptions?: ClaudeSubscriptionListEntry[]) {
   const accounts = subscriptions ?? [
@@ -61,6 +61,8 @@ async function open(page: Page, verify: { current: Verify }, subscriptions?: Cla
           return json({ ok: false, reason: 'timeout' });
         case 'unavailable':
           return json({ ok: false, reason: 'unavailable' });
+        case 'quota':
+          return json({ ok: false, reason: 'quota' });
         case 'rate-limited':
           return json({ error: 'wait' }, 429);
         case 'reset':
@@ -80,6 +82,7 @@ async function open(page: Page, verify: { current: Verify }, subscriptions?: Cla
 
 async function shot(page: Page, name: string) {
   if (SHOTS === undefined) return;
+  await page.waitForTimeout(300);
   const base = `${SHOTS}/${name}-${WIDTH}-${SCHEME}`;
   await page.screenshot({ path: `${base}.png` });
   if (WIDTH < 500) {
@@ -90,6 +93,7 @@ async function shot(page: Page, name: string) {
 const row = (page: Page) => page.getByTestId('provider-instance').first();
 const status = (page: Page) => page.getByTestId('subscription-status');
 const verify = (page: Page) => page.getByTestId('subscription-verify');
+const feedback = (page: Page) => page.getByTestId('subscription-verify-feedback');
 
 test('a settled account reads one status, never available next to verifying', async ({ page }) => {
   const mode = { current: 'slow' as Verify };
@@ -105,17 +109,27 @@ test('a settled account reads one status, never available next to verifying', as
   await expect(row(page)).not.toContainText('可用');
   await expect(page.getByTestId('subscription-detail')).not.toContainText('可用');
   await expect(verify(page)).toBeDisabled();
+  await expect(feedback(page)).toHaveAttribute('data-phase', 'verifying');
+  await expect(feedback(page)).toHaveText('正在用这个订阅发一次模型请求');
   await shot(page, 'verifying');
 
   await expect(status(page)).toHaveText('可用');
-  await expect(page.getByText('「Claude subscription」验证通过')).toBeVisible();
+  await expect(feedback(page)).toHaveAttribute('data-phase', 'passed');
+  await expect(feedback(page)).toHaveText('这个订阅刚完成了一次模型请求。');
+  await expect(page.getByTestId('subscription-reason')).toHaveCount(0);
   await expect(row(page)).not.toContainText('验证中');
+  await shot(page, 'passed');
+
+  await page.keyboard.press('Escape');
+  await expect(feedback(page)).toHaveCount(0);
+  await expect(verify(page)).toBeFocused();
 });
 
 const FAILURES: { mode: Verify; reason: string; shot: string }[] = [
   { mode: 'auth', reason: '这个订阅的登录已失效。先移除它，再在终端运行 claude setup-token，把新的 token 添加回来。', shot: 'failed-auth' },
   { mode: 'timeout', reason: '验证超时，请重试', shot: 'failed-timeout' },
   { mode: 'unavailable', reason: '服务器上找不到 claude 命令', shot: 'failed-unavailable' },
+  { mode: 'quota', reason: '模型额度已用尽，请等待额度恢复后重试。', shot: 'failed-quota' },
   { mode: 'rate-limited', reason: '验证太频繁，请 10 秒后重试', shot: 'failed-rate-limited' },
   { mode: 'reset', reason: '连接中断，服务器可能正在重启，请重试', shot: 'failed-connection-dropped' },
   { mode: 'restart', reason: '连接中断，服务器可能正在重启，请重试', shot: 'failed-server-restarting' },
@@ -129,15 +143,20 @@ for (const failure of FAILURES) {
     await open(page, mode);
     await verify(page).click();
     await expect(status(page)).toHaveText('验证失败');
-    await expect(page.getByTestId('subscription-detail')).toContainText(failure.reason);
+    await expect(feedback(page)).toHaveAttribute('data-phase', 'failed');
+    await expect(feedback(page)).toHaveText(failure.reason);
     await expect(row(page)).toContainText('订阅 · 3 个模型 · 验证失败');
-    await expect(page.getByTestId('subscription-reason')).toHaveText(failure.reason);
+    await expect(page.getByTestId('subscription-detail')).not.toContainText(failure.reason);
     await expect(row(page)).not.toContainText('可用');
     await expect(page.getByText('验证失败', { exact: true })).toHaveCount(1);
     await expect(verify(page)).toHaveText('重试');
     await expect(verify(page)).toBeEnabled();
     await expect(row(page)).toHaveAttribute('data-tone', 'fail');
     await shot(page, failure.shot);
+    await page.keyboard.press('Escape');
+    await expect(feedback(page)).toHaveCount(0);
+    await status(page).click();
+    await expect(feedback(page)).toHaveText(failure.reason);
 
     mode.current = 'ok';
     await verify(page).click();

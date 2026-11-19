@@ -5,6 +5,7 @@ export const VERIFY_FAILURES = [
   'auth',
   'timeout',
   'unavailable',
+  'quota',
   'failed',
   'network',
   'rate-limited',
@@ -12,7 +13,10 @@ export const VERIFY_FAILURES = [
 ] as const;
 export type VerifyFailure = (typeof VERIFY_FAILURES)[number];
 
-export type Verification = { phase: 'verifying' } | { phase: 'failed'; reason: VerifyFailure };
+export type Verification =
+  | { phase: 'verifying' }
+  | { phase: 'passed' }
+  | { phase: 'failed'; reason: VerifyFailure };
 
 export type VerifyOutcome = { ok: true } | { ok: false; reason: VerifyFailure };
 

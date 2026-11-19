@@ -80,6 +80,24 @@ describe('verifyClaudeSubscription', () => {
     expect(JSON.stringify(result)).not.toContain(TOKEN);
   });
 
+  test.each(['weekly ', ''])(
+    'an exhausted %slimit is distinct from invalid credentials',
+    async (window) => {
+      const dir = fixtureDir();
+      const output = JSON.stringify({
+        type: 'result',
+        subtype: 'success',
+        is_error: true,
+        result: `You've hit your ${window}limit · resets 5pm (UTC)`,
+      });
+      vi.stubEnv(
+        'CLAUDE_BIN',
+        fakeClaude(dir, `printf '%s\\n' "${output.replaceAll('"', '\\"')}"\nexit 1`),
+      );
+      expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: false, reason: 'quota' });
+    },
+  );
+
   test('a non-auth failure is classified as failed', async () => {
     const dir = fixtureDir();
     vi.stubEnv('CLAUDE_BIN', fakeClaude(dir, 'echo "region blocked" >&2\nexit 3'));

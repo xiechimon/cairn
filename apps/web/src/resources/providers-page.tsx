@@ -43,7 +43,7 @@ import { type ProviderItem, ProviderPanel } from '../components/providers/provid
 import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
@@ -167,7 +167,7 @@ function subscriptionEntries(
           picked={pickedWithLiveness}
           now={deps.now}
           view={view}
-          verifying={verification?.phase === 'verifying'}
+          verification={verification}
           actions={deps.actionsFor(account)}
         />
       ),
@@ -324,11 +324,8 @@ export function ProvidersSection() {
     antigravity: deleteAntigravitySubscription,
   };
 
-  const announceVerification = (ref: { id: string; label: string; vendor: AccountVendor }) => {
-    const verify = verifyByVendor[ref.vendor] ?? verification.verify;
-    void verify(ref.id).then((outcome) => {
-      if (outcome?.ok) toastSuccess(t('「{name}」验证通过', { name: ref.label }));
-    });
+  const startVerification = (ref: { id: string; vendor: AccountVendor }) => {
+    void (verifyByVendor[ref.vendor] ?? verification.verify)(ref.id);
   };
 
   const subscriptionActionsFor = (account: SubscriptionAccount): SubscriptionActions => {
@@ -338,7 +335,7 @@ export function ProvidersSection() {
       onRemove: () => setRemovingSubscription(account),
       ...(live
         ? {
-            onVerify: () => announceVerification(account),
+            onVerify: () => startVerification(account),
             ...(apiIds.includes(account.id)
               ? {
                   onRename: (label: string) =>
@@ -474,7 +471,7 @@ export function ProvidersSection() {
         onConnectError={setConnectError}
         onSubscriptionCreated={(created, source) => {
           setParams({ item: `subscription:${created.id}` }, true);
-          announceVerification({ id: created.id, label: created.label, vendor: source });
+          startVerification({ id: created.id, vendor: source });
         }}
       />
       {pickingSubscription !== null && live && teamId !== undefined && (

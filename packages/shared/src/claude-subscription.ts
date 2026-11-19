@@ -31,7 +31,7 @@ export const renameClaudeSubscriptionSchema = z.object({
 
 export const claudeSubscriptionVerifyResultSchema = z.object({
   ok: z.boolean(),
-  reason: z.enum(['auth', 'timeout', 'unavailable', 'failed']).optional(),
+  reason: z.enum(['auth', 'timeout', 'unavailable', 'quota', 'failed']).optional(),
 });
 
 export type ClaudeSubscriptionVerifyResult = z.infer<typeof claudeSubscriptionVerifyResultSchema>;
