@@ -108,7 +108,6 @@ describe('orb step dispatch', () => {
     const provider = new FakeOrbProvider({ runner: workerRunner(backend) });
     const ensure = vi.spyOn(provider, 'ensure');
     const api = new FakeMachineApi();
-    api.mePatch = { maxConcurrent: 4 };
     for (const id of ['s1', 's2', 's3'])
       api.claimQueue.push({
         ...CLAIMED,
@@ -325,7 +324,6 @@ test('Coordinator and worker claims share the executor cap even when the server 
     },
   };
   const api = new FakeMachineApi();
-  api.mePatch = { maxConcurrent: 4 };
   for (const [index, kind] of (['chief', 'plan', 'plan'] as const).entries())
     api.claimQueue.push({
       ...CLAIMED,
@@ -468,7 +466,6 @@ test('worker exit waits for an in-flight finish report without replacing or dupl
 test('an orb cannot complete another step or mount its host recovery journal', async () => {
   const executions: FakeWorkerOptions[] = [];
   const api = new FakeMachineApi();
-  api.mePatch = { maxConcurrent: 2 };
   for (const id of ['s1', 's2'])
     api.claimQueue.push({
       ...CLAIMED,

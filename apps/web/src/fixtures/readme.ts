@@ -308,7 +308,6 @@ function readmeFixture(copy: Copy): FixtureSet {
           online: true,
           chiefHost: true,
           runningSteps: 1,
-          maxConcurrent: 8,
         },
         {
           id: 'readme-laptop',
@@ -316,7 +315,6 @@ function readmeFixture(copy: Copy): FixtureSet {
           name: 'MacBook Air',
           online: true,
           runningSteps: 0,
-          maxConcurrent: 4,
         },
       ],
     },

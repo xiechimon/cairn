@@ -219,32 +219,22 @@ function claimAs(w: World, opts: { maxWorkers?: number } = {}) {
   );
 }
 
-function setCap(w: World, cap: number): void {
-  w.s.db
-    .update(machineTable)
-    .set({ maxConcurrent: cap })
-    .where(eq(machineTable.id, w.machineAId))
-    .run();
-}
-
-describe('#1260 chief steps occupy concurrency slots (capacity gate)', () => {
-  test('failure mode 1: at capacity (running workers fill it) -> chief comes up empty, step stays pending', async () => {
+describe('#1260 chief steps occupy the Runner maxWorkers slots', () => {
+  test('failure mode 1: running workers fill maxWorkers -> chief comes up empty, step stays pending', async () => {
     const w = await setupWorld();
-    setCap(w, 1);
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const chiefStepId = insertPendingChiefStep(w.s, { createdAt: Date.now() - 4000 });
-    expect(await claimAs(w)).toBeNull();
+    expect(await claimAs(w, { maxWorkers: 1 })).toBeNull();
     expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
       'pending',
     );
   });
 
-  test('failure mode 2: only running chiefs fill it (cap 1) -> worker comes up empty', async () => {
+  test('failure mode 2: only running chiefs fill maxWorkers 1 -> worker comes up empty', async () => {
     const w = await setupWorld();
-    setCap(w, 1);
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000, kind: 'chief' });
     const workerStepId = insertPendingBuildStep(w.s, w);
-    expect(await claimAs(w)).toBeNull();
+    expect(await claimAs(w, { maxWorkers: 1 })).toBeNull();
     expect(
       w.s.db.select().from(stepTable).where(eq(stepTable.id, workerStepId)).get()!.status,
     ).toBe('pending');
@@ -252,7 +242,6 @@ describe('#1260 chief steps occupy concurrency slots (capacity gate)', () => {
 
   test('failure mode 4: gate open FIFO order preserved with zero drift (chief earlier -> chief first; worker earlier -> worker first)', async () => {
     const w = await setupWorld();
-    setCap(w, 4);
     const olderChief = insertPendingChiefStep(w.s, { createdAt: 1_000 });
     const worker = insertPendingBuildStep(w.s, w);
     const first = await claimAs(w);
@@ -273,22 +262,20 @@ describe('#1260 chief steps occupy concurrency slots (capacity gate)', () => {
 describe('#1260 read-surface semantics (runningSteps includes running chiefs)', () => {
   test('failure mode 3: me / machine list runningSteps includes chief', async () => {
     const w = await setupWorld();
-    setCap(w, 3);
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000, kind: 'chief' });
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 4000 });
     const me = await w.s.app.request('/api/machine/me', {
       headers: { authorization: `Bearer ${w.tokenA}` },
     });
-    const meBody = (await me.json()) as { maxConcurrent: number; runningSteps: number };
+    const meBody = (await me.json()) as { runningSteps: number };
     expect(meBody.runningSteps).toBe(2);
     const list = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/machines`);
     const rows = (await list.json()) as { id: string; runningSteps?: number }[];
     expect(rows.find((r) => r.id === w.machineAId)?.runningSteps).toBe(2);
   });
 
-  test('failure mode 3b: waitingFor.running includes chief (queue projection)', async () => {
+  test('failure mode 3b: a step queued behind a running chief names its machine', async () => {
     const w = await setupWorld();
-    setCap(w, 1);
     w.s.db
       .update(machineTable)
       .set({ online: true })
@@ -303,16 +290,11 @@ describe('#1260 read-surface semantics (runningSteps includes running chiefs)', 
       createdAt: Date.now(),
       homeMachineId: w.machineAId,
     });
-    expect(info?.waitingFor).toMatchObject({
-      machineId: w.machineAId,
-      running: 1,
-      capacity: 1,
-    });
+    expect(info?.waitingFor).toEqual({ machineId: w.machineAId, name: expect.any(String) });
   });
 
   test('failure mode 3c: chief thread leaves turnQueue after being claimed (current behavior zero drift)', async () => {
     const w = await setupWorld();
-    setCap(w, 1);
     const chiefStepId = insertPendingChiefStep(w.s, { createdAt: Date.now() });
     const claimed = await claimAs(w);
     expect(claimed?.step.id).toBe(chiefStepId);
@@ -330,9 +312,8 @@ describe('#1260 read-surface semantics (runningSteps includes running chiefs)', 
 });
 
 describe('#1148/#1260 claim body maxWorkers (env fallback server consumption surface)', () => {
-  test('failure mode 5: DB 3 / body 1, 1 worker running -> worker and chief both gated', async () => {
+  test('failure mode 5: body maxWorkers 1, 1 worker running -> worker and chief both gated', async () => {
     const w = await setupWorld();
-    setCap(w, 3);
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const workerStepId = insertPendingBuildStep(w.s, w);
     expect(await claimAs(w, { maxWorkers: 1 })).toBeNull();
@@ -346,9 +327,8 @@ describe('#1148/#1260 claim body maxWorkers (env fallback server consumption sur
     );
   });
 
-  test('failure mode 5b: body absent (legacy daemon) = only the DB row', async () => {
+  test('failure mode 5b: body without maxWorkers claims however many already run', async () => {
     const w = await setupWorld();
-    setCap(w, 2);
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const stepId = insertPendingBuildStep(w.s, w);
     const claimed = await claimAs(w);
@@ -369,7 +349,6 @@ describe('#1148/#1260 claim body maxWorkers (env fallback server consumption sur
 describe('chief turns never wait behind a worker step another machine owns', () => {
   test('an older pending step whose preferred machine is online elsewhere does not hold back a newer chief turn', async () => {
     const w = await setupWorld();
-    setCap(w, 8);
     const key = await issueApiKey(w.s);
     const other = await w.s.app.request('/api/machine/enroll', {
       method: 'POST',
@@ -410,7 +389,6 @@ describe('chief turns never wait behind a worker step another machine owns', () 
 
   test('an older worker step this machine can run still goes before a newer chief turn', async () => {
     const w = await setupWorld();
-    setCap(w, 8);
     const worker = insertPendingBuildStep(w.s, w);
     const workerAt = w.s.db
       .select()

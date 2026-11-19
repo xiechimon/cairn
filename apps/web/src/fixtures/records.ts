@@ -308,7 +308,6 @@ export interface MachineRow {
   enabledRuntimes?: string[];
   chiefHost?: boolean;
   isDefault?: boolean;
-  maxConcurrent?: number;
   runningSteps?: number;
   capabilities?: {
     mcpServers: string[];
@@ -330,10 +329,6 @@ export interface MachineRow {
       screenRecording: PermissionState;
     };
   } | null;
-  maxConcurrentOverridden?: boolean;
-  recommendedConcurrent?: number;
-  concurrencyRange?: { min: number; max: number };
-  concurrencySource?: 'measured' | 'estimate' | 'manual';
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
   ownComputerFixture?: OwnComputerFixture;

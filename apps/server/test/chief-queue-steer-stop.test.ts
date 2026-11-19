@@ -97,11 +97,7 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = s.db.select().from(machineTable).limit(1).all()[0]!.id;
-  s.db
-    .update(machineTable)
-    .set({ online: true, maxConcurrent: 4 })
-    .where(eq(machineTable.id, machineId))
-    .run();
+  s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, machineId)).run();
   seedRoute(s, 'coordinator', {
     provider: 'relay-a',
     modelId: 'model-a',

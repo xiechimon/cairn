@@ -55,13 +55,7 @@ import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { contextWindowOf } from './coordinator-context.js';
 import { assertCorrectionDone } from './correction.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
-import {
-  capabilityGatePasses,
-  type MachineQueueReason,
-  machineQueueReason,
-  machineRunningCount,
-  runtimeGatePasses,
-} from './dispatch-eligibility.js';
+import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import {
   claimEffect,
@@ -443,7 +437,6 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
   const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
   const sole =
     teamDefaultMachineId(deps.db, row.teamId) ?? soleOnlineMachineId(online.map((m) => m.id));
-  let queueReason: MachineQueueReason | null = null;
   for (const s of pendingSteps) {
     const agentRow = profileForStep(deps.db, row, s.kind, s.id);
     if (agentRow === null) continue;
@@ -469,12 +462,11 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
       (m) => m.id === named && runtimeGatePasses(m, provider) && capabilityGatePasses(m, agentRow),
     );
     if (target === undefined) return { on: 'machine', retryAt: null };
-    queueReason ??= machineQueueReason(target, machineRunningCount(deps.db, target.id));
   }
   if (online.length === 0) {
     return { on: 'machine', retryAt: null };
   }
-  return queueReason === null ? undefined : { on: queueReason, retryAt: null };
+  return undefined;
 }
 
 function archiveWithPhase(

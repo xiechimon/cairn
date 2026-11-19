@@ -123,7 +123,6 @@ function stepDeps(api: FakeMachineApi, extra: { workspace?: WorktreeOps; backend
 describe('#1473 only one copy of a step runs on the same machine', () => {
   test('an in-flight step dispatched back to the same machine: no second session, exactly one done', async () => {
     const api = new FakeMachineApi();
-    api.mePatch = { maxConcurrent: 1 };
     const release = defer();
     const { backend, probe } = gatedBackend(release.promise);
     const { handle, lines } = await boot({ api, backend });

@@ -19,7 +19,7 @@ export const machineQueuedThreadSchema = z.object({
   threadId: recordId,
   title: z.string(),
   projectId: recordId,
-  reason: z.enum(['capacity', 'quota', 'waiting']),
+  reason: z.enum(['quota', 'waiting']),
   retryAt: epochMs.nullable(),
 });
 export type MachineQueuedThread = z.infer<typeof machineQueuedThreadSchema>;
@@ -54,11 +54,6 @@ export const machineRecordSchema = z.object({
   latestCliVersion: z.string().nullable(),
   kind: z.enum(['local', 'remote']),
   enabledRuntimes: z.array(z.string()),
-  maxConcurrent: z.number().int().optional(),
-  maxConcurrentOverridden: z.boolean().optional(),
-  recommendedConcurrent: z.number().int().optional(),
-  concurrencyRange: z.object({ min: z.number().int(), max: z.number().int() }).optional(),
-  concurrencySource: z.enum(['measured', 'estimate', 'manual']).optional(),
   runningSteps: z.number().int().optional(),
   running: z.array(machineRunningThreadSchema).optional(),
   queued: z.array(machineQueuedThreadSchema).optional(),
@@ -88,7 +83,6 @@ export const patchMachineBodySchema = z.object({
   browserOverride: z.boolean().nullable().optional(),
   desktopOverride: z.boolean().nullable().optional(),
   enabledRuntimes: z.array(z.enum(MACHINE_RUNTIMES)).optional(),
-  maxConcurrent: z.number().int().min(1).max(16).nullable().optional(),
   isDefault: z.literal(true).optional(),
   folderPins: z.array(machineFolderPinOpSchema).min(1).max(MACHINE_FOLDER_PINS_LIMIT).optional(),
 });

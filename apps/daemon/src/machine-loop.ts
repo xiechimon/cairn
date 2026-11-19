@@ -154,20 +154,6 @@ export const PRESENCE_TIMEOUT_MS = 20_000;
 export const GOODBYE_TIMEOUT_MS = 2_000;
 export const DISPATCHER_RESET_FAILURE_THRESHOLD = 3;
 
-export const DAEMON_MAX_CONCURRENT_ENV = 'CAIRN_DAEMON_MAX_CONCURRENT';
-
-export function resolveLocalCap(
-  env: NodeJS.ProcessEnv,
-  meMaxConcurrent: number | undefined,
-): number {
-  const raw = env[DAEMON_MAX_CONCURRENT_ENV];
-  if (raw !== undefined) {
-    const parsed = Number(raw);
-    if (Number.isInteger(parsed) && parsed >= 1) return parsed;
-  }
-  return typeof meMaxConcurrent === 'number' && meMaxConcurrent >= 1 ? meMaxConcurrent : 1;
-}
-
 export const PORT_BASE_ENV = 'CAIRN_PORT_BASE';
 
 export const PORT_BASE_FLOOR = 20_000;
@@ -670,31 +656,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
   logger.raw(`Online (machineId=${machineId}); polling ${config.serverUrl}`);
 
-  let localCap = 1;
-  let serverGates = false;
+  const orbCap = resolveOrbCap(capEnv);
   const idleStop = Number(capEnv.CAIRN_ORB_IDLE_STOP_MS);
   const orbs = new OrbLifecycle(orbProvider, {
-    max: resolveOrbCap(capEnv, localCap),
+    max: orbCap,
     onStopped: (handle) => relayOrbStopped(stepDeps(), handle),
     log: (message) => logger.workspace(message),
     ...(Number.isFinite(idleStop) && idleStop > 0 ? { idleStopMs: idleStop } : {}),
   });
-  const refreshCap = async (): Promise<void> => {
-    try {
-      const me = await client.me();
-      serverGates = typeof me.maxConcurrent === 'number' && me.maxConcurrent >= 1;
-      localCap = resolveLocalCap(capEnv, me.maxConcurrent);
-      if (orbProvider.kind === 'orb') {
-        localCap = resolveOrbCap(capEnv, localCap);
-        orbs.setMax(localCap);
-      }
-    } catch (err) {
-      logger.machine(
-        `me failed (keeping cap ${localCap}): ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  };
-  await refreshCap();
 
   let caffeinate: ChildProcess | undefined;
   if (opts.idleSleepPrevention !== false && process.platform === 'darwin') {
@@ -728,7 +697,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const stepSteeringSupport = new Map<string, boolean>();
   const stepTranscripts = new Map<string, TranscriptBuffer>();
   const stops = new StepStops();
-  const inFlightChief = new Set<string>();
   const workerSlots = new Map<string, number>();
   const assignWorkerSlot = (stepId: string): number => {
     const used = new Set(workerSlots.values());
@@ -1062,7 +1030,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   })();
 
   const presenceTimer = setInterval(() => {
-    void refreshCap();
     const currentAg = antigravityManaged.current();
     if (currentAg === null || !currentAg.authenticated) {
       void antigravityManaged.probe().catch(() => {});
@@ -1187,11 +1154,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         });
         continue;
       }
-      const workersInFlight = inFlight.size - inFlightChief.size;
-      if (
-        (orbProvider.kind === 'orb' && inFlight.size >= localCap) ||
-        (!serverGates && workersInFlight > 0 && workersInFlight >= localCap)
-      ) {
+      if (orbProvider.kind === 'orb' && inFlight.size >= orbCap) {
         await Promise.race(inFlight.values());
         continue;
       }
@@ -1199,7 +1162,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       try {
         step = await client.claim(
           AbortSignal.any([claimCtrl.signal, AbortSignal.timeout(claimTimeoutMs)]),
-          { maxWorkers: localCap, confinement: availability.report },
+          {
+            ...(orbProvider.kind === 'orb' ? { maxWorkers: orbCap } : {}),
+            confinement: availability.report,
+          },
         );
         backoff = backoffBase;
       } catch (err) {
@@ -1218,7 +1184,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         logger.step(`claim for step ${stepId} already running here — keeping the run in flight`);
         continue;
       }
-      if (step.step.kind === 'chief') inFlightChief.add(stepId);
       const stepEnv = step.step.kind === 'chief' ? undefined : workerEnv(stepId);
       const launched = runOrbStep(orbs, stepDeps(), step, {
         running: inFlight.size + 1,
@@ -1233,7 +1198,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         })
         .finally(() => {
           inFlight.delete(stepId);
-          inFlightChief.delete(stepId);
           workerSlots.delete(stepId);
         });
       inFlight.set(stepId, launched);

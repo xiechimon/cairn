@@ -490,7 +490,6 @@ function demoFixtureOf(): FixtureSet {
       online: true,
       enabledRuntimes: ['pi', 'claude-code'],
       chiefHost: true,
-      maxConcurrent: 4,
       runningSteps: 1,
     },
     {
@@ -499,7 +498,6 @@ function demoFixtureOf(): FixtureSet {
       name: 'build-box',
       online: true,
       enabledRuntimes: ['pi'],
-      maxConcurrent: 2,
       runningSteps: 1,
     },
   ];

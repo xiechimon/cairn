@@ -44,7 +44,7 @@ import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import { NotFoundError } from './builds.js';
 import { ackChiefSteer, chiefSteerSentBatch, takeChiefSteer } from './chief-turns.js';
-import { availableRuntimes, recommendMachineConcurrency } from './dispatch-eligibility.js';
+import { availableRuntimes } from './dispatch-eligibility.js';
 import type { ConversationStreamHub } from './events.js';
 import { applyComputerPresence } from './machine-computer-presence.js';
 import {
@@ -227,7 +227,6 @@ export function findApiKeyByPlain(db: Db, plain: string) {
 export { machineRunningCount } from './dispatch-eligibility.js';
 
 export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?: number) {
-  const recommendation = recommendMachineConcurrency(row.capabilities?.hardware);
   const login = claudeLoginSchema.safeParse(row.claudeCodeReport?.login);
   const reportedHostname =
     row.claudeCodeReport?.hostname ?? (row.kind === 'local' ? hostname() : undefined);
@@ -241,11 +240,6 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     latestCliVersion: row.latestCliVersion,
     kind: row.kind,
     enabledRuntimes: availableRuntimes(row),
-    maxConcurrent: row.maxConcurrent,
-    maxConcurrentOverridden: row.maxConcurrentOverridden,
-    recommendedConcurrent: recommendation.value,
-    concurrencyRange: recommendation.range,
-    concurrencySource: row.maxConcurrentOverridden ? 'manual' : recommendation.source,
     ...(runningSteps !== undefined ? { runningSteps } : {}),
     capabilities: row.capabilities,
     browserOverride: row.browserOverride,
@@ -295,58 +289,6 @@ function mergeReportedCapabilities(
     return { ...reported, hardware: previous.hardware };
   }
   return reported;
-}
-
-function reportedConcurrencyPatch(
-  row: {
-    maxConcurrentOverridden: boolean;
-    capabilities: MachineCapabilities | null;
-  },
-  reported: MachineCapabilities,
-): {
-  capabilities: MachineCapabilities;
-  maxConcurrent?: number;
-} {
-  const capabilities = mergeReportedCapabilities(row.capabilities, reported);
-  const recommendation = recommendMachineConcurrency(capabilities.hardware);
-  return {
-    capabilities,
-    ...(!row.maxConcurrentOverridden ? { maxConcurrent: recommendation.value } : {}),
-  };
-}
-
-export function backfillMachineConcurrency(db: Db): number {
-  const rows = db
-    .select({
-      id: machine.id,
-      maxConcurrent: machine.maxConcurrent,
-      capabilities: machine.capabilities,
-    })
-    .from(machine)
-    .where(eq(machine.maxConcurrentOverridden, false))
-    .all();
-  let changed = 0;
-  for (const row of rows) {
-    const { value } = recommendMachineConcurrency(row.capabilities?.hardware);
-    if (row.maxConcurrent === value) continue;
-    db.update(machine).set({ maxConcurrent: value }).where(eq(machine.id, row.id)).run();
-    changed += 1;
-  }
-  return changed;
-}
-
-export function machineConcurrencyPatch(
-  row: typeof machine.$inferSelect,
-  maxConcurrent: number | null,
-): {
-  maxConcurrent: number;
-  maxConcurrentOverridden: boolean;
-} {
-  if (maxConcurrent === null) {
-    const recommendation = recommendMachineConcurrency(row.capabilities?.hardware);
-    return { maxConcurrent: recommendation.value, maxConcurrentOverridden: false };
-  }
-  return { maxConcurrent, maxConcurrentOverridden: true };
 }
 
 function localMachineRow(db: Db, teamId: string, name: string) {
@@ -427,13 +369,15 @@ export function enrollMachine(
         ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
         ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
         ...(capabilities !== undefined || byKey.capabilities?.confinement
-          ? reportedConcurrencyPatch(
-              byKey,
-              capabilities ?? {
-                ...(byKey.capabilities ?? { mcpServers: [], skills: [] }),
-                confinement: undefined,
-              },
-            )
+          ? {
+              capabilities: mergeReportedCapabilities(
+                byKey.capabilities,
+                capabilities ?? {
+                  ...(byKey.capabilities ?? { mcpServers: [], skills: [] }),
+                  confinement: undefined,
+                },
+              ),
+            }
           : {}),
       })
       .where(eq(machine.id, byKey.id))
@@ -472,10 +416,7 @@ export function enrollMachine(
       kind: isLocalName ? 'local' : 'remote',
       ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
       ...(capabilities !== undefined
-        ? reportedConcurrencyPatch(
-            { maxConcurrentOverridden: false, capabilities: null },
-            capabilities,
-          )
+        ? { capabilities: mergeReportedCapabilities(null, capabilities) }
         : {}),
     })
     .run();
@@ -557,23 +498,24 @@ export function markPresence(
     (row.capabilities?.confinement ? { ...row.capabilities, confinement: undefined } : undefined);
   const folderGrants =
     body.folders !== undefined ? applyFolderReport(row.folderGrants, body.folders) : undefined;
-  const concurrency =
-    capabilities !== undefined ? reportedConcurrencyPatch(row, capabilities) : undefined;
+  const merged =
+    capabilities !== undefined
+      ? mergeReportedCapabilities(row.capabilities, capabilities)
+      : undefined;
   db.update(machine)
     .set({
       ...(admitOnline ? { online: true } : {}),
       lastSeenAt: nowMs(),
       ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
-      ...(concurrency !== undefined ? concurrency : {}),
+      ...(merged !== undefined ? { capabilities: merged } : {}),
       ...(folderGrants !== undefined ? { folderGrants } : {}),
     })
     .where(eq(machine.id, machineId))
     .run();
   const strainChanged =
-    concurrency !== undefined &&
-    machineStrain(row.capabilities?.hardware).join() !==
-      machineStrain(concurrency.capabilities.hardware).join();
+    merged !== undefined &&
+    machineStrain(row.capabilities?.hardware).join() !== machineStrain(merged.hardware).join();
   const computerChanged = applyComputerPresence(db, machineId, row.teamId, body.computers, nowMs());
   if (becameOnline || loginChanged || computerChanged || strainChanged) {
     const online = admitOnline || row.online;

@@ -63,7 +63,6 @@ import { readDeployLease } from './deploy-lease.js';
 import { enabledDevinSubscriptionId, hasActiveDevinSubscription } from './devin-subscriptions.js';
 import {
   capabilityGatePasses,
-  machineQueueReason,
   machineRunningCount,
   projectRunningCount,
   runtimeGatePasses,
@@ -412,8 +411,12 @@ function claudeBlockedReader(db: MachineDeps['db']): (id: string | null) => bool
   };
 }
 
-function workerCapOf(machineRow: typeof machine.$inferSelect, maxWorkers?: number): number {
-  return Math.min(machineRow.maxConcurrent, ...(maxWorkers !== undefined ? [maxWorkers] : []));
+function runnerFull(
+  db: MachineDeps['db'],
+  machineId: string,
+  maxWorkers: number | undefined,
+): boolean {
+  return maxWorkers !== undefined && machineRunningCount(db, machineId) >= maxWorkers;
 }
 
 function claimChiefTurn(
@@ -426,7 +429,7 @@ function claimChiefTurn(
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
-  if (machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers)) return null;
+  if (runnerFull(db, machineId, maxWorkers)) return null;
   const claudeBlocked = claudeBlockedReader(db);
   const cands = claimChiefCandidates(deps, machineId, teamId).filter(
     (cand) => cand.stepRow.createdAt <= createdUpTo,
@@ -482,13 +485,9 @@ async function tryClaim(
   if (!machineRow) return null;
   refreshClaudeRateParks(deps, teamId);
   const catalog = mergedCatalogModels(teamId);
-  const full =
-    machineQueueReason(
-      machineRow,
-      machineRunningCount(db, machineId),
-      workerCapOf(machineRow, maxWorkers),
-    ) !== null;
-  const queued = full ? [] : claimCandidates(deps, machineId, teamId);
+  const queued = runnerFull(db, machineId, maxWorkers)
+    ? []
+    : claimCandidates(deps, machineId, teamId);
   const earliestWorker = queued[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
   const workerCands = [
     ...queued.filter((cand) => cand.stepRow.byPerson),

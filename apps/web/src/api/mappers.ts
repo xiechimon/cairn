@@ -222,13 +222,8 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
   }
   return queue.waitingFor != null
     ? {
-        label: '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）',
-        vars: {
-          machine: queue.waitingFor.name,
-          running: queue.waitingFor.running,
-          cap: queue.waitingFor.capacity,
-          ahead,
-        },
+        label: '排队中：等 {machine}（前面 {ahead} 个）',
+        vars: { machine: queue.waitingFor.name, ahead },
       }
     : { label: '排队中：等空闲执行机（前面 {ahead} 个）', vars: { ahead } };
 }
@@ -1451,17 +1446,8 @@ export function mapMachines(
     online: m.online,
     ...(m.lastSeenAt !== undefined ? { lastSeenAt: m.lastSeenAt } : {}),
     enabledRuntimes: m.enabledRuntimes,
-    ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),
     ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
-    ...(m.maxConcurrentOverridden !== undefined
-      ? { maxConcurrentOverridden: m.maxConcurrentOverridden }
-      : {}),
-    ...(m.recommendedConcurrent !== undefined
-      ? { recommendedConcurrent: m.recommendedConcurrent }
-      : {}),
-    ...(m.concurrencySource !== undefined ? { concurrencySource: m.concurrencySource } : {}),
-    ...(m.concurrencyRange !== undefined ? { concurrencyRange: m.concurrencyRange } : {}),
     ...(m.claudeLogin !== undefined ? { claudeLogin: m.claudeLogin } : {}),
     ...(m.providers !== undefined ? { providers: m.providers } : {}),
     ...(m.browserOverride !== undefined ? { browserOverride: m.browserOverride } : {}),

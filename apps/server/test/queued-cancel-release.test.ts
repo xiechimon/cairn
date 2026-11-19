@@ -27,7 +27,7 @@ function machineDepsOf(s: TestServer) {
   return { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir };
 }
 
-function insertMachine(s: TestServer, id: string, opts: { cap?: number; online?: boolean } = {}) {
+function insertMachine(s: TestServer, id: string, opts: { online?: boolean } = {}) {
   s.db
     .insert(machineTable)
     .values(
@@ -36,7 +36,6 @@ function insertMachine(s: TestServer, id: string, opts: { cap?: number; online?:
         teamId: s.team.id,
         name: id,
         online: opts.online ?? true,
-        maxConcurrent: opts.cap ?? 8,
       }),
     )
     .run();
@@ -305,7 +304,7 @@ describe('#1219 the grace period for a pinned online machine not claiming', () =
     const stepId = `step-w-${Math.random().toString(36).slice(2)}`;
     const machineId = `machine-w-${Math.random().toString(36).slice(2)}`;
     s.db.insert(projectTable).values({ id: 'proj-w', name: 'wedge', teamId }).run();
-    insertMachine(s, machineId, { cap: opts.machineCap });
+    insertMachine(s, machineId);
     seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
     s.db
       .insert(todoTable)

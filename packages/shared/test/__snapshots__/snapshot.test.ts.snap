@@ -5521,28 +5521,16 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "capacity": {
-                          "maximum": 9007199254740991,
-                          "minimum": -9007199254740991,
-                          "type": "integer",
-                        },
                         "machineId": {
                           "type": "string",
                         },
                         "name": {
                           "type": "string",
                         },
-                        "running": {
-                          "maximum": 9007199254740991,
-                          "minimum": -9007199254740991,
-                          "type": "integer",
-                        },
                       },
                       "required": [
                         "machineId",
                         "name",
-                        "running",
-                        "capacity",
                       ],
                       "type": "object",
                     },
@@ -7152,28 +7140,16 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
             {
               "additionalProperties": false,
               "properties": {
-                "capacity": {
-                  "maximum": 9007199254740991,
-                  "minimum": -9007199254740991,
-                  "type": "integer",
-                },
                 "machineId": {
                   "type": "string",
                 },
                 "name": {
                   "type": "string",
                 },
-                "running": {
-                  "maximum": 9007199254740991,
-                  "minimum": -9007199254740991,
-                  "type": "integer",
-                },
               },
               "required": [
                 "machineId",
                 "name",
-                "running",
-                "capacity",
               ],
               "type": "object",
             },
@@ -8197,7 +8173,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                   "enum": [
                     "machine",
                     "quota",
-                    "capacity",
                   ],
                   "type": "string",
                 },
@@ -9143,28 +9118,16 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                             {
                               "additionalProperties": false,
                               "properties": {
-                                "capacity": {
-                                  "maximum": 9007199254740991,
-                                  "minimum": -9007199254740991,
-                                  "type": "integer",
-                                },
                                 "machineId": {
                                   "type": "string",
                                 },
                                 "name": {
                                   "type": "string",
                                 },
-                                "running": {
-                                  "maximum": 9007199254740991,
-                                  "minimum": -9007199254740991,
-                                  "type": "integer",
-                                },
                               },
                               "required": [
                                 "machineId",
                                 "name",
-                                "running",
-                                "capacity",
                               ],
                               "type": "object",
                             },
@@ -11426,28 +11389,16 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                 {
                   "additionalProperties": false,
                   "properties": {
-                    "capacity": {
-                      "maximum": 9007199254740991,
-                      "minimum": -9007199254740991,
-                      "type": "integer",
-                    },
                     "machineId": {
                       "type": "string",
                     },
                     "name": {
                       "type": "string",
                     },
-                    "running": {
-                      "maximum": 9007199254740991,
-                      "minimum": -9007199254740991,
-                      "type": "integer",
-                    },
                   },
                   "required": [
                     "machineId",
                     "name",
-                    "running",
-                    "capacity",
                   ],
                   "type": "object",
                 },
@@ -12066,34 +12017,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       ],
       "type": "object",
     },
-    "concurrencyRange": {
-      "additionalProperties": false,
-      "properties": {
-        "max": {
-          "maximum": 9007199254740991,
-          "minimum": -9007199254740991,
-          "type": "integer",
-        },
-        "min": {
-          "maximum": 9007199254740991,
-          "minimum": -9007199254740991,
-          "type": "integer",
-        },
-      },
-      "required": [
-        "min",
-        "max",
-      ],
-      "type": "object",
-    },
-    "concurrencySource": {
-      "enum": [
-        "measured",
-        "estimate",
-        "manual",
-      ],
-      "type": "string",
-    },
     "desktopOverride": {
       "type": [
         "boolean",
@@ -12194,14 +12117,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         "null",
       ],
     },
-    "maxConcurrent": {
-      "maximum": 9007199254740991,
-      "minimum": -9007199254740991,
-      "type": "integer",
-    },
-    "maxConcurrentOverridden": {
-      "type": "boolean",
-    },
     "name": {
       "type": "string",
     },
@@ -12217,7 +12132,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
           },
           "reason": {
             "enum": [
-              "capacity",
               "quota",
               "waiting",
             ],
@@ -12252,11 +12166,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         "type": "object",
       },
       "type": "array",
-    },
-    "recommendedConcurrent": {
-      "maximum": 9007199254740991,
-      "minimum": -9007199254740991,
-      "type": "integer",
     },
     "running": {
       "items": {
@@ -14252,7 +14161,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
           "enum": [
             "machine",
             "quota",
-            "capacity",
           ],
           "type": "string",
         },

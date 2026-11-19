@@ -163,9 +163,8 @@ test('lifecycle caps, serializes Threads, evicts idle machines and protects pend
   expect(commands.some((argv) => argv[1] === 'poweroff')).toBe(true);
   await lifecycle.sweep({ activeConversationIds: ['A'], now: Date.now() + 73 * 60 * 60_000 });
   expect((await provider.list()).map((handle) => handle.conversationId)).toEqual(['A']);
-  expect(resolveOrbCap({ CAIRN_ORB_MAX: '4' }, 1)).toBe(1);
-  expect(resolveOrbCap({}, 4)).toBe(orbConcurrencyFromCpuCount(cpus().length));
-  expect(resolveOrbCap({}, 1)).toBe(1);
+  expect(resolveOrbCap({ CAIRN_ORB_MAX: '4' })).toBe(4);
+  expect(resolveOrbCap({})).toBe(orbConcurrencyFromCpuCount(cpus().length));
   expect(orbConcurrencyFromCpuCount(16)).toBe(4);
   expect(orbConcurrencyFromCpuCount(4)).toBe(1);
   expect(orbConcurrencyFromCpuCount(2)).toBe(1);

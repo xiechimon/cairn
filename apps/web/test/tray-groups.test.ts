@@ -70,7 +70,6 @@ const machine = (extra: Partial<TrayMachine>): TrayMachine => ({
   id: 'm1',
   name: 'xmon 的 MacBook Pro',
   online: true,
-  maxConcurrent: 3,
   running: [],
   queued: [],
   strain: [],
@@ -94,7 +93,7 @@ test('a computer groups its tasks: stalled first, then running oldest first, the
       machine({
         running: [thread('fresh', now - 2 * MIN), thread('old', now - 30 * MIN, now - MIN), thread('hung', now - 20 * MIN, now - 16 * MIN)],
         queued: [
-          { threadId: 'full', title: 'full', projectId: 'p', reason: 'capacity', retryAt: null },
+          { threadId: 'full', title: 'full', projectId: 'p', reason: 'waiting', retryAt: null },
         ],
       }),
       machine({ id: 'idle', name: 'idle', running: [] }),

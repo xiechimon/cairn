@@ -177,8 +177,6 @@ export const chiefThreadSchema = z.object({
         .object({
           machineId: recordId,
           name: z.string(),
-          running: z.number().int(),
-          capacity: z.number().int(),
         })
         .nullable(),
       blocked: stepQueueBlockedSchema.optional(),

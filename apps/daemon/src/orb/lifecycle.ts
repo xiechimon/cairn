@@ -17,13 +17,11 @@ export function orbConcurrencyFromCpuCount(cpuCount: number): number {
   );
 }
 
-export function resolveOrbCap(env: NodeJS.ProcessEnv, localCap: number): number {
+export function resolveOrbCap(env: NodeJS.ProcessEnv): number {
   const override = Number(env.CAIRN_ORB_MAX);
-  const max =
-    Number.isInteger(override) && override > 0
-      ? override
-      : orbConcurrencyFromCpuCount(cpus().length);
-  return Math.min(localCap, max);
+  return Number.isInteger(override) && override > 0
+    ? override
+    : orbConcurrencyFromCpuCount(cpus().length);
 }
 
 export class OrbLifecycle {
@@ -45,11 +43,6 @@ export class OrbLifecycle {
   ) {
     this.max = options.max;
     this.idleStopMs = options.idleStopMs ?? ORB_IDLE_STOP_MS;
-  }
-
-  setMax(max: number): void {
-    this.max = max;
-    this.wake();
   }
 
   async run<T>(

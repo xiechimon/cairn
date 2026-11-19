@@ -105,8 +105,16 @@ async function setupWorld(
   return { s, machineAId, machineBId, projectId, chiefId, threadId, stepId };
 }
 
-function claimOn(w: World, machineId: string) {
-  return claimStep(machineDepsOf(w.s), machineId, w.s.team.id, 10, 'http://localhost');
+function claimOn(w: World, machineId: string, maxWorkers?: number) {
+  return claimStep(
+    machineDepsOf(w.s),
+    machineId,
+    w.s.team.id,
+    10,
+    'http://localhost',
+    undefined,
+    maxWorkers !== undefined ? { maxWorkers } : undefined,
+  );
 }
 
 function stepRowOf(w: World, id = w.stepId) {
@@ -284,29 +292,19 @@ describe('#1260 route re-source: chief step destination = the coordinator rule h
   });
 });
 
-describe('#1260 slot occupancy: chief steps are ordinary consumers of the machine slots', () => {
-  test('failure mode 3a: worker at capacity (cap 1) -> chief step comes up empty, step stays pending', async () => {
+describe('#1260 slot occupancy: chief steps are ordinary consumers of the Runner maxWorkers slots', () => {
+  test('failure mode 3a: a worker fills maxWorkers 1 -> chief step comes up empty, step stays pending', async () => {
     const w = await setupWorld();
-    w.s.db
-      .update(machineTable)
-      .set({ maxConcurrent: 1 })
-      .where(eq(machineTable.id, w.machineAId))
-      .run();
     insertClaimedOn(w, 'build');
-    expect(await claimOn(w, w.machineAId)).toBeNull();
+    expect(await claimOn(w, w.machineAId, 1)).toBeNull();
     expect(stepRowOf(w).status).toBe('pending');
   });
 
-  test('failure mode 3b: running chief steps fill it (cap 1) -> worker step comes up empty', async () => {
+  test('failure mode 3b: a running chief fills maxWorkers 1 -> worker step comes up empty', async () => {
     const w = await setupWorld();
-    w.s.db
-      .update(machineTable)
-      .set({ maxConcurrent: 1 })
-      .where(eq(machineTable.id, w.machineAId))
-      .run();
     insertClaimedOn(w, 'chief');
     const waiting = insertPendingWorkerStep(w);
-    expect(await claimOn(w, w.machineAId)).toBeNull();
+    expect(await claimOn(w, w.machineAId, 1)).toBeNull();
     expect(stepRowOf(w, waiting).status).toBe('pending');
     expect(stepRowOf(w).status).toBe('pending');
   });

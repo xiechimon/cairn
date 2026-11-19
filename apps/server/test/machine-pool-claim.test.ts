@@ -43,7 +43,6 @@ async function machineOf(
     online?: boolean;
     executor?: 'orb' | 'host';
     runtimes?: string[];
-    maxConcurrent?: number;
     osPlatform?: 'linux' | 'darwin' | 'windows';
   } = {},
 ): Promise<string> {
@@ -85,7 +84,6 @@ async function machineOf(
           }
         : {}),
       online: opts.online ?? true,
-      maxConcurrent: opts.maxConcurrent ?? 3,
     })
     .where(eq(machineTable.id, machineId))
     .run();
@@ -281,7 +279,7 @@ describe('a worker step runs only on its named machine', () => {
 
   test('preferred machine only busy: another machine never takes the step', async () => {
     const w = await world();
-    const omarchy = await machineOf(w, 'omarchy', { maxConcurrent: 1 });
+    const omarchy = await machineOf(w, 'omarchy');
     const mac = await machineOf(w, 'mac');
     routeOf(w, omarchy);
     occupy(w, omarchy, 1);
@@ -372,7 +370,7 @@ describe('a worker step runs only on its named machine', () => {
 
   test('the queue names the preferred machine and the moment the step may fall back', async () => {
     const w = await world();
-    const omarchy = await machineOf(w, 'omarchy', { maxConcurrent: 1 });
+    const omarchy = await machineOf(w, 'omarchy');
     routeOf(w, omarchy);
     occupy(w, omarchy, 1);
     const stepId = pendingStep(w);
@@ -427,7 +425,7 @@ describe('a worker step runs only on its named machine', () => {
   test('the queue keeps waiting for the named machine when it is offline', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
-    const mac = await machineOf(w, 'mac', { maxConcurrent: 1 });
+    const mac = await machineOf(w, 'mac');
     routeOf(w, omarchy);
     occupy(w, mac, 1);
     const stepId = pendingStep(w);

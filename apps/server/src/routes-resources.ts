@@ -120,11 +120,7 @@ import { isOwner } from './services/instance-owner.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import { applyFolderPinOps } from './services/machine-folders.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
-import {
-  machineConcurrencyPatch,
-  machineRunningCount,
-  toMachineRecord,
-} from './services/machines.js';
+import { machineRunningCount, toMachineRecord } from './services/machines.js';
 import {
   bindGithubConnector,
   cancelGithubConnectorDevice,
@@ -345,7 +341,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.browserOverride !== undefined ? { browserOverride: body.browserOverride } : {}),
       ...(body.desktopOverride !== undefined ? { desktopOverride: body.desktopOverride } : {}),
-      ...(body.maxConcurrent !== undefined ? machineConcurrencyPatch(row, body.maxConcurrent) : {}),
       ...(folderGrantsPatch !== undefined ? folderGrantsPatch : {}),
     };
     if (Object.keys(patch).length > 0) {

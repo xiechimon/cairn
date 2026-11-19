@@ -41,7 +41,6 @@ async function machineOf(
     online?: boolean;
     executor?: 'orb' | 'host';
     runtimes?: string[];
-    maxConcurrent?: number;
   } = {},
 ): Promise<string> {
   const apiKey = await issueApiKey(w.s);
@@ -61,7 +60,6 @@ async function machineOf(
     .update(machineTable)
     .set({
       online: opts.online ?? true,
-      maxConcurrent: opts.maxConcurrent ?? 3,
     })
     .where(eq(machineTable.id, machineId))
     .run();

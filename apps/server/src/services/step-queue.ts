@@ -23,7 +23,6 @@ import { type CoordinatorRouteRefusal, coordinatorRouteVerdict } from './coordin
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import {
   type MachineIneligibility,
-  machineQueueReason,
   missingCapabilities,
   runtimeGatePasses,
   stepRuntimeFor,
@@ -152,18 +151,6 @@ export function stepQueueProjector(db: Db, teamId: string) {
     (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1),
   );
 
-  const claimedCountCache = new Map<string, number>();
-  const claimedCount = (machineId: string): number => {
-    const hit = claimedCountCache.get(machineId);
-    if (hit !== undefined) return hit;
-    const n = db
-      .select({ id: step.id })
-      .from(step)
-      .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed')))
-      .all().length;
-    claimedCountCache.set(machineId, n);
-    return n;
-  };
   const machineCache = new Map<string, typeof machine.$inferSelect | undefined>();
   const machineRowOf = (machineId: string) => {
     if (!machineCache.has(machineId)) {
@@ -337,8 +324,6 @@ export function stepQueueProjector(db: Db, teamId: string) {
         waitingFor = {
           machineId: row.id,
           name: row.name,
-          running: claimedCount(row.id),
-          capacity: row.maxConcurrent,
         };
       }
     }
@@ -433,10 +418,7 @@ export function queuedThreadsByMachine(db: Db, teamId: string): Map<string, Mach
       threadId: todoRow.id,
       title: todoRow.title,
       projectId: todoRow.projectId,
-      reason:
-        queue?.hold !== undefined
-          ? 'quota'
-          : (machineQueueReason(machineRow, waitingFor.running, waitingFor.capacity) ?? 'waiting'),
+      reason: queue?.hold !== undefined ? 'quota' : 'waiting',
       retryAt: queue?.hold?.retryAt ?? null,
     });
     grouped.set(machineRow.id, threads);

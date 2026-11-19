@@ -1111,24 +1111,8 @@ export function useApiMutations(teamId: string | undefined) {
         qc.setQueryData<MachineRecord[]>(['machines', teamId], (rows) =>
           (rows ?? []).map((m) => {
             if (m.id !== input.id) return m;
-            const { maxConcurrent, folderPins: _folderPins, ...rest } = input.body;
-            if (maxConcurrent === null) {
-              return {
-                ...m,
-                ...rest,
-                maxConcurrentOverridden: false,
-                maxConcurrent: m.recommendedConcurrent ?? m.maxConcurrent,
-                concurrencySource:
-                  m.capabilities?.hardware?.memoryTotalMb !== undefined ? 'measured' : 'estimate',
-              };
-            }
-            return {
-              ...m,
-              ...rest,
-              ...(maxConcurrent !== undefined
-                ? { maxConcurrent, maxConcurrentOverridden: true, concurrencySource: 'manual' }
-                : {}),
-            };
+            const { folderPins: _folderPins, ...rest } = input.body;
+            return { ...m, ...rest };
           }),
         );
         return { previous };

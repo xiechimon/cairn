@@ -37,7 +37,7 @@ function thread(stepId: string): ChiefThread {
     turnQueue: {
       stepId,
       position: 1,
-      waitingFor: { machineId: 'mac-1', name: 'mac', running: 0, capacity: 8 },
+      waitingFor: { machineId: 'mac-1', name: 'mac' },
     },
   };
 }

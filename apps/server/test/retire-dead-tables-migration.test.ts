@@ -99,8 +99,8 @@ test('upgrade drops dead tables and columns and keeps live rows', () => {
     expect(sqlite.prepare('SELECT id, plan, actionTier FROM team').all()).toEqual([
       { id: 'team', plan: 'free', actionTier: 'full' },
     ]);
-    expect(sqlite.prepare('SELECT id, online, maxConcurrent FROM machine').all()).toEqual([
-      { id: 'machine', online: 1, maxConcurrent: 4 },
+    expect(sqlite.prepare('SELECT id, online FROM machine').all()).toEqual([
+      { id: 'machine', online: 1 },
     ]);
     expect(
       sqlite.prepare('SELECT id, `use`, requiredCapabilities FROM routing_rule').all(),

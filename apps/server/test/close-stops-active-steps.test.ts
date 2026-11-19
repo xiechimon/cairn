@@ -75,7 +75,6 @@ function makeWorld(opts: {
         teamId,
         name: machineId,
         online: opts.machineOnline ?? true,
-        maxConcurrent: 8,
       }),
     )
     .run();

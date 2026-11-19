@@ -49,7 +49,7 @@ export interface TrayGroup {
 
 export type TrayMachine = Pick<
   MachineRecord,
-  'id' | 'name' | 'online' | 'running' | 'queued' | 'strain' | 'capabilities' | 'maxConcurrent'
+  'id' | 'name' | 'online' | 'running' | 'queued' | 'strain' | 'capabilities'
 >;
 
 function channelPath(projectId: string | null): string {
@@ -99,7 +99,6 @@ function runningRow(thread: MachineRunningThread, now: number): TrayRow {
 }
 
 const QUEUED_TIP: Record<MachineQueuedThread['reason'], string> = {
-  capacity: '这台电脑同时在跑的已经到上限，空出位置就开始',
   quota: '额度用完了，到点自动开始',
   waiting: '等这台电脑空出来',
 };
@@ -147,13 +146,12 @@ function machineMeta(machine: TrayMachine): TrayGroup['meta'] {
     parts,
     warn: strain.length > 0,
     tip: {
-      key: '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB；最多同时 {slots} 个',
+      key: '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB',
       vars: {
         free: (hardware.memoryAvailableMb / 1024).toFixed(1),
         load: load.toFixed(1),
         cores: hardware.cpuCores,
         disk: Math.round(hardware.diskFreeMb / 1024),
-        slots: machine.maxConcurrent ?? '—',
       },
     },
   };

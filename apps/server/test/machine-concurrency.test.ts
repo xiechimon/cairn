@@ -135,14 +135,6 @@ function claimAs(w: World, machineId = w.machineAId) {
   return claimStep(machineDepsOf(w), machineId, w.s.team.id, 10, 'http://localhost');
 }
 
-function setCap(w: World, cap: number): void {
-  w.s.db
-    .update(machineTable)
-    .set({ maxConcurrent: cap })
-    .where(eq(machineTable.id, w.machineAId))
-    .run();
-}
-
 function insertClaimedStep(s: TestServer, machineId: string, opts: { createdAt: number }): string {
   const suffix = Math.random().toString(36).slice(2, 8);
   const id = `step-run-${suffix}`;
@@ -164,55 +156,33 @@ function insertClaimedStep(s: TestServer, machineId: string, opts: { createdAt: 
   return id;
 }
 
-describe('#1108 claim capacity gate (at capacity no claim / free slot claims / adjustments immediate)', () => {
-  test('failure mode 1: at capacity -> claim comes up empty, step stays pending (no failure funnel)', async () => {
+describe('a computer has no concurrency cap (docs/design/no-machine-concurrency-cap.md)', () => {
+  test('four ready tasks on one computer all start', async () => {
     const w = await setupWorld();
-    setCap(w, 2);
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
-    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 4000 });
-    const { stepId } = insertPendingBuildStep(w.s, w);
-    const claimed = await claimAs(w);
-    expect(claimed).toBeNull();
-    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!.status).toBe(
-      'pending',
-    );
+    const ids = [1, 2, 3, 4].map(() => insertPendingBuildStep(w.s, w).stepId);
+    const claimed: (string | undefined)[] = [];
+    for (const _ of ids) claimed.push((await claimAs(w))?.step.id);
+    expect(claimed.sort()).toEqual([...ids].sort());
   });
 
-  test('failure mode 2: free slot claims (running step wraps up -> capacity gate opens)', async () => {
+  test('a Runner that sends maxWorkers still limits its own claims', async () => {
     const w = await setupWorld();
-    setCap(w, 1);
-    const running = insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
+    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const { stepId } = insertPendingBuildStep(w.s, w);
-    expect(await claimAs(w)).toBeNull();
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, running)).run();
-    const claimed = await claimAs(w);
-    expect(claimed?.step.id).toBe(stepId);
-  });
-
-  test('failure mode 3: lowering does not preempt -- in-flight steps as usual, new steps not claimed; raising immediate', async () => {
-    const w = await setupWorld();
-    setCap(w, 3);
-    const running = [
-      insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 }),
-      insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 4000 }),
-    ];
+    const claimTwo = () =>
+      claimStep(machineDepsOf(w), w.machineAId, w.s.team.id, 10, 'http://localhost', undefined, {
+        maxWorkers: 2,
+      });
+    expect((await claimTwo())?.step.id).toBe(stepId);
     insertPendingBuildStep(w.s, w);
-    setCap(w, 2);
-    expect(await claimAs(w)).toBeNull();
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, running[0]!)).run();
-    expect((await claimAs(w))?.step.id).toBeTruthy();
-    setCap(w, 3);
-    const { stepId: step3 } = insertPendingBuildStep(w.s, w);
-    expect((await claimAs(w))?.step.id).toBe(step3);
+    expect(await claimTwo()).toBeNull();
   });
 });
 
 describe('#1108 queue projection (position + waiting target + read-surface mount)', () => {
   test('failure mode 4 (#1259 home-machine version): home-machine step position only counts the same home-machine set; waitingFor snapshot', async () => {
     const w = await setupWorld();
-    setCap(w, 2);
-    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 9000 });
-    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 8000 });
     const machineBId = `machine-b-${Math.random().toString(36).slice(2)}`;
     w.s.db
       .insert(machineTable)
@@ -222,7 +192,6 @@ describe('#1108 queue projection (position + waiting target + read-surface mount
           teamId: w.s.team.id,
           name: 'cap-mbp-b',
           online: true,
-          maxConcurrent: 3,
         }),
       )
       .run();
@@ -236,30 +205,23 @@ describe('#1108 queue projection (position + waiting target + read-surface mount
       homeMachineId: w.machineAId,
     });
     expect(targetInfo?.position).toBe(2);
-    expect(targetInfo?.waitingFor).toMatchObject({
-      machineId: w.machineAId,
-      running: 2,
-      capacity: 2,
-    });
+    expect(targetInfo?.waitingFor).toEqual({ machineId: w.machineAId, name: expect.any(String) });
     const bInfo = projector.project({
       id: lateB.stepId,
       createdAt: Date.now(),
       homeMachineId: machineBId,
     });
     expect(bInfo?.position).toBe(1);
-    expect(bInfo?.waitingFor).toMatchObject({ machineId: machineBId, running: 0, capacity: 3 });
+    expect(bInfo?.waitingFor).toEqual({ machineId: machineBId, name: 'cap-mbp-b' });
   });
 
   test('failure mode 4b: steps query mounts queue; step claimed -> projection exits', async () => {
     const w = await setupWorld();
-    setCap(w, 1);
-    const running = insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const { buildId, stepId } = insertPendingBuildStep(w.s, w);
     const rows = listSteps(machineDepsOf(w), buildId);
     const row = rows.find((r) => r.id === stepId);
     expect(row?.status).toBe('pending');
     expect(row?.queue).toMatchObject({ position: 1 });
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, running)).run();
     await claimAs(w);
     const after = listSteps(machineDepsOf(w), buildId).find((r) => r.id === stepId);
     expect(after?.status).toBe('claimed');
@@ -268,8 +230,6 @@ describe('#1108 queue projection (position + waiting target + read-surface mount
 
   test('failure mode 4c: chief threads mount turnQueue; after claimed they exit', async () => {
     const w = await setupWorld();
-    setCap(w, 1);
-    const running = insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const now = Date.now();
     const threadId = `chief-cap-${Math.random().toString(36).slice(2, 8)}`;
     w.s.db
@@ -325,9 +285,8 @@ describe('#1108 queue projection (position + waiting target + read-surface mount
     const thread = threads.find((t) => t.id === threadId);
     expect(thread?.turnQueue).toMatchObject({
       position: 1,
-      waitingFor: { machineId: w.machineAId, running: 1, capacity: 1 },
+      waitingFor: { machineId: w.machineAId },
     });
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, running)).run();
     const claimed = await claimAs(w);
     expect(claimed?.step.id).toBe(chiefStepId);
     const after = listChiefThreads(
@@ -339,32 +298,13 @@ describe('#1108 queue projection (position + waiting target + read-surface mount
 });
 
 describe('#1108 write surface and wire contract (PATCH validation / record projection / wake)', () => {
-  test('failure mode 5: PATCH maxConcurrent 0 / 17 -> 400; legal value persisted + runningSteps', async () => {
+  test('the machine list reports running steps', async () => {
     const w = await setupWorld();
-    for (const bad of [0, 17]) {
-      const res = await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
-        maxConcurrent: bad,
-      });
-      expect(res.status).toBe(400);
-    }
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
-    const res = await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
-      maxConcurrent: 5,
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { maxConcurrent: number; runningSteps: number };
-    expect(body.maxConcurrent).toBe(5);
-    expect(body.runningSteps).toBe(1);
-    const list = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/machines`);
-    const rows = (await list.json()) as {
-      id: string;
-      maxConcurrent: number;
-      runningSteps: number;
-    }[];
-    expect(rows.find((r) => r.id === w.machineAId)?.maxConcurrent).toBe(5);
+    expect((await machineListRow(w)).runningSteps).toBe(1);
   });
 
-  test('failure mode 6: legacy server shape (no maxConcurrent/runningSteps fields) -> wire parse passes', () => {
+  test('failure mode 6: legacy server shape (no runningSteps field) -> wire parse passes', () => {
     const parsed = machineRecordSchema.parse({
       id: 'm-old',
       name: 'old',
@@ -374,13 +314,11 @@ describe('#1108 write surface and wire contract (PATCH validation / record proje
       kind: 'remote',
       enabledRuntimes: [],
     });
-    expect(parsed.maxConcurrent).toBeUndefined();
     expect(parsed.runningSteps).toBeUndefined();
   });
 
   test('failure mode 2b: finishStep terminal sends a team wake (free slot handover immediately)', async () => {
     const w = await setupWorld();
-    setCap(w, 1);
     const { stepId } = insertPendingBuildStep(w.s, w);
     const claimed = await claimAs(w);
     expect(claimed?.step.id).toBe(stepId);
@@ -441,9 +379,8 @@ describe('machine strain never holds a task (mon X 2026-11-19)', () => {
     ['disk below 5 GB free', { diskFreeMb: 4_000 }, 'disk'],
   ];
   for (const [label, patch, reason] of strained) {
-    test(`${label}: a busy computer under its cap still starts the next task`, async () => {
+    test(`${label}: a busy computer still starts the next task`, async () => {
       const w = await setupWorld();
-      setCap(w, 4);
       setHardware(w, { ...CALM, ...patch });
       insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
       const { stepId, todoId } = pendingTask(w);
@@ -453,24 +390,8 @@ describe('machine strain never holds a task (mon X 2026-11-19)', () => {
     });
   }
 
-  test('a full computer says capacity', async () => {
+  test('a calm busy computer reports no queue reason', async () => {
     const w = await setupWorld();
-    setCap(w, 1);
-    setHardware(w, { ...CALM, memoryAvailableMb: 200 });
-    insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
-    const { todoId } = pendingTask(w);
-    expect(toTodoRecord(w.s.svc, todoRowOf(w, todoId)).waitingOn).toEqual({
-      on: 'capacity',
-      retryAt: null,
-    });
-    expect((await machineListRow(w)).queued).toEqual([
-      expect.objectContaining({ threadId: todoId, reason: 'capacity' }),
-    ]);
-  });
-
-  test('a calm computer with a free slot reports no queue reason', async () => {
-    const w = await setupWorld();
-    setCap(w, 3);
     setHardware(w, CALM);
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const { todoId } = pendingTask(w);
@@ -485,7 +406,6 @@ describe('machine strain never holds a task (mon X 2026-11-19)', () => {
 
 describe('step last progress (docs/design/runner-strain-and-progress.md)', () => {
   async function running(w: World) {
-    setCap(w, 3);
     const { stepId, todoId } = pendingTask(w);
     expect((await claimAs(w))?.step.id).toBe(stepId);
     const read = () => w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;

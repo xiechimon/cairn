@@ -1076,10 +1076,7 @@ export const EN: Record<string, string> = {
   '处理中...': 'Working on it...',
   '正在连接 {machine}...': 'Connecting to {machine}...',
   '执行中...': 'Running...',
-  // #1108 queue rows (pending steps waiting for a machine) + machines page
-  // concurrency face.
-  '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）':
-    'Queued: waiting for {machine} ({running}/{cap} running, {ahead} ahead)',
+  '排队中：等 {machine}（前面 {ahead} 个）': 'Queued: waiting for {machine} ({ahead} ahead)',
   '排队中：等空闲执行机（前面 {ahead} 个）': 'Queued: waiting for a free Runner ({ahead} ahead)',
   // #1251 visible pending reasons (queue blocked face): missing capability =
   // the fix, offline = waiting.
@@ -1752,8 +1749,6 @@ export const EN: Record<string, string> = {
   '{n} 分没进展': 'No progress for {n}m',
   '还在运行，但 {n} 分钟没有新输出或工具结果':
     'Still running, but no new output or tool result for {n#1 minute|# minutes}',
-  '这台电脑同时在跑的已经到上限，空出位置就开始':
-    'This computer is running as many as it allows; this starts when a slot frees up',
   '额度用完了，到点自动开始': 'Quota is used up; this starts on its own when it resets',
   等这台电脑空出来: 'Waiting for this computer to free up',
   '等额度 · {at}': 'Quota · {at}',
@@ -1762,8 +1757,8 @@ export const EN: Record<string, string> = {
   负载满了: 'load full',
   '内存 {memory}%': 'memory {memory}%',
   磁盘快满了: 'disk almost full',
-  '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB；最多同时 {slots} 个':
-    '{free} GB memory free; 5-minute load {load} on {cores#1 core|# cores}; {disk} GB disk free; up to {slots} at once',
+  '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB':
+    '{free} GB memory free; 5-minute load {load} on {cores#1 core|# cores}; {disk} GB disk free',
   '还有 {n} 个，在 Cairn 里看': '{n} more, see them in Cairn',
   '今天用了 {tokens} tokens': 'Used today: {tokens}',
   '{n} tokens': '{n#1 token|# tokens}',

@@ -176,17 +176,6 @@ export function unassignedStepReason(kind: StepKind): string {
   return `${kind} step has nothing to run it: add a model provider, a Claude subscription and a Runner with Claude Code, or a Devin subscription and a Runner with Devin, in settings, then rerun the task.`;
 }
 
-export type MachineQueueReason = 'capacity';
-
-export function machineQueueReason(
-  machineRow: { maxConcurrent: number },
-  running: number,
-  cap: number = machineRow.maxConcurrent,
-): MachineQueueReason | null {
-  if (running >= cap) return 'capacity';
-  return null;
-}
-
 export function machineRunningCount(db: Db, machineId: string): number {
   return db
     .select({ id: step.id })
@@ -302,45 +291,4 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
   }
   if (!confinementDispatchReady(machineRow.capabilities)) return { kind: 'confinement' };
   return null;
-}
-
-export const CONCURRENCY_FLOOR = 1;
-export const CONCURRENCY_CEILING = 16;
-export const MEMORY_GB_PER_SLOT = 2;
-export const RANGE_MEMORY_GB_PER_SLOT = 1;
-export const CONSERVATIVE_CONCURRENCY = 3;
-export const FALLBACK_CONCURRENCY_MAX = 8;
-export interface ConcurrencyRange {
-  min: number;
-  max: number;
-}
-export interface ConcurrencyRecommendation {
-  value: number;
-  source: 'measured' | 'estimate';
-  range: ConcurrencyRange;
-}
-
-export function recommendMachineConcurrency(
-  hardware: MachineHardware | null | undefined,
-): ConcurrencyRecommendation {
-  if (
-    hardware == null ||
-    !Number.isInteger(hardware.cpuCores) ||
-    hardware.cpuCores < 1 ||
-    hardware.memoryTotalMb === undefined ||
-    !Number.isInteger(hardware.memoryTotalMb) ||
-    hardware.memoryTotalMb < 0
-  ) {
-    return {
-      value: CONSERVATIVE_CONCURRENCY,
-      source: 'estimate',
-      range: { min: CONCURRENCY_FLOOR, max: FALLBACK_CONCURRENCY_MAX },
-    };
-  }
-  const memoryTotalMb = hardware.memoryTotalMb;
-  const slots = (gbPerSlot: number) => Math.round(memoryTotalMb / (1024 * gbPerSlot));
-  const clamp = (n: number) => Math.min(CONCURRENCY_CEILING, Math.max(CONCURRENCY_FLOOR, n));
-  const value = clamp(Math.min(hardware.cpuCores, slots(MEMORY_GB_PER_SLOT)));
-  const max = clamp(slots(RANGE_MEMORY_GB_PER_SLOT));
-  return { value, source: 'measured', range: { min: CONCURRENCY_FLOOR, max } };
 }

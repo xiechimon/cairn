@@ -92,8 +92,6 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
         .object({
           machineId: recordId,
           name: z.string(),
-          running: z.number().int(),
-          capacity: z.number().int(),
         })
         .nullable(),
       hold: z

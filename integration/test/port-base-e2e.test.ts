@@ -3,11 +3,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
-import {
-  DAEMON_MAX_CONCURRENT_ENV,
-  type MachineHandle,
-  runMachine,
-} from '../../apps/daemon/src/machine-loop.js';
+import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import {
   build as buildTable,
@@ -169,105 +165,4 @@ describe('#1148 E2E: port base segmentation (two concurrent worker steps in diff
     const found = [...flat.matchAll(/PB=(\d{5})/g)].map((m) => m[1]);
     expect(new Set(found)).toEqual(new Set(['20000', '20100']));
   }, 150_000);
-});
-
-describe('#1260 E2E: chief occupies the machine concurrency slot (cap 1)', () => {
-  test('while a worker runs (cap 1) the chief queues for a free slot; a later worker is FIFO behind it', async () => {
-    const stack = await bootStack({
-      responses: [
-        {
-          delayMs: 6_000,
-          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
-        },
-        { delayMs: 2_000, content: '收到，已了解当前进度。' },
-        { content: '探针完成。' },
-        {
-          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
-        },
-        { content: '探针完成。' },
-      ],
-    });
-    stack.server.db
-      .update(machineTable)
-      .set({ maxConcurrent: 1 })
-      .where(eq(machineTable.id, stack.machineId))
-      .run();
-    const patch = await api(
-      stack.server.url,
-      'PATCH',
-      `/api/teams/${stack.server.teamId}/routing-rules/coordinator`,
-      {
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-      },
-    );
-    expect(patch.status).toBe(200);
-
-    const w1 = await startBuild(stack, '并发探针一');
-    await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'claimed', 30_000);
-
-    const sent = await api(
-      stack.server.url,
-      'POST',
-      `/api/teams/${stack.server.teamId}/chief/threads`,
-      { content: '现在团队里在跑什么？' },
-    );
-    expect(sent.status).toBe(201);
-    const threadId = (sent.body as { thread: { id: string } }).thread.id;
-    await new Promise((r) => setTimeout(r, 1_500));
-    expect(stepsOf(stack, threadId)[0]?.status).toBe('pending');
-
-    const w2 = await startBuild(stack, '并发探针二');
-    await new Promise((r) => setTimeout(r, 1_500));
-    expect(stepsOf(stack, w2.buildId)[0]?.status).toBe('pending');
-
-    await waitFor(
-      () =>
-        stepsOf(stack, threadId)[0]?.status === 'claimed' ||
-        stack.lines().some((l) => l.includes(`for conv ${threadId}`)),
-      30_000,
-    );
-    await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'done', 120_000);
-
-    await waitFor(() => {
-      const chiefSteps = stack.server.db
-        .select()
-        .from(stepTable)
-        .where(eq(stepTable.buildId, threadId))
-        .all();
-      return chiefSteps[0]?.status === 'done';
-    }, 120_000);
-    await waitFor(() => stepsOf(stack, w2.buildId)[0]?.status === 'done', 120_000);
-  }, 240_000);
-});
-
-describe('#1148 E2E: env fallback precedence (env > DB > default)', () => {
-  test('DB 2 / env 1 → only 1 worker runs at a time (env beats DB; server gate narrows to self-report)', async () => {
-    const stack = await bootStack({
-      capEnv: { [DAEMON_MAX_CONCURRENT_ENV]: '1' },
-      responses: [
-        {
-          delayMs: 6_000,
-          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
-        },
-        { content: '探针完成。' },
-        {
-          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
-        },
-        { content: '探针完成。' },
-      ],
-    });
-    stack.server.db
-      .update(machineTable)
-      .set({ maxConcurrent: 2 })
-      .where(eq(machineTable.id, stack.machineId))
-      .run();
-    const w1 = await startBuild(stack, 'env 探针一');
-    await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'claimed', 30_000);
-    const w2 = await startBuild(stack, 'env 探针二');
-    await new Promise((r) => setTimeout(r, 1_500));
-    expect(stepsOf(stack, w2.buildId)[0]?.status).toBe('pending');
-    await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'done', 120_000);
-    await waitFor(() => stepsOf(stack, w2.buildId)[0]?.status === 'done', 120_000);
-  }, 240_000);
 });

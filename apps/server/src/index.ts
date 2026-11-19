@@ -47,7 +47,7 @@ import { createSlackAdapter } from './services/im/slack.js';
 import { createTelegramAdapter } from './services/im/telegram.js';
 import { wechatAdapter } from './services/im/wechat.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
-import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
+import { seedLocalMachine } from './services/machines.js';
 import { createMailConnector } from './services/mail-connector.js';
 import { adoptGithubConnectorGrants } from './services/mcp-github-connector.js';
 import { newMcpOAuthState } from './services/mcp-servers.js';
@@ -148,15 +148,6 @@ seedLocalMachine(db, seeded.team.id);
 setCoordinatorInServer(config.coordinatorInServer);
 logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 runDataMigrationOnce(db, 'token-usage-cost-backfill', () => backfillTokenUsageCost(db));
-const concurrencyBackfilled = runDataMigrationOnce(db, 'machine-concurrency-backfill', () =>
-  backfillMachineConcurrency(db),
-);
-if ((concurrencyBackfilled ?? 0) > 0) {
-  logger.info(
-    { machines: concurrencyBackfilled },
-    'machine concurrency backfilled to recommendation',
-  );
-}
 const ownersSeeded = runDataMigrationOnce(db, 'owner-checkpoints-seed', () =>
   seedOwnerCheckpoints(db),
 );

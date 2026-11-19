@@ -6,7 +6,6 @@ Backend for the tray's run overview (prototype approved by mon X, 2026-11-18): p
 
 - A Mac with 16 GB runs three tasks and memory runs out. The tray heading turns amber and names the strain. The fourth task still starts: strain never holds a task (mon X, 2026-11-19, after a high load average made every second task queue behind the first).
 - A task's agent sits in one tool call or retry loop for twenty minutes. Today nothing distinguishes it from a healthy run: the 30-second heartbeat only says the process is alive. After: the step carries the time of its last real progress, and the tray marks the task stuck after 15 minutes without progress.
-- A task waits because its computer is already running as many tasks as it allows. Today the task says nothing (`waitingOn` only knows `machine` and `quota`). After: it says `capacity`.
 
 ## Strain
 
@@ -22,13 +21,13 @@ The Runner reports `loadAvg5` beside `loadAvg1` (optional on the wire; an old Ru
 
 ## No claim gate
 
-Strain is shown, never enforced. A strained computer claims task steps like a calm one, up to `maxConcurrent`. An earlier gate held a second task while a computer was strained and busy; it was removed on 2026-11-19 because on a busy Mac the 5-minute load stays above the core count for hours, so tasks ran one at a time with a queue label that gave no reason.
+Strain is shown, never enforced. A strained computer claims task steps like a calm one; computers have no concurrency cap (`no-machine-concurrency-cap.md`). An earlier gate held a second task while a computer was strained and busy; it was removed on 2026-11-19 because on a busy Mac the 5-minute load stays above the core count for hours, so tasks ran one at a time with a queue label that gave no reason.
 
 ## Queue reasons
 
-`TodoRecord.waitingOn.on` gains `capacity` (the computer that would run the step is online and eligible but at `maxConcurrent`). Order of checks: quota hold, no runnable computer (`machine`), `capacity`.
+`TodoRecord.waitingOn.on` is `machine` (no runnable computer) or `quota` (a quota hold).
 
-`MachineRecord` gains `strain` (the reasons above, empty when fine) and `queued`, the tasks whose next step waits for this computer, each with its reason (`capacity`, `quota` with `retryAt`, or `waiting` for a step that will be claimed on the next poll).
+`MachineRecord` gains `strain` (the reasons above, empty when fine) and `queued`, the tasks whose next step waits for this computer, each with its reason (`quota` with `retryAt`, or `waiting` for a step that will be claimed on the next poll).
 
 ## Last progress
 
@@ -48,4 +47,4 @@ Strain is shown, never enforced. A strained computer claims task steps like a ca
 
 ## Tests
 
-One per path: memory, load and disk strain each still let a busy computer under its cap start the next task, with the strain reported on the computer; a full computer reads `capacity`; progress reports set `lastProgressAt` and non-progress activity does not; the throttle skips a second write within 30 seconds; a strain change publishes `machine_presence` and an unchanged report does not; the macOS memory probe parses the sysctl value and falls back on failure.
+One per path: memory, load and disk strain each still let a busy computer start the next task, with the strain reported on the computer; progress reports set `lastProgressAt` and non-progress activity does not; the throttle skips a second write within 30 seconds; a strain change publishes `machine_presence` and an unchanged report does not; the macOS memory probe parses the sysctl value and falls back on failure.

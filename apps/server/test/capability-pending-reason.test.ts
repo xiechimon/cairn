@@ -72,7 +72,6 @@ function insertMachine(
             },
           }
         : {}),
-      maxConcurrent: 3,
     })
     .run();
 }

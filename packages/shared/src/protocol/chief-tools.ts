@@ -336,8 +336,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'machines',
-    description:
-      'List registered machines with online state, running/ max concurrency and CLI version.',
+    description: 'List registered machines with online state, running steps and CLI version.',
     parameters: obj({}),
     replaySafe: true,
   },

@@ -323,19 +323,19 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
     return { ...step('pending'), queue };
   }
 
-  test('Q1: pending + queue with machine → queue label fully interpolated', () => {
+  test('Q1: pending + queue with machine → queue label names the machine and the steps ahead, no running count', () => {
     const items = render({
       steps: [
         queuedStep({
           position: 2,
-          waitingFor: { machineId: 'm1', name: 'xmonsMac', running: 2, capacity: 3 },
+          waitingFor: { machineId: 'm1', name: 'xmonsMac' },
         }),
       ],
     });
     expect(tail(items)).toMatchObject({
       kind: 'streaming',
-      label: '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）',
-      labelVars: { machine: 'xmonsMac', running: 2, cap: 3, ahead: 1 },
+      label: '排队中：等 {machine}（前面 {ahead} 个）',
+      labelVars: { machine: 'xmonsMac', ahead: 1 },
     });
   });
 
@@ -459,7 +459,7 @@ describe('mapChief queue projection (#1108 Q6)', () => {
         ...THREAD_Q,
         turnQueue: {
           position: 3,
-          waitingFor: { machineId: 'm1', name: 'xmonsMac', running: 2, capacity: 2 },
+          waitingFor: { machineId: 'm1', name: 'xmonsMac' },
         },
       }).stream?.at(-1),
     ).toMatchObject({
@@ -467,8 +467,8 @@ describe('mapChief queue projection (#1108 Q6)', () => {
       label: '正在连接 {machine}...',
       labelVars: { machine: 'xmonsMac' },
       labelDetail: {
-        label: '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）',
-        vars: { machine: 'xmonsMac', running: 2, cap: 2, ahead: 2 },
+        label: '排队中：等 {machine}（前面 {ahead} 个）',
+        vars: { machine: 'xmonsMac', ahead: 2 },
       },
     });
     expect(
@@ -491,7 +491,7 @@ describe('mapChief queue projection (#1108 Q6)', () => {
         ...THREAD_Q,
         turnQueue: {
           position: 1,
-          waitingFor: { machineId: 'm1', name: 'xmonsMac', running: 0, capacity: 2 },
+          waitingFor: { machineId: 'm1', name: 'xmonsMac' },
           blocked: { kind: 'machine-offline', missing: [] },
         },
       }).stream?.at(-1),

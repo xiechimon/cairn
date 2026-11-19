@@ -1,11 +1,7 @@
 import type { AgentBackend, AgentSessionHandle, ClaimedStep, StepEvent } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
-import {
-  DAEMON_MAX_CONCURRENT_ENV,
-  portBaseForSlot,
-  resolveLocalCap,
-} from '../src/machine-loop.js';
+import { portBaseForSlot } from '../src/machine-loop.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 
 function gatedSession(sessionId: string, release: Promise<void>): AgentSessionHandle {
@@ -67,99 +63,9 @@ function recordingBackend(gates: Promise<void>[]): AgentBackend {
   return Object.assign(backend, { created });
 }
 
-describe('#1148 chief steps take no concurrency slot (daemon-local gate)', () => {
-  test('C1: gated server, workers full → pending claim holds + chief launches immediately', async () => {
-    const api = new FakeMachineApi();
-    api.mePatch = { maxConcurrent: 1 };
-    const gate = defer<void>();
-    const backend = recordingBackend([gate.promise]);
-    const { handle, lines } = await boot({ api, backend });
-    await waitFor(() => api.parked !== null);
-    api.parked?.(claimedFor('s1', 'conv-1'));
-    await waitFor(() => lines.some((l) => l.includes('step s1 for conv conv-1 (1 running)')));
-    await waitFor(() => api.parked !== null);
-    api.parked?.(claimedFor('c1', 'chief-t1', 'chief'));
-    await waitFor(() => lines.some((l) => l.includes('step c1 for conv chief-t1 (2 running)')));
-    gate.resolve();
-    await waitFor(() => api.doneBodies.length === 2);
-    await handle.stop();
-    await handle.done;
-  });
-
-  test('C2: ungated server, only chief in flight → local park not triggered (claims as usual)', async () => {
-    const api = new FakeMachineApi();
-    const gate = defer<void>();
-    const backend = recordingBackend([gate.promise]);
-    const { handle, lines } = await boot({ api, backend });
-    await waitFor(() => api.parked !== null);
-    api.parked?.(claimedFor('c1', 'chief-t1', 'chief'));
-    await waitFor(() => lines.some((l) => l.includes('step c1 for conv chief-t1 (1 running)')));
-    await waitFor(() => api.parked !== null);
-    api.parked?.(claimedFor('s1', 'conv-1'));
-    await waitFor(() => lines.some((l) => l.includes('step s1 for conv conv-1 (2 running)')));
-    const claimsAtFull = api.claimCalls;
-    await new Promise((r) => setTimeout(r, 80));
-    expect(api.claimCalls).toBe(claimsAtFull);
-    gate.resolve();
-    await waitFor(() => api.doneBodies.length === 2);
-    await handle.stop();
-    await handle.done;
-  });
-});
-
-describe('#1148 env fallback (CAIRN_DAEMON_MAX_CONCURRENT)', () => {
-  test('C3: ungated server + env=2 → parallelism 2 (serial fallback widened by env)', async () => {
-    const api = new FakeMachineApi();
-    const gate1 = defer<void>();
-    const gate2 = defer<void>();
-    const backend = recordingBackend([gate1.promise, gate2.promise]);
-    const { handle, lines } = await boot({
-      api,
-      backend,
-      capEnv: { [DAEMON_MAX_CONCURRENT_ENV]: '2' },
-    });
-    await waitFor(() => api.parked !== null);
-    api.parked?.(claimedFor('s1', 'conv-1'));
-    await waitFor(() => api.parked !== null);
-    api.parked?.(claimedFor('s2', 'conv-2'));
-    await waitFor(() => lines.some((l) => l.includes('step s2 for conv conv-2 (2 running)')));
-    const claimsAtFull = api.claimCalls;
-    await new Promise((r) => setTimeout(r, 80));
-    expect(api.claimCalls).toBe(claimsAtFull);
-    gate1.resolve();
-    gate2.resolve();
-    await waitFor(() => api.doneBodies.length === 2);
-    await handle.stop();
-    await handle.done;
-  });
-
-  test('C4: value precedence env > DB > default (resolveLocalCap single source)', () => {
-    expect(resolveLocalCap({ [DAEMON_MAX_CONCURRENT_ENV]: '2' }, 3)).toBe(2);
-    expect(resolveLocalCap({ [DAEMON_MAX_CONCURRENT_ENV]: '4' }, undefined)).toBe(4);
-    expect(resolveLocalCap({}, 3)).toBe(3);
-    expect(resolveLocalCap({}, undefined)).toBe(1);
-    expect(resolveLocalCap({ [DAEMON_MAX_CONCURRENT_ENV]: 'abc' }, 3)).toBe(3);
-    expect(resolveLocalCap({ [DAEMON_MAX_CONCURRENT_ENV]: '0' }, 3)).toBe(3);
-  });
-});
-
 describe('#1148 port base (CAIRN_PORT_BASE slot segmentation)', () => {
-  test('C5: claim body reports maxWorkers itself (effective cap)', async () => {
-    const api = new FakeMachineApi();
-    api.mePatch = { maxConcurrent: 2 };
-    const gate = defer<void>();
-    const backend = recordingBackend([gate.promise]);
-    const { handle } = await boot({ api, backend });
-    await waitFor(() => api.claimBodies.length >= 1);
-    expect(api.claimBodies[0]).toMatchObject({ maxWorkers: 2 });
-    gate.resolve();
-    await handle.stop();
-    await handle.done;
-  });
-
   test('C6: concurrent worker steps get different CAIRN_PORT_BASE segments; chief carries none; segments reused after release', async () => {
     const api = new FakeMachineApi();
-    api.mePatch = { maxConcurrent: 3 };
     const gate1 = defer<void>();
     const gate2 = defer<void>();
     const gateChief = defer<void>();

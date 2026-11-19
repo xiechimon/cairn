@@ -908,8 +908,6 @@ export const machine = sqliteTable(
     kind: text('kind').notNull().default('remote'),
     claudeCodeReport: json<ClaudeCodeReport | null>('claudeCodeReport'),
     claudeRateLimits: json<ClaudeRateLimitWindow[] | null>('claudeRateLimits'),
-    maxConcurrent: integer('maxConcurrent').notNull().default(3),
-    maxConcurrentOverridden: bool('maxConcurrentOverridden').notNull().default(false),
     lastSeenAt: epochMs('lastSeenAt'),
     capabilities: json<MachineCapabilities | null>('capabilities'),
     browserOverride: bool('browserOverride'),
