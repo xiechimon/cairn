@@ -87,7 +87,11 @@ test('cutover preserves exact label identities and metadata, moved origins and s
       }),
     );
     expect(opened.db.all('SELECT * FROM build ORDER BY id')).toEqual(
-      original.builds.map((row) => ({ ...(row as object), afterStopPhase: null })),
+      original.builds.map((row) => ({
+        ...(row as object),
+        afterStopPhase: null,
+        retryAttempt: 0,
+      })),
     );
     expect(opened.db.all('PRAGMA foreign_key_check')).toEqual([]);
   } finally {

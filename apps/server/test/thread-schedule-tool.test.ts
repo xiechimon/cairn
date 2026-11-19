@@ -767,6 +767,11 @@ async function withNonHumanContinuation(path: 'auto-retry' | 'chief-message', co
       .where(eq(step.id, 'continuation-source-step'))
       .get()!;
     applyStepFailure(s.svc, failedStep, 'Temporary connection reset');
+    s.db
+      .update(todo)
+      .set({ phaseAt: now - 60_001 })
+      .where(eq(todo.id, s.todoId))
+      .run();
     await sweepFailedRetries(s.svc);
     expect(
       s.db.select().from(buildFeedback).where(eq(buildFeedback.buildId, lastScheduledId)).get()

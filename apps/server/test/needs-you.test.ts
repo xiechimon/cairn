@@ -33,7 +33,12 @@ import {
   NEEDS_YOU_STALE_MS,
   sweepFailedRetries,
 } from '../src/services/needs-you.js';
-import { parkFailedBuild } from '../src/services/retry-parking.js';
+import {
+  AUTOMATIC_RETRY_BASE_MS,
+  AUTOMATIC_RETRY_LIMIT,
+  automaticRetryDelayMs,
+  parkFailedBuild,
+} from '../src/services/retry-parking.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import {
   drainTaskMessageQueue,
@@ -626,6 +631,7 @@ describe('needs you (#1800)', () => {
     expect(groups(w).current).toEqual([]);
     expect(groups(w).stale).toEqual([]);
 
+    agePhase(w, nowMs() - AUTOMATIC_RETRY_BASE_MS - 1);
     await sweepFailedRetries(w.deps);
     expect(phaseOf(w)).toBe('queued');
     expect(buildCount(w)).toBe(2);
@@ -645,15 +651,22 @@ describe('needs you (#1800)', () => {
     expect(groups(w).stale).toEqual([]);
   });
 
-  test('a second failure after the automatic retry stays failed and enters the current group', async () => {
+  test('a failure after the automatic retry budget stays failed and hands to the Coordinator', async () => {
     const w = openWorld();
-    const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
-    if (step === undefined) throw new Error('missing step');
-    applyStepFailure(w.deps, step, 'connection reset by peer');
-    await sweepFailedRetries(w.deps);
-    const retried = w.s.db.select().from(stepTable).where(eq(stepTable.status, 'pending')).get();
-    if (retried === undefined) throw new Error('missing retry step');
-    applyStepFailure(w.deps, retried, 'connection reset by peer');
+    let stepId = w.stepId;
+    for (let attempt = 0; attempt < AUTOMATIC_RETRY_LIMIT; attempt++) {
+      const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
+      if (row === undefined) throw new Error('missing step');
+      applyStepFailure(w.deps, row, 'connection reset by peer');
+      agePhase(w, nowMs() - automaticRetryDelayMs(attempt) - 1);
+      await sweepFailedRetries(w.deps);
+      const retried = w.s.db.select().from(stepTable).where(eq(stepTable.status, 'pending')).get();
+      if (retried === undefined) throw new Error('missing retry step');
+      stepId = retried.id;
+    }
+    const last = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
+    if (last === undefined) throw new Error('missing step');
+    applyStepFailure(w.deps, last, 'connection reset by peer');
     const buildsAfterRetry = buildCount(w);
     await sweepFailedRetries(w.deps);
 
@@ -706,6 +719,7 @@ describe('needs you (#1800)', () => {
     ).toBe(errorMessage);
     const needsHuman = kind !== 'ordinary failure';
 
+    agePhase(w, nowMs() - AUTOMATIC_RETRY_BASE_MS - 1);
     await sweepFailedRetries(w.deps);
 
     expect(phaseOf(w)).toBe(needsHuman ? 'failed' : 'queued');
@@ -773,6 +787,7 @@ describe('needs you (#1800)', () => {
     const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
     if (step === undefined) throw new Error('missing step');
     applyStepFailure(w.deps, step, 'connection reset by peer');
+    agePhase(w, nowMs() - AUTOMATIC_RETRY_BASE_MS - 1);
     const scheduler = createScheduler(w.deps, { tickMs: 60_000 });
     scheduler.tick();
     await new Promise((resolve) => setImmediate(resolve));
@@ -786,6 +801,7 @@ describe('needs you (#1800)', () => {
     if (step === undefined) throw new Error('missing step');
     applyStepFailure(w.deps, step, 'connection reset by peer');
 
+    agePhase(w, nowMs() - AUTOMATIC_RETRY_BASE_MS - 1);
     await sweepFailedRetries(w.deps);
 
     const retryBuildId = getTodo(w.deps, w.todoId)?.latestBuildId;

@@ -542,6 +542,29 @@ export function insertStepIntoOldSchema(
   }
 }
 
+export function insertBuildIntoOldSchema(
+  sqlite: BetterSqlite.Database,
+  rows: Record<string, unknown>[],
+): void {
+  const columns = new Set(
+    (sqlite.prepare('PRAGMA table_info(build)').all() as { name: string }[]).map(
+      (column) => column.name,
+    ),
+  );
+  for (const row of rows) {
+    const entries = Object.entries(row).filter(
+      ([key, value]) => columns.has(key) && value !== undefined,
+    );
+    sqlite
+      .prepare(
+        `INSERT INTO build (${entries.map(([key]) => `"${key}"`).join(', ')}) VALUES (${entries
+          .map(() => '?')
+          .join(', ')})`,
+      )
+      .run(...entries.map(([, value]) => sqliteValue(value)));
+  }
+}
+
 export interface RouteSeed {
   id?: string;
   provider?: string;

@@ -112,6 +112,14 @@ export function startBuilds(
           };
     const id = newUuidv7();
     const createdAt = nowMs();
+    const previousAttempt =
+      triggerSource !== 'user' && todoRecord.phase === 'failed' && todoRecord.latestBuildId !== null
+        ? deps.db
+            .select({ retryAttempt: build.retryAttempt })
+            .from(build)
+            .where(eq(build.id, todoRecord.latestBuildId))
+            .get()?.retryAttempt
+        : undefined;
     deps.db.transaction(() => {
       deps.db
         .insert(build)
@@ -121,6 +129,7 @@ export function startBuilds(
           withPlan: false,
           prevPhase: todoRecord.phase,
           triggerSource,
+          retryAttempt: previousAttempt === undefined ? 0 : previousAttempt + 1,
           scheduledBy: input.scheduledBy ?? null,
           planDocId: null,
           errorMessage: null,

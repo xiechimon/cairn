@@ -1,0 +1,1 @@
+ALTER TABLE `build` ADD `retryAttempt` integer DEFAULT 0 NOT NULL;

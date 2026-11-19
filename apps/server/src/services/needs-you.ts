@@ -1,82 +1,25 @@
 import type { NeedsYouQuery } from '@cairn/shared';
-import { isProviderAuthFailure } from '@cairn/shared';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, step, todo } from '../db/schema.js';
+import { build, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, NotFoundError } from './builds.js';
 import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
-import { retryIsParked } from './retry-parking.js';
+import { automaticRetryDueAt, automaticRetryOwed, failureNeedsHuman } from './retry-parking.js';
 import { getTodo } from './todos.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
+export { failureNeedsHuman };
+
 export const NEEDS_YOU_STALE_MS = 7 * 24 * 60 * 60 * 1000;
-
-const GATE_REJECTION = [
-  '方案结构不合格',
-  '规划未产出方案',
-  '信息卡未产出报告',
-  '偏离工作分支',
-  '构建零改动',
-  '转人工处理',
-  '死循环闸',
-  '请人工复核',
-] as const;
-
-const MISSING_CREDENTIALS = [
-  'no team secret is available',
-  'api key is missing',
-  'api key is not configured',
-  'gemini login',
-  'reconnect github',
-  '重新连接 github',
-  '未配置模型',
-  '尚未上报模型清单',
-  '未启用',
-] as const;
-
-export function failureNeedsHuman(errorMessage: string): boolean {
-  if (retryIsParked(errorMessage)) return true;
-  if (errorMessage.startsWith('PR Auto-fix needs you:')) return true;
-  if (isProviderAuthFailure(errorMessage)) return true;
-  if (GATE_REJECTION.some((mark) => errorMessage.includes(mark))) return true;
-  const lower = errorMessage.toLowerCase();
-  return MISSING_CREDENTIALS.some((mark) => lower.includes(mark.toLowerCase()));
-}
-
-function lastStepScheduledBuildIds(db: Db, buildIds: string[]): Set<string> {
-  if (buildIds.length === 0) return new Set();
-  const latestByBuild = new Map<string, { scheduleId: string | null; createdAt: number }>();
-  for (const row of db
-    .select({ buildId: step.buildId, scheduleId: step.scheduleId, createdAt: step.createdAt })
-    .from(step)
-    .where(inArray(step.buildId, buildIds))
-    .all()) {
-    const seen = latestByBuild.get(row.buildId);
-    if (seen === undefined || row.createdAt >= seen.createdAt) latestByBuild.set(row.buildId, row);
-  }
-  return new Set(
-    [...latestByBuild].flatMap(([buildId, row]) => (row.scheduleId === null ? [] : [buildId])),
-  );
-}
-
-function owedAutomaticRetry(
-  buildRow: { id: string; errorMessage: string | null; prevPhase: string | null } | undefined,
-  scheduledBuildIds: Set<string>,
-): boolean {
-  if (buildRow === undefined) return false;
-  if (scheduledBuildIds.has(buildRow.id)) return false;
-  if (failureNeedsHuman(buildRow.errorMessage ?? '')) return false;
-  return buildRow.prevPhase !== 'failed';
-}
 
 export function failureAwaitsAutomaticRetry(
   db: Db,
-  buildRow: { id: string; errorMessage: string | null; prevPhase: string | null },
+  buildRow: { id: string; errorMessage: string | null; retryAttempt: number },
 ): boolean {
-  return owedAutomaticRetry(buildRow, lastStepScheduledBuildIds(db, [buildRow.id]));
+  return automaticRetryOwed(db, buildRow);
 }
 
 export function listNeedsYou(
@@ -123,12 +66,8 @@ export async function sweepFailedRetries(deps: BuildDeps): Promise<void> {
       continue;
     if (pendingWorkerQuestions(deps.db, row.latestBuildId).length > 0) continue;
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
-    if (
-      buildRow === undefined ||
-      !owedAutomaticRetry(buildRow, lastStepScheduledBuildIds(deps.db, [row.latestBuildId]))
-    ) {
-      continue;
-    }
+    if (buildRow === undefined || !automaticRetryOwed(deps.db, buildRow)) continue;
+    if (nowMs() < automaticRetryDueAt(row.phaseAt, buildRow.retryAttempt)) continue;
     try {
       await applyBuildStepAction(
         deps,

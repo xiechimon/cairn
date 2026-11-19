@@ -237,6 +237,8 @@ export async function sendBuildSteer(
             withPlan: false,
             prevPhase: todoRow?.phase ?? 'done',
             triggerSource: 'user',
+            retryAttempt:
+              human === true || todoRow?.phase !== 'failed' ? 0 : buildRow.retryAttempt + 1,
             createdAt: now,
           })
           .run();
@@ -299,7 +301,12 @@ export async function sendBuildSteer(
           deps.machineHub?.steerSignal(todoRow.teamId, running.id);
         } else {
           db.update(build)
-            .set({ errorMessage: null, prevPhase: todoRow?.phase ?? 'done' })
+            .set({
+              errorMessage: null,
+              prevPhase: todoRow?.phase ?? 'done',
+              retryAttempt:
+                human === true || todoRow?.phase !== 'failed' ? 0 : buildRow.retryAttempt + 1,
+            })
             .where(eq(build.id, targetBuildId))
             .run();
           const nextPhase =

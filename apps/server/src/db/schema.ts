@@ -271,6 +271,7 @@ export const build = sqliteTable('build', {
   reportLine: text('reportLine'),
   evidenceStore: text('evidenceStore').$type<EvidenceStore>(),
   stop: json<BuildStop | null>('stop'),
+  retryAttempt: integer('retryAttempt').notNull().default(0),
   createdAt: epochMs('createdAt').notNull(),
 });
 

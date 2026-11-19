@@ -28,7 +28,7 @@ import {
   reconcileOwners,
   seedOwnerCheckpoints,
 } from '../src/services/owner.js';
-import { parkFailedBuild } from '../src/services/retry-parking.js';
+import { AUTOMATIC_RETRY_LIMIT, parkFailedBuild } from '../src/services/retry-parking.js';
 import { getTodo, setTodoArchived, setTodoPhase } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
 import { bootServer, seedSessionRoute, type TestServer } from './helpers.js';
@@ -108,6 +108,7 @@ function openWorld(
       todoId,
       withPlan: false,
       prevPhase: failure === 'repeated' ? 'failed' : 'todo',
+      retryAttempt: failure === 'repeated' ? AUTOMATIC_RETRY_LIMIT : 0,
       triggerSource: 'user',
       createdAt: nowMs() - 60_000,
       errorMessage:

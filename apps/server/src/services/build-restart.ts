@@ -27,7 +27,7 @@ import {
 import { rewatchCreatingThread } from './chief.js';
 import { claimClientMessage, completeClientMessage } from './client-message.js';
 import { retryLessonsOf } from './retry-lessons.js';
-import { assertAutomaticRetryAllowed } from './retry-parking.js';
+import { AUTOMATIC_RETRY_LIMIT, assertAutomaticRetryAllowed } from './retry-parking.js';
 import { getTodo, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -143,6 +143,14 @@ export async function restartFailedBuild(
         content: buildReworkReuseNote({ prNumber: reworkTarget.prNumber }),
         createdAt: now,
       });
+      if (origin !== 'person') {
+        insertMessageRow(transcriptDeps, reworkTarget.id, {
+          id: newRecordId(),
+          role: 'system',
+          content: `Automatic retry ${row.retryAttempt + 1}/${AUTOMATIC_RETRY_LIMIT}`,
+          createdAt: now,
+        });
+      }
       const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
       const reuseKind = buildRunsSession(deps, reworkTarget.id)
         ? 'session'
@@ -168,6 +176,7 @@ export async function restartFailedBuild(
         .set({
           errorMessage: null,
           prevPhase: 'failed',
+          retryAttempt: origin === 'person' ? 0 : row.retryAttempt + 1,
         })
         .where(eq(build.id, reworkTarget.id))
         .run();
@@ -192,6 +201,7 @@ export async function restartFailedBuild(
         withPlan: false,
         prevPhase: todoRecord.phase,
         triggerSource: RESTART_TRIGGER_SOURCE[origin],
+        retryAttempt: origin === 'person' ? 0 : row.retryAttempt + 1,
         planDocId: null,
         errorMessage: null,
         prUrl: null,
@@ -220,6 +230,14 @@ export async function restartFailedBuild(
           branch: conversationBranch(newId),
           outcome: prClosed,
         }),
+        createdAt,
+      });
+    }
+    if (origin !== 'person') {
+      insertMessageRow(transcriptDeps, newId, {
+        id: newRecordId(),
+        role: 'system',
+        content: `Automatic retry ${row.retryAttempt + 1}/${AUTOMATIC_RETRY_LIMIT}`,
         createdAt,
       });
     }

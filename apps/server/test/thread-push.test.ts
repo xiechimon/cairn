@@ -25,6 +25,7 @@ import {
   prepareStopForDone,
 } from '../src/services/builds.js';
 import { upsertMessage } from '../src/services/machine-deps.js';
+import { AUTOMATIC_RETRY_LIMIT } from '../src/services/retry-parking.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createTodo, setTodoPhase } from '../src/services/todos.js';
 import { bootServer, req } from './helpers.js';
@@ -106,7 +107,11 @@ const terminalCases = (['user', 'chief', 'schedule'] as const).flatMap((triggerS
 );
 
 function exhaustRetries(s: ReturnType<typeof world>): void {
-  s.db.update(build).set({ prevPhase: 'failed' }).where(eq(build.id, 'build')).run();
+  s.db
+    .update(build)
+    .set({ prevPhase: 'failed', retryAttempt: AUTOMATIC_RETRY_LIMIT })
+    .where(eq(build.id, 'build'))
+    .run();
 }
 
 describe('terminal thread push routing (#1784: push only when a human is needed)', () => {

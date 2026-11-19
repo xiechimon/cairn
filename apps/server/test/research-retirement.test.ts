@@ -9,6 +9,7 @@ import { build, message, step, todo } from '../src/db/schema.js';
 import { finishStep } from '../src/services/machines.js';
 import {
   bootServer,
+  insertBuildIntoOldSchema,
   insertMachineIntoOldSchema,
   insertStepIntoOldSchema,
   stepRowsRaw,
@@ -47,16 +48,9 @@ test('an upgrade stops only active retired research steps and discards their lat
         latestBuildId: id,
       })
       .run();
-    s.db
-      .insert(build)
-      .values({
-        id,
-        todoId: id,
-        withPlan: false,
-        triggerSource: 'chief',
-        createdAt: 1,
-      })
-      .run();
+    insertBuildIntoOldSchema(sqlite, [
+      { id, todoId: id, withPlan: false, triggerSource: 'chief', createdAt: 1 },
+    ]);
     for (const status of [
       'pending',
       'claimed',
@@ -79,7 +73,6 @@ test('an upgrade stops only active retired research steps and discards their lat
     }
   }
   const tasks = s.db.select().from(todo).all();
-  const builds = s.db.select().from(build).all();
   const before = stepRowsRaw(sqlite);
   migrateAll(sqlite);
   for (const row of before) {
@@ -90,6 +83,7 @@ test('an upgrade stops only active retired research steps and discards their lat
       retired && active ? { ...row, status: 'stopped', finishedAt: expect.any(Number) } : row,
     );
   }
+  const builds = s.db.select().from(build).all();
   const stopped = s.db.select().from(step).all();
   const messages = s.db.select().from(message).all();
   for (const id of ['research-0-claimed', 'research-1-claimed']) {
