@@ -6,6 +6,7 @@ import {
   type PointerEvent,
   type ReactNode,
   type Ref,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -14,6 +15,7 @@ import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import {
   clampPanelWidth,
+  dockedThreadLayout,
   PANEL_WIDTH_DEFAULT,
   PANEL_WIDTH_MIN,
   PANEL_WIDTH_STEP,
@@ -133,12 +135,27 @@ function ResizeHandle({ width }: { width: number }) {
   );
 }
 
+function useParentWidth(node: HTMLElement | null): number | null {
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const parent = node?.parentElement;
+    if (parent == null) return;
+    const measure = () => setWidth(parent.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, [node]);
+  return width;
+}
+
 export function SidePanel({
   ref,
   label,
   onDismiss,
   scrimTestId,
   phoneTab = false,
+  docked = false,
   testId,
   children,
 }: {
@@ -147,10 +164,42 @@ export function SidePanel({
   onDismiss: () => void;
   scrimTestId?: string;
   phoneTab?: boolean;
+  docked?: boolean;
   testId?: string;
   children: ReactNode;
 }) {
   const width = useSidePanelWidth();
+  const [node, setNode] = useState<HTMLElement | null>(null);
+  const rowWidth = useParentWidth(docked ? node : null);
+  const layout = docked && rowWidth !== null ? dockedThreadLayout(rowWidth, width) : null;
+  const setRef = (element: HTMLElement | null) => {
+    setNode(element);
+    if (typeof ref === 'function') ref(element);
+    else if (ref != null) ref.current = element;
+  };
+  if (docked) {
+    return (
+      <aside
+        ref={setRef}
+        aria-label={label}
+        data-testid={testId}
+        data-docked={layout?.floating === true ? 'floating' : ''}
+        style={
+          {
+            '--side-panel-w': `${layout?.width ?? width}px`,
+            '--side-panel-right': `${width}px`,
+          } as CSSProperties
+        }
+        className={cn(
+          'side-panel relative flex w-(--side-panel-w) min-w-0 flex-none flex-col border-l border-border bg-background',
+          layout?.floating === true &&
+            'absolute inset-y-0 right-(--side-panel-right) z-(--z-panel-low) shadow-(--floating-shadow)',
+        )}
+      >
+        {children}
+      </aside>
+    );
+  }
   return (
     <>
       <div

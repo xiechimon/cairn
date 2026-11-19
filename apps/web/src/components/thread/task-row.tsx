@@ -28,6 +28,7 @@ export interface TaskRowProps {
   menu?: ReactNode;
   below?: ReactNode;
   onOpen?: () => void;
+  open?: boolean;
   onIntent?: () => void;
 }
 
@@ -57,6 +58,7 @@ export function TaskRow({
   menu,
   below,
   onOpen,
+  open,
   onIntent,
 }: TaskRowProps) {
   const descriptionId = useId();
@@ -73,6 +75,8 @@ export function TaskRow({
             data-slot="task-row"
             data-waiting={waiting ? '' : undefined}
             aria-describedby={descriptionId}
+            aria-current={open === true ? 'true' : undefined}
+            data-thread-row={open === undefined ? undefined : ''}
             onClick={onOpen}
             onPointerEnter={onIntent}
             onFocus={onIntent}
@@ -144,6 +148,7 @@ export function TaskRow({
         'group/task relative',
         below != null && 'rounded-(--radius-tile) hover:bg-(--menu-hover)',
         checkable && check.checked === true && 'rounded-(--radius-tile) bg-(--menu-hover)',
+        open === true && 'rounded-(--radius-tile) bg-(--sidebar-active)',
       )}
     >
       {row}

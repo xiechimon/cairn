@@ -65,7 +65,7 @@ import {
   type TasksView,
 } from './tasks-sections.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
-import { useOpenThread } from './thread-link.js';
+import { useCloseThread, useOpenThread } from './thread-link.js';
 import { useNarrow } from './use-narrow.js';
 import { PANE_PARAM, paneOf, TASKS_TAB_PARAM, type WorkPane, WorkPanel } from './work-panel.js';
 
@@ -113,6 +113,7 @@ interface HomeCProps {
   tasksQuery?: QueryLike;
   archived?: ArchivedProjectState | null;
   fixtureProjects?: readonly SpiralProject[];
+  thread?: ReactNode;
 }
 
 export function conversationBoundaryKey(input: {
@@ -183,6 +184,7 @@ export function HomeC({
   tasksQuery,
   archived = null,
   fixtureProjects,
+  thread,
 }: HomeCProps) {
   const { t } = useI18n();
   const { user, live, teamId, teamsQuery } = useLiveData();
@@ -201,6 +203,8 @@ export function HomeC({
     [machines, coordinatorMachineId],
   );
   const threadId = searchParams.get(THREAD_PARAM);
+  const docked = thread != null;
+  const paneShown = threadId === null || docked;
   const narrow = useNarrow();
   const { createTodo } = useApiMutations(teamId);
   const projectsQuery = useProjects(teamId, live);
@@ -234,9 +238,10 @@ export function HomeC({
     [setSearchParams],
   );
   const togglePane = (next: WorkPane) => {
-    showPane(pane === next && threadId === null ? null : next);
+    showPane(pane === next && paneShown ? null : next);
   };
   const openThread = useOpenThread();
+  const closeThread = useCloseThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const [loadingDraft, setLoadingDraft] = useState('');
   const { chiefData } = surface;
@@ -381,7 +386,7 @@ export function HomeC({
             variant="ghost"
             size="icon"
             data-testid="tasks-toggle"
-            aria-pressed={pane === 'tasks' && threadId === null}
+            aria-pressed={pane === 'tasks' && paneShown}
             onClick={() => togglePane('tasks')}
             className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
           />
@@ -441,48 +446,48 @@ export function HomeC({
     />
   );
 
-  const panelBody =
-    threadId !== null ? null : pane === 'file' ? (
-      fileTarget !== null && (
-        <FilePreviewPanel key={fileTarget.key} target={fileTarget} onClose={() => showPane(null)} />
-      )
-    ) : pane === 'machines' ? (
-      <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
-    ) : pane === 'tasks' ? (
-      <TasksPanel
-        entries={scopedTasks.entries}
-        questions={scopedTasks.questions}
+  const panelBody = !paneShown ? null : pane === 'file' ? (
+    fileTarget !== null && (
+      <FilePreviewPanel key={fileTarget.key} target={fileTarget} onClose={() => showPane(null)} />
+    )
+  ) : pane === 'machines' ? (
+    <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
+  ) : pane === 'tasks' ? (
+    <TasksPanel
+      entries={scopedTasks.entries}
+      questions={scopedTasks.questions}
+      projectId={projectId}
+      now={now}
+      onClose={() => showPane(null)}
+      openThreadId={docked ? threadId : null}
+      onOpenThread={(id) => (docked && id === threadId ? closeThread() : openThread(id))}
+      onOpenQuestion={openQuestion}
+      addBlocked={archived === null ? null : t(ARCHIVED_PROJECT_WRITE_REASON)}
+      onAddTask={async (text) => {
+        if (live && saveProjectId !== null) {
+          await createTodo.mutateAsync({ projectId: saveProjectId, spec: text });
+          return 'saved';
+        }
+        if (surface.onSend == null) setPrefill({ text, key: Date.now() });
+        else await surface.onSend(text, projectId);
+        if (narrow) showPane(null);
+        return 'sent';
+      }}
+      query={tasksQuery}
+    />
+  ) : (
+    pane !== null && (
+      <WorkPanel
+        todos={scoped}
         projectId={projectId}
         now={now}
         onClose={() => showPane(null)}
         onOpenThread={openThread}
-        onOpenQuestion={openQuestion}
-        addBlocked={archived === null ? null : t(ARCHIVED_PROJECT_WRITE_REASON)}
-        onAddTask={async (text) => {
-          if (live && saveProjectId !== null) {
-            await createTodo.mutateAsync({ projectId: saveProjectId, spec: text });
-            return 'saved';
-          }
-          if (surface.onSend == null) setPrefill({ text, key: Date.now() });
-          else await surface.onSend(text, projectId);
-          if (narrow) showPane(null);
-          return 'sent';
-        }}
-        query={tasksQuery}
+        todosQuery={todosQuery}
       />
-    ) : (
-      pane !== null && (
-        <WorkPanel
-          todos={scoped}
-          projectId={projectId}
-          now={now}
-          onClose={() => showPane(null)}
-          onOpenThread={openThread}
-          todosQuery={todosQuery}
-        />
-      )
-    );
-  const workPanel = threadId === null && pane !== null && (
+    )
+  );
+  const workPanel = paneShown && pane !== null && (
     <PanelBoundary
       title={
         pane === 'file'
@@ -562,6 +567,7 @@ export function HomeC({
               />
             )}
           </section>
+          {thread}
           {workPanel}
         </div>
         {phoneChrome}
@@ -639,6 +645,7 @@ export function HomeC({
             </ConversationBoundary>
           </OpenFileContext.Provider>
         </section>
+        {thread}
         {workPanel}
       </div>
       {phoneChrome}

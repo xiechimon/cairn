@@ -14,11 +14,14 @@ const slideInDone = (page: Page) =>
     .locator('.side-panel')
     .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 
-test('a task row opens its thread beside the Coordinator, and going back returns to the list', async ({
+test('a task row expands its thread between the Coordinator and the list, and the same row collapses it', async ({
   page,
 }) => {
   await page.goto(`${HOME}&pane=tasks`);
-  await tasksPanel(page).getByText('Push for finished threads').click();
+  const row = tasksPanel(page)
+    .locator('[data-slot="task-row"]')
+    .filter({ hasText: 'Push for finished threads' });
+  await row.click();
   await expect(page).toHaveURL(/[?&]thread=home-c-working-a/);
   await expect(page).toHaveURL(/\/app\?/);
   await expect(sideChat(page).locator('h2')).toHaveText('Push for finished threads');
@@ -26,14 +29,62 @@ test('a task row opens its thread beside the Coordinator, and going back returns
   await expect(sideChat(page)).not.toContainText('#2302');
   await expect(page.getByTestId('side-chat-status')).toContainText('运行中');
   await expect(page.getByTestId('transcript-col')).toBeVisible();
-  await expect(page.getByTestId('home-c')).toBeVisible();
-  await expect(tasksPanel(page)).toHaveCount(0);
-  expect(await panelWidth(page)).toBe(420);
+  await expect(tasksPanel(page)).toBeVisible();
+  await expect(row).toHaveAttribute('aria-current', 'true');
+  await expect(sideChat(page).getByRole('button', { name: '返回' })).toHaveCount(0);
+  await expect(sideChat(page).getByRole('button', { name: '关闭' })).toHaveCount(0);
+  const boxes = await page.evaluate(() =>
+    ['[data-testid="home-c"]', '[data-testid="side-chat-panel"]', 'aside[aria-label="任务"]'].map(
+      (selector) => {
+        const box = document.querySelector(selector)!.getBoundingClientRect();
+        return [Math.round(box.left), Math.round(box.right)];
+      },
+    ),
+  );
+  expect(boxes).toEqual([
+    [0, 459],
+    [459, 1020],
+    [1020, 1440],
+  ]);
 
-  await sideChat(page).getByRole('button', { name: '返回' }).click();
+  await row.click();
   await expect(sideChat(page)).toHaveCount(0);
   await expect(page).not.toHaveURL(/thread=/);
   await expect(tasksPanel(page)).toBeVisible();
+  await expect(row).not.toHaveAttribute('aria-current');
+
+  await row.click();
+  await sideChat(page).getByRole('button', { name: '收起' }).click();
+  await expect(sideChat(page)).toHaveCount(0);
+  await expect(tasksPanel(page)).toBeVisible();
+
+  await row.click();
+  await page.mouse.move(0, 0);
+  await expect(sideChat(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(sideChat(page)).toHaveCount(0);
+  await expect(tasksPanel(page)).toBeVisible();
+
+  await row.click();
+  await expect(sideChat(page).locator('h2')).toHaveText('Push for finished threads');
+  await page.keyboard.press('ArrowUp');
+  await expect(sideChat(page).locator('h2')).toHaveText('Rerun the relay probe');
+  await expect(
+    tasksPanel(page).locator('[data-slot="task-row"]').filter({ hasText: 'Rerun the relay probe' }),
+  ).toBeFocused();
+});
+
+test('an expanded thread floats over the Coordinator when docking would leave it under 400px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await page.goto(`${HOME}&pane=tasks&thread=home-c-working-a`);
+  await expect(page.getByTestId('side-chat-panel')).toHaveAttribute('data-docked', 'floating');
+  await expect(tasksPanel(page)).toBeVisible();
+  const conversation = await page
+    .getByTestId('home-c')
+    .evaluate((node) => Math.round(node.getBoundingClientRect().width));
+  expect(conversation).toBe(780);
 });
 
 test('a waiting task in the Tasks panel opens the thread in the side chat', async ({ page }) => {

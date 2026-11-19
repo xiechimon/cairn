@@ -1,7 +1,7 @@
 import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleCheck, Plus, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
@@ -145,11 +145,13 @@ function PanelTaskRow({
   prs,
   prsPending,
   selected,
+  open: expanded,
   onToggle,
   now,
   onOpenThread,
 }: {
   selected: boolean;
+  open: boolean;
   onToggle: () => void;
   entry: TaskEntry;
   place: string | undefined;
@@ -197,6 +199,7 @@ function PanelTaskRow({
           ) : null
         }
         onOpen={open}
+        open={expanded}
         onIntent={() => prefetch(entry.todo.id)}
       />
       {dialogs}
@@ -210,6 +213,7 @@ interface TasksPanelProps {
   projectId: string | null;
   now: number;
   onClose: () => void;
+  openThreadId?: string | null;
   onOpenThread: (id: string) => void;
   onOpenQuestion: (question: QuestionTarget) => void;
   onAddTask: (text: string) => Promise<TaskAddOutcome>;
@@ -223,6 +227,7 @@ export function TasksPanel({
   projectId,
   now,
   onClose,
+  openThreadId = null,
   onOpenThread,
   onOpenQuestion,
   onAddTask,
@@ -259,6 +264,23 @@ export function TasksPanel({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [picked.size]);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    if (openThreadId === null || list === null) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      const rows = [...list.querySelectorAll<HTMLElement>('[data-thread-row]')];
+      const at = rows.findIndex((row) => row.contains(event.target as Node));
+      const next = at === -1 ? undefined : rows[at + (event.key === 'ArrowDown' ? 1 : -1)];
+      if (next === undefined) return;
+      event.preventDefault();
+      next.focus();
+      next.click();
+    };
+    list.addEventListener('keydown', onKey);
+    return () => list.removeEventListener('keydown', onKey);
+  }, [openThreadId]);
   const { live: connected, teamId } = useLiveData();
   const prsQuery = usePrs(teamId, undefined, connected);
   const prs = (prsQuery.data ?? []).filter(
@@ -278,6 +300,7 @@ export function TasksPanel({
       prs={prsOf.get(entry.todo.id) ?? []}
       prsPending={connected && prsQuery.isPending}
       selected={picked.has(entry.todo.id)}
+      open={entry.todo.id === openThreadId}
       onToggle={() => togglePicked(entry.todo.id)}
       now={now}
       onOpenThread={onOpenThread}
@@ -435,7 +458,7 @@ export function TasksPanel({
           }}
         />
       )}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
+      <div ref={listRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
         {tab === 'scheduled' ? (
           <TasksScheduleList
             projectId={projectId}

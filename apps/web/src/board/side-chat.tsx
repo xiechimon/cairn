@@ -3,6 +3,7 @@ import { cn } from 'cn';
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronsRight,
   CircleAlert,
   ListChecks,
   UnfoldVertical,
@@ -546,12 +547,14 @@ export function SideChat({
   listed,
   now,
   chatStream,
+  docked = false,
   onClose,
 }: {
   todoId: string;
   listed: TodoRecord | undefined;
   now: number;
   chatStream?: ThreadChatStream;
+  docked?: boolean;
   onClose: () => void;
 }) {
   const { t } = useI18n();
@@ -590,6 +593,7 @@ export function SideChat({
         changesOpen={changesOpenFor === todo.id}
         onChangesOpen={(open) => setChangesOpenFor(open ? todo.id : null)}
         chatStream={chatStream}
+        docked={docked}
         onClose={onClose}
         onCloseAll={closeAll}
       />
@@ -632,6 +636,7 @@ export function SideChat({
       ref={panelRef}
       label={todo?.title ?? t('任务')}
       onDismiss={onClose}
+      docked={docked}
       testId="side-chat-panel"
     >
       {todo != null && chat.load === 'ready' ? (
@@ -649,7 +654,13 @@ export function SideChat({
         )
       ) : (
         <>
-          <Head todoId={todoId} todo={null} onBack={onClose} onClose={closeAll} />
+          <Head
+            todoId={todoId}
+            todo={null}
+            onBack={onClose}
+            onClose={closeAll}
+            {...(docked ? { onCollapse: onClose } : {})}
+          />
           <Unavailable chat={chat} />
         </>
       )}
@@ -667,6 +678,7 @@ function ReadyThread({
   changesOpen,
   onChangesOpen,
   chatStream,
+  docked,
   onClose,
   onCloseAll,
 }: {
@@ -679,6 +691,7 @@ function ReadyThread({
   changesOpen: boolean;
   onChangesOpen: (open: boolean) => void;
   chatStream: ThreadChatStream | undefined;
+  docked: boolean;
   onClose: () => void;
   onCloseAll: () => void;
 }) {
@@ -771,6 +784,7 @@ function ReadyThread({
         onBack={view !== 'chat' ? () => onView('chat') : onClose}
         backLabel={view !== 'chat' ? t('返回对话') : t('返回')}
         onClose={onCloseAll}
+        {...(docked ? { onCollapse: onClose, subView: view !== 'chat' } : {})}
         menu={actions.menu}
         titleExtra={<ThreadAutomations key={todo.id} todo={todo} now={now} />}
         tooltip={todo.title}
@@ -862,6 +876,8 @@ function Head({
   todo,
   onBack,
   onClose,
+  onCollapse,
+  subView = false,
   menu,
   backLabel,
   titleExtra,
@@ -872,6 +888,8 @@ function Head({
   todo: TodoRecord | null;
   onBack: () => void;
   onClose: () => void;
+  onCollapse?: () => void;
+  subView?: boolean;
   menu?: ReactNode;
   backLabel?: string;
   titleExtra?: ReactNode;
@@ -889,27 +907,35 @@ function Head({
       data-testid="side-chat"
       data-todo-id={todoId}
       data-phase={todo?.phase}
-      className="flex min-h-17 flex-none items-center gap-0.5 py-3.5 pr-3.5 pl-1"
+      className={cn(
+        'flex min-h-17 flex-none items-center gap-0.5 py-3.5 pr-3.5',
+        onCollapse !== undefined && !subView ? 'pl-4' : 'pl-1',
+      )}
     >
-      <IconTooltip
-        label={backLabel ?? t('返回')}
-        side="bottom"
-        trigger={
-          <Button
-            variant="ghost"
-            size="icon"
-            data-testid="side-chat-back"
-            onClick={onBack}
-            className={THREAD_HEAD_BUTTON}
-          />
-        }
-      >
-        <ChevronLeft aria-hidden="true" />
-      </IconTooltip>
+      {(onCollapse === undefined || subView) && (
+        <IconTooltip
+          label={backLabel ?? t('返回')}
+          side="bottom"
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              data-testid="side-chat-back"
+              onClick={onBack}
+              className={THREAD_HEAD_BUTTON}
+            />
+          }
+        >
+          <ChevronLeft aria-hidden="true" />
+        </IconTooltip>
+      )}
       <span
         aria-hidden="true"
         data-slot="side-chat-glyph"
-        className="ml-1.5 flex size-6 flex-none items-center justify-center rounded-(--cds-radius-md) bg-background shadow-(--e1-lift)"
+        className={cn(
+          'flex size-6 flex-none items-center justify-center rounded-(--cds-radius-md) bg-background shadow-(--e1-lift)',
+          (onCollapse === undefined || subView) && 'ml-1.5',
+        )}
       >
         <ListChecks className="size-4 text-content-secondary" />
       </span>
@@ -933,15 +959,33 @@ function Head({
         {children}
       </div>
       {menu}
-      <IconTooltip
-        label={t('关闭')}
-        side="bottom"
-        trigger={
-          <Button variant="ghost" size="icon" onClick={onClose} className={THREAD_HEAD_BUTTON} />
-        }
-      >
-        <X aria-hidden="true" />
-      </IconTooltip>
+      {onCollapse === undefined ? (
+        <IconTooltip
+          label={t('关闭')}
+          side="bottom"
+          trigger={
+            <Button variant="ghost" size="icon" onClick={onClose} className={THREAD_HEAD_BUTTON} />
+          }
+        >
+          <X aria-hidden="true" />
+        </IconTooltip>
+      ) : (
+        <IconTooltip
+          label={t('收起')}
+          side="bottom"
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              data-testid="side-chat-collapse"
+              onClick={onCollapse}
+              className={THREAD_HEAD_BUTTON}
+            />
+          }
+        >
+          <ChevronsRight aria-hidden="true" />
+        </IconTooltip>
+      )}
     </header>
   );
 }

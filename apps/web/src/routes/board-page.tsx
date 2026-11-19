@@ -43,7 +43,9 @@ import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import { SideChat } from '../board/side-chat.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useCloseThread } from '../board/thread-link.js';
+import { usePanelDocked } from '../board/use-narrow.js';
 import { useTasksView } from '../board/use-tasks-view.js';
+import { PANE_PARAM, paneOf } from '../board/work-panel.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { todoGlanceOf } from '../chief/chief-task-refs.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -79,6 +81,7 @@ export function BoardPage() {
   const homeProjectId = searchParams.get('project');
   const threadId = searchParams.get(THREAD_PARAM);
   const closeThread = useCloseThread();
+  const panelDocked = usePanelDocked();
   const liveProject = live ? (projectsQ.data ?? []).find((p) => p.id === homeProjectId) : undefined;
   const fixtureList = useMemo(
     () => (live ? [] : fixtureProjects(fixture, archiveEdits)),
@@ -239,6 +242,28 @@ export function BoardPage() {
     projectLookup !== 'loading' &&
     projectLookup !== 'failed' &&
     !(projectLookup === 'unknown' && homeProjectId !== null);
+  const dockThread =
+    homeShown &&
+    threadId !== null &&
+    panelDocked &&
+    paneOf(searchParams.get(PANE_PARAM)) === 'tasks';
+  const sideChat = (docked: boolean) =>
+    threadId !== null && (
+      <TodoGlanceContext.Provider value={todoGlances}>
+        <SideChat
+          key={threadId}
+          todoId={threadId}
+          listed={
+            todos.find((todo) => todo.id === threadId) ??
+            (!live && todos.length === 1 ? todos[0] : undefined)
+          }
+          now={live ? Date.now() : fixture.now}
+          chatStream={{ items: chief.chiefData.stream ?? [], at: chief.chiefData.streamAt ?? [] }}
+          docked={docked}
+          onClose={closeThread}
+        />
+      </TodoGlanceContext.Provider>
+    );
   if (setupHome && setupDecision === undefined && firstRunRemembered()) {
     return <FirstRunFrame />;
   }
@@ -314,27 +339,11 @@ export function BoardPage() {
               tasksQuery={live ? tasksQ : undefined}
               archived={archivedState}
               fixtureProjects={live ? undefined : fixtureActive}
+              {...(dockThread ? { thread: sideChat(true) } : {})}
             />
           )}
         </div>
-        {threadId !== null && (
-          <TodoGlanceContext.Provider value={todoGlances}>
-            <SideChat
-              key={threadId}
-              todoId={threadId}
-              listed={
-                todos.find((todo) => todo.id === threadId) ??
-                (!live && todos.length === 1 ? todos[0] : undefined)
-              }
-              now={live ? Date.now() : fixture.now}
-              chatStream={{
-                items: chief.chiefData.stream ?? [],
-                at: chief.chiefData.streamAt ?? [],
-              }}
-              onClose={closeThread}
-            />
-          </TodoGlanceContext.Provider>
-        )}
+        {threadId !== null && !dockThread && sideChat(false)}
       </div>
       <SearchPanel
         open={search.open}

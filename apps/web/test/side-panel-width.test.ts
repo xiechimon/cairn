@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampPanelWidth,
+  dockedThreadLayout,
   PANEL_WIDTH_DEFAULT,
   PANEL_WIDTH_MIN,
   panelWidthMax,
@@ -37,5 +38,13 @@ describe('side panel width', () => {
 
   it('rounds to whole pixels', () => {
     expect(clampPanelWidth(480.6, 1440)).toBe(481);
+  });
+
+  it('docks an open task between the conversation and the Tasks panel while the conversation keeps 400px', () => {
+    expect(dockedThreadLayout(1440, 420)).toEqual({ width: 561, floating: false });
+    expect(dockedThreadLayout(1920, 420)).toEqual({ width: 600, floating: false });
+    expect(dockedThreadLayout(1320, 420)).toEqual({ width: 495, floating: false });
+    expect(dockedThreadLayout(1260, 420)).toEqual({ width: 462, floating: true });
+    expect(dockedThreadLayout(1220, 420)).toEqual({ width: 440, floating: true });
   });
 });

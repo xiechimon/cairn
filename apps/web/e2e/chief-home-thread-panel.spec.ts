@@ -202,6 +202,7 @@ test('a working thread offers no action note', async ({ page }) => {
 });
 
 test('back returns to the tasks list and close leaves the panel area empty', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 732 });
   await page.goto(`${HOME}&pane=tasks&thread=home-c-review`);
   await panel(page).getByTestId('side-chat-back').click();
   await expect(panel(page)).toHaveCount(0);
