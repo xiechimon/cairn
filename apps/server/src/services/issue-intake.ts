@@ -4,6 +4,7 @@ import {
   type Phase,
   parseGithubIssueSourceRef,
   type SecretBox,
+  WEBHOOK_TRIGGER_LABEL,
 } from '@cairn/shared';
 import {
   and,
@@ -63,7 +64,7 @@ import { orchestrateTodo } from './orchestrate.js';
 
 export const ISSUE_INTAKE_INTERVAL_MS = 300_000;
 
-export const ISSUE_INTAKE_LABEL = 'ready-for-agent';
+export const ISSUE_INTAKE_LABEL = WEBHOOK_TRIGGER_LABEL;
 
 export const ISSUE_INTAKE_OWN_LANE_LABEL = 'by:cairn';
 

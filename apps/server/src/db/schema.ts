@@ -1229,24 +1229,32 @@ export const composerDraft = sqliteTable(
   (t) => [uniqueIndex('composer_draft_owner_scope_idx').on(t.teamId, t.userId, t.scope)],
 );
 
-export const githubConnection = sqliteTable('github_connection', {
-  githubUserId: integer('githubUserId'),
-  githubName: text('githubName'),
-  teamId: text('teamId')
-    .primaryKey()
-    .references(() => team.id, { onDelete: 'cascade' }),
-  login: text('login').notNull(),
-  accessTokenCipher: text('accessTokenCipher').notNull(),
-  refreshTokenCipher: text('refreshTokenCipher'),
-  accessTokenExpiresAt: epochMs('accessTokenExpiresAt'),
-  refreshTokenExpiresAt: epochMs('refreshTokenExpiresAt'),
-  appClientId: text('appClientId'),
-  connectionGeneration: text('connectionGeneration'),
-  refreshLeaseUntil: epochMs('refreshLeaseUntil'),
-  disconnectedReason: text('disconnectedReason'),
-  scope: text('scope').notNull(),
-  createdAt: epochMs('createdAt').notNull(),
-});
+export const githubConnection = sqliteTable(
+  'github_connection',
+  {
+    githubUserId: integer('githubUserId'),
+    githubName: text('githubName'),
+    teamId: text('teamId')
+      .primaryKey()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    login: text('login').notNull(),
+    accessTokenCipher: text('accessTokenCipher').notNull(),
+    refreshTokenCipher: text('refreshTokenCipher'),
+    accessTokenExpiresAt: epochMs('accessTokenExpiresAt'),
+    refreshTokenExpiresAt: epochMs('refreshTokenExpiresAt'),
+    appClientId: text('appClientId'),
+    connectionGeneration: text('connectionGeneration'),
+    refreshLeaseUntil: epochMs('refreshLeaseUntil'),
+    disconnectedReason: text('disconnectedReason'),
+    webhookTokenHash: text('webhookTokenHash'),
+    webhookMasked: text('webhookMasked'),
+    webhookDeliveries: json<string[]>('webhookDeliveries'),
+    webhookLastUsedAt: epochMs('webhookLastUsedAt'),
+    scope: text('scope').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [uniqueIndex('github_connection_webhookTokenHash_unique').on(t.webhookTokenHash)],
+);
 
 type GateVerdictKind = 'review' | 'verify' | 'decision';
 type GateVerdictOutcome =

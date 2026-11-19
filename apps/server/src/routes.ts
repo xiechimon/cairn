@@ -9,6 +9,7 @@ import { registerDeployRoutes } from './routes-deploy.js';
 import { registerDraftRoutes } from './routes-drafts.js';
 import { registerEngineScreenRoutes } from './routes-engine-screen.js';
 import { registerGitHostingRoutes } from './routes-git-hosting.js';
+import { registerGithubWebhookRoutes } from './routes-github-webhook.js';
 import { githubAppOf } from './routes-helpers.js';
 import { registerImRoutes } from './routes-im.js';
 import { registerMailRoutes } from './routes-mail.js';
@@ -36,6 +37,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerMemoryRoutes(app, ctx);
   registerResourceRoutes(app, ctx);
   registerGitHostingRoutes(app, ctx);
+  registerGithubWebhookRoutes(app, ctx);
   registerPushRoutes(app, ctx);
   registerImRoutes(app, ctx);
   registerMailRoutes(app, ctx);

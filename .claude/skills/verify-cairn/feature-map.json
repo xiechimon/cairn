@@ -1707,7 +1707,8 @@
         ],
         "server": [
           "apps/server/src/services/github-connection.ts",
-          "apps/server/src/services/github-issues.ts"
+          "apps/server/src/services/github-issues.ts",
+          "apps/server/src/services/github-webhook.ts"
         ]
       },
       "routes": {
@@ -1715,7 +1716,8 @@
           "/api/teams/:id/github/**",
           "/api/github/repos",
           "/api/projects/:id/github/issues/import",
-          "/api/todos/:id/github-issue**"
+          "/api/todos/:id/github-issue**",
+          "/api/webhook/github/:token"
         ]
       },
       "reach": [

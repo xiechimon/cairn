@@ -20,9 +20,8 @@ describe('retired zero-use features (#1796)', () => {
   it('drops the whats-new route and every retired webhook route from the web vocabulary', () => {
     const paths = WEB_REST_ENDPOINTS.map((endpoint) => endpoint.path);
     expect(paths).not.toContain('/api/whats-new');
-    expect(
-      paths.some((path) => path.includes('webhook') && path !== '/api/webhook/schedule/{token}'),
-    ).toBe(false);
+    const kept = new Set(['/api/webhook/github/{token}', '/api/webhook/schedule/{token}']);
+    expect(paths.some((path) => path.includes('webhook') && !kept.has(path))).toBe(false);
   });
 
   it('drops remote shell from agent switches, chief tools, machine wire, and custom tools', () => {

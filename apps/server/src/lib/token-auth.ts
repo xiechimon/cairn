@@ -15,7 +15,7 @@ const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const OWNER_ONLY_PATTERNS = [
   /^\/api\/computers(?:\/[^/]+)?$/,
   /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|devin-subscriptions|antigravity-subscriptions|mcp-connectors|agent-config)(?:\/|$)/,
-  /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection)(?:\/|$)/,
+  /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection|webhook)(?:\/|$)/,
   /^\/api\/machines\/[^/]+(?:\/|$)/,
 ];
 
@@ -44,6 +44,7 @@ function isExempt(pathname: string): boolean {
     (pathname === '/api/machine' || pathname.startsWith('/api/machine/'))
   )
     return true;
+  if (pathname.startsWith('/api/webhook/')) return true;
   if (pathname === '/api/mcp') return true;
   if (pathname === '/api/oauth/callback') return true;
   if (pathname === '/api/auth/bootstrap') return true;

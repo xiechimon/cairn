@@ -331,10 +331,14 @@ export function readGithubConnectionStatus(
 ): GithubConnectionStatus {
   const row = getRow(deps, teamId);
   if (!row) return { connected: false };
+  const webhook = {
+    ...(row.webhookMasked !== null ? { webhookMasked: row.webhookMasked } : {}),
+    ...(row.webhookLastUsedAt !== null ? { webhookLastUsedAt: row.webhookLastUsedAt } : {}),
+  };
   if (row.disconnectedReason !== null) {
-    return { connected: false, disconnectReason: row.disconnectedReason };
+    return { connected: false, disconnectReason: row.disconnectedReason, ...webhook };
   }
-  return { connected: true, login: row.login, scope: row.scope };
+  return { connected: true, login: row.login, scope: row.scope, ...webhook };
 }
 
 export async function teamUserToken(

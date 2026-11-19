@@ -145,6 +145,10 @@ test('device-grant migration preserves historical credentials and nullable prove
       appClientId: null,
       connectionGeneration: null,
       refreshLeaseUntil: null,
+      webhookTokenHash: null,
+      webhookMasked: null,
+      webhookDeliveries: null,
+      webhookLastUsedAt: null,
     });
     const info = sqlite.prepare('PRAGMA table_info(github_connection)').all() as {
       name: string;

@@ -6513,6 +6513,12 @@ exports[`body/envelope schema snapshots > githubConnectionStatus > githubConnect
     "scope": {
       "type": "string",
     },
+    "webhookLastUsedAt": {
+      "type": "number",
+    },
+    "webhookMasked": {
+      "type": "string",
+    },
   },
   "required": [
     "connected",
@@ -10999,6 +11005,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
       "state",
       "error",
     ],
+  },
+  {
+    "method": "POST",
+    "note": "seq-32：GitHub issues webhook——labeled ready-for-agent 进 importGithubIssue，202 一律，未知 token 401",
+    "path": "/api/webhook/github/{token}",
   },
 ]
 `;
