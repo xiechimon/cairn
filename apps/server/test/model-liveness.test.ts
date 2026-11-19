@@ -1,7 +1,11 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { getModelLiveness, refreshRelayCatalog } from '../src/services/model-liveness.js';
+import {
+  getModelLiveness,
+  markModelDead,
+  refreshRelayCatalog,
+} from '../src/services/model-liveness.js';
 import { bootServer, req } from './helpers.js';
 
 let server: Server;
@@ -54,7 +58,7 @@ describe('refreshRelayCatalog probes the models list under the base URL', () => 
       paths.length = 0;
       await refreshRelayCatalog({ db: s.db, box: s.secretBox }, s.team.id, providerId);
       expect(paths).toEqual([expected]);
-      expect(getModelLiveness(providerId, 'listed-model')).toBe('alive');
+      expect(getModelLiveness(s.team.id, providerId, 'listed-model')).toBe('alive');
     } finally {
       s.dispose();
     }
@@ -85,5 +89,33 @@ test('a subscription provider is probed with its access token, never the stored 
     expect(authorizations).toEqual(['Bearer access-fixture']);
   } finally {
     s.dispose();
+  }
+});
+
+test("liveness state is scoped per team: one team cannot share another team's catalog or dead marks", async () => {
+  const a = bootServer();
+  const b = bootServer();
+  try {
+    expect(a.team.id).not.toBe(b.team.id);
+    for (const s of [a, b]) {
+      const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/providers`, {
+        providerId: 'shared-relay',
+        label: 'Relay',
+        baseUrl: `${origin}/v1`,
+        api: 'openai-completions',
+        apiKey: 'sk-probe',
+        models: [{ id: 'listed-model', name: 'Listed' }],
+      });
+      expect(res.status).toBe(201);
+    }
+    await refreshRelayCatalog({ db: a.db, box: a.secretBox }, a.team.id, 'shared-relay');
+    expect(getModelLiveness(a.team.id, 'shared-relay', 'listed-model')).toBe('alive');
+    expect(getModelLiveness(b.team.id, 'shared-relay', 'listed-model')).toBe('unknown');
+    markModelDead(a.team.id, 'shared-relay', 'listed-model');
+    expect(getModelLiveness(b.team.id, 'shared-relay', 'listed-model')).not.toBe('dead');
+    expect(getModelLiveness(a.team.id, 'shared-relay', 'listed-model')).toBe('dead');
+  } finally {
+    a.dispose();
+    b.dispose();
   }
 });

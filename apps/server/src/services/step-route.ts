@@ -95,7 +95,7 @@ export function capabilityCandidates(
   constraints: RouteConstraints,
 ): CapabilityCandidate[] {
   const now = nowMs();
-  const catalog = mergedCatalogModels();
+  const catalog = mergedCatalogModels(teamId);
   const subscribed = hasActiveClaudeSubscription({ db }, teamId);
   const codexProvider = codexProviderKeyed(db, teamId);
   const candidates: CapabilityCandidate[] = [];

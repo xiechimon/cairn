@@ -214,7 +214,10 @@ export function getModelSources(deps: ProviderDeps, teamId: string): ModelSource
       providerLabel: p.label,
       installed: true,
       hostname: hostname(),
-      models: models.map((m) => ({ ...m, liveness: getModelLiveness(p.providerId, m.id) })),
+      models: models.map((m) => ({
+        ...m,
+        liveness: getModelLiveness(teamId, p.providerId, m.id),
+      })),
     };
   });
   return {

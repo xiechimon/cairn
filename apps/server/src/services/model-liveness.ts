@@ -10,6 +10,7 @@ interface CachedModel {
 }
 
 interface ProviderLivenessCache {
+  teamId: string;
   fetchedAt: number;
   models: Map<string, CachedModel>;
 }
@@ -64,9 +65,10 @@ export async function refreshRelayCatalog(
 
     const models = new Map<string, CachedModel>();
     const now = Date.now();
+    const cacheKey = `${teamId}/${providerId}`;
     for (const item of raw.data ?? []) {
       if (typeof item.id === 'string' && item.id !== '') {
-        const prev = catalogCache.get(providerId)?.models.get(item.id);
+        const prev = catalogCache.get(cacheKey)?.models.get(item.id);
         if (prev?.liveness === 'dead' && now - prev.at < DEAD_TTL_MS) {
           models.set(item.id, prev);
         } else {
@@ -74,24 +76,25 @@ export async function refreshRelayCatalog(
         }
       }
     }
-    catalogCache.set(providerId, { fetchedAt: now, models });
+    catalogCache.set(cacheKey, { teamId, fetchedAt: now, models });
   } catch {}
 }
 
-export function markModelDead(providerId: string, modelId: string): void {
+export function markModelDead(teamId: string, providerId: string, modelId: string): void {
   const now = Date.now();
-  const cached = catalogCache.get(providerId);
+  const cached = catalogCache.get(`${teamId}/${providerId}`);
   if (cached !== undefined) {
     cached.models.set(modelId, { at: now, liveness: 'dead' });
   }
-  minProbeCache.set(`${providerId}/${modelId}`, { at: now, liveness: 'dead' });
+  minProbeCache.set(`${teamId}/${providerId}/${modelId}`, { at: now, liveness: 'dead' });
 }
 
 export function getModelLiveness(
+  teamId: string,
   providerId: string,
   modelId: string,
 ): 'alive' | 'dead' | 'unknown' {
-  const cacheKey = `${providerId}/${modelId}`;
+  const cacheKey = `${teamId}/${providerId}/${modelId}`;
   const mpCached = minProbeCache.get(cacheKey);
   if (mpCached !== undefined && Date.now() - mpCached.at < MIN_PROBE_TTL_MS) {
     if (mpCached.liveness === 'dead' && Date.now() - mpCached.at >= DEAD_TTL_MS) {
@@ -99,7 +102,7 @@ export function getModelLiveness(
     }
     return mpCached.liveness;
   }
-  const catCached = catalogCache.get(providerId)?.models.get(modelId);
+  const catCached = catalogCache.get(`${teamId}/${providerId}`)?.models.get(modelId);
   if (catCached === undefined) return 'unknown';
   if (catCached.liveness === 'dead' && Date.now() - catCached.at >= DEAD_TTL_MS) {
     return 'unknown';
@@ -107,14 +110,14 @@ export function getModelLiveness(
   return catCached.liveness;
 }
 
-export function mergedCatalogModels(): ModelSourceModel[] {
+export function mergedCatalogModels(teamId: string): ModelSourceModel[] {
   const merged = new Map<
     string,
     { id: string; name: string; liveness: 'alive' | 'dead' | 'unknown' }
   >();
   const now = Date.now();
-  for (const [_providerId, cache] of catalogCache) {
-    if (now - cache.fetchedAt >= CATALOG_CACHE_TTL_MS) continue;
+  for (const cache of catalogCache.values()) {
+    if (cache.teamId !== teamId || now - cache.fetchedAt >= CATALOG_CACHE_TTL_MS) continue;
     for (const [id, entry] of cache.models) {
       let liveness: 'alive' | 'dead' | 'unknown' = entry.liveness;
       if (liveness === 'dead' && now - entry.at >= DEAD_TTL_MS) liveness = 'unknown';

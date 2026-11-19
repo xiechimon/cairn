@@ -482,7 +482,7 @@ async function tryClaim(
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
   refreshClaudeRateParks(deps, teamId);
-  const catalog = mergedCatalogModels();
+  const catalog = mergedCatalogModels(teamId);
   const full =
     machineQueueReason(
       machineRow,

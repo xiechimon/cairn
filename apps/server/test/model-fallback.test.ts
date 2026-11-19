@@ -481,8 +481,8 @@ describe('model fallback chain (#1493)', () => {
 
   test('X7: an open provider is not chosen as fallback', async () => {
     const w = await setupWorld();
-    for (let i = 0; i < 5; i++) providerHealth.recordFailure('relay-b');
-    expect(providerHealth.state('relay-b')).toBe('open');
+    for (let i = 0; i < 5; i++) providerHealth.recordFailure(`${w.s.team.id}/relay-b`);
+    expect(providerHealth.state(`${w.s.team.id}/relay-b`)).toBe('open');
     await startBuild(w);
     const c = await claim(w);
     await done(w, c.stepId, quotaDone('relay-a'));
@@ -623,21 +623,22 @@ describe('model fallback chain (#1493)', () => {
         .from(buildTable)
         .where(eq(buildTable.id, buildId))
         .get()?.errorMessage;
-      for (let i = 0; i < 5; i++) providerHealth.recordFailure('relay-b');
+      const relayBKey = `${w.s.team.id}/relay-b`;
+      for (let i = 0; i < 5; i++) providerHealth.recordFailure(relayBKey);
       const circuit = vi.spyOn(providerHealth, 'state').mockReturnValue('half_open');
       const failures = vi.spyOn(providerHealth, 'recordFailure');
       try {
-        expect(providerHealth.tryAcquire('relay-b')).toBe(true);
-        expect(providerHealth.tryAcquire('relay-b')).toBe(false);
+        expect(providerHealth.tryAcquire(relayBKey)).toBe(true);
+        expect(providerHealth.tryAcquire(relayBKey)).toBe(false);
         await done(w, 'fallback-probe-sibling', outcome);
-        expect(providerHealth.tryAcquire('relay-b')).toBe(true);
-        if (_label === 'provider failure') expect(failures).toHaveBeenCalledWith('relay-b');
+        expect(providerHealth.tryAcquire(relayBKey)).toBe(true);
+        if (_label === 'provider failure') expect(failures).toHaveBeenCalledWith(relayBKey);
         else expect(failures).not.toHaveBeenCalled();
       } finally {
         circuit.mockRestore();
         failures.mockRestore();
       }
-      expect(providerHealth.state('relay-b')).toBe(clearsFailures ? 'healthy' : 'open');
+      expect(providerHealth.state(relayBKey)).toBe(clearsFailures ? 'healthy' : 'open');
       expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.phase).toBe(
         'failed',
       );
@@ -713,16 +714,18 @@ describe('model fallback chain (#1493)', () => {
     await startBuild(w);
     const a = await claim(w);
     await done(w, a.stepId, quotaDone('relay-a'));
-    for (let i = 0; i < 2; i++) providerHealth.recordFailure('relay-a');
-    expect(providerHealth.state('relay-a')).toBe('degraded');
-    providerHealth.recordFailure('relay-b');
+    const relayAKey = `${w.s.team.id}/relay-a`;
+    const relayBKey = `${w.s.team.id}/relay-b`;
+    for (let i = 0; i < 2; i++) providerHealth.recordFailure(relayAKey);
+    expect(providerHealth.state(relayAKey)).toBe('degraded');
+    providerHealth.recordFailure(relayBKey);
     const b = await claim(w);
     await done(w, b.stepId, {
       status: 'success',
       usage: [{ model: 'relay-b/model-b', input: 10, output: 5, cacheRead: 0, cacheWrite: 0 }],
     });
-    expect(providerHealth.state('relay-b')).toBe('healthy');
-    expect(providerHealth.state('relay-a')).toBe('degraded');
+    expect(providerHealth.state(relayBKey)).toBe('healthy');
+    expect(providerHealth.state(relayAKey)).toBe('degraded');
   });
 });
 

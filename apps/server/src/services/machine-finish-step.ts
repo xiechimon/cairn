@@ -466,7 +466,12 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   ) {
     releaseUnconsumedSteer(db, stepRow);
     if (worker?.agentRow)
-      recordProviderOutcome(effectiveModel(worker.agentRow, stepRow).provider, outcome, false);
+      recordProviderOutcome(
+        stepTeamId(deps, stepRow),
+        effectiveModel(worker.agentRow, stepRow).provider,
+        outcome,
+        false,
+      );
     if (outcome.skillInjectionFacts !== undefined)
       recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
     applyStoppedStep(deps, stepId);
@@ -477,6 +482,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   if (worker !== null && settleParkedStep(deps, stepRow, outcome)) {
     if (worker.agentRow)
       recordProviderOutcome(
+        stepTeamId(deps, stepRow),
         effectiveModel(worker.agentRow, stepRow).provider,
         outcome,
         isZeroUsageSilentSuccess(stepRow.kind, outcome),
@@ -489,16 +495,27 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   if (recoverClaudeRateLimitFailure(deps, stepRow, outcome)) return;
   const zeroUsage = worker !== null && isZeroUsageSilentSuccess(stepRow.kind, outcome);
   if (worker?.agentRow) {
-    recordProviderOutcome(effectiveModel(worker.agentRow, stepRow).provider, outcome, zeroUsage);
+    recordProviderOutcome(
+      stepTeamId(deps, stepRow),
+      effectiveModel(worker.agentRow, stepRow).provider,
+      outcome,
+      zeroUsage,
+    );
   }
   const chiefAgent = chiefStepAgent(deps, stepRow);
   if (chiefAgent !== null) {
     releaseUnconsumedSteer(db, stepRow);
-    recordProviderOutcome(effectiveModel(chiefAgent, stepRow).provider, outcome, false);
+    recordProviderOutcome(
+      stepTeamId(deps, stepRow),
+      effectiveModel(chiefAgent, stepRow).provider,
+      outcome,
+      false,
+    );
     const plan = planModelFallback(db, stepRow, chiefAgent, outcome);
     if (plan !== null) {
       if (plan.trigger === 'model_unavailable') {
-        markModelDead(plan.from.provider, plan.from.modelId);
+        const teamId = stepTeamId(deps, stepRow);
+        if (teamId !== null) markModelDead(teamId, plan.from.provider, plan.from.modelId);
       }
       const content: ChiefModelFallbackContent = {
         kind: CHIEF_MODEL_FALLBACK_KIND,
@@ -519,7 +536,10 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable'
   ) {
     const ran = worker.agentRow ? effectiveModel(worker.agentRow, stepRow) : null;
-    if (ran?.provider && ran.modelId) markModelDead(ran.provider, ran.modelId);
+    if (ran?.provider && ran.modelId) {
+      const teamId = stepTeamId(deps, stepRow);
+      if (teamId !== null) markModelDead(teamId, ran.provider, ran.modelId);
+    }
     if (outcome.skillInjectionFacts !== undefined)
       recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
     applyStepFailure(
@@ -536,7 +556,8 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     const plan = planModelFallback(db, stepRow, worker.agentRow, outcome);
     if (plan !== null) {
       if (plan.trigger === 'model_unavailable') {
-        markModelDead(plan.from.provider, plan.from.modelId);
+        const teamId = stepTeamId(deps, stepRow);
+        if (teamId !== null) markModelDead(teamId, plan.from.provider, plan.from.modelId);
       }
       requeueStep(deps, stepRow, plan.row, {
         id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
@@ -573,7 +594,10 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   ) {
     const ranAgent = worker?.agentRow ?? chiefAgent;
     const ran = ranAgent ? effectiveModel(ranAgent, stepRow) : { provider: null, modelId: null };
-    if (ran.provider && ran.modelId) markModelDead(ran.provider, ran.modelId);
+    if (ran.provider && ran.modelId) {
+      const teamId = stepTeamId(deps, stepRow);
+      if (teamId !== null) markModelDead(teamId, ran.provider, ran.modelId);
+    }
   }
   if (outcome.skillInjectionFacts !== undefined) {
     recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);

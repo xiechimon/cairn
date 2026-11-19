@@ -179,7 +179,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     return coordinatorProfile(db, teamId, row.projectId);
   }
 
-  const catalog = mergedCatalogModels();
+  const catalog = mergedCatalogModels(teamId);
   const enabledId = enabledSubscriptionId({ db }, teamId);
   const enabledDevinId = enabledDevinSubscriptionId({ db }, teamId);
   const enabledAntigravityId = enabledAntigravitySubscriptionId({ db }, teamId);

@@ -94,7 +94,14 @@ function canRunOn(db: Db, row: PendingRow, target: MachineRow, now: number): boo
     localProject,
     localMerge: parseLocalMergeInstruction(row.stepRow.prompt) !== null,
   };
-  return !targetUnavailable(db, target, row.todoRow.teamId, facts, mergedCatalogModels(), now);
+  return !targetUnavailable(
+    db,
+    target,
+    row.todoRow.teamId,
+    facts,
+    mergedCatalogModels(row.todoRow.teamId),
+    now,
+  );
 }
 
 function alternativeFor(

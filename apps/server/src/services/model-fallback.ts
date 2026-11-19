@@ -93,14 +93,16 @@ export function isProviderFailure(outcome: MachineDoneBody): boolean {
 }
 
 export function recordProviderOutcome(
+  teamId: string | null,
   provider: string | null,
   outcome: MachineDoneBody,
   silent: boolean,
 ): void {
-  if (provider === null) return;
-  if (outcome.status === 'success' && !silent) providerHealth.recordSuccess(provider);
-  else if (isProviderFailure(outcome)) providerHealth.recordFailure(provider);
-  else providerHealth.releaseProbe(provider);
+  if (teamId === null || provider === null) return;
+  const key = `${teamId}/${provider}`;
+  if (outcome.status === 'success' && !silent) providerHealth.recordSuccess(key);
+  else if (isProviderFailure(outcome)) providerHealth.recordFailure(key);
+  else providerHealth.releaseProbe(key);
 }
 
 export interface FallbackPlan {
@@ -145,8 +147,8 @@ export function planModelFallback(
           ? m.provider === primary.provider
           : true)) &&
       hosts.some((host) => runtimeGatePasses(host, m.provider)) &&
-      getModelLiveness(m.provider, m.modelId) !== 'dead' &&
-      providerHealth.tryAcquire(m.provider),
+      getModelLiveness(agentRow.teamId, m.provider, m.modelId) !== 'dead' &&
+      providerHealth.tryAcquire(`${agentRow.teamId}/${m.provider}`),
   );
   if (to === undefined) return null;
   return {
