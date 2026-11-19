@@ -46,6 +46,12 @@ Component x state list (every cell is produced and screenshotted; the transition
 | <component> | <how produced: live / seeded / fixture> | ... | | | | | | | <recording: appear, update, settle, reopened> |
 Seed any state the stack cannot reach on its own (verify-cairn seeds or fixtures). Mark fixture cells as fixture. Do not mark a cell "n/a" without a reason.
 
+Craft (answer before code, one line each; DESIGN-RULES P6):
+- Arrival: what appears or changes while the user watches, and how it grows (DESIGN.md Motion, Growth)? History, reloads and the user's own actions show the result at once; reduced motion turns it off. Rules C23, A2, V24.
+- States: does the loading skeleton have the final shape (A4)? Does the user's own change show in the same frame and roll back with a message on failure (C24)? Which P3 cells need seeding?
+- Finish: counts and times in tabular figures (V27); dark layers by surface lightness, not stroke (V28); glyphs on their optical centre (V29).
+- Measure: which `M` rule and which spec asserts each answer? A new `M` rule names its spec in the Check column (`test/anti-slop-foundations.test.ts` enforces it).
+
 Acceptance (done means all of these):
 1. Coverage table: the filled component x state list above, each cell with a screenshot.
 2. Compare to reference: for each state with a reference shot, one row "reference | ours" and one sentence on the difference. State what is still worse than the reference.

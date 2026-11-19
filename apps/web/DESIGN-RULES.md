@@ -17,6 +17,7 @@ Each rule has an id. Name the ids you checked when you report the change. The Ch
 | P3 | List component x state before coding: empty, loading, error, offline, long content, pending question, 390px, dark, and transition. A state the stack cannot produce is seeded; a state nobody has seen is not done. Transition applies to anything that appears or changes while the user watches (a live turn, a task, a stream): its evidence is a recording or a run of consecutive frames covering appear, update, settle and the same view reopened as history; screenshots alone do not finish it (mon X 2026-11-19). | H |
 | P4 | Drafts and fixtures use real copy and real-looking data, never lorem ipsum or `Item 1`. | H |
 | P5 | Fixture screenshots (`?scenario=`) are labelled as fixture evidence and never stand in for the live stack. | H |
+| P6 | Before code, the brief answers the four craft questions in `.claude/skills/design-cairn/SKILL.md`: how what arrives grows, which states (skeleton shape, the user's own change and its rollback), which finishing rules apply, and which spec measures each answer (mon X 2026-11-19: quality found in review is quality found too late). | H |
 
 ## 2. Composition and state
 
@@ -121,8 +122,9 @@ Source: the owner's reference-versus-ours review of the sidebar (#3144, 2026-11-
 ## 5. Using the rules
 
 - Briefs for UI work come from `.claude/skills/design-cairn/SKILL.md`; the brief lists the rule ids that apply and the reference shots.
-- The look-and-feel assertions come from the `M` rows. There is no separate screenshot job: an assertion lives in an ordinary e2e spec (axe runs in `e2e/a11y-axe.spec.ts`), and its message starts with the rule id (`C3: ...`) so a failure points here. An `M` row with no spec yet is measured by hand in the change that touches it.
+- The look-and-feel assertions come from the `M` rows. There is no separate screenshot job: an assertion lives in an ordinary e2e spec (axe runs in `e2e/a11y-axe.spec.ts`), and its message starts with the rule id (`C3: ...`) so a failure points here. An `M` row with no spec yet (the by-hand list below) is measured by hand in the change that touches it.
 - A spec that exercises a live surface carries `@motion` in its title; the `motion-reel` workflow records those specs every Monday (and on demand) and uploads the videos as the `motion-reel` artifact. It is not part of `ci`, so it never slows landing.
+- An `M` row names the spec or test that measures it in its Check column; `test/anti-slop-foundations.test.ts` fails on a new `M` row that names none and on any source path this file or `DESIGN.md` names that no longer exists. The rows still measured by hand are listed there and the list only shrinks.
 - A rule enters this file after the A/B check in `docs/design/rule-ab.md`, or when it copies a measured value from `DESIGN.md` or an audit finding. A rule that stops changing output is deleted.
 - A review finding that can be measured becomes an `M` rule with an assertion; one that is taste becomes an `H` rule with a reference shot. Fixing the one page is not enough.
 

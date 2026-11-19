@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -119,5 +119,44 @@ describe('DESIGN-RULES carries the anti-slop rules', () => {
       const row = rules.split('\n').find((line) => line.startsWith(`| ${id} |`));
       expect(row).not.toMatch(/`bubble-gradient`/);
     }
+  });
+});
+
+const design = readFileSync(join(ROOT, 'DESIGN.md'), 'utf8');
+const SOURCE_PATH =
+  /`((?:src|e2e|test|components|board|chief|detail|design|lib|api|styles|thread|overlay)\/[^`\s]*?\.(?:tsx?|css|mjs))`/g;
+const ruleRows = rules
+  .split('\n')
+  .filter((line) => /^\| [A-Z]\d+ \|/.test(line))
+  .map((line) => {
+    const cells = line.replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
+    return { id: cells[0] ?? '', check: cells[2] ?? '' };
+  });
+const MEASURED_BY_HAND = [
+  'C1', 'C2', 'C3', 'C4', 'C5', 'C7', 'C18', 'V2', 'V4', 'V12', 'V13', 'V15', 'V17', 'V18',
+  'V19', 'T3', 'L1', 'L2', 'L3', 'L4', 'L6', 'L7', 'T1', 'A1', 'A2', 'A3', 'R1',
+];
+
+describe('the design docs stay true and checkable', () => {
+  test.each([
+    ['DESIGN.md', design],
+    ['DESIGN-RULES.md', rules],
+  ])('every source path %s names exists', (_name, text) => {
+    const dead = [...text.matchAll(SOURCE_PATH)]
+      .map((match) => match[1] ?? '')
+      .filter((path) =>
+        [path, `src/${path}`, `src/components/${path}`, `../../${path}`].every(
+          (candidate) => !existsSync(join(ROOT, candidate)),
+        ),
+      );
+    expect(dead).toEqual([]);
+  });
+
+  test('a measured rule names the spec or test that measures it; the by-hand list only shrinks', () => {
+    const unnamed = ruleRows
+      .filter((row) => row.check.startsWith('M') && row.check.match(SOURCE_PATH) === null)
+      .map((row) => row.id);
+    expect(unnamed.filter((id) => !MEASURED_BY_HAND.includes(id))).toEqual([]);
+    expect(MEASURED_BY_HAND.filter((id) => !unnamed.includes(id))).toEqual([]);
   });
 });
