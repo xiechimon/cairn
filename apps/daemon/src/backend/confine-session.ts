@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { homedir, tmpdir, userInfo } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { SessionOpts } from '@cairn/shared';
 import { ANTIGRAVITY_CREDENTIAL_FILES, GEMINI_CREDENTIAL_FILES } from '../agent-config.js';
@@ -173,6 +173,9 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const userDirectories = [...new Set([dirname(temp), systemUserDirectory])].filter(
       (path): path is string => path !== null,
     );
+    const harnessTemp =
+      harness === 'claude-code' ? join(realpathSync('/tmp'), `claude-${userInfo().uid}`) : null;
+    if (harnessTemp !== null) mkdirSync(harnessTemp, { recursive: true, mode: 0o700 });
     const policy: SeatbeltPolicy = {
       home,
       deniedRoots,
@@ -182,6 +185,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       state: [...state, ...explicitState],
       caches: [
         ...userDirectories,
+        ...(harnessTemp === null ? [] : [harnessTemp]),
         ...SHARED_CACHES.map((path) => join(home, path)).filter((path) => existsSync(path)),
       ],
       readable: [

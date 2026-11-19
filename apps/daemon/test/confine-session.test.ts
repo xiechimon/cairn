@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { userInfo } from 'node:os';
+import { basename, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { createAcpBackend } from '../src/backend/acp.js';
 import { buildClaudeSdkOptions } from '../src/backend/claude-code.js';
@@ -103,6 +104,23 @@ describe('session confiner', () => {
     expect(own).not.toContain('auth.json');
   });
 
+  test('grants only Claude Code its uid-scoped temporary directory, not the shared temp root', () => {
+    const { confine, worktree } = fixture();
+    const sharedTemp = realpathSync('/tmp');
+    const claudeTemp = join(sharedTemp, `claude-${userInfo().uid}`);
+    for (const harness of ['claude-code', 'gemini', 'pi', 'devin', 'antigravity'] as const) {
+      const launch = confine({ cwd: worktree }, harness, { command: '/bin/true', args: [] });
+      const writable = launch.args[1]
+        ?.split('\n')
+        .find((line) => line.startsWith('(allow file-write*'));
+      expect(writable?.includes(`(subpath "${claudeTemp}")`)).toBe(harness === 'claude-code');
+      expect(writable).not.toContain(`(subpath "${sharedTemp}")`);
+      expect(writable).not.toContain(
+        `(subpath "${join(sharedTemp, `claude-${userInfo().uid + 1}`)}")`,
+      );
+    }
+  });
+
   test('wraps the ACP adapter launch', async () => {
     const { confine, worktree } = fixture();
     const launches: string[][] = [];
@@ -129,6 +147,37 @@ describe('session confiner', () => {
 });
 
 describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () => {
+  test('can create Claude background output while sibling temporary paths remain unwritable', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const claudeTemp = join(realpathSync('/tmp'), `claude-${userInfo().uid}`);
+    const sibling = `${claudeTemp}-cairn-denied-${process.pid}`;
+    const script = `
+      const fs = require('node:fs');
+      const directory = ${JSON.stringify(join(claudeTemp, basename(root)))};
+      fs.mkdirSync(directory);
+      try {
+        fs.writeFileSync(directory + '/output', 'background-ok');
+        process.stdout.write(fs.readFileSync(directory + '/output', 'utf8'));
+        for (const path of ${JSON.stringify([sibling, join(runnerHome, 'denied')])}) {
+          try { fs.mkdirSync(path); process.exitCode = 1; }
+          catch (error) { if (error.code !== 'EPERM') throw error; }
+        }
+      } finally { fs.rmSync(directory, { recursive: true }); }
+    `;
+    const launch = confine({ cwd: worktree }, 'claude-code', {
+      command: process.execPath,
+      args: ['-e', script],
+    });
+    expect(execFileSync(launch.command, launch.args, { encoding: 'utf8' })).toBe('background-ok');
+    const otherHarness = confine({ cwd: worktree }, 'gemini', {
+      command: process.execPath,
+      args: ['-e', script],
+    });
+    expect(() =>
+      execFileSync(otherHarness.command, otherHarness.args, { stdio: 'pipe' }),
+    ).toThrow();
+  });
+
   test('a session started through the seam cannot read the tokens and can read skills', async () => {
     const { confine, worktree, serverHome, runnerHome, skills } = fixture();
     const options = buildClaudeSdkOptions({
