@@ -138,6 +138,17 @@ describe('parseAgentTodoText (pi text channel: `- [ ]` lines → cairn format)',
     ]);
   });
 
+  test('T3c: an ordinal the model writes before an item is not part of its text', () => {
+    const items = parseAgentTodoText(
+      ['- [x] 1. 数据模型', '- [ ] 2) add 子命令', '- [ ] 3 个文件'].join('\n'),
+    );
+    expect(items).toEqual([
+      { text: '数据模型', state: 'done' },
+      { text: 'add 子命令', state: 'todo' },
+      { text: '3 个文件', state: 'todo' },
+    ]);
+  });
+
   test('T4: task lines inside fences do not count (same rule as web rendering)', () => {
     const items = parseAgentTodoText(
       ['```md', '- [ ] 围栏里的假清单', '```', '', '- [x] 真清单'].join('\n'),

@@ -40,6 +40,8 @@ export const CLAUDE_TODO_STATUS_STATES: Record<string, AgentTodoState> = {
   completed: 'done',
 };
 
+const TODO_ORDINAL = /^\d+[.)、]\s*/;
+
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
 
 export function parseAgentTodoText(text: string): AgentTodoItem[] | null {
@@ -58,7 +60,7 @@ export function parseAgentTodoText(text: string): AgentTodoItem[] | null {
       run = null;
       continue;
     }
-    const content = (m[2] ?? '').trim();
+    const content = (m[2] ?? '').trim().replace(TODO_ORDINAL, '');
     if (content === '') continue;
     const state = AGENT_TODO_MARKER_STATES[m[1] ?? ''];
     if (state === undefined) continue;
