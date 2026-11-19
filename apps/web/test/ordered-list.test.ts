@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { applyOrderedListEnter } from '../src/overlay/ordered-list.js';
+import {
+  applyOrderedListBackspace,
+  applyOrderedListEnter,
+} from '../src/overlay/ordered-list.js';
 
 // Ticket #814: ordered-list (`1. `) auto-continuation on Enter.
 // Only the half-width `N. ` marker is recognized; full-width forms
@@ -76,5 +79,53 @@ describe('applyOrderedListEnter', () => {
 
   it('returns null when the caret sits inside the marker span', () => {
     expect(applyOrderedListEnter('1. foo', 1)).toBeNull();
+  });
+});
+
+describe('applyOrderedListBackspace', () => {
+  it('removes an auto-continued marker left by Enter', () => {
+    expect(applyOrderedListBackspace('1. foo\n2. ', 10)).toEqual({
+      value: '1. foo\n',
+      caret: 7,
+    });
+  });
+
+  it('removes the marker before content', () => {
+    expect(applyOrderedListBackspace('2. foo', 3)).toEqual({ value: 'foo', caret: 0 });
+  });
+
+  it('keeps the indent when removing a nested marker', () => {
+    expect(applyOrderedListBackspace('  2. foo', 5)).toEqual({ value: '  foo', caret: 2 });
+  });
+
+  it('removes a multi-digit marker', () => {
+    expect(applyOrderedListBackspace('12. foo', 4)).toEqual({ value: 'foo', caret: 0 });
+  });
+
+  it('removes the marker on a middle line', () => {
+    expect(applyOrderedListBackspace('intro\n2. bar\ntail', 9)).toEqual({
+      value: 'intro\nbar\ntail',
+      caret: 6,
+    });
+  });
+
+  it('removes the whole marker run of extra spaces', () => {
+    expect(applyOrderedListBackspace('2.   foo', 5)).toEqual({ value: 'foo', caret: 0 });
+  });
+
+  it('returns null inside the content', () => {
+    expect(applyOrderedListBackspace('2. foo', 5)).toBeNull();
+  });
+
+  it('returns null inside the marker span', () => {
+    expect(applyOrderedListBackspace('2. foo', 2)).toBeNull();
+  });
+
+  it('returns null on a plain line', () => {
+    expect(applyOrderedListBackspace('foo', 3)).toBeNull();
+  });
+
+  it('returns null for a bullet marker', () => {
+    expect(applyOrderedListBackspace('- foo', 2)).toBeNull();
   });
 });

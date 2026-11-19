@@ -41,6 +41,18 @@ export interface OrderedListEnter {
   caret: number;
 }
 
+export function applyOrderedListBackspace(value: string, caret: number): OrderedListEnter | null {
+  const marker = markerAtCaret(value, caret);
+  if (marker === null) return null;
+  const clamped = Math.max(0, Math.min(caret, value.length));
+  if (clamped !== marker.markerEnd) return null;
+  const caretAfter = marker.lineStart + marker.indent.length;
+  return {
+    value: value.slice(0, caretAfter) + value.slice(marker.markerEnd),
+    caret: caretAfter,
+  };
+}
+
 export function applyOrderedListEnter(value: string, caret: number): OrderedListEnter | null {
   const marker = markerAtCaret(value, caret);
   if (marker === null) return null;
