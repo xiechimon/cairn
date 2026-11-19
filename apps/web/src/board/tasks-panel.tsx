@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { questionDockState } from '../chief/question-dock-state.js';
+import { useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
@@ -143,6 +144,7 @@ function PanelTaskRow({
   entry,
   place,
   prs,
+  prsArrived,
   prsPending,
   selected,
   open: expanded,
@@ -156,6 +158,7 @@ function PanelTaskRow({
   entry: TaskEntry;
   place: string | undefined;
   prs: readonly PrPanelRow[];
+  prsArrived: ReadonlySet<string>;
   prsPending: boolean;
   now: number;
   onOpenThread: (id: string) => void;
@@ -193,7 +196,7 @@ function PanelTaskRow({
         menu={<TaskRowMenu todo={entry.todo} onOpen={open} onMarkDone={markDone} />}
         below={
           prs.length > 0 ? (
-            <TaskPrLine prs={prs} now={now} />
+            <TaskPrLine prs={prs} now={now} arrived={prsArrived} />
           ) : prsPending && entry.todo.latestBuildId !== null ? (
             <TaskPrLineSkeleton />
           ) : null
@@ -289,6 +292,10 @@ export function TasksPanel({
   const projects = useProjects(teamId, connected && projectId === null).data;
   const placeOf = (entry: TaskEntry) =>
     projectId === null ? projects?.find((p) => p.id === entry.todo.projectId)?.name : undefined;
+  const prsArrived = useArrivals(
+    prs.map((pr) => pr.buildId),
+    prsQuery.data !== undefined,
+  );
   const prsOf = new Map<string, PrPanelRow[]>();
   for (const pr of prs) prsOf.set(pr.threadId, [...(prsOf.get(pr.threadId) ?? []), pr]);
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
@@ -298,6 +305,7 @@ export function TasksPanel({
       entry={entry}
       place={placeOf(entry)}
       prs={prsOf.get(entry.todo.id) ?? []}
+      prsArrived={prsArrived}
       prsPending={connected && prsQuery.isPending}
       selected={picked.has(entry.todo.id)}
       open={entry.todo.id === openThreadId}

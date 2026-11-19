@@ -313,6 +313,7 @@ function Row({
       return (
         <div className="mt-3.5 agent-measure" data-testid="agent-todo">
           <TaskCard
+            live
             items={item.items.map((it) => ({
               state: it.state,
               segments: inlineSegments(it.text),
@@ -671,11 +672,13 @@ export function Transcript({ transcript, result }: TranscriptProps) {
   const hasLiveTail =
     tailItem?.kind === 'streaming' || (tailItem?.kind === 'work' && tailItem.running === true);
   const resultAt = hasLiveTail ? transcript.length - 1 : transcript.length;
+  let todoRows = 0;
   const rows = transcript.map((item, index) => {
     const id =
       ('id' in item ? item.id : undefined) ?? (item.kind === 'user' ? `user-${index}` : undefined);
+    const key = item.kind === 'agent-todo' ? `agent-todo-${todoRows++}` : (id ?? index);
     return (
-      <MessageScrollerItem key={id ?? index} messageId={id} style={SCROLLER_ITEM_STYLE}>
+      <MessageScrollerItem key={key} messageId={id} style={SCROLLER_ITEM_STYLE}>
         <Row
           item={item}
           prev={transcript[index - 1]}

@@ -63,7 +63,7 @@ test('under reduced motion the new branch shows drawn at once', async ({ page })
   expect(
     await grown
       .getByTestId('chief-task-ref')
-      .locator('.task-ref-tile-grow')
+      .locator('.grow-pop')
       .evaluate((node) => getComputedStyle(node).opacity),
   ).toBe('1');
 });

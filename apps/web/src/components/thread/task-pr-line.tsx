@@ -1,7 +1,7 @@
 import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
 import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
 import { pillOf } from './pr-card.js';
@@ -110,7 +110,7 @@ function repoName(pr: PrPanelRow): string {
   return `${pr.repo.split('/').at(-1)} #${pr.number}`;
 }
 
-function OpenPr({ pr, now }: { pr: PrPanelRow; now: number }) {
+function OpenPr({ pr, now, grow }: { pr: PrPanelRow; now: number; grow: boolean }) {
   const { t } = useI18n();
   const card = useWarmHoverCard();
   const model = prCardModelOfRow(pr, now);
@@ -129,14 +129,18 @@ function OpenPr({ pr, now }: { pr: PrPanelRow; now: number }) {
         data-slot="task-pr"
         data-state={pr.state}
         data-tone={tone}
-        className={cn(CHIP, 'group/chip')}
+        data-grow={grow ? '' : undefined}
+        className={cn(CHIP, 'group/chip', grow && 'grow-enter')}
       >
         <PrGlyph state={pr.state} />
         <span className="min-w-0 truncate">
           <span className="text-foreground tabular-nums decoration-1 underline-offset-4 group-hover/chip:underline group-focus-visible/chip:underline group-data-popup-open/chip:underline">
             #{pr.number}
           </span>
-          <span className={TONE_INK[tone]}> — {pill.label}</span>
+          <span className={cn('transition-colors duration-(--dur-fast)', TONE_INK[tone])}>
+            {' '}
+            — {pill.label}
+          </span>
         </span>
       </PopoverTrigger>
       <PopoverContent
@@ -163,9 +167,18 @@ function OpenPr({ pr, now }: { pr: PrPanelRow; now: number }) {
   );
 }
 
+function useCountBump(count: number): number {
+  const last = useRef(count);
+  const bumps = useRef(0);
+  if (count > last.current) bumps.current += 1;
+  last.current = count;
+  return bumps.current;
+}
+
 function MergedPrs({ prs }: { prs: readonly PrPanelRow[] }) {
   const { t } = useI18n();
   const card = useWarmHoverCard();
+  const bump = useCountBump(prs.length);
   const [only] = prs;
   if (prs.length === 1 && only !== undefined) {
     return (
@@ -191,8 +204,10 @@ function MergedPrs({ prs }: { prs: readonly PrPanelRow[] }) {
         data-slot="task-pr-merged"
         className={cn(CHIP, UNDERLINE, 'flex-none text-content-secondary')}
       >
-        <PrGlyph state="merged" />
-        {t('{n} 个已合并', { n: prs.length })}
+        <span key={bump} className={cn(CHIP, bump > 0 && 'grow-flash')}>
+          <PrGlyph state="merged" />
+          {t('{n} 个已合并', { n: prs.length })}
+        </span>
       </PopoverTrigger>
       <PopoverContent
         side="left"
@@ -226,20 +241,42 @@ function MergedPrs({ prs }: { prs: readonly PrPanelRow[] }) {
   );
 }
 
-export function TaskPrLine({ prs, now }: { prs: readonly PrPanelRow[]; now: number }) {
+const NO_ARRIVALS: ReadonlySet<string> = new Set();
+
+export function TaskPrLine({
+  prs,
+  now,
+  arrived = NO_ARRIVALS,
+}: {
+  prs: readonly PrPanelRow[];
+  now: number;
+  arrived?: ReadonlySet<string>;
+}) {
   const live = prs.filter((pr) => pr.state !== 'merged');
   const merged = prs.filter((pr) => pr.state === 'merged');
+  const [newLine] = useState(() => prs.length > 0 && prs.every((pr) => arrived.has(pr.buildId)));
   return (
     <div
       data-slot="task-pr-line"
+      data-grow={newLine ? '' : undefined}
       className="relative -mt-1.5 flex min-w-0 items-center gap-2.5 pr-2.5 pb-2 pl-12 text-meta leading-6"
+      style={newLine ? ({ '--grow-delay': '0ms' } as CSSProperties) : undefined}
     >
       <span
         aria-hidden
-        className="absolute -top-1 left-6 h-4 w-4 rounded-bl-md border-b border-l border-(--tree-line)"
+        className={cn(
+          'absolute -top-1 left-6 h-4 w-4 rounded-bl-md border-b border-l border-(--tree-line)',
+          newLine && 'grow-guide',
+        )}
       />
       {live.map((pr) => (
-        <OpenPr key={pr.buildId} pr={pr} now={now} />
+        <span
+          key={pr.buildId}
+          className="contents"
+          style={newLine ? ({ '--grow-delay': '180ms' } as CSSProperties) : undefined}
+        >
+          <OpenPr pr={pr} now={now} grow={arrived.has(pr.buildId)} />
+        </span>
       ))}
       {merged.length > 0 && <MergedPrs prs={merged} />}
     </div>

@@ -26,6 +26,7 @@ import { Link, type NavigateFunction, type To, useLocation, useNavigate } from '
 import { CoordinatorGlyph } from '../chief/chief-status-mark.js';
 import { ChiefMemoryDialog } from '../chief/memory-dialog.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
+import { createdHere, useArrivals } from '../components/growth.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import {
   SIDEBAR_ROW_ACTION,
@@ -293,7 +294,9 @@ const ProjectRowItem = memo(function ProjectRowItem({
   plain,
   navigate,
   actionsRef,
+  grow,
 }: {
+  grow: boolean;
   row: SidebarProject;
   place: TreePlace;
   flat: boolean;
@@ -349,6 +352,7 @@ const ProjectRowItem = memo(function ProjectRowItem({
         navigate({ pathname: '/app', search: appSearch({ project: row.id, chat: '1' }) })
       }
       menu={menu}
+      grow={grow}
     />
   );
 });
@@ -417,6 +421,10 @@ export function BoardSidebar({
   useLayoutEffect(() => {
     actionsRef.current = actions;
   });
+  const arrived = useArrivals(
+    allProjects.map((row) => row.id),
+    projectsState === undefined,
+  );
   const projectRows = (rows: readonly SidebarProject[], flat = false) =>
     rows.map((row, index) => (
       <ProjectRowItem
@@ -432,6 +440,7 @@ export function BoardSidebar({
         plain={plain}
         navigate={navigate}
         actionsRef={actions === undefined ? null : actionsRef}
+        grow={arrived.has(row.id) && !createdHere(row.id)}
       />
     ));
   const [groupsCollapsed, setGroupsCollapsed] = useState(() =>

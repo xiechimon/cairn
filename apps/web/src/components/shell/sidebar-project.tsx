@@ -3,6 +3,7 @@ import { cn } from 'cn';
 import { Archive, Box, ChevronDown, ChevronRight, Folder } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { PROJECT_ICON_COMPONENTS } from '../../board/project-icon-map.js';
+import { GrowText } from '../growth.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Skeleton } from '../ui/skeleton.js';
@@ -17,6 +18,7 @@ export interface SidebarRename {
 }
 
 export interface SidebarProjectRowProps {
+  grow?: boolean;
   name: string;
   icon?: ProjectIcon | null | undefined;
   active?: boolean;
@@ -72,7 +74,7 @@ export function ProjectGlyph({
   );
 }
 
-export function TreeGuide({ place }: { place: TreePlace }) {
+export function TreeGuide({ place, grow = false }: { place: TreePlace; grow?: boolean }) {
   const first = place === 'only' || place === 'first';
   const last = place === 'only' || place === 'last';
   return (
@@ -84,6 +86,7 @@ export function TreeGuide({ place }: { place: TreePlace }) {
           className={cn(
             'pointer-events-none absolute -left-2 bottom-0 w-px bg-(--tree-line) pointer-coarse:hidden',
             first ? 'top-1.25' : '-top-0.5',
+            grow && 'grow-guide',
           )}
         />
       )}
@@ -93,6 +96,7 @@ export function TreeGuide({ place }: { place: TreePlace }) {
         className={cn(
           'pointer-events-none absolute -left-2 w-2 rounded-bl-(--cds-radius-sm) border-b border-l border-(--tree-line) pointer-coarse:hidden',
           first ? 'top-1.25 h-3' : '-top-0.5 h-4.75',
+          grow && 'grow-guide',
         )}
       />
     </>
@@ -178,6 +182,7 @@ export function SidebarProjectRow({
   onClick,
   menu,
   rename = null,
+  grow = false,
 }: SidebarProjectRowProps) {
   if (rename !== null) {
     return (
@@ -214,9 +219,11 @@ export function SidebarProjectRow({
         menu != null && REVEAL_PAD,
       )}
     >
-      <ProjectGlyph icon={icon} name={name} />
+      <span className={cn('flex flex-none', grow && 'grow-pop')}>
+        <ProjectGlyph icon={icon} name={name} />
+      </span>
       <span className="min-w-0 flex-1 truncate text-left" title={name}>
-        {name}
+        {grow ? <GrowText text={name} /> : name}
       </span>
       {archived != null && (
         <span
@@ -248,8 +255,11 @@ export function SidebarProjectRow({
     </Button>
   );
   return (
-    <div className={cn('group/row relative flex flex-none', !flat && 'ml-5.5')}>
-      {!flat && <TreeGuide place={place} />}
+    <div
+      data-grow={grow ? '' : undefined}
+      className={cn('group/row relative flex flex-none', !flat && 'ml-5.5')}
+    >
+      {!flat && <TreeGuide place={place} grow={grow} />}
       {(status ?? archived) === null ? (
         button
       ) : (
