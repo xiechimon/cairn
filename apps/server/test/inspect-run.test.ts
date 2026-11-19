@@ -8,6 +8,7 @@ import {
   step,
   team,
   todo,
+  todoTransition,
   tokenUsage,
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
@@ -87,6 +88,17 @@ describe('inspect_run', () => {
       .values({ id: 'project-other', name: 'other', teamId: 'team-other' })
       .run();
     seedFailedBuild('team-other', 'project-other', 'theirs');
+    H.s.db
+      .insert(todoTransition)
+      .values({
+        id: 'transition-mine',
+        todoId: 'todo-mine',
+        fromPhase: 'queued',
+        toPhase: 'failed',
+        cause: null,
+        at: 1,
+      })
+      .run();
 
     const body = (await relay('inspect_run', { id: 'todo-mine' })) as Record<string, unknown>;
     expect(body).toMatchObject({
@@ -95,6 +107,7 @@ describe('inspect_run', () => {
       cause: 'model-config',
       steps: [{ id: 'step-mine', status: 'failed', fallback: { model: 'relay/glm-5.3' } }],
       recentToolCalls: [{ name: 'Bash', isError: true }],
+      phaseHistory: [{ from: 'queued', to: 'failed', cause: null }],
       usage: { costTotal: 0.25 },
       trust: 'untrusted-run-record',
     });

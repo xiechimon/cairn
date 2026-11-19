@@ -198,6 +198,21 @@ export const todo = sqliteTable(
   (t) => [index('todo_phase_idx').on(t.phase)],
 );
 
+export const todoTransition = sqliteTable(
+  'todo_transition',
+  {
+    id: text('id').primaryKey(),
+    todoId: text('todoId')
+      .notNull()
+      .references(() => todo.id, { onDelete: 'cascade' }),
+    fromPhase: text('fromPhase').$type<Phase>().notNull(),
+    toPhase: text('toPhase').$type<Phase>().notNull(),
+    cause: text('cause').$type<'stop' | 'manual'>(),
+    at: epochMs('at').notNull(),
+  },
+  (t) => [index('todo_transition_todo_idx').on(t.todoId, t.at)],
+);
+
 export const taskIssueClose = sqliteTable('task_issue_close', {
   id: text('id').primaryKey(),
   teamId: text('teamId')

@@ -25,7 +25,7 @@ Four outer states with the reason or result in a field, the shape Letta and GitH
 2. A stop is settled only when the runner reports the step stopped. The runner reports it only after the agent process has exited, background subagents are dropped and background commands are killed and reaped (daemon side, `apps/daemon/src/backend/claude-code.ts`).
 3. Ended tasks hold no session and no background work. `stopped` leaves to `queued` (new run), `todo`, `done` or `closed`; the new run records `prevPhase = 'stopped'` and does not reuse the old session.
 4. After a turn, a running task with live work (a foreground step, a background subagent, a background command) keeps its session open; a waiting task checkpoints and sends no model requests.
-5. Every phase change appends one transition row (from, to, actor, reason, at).
+5. Every phase change appends one `todo_transition` row (from, to, cause, at), written in the same transaction as the phase by `setTodoPhase` and `updateTodo`. The cause is `stop`, `manual` (a board move) or empty for the system. `inspect_run` returns the last rows as `phaseHistory`, so the Coordinator and a debugging session can see how a task reached its phase.
 6. The scheduler checks every in-flight phase, not only `queued`: an in-flight task with no active step is settled with a recorded reason.
 
 ## Paths that write the phase

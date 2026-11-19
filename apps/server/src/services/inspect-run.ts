@@ -12,6 +12,7 @@ import {
   step,
   stepUsage,
   todo,
+  todoTransition,
   tokenUsage,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -235,6 +236,20 @@ function inspectBuild(
     .groupBy(stepUsage.model)
     .all()
     .filter((c) => c.contextTokens !== null);
+  const phaseHistory = db
+    .select({
+      at: todoTransition.at,
+      from: todoTransition.fromPhase,
+      to: todoTransition.toPhase,
+      cause: todoTransition.cause,
+    })
+    .from(todoTransition)
+    .where(eq(todoTransition.todoId, row.todoId))
+    .orderBy(desc(todoTransition.at), desc(sql`rowid`))
+    .limit(STEP_LIMIT)
+    .all()
+    .reverse()
+    .map((t) => ({ ...t, at: iso(t.at) }));
   const shownSteps = steps.slice(-STEP_LIMIT);
   const focus = focusStepId === null ? undefined : steps.find((s) => s.id === focusStepId);
   if (focus !== undefined && !shownSteps.includes(focus)) shownSteps.unshift(focus);
@@ -249,6 +264,7 @@ function inspectBuild(
     },
     cause,
     evidence,
+    phaseHistory,
     steps: shownSteps.map(stepLine),
     stepsOmitted: steps.length - shownSteps.length,
     recentEvents: events,

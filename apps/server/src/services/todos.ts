@@ -41,6 +41,7 @@ import {
   taskIssueClose,
   todo,
   todoGithubLabel,
+  todoTransition,
   tokenUsage,
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
@@ -771,6 +772,16 @@ export function updateAutonomousTodo(
       sets.v = row.v + 1;
       tx.update(todo).set(sets).where(eq(todo.id, id)).run();
     }
+    if (sets.phase !== undefined && sets.phaseAt !== undefined) {
+      recordTransition(
+        db,
+        id,
+        row.phase,
+        sets.phase,
+        manualPhaseApplied ? 'manual' : null,
+        sets.phaseAt,
+      );
+    }
     if (move !== null) {
       tx.update(schedule)
         .set({ projectId: move.sets.projectId })
@@ -870,6 +881,19 @@ export function queueIssueClose(db: Db, teamId: string, sourceRef: string, comme
 
 export const DELETED_TASK_ISSUE_COMMENT = 'Cairn：这个任务已删除，这里的 issue 关闭（未计划）。';
 
+function recordTransition(
+  db: Db,
+  todoId: string,
+  fromPhase: Phase,
+  toPhase: Phase,
+  cause: 'stop' | 'manual' | null,
+  at: number,
+): void {
+  db.insert(todoTransition)
+    .values({ id: newRecordId(), todoId, fromPhase, toPhase, cause, at })
+    .run();
+}
+
 export function setTodoPhase(
   deps: TodoDeps,
   id: string,
@@ -919,6 +943,7 @@ export function setTodoPhase(
       })
       .where(eq(todo.id, id))
       .run();
+    recordTransition(db, id, row.phase, to, options.cause ?? null, at);
     if (to === 'closed') pauseTodoSchedule(deps, id, ARCHIVED_SCHEDULE_PAUSE_REASON);
     const record = getTodo(deps, id);
     if (!record) return null;

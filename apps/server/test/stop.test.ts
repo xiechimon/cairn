@@ -16,6 +16,7 @@ import {
   step as stepTable,
   stopPending as stopPendingTable,
   todo as todoTable,
+  todoTransition as todoTransitionTable,
 } from '../src/db/schema.js';
 import {
   bootServer,
@@ -195,7 +196,7 @@ describe('the stop server write surface (M7 #308)', () => {
     expect(w.s.db.select().from(stopPendingTable).all()).toHaveLength(0);
   });
 
-  test('a run started from an in-flight phase ends as stopped instead of that phase without a step, and starts again', async () => {
+  test('a run started from an in-flight phase ends as stopped instead of that phase without a step, starts again, and every phase change is recorded', async () => {
     const buildId = await w.startBuild();
     w.s.db
       .update(buildTable)
@@ -208,6 +209,26 @@ describe('the stop server write surface (M7 #308)', () => {
     expect(again).not.toBe(buildId);
     expect(w.todoRow().phase).toBe('queued');
     expect(w.buildRow(again).prevPhase).toBe('stopped');
+    await w.stop(again, true);
+    const todoId = w.todoRow().id;
+    expect(
+      (await call(w.s.app, 'PATCH', `/api/todos/${todoId}`, { body: { phase: 'closed' } })).status,
+    ).toBe(200);
+    expect(
+      w.s.db
+        .select()
+        .from(todoTransitionTable)
+        .where(eq(todoTransitionTable.todoId, todoId))
+        .orderBy(todoTransitionTable.at, sql`rowid`)
+        .all()
+        .map((t) => [t.fromPhase, t.toPhase, t.cause]),
+    ).toEqual([
+      ['todo', 'queued', null],
+      ['queued', 'stopped', 'stop'],
+      ['stopped', 'queued', null],
+      ['queued', 'stopped', 'stop'],
+      ['stopped', 'closed', 'manual'],
+    ]);
   });
 
   test('failure mode 3: a claimed step -> single-slot pending + an SSE stop signal + 202 delegated', async () => {
