@@ -156,7 +156,7 @@ async function open(page: Page, world: World, path = '/app') {
 
 const fresh = (): World => ({ projects: [], bound: true, rules: [], patches: [] });
 
-test('a team with no projects lands on the setup page, and confirming saves both rules and opens the conversation', async ({ page }) => {
+test('a team with no projects lands on the setup page, and confirming saves the Coordinator rule only and opens the conversation', async ({ page }) => {
   const world = fresh();
   await open(page, world);
   const setup = page.getByTestId('first-run-setup');
@@ -164,11 +164,12 @@ test('a team with no projects lands on the setup page, and confirming saves both
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
   await expect(page.getByTestId('first-run-pick-coordinator')).toHaveText(/Claude Opus 5\.5/);
-  await expect(page.getByTestId('first-run-pick-session')).toHaveText(/Claude Sonnet 5\.5/);
+  await expect(page.getByTestId('first-run-pick-session')).toHaveCount(0);
+  await expect(setup).toContainText('任务默认用 Coordinator 的模型');
   await expect(setup).not.toContainText('因为');
   await expect(page.getByTestId('first-run-vm')).toHaveCount(0);
   await page.getByTestId('first-run-confirm').click();
-  await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
+  await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator']);
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-opus-5-5' });
   await expect(setup).toHaveCount(0);
   await expect(page.getByTestId('home-c')).toBeVisible();
@@ -201,7 +202,7 @@ test('the change control opens the model picker, and confirming saves the model 
   await expect(coordinator).toContainText('Claude Sonnet 5.5');
   expect(world.patches).toEqual([]);
   await page.getByTestId('first-run-confirm').click();
-  await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
+  await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator']);
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-sonnet-5-5' });
 });
 
@@ -287,27 +288,19 @@ test('the new-project dialog says which step is missing until setup is done', as
   await expect(page.getByTestId('first-run-setup')).toBeVisible();
 });
 
-test('skipping goes to the Coordinator home; a team with projects never sees the page', async ({ page }) => {
+test('setup cannot be skipped until the Coordinator has a model; a team with projects never sees the page', async ({ page }) => {
   await open(page, fresh());
-  await page.locator('[data-testid="first-run-skip"]:visible').click();
-  await expect(page.getByTestId('team-row')).toBeVisible();
-  await expect(page.getByTestId('first-run-setup')).toHaveCount(0);
-  await expect(page.getByTestId('home-c')).toBeVisible();
+  await expect(page.getByTestId('first-run-setup')).toBeVisible();
+  await expect(page.getByTestId('first-run-skip')).toHaveCount(0);
+  await expect(page.getByText('稍后再说')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId('first-run-setup')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toHaveCount(0);
 
   const other = await page.context().newPage();
   await open(other, { ...fresh(), projects: [PROJECT] });
   await expect(other.getByTestId('home-c')).toBeVisible();
   await expect(other.getByTestId('first-run-setup')).toHaveCount(0);
-});
-
-test('after skipping, the home offers a way back to the setup page until it is done', async ({ page }) => {
-  await open(page, fresh());
-  await page.locator('[data-testid="first-run-skip"]:visible').click();
-  const banner = page.getByTestId('first-run-resume');
-  await expect(banner).toContainText('模型还没确认');
-  await banner.getByRole('button', { name: '继续设置' }).click();
-  await expect(page.getByTestId('first-run-setup')).toBeVisible();
-  await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
 });
 
 test('a saved Claude subscription with Claude Code found is the Coordinator pick', async ({ page }) => {
@@ -316,7 +309,7 @@ test('a saved Claude subscription with Claude Code found is the Coordinator pick
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('Claude Sonnet 5.5');
   await page.getByTestId('first-run-confirm').click();
-  await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
+  await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator']);
   expect(world.patches[0]?.body).toEqual({ provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
 });
 

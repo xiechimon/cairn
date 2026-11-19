@@ -885,7 +885,7 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     expect(coordinatorDefault()).toEqual({ reason: 'provider', provider: 'vani', modelId: 'm1' });
   });
 
-  test('signing in a first Claude subscription saves the Coordinator and task rules, and leaves another source alone', async () => {
+  test('signing in a first Claude subscription saves only the Coordinator rule, tasks follow it, and another source is left alone', async () => {
     const s = bare();
     claudeRunner(s);
     const subscribe = (label: string) =>
@@ -901,10 +901,8 @@ describe('rules store provider ids, with a read-time default for Session', () =>
           [r.provider, r.modelId],
         ]),
       );
-    expect(rules()).toEqual({
-      coordinator: ['claude-code', 'claude-sonnet-5-5'],
-      session: ['claude-code', 'claude-sonnet-5-5'],
-    });
+    expect(rules()).toEqual({ coordinator: ['claude-code', 'claude-sonnet-5-5'] });
+    expect(session(s)).toMatchObject({ provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
     s.db.delete(routingRule).run();
     expect((await subscribe('second')).status).toBe(201);
     expect(rules()).toEqual({});
@@ -916,9 +914,8 @@ describe('rules store provider ids, with a read-time default for Session', () =>
       label: 'mine',
       token: `sk-ant-oat01-mine-${'x'.repeat(60)}`,
     });
-    expect(
-      listRoutingSettings(other.db, other.team.id, true).rules.map((r) => [r.use, r.provider]),
-    ).toEqual([['session', 'claude-code']]);
+    expect(listRoutingSettings(other.db, other.team.id, true).rules).toEqual([]);
+    expect(session(other)).toMatchObject({ provider: 'claude-code' });
   });
 
   test('memory ownership stays on the stored rule, not the read-time default', () => {

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { mockLive } from './chief-home-mock';
 
-test('model selector with no rules offers a picker per use and no Runner or policy controls', async ({
+test('model selector with no rules offers the Coordinator picker, no task row, and no Runner or policy controls', async ({
   page,
 }) => {
   await page.goto('/app/settings/routing?scenario=01');
@@ -11,10 +11,10 @@ test('model selector with no rules offers a picker per use and no Runner or poli
     'page',
   );
   await expect(settings.getByTestId('settings-head')).toHaveText('模型');
-  for (const use of ['session', 'coordinator']) {
-    await expect(settings.getByTestId(`routing-rule-new-${use}`)).toBeVisible();
-  }
-  for (const use of ['review', 'citation_check']) {
+  await expect(settings.getByTestId('routing-rule-new-coordinator')).toBeVisible();
+  await expect(settings.getByTestId('frequent-models')).toBeVisible();
+  await expect(settings.getByTestId('frequent-models-empty')).toBeVisible();
+  for (const use of ['session', 'review', 'citation_check']) {
     await expect(settings.locator(`#route-${use}`)).toHaveCount(0);
   }
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toContainText(
@@ -25,14 +25,18 @@ test('model selector with no rules offers a picker per use and no Runner or poli
   await expect(settings.getByRole('button', { name: '创建' })).toHaveCount(0);
 });
 
-test('model selector shows stored rules with their model and thinking level, never review or policies', async ({
+test('model selector lists the frequently used models in place of the task row, never review or policies', async ({
   page,
 }) => {
   await page.goto('/app/settings/routing?scenario=routing-settings');
   const settings = page.getByRole('dialog', { name: '设置' });
-  const session = settings.getByTestId('routing-rule-session');
-  await expect(session.locator('.routing-rule-model-select')).toContainText('claude-sonnet-5');
-  await expect(session.locator('.routing-rule-level-select')).toContainText('High');
+  await expect(settings.getByTestId('routing-rule-session')).toHaveCount(0);
+  await expect(settings.getByTestId('routing-rule-new-session')).toHaveCount(0);
+  const rows = settings.getByTestId('frequent-model-row');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText('claude-sonnet-5');
+  await expect(rows.nth(0).locator('.frequent-model-level')).toContainText('High');
+  await expect(rows.nth(2)).toHaveAttribute('data-unavailable', '');
   await expect(settings.getByTestId('routing-rule-review')).toHaveCount(0);
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toBeVisible();
   await expect(settings.locator('[data-testid^="work-policy-"]')).toHaveCount(0);
@@ -43,14 +47,6 @@ test('the model menu groups by runtime and greys nothing, not for the Coordinato
 }) => {
   await page.goto('/app/settings/routing?scenario=routing-settings');
   const settings = page.getByRole('dialog', { name: '设置' });
-  await settings.getByTestId('routing-rule-session').locator('.routing-rule-model-select').click();
-  const menu = page.locator('.routing-rule-model-menu');
-  await expect(menu.getByText('Claude Code', { exact: true })).toBeVisible();
-  const haiku = menu.locator('.routing-rule-model-row', { hasText: 'claude-haiku-4-5' });
-  await expect(haiku).not.toHaveAttribute('data-disabled', '');
-  await expect(menu.locator('.routing-rule-model-row', { hasText: 'GPT-5.2' })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(menu).toBeHidden();
   await settings
     .getByTestId('routing-rule-new-coordinator')
     .locator('.routing-rule-model-select')
@@ -72,7 +68,7 @@ test('the model menu groups by runtime and greys nothing, not for the Coordinato
   await page.goto('/app/settings/routing?scenario=routing-settings-pi-only');
   await page
     .getByRole('dialog', { name: '设置' })
-    .locator('#route-session .routing-rule-model-select')
+    .locator('#route-coordinator .routing-rule-model-select')
     .click();
   const piOnly = page.locator('.routing-rule-model-menu');
   await expect(piOnly.getByText('Claude Code', { exact: true })).toBeVisible();
@@ -175,4 +171,54 @@ test('a rule changed since it was read reloads the settings and says so', async 
     '这条规则刚被改过，已重新读取，请再看一眼。',
   );
   await expect.poll(() => seen.gets).toBeGreaterThan(1);
+});
+
+test('adding, tuning and removing a frequently used model saves the whole list', async ({ page }) => {
+  const puts: unknown[] = [];
+  let models: unknown[] | null = null;
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    const method = route.request().method();
+    if (path === '/api/teams/t1/top-models' && method === 'GET') return json({ models });
+    if (path === '/api/teams/t1/top-models' && method === 'PUT') {
+      const body = route.request().postDataJSON() as { models: unknown[] };
+      puts.push(body.models);
+      models = body.models;
+      return json({ models });
+    }
+    if (path === '/api/teams/t1/machines') return json([]);
+    if (path === '/api/teams/t1/model-sources')
+      return json({
+        sources: [
+          {
+            runtime: 'pi',
+            provider: 'relay',
+            providerLabel: 'domestic-proxy',
+            installed: true,
+            models: [
+              { id: 'glm-5.3', name: 'GLM-5.3' },
+              { id: 'claude-opus-5', name: 'Claude Opus 5' },
+            ],
+          },
+        ],
+      });
+    return undefined;
+  });
+  await page.goto('/app/settings/routing');
+  const card = page.getByRole('dialog', { name: '设置' }).getByTestId('frequent-models');
+  await expect(card.getByTestId('frequent-models-empty')).toBeVisible();
+  await card.getByTestId('frequent-models-add').click();
+  await page.locator('.frequent-models-add-row', { hasText: 'GLM-5.3' }).click();
+  await expect
+    .poll(() => puts)
+    .toEqual([[{ provider: 'relay', modelId: 'glm-5.3', thinkingLevel: null }]]);
+  const row = card.getByTestId('frequent-model-row');
+  await expect(row).toContainText('GLM-5.3');
+  await row.locator('.frequent-model-level').click();
+  await page.getByRole('option', { name: 'High', exact: true }).click();
+  await expect
+    .poll(() => puts.at(-1))
+    .toEqual([{ provider: 'relay', modelId: 'glm-5.3', thinkingLevel: 'high' }]);
+  await row.getByRole('button', { name: '删除 GLM-5.3' }).click();
+  await expect.poll(() => puts.at(-1)).toEqual([]);
+  await expect(card.getByTestId('frequent-models-empty')).toBeVisible();
 });

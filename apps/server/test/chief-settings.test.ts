@@ -213,12 +213,16 @@ describe('chief envelope; PATCH /chief is gone', () => {
   });
 
   test('the old prompt rules live in the descriptions of the tools they govern', () => {
-    const tool = (name: string) =>
+    const definition = (name: string) =>
       [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS].find(
         (t) => t.name === name,
-      )!.description;
+      )!;
+    const tool = (name: string) => definition(name).description;
     expect(tool('create_todo')).toContain('You write no task text');
     expect(tool('create_todo')).toContain('search todos with query');
+    expect(JSON.stringify(definition('create_todo').parameters)).toContain(
+      "the owner's frequently used models",
+    );
     expect(tool('create_todo')).toContain(
       'One message about several projects becomes one todo per project',
     );

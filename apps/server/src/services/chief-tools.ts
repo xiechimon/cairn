@@ -113,6 +113,7 @@ import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js
 import { listBuildStepRoutes } from './step-route.js';
 import { startThreadBuild } from './thread-message.js';
 import { getTodo, listTodos, setTodoArchived, setTodoPhase } from './todos.js';
+import { readTopModels } from './top-models.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
@@ -450,7 +451,11 @@ export async function executeChiefTool(
         providerLabel: string;
         modelId: string;
         modelName: string;
+        frequent?: true;
       }[] = [];
+      const frequent = new Set(
+        (readTopModels(db, ctx.teamId).models ?? []).map((m) => `${m.provider}/${m.modelId}`),
+      );
       const seen = new Set<string>();
       const push = (row: (typeof rows)[number]) => {
         const key = row.provider === 'claude-code' ? `${row.provider}/${row.modelId}` : row.modelId;
@@ -462,7 +467,16 @@ export async function executeChiefTool(
         const providerLabel = MODEL_SOURCE_RUNTIME_LABELS[source.runtime] ?? source.runtime;
         for (const m of source.models) {
           if (m.id === '') continue;
-          push({ provider: source.runtime, providerLabel, modelId: m.id, modelName: m.name });
+          push({
+            provider: source.runtime,
+            providerLabel,
+            modelId: m.id,
+            modelName: m.name,
+            ...(frequent.has(`${source.provider ?? source.runtime}/${m.id}`) ||
+            frequent.has(`${source.runtime}/${m.id}`)
+              ? { frequent: true as const }
+              : {}),
+          });
         }
       }
       return json(rows);

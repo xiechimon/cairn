@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { renderAttachmentTokensToLabels } from '../attachment-token.js';
 import { parseReplyQuote } from '../reply-quote.js';
 import { fenceIssueText } from './prompts.js';
+import { topModelSchema } from './top-models.js';
 
 export const TASK_REQUEST_DIFFICULTIES = ['easy', 'standard', 'hard'] as const;
 export const TASK_REQUEST_PRIORITIES = ['first', 'normal'] as const;
@@ -71,6 +72,7 @@ export const taskRequestSchema = z.object({
   titleSource: z.enum(['owner', 'third-party', 'worker', 'coordinator']),
   titleSourceRef: z.string().nullable(),
   briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
+  model: topModelSchema.optional(),
 });
 export type TaskRequest = z.infer<typeof taskRequestSchema>;
 

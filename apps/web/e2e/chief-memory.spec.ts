@@ -733,13 +733,14 @@ for (const memories of [[], MANY]) {
       ]);
       return { outer: outer!, field: field!, inner: inner! };
     };
+    const bottomGap = ({ outer, field }: Awaited<ReturnType<typeof box>>) =>
+      Math.abs(outer.y + outer.height - 16 - (field.y + field.height));
+    await expect.poll(async () => bottomGap(await box())).toBeLessThan(2);
     const top = await box();
-    expect(Math.abs(top.outer.y + top.outer.height - 16 - (top.field.y + top.field.height))).toBeLessThan(2);
     expect(Math.abs(top.field.x - top.inner.x)).toBeLessThan(2);
     expect(Math.abs(top.field.width - top.inner.width)).toBeLessThan(2);
     await body.evaluate((el) => el.scrollTo(0, el.scrollHeight));
-    const end = await box();
-    expect(Math.abs(end.outer.y + end.outer.height - 16 - (end.field.y + end.field.height))).toBeLessThan(2);
+    await expect.poll(async () => bottomGap(await box())).toBeLessThan(2);
   });
 }
 
@@ -760,12 +761,13 @@ for (const memories of [[], MANY_TEAM]) {
       ]);
       return { outer: outer!, field: field!, inner: inner! };
     };
+    const bottomGap = ({ outer, field }: Awaited<ReturnType<typeof box>>) =>
+      Math.abs(outer.y + outer.height - 16 - (field.y + field.height));
+    await expect.poll(async () => bottomGap(await box())).toBeLessThan(2);
     const top = await box();
-    expect(Math.abs(top.outer.y + top.outer.height - 16 - (top.field.y + top.field.height))).toBeLessThan(2);
     expect(Math.abs(top.field.x - top.inner.x)).toBeLessThan(2);
     expect(Math.abs(top.field.width - top.inner.width)).toBeLessThan(2);
     await body.evaluate((el) => el.scrollTo(0, el.scrollHeight));
-    const end = await box();
-    expect(Math.abs(end.outer.y + end.outer.height - 16 - (end.field.y + end.field.height))).toBeLessThan(2);
+    await expect.poll(async () => bottomGap(await box())).toBeLessThan(2);
   });
 }

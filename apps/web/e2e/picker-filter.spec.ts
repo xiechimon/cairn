@@ -39,13 +39,13 @@ async function open(page: Page, patches: unknown[]) {
           },
         ],
       });
-    if (path === '/api/teams/t1/routing-rules/session' && method === 'PATCH') {
+    if (path === '/api/teams/t1/routing-rules/coordinator' && method === 'PATCH') {
       const body = route.request().postDataJSON() as { provider: string; modelId: string };
       patches.push({ provider: body.provider, modelId: body.modelId });
       rule = {
         id: 'r1',
         teamId: 't1',
-        use: 'session',
+        use: 'coordinator',
         provider: body.provider,
         modelId: body.modelId,
         thinkingLevel: null,
@@ -63,7 +63,7 @@ async function open(page: Page, patches: unknown[]) {
   await page.goto('/app/settings/routing');
   return page
     .getByRole('dialog', { name: '设置' })
-    .getByTestId('routing-rule-new-session')
+    .getByTestId('routing-rule-new-coordinator')
     .locator('.routing-rule-model-select');
 }
 
@@ -119,6 +119,6 @@ test('C20: the trigger names the picked model with its provider', async ({ page 
   await page.keyboard.press('Enter');
   await expect.poll(() => patches).toEqual([{ provider: 'proxy', modelId: 'claude-opus-4-8' }]);
   await expect(
-    page.getByRole('dialog', { name: '设置' }).locator('#route-session .routing-rule-model-select'),
+    page.getByRole('dialog', { name: '设置' }).locator('#route-coordinator .routing-rule-model-select'),
   ).toContainText(/claude-opus-4-8\s*domestic-proxy/);
 });

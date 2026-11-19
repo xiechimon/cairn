@@ -642,6 +642,44 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 },
               ],
             },
+            "model": {
+              "additionalProperties": false,
+              "properties": {
+                "modelId": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "provider": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "thinkingLevel": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "off",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max",
+                      ],
+                      "type": "string",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+              },
+              "required": [
+                "provider",
+                "modelId",
+                "thinkingLevel",
+              ],
+              "type": "object",
+            },
             "segments": {
               "items": {
                 "additionalProperties": false,
@@ -1638,6 +1676,44 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                           "type": "null",
                         },
                       ],
+                    },
+                    "model": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "modelId": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "provider": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "thinkingLevel": {
+                          "anyOf": [
+                            {
+                              "enum": [
+                                "off",
+                                "minimal",
+                                "low",
+                                "medium",
+                                "high",
+                                "xhigh",
+                                "max",
+                              ],
+                              "type": "string",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                      },
+                      "required": [
+                        "provider",
+                        "modelId",
+                        "thinkingLevel",
+                      ],
+                      "type": "object",
                     },
                     "segments": {
                       "items": {
@@ -7969,6 +8045,44 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                         },
                       ],
                     },
+                    "model": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "modelId": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "provider": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "thinkingLevel": {
+                          "anyOf": [
+                            {
+                              "enum": [
+                                "off",
+                                "minimal",
+                                "low",
+                                "medium",
+                                "high",
+                                "xhigh",
+                                "max",
+                              ],
+                              "type": "string",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                      },
+                      "required": [
+                        "provider",
+                        "modelId",
+                        "thinkingLevel",
+                      ],
+                      "type": "object",
+                    },
                     "segments": {
                       "items": {
                         "additionalProperties": false,
@@ -13975,6 +14089,44 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
                   "type": "null",
                 },
               ],
+            },
+            "model": {
+              "additionalProperties": false,
+              "properties": {
+                "modelId": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "provider": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "thinkingLevel": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "off",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max",
+                      ],
+                      "type": "string",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+              },
+              "required": [
+                "provider",
+                "modelId",
+                "thinkingLevel",
+              ],
+              "type": "object",
             },
             "segments": {
               "items": {

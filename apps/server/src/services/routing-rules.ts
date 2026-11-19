@@ -19,12 +19,13 @@ import {
   runnerOsOf,
   type SessionDefault,
   type StepKind,
+  type TaskRequest,
   type TeamRoutingSettings,
   type TodoSourceKind,
   type WorkPolicyRecord,
   withPlatform,
 } from '@cairn/shared';
-import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, ne, or, sql } from 'drizzle-orm';
 import { builtinModelIds, isBuiltinProvider } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
 import {
@@ -77,6 +78,7 @@ export interface RoutedTodo {
   sourceKind?: TodoSourceKind | null;
   sourceRef?: string | null;
   routeOverride?: RouteOverride | null;
+  request?: TaskRequest | null;
 }
 
 const USE_DISPLAY_NAMES: Record<RouteUse, string> = {
@@ -190,6 +192,10 @@ export function defaultSessionChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
 ): (SessionDefault & { provider: string; modelId: string }) | null {
+  const coordinator = ruleRow(db, teamId, 'coordinator');
+  if (coordinator !== null) {
+    return { reason: 'coordinator', provider: coordinator.provider, modelId: coordinator.modelId };
+  }
   if (claudeCodeUsable(db, teamId)) {
     return {
       reason: 'claude-code',
@@ -273,7 +279,18 @@ export function defaultCoordinatorRule(
 
 function defaultSessionRule(db: Pick<Db, 'select'>, teamId: string): RoutingRuleRow | null {
   const choice = defaultSessionChoice(db, teamId);
-  return choice === null ? null : syntheticRule(teamId, 'session', choice);
+  if (choice === null) return null;
+  const thinkingLevel =
+    choice.reason === 'coordinator'
+      ? (storedRuleRow(db, teamId, 'coordinator')?.thinkingLevel ?? null)
+      : null;
+  return { ...syntheticRule(teamId, 'session', choice), thinkingLevel };
+}
+
+function taskModelChoice(todoRow: RoutedTodo): ProjectModelChoice | null {
+  const model = todoRow.request?.model;
+  if (model === undefined) return null;
+  return { provider: model.provider, modelId: model.modelId, thinkingLevel: model.thinkingLevel };
 }
 
 function syntheticRule(
@@ -315,7 +332,9 @@ export function routeForStep(
   const stored = storedRouteForStep(db, todoRow, kind);
   if (kind === 'review' || (!isSessionStepKind(kind) && kind !== 'merge')) return stored;
   const base = stored ?? defaultSessionRule(db, todoRow.teamId);
-  const choice = projectModelChoice(db, todoRow.teamId, todoRow.projectId ?? null, 'session');
+  const choice =
+    taskModelChoice(todoRow) ??
+    projectModelChoice(db, todoRow.teamId, todoRow.projectId ?? null, 'session');
   if (choice === null) return base;
   return { ...(base ?? syntheticRule(todoRow.teamId, 'session', choice)), ...choice };
 }
@@ -476,6 +495,7 @@ export function profileForStep(
   const route = routeForStep(db, todoRow, kind);
   if (route?.use !== 'session') return base;
   if (base.provider === null || !ROUTED_PROVIDERS.includes(base.provider)) return base;
+  if (taskModelChoice(todoRow) !== null) return base;
   const decision = decideStepRoute(db, todoRow, kind, stepId, {
     machineId: base.machineId,
     required: base.requiredCapabilities,
@@ -650,6 +670,41 @@ export function upsertRoutingRule(
   use: RouteUse,
   body: PatchRoutingRuleBody,
 ): RoutingRuleRecord {
+  return db.transaction(() => {
+    const saved = writeRoutingRule(db, teamId, use, body);
+    if (use === 'coordinator') taskRuleFollowsCoordinator(db, saved);
+    return saved;
+  });
+}
+
+function taskRuleFollowsCoordinator(db: Db, coordinator: RoutingRuleRecord): void {
+  db.update(routingRule)
+    .set({
+      provider: coordinator.provider,
+      modelId: coordinator.modelId,
+      thinkingLevel: coordinator.thinkingLevel,
+      updatedAt: nowMs(),
+    })
+    .where(
+      and(
+        eq(routingRule.teamId, coordinator.teamId),
+        eq(routingRule.use, 'session'),
+        or(
+          ne(routingRule.provider, coordinator.provider),
+          ne(routingRule.modelId, coordinator.modelId),
+          sql`${routingRule.thinkingLevel} is not ${coordinator.thinkingLevel}`,
+        ),
+      ),
+    )
+    .run();
+}
+
+function writeRoutingRule(
+  db: Db,
+  teamId: string,
+  use: RouteUse,
+  body: PatchRoutingRuleBody,
+): RoutingRuleRecord {
   const existing = db
     .select()
     .from(routingRule)
@@ -733,13 +788,6 @@ export function seedClaudeCodeRules(db: Db, teamId: string): void {
       provider: coordinator.provider,
       modelId: coordinator.modelId,
       ...(home !== undefined ? { machineId: home.id } : {}),
-    });
-  }
-  const session = defaultSessionChoice(db, teamId);
-  if (!stored.has('session') && session?.reason === 'claude-code') {
-    upsertRoutingRule(db, teamId, 'session', {
-      provider: session.provider,
-      modelId: session.modelId,
     });
   }
 }
