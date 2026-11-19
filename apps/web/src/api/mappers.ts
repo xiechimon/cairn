@@ -88,7 +88,6 @@ import {
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
-import { isNarrationPreamble } from '../detail/narration-preamble.js';
 import type {
   BranchInfoContent,
   ChiefContent,
@@ -896,23 +895,28 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     : Number.NEGATIVE_INFINITY;
   const loaded = entries.filter((entry) => entry.at >= loadedFrom).sort((a, b) => a.at - b.at);
   const items: TranscriptItem[] = [...head];
+  const workAhead: boolean[] = [];
+  for (let index = loaded.length - 1, ahead = false; index >= 0; index--) {
+    const kind = loaded[index]?.item.kind;
+    workAhead[index] = ahead;
+    if (kind === '__work__') ahead = true;
+    else if (kind !== 'robot') ahead = false;
+  }
   for (let index = 0; index < loaded.length; index++) {
     const entry = loaded[index];
     if (!entry) continue;
-    const nextEntry = loaded[index + 1];
     if (
       entry.item.kind === 'robot' &&
       entry.item.markdown !== undefined &&
-      isNarrationPreamble(entry.item.markdown) &&
-      nextEntry?.item.kind === '__work__'
+      workAhead[index] === true
     ) {
       const id = entry.item.id ?? `say-${entry.at}`;
-      items.push({
-        kind: 'work',
-        id,
-        steps: [{ kind: 'say', id, text: entry.item.markdown }],
-        createdAt: entry.at,
-      });
+      const say: WorkStep = { kind: 'say', id, text: entry.item.markdown };
+      const previous = items.at(-1);
+      if (previous?.kind === 'work') {
+        previous.steps.push(say);
+        previous.createdAt = entry.at;
+      } else items.push({ kind: 'work', id, steps: [say], createdAt: entry.at });
       continue;
     }
     if (entry.item.kind === '__work__') {
@@ -990,8 +994,30 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const shownTodo = liveTodo?.items ?? persistedTodo;
     if (shownTodo !== null && shownTodo.length > 0) {
       const todoRow: TranscriptItem = { kind: 'agent-todo', items: shownTodo };
-      if (hasActiveTailWork && liveReply === null) {
-        items.splice(items.length - 1, 0, todoRow);
+      if (hasActiveTailWork && liveReply === null && tailWork?.kind === 'work') {
+        let split = tailWork.steps.findIndex(
+          (step) => (step.kind === 'call' || step.kind === 'think') && step.running === true,
+        );
+        while (split > 0 && tailWork.steps[split - 1]?.kind === 'say') split--;
+        if (split > 0) {
+          const active: TranscriptItem = {
+            ...tailWork,
+            id: tailWork.steps[split]?.id ?? tailWork.id,
+            steps: tailWork.steps.slice(split),
+          };
+          items.splice(
+            items.length - 1,
+            1,
+            {
+              kind: 'work',
+              id: tailWork.id,
+              steps: tailWork.steps.slice(0, split),
+              ...(tailWork.createdAt !== undefined ? { createdAt: tailWork.createdAt } : {}),
+            },
+            todoRow,
+            active,
+          );
+        } else items.splice(items.length - 1, 0, todoRow);
       } else {
         items.push(todoRow);
       }
@@ -1003,7 +1029,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       running.status === 'waiting_quota' && running.quotaWait != null
         ? quotaWaitLabel(running.quotaWait)
         : null;
-    if (queued != null || quota != null || stopping || (!hasActiveTailWork && liveReply === null)) {
+    if (queued != null || quota != null || stopping || !hasActiveTailWork) {
       items.push({
         kind: 'streaming',
         startedAt: running.createdAt,

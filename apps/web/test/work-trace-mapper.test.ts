@@ -11,7 +11,7 @@ function call(id: string, name: string, args: Record<string, unknown>, at: numbe
   return { id, role: 'assistant', createdAt: at, content: { kind: 'toolcall', call: { id, name, arguments: args, result: 'done', ...timing } } };
 }
 
-test('thinking and calls form maximal runs separated by notes, absorbing leading narration preambles', () => {
+test('one run of work folds its calls and the prose between them, and only a non-prose row splits it', () => {
   const items = render([
     { id: 'think', role: 'assistant', content: [{ type: 'thinking', thinking: 'Full reasoning' }], createdAt: 1000 },
     call('read', 'Read', { file_path: '/home/ian/.pacman-chief/workspaces/abc/src/main.ts', offset: 2, limit: 8 }, 2500),
@@ -20,25 +20,20 @@ test('thinking and calls form maximal runs separated by notes, absorbing leading
     { id: 'note', role: 'system', content: 'Checkpoint', createdAt: 5000 },
     call('run', 'Bash', { command: 'pnpm lint\npnpm typecheck' }, 6000),
   ]);
-  expect(items.map((item) => item.kind)).toEqual(['work', 'work', 'note', 'work']);
+  expect(items.map((item) => item.kind)).toEqual(['work', 'note', 'work']);
   expect(items[0]).toMatchObject({
     kind: 'work',
     steps: [
       { kind: 'think', text: 'Full reasoning', seconds: null },
       { kind: 'call', action: 'read', target: 'src/main.ts L2–9', seconds: 1.5 },
-    ],
-  });
-  expect(items[1]).toMatchObject({
-    kind: 'work',
-    steps: [
       { kind: 'say', id: 'prose', text: 'Next stage' },
       { kind: 'call', action: 'search', description: 'Find target', command: 'rg target src' },
     ],
   });
-  expect(items[3]).toMatchObject({ steps: [{ action: 'run', description: 'pnpm lint' }] });
+  expect(items[2]).toMatchObject({ steps: [{ action: 'run', description: 'pnpm lint' }] });
 });
 
-test('trailing prose and multi-paragraph or block-markdown prose stay visible as robot replies', () => {
+test('prose of any length between calls folds in order; only the prose after the last call stays as the reply', () => {
   const items = render([
     call('read-1', 'Read', { file_path: 'src/a.ts' }, 1000),
     { id: 'multi', role: 'assistant', content: 'First line.\n\nSecond paragraph.', createdAt: 2000 },
@@ -47,10 +42,17 @@ test('trailing prose and multi-paragraph or block-markdown prose stay visible as
     call('read-3', 'Read', { file_path: 'src/c.ts' }, 5000),
     { id: 'tail', role: 'assistant', content: 'All checks passed.', createdAt: 6000 },
   ]);
-  expect(items.map((item) => item.kind)).toEqual(['work', 'robot', 'work', 'robot', 'work', 'robot']);
-  expect(items[1]).toMatchObject({ kind: 'robot', markdown: 'First line.\n\nSecond paragraph.' });
-  expect(items[3]).toMatchObject({ kind: 'robot', markdown: '## Summary' });
-  expect(items[5]).toMatchObject({ kind: 'robot', markdown: 'All checks passed.' });
+  expect(items.map((item) => item.kind)).toEqual(['work', 'robot']);
+  expect(items[0]).toMatchObject({
+    steps: [
+      { kind: 'call', target: 'src/a.ts' },
+      { kind: 'say', text: 'First line.\n\nSecond paragraph.' },
+      { kind: 'call', target: 'src/b.ts' },
+      { kind: 'say', text: '## Summary' },
+      { kind: 'call', target: 'src/c.ts' },
+    ],
+  });
+  expect(items[1]).toMatchObject({ kind: 'robot', markdown: 'All checks passed.' });
 });
 
 test('timestamps retain subsecond precision and absent durations stay unknown', () => {

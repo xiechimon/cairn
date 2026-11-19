@@ -330,6 +330,28 @@ describe('task thread hierarchy', () => {
       'failed',
     ).filter((item) => item.kind === 'work');
     expect(shouldExpandLastWork(withFailedCall)).toBe(true);
+
+    const recovered = render(
+      rows([
+        [
+          'assistant',
+          {
+            kind: 'toolcall',
+            call: { id: 'c3', name: 'Bash', arguments: { command: 'pnpm test' }, result: 'exit 1', isError: true, startedAt: 0, endedAt: 100 },
+          },
+        ],
+        [
+          'assistant',
+          {
+            kind: 'toolcall',
+            call: { id: 'c4', name: 'Bash', arguments: { command: 'pnpm test' }, result: 'ok', startedAt: 200, endedAt: 300 },
+          },
+        ],
+      ]),
+      'failed',
+    ).filter((item) => item.kind === 'work');
+    expect(recovered).toHaveLength(1);
+    expect(shouldExpandLastWork(recovered)).toBe(false);
   });
 
   test('a failed build without a failure row still shows its error once', () => {

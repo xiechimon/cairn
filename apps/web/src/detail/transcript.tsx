@@ -1,12 +1,11 @@
 import type { StepPromptOrigin } from '@cairn/shared';
 import { CircleAlert } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { formatTokens } from '../api/mappers.js';
 import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { TaskBlockedRow, TaskLiveRow } from '../components/chat/live-row.js';
+import { liveTokensLabel, TaskBlockedRow, TaskLiveRow } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
@@ -339,7 +338,7 @@ function Row({
               seconds={item.seconds}
               startedAt={item.startedAt}
               {...(item.outputTokens !== undefined
-                ? { tokens: t('{n} tokens', { n: formatTokens(item.outputTokens) }) }
+                ? { tokens: liveTokensLabel(item.outputTokens, t) }
                 : {})}
             />
           )}

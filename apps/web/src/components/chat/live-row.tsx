@@ -1,7 +1,8 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { useConnected } from '../../api/connection-state.js';
+import { formatTokens } from '../../api/mappers.js';
 import { useI18n } from '../../i18n/provider.js';
-import type { TVars } from '../../i18n/translate.js';
+import type { TFunc, TVars } from '../../i18n/translate.js';
 import { Button } from '../ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js';
 import { TraceChevron } from './trace-parts.js';
@@ -22,6 +23,10 @@ export function useLiveSeconds(startedAt: number | null | undefined): number | n
 export function formatClock(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   return `${minutes}:${String(totalSeconds % 60).padStart(2, '0')}`;
+}
+
+export function liveTokensLabel(output: number, t: TFunc): string {
+  return t('{n} tokens', { n: output < 1000 ? output : formatTokens(output) });
 }
 
 export function formatLiveElapsed(seconds: number | null): string {

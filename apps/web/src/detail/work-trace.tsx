@@ -1,7 +1,6 @@
 import { CircleDashed } from 'lucide-react';
 import { useState } from 'react';
-import { formatTokens } from '../api/mappers.js';
-import { formatLiveElapsed, useLiveSeconds } from '../components/chat/live-row.js';
+import { formatLiveElapsed, liveTokensLabel, useLiveSeconds } from '../components/chat/live-row.js';
 import {
   EMPTY_TRACE_COUNTS,
   TraceCard,
@@ -14,6 +13,7 @@ import {
 } from '../components/chat/trace-parts.js';
 import type { TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
+import { ChatMarkdown } from './chat-markdown.js';
 
 const TAIL_STEPS = 5;
 
@@ -53,7 +53,7 @@ const NAMED_PURPOSES = 2;
 
 function liveMeta(elapsed: string, outputTokens: number | undefined, t: TFunc): string {
   if (elapsed === '' || outputTokens === undefined) return elapsed;
-  return `${elapsed} · ${t('{n} tokens', { n: formatTokens(outputTokens) })}`;
+  return `${elapsed} · ${liveTokensLabel(outputTokens, t)}`;
 }
 
 export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TFunc): string[] {
@@ -308,14 +308,12 @@ export function WorkTrace({
   const [showsEarlier, setShowsEarlier] = useState(false);
   const expanded =
     disclosure?.defaultExpanded === defaultExpanded ? disclosure.open : defaultExpanded;
-  const saySteps = item.steps.filter(
-    (step): step is Extract<WorkStep, { kind: 'say' }> => step.kind === 'say',
-  );
   const traceSteps = item.steps.filter(
     (step): step is Exclude<WorkStep, { kind: 'say' }> => step.kind !== 'say',
   );
   const earlier = earlierStepCount(traceSteps.length);
-  const shown = showsEarlier ? traceSteps : traceSteps.slice(earlier);
+  const firstShown = showsEarlier || earlier === 0 ? undefined : traceSteps[earlier];
+  const shown = item.steps.slice(firstShown === undefined ? 0 : item.steps.indexOf(firstShown));
   const counts = { ...EMPTY_TRACE_COUNTS };
   const readPaths = new Set<string>();
   const editPaths = new Set<string>();
@@ -371,15 +369,6 @@ export function WorkTrace({
       </div>
       {expanded && (
         <TraceCard>
-          {saySteps.map((step) => (
-            <div
-              key={step.id}
-              data-slot="work-say"
-              className="px-3 py-2 text-ui leading-5 text-(--text-secondary) [overflow-wrap:anywhere]"
-            >
-              {step.text}
-            </div>
-          ))}
           {earlier > 0 && (
             <div>
               <TraceRowButton
@@ -391,9 +380,19 @@ export function WorkTrace({
               />
             </div>
           )}
-          {shown.map((step) => (
-            <WorkStepRow key={step.id} step={step} enter={entering.has(step.id)} t={t} />
-          ))}
+          {shown.map((step) =>
+            step.kind === 'say' ? (
+              <div
+                key={step.id}
+                data-slot="work-say"
+                className="px-3 py-2 text-ui leading-5 text-(--text-secondary) [overflow-wrap:anywhere]"
+              >
+                <ChatMarkdown text={step.text} />
+              </div>
+            ) : (
+              <WorkStepRow key={step.id} step={step} enter={entering.has(step.id)} t={t} />
+            ),
+          )}
         </TraceCard>
       )}
     </div>

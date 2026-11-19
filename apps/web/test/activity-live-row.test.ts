@@ -111,6 +111,22 @@ describe('mapTranscript activity phase (#905)', () => {
     expect(items.find((i) => i.kind === 'work')).toMatchObject({ running: true, outputTokens: 2_400 });
   });
 
+  test('while the reply streams, the status row stays under it with the running count', () => {
+    const running = step('claimed');
+    const items = mapTranscript({
+      messages: [],
+      steps: [running],
+      build: BUILD,
+      todo: todo(9, 'building'),
+      machineName: null,
+      userName: 'Xmon Dai',
+      liveText: 'Writing the summary now',
+      activity: act(running.id, 'responding', { tokens: { input: 900, output: 1_500 } }),
+    });
+    expect(items.slice(-2).map((i) => i.kind)).toEqual(['robot', 'streaming']);
+    expect(tail(items)).toMatchObject({ outputTokens: 1_500 });
+  });
+
   test('W1: stepId mismatch (stale step phase) → base label unchanged', () => {
     const running = step('claimed');
     const items = render({

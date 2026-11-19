@@ -175,24 +175,21 @@ async function stubWorld(
   await expect(page.getByTestId('transcript-col')).toBeVisible();
 }
 
-test('work groups consecutive thinking and calls, keeping blocks collapsed until opened', async ({ page }, testInfo) => {
+test('a run folds its thinking, calls and narration into one block that stays collapsed until opened', async ({ page }, testInfo) => {
   await stubWorld(page);
   const summaries = page.getByTestId('work-summary');
-  await expect(summaries).toHaveCount(2);
-  const words = summaries.first().locator('[data-trace-summary]');
-  await expect(words).toHaveText('改了 main.ts');
-  await expect(words).toHaveAttribute('title', /^Find readiness checks，Verify changes · /);
-  await expect(summaries.first().locator('[data-trace-failed]')).toHaveText('（1 个失败）');
-  await expect(summaries.first()).toHaveAttribute('data-trace-state', 'failed');
-  for (const count of ['思考 1 次', '读了 1 个文件', '搜索 1 次', '跑了 1 条命令', '改了 2 个文件', '调用 1 个工具'])
-    await expect(words).toHaveAttribute('title', new RegExp(count));
-  await expect(summaries.last().locator('[data-trace-summary]')).toHaveText('Check formatting');
-  await expect(summaries.last()).toHaveAttribute('data-trace-state', 'running');
-  await expect(summaries.first()).toHaveAttribute('aria-expanded', 'false');
-  await expect(summaries.last()).toHaveAttribute('aria-expanded', 'false');
-  await summaries.first().click();
+  await expect(summaries).toHaveCount(1);
+  const summary = summaries.first();
+  await expect(summary.locator('[data-trace-summary]')).toHaveText('Check formatting');
+  await expect(summary).toHaveAttribute('data-trace-state', 'running');
+  await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  for (const count of ['正在思考', '正在读 1 个文件', '正在搜索 1 次', '正在跑 2 条命令', '正在改 2 个文件', '正在调用 1 个工具', '1 个失败'])
+    await expect(summary.locator('[data-trace-summary]')).toHaveAttribute('title', new RegExp(count));
+  await summary.click();
   const block = page.getByTestId('work-block').first();
-  await expect(block.getByTestId('work-earlier')).toHaveText('之前的 2 步');
+  await expect(block.locator('[data-slot="work-say"]')).toHaveText('The checks passed.');
+  await expect(block.getByTestId('work-spinner')).toBeVisible();
+  await expect(block.getByTestId('work-earlier')).toHaveText('之前的 4 步');
   await block.getByTestId('work-earlier').click();
   const read = block.getByTestId('work-call').first();
   await expect(read).toContainText('读');
@@ -201,12 +198,8 @@ test('work groups consecutive thinking and calls, keeping blocks collapsed until
   await expect(read).not.toContainText('/home/user');
   await read.click();
   await expect(read.locator('..').getByTestId('tool-output')).toContainText('export const ready = true;');
-  await block.getByTestId('work-think').click();
-  await expect(block.getByTestId('thinking-body')).toHaveText(LONG_THINKING);
-  await summaries.last().click();
-  const lastBlock = page.getByTestId('work-block').last();
-  await expect(lastBlock.locator('[data-slot="work-say"]')).toHaveText('The checks passed.');
-  await expect(lastBlock.getByTestId('work-spinner')).toBeVisible();
+  await block.getByTestId('work-think').first().click();
+  await expect(block.getByTestId('thinking-body').first()).toHaveText(LONG_THINKING);
   await page.screenshot({ path: testInfo.outputPath('work-trace-current.png') });
 });
 
@@ -239,6 +232,7 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await stubWorld(page);
   await page.getByTestId('work-summary').first().click();
   const block = page.getByTestId('work-block').first();
+  await block.getByTestId('work-earlier').click();
   const run = block.getByTestId('work-call').filter({ hasText: 'Verify changes' });
   await expect(run).toContainText('Verify changes');
   await expect(run).toContainText('12s');
@@ -254,7 +248,7 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await edit.click();
   await expect(edit.locator('..').getByTestId('tool-output')).toContainText('old line');
   await expect(edit.locator('..').getByTestId('tool-output')).toContainText('new line');
-  await expect(block.getByTestId('work-call').last()).toContainText('docs · lookup');
+  await expect(block.getByTestId('work-call').filter({ hasText: 'docs · lookup' })).toHaveCount(1);
   const failed = block.getByTestId('work-call').filter({ hasText: 'src/other.ts' });
   await expect(failed.getByText('失败')).toBeVisible();
   await expect(failed).toHaveAttribute('aria-expanded', 'true');
@@ -302,7 +296,7 @@ test('a long summary stays on one line in a narrow column and keeps the full tex
   await stubWorld(page);
   const summary = page.getByTestId('work-summary').first();
   const text = summary.locator('span[title]');
-  await expect(text).toHaveAttribute('title', /思考 1 次.*调用 1 个工具/);
+  await expect(text).toHaveAttribute('title', /正在思考.*正在调用 1 个工具/);
   const box = await text.evaluate((el) => ({
     height: el.getBoundingClientRect().height,
     lineHeight: Number.parseFloat(getComputedStyle(el).lineHeight),

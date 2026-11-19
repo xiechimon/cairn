@@ -125,15 +125,15 @@ test('a long step list folds its earlier steps behind one row', async ({ page })
   const summary = page.getByTestId('work-summary').last();
   await expect(summary).toHaveAttribute('aria-expanded', 'false');
   await summary.click();
-  await expect(
-    page.getByTestId('work-block').last().locator('[data-slot="work-say"]'),
-  ).toHaveText('设置文件名的地方不止下载接口一处，我先把它们都找出来。');
+  const say = page.getByTestId('work-block').last().locator('[data-slot="work-say"]');
+  await expect(say).toHaveCount(0);
   const earlier = page.getByTestId('work-earlier');
   await expect(earlier).toHaveText('之前的 18 步');
   await expect(lastSteps(page)).toHaveCount(5);
   await earlier.click();
   await expect(earlier).toHaveAttribute('aria-expanded', 'true');
   await expect(lastSteps(page)).toHaveCount(23);
+  await expect(say).toHaveText('设置文件名的地方不止下载接口一处，我先把它们都找出来。');
   await open(page, 'running');
   await expect(page.getByTestId('work-earlier')).toHaveCount(0);
 });
