@@ -4,6 +4,7 @@ import { formatLiveElapsed, liveTokensLabel, useLiveSeconds } from '../component
 import {
   EMPTY_TRACE_COUNTS,
   TraceCard,
+  TraceChevron,
   TraceCollapse,
   TraceCommandBox,
   TraceFailTag,
@@ -12,6 +13,8 @@ import {
   TraceRowButton,
   traceSummary,
 } from '../components/chat/trace-parts.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
+import { Button } from '../components/ui/button.js';
 import type { TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
 import { ChatMarkdown } from './chat-markdown.js';
@@ -160,6 +163,70 @@ function currentAction(steps: readonly Exclude<WorkStep, { kind: 'say' }>[], t: 
 function stepTarget(step: Extract<WorkStep, { kind: 'call' }>): string {
   if (step.description !== undefined) return step.description;
   return (step.command ?? step.target ?? '').split('\n')[0] ?? '';
+}
+
+const MARKDOWN_LEAD = /^\s*(?:#{1,6}\s+|[-*•+]\s+(?:\[[ xX~]\]\s+)?|\d+[.)]\s+|>\s*)/;
+
+function sayHeadline(text: string): { line: string; more: boolean } {
+  const lines = text.split('\n').filter((line) => line.trim() !== '');
+  const raw = lines[0] ?? '';
+  const line = raw
+    .replace(MARKDOWN_LEAD, '')
+    .replace(/\*\*|__|`/g, '')
+    .trim();
+  return { line, more: lines.length > 1 || line !== raw.trim() };
+}
+
+function WorkSayRow({ text, t }: { text: string; t: TFunc }) {
+  const [open, setOpen] = useState(false);
+  const { line, more } = sayHeadline(text);
+  if (!more)
+    return (
+      <div
+        data-slot="work-say"
+        className="px-3 py-2 text-ui leading-5 text-(--text-secondary) [overflow-wrap:anywhere]"
+      >
+        <ChatMarkdown text={text} />
+      </div>
+    );
+  if (open)
+    return (
+      <div data-slot="work-say" data-open="" className="relative">
+        <div className="py-2 pr-10 pl-3 text-ui leading-5 text-(--text-secondary) [overflow-wrap:anywhere]">
+          <ChatMarkdown text={text} />
+        </div>
+        <IconTooltip
+          label={t('收起这段话')}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-expanded
+              className="absolute top-1.5 right-1.5 size-7"
+              onClick={() => setOpen(false)}
+            />
+          }
+        >
+          <TraceChevron open />
+        </IconTooltip>
+      </div>
+    );
+  return (
+    <div data-slot="work-say">
+      <TraceRowButton
+        aria-label={t('展开这段话')}
+        expandable
+        open={false}
+        onClick={() => setOpen(true)}
+        verb={
+          <span className="font-normal text-(--text-secondary)" data-testid="work-say-line">
+            {line}
+          </span>
+        }
+        className="[&_[data-trace-verb]]:min-w-0 [&_[data-trace-verb]]:flex-1 [&_[data-trace-verb]]:truncate"
+      />
+    </div>
+  );
 }
 
 function WorkStepRow({
@@ -413,13 +480,7 @@ export function WorkTrace({
           )}
           {shown.map((step) =>
             step.kind === 'say' ? (
-              <div
-                key={step.id}
-                data-slot="work-say"
-                className="px-3 py-2 text-ui leading-5 text-(--text-secondary) [overflow-wrap:anywhere]"
-              >
-                <ChatMarkdown text={step.text} />
-              </div>
+              <WorkSayRow key={step.id} text={step.text} t={t} />
             ) : (
               <WorkStepRow key={step.id} step={step} enter={entering.has(step.id)} t={t} />
             ),

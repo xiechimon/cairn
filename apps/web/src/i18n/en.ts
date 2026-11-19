@@ -570,6 +570,8 @@ export const EN: Record<string, string> = {
   后台任务: 'Background tasks',
   '{n} 个后台任务进行中': '{n## background task running|# background tasks running}',
   后台: 'Background',
+  收起这段话: 'Collapse this note',
+  展开这段话: 'Expand this note',
   发送: 'Send',
   暂无方案: 'No plan yet',
   全部展开: 'Expand all',
