@@ -1208,7 +1208,7 @@ export function useApiMutations(teamId: string | undefined) {
         );
         invalidateAll();
       },
-      onError: (_error, input, context) => {
+      onError: (_error, _input, context) => {
         qc.setQueryData(['projects', teamId], context?.previous);
       },
     }),

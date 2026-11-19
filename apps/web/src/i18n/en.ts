@@ -2201,6 +2201,8 @@ export const EN: Record<string, string> = {
   到任务里批准计划: 'Approve the plan in the task',
   在问你一个问题: 'Asked you a question',
   到任务里回答: 'Answer in the task',
+  '被阻塞了，等你处理。': "Blocked — it's waiting on you.",
+  到任务里处理: 'Handle it in the task',
   'Coordinator 在跟进': 'Coordinator is on it',
   'Coordinator 建任务前先问你': 'Coordinator asks before creating a task',
   在对话里回答: 'Answer in the conversation',
