@@ -71,6 +71,7 @@ function harness(
     activity: {
       setPhase: () => {},
       noteEvent: () => {},
+      noteUsage: () => {},
     } as unknown as StepPassLoopInput['activity'],
     stream: {
       discardDeltas: () => {},
@@ -122,6 +123,36 @@ describe('runStepPasses', () => {
     expect(h.journal).toEqual([{ state: 'running', sessionId: 'sess-1' }]);
     expect(h.input.session.current?.sessionId).toBe('sess-1');
     expect(h.input.passState.sawDone).toBe(true);
+  });
+
+  test('usage events reach the activity tracker', async () => {
+    const row = (output: number) => ({
+      model: 'p1/m',
+      input: 1,
+      output,
+      cacheRead: 0,
+      cacheWrite: 0,
+    });
+    const seen: number[] = [];
+    const h = harness(
+      [
+        sessionHandle('sess-1', [
+          { type: 'usage', usage: [row(5)] },
+          { type: 'compaction_start' } as StepEvent,
+          { type: 'usage', usage: [row(12)] },
+          done,
+        ]),
+      ],
+      {
+        activity: {
+          setPhase: () => {},
+          noteEvent: () => {},
+          noteUsage: (rows: { output: number }[]) => seen.push(rows[0]?.output ?? 0),
+        } as unknown as StepPassLoopInput['activity'],
+      },
+    );
+    await runStepPasses(h.input);
+    expect(seen).toEqual([5, 12]);
   });
 
   test('a network failure continues the same session once', async () => {

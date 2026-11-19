@@ -1,4 +1,9 @@
-import type { SkillFact, StepActivityPhase, StepActivityReport } from '@cairn/shared';
+import type {
+  AgentTokenUsage,
+  SkillFact,
+  StepActivityPhase,
+  StepActivityReport,
+} from '@cairn/shared';
 
 export const ACTIVITY_REPEAT_MS = 5_000;
 
@@ -19,6 +24,7 @@ export interface ActivityTracker {
   toolStarted: (id: string, name: string) => void;
   toolEnded: (id: string) => void;
   noteSkill: (fact: SkillFact) => void;
+  noteUsage: (usage: AgentTokenUsage) => void;
 }
 
 export function createActivityTracker(deps: ActivityTrackerDeps): ActivityTracker {
@@ -26,15 +32,20 @@ export function createActivityTracker(deps: ActivityTrackerDeps): ActivityTracke
   const repeatMs = deps.repeatMs ?? ACTIVITY_REPEAT_MS;
   const pendingTools = new Map<string, string>();
   const skills: SkillFact[] = [];
-  let base: Omit<StepActivityReport, 'skills'> | null = null;
+  let tokens: StepActivityReport['tokens'];
+  let base: Omit<StepActivityReport, 'skills' | 'tokens'> | null = null;
   let current: StepActivityReport | null = null;
   let lastSent: StepActivityReport | null = null;
   let lastSentAt = Number.NEGATIVE_INFINITY;
   let lastEventAt = 0;
   let lastSentEventAt = 0;
 
-  function withSkills(report: Omit<StepActivityReport, 'skills'>): StepActivityReport {
-    return skills.length > 0 ? { ...report, skills: [...skills] } : report;
+  function withSkills(report: Omit<StepActivityReport, 'skills' | 'tokens'>): StepActivityReport {
+    return {
+      ...report,
+      ...(skills.length > 0 ? { skills: [...skills] } : {}),
+      ...(tokens !== undefined ? { tokens } : {}),
+    };
   }
 
   function emit(report: StepActivityReport): void {
@@ -104,6 +115,22 @@ export function createActivityTracker(deps: ActivityTrackerDeps): ActivityTracke
       if (base === null) return;
       emit(withSkills(base));
     },
+    noteUsage(usage) {
+      let input = 0;
+      let output = 0;
+      for (const row of usage) {
+        input += row.input + row.cacheRead + row.cacheWrite;
+        output += row.output;
+      }
+      if (input === 0 && output === 0) return;
+      const next = {
+        input: Math.max(input, tokens?.input ?? 0),
+        output: Math.max(output, tokens?.output ?? 0),
+      };
+      if (next.input === tokens?.input && next.output === tokens?.output) return;
+      tokens = next;
+      if (base !== null) current = withSkills(base);
+    },
   };
 }
 
@@ -114,6 +141,8 @@ function sameReport(a: StepActivityReport | null, b: StepActivityReport | null):
     a.tool === b.tool &&
     a.attempt === b.attempt &&
     a.resetLive === b.resetLive &&
+    a.tokens?.input === b.tokens?.input &&
+    a.tokens?.output === b.tokens?.output &&
     sameSkills(a.skills, b.skills)
   );
 }

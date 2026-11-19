@@ -358,6 +358,7 @@ class AcpSession implements AgentSessionHandle {
         cacheWrite: num('cachedWriteTokens'),
         contextWindow: update.size,
       });
+      this.push({ type: 'usage', usage: [...this.usageRows] });
       return;
     }
     if (update.sessionUpdate === 'agent_thought_chunk' && update.content.type === 'text') {

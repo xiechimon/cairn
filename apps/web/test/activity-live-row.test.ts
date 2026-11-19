@@ -78,6 +78,39 @@ describe('mapTranscript activity phase (#905)', () => {
     });
   });
 
+  test('running output tokens reach the live row only from this step and only when non-zero', () => {
+    const running = step('claimed');
+    const tokens = { input: 52_000, output: 1_234 };
+    expect(tail(render({ steps: [running], activity: act(running.id, 'thinking', { tokens }) }))).toMatchObject({
+      outputTokens: 1_234,
+    });
+    for (const activity of [
+      act(running.id, 'thinking'),
+      act(running.id, 'thinking', { tokens: { input: 9, output: 0 } }),
+      act('other-step', 'thinking', { tokens }),
+    ]) {
+      expect(tail(render({ steps: [running], activity }))).not.toHaveProperty('outputTokens');
+    }
+  });
+
+  test('while a tool runs the status row is hidden, so the running work block carries the count', () => {
+    const running = step('claimed');
+    const items = render({
+      steps: [running],
+      activity: act(running.id, 'tool', { tool: 'bash', tokens: { input: 7_000, output: 2_400 } }),
+      messages: [
+        {
+          id: 'm-run',
+          role: 'assistant',
+          createdAt: NOW - 1_000,
+          content: { kind: 'toolcall', call: { id: 'c-run', name: 'bash', arguments: { command: 'python3 fib.py' } } },
+        },
+      ],
+    });
+    expect(items.some((i) => i.kind === 'streaming')).toBe(false);
+    expect(items.find((i) => i.kind === 'work')).toMatchObject({ running: true, outputTokens: 2_400 });
+  });
+
   test('W1: stepId mismatch (stale step phase) → base label unchanged', () => {
     const running = step('claimed');
     const items = render({

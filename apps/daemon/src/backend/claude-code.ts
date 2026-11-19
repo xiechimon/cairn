@@ -84,6 +84,7 @@ export interface ClaudeMapState {
   runningTools: Set<string>;
   interrupted: boolean;
   usage: AgentTokenUsage;
+  liveUsage: Map<string, ModelUsage>;
   lastContext?: { model: string; tokens: number };
   contextLimits?: { model: string; window: number; compactAt?: number };
   sessionId: string | null;
@@ -92,12 +93,33 @@ export interface ClaudeMapState {
   authFailed?: boolean;
 }
 
+function liveUsageRows(state: ClaudeMapState): ModelUsage[] {
+  const byModel = new Map<string, ModelUsage>();
+  for (const row of state.liveUsage.values()) {
+    const prev = byModel.get(row.model);
+    byModel.set(
+      row.model,
+      prev === undefined
+        ? { ...row }
+        : {
+            model: row.model,
+            input: prev.input + row.input,
+            output: prev.output + row.output,
+            cacheRead: prev.cacheRead + row.cacheRead,
+            cacheWrite: prev.cacheWrite + row.cacheWrite,
+          },
+    );
+  }
+  return [...byModel.values()];
+}
+
 export function createClaudeMapState(opts?: { modelId?: string }): ClaudeMapState {
   return {
     calls: new Map(),
     runningTools: new Set(),
     interrupted: false,
     usage: [],
+    liveUsage: new Map(),
     sessionId: null,
     rateLimits: [],
     ...(opts?.modelId !== undefined ? { modelId: opts.modelId } : {}),
@@ -220,6 +242,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
       const assistant = msg as {
         parent_tool_use_id?: string | null;
         message?: {
+          id?: string;
           role?: string;
           content?: unknown[];
           model?: string;
@@ -242,12 +265,25 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
           cacheWrite: callUsage.cache_creation_input_tokens,
         });
         if (tokens > 0) state.lastContext = { model: callModel, tokens };
+        const messageId = assistant.message?.id;
+        if (messageId !== undefined)
+          state.liveUsage.set(messageId, {
+            model: `${USAGE_MODEL_PREFIX}/${callModel}`,
+            input: callUsage.input_tokens ?? 0,
+            output: callUsage.output_tokens ?? 0,
+            cacheRead: callUsage.cache_read_input_tokens ?? 0,
+            cacheWrite: callUsage.cache_creation_input_tokens ?? 0,
+          });
       }
       if ((msg as { error?: unknown }).error === 'authentication_failed') {
         state.authFailed = true;
       }
-      if (!Array.isArray(content)) return [];
       const out: StepEvent[] = [];
+      if (assistant.parent_tool_use_id == null && callModel !== undefined && callUsage) {
+        const live = liveUsageRows(state);
+        if (live.length > 0) out.push({ type: 'usage', usage: live });
+      }
+      if (!Array.isArray(content)) return out;
       for (const block of content) {
         const b = block as {
           type?: string;

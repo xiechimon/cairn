@@ -407,14 +407,20 @@ describe('hub activity phase (#905)', () => {
   test('A1/A3/A5: multiple activity entries during zero-subscriber period -> catch-up carries only the last, frames pass the vocabulary', () => {
     const hub = new ConversationStreamHub();
     hub.publishActivity('c1', act('thinking', 100));
-    hub.publishActivity('c1', act('tool', 200, { tool: 'bash' }));
+    hub.publishActivity('c1', act('tool', 200, { tool: 'bash', tokens: { input: 10, output: 3 } }));
     const conn = new FakeConn();
     hub.subscribe('c1', conn);
     const frames = activityFrames(conn);
     expect(frames).toHaveLength(1);
     expect(frames[0]).toEqual({
       type: 'activity',
-      activity: { stepId: 'step-1', at: 200, phase: 'tool', tool: 'bash' },
+      activity: {
+        stepId: 'step-1',
+        at: 200,
+        phase: 'tool',
+        tool: 'bash',
+        tokens: { input: 10, output: 3 },
+      },
     });
     expect(conversationStreamEventSchema.parse(frames[0])).toBeTruthy();
     hub.publishActivity('c1', act('responding', 300));

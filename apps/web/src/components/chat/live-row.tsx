@@ -88,11 +88,13 @@ export function TaskLiveRow({
   label,
   seconds,
   startedAt,
+  tokens,
   testId = 'live-row',
 }: {
   label: string;
   seconds?: number | undefined;
   startedAt?: number | undefined;
+  tokens?: string | undefined;
   testId?: string | undefined;
 }) {
   const liveSeconds = useLiveSeconds(seconds === undefined ? (startedAt ?? null) : null);
@@ -115,6 +117,7 @@ export function TaskLiveRow({
           data-slot="live-elapsed"
         >
           {elapsed}
+          {tokens !== undefined && <span data-slot="live-tokens"> · {tokens}</span>}
         </span>
       )}
     </div>

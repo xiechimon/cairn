@@ -279,6 +279,43 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
     expect(state.usage).toEqual([row]);
   });
 
+  test('main-loop assistant messages report running usage, each message once, without sub-agents', () => {
+    const state = createClaudeMapState();
+    const call = (id: string, output: number, parent: string | null = null) =>
+      mapClaudeMessage(
+        {
+          type: 'assistant',
+          parent_tool_use_id: parent,
+          message: {
+            id,
+            role: 'assistant',
+            model: 'claude-sonnet-4-5',
+            content: [{ type: 'text', text: id }],
+            usage: { input_tokens: 3, cache_read_input_tokens: 100, output_tokens: output },
+          },
+        } as unknown as SDKMessage,
+        state,
+      ).filter((e) => e.type === 'usage');
+    expect(call('a', 10)).toHaveLength(1);
+    call('a', 25);
+    expect(call('sub', 9_000, 'toolu_task')).toEqual([]);
+    expect(call('b', 7)).toEqual([
+      {
+        type: 'usage',
+        usage: [
+          {
+            model: 'claude-code/claude-sonnet-4-5',
+            input: 6,
+            output: 32,
+            cacheRead: 200,
+            cacheWrite: 0,
+          },
+        ],
+      },
+    ]);
+    expect(state.usage).toEqual([]);
+  });
+
   test('the usage row carries the last top-level request as contextTokens, so the composer context ring has data', () => {
     const call = (
       id: string,

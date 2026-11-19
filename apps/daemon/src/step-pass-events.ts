@@ -284,6 +284,9 @@ export async function consumeStepPassEvent(
         }
       }
       break;
+    case 'usage':
+      activity.noteUsage(ev.usage);
+      break;
     case 'auto_retry_start':
       s.lastError = null;
       s.zeroProgressRetries += 1;

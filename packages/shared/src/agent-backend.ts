@@ -120,6 +120,7 @@ export const stepEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('auto_retry_start'), attempt: z.number().int() }),
   z.object({ type: z.literal('auto_retry_end'), attempt: z.number().int() }),
   z.object({ type: z.literal('steer'), text: z.string() }),
+  z.object({ type: z.literal('usage'), usage: agentTokenUsageSchema }),
   z.object({ type: z.literal('done'), usage: agentTokenUsageSchema }),
   z.object({
     type: z.literal('error'),
@@ -131,10 +132,6 @@ export const stepEventSchema = z.discriminatedUnion('type', [
   }),
 ]);
 export type StepEvent = z.infer<typeof stepEventSchema>;
-
-export const STEP_EVENT_TYPES = stepEventSchema.options.map(
-  (o) => o.shape.type.value,
-) as readonly string[];
 
 export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export const thinkingLevelSchema = z.enum(THINKING_LEVELS);

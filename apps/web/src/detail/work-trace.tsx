@@ -1,5 +1,6 @@
 import { CircleDashed } from 'lucide-react';
 import { useState } from 'react';
+import { formatTokens } from '../api/mappers.js';
 import { formatLiveElapsed, useLiveSeconds } from '../components/chat/live-row.js';
 import {
   EMPTY_TRACE_COUNTS,
@@ -49,6 +50,11 @@ const THINK_HEADING = /^\*\*(.+?)\*\*$/gm;
 const TEST_COMMAND =
   /\b(?:vitest|jest|pytest|mocha|playwright test|cargo test|go test)\b|\b(?:pnpm|npm|yarn|bun)(?: run)? (?:test|e2e)/;
 const NAMED_PURPOSES = 2;
+
+function liveMeta(elapsed: string, outputTokens: number | undefined, t: TFunc): string {
+  if (elapsed === '' || outputTokens === undefined) return elapsed;
+  return `${elapsed} · ${t('{n} tokens', { n: formatTokens(outputTokens) })}`;
+}
 
 export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TFunc): string[] {
   const purposes = steps.flatMap((step, index) => {
@@ -357,7 +363,7 @@ export function WorkTrace({
           }
           summaryTitle={failed === null ? detail : `${detail} ${failed}`}
           failed={failed}
-          elapsed={running ? formatLiveElapsed(liveSeconds) : ''}
+          elapsed={running ? liveMeta(formatLiveElapsed(liveSeconds), item.outputTokens, t) : ''}
           open={expanded}
           running={running}
           onClick={() => setDisclosure({ defaultExpanded, open: !expanded })}

@@ -1768,6 +1768,7 @@ export const EN: Record<string, string> = {
     '{free} GB memory free; 5-minute load {load} on {cores#1 core|# cores}; {disk} GB disk free; up to {slots} at once',
   '还有 {n} 个，在 Cairn 里看': '{n} more, see them in Cairn',
   '今天用了 {tokens} tokens': 'Used today: {tokens}',
+  '{n} tokens': '{n} tokens',
   'Claude 额度用完 · {at} 恢复': 'Claude quota used up · back at {at}',
   'Claude 额度用完': 'Claude quota used up',
   'Claude 额度 {pct}%': 'Claude quota {pct}%',

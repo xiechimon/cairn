@@ -669,6 +669,8 @@ export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState)
         return [{ type: 'message_stop', message: toMessageRecord(msg) }];
       }
       const out: StepEvent[] = [{ type: 'message_end', message: toMessageRecord(msg) }];
+      if (msg.role === 'assistant' && msg.usage && msg.provider && msg.model)
+        out.push({ type: 'usage', usage: settledUsage(state) });
       if (msg.role === 'assistant' && msg.stopReason === 'error') {
         const message = msg.errorMessage ?? 'unknown error';
         const retryable = isRetryableError(message);

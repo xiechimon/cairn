@@ -190,4 +190,41 @@ describe('activity tracker', () => {
     }
     expect(h.sent.map((s) => s.report.phase)).toEqual([...STEP_ACTIVITY_PHASES]);
   });
+
+  it('running token counts ride on the next report, only grow, and are absent until known', () => {
+    const h = harness({ repeatMs: 5_000 });
+    const row = (input: number, output: number) => ({
+      model: 'm',
+      input,
+      output,
+      cacheRead: 10,
+      cacheWrite: 0,
+    });
+    h.tracker.setPhase('thinking');
+    h.tracker.noteUsage([]);
+    h.tracker.noteUsage([{ model: 'm', input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }]);
+    h.tracker.setPhase('responding');
+    expect(h.sent.map((s) => s.report.tokens)).toEqual([undefined, undefined]);
+    h.tracker.noteUsage([
+      row(100, 40),
+      { model: 'n', input: 5, output: 2, cacheRead: 0, cacheWrite: 0 },
+    ]);
+    expect(h.sent).toHaveLength(2);
+    h.advance(5_000);
+    h.tracker.noteEvent();
+    expect(h.sent.at(-1)?.report).toEqual({
+      phase: 'responding',
+      tokens: { input: 115, output: 42 },
+    });
+    h.tracker.noteUsage([row(20, 3)]);
+    h.tracker.setPhase('tool', { tool: 'bash' });
+    expect(h.sent.at(-1)?.report).toEqual({
+      phase: 'tool',
+      tool: 'bash',
+      tokens: { input: 115, output: 42 },
+    });
+    h.tracker.noteUsage([row(300, 90)]);
+    h.tracker.setPhase('awaiting_model');
+    expect(h.sent.at(-1)?.report.tokens).toEqual({ input: 310, output: 90 });
+  });
 });

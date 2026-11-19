@@ -24,10 +24,10 @@ Out of scope: queued input. Task threads already queue (Cmd/Ctrl+Enter), steer, 
 
 **Transitions and paths.**
 
-1. Daemon: each backend exposes its running counts through the existing activity tracker. `createActivityTracker` gains `noteUsage({ input, output })` (cumulative for the step, monotonic). Claude Code calls it on each main-loop `assistant` usage (`parent_tool_use_id == null`, as the context meter already filters) plus `thinking_tokens.estimated_tokens` while thinking; pi on each message usage; ACP on `usage_update`.
+1. Daemon: a new `usage` step event carries the step's running usage rows (the same shape as `done`). pi emits it after each assistant `message_end`, ACP on each `usage_update`, Claude Code on each main-loop assistant message (`parent_tool_use_id == null`, one row per message id so repeated frames of one message count once). The pass handler hands it to `ActivityTracker.noteUsage`, which keeps input (with cache read and write) and output, both only growing within a step. Final usage and crash billing are unchanged: `done` and `usage()` still own them. The step event vocabulary is not tied to pi's: the old test pinning it to pi's 15 events came from the deleted replication spec and is removed, so any harness can add the events it needs.
 2. Wire: `stepActivityReportSchema` gains optional `tokens: { input: number, output: number }`. It rides on the activity report the tracker already re-sends every 5 s; no new endpoint, no extra request.
 3. Server: `reportActivity` passes it through `publishActivity`; the hub's `lastActivity` replay carries it to a reloaded page. No SQLite write.
-4. Web: `activityStore` keeps it; `mapTranscript` copies it to the `streaming` item; `TaskLiveRow` shows `· 1.2k tokens` after the elapsed time, using output tokens (what the agent produced in this step), same `>= 5s` rule as the timer.
+4. Web: `activityStore` keeps it; `mapTranscript` copies it to the `streaming` item; `TaskLiveRow` shows `· 1.2k tokens` after the elapsed time, using output tokens (what the agent produced in this step), same `>= 5s` rule as the timer; queue and quota rows show no count.
 5. Step end: the hub clears `lastActivity` as today; the usage ring reads `step_usage` as today.
 
 **Failures.** A backend without numbers sends no `tokens`; the row shows no count, never `0`. A server restart mid-step loses the value until the next 5 s report. Counts are approximate while streaming and are never summed into billing.

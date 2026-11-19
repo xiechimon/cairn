@@ -127,6 +127,22 @@ describe('devin ACP adapter over scripted stdio', () => {
       }),
     );
     expect(events).toContainEqual({
+      type: 'usage',
+      usage: [
+        {
+          model: 'stub-model',
+          input: 40,
+          output: 10,
+          cacheRead: 3,
+          cacheWrite: 2,
+          contextWindow: 1000,
+        },
+      ],
+    });
+    expect(events.findIndex((e) => e.type === 'usage')).toBeLessThan(
+      events.findIndex((e) => e.type === 'done'),
+    );
+    expect(events).toContainEqual({
       type: 'done',
       usage: [
         {

@@ -157,6 +157,30 @@ describe('conversation stream (02 section 1.2 conversation stream, M5 live strea
       });
       expect(badPhase.status).toBe(400);
 
+      const tokensRes = await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+        cred: token,
+        body: {
+          kind: 'activity',
+          activity: { phase: 'responding', tokens: { input: 900, output: 42 } },
+        },
+      });
+      expect(tokensRes.status).toBe(200);
+      const tokensEv = conversationStreamEventSchema.parse(
+        await stream.next((ev) => ev.type === 'activity'),
+      );
+      expect(tokensEv.type === 'activity' && tokensEv.activity.tokens).toEqual({
+        input: 900,
+        output: 42,
+      });
+      const badTokens = await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+        cred: token,
+        body: {
+          kind: 'activity',
+          activity: { phase: 'responding', tokens: { input: -1, output: 2 } },
+        },
+      });
+      expect(badTokens.status).toBe(400);
+
       const skillsRes = await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
         cred: token,
         body: {

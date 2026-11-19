@@ -157,3 +157,23 @@ describe('pi sessions report the context size of the last request', () => {
     expect(settle(state)[0]?.contextTokens).toBe(1010);
   });
 });
+
+test('each finished assistant message reports the step running usage right after its message_end', () => {
+  const state = newMapState({ now: () => 0 });
+  const first = mapPiSessionEvent(end(), state);
+  expect(first.map((e) => e.type)).toEqual(['message_end', 'usage']);
+  mapPiSessionEvent(end('m2'), state);
+  const third = mapPiSessionEvent(end(), state);
+  expect(third[1]).toEqual({
+    type: 'usage',
+    usage: [
+      expect.objectContaining({ model: 'gw/m1', input: 20, output: 4, cacheRead: 10 }),
+      expect.objectContaining({ model: 'gw/m2', input: 10, output: 2, cacheRead: 5 }),
+    ],
+  });
+  expect(
+    mapPiSessionEvent({ type: 'message_end', message: { role: 'user', content: 'hi' } }, state).map(
+      (e) => e.type,
+    ),
+  ).toEqual(['message_end']);
+});

@@ -439,6 +439,7 @@ export type TranscriptItem =
       startedAt?: number;
       label: string;
       labelVars?: Record<string, string | number>;
+      outputTokens?: number;
       blocked?: true;
       blockedKind?: StepQueueBlocked['kind'];
     }
@@ -450,6 +451,7 @@ export type TranscriptItem =
       expanded?: boolean;
       running?: boolean;
       startedAt?: number;
+      outputTokens?: number;
       createdAt?: number;
     }
   | {

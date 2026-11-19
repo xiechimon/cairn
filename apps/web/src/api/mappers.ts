@@ -958,6 +958,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       : { kind: 'robot', paragraphs: [{ segments: [{ text: liveText }] }] };
   if (!running && liveReply !== null) items.push(liveReply);
   if (running && build) {
+    const act = activity != null && activity.stepId === running.id ? activity : null;
+    const runOutput = act?.tokens !== undefined && act.tokens.output > 0 ? act.tokens.output : null;
     if (liveThinking.trim() !== '') {
       const step: WorkStep = {
         kind: 'think',
@@ -981,6 +983,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     if (hasActiveTailWork && tailWork?.kind === 'work') {
       tailWork.running = true;
       tailWork.startedAt = running.createdAt;
+      if (runOutput !== null) tailWork.outputTokens = runOutput;
     }
     if (liveReply !== null) items.push(liveReply);
     const liveTodo = agentTodo != null && agentTodo.stepId === running.id ? agentTodo : null;
@@ -993,7 +996,6 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         items.push(todoRow);
       }
     }
-    const act = activity != null && activity.stepId === running.id ? activity : null;
     const actLabel = act != null && !stopping ? activityLabel(act) : null;
     const queued =
       running.status === 'pending' && running.queue != null ? queueLabel(running.queue) : null;
@@ -1005,6 +1007,9 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       items.push({
         kind: 'streaming',
         startedAt: running.createdAt,
+        ...(runOutput !== null && queued == null && quota == null
+          ? { outputTokens: runOutput }
+          : {}),
         ...(queued != null && running.queue?.blocked != null
           ? { blocked: true as const, blockedKind: running.queue.blocked.kind }
           : {}),

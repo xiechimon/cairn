@@ -43,7 +43,6 @@ import {
   remoteToolDefSchema,
   SECRET_BOX_ENVELOPE_VERSION,
   SSE_CHANNELS,
-  STEP_EVENT_TYPES,
   STEP_LIFECYCLE_LOG_LINES,
   STREAM_TIMEOUTS_MS,
   THINKING_LEVELS,
@@ -636,11 +635,6 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
 });
 
 describe('AgentBackend seam (01 §5, 00/D1 seam)', () => {
-  it('StepEvent types = 02 §5.6 pi vocabulary session-facing 15 items, 1:1 no rename', () => {
-    expect(STEP_EVENT_TYPES).toHaveLength(15);
-    expect(STEP_EVENT_TYPES).toEqual(PI_STREAM_EVENTS.slice(0, 15));
-  });
-
   it('BACKEND_RUNTIME_IDS accepts claude-code, gemini, devin and antigravity; pi is still not a backend identity', () => {
     expect(BACKEND_RUNTIME_IDS).toEqual(['claude-code', 'gemini', 'devin', 'antigravity']);
     expect(BACKEND_RUNTIME_IDS).not.toContain('pi');

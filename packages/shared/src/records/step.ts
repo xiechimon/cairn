@@ -171,6 +171,9 @@ export const stepActivityReportSchema = z.object({
   attempt: z.number().int().optional(),
   resetLive: z.boolean().optional(),
   skills: z.array(skillFactSchema).optional(),
+  tokens: z
+    .object({ input: z.number().int().nonnegative(), output: z.number().int().nonnegative() })
+    .optional(),
 });
 export type StepActivityReport = z.infer<typeof stepActivityReportSchema>;
 
