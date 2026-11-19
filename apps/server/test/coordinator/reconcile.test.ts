@@ -119,6 +119,118 @@ describe('Coordinator reconcile at open', () => {
     expect(JSON.stringify(w.s.db.select().from(chiefMessage).all())).toContain('resumed answer');
   });
 
+  it('ends a mail turn interrupted by a restart instead of resuming it without a step, so the next mail turn runs its tools', async () => {
+    const w = await world('hello');
+    w.s.db
+      .update(step)
+      .set({ prompt: '[wake:wake] provenance=mail:mail-three\nmail three' })
+      .where(eq(step.id, w.stepId))
+      .run();
+    const origin = w.s.db.select().from(step).where(eq(step.id, w.stepId)).get();
+    if (origin === undefined) throw new Error('seed step missing');
+    const { faux } = stub('unused');
+    let held = 0;
+    faux.setResponses([
+      (_context, options) => {
+        held++;
+        return new Promise<never>((_resolve, reject) =>
+          options?.signal?.addEventListener('abort', () => reject(new Error('process ended'))),
+        );
+      },
+    ]);
+    const first = boot(w, faux);
+    first.wake(w.threadId);
+    await until(() => held === 1);
+    await first.close();
+    w.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, w.stepId)).run();
+    w.s.db
+      .insert(step)
+      .values({
+        ...origin,
+        id: 'mail-four',
+        prompt: '[wake:wake] provenance=mail:mail-four\nmail four',
+        status: 'pending',
+        claimedAt: null,
+        lastHeartbeatAt: null,
+        createdAt: origin.createdAt + 1,
+      })
+      .run();
+
+    let orphanCalls = 0;
+    const toolResults: { isError: boolean; text: string }[] = [];
+    const reply = (c: { messages: { role: string; content: unknown; isError?: boolean }[] }) => {
+      const text = JSON.stringify(c.messages);
+      if (text.includes('provenance=mail:mail-three')) {
+        orphanCalls++;
+        return fauxAssistantMessage('mail three answered');
+      }
+      const results = c.messages.filter((m) => m.role === 'toolResult');
+      if (results.length === 0)
+        return fauxAssistantMessage([fauxToolCall('todos', {})], { stopReason: 'toolUse' });
+      for (const m of results)
+        toolResults.push({ isError: m.isError === true, text: JSON.stringify(m.content) });
+      return fauxAssistantMessage('mail four answered');
+    };
+    faux.setResponses(Array(12).fill(reply));
+    const second = boot(w, faux);
+    second.wake(w.threadId);
+    await until(
+      () => w.s.db.select().from(step).where(eq(step.id, 'mail-four')).get()?.status === 'done',
+    );
+    await second.idle();
+
+    expect(orphanCalls).toBe(0);
+    expect(toolResults).toHaveLength(1);
+    expect(toolResults[0]?.text).not.toContain('has no live step');
+    expect(toolResults[0]?.isError).toBe(false);
+  });
+
+  it('reruns a mail turn still claimed at a restart once, on its own step, instead of beside a stepless resumed run', async () => {
+    const w = await world('hello');
+    w.s.db
+      .update(step)
+      .set({ prompt: '[wake:wake] provenance=mail:mail-three\nmail three' })
+      .where(eq(step.id, w.stepId))
+      .run();
+    const { faux } = stub('unused');
+    let held = 0;
+    faux.setResponses([
+      (_context, options) => {
+        held++;
+        return new Promise<never>((_resolve, reject) =>
+          options?.signal?.addEventListener('abort', () => reject(new Error('process ended'))),
+        );
+      },
+    ]);
+    const first = boot(w, faux);
+    first.wake(w.threadId);
+    await until(() => held === 1);
+    await first.close();
+
+    let calls = 0;
+    const toolResults: { isError: boolean; text: string }[] = [];
+    const reply = (c: { messages: { role: string; content: unknown; isError?: boolean }[] }) => {
+      calls++;
+      const results = c.messages.filter((m) => m.role === 'toolResult');
+      if (results.length === 0)
+        return fauxAssistantMessage([fauxToolCall('todos', {})], { stopReason: 'toolUse' });
+      for (const m of results)
+        toolResults.push({ isError: m.isError === true, text: JSON.stringify(m.content) });
+      return fauxAssistantMessage('mail three answered');
+    };
+    faux.setResponses(Array(12).fill(reply));
+    const second = boot(w, faux);
+    second.wake(w.threadId);
+    await until(
+      () => w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.status === 'done',
+    );
+    await second.idle();
+
+    expect(toolResults.map((r) => r.text).join('\n')).not.toContain('has no live step');
+    expect(toolResults.map((r) => r.isError)).toEqual([false]);
+    expect(calls).toBe(2);
+  });
+
   it('recovers proven mirror debt before deciding that the store is ahead of the restored database', async () => {
     const w = await world('before the restore');
     const { faux } = stub('ok');

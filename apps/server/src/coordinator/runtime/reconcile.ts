@@ -158,15 +158,23 @@ export async function openReconciledHarness(
     await seedCoordinator(harness, seed.rows, seed.model, context);
     outcome = reseed;
   }
-  const settled = await settleStaleSubmissions(harness, context, facts.isLive);
   const active = reseed === null && recorded !== undefined ? recorded : await harness.root(context);
+  const settled = await settleStaleSubmissions(
+    harness,
+    context,
+    (record) =>
+      record.conversationId === active.id &&
+      record.requestId !== undefined &&
+      facts.isLive(record.requestId),
+  );
   facts.record({
     ...(storeId === undefined ? {} : { storeId }),
     conversationId: String(active.id),
     piVersion: PI_VERSION,
     reseeded: reseed !== null && rootNewest !== undefined,
   });
+  for (const id of settled.orphaned)
+    await (await harness.conversation(id, context))?.abort(context);
   harness.resume();
-  if (settled.placedStale && settled.adopted.length === 0) await active.abort(context);
   return { harness, outcome, stale: settled.aborted };
 }
