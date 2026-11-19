@@ -234,6 +234,8 @@ describe('devin credential delivery', () => {
         git: null,
         appCredential: null,
         readonlyGit: false,
+        runtimeId: 'devin',
+        agentConfig: { own: false, cairnHome: '/cairn-home' },
         claudeSubscriptionToken: undefined,
         devinToken: creds.devinToken,
         devinHome: '/managed/devin/home',
@@ -301,7 +303,7 @@ describe('devin advertised model catalog', () => {
   test('a non-devin adapter never reports a catalog', async () => {
     const onDevinModels = vi.fn();
     const session = await createAcpBackend({
-      harness: 'codex',
+      harness: 'antigravity',
       command: process.execPath,
       args: [fixture, 'complete'],
       onDevinModels,

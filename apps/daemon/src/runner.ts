@@ -399,6 +399,8 @@ async function runClaimedStep(
       git: repo?.kind === 'github' ? creds.git : null,
       appCredential,
       readonlyGit: attachmentVerify,
+      runtimeId,
+      agentConfig: { own: tokenRes.ownAgentConfig === true, cairnHome: deps.paths.home },
       claudeSubscriptionToken:
         runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
       claudeCodeCoordinator: isChief && runtimeId === 'claude-code',
@@ -441,6 +443,7 @@ async function runClaimedStep(
     isChief,
     isReview,
     remoteToolsOnly: claimed.remoteToolsOnly === true,
+    ownAgentConfig: tokenRes.ownAgentConfig === true,
     telemetry,
     env: stepEnv.env,
     secrets: () => credentialValues,

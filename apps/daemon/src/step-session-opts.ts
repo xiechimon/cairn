@@ -23,6 +23,7 @@ export interface StepSessionOptsInput {
   isChief: boolean;
   isReview: boolean;
   remoteToolsOnly: boolean;
+  ownAgentConfig: boolean;
   telemetry: SessionOpts['telemetry'];
   env: Record<string, string>;
   secrets?: SessionOpts['secrets'];
@@ -55,6 +56,7 @@ export function composeStepSessionOpts(input: StepSessionOptsInput): SessionOpts
     ...(isReview ? { readOnly: true } : {}),
     ...(isChief || isReview || input.remoteToolsOnly ? { lockedDown: true } : {}),
     ...(input.remoteToolsOnly ? { remoteToolsOnly: true } : {}),
+    ...(input.ownAgentConfig ? { ownAgentConfig: true } : {}),
     ...(input.telemetry !== undefined ? { telemetry: input.telemetry } : {}),
     ...(input.secrets !== undefined ? { secrets: input.secrets } : {}),
     ...(Object.keys(input.env).length > 0 ? { env: input.env } : {}),

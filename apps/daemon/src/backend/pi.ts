@@ -52,6 +52,7 @@ import {
   defineTool,
   type ExtensionUIContext,
   generateSummary,
+  getAgentDir,
   type InlineExtension,
   type McpExtensionOptions,
   type McpServerConfig,
@@ -1146,11 +1147,16 @@ export class PiBackend implements AgentBackend {
       }
     }, askRelay);
     const runtimePrompt = opts.systemPrompt;
+    const userAgentDir = opts.ownAgentConfig === true ? getAgentDir() : null;
+    const userSkillsDir = userAgentDir === null ? null : join(userAgentDir, 'skills');
     const loader = new DefaultResourceLoader({
       cwd: opts.cwd,
-      agentDir: this.opts.agentDir,
+      agentDir: userAgentDir ?? this.opts.agentDir,
       settingsManager,
       noSkills: true,
+      ...(userSkillsDir !== null && existsSync(userSkillsDir)
+        ? { additionalSkillPaths: [userSkillsDir] }
+        : {}),
       ...(runtimePrompt !== undefined
         ? { appendSystemPromptOverride: (base) => [...base, runtimePrompt] }
         : {}),

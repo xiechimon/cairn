@@ -14,7 +14,7 @@ const STREAM_PATH_PATTERNS = [
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const OWNER_ONLY_PATTERNS = [
   /^\/api\/computers(?:\/[^/]+)?$/,
-  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|devin-subscriptions|antigravity-subscriptions|mcp-connectors)(?:\/|$)/,
+  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|devin-subscriptions|antigravity-subscriptions|mcp-connectors|agent-config)(?:\/|$)/,
   /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection)(?:\/|$)/,
   /^\/api\/machines\/[^/]+(?:\/|$)/,
 ];

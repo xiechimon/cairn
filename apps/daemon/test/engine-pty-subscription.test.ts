@@ -85,6 +85,8 @@ describe('engine pty backend on a claimed host step', () => {
       git: null,
       appCredential: null,
       readonlyGit: false,
+      runtimeId: 'claude-code',
+      agentConfig: { own: false, cairnHome: dir },
       claudeSubscriptionToken: 'step-subscription-token',
     });
     expect(env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe('1');
@@ -115,6 +117,8 @@ describe('engine pty backend on a claimed host step', () => {
       git: null,
       appCredential: null,
       readonlyGit: false,
+      runtimeId: 'claude-code',
+      agentConfig: { own: false, cairnHome: dir },
       claudeSubscriptionToken: undefined,
     });
     expect(env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBeUndefined();

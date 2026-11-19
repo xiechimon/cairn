@@ -14,6 +14,7 @@ import { z } from 'zod';
 import type { ClaudeCodeBackendOpts } from '../backend/claude-code.js';
 import {
   buildSkillDenyRules,
+  claudeSessionConfigEnv,
   claudeSessionEnv,
   createClaudeMapState,
   HOST_MCP_SERVER_NAME,
@@ -77,7 +78,7 @@ class ClaudePtyBackend implements AgentBackend {
   }
 
   continueSession(id: string, session: SessionOpts): Promise<AgentSessionHandle> {
-    if (!existsSync(sdkTranscriptPath(session.cwd, id))) {
+    if (!existsSync(sdkTranscriptPath(session.cwd, id, claudeSessionConfigEnv(session.env)))) {
       return Promise.reject(new SessionNotResumableError(id));
     }
     return this.open(session, id);
@@ -256,7 +257,12 @@ class ClaudePtyBackend implements AgentBackend {
       onExit: () => handle.onProcessExit(),
     });
     const handle = new TuiSessionHandle(
-      { sessionId, cwd: session.cwd, modelId: session.modelId },
+      {
+        sessionId,
+        cwd: session.cwd,
+        modelId: session.modelId,
+        configEnv: claudeSessionConfigEnv(session.env),
+      },
       pty,
       () => {
         bridge?.close();
@@ -319,12 +325,17 @@ class TuiSessionHandle implements AgentSessionHandle {
   private readonly state;
 
   constructor(
-    opts: { sessionId: string; cwd: string; modelId: string },
+    opts: {
+      sessionId: string;
+      cwd: string;
+      modelId: string;
+      configEnv: ReturnType<typeof claudeSessionConfigEnv>;
+    },
     private readonly pty: EnginePty,
     private readonly onClose: () => void,
   ) {
     this.sessionId = opts.sessionId;
-    this.sessionFile = sdkTranscriptPath(opts.cwd, opts.sessionId);
+    this.sessionFile = sdkTranscriptPath(opts.cwd, opts.sessionId, opts.configEnv);
     this.events = this.queue.iterable();
     this.modelId = opts.modelId;
     this.cwd = opts.cwd;

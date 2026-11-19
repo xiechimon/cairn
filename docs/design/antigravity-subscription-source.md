@@ -32,8 +32,8 @@
 
 | Mode | Condition | Server / Dispatch | Daemon Execution |
 | --- | --- | --- | --- |
-| Host keyring (`tokenCipher = null`) | `hasToken === false` | Requires enabled subscription AND an online Runner reporting `antigravity.authenticated === true` (or explicit home override). | No `GEMINI_API_KEY` env override; `GEMINI_HOME` unset. macOS `confine-session` allows `antigravity` only read-only traversal/read access to `~/Library/Keychains` + `~/.gemini`. Keychain writes remain denied. |
-| Token fallback (`tokenCipher !== null`) | `hasToken === true` | Eligible on any Runner with `antigravity.installed === true` regardless of host Keychain login. | Server sends ephemeral `antigravityToken` on `stepToken` (`claimed` only). Daemon writes `GEMINI_API_KEY` and creates per-step temp `GEMINI_HOME`; macOS Seatbelt omits `~/Library/Keychains` read access and isolates state to the step temp `GEMINI_HOME`. |
+| Host keyring (`tokenCipher = null`) | `hasToken === false` | Requires enabled subscription AND an online Runner reporting `antigravity.authenticated === true` (or explicit home override). | No `GEMINI_API_KEY` env override; `HOME` is Cairn's `agent-homes/antigravity`, which links the user's sign-in files (see `agent-config-isolation.md`). macOS `confine-session` allows `antigravity` read-only access to `~/Library/Keychains`. Keychain writes remain denied. |
+| Token fallback (`tokenCipher !== null`) | `hasToken === true` | Eligible on any Runner with `antigravity.installed === true` regardless of host Keychain login. | Server sends ephemeral `antigravityToken` on `stepToken` (`claimed` only). Daemon writes `GEMINI_API_KEY` and points `HOME` at Cairn's `agent-homes/antigravity-api-key` with `modelProvider: gemini` (`agy` ignores `GEMINI_HOME`); macOS Seatbelt omits `~/Library/Keychains` read access. |
 | Unauthenticated & no token | Neither active | Dispatch blocks with `'antigravity-subscription'` (or `'runtime'` if `agy` missing). Step preflight refuses with Chinese setup instructions. | Not spawned. |
 
 ### Mode & Confinement Invariants
@@ -53,9 +53,9 @@
 ## Test Matrix (One Test per Path)
 
 1. `shared/antigravity-local`: parses raw tokens, `GEMINI_API_KEY=...` assignments, JSON `{ GEMINI_API_KEY }`, rejects empty/unrelated strings, and validates `DEFAULT_ANTIGRAVITY_MODELS`.
-2. `daemon/confine-session`: macOS Seatbelt grants `antigravity` read-only `Library/Keychains` only when `GEMINI_HOME` is unset, denies Keychains writes (`ISOLATION_RC === 0`), and denies `Library/Keychains` reads for all other harnesses.
+2. `daemon/confine-session`: macOS Seatbelt grants `antigravity` read-only `Library/Keychains` only without a `GEMINI_API_KEY`, denies Keychains writes (`ISOLATION_RC === 0`), and denies `Library/Keychains` reads for all other harnesses.
 3. `daemon/antigravity-managed`: detects local binary first, falls back to `.zip`/`.tar.gz` registry archive with checksum verification, rejects corrupted checksum, probes models & auth status.
-4. `daemon/antigravity-acp`: starts `agy` ACP over stdio MCP, sets `GEMINI_API_KEY` + isolated `GEMINI_HOME` when `antigravityToken` present, selects `'auto'` vs `'plan'` mode cleanly without `--dangerously-skip-permissions`, adapts `thought_level`, enforces `readOnly`/`remoteToolsOnly`, and passes `step-preflight`.
+4. `daemon/antigravity-acp`: starts `agy` ACP over stdio MCP, sets `GEMINI_API_KEY` and a Cairn `HOME` when `antigravityToken` present, selects `'auto'` vs `'plan'` mode cleanly without `--dangerously-skip-permissions`, adapts `thought_level`, enforces `readOnly`/`remoteToolsOnly`, and passes `step-preflight`.
 5. `server/antigravity-subscriptions`: CRUD + optional `token` (`hasToken: false` vs `true`), partial unique active constraint, `refuseWhileRunning` 409, verification of both host login and token modes.
 6. `server/antigravity-claim`: worker + Coordinator (`chief`) claim bind `antigravitySubscriptionId`, deliver `antigravityToken` only while claimed (or omit when host keyring mode), block when `antigravity-subscription` missing or unauthenticated host, and hold/reset session on account switch.
 7. `desktop + web`: `cairnDesktop.antigravity` IPC probe/login behind `fromOwnPage`, mono icon rendering, subscription management UI + board login banner, model routing integration, and `antigravity-local-login.spec.ts` Playwright flow.

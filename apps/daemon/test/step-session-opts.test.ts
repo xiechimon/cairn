@@ -36,6 +36,7 @@ function opts(overrides: Partial<StepSessionOptsInput> = {}) {
     isChief: false,
     isReview: false,
     remoteToolsOnly: false,
+    ownAgentConfig: false,
     telemetry: undefined,
     env: {},
     ...overrides,

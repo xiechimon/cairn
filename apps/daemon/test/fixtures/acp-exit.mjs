@@ -5,7 +5,7 @@ import { createAcpBackend } from '../../src/backend/acp.ts';
 
 let adapterPid;
 const backend = createAcpBackend({
-  harness: 'codex',
+  harness: 'claude-code',
   command: process.execPath,
   args: [fileURLToPath(new URL('./acp-agent.mjs', import.meta.url)), 'descendant'],
   spawnProcess: (command, args, options) => {

@@ -1,6 +1,19 @@
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { assembleStepEnv, prepareStepEnv, type StepEnvInput } from '../src/step-env.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const git: BoundGitCredentials = {
   username: 'x-access-token',
@@ -15,6 +28,8 @@ function input(patch: Partial<StepEnvInput> = {}): StepEnvInput {
     git: null,
     appCredential: null,
     readonlyGit: false,
+    runtimeId: null,
+    agentConfig: { own: false, cairnHome: '/cairn-home' },
     claudeSubscriptionToken: undefined,
     ...patch,
   };
@@ -98,6 +113,7 @@ describe('assembleStepEnv', () => {
     const { env } = assembleStepEnv(
       input({
         inherited: { WINDSURF_API_KEY: 'host', HOME: '/Users/real' },
+        runtimeId: 'devin',
         devinToken: 'step-token',
         devinHome: '/managed/devin/home',
       }),
@@ -114,10 +130,183 @@ describe('assembleStepEnv', () => {
           DEVIN_TRACEPARENT: '00-trace',
           KEEP: '1',
         },
+        runtimeId: 'devin',
         devinHome: '/managed/devin/home',
       }),
     );
     expect(env).toEqual({ HOME: '/managed/devin/home', KEEP: '1' });
+  });
+});
+
+describe('agent config isolation', () => {
+  test('Claude Code uses the Cairn config dir even when the user set CLAUDE_CONFIG_DIR', () => {
+    const { env } = assembleStepEnv(
+      input({
+        inherited: { CLAUDE_CONFIG_DIR: '/Users/real/.claude-work' },
+        runtimeId: 'claude-code',
+      }),
+    );
+    expect(env.CLAUDE_CONFIG_DIR).toBe(join('/cairn-home', 'claude'));
+  });
+
+  test('the own-config switch leaves every harness on the user directories', () => {
+    for (const runtimeId of ['claude-code', 'devin', 'antigravity', 'gemini', 'pi']) {
+      const { env } = assembleStepEnv(
+        input({
+          inherited: { HOME: '/Users/real' },
+          runtimeId,
+          devinHome: '/managed/devin/home',
+          agentConfig: { own: true, cairnHome: '/cairn-home' },
+        }),
+      );
+      expect(env, runtimeId).toEqual({ HOME: '/Users/real' });
+    }
+  });
+
+  test('an Orb guest keeps the image config, whose Claude settings the sandbox needs', () => {
+    const { env } = assembleStepEnv(
+      input({ inherited: { CAIRN_ORB: '1' }, runtimeId: 'claude-code' }),
+    );
+    expect(env.CLAUDE_CONFIG_DIR).toBeUndefined();
+  });
+
+  test('Antigravity gets a Cairn HOME whose sign-in links follow the user file', () => {
+    const root = realpathSync(testTempDir('agent-home-'));
+    const realHome = join(root, 'real');
+    const tokenFile = join(realHome, '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
+    mkdirSync(join(realHome, '.gemini', 'antigravity-cli', 'skills'), { recursive: true });
+    mkdirSync(join(realHome, '.gemini', 'config'), { recursive: true });
+    writeFileSync(join(realHome, '.gemini', 'config', 'hooks.json'), '{"hooks":[]}');
+    writeFileSync(join(realHome, '.gemini', 'GEMINI.md'), 'user rules');
+    writeFileSync(
+      join(realHome, '.gemini', 'antigravity-cli', 'settings.json'),
+      JSON.stringify({ gcp: { project: 'p1' }, agentMode: 'auto', modelProvider: 'gemini' }),
+    );
+    writeFileSync(tokenFile, 'token-v1');
+    const step = () =>
+      assembleStepEnv(
+        input({
+          inherited: { HOME: realHome },
+          runtimeId: 'antigravity',
+          agentConfig: { own: false, cairnHome: join(root, 'cairn'), realHome },
+        }),
+      ).env;
+
+    const home = step().HOME ?? '';
+    expect(home.startsWith(join(root, 'cairn'))).toBe(true);
+    const linked = join(home, '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
+    expect(readFileSync(linked, 'utf8')).toBe('token-v1');
+    expect(existsSync(join(home, '.gemini', 'config', 'hooks.json'))).toBe(false);
+    expect(existsSync(join(home, '.gemini', 'GEMINI.md'))).toBe(false);
+    expect(existsSync(join(home, '.gemini', 'antigravity-cli', 'skills'))).toBe(false);
+    expect(
+      JSON.parse(readFileSync(join(home, '.gemini', 'antigravity-cli', 'settings.json'), 'utf8')),
+    ).toEqual({ gcp: { project: 'p1' } });
+
+    writeFileSync(`${tokenFile}.new`, 'token-v2');
+    renameSync(`${tokenFile}.new`, tokenFile);
+    expect(readFileSync(linked, 'utf8')).toBe('token-v2');
+
+    rmSync(linked);
+    writeFileSync(linked, 'stale copy written by a refresh');
+    expect(step().HOME).toBe(home);
+    expect(lstatSync(linked).isSymbolicLink()).toBe(true);
+    expect(readFileSync(linked, 'utf8')).toBe('token-v2');
+
+    rmSync(tokenFile);
+    step();
+    expect(existsSync(linked)).toBe(false);
+    expect(lstatSync(join(home, '.gemini', 'antigravity-cli')).isDirectory()).toBe(true);
+  });
+
+  test('an Antigravity API key step gets its own HOME with the Gemini provider and no sign-in', () => {
+    const root = realpathSync(testTempDir('agent-home-'));
+    const realHome = join(root, 'real');
+    mkdirSync(join(realHome, '.gemini', 'antigravity-cli'), { recursive: true });
+    writeFileSync(join(realHome, '.gemini', 'antigravity-cli', 'antigravity-oauth-token'), 't');
+    const { env } = assembleStepEnv(
+      input({
+        runtimeId: 'antigravity',
+        antigravityToken: 'AIza-step',
+        agentConfig: { own: false, cairnHome: join(root, 'cairn'), realHome },
+      }),
+    );
+    const home = env.HOME ?? '';
+    expect(env.GEMINI_API_KEY).toBe('AIza-step');
+    expect(env.GEMINI_HOME).toBeUndefined();
+    expect(
+      JSON.parse(readFileSync(join(home, '.gemini', 'antigravity-cli', 'settings.json'), 'utf8')),
+    ).toEqual({ modelProvider: 'gemini' });
+    expect(existsSync(join(home, '.gemini', 'antigravity-cli', 'antigravity-oauth-token'))).toBe(
+      false,
+    );
+  });
+
+  test('Gemini CLI gets a Cairn GEMINI_CLI_HOME with the sign-in and auth type only', () => {
+    const root = realpathSync(testTempDir('agent-home-'));
+    const realHome = join(root, 'real');
+    mkdirSync(join(realHome, '.gemini'), { recursive: true });
+    writeFileSync(join(realHome, '.gemini', 'oauth_creds.json'), '{"refresh_token":"r"}');
+    writeFileSync(
+      join(realHome, '.gemini', 'settings.json'),
+      JSON.stringify({
+        security: { auth: { selectedType: 'oauth-personal' } },
+        mcpServers: { mine: { command: 'x' } },
+        hooks: { BeforeTool: [] },
+      }),
+    );
+    const { env } = assembleStepEnv(
+      input({
+        runtimeId: 'gemini',
+        agentConfig: { own: false, cairnHome: join(root, 'cairn'), realHome },
+      }),
+    );
+    const home = env.GEMINI_CLI_HOME ?? '';
+    expect(readFileSync(join(home, '.gemini', 'oauth_creds.json'), 'utf8')).toContain('"r"');
+    expect(JSON.parse(readFileSync(join(home, '.gemini', 'settings.json'), 'utf8'))).toEqual({
+      security: { auth: { selectedType: 'oauth-personal' } },
+    });
+  });
+
+  test('links an agent planted in its Cairn home never redirect the next setup outside it', () => {
+    const root = realpathSync(testTempDir('agent-home-'));
+    const realHome = join(root, 'real');
+    const secret = join(root, 'secret.json');
+    const realSettings = join(realHome, '.gemini', 'settings.json');
+    const realCreds = join(realHome, '.gemini', 'oauth_creds.json');
+    mkdirSync(join(realHome, '.gemini'), { recursive: true });
+    writeFileSync(realCreds, '{"refresh_token":"r"}');
+    writeFileSync(realSettings, '{"security":{"auth":{"selectedType":"oauth-personal"}}}');
+    writeFileSync(secret, '{"auths":{"registry":"docker-secret"}}');
+    const step = () =>
+      assembleStepEnv(
+        input({
+          runtimeId: 'gemini',
+          agentConfig: { own: false, cairnHome: join(root, 'cairn'), realHome },
+        }),
+      ).env.GEMINI_CLI_HOME ?? '';
+    const home = step();
+
+    rmSync(join(home, '.gemini', 'settings.json'));
+    symlinkSync(secret, join(home, '.gemini', 'settings.json'));
+    step();
+    expect(readFileSync(join(home, '.gemini', 'settings.json'), 'utf8')).not.toContain(
+      'docker-secret',
+    );
+    expect(readFileSync(secret, 'utf8')).toContain('docker-secret');
+
+    rmSync(join(home, '.gemini'), { recursive: true });
+    symlinkSync(join(realHome, '.gemini'), join(home, '.gemini'));
+    step();
+    expect(lstatSync(join(home, '.gemini')).isSymbolicLink()).toBe(false);
+    expect(lstatSync(realCreds).isSymbolicLink()).toBe(false);
+    expect(readFileSync(realCreds, 'utf8')).toContain('"r"');
+    expect(readFileSync(realSettings, 'utf8')).toContain('oauth-personal');
+
+    rmSync(join(home, '.gemini', 'oauth_creds.json'));
+    mkdirSync(join(home, '.gemini', 'oauth_creds.json'));
+    expect(step()).toBe(home);
+    expect(readFileSync(join(home, '.gemini', 'oauth_creds.json'), 'utf8')).toContain('"r"');
   });
 });
 

@@ -18,7 +18,7 @@ const opts: SessionOpts = {
   prompt: 'Hello',
 };
 
-function adapter(scenario = 'complete', harness: 'claude-code' | 'codex' = 'codex') {
+function adapter(scenario = 'complete', harness: 'claude-code' = 'claude-code') {
   return createAcpBackend({
     harness,
     command: process.execPath,
@@ -35,7 +35,7 @@ async function collect(events: AsyncIterable<StepEvent>): Promise<StepEvent[]> {
 }
 
 describe('ACP spike with a real scripted stdio child', () => {
-  test.each(['claude-code', 'codex'] as const)(
+  test.each(['claude-code'] as const)(
     '%s lands the same step transcript, tools and status as the existing backend',
     async (harness) => {
       const events: StepEvent[] = [
@@ -154,7 +154,7 @@ describe('ACP spike with a real scripted stdio child', () => {
     async (scenario) => {
       let child: ReturnType<typeof spawn> | undefined;
       const backend = createAcpBackend({
-        harness: 'codex',
+        harness: 'claude-code',
         command: process.execPath,
         args: [fixture, scenario],
         cancelTimeoutMs: 100,
@@ -244,7 +244,7 @@ describe('ACP spike with a real scripted stdio child', () => {
   test('missing adapter executable reports a spawn failure', async () => {
     await expect(
       createAcpBackend({
-        harness: 'codex',
+        harness: 'claude-code',
         command: '/missing-cairn-acp-executable',
       }).createSession(opts),
     ).rejects.toThrow('ENOENT');
@@ -303,7 +303,7 @@ describe('ACP spike with a real scripted stdio child', () => {
 
   test('allows a single permission only under the explicit per-agent policy', async () => {
     const session = await createAcpBackend({
-      harness: 'codex',
+      harness: 'claude-code',
       command: process.execPath,
       args: [fixture, 'permission-allow'],
       permissions: 'allow-once',
@@ -331,7 +331,7 @@ describe('ACP spike with a real scripted stdio child', () => {
     await collect(session.events);
   });
 
-  test.each(['claude-code', 'codex'] as const)(
+  test.each(['claude-code'] as const)(
     '%s leaves unsupported steering queued through the daemon and runner',
     async (harness) => {
       const api = new FakeMachineApi();
@@ -374,7 +374,7 @@ describe('ACP spike with a real scripted stdio child', () => {
   );
 
   test.each(
-    (['claude-code', 'codex'] as const).flatMap((harness) =>
+    (['claude-code'] as const).flatMap((harness) =>
       [[], [{ slug: 'host', transport: 'http' as const, url: 'http://host' }]].map(
         (mcpServers) => ({ harness, mcpServers }),
       ),
@@ -397,7 +397,7 @@ describe('ACP spike with a real scripted stdio child', () => {
     'fails the daemon step for external MCP policy $mcpServers',
     async ({ mcpServers }) => {
       const { api, handle } = await boot({
-        backend: createAcpBackend({ harness: 'codex', command: 'must-not-spawn' }),
+        backend: createAcpBackend({ harness: 'claude-code', command: 'must-not-spawn' }),
       });
       try {
         await waitFor(() => api.parked !== null);
@@ -439,7 +439,7 @@ describe('ACP spike with a real scripted stdio child', () => {
     };
 
     const readOnlySession = await createAcpBackend({
-      harness: 'codex',
+      harness: 'claude-code',
       command: process.execPath,
       args: [fixture, 'policy-readonly'],
       permissions: 'allow-once',
@@ -448,7 +448,7 @@ describe('ACP spike with a real scripted stdio child', () => {
     expect(await collect(readOnlySession.events)).toContainEqual({ type: 'done', usage: [] });
 
     const remoteOnlySession = await createAcpBackend({
-      harness: 'codex',
+      harness: 'claude-code',
       command: process.execPath,
       args: [fixture, 'policy-remote-tools-only'],
       permissions: 'allow-once',
@@ -500,7 +500,7 @@ describe('ACP spike with a real scripted stdio child', () => {
     const addr = upstream.address() as { port: number };
     try {
       const session = await createAcpBackend({
-        harness: 'codex',
+        harness: 'claude-code',
         command: process.execPath,
         args: [fixture, 'no-http-mcp'],
         allowHostMcp: true,

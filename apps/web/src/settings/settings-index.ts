@@ -7,6 +7,21 @@ export interface SettingsRowEntry {
 }
 
 export const SETTINGS_ROW_INDEX: SettingsRowEntry[] = [
+  {
+    section: 'machines',
+    label: '使用我自己的 agent 配置',
+    keywords: [
+      'agent config',
+      'claude code',
+      'hooks',
+      'skills',
+      'mcp',
+      '钩子',
+      '全局指令',
+      'CLAUDE.md',
+      'AGENTS.md',
+    ],
+  },
   { section: 'account', label: '语言', keywords: ['language', 'locale'] },
   {
     section: 'account',

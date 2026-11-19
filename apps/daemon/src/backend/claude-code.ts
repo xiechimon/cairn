@@ -577,6 +577,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     opts: {
       sessionId: string;
       cwd: string;
+      configEnv: ClaudeConfigEnv;
       state: ClaudeMapState;
       abort: AbortController;
       input: AsyncQueue<SDKUserMessage>;
@@ -587,7 +588,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   ) {
     this.q = q;
     this.sessionId = opts.sessionId;
-    this.sessionFile = sdkTranscriptPath(opts.cwd, opts.sessionId);
+    this.sessionFile = sdkTranscriptPath(opts.cwd, opts.sessionId, opts.configEnv);
     this.state = opts.state;
     this.abort = opts.abort;
     this.input = opts.input;
@@ -867,29 +868,39 @@ function claudeProjectSlug(resolvedPath: string): string {
   return `${flat.slice(0, CLAUDE_PROJECT_SLUG_MAX)}-${claudePathHash(resolvedPath)}`;
 }
 
-function claudeProjectDirOverride(): string | undefined {
-  if (!process.env.CLAUDE_CONFIG_DIR) return undefined;
-  const name = process.env.CLAUDE_CODE_PROJECT_DIR_NAME;
+type ClaudeConfigEnv = Readonly<Record<string, string | undefined>>;
+
+function claudeProjectDirOverride(env: ClaudeConfigEnv): string | undefined {
+  if (!env.CLAUDE_CONFIG_DIR) return undefined;
+  const name = env.CLAUDE_CODE_PROJECT_DIR_NAME;
   if (!name || !CLAUDE_PROJECT_DIR_NAME.test(name) || WINDOWS_DEVICE_NAME.test(name)) {
     return undefined;
   }
   return name;
 }
 
-function claudeProjectsRoot(): string {
-  const configDir = process.env.CLAUDE_CONFIG_DIR;
+function claudeProjectsRoot(env: ClaudeConfigEnv): string {
+  const configDir = env.CLAUDE_CONFIG_DIR;
   const root = configDir ? configDir : join(homedir(), '.claude');
   return join(root.normalize('NFC'), 'projects');
 }
 
-export function sdkTranscriptPath(cwd: string, sessionId: string): string {
+export function claudeSessionConfigEnv(env: Record<string, string> | undefined): ClaudeConfigEnv {
+  return { ...process.env, ...env };
+}
+
+export function sdkTranscriptPath(
+  cwd: string,
+  sessionId: string,
+  env: ClaudeConfigEnv = process.env,
+): string {
   let resolved = cwd;
   try {
     resolved = realpathSync(cwd);
   } catch {}
   if (process.platform === 'darwin') resolved = resolved.normalize('NFC');
-  const slug = claudeProjectDirOverride() ?? claudeProjectSlug(resolved);
-  return join(claudeProjectsRoot(), slug, `${sessionId}.jsonl`);
+  const slug = claudeProjectDirOverride(env) ?? claudeProjectSlug(resolved);
+  return join(claudeProjectsRoot(env), slug, `${sessionId}.jsonl`);
 }
 
 export const HOST_MCP_SERVER_NAME = 'cairn';
@@ -1354,7 +1365,7 @@ export class ClaudeCodeBackend implements AgentBackend {
   }
 
   async continueSession(id: string, opts: SessionOpts): Promise<AgentSessionHandle> {
-    if (!existsSync(sdkTranscriptPath(opts.cwd, id))) {
+    if (!existsSync(sdkTranscriptPath(opts.cwd, id, claudeSessionConfigEnv(opts.env)))) {
       throw new SessionNotResumableError(id);
     }
     return this.open(opts, id);
@@ -1472,6 +1483,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       {
         sessionId,
         cwd: opts.cwd,
+        configEnv: claudeSessionConfigEnv(opts.env),
         state,
         abort,
         input,

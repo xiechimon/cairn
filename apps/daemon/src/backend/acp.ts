@@ -867,22 +867,11 @@ class AcpBackend implements AgentBackend {
               modeId: target,
             });
           }
-        } else if (adapter?.harness === 'devin' || adapter?.harness === 'codex') {
+        } else if (adapter?.harness === 'devin') {
           throw new Error(
             `${adapter.harness} ACP did not report its modes: refusing a locked turn (fail-closed)`,
           );
         }
-      } else if (
-        adapter?.harness === 'codex' &&
-        this.options.confine !== undefined &&
-        !isRestricted
-      ) {
-        if (!modes?.availableModes.some((mode) => mode.id === 'full-access'))
-          throw new Error('Codex ACP did not offer full-access mode under confinement');
-        await connection.agent.request(methods.agent.session.setMode, {
-          sessionId,
-          modeId: 'full-access',
-        });
       }
       if (adapter?.harness === 'devin' && policy === 'normal' && !isRestricted) {
         if (!modes?.availableModes.some((mode) => mode.id === 'bypass'))
@@ -949,7 +938,7 @@ export interface AcpUpdateNormalization {
 
 export interface AcpBackendOptions {
   confine?: SessionConfiner;
-  harness: 'claude-code' | 'codex' | 'devin' | 'antigravity';
+  harness: 'claude-code' | 'devin' | 'antigravity';
   command: string;
   args?: string[];
   permissions?: 'deny' | 'allow-once';

@@ -1,0 +1,1 @@
+ALTER TABLE `team` ADD `ownAgentConfig` integer DEFAULT false NOT NULL;

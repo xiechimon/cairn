@@ -443,6 +443,7 @@ export const machineTokenResponseSchema = z.object({
   claudeSubscriptionToken: z.string().optional(),
   devinToken: z.string().optional(),
   antigravityToken: z.string().optional(),
+  ownAgentConfig: z.literal(true).optional(),
   provider: providerConfigSchema.nullable(),
   secrets: z.record(z.string(), z.string()),
   httpSecrets: z.array(httpSecretGrantSchema).optional(),

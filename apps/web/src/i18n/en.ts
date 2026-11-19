@@ -905,6 +905,13 @@ export const EN: Record<string, string> = {
     'Once deleted, the Runner has to enroll again before it takes work',
   '确定删除这台执行机？此操作不可撤销。': 'Delete this Runner? This cannot be undone.',
   尚无执行机: 'No Runners yet',
+  '使用我自己的 agent 配置': 'Use my own agent config',
+  钩子: 'Hooks',
+  全局指令: 'Global instructions',
+  '各 agent 读取并可修改执行机上你自己的钩子、技能、全局指令和 MCP 配置':
+    'Agents read, and can change, your own hooks, skills, global instructions and MCP config on the Runner',
+  '各 agent 只用 Cairn 自己的配置，从执行机带入的只有登录凭据':
+    "Agents use only Cairn's own config; only sign-in credentials come from the Runner",
   '在要执行任务的执行机上运行注册命令，它就会出现在这里。':
     'Run the enroll command on the Runner that should run tasks and it appears here.',
   '删除执行机失败，请重试。': 'Could not delete the Runner. Try again.',

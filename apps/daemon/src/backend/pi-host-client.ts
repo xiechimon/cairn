@@ -343,6 +343,7 @@ function serializableSession(opts: SessionOpts) {
     ...(opts.teamSkillsDir !== undefined ? { teamSkillsDir: opts.teamSkillsDir } : {}),
     ...(opts.readOnly !== undefined ? { readOnly: opts.readOnly } : {}),
     ...(opts.remoteToolsOnly !== undefined ? { remoteToolsOnly: opts.remoteToolsOnly } : {}),
+    ...(opts.ownAgentConfig !== undefined ? { ownAgentConfig: opts.ownAgentConfig } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
     ...(opts.telemetry !== undefined ? { telemetry: opts.telemetry } : {}),
     ...(opts.prompt !== undefined ? { prompt: opts.prompt } : {}),
@@ -359,11 +360,18 @@ export async function openPiHostSession(args: PiHostOpen): Promise<AgentSessionH
   const allowedFiles = args.resumeFile !== null ? [realpathSync(args.resumeFile)] : [];
   let confined: Launch;
   try {
-    confined = args.confine({ cwd: args.opts.cwd, env: args.opts.env ?? {} }, 'pi', args.launch, [
-      args.backend.agentDir,
-      privateDirectory,
-      ...allowedFiles,
-    ]);
+    confined = args.confine(
+      {
+        cwd: args.opts.cwd,
+        env: args.opts.env ?? {},
+        ...(args.opts.ownAgentConfig !== undefined
+          ? { ownAgentConfig: args.opts.ownAgentConfig }
+          : {}),
+      },
+      'pi',
+      args.launch,
+      [args.backend.agentDir, privateDirectory, ...allowedFiles],
+    );
   } catch (error) {
     removeIfEmpty(privateDirectory);
     throw new Error(

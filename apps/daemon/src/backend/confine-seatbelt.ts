@@ -17,7 +17,7 @@ const MAC_DENIED_DIRECTORIES = [
   'Library/Mail',
   'Library/Messages',
 ];
-const OWN_STATE_NAMES = ['.claude', '.codex', '.pi', '.gemini', '.claude.json'];
+const OWN_STATE_NAMES = ['.claude', '.pi', '.gemini', '.claude.json'];
 const DEVICE_WRITES = ['/dev/null', '/dev/dtracehelper'];
 
 const LAUNCH_SERVICE_DENIALS = [

@@ -40,7 +40,10 @@ const relayCall: Call = {
   hostTool: 'mail_reply',
 };
 
-function backendFor(harness: 'codex' | 'devin' | 'claude-code' | 'gemini', scenario = 'gate') {
+function backendFor(
+  harness: 'antigravity' | 'devin' | 'claude-code' | 'gemini',
+  scenario = 'gate',
+) {
   if (harness === 'gemini') {
     return createGeminiBackend({
       spawnProcess: (_command, _args, options) =>
@@ -79,7 +82,7 @@ function rejectedCall(events: StepEvent[], id: string) {
 }
 
 describe('ACP permission gate on locked turns', () => {
-  test.each(['codex', 'devin', 'claude-code', 'gemini'] as const)(
+  test.each(['antigravity', 'devin', 'claude-code', 'gemini'] as const)(
     '%s: a mail turn that injects a command gets no execution and keeps its relay tool',
     async (harness) => {
       const { events, outcomes } = await run(backendFor(harness), mailTurn, [
@@ -103,14 +106,12 @@ describe('ACP permission gate on locked turns', () => {
     },
   );
 
-  test('a normal turn keeps the full-access start of its agent', async () => {
-    const { outcomes } = await run(backendFor('codex'), {}, [injectedExec]);
-    expect(outcomes.__mode).toBe('full-access');
+  test('a normal turn keeps the bypass start of its agent', async () => {
     const devin = await run(backendFor('devin'), {}, [injectedExec]);
     expect(devin.outcomes.__mode).toBe('bypass');
   });
 
-  test.each(['codex', 'devin', 'gemini'] as const)(
+  test.each(['antigravity', 'devin', 'gemini'] as const)(
     '%s: a review turn reads but cannot edit, execute, fetch or use an unknown tool kind',
     async (harness) => {
       const calls: Call[] = [

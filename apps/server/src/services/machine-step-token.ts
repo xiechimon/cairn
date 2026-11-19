@@ -8,7 +8,7 @@ import type {
 import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
-import { build, chiefThread, machine, step, todo } from '../db/schema.js';
+import { build, chiefThread, machine, step, team, todo } from '../db/schema.js';
 import { githubAppTokenExpiry, isAppToken } from '../lib/github-token.js';
 import { materializeCodexAccessToken } from './codex-device-login.js';
 import type { StepCredentialBundle } from './credentials.js';
@@ -104,11 +104,25 @@ export async function stepToken(
     ...(owned.status === 'claimed' && bundle.antigravityToken !== undefined
       ? { antigravityToken: bundle.antigravityToken }
       : {}),
+    ...ownAgentConfigField(deps, todoRow?.teamId),
     ...(owned.status === 'claimed' && todoRow && agentRow
       ? await connectorFields(deps, owned, todoRow.teamId)
       : {}),
     git,
   };
+}
+
+function ownAgentConfigField(
+  deps: MachineDeps,
+  teamId: string | undefined,
+): Pick<MachineTokenResponse, 'ownAgentConfig'> {
+  if (teamId === undefined) return {};
+  const row = deps.db
+    .select({ ownAgentConfig: team.ownAgentConfig })
+    .from(team)
+    .where(eq(team.id, teamId))
+    .get();
+  return row?.ownAgentConfig === true ? { ownAgentConfig: true } : {};
 }
 
 type ClaimedStepRow = Pick<typeof step.$inferSelect, 'id' | 'machineId' | 'claimedAt'>;
@@ -277,6 +291,7 @@ async function chiefStepToken(
     ...(claimed && bundle.antigravityToken !== undefined
       ? { antigravityToken: bundle.antigravityToken }
       : {}),
+    ...ownAgentConfigField(deps, threadRow?.teamId),
     ...(claimed && stepRow && threadRow && agentRow
       ? await connectorFields(deps, stepRow, threadRow.teamId, chiefTurnLocked(stepRow))
       : {}),

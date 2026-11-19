@@ -94,7 +94,8 @@ describe('antigravity ACP runtime and credentials', () => {
     });
   });
 
-  test('step-env injects GEMINI_API_KEY and isolated GEMINI_HOME when antigravityToken is present and omits both for host keyring', () => {
+  test('step-env injects GEMINI_API_KEY and a Cairn HOME when antigravityToken is present and omits the key for host keyring', () => {
+    const cairnHome = tempDir('agy-cairn-');
     const cleanups: (() => void | Promise<void>)[] = [];
     const credsWithToken = pushCredential(
       {
@@ -112,6 +113,8 @@ describe('antigravity ACP runtime and credentials', () => {
         git: null,
         appCredential: null,
         readonlyGit: false,
+        runtimeId: 'antigravity',
+        agentConfig: { own: false, cairnHome, realHome: cairnHome },
         claudeSubscriptionToken: undefined,
         antigravityToken: credsWithToken.antigravityToken,
       },
@@ -120,8 +123,8 @@ describe('antigravity ACP runtime and credentials', () => {
     expect('error' in withToken).toBe(false);
     if (!('error' in withToken)) {
       expect(withToken.env.GEMINI_API_KEY).toBe('ag-secret-token-1234');
-      expect(withToken.env.GEMINI_HOME).toBeDefined();
-      expect(existsSync(withToken.env.GEMINI_HOME ?? '')).toBe(true);
+      expect(withToken.env.GEMINI_HOME).toBeUndefined();
+      expect(existsSync(withToken.env.HOME ?? '')).toBe(true);
     }
     clearCredentials(credsWithToken);
     expect(credsWithToken.antigravityToken).toBeUndefined();
@@ -133,6 +136,8 @@ describe('antigravity ACP runtime and credentials', () => {
         git: null,
         appCredential: null,
         readonlyGit: false,
+        runtimeId: 'antigravity',
+        agentConfig: { own: false, cairnHome, realHome: cairnHome },
         claudeSubscriptionToken: undefined,
         antigravityToken: undefined,
       },
@@ -142,6 +147,7 @@ describe('antigravity ACP runtime and credentials', () => {
     if (!('error' in hostOnly)) {
       expect(hostOnly.env.GEMINI_API_KEY).toBeUndefined();
       expect(hostOnly.env.GEMINI_HOME).toBeUndefined();
+      expect(hostOnly.env.HOME?.startsWith(cairnHome)).toBe(true);
     }
   });
 

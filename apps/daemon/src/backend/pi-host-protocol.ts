@@ -38,6 +38,7 @@ const sessionSchema = z.object({
   teamSkillsDir: z.string().optional(),
   readOnly: z.boolean().optional(),
   remoteToolsOnly: z.boolean().optional(),
+  ownAgentConfig: z.boolean().optional(),
   env: z.record(z.string(), z.string()).optional(),
   telemetry: z
     .object({

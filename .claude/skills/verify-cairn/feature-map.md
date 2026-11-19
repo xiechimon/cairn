@@ -510,9 +510,9 @@ Reach:
 
 ### machines
 
-**Machines** (shipped, centrality 2). A compact machine list with names, default marker, system, online state and a menu for default and delete.
+**Machines** (shipped, centrality 2). A compact machine list with names, default marker, system, online state and a menu for default and delete, and the team switch that lets every harness read the user's own agent config instead of Cairn's.
 
-States: Empty, loading and error states; online and offline rows; default machine; long names; row menu and confirmation dialogs. No expandable details or capability controls.
+States: Empty, loading and error states; online and offline rows; default machine; long names; row menu and confirmation dialogs; the own agent config switch off (default) and on. No expandable details or capability controls.
 
 Reach:
 

@@ -71,6 +71,7 @@ import type {
   PatchProjectBody,
   PatchProviderBody,
   PatchScheduleBody,
+  PatchTeamAgentConfigBody,
   PatchTeamAutonomyBody,
   PatchTeamBody,
   PatchUserBody,
@@ -1150,6 +1151,17 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: (record) => {
         qc.setQueryData(['team-autonomy', teamId], record);
         invalidateAll();
+      },
+    }),
+    patchTeamAgentConfig: useMutation({
+      mutationFn: (body: PatchTeamAgentConfigBody) =>
+        api.patch<PatchTeamAgentConfigBody>(`/api/teams/${teamId}/agent-config`, body),
+      onSuccess: (record) => {
+        qc.setQueryData<TeamRecord[]>(['teams'], (teams) =>
+          teams?.map((team) =>
+            team.id === teamId ? { ...team, ownAgentConfig: record.ownAgentConfig } : team,
+          ),
+        );
       },
     }),
     pickLocalFolder: useMutation({

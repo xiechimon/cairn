@@ -1,7 +1,7 @@
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { homedir } from 'node:os';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
+import { claudeConfigDir, prepareAntigravityHome, prepareGeminiHome } from './agent-config.js';
 import { gitCredentialEnv } from './git.js';
 
 const READONLY_GIT_ENV: Record<string, string> = {
@@ -16,6 +16,8 @@ export interface StepEnvInput {
   git: BoundGitCredentials | null;
   appCredential: { env(): Record<string, string> } | null;
   readonlyGit: boolean;
+  runtimeId: string | null;
+  agentConfig: { own: boolean; cairnHome: string; realHome?: string };
   claudeSubscriptionToken: string | undefined;
   claudeCodeCoordinator?: boolean;
   devinToken?: string;
@@ -60,22 +62,15 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
   }
   delete env.WINDSURF_API_KEY;
   if (input.devinToken !== undefined) env.WINDSURF_API_KEY = input.devinToken;
-  if (input.devinHome !== undefined) {
-    env.HOME = input.devinHome;
+  if (input.runtimeId === 'devin') {
     for (const key of Object.keys(env)) {
       if (key.startsWith('CHISEL_') || key.startsWith('DEVIN_')) delete env[key];
     }
   }
   delete env.GEMINI_API_KEY;
-  if (input.antigravityToken !== undefined) {
-    env.GEMINI_API_KEY = input.antigravityToken;
-    const tempBase = input.temporary.TMPDIR;
-    if (tempBase !== undefined && tempBase !== '') {
-      const isolatedGeminiHome = join(tempBase, 'gemini-home');
-      mkdirSync(isolatedGeminiHome, { recursive: true });
-      env.GEMINI_HOME = isolatedGeminiHome;
-    }
-  }
+  if (input.antigravityToken !== undefined) env.GEMINI_API_KEY = input.antigravityToken;
+  if (!input.agentConfig.own && input.inherited?.CAIRN_ORB !== '1')
+    Object.assign(env, isolatedConfigEnv(input));
   return {
     env,
     dropGitCredentials: () => {
@@ -85,6 +80,29 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
       }
     },
   };
+}
+
+function isolatedConfigEnv(input: StepEnvInput): Record<string, string> {
+  const { cairnHome } = input.agentConfig;
+  const realHome = input.agentConfig.realHome ?? homedir();
+  switch (input.runtimeId) {
+    case 'claude-code':
+      return { CLAUDE_CONFIG_DIR: claudeConfigDir(cairnHome) };
+    case 'devin':
+      return input.devinHome === undefined ? {} : { HOME: input.devinHome };
+    case 'antigravity':
+      return {
+        HOME: prepareAntigravityHome({
+          cairnHome,
+          realHome,
+          apiKey: input.antigravityToken !== undefined,
+        }),
+      };
+    case 'gemini':
+      return { GEMINI_CLI_HOME: prepareGeminiHome({ cairnHome, realHome }) };
+    default:
+      return {};
+  }
 }
 
 export function prepareStepEnv(
@@ -100,7 +118,15 @@ export function prepareStepEnv(
     };
   }
   cleanups.push(temporary.cleanup);
-  const { env, dropGitCredentials } = assembleStepEnv({ ...input, temporary: temporary.env });
+  let assembled: StepEnv;
+  try {
+    assembled = assembleStepEnv({ ...input, temporary: temporary.env });
+  } catch (error) {
+    return {
+      error: `Agent config directory setup failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  const { env, dropGitCredentials } = assembled;
   cleanups.push(dropGitCredentials);
   return { env };
 }

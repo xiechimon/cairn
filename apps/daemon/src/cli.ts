@@ -18,7 +18,6 @@ import { runPiHost } from './backend/pi-host.js';
 import {
   type DaemonConfig,
   type DaemonConfigInput,
-  isolateClaudeConfigDir,
   loadDaemonConfig,
   WorkspacesDirError,
 } from './config.js';
@@ -106,7 +105,6 @@ export async function runForeground(opts: StartOptions): Promise<void> {
     }
     throw err;
   }
-  isolateClaudeConfigDir(config.home);
   const paths = statePaths(config.home, config.workspacesDir);
   const logger = createDaemonLogger({ logFile: paths.daemonLog, stdout: true });
   process.env.CAIRN_HOME = config.home;

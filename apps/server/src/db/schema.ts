@@ -101,6 +101,7 @@ export const team = sqliteTable('team', {
   maxAutonomousMergesPerDay: integer('maxAutonomousMergesPerDay').notNull().default(10),
   defaultMachineId: text('defaultMachineId'),
   actionTier: text('actionTier').$type<ActionTier>().notNull().default('full'),
+  ownAgentConfig: bool('ownAgentConfig').notNull().default(false),
 });
 
 export const autonomyPause = sqliteTable(

@@ -95,8 +95,9 @@ beforeAll(async () => {
   setCoordinatorInServer(true);
   const userHome = makeTestTempDir('cairn-it-switch-user-');
   const configDir = join(userHome, '.claude');
-  const transcripts = join(configDir, 'projects', PROJECT_DIR_NAME);
-  mkdirSync(transcripts, { recursive: true });
+  home = makeTestTempDir('cairn-it-switch-home-');
+  const transcripts = join(home, 'claude', 'projects', PROJECT_DIR_NAME);
+  mkdirSync(configDir, { recursive: true });
   writeFileSync(
     join(configDir, 'settings.json'),
     `${JSON.stringify({
@@ -127,7 +128,6 @@ beforeAll(async () => {
     .update(routingRule)
     .set({ provider: 'claude-code', modelId: 'claude-sonnet-5-5' })
     .run();
-  home = makeTestTempDir('cairn-it-switch-home-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

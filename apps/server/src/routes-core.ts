@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   dailyUsageQuerySchema,
   patchRoutingRuleBodySchema,
+  patchTeamAgentConfigBodySchema,
   patchTeamAutonomyBodySchema,
   patchTeamBodySchema,
   patchUserBodySchema,
@@ -240,6 +241,14 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       ...ctx.team,
       ...(row === undefined ? {} : toTeamRecord(row, openAutonomyPauses(ctx.db, id))),
     });
+  });
+
+  app.patch('/api/teams/:id/agent-config', async (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    const body = parseWith(patchTeamAgentConfigBodySchema, await jsonBody(c), 'body');
+    ctx.db.update(team).set({ ownAgentConfig: body.ownAgentConfig }).where(eq(team.id, id)).run();
+    return c.json({ ownAgentConfig: body.ownAgentConfig });
   });
 
   app.get('/api/teams/:id/members', (c) => {

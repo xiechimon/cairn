@@ -3,10 +3,11 @@ import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { SessionOpts } from '@cairn/shared';
+import { ANTIGRAVITY_CREDENTIAL_FILES, GEMINI_CREDENTIAL_FILES } from '../agent-config.js';
 import { contains } from './confine.js';
 import { type SeatbeltPolicy, seatbeltCommand } from './confine-seatbelt.js';
 
-export type SessionHarness = 'claude-code' | 'codex' | 'gemini' | 'pi' | 'devin' | 'antigravity';
+export type SessionHarness = 'claude-code' | 'gemini' | 'pi' | 'devin' | 'antigravity';
 
 export interface Launch {
   command: string;
@@ -14,7 +15,7 @@ export interface Launch {
 }
 
 export type SessionConfiner = (
-  opts: Pick<SessionOpts, 'cwd' | 'env'>,
+  opts: Pick<SessionOpts, 'cwd' | 'env' | 'ownAgentConfig'>,
   harness: SessionHarness,
   launch: Launch,
   state?: readonly string[],
@@ -66,30 +67,74 @@ function readGitPointer(dotGit: string): string | null {
   }
 }
 
+function isolatedHome(dir: string | undefined, home: string): string | null {
+  if (dir === undefined || !isAbsolute(dir)) return null;
+  return existsSync(dir) && realpathSync(dir) === home ? null : dir;
+}
+
 function ownState(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv): string[] {
-  const explicit =
-    harness === 'claude-code' ? env.CLAUDE_CONFIG_DIR : harness === 'codex' ? env.CODEX_HOME : null;
-  if (explicit !== undefined && explicit !== null && isAbsolute(explicit)) return [explicit];
-  if (harness === 'pi') return [];
-  if (harness === 'antigravity') {
-    if (env.GEMINI_HOME !== undefined && isAbsolute(env.GEMINI_HOME)) return [env.GEMINI_HOME];
-    return [join(home, '.gemini')];
-  }
-  if (harness === 'devin') {
-    if (env.HOME === undefined || !isAbsolute(env.HOME) || realpathSync(env.HOME) === home)
+  switch (harness) {
+    case 'claude-code': {
+      const explicit = env.CLAUDE_CONFIG_DIR;
+      if (explicit !== undefined && isAbsolute(explicit)) return [explicit];
+      return [join(home, '.claude'), join(home, '.claude.json')];
+    }
+    case 'pi':
       return [];
-    const base = env.HOME;
-    return [
-      base,
-      join(base, '.local', 'share', 'devin'),
-      join(base, '.cache', 'devin'),
-      join(base, '.config', 'devin'),
-    ];
+    case 'antigravity': {
+      const base = isolatedHome(env.HOME, home);
+      if (base === null) return [join(home, '.gemini')];
+      return [
+        base,
+        ...(env.GEMINI_API_KEY === undefined
+          ? ANTIGRAVITY_CREDENTIAL_FILES.map((file) => join(home, file))
+          : []),
+      ];
+    }
+    case 'gemini': {
+      const base = isolatedHome(env.GEMINI_CLI_HOME, home);
+      if (base === null) return [join(home, '.gemini')];
+      return [base, ...GEMINI_CREDENTIAL_FILES.map((file) => join(home, file))];
+    }
+    case 'devin': {
+      const base = isolatedHome(env.HOME, home) ?? home;
+      return [
+        ...(base === home ? [] : [base]),
+        join(base, '.local', 'share', 'devin'),
+        join(base, '.cache', 'devin'),
+        join(base, '.config', 'devin'),
+      ];
+    }
   }
-  const name = harness === 'claude-code' ? '.claude' : harness === 'codex' ? '.codex' : '.gemini';
-  const defaults = [join(home, name)];
-  if (harness === 'claude-code') defaults.push(join(home, '.claude.json'));
-  return defaults;
+}
+
+const PI_USER_RESOURCES = [
+  'AGENTS.md',
+  'CLAUDE.md',
+  'SYSTEM.md',
+  'APPEND_SYSTEM.md',
+  'extensions',
+  'prompts',
+  'skills',
+  'themes',
+];
+
+function ownReadable(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv, own: boolean) {
+  if (harness !== 'pi' || !own) return [];
+  const explicit = env.PI_CODING_AGENT_DIR;
+  const agentDir =
+    explicit !== undefined && isAbsolute(explicit) ? explicit : join(home, '.pi', 'agent');
+  return PI_USER_RESOURCES.map((name) => join(agentDir, name));
+}
+
+const STATE_FILES = new Set<string>([
+  '.claude.json',
+  ...ANTIGRAVITY_CREDENTIAL_FILES,
+  ...GEMINI_CREDENTIAL_FILES,
+]);
+
+function isStateFile(home: string, path: string): boolean {
+  return [...STATE_FILES].some((file) => path === join(home, file));
 }
 
 export function createSessionConfiner(options: SessionConfinerOptions): SessionConfiner | null {
@@ -101,9 +146,9 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const env = { ...environment, ...opts.env };
     const workspace = realpathSync(opts.cwd);
     const state = ownState(harness, home, env)
-      .filter((path) => !path.endsWith('.claude.json') || existsSync(path))
+      .filter((path) => !isStateFile(home, path) || existsSync(path))
       .map((path) => {
-        if (!path.endsWith('.claude.json')) mkdirSync(path, { recursive: true });
+        if (!isStateFile(home, path)) mkdirSync(path, { recursive: true });
         return realpathSync(path);
       });
     const handoff = options.handoffDirectories.map((path) => {
@@ -141,7 +186,8 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       ],
       readable: [
         ...options.readable,
-        ...(harness === 'antigravity' && env.GEMINI_HOME === undefined
+        ...ownReadable(harness, home, env, opts.ownAgentConfig === true),
+        ...(harness === 'antigravity' && opts.env?.GEMINI_API_KEY === undefined
           ? [join(home, 'Library', 'Keychains')]
           : []),
       ].filter((path) => existsSync(path)),

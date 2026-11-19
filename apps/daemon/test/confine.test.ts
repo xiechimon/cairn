@@ -16,7 +16,7 @@ function fixture(): ConfinementPolicy {
     workspace: join(daemonHome, 'work'),
     gitDirectories: [join(daemonHome, 'git')],
     taskTemp: join(root, 'temp'),
-    state: [join(home, '.codex')],
+    state: [join(home, '.pi')],
     caches: [join(home, '.cache')],
   };
   for (const path of [
@@ -148,12 +148,12 @@ test.runIf(linuxProbes)('real bwrap: writable git metadata cannot modify config 
 test.runIf(linuxProbes)('real bwrap: only the selected harness state is exposed', () => {
   const policy = fixture();
   writeFileSync(join(policy.home, '.claude.json'), 'state');
-  for (const name of ['.claude', '.codex', '.pi', '.gemini']) {
+  for (const name of ['.claude', '.pi', '.gemini']) {
     const path = join(policy.home, name);
     mkdirSync(path, { recursive: true });
     writeFileSync(join(path, 'sentinel'), name);
   }
-  for (const name of ['.claude', '.codex', '.pi', '.gemini']) {
+  for (const name of ['.claude', '.pi', '.gemini']) {
     policy.state = [join(policy.home, name)];
     if (name === '.claude') policy.state.push(join(policy.home, '.claude.json'));
     const fileResult = run(
@@ -163,7 +163,7 @@ test.runIf(linuxProbes)('real bwrap: only the selected harness state is exposed'
     expect(fileResult.status, fileResult.stderr).toBe(0);
     const result = run(
       policy,
-      `touch "$5/own" && ! cat "$2/${name === '.codex' ? '.claude' : '.codex'}/sentinel"`,
+      `touch "$5/own" && ! cat "$2/${name === '.pi' ? '.claude' : '.pi'}/sentinel"`,
     );
     expect(result.status, result.stderr).toBe(0);
   }

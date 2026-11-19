@@ -101,7 +101,7 @@ export function confinementArgs(
     if (
       denied.some((secret) => contains(secret, path)) &&
       !contains(daemonHome, path) &&
-      !['.claude', '.codex', '.pi', '.gemini', '.claude.json'].some((name) =>
+      !['.claude', '.pi', '.gemini', '.claude.json'].some((name) =>
         contains(join(home, name), path),
       )
     )

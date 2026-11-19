@@ -75,7 +75,8 @@ export function toUserRecord(row: {
 }
 
 export function toTeamRecord(
-  row: Pick<typeof team.$inferSelect, keyof typeof teamRecordColumns>,
+  row: Pick<typeof team.$inferSelect, keyof typeof teamRecordColumns> &
+    Partial<Pick<typeof team.$inferSelect, 'ownAgentConfig'>>,
   pauses?: AutonomyPauseEntry[],
 ): TeamRecord {
   return {
@@ -87,5 +88,6 @@ export function toTeamRecord(
     ...(pauses === undefined ? {} : { autonomyPaused: pauses.length > 0, autonomyPauses: pauses }),
     maxAutonomousMergesPerDay: row.maxAutonomousMergesPerDay,
     defaultMachineId: row.defaultMachineId,
+    ...(row.ownAgentConfig === undefined ? {} : { ownAgentConfig: row.ownAgentConfig }),
   };
 }

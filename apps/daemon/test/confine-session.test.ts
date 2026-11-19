@@ -55,11 +55,59 @@ describe('session confiner', () => {
     ).toBeNull();
   });
 
-  test('wraps the ACP adapter launch for codex and gemini', async () => {
+  test('an isolated Antigravity HOME opens only that HOME and the linked sign-in file', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const home = join(root, 'user');
+    const agentHome = join(runnerHome, 'agent-homes', 'antigravity');
+    const token = join(home, '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
+    mkdirSync(agentHome, { recursive: true });
+    mkdirSync(join(home, '.gemini', 'antigravity-cli'), { recursive: true });
+    writeFileSync(token, 't');
+    const profileFor = (env: Record<string, string>) =>
+      (
+        confine({ cwd: worktree, env }, 'antigravity', { command: '/bin/true', args: [] })
+          .args[1] as string
+      )
+        .split('\n')
+        .find((line) => line.startsWith('(allow file-read* file-write*')) ?? '';
+
+    const isolated = profileFor({ HOME: agentHome });
+    expect(isolated).toContain(`(subpath "${realpathSync(agentHome)}")`);
+    expect(isolated).toContain(`(subpath "${realpathSync(token)}")`);
+    expect(isolated).not.toContain(`(subpath "${join(home, '.gemini')}")`);
+
+    const apiKey = profileFor({ HOME: agentHome, GEMINI_API_KEY: 'AIza-step' });
+    expect(apiKey).toContain(`(subpath "${realpathSync(agentHome)}")`);
+    expect(apiKey).not.toContain(realpathSync(token));
+
+    const own = profileFor({ HOME: home });
+    expect(own).toContain(`(subpath "${join(home, '.gemini')}")`);
+    expect(own).not.toContain(`(subpath "${realpathSync(agentHome)}")`);
+  });
+
+  test('the own-config switch lets pi read the user resources but never write them or read auth', () => {
+    const { confine, worktree, root } = fixture();
+    const piDir = join(root, 'user', '.pi', 'agent');
+    mkdirSync(join(piDir, 'skills'), { recursive: true });
+    writeFileSync(join(piDir, 'AGENTS.md'), 'rules');
+    writeFileSync(join(piDir, 'auth.json'), '{}');
+    const profileFor = (ownAgentConfig: boolean) =>
+      confine({ cwd: worktree, env: {}, ownAgentConfig }, 'pi', { command: '/bin/true', args: [] })
+        .args[1] as string;
+    expect(profileFor(false)).not.toContain(piDir);
+    const own = profileFor(true);
+    const readOnly = own.split('\n').find((line) => line.startsWith('(allow file-read* (')) ?? '';
+    expect(readOnly).toContain(`(subpath "${join(piDir, 'skills')}")`);
+    expect(readOnly).toContain(`(subpath "${join(piDir, 'AGENTS.md')}")`);
+    expect(own).not.toContain(`(subpath "${piDir}")`);
+    expect(own).not.toContain('auth.json');
+  });
+
+  test('wraps the ACP adapter launch', async () => {
     const { confine, worktree } = fixture();
     const launches: string[][] = [];
     const backend = createAcpBackend({
-      harness: 'codex',
+      harness: 'claude-code',
       command: '/bin/true',
       confine,
       spawnProcess: (command, args) => {
@@ -169,14 +217,12 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
   });
 
   test.runIf(process.platform === 'darwin')(
-    'antigravity grants read-only Library/Keychains only when GEMINI_HOME is unset and keeps Keychains denied for all other harnesses',
+    'antigravity grants read-only Library/Keychains only without an API key and keeps Keychains denied for all other harnesses',
     () => {
       const { root, runnerHome, worktree, serverHome } = fixture();
       const home = join(root, 'user');
       const keychains = join(home, 'Library', 'Keychains');
-      const isolatedGemini = join(root, 'isolated-gemini');
       mkdirSync(keychains, { recursive: true });
-      mkdirSync(isolatedGemini, { recursive: true });
       writeFileSync(join(keychains, 'login.keychain-db'), 'kc-secret');
       const confine = createSessionConfiner({
         daemonHome: runnerHome,
@@ -202,7 +248,7 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
       expect(() => execFileSync(agWrite.command, agWrite.args, { stdio: 'pipe' })).toThrow();
 
       const agIsolated = confine(
-        { cwd: worktree, env: { GEMINI_HOME: isolatedGemini } },
+        { cwd: worktree, env: { GEMINI_API_KEY: 'AIza-step' } },
         'antigravity',
         {
           command: '/bin/sh',
@@ -211,7 +257,7 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
       );
       expect(() => execFileSync(agIsolated.command, agIsolated.args, { stdio: 'pipe' })).toThrow();
 
-      for (const other of ['claude-code', 'codex', 'devin', 'gemini', 'pi'] as const) {
+      for (const other of ['claude-code', 'devin', 'gemini', 'pi'] as const) {
         const denied = confine({ cwd: worktree, env: {} }, other, {
           command: '/bin/sh',
           args: ['-c', `cat '${join(keychains, 'login.keychain-db')}'`],
