@@ -43,7 +43,6 @@ interface TranscriptColumnProps {
   threadKey?: string;
   hasEarlier?: boolean;
   earlier?: EarlierPages;
-  shortEnd?: boolean;
 }
 
 export const TranscriptColumn = forwardRef<TranscriptColumnHandle, TranscriptColumnProps>(
@@ -70,7 +69,6 @@ function TranscriptColumnInner({
   threadKey,
   hasEarlier = false,
   earlier,
-  shortEnd = false,
   handleRef,
   setUnpinned,
 }: Omit<TranscriptColumnProps, 'autoScroll'> & {
@@ -93,7 +91,6 @@ function TranscriptColumnInner({
     const gutter = viewport.offsetWidth - viewport.clientWidth;
     viewport.style.setProperty('--scrollbar-gutter', `${Math.min(gutter, 16)}px`);
   }, []);
-  const compactEnd = shortEnd || running === false;
   const anchoredKey = useRef<string | undefined>(undefined);
   const [openedKey, setOpenedKey] = useState<string | undefined>(undefined);
   const anchor = running === undefined || !settled ? null : openingAnchor(running, transcript);
@@ -124,7 +121,7 @@ function TranscriptColumnInner({
     <MessageScroller className={ROOT_CLS}>
       <FadeScrollerViewport
         ref={viewportRef}
-        reserveEnd={compactEnd}
+        reserveEnd
         onClickCapture={(event) => {
           const toggle =
             event.target instanceof Element
@@ -133,7 +130,7 @@ function TranscriptColumnInner({
           if (toggle !== null) setUnpinned(true);
         }}
         data-testid="transcript-col"
-        className={compactEnd ? VIEWPORT_CLS : `${VIEWPORT_CLS} pb-(--chat-extra-space)`}
+        className={VIEWPORT_CLS}
       >
         <MessageScrollerContent ref={setRows} className={CONTENT_CLS}>
           {lead}

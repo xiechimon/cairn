@@ -483,7 +483,6 @@ function ThreadBody({
             running={threadStatus(todo) === 'running'}
             settled={chat.transcriptSettled}
             threadKey={todo.id}
-            shortEnd={engine !== undefined}
           />
         </ReportThreadContext.Provider>
       )}

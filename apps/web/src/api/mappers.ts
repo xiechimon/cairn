@@ -1089,6 +1089,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   }
   if (
     !running &&
+    todo.phase !== 'done' &&
+    todo.phase !== 'review' &&
     persistedTodo !== null &&
     persistedTodo.length > 0 &&
     persistedTodo.some((it) => it.state !== 'done')

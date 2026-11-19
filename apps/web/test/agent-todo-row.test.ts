@@ -42,12 +42,13 @@ function render(overrides: {
   pageTodo?: AgentTodoItem[] | null;
   build?: BuildRecord | null;
   liveText?: string;
+  phase?: TodoRecord['phase'];
 }): TranscriptItem[] {
   return mapTranscript({
     messages: overrides.messages ?? [],
     steps: overrides.steps ?? [],
     build: overrides.build === undefined ? BUILD : overrides.build,
-    todo: todo(9, 'building') as TodoRecord,
+    todo: todo(9, overrides.phase ?? 'building') as TodoRecord,
     machineName: null,
     userName: 'Xmon Dai',
     liveText: overrides.liveText ?? '',
@@ -149,6 +150,20 @@ describe('mapTranscript agent todo list (#1524)', () => {
         ],
       },
     ]);
+  });
+
+  test('a finished task hides its unfinished checklist; a stopped or failed one keeps it', () => {
+    const checklist: MessageRow = {
+      id: 'm-plan',
+      role: 'assistant',
+      createdAt: NOW - 10_000,
+      content: '- [x] 读配置\n- [ ] 改接口',
+    };
+    const settled = [{ ...runningStep('s1'), status: 'done' as const }];
+    for (const phase of ['done', 'review'] as const)
+      expect(todoItems(render({ messages: [checklist], steps: settled, phase }))).toEqual([]);
+    for (const phase of ['failed', 'needs_input'] as const)
+      expect(todoItems(render({ messages: [checklist], steps: settled, phase }))).toHaveLength(1);
   });
 
   test('persisted TodoWrite hides once all items are done after the step settles', () => {

@@ -392,3 +392,34 @@ for (const theme of ['light', 'dark'] as const) {
     await expect.soft(summary).toHaveCSS('outline-style', 'solid');
   });
 }
+
+test('a call with nothing more to show is a plain row, and the summary takes no fill on hover', async ({ page }) => {
+  await stubWorld(page, 'stopped', 'failed', [
+    msg('user', TASK_PROMPT, 1000),
+    msg(
+      'assistant',
+      {
+        kind: 'toolcall',
+        call: { id: 'meta', name: 'set_task_meta', arguments: {}, result: '', startedAt: 1500, endedAt: 1600 },
+      },
+      1600,
+    ),
+    msg(
+      'assistant',
+      {
+        kind: 'toolcall',
+        call: { id: 'ls', name: 'Bash', arguments: { command: 'ls' }, result: 'a.txt', startedAt: 1700, endedAt: 1800 },
+      },
+      1800,
+    ),
+  ]);
+  const summary = page.getByTestId('work-summary').last();
+  await summary.hover();
+  await expect(summary).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await summary.click();
+  const rows = page.getByTestId('work-block').last().getByTestId('work-call');
+  const meta = rows.filter({ hasText: 'set_task_meta' });
+  await expect(meta).not.toHaveAttribute('aria-expanded');
+  await expect(meta.locator('[data-trace-triangle]')).toHaveCount(0);
+  await expect(rows.filter({ hasText: 'ls' })).toHaveAttribute('aria-expanded', 'false');
+});

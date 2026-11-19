@@ -29,7 +29,7 @@ export const EMPTY_TRACE_COUNTS: TraceCounts = {
 };
 
 const SUMMARY_BTN =
-  "chat-interaction -ml-3 h-7 min-h-0 w-fit max-w-full cursor-pointer justify-start gap-2 rounded-(--radius-control) border-0 bg-transparent px-3 py-0 text-left text-ui leading-5 font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-secondary) aria-expanded:hover:bg-(--menu-hover) dark:aria-expanded:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
+  "chat-interaction -ml-3 h-7 min-h-0 w-fit max-w-full cursor-pointer justify-start gap-2 rounded-(--radius-control) border-0 bg-transparent px-3 py-0 text-left text-ui leading-5 font-normal text-(--text-secondary) hover:bg-transparent hover:text-(--foreground) dark:hover:bg-transparent dark:hover:text-(--foreground) aria-expanded:bg-transparent aria-expanded:text-(--text-secondary) aria-expanded:hover:bg-transparent aria-expanded:hover:text-(--foreground) dark:aria-expanded:hover:bg-transparent [&_svg:not([class*='size-'])]:size-auto";
 
 const ROW_BTN =
   "chat-interaction flex h-9 min-h-9 w-full min-w-0 cursor-pointer justify-start gap-1.5 rounded-(--cds-radius-xs) border-0 bg-transparent px-3 text-left font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) dark:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
@@ -241,6 +241,7 @@ export function TraceRowButton({
     return (
       <div
         data-running={running ? '' : undefined}
+        data-testid={props['data-testid' as keyof typeof props] as string | undefined}
         className={cn(
           'flex h-9 min-w-0 items-center gap-1.5 px-3 text-(--text-tertiary)',
           tone,

@@ -384,13 +384,13 @@ test('a running thread ends in an unframed live status row with three typing dot
   await expect(live.getByTestId('typing-dot').first()).toHaveCSS('animation-name', 'none');
 });
 
-test('a running thread keeps room under its reply for the streaming text', async ({ page }) => {
+test('a running thread reserves only the end space under its live line', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-working-c`);
   await expect(page.locator('.side-panel').getByTestId('live-row')).toHaveCount(1);
   const room = await page
     .getByTestId('transcript-col')
-    .evaluate((el) => Number.parseFloat(getComputedStyle(el).paddingBottom) / window.innerHeight);
-  expect(room).toBeCloseTo(0.35, 2);
+    .evaluate((el) => Number.parseFloat(getComputedStyle(el).paddingBottom));
+  expect(room).toBe(24);
 });
 
 test.describe('phone width thread', () => {

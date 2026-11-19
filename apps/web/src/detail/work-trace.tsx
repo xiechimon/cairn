@@ -191,6 +191,12 @@ function WorkStepRow({
     : null;
   const lineCount = changeLines?.length ?? lines.length;
   const running = call !== null ? call.running === true : step.running === true;
+  const hasDetail =
+    call === null
+      ? step.kind === 'think' && step.text.trim() !== ''
+      : (call.output !== null && call.output.trim() !== '') ||
+        changeLines !== null ||
+        (call.command !== undefined && call.command.trim() !== stepTarget(call).trim());
   const verb =
     call === null
       ? t(running ? '正在思考' : open ? '思考' : '思考了')
@@ -208,9 +214,9 @@ function WorkStepRow({
         data-testid={call === null ? 'work-think' : 'work-call'}
         aria-label={call === null ? t(open ? '收起思考' : '展开思考') : undefined}
         running={running}
-        expandable
+        expandable={hasDetail}
         open={open}
-        onClick={() => setOpen((value) => !value)}
+        {...(hasDetail ? { onClick: () => setOpen((value) => !value) } : {})}
         verb={verb}
         target={
           call === null ? (

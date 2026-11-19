@@ -139,7 +139,6 @@
   --composer-bottom-gap: 16px;
   --scroll-fade-size: 28px;
   --chat-end-space: 24px;
-  --chat-extra-space: 35vh;
   --type-scale: calc(var(--rem-scale) * 17 / 16);
   --type-page: calc(1.5rem * var(--type-scale));
   --type-brand: calc(1.125rem * var(--type-scale));
