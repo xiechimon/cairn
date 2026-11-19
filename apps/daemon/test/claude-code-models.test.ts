@@ -66,15 +66,42 @@ describe('readClaudeCodeReport', () => {
     expect(report.models).toEqual(DEFAULT_CLAUDE_CODE_MODELS);
   });
 
-  test('settings.json models win over the built-in list, with or without the binary', () => {
-    const settings = JSON.stringify({ model: 'claude-opus-4-5' });
-    const withBin = readClaudeCodeReport(tmpHome(settings), {
+  test('settings.json models come first and the built-in models stay beside them', () => {
+    const settings = JSON.stringify({
+      model: 'haiku',
+      env: {
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: 'claude-haiku-5-5',
+        ANTHROPIC_DEFAULT_SONNET_MODEL: 'claude-sonnet-5-5',
+      },
+    });
+    const report = readClaudeCodeReport(tmpHome(settings), {
       bin: { path: '/usr/bin/claude', version: null },
     });
-    expect(withBin.models).toEqual([
+    expect(report.models.map((model) => model.id)).toEqual([
+      'claude-haiku-5-5',
+      'claude-sonnet-5-5',
+      'claude-opus-5-5',
+    ]);
+    expect(report.models[0]?.slot).toBe('default');
+  });
+
+  test('without the binary, or with a custom backend, only the settings.json models are reported', () => {
+    const settings = JSON.stringify({ model: 'claude-opus-4-5' });
+    expect(readClaudeCodeReport(tmpHome(settings)).models).toEqual([
       { id: 'claude-opus-4-5', name: 'claude-opus-4-5', slot: 'default' },
     ]);
-    expect(readClaudeCodeReport(tmpHome(settings)).models).toEqual(withBin.models);
+    const relay = JSON.stringify({
+      model: 'fable',
+      env: {
+        ANTHROPIC_BASE_URL: 'https://relay.example',
+        ANTHROPIC_DEFAULT_FABLE_MODEL: 'deepseek-v4.1-flash',
+      },
+    });
+    expect(
+      readClaudeCodeReport(tmpHome(relay), {
+        bin: { path: '/usr/bin/claude', version: null },
+      }).models.map((model) => model.id),
+    ).toEqual(['deepseek-v4.1-flash']);
   });
 
   test('no binary and no settings.json stays not installed, and a missing bin probe is not a found binary', () => {
