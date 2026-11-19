@@ -118,6 +118,21 @@ describe('failure modes', () => {
 });
 
 describe('classifyDifficulty', () => {
+  test('a stored request difficulty wins over markers and length', () => {
+    for (const difficulty of ['easy', 'standard', 'hard'] as const) {
+      expect(
+        classifyDifficulty({
+          title: 't',
+          spec: 'x'.repeat(5000),
+          request: { difficulty },
+        }),
+      ).toBe(difficulty);
+    }
+    expect(
+      classifyDifficulty({ title: 't', spec: 'difficulty:hard', request: { difficulty: 'easy' } }),
+    ).toBe('easy');
+  });
+
   test('an explicit marker wins', () => {
     expect(classifyDifficulty({ title: 't', spec: 'difficulty:hard fix the typo' })).toBe('hard');
     expect(classifyDifficulty({ title: 't', spec: `difficulty:easy ${'x'.repeat(5000)}` })).toBe(
