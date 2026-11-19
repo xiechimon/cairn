@@ -31,7 +31,7 @@ async function openRunningTurn(page: Page) {
   return refs;
 }
 
-test('a task dispatched in a running turn grows on that turn, and one already there when the page opened does not', async ({
+test('a task dispatched in a running turn grows on that turn, and one already there when the page opened does not @motion', async ({
   page,
 }) => {
   const refs = await openRunningTurn(page);

@@ -25,6 +25,7 @@ export default defineConfig({
     viewport: { width: 1440, height: 732 },
     colorScheme: 'dark',
     locale: 'zh-CN',
+    video: process.env.CAIRN_E2E_VIDEO ? 'on' : 'off',
   },
   webServer: {
     command: `pnpm exec vite build --mode fixture ${buildFlags} --emptyOutDir && pnpm exec vite preview ${buildFlags} --host 127.0.0.1 --port ${PORT} --strictPort`,

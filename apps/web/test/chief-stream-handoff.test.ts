@@ -220,4 +220,31 @@ describe('chief streaming handoff (#857 F-H1..H6)', () => {
     const started = startConv(CONV, qc, {});
     expect(liveTextStore.get(CONV)).toBe('');
   });
+
+  test('a settled reply whose turn created tasks shows no working dots while the run winds down', () => {
+    const create: MessageRow = {
+      id: 'create',
+      role: 'assistant',
+      content: {
+        kind: 'toolcall',
+        call: {
+          id: 'c-create',
+          name: 'create_todo',
+          arguments: { title: 'Fix counts', projectId: 'p1' },
+          result: { id: 'todo-1', seqNum: 9, title: 'Fix counts' },
+          startedAt: NOW,
+          endedAt: NOW + 1,
+        },
+      },
+      createdAt: NOW,
+    };
+    const chief = mapChief(ENV, {
+      threads: [THREAD],
+      activeThreadId: CONV,
+      messages: [USER, create, textRow('answer', 'Started it.')],
+    });
+    const kinds = (chief.stream ?? []).map((item: ChiefStreamItem) => item.kind);
+    expect(kinds).toEqual(['user', 'robot', 'task-card']);
+  });
 });
+

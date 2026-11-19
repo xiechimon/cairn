@@ -2086,7 +2086,7 @@ export function mapChief(
     if (liveReply !== null) {
       chiefStream.push(liveReply);
     } else if (
-      chiefStream[chiefStream.length - 1]?.kind !== 'robot' ||
+      chiefStream.findLast((item) => item.kind !== 'task-card')?.kind !== 'robot' ||
       trailingTools.length > 0 ||
       (collected?.pending.length ?? 0) > 0
     ) {

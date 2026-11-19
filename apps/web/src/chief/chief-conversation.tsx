@@ -53,7 +53,7 @@ import type { MentionGroups } from '../overlay/mention-token.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { AnswerComposer } from './answer-composer.js';
 import { type BubbleRun, bubbleRuns } from './bubble-runs.js';
-import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
+import { ChiefStreamRow, chiefStreamRowKey, chiefStreamRowKeys } from './chief-message-rows.js';
 import {
   BANNER_CLS,
   ChiefConnectionBanner,
@@ -118,7 +118,7 @@ function layoutStream(
   });
   return {
     grouped,
-    keys: grouped.map(({ item, i }) => chiefStreamRowKey(item, i)),
+    keys: chiefStreamRowKeys(grouped),
     runs: bubbleRuns(grouped, previousAt),
     taskRefs: placeTaskRefs(grouped, startedBy, glances, seen),
     reports: placeReportCards(grouped, startedBy, glances, reportSeen),
