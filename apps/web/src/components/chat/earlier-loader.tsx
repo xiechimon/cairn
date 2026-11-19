@@ -75,6 +75,8 @@ export function EarlierLoader({
     },
     [hasEarlier, loading, failed, onLoad, viewportRef],
   );
+  const maybeLoadRef = useRef(maybeLoad);
+  maybeLoadRef.current = maybeLoad;
   useEffect(() => {
     const viewport = viewportRef.current;
     if (viewport === null) return;
@@ -89,6 +91,7 @@ export function EarlierLoader({
   }, [maybeLoad, rowCount, viewportRef]);
   const wasLoading = useRef(loading);
   const lastRowCount = useRef(rowCount);
+  const pendingRafRef = useRef(0);
   useLayoutEffect(() => {
     const settled = !loading && (wasLoading.current || lastRowCount.current !== rowCount);
     wasLoading.current = loading;
@@ -96,9 +99,15 @@ export function EarlierLoader({
     const anchor = anchorRef.current;
     const viewport = viewportRef.current;
     if (!settled || anchor === null || viewport === null) return;
-    anchorRef.current = null;
     restoreAnchor(anchor, viewport);
-    requestAnimationFrame(() => restoreAnchor(anchor, viewport));
+    cancelAnimationFrame(pendingRafRef.current);
+    pendingRafRef.current = requestAnimationFrame(() => {
+      pendingRafRef.current = 0;
+      const current = viewportRef.current;
+      if (current !== null) restoreAnchor(anchor, current);
+      anchorRef.current = null;
+      maybeLoadRef.current(false);
+    });
   }, [loading, rowCount, viewportRef]);
   return null;
 }
