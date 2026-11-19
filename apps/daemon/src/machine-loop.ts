@@ -997,10 +997,13 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'steer') void deliverSteer(ev.stepId);
             if (ev.type === 'stop') void deliverStop(ev.stepId);
             if (ev.type === 'task.stop') {
-              logger.step(`background task stop requested step=${ev.stepId} task=${ev.taskId}`);
-              void sessionHandles
-                .get(ev.stepId)
+              const handle = sessionHandles.get(ev.stepId);
+              logger.step(
+                `background task stop requested step=${ev.stepId} task=${ev.taskId} session=${handle === undefined ? 'none' : handle.stopTask === undefined ? 'unsupported' : 'live'}`,
+              );
+              void handle
                 ?.stopTask?.(ev.taskId)
+                .then(() => logger.step(`background task stop delivered task=${ev.taskId}`))
                 .catch((err: unknown) =>
                   logger.step(
                     `background task stop failed: ${err instanceof Error ? err.message : String(err)}`,

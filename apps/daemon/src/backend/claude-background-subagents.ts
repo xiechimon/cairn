@@ -54,6 +54,10 @@ export class BackgroundSubagents {
     return [...this.live, ...this.awaitingResult].map((id) => this.descriptions.get(id) ?? id);
   }
 
+  get hasFinished(): boolean {
+    return this.finished.length > 0 || this.omitted > 0;
+  }
+
   takeFinished(): { finished: FinishedSubagent[]; omitted: number } {
     const taken = { finished: this.finished, omitted: this.omitted };
     this.finished = [];

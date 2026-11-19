@@ -158,7 +158,9 @@ test('a turn that ends while a background subagent runs waits for it and continu
   expect(events.filter((event) => event.type === 'done')).toHaveLength(1);
   expect(events.at(-1)?.type).toBe('done');
   const waits = waitCalls(events);
-  expect(waits.map((call) => call.result === undefined)).toEqual([true, false]);
+  expect(waits.map((call) => call.result === undefined)).toEqual([true, false, true, false]);
+  expect(waits[1]?.result).toContain('Survey ops docs and scripts');
+  expect(waits[3]?.result).toContain('ended before the background');
   expect(events.some((event) => event.type === 'steer' && event.text === prompts[1])).toBe(true);
 });
 
@@ -325,6 +327,44 @@ test('stopping one background task asks the CLI to stop that task; stopping the 
   expect(q.stopTask).toHaveBeenCalledWith('agent-1');
   await handle.stop();
   await drained;
+  expect(events.flatMap((event) => (event.type === 'bg_task' ? [event.task.status] : []))).toEqual([
+    'running',
+    'stopped',
+  ]);
+});
+
+test('a turn that ends while a background shell runs keeps the session open, so the shell can still be stopped', async () => {
+  const stopTask = () => (vi.mocked(query).mock.results[0]?.value as Query | undefined)?.stopTask;
+  const prompts = fakeCli(async (cli) => {
+    await cli.nextPrompt();
+    cli.emit({ ...started('bash-1', 'local_bash', 'sleep 120'), tool_use_id: 'toolu_bash' });
+    cli.emit(assistant('Waiting for the shell.'));
+    cli.emit(result);
+    await vi.waitFor(() => expect(stopTask()).toHaveBeenCalledWith('bash-1'));
+    cli.emit({ ...notified('bash-1', 'killed'), status: 'killed' });
+    await cli.nextPrompt();
+    cli.emit(assistant('The shell was stopped.'));
+    cli.emit(result);
+  });
+  const handle = await createClaudeCodeBackend({}).createSession({
+    provider: { kind: 'http', providerId: 'fake-claude' },
+    modelId: 'fake-model',
+    cwd: '/tmp',
+    prompt: 'Run the dev server.',
+  });
+  const events: StepEvent[] = [];
+  const drained = (async () => {
+    for await (const event of handle.events) events.push(event);
+  })();
+  await vi.waitFor(() => expect(waitCalls(events)).toHaveLength(1));
+  expect(events.some((event) => event.type === 'done')).toBe(false);
+  await handle.stopTask?.('bash-1');
+  await drained;
+  expect(prompts).toHaveLength(2);
+  expect(prompts[1]).toContain('sleep 120');
+  expect(prompts[1]).toContain('stopped');
+  expect(events.filter((event) => event.type === 'done')).toHaveLength(1);
+  expect(events.at(-1)?.type).toBe('done');
   expect(events.flatMap((event) => (event.type === 'bg_task' ? [event.task.status] : []))).toEqual([
     'running',
     'stopped',
