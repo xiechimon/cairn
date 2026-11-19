@@ -1,4 +1,5 @@
 import type { PrPanelRow } from '@cairn/shared';
+import { TraceCard } from '../components/chat/trace-parts.js';
 import { PrCard } from '../components/thread/pr-card.js';
 import { prCardModelOfRow } from '../components/thread/pr-panel-model.js';
 import { Button } from '../components/ui/button.js';
@@ -18,23 +19,20 @@ export function ThreadPrPanel({ status, rows, onViewChanges, onRetry }: ThreadPr
   if (status === 'pending') return null;
   if (status === 'error') {
     return (
-      <div
+      <TraceCard
         data-testid="thread-pr-error"
-        className="flex flex-none items-center gap-2 border-b border-border px-4 py-2 text-meta text-content-tertiary"
+        className="mt-5 flex items-center gap-2 py-1 pr-1.5 pl-3 text-meta text-content-tertiary"
       >
         <span className="min-w-0 flex-1">{t('PR 状态加载失败，稍后会自动重试。')}</span>
         <Button variant="ghost" size="sm" onClick={onRetry} className="h-6.5 text-meta">
           {t('重试')}
         </Button>
-      </div>
+      </TraceCard>
     );
   }
   if (rows.length === 0) return null;
   return (
-    <div
-      data-testid="thread-pr-panel"
-      className="flex max-h-[40%] flex-none flex-col gap-2 overflow-y-auto border-b border-border px-3 py-2.5"
-    >
+    <TraceCard data-testid="thread-pr-panel" className="mt-5 px-1 py-0.5">
       {rows.map((row) => (
         <PrCard
           key={row.buildId}
@@ -44,6 +42,6 @@ export function ThreadPrPanel({ status, rows, onViewChanges, onRetry }: ThreadPr
           {...(onViewChanges !== undefined ? { onViewDiff: onViewChanges } : {})}
         />
       ))}
-    </div>
+    </TraceCard>
   );
 }

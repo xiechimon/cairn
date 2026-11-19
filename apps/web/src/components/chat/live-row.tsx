@@ -4,7 +4,7 @@ import { useI18n } from '../../i18n/provider.js';
 import type { TVars } from '../../i18n/translate.js';
 import { Button } from '../ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js';
-import { TraceTriangle } from './trace-parts.js';
+import { TraceChevron } from './trace-parts.js';
 
 export function useLiveSeconds(startedAt: number | null | undefined): number | null {
   const connected = useConnected();
@@ -187,7 +187,7 @@ export function LiveRow({
       >
         {t(label, labelVars)}
       </span>
-      {disclosure != null && <TraceTriangle open={expanded} />}
+      {disclosure != null && <TraceChevron open={expanded} />}
     </>
   );
   const testid = variant === 'detail' ? 'live-row' : undefined;

@@ -83,21 +83,6 @@ export function traceSummary(
   };
 }
 
-export function TraceTriangle({ open }: { open: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 12 12"
-      width="12"
-      height="12"
-      className="flex-none"
-      data-trace-triangle={open ? 'open' : 'closed'}
-    >
-      <path d={open ? 'M3.5 4.5h5L6 8Z' : 'M4.5 3.5v5L8 6Z'} fill="currentColor" />
-    </svg>
-  );
-}
-
 export function TraceChevron({ open }: { open: boolean }) {
   return (
     <ChevronRight
@@ -209,7 +194,7 @@ export function TraceRowButton({
           {target}
         </span>
       )}
-      {expandable && <TraceTriangle open={open} />}
+      {expandable && <TraceChevron open={open} />}
       <span className="ml-auto flex flex-none items-center gap-2 pl-2 tabular-nums">
         {trailing}
       </span>
@@ -255,7 +240,7 @@ export function TraceCommandBox({
   return (
     <div
       className={cn(
-        'rounded-lg bg-(--background) px-3 py-2 font-mono text-code leading-5 whitespace-pre-wrap text-(--foreground) ring-1 ring-(--border) ring-inset [overflow-wrap:anywhere]',
+        'rounded-lg bg-(--menu-hover) px-3 py-2 font-mono text-code leading-5 whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere]',
         className,
       )}
       data-trace-command=""

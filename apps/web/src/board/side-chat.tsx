@@ -402,6 +402,7 @@ function ThreadBody({
   onClose,
   usage,
   engine,
+  pr,
 }: {
   chat: ThreadChat;
   todo: TodoRecord;
@@ -414,6 +415,7 @@ function ThreadBody({
   onClose: () => void;
   usage: ThreadUsageView | null;
   engine: EngineRunView | undefined;
+  pr: ReactNode;
 }) {
   const { t } = useI18n();
   const mentions = useThreadMentions(todo.projectId);
@@ -450,9 +452,11 @@ function ThreadBody({
             }
             result={
               engine !== undefined ||
+              pr != null ||
               chat.changes.status === 'ready' ||
               chat.changes.status === 'error' ? (
                 <>
+                  {pr}
                   {engine?.controls}
                   {engine !== undefined && (
                     <div data-testid="engine-run" data-state={engine.run.state}>
@@ -779,24 +783,6 @@ function ReadyThread({
           updates={updates}
         />
       </Head>
-      <ThreadPrPanel
-        status={prs.status}
-        rows={prRows}
-        onViewChanges={
-          chat.changes.status !== 'none'
-            ? () => {
-                onView('chat');
-                onChangesOpen(true);
-                requestAnimationFrame(() =>
-                  document
-                    .querySelector('.side-panel [data-testid="side-chat-changes"]')
-                    ?.scrollIntoView({ block: 'nearest' }),
-                );
-              }
-            : undefined
-        }
-        onRetry={() => void prs.refetch()}
-      />
       <ThreadBody
         chat={chat}
         todo={todo}
@@ -808,6 +794,28 @@ function ReadyThread({
         onJumpToOrigin={jumpToOrigin}
         onClose={onClose}
         engine={engineView}
+        pr={
+          prs.status === 'error' || (prs.status === 'success' && prRows.length > 0) ? (
+            <ThreadPrPanel
+              status={prs.status}
+              rows={prRows}
+              onViewChanges={
+                chat.changes.status !== 'none'
+                  ? () => {
+                      onView('chat');
+                      onChangesOpen(true);
+                      requestAnimationFrame(() =>
+                        document
+                          .querySelector('.side-panel [data-testid="side-chat-changes"]')
+                          ?.scrollIntoView({ block: 'nearest' }),
+                      );
+                    }
+                  : undefined
+              }
+              onRetry={() => void prs.refetch()}
+            />
+          ) : null
+        }
         usage={
           engineView !== undefined ||
           (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||

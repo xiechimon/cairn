@@ -150,7 +150,7 @@ function Row({
       return (
         <div
           data-testid="transcript-time-divider"
-          className="mt-5 w-full text-center text-caption text-(--text-tertiary)"
+          className="mt-5 w-full text-meta text-(--text-tertiary)"
         >
           {[item.at, item.machine != null ? t('运行在 {m} 上', { m: item.machine }) : null]
             .filter((part) => part != null)
@@ -174,11 +174,17 @@ function Row({
               <div className="text-meta text-(--text-tertiary)">{q.header}</div>
               <div className="text-foreground">{q.question}</div>
               {q.options.length > 0 && (
-                <ul className="list-disc pl-5 text-foreground">
+                <ul
+                  className="m-0 flex list-none flex-wrap gap-1.5 p-0"
+                  data-slot="question-options"
+                >
                   {q.options.map((o) => (
-                    <li key={o.label}>
+                    <li
+                      key={o.label}
+                      title={o.description}
+                      className="rounded-(--radius-control) bg-(--menu-hover) px-2 py-0.5 text-meta text-foreground"
+                    >
                       {o.label}
-                      {o.description !== undefined && ` — ${o.description}`}
                     </li>
                   ))}
                 </ul>
@@ -196,7 +202,7 @@ function Row({
       );
     case 'note':
       return (
-        <StatusLine className="mt-5 justify-center text-center" testId="transcript-note">
+        <StatusLine className="mt-5" testId="transcript-note">
           {t(item.text, item.vars)}
         </StatusLine>
       );
@@ -206,7 +212,7 @@ function Row({
       return (
         <div
           data-testid="schedule-wake-marker"
-          className="mt-3.5 flex items-center gap-1.5 text-meta text-(--text-tertiary)"
+          className="mt-5 flex items-center gap-1.5 text-meta text-(--text-tertiary)"
         >
           <Clock width={13} height={13} />
           {t('由定时发起')}
@@ -214,7 +220,7 @@ function Row({
       );
     case 'scheduled-turn':
       return (
-        <Collapsible className="mt-3.5" defaultOpen={false} data-testid="scheduled-turn">
+        <Collapsible className="mt-5" defaultOpen={false} data-testid="scheduled-turn">
           <CollapsibleTrigger
             render={<Button variant="ghost" className="text-meta text-(--text-secondary)" />}
           >
@@ -228,7 +234,7 @@ function Row({
       );
     case 'automation-completed':
       return (
-        <div className="mt-3.5 text-meta text-(--text-tertiary)" data-testid="automation-completed">
+        <div className="mt-5 text-meta text-(--text-tertiary)" data-testid="automation-completed">
           {t('完成')}
         </div>
       );
@@ -356,7 +362,7 @@ function Row({
             >
               <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
                 <span
-                  className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px text-caption leading-[1.5] font-semibold ${
+                  className={`chat-review-tag flex-shrink-0 font-semibold ${
                     item.extractionError !== undefined
                       ? 'chat-review-tag--error text-destructive'
                       : 'text-content-secondary'
@@ -426,7 +432,7 @@ function Row({
             >
               <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
                 <span
-                  className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px text-caption leading-[1.5] font-semibold ${
+                  className={`chat-review-tag flex-shrink-0 font-semibold ${
                     item.passed && item.extractionError === undefined
                       ? 'text-content-secondary'
                       : 'text-destructive'
