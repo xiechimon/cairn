@@ -585,21 +585,16 @@ export function ChiefConversation({
       onCancelEdit={() => cancelEdit?.()}
     />
   );
-  const lastUserText = latestUser?.item.kind === 'user' ? latestUser.item.text : null;
-  const resend = useCallback(
-    (text: string) => {
-      if (onSend == null) return;
-      followSentRef.current = true;
-      Promise.resolve(onSend(text)).catch((error: unknown) => {
-        followSentRef.current = false;
-        toastError(t('没发出去，再试一次。'), error);
-      });
-    },
-    [onSend, t],
-  );
+  const lastUserId = latestUser?.item.kind === 'user' ? (latestUser.item.id ?? null) : null;
   const retryLastUser = useMemo(
-    () => (onSend == null || lastUserText === null ? undefined : () => resend(lastUserText)),
-    [onSend, lastUserText, resend],
+    () =>
+      onRewind == null || lastUserId === null
+        ? undefined
+        : () => {
+            followSentRef.current = true;
+            onRewind(lastUserId);
+          },
+    [onRewind, lastUserId],
   );
   const [dismissedFailure, setDismissedFailure] = useState<string | null>(null);
   const failure = useMemo(() => {

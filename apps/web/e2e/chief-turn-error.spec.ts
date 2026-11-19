@@ -16,11 +16,20 @@ const TIMEOUT = {
   elapsedMs: 199_000,
 };
 
-async function open(page: Page, messages: unknown[], sent: string[] = []) {
+async function open(
+  page: Page,
+  messages: unknown[],
+  sent: string[] = [],
+  rewound: string[] = [],
+) {
   await mockLive(page, { threads: [THREAD], messages }, (path, route, json) => {
     if (path === `/api/conversations/${THREAD.id}/messages` && route.request().method() === 'POST') {
       sent.push((route.request().postDataJSON() as { content: string }).content);
       return json({ thread: THREAD }, 201);
+    }
+    if (path === `/api/teams/t1/chief/threads/${THREAD.id}/rewind`) {
+      rewound.push((route.request().postDataJSON() as { messageId: string }).messageId);
+      return json({ deletedCount: 1, thread: THREAD });
     }
     return undefined;
   });
@@ -35,6 +44,7 @@ test('every failure is the same grey line in the conversation, and only the late
   page,
 }) => {
   const sent: string[] = [];
+  const rewound: string[] = [];
   await open(
     page,
     [
@@ -44,6 +54,7 @@ test('every failure is the same grey line in the conversation, and only the late
       failure('m4', 13, TIMEOUT),
     ],
     sent,
+    rewound,
   );
   const lines = page.getByTestId('chief-turn-error');
   await expect(lines).toHaveText(['没完成：这一轮被打断了', '没完成：模型太久没有回应']);
@@ -61,7 +72,8 @@ test('every failure is the same grey line in the conversation, and only the late
   await lines.first().click();
   await expect(page.getByTestId('chief-turn-error-detail')).toContainText('Cairn 在回复途中重启');
   await card.getByTestId('chief-turn-retry').click();
-  await expect.poll(() => sent).toEqual(['再试一次']);
+  await expect.poll(() => rewound).toEqual(['m3']);
+  expect(sent).toEqual([]);
 });
 
 test('closing the card leaves only the line', async ({ page }) => {
