@@ -17,6 +17,7 @@ import {
   INSTALL_PACKAGES_TIMEOUT_MS,
   installPackagesParamsSchema,
   isComputerBrowserTool,
+  isOwnComputerTool,
   type MachineComputerFramesResponse,
   type MachineComputerRelayBody,
   normalizeBrowserSecretOrigin,
@@ -76,8 +77,9 @@ import {
 import type { TeamStreamHub } from './events.js';
 import { type MachineDeps, ownedStep } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { type GateResult, isOwnComputerTool, ownComputerGate } from './own-computer.js';
+import { ownComputerTarget } from './own-computer.js';
 import { sendMustReachAlert } from './push-alerts.js';
+import { refuseRestrictedTurnTool } from './report-turn.js';
 
 export const COMPUTER_OUTPUT_HEAD_CHARS = 16 * 1024;
 export const COMPUTER_OUTPUT_TAIL_CHARS = 48 * 1024;
@@ -1205,7 +1207,6 @@ export async function forwardComputerCall(
   body: MachineComputerRelayBody,
   opts: {
     signal?: AbortSignal;
-    ownComputer?: { timeoutMs?: number; pollMs?: number };
     takeover?: { timeoutMs?: number; pollMs?: number };
   } = {},
 ): Promise<ComputerRelayResult> {
@@ -1223,27 +1224,17 @@ export async function forwardComputerCall(
   if (tool === 'computer_manage') throw new HttpError(400, COMPUTER_MANAGE_PANEL_ONLY);
   if (tool === 'browser_close_tab')
     throw new HttpError(400, 'browser_close_tab is sent by the server when a step ends');
-  let own: Extract<GateResult, { kind: 'granted' }> | null = null;
+  let own: { machineId: string } | null = null;
   if (isOwnComputerTool(tool)) {
+    refuseRestrictedTurnTool(db, stepRow.prompt, tool, body.params, stepRow.ownerMessageIds ?? []);
     const chiefRow =
       stepRow.kind === 'chief'
         ? db.select().from(chiefThread).where(eq(chiefThread.id, stepRow.buildId)).get()
         : undefined;
     if (chiefRow === undefined) throw new NotFoundError(`chief thread ${stepRow.buildId}`);
-    const gate = await ownComputerGate(
-      deps,
-      stepRow,
-      chiefRow,
-      tool,
-      body.toolCallId,
-      body.params,
-      {
-        ...opts.ownComputer,
-        ...(opts.signal === undefined ? {} : { signal: opts.signal }),
-      },
-    );
-    if (gate.kind === 'refused') return { text: gate.text };
-    own = gate;
+    const target = ownComputerTarget(deps, chiefRow, tool);
+    if (target.kind === 'refused') return { text: target.text };
+    own = { machineId: target.machineId };
   }
   const safe = COMPUTER_REPLAY_SAFE_TOOLS.has(tool);
   const latest = latestComputerAttempt(db, stepId, body.toolCallId);
@@ -1463,7 +1454,7 @@ export async function forwardComputerCall(
       : {}),
     ...(own === null
       ? { computerGrant: browserTool ? ('browser' as const) : ('desktop' as const) }
-      : { ownComputerGrant: own.stamp }),
+      : {}),
   };
   try {
     if (browserRows.length > 0)

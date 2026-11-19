@@ -144,23 +144,25 @@ describe('a Runner-claimed chief turn offers the computer tools the grants allow
     for (const name of VM_TOOLS) expect(names).not.toContain(name);
   });
 
-  test("an enabled owner Mac puts the user's own-Mac tools on the claim payload", async () => {
-    const s = boot();
-    insertMachine(s, {
-      name: 'ians-mac',
-      capabilities: {
-        mcpServers: [],
-        skills: [],
-        ownComputer: true,
-        ownComputerShell: true,
-      },
-    });
-    s.db
-      .update(machineTable)
-      .set({ ownComputerEnabled: true })
-      .where(eq(machineTable.id, 'machine-ians-mac'))
-      .run();
-    const names = await toolNames(s);
-    for (const name of OWN_TOOLS) expect(names).toContain(name);
-  });
+  test.each([
+    ['the local Mac that runs Cairn', 'local', true],
+    ['a remote machine reporting the same capabilities', 'remote', false],
+  ])(
+    "%s decides whether the user's own-Mac tools are on the claim payload",
+    async (_label, kind, offered) => {
+      const s = boot();
+      const mac = insertMachine(s, {
+        name: 'users-mac',
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          ownComputer: true,
+          ownComputerShell: true,
+        },
+      });
+      s.db.update(machineTable).set({ kind }).where(eq(machineTable.id, mac)).run();
+      const names = await toolNames(s);
+      for (const name of OWN_TOOLS) expect(names.includes(name)).toBe(offered);
+    },
+  );
 });

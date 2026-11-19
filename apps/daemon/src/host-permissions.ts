@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
 import { type HostPermissions, hostPermissionsSchema } from '@cairn/shared';
 import { z } from 'zod';
-import { agentDesktopBinary } from './computer/host-screen.js';
 
 export const HOST_PERMISSIONS_REFRESH_MS = 10 * 60_000;
 export const HOST_PERMISSIONS_DENIED_REFRESH_MS = 30_000;
@@ -60,7 +59,8 @@ function refreshAfter(report: HostPermissions | undefined): number {
 }
 
 export function createHostPermissionsProbe(env: NodeJS.ProcessEnv): HostPermissionsProbe {
-  return new HostPermissionsProbe(runStatus(agentDesktopBinary(env)));
+  const binary = env.CAIRN_AGENT_DESKTOP;
+  return new HostPermissionsProbe(binary ? runStatus(binary) : async () => null);
 }
 
 export class HostPermissionsProbe {

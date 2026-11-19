@@ -23,7 +23,7 @@ export type CoordinatorComputerToolOffer =
   | { offered: 'always' }
   | { offered: 'when_machine_reports_computer' }
   | { offered: 'when_machine_reports_vm_computer' }
-  | { offered: 'when_owner_turn_and_own_computer_on' }
+  | { offered: 'when_owner_thread_and_team_has_mac' }
   | { withheld: string };
 
 export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorComputerToolOffer> =
@@ -49,9 +49,9 @@ export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorC
       withheld:
         'only the owner stops, updates, recovers or resets the computer from the Computers panel',
     },
-    user_computer_shell: { offered: 'when_owner_turn_and_own_computer_on' },
-    user_computer_observe: { offered: 'when_owner_turn_and_own_computer_on' },
-    user_computer_act: { offered: 'when_owner_turn_and_own_computer_on' },
+    user_computer_shell: { offered: 'when_owner_thread_and_team_has_mac' },
+    user_computer_observe: { offered: 'when_owner_thread_and_team_has_mac' },
+    user_computer_act: { offered: 'when_owner_thread_and_team_has_mac' },
   };
 
 function actionToolDefs(): RemoteToolDef[] {

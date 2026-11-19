@@ -19,7 +19,6 @@ import {
   COMPUTER_COMMAND_TIMEOUT_MS,
   createComputerDispatcher,
   NO_COMPUTER_PROVIDER_MESSAGE,
-  NO_OWNER_GRANT_MESSAGE,
 } from '../src/computer/dispatch.js';
 import { OUTPUT_TRUNCATED_MARKER } from '../src/computer/frame-poster.js';
 import { HostComputerProvider } from '../src/computer/host.js';
@@ -84,9 +83,7 @@ function call(
     tool,
     params: { command: command ?? 'echo hi', ...(cwd !== undefined ? { cwd } : {}) },
     deadlineAt: Date.now() + 60_000,
-    ...(tool.startsWith('user_computer_')
-      ? { ownComputerGrant: { proposalId: 'grant-1', key: command ?? 'echo hi' } }
-      : { computerGrant: 'desktop' as const }),
+    ...(tool.startsWith('user_computer_') ? {} : { computerGrant: 'desktop' as const }),
     ...rest,
   };
 }
@@ -192,8 +189,7 @@ describe('computer dispatcher: refusals post one not-delivered error and run not
       {
         kind: 'error',
         seq: 1,
-        message:
-          tool === 'user_computer_act' ? NO_OWNER_GRANT_MESSAGE : NO_COMPUTER_PROVIDER_MESSAGE,
+        message: NO_COMPUTER_PROVIDER_MESSAGE,
         delivery: 'not_delivered',
       },
     ]);
@@ -245,10 +241,14 @@ describe('computer dispatcher: refusals post one not-delivered error and run not
   });
 
   test.each([
-    'systemctl --user stop cairn-daemon',
-    'pkill -f cairn',
-    'machinectl poweroff cairn-orb-x',
-  ])('the guard refuses %j and says why', async (command) => {
+    'rm -rf ~',
+    'sudo rm -rf --no-preserve-root /',
+    'diskutil eraseDisk APFS X disk2',
+    'dd if=/dev/zero of=/dev/disk2 bs=1m',
+    ':(){ :|:& };:',
+    'sudo shutdown -h now',
+    'csrutil disable',
+  ])('the hardline list refuses %j and says why', async (command) => {
     const api = fakeClient();
     const provider = countingProvider();
     await createComputerDispatcher({ client: api.client, host: provider, ...FAST }).dispatch(
@@ -258,6 +258,22 @@ describe('computer dispatcher: refusals post one not-delivered error and run not
     expect(api.frames).toHaveLength(1);
     expect(api.frames[0]).toMatchObject({ kind: 'error', delivery: 'not_delivered' });
     expect((api.frames[0] as { message: string }).message).toContain('This command was not run');
+  });
+
+  test.each([
+    "python3 - <<'EOF'\nprint(1)\nEOF",
+    'echo "$(date)" `whoami`',
+    '(cd /tmp && ls)',
+    'systemctl --user stop cairn-daemon',
+    'pkill -f cairn',
+    'rm -rf ~/Code/cairn/node_modules',
+  ])('the Mac shell runs %j without a syntax filter', async (command) => {
+    const api = fakeClient();
+    const provider = countingProvider();
+    await createComputerDispatcher({ client: api.client, host: provider, ...FAST }).dispatch(
+      call({ command }),
+    );
+    expect(provider.executed).toHaveLength(1);
   });
 
   test('a cwd outside home is refused before anything runs', async () => {

@@ -1,0 +1,2 @@
+ALTER TABLE `machine` DROP COLUMN `ownComputerEnabled`;--> statement-breakpoint
+UPDATE `action_proposal` SET `status` = 'superseded' WHERE `actionId` IN ('user_computer.app', 'user_computer.shell') AND `status` IN ('pending', 'executed');

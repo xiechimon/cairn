@@ -33,7 +33,7 @@ describe('Coordinator computer tool offers', () => {
     expect(computerNames(true)).toEqual(offered);
   });
 
-  test("the owner's Mac tools are offered only for an owner turn with the switch on, and keep the Mac prefix", () => {
+  test("the user's Mac tools are offered only when the user's Mac is, and keep the Mac prefix", () => {
     expect(computerNames(true, true, false)).not.toContain('user_computer_observe');
     const mac = ['user_computer_act', 'user_computer_observe', 'user_computer_shell'];
     expect(computerNames(false, false, true).filter((name) => name.startsWith('user_'))).toEqual(
@@ -42,11 +42,11 @@ describe('Coordinator computer tool offers', () => {
     const defs = coordinatorToolDefs({ ownComputer: true, desktopTools: true });
     for (const name of mac)
       expect(defs.find((def) => def.name === name)?.description).toMatch(
-        /^The owner's own Mac, not your VM computer/,
+        /^The user's own Mac, not your VM computer/,
       );
     for (const name of ['computer_observe', 'computer_act'])
       expect(defs.find((def) => def.name === name)?.description).toMatch(
-        /^Your VM computer, not the owner's Mac/,
+        /^Your VM computer, not the user's Mac/,
       );
   });
 
@@ -55,10 +55,10 @@ describe('Coordinator computer tool offers', () => {
     expect(computerNames(true, true)).toContain('shell');
     const defs = coordinatorToolDefs({ desktopTools: true, vmComputer: true, ownComputer: true });
     expect(defs.find((def) => def.name === 'shell')?.description).toMatch(
-      /^Your VM computer, not the owner's Mac/,
+      /^Your VM computer, not the user's Mac/,
     );
     expect(defs.find((def) => def.name === 'user_computer_shell')?.description).toMatch(
-      /^The owner's own Mac/,
+      /^The user's own Mac/,
     );
   });
 

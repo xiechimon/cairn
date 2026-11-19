@@ -80,7 +80,6 @@ export function fakeScreen(
     binary,
     stateDir: path.join(dir, 'state'),
     env: { PATH: process.env.PATH, HOME: dir },
-    isOwnProcess: async () => false,
     ...options,
   });
   const calls = () => {

@@ -1,7 +1,5 @@
 import { execFileSync } from 'node:child_process';
 import { describe, expect, test } from 'vitest';
-import { createComputerDispatcher } from '../src/computer/dispatch.js';
-import type { ComputerFrameBody } from '../src/computer/frame-poster.js';
 import { protectedComputerLifecycleRefusal } from '../src/computer/guard.js';
 
 describe('host lifecycle guard syntax and actions', () => {
@@ -212,8 +210,8 @@ describe('host lifecycle unit boundary', () => {
 });
 
 test.each(['direct', 'nested', 'heredoc'] as const)(
-  'an overlength unit mutation produces one terminal refusal through %s inspection',
-  async (mode) => {
+  'an overlength unit mutation is refused through %s inspection',
+  (mode) => {
     const mutation = `systemctl start "${'*'.repeat(70000)}"`;
     const command =
       mode === 'nested'
@@ -221,47 +219,6 @@ test.each(['direct', 'nested', 'heredoc'] as const)(
         : mode === 'heredoc'
           ? `cat > script <<'EOF'\n${mutation}\nEOF`
           : mutation;
-    let executed = 0;
-    const frames: ComputerFrameBody[] = [];
-    const dispatcher = createComputerDispatcher({
-      cairnOrigins: [],
-      host: {
-        async execute() {
-          executed += 1;
-          return (async function* () {
-            yield { kind: 'exit' as const, code: 0 };
-          })();
-        },
-        async listFiles() {
-          return [];
-        },
-        async readFile() {
-          return '';
-        },
-        async writeFile() {},
-        async killAll() {},
-      },
-      client: {
-        async computerFrames(_callId, body) {
-          frames.push(...body.frames);
-          return { ok: true, cancelled: false };
-        },
-      },
-    });
-    try {
-      await dispatcher.dispatch({
-        callId: 'c'.repeat(64),
-        stepId: 'step',
-        tool: 'user_computer_shell',
-        params: { command },
-        ownComputerGrant: { proposalId: 'grant-1', key: command },
-        deadlineAt: Date.now() + 60000,
-      });
-      expect(executed).toBe(0);
-      expect(frames).toHaveLength(1);
-      expect(frames[0]).toMatchObject({ kind: 'error', delivery: 'not_delivered' });
-    } finally {
-      await dispatcher.close();
-    }
+    expect(protectedComputerLifecycleRefusal(command)).toBeTypeOf('string');
   },
 );

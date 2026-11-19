@@ -250,7 +250,6 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     capabilities: row.capabilities,
     browserOverride: row.browserOverride,
     desktopOverride: row.desktopOverride,
-    ownComputerEnabled: row.ownComputerEnabled,
     ...(login.success ? { claudeLogin: login.data } : {}),
     folderGrants: row.folderGrants,
   });

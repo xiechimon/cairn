@@ -60,8 +60,7 @@ import type {
   NotificationRecord,
   NotificationsResponse,
   OAuthAuthorizeResponse,
-  OwnComputerGrant,
-  OwnComputerGrantsResponse,
+  OwnComputerActivity,
   PackageInstallDecisionBody,
   PairedDevice,
   PairingCodeResponse,
@@ -464,33 +463,17 @@ export function useComputers(
   });
 }
 
-const ownComputerGrantsKey = (machineId: string | undefined) => ['own-computer-grants', machineId];
-
-export function useOwnComputerGrants(machineId: string | undefined, enabled: boolean) {
+export function useOwnComputerActivity(machineId: string | undefined, enabled: boolean) {
   return useQuery({
-    queryKey: ownComputerGrantsKey(machineId),
+    queryKey: ['own-computer-activity', machineId],
     queryFn: async () =>
       (
-        await api.get<OwnComputerGrantsResponse>(
-          `/api/machines/${encodeURIComponent(machineId ?? '')}/own-computer/grants`,
+        await api.get<{ activity: OwnComputerActivity[] }>(
+          `/api/machines/${encodeURIComponent(machineId ?? '')}/own-computer/activity`,
         )
-      ).grants,
+      ).activity,
     enabled: enabled && machineId !== undefined,
     refetchInterval: 10_000,
-  });
-}
-
-export function useRevokeOwnComputerGrant(machineId: string | undefined) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (proposalId: string) =>
-      api.del<void>(
-        `/api/machines/${encodeURIComponent(machineId ?? '')}/own-computer/grants/${encodeURIComponent(proposalId)}`,
-      ),
-    onSuccess: (_result, proposalId) =>
-      qc.setQueryData<OwnComputerGrant[]>(ownComputerGrantsKey(machineId), (rows) =>
-        (rows ?? []).filter((row) => row.proposalId !== proposalId),
-      ),
   });
 }
 

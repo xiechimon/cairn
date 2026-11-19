@@ -8,13 +8,6 @@ import {
   connectorActionForId,
   isConnectorActionId,
   isExternalActionClass,
-  OWN_COMPUTER_ACTIONS,
-  OWN_COMPUTER_ALLOW_COMMAND,
-  OWN_COMPUTER_ALLOW_CONVERSATION,
-  OWN_COMPUTER_ALLOW_ONCE,
-  OWN_COMPUTER_APP_ACTION,
-  OWN_COMPUTER_DENY,
-  OWN_COMPUTER_SHELL_ACTION,
   SLICE1_ACTIONS,
   type UserRecord,
 } from '@cairn/shared';
@@ -54,7 +47,7 @@ export const SEND_CHOICE = '发送';
 export const DECLINE_SEND_CHOICE = '不发';
 
 type ProposalStatus = 'pending' | 'refused' | 'executed' | 'failed' | 'expired' | 'superseded';
-export type Decision = 'refuse' | 'allow-once' | 'always' | 'conversation';
+export type Decision = 'refuse' | 'allow-once' | 'always';
 type ProposalRow = typeof actionProposal.$inferSelect;
 
 export interface ProposeInput {
@@ -209,15 +202,7 @@ function cardRow(tx: ProjectTx, proposalId: string) {
     .get();
 }
 
-const OWN_COMPUTER_CHOICES: Record<Decision, string> = {
-  'allow-once': OWN_COMPUTER_ALLOW_ONCE,
-  conversation: OWN_COMPUTER_ALLOW_CONVERSATION,
-  always: OWN_COMPUTER_ALLOW_COMMAND,
-  refuse: OWN_COMPUTER_DENY,
-};
-
 function choiceOf(actionId: string, decision: Decision): string {
-  if (OWN_COMPUTER_ACTIONS.includes(actionId)) return OWN_COMPUTER_CHOICES[decision];
   if (isConnectorActionId(actionId))
     return decision === 'allow-once' ? SEND_CHOICE : DECLINE_SEND_CHOICE;
   if (decision === 'allow-once') return APPROVE_CHOICE;
@@ -438,10 +423,6 @@ function runTodoDelete(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: n
 }
 
 function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: number) {
-  if (OWN_COMPUTER_ACTIONS.includes(row.actionId)) {
-    journal(tx, row, 'run', now);
-    return;
-  }
   if (row.actionId === BROWSER_PASSWORD_ACTION) {
     validateBrowserPasswordApproval(tx, row.teamId, JSON.parse(row.inputJson));
     journal(tx, row, 'run', now);
@@ -488,9 +469,6 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
       if (row.actionId === BROWSER_PASSWORD_ACTION && !isOwner(deps.db, input.decidedBy)) {
         throw new HttpError(403, 'only the owner can authorize a browser password website');
       }
-      if (OWN_COMPUTER_ACTIONS.includes(row.actionId) && !isOwner(deps.db, input.decidedBy)) {
-        throw new HttpError(403, "only the owner can let the agent use the owner's Mac");
-      }
       const digest = storedCardDigest(row);
       if (digest !== null && input.viaCard !== true) {
         throw new HttpError(409, `proposal ${input.proposalId} is answered on its card`);
@@ -503,11 +481,8 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
         return;
       }
       const standing =
-        (input.decision === 'conversation' && row.actionId === OWN_COMPUTER_APP_ACTION) ||
-        (input.decision === 'always' &&
-          (row.actionId === OWN_COMPUTER_SHELL_ACTION ||
-            entryOf(deps, row.actionId)?.standingGrant === true));
-      if ((input.decision === 'always' || input.decision === 'conversation') && !standing)
+        input.decision === 'always' && entryOf(deps, row.actionId)?.standingGrant === true;
+      if (input.decision === 'always' && !standing)
         throw new HttpError(409, 'standing grant not offered');
       if (input.decision === 'refuse') {
         closeProposal(tx, row, 'refused', 'refuse', input.decidedBy, now);

@@ -1,4 +1,3 @@
-import { type ChildProcess, spawn } from 'node:child_process';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -26,16 +25,14 @@ const SNAPSHOT_ID = (
 ).data.snapshot_id;
 
 const created: FakeScreen[] = [];
-const children: ChildProcess[] = [];
 
 afterEach(() => {
   for (const fake of created.splice(0)) fake.cleanup();
-  for (const child of children.splice(0)) child.kill('SIGKILL');
 });
 
 function setup(
   rules: FakeRule[],
-  options: ConstructorParameters<typeof AgentDesktopHostScreen>[0] = {},
+  options: Partial<ConstructorParameters<typeof AgentDesktopHostScreen>[0]> = {},
 ) {
   const fake = fakeScreen(rules, options);
   created.push(fake);
@@ -495,124 +492,28 @@ describe('act', () => {
   });
 });
 
-describe('self protection', () => {
-  const windowWith = (patch: Record<string, unknown>): FakeRule => ({
-    command: 'list-windows',
-    fixture: 'list-windows-wayland-gtk4',
-    override: (value) => {
-      const listed = value as { data: Record<string, unknown>[] };
-      return { ...listed, data: listed.data.map((window) => ({ ...window, ...patch })) };
-    },
-  });
-
-  test('refuses the daemon process', async () => {
-    const fake = setup([windowWith({ pid: process.pid }), snapshot], {
-      isOwnProcess: undefined,
-    });
-    const result = error(await fake.screen.observe(call({ app: 'nautilus' })));
-    expect(result.delivery).toBe('not_delivered');
-    expect(result.message).toContain('part of the cairn daemon');
-    expect(fake.commands()).toEqual(['list-windows']);
-  });
-
-  test('refuses a window owned by a child of the daemon', async () => {
-    const child = spawn('sleep', ['30'], { stdio: 'ignore' });
-    children.push(child);
-    const fake = setup([windowWith({ pid: child.pid }), snapshot], { isOwnProcess: undefined });
-    const result = error(
-      await fake.screen.act(call({ app: 'nautilus', actions: [{ kind: 'wait', ms: 1 }] })),
-    );
-    expect(result.message).toContain('part of the cairn daemon');
-    expect(fake.commands()).toEqual(['list-windows']);
-  });
-
-  test('does not refuse an unrelated process', async () => {
-    const fake = setup([windowWith({ pid: 1 }), ...observing().slice(1)], {
-      isOwnProcess: undefined,
-    });
-    done(await fake.screen.observe(call({ app: 'nautilus' })));
-  });
-
-  test('refuses a browser window titled like the cairn web app', async () => {
+describe('Cairn itself', () => {
+  test('a browser window showing the cairn web app is driven like any other window', async () => {
     const fake = setup([
-      windowWith({ app_name: 'google-chrome', title: 'Cairn - Threads' }),
-      snapshot,
-    ]);
-    const result = error(await fake.screen.observe(call({ app: 'google-chrome' })));
-    expect(result.message).toContain('shows the cairn web app');
-    expect(fake.commands()).toEqual(['list-windows']);
-  });
-
-  test('refuses a browser window whose title carries a configured origin', async () => {
-    const fake = setup(
-      [windowWith({ app_name: 'firefox', title: 'inbox - cairn.example.test:8443' }), snapshot],
-      { cairnOrigins: ['https://cairn.example.test:8443'] },
-    );
-    const result = error(await fake.screen.observe(call({ app: 'firefox' })));
-    expect(result.message).toContain('shows the cairn web app');
-  });
-
-  test('refuses a browser whose address bar shows a configured origin and remembers it', async () => {
-    const withUrl: FakeRule = {
-      command: 'snapshot',
-      fixture: 'snapshot-wayland-gtk4',
-      override: (value) =>
-        JSON.parse(
-          JSON.stringify(value).replace(
-            'Search Everywhere',
-            'https://cairn.example.test:8443/threads',
-          ),
-        ),
-    };
-    const fake = setup(
-      [
-        windowWith({ app_name: 'chromium', title: 'Threads' }),
-        withUrl,
-        windowShotRefused,
-        fullShot(solidPng(8, 8)),
-      ],
-      { cairnOrigins: ['https://cairn.example.test:8443'] },
-    );
-    const first = error(await fake.screen.observe(call({ app: 'chromium' })));
-    expect(first.message).toContain('shows the cairn web app');
-    expect(first.delivery).toBe('not_delivered');
-    expect(fake.commands()).not.toContain('screenshot');
-    const second = error(
-      await fake.screen.act(call({ app: 'chromium', actions: [{ kind: 'wait', ms: 1 }] })),
-    );
-    expect(second.message).toContain('shows the cairn web app');
-  });
-
-  test('checks a browser address before the first action without a prior observe', async () => {
-    const fake = setup(
-      [
-        windowWith({ app_name: 'chromium', title: 'Threads' }),
-        {
-          command: 'snapshot',
-          fixture: 'snapshot-wayland-gtk4',
-          override: (value) =>
-            JSON.parse(
-              JSON.stringify(value).replace(
-                'Search Everywhere',
-                'https://cairn.example.test/threads',
-              ),
-            ),
+      {
+        command: 'list-windows',
+        fixture: 'list-windows-wayland-gtk4',
+        override: (value) => {
+          const listed = value as { data: Record<string, unknown>[] };
+          return {
+            ...listed,
+            data: listed.data.map((window) => ({
+              ...window,
+              app_name: 'google-chrome',
+              title: 'Cairn - Threads',
+              pid: process.pid,
+            })),
+          };
         },
-        { command: 'press', fixture: 'click-semantic-ok' },
-      ],
-      { cairnOrigins: ['https://cairn.example.test'] },
-    );
-    const result = error(
-      await fake.screen.act(call({ app: 'chromium', actions: [{ kind: 'key', key: 'Escape' }] })),
-    );
-    expect(result.delivery).toBe('not_delivered');
-    expect(result.message).toContain('shows the cairn web app');
-    expect(fake.commands()).not.toContain('press');
-  });
-
-  test('a non-browser app with cairn in its title is not refused by title', async () => {
-    const fake = setup([windowWith({ title: 'cairn notes' }), ...observing().slice(1)]);
-    done(await fake.screen.observe(call({ app: 'nautilus' })));
+      },
+      ...observing().slice(1),
+    ]);
+    done(await fake.screen.observe(call({ app: 'google-chrome' })));
   });
 });
 
@@ -623,12 +524,11 @@ describe('failures', () => {
       binary: path.join(fake.dir, 'nope', 'agent-desktop'),
       stateDir: path.join(fake.dir, 'state'),
       env: { PATH: process.env.PATH },
-      isOwnProcess: async () => false,
     });
     const result = error(await missing.observe(call({ app: 'nautilus' })));
     expect(result.delivery).toBe('not_delivered');
     expect(result.message).toContain('could not be started');
-    expect(result.message).toContain('CAIRN_AGENT_DESKTOP');
+    expect(result.message).toContain('reinstall the Cairn app');
   });
 
   test('a command that outlives its timeout is killed and reports unknown', async () => {

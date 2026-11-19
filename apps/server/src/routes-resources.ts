@@ -117,7 +117,7 @@ import {
 } from './services/github-connection-device.js';
 import { adoptGithubProfile } from './services/github-profile.js';
 import { isOwner } from './services/instance-owner.js';
-import { pendingComputerOutputRelease, settleComputerCall } from './services/machine-computer.js';
+import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import { applyFolderPinOps } from './services/machine-folders.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
 import {
@@ -158,11 +158,7 @@ import {
   startMcpConnectorAuthorize,
   startOAuthAuthorize,
 } from './services/oauth.js';
-import {
-  listOwnComputerGrants,
-  revokeOwnComputerGrant,
-  setOwnComputerEnabled,
-} from './services/own-computer.js';
+import { listOwnComputerActivity } from './services/own-computer.js';
 import {
   listUpstreamModels,
   ProviderTestLimiter,
@@ -340,11 +336,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         'runtimes follow what the Runner detects; there is no runtime switch to change',
       );
     }
-    if (body.ownComputerEnabled !== undefined) {
-      if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
-      const cancelled = setOwnComputerEnabled(ctx, row, body.ownComputerEnabled);
-      for (const callId of cancelled) settleComputerCall(ctx.db, callId, ctx.hub);
-    }
     let folderGrantsPatch: { folderGrants: MachineFolderGrants } | undefined;
     if (body.folderPins !== undefined) {
       if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
@@ -378,14 +369,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return row;
   };
 
-  app.get('/api/machines/:id/own-computer/grants', (c) =>
-    c.json({ grants: listOwnComputerGrants(ctx.db, ownedMachine(c)) }),
+  app.get('/api/machines/:id/own-computer/activity', (c) =>
+    c.json({ activity: listOwnComputerActivity(ctx.db, ownedMachine(c)) }),
   );
-
-  app.delete('/api/machines/:id/own-computer/grants/:proposalId', (c) => {
-    revokeOwnComputerGrant(ctx.db, ownedMachine(c), c.req.param('proposalId'));
-    return c.body(null, 204);
-  });
 
   app.delete('/api/machines/:id', (c) => {
     const id = c.req.param('id');

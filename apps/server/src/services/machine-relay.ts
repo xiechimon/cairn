@@ -10,6 +10,8 @@ import {
   INSTALL_PACKAGES_TOOL,
   isBuildStepKind,
   isComputerBrowserTool,
+  isOwnComputerTool,
+  OWN_COMPUTER_TOOL_NAMES,
   parseGithubIssueSourceRef,
   REQUEST_CLOAK_LICENSE_TOOL,
   updateSkillToolParamsSchema,
@@ -55,7 +57,6 @@ import {
   newMcpOAuthState,
   publicOAuthFetch,
 } from './mcp-servers.js';
-import { isOwnComputerTool, OWN_COMPUTER_TOOL_NAMES } from './own-computer.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { refuseRestrictedTurnTool, turnForcesOutboundApproval } from './report-turn.js';
 import {

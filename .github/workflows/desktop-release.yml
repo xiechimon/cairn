@@ -81,6 +81,7 @@ jobs:
           node apps/server/scripts/stage-web.mjs
           pnpm --filter @cairn/desktop stage-server
           pnpm --filter @cairn/desktop stage-runner
+          pnpm --filter @cairn/desktop stage-agent-desktop
 
       - name: Import the release signing certificate
         env:

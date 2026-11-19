@@ -124,7 +124,6 @@ export function MachineRowView({
             {folders.meta}
           </div>
         </div>
-        {ownComputer.control}
         <DropdownMenu>
           <IconTooltip
             label={t('{name} 的菜单', { name: machine.name })}

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { ComputerCall, ComputerFrame, ComputerTool, MachineStreamEvent } from '@cairn/shared';
-import { OWN_COMPUTER_NOT_ON } from '@cairn/shared';
+import { OWN_COMPUTER_NO_MAC } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { computerMachineName as daemonComputerMachineName } from '../../daemon/src/computer/host-desktop.js';
@@ -230,13 +230,13 @@ describe('Coordinator desktop tools', () => {
     ['user_computer_observe', { app: 'Finder' }],
     ['user_computer_act', { app: 'Finder', actions: [{ kind: 'wait', ms: 1 }] }],
   ] as const)(
-    'relayTool routes %s to the own-computer gate instead of unknown chief tool',
+    'relayTool routes %s to the own Mac instead of unknown chief tool',
     async (name, params) => {
       const { s, deps } = boot();
       s.db.update(stepTable).set({ machineId: null }).where(eq(stepTable.id, 'step-a')).run();
       await expect(
         createCoordinatorServerApi(deps).relayTool('step-a', name, params, 'tc-own'),
-      ).resolves.toBe(OWN_COMPUTER_NOT_ON);
+      ).resolves.toBe(OWN_COMPUTER_NO_MAC);
     },
   );
 });
@@ -259,7 +259,6 @@ describe('Coordinator shell and desktop start-up', () => {
       scopeKey: `chief:${chiefId}`,
       params: { command: 'echo hi' },
     });
-    expect(calls[0]?.ownComputerGrant).toBeUndefined();
     receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1, '', 0)]);
     expect(await result).toBe('');
   });

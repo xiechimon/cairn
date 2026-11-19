@@ -1,56 +1,9 @@
-import { execFile } from 'node:child_process';
 import { lookup } from 'node:dns/promises';
-import { readFile } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
-import { promisify } from 'node:util';
 
-const execFileAsync = promisify(execFile);
-const MAX_DEPTH = 64;
 const BROWSER_NAME =
   /chrom|firefox|brave|vivaldi|edge|opera|zen|librewolf|epiphany|safari|browser/i;
-
-export type ParentOf = (pid: number) => Promise<number | undefined>;
-
-export async function parentOfProcess(pid: number): Promise<number | undefined> {
-  const stat = await readFile(`/proc/${pid}/stat`, 'utf8').catch(() => undefined);
-  if (stat !== undefined) {
-    const parent = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1]);
-    return Number.isInteger(parent) ? parent : undefined;
-  }
-  const { stdout } = await execFileAsync('ps', ['-o', 'ppid=', '-p', String(pid)]).catch(() => ({
-    stdout: '',
-  }));
-  const parent = Number.parseInt(stdout.trim(), 10);
-  return Number.isInteger(parent) ? parent : undefined;
-}
-
-export async function isDaemonProcess(
-  pid: number,
-  daemonPid: number = process.pid,
-  parentOf: ParentOf = parentOfProcess,
-): Promise<boolean> {
-  let current: number | undefined = pid;
-  for (let depth = 0; depth < MAX_DEPTH && current !== undefined && current > 1; depth += 1) {
-    if (current === daemonPid) return true;
-    current = await parentOf(current);
-  }
-  return false;
-}
-
-export async function isOwnFamily(
-  pid: number,
-  daemonPid: number = process.pid,
-  parentOf: ParentOf = parentOfProcess,
-): Promise<boolean> {
-  if (await isDaemonProcess(pid, daemonPid, parentOf)) return true;
-  let ancestor = await parentOf(daemonPid);
-  for (let depth = 0; depth < MAX_DEPTH && ancestor !== undefined && ancestor > 1; depth += 1) {
-    if (ancestor === pid) return true;
-    ancestor = await parentOf(ancestor);
-  }
-  return false;
-}
 
 export function isBrowserApp(appName: string): boolean {
   return BROWSER_NAME.test(appName);

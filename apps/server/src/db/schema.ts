@@ -914,7 +914,6 @@ export const machine = sqliteTable(
     capabilities: json<MachineCapabilities | null>('capabilities'),
     browserOverride: bool('browserOverride'),
     desktopOverride: bool('desktopOverride'),
-    ownComputerEnabled: bool('ownComputerEnabled').notNull().default(false),
     folderGrants: json<MachineFolderGrants | null>('folderGrants'),
   },
   (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
@@ -1584,7 +1583,7 @@ export const actionProposal = sqliteTable(
     status: text('status')
       .$type<'pending' | 'refused' | 'executed' | 'failed' | 'expired' | 'superseded'>()
       .notNull(),
-    decision: text('decision').$type<'refuse' | 'allow-once' | 'always' | 'conversation' | null>(),
+    decision: text('decision').$type<'refuse' | 'allow-once' | 'always' | null>(),
     expiresAt: epochMs('expiresAt').notNull(),
     createdAt: epochMs('createdAt').notNull(),
     decidedBy: text('decidedBy'),

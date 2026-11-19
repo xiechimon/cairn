@@ -685,7 +685,6 @@ const OWN_MAC_READY: OwnMacCapabilities = {
   mcpServers: [],
   skills: [],
   osPlatform: 'darwin',
-  ownComputerHost: true,
   ownComputer: true,
   ownComputerShell: true,
   hostPermissions: { accessibility: 'granted', automation: 'unknown', screenRecording: 'granted' },
@@ -705,37 +704,23 @@ function ownMac(
     enabledRuntimes: ['pi'],
     maxConcurrent: 3,
     runningSteps: 0,
-    ownComputerEnabled: true,
     ...patch,
     capabilities: { ...OWN_MAC_READY, ...capabilities },
   };
 }
+
+const MINUTE = 60_000;
 
 export const ownComputerStates: FixtureSet = {
   ...resourcesDefault,
   resources: {
     ...RESOURCES,
     machines: [
-      ownMac('oc-off', 'off-mac', { ownComputerEnabled: false }),
-      ownMac(
-        'oc-browser',
-        'browser-mac',
-        { ownComputerFixture: { inMacApp: false } },
-        {
-          ownComputerHost: undefined,
-          ownComputer: undefined,
-        },
-      ),
-      ownMac('oc-installing', 'installing-mac', {
-        ownComputerFixture: { inMacApp: true, install: 'installing' },
-      }),
-      ownMac('oc-failed', 'failed-mac', {
-        ownComputerFixture: { inMacApp: true, install: 'checksum' },
-      }),
+      ownMac('oc-cli', 'cli-mac', {}, { ownComputer: undefined }),
       ownMac(
         'oc-no-ax',
         'no-access-mac',
-        { ownComputerFixture: { inMacApp: true } },
+        {},
         {
           hostPermissions: {
             accessibility: 'denied',
@@ -747,7 +732,7 @@ export const ownComputerStates: FixtureSet = {
       ownMac(
         'oc-no-screen',
         'no-screen-mac',
-        { ownComputerFixture: { inMacApp: true } },
+        {},
         {
           hostPermissions: {
             accessibility: 'granted',
@@ -756,25 +741,52 @@ export const ownComputerStates: FixtureSet = {
           },
         },
       ),
-      ownMac('oc-ready', 'ians-macbook', {
+      ownMac('oc-ready', 'macbook-pro', {
         ownComputerFixture: {
-          inMacApp: true,
-          grants: [
+          activity: [
             {
-              proposalId: 'grant-finder',
-              kind: 'app',
-              key: 'finder',
+              callId: 'a'.repeat(64),
+              tool: 'user_computer_shell',
+              summary: 'xcodebuild -scheme Cairn -configuration Debug build',
+              state: 'done',
+              exitCode: 0,
+              error: null,
               threadId: 'chief-thread-1',
-              threadTitle: '整理下载文件夹',
-              decidedAt: Date.now() - 20 * 60_000,
+              threadTitle: '验收桌面版的托盘菜单',
+              createdAt: Date.now() - 4 * MINUTE,
             },
             {
-              proposalId: 'grant-git',
-              kind: 'shell',
-              key: 'git status',
+              callId: 'b'.repeat(64),
+              tool: 'user_computer_act',
+              summary: 'Cairn: click, type',
+              state: 'done',
+              exitCode: null,
+              error: null,
+              threadId: 'chief-thread-1',
+              threadTitle: '验收桌面版的托盘菜单',
+              createdAt: Date.now() - 6 * MINUTE,
+            },
+            {
+              callId: 'c'.repeat(64),
+              tool: 'user_computer_shell',
+              summary: 'pnpm test --filter @cairn/desktop',
+              state: 'done',
+              exitCode: 1,
+              error: null,
               threadId: null,
               threadTitle: null,
-              decidedAt: Date.now() - 2 * 60 * 60_000,
+              createdAt: Date.now() - 2 * 60 * MINUTE,
+            },
+            {
+              callId: 'd'.repeat(64),
+              tool: 'user_computer_observe',
+              summary: 'Finder',
+              state: 'done',
+              exitCode: null,
+              error: null,
+              threadId: 'chief-thread-2',
+              threadTitle: '整理下载文件夹',
+              createdAt: Date.now() - 26 * 60 * MINUTE,
             },
           ],
         },

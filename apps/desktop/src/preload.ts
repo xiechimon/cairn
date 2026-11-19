@@ -12,7 +12,6 @@ import type {
   HostPermissions,
   LocalProvider,
   LocalProviderImport,
-  OwnComputerInstallResult,
 } from '@cairn/shared';
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -61,8 +60,6 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
       ipcRenderer.invoke('local-providers:read', providerIds),
   },
   ownComputer: {
-    install: (): Promise<OwnComputerInstallResult | null> =>
-      ipcRenderer.invoke('own-computer:install'),
     guide: (): Promise<boolean | null> => ipcRenderer.invoke('own-computer:guide'),
     permissions: (): Promise<HostPermissions | null> =>
       ipcRenderer.invoke('own-computer:permissions'),

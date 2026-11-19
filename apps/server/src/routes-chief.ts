@@ -3,7 +3,6 @@ import {
   chiefMessageEditBodySchema,
   chiefRewindBodySchema,
   chiefSendMessageBodySchema,
-  OWN_COMPUTER_ACTIONS,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -18,7 +17,6 @@ import {
   answerProposal,
   type Decision,
   dispatchActionWakes,
-  proposalById,
   proposalCardId,
   SEND_CHOICE,
 } from './services/action-proposals.js';
@@ -44,7 +42,6 @@ import {
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { latestChiefMemoryUsage } from './services/coordinator-steps.js';
 import { isChiefConversation } from './services/machines.js';
-import { ownComputerDecisionOf } from './services/own-computer.js';
 import {
   cancelQueuedMessage,
   deliverQueuedMessage,
@@ -195,12 +192,8 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     if (card !== null && proposalId !== null) {
       const choices = answers.length === 1 ? answers[0]?.choices : undefined;
       const choice = choices?.length === 1 ? choices[0] : undefined;
-      const ownComputer = OWN_COMPUTER_ACTIONS.includes(
-        proposalById(ctx.db, proposalId)?.actionId ?? '',
-      );
-      const decision: Decision = ownComputer
-        ? ownComputerDecisionOf(choice)
-        : choice === APPROVE_CHOICE || choice === SEND_CHOICE
+      const decision: Decision =
+        choice === APPROVE_CHOICE || choice === SEND_CHOICE
           ? 'allow-once'
           : choice === ALWAYS_CHOICE
             ? 'always'

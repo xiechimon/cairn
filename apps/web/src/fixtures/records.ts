@@ -13,8 +13,8 @@ import {
   type MachineOsPlatform,
   type MemoryRecord,
   type ModelSource,
-  type OwnComputerGrant,
-  type OwnComputerInstallFailure,
+  type OwnComputerActivity,
+  type OwnComputerTool,
   type PermissionState,
   PHASE_VALUES,
   type Phase,
@@ -320,7 +320,6 @@ export interface MachineRow {
     confinementCause?: ConfinementCause;
     computer?: true;
     ownComputer?: true;
-    ownComputerHost?: true;
     ownComputerShell?: true;
     browser?: true;
     computerName?: string;
@@ -337,7 +336,6 @@ export interface MachineRow {
   concurrencySource?: 'measured' | 'estimate' | 'manual';
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
-  ownComputerEnabled?: boolean;
   ownComputerFixture?: OwnComputerFixture;
   browserOverride?: boolean | null;
   desktopOverride?: boolean | null;
@@ -345,9 +343,7 @@ export interface MachineRow {
 }
 
 export interface OwnComputerFixture {
-  inMacApp?: boolean;
-  install?: 'installing' | OwnComputerInstallFailure;
-  grants?: OwnComputerGrant[];
+  activity?: OwnComputerActivity[];
 }
 
 export interface ResourcesContent {
@@ -592,6 +588,14 @@ export type ChiefStreamItem =
       createdAt?: number;
     }
   | { kind: 'handoff'; todoId: string; id?: string }
+  | {
+      kind: 'mac-activity';
+      id: string;
+      tool: OwnComputerTool;
+      summary: string;
+      running: boolean;
+      error: boolean;
+    }
   | { kind: 'report-ack'; id: string; todoId: string; buildId: string }
   | {
       kind: 'takeover';

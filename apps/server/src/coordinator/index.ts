@@ -296,7 +296,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         const teamId = threadTeam(threadId);
         return teamId === null ? [] : connectorToolDefsForTeam(db, teamId);
       },
-      ownComputer: (threadId, stepId) => ownComputerOffered(db, threadId, stepId),
+      ownComputer: (threadId) => ownComputerOffered(db, threadId),
       providersFor: (threadId) => {
         const teamId = threadTeam(threadId);
         const providers =
@@ -576,7 +576,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             desktopTools: teamOffersDesktop(db, threadRow.teamId),
             vmComputer: teamHasVmComputer(db, threadRow.teamId),
             vmBrowser: teamHasVmBrowser(db, threadRow.teamId),
-            ownComputer: ownComputerOffered(db, row.buildId, row.id),
+            ownComputer: ownComputerOffered(db, row.buildId),
           }),
           ...connectorToolDefsForTeam(db, threadRow.teamId),
         ],

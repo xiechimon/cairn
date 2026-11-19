@@ -29,6 +29,7 @@ export {
   chiefCode,
   chiefDefault,
   chiefGated,
+  chiefMacActivity,
   chiefMarkdown,
   chiefMarkdownRef,
   chiefQuestion,

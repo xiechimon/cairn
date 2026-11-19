@@ -6,9 +6,6 @@ import { join } from 'node:path';
 import { format } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
-  AGENT_DESKTOP_HELPER,
-  AGENT_DESKTOP_VERSION,
-  agentDesktopRelease,
   DESKTOP_NOTIFY_SOUND_FILES,
   DESKTOP_SHELL_USER_AGENT,
   DESKTOP_TRAY_PATH,
@@ -64,13 +61,7 @@ import {
 import { createKeepAwake } from './keep-awake.js';
 import { readLocalProviders, scanLocalProviders } from './local-providers.js';
 import { desktopOtelEnv, type OtelEnv, withOtelEnv } from './otel-config.js';
-import {
-  agentDesktopPath,
-  installAgentDesktop,
-  openPermissionGuide,
-  readPermissions,
-  registerOwnComputerIpc,
-} from './own-computer.js';
+import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
 import { addLiquidGlass } from './tray-glass.js';
@@ -142,28 +133,28 @@ function runnerHome(): string {
   return join(app.getPath('userData'), 'runner');
 }
 
-function serveOwnComputer(origin: string): void {
-  const toolsRoot = join(runnerHome(), 'tools');
-  const binary = agentDesktopPath(toolsRoot, AGENT_DESKTOP_VERSION);
+function bundledRoot(name: string): string {
+  return app.isPackaged ? join(process.resourcesPath, name) : join(app.getAppPath(), name);
+}
+
+function agentDesktopBinary(): string | null {
+  if (process.platform !== 'darwin') return null;
+  const folder = app.isPackaged
+    ? bundledRoot('agent-desktop')
+    : join(bundledRoot('agent-desktop'), process.arch);
+  return join(folder, 'agent-desktop');
+}
+
+function serveOwnComputer(origin: string, binary: string | null): void {
+  if (binary === null) return;
   registerOwnComputerIpc(
     ipcMain,
     (event: IpcMainInvokeEvent) => event.senderFrame?.origin === origin,
     {
-      install: () =>
-        installAgentDesktop({
-          toolsRoot,
-          release: agentDesktopRelease(process.arch),
-          version: AGENT_DESKTOP_VERSION,
-          helper: AGENT_DESKTOP_HELPER,
-        }),
       guide: () => openPermissionGuide(binary),
       permissions: () => readPermissions(binary),
     },
   );
-}
-
-function bundledRoot(name: string): string {
-  return app.isPackaged ? join(process.resourcesPath, name) : join(app.getAppPath(), name);
 }
 
 function freeLoopbackPort(wanted: number): Promise<number> {
@@ -698,6 +689,7 @@ async function boot(): Promise<void> {
         origin,
         ownerToken,
         otelEnv,
+        agentDesktop: agentDesktopBinary(),
         isQuitting: () => quitting,
       })
         .then(
@@ -736,7 +728,7 @@ async function boot(): Promise<void> {
     void removeLeftoverUpdates();
     serveUpdates(server.origin);
     serveNotifications(server.origin);
-    serveOwnComputer(server.origin);
+    serveOwnComputer(server.origin, agentDesktopBinary());
     openWindow(server.origin);
   } catch (error) {
     quitting = true;

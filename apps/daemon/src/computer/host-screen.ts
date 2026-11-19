@@ -1,12 +1,8 @@
 import { execFile } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { chmodSync, mkdirSync, readFileSync, statSync } from 'node:fs';
-import { homedir, hostname } from 'node:os';
-import path from 'node:path';
+import { chmodSync, mkdirSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
 import {
-  AGENT_DESKTOP_VERSION,
-  agentDesktopRelease,
   COMPUTER_IMAGE_MAX_BASE64_CHARS,
   type ComputerImage,
   OWN_COMPUTER_NO_ACCESSIBILITY,
@@ -15,10 +11,8 @@ import { z } from 'zod';
 import { hostCommandEnvironment } from './host.js';
 import { fitPngUnderCap } from './host-screen-png.js';
 import { type AccessibilityNode, accessibilityRows } from './host-screen-rows.js';
-import { isBrowserApp, isOwnFamily, originHosts, showsCairn } from './host-screen-self.js';
 
 const PERM_DENIED = 'PERM_DENIED';
-const VERSION_TIMEOUT_MS = 15_000;
 export const SCREEN_MAX_ACTIONS = 24;
 export const SCREEN_MAX_WAIT_MS = 10_000;
 export const SCREEN_IMAGE_EDGES: readonly number[] = [1568, 1024, 640];
@@ -129,11 +123,9 @@ const actSchema = z.object({ app: appSchema, actions: z.array(z.unknown()) });
 const MODIFIER_NAMES = { cmd: 'ctrl', ctrl: 'ctrl', alt: 'alt', option: 'alt', shift: 'shift' };
 
 export interface AgentDesktopHostScreenOptions {
-  binary?: string;
-  stateDir?: string;
+  binary: string;
+  stateDir: string;
   env?: NodeJS.ProcessEnv;
-  cairnOrigins?: readonly string[];
-  isOwnProcess?: (pid: number) => Promise<boolean>;
   onPermissionDenied?: () => void;
   commandTimeoutMs?: number;
   outputCapBytes?: number;
@@ -141,111 +133,12 @@ export interface AgentDesktopHostScreenOptions {
   now?: () => number;
 }
 
-export function agentDesktopBinary(env: NodeJS.ProcessEnv): string {
-  return (
-    env.CAIRN_AGENT_DESKTOP ||
-    path.join(
-      env.HOME ?? homedir(),
-      '.cairn',
-      'tools',
-      'agent-desktop',
-      AGENT_DESKTOP_VERSION,
-      'agent-desktop',
-    )
-  );
-}
-
 export function createHostScreenFromEnv(
   env: NodeJS.ProcessEnv,
-  options: Pick<AgentDesktopHostScreenOptions, 'isOwnProcess' | 'onPermissionDenied'> = {},
+  options: Pick<AgentDesktopHostScreenOptions, 'stateDir' | 'onPermissionDenied'>,
 ): HostScreen | undefined {
   if (!env.CAIRN_AGENT_DESKTOP) return undefined;
-  return new AgentDesktopHostScreen({
-    env,
-    binary: agentDesktopBinary(env),
-    cairnOrigins: (env.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
-    ...options,
-  });
-}
-
-export type RunVersion = () => Promise<string | null>;
-
-export function runAgentDesktopVersion(binary: string): RunVersion {
-  return () =>
-    new Promise((resolve) => {
-      execFile(
-        binary,
-        ['version'],
-        { timeout: VERSION_TIMEOUT_MS, maxBuffer: 64 * 1024, encoding: 'utf8' },
-        (error, stdout) => {
-          if (error) return resolve(null);
-          try {
-            const version = (JSON.parse(stdout) as { data?: { version?: unknown } }).data?.version;
-            resolve(typeof version === 'string' ? version : null);
-          } catch {
-            resolve(null);
-          }
-        },
-      );
-    });
-}
-
-export class AgentDesktopVerifier {
-  private readonly binary: string;
-  private readonly expectedSha256: string | null;
-  private readonly runVersion: RunVersion;
-  private checkedMtime: number | null = null;
-  private verified = false;
-  private running: Promise<void> | null = null;
-
-  constructor(options: {
-    binary: string;
-    expectedSha256?: string | null;
-    runVersion?: RunVersion;
-  }) {
-    this.binary = options.binary;
-    this.expectedSha256 =
-      options.expectedSha256 === undefined
-        ? (agentDesktopRelease(process.arch)?.binarySha256 ?? null)
-        : options.expectedSha256;
-    this.runVersion = options.runVersion ?? runAgentDesktopVersion(options.binary);
-  }
-
-  current(): boolean {
-    let mtime: number;
-    try {
-      mtime = statSync(this.binary).mtimeMs;
-    } catch {
-      this.checkedMtime = null;
-      this.verified = false;
-      return false;
-    }
-    if (this.running === null && mtime !== this.checkedMtime) {
-      this.checkedMtime = mtime;
-      this.verified = false;
-      this.running = this.verify().then((verified) => {
-        this.verified = verified;
-        this.running = null;
-      });
-    }
-    return this.verified;
-  }
-
-  settled(): Promise<void> {
-    return this.running ?? Promise.resolve();
-  }
-
-  private async verify(): Promise<boolean> {
-    if (this.expectedSha256 === null) return false;
-    let digest: string;
-    try {
-      digest = createHash('sha256').update(readFileSync(this.binary)).digest('hex');
-    } catch {
-      return false;
-    }
-    if (digest !== this.expectedSha256) return false;
-    return (await this.runVersion()) === AGENT_DESKTOP_VERSION;
-  }
+  return new AgentDesktopHostScreen({ env, binary: env.CAIRN_AGENT_DESKTOP, ...options });
 }
 
 function refuse(message: string): Stop {
@@ -263,8 +156,6 @@ export class AgentDesktopHostScreen implements HostScreen {
   private readonly binary: string;
   private readonly stateDir: string;
   private readonly env: NodeJS.ProcessEnv;
-  private readonly hosts: string[];
-  private readonly isOwnProcess: (pid: number) => Promise<boolean>;
   private readonly onPermissionDenied: (() => void) | undefined;
   private readonly commandTimeoutMs: number;
   private readonly outputCapBytes: number;
@@ -272,16 +163,12 @@ export class AgentDesktopHostScreen implements HostScreen {
   private readonly now: () => number;
   private readonly closing = new AbortController();
   private readonly snapshots = new Map<string, { id: string; windowId: string }>();
-  private readonly cairnWindows = new Set<string>();
   private windowCaptureUnsupported = false;
 
-  constructor(options: AgentDesktopHostScreenOptions = {}) {
+  constructor(options: AgentDesktopHostScreenOptions) {
     this.env = options.env ?? process.env;
-    const home = this.env.HOME ?? homedir();
-    this.binary = options.binary ?? agentDesktopBinary({ ...this.env, HOME: home });
-    this.stateDir = options.stateDir ?? path.join(path.dirname(this.binary), 'state');
-    this.hosts = originHosts(options.cairnOrigins ?? []);
-    this.isOwnProcess = options.isOwnProcess ?? ((pid) => isOwnFamily(pid));
+    this.binary = options.binary;
+    this.stateDir = options.stateDir;
     this.onPermissionDenied = options.onPermissionDenied;
     this.commandTimeoutMs = options.commandTimeoutMs ?? SCREEN_COMMAND_TIMEOUT_MS;
     this.outputCapBytes = options.outputCapBytes ?? SCREEN_OUTPUT_CAP_BYTES;
@@ -343,29 +230,6 @@ export class AgentDesktopHostScreen implements HostScreen {
       const done: string[] = [];
       for (const [index, action] of actions.entries()) {
         try {
-          if (isBrowserApp(target.app)) {
-            const checked = await this.read(
-              [
-                'snapshot',
-                '--window-id',
-                target.windowId,
-                '--timeout-ms',
-                SNAPSHOT_TIMEOUT_MS,
-                '--compact',
-                '--max-depth',
-                '40',
-              ],
-              call,
-              budget,
-            );
-            if (!checked.ok) throw refuse(clip(checked.raw, SCREEN_ERROR_MESSAGE_MAX_CHARS));
-            const data = checked.data as { tree?: AccessibilityNode };
-            const rows = accessibilityRows(data.tree ? [data.tree] : [], '', false);
-            if (showsCairn(rows.strings, ['cairn', ...this.hosts])) {
-              this.cairnWindows.add(target.windowId);
-              throw refuse('This window shows the cairn web app; it is never driven');
-            }
-          }
           await this.perform(target, action, index, done.length, call, budget);
         } catch (error) {
           if (error instanceof Stop && done.length > 0) {
@@ -458,7 +322,7 @@ export class AgentDesktopHostScreen implements HostScreen {
     label: string,
   ): Stop {
     const messages = {
-      missing: `agent-desktop could not be started at ${this.binary}; install version ${AGENT_DESKTOP_VERSION} there or set CAIRN_AGENT_DESKTOP`,
+      missing: `agent-desktop could not be started at ${this.binary}; reinstall the Cairn app`,
       timeout: `${label} timed out and agent-desktop was killed`,
       aborted: `${label} was cancelled and agent-desktop was killed`,
       oversize: `${label} produced more output than the ${this.outputCapBytes} byte cap and was killed`,
@@ -506,25 +370,14 @@ export class AgentDesktopHostScreen implements HostScreen {
           : `No open app is named exactly "${appName}", and no app has a window agent-desktop can see`,
       );
     }
-    for (const window of matching) {
-      if (await this.isOwnProcess(window.pid)) {
-        throw refuse(`${window.app_name} is part of the cairn daemon; it is never driven`);
-      }
-    }
     const usable = matching.filter(
       (window) => window.accessible !== false && window.visible !== false && !window.minimized,
     );
-    const window = usable.find((candidate) => !this.cairnWindows.has(candidate.id)) ?? usable[0];
+    const window = usable[0];
     if (!window) {
       throw refuse(`${matching[0]?.app_name ?? appName} has no visible, restored window to drive`);
     }
     const title = window.title ?? '';
-    if (
-      this.cairnWindows.has(window.id) ||
-      (isBrowserApp(window.app_name) && showsCairn([title], ['cairn', ...this.hosts]))
-    ) {
-      throw refuse('This window shows the cairn web app; it is never driven');
-    }
     return { app: window.app_name, windowId: window.id, title };
   }
 
@@ -559,10 +412,6 @@ export class AgentDesktopHostScreen implements HostScreen {
       snapshotId,
       data.complete === false || data.truncated === true,
     );
-    if (isBrowserApp(target.app) && showsCairn(rows.strings, ['cairn', ...this.hosts])) {
-      this.cairnWindows.add(target.windowId);
-      throw refuse('This window shows the cairn web app; it is never driven');
-    }
     const shot = await this.screenshot(target, call, budget);
     const header = [
       `app: ${target.app}`,

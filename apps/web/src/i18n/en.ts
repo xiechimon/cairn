@@ -2574,40 +2574,29 @@ export const EN: Record<string, string> = {
   搜索分支: 'Search branches',
   搜索任务或项目: 'Search tasks or projects',
   搜索模型或服务商: 'Search models or providers',
-  '没能下载 agent-desktop，检查网络后重试':
-    'Could not download agent-desktop; check the network and retry',
-  '下载的 agent-desktop 校验不通过，没有安装':
-    'The downloaded agent-desktop failed its checksum; nothing was installed',
-  'agent-desktop 安装包不完整，没有安装':
-    'The agent-desktop package is incomplete; nothing was installed',
-  '下载的 agent-desktop 版本不对，没有安装':
-    'The downloaded agent-desktop is the wrong version; nothing was installed',
-  '没能写入 Runner 的工具目录，检查磁盘空间后重试':
-    "Could not write to the Runner's tools folder; check disk space and retry",
-  '这台 Mac 的处理器不受 agent-desktop 支持': "agent-desktop does not support this Mac's processor",
-  '开启后，Coordinator 可以在这台 Mac 上以你的身份读取文件和运行程序；每个应用和每条命令第一次用都会先问你':
-    'When on, the Coordinator can read files and run programs on this Mac as you; it asks you before each new app and each command',
-  '在这台 Mac 上打开 Cairn 应用完成设置': 'Open the Cairn app on this Mac to finish setup',
-  '正在安装 agent-desktop': 'Installing agent-desktop',
-  'agent-desktop 还没装在这台 Mac 上': 'agent-desktop is not installed on this Mac yet',
-  '正在等 Runner 确认 agent-desktop': 'Waiting for the Runner to confirm agent-desktop',
-  'Cairn 还没有“辅助功能”权限': 'Cairn does not have the Accessibility permission yet',
+  '在这台 Mac 上打开 Cairn 应用后，Coordinator 才能使用它的应用':
+    'Open the Cairn app on this Mac so the Coordinator can use its apps',
+  'Cairn 还没有“辅助功能”权限：Coordinator 能在这台 Mac 上运行命令，但不能读取或操作应用':
+    'Cairn does not have the Accessibility permission yet: the Coordinator can run commands on this Mac but cannot read or use its apps',
   'Cairn 没有“屏幕录制”权限：Coordinator 只能以文字读取应用':
     'Cairn does not have the Screen Recording permission: the Coordinator reads apps as text only',
-  '你批准后，Coordinator 可以使用这台 Mac 上的应用':
-    'After you approve, the Coordinator can use apps on this Mac',
-  '命令 {key}': 'Command {key}',
-  所有对话: 'All conversations',
-  一个对话: 'One conversation',
-  '对话「{title}」': 'Conversation “{title}”',
-  '在 Cairn 应用里完成设置': 'Finish setup in the Cairn app',
-  '正在确认 agent-desktop': 'Confirming agent-desktop',
-  '还没装 agent-desktop': 'agent-desktop not installed yet',
-  安装失败: 'Install failed',
+  'Coordinator 会直接在这台 Mac 上运行命令和操作应用，只拒绝抹盘、删除主目录、关机这类危险命令。每一次都记在这里':
+    'The Coordinator runs commands and uses apps on this Mac directly, refusing only dangerous commands such as erasing a disk, deleting the home folder or shutting down. Every call is listed here',
+  '在 Cairn 应用里打开': 'Open in the Cairn app',
   '缺“辅助功能”权限': 'Missing the Accessibility permission',
   '缺“屏幕录制”权限': 'Missing the Screen Recording permission',
-  '{n} 项授权': '{n} {n#grant|grants}',
-  还没授权: 'No grants yet',
+  '{n} 条操作记录': '{n} {n#action|actions} logged',
+  还没有操作记录: 'Nothing logged yet',
+  运行命令: 'Ran a command',
+  操作应用: 'Used an app',
+  查看应用: 'Read an app',
+  没有成功: 'did not succeed',
+  '正在你的 Mac 上运行': 'Running on your Mac',
+  '在你的 Mac 上运行了': 'Ran on your Mac',
+  '正在你的 Mac 上操作': 'Using on your Mac',
+  '在你的 Mac 上操作了': 'Used on your Mac',
+  '正在查看你的 Mac 上的': 'Reading on your Mac',
+  '查看了你的 Mac 上的': 'Read on your Mac',
   '{n} 个文件夹': '{n} {n#folder|folders}',
   工作目录: 'Workspace directory',
   '工作目录 · 始终开放': 'Workspace directory · always open',
@@ -2624,13 +2613,7 @@ export const EN: Record<string, string> = {
   '没能固定文件夹，请重试': 'Could not pin the folder; retry',
   '没能移除文件夹，请重试': 'Could not remove the folder; retry',
   '没能更改文件夹开放状态，请重试': 'Could not change the folder state; retry',
-  '没能开启，请在这台 Mac 上的 Cairn 应用里重试':
-    'Could not turn it on; retry in the Cairn app on this Mac',
-  '没能关闭，请重试': 'Could not turn it off; retry',
   打开系统设置: 'Open System Settings',
-  '让 Coordinator 使用这台 Mac': 'Let the Coordinator use this Mac',
-  安装: 'Install',
-  '没能撤销，请重试': 'Could not revoke; retry',
   消息: 'Messages',
   '连接 Telegram': 'Connect Telegram',
   '连接 Telegram 机器人': 'Connect a Telegram bot',

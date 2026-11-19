@@ -93,9 +93,6 @@ function call(
     tool,
     params,
     deadlineAt: Date.now() + 60_000,
-    ...(tool === 'user_computer_shell' && typeof params.command === 'string'
-      ? { ownComputerGrant: { proposalId: 'grant-1', key: params.command } }
-      : {}),
     ...(tool.startsWith('user_computer_')
       ? {}
       : {
@@ -434,7 +431,7 @@ describe('orb routing', () => {
       call('user_computer_shell', { command: 'machinectl poweroff cairn-orb-x' }),
     );
     const errors = fake.frames.filter((frame) => frame.kind === 'error');
-    expect(errors).toHaveLength(3);
+    expect(errors).toHaveLength(2);
     for (const error of errors) {
       expect(error).toMatchObject({ delivery: 'not_delivered' });
       expect((error as { message: string }).message).toContain('desktop-protection guard');
@@ -442,6 +439,7 @@ describe('orb routing', () => {
     expect(log).toEqual([
       'orb[chief:c1]:execute:systemctl status cairn-computer-desktop',
       'orb[chief:c1]:execute:machinectl poweroff cairn-orb-x',
+      'host:execute:machinectl poweroff cairn-orb-x',
     ]);
   });
 
@@ -460,40 +458,6 @@ describe('orb routing', () => {
     expect(errors).toHaveLength(1);
     expect((errors[0] as { message: string }).message).toContain('desktop-protection guard');
     expect(log).toEqual(['orb[chief:c1]:execute:echo ok']);
-  });
-
-  test('host shells cannot name the agent desktops, which hold its logins', async () => {
-    const log: string[] = [];
-    const fake = fakeClient();
-    const root = join(homedir(), '.cairn', 'desktops');
-    const dispatcher = createComputerDispatcher({
-      client: fake.client,
-      host: fakeProvider(log, 'host'),
-      orb: { ...fakeOrb(log), hostRoot: root },
-      ...FAST,
-    });
-    for (const command of [
-      `cat ${root}/0123/home/.config/chromium/Default/Cookies`,
-      'tar czf /tmp/x.tgz ~/.cairn/desktops',
-      'cp -r "$HOME"/".cairn"/desktops /tmp',
-      'ls ~/.cairn/./desktops',
-      'ls ~/.cairn//desktops/',
-    ]) {
-      await dispatcher.dispatch(call('user_computer_shell', { command }));
-    }
-    await dispatcher.dispatch(call('user_computer_shell', { command: 'ls ~/.cairn/logs' }));
-    await dispatcher.dispatch(
-      call('shell', { command: `ls ${root}/0123/home/Downloads` }, { scopeKey: 'chief:c1' }),
-    );
-    const errors = fake.frames.filter((frame) => frame.kind === 'error');
-    expect(errors).toHaveLength(5);
-    for (const error of errors) {
-      expect((error as { message: string }).message).toContain('agent computer path');
-    }
-    expect(log).toEqual([
-      'host:execute:ls ~/.cairn/logs',
-      `orb[chief:c1]:execute:ls ${root}/0123/home/Downloads`,
-    ]);
   });
 
   test('the two guard entry points differ only by the cairn host rules', () => {

@@ -7,7 +7,7 @@ import {
   computerManageParamsSchema,
   INSTALL_PACKAGES_TIMEOUT_MS,
   installPackagesParamsSchema,
-  ownComputerGrantKey,
+  ownComputerHardlineRefusal,
   PACKAGES_INSTALLED_PREFIX,
 } from '@cairn/shared';
 import { z } from 'zod';
@@ -25,7 +25,6 @@ import { DesktopScreen } from './desktop-screen.js';
 import { FramePoster } from './frame-poster.js';
 import {
   desktopProtectionGuardMessage,
-  hostComputerRootRefusal,
   orbComputerProtectionRefusal,
   protectedComputerLifecycleRefusal,
 } from './guard.js';
@@ -43,8 +42,6 @@ export const NO_COMPUTER_PROVIDER_MESSAGE = 'This machine has no computer provid
 export const NO_COMPUTER_SCOPE_MESSAGE = 'The call names no computer';
 export const NO_COMPUTER_GRANT_MESSAGE =
   'The server did not stamp a computer grant on this call, so it was not run; update the Cairn server';
-export const NO_OWNER_GRANT_MESSAGE =
-  'The owner did not approve this call on their Mac, so it was not run; update the Cairn server';
 export const NO_VM_COMPUTER_MESSAGE =
   'Only the Coordinator VM computer can install system packages or be stopped, updated, recovered or reset';
 const INSTALL_SUMMARY_LINES = 12;
@@ -89,7 +86,7 @@ const BROWSER_TOOLS: ReadonlySet<ComputerTool> = new Set(COMPUTER_BROWSER_TOOLS)
 
 interface Route {
   provider: ComputerProvider;
-  guard: (command: string) => string | undefined;
+  refusal: (command: string) => string | undefined;
 }
 
 type ComputerClient = Pick<MachineApi, 'computerFrames'>;
@@ -122,19 +119,7 @@ export interface ComputerDispatcherOptions {
 
 export interface ComputerDispatcher {
   dispatch(call: ComputerCall): Promise<void>;
-  cancel(callId: string): void;
   close(): Promise<void>;
-}
-
-function ownerGrantMissing(call: ComputerCall): boolean {
-  if (
-    call.tool !== 'user_computer_shell' &&
-    call.tool !== 'user_computer_observe' &&
-    call.tool !== 'user_computer_act'
-  )
-    return false;
-  const key = ownComputerGrantKey(call.tool, call.params);
-  return key === null || call.ownComputerGrant?.key !== key;
 }
 
 function orbGrantNeeded(call: ComputerCall): 'browser' | 'desktop' | null {
@@ -221,9 +206,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       return options.host
         ? {
             provider: options.host,
-            guard: (command) =>
-              protectedComputerLifecycleRefusal(command) ??
-              hostComputerRootRefusal(command, options.orb?.hostRoot),
+            refusal: (command) => ownComputerHardlineRefusal(command) ?? undefined,
           }
         : NO_COMPUTER_PROVIDER_MESSAGE;
     }
@@ -235,9 +218,12 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         call.scopeKey,
         call.browserLicense === undefined ? {} : { browserLicense: call.browserLicense },
       ),
-      guard: options.orb.hostRoot
-        ? protectedComputerLifecycleRefusal
-        : orbComputerProtectionRefusal,
+      refusal: (command) => {
+        const reason = options.orb?.hostRoot
+          ? protectedComputerLifecycleRefusal(command)
+          : orbComputerProtectionRefusal(command);
+        return reason === undefined ? undefined : desktopProtectionGuardMessage(reason);
+      },
     };
   }
 
@@ -365,9 +351,9 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await refuse(call, 'The call deadline had already passed, so nothing ran');
       return;
     }
-    const refusal = route.guard(params.data.command);
+    const refusal = route.refusal(params.data.command);
     if (refusal !== undefined) {
-      await refuse(call, desktopProtectionGuardMessage(refusal));
+      await refuse(call, refusal);
       return;
     }
     const startedAt = now();
@@ -629,10 +615,6 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
   }
 
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
-    if (ownerGrantMissing(call)) {
-      await refuse(call, NO_OWNER_GRANT_MESSAGE);
-      return;
-    }
     const grant = orbGrantNeeded(call);
     if (grant !== null && call.computerGrant !== grant) {
       await refuse(call, NO_COMPUTER_GRANT_MESSAGE);
@@ -712,9 +694,6 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         .finally(() => inFlight.delete(call.callId));
       inFlight.set(call.callId, { controller, settled });
       await settled;
-    },
-    cancel(callId) {
-      inFlight.get(callId)?.controller.abort('cancelled');
     },
     async close() {
       closing = true;

@@ -390,7 +390,7 @@ function chiefClaimPayload(
                 desktopTools: teamOffersDesktop(deps.db, threadRow.teamId),
                 vmComputer: teamHasVmComputer(deps.db, threadRow.teamId),
                 vmBrowser: teamHasVmBrowser(deps.db, threadRow.teamId),
-                ownComputer: ownComputerOffered(deps.db, stepRow.buildId, stepRow.id),
+                ownComputer: ownComputerOffered(deps.db, stepRow.buildId),
               }),
               ...connectorToolDefsForTeam(deps.db, threadRow.teamId),
             ]),

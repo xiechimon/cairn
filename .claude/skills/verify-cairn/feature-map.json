@@ -1048,8 +1048,7 @@
           "/api/teams/:id/cloak-license",
           "/api/computers/package-install",
           "/api/computers/:id/actions",
-          "/api/machines/:id/own-computer/grants",
-          "/api/machines/:id/own-computer/grants/:proposalId"
+          "/api/machines/:id/own-computer/activity"
         ]
       },
       "reach": [
@@ -1075,7 +1074,7 @@
         "apps/web/e2e/machines-computer-card.spec.ts",
         "apps/web/e2e/machines-own-computer.spec.ts",
         "apps/web/e2e/machines-computer-grants.spec.ts",
-        "apps/server/test/own-computer-gate.test.ts",
+        "apps/server/test/own-computer.test.ts",
         "apps/server/test/cloak-license.test.ts",
         "apps/server/test/chief-claim-computer-tools.test.ts",
         "apps/server/test/machine-computer-forward.test.ts",

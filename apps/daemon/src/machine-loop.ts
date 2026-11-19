@@ -47,12 +47,7 @@ import type { ComputerDesktops } from './computer/desktops.js';
 import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
 import { HostDesktops } from './computer/host-desktop.js';
-import {
-  AgentDesktopVerifier,
-  agentDesktopBinary,
-  createHostScreenFromEnv,
-  type HostScreen,
-} from './computer/host-screen.js';
+import { createHostScreenFromEnv, type HostScreen } from './computer/host-screen.js';
 import { ComputerInputFence } from './computer/input-fence.js';
 import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
@@ -264,12 +259,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const hostScreen =
     opts.hostScreen ??
     createHostScreenFromEnv(capEnv, {
+      stateDir: join(paths.home, 'agent-desktop'),
       onPermissionDenied: () => hostPermissionsProbe.refreshNow(),
     });
-  const ownComputerHost = Boolean(capEnv.CAIRN_AGENT_DESKTOP);
-  const agentDesktop = ownComputerHost
-    ? new AgentDesktopVerifier({ binary: agentDesktopBinary(capEnv) })
-    : undefined;
   const enrolledIdentity = { machineId: '' };
   const computerInputLocks = join(paths.home, 'computer-input');
   const inputFence = new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId);
@@ -369,8 +361,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(hostDesktops ? { computerKind: hostDesktops.kind, screenHandoff: true as const } : {}),
       ...(vmDownload !== undefined ? { vmDownload } : {}),
       ...(hostComputer ? { ownComputerShell: true as const } : {}),
-      ...(ownComputerHost ? { ownComputerHost: true as const } : {}),
-      ...(agentDesktop?.current() ? { ownComputer: true as const } : {}),
+      ...(hostScreen ? { ownComputer: true as const } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(scraper !== undefined ? { scrapling: scraper } : {}),
       ...(hostPermissions !== undefined ? { hostPermissions } : {}),
@@ -1041,7 +1032,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
               void performRepoArchive({ client, logger }, ev.archive);
             }
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
-            if (ev.type === 'computer.cancel') computerDispatcher.cancel(ev.callId);
             if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
             if (ev.type === 'engine.screen') void engineScreens.dispatch(ev.channel);
           },

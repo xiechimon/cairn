@@ -12,3 +12,8 @@ packages/adapters/src/agent-desktop-host-screen.ts.
 
 The shell tokenizer in apps/daemon/src/computer/guard-shell-parse.ts is a TypeScript port of the parse
 function of shell-quote (https://github.com/ljharb/shell-quote), MIT License, Copyright (c) 2013 James Halliday.
+
+The Mac desktop app bundles the agent-desktop 1.3.1 command-line tool and its macOS helper
+(https://github.com/vercel-labs/agent-desktop), Apache License 2.0, unmodified release binaries for
+arm64 and x64; its license ships beside the binaries in the app's `Resources/agent-desktop/LICENSE`.
+The repository has no NOTICE file.

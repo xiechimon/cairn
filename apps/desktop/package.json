@@ -17,6 +17,7 @@
   "scripts": {
     "stage-server": "node scripts/stage-server.mjs",
     "stage-runner": "node scripts/stage-runner.mjs",
+    "stage-agent-desktop": "node scripts/stage-agent-desktop.mjs",
     "build": "node build.mjs",
     "start": "node build.mjs && electron .",
     "dist:mac": "node build.mjs && electron-builder --mac",
