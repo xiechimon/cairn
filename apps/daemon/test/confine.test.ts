@@ -189,7 +189,7 @@ test('pins a git metadata container that exists as a plain file', () => {
   const worktrees = join(git, 'worktrees');
   writeFileSync(worktrees, 'x');
   const args = confinementArgs(policy, 'linux');
-  const index = args.findIndex((arg) => arg === worktrees);
+  const index = args.indexOf(worktrees);
   expect(args[index - 1]).toBe('--ro-bind');
   expect(args[index + 1]).toBe(worktrees);
 });
