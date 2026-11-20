@@ -2441,6 +2441,7 @@ export const EN: Record<string, string> = {
   '正在更新 {percent}%': 'Updating {percent}%',
   '正在安装…': 'Installing…',
   '正在重启…': 'Restarting…',
+  '重新启动以更新到 {version}': 'Restart to update to {version}',
   '更新失败：{message}': 'Update failed: {message}',
   开发版不检查更新: 'Development builds do not check for updates',
   '把 Cairn 移到「应用程序」后才能自动更新':

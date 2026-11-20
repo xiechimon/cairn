@@ -70,6 +70,7 @@ export type DesktopUpdateState =
   | { status: 'current'; version: string }
   | { status: 'available'; version: string }
   | { status: 'downloading'; version: string; percent: number }
+  | { status: 'ready'; version: string }
   | { status: 'installing'; version: string }
   | { status: 'restarting'; version: string }
   | { status: 'error'; message: string };

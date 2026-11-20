@@ -79,7 +79,37 @@ import {
   TRAY_POPOVER_WIDTH,
   trayPopoverBounds,
 } from './tray-popover.js';
-import { createUpdater, removeLeftoverUpdates } from './updater.js';
+import {
+  armGuard,
+  type GuardAction,
+  type GuardEvent,
+  type GuardState,
+  guardStep,
+} from './update-guard.js';
+import { appendUpdateLog, updateLogPath } from './update-log.js';
+import { removeFolder, removeFolderAfterExit } from './update-staging.js';
+import {
+  readUpdateState,
+  type UpdateNotice,
+  updateStatePath,
+  writeUpdateState,
+} from './update-state.js';
+import {
+  failedAppPath,
+  previousAppPath,
+  readBundleVersion,
+  restoreIfBundleMissing,
+  restorePrevious,
+} from './update-swap.js';
+import {
+  BACKGROUND_LAUNCH_FLAG,
+  createUpdater,
+  messageOf,
+  relaunchArgs,
+  removeLeftoverUpdates,
+  runningBundle,
+  type Updater,
+} from './updater.js';
 import { createWakeAhead, earliestScheduleNextRunAt } from './wake-ahead.js';
 
 const LOOPBACK = '127.0.0.1';
@@ -89,6 +119,10 @@ const STOP_TIMEOUT_MS = 10_000;
 const UPDATE_FIRST_CHECK_MS = 10_000;
 const UPDATE_CHECK_EVERY_MS = 60 * 60 * 1000;
 const UPDATE_CHECK_ON_FOCUS_AFTER_MS = 10 * 60 * 1000;
+const HEALTH_PROBE_MS = 5_000;
+const HEALTH_PROBE_TIMEOUT_MS = 5_000;
+const IDLE_APPLY_MS = 10 * 60_000;
+const IDLE_TICK_MS = 60_000;
 const NEW_TASK_SHORTCUT = 'Control+Alt+N';
 const TRAY_FIRST_HEIGHT = 440;
 const TRAY_MAX_HEIGHT = 900;
@@ -97,6 +131,7 @@ const TRAY_REOPEN_GUARD_MS = 250;
 const TRAY_LIGHT_FILL = '#f6f6f6';
 const TRAY_DARK_FILL = '#2b2b2b';
 const IS_MAC = process.platform === 'darwin';
+const BACKGROUND_LAUNCH = process.argv.includes(BACKGROUND_LAUNCH_FLAG);
 const MENU_COMMANDS: ReadonlySet<string> = new Set<DesktopMenuCommand>([
   'settings',
   'new-task',
@@ -115,6 +150,10 @@ let tray: Tray | null = null;
 let runner: LocalRunner | null = null;
 let runnerStarting: Promise<void> | null = null;
 let quitting = false;
+let updater: Updater | null = null;
+let hiddenSince: number | null = null;
+let launchActivationPending = BACKGROUND_LAUNCH;
+let activeGuard: VersionGuard | null = null;
 const otelHeaderLogSecrets: string[] = [];
 let ownerTokenLogSecret: string | null = null;
 
@@ -222,7 +261,11 @@ async function serverPort(): Promise<number> {
   return port;
 }
 
-function startServer(port: number, otelEnv: OtelEnv): RunningServer {
+function startServer(
+  port: number,
+  otelEnv: OtelEnv,
+  onExit: (code: number | null) => void,
+): RunningServer {
   const env = withOtelEnv(
     { ...process.env, HOST: LOOPBACK, PORT: String(port), [ENV_VARS.home]: cairnHome() },
     otelEnv,
@@ -245,9 +288,7 @@ function startServer(port: number, otelEnv: OtelEnv): RunningServer {
   child.on('exit', (code) => {
     running.exitCode = code;
     log.close();
-    if (quitting) return;
-    dialog.showErrorBox('Cairn server stopped', `The Cairn server exited with code ${code}.`);
-    app.quit();
+    onExit(code);
   });
   return running;
 }
@@ -259,7 +300,7 @@ async function waitUntilServing(running: RunningServer): Promise<void> {
       throw new Error(`The Cairn server exited with code ${running.exitCode} before it was ready.`);
     }
     const answered = await fetch(running.origin, {
-      signal: AbortSignal.timeout(READY_POLL_MS * 4),
+      signal: AbortSignal.timeout(HEALTH_PROBE_TIMEOUT_MS),
     }).then(
       () => true,
       () => false,
@@ -580,34 +621,45 @@ function serveUpdates(origin: string): void {
         ),
       ),
     );
-  const updater = createUpdater((state) => {
+  const created = createUpdater((state) => {
     showMenu(state);
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send('desktop-update:state', state);
     }
   });
+  updater = created;
   let lastCheckedAt = 0;
   const check = (): Promise<void> => {
     lastCheckedAt = Date.now();
-    return updater.check();
+    return created.check();
   };
   const installFromMenu = async (): Promise<void> => {
-    const state = updater.state();
+    const state = created.state();
+    if (state.status === 'ready') {
+      await created.apply('foreground');
+      return;
+    }
     if (state.status !== 'available') return;
     const { response } = await dialog.showMessageBox({
       type: 'question',
       message: `Cairn ${state.version} is available`,
-      detail: `You have ${app.getVersion()}. Cairn downloads the update and restarts to install it.`,
+      detail:
+        readUpdateState(updateStatePath(app.getPath('userData'))).blocked?.version === state.version
+          ? `${state.version} did not start here last time. Cairn will install it again because you asked.`
+          : `You have ${app.getVersion()}. Cairn downloads the update and restarts to install it.`,
       buttons: ['Install and Restart', 'Later'],
       defaultId: 0,
       cancelId: 1,
     });
-    if (response === 0) await updater.install();
+    if (response === 0) {
+      await created.install();
+      await created.apply('foreground');
+    }
   };
   const checkFromMenu = async (): Promise<void> => {
     await check();
-    const state = updater.state();
-    if (state.status === 'available') await installFromMenu();
+    const state = created.state();
+    if (state.status === 'available' || state.status === 'ready') await installFromMenu();
     else if (state.status === 'current')
       await dialog.showMessageBox({
         type: 'info',
@@ -632,18 +684,19 @@ function serveUpdates(origin: string): void {
         detail: state.message,
       });
   };
-  showMenu(updater.state());
+  showMenu(created.state());
   const fromOwnPage = (event: IpcMainInvokeEvent | IpcMainEvent): boolean =>
     event.senderFrame?.origin === origin;
   ipcMain.on('window-controls:set-visible', (event, visible: unknown) => {
     if (!fromOwnPage(event)) return;
     BrowserWindow.fromWebContents(event.sender)?.setWindowButtonVisibility(visible === true);
   });
-  ipcMain.handle('desktop-update:state', (event) => (fromOwnPage(event) ? updater.state() : null));
+  ipcMain.handle('desktop-update:state', (event) => (fromOwnPage(event) ? created.state() : null));
   ipcMain.handle('desktop-update:check', (event) => (fromOwnPage(event) ? check() : undefined));
-  ipcMain.handle('desktop-update:install', (event) =>
-    fromOwnPage(event) ? updater.install() : undefined,
-  );
+  ipcMain.handle('desktop-update:install', (event) => {
+    if (!fromOwnPage(event)) return undefined;
+    return created.state().status === 'ready' ? created.apply('foreground') : created.install();
+  });
   ipcMain.handle('local-providers:scan', (event) =>
     fromOwnPage(event) ? scanLocalProviders() : [],
   );
@@ -685,6 +738,160 @@ function serveUpdates(origin: string): void {
   });
 }
 
+const QUIT_FALLBACK_MS = 30_000;
+
+interface VersionGuard {
+  step(event: GuardEvent, reason: string): Promise<GuardAction>;
+  rollingBack(): boolean;
+}
+
+function takeRollbackNotice(userData: string): UpdateNotice | null {
+  const statePath = updateStatePath(userData);
+  const state = readUpdateState(statePath);
+  const notice = state.notice;
+  if (notice === null) return null;
+  writeUpdateState(statePath, { ...state, notice: null });
+  appendUpdateLog(
+    userData,
+    `told the user that ${notice.failedVersion} was rolled back to ${notice.restoredVersion}`,
+  );
+  return notice;
+}
+
+async function tellRollback(notice: UpdateNotice): Promise<void> {
+  const line = `${notice.failedVersion} did not start, so Cairn went back to ${notice.restoredVersion}.`;
+  if (Notification.isSupported()) {
+    const delivered = await new Promise<boolean>((done) => {
+      const notification = new Notification({ title: 'Cairn rolled back an update', body: line });
+      notification.on('failed', () => done(false));
+      notification.on('show', () => done(true));
+      notification.show();
+      setTimeout(() => done(true), 3_000).unref();
+    });
+    if (delivered) return;
+  }
+  await dialog.showMessageBox({
+    type: 'warning',
+    message: 'Cairn rolled back an update',
+    detail: `${line}\n\nThe failure is logged in ${notice.logPath}.`,
+  });
+}
+
+function armVersionGuard(userData: string): VersionGuard | null {
+  const statePath = updateStatePath(userData);
+  const state = readUpdateState(statePath);
+  const installed = state.installed;
+  const bundle = runningBundle();
+  if (installed === null || installed.version !== app.getVersion()) {
+    if (installed !== null) writeUpdateState(statePath, { ...state, installed: null });
+    void removeFolder(previousAppPath(bundle)).catch(() => {});
+    return null;
+  }
+  const attempts =
+    state.blocked !== null && state.blocked.version === installed.version
+      ? state.blocked.attempts
+      : 0;
+  let guard: GuardState = armGuard(attempts, Date.now());
+  let rolling = false;
+  const rollBack = async (reason: string): Promise<GuardAction> => {
+    rolling = true;
+    const previousApp = previousAppPath(bundle);
+    try {
+      if ((await readBundleVersion(previousApp)) !== installed.previousVersion) {
+        throw new Error(
+          `${previousApp} is not the copy of ${installed.previousVersion} Cairn kept`,
+        );
+      }
+      await removeFolder(failedAppPath(bundle)).catch(() => {});
+      const failed = await restorePrevious({ bundle, previousApp });
+      removeFolderAfterExit(failed, process.pid);
+      const at = Date.now();
+      appendUpdateLog(
+        userData,
+        `rolled back ${installed.version} to ${installed.previousVersion}: ${reason}`,
+      );
+      writeUpdateState(statePath, {
+        ...readUpdateState(statePath),
+        installed: null,
+        blocked: { version: installed.version, at, reason, attempts: attempts + 1 },
+        notice: {
+          failedVersion: installed.version,
+          restoredVersion: installed.previousVersion,
+          reason,
+          logPath: updateLogPath(userData),
+          at,
+        },
+      });
+      app.relaunch({ args: relaunchArgs(true) });
+      setTimeout(() => app.exit(1), QUIT_FALLBACK_MS).unref();
+      app.quit();
+    } catch (error) {
+      appendUpdateLog(userData, `rollback of ${installed.version} failed: ${messageOf(error)}`);
+      dialog.showErrorBox('Cairn could not start', `${reason}\n\n${messageOf(error)}`);
+      app.exit(1);
+    }
+    return 'rollback';
+  };
+  const confirm = async (): Promise<GuardAction> => {
+    appendUpdateLog(userData, `${installed.version} started and stayed healthy`);
+    writeUpdateState(statePath, { ...readUpdateState(statePath), installed: null });
+    await removeFolder(previousAppPath(bundle)).catch(() => {});
+    return 'confirm';
+  };
+  return {
+    async step(event, reason) {
+      const step = guardStep(guard, { event, at: Date.now() });
+      guard = step.state;
+      if (step.action === 'confirm') return confirm();
+      if (step.action === 'rollback') return rollBack(reason);
+      return 'none';
+    },
+    rollingBack: () => rolling,
+  };
+}
+
+function startHealthWatch(running: RunningServer, guard: VersionGuard | null): void {
+  if (guard === null) return;
+  const probe = async (): Promise<void> => {
+    const answered = await fetch(running.origin, {
+      signal: AbortSignal.timeout(HEALTH_PROBE_TIMEOUT_MS),
+    }).then(
+      () => true,
+      () => false,
+    );
+    const action = await guard.step(
+      answered ? 'health-ok' : 'health-failed',
+      `The Cairn server stopped answering on ${running.origin}.`,
+    );
+    if (action !== 'none') clearInterval(timer);
+  };
+  const timer = setInterval(() => {
+    if (running.exitCode === null) void probe();
+  }, HEALTH_PROBE_MS);
+  timer.unref();
+  void probe();
+}
+
+function watchIdleUpdate(): void {
+  const timer = setInterval(() => {
+    const visible = BrowserWindow.getAllWindows().some((window) => window.isVisible());
+    if (visible || updater === null || updater.state().status !== 'ready') {
+      hiddenSince = null;
+      return;
+    }
+    hiddenSince ??= Date.now();
+    if (Date.now() - hiddenSince < IDLE_APPLY_MS) return;
+    if (activeGuard?.rollingBack() === true) return;
+    hiddenSince = null;
+    void updater
+      .apply('background')
+      .catch((error: unknown) =>
+        console.error('applying the idle update failed:', messageOf(error)),
+      );
+  }, IDLE_TICK_MS);
+  timer.unref();
+}
+
 function captureMainConsole(): void {
   const log = createServerLog(join(app.getPath('userData'), 'logs', 'main.log'), logSecrets);
   for (const level of ['log', 'info', 'warn', 'error'] as const) {
@@ -697,12 +904,33 @@ function captureMainConsole(): void {
 }
 
 async function boot(): Promise<void> {
+  const userData = app.getPath('userData');
+  let guard: VersionGuard | null = null;
   try {
     captureMainConsole();
-    const otelEnv = desktopOtelEnv(join(app.getPath('userData'), 'otel.env'), console.error);
+    if (await restoreIfBundleMissing(runningBundle())) {
+      console.warn('restored the previous Cairn after an install was interrupted');
+    }
+    const notice = takeRollbackNotice(userData);
+    guard = armVersionGuard(userData);
+    activeGuard = guard;
+    const otelEnv = desktopOtelEnv(join(userData, 'otel.env'), console.error);
     otelHeaderLogSecrets.push(...otelHeaderSecrets(otelEnv.CAIRN_OTEL_HEADERS));
-    server = startServer(await serverPort(), otelEnv);
+    const handleServerExit = async (code: number | null): Promise<void> => {
+      if (quitting) return;
+      const reason = `The Cairn server exited with code ${code}.`;
+      if (guard !== null) {
+        await guard.step('server-exit', reason);
+        if (guard.rollingBack()) return;
+      }
+      dialog.showErrorBox('Cairn server stopped', reason);
+      app.quit();
+    };
+    server = startServer(await serverPort(), otelEnv, (code) => {
+      void handleServerExit(code);
+    });
     await waitUntilServing(server);
+    startHealthWatch(server, guard);
     const ownerToken = readOwnerToken();
     signOwnPagesIn(server.origin, ownerToken);
     const origin = server.origin;
@@ -760,13 +988,17 @@ async function boot(): Promise<void> {
     serveUpdates(server.origin);
     serveNotifications(server.origin);
     serveOwnComputer(server.origin, agentDesktopBinary());
-    openWindow(server.origin);
+    watchIdleUpdate();
+    if (!BACKGROUND_LAUNCH) openWindow(server.origin);
+    if (notice !== null) void tellRollback(notice);
   } catch (error) {
+    const reason = messageOf(error);
+    if (guard !== null) {
+      await guard.step('health-failed', reason);
+      if (guard.rollingBack()) return;
+    }
     quitting = true;
-    dialog.showErrorBox(
-      'Cairn could not start',
-      error instanceof Error ? error.message : String(error),
-    );
+    dialog.showErrorBox('Cairn could not start', reason);
     server?.process.kill();
     app.exit(1);
   }
@@ -788,7 +1020,13 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', focusWindow);
-  app.on('activate', focusWindow);
+  app.on('activate', () => {
+    if (launchActivationPending) {
+      launchActivationPending = false;
+      return;
+    }
+    focusWindow();
+  });
   app.on('before-quit', (event) => {
     if (quitting || server === null) return;
     quitting = true;
@@ -799,6 +1037,10 @@ if (!app.requestSingleInstanceLock()) {
     const running = server;
     void (runner?.stop() ?? Promise.resolve())
       .then(() => stopServer(running))
+      .then(() => (activeGuard?.rollingBack() === true ? undefined : updater?.apply('none')))
+      .catch((error: unknown) =>
+        console.error('finishing the pending update on quit failed:', messageOf(error)),
+      )
       .then(() => {
         tray?.destroy();
         app.quit();
