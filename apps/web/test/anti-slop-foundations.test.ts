@@ -133,8 +133,8 @@ const ruleRows = rules
     return { id: cells[0] ?? '', check: cells[2] ?? '' };
   });
 const MEASURED_BY_HAND = [
-  'C1', 'C2', 'C3', 'C4', 'C5', 'C7', 'C18', 'V2', 'V4', 'V12', 'V13', 'V15', 'V17', 'V18',
-  'V19', 'T3', 'L1', 'L2', 'L3', 'L4', 'L6', 'L7', 'T1', 'A1', 'A2', 'A3', 'R1',
+  'C1', 'C2', 'C3', 'C4', 'C5', 'C7', 'C18', 'V12', 'V13', 'V15', 'V17', 'V18', 'L1', 'L3',
+  'L4', 'L6', 'L7', 'T1', 'A1', 'A2',
 ];
 
 describe('the design docs stay true and checkable', () => {
