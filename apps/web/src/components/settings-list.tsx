@@ -262,7 +262,7 @@ export function SettingsSection({
 
 interface SettingsDangerZoneProps {
   label: string;
-  description: string;
+  description?: string;
   actionLabel: string;
   onAction?: () => void;
   disabled?: boolean;

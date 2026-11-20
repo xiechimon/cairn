@@ -104,6 +104,6 @@ test('an account nobody has used says so once, and still has a quota line of its
   await expect(detail).toContainText('还没勾选模型。从上游拉一份清单来勾选。');
   await expect(detail.getByTestId('subscription-status')).toHaveCount(0);
   await expect(detail.getByTestId('subscription-verify-feedback')).toHaveCount(0);
-  await expect(detail).toContainText('用这个订阅跑过一次任务后，这里显示 5 小时和每周额度');
+  await expect(detail.getByTestId('subscription-quota')).toHaveCount(0);
   await expect(detail).not.toContainText('—');
 });

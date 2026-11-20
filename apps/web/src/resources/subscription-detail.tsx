@@ -26,6 +26,7 @@ import {
 import { isLowQuota } from '../components/settings/quota-row.js';
 import { SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { ACCENT_INK } from '../phase.js';
@@ -290,17 +291,7 @@ function QuotaHead({ account, now }: { account: SubscriptionAccount; now: number
   const { t } = useI18n();
   const clock = useClock();
   const ordered = quotaWindows(account.windows);
-  if (ordered.length === 0) {
-    if (account.vendor !== 'claude') return null;
-    return (
-      <span
-        data-testid="subscription-quota"
-        className="ml-auto max-w-64 text-right text-meta text-content-tertiary max-sm:ml-0 max-sm:w-full max-sm:text-left"
-      >
-        {t('用这个订阅跑过一次任务后，这里显示 5 小时和每周额度')}
-      </span>
-    );
-  }
+  if (ordered.length === 0) return null;
   return (
     <span data-testid="subscription-quota" className="ml-auto flex gap-4 max-sm:ml-0 max-sm:w-full">
       {ordered.map((window) => {
@@ -594,18 +585,27 @@ export function SubscriptionDetail({
               </Button>
             )}
             {test !== undefined && (
-              <Button
-                variant="outline"
-                size="sm"
-                ref={testAllRef}
-                data-testid="subscription-test-all"
-                className="min-w-24"
-                disabled={running > 0 || ids.length === 0}
-                onClick={() => void tests.run(ids, testAllRef.current)}
-              >
-                <Play aria-hidden />
-                {t('全部测试')}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      ref={testAllRef}
+                      data-testid="subscription-test-all"
+                      className="min-w-24"
+                      disabled={running > 0 || ids.length === 0}
+                      onClick={() => void tests.run(ids, testAllRef.current)}
+                    />
+                  }
+                >
+                  <Play aria-hidden />
+                  {t('全部测试')}
+                </TooltipTrigger>
+                <TooltipContent data-testid="subscription-test-cost" sideOffset={8}>
+                  {t('每个模型测试会发一次很短的请求，算在订阅额度里。')}
+                </TooltipContent>
+              </Tooltip>
             )}
           </span>
         </div>
@@ -653,16 +653,10 @@ export function SubscriptionDetail({
           failureShort={MODEL_FAILURE_SHORT}
           onClose={tests.close}
         />
-        {test !== undefined && (
-          <p className="m-0 text-meta text-content-tertiary">
-            {t('每个模型测试会发一次很短的请求，算在订阅额度里。')}
-          </p>
-        )}
       </section>
       <SettingsSection title={t('管理')}>
         <SettingsDangerZone
           label={t('移除订阅')}
-          description={t('移除后，后续步骤不再使用这个订阅。')}
           actionLabel={t('移除')}
           onAction={actions.onRemove}
         />

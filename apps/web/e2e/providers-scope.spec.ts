@@ -298,3 +298,24 @@ test('the sample data shows the owner controls, so design screenshots match the 
   await page.locator('[data-instance-id="subscription:sub-personal"]').click();
   await expect(page.getByTestId('subscription-detail').getByTestId('subscription-verify')).toBeVisible();
 });
+
+test('a subscription shows no standing sentences: the test cost sits on Test all, the remove consequence in its confirm', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/routing?scenario=model-routing');
+  await page.locator('[data-instance-id="subscription:sub-personal"]').click();
+  const detail = page.getByTestId('subscription-detail');
+  await expect(detail.getByTestId('subscription-test-all')).toBeVisible();
+  await expect(detail).not.toContainText('算在订阅额度里');
+  await expect(detail).not.toContainText('后续步骤不再使用这个订阅');
+  await detail.getByTestId('subscription-test-all').hover();
+  await expect(page.getByTestId('subscription-test-cost')).toHaveText(
+    '每个模型测试会发一次很短的请求，算在订阅额度里。',
+  );
+  await detail.getByRole('button', { name: '移除', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('移除后，后续步骤不再使用这个订阅。');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-instance-id="subscription:sub-old-laptop"]').click();
+  await expect(detail.getByTestId('subscription-quota')).toHaveCount(0);
+  await expect(detail).not.toContainText('5 小时和每周额度');
+});

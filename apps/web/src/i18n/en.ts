@@ -2784,8 +2784,6 @@ export const EN: Record<string, string> = {
   执行机未登录: 'Runner not signed in',
   未验证: 'Not checked',
   '{window} 剩 {left}%': '{window} {left}% left',
-  '用这个订阅跑过一次任务后，这里显示 5 小时和每周额度':
-    'After a task runs on this subscription, the 5-hour and weekly quota show here',
   '剩 {left}%': '{left}% left',
   通过: 'Passed',
   '没通过 · {reason}': 'Failed · {reason}',
