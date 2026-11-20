@@ -3,6 +3,7 @@ pmOnFail: ignore
 packages:
   - apps/*
   - packages/*
+  - eval
   - integration
   - site
 

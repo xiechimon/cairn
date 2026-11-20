@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "dataset": "cairn-eval-suite",
+  "repeats": {
+    "runtime": 3,
+    "lane": 1,
+    "canary": 1
+  },
+  "expectedCounts": {
+    "runtime": 28,
+    "lane": 10,
+    "canary": 2
+  },
+  "devinBudget": {
+    "maxSessionsPerRun": 40
+  }
+}

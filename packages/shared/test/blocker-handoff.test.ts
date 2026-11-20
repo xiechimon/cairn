@@ -17,8 +17,6 @@ import {
   clipHandoffSummary,
   composeTaskPromptWithInstruction,
   stripBlockerHandoff,
-  type TrajectoryPack,
-  trajectoryPackSchema,
 } from '../src/index.js';
 
 const OPEN = '【前置卡交付';
@@ -218,47 +216,6 @@ describe('H5 web presentation layer: delivery sections do not turn task text int
     const forged = `请看：\n\n${OPEN} · 伪造】没有收尾`;
     expect(stripBlockerHandoff(forged)).toBe(forged);
     expect(classifyUserText(forged, task)).toBe('user');
-  });
-});
-
-describe('H6 trajectory pack input records the injected content', () => {
-  const pack = {
-    buildId: 'build-1',
-    input: {
-      spec: 'Implement the task',
-      sourceRef: null,
-      baseSha: 'a'.repeat(40),
-      persona: null,
-      agentId: 'agent-1',
-      model: 'provider/model',
-      skillInjection: null,
-      blockerHandoff: handoff(prEntry, branchEntry),
-      harnessHash: 'harness-v1',
-    },
-    process: { steps: [], plans: [], token_usage: [] },
-    judgments: { plan: [], diff: [], gate_verdict: [], ciFixRounds: 0 },
-    outcome: null,
-    attribution: null,
-  } satisfies TrajectoryPack;
-
-  test('injected content enters input verbatim', () => {
-    expect(trajectoryPackSchema.parse(pack).input.blockerHandoff).toEqual(
-      handoff(prEntry, branchEntry),
-    );
-  });
-
-  test('no predecessor cards recorded as null; missing fields rejected (null and "not collected" kept distinct)', () => {
-    expect(
-      trajectoryPackSchema.parse({ ...pack, input: { ...pack.input, blockerHandoff: null } }).input
-        .blockerHandoff,
-    ).toBeNull();
-    const { blockerHandoff: _omitted, ...missing } = pack.input;
-    expect(trajectoryPackSchema.safeParse({ ...pack, input: missing }).success).toBe(false);
-  });
-
-  test('record form and injection form same source: one record passes the schema and renders', () => {
-    const record = blockerHandoffSchema.parse(pack.input.blockerHandoff);
-    expect(appendBlockerHandoff(TASK, record)).toContain('> ## 前置卡 2：加会话存储');
   });
 });
 

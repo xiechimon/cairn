@@ -1,0 +1,30 @@
+{
+  "kind": "runtime",
+  "id": "answer-read-04",
+  "request": "\u5217\u4e00\u4e0b\u53ef\u7528\u7684\u6a21\u578b",
+  "world": {
+    "projects": [
+      "a",
+      "b"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "models",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "\u8fd9\u662f\u7b54\u6848\u3002"
+    }
+  ],
+  "expected": {
+    "decision": "answer",
+    "ask": false,
+    "boundModel": "stub/m"
+  },
+  "gate": true
+}

@@ -1,0 +1,30 @@
+{
+  "kind": "runtime",
+  "id": "answer-read-03",
+  "request": "\u4e0a\u6b21\u90a3\u4e2a\u4efb\u52a1\u4e3a\u4ec0\u4e48\u5931\u8d25\u4e86\uff1f",
+  "world": {
+    "projects": [
+      "a",
+      "b"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "inspect_run",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "\u8fd9\u662f\u7b54\u6848\u3002"
+    }
+  ],
+  "expected": {
+    "decision": "answer",
+    "ask": false,
+    "boundModel": "stub/m"
+  },
+  "gate": true
+}

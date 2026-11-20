@@ -1,0 +1,27 @@
+{
+  "kind": "runtime",
+  "id": "contract-bad-call-01",
+  "request": "\u5220\u5e93",
+  "world": {
+    "projects": [
+      "core"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "nonexistent_tool",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "\u62d2\u7edd\u4e86\u3002"
+    }
+  ],
+  "expected": {
+    "decision": "any"
+  },
+  "gate": true
+}

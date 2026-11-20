@@ -4,6 +4,8 @@
 >
 > Removed (owner decision, 2026-11-16): the in-repo eval directory `integration/eval/`, the `.claude/hillclimb/` flows, the harness-regression merge gate, the weekly eval jobs and failure-replay candidate generation were deleted. Sections below that name them are history. What remains is trajectory capture and export (E0, the pack schema, outcome and attribution fields) and the Langfuse observability line (§3).
 >
+> Removed (owner decision, 2026-11-21): the trajectory pack schema, exporter and outcome fields this spec built were deleted with the eval-gate v1; the replacement mechanism is `docs/design/eval-gate.md`. The rest is history.
+>
 > Related: ADR 0021 D4 (protected paths, amended for the eval surface by ADR 0025), ADR 0022 (evidence pruning — nothing here depends on merged evidence staying on main), `docs/research/eval-methods.md` (methodology survey). Tickets: §4 ledger.
 
 ## 0 · Goal and end state
@@ -16,7 +18,7 @@ End state, machine-checkable:
 2. Every merged build leaves a complete trajectory pack (schema in `packages/shared/src/trajectory-pack.ts`); outcome fields (`merged`, `revertedWithin7d`, `fixedByLaterPr`) are backfilled from real repository history (#1515).
 3. Rejections and rollbacks automatically become candidate bench questions; a human confirms before anything enters `integration/eval/` (#1516).
 4. pacman-bench (#1517–#1519) scores the harness on real merged-PR tasks; CI runs its holdout slice on every harness-touching PR and blocks regressions beyond the confidence interval.
-5. The eval ruler (the trajectory exporter source, its outcome fields and the pack schema) is in D4 category ⑥ (ADR 0025): no auto-merge can edit its own ruler.
+5. The eval ruler is the system-level eval gate's own task set, scorers and run configuration (`eval/**`, `docs/design/eval-gate.md` §8), protected in D4 category ⑥ (ADR 0025): no auto-merge can edit its own ruler, and the gate reads the exam from the merge-base checkout at run time. The trajectory exporter, its outcome fields and the pack schema it replaced are deleted (owner decision, 2026-11-21).
 
 ## 1 · Phases
 

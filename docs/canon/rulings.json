@@ -95,7 +95,7 @@
     {
       "id": "eval.data-loop",
       "date": "2026-10-08",
-      "ruling": "The trajectory exporter and the trajectory-pack schema are protected paths; no change may edit what judges it.",
+      "ruling": "The eval suite's task set, scorers and run configuration (eval/**) are protected paths; no change may edit what judges it.",
       "spec": "docs/spec/29-evaluation-and-data-loop.md",
       "section": "volume"
     },

@@ -12,7 +12,6 @@
     "docs/research/sidebar-coordinator-icon-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/t3code-devices-and-scope-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/thread-pr-placement-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
-    "docs/research/trajectory-self-improvement-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/ui-ux-audit-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/user-computer-model-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/design/pilot-coordinator-chat-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
@@ -1154,38 +1153,6 @@
         "apps/web/e2e/settings-routing.spec.ts",
         "apps/web/e2e/route-override-capabilities.spec.ts",
         "apps/server/test/routing-rules.test.ts"
-      ]
-    },
-    {
-      "id": "trajectory-export",
-      "name": "Trajectory export",
-      "summary": "Build trajectories export as packs and traces for the self-improvement loop.",
-      "states": "No product page; results appear as command-line reports and traces.",
-      "centrality": 1,
-      "status": "partial",
-      "code": {
-        "server": [
-          "apps/server/src/trajectory-export.ts",
-          "apps/server/src/trajectory-push.ts",
-          "apps/server/src/runtime-otel.ts"
-        ]
-      },
-      "reach": [
-        "settings routing"
-      ],
-      "research": [
-        "docs/research/eval-methods.md",
-        "docs/research/trajectory-self-improvement-2026-11-08.md"
-      ],
-      "frontendDesign": {
-        "na": "runs as command-line tools and trace export with no product page"
-      },
-      "backendDesign": [
-        "docs/spec/29-evaluation-and-data-loop.md",
-        "docs/research/trajectory-self-improvement-2026-11-08.md"
-      ],
-      "evidence": [
-        "apps/server/test/trajectory-export.test.ts"
       ]
     },
     {

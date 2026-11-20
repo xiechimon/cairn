@@ -1,0 +1,16 @@
+{
+  "kind": "lane",
+  "id": "gitignore",
+  "instruction": "\u52a0\u4e00\u4e2a .gitignore \u5ffd\u7565 node_modules \u548c *.log",
+  "timeoutMs": 600000,
+  "checks": {
+    "files": [
+      {
+        "path": ".gitignore",
+        "contains": "node_modules"
+      }
+    ],
+    "commands": []
+  },
+  "gate": true
+}

@@ -15,15 +15,15 @@
 
 | Item | Count |
 |---|---|
-| Features | 58 |
+| Features | 57 |
 | status shipped | 45 |
-| status partial | 11 |
+| status partial | 10 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 30 |
+| research, frontend design and backend design all present or not applicable | 29 |
 | Research gaps | 13 |
 | Frontend design gaps | 15 |
 | Backend design gaps | 18 |
-| notes cited but not on main | 20 |
+| notes cited but not on main | 19 |
 
 ## Coverage
 
@@ -50,7 +50,6 @@
 | [Thread PR panel and auto-fix](#thread-pr-panel) | 1 | shipped | yes | yes | yes |  |
 | [Thread transcript and work trace](#thread-transcript) | 1 | shipped | yes | yes | yes |  |
 | [Threads](#threads) | 1 | shipped | yes | yes | yes |  |
-| [Trajectory export](#trajectory-export) | 1 | partial | yes | n/a | yes |  |
 | [Desktop app](#desktop-app) | 2 | planned | yes (not on main) | gap | gap | B6 |
 | [First run](#first-run) | 2 | shipped | yes (not on main) | yes | gap | B6 |
 | [Machine enrollment](#machine-enrollment) | 2 | shipped | yes | gap | gap | B5 |
@@ -367,14 +366,6 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Frontend design: [docs/design/references/thread-review](design/references/thread-review), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
 
-### trajectory-export
-
-**Trajectory export** (partial). Build trajectories export as packs and traces for the self-improvement loop.
-
-- Research: [docs/research/eval-methods.md](research/eval-methods.md), [docs/research/trajectory-self-improvement-2026-11-08.md](research/trajectory-self-improvement-2026-11-08.md) (not on main)
-- Frontend design: n/a: runs as command-line tools and trace export with no product page
-- Backend design: [docs/spec/29-evaluation-and-data-loop.md](spec/29-evaluation-and-data-loop.md), [docs/research/trajectory-self-improvement-2026-11-08.md](research/trajectory-self-improvement-2026-11-08.md) (not on main)
-
 ### desktop-app
 
 **Desktop app** (planned). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
@@ -684,6 +675,5 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 | `docs/research/sidebar-coordinator-icon-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/t3code-devices-and-scope-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/thread-pr-placement-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
-| `docs/research/trajectory-self-improvement-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/ui-ux-audit-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/user-computer-model-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |

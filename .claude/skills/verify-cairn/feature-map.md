@@ -439,24 +439,6 @@ Reach:
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/archive.test.ts`, `apps/server/test/tasks.test.ts`
 
-### trajectory-export
-
-**Trajectory export** (partial, centrality 1). Build trajectories export as packs and traces for the self-improvement loop.
-
-States: No product page; results appear as command-line reports and traces.
-
-Reach:
-
-1. `settings routing`
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: [docs/research/eval-methods.md](../../../docs/research/eval-methods.md), [docs/research/trajectory-self-improvement-2026-11-08.md](../../../docs/research/trajectory-self-improvement-2026-11-08.md) (not on main)
-- Frontend design: n/a: runs as command-line tools and trace export with no product page
-- Backend design: [docs/spec/29-evaluation-and-data-loop.md](../../../docs/spec/29-evaluation-and-data-loop.md), [docs/research/trajectory-self-improvement-2026-11-08.md](../../../docs/research/trajectory-self-improvement-2026-11-08.md) (not on main)
-- Evidence: `apps/server/test/trajectory-export.test.ts`
-
 ### desktop-app
 
 **Desktop app** (planned, centrality 2). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.

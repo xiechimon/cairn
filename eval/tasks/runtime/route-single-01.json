@@ -1,0 +1,43 @@
+{
+  "kind": "runtime",
+  "id": "route-single-01",
+  "request": "在 webapp 里把登录页的错误提示改成红色",
+  "world": {
+    "projects": [
+      "webapp",
+      "other-a",
+      "other-b"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@webapp",
+            "title": "把登录页的错误提示改成红色"
+          }
+        }
+      ]
+    },
+    {
+      "text": "已开任务。"
+    }
+  ],
+  "expected": {
+    "decision": "route",
+    "projects": [
+      "webapp"
+    ],
+    "parts": 1,
+    "boundModel": "stub/m",
+    "promptContains": [
+      "webapp"
+    ],
+    "promptExcludes": [
+      "<script>"
+    ]
+  },
+  "gate": true
+}

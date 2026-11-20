@@ -1,0 +1,55 @@
+{
+  "kind": "runtime",
+  "id": "route-split-01",
+  "request": "web 加按钮，api 加对应端点",
+  "world": {
+    "projects": [
+      "web",
+      "api",
+      "unrelated"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@web",
+            "title": "web 部分",
+            "quotes": [
+              "web 加按钮"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@api",
+            "title": "api 部分",
+            "quotes": [
+              "api 加对应端点"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "已拆成多个任务。"
+    }
+  ],
+  "expected": {
+    "decision": "route",
+    "projects": [
+      "web",
+      "api"
+    ],
+    "parts": 2,
+    "boundModel": "stub/m"
+  },
+  "gate": true
+}

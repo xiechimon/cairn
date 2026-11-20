@@ -1,0 +1,16 @@
+{
+  "kind": "lane",
+  "id": "fix-bug",
+  "instruction": "\u4fee\u590d sum.py \u91cc\u7684 bug\uff1a\u5b83\u628a\u53c2\u6570\u5f53\u5b57\u7b26\u4e32\u62fc\u63a5",
+  "timeoutMs": 600000,
+  "checks": {
+    "files": [
+      {
+        "path": "sum.py",
+        "contains": "a+b"
+      }
+    ],
+    "commands": []
+  },
+  "gate": true
+}

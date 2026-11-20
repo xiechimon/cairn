@@ -461,9 +461,6 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       confineDeniedRoots,
       claudeBin,
       agentImportHome,
-      trajectoryOutcomeBackfill,
-      trajectoryReflectCurate,
-      trajectoryReflectOpenGuardIssues,
       parentPid,
       ...observed
     } = ENV_VARS;
@@ -499,9 +496,6 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(confineDeniedRoots).toBe('CAIRN_CONFINE_DENIED_ROOTS');
     expect(claudeBin).toBe('CAIRN_CLAUDE_BIN');
     expect(agentImportHome).toBe('CAIRN_AGENT_IMPORT_HOME');
-    expect(trajectoryOutcomeBackfill).toBe('CAIRN_TRAJ_OUTCOME_BACKFILL');
-    expect(trajectoryReflectCurate).toBe('CAIRN_TRAJ_REFLECT_CURATE');
-    expect(trajectoryReflectOpenGuardIssues).toBe('CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES');
   });
 
   it('credential formats match the observed shapes (key prefix follows the BRAND slot)', () => {

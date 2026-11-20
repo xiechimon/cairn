@@ -72,9 +72,6 @@ export const ENV_VARS = {
   confineDeniedRoots: 'CAIRN_CONFINE_DENIED_ROOTS',
   claudeBin: 'CAIRN_CLAUDE_BIN',
   agentImportHome: 'CAIRN_AGENT_IMPORT_HOME',
-  trajectoryOutcomeBackfill: 'CAIRN_TRAJ_OUTCOME_BACKFILL',
-  trajectoryReflectCurate: 'CAIRN_TRAJ_REFLECT_CURATE',
-  trajectoryReflectOpenGuardIssues: 'CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES',
   parentPid: 'CAIRN_PARENT_PID',
 } as const;
 

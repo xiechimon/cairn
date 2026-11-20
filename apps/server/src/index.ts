@@ -56,12 +56,7 @@ import { newMcpOAuthState } from './services/mcp-servers.js';
 import { seedOwnerCheckpoints } from './services/owner.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
-import {
-  createScheduler,
-  trajectoryExportRunOf,
-  trajectoryOutcomeRunOf,
-  trajectoryReflectCurateRunOf,
-} from './services/scheduler.js';
+import { createScheduler } from './services/scheduler.js';
 import { sharedAgentSkillRoots } from './services/skills.js';
 import { prepareSkillsHome } from './services/skills-home.js';
 import { fillSystemAvatar } from './services/system-avatar.js';
@@ -290,17 +285,6 @@ const scheduler = createScheduler(
   },
   { attachmentsDir, logger },
   { githubFetch, logger },
-  trajectoryOutcomeRunOf(config, { logger }),
-  trajectoryExportRunOf(config, { logger }),
-  trajectoryReflectCurateRunOf(config, {
-    logger,
-    config,
-    model: process.env.CAIRN_REFLECTOR_MODEL ?? '',
-    endpoint: {
-      baseUrl: process.env.CAIRN_REFLECTOR_BASE_URL ?? '',
-      apiKey: process.env.CAIRN_REFLECTOR_API_KEY ?? '',
-    },
-  }),
 );
 if (config.coordinatorInServer) {
   warnTeamsWithoutCoordinatorRule(db, logger);

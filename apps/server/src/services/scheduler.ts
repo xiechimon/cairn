@@ -1,23 +1,8 @@
-import { join } from 'node:path';
-import { ACTIVE_STEP_STATUSES, ENV_VARS, type Scheduler, WAITING_PHASES } from '@cairn/shared';
+import { ACTIVE_STEP_STATUSES, type Scheduler, WAITING_PHASES } from '@cairn/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import type { ServerConfig } from '../config.js';
 import { build, chief, dueEvent, project, schedule, step, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
-import { exportTrajectories } from '../trajectory-export.js';
-import {
-  OUTCOME_BACKFILL_INTERVAL_MS,
-  type OutcomeBackfillLogger,
-  sweepOutcomeBackfill,
-} from '../trajectory-outcome-backfill.js';
-import type { ReflectorEndpoint } from '../trajectory-reflect.js';
-import {
-  openGuardCandidateIssues,
-  REFLECT_CURATE_INTERVAL_MS,
-  type ReflectCurateLogger,
-  sweepReflectCurate,
-} from '../trajectory-reflect-curate.js';
 import { dispatchActionWakes, sweepExpiredActionProposals } from './action-proposals.js';
 import {
   ATTACHMENT_GC_INTERVAL_MS,
@@ -49,7 +34,6 @@ import {
 import { createDueRunner, type DueClock } from './due-events.js';
 import { drainEffects, effectRegistry, reconcileEffects } from './external-effects.js';
 import { projectOfTodo } from './git.js';
-import { autonomousToken } from './github-autonomous-token.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
 import { sweepStaleMachines } from './machines.js';
 import { purgeExpiredMemoryVersions } from './memory.js';
@@ -102,85 +86,6 @@ export interface AttachmentGcRun {
   logger: GcLogger;
 }
 
-export interface TrajectoryOutcomeRun {
-  logger: OutcomeBackfillLogger;
-}
-
-export interface TrajectoryExportRun {
-  logger: OutcomeBackfillLogger;
-  config: ServerConfig;
-}
-
-export function trajectoryExportRunOf(
-  config: ServerConfig,
-  run: { logger: OutcomeBackfillLogger },
-): TrajectoryExportRun {
-  return { logger: run.logger, config };
-}
-
-export function trajectoryOutcomeRunOf(
-  config: { trajectoryOutcomeBackfill: boolean },
-  run: TrajectoryOutcomeRun,
-): TrajectoryOutcomeRun | null {
-  run.logger.info(
-    { trajectoryOutcomeBackfill: config.trajectoryOutcomeBackfill },
-    config.trajectoryOutcomeBackfill
-      ? `trajectory outcome backfill on (${ENV_VARS.trajectoryOutcomeBackfill})`
-      : `trajectory outcome backfill off (set ${ENV_VARS.trajectoryOutcomeBackfill}=1 to enable)`,
-  );
-  return config.trajectoryOutcomeBackfill ? run : null;
-}
-
-export interface TrajectoryReflectCurateRun {
-  logger: ReflectCurateLogger;
-  config: ServerConfig;
-  model: string;
-  endpoint: ReflectorEndpoint;
-  openGuardIssues: boolean;
-}
-
-export function trajectoryReflectCurateRunOf(
-  config: {
-    trajectoryReflectCurate: boolean;
-    trajectoryReflectOpenGuardIssues: boolean;
-  },
-  run: {
-    logger: ReflectCurateLogger;
-    config: ServerConfig;
-    model: string;
-    endpoint: ReflectorEndpoint;
-  },
-): TrajectoryReflectCurateRun | null {
-  if (!config.trajectoryReflectCurate) {
-    run.logger.info(
-      { trajectoryReflectCurate: false },
-      `trajectory reflect-curate off (set ${ENV_VARS.trajectoryReflectCurate}=1 to enable)`,
-    );
-    return null;
-  }
-  if (run.model === '' || run.endpoint.baseUrl === '' || run.endpoint.apiKey === '') {
-    run.logger.info(
-      { trajectoryReflectCurate: true },
-      'trajectory reflect-curate off (missing reflector model, CAIRN_REFLECTOR_BASE_URL, or CAIRN_REFLECTOR_API_KEY)',
-    );
-    return null;
-  }
-  run.logger.info(
-    {
-      trajectoryReflectCurate: true,
-      openGuardIssues: config.trajectoryReflectOpenGuardIssues,
-    },
-    `trajectory reflect-curate on (${ENV_VARS.trajectoryReflectCurate})`,
-  );
-  return {
-    logger: run.logger,
-    config: run.config,
-    model: run.model,
-    endpoint: run.endpoint,
-    openGuardIssues: config.trajectoryReflectOpenGuardIssues,
-  };
-}
-
 const SCHEDULE_GATE_PHASES: ReadonlySet<string> = new Set(WAITING_PHASES);
 
 export function createScheduler(
@@ -188,9 +93,6 @@ export function createScheduler(
   opts: SchedulerOptions,
   gc?: AttachmentGcRun | null,
   ci?: CiPollRun | null,
-  outcome?: TrajectoryOutcomeRun | null,
-  exportRun?: TrajectoryExportRun | null,
-  reflectCurate?: TrajectoryReflectCurateRun | null,
 ): Scheduler {
   const lastDigestRun = new Map<string, number>();
   let digestSweeping = false;
@@ -220,9 +122,6 @@ export function createScheduler(
   let lastGcAt = 0;
   let gcImmediate: NodeJS.Immediate | null = null;
   let gcBatches: ReturnType<typeof sweepAttachmentBatches> | null = null;
-  let outcomeSweeping = false;
-  let exportSweeping = false;
-  let reflectCurateSweeping = false;
   let dueStarted = false;
 
   function advanceGc(): void {
@@ -566,20 +465,6 @@ export function createScheduler(
       clearTimeout(handle as ReturnType<typeof setTimeout>);
     },
   };
-  const openReflectGuards =
-    reflectCurate?.openGuardIssues && deps.githubFetch !== undefined
-      ? (guards: Parameters<typeof openGuardCandidateIssues>[1]) =>
-          openGuardCandidateIssues(
-            {
-              db: deps.db,
-              githubFetch: deps.githubFetch as FetchLike,
-              tokenForTeam: (teamId, repo) => autonomousToken(deps, teamId, repo),
-              logger: reflectCurate.logger,
-            },
-            guards,
-          )
-      : undefined;
-
   function scheduleDeadline(row: { nextRunAt: number; retryNotBefore: number | null }): number {
     if (row.retryNotBefore !== null && row.retryNotBefore > row.nextRunAt)
       return row.retryNotBefore;
@@ -688,59 +573,6 @@ export function createScheduler(
         await watchPrs();
         await taskIssueSync?.sweep();
       },
-      outcome: () => {
-        if (outcome === undefined || outcome === null || deps.reposDir === undefined) return;
-        if (outcomeSweeping) return;
-        const reposDir = deps.reposDir;
-        outcomeSweeping = true;
-        return sweepOutcomeBackfill({ db: deps.db, reposDir, logger: outcome.logger })
-          .catch(() => undefined)
-          .finally(() => {
-            outcomeSweeping = false;
-          });
-      },
-      export: () => {
-        if (exportRun === undefined || exportRun === null || exportSweeping) return;
-        exportSweeping = true;
-        const date = new Date().toISOString().slice(0, 10);
-        const out = join(exportRun.config.dataDir, 'trajectory-exports', `${date}.jsonl`);
-        try {
-          const res = exportTrajectories(exportRun.config, { out });
-          exportRun.logger.info({ ...res, date }, 'trajectory daily export');
-        } catch (err) {
-          exportRun.logger.info(
-            { err: err instanceof Error ? err.message : String(err), date },
-            'trajectory daily export failed (scheduler continues)',
-          );
-        } finally {
-          exportSweeping = false;
-        }
-      },
-      reflect: () => {
-        if (reflectCurate === undefined || reflectCurate === null || reflectCurateSweeping) return;
-        const run = reflectCurate;
-        reflectCurateSweeping = true;
-        return sweepReflectCurate({
-          config: run.config,
-          db: deps.db,
-          logger: run.logger,
-          model: run.model,
-          endpoint: run.endpoint,
-          openNewGuards: openReflectGuards,
-        })
-          .then((summary) => {
-            run.logger.info(summary, 'trajectory reflect-curate');
-          })
-          .catch((err) => {
-            run.logger.info(
-              { err: err instanceof Error ? err.message : String(err) },
-              'trajectory reflect-curate failed (scheduler continues)',
-            );
-          })
-          .finally(() => {
-            reflectCurateSweeping = false;
-          });
-      },
     },
     syncDueSources,
   );
@@ -768,15 +600,6 @@ export function createScheduler(
       );
       if (ciPoller !== null) ensureDue('poll:ci', 'ci', CI_POLL_INTERVAL_MS);
       if (prWatch !== null) ensureDue('poll:pr-watch', 'pr-watch', PR_WATCH_INTERVAL_MS);
-      if (outcome !== undefined && outcome !== null && deps.reposDir !== undefined) {
-        ensureDue('poll:outcome', 'outcome', OUTCOME_BACKFILL_INTERVAL_MS);
-      }
-      if (exportRun !== undefined && exportRun !== null) {
-        ensureDue('poll:export', 'export', OUTCOME_BACKFILL_INTERVAL_MS);
-      }
-      if (reflectCurate !== undefined && reflectCurate !== null) {
-        ensureDue('poll:reflect', 'reflect', REFLECT_CURATE_INTERVAL_MS);
-      }
       dueRunner.arm();
     },
     stop() {

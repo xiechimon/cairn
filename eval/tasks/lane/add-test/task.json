@@ -1,0 +1,15 @@
+{
+  "kind": "lane",
+  "id": "add-test",
+  "instruction": "\u7ed9 calc.py \u7684 add \u5199\u4e00\u4e2a pytest \u6d4b\u8bd5\u6587\u4ef6 test_calc.py",
+  "timeoutMs": 600000,
+  "checks": {
+    "files": [
+      {
+        "path": "test_calc.py"
+      }
+    ],
+    "commands": []
+  },
+  "gate": true
+}
