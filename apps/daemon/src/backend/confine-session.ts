@@ -15,7 +15,7 @@ export interface Launch {
 }
 
 export type SessionConfiner = (
-  opts: Pick<SessionOpts, 'cwd' | 'env' | 'ownAgentConfig'>,
+  opts: Pick<SessionOpts, 'cwd' | 'env'>,
   harness: SessionHarness,
   launch: Launch,
   state?: readonly string[],
@@ -108,25 +108,6 @@ function ownState(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv)
   }
 }
 
-const PI_USER_RESOURCES = [
-  'AGENTS.md',
-  'CLAUDE.md',
-  'SYSTEM.md',
-  'APPEND_SYSTEM.md',
-  'extensions',
-  'prompts',
-  'skills',
-  'themes',
-];
-
-function ownReadable(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv, own: boolean) {
-  if (harness !== 'pi' || !own) return [];
-  const explicit = env.PI_CODING_AGENT_DIR;
-  const agentDir =
-    explicit !== undefined && isAbsolute(explicit) ? explicit : join(home, '.pi', 'agent');
-  return PI_USER_RESOURCES.map((name) => join(agentDir, name));
-}
-
 const STATE_FILES = new Set<string>([
   '.claude.json',
   ...ANTIGRAVITY_CREDENTIAL_FILES,
@@ -190,7 +171,6 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       ],
       readable: [
         ...options.readable,
-        ...ownReadable(harness, home, env, opts.ownAgentConfig === true),
         ...(harness === 'antigravity' && opts.env?.GEMINI_API_KEY === undefined
           ? [join(home, 'Library', 'Keychains')]
           : []),

@@ -17,7 +17,7 @@ export interface StepEnvInput {
   appCredential: { env(): Record<string, string> } | null;
   readonlyGit: boolean;
   runtimeId: string | null;
-  agentConfig: { own: boolean; cairnHome: string; realHome?: string };
+  agentConfig: { cairnHome: string; realHome?: string };
   claudeSubscriptionToken: string | undefined;
   claudeCodeCoordinator?: boolean;
   devinToken?: string;
@@ -69,8 +69,7 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
   }
   delete env.GEMINI_API_KEY;
   if (input.antigravityToken !== undefined) env.GEMINI_API_KEY = input.antigravityToken;
-  if (!input.agentConfig.own && input.inherited?.CAIRN_ORB !== '1')
-    Object.assign(env, isolatedConfigEnv(input));
+  if (input.inherited?.CAIRN_ORB !== '1') Object.assign(env, isolatedConfigEnv(input));
   return {
     env,
     dropGitCredentials: () => {

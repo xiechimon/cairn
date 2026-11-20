@@ -165,7 +165,6 @@ export interface SessionOpts {
   teamSkillsDir?: string;
   readOnly?: boolean;
   remoteToolsOnly?: boolean;
-  ownAgentConfig?: boolean;
   env?: Record<string, string>;
   secrets?: () => readonly (string | undefined)[];
   telemetry?: StepOtelContext;

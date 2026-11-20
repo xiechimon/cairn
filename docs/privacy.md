@@ -12,7 +12,7 @@ Before the upload the runner replaces strings that look like secrets (GitHub and
 
 The server deletes a record 30 days after its last write, and deletes the record of a removed step after a 7-day grace period.
 
-The runner keeps each agent's configuration and history in Cairn's own directories (for example `<home>/claude`), separate from your personal `~/.claude` or `~/.gemini`, and carries in only your sign-in. Turn on "Use my own agent config" in the Runners settings to have agents read your own configuration instead ([design](design/agent-config-isolation.md)).
+The runner keeps each agent's configuration and history in Cairn's own directories (for example `<home>/claude`), separate from your personal `~/.claude` or `~/.gemini`, and carries in only your sign-in ([design](design/agent-config-isolation.md)).
 
 ## Where to ask
 

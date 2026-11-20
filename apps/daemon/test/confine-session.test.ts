@@ -86,24 +86,6 @@ describe('session confiner', () => {
     expect(own).not.toContain(`(subpath "${realpathSync(agentHome)}")`);
   });
 
-  test('the own-config switch lets pi read the user resources but never write them or read auth', () => {
-    const { confine, worktree, root } = fixture();
-    const piDir = join(root, 'user', '.pi', 'agent');
-    mkdirSync(join(piDir, 'skills'), { recursive: true });
-    writeFileSync(join(piDir, 'AGENTS.md'), 'rules');
-    writeFileSync(join(piDir, 'auth.json'), '{}');
-    const profileFor = (ownAgentConfig: boolean) =>
-      confine({ cwd: worktree, env: {}, ownAgentConfig }, 'pi', { command: '/bin/true', args: [] })
-        .args[1] as string;
-    expect(profileFor(false)).not.toContain(piDir);
-    const own = profileFor(true);
-    const readOnly = own.split('\n').find((line) => line.startsWith('(allow file-read* (')) ?? '';
-    expect(readOnly).toContain(`(subpath "${join(piDir, 'skills')}")`);
-    expect(readOnly).toContain(`(subpath "${join(piDir, 'AGENTS.md')}")`);
-    expect(own).not.toContain(`(subpath "${piDir}")`);
-    expect(own).not.toContain('auth.json');
-  });
-
   test('grants only Claude Code its uid-scoped temporary directory, not the shared temp root', () => {
     const { confine, worktree } = fixture();
     const sharedTemp = realpathSync('/tmp');

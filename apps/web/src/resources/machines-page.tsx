@@ -1,16 +1,13 @@
 import { Monitor, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useApiMutations, useMachines, useTeams } from '../api/hooks.js';
+import { useMachines, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
 import { QueryBoundary } from '../components/query-state.js';
-import { SettingsCard, SettingsPanel, SettingsRow } from '../components/settings-list.js';
-import { ToggleSwitch } from '../components/toggle-switch.js';
+import { SettingsPanel } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import { toastError } from '../components/ui/toaster.js';
-import { blockDemoWrite } from '../demo/demo-gate.js';
 import { TEAM_NAME } from '../fixtures/core.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -32,20 +29,6 @@ export function MachinesPage() {
     ? (teamsQ.data?.[0]?.defaultMachineId ?? null)
     : (machines.find((machine) => machine.isDefault === true)?.id ?? null);
   const [addOpen, setAddOpen] = useState(false);
-  const mutations = useApiMutations(teamId);
-  const [fixtureOwnConfig, setFixtureOwnConfig] = useState(false);
-  const ownAgentConfig = live ? teamsQ.data?.[0]?.ownAgentConfig === true : fixtureOwnConfig;
-  const commitOwnAgentConfig = (next: boolean) => {
-    if (!live) {
-      if (blockDemoWrite()) return;
-      setFixtureOwnConfig(next);
-      return;
-    }
-    mutations.patchTeamAgentConfig.mutate(
-      { ownAgentConfig: next },
-      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
-    );
-  };
 
   const noMachines = (
     <EmptyState
@@ -107,22 +90,6 @@ export function MachinesPage() {
             </div>
           </SettingsPanel>
         </QueryBoundary>
-        <SettingsCard>
-          <SettingsRow
-            label={t('使用我自己的 agent 配置')}
-            hint={
-              ownAgentConfig
-                ? t('各 agent 读取并可修改执行机上你自己的钩子、技能、全局指令和 MCP 配置')
-                : t('各 agent 只用 Cairn 自己的配置，从执行机带入的只有登录凭据')
-            }
-          >
-            <ToggleSwitch
-              aria-label={t('使用我自己的 agent 配置')}
-              checked={ownAgentConfig}
-              onCheckedChange={commitOwnAgentConfig}
-            />
-          </SettingsRow>
-        </SettingsCard>
       </div>
       <CreateMachineDialog
         open={addOpen}

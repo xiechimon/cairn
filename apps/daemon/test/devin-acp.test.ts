@@ -235,7 +235,7 @@ describe('devin credential delivery', () => {
         appCredential: null,
         readonlyGit: false,
         runtimeId: 'devin',
-        agentConfig: { own: false, cairnHome: '/cairn-home' },
+        agentConfig: { cairnHome: '/cairn-home' },
         claudeSubscriptionToken: undefined,
         devinToken: creds.devinToken,
         devinHome: '/managed/devin/home',

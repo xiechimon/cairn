@@ -29,7 +29,7 @@ function input(patch: Partial<StepEnvInput> = {}): StepEnvInput {
     appCredential: null,
     readonlyGit: false,
     runtimeId: null,
-    agentConfig: { own: false, cairnHome: '/cairn-home' },
+    agentConfig: { cairnHome: '/cairn-home' },
     claudeSubscriptionToken: undefined,
     ...patch,
   };
@@ -149,20 +149,6 @@ describe('agent config isolation', () => {
     expect(env.CLAUDE_CONFIG_DIR).toBe(join('/cairn-home', 'claude'));
   });
 
-  test('the own-config switch leaves every harness on the user directories', () => {
-    for (const runtimeId of ['claude-code', 'devin', 'antigravity', 'gemini', 'pi']) {
-      const { env } = assembleStepEnv(
-        input({
-          inherited: { HOME: '/Users/real' },
-          runtimeId,
-          devinHome: '/managed/devin/home',
-          agentConfig: { own: true, cairnHome: '/cairn-home' },
-        }),
-      );
-      expect(env, runtimeId).toEqual({ HOME: '/Users/real' });
-    }
-  });
-
   test('an Orb guest keeps the image config, whose Claude settings the sandbox needs', () => {
     const { env } = assembleStepEnv(
       input({ inherited: { CAIRN_ORB: '1' }, runtimeId: 'claude-code' }),
@@ -188,7 +174,7 @@ describe('agent config isolation', () => {
         input({
           inherited: { HOME: realHome },
           runtimeId: 'antigravity',
-          agentConfig: { own: false, cairnHome: join(root, 'cairn'), realHome },
+          agentConfig: { cairnHome: join(root, 'cairn'), realHome },
         }),
       ).env;
 
@@ -228,7 +214,7 @@ describe('agent config isolation', () => {
       input({
         runtimeId: 'antigravity',
         antigravityToken: 'AIza-step',
-        agentConfig: { own: false, cairnHome: join(root, 'cairn'), realHome },
+        agentConfig: { cairnHome: join(root, 'cairn'), realHome },
       }),
     );
     const home = env.HOME ?? '';
@@ -258,7 +244,7 @@ describe('agent config isolation', () => {
     const { env } = assembleStepEnv(
       input({
         runtimeId: 'gemini',
-        agentConfig: { own: false, cairnHome: join(root, 'cairn'), realHome },
+        agentConfig: { cairnHome: join(root, 'cairn'), realHome },
       }),
     );
     const home = env.GEMINI_CLI_HOME ?? '';
@@ -282,7 +268,7 @@ describe('agent config isolation', () => {
       assembleStepEnv(
         input({
           runtimeId: 'gemini',
-          agentConfig: { own: false, cairnHome: join(root, 'cairn'), realHome },
+          agentConfig: { cairnHome: join(root, 'cairn'), realHome },
         }),
       ).env.GEMINI_CLI_HOME ?? '';
     const home = step();

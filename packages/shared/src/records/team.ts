@@ -38,7 +38,6 @@ export const teamRecordSchema = z.object({
   autonomyPauses: z.array(autonomyPauseEntrySchema).optional(),
   maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),
   defaultMachineId: recordId.nullable().optional(),
-  ownAgentConfig: z.boolean().optional(),
 });
 export type TeamRecord = z.infer<typeof teamRecordSchema>;
 
@@ -52,9 +51,6 @@ export const patchTeamBodySchema = z
     { message: 'At least one team setting is required' },
   );
 export type PatchTeamBody = z.infer<typeof patchTeamBodySchema>;
-
-export const patchTeamAgentConfigBodySchema = z.object({ ownAgentConfig: z.boolean() });
-export type PatchTeamAgentConfigBody = z.infer<typeof patchTeamAgentConfigBodySchema>;
 
 export const memberTypeSchema = z.enum(['user', 'agent']);
 export const teamMemberSchema = z

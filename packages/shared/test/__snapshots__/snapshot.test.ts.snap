@@ -3711,10 +3711,6 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
-    "ownAgentConfig": {
-      "const": true,
-      "type": "boolean",
-    },
     "provider": {
       "anyOf": [
         {
@@ -10750,11 +10746,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/teams/{id}/model-routing",
   },
   {
-    "method": "PATCH",
-    "note": "owner-only own-agent-config switch (docs/design/agent-config-isolation.md)",
-    "path": "/api/teams/{id}/agent-config",
-  },
-  {
     "method": "GET",
     "note": "D60 PR8: routing_rule + work_policy settings (flag state included)",
     "path": "/api/teams/{id}/routing-settings",
@@ -13839,9 +13830,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
     },
     "name": {
       "type": "string",
-    },
-    "ownAgentConfig": {
-      "type": "boolean",
     },
     "plan": {
       "type": "string",

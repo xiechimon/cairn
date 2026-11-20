@@ -10,7 +10,6 @@ import {
   step as stepTable,
 } from '../src/db/schema.js';
 import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
-import { isOwnerOnlyRoute } from '../src/lib/token-auth.js';
 import { startBuilds } from '../src/services/builds.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
 import { stepToken } from '../src/services/machine-step-token.js';
@@ -384,45 +383,4 @@ describe('resolveStepCredentials routing', () => {
     seedPolicy(s, 'session', { secrets: [] });
     expect(resolveStepCredentials(s.keysvc, addStep(s, s.buildId, 'build')).secrets).toEqual({});
   });
-});
-
-test('the own agent config switch reaches the step token only after the owner turns it on', async () => {
-  const s = await withRoutedStack();
-  const machineId = insertMachine(s, { name: 'agent-config' });
-  const stepId = addStep(s, s.buildId, 'build');
-  s.db
-    .update(stepTable)
-    .set({ machineId, status: 'claimed' })
-    .where(eq(stepTable.id, stepId))
-    .run();
-  const deps = {
-    ...s.svc,
-    box: s.secretBox,
-    reposDir: s.reposDir,
-    attachmentsDir: s.attachmentsDir,
-    skillsDir: s.skillsDir,
-  };
-  expect(isOwnerOnlyRoute('PATCH', `/api/teams/${s.team.id}/agent-config`)).toBe(true);
-  expect(await stepToken(deps, machineId, stepId)).not.toHaveProperty('ownAgentConfig');
-  const listed = (await (await req(s.app, 'GET', '/api/teams')).json()) as {
-    ownAgentConfig?: boolean;
-  }[];
-  expect(listed[0]?.ownAgentConfig).toBe(false);
-
-  const on = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/agent-config`, {
-    ownAgentConfig: true,
-  });
-  expect(on.status).toBe(200);
-  expect((await stepToken(deps, machineId, stepId)).ownAgentConfig).toBe(true);
-  const relisted = (await (await req(s.app, 'GET', '/api/teams')).json()) as {
-    ownAgentConfig?: boolean;
-  }[];
-  expect(relisted[0]?.ownAgentConfig).toBe(true);
-
-  await req(s.app, 'PATCH', `/api/teams/${s.team.id}/agent-config`, { ownAgentConfig: false });
-  expect(await stepToken(deps, machineId, stepId)).not.toHaveProperty('ownAgentConfig');
-  expect(
-    (await req(s.app, 'PATCH', `/api/teams/${s.team.id}/agent-config`, { ownAgentConfig: 'yes' }))
-      .status,
-  ).toBe(400);
 });

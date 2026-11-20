@@ -66,11 +66,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams/{id}/models' },
   { method: 'GET', path: '/api/teams/{id}/model-routing' },
   {
-    method: 'PATCH',
-    path: '/api/teams/{id}/agent-config',
-    note: 'owner-only own-agent-config switch (docs/design/agent-config-isolation.md)',
-  },
-  {
     method: 'GET',
     path: '/api/teams/{id}/routing-settings',
     note: 'D60 PR8: routing_rule + work_policy settings (flag state included)',
