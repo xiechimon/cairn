@@ -155,12 +155,10 @@ function LineRow({
   render: ReactElement;
 }) {
   return (
-    <ListCard outlined className="flex-none">
-      <Button variant="ghost" render={render} className={cn(ROW_CLS, LINE_ROW_CLS)}>
-        <span className="flex flex-none text-content-secondary">{icon}</span>
-        <span className="min-w-0 flex-1 truncate text-ui text-foreground">{label}</span>
-      </Button>
-    </ListCard>
+    <Button variant="ghost" render={render} className={cn(ROW_CLS, LINE_ROW_CLS)}>
+      <span className="flex flex-none text-content-secondary">{icon}</span>
+      <span className="min-w-0 flex-1 truncate text-ui text-foreground">{label}</span>
+    </Button>
   );
 }
 
@@ -523,6 +521,15 @@ export function MachinesPanel({
   const computerFor = (machine: MachineRow): ComputerRecord | null =>
     computers.find((computer) => computer.machine.id === machine.id) ?? null;
   const keyOf = (machine: MachineRow) => machine.id ?? machine.name;
+  const addRow = (
+    <div data-testid="machines-add">
+      <LineRow
+        icon={<Plus aria-hidden="true" className="size-5.5" />}
+        label={t('添加执行机')}
+        render={<Link to={settingsHref('machines')} />}
+      />
+    </div>
+  );
 
   return (
     <SidePanel label={t('执行机')} onDismiss={onClose}>
@@ -535,28 +542,25 @@ export function MachinesPanel({
           isEmpty={machines.length === 0}
           loadingLabel={t('正在加载执行机')}
           errorTitle={t('执行机没能加载')}
-          empty={null}
+          empty={
+            <ListCard outlined className="flex-none">
+              {addRow}
+            </ListCard>
+          }
         >
-          <div className="flex flex-none flex-col gap-3">
+          <ListCard outlined className="flex-none">
             {ordered.map((machine) => (
-              <ListCard key={keyOf(machine)} outlined className="flex-none">
-                <MachineCard
-                  machine={machine}
-                  computer={computerFor(machine)}
-                  teamId={teamId}
-                  openScreen={linkedMachine !== null && keyOf(machine) === linkedMachine}
-                />
-              </ListCard>
+              <MachineCard
+                key={keyOf(machine)}
+                machine={machine}
+                computer={computerFor(machine)}
+                teamId={teamId}
+                openScreen={linkedMachine !== null && keyOf(machine) === linkedMachine}
+              />
             ))}
-          </div>
+            {addRow}
+          </ListCard>
         </QueryBoundary>
-        <div data-testid="machines-add">
-          <LineRow
-            icon={<Plus aria-hidden="true" className="size-5.5" />}
-            label={t('添加执行机')}
-            render={<Link to={settingsHref('machines')} />}
-          />
-        </div>
       </div>
     </SidePanel>
   );

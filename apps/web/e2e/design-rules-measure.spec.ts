@@ -90,7 +90,7 @@ for (const surface of SURFACES) {
     ).toBeLessThanOrEqual(1);
   });
 
-  test(`${surface.name}: an object list is rows in one card, not a grid of cards`, async ({
+  test(`${surface.name}: an object list is rows in one card, not a grid or stack of cards`, async ({
     page,
   }) => {
     await open(page, surface.url);
@@ -98,7 +98,7 @@ for (const surface of SURFACES) {
       const found: string[] = [];
       for (const el of document.querySelectorAll<HTMLElement>('body *')) {
         const style = getComputedStyle(el);
-        if (style.display !== 'grid' || el.closest('[data-testid=made-panel]')) continue;
+        if (!/grid|flex/.test(style.display) || el.closest('[data-testid=made-panel]')) continue;
         const cards = [...el.children].filter((child) => {
           const s = getComputedStyle(child);
           return (
@@ -107,8 +107,7 @@ for (const surface of SURFACES) {
             (s.borderTopWidth !== '0px' || s.boxShadow !== 'none')
           );
         });
-        const columns = style.gridTemplateColumns.split(' ').length;
-        if (cards.length >= 3 && columns >= 2) {
+        if (cards.length >= 3) {
           found.push(el.closest('[data-testid]')?.getAttribute('data-testid') ?? el.className);
         }
       }
@@ -121,7 +120,7 @@ for (const surface of SURFACES) {
       ).toBeGreaterThan(0);
       return;
     }
-    expect(grids, 'V20: no grid of three or more identical cards').toEqual([]);
+    expect(grids, 'V20: no grid or stack of three or more identical cards').toEqual([]);
   });
 
   test(`${surface.name}: no horizontal scroll at 390px`, async ({ page }) => {

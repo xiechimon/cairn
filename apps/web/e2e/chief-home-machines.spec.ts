@@ -110,13 +110,11 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
   }
 });
 
-test('each computer is its own outlined card with its status dot, and the add row is outlined', async ({
+test('the computers and the add row are rows in one outlined list card, each with its status dot', async ({
   page,
 }) => {
   await page.clock.setFixedTime(MIDDAY_IN_BEIJING);
   await page.goto('/app?scenario=home-c-machines&pane=machines');
-  const cards = panel(page).getByTestId('machine-card');
-  await expect(cards).toHaveCount(4);
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(4);
   await expect(rows.nth(0)).toContainText('xmonsMac');
@@ -127,16 +125,11 @@ test('each computer is its own outlined card with its status dot, and the add ro
   await expect(dots.nth(2)).toHaveAttribute('data-online', 'true');
   await expect(dots.nth(3)).toHaveAttribute('data-online', 'false');
   await expect(rows.nth(3)).toHaveText('Office Mac mini离线 · 2 小时前');
-  for (let i = 0; i < 4; i++) {
-    await expect(cards.nth(i).locator('xpath=ancestor::*[@data-slot="list-card"]')).toHaveAttribute(
-      'data-outlined',
-      'true',
-    );
-  }
-  await expect(panel(page).getByTestId('machines-add').locator('[data-slot="list-card"]')).toHaveAttribute(
-    'data-outlined',
-    'true',
-  );
+  const list = panel(page).locator('[data-slot="list-card"]');
+  await expect(list).toHaveCount(1);
+  await expect(list).toHaveAttribute('data-outlined', 'true');
+  await expect(list.getByTestId('machine-card')).toHaveCount(4);
+  await expect(list.locator(':scope > *').last()).toHaveAttribute('data-testid', 'machines-add');
 });
 
 test('Computer settings in a card menu opens that computer in settings', async ({ page }) => {
