@@ -1,6 +1,8 @@
 import { createGeminiBackend } from '../src/backend/acp.js';
 
-const backend = createGeminiBackend();
+const backend = createGeminiBackend({
+  executablePath: process.env.GEMINI_BIN ?? 'gemini',
+});
 const opts = {
   provider: { kind: 'api_key' as const, providerId: 'gemini' },
   modelId: process.env.GEMINI_MODEL ?? 'gemini-2.5-pro',

@@ -169,7 +169,7 @@ export function acpErrorMessage(error: unknown): string {
     return `Antigravity login failed: sign in to Antigravity on the Runner or enable a subscription with a token. ${message}`;
   }
   if (/spawn gemini .*ENOENT|gemini.*not found/i.test(message)) {
-    return 'Gemini executable not found: install Gemini CLI with npm install -g @google/gemini-cli';
+    return 'Gemini executable not found: the managed Gemini install is missing or still downloading';
   }
   if (
     /authenticate|required|not logged in|login|api key is missing|auth method|GEMINI_API_KEY/i.test(
@@ -518,6 +518,7 @@ export interface AcpGateOptions {
 export interface GeminiBackendOptions {
   gate?: AcpGateOptions;
   executablePath?: string;
+  executableArgs?: readonly string[];
   confine?: SessionConfiner;
   permissions?: 'deny' | 'allow-once';
   skills?: { skillsDir: string; cwd: string };
@@ -626,11 +627,16 @@ class AcpBackend implements AgentBackend {
     const hostTools = await openAcpTools(opts);
     const mcpBridges: AcpStdioBridge[] = [];
     const spawnProcess = this.options.spawnProcess ?? spawn;
+    const command = adapter?.command ?? this.options.executablePath;
+    if (command === undefined) {
+      hostTools?.close();
+      throw new Error('Gemini managed install is missing: the managed runtime setup did not complete');
+    }
     let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
     try {
       const launch = {
-        command: adapter?.command ?? this.options.executablePath ?? 'gemini',
-        args: adapter ? (adapter.args ?? []) : ['--acp'],
+        command,
+        args: adapter ? (adapter.args ?? []) : [...(this.options.executableArgs ?? ['--acp'])],
       };
       const confined =
         this.options.confine?.(opts, adapter ? adapter.harness : 'gemini', launch) ?? launch;

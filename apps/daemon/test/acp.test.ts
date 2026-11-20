@@ -9,7 +9,7 @@ import { acpErrorMessage, mapAcpUpdate, validateGeminiSession } from '../src/bac
 
 describe('Gemini ACP bridge', () => {
   test('failure mode 1: missing spawn binary yields an install hint', () => {
-    expect(acpErrorMessage(new Error('spawn gemini ENOENT'))).toContain('install Gemini CLI');
+    expect(acpErrorMessage(new Error('spawn gemini ENOENT'))).toContain('managed Gemini install');
   });
 
   test('failure mode 2: auth failure points to Gemini login', () => {

@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import {
   closeSync,
   existsSync,
@@ -10,7 +11,7 @@ import {
 import { join } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { BRAND, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
+import { BRAND, ENV_VARS, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
 import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
@@ -21,13 +22,16 @@ import {
   loadDaemonConfig,
   WorkspacesDirError,
 } from './config.js';
+import { bundledClaudeCodePath } from './claude-code-bin.js';
 import { realDoctorEnv, runDoctorCommand } from './doctor.js';
+import { importAgentConfig } from './import-agent-config.js';
 import { createDaemonLogger } from './log.js';
 import { machineNameSuffix, pendingEnrollmentUrl } from './machine-enroll.js';
 import { runMachine } from './machine-loop.js';
 import { ORB_RELAY_TOKEN_ENV } from './orb/protocol.js';
 import { runOrbServicesEnsure } from './orb/services-runtime.js';
 import { orbAgentHome, runOrbWorker } from './orb/worker.js';
+import { claudeConfigHome } from './runtime-homes.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import {
   isAlive,
@@ -306,6 +310,48 @@ export function buildProgram(): Command {
     .description('Provider management notice')
     .action(() => {
       process.stdout.write(`${PROVIDER_COMMAND_NOTICE}\n`);
+    });
+
+  const agentConfig = program
+    .command('agent-config')
+    .description('Managed runtime homes and imports');
+  agentConfig
+    .command('import')
+    .description('Copy skills and MCP servers from your own Claude/Codex config into the managed homes')
+    .option('--force', 'run again even though the import already ran once')
+    .action((opts: { force?: boolean }) => {
+      const config = loadDaemonConfig({});
+      const report = importAgentConfig({ cairnHome: config.home, force: opts.force === true });
+      if (report === null) {
+        process.stdout.write('Import already ran once; pass --force to run it again.\n');
+        return;
+      }
+      for (const item of report.copied) process.stdout.write(`copied  ${item}\n`);
+      for (const { item, reason } of report.skipped)
+        process.stdout.write(`skipped ${item} (${reason})\n`);
+      for (const { item, reason } of report.failed)
+        process.stdout.write(`failed  ${item} (${reason})\n`);
+      if (report.failed.length > 0) process.exitCode = 1;
+    });
+
+  const claude = program.command('claude').description('Managed Claude Code');
+  claude
+    .command('login')
+    .description('Sign in to the managed Claude Code (writes into the Cairn-managed home, not your own)')
+    .action(() => {
+      const config = loadDaemonConfig({});
+      const command = process.env[ENV_VARS.claudeBin] ?? bundledClaudeCodePath();
+      if (command === null) {
+        process.stderr.write('No managed claude binary is installed (SDK platform package missing).\n');
+        process.exitCode = 1;
+        return;
+      }
+      const result = spawnSync(command, ['auth', 'login'], {
+        stdio: 'inherit',
+        env: { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigHome(config.home) },
+      });
+      if (result.error !== undefined) throw result.error;
+      process.exitCode = result.status ?? 1;
     });
 
   program

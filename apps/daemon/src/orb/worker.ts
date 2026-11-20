@@ -62,7 +62,7 @@ export function orbBackendFor(deps: {
     if (existing) return existing;
     const backend =
       runtime === 'gemini'
-        ? createGeminiBackend()
+        ? createGeminiBackend({ executablePath: 'gemini' })
         : runtime === 'claude-code'
           ? createClaudeCodeBackend({
               inOrb: true,

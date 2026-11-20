@@ -46,6 +46,7 @@ function backendFor(
 ) {
   if (harness === 'gemini') {
     return createGeminiBackend({
+      executablePath: process.execPath,
       spawnProcess: (_command, _args, options) =>
         spawn(process.execPath, [fixture, scenario], options),
     });

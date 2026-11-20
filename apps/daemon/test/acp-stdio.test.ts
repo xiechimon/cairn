@@ -19,6 +19,7 @@ async function collect(events: AsyncIterable<StepEvent>): Promise<StepEvent[]> {
 
 function backend(env: Record<string, string> = {}) {
   return createGeminiBackend({
+    executablePath: 'gemini',
     spawnProcess: () => {
       const child = new ChildProcess();
       const stdin = new PassThrough();
@@ -280,6 +281,7 @@ describe('Gemini stdio execution', () => {
 test('ACP children remove inherited token variables when the step uses an App file', async () => {
   let inherited: NodeJS.ProcessEnv | undefined;
   const agent = createGeminiBackend({
+    executablePath: 'gemini',
     spawnProcess: (_command, _args, options) => {
       inherited = options.env;
       throw new Error('captured environment');

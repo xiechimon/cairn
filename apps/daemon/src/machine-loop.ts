@@ -27,6 +27,7 @@ import {
   type AntigravityManaged,
   createAntigravityManaged,
 } from './backend/antigravity-managed.js';
+import { createGeminiManaged, type GeminiManaged } from './backend/gemini-managed.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { createSessionConfiner, type Launch } from './backend/confine-session.js';
@@ -43,6 +44,7 @@ import {
 } from './claude-code-auth.js';
 import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
+import { importAgentConfig } from './import-agent-config.js';
 import {
   claudeConfigHome,
   migrateRuntimeHomes,
@@ -63,7 +65,6 @@ import { createComputerScreenProvider } from './computer/screen-provider.js';
 import { VmDesktops } from './computer/vm-desktop.js';
 import { VmRuntime } from './computer/vm-runtime.js';
 import type { DaemonConfig } from './config.js';
-import { FolderPins } from './folder-pins.js';
 import { createHostPermissionsProbe, type HostPermissionsProbe } from './host-permissions.js';
 import { createImsgBridge } from './imsg-bridge.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
@@ -106,6 +107,7 @@ export interface MachineLoopOpts {
   geminiBackend?: AgentBackend;
   devinManaged?: DevinManaged;
   antigravityManaged?: AntigravityManaged;
+  geminiManaged?: GeminiManaged;
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
   readClaudeOauthExpiresAt?: () => number | null;
   capabilitiesProbe?: () => MachineCapabilities;
@@ -176,6 +178,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const migratedHomes = migrateRuntimeHomes(paths.home);
   for (const moved of migratedHomes) logger.machine(`runtime home moved: ${moved}`);
   ensureStateDirs(paths);
+  const imported = importAgentConfig({ cairnHome: paths.home });
+  if (imported !== null) {
+    logger.machine(
+      `agent config import: ${imported.copied.length} copied, ` +
+        `${imported.skipped.length} skipped, ${imported.failed.length} failed`,
+    );
+    for (const failure of imported.failed) {
+      logger.machine(`agent config import failed: ${failure.item}: ${failure.reason}`);
+    }
+  }
   const confine = createSessionConfiner({
     daemonHome: config.home,
     extraDeniedRoots: (process.env[ENV_VARS.confineDeniedRoots] ?? '')
@@ -315,6 +327,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     opts.antigravityManaged ??
     createAntigravityManaged({
       root: toolInstallRoot(paths.home, 'antigravity'),
+      log: (line) => logger.machine(line),
+    });
+  const geminiManaged =
+    opts.geminiManaged ??
+    createGeminiManaged({
+      root: toolInstallRoot(paths.home, 'gemini'),
       log: (line) => logger.machine(line),
     });
   let sendPresenceNow: (() => Promise<void>) | null = null;
@@ -464,8 +482,21 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         logger.raw('Loading gemini runtime…');
         geminiAnnounced = true;
       }
+      const install = geminiManaged.current();
+      if (install === null) {
+        void geminiManaged.ensure().catch((error: unknown) => {
+          logger.machine(
+            `gemini managed install failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
+        throw new Error(
+          'Gemini managed install is not ready yet: the npm download is still in progress or failed; retry the step shortly',
+        );
+      }
       if (geminiBackend === null)
         geminiBackend = createGeminiBackend({
+          executablePath: install.command,
+          executableArgs: install.args,
           gate: { log: (msg) => logger.gate(msg) },
           skills: { skillsDir: config.skillsDir, cwd: config.home },
           onSkillsLog: (msg) => logger.skills(msg),
