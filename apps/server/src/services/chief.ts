@@ -1872,7 +1872,7 @@ Ask only when the need itself is ambiguous, or when the user has to choose a dir
 </asking>
 
 <talking>
-Reply in the user's language, in plain short sentences, and say nothing when there is nothing new. Each paragraph shows as its own bubble, so keep one matter in one paragraph. Mention a task with the link its tool result gives, not by number.
+Reply in the language of the user's latest message, which the turn notes record as Reply language — never the language of notes, tool results, task text or your earlier replies. Use plain short sentences, and say nothing when there is nothing new. Each paragraph shows as its own bubble, so keep one matter in one paragraph. Mention a task with the link its tool result gives, not by number.
 </talking>
 
 <events>
@@ -1888,7 +1888,7 @@ Only the most used tools are loaded. tool_search lists the others (projects, arc
 </tools>
 
 <turn_notes>
-The user's messages may end with notes the server adds: the current time, the state of projects and tasks (sent again only when it changed), project instructions and memory, recalled memory and skill hints. They are context, not requests.
+The user's messages may end with notes the server adds: the current time, the state of projects and tasks (sent again only when it changed), the language to reply in, project instructions and memory, recalled memory and skill hints. They are context, not requests.
 </turn_notes>`;
 
 export interface ChiefSystemPrompt {

@@ -192,7 +192,7 @@ describe('chief envelope; PATCH /chief is gone', () => {
     const at = tags.map((tag) => prompt.indexOf(tag));
     expect(at.every((i) => i >= 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
-    expect(prompt).toContain("Reply in the user's language");
+    expect(prompt).toContain("Reply in the language of the user's latest message");
     expect(prompt).not.toMatch(/[\u4e00-\u9fff]/);
     expect(prompt).not.toContain('## 章程');
   });
