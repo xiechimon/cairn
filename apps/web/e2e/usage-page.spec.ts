@@ -1,7 +1,8 @@
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive } from './chief-home-mock';
 
-const bar = (page: Page, date: string) => page.locator(`[data-testid="usage-chart"] [data-day="${date}"]`);
+const cell = (page: Page, date: string) =>
+  page.locator(`[data-testid="usage-heatmap"] [data-day="${date}"]`);
 const readout = (page: Page) => page.getByTestId('usage-readout');
 
 const day = (date: string, coordinator: number, tasks: number, models: Record<string, number>) => ({
@@ -25,7 +26,7 @@ test.beforeEach(async ({ page }) => {
 test.describe('live', () => {
   test.use({ timezoneId: 'Asia/Shanghai' });
 
-  test('a new user sees their days from the first one, split by source and by model', async ({
+  test('a full year of days: hover reads a day, a click scopes the rankings to it', async ({
     page,
   }) => {
     await page.clock.setFixedTime(new Date('2026-11-16T12:00:00Z'));
@@ -49,36 +50,38 @@ test.describe('live', () => {
     await page.getByTestId('sidebar-usage').click();
     await expect(page).toHaveURL(/\/app\/usage/);
     await expect(page.getByRole('dialog', { name: 'Usage' })).toBeVisible();
-    await expect(page.getByTestId('usage-stats')).toContainText('Since 11/15');
     expect(asked.at(-1)?.get('tz')).toBe('Asia/Shanghai');
-    expect(asked.at(-1)?.get('days')).toBe('180');
-    await expect(page.getByTestId('usage-stats')).toContainText('864K token');
-    await expect(page.getByTestId('usage-stats')).toContainText('1 task');
-    await expect(page.getByTestId('usage-stats')).toContainText('80%');
-    await expect(page.locator('[data-testid="usage-chart"] [data-day]')).toHaveCount(7);
-    await expect(bar(page, '2026-11-10')).toHaveCount(1);
-    await expect(readout(page)).toHaveText('Started 11/15 · 2 days used');
+    expect(asked.at(-1)?.get('days')).toBe('371');
+    const stats = page.getByTestId('usage-stats');
+    await expect(stats).toContainText('Past year864K token');
+    await expect(stats).toContainText('Coordinator 71% · Tasks 29%');
+    await expect(stats).toContainText('80%');
+    await expect(page.locator('[data-testid="usage-heatmap"] [data-day]')).toHaveCount(365);
+    await expect(page.getByTestId('usage-legend')).toHaveText('LessMore');
+    await expect(page.getByTestId('usage-since')).toHaveText('Started 11/15');
+    await expect(page.getByTestId('usage-year')).not.toContainText('864K');
+    await expect(readout(page)).toHaveText('Click a day to see it; click again for the whole year');
 
-    await bar(page, '2026-11-16').hover();
+    await cell(page, '2026-11-16').hover();
     await expect(readout(page)).toHaveText(
       'Mon, November 16 · 860K token · Coordinator 612K · Tasks 248K',
-    );
-    await page.getByTestId('usage-split-model').click();
-    await bar(page, '2026-11-16').hover();
-    await expect(readout(page)).toHaveText(
-      'Mon, November 16 · 860K token · claude-haiku-5-5 612K · Big Model 248K',
     );
     await expect(page.getByTestId('usage-models')).toContainText('Big ModelGateway');
     await expect(page.getByTestId('usage-projects')).toContainText('cairn248K100%');
 
+    await cell(page, '2026-11-15').click();
+    await expect(cell(page, '2026-11-15')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('usage-models')).not.toContainText('Big Model');
+    await expect(page.getByTestId('usage-projects')).toHaveCount(0);
     await page.mouse.move(0, 0);
-    await page.getByTestId('usage-chart').focus();
-    await page.keyboard.press('ArrowLeft');
-    await expect(readout(page)).toHaveText('Mon, November 16 · 860K token · claude-haiku-5-5 612K · Big Model 248K');
-    await page.keyboard.press('ArrowLeft');
-    await expect(readout(page)).toHaveText(
-      'Sun, November 15 · 4K token · claude-haiku-5-5 4K',
-    );
+    await expect(readout(page)).toHaveText('Sun, November 15 · 4K token · Coordinator 4K · Tasks 0');
+
+    await page.keyboard.press('ArrowDown');
+    await expect(cell(page, '2026-11-16')).toBeFocused();
+    await expect(cell(page, '2026-11-16')).toHaveAttribute('aria-pressed', 'true');
+    await cell(page, '2026-11-16').click();
+    await expect(cell(page, '2026-11-16')).toHaveAttribute('aria-pressed', 'false');
+    await expect(stats).toContainText('864K token');
   });
 });
 
@@ -88,5 +91,5 @@ test('a new team sees an empty state instead of a blank chart', async ({ page })
   );
   await page.goto('/app/usage');
   await expect(page.getByTestId('usage-empty')).toContainText('No usage yet');
-  await expect(page.getByTestId('usage-chart')).toHaveCount(0);
+  await expect(page.getByTestId('usage-heatmap')).toHaveCount(0);
 });

@@ -630,9 +630,9 @@ Reach:
 
 ### token-usage
 
-**Token usage** (shipped, centrality 2). The Usage dialog from the sidebar footer: a 7, 30 or 90 day range with totals, cache hit, the token-type bar, tokens per local day as stacked bars by source or by model, and models and projects ranked.
+**Token usage** (shipped, centrality 2). The Usage dialog from the sidebar footer: a past-year heatmap of tokens per local day, year totals with days used, daily average and cache hit, the token-type bar, and models and projects ranked for the year or the clicked day.
 
-States: Loading, failed with retry, empty for a new team, a new user whose chart starts at the first used day, and a full range with the previous-range change and a readout for the hovered or keyboard-selected day; light and dark, desktop dialog and phone.
+States: Loading, failed with retry, empty for a new team, a new user with a started-on line under the heatmap, a full year with a readout for the hovered or selected day, and a selected day scoping the rankings; light and dark, desktop dialog and phone (16 weeks).
 
 Reach:
 
@@ -641,7 +641,7 @@ Reach:
 
 - Web routes: `/app/usage`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `usage-chart`, `usage-empty`, `usage-error`, `usage-mix`, `usage-models`, `usage-projects`, `usage-readout`, `usage-stats`
+- Test ids in its code: `usage-empty`, `usage-error`, `usage-heatmap`, `usage-legend`, `usage-mix`, `usage-models`, `usage-projects`, `usage-readout`, `usage-since`, `usage-stats`, `usage-year`
 - Research: **gap**: no note beyond GitHub's contribution calendar, which the owner named
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar)
 - Backend design: [docs/design/step-usage-daily.md](../../../docs/design/step-usage-daily.md)

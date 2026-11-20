@@ -14,7 +14,7 @@ const PROJECTS = [
   { id: 'p-docs', name: 'docs-bot' },
 ];
 
-export function usageFixture(today: string, count = 90): DailyUsage {
+export function usageFixture(today: string, count = 240): DailyUsage {
   let seed = 20261116;
   const next = () => {
     seed = (seed * 1103515245 + 12345) % 2147483648;
