@@ -22,6 +22,7 @@ import {
 import { useConnected } from '../api/connection-state.js';
 import { useArchivedTodos, useMachines, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import type { PendingComments } from '../board/design/design-composer.js';
 import { useNarrow } from '../board/use-narrow.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
@@ -223,12 +224,6 @@ export interface ChiefConversationProps {
   composerTools?: ReactNode;
   showBindGate?: boolean;
   pendingComments?: PendingComments | null;
-}
-
-export interface PendingComments {
-  count: number;
-  chips: ReactNode;
-  emptyDraftText: string;
 }
 
 export function ChiefConversation({

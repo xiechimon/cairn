@@ -1,12 +1,18 @@
 import type { DesignCommentRecord } from '@cairn/shared';
+import type { ReactNode } from 'react';
 import { useDesignComments, useDesignMutations, useDesignPages } from '../../api/hooks.js';
 import { useLiveData } from '../../api/provider.js';
-import type { PendingComments } from '../../chief/chief-conversation.js';
 import { Button } from '../../components/ui/button.js';
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
 import { X } from '../../icons/index.js';
 import { type DesignTarget, pickPage } from './design-route.js';
+
+export interface PendingComments {
+  count: number;
+  chips: ReactNode;
+  emptyDraftText: string;
+}
 
 export function commentSubject(comment: Pick<DesignCommentRecord, 'text' | 'label'>): string {
   return comment.text !== '' ? comment.text : comment.label;
