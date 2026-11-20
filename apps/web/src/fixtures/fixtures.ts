@@ -117,6 +117,7 @@ export {
   machinesDuplicateNames,
   machinesMasterDetail,
   ownComputerStates,
+  phoneStates,
   providersEmpty,
   providersFleet,
   resourcesCcBinGone,

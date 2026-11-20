@@ -10,8 +10,9 @@ const computerNames = (
   desktopTools: boolean,
   vmComputer = desktopTools,
   ownComputer = desktopTools,
+  phoneComputer: readonly string[] = [],
 ) =>
-  coordinatorToolDefs({ desktopTools, vmComputer, ownComputer })
+  coordinatorToolDefs({ desktopTools, vmComputer, ownComputer, phoneComputer })
     .map((def) => def.name)
     .filter((name) => (COMPUTER_TOOLS as readonly string[]).includes(name))
     .sort();
@@ -30,7 +31,7 @@ describe('Coordinator computer tool offers', () => {
     const offered = COMPUTER_TOOLS.filter(
       (name) => 'offered' in COORDINATOR_COMPUTER_TOOL_OFFERS[name],
     ).sort();
-    expect(computerNames(true)).toEqual(offered);
+    expect(computerNames(true, true, true, ['Pixel 8a'])).toEqual(offered);
   });
 
   test("the user's Mac tools are offered only when the user's Mac is, and keep the Mac prefix", () => {

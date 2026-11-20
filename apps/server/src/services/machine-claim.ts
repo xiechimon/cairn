@@ -101,6 +101,7 @@ import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { ownComputerOffered } from './own-computer.js';
+import { offeredPhoneNames } from './phone-computer.js';
 import { projectMergeConfigOf } from './projects.js';
 import {
   coordinatorMemoryOwner,
@@ -421,6 +422,7 @@ function chiefClaimPayload(
                 vmComputer: teamHasVmComputer(deps.db, threadRow.teamId),
                 vmBrowser: teamHasVmBrowser(deps.db, threadRow.teamId),
                 ownComputer: ownComputerOffered(deps.db, stepRow.buildId),
+                phoneComputer: offeredPhoneNames(deps, stepRow.buildId),
               }),
               ...connectorToolDefsForTeam(deps.db, threadRow.teamId),
             ].map((def) =>

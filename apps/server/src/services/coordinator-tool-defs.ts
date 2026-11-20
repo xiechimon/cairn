@@ -8,6 +8,7 @@ import {
   COMPUTER_VM_TOOLS,
   type ComputerTool,
   OWN_COMPUTER_TOOLS,
+  PHONE_TOOLS,
   type RemoteToolDef,
   SLICE1_ACTIONS,
 } from '@cairn/shared';
@@ -24,6 +25,7 @@ export type CoordinatorComputerToolOffer =
   | { offered: 'when_machine_reports_computer' }
   | { offered: 'when_machine_reports_vm_computer' }
   | { offered: 'when_owner_thread_and_team_has_mac' }
+  | { offered: 'when_owner_thread_and_consented_phone' }
   | { withheld: string };
 
 export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorComputerToolOffer> =
@@ -52,7 +54,24 @@ export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorC
     user_computer_shell: { offered: 'when_owner_thread_and_team_has_mac' },
     user_computer_observe: { offered: 'when_owner_thread_and_team_has_mac' },
     user_computer_act: { offered: 'when_owner_thread_and_team_has_mac' },
+    phone_observe: { offered: 'when_owner_thread_and_consented_phone' },
+    phone_act: { offered: 'when_owner_thread_and_consented_phone' },
+    phone_manage: {
+      withheld: 'only the owner pairs or forgets a phone from the Computers panel',
+    },
   };
+
+export function phoneToolDefs(names: readonly string[]): RemoteToolDef[] {
+  const label =
+    names.length === 0 ? '' : names.length === 1 ? ` ${names[0]}` : ` (${names.join(', ')})`;
+  return PHONE_TOOLS.map((def) => ({
+    ...def,
+    description: def.description.replace(
+      "The owner's real phone",
+      `The owner's real phone${label}`,
+    ),
+  }));
+}
 
 function actionToolDefs(): RemoteToolDef[] {
   return SLICE1_ACTIONS.filter(
@@ -83,6 +102,7 @@ export function coordinatorToolDefs(
     vmComputer?: boolean;
     vmBrowser?: boolean;
     ownComputer?: boolean;
+    phoneComputer?: readonly string[];
   } = {},
 ): RemoteToolDef[] {
   return [
@@ -97,6 +117,9 @@ export function coordinatorToolDefs(
         ? [CLOAK_LICENSE_TOOL]
         : []),
     ...(options.ownComputer === true ? OWN_COMPUTER_TOOLS : []),
+    ...(options.phoneComputer !== undefined && options.phoneComputer.length > 0
+      ? phoneToolDefs(options.phoneComputer)
+      : []),
     ...actionToolDefs(),
   ];
 }

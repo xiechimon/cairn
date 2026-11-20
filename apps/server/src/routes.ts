@@ -16,6 +16,7 @@ import { githubAppOf } from './routes-helpers.js';
 import { registerImRoutes } from './routes-im.js';
 import { registerMailRoutes } from './routes-mail.js';
 import { registerMemoryRoutes } from './routes-memories.js';
+import { registerPhoneRoutes } from './routes-phones.js';
 import { registerProjectRoutes } from './routes-projects.js';
 import { registerPushRoutes } from './routes-push.js';
 import { registerResourceRoutes } from './routes-resources.js';
@@ -28,6 +29,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerCoreRoutes(app, ctx);
   registerDeployRoutes(app, ctx);
   registerComputerRoutes(app, ctx);
+  registerPhoneRoutes(app, ctx);
   registerComputerScreenRoutes(app, ctx);
   registerEngineScreenRoutes(app, ctx);
   registerProjectRoutes(app, ctx);

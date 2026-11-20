@@ -1432,6 +1432,52 @@
       "batch": "B5"
     },
     {
+      "id": "phones",
+      "name": "Phone computers",
+      "summary": "The owner pairs a real phone over adb in Settings, Machines; the Coordinator then sees and drives it with phone_observe and phone_act, with consent, takeover and lock handback.",
+      "states": "Each phone row shows not paired, pairing, ready, busy, locked, handoff or unreachable; pair failure keeps the row with its error and a retry.",
+      "centrality": 2,
+      "status": "partial",
+      "code": {
+        "server": [
+          "apps/server/src/routes-phones.ts",
+          "apps/server/src/services/phone-computer.ts"
+        ],
+        "daemon": [
+          "apps/daemon/src/computer/phone-probe.ts",
+          "apps/daemon/src/computer/phone-android.ts",
+          "apps/daemon/src/computer/phones.ts"
+        ],
+        "web": [
+          "apps/web/src/resources/phones-panel.tsx"
+        ]
+      },
+      "routes": {
+        "server": [
+          "/api/machines/:id/phones",
+          "/api/machines/:id/phones/:phoneId",
+          "/api/machines/:id/phones/:phoneId/pair",
+          "/api/machines/:id/phones/:phoneId/handback",
+          "/api/machines/:id/phones/activity",
+          "/api/phones/handoffs"
+        ]
+      },
+      "reach": [
+        "settings machines",
+        "click testid:phones-meta"
+      ],
+      "research": [
+        "docs/research/phone-agents-2026-11-20.md"
+      ],
+      "evidence": [],
+      "frontendDesign": [
+        "docs/design/phone-computer.md"
+      ],
+      "backendDesign": [
+        "docs/design/phone-computer.md"
+      ]
+    },
+    {
       "id": "remote-access",
       "name": "Remote access over the tailnet",
       "summary": "The built-in tsnet node with a route list (LAN, tailnet, Funnel), device pairing by QR code and the remote access settings page.",

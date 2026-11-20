@@ -74,6 +74,8 @@ import type {
   PatchTeamAutonomyBody,
   PatchTeamBody,
   PatchUserBody,
+  PhoneActivity,
+  PhoneRow,
   PlanResponse as PlanRow,
   ProjectFilesResponse,
   ProjectRecord,
@@ -476,6 +478,51 @@ export function useOwnComputerActivity(machineId: string | undefined, enabled: b
       ).activity,
     enabled: enabled && machineId !== undefined,
     refetchInterval: 10_000,
+  });
+}
+
+export function usePhones(machineId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['phones', machineId],
+    queryFn: async () =>
+      (
+        await api.get<{ phones: PhoneRow[] }>(
+          `/api/machines/${encodeURIComponent(machineId ?? '')}/phones`,
+        )
+      ).phones,
+    enabled: enabled && machineId !== undefined,
+    refetchInterval: 10_000,
+  });
+}
+
+export function usePhoneActivity(machineId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['phone-activity', machineId],
+    queryFn: async () =>
+      (
+        await api.get<{ activity: PhoneActivity[] }>(
+          `/api/machines/${encodeURIComponent(machineId ?? '')}/phones/activity`,
+        )
+      ).activity,
+    enabled: enabled && machineId !== undefined,
+    refetchInterval: 10_000,
+  });
+}
+
+export interface PhoneHandoffRow {
+  phoneId: string;
+  machineId: string;
+  name: string;
+  requestedAt: number | null;
+}
+
+export function usePhoneHandoffs(enabled: boolean) {
+  return useQuery({
+    queryKey: ['phone-handoffs'],
+    queryFn: async () =>
+      (await api.get<{ handoffs: PhoneHandoffRow[] }>('/api/phones/handoffs')).handoffs,
+    enabled,
+    refetchInterval: 3_000,
   });
 }
 
@@ -1205,6 +1252,55 @@ export function useApiMutations(teamId: string | undefined) {
         void qc.invalidateQueries({ queryKey: ['machines', teamId] });
         void qc.invalidateQueries({ queryKey: ['routing-settings', teamId] });
         void qc.invalidateQueries({ queryKey: ['model-routing', teamId] });
+      },
+    }),
+    pairPhone: useMutation({
+      mutationFn: (input: {
+        machineId: string;
+        body:
+          | { deviceId: string; name?: string; consent: true }
+          | { endpoint: string; code: string; name?: string; consent: true };
+      }) =>
+        api.post<{ phone: PhoneRow }>(
+          `/api/machines/${encodeURIComponent(input.machineId)}/phones`,
+          input.body,
+        ),
+      onSuccess: (_result, input) => {
+        void qc.invalidateQueries({ queryKey: ['phones', input.machineId] });
+      },
+    }),
+    retryPairPhone: useMutation({
+      mutationFn: (input: {
+        machineId: string;
+        phoneId: string;
+        body: { endpoint: string; code: string; consent: true };
+      }) =>
+        api.post<{ phone: PhoneRow }>(
+          `/api/machines/${encodeURIComponent(input.machineId)}/phones/${encodeURIComponent(input.phoneId)}/pair`,
+          input.body,
+        ),
+      onSuccess: (_result, input) => {
+        void qc.invalidateQueries({ queryKey: ['phones', input.machineId] });
+      },
+    }),
+    forgetPhone: useMutation({
+      mutationFn: (input: { machineId: string; phoneId: string }) =>
+        api.del<{ outcome: string }>(
+          `/api/machines/${encodeURIComponent(input.machineId)}/phones/${encodeURIComponent(input.phoneId)}`,
+        ),
+      onSuccess: (_result, input) => {
+        void qc.invalidateQueries({ queryKey: ['phones', input.machineId] });
+        void qc.invalidateQueries({ queryKey: ['phone-activity', input.machineId] });
+      },
+    }),
+    handbackPhone: useMutation({
+      mutationFn: (input: { machineId: string; phoneId: string }) =>
+        api.post<{ ok: boolean }>(
+          `/api/machines/${encodeURIComponent(input.machineId)}/phones/${encodeURIComponent(input.phoneId)}/handback`,
+          {},
+        ),
+      onSuccess: () => {
+        void qc.invalidateQueries({ queryKey: ['phone-handoffs'] });
       },
     }),
     createProject: useMutation({

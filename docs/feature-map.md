@@ -15,11 +15,11 @@
 
 | Item | Count |
 |---|---|
-| Features | 57 |
+| Features | 58 |
 | status shipped | 45 |
-| status partial | 10 |
+| status partial | 11 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 29 |
+| research, frontend design and backend design all present or not applicable | 30 |
 | Research gaps | 13 |
 | Frontend design gaps | 15 |
 | Backend design gaps | 18 |
@@ -57,6 +57,7 @@
 | [Machines](#machines) | 2 | shipped | yes | yes | yes |  |
 | [Mobile web and PWA](#mobile-web) | 2 | shipped | gap | yes | n/a | B6 |
 | [Own-key cloud sandboxes](#own-key-sandboxes) | 2 | partial | gap | gap | gap | B4 |
+| [Phone computers](#phones) | 2 | partial | yes | yes | yes |  |
 | [Model providers and subscriptions](#providers) | 2 | shipped | yes | yes | yes |  |
 | [Remote access over the tailnet](#remote-access) | 2 | partial | yes | gap | yes | B5 |
 | [Login and tailnet device auth](#tailnet-login) | 2 | partial | yes (not on main) | gap | yes (not on main) | B5 |
@@ -421,6 +422,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: **gap**: no note comparing E2B and Daytona against the dispatch contract
 - Frontend design: **gap**: no design for adding a sandbox provider and its key
 - Backend design: **gap**: no design for the E2B and Daytona providers, key injection and teardown
+
+### phones
+
+**Phone computers** (partial). The owner pairs a real phone over adb in Settings, Machines; the Coordinator then sees and drives it with phone_observe and phone_act, with consent, takeover and lock handback.
+
+- Research: [docs/research/phone-agents-2026-11-20.md](research/phone-agents-2026-11-20.md)
+- Frontend design: [docs/design/phone-computer.md](design/phone-computer.md)
+- Backend design: [docs/design/phone-computer.md](design/phone-computer.md)
 
 ### providers
 

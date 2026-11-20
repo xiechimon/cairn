@@ -17,6 +17,7 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { useComputerGrantsRow } from './computer-grants-panel.js';
 import { useFolderGrantsRow } from './folder-grants-panel.js';
 import { useOwnComputerRow } from './own-computer-panel.js';
+import { usePhonesRow } from './phones-panel.js';
 
 export function MachineRowView({
   machine,
@@ -38,6 +39,7 @@ export function MachineRowView({
   const ownComputer = useOwnComputerRow(machine);
   const computerGrants = useComputerGrantsRow(machine);
   const folders = useFolderGrantsRow(machine);
+  const phones = usePhonesRow(machine);
 
   const makeDefault = () => {
     if (!live) {
@@ -122,6 +124,7 @@ export function MachineRowView({
             {ownComputer.meta}
             {computerGrants.meta}
             {folders.meta}
+            {phones.meta}
           </div>
         </div>
         <DropdownMenu>
@@ -167,6 +170,7 @@ export function MachineRowView({
       {ownComputer.drawer}
       {computerGrants.drawer}
       {folders.drawer}
+      {phones.drawer}
       <DeleteConfirm
         open={confirmOpen}
         title={t('确定删除这台执行机？此操作不可撤销。')}

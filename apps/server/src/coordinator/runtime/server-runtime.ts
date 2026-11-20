@@ -52,6 +52,7 @@ export interface ServerRuntimeConfig {
   vmBrowser?(threadId: string): boolean;
   connectorTools?(threadId: string): RemoteToolDef[];
   ownComputer?(threadId: string): boolean;
+  phoneComputer?(threadId: string): readonly string[];
   providersFor?(threadId: string): readonly ProviderBinding[];
   onImagesRejected?(threadId: string, providerId: string, modelId: string): void;
   recordConversation?(threadId: string, conversationId: string, entryId: number): void;
@@ -137,6 +138,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
           ? { remoteTools: WORKER_MEMORY_REMOTE_TOOLS }
           : { loaded: CORE_COORDINATOR_TOOLS }),
         ownComputer: config.ownComputer?.(threadId) === true,
+        phoneComputer: config.phoneComputer?.(threadId) ?? [],
         shuttingDown: () => shuttingDown,
         ...(inputs === undefined
           ? {}

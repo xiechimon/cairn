@@ -18,6 +18,7 @@ import {
   installPackagesParamsSchema,
   isComputerBrowserTool,
   isOwnComputerTool,
+  isPhoneTool,
   type MachineComputerFramesResponse,
   type MachineComputerRelayBody,
   normalizeBrowserSecretOrigin,
@@ -25,11 +26,18 @@ import {
   PACKAGES_NO_VM_COMPUTER,
   PACKAGES_NOT_ANSWERED,
   type PackageInstallDecisionBody,
+  PHONE_HANDED_BACK,
+  PHONE_MANAGE_PANEL_ONLY,
+  PHONE_MANAGE_TIMEOUT_MS,
+  PHONE_NOT_OWNER,
+  PHONE_TAKEOVER_NO_PHONE,
+  type PhoneManageAction,
+  phoneManageResultSchema,
   redactSecrets,
   type SecretBox,
   TAKEOVER_HANDED_BACK,
 } from '@cairn/shared';
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   chiefThread,
@@ -37,6 +45,7 @@ import {
   computerBrowserLease,
   computerCall,
   machine,
+  phone,
   secret,
   step,
 } from '../db/schema.js';
@@ -75,9 +84,19 @@ import {
   NO_CARD_THREAD,
 } from './computer-thread.js';
 import type { TeamStreamHub } from './events.js';
+import { isOwner } from './instance-owner.js';
 import { type MachineDeps, ownedStep } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { ownComputerTarget } from './own-computer.js';
+import {
+  acquirePhoneLease,
+  cancelPhoneCalls,
+  markPhoneHandoffIfNone,
+  type PhoneComputerTarget,
+  phoneComputerTarget,
+  resolveConsentedPhone,
+  sanitizePhoneName,
+} from './phone-computer.js';
 import { sendMustReachAlert } from './push-alerts.js';
 import { refuseRestrictedTurnTool } from './report-turn.js';
 
@@ -117,6 +136,8 @@ const SCREEN_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'desktop_act',
   'user_computer_observe',
   'user_computer_act',
+  'phone_observe',
+  'phone_act',
   'open_path',
   'launch_app',
 ]);
@@ -575,6 +596,14 @@ function releaseExecutionLease(db: Db, stepId: string): void {
     .set({ ...HANDOFF_CLEARED, updatedAt: nowMs() })
     .where(eq(computer.handoffStepId, stepId))
     .run();
+  db.update(phone)
+    .set({ executionStepId: null, executionLeaseExpiresAt: null, updatedAt: nowMs() })
+    .where(eq(phone.executionStepId, stepId))
+    .run();
+  db.update(phone)
+    .set({ ...HANDOFF_CLEARED, updatedAt: nowMs() })
+    .where(eq(phone.handoffStepId, stepId))
+    .run();
   db.delete(computerBrowserLease).where(eq(computerBrowserLease.stepId, stepId)).run();
 }
 
@@ -910,6 +939,108 @@ async function holdTakeover(
   };
 }
 
+function clearPhoneHandoff(db: Db, phoneId: string): void {
+  db.update(phone).set(HANDOFF_CLEARED).where(eq(phone.id, phoneId)).run();
+}
+
+async function holdPhoneTakeover(
+  deps: MachineDeps,
+  thread: ComputerThread,
+  stepId: string,
+  body: MachineComputerRelayBody,
+  opts: { signal?: AbortSignal; takeover?: { timeoutMs?: number; pollMs?: number } },
+): Promise<ComputerRelayResult> {
+  const { db } = deps;
+  if (!isOwner(db, thread.userId)) return { text: PHONE_NOT_OWNER };
+  const asked = typeof body.params.phone === 'string' ? body.params.phone.trim() : '';
+  const resolved = resolveConsentedPhone(deps, thread.teamId, asked === '' ? null : asked);
+  if (resolved.kind === 'refused') return { text: PHONE_TAKEOVER_NO_PHONE };
+  const target = resolved.joined.row;
+  const timeoutMs = opts.takeover?.timeoutMs ?? COMPUTER_HANDOFF_TIMEOUT_MS;
+  const pollMs = opts.takeover?.pollMs ?? COMPUTER_HANDOFF_POLL_MS;
+  const now = nowMs();
+  const callId = computerCallId(stepId, body.toolCallId);
+  const waiting = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  const resumed = waiting?.state === 'running';
+  const deadlineAt = resumed ? waiting.deadlineAt : now + timeoutMs;
+  if (!resumed) {
+    acquirePhoneLease(db, target.id, stepId, deadlineAt);
+    db.insert(computerCall)
+      .values({
+        id: callId,
+        teamId: thread.teamId,
+        stepId,
+        toolCallId: body.toolCallId,
+        machineId: target.machineId,
+        computerId: null,
+        phoneId: target.id,
+        tool: 'request_takeover',
+        replaySafe: false,
+        params: storedParams(body.params),
+        state: 'running',
+        deadlineAt,
+        createdAt: now,
+        startedAt: now,
+      })
+      .run();
+  }
+  markPhoneHandoffIfNone(db, target.id, 'model', stepId, now);
+  const askedReason = body.params.reason;
+  const reason =
+    typeof askedReason === 'string' && askedReason.trim() !== ''
+      ? redact(askedReason).slice(0, 200)
+      : '';
+  if (!resumed) {
+    void sendMustReachAlert(db, deps.vapidKeys ?? null, thread.userId, thread.teamId, {
+      title: '需要你接管手机',
+      body: reason || `Coordinator 需要你在 ${target.name} 上操作。`,
+      href: thread.id === NO_CARD_THREAD ? '/app' : `/app?chief=${encodeURIComponent(thread.id)}`,
+      tag: `${thread.userId}:${callId}`,
+    }).catch(() => {
+      process.stderr.write('takeover push failed\n');
+    });
+  }
+  let outcome: HandoffWait = 'not_done';
+  try {
+    for (;;) {
+      const call = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+      const owner = db.select().from(step).where(eq(step.id, stepId)).get();
+      const row = db.select().from(phone).where(eq(phone.id, target.id)).get();
+      if (call?.state !== 'running' || owner?.status !== 'claimed' || !row) break;
+      if (row.handoffReason === null) {
+        outcome = 'handed_back';
+        break;
+      }
+      if (opts.signal?.aborted || nowMs() >= deadlineAt) break;
+      await pause(pollMs, opts.signal);
+    }
+  } finally {
+    const current = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+    if (current?.state === 'running') {
+      const handedBack = outcome === 'handed_back';
+      db.update(computerCall)
+        .set(
+          handedBack
+            ? { state: 'done', resultText: PHONE_HANDED_BACK, finishedAt: nowMs() }
+            : {
+                state: 'error',
+                errorMessage: 'the owner did not finish',
+                errorDelivery: 'not_delivered',
+                finishedAt: nowMs(),
+              },
+        )
+        .where(eq(computerCall.id, callId))
+        .run();
+      clearPhoneHandoff(db, target.id);
+      releaseExecutionLease(db, stepId);
+    }
+  }
+  const settled = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  return {
+    text: settled?.state === 'done' ? PHONE_HANDED_BACK : TAKEOVER_NOT_DONE,
+  };
+}
+
 export const COMPUTER_MANAGE_PANEL_ONLY =
   'computer_manage is started only by the owner from the Computers panel';
 export const COMPUTER_MANAGE_VM_ONLY =
@@ -1137,6 +1268,119 @@ export async function manageComputer(
   throw new HttpError(409, row?.errorMessage ?? 'The computer action did not finish');
 }
 
+export type ManagePhoneResult = { outcome: 'paired' | 'forgotten' | 'failed'; error?: string };
+
+export async function managePhone(
+  deps: PendingDeps,
+  teamId: string,
+  machineId: string,
+  phoneId: string,
+  params: { action: PhoneManageAction; code?: string; endpoint?: string },
+): Promise<ManagePhoneResult> {
+  const { db } = deps;
+  const row = db
+    .select()
+    .from(phone)
+    .where(and(eq(phone.id, phoneId), eq(phone.machineId, machineId), eq(phone.teamId, teamId)))
+    .get();
+  if (row === undefined) throw new NotFoundError(`phone ${phoneId}`);
+  if (params.action === 'forget') {
+    cancelPhoneCalls(db, row.id);
+    if (!deps.machineHub.isConnected(machineId)) {
+      db.delete(phone).where(eq(phone.id, row.id)).run();
+      return { outcome: 'forgotten' };
+    }
+  } else if (!deps.machineHub.isConnected(machineId)) {
+    throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+  }
+  const stepId = newRecordId();
+  const toolCallId = `owner-phone-${params.action}`;
+  const callId = computerCallId(stepId, toolCallId);
+  const now = nowMs();
+  const deadlineAt = now + PHONE_MANAGE_TIMEOUT_MS;
+  const stored = {
+    action: params.action,
+    ...(params.endpoint ? { endpoint: params.endpoint } : {}),
+  };
+  db.insert(computerCall)
+    .values({
+      id: callId,
+      teamId,
+      stepId,
+      toolCallId,
+      machineId,
+      computerId: null,
+      phoneId: row.id,
+      tool: 'phone_manage',
+      replaySafe: false,
+      params: stored,
+      state: 'dispatched',
+      deadlineAt,
+      createdAt: now,
+    })
+    .run();
+  const call: ComputerCall = {
+    callId,
+    stepId,
+    tool: 'phone_manage',
+    params: { ...stored, ...(params.code !== undefined ? { code: params.code } : {}) },
+    deadlineAt,
+    phone: { phoneId: row.id, deviceId: row.deviceId },
+  };
+  if (!deps.machineHub.pushComputer(machineId, call)) {
+    db.delete(computerCall).where(eq(computerCall.id, callId)).run();
+    if (params.action === 'forget') {
+      db.delete(phone).where(eq(phone.id, row.id)).run();
+      return { outcome: 'forgotten' };
+    }
+    throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+  }
+  await openPending(deps, call).result;
+  const finished = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  if (params.action === 'forget') {
+    db.delete(phone).where(eq(phone.id, row.id)).run();
+    return { outcome: 'forgotten' };
+  }
+  let parsed: ReturnType<typeof phoneManageResultSchema.safeParse> | null = null;
+  if (finished?.resultText !== null && finished?.resultText !== undefined) {
+    try {
+      parsed = phoneManageResultSchema.safeParse(JSON.parse(finished.resultText));
+    } catch {
+      parsed = null;
+    }
+  }
+  if (finished?.state === 'done' && parsed?.success === true && parsed.data.outcome === 'paired') {
+    const nextDeviceId = parsed.data.deviceId ?? row.deviceId;
+    if (nextDeviceId !== row.deviceId) {
+      db.delete(phone)
+        .where(
+          and(
+            eq(phone.machineId, row.machineId),
+            eq(phone.deviceId, nextDeviceId),
+            ne(phone.id, row.id),
+          ),
+        )
+        .run();
+    }
+    db.update(phone)
+      .set({
+        deviceId: nextDeviceId,
+        name:
+          parsed.data.name === undefined
+            ? row.name
+            : sanitizePhoneName(parsed.data.name) || row.name,
+        lastError: null,
+        updatedAt: nowMs(),
+      })
+      .where(eq(phone.id, row.id))
+      .run();
+    return { outcome: 'paired' };
+  }
+  const error = finished?.errorMessage ?? 'the pairing did not finish';
+  db.update(phone).set({ lastError: error, updatedAt: nowMs() }).where(eq(phone.id, row.id)).run();
+  return { outcome: 'failed', error };
+}
+
 const CARD_TAB_CLOSE_TIMEOUT_MS = 15_000;
 
 export function browserTabScope(
@@ -1222,19 +1466,27 @@ export async function forwardComputerCall(
 
   const tool = body.name;
   if (tool === 'computer_manage') throw new HttpError(400, COMPUTER_MANAGE_PANEL_ONLY);
+  if (tool === 'phone_manage') throw new HttpError(400, PHONE_MANAGE_PANEL_ONLY);
   if (tool === 'browser_close_tab')
     throw new HttpError(400, 'browser_close_tab is sent by the server when a step ends');
   let own: { machineId: string } | null = null;
-  if (isOwnComputerTool(tool)) {
+  let phoneTarget: Extract<PhoneComputerTarget, { kind: 'ready' }> | null = null;
+  if (isOwnComputerTool(tool) || isPhoneTool(tool)) {
     refuseRestrictedTurnTool(db, stepRow.prompt, tool, body.params, stepRow.ownerMessageIds ?? []);
     const chiefRow =
       stepRow.kind === 'chief'
         ? db.select().from(chiefThread).where(eq(chiefThread.id, stepRow.buildId)).get()
         : undefined;
     if (chiefRow === undefined) throw new NotFoundError(`chief thread ${stepRow.buildId}`);
-    const target = ownComputerTarget(deps, chiefRow, tool);
-    if (target.kind === 'refused') return { text: target.text };
-    own = { machineId: target.machineId };
+    if (isOwnComputerTool(tool)) {
+      const target = ownComputerTarget(deps, chiefRow, tool);
+      if (target.kind === 'refused') return { text: target.text };
+      own = { machineId: target.machineId };
+    } else {
+      const target = phoneComputerTarget(deps, thread, stepId, tool, body.params);
+      if (target.kind === 'refused') return { text: target.text };
+      phoneTarget = target;
+    }
   }
   const safe = COMPUTER_REPLAY_SAFE_TOOLS.has(tool);
   const latest = latestComputerAttempt(db, stepId, body.toolCallId);
@@ -1248,6 +1500,8 @@ export async function forwardComputerCall(
   if (live) return waitForCall(deps, live, stepId, opts.signal);
 
   if (existing && existing.tool === 'request_takeover' && existing.state === 'running') {
+    if (typeof body.params.phone === 'string' && body.params.phone.trim() !== '')
+      return holdPhoneTakeover(deps, thread, stepId, body, opts);
     return holdTakeover(deps, thread, stepId, body, opts);
   }
   if (tool === 'install_packages' && (existing === undefined || existing.state === 'running'))
@@ -1271,7 +1525,11 @@ export async function forwardComputerCall(
     return resultOfRow(existing);
   }
 
-  if (tool === 'request_takeover') return holdTakeover(deps, thread, stepId, body, opts);
+  if (tool === 'request_takeover') {
+    if (typeof body.params.phone === 'string' && body.params.phone.trim() !== '')
+      return holdPhoneTakeover(deps, thread, stepId, body, opts);
+    return holdTakeover(deps, thread, stepId, body, opts);
+  }
   const refusal = handoffRefusal(
     db
       .select()
@@ -1284,9 +1542,11 @@ export async function forwardComputerCall(
   if (refusal !== null) return { text: refusal };
 
   const target =
-    own === null
-      ? selectTarget(deps, thread.teamId, thread.chiefId, tool)
-      : { machineId: own.machineId, computerId: null };
+    phoneTarget !== null
+      ? { machineId: phoneTarget.machineId, computerId: null }
+      : own === null
+        ? selectTarget(deps, thread.teamId, thread.chiefId, tool)
+        : { machineId: own.machineId, computerId: null };
   const secretActions =
     tool === 'browser_act' && Array.isArray(body.params.actions)
       ? body.params.actions
@@ -1381,11 +1641,14 @@ export async function forwardComputerCall(
     if (browserTool)
       acquireBrowserLease(db, target.computerId, browserScopeFor(thread), stepId, safe, deadlineAt);
     else acquireExecutionLease(db, target.computerId, stepId, safe, deadlineAt);
+  } else if (phoneTarget !== null) {
+    acquirePhoneLease(db, phoneTarget.phoneId, stepId, deadlineAt);
   }
 
   const fresh = {
     machineId: target.machineId,
     computerId: target.computerId,
+    phoneId: phoneTarget?.phoneId ?? null,
     tool,
     replaySafe: safe,
     params: {
@@ -1452,8 +1715,11 @@ export async function forwardComputerCall(
     ...(browserTool
       ? { tabScope: browserTabScope(stepRow), browserScope: browserScopeFor(thread) }
       : {}),
-    ...(own === null
+    ...(own === null && phoneTarget === null
       ? { computerGrant: browserTool ? ('browser' as const) : ('desktop' as const) }
+      : {}),
+    ...(phoneTarget !== null
+      ? { phone: { phoneId: phoneTarget.phoneId, deviceId: phoneTarget.deviceId } }
       : {}),
   };
   try {

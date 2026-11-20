@@ -1,7 +1,7 @@
 import { COMPUTER_HANDOFF_TIMEOUT_MS } from '@cairn/shared';
 import { cn } from 'cn';
 import { useEffect, useState } from 'react';
-import { useComputers } from '../api/hooks.js';
+import { useApiMutations, useComputers, usePhoneHandoffs } from '../api/hooks.js';
 import { clockTime } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useComputerControl } from '../api/use-computer-control.js';
@@ -61,11 +61,42 @@ function useDevicePushOff(teamId: string | undefined, active: boolean) {
   return { off, turnOn };
 }
 
+function PhoneTakeoverButtons({ item, waiting }: { item: TakeoverItem; waiting: boolean }) {
+  const { t } = useI18n();
+  const { teamId } = useLiveData();
+  const mutations = useApiMutations(teamId);
+  const handoffsQ = usePhoneHandoffs(waiting);
+  const target = handoffsQ.data?.find((row) => row.name === item.phone) ?? null;
+  const handback = () => {
+    if (target === null) return;
+    mutations.handbackPhone.mutate({ machineId: target.machineId, phoneId: target.phoneId });
+  };
+  if (!waiting) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3">
+      <Button
+        type="button"
+        size="sm"
+        className="pointer-coarse:h-11 pointer-coarse:px-4"
+        disabled={target === null || mutations.handbackPhone.isPending}
+        data-testid="chief-takeover-handback"
+        onClick={handback}
+      >
+        {t('我已操作完，交还')}
+      </Button>
+      {target === null && (
+        <span className="text-meta text-content-tertiary">{t('正在连接手机状态…')}</span>
+      )}
+    </div>
+  );
+}
+
 export function TakeoverCard({ item }: { item: TakeoverItem }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const waiting = item.outcome === 'waiting';
-  const computersQ = useComputers(teamId, live && waiting, COMPUTERS_REFRESH_MS);
+  const onPhone = item.phone !== undefined;
+  const computersQ = useComputers(teamId, live && waiting && !onPhone, COMPUTERS_REFRESH_MS);
   const computer = computersQ.data?.[0] ?? null;
   const control = useComputerControl({ teamId, computer });
   const hover = useScreenHoverControl(control, computer?.handoffReason != null);
@@ -84,7 +115,9 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
       : t('没有完成')
     : held
       ? t('你正在操作电脑')
-      : t('需要你登录');
+      : onPhone
+        ? t('需要你操作手机 {name}', { name: item.phone ?? '' })
+        : t('需要你登录');
 
   const meta = !waiting
     ? item.outcome === 'handed-back'
@@ -92,7 +125,11 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
       : t('这一步已停止，不会自动重试')
     : held
       ? t('Coordinator 已暂停，不读取屏幕')
-      : item.reason;
+      : item.reason !== ''
+        ? item.reason
+        : onPhone
+          ? t('在手机上完成后点“交还”，Coordinator 继续。')
+          : item.reason;
   const timeLeft = waiting && left !== null ? t('还剩 {n} 分钟', { n: left }) : null;
 
   return (
@@ -135,7 +172,8 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
             </Button>
           </p>
         )}
-        {waiting && (
+        {waiting && onPhone && <PhoneTakeoverButtons item={item} waiting={waiting} />}
+        {waiting && !onPhone && (
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <Button
               type="button"

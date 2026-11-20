@@ -910,3 +910,131 @@ export const resourcesMailError: FixtureSet = {
     ],
   },
 };
+
+const PHONE_NOW = Date.now();
+
+function phoneRow(
+  patch: Partial<import('@cairn/shared').PhoneRow> &
+    Pick<import('@cairn/shared').PhoneRow, 'id' | 'deviceId' | 'name'>,
+): import('@cairn/shared').PhoneRow {
+  return {
+    machineId: 'ph-mac',
+    platform: 'android',
+    consented: true,
+    pairing: false,
+    busy: false,
+    handoff: false,
+    lastError: null,
+    createdAt: PHONE_NOW - 60 * 60_000,
+    ...patch,
+  };
+}
+
+export const phoneStates: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    machines: [
+      ownMac(
+        'ph-mac',
+        'runner-mac',
+        {
+          phonesFixture: {
+            phones: [
+              phoneRow({ id: 'ph-ready', deviceId: '192.168.1.20:42155', name: 'Pixel 8a' }),
+              phoneRow({ id: 'ph-locked', deviceId: '192.168.1.21:42155', name: 'Pixel 7' }),
+              phoneRow({ id: 'ph-busy', deviceId: 'emulator-5554', name: '工作台机', busy: true }),
+              phoneRow({
+                id: 'ph-pairing',
+                deviceId: '39041FDJG00ABC',
+                name: 'USB 手机',
+                pairing: true,
+              }),
+              phoneRow({
+                id: 'ph-error',
+                deviceId: '192.168.1.22:42155',
+                name: '旧手机',
+                lastError: 'adb pair failed: failed',
+              }),
+              phoneRow({ id: 'ph-away', deviceId: '192.168.1.23:42155', name: '带走的手机' }),
+            ],
+            activity: [
+              {
+                callId: 'e'.repeat(64),
+                tool: 'phone_act',
+                phoneName: 'Pixel 8a',
+                summary: 'Pixel 8a: tap, type',
+                state: 'done',
+                exitCode: null,
+                error: null,
+                threadId: 'chief-thread-1',
+                threadTitle: '回一条微信',
+                createdAt: PHONE_NOW - 5 * MINUTE,
+              },
+              {
+                callId: 'f'.repeat(64),
+                tool: 'phone_observe',
+                phoneName: 'Pixel 8a',
+                summary: 'Pixel 8a',
+                state: 'done',
+                exitCode: null,
+                error: null,
+                threadId: 'chief-thread-1',
+                threadTitle: '回一条微信',
+                createdAt: PHONE_NOW - 6 * MINUTE,
+              },
+            ],
+          },
+        },
+        {
+          phoneHost: true,
+          phones: [
+            {
+              deviceId: '192.168.1.20:42155',
+              platform: 'android',
+              name: 'Pixel 8a',
+              link: 'ready',
+            },
+            {
+              deviceId: '192.168.1.21:42155',
+              platform: 'android',
+              name: 'Pixel 7',
+              link: 'locked',
+            },
+            { deviceId: 'emulator-5554', platform: 'android', name: '工作台机', link: 'ready' },
+            {
+              deviceId: '39041FDJG00ABC',
+              platform: 'android',
+              name: 'USB 手机',
+              link: 'unauthorized',
+            },
+            { deviceId: '192.168.1.30:40001', platform: 'android', name: '新手机', link: 'seen' },
+            {
+              deviceId: '192.168.1.22:42155',
+              platform: 'android',
+              name: '旧手机',
+              link: 'offline',
+            },
+          ],
+        },
+      ),
+      ownMac(
+        'ph-noadb',
+        'no-adb-mac',
+        {
+          phonesFixture: {
+            phones: [
+              phoneRow({
+                id: 'ph-gone',
+                deviceId: '192.168.1.50:42155',
+                name: '离线的手机',
+                machineId: 'ph-noadb',
+              }),
+            ],
+          },
+        },
+        {},
+      ),
+    ],
+  },
+};

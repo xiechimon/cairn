@@ -190,7 +190,157 @@ function rmOperands(args: string[]): string[] {
   return out;
 }
 
+const ADB_SAFE_SUBCOMMANDS = new Set([
+  'devices',
+  'version',
+  'mdns',
+  'help',
+  '--help',
+  'start-server',
+  'kill-server',
+]);
+const IOS_BRIDGE_HEADS = new Set([
+  'afcclient',
+  'cfgutil',
+  'devicectl',
+  'fb-idb',
+  'gidevice',
+  'idb',
+  'ifuse',
+  'instruments',
+  'ios-deploy',
+  'iproxy',
+  'irecovery',
+  'mobiledevice',
+  'pymobiledevice3',
+  'simctl',
+  'tidevice',
+  'xctrace',
+]);
+const IOS_BRIDGE_MODULE = /^(?:pythonw?[\d.]*|uv|uvx|pipx)$/;
+const PHONE_WORD =
+  /\b(?:adb|afcclient|cfgutil|devicectl|fb-idb|gidevice|idb|idevice\w*|ifuse|instruments|ios-deploy|iproxy|irecovery|mobiledevice|pymobiledevice3|simctl|tidevice|xcodebuild|xcrun|xctrace)\b/i;
+const PHONE_SHELL_SCRIPT =
+  /\b(?:do shell script|doShellScript|doScript|do script|includeStandardAdditions|NSTask)\b|\$\s*(?:\.\s*system\b|\[\s*['"]\s*system\b)/i;
+const PHONE_SCRIPT_DYNAMIC = /&|system attribute|getenv|contents of|\$\s*[.[]/i;
+const COMMAND_OPERAND_HEADS = new Set([
+  'arch',
+  'at',
+  'automator',
+  'batch',
+  'caffeinate',
+  'crontab',
+  'exec',
+  'launchctl',
+  'screen',
+  'script',
+  'socat',
+  'ssh',
+  'su',
+  'tmux',
+  'xargs',
+]);
+const ARITH_EVAL_HEADS = new Set([
+  '[',
+  '[[',
+  'declare',
+  'export',
+  'let',
+  'local',
+  'mapfile',
+  'printf',
+  'read',
+  'readonly',
+  'test',
+  'typeset',
+  'unset',
+]);
+const COMMAND_VALUE_OPTIONS: Readonly<Record<string, readonly string[]>> = {
+  git: ['-c', '--exec-path'],
+  rsync: ['-e', '--rsh', '--rsync-path'],
+  scp: ['-S'],
+  sftp: ['-S'],
+  ssh: ['-o'],
+  tar: [
+    '--checkpoint-action',
+    '--to-command',
+    '-I',
+    '--use-compress-program',
+    '-F',
+    '--info-script',
+    '--new-volume-script',
+  ],
+};
+const RUNNER_ENV_NAMES = new Set([
+  'BASH_ENV',
+  'BROWSER',
+  'CVSEDITOR',
+  'CVS_RSH',
+  'DIFFPROG',
+  'EDITOR',
+  'ENV',
+  'GIT_ASKPASS',
+  'GIT_EDITOR',
+  'GIT_EXTERNAL_DIFF',
+  'GIT_PAGER',
+  'GIT_PROXY_COMMAND',
+  'GIT_SEQUENCE_EDITOR',
+  'GIT_SSH',
+  'GIT_SSH_COMMAND',
+  'HGEDITOR',
+  'LESSCLOSE',
+  'LESSOPEN',
+  'MANPAGER',
+  'MAILER',
+  'P4DIFF',
+  'P4EDITOR',
+  'P4MERGE',
+  'PAGER',
+  'PROMPT_COMMAND',
+  'PS4',
+  'RSYNC_RSH',
+  'SSH_ASKPASS',
+  'SUDO_ASKPASS',
+  'SVN_EDITOR',
+  'SVN_SSH',
+  'SYSTEMD_PAGER',
+  'TERMINAL',
+  'VISUAL',
+]);
+const RUNNER_ENV_PREFIX = /^GIT_CONFIG_/;
+function runnerEnvName(name: string): boolean {
+  return RUNNER_ENV_NAMES.has(name) || RUNNER_ENV_PREFIX.test(name);
+}
+function payloadScript(value: string): string {
+  let s = value;
+  while (/^[!A-Za-z0-9_.-]+=/.test(s)) s = s.slice(s.indexOf('=') + 1);
+  while (s.startsWith('!')) s = s.slice(1);
+  return s;
+}
+function noteRunnerEnv(name: string, value: string, collected: CollectedCommands): void {
+  if (RUNNER_ENV_PREFIX.test(name)) {
+    for (const token of value.split(/\s+/)) {
+      const s = payloadScript(token);
+      if (s !== '') collected.scripts.push(s);
+    }
+    return;
+  }
+  collected.scripts.push(value);
+}
+const PHONE_ALIAS = /\balias\s+\w+=/i;
 const POWER_HEADS = new Set(['shutdown', 'reboot', 'halt', 'poweroff']);
+const ADB_VALUE_FLAGS = new Set(['-s', '-H', '-P', '-L', '-t']);
+function adbSubcommand(args: readonly string[]): string | undefined {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]!;
+    if (ADB_VALUE_FLAGS.has(arg)) {
+      i += 1;
+      continue;
+    }
+    return arg;
+  }
+  return undefined;
+}
 
 export const DEFAULT_BASH_PATTERNS: readonly BashGatePattern[] = [
   {
@@ -255,6 +405,51 @@ export const DEFAULT_BASH_PATTERNS: readonly BashGatePattern[] = [
     description: '关机/重启（执行机是共享/远端资产，停机不可逆）',
     scope: 'segment',
     test: (_text, s) => POWER_HEADS.has(s.head),
+  },
+  {
+    id: 'ask-phone-control',
+    action: 'ask',
+    description:
+      '真机/模拟器控制（adb 写子命令、devicectl、WebDriverAgent、idevice 系；可能触达机主真机）',
+    scope: 'segment',
+    test: (_text, s) => {
+      if (s.head === 'adb') {
+        const sub = adbSubcommand(s.args);
+        return sub === undefined || !ADB_SAFE_SUBCOMMANDS.has(sub);
+      }
+      if (s.head === 'xcrun')
+        return s.args.some((arg) => {
+          const lower = arg.toLowerCase();
+          return (
+            IOS_BRIDGE_HEADS.has(lower) ||
+            lower === 'adb' ||
+            lower === 'osascript' ||
+            lower === 'xcodebuild' ||
+            lower === 'xcrun'
+          );
+        });
+      if (s.head === 'xcodebuild')
+        return s.args.some(
+          (arg) =>
+            /webdriveragent/i.test(arg) ||
+            /(^|,)id=[0-9a-f-]+/i.test(arg) ||
+            /platform=(?:iOS|watchOS|tvOS|visionOS)(?! Simulator)\b/i.test(arg),
+        );
+      if (s.head === 'osascript') {
+        if (!s.args.some((arg) => arg === '-e')) return true;
+        const joined = s.args.join(' ');
+        if (!PHONE_SHELL_SCRIPT.test(joined)) return false;
+        return PHONE_WORD.test(joined) || PHONE_SCRIPT_DYNAMIC.test(joined);
+      }
+      if (IOS_BRIDGE_MODULE.test(s.head)) {
+        if (s.args.some((arg) => PHONE_WORD.test(arg))) return true;
+        const at = s.args.findIndex((arg) => arg === '-m' || arg.startsWith('-m'));
+        if (at === -1) return false;
+        const name = s.args[at] === '-m' ? (s.args[at + 1] ?? '') : s.args[at]!.slice(2);
+        return IOS_BRIDGE_HEADS.has(name.toLowerCase());
+      }
+      return IOS_BRIDGE_HEADS.has(s.head) || s.head.startsWith('idevice');
+    },
   },
 ];
 
@@ -329,6 +524,10 @@ const WRAPPERS: Readonly<Record<string, WrapperSpec>> = {
     values: ['u', 'unset', 'C', 'chdir', 'a', 'argv0'],
     scripts: ['S', 'split-string'],
   },
+  doas: {
+    flags: ['n', 'non-interactive', 's', 'L', 'N', 'T'],
+    values: ['u', 'user', 'C', 'config'],
+  },
   exec: { flags: ['c', 'l'], values: ['a'] },
   flock: {
     flags: ['s', 'shared', 'x', 'exclusive', 'n', 'nonblock', 'u', 'unlock', 'o', 'close'],
@@ -342,6 +541,8 @@ const WRAPPERS: Readonly<Record<string, WrapperSpec>> = {
   },
   nice: { flags: [], values: ['n', 'adjustment'], numeric: true },
   nohup: { flags: [], values: [] },
+  parallel: { flags: [], values: [] },
+  pkexec: { flags: ['disable-internal-agent'], values: ['user', 'u'] },
   nsenter: {
     flags: ['a', 'all'],
     values: [
@@ -367,6 +568,25 @@ const WRAPPERS: Readonly<Record<string, WrapperSpec>> = {
       'wd',
       'r',
       'root',
+    ],
+  },
+  run0: {
+    flags: ['no-ask-password', 'no-pager', 'pty', 'background'],
+    values: [
+      'E',
+      'setenv',
+      'u',
+      'user',
+      'g',
+      'group',
+      'D',
+      'chdir',
+      'nice',
+      'property',
+      'description',
+      'unit',
+      'slice',
+      'machine',
     ],
   },
   setsid: { flags: ['f', 'fork', 'w', 'wait', 'c', 'ctty'], values: [] },
@@ -447,6 +667,31 @@ const WRAPPERS: Readonly<Record<string, WrapperSpec>> = {
     values: ['k', 'kill-after', 's', 'signal'],
     skipOperand: true,
   },
+  uvx: { flags: [], values: ['from', 'with', 'python', 'p'] },
+  watch: {
+    flags: [
+      'p',
+      'precise',
+      'd',
+      'differences',
+      't',
+      'no-title',
+      'c',
+      'color',
+      'b',
+      'beep',
+      'e',
+      'errexit',
+      'g',
+      'chgexit',
+      'w',
+      'no-wrap',
+      'x',
+      'exec',
+      'o',
+    ],
+    values: ['n', 'interval'],
+  },
   xargs: {
     flags: ['0', 'null', 't', 'verbose', 'x', 'exit', 'r', 'no-run-if-empty', 'o', 'open-tty'],
     values: [
@@ -482,11 +727,18 @@ function commandBasename(word: string): string {
 }
 
 function isAssignment(word: string): boolean {
-  return /^[A-Za-z_][A-Za-z0-9_]*=/.test(word);
+  return /^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(word);
 }
 
-function isParameterHead(word: string): boolean {
-  return /^\$[A-Za-z_]/.test(word);
+function assignmentParts(word: string): { name: string; value: string } {
+  const eq = word.indexOf('=');
+  let name = eq === -1 ? word : word.slice(0, eq);
+  if (name.endsWith('+')) name = name.slice(0, -1);
+  return { name, value: eq === -1 ? '' : word.slice(eq + 1) };
+}
+
+function isUnresolvedHead(word: string): boolean {
+  return /[$`]/.test(word);
 }
 
 function hasCommandGlob(word: string): boolean {
@@ -836,22 +1088,24 @@ function emitSimple(
   let index = 0;
   while (index < words.length) {
     const word = words[index] ?? '';
-    if (isAssignment(word) || COMMAND_KEYWORDS.has(word)) {
+    if (isAssignment(word)) {
+      const { name, value } = assignmentParts(word);
+      if (runnerEnvName(name) && value !== '') noteRunnerEnv(name, value, collected);
+      else if (/\$\(|`/.test(value)) collected.unresolved = true;
+      index += 1;
+      continue;
+    }
+    if (COMMAND_KEYWORDS.has(word)) {
       index += 1;
       if (word === 'function' && index < words.length && words[index] !== '{') index += 1;
       continue;
     }
-    if (
-      isParameterHead(word) ||
-      word.startsWith('$(') ||
-      word.startsWith('`') ||
-      word.startsWith('"$(')
-    ) {
+    if (isUnresolvedHead(word)) {
       collected.unresolved = true;
       rememberUnknownHead(words.slice(index + 1), collected);
       return;
     }
-    const base = commandBasename(word);
+    const base = commandBasename(word).toLowerCase();
     if (base === 'eval') {
       const rest = words.slice(index + 1);
       if (rest.some((part) => dynamicScript(part))) collected.unresolved = true;
@@ -884,9 +1138,105 @@ function emitSimple(
       index = skipped.index;
       continue;
     }
+    if (/\s/.test(word)) {
+      collected.scripts.push(word);
+      return;
+    }
     if (hasCommandGlob(word)) {
       collected.unresolved = true;
       return;
+    }
+    if (COMMAND_OPERAND_HEADS.has(base) || ARITH_EVAL_HEADS.has(base)) {
+      const arith = ARITH_EVAL_HEADS.has(base);
+      const rest = words.slice(index + 1);
+      for (let at = 0; at < rest.length; at += 1) {
+        const arg = rest[at]!;
+        const eq = arg.indexOf('=');
+        const parts = eq === -1 ? [arg] : [arg, arg.slice(eq + 1)];
+        for (const part of parts) {
+          if (arith) {
+            if (!/\$\(|`/.test(part)) continue;
+            const inner = /^\$\(([\s\S]*)\)$/.exec(part) ?? /^`([\s\S]*)`$/.exec(part);
+            collected.scripts.push(inner ? inner[1]! : part);
+            continue;
+          }
+          if (/\s/.test(part)) {
+            collected.scripts.push(part);
+            continue;
+          }
+          const lower = commandBasename(part).toLowerCase();
+          if (
+            IOS_BRIDGE_HEADS.has(lower) ||
+            lower === 'adb' ||
+            lower === 'xcodebuild' ||
+            lower === 'xcrun' ||
+            lower === 'osascript' ||
+            lower.startsWith('idevice')
+          )
+            collected.segments.push({
+              head: lower,
+              args: rest.slice(at + 1),
+              text: part,
+            });
+        }
+        if (base === 'socat') {
+          const execMatch = /^(?:exec|system):(.*)$/is.exec(arg);
+          if (execMatch !== null && execMatch[1] !== '') collected.scripts.push(execMatch[1]!);
+        }
+      }
+    }
+    if (base === 'trap') {
+      for (const arg of words.slice(index + 1)) {
+        if (!arg.startsWith('-')) {
+          if (arg !== '') collected.scripts.push(arg);
+          break;
+        }
+      }
+    }
+    if (base === 'hash') {
+      const rest = words.slice(index + 1);
+      for (let at = 0; at < rest.length; at += 1) {
+        const arg = rest[at]!;
+        if (arg === '--') break;
+        if (!arg.startsWith('-') || arg.startsWith('--')) continue;
+        const pAt = arg.indexOf('p', 1);
+        if (pAt === -1) continue;
+        const path = arg.slice(pAt + 1) !== '' ? arg.slice(pAt + 1) : rest[at + 1];
+        if (path === undefined) continue;
+        const lower = commandBasename(path).toLowerCase();
+        if (
+          IOS_BRIDGE_HEADS.has(lower) ||
+          lower === 'adb' ||
+          lower === 'xcodebuild' ||
+          lower === 'xcrun' ||
+          lower === 'osascript' ||
+          lower.startsWith('idevice')
+        ) {
+          collected.segments.push({ head: lower, args: [], text: path });
+          collected.unresolved = true;
+        }
+      }
+    }
+    const valueOpts = Object.hasOwn(COMMAND_VALUE_OPTIONS, base)
+      ? COMMAND_VALUE_OPTIONS[base]
+      : undefined;
+    if (valueOpts !== undefined) {
+      const rest = words.slice(index + 1);
+      for (let at = 0; at < rest.length; at += 1) {
+        const arg = rest[at]!;
+        for (const opt of valueOpts) {
+          let payload: string | undefined;
+          if (arg === opt && at + 1 < rest.length) payload = rest[at + 1];
+          else if (arg.startsWith(`${opt}=`)) payload = arg.slice(opt.length + 1);
+          else if (arg.startsWith(opt)) {
+            const restArg = arg.slice(opt.length);
+            if (restArg !== '') payload = restArg.startsWith('=') ? restArg.slice(1) : restArg;
+          }
+          if (payload === undefined) continue;
+          const s = payloadScript(payload);
+          if (s !== '') collected.scripts.push(s);
+        }
+      }
     }
     if (base === 'find') {
       let at = index + 1;
@@ -1016,6 +1366,13 @@ function collectCommands(entries: readonly ShellParseEntry[]): CollectedCommands
           const name = entries[index] ? entryWord(entries[index] as ShellParseEntry) : undefined;
           if (name && name !== '{') index += 1;
         }
+        if (word === 'coproc') {
+          const name = entries[index] ? entryWord(entries[index] as ShellParseEntry) : undefined;
+          const after = entries[index + 1]
+            ? entryWord(entries[index + 1] as ShellParseEntry)
+            : undefined;
+          if (name !== undefined && name !== '{' && after !== undefined) index += 1;
+        }
         continue;
       }
       if (commandPosition && word === '$' && nextOp === '(') {
@@ -1023,7 +1380,12 @@ function collectCommands(entries: readonly ShellParseEntry[]): CollectedCommands
         awaitingSubstitutionArgs = true;
         continue;
       }
-      if (commandPosition && isAssignment(word)) continue;
+      if (commandPosition && isAssignment(word)) {
+        const { name, value } = assignmentParts(word);
+        if (runnerEnvName(name) && value !== '') noteRunnerEnv(name, value, collected);
+        else if (/\$\(|`/.test(value)) collected.unresolved = true;
+        continue;
+      }
       words.push(word);
       commandPosition = false;
     }
@@ -1106,6 +1468,14 @@ export function decideBashCommand(
   }
   const roots = folders === undefined ? undefined : prepareFolderRoots(folders);
   return classifyCommand(command, 0, new Set(), roots) ?? { action: 'allow' };
+}
+
+export function phoneControlRefusal(command: string): string | undefined {
+  const decision = decideBashCommand(command);
+  if (decision.action !== 'allow') return formatGateRefusal(command, decision);
+  if (PHONE_ALIAS.test(command) && PHONE_WORD.test(command))
+    return formatGateRefusal(command, { action: 'ask', ruleId: 'ask-phone-control' });
+  return undefined;
 }
 
 function refusalActionNote(action: PermissionAction): string {

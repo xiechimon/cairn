@@ -2777,4 +2777,40 @@ export const EN: Record<string, string> = {
     'Each model test sends one short request, counted against the subscription quota.',
   '还没勾选模型。从上游拉一份清单来勾选。':
     'No models picked yet. Pull a list from upstream to pick from.',
+  手机: 'Phone',
+  '{n} 台手机': '{n#1 phone|# phones}',
+  未配对: 'Not paired',
+  配对中: 'Pairing',
+  就绪: 'Ready',
+  配对: 'Pair',
+  使用中: 'In use',
+  '已锁定，需要主人解锁': 'Locked; the owner enters the passcode',
+  主人正在操作: 'The owner is using it',
+  签名已过期: 'Signature expired',
+  不可达: 'Unreachable',
+  操作手机: 'Used the phone',
+  查看手机: 'Looked at the phone',
+  配对手机: 'Pair a phone',
+  '在手机上：开发者选项 → 无线调试 → 使用配对码配对设备，把显示的 IP:端口 和 6 位配对码填到这里。{name} 会通过 adb 连接手机。':
+    'On the phone: Developer options → Wireless debugging → Pair device with pairing code, then enter the IP:port and 6-digit code it shows. {name} then connects to the phone over adb.',
+  '手机名称（可选）': 'Phone name (optional)',
+  '例如 Pixel 8a': 'e.g. Pixel 8a',
+  'IP:端口': 'IP:port',
+  '6 位配对码': '6-digit pairing code',
+  '我了解配对后 Coordinator 可以像使用电脑一样查看和操作这台手机：屏幕截图和元素文字会发给模型提供方。发消息、付款、改设置前会先问我。':
+    'I understand that once paired the Coordinator can see and use this phone like a computer: screenshots and element text go to the model provider. It asks me before messaging, paying, or changing settings.',
+  '配对失败，请重试。': 'Pairing failed. Try again.',
+  '移除手机失败，请重试。': 'Could not remove the phone. Try again.',
+  '这台执行机上没有找到 adb。安装 Android platform-tools（brew install --cask android-platform-tools）后重启 runner。':
+    'adb was not found on this runner. Install Android platform-tools (brew install --cask android-platform-tools) and restart the runner.',
+  '没有发现手机。打开手机的无线调试后会出现在这里，或直接配对。':
+    'No phone found. It appears here once wireless debugging is on, or pair it directly.',
+  '确定移除这台手机？Coordinator 会立刻失去对它的访问。':
+    'Remove this phone? The Coordinator loses access to it right away.',
+  移除手机: 'Remove phone',
+  '我已操作完，交还': "I'm done, hand it back",
+  '正在连接手机状态…': 'Checking the phone state…',
+  '需要你操作手机 {name}': 'The phone {name} is waiting for you',
+  '在手机上完成后点“交还”，Coordinator 继续。':
+    'Finish on the phone, then tap "hand back" and the Coordinator continues.',
 };

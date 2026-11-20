@@ -1027,6 +1027,21 @@
         }
       }
     },
+    "phones": {
+      "recipe": null,
+      "cases": {
+        "panel-states": {
+          "script": ".claude/skills/verify-cairn/scripts/probe-phones-panel.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Seeds a machine reporting three phones (unpaired, locked, ready), then walks Settings > Machines phones drawer: row states, pair dialog consent gate, forget confirm cancel, and the phones plus activity API endpoints.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
     "plan-doc-chain": {
       "recipe": null,
       "cases": {

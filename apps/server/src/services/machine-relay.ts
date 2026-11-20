@@ -11,6 +11,7 @@ import {
   isBuildStepKind,
   isComputerBrowserTool,
   isOwnComputerTool,
+  isPhoneTool,
   OWN_COMPUTER_TOOL_NAMES,
   parseGithubIssueSourceRef,
   REQUEST_CLOAK_LICENSE_TOOL,
@@ -125,6 +126,7 @@ export function isCoordinatorComputerTool(name: string): boolean {
   return (
     isComputerBrowserTool(name) ||
     isOwnComputerTool(name) ||
+    isPhoneTool(name) ||
     name === 'request_takeover' ||
     name === INSTALL_PACKAGES_TOOL ||
     name === 'shell' ||

@@ -137,9 +137,16 @@ export const machinePresencePinSchema = z.object({
 });
 export type MachinePresencePin = z.infer<typeof machinePresencePinSchema>;
 
+export const machinePresencePhoneSchema = z.object({
+  deviceId: z.string().min(1).max(256),
+  phoneId: z.string().min(1).max(64),
+});
+export type MachinePresencePhone = z.infer<typeof machinePresencePhoneSchema>;
+
 export const machinePresenceResponseSchema = machineOkResponseSchema.extend({
   folderPins: z.array(machinePresencePinSchema).max(MACHINE_FOLDER_PINS_LIMIT).optional(),
   installDevin: z.boolean().optional(),
+  phones: z.array(machinePresencePhoneSchema).max(32).optional(),
 });
 export type MachinePresenceResponse = z.infer<typeof machinePresenceResponseSchema>;
 

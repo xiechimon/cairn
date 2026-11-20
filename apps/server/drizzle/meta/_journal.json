@@ -1611,6 +1611,13 @@
       "when": 1795165134944,
       "tag": "0234_demonic_grandmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 235,
+      "version": "6",
+      "when": 1795167205488,
+      "tag": "0235_phone",
+      "breakpoints": true
     }
   ]
 }

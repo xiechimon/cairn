@@ -15,39 +15,140 @@ export function isOwnComputerTool(tool: string): tool is OwnComputerTool {
 const RM_TARGET = String.raw`(?:\/|\/\*|~|~\/|~\/\*|\$HOME|\$HOME\/|\$HOME\/\*|\$\{HOME\}|\$\{HOME\}\/|\$\{HOME\}\/\*|\/Users|\/Users\/|\/Users\/\*|\/Users\/[^\/\s;&|]+\/?\*?|\/System|\/System\/|\/Library|\/Library\/|\/Applications\/?)`;
 const COMMAND_START = String.raw`(?:^|[;&|({\x60]|\$\()\s*(?:sudo\s+(?:-\S+\s+)*)?(?:\S*\/)?`;
 
+const PHONE_COMMANDS =
+  'adb|afcclient|cfgutil|devicectl|fb-idb|gidevice|idb|idevice\\w*|ifuse|instruments|ios-deploy|iproxy|irecovery|mobiledevice|pymobiledevice3|simctl|tidevice|xcodebuild|xcrun|xctrace';
+
 const HARDLINE: readonly { pattern: RegExp; reason: string }[] = [
   {
     pattern: new RegExp(
       String.raw`${COMMAND_START}rm\s+(?:\S+\s+)*?(?:--\s+)?${RM_TARGET}(?=$|[\s;&|)])`,
+      'i',
     ),
     reason: 'it deletes the home folder, a system folder or the root of the disk',
   },
-  { pattern: /\b(?:mkfs(?:\.\w+)?|newfs_\w+)\b/, reason: 'it formats a disk' },
+  { pattern: /\b(?:mkfs(?:\.\w+)?|newfs_\w+)\b/i, reason: 'it formats a disk' },
   {
     pattern:
       /\bdiskutil\s+(?:\S+\s+)*?(?:erase\w*|zerodisk|randomdisk|secureerase|reformat|partitiondisk|deletecontainer|deletevolume)\b/i,
     reason: 'it erases or repartitions a disk',
   },
   {
-    pattern: /\bdd\b[^;&|]*\bof=\/dev\/(?!(?:null|zero|stdout|stderr|tty)\b|fd\/)/,
+    pattern: /\bdd\b[^;&|]*\bof=\/dev\/(?!(?:null|zero|stdout|stderr|tty)\b|fd\/)/i,
     reason: 'it writes raw bytes to a disk device',
   },
-  { pattern: />\s*\/dev\/r?disk\d/, reason: 'it writes raw bytes to a disk device' },
+  { pattern: />\s*\/dev\/r?disk\d/i, reason: 'it writes raw bytes to a disk device' },
   {
     pattern: /(\w+|:)\s*\(\s*\)\s*\{[^}]*\1\s*\|\s*\1\s*&/,
     reason: 'it is a fork bomb',
   },
   {
-    pattern: new RegExp(String.raw`${COMMAND_START}(?:shutdown|reboot|halt|poweroff)\b`),
+    pattern: new RegExp(String.raw`${COMMAND_START}(?:shutdown|reboot|halt|poweroff)\b`, 'i'),
     reason: 'it shuts down or restarts the Mac',
   },
   {
-    pattern: /\b(?:launchctl\s+reboot|systemctl\s+(?:poweroff|reboot|halt))\b/,
+    pattern: /\b(?:launchctl\s+reboot|systemctl\s+(?:poweroff|reboot|halt))\b/i,
     reason: 'it shuts down or restarts the Mac',
   },
   {
-    pattern: /\bcsrutil\b[^;&|]*\b(?:disable|clear)\b/,
+    pattern: /\bcsrutil\b[^;&|]*\b(?:disable|clear)\b/i,
     reason: 'it turns off System Integrity Protection',
+  },
+  {
+    pattern: new RegExp(
+      String.raw`${COMMAND_START}adb\s+(?:-\S+\s+)*(?!devices\b|version\b|mdns\b|help\b|--help\b|start-server\b|kill-server\b)\S`,
+      'i',
+    ),
+    reason:
+      'it controls a paired phone outside the phone tools; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern:
+      /\bxcrun\b[^;&|]*\bdevicectl\b[^;&|]*\b(?:install|uninstall|launch|terminate|pair|unpair|erase|reset|manage|copy)\b/i,
+    reason:
+      'it controls a paired phone outside the phone tools; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern:
+      /\bxcodebuild\b[^;&|]*\b(?:WebDriverAgent|platform=(?:iOS|watchOS|tvOS|visionOS)(?! Simulator)\b)/i,
+    reason:
+      'it drives a phone through WebDriverAgent outside the phone tools; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: new RegExp(String.raw`(?:${COMMAND_START}simctl|\bxcrun\b[^;&|]*\bsimctl)\b`, 'i'),
+    reason:
+      'it controls a phone simulator outside the phone tools; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: new RegExp(
+      String.raw`${COMMAND_START}(?:afcclient|cfgutil|devicectl|fb-idb|gidevice|idb|idevice\w*|ifuse|instruments|ios-deploy|iproxy|irecovery|mobiledevice|pymobiledevice3|tidevice|xctrace)\b`,
+      'i',
+    ),
+    reason:
+      'it talks to a phone outside the phone tools; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: new RegExp(
+      String.raw`\bosascript\b(?=[^;&|]*(?:\b(?:do shell script|doShellScript|doScript|do script|includeStandardAdditions|NSTask)\b|\$\s*(?:\.\s*system\b|\[\s*['"]\s*system\b)))(?=[^;|]*(?:\b(?:${PHONE_COMMANDS})\b|&|system attribute|getenv))`,
+      'i',
+    ),
+    reason:
+      'it controls a paired phone outside the phone tools; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: new RegExp(
+      String.raw`\b(?:BASH_ENV|BROWSER|CVSEDITOR|CVS_RSH|DIFFPROG|EDITOR|ENV|GIT_ASKPASS|GIT_CONFIG_\w*|GIT_EDITOR|GIT_EXTERNAL_DIFF|GIT_PAGER|GIT_PROXY_COMMAND|GIT_SEQUENCE_EDITOR|GIT_SSH|GIT_SSH_COMMAND|HGEDITOR|LESSCLOSE|LESSOPEN|MANPAGER|MAILER|P4DIFF|P4EDITOR|P4MERGE|PAGER|PROMPT_COMMAND|PS4|RSYNC_RSH|SSH_ASKPASS|SUDO_ASKPASS|SVN_EDITOR|SVN_SSH|SYSTEMD_PAGER|TERMINAL|VISUAL)\+?=\S*\b(?:${PHONE_COMMANDS})\b`,
+      'i',
+    ),
+    reason:
+      'it hides phone control inside an environment variable a program runs as a command; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: new RegExp(String.raw`\bGIT_CONFIG_\w*\+?=[^;&|]*\b(?:${PHONE_COMMANDS})\b`, 'i'),
+    reason:
+      'it hides phone control inside git config injected through the environment; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: new RegExp(
+      String.raw`\b[A-Za-z_]\w*=\S*(?:\$\(|\x60)[^;&|]*\b(?:${PHONE_COMMANDS})\b`,
+      'i',
+    ),
+    reason:
+      'it hides phone control inside a command substitution the checker cannot resolve; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: new RegExp(String.raw`\btrap\s+[^;&|]*\b(?:${PHONE_COMMANDS})\b`, 'i'),
+    reason:
+      'it defers phone control to a shell trap outside the phone tools; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: new RegExp(
+      String.raw`\b(?:test|\[|declare|let|local|mapfile|printf|read|readonly|typeset|unset|export)\b[^;&|]*(?:\$\(|\x60)[^;&|]*\b(?:${PHONE_COMMANDS})\b`,
+      'i',
+    ),
+    reason:
+      'it hides phone control inside a shell builtin the checker cannot resolve; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: new RegExp(String.raw`\bhash\b[^;&|]*\b(?:${PHONE_COMMANDS}|osascript)\b`, 'i'),
+    reason:
+      'it aliases a phone-control binary outside the phone tools; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: /\b(?:pythonw?[\d.]*|uvx?|pipx)\b[^;&|]*pymobiledevice3\b/i,
+    reason:
+      'it controls a paired phone outside the phone tools; phone control goes through phone_observe and phone_act',
+  },
+  {
+    pattern: new RegExp(
+      String.raw`\b\w+=["']?[^;&|]*\b(?:${PHONE_COMMANDS}|rm|dd|mkfs|diskutil|newfs_\w+|shutdown|reboot|halt|poweroff|csrutil|launchctl)\b[^;&|]*;[^;&|]*\$[\w({]`,
+      'i',
+    ),
+    reason: 'it hides a gated command behind a variable expansion the checker cannot resolve',
+  },
+  {
+    pattern: new RegExp(String.raw`\balias\s+\w+=["']?[^;&|]*\b(?:${PHONE_COMMANDS})\b`, 'i'),
+    reason:
+      'it aliases a phone-control binary outside the phone tools; phone control goes through phone_observe and phone_act',
   },
 ];
 
@@ -56,7 +157,17 @@ export function ownComputerHardlineRefusal(command: string): string | null {
     .replace(/["'\\]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  const hit = HARDLINE.find((rule) => rule.pattern.test(folded));
+  const spliced = folded
+    .replace(/\$\([^()]*\)/g, '')
+    .replace(/`[^`]*`/g, '')
+    .replace(/\$\{[^}]*\}/g, '')
+    .replace(/\$[A-Za-z0-9_]+/g, '')
+    .replace(/\$[^\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const hit = HARDLINE.find(
+    (rule) => rule.pattern.test(folded) || (spliced !== folded && rule.pattern.test(spliced)),
+  );
   return hit === undefined
     ? null
     : `This command was not run because ${hit.reason}. The agent never runs it on the user's Mac; if the user really wants it, they run it themselves in Terminal.`;

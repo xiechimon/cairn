@@ -1761,7 +1761,9 @@ function chiefUserText(raw: string): string {
 }
 
 function takeoverItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
-  const reason = (call.arguments as { reason?: unknown } | null)?.reason;
+  const args = call.arguments as { reason?: unknown; phone?: unknown } | null;
+  const reason = args?.reason;
+  const phone = args?.phone;
   const finished = call.result !== undefined || call.endedAt !== undefined || call.isError === true;
   const handedBack =
     finished &&
@@ -1771,6 +1773,7 @@ function takeoverItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
     kind: 'takeover',
     id,
     reason: typeof reason === 'string' ? reason : '',
+    ...(typeof phone === 'string' && phone.trim() !== '' ? { phone: phone.trim() } : {}),
     startedAt: call.startedAt ?? null,
     endedAt: call.endedAt ?? null,
     outcome: !finished ? 'waiting' : handedBack ? 'handed-back' : 'not-done',

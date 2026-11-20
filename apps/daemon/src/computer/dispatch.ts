@@ -7,10 +7,12 @@ import {
   computerManageParamsSchema,
   INSTALL_PACKAGES_TIMEOUT_MS,
   installPackagesParamsSchema,
+  isPhoneTool,
   ownComputerHardlineRefusal,
   PACKAGES_INSTALLED_PREFIX,
 } from '@cairn/shared';
 import { z } from 'zod';
+import { phoneControlRefusal } from '../backend/command-gate.js';
 import type { DaemonLogger } from '../log.js';
 import type { MachineApi } from '../machine-client.js';
 import {
@@ -29,6 +31,7 @@ import {
   protectedComputerLifecycleRefusal,
 } from './guard.js';
 import type { HostScreen, ScreenCall, ScreenOutcome } from './host-screen.js';
+import type { Phones } from './phones.js';
 import {
   type ComputerFileEntry,
   type ComputerFileOptions,
@@ -44,6 +47,8 @@ export const NO_COMPUTER_GRANT_MESSAGE =
   'The server did not stamp a computer grant on this call, so it was not run; update the Cairn server';
 export const NO_VM_COMPUTER_MESSAGE =
   'Only the Coordinator VM computer can install system packages or be stopped, updated, recovered or reset';
+export const NO_PHONE_STAMP_MESSAGE =
+  'The server did not stamp a consented phone on this call, so it was not run';
 const INSTALL_SUMMARY_LINES = 12;
 const INSTALL_TAIL_CHARS = 16 * 1024;
 export const FILE_TRUNCATED_MARKER = '\n[file truncated]';
@@ -115,6 +120,7 @@ export interface ComputerDispatcherOptions {
   retryBaseMs?: number;
   retryMaxMs?: number;
   cairnOrigins: readonly string[];
+  phones?: Phones;
 }
 
 export interface ComputerDispatcher {
@@ -206,7 +212,8 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       return options.host
         ? {
             provider: options.host,
-            refusal: (command) => ownComputerHardlineRefusal(command) ?? undefined,
+            refusal: (command) =>
+              ownComputerHardlineRefusal(command) ?? phoneControlRefusal(command) ?? undefined,
           }
         : NO_COMPUTER_PROVIDER_MESSAGE;
     }
@@ -222,7 +229,9 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         const reason = options.orb?.hostRoot
           ? protectedComputerLifecycleRefusal(command)
           : orbComputerProtectionRefusal(command);
-        return reason === undefined ? undefined : desktopProtectionGuardMessage(reason);
+        return reason === undefined
+          ? phoneControlRefusal(command)
+          : desktopProtectionGuardMessage(reason);
       },
     };
   }
@@ -614,10 +623,67 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
   }
 
+  async function handlePhoneManage(call: ComputerCall, controller: AbortController): Promise<void> {
+    const phones = options.phones;
+    if (phones === undefined) {
+      await refuse(call, NO_COMPUTER_PROVIDER_MESSAGE);
+      return;
+    }
+    if (call.phone === undefined) {
+      await refuse(call, NO_PHONE_STAMP_MESSAGE);
+      return;
+    }
+    if (call.deadlineAt - now() <= 0) {
+      await refuse(call, 'The call deadline had already passed, so nothing ran');
+      return;
+    }
+    const poster = posterFor(call, controller);
+    try {
+      const { text } = await phones.manage(call);
+      await poster.finish({ kind: 'done', text });
+    } catch (error) {
+      await poster.finish({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'The phone action failed',
+        delivery: 'unknown',
+      });
+    }
+  }
+
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
     const grant = orbGrantNeeded(call);
     if (grant !== null && call.computerGrant !== grant) {
       await refuse(call, NO_COMPUTER_GRANT_MESSAGE);
+      return;
+    }
+    if (call.tool === 'phone_manage') {
+      await handlePhoneManage(call, controller);
+      return;
+    }
+    if (call.tool === 'phone_observe' || call.tool === 'phone_act') {
+      const phones = options.phones;
+      if (phones === undefined) {
+        await refuse(call, NO_COMPUTER_PROVIDER_MESSAGE);
+        return;
+      }
+      if (call.phone === undefined) {
+        await refuse(call, NO_PHONE_STAMP_MESSAGE);
+        return;
+      }
+      const screen = phones.screen(call);
+      if (screen === null) {
+        await refuse(call, NO_PHONE_STAMP_MESSAGE);
+        return;
+      }
+      await handleScreen(
+        call,
+        (request) => (call.tool === 'phone_act' ? screen.act(request) : screen.observe(request)),
+        controller,
+      );
+      return;
+    }
+    if (isPhoneTool(call.tool)) {
+      await refuse(call, 'The phone tool is not a known phone tool');
       return;
     }
     if (call.tool === 'install_packages') {
@@ -705,6 +771,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
           options.host?.killAll(),
           options.screen?.killAll(),
           options.orb?.killAll(),
+          options.phones?.killAll(),
         ]);
         await Promise.race([
           Promise.allSettled(running.map(({ settled }) => settled)),

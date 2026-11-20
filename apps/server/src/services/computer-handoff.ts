@@ -1,7 +1,7 @@
 import { COMPUTER_HANDOFF_TIMEOUT_MS, type ComputerTool } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, lte } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { computer, computerCall } from '../db/schema.js';
+import { computer, computerCall, phone } from '../db/schema.js';
 
 export const COMPUTER_HANDOFF_POLL_MS = 500;
 
@@ -77,6 +77,7 @@ export function sweepComputerHandoffs(db: Db, now: number): void {
     .select({
       id: computerCall.id,
       computerId: computerCall.computerId,
+      phoneId: computerCall.phoneId,
       stepId: computerCall.stepId,
     })
     .from(computerCall)
@@ -99,9 +100,16 @@ export function sweepComputerHandoffs(db: Db, now: number): void {
       .where(eq(computerCall.id, call.id))
       .run();
     if (call.computerId !== null) clearHandoff(db, call.computerId);
+    if (call.phoneId !== null) {
+      db.update(phone).set(HANDOFF_CLEARED).where(eq(phone.id, call.phoneId)).run();
+    }
     db.update(computer)
       .set({ executionStepId: null, executionLeaseExpiresAt: null })
       .where(eq(computer.executionStepId, call.stepId))
+      .run();
+    db.update(phone)
+      .set({ executionStepId: null, executionLeaseExpiresAt: null })
+      .where(eq(phone.executionStepId, call.stepId))
       .run();
   }
   db.update(computerCall)
@@ -113,7 +121,7 @@ export function sweepComputerHandoffs(db: Db, now: number): void {
     })
     .where(
       and(
-        inArray(computerCall.tool, ['install_packages', 'computer_manage']),
+        inArray(computerCall.tool, ['install_packages', 'computer_manage', 'phone_manage']),
         inArray(computerCall.state, ['dispatched', 'running']),
         lte(computerCall.deadlineAt, now),
       ),
@@ -125,6 +133,15 @@ export function sweepComputerHandoffs(db: Db, now: number): void {
       and(
         isNotNull(computer.handoffReason),
         lte(computer.handoffRequestedAt, now - COMPUTER_HANDOFF_TIMEOUT_MS),
+      ),
+    )
+    .run();
+  db.update(phone)
+    .set(HANDOFF_CLEARED)
+    .where(
+      and(
+        isNotNull(phone.handoffReason),
+        lte(phone.handoffRequestedAt, now - COMPUTER_HANDOFF_TIMEOUT_MS),
       ),
     )
     .run();

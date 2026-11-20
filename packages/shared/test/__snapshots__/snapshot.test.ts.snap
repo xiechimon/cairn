@@ -3055,6 +3055,30 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "const": true,
       "type": "boolean",
     },
+    "phones": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "deviceId": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string",
+          },
+          "phoneId": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "deviceId",
+          "phoneId",
+        ],
+        "type": "object",
+      },
+      "maxItems": 32,
+      "type": "array",
+    },
   },
   "required": [
     "ok",
@@ -3334,6 +3358,24 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               },
               "type": "object",
             },
+            "phone": {
+              "additionalProperties": false,
+              "properties": {
+                "deviceId": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "phoneId": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "phoneId",
+                "deviceId",
+              ],
+              "type": "object",
+            },
             "scopeKey": {
               "minLength": 1,
               "type": "string",
@@ -3368,6 +3410,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "user_computer_shell",
                 "user_computer_observe",
                 "user_computer_act",
+                "phone_observe",
+                "phone_act",
+                "phone_manage",
               ],
               "type": "string",
             },
@@ -10596,6 +10641,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "api_key",
   "paired_device",
   "pairing_grant",
+  "phone",
   "browser_session",
   "machine",
   "token_usage",
@@ -12512,6 +12558,53 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
             "ownComputerShell": {
               "const": true,
               "type": "boolean",
+            },
+            "phoneHost": {
+              "const": true,
+              "type": "boolean",
+            },
+            "phones": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "deviceId": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "link": {
+                    "enum": [
+                      "seen",
+                      "unauthorized",
+                      "ready",
+                      "locked",
+                      "offline",
+                      "signing_expired",
+                    ],
+                    "type": "string",
+                  },
+                  "name": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "platform": {
+                    "enum": [
+                      "android",
+                      "ios",
+                    ],
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "deviceId",
+                  "platform",
+                  "name",
+                  "link",
+                ],
+                "type": "object",
+              },
+              "type": "array",
             },
             "scrapling": {
               "additionalProperties": false,

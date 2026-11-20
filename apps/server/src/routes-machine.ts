@@ -92,6 +92,7 @@ import {
   stepToken,
   toMachineRecord,
 } from './services/machines.js';
+import { phoneRowsForPresence } from './services/phone-computer.js';
 
 function isComputerRelayBody(raw: unknown): boolean {
   return raw !== null && typeof raw === 'object' && 'computer' in raw && raw.computer === true;
@@ -386,10 +387,12 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         if (admission !== 'ignore') markPresence(deps, row.id, body, admission === 'online');
         const current = ctx.db.select().from(machineTable).where(eq(machineTable.id, row.id)).get();
         const folderPins = folderPinsForPresence(current?.folderGrants ?? null);
+        const phones = phoneRowsForPresence(ctx.db, row.id);
         return c.json({
           ok: true as const,
           ...(folderPins !== undefined ? { folderPins } : {}),
           ...(hasActiveDevinSubscription(deps, row.teamId) ? { installDevin: true } : {}),
+          ...(phones.length > 0 ? { phones } : {}),
         });
       },
     );

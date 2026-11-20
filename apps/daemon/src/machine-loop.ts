@@ -49,6 +49,7 @@ import { HostComputerProvider } from './computer/host.js';
 import { HostDesktops } from './computer/host-desktop.js';
 import { createHostScreenFromEnv, type HostScreen } from './computer/host-screen.js';
 import { ComputerInputFence } from './computer/input-fence.js';
+import { createPhones } from './computer/phones.js';
 import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
 import { OutboundComputerScreens } from './computer/screen-channel.js';
@@ -293,6 +294,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const antigravityManaged =
     opts.antigravityManaged ?? createAntigravityManaged({ log: (line) => logger.machine(line) });
   let sendPresenceNow: (() => Promise<void>) | null = null;
+  const phones = createPhones({
+    home: paths.home,
+    log: (msg) => logger.machine(msg),
+    onStale: () => void sendPresenceNow?.(),
+    adbPath: platform === 'darwin' ? undefined : null,
+  });
   void antigravityManaged
     .ensure()
     .then((install) => {
@@ -349,6 +356,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(vmDownload !== undefined ? { vmDownload } : {}),
       ...(hostComputer ? { ownComputerShell: true as const } : {}),
       ...(hostScreen ? { ownComputer: true as const } : {}),
+      ...(phones.usable() ? { phoneHost: true as const } : {}),
+      ...(phones.reports().length > 0 ? { phones: phones.reports() } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(scraper !== undefined ? { scrapling: scraper } : {}),
       ...(hostPermissions !== undefined ? { hostPermissions } : {}),
@@ -584,6 +593,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     send: async (body, signal) => {
       const response = await client.presence(body, signal);
       folderPins.setPins(response.folderPins ?? []);
+      phones.setConsented(response.phones ?? []);
       if (response.installDevin === true && !devinInstalling && !devinInstalled) {
         devinInstalling = true;
         void devinManaged
@@ -1005,6 +1015,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(hostComputer ? { host: hostComputer } : {}),
     ...(hostScreen ? { screen: hostScreen } : {}),
     ...(orbComputer ? { orb: orbComputer } : {}),
+    phones,
     cairnOrigins: [
       config.serverUrl,
       ...(capEnv.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),

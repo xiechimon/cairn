@@ -416,6 +416,37 @@ export const computer = sqliteTable(
   (t) => [uniqueIndex('computer_scope_key_idx').on(t.scopeKey)],
 );
 
+export const phone = sqliteTable(
+  'phone',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    machineId: text('machineId')
+      .notNull()
+      .references(() => machine.id, { onDelete: 'cascade' }),
+    platform: text('platform').$type<'android' | 'ios'>().notNull(),
+    deviceId: text('deviceId').notNull(),
+    name: text('name').notNull(),
+    consentAt: epochMs('consentAt'),
+    consentedBy: text('consentedBy'),
+    lastError: text('lastError'),
+    executionStepId: text('executionStepId'),
+    executionLeaseExpiresAt: epochMs('executionLeaseExpiresAt'),
+    executionFence: integer('executionFence').notNull().default(0),
+    handoffReason: text('handoffReason').$type<'login' | 'model'>(),
+    handoffStepId: text('handoffStepId'),
+    handoffRequestedAt: epochMs('handoffRequestedAt'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    index('phone_team_idx').on(t.teamId),
+    uniqueIndex('phone_machine_device_idx').on(t.machineId, t.deviceId),
+  ],
+);
+
 export const computerCall = sqliteTable(
   'computer_call',
   {
@@ -429,6 +460,7 @@ export const computerCall = sqliteTable(
       .notNull()
       .references(() => machine.id, { onDelete: 'cascade' }),
     computerId: text('computerId').references(() => computer.id, { onDelete: 'set null' }),
+    phoneId: text('phoneId').references(() => phone.id, { onDelete: 'set null' }),
     tool: text('tool').$type<ComputerTool>().notNull(),
     replaySafe: bool('replaySafe').notNull(),
     params: json<Record<string, unknown>>('params').notNull(),

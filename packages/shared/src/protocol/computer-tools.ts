@@ -66,9 +66,12 @@ export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'request_takeover',
     description:
-      'Ask the owner to take over the Coordinator computer for a login, captcha, slider or code. Waits until the owner gives control back, then continue from a fresh browser_snapshot.',
+      'Ask the owner to take over the Coordinator computer for a login, captcha, slider or code. Waits until the owner gives control back, then continue from a fresh browser_snapshot. Pass phone with the phone name to ask the owner to take over a paired phone instead (unlock it or open the secure screen); the call waits for the owner to hand it back.',
     parameters: obj({
       reason: str('Short reason shown to the owner, for example which site needs a login.'),
+      phone: str(
+        'The phone name exactly as Settings, Computers shows it. Set to hand the phone to the owner instead of the computer.',
+      ),
     }),
   },
 ];

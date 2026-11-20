@@ -24,6 +24,9 @@ export const COMPUTER_TOOLS = [
   'user_computer_shell',
   'user_computer_observe',
   'user_computer_act',
+  'phone_observe',
+  'phone_act',
+  'phone_manage',
 ] as const;
 export const computerToolSchema = z.enum(COMPUTER_TOOLS);
 export type ComputerTool = z.infer<typeof computerToolSchema>;
@@ -35,6 +38,7 @@ export const COMPUTER_REPLAY_SAFE_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'desktop_snapshot',
   'browser_snapshot',
   'user_computer_observe',
+  'phone_observe',
 ]);
 
 export const DEBIAN_PACKAGE_NAME = /^[a-z0-9][a-z0-9+.-]+$/;
@@ -135,6 +139,12 @@ export const computerCallSchema = z.object({
     .optional(),
   browserLicense: z.string().min(1).max(4096).optional(),
   computerGrant: z.enum(['browser', 'desktop']).optional(),
+  phone: z
+    .strictObject({
+      phoneId: recordId,
+      deviceId: z.string().min(1).max(256),
+    })
+    .optional(),
 });
 export type ComputerCall = z.infer<typeof computerCallSchema>;
 

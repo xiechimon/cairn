@@ -331,10 +331,13 @@ export interface MachineRow {
       automation: PermissionState;
       screenRecording: PermissionState;
     };
+    phoneHost?: true;
+    phones?: import('@cairn/shared').MachinePhoneReport[];
   } | null;
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
   ownComputerFixture?: OwnComputerFixture;
+  phonesFixture?: PhonesFixture;
   browserOverride?: boolean | null;
   desktopOverride?: boolean | null;
   folderGrants?: MachineFolderGrants | null;
@@ -342,6 +345,11 @@ export interface MachineRow {
 
 export interface OwnComputerFixture {
   activity?: OwnComputerActivity[];
+}
+
+export interface PhonesFixture {
+  phones?: import('@cairn/shared').PhoneRow[];
+  activity?: import('@cairn/shared').PhoneActivity[];
 }
 
 export interface ResourcesContent {
@@ -613,6 +621,7 @@ export type ChiefStreamItem =
       kind: 'takeover';
       id: string;
       reason: string;
+      phone?: string;
       startedAt: number | null;
       endedAt: number | null;
       outcome: 'waiting' | 'handed-back' | 'not-done';

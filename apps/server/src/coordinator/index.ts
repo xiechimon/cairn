@@ -40,6 +40,7 @@ import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services
 import { ownComputerOffered } from '../services/own-computer.js';
 import { ownershipOf } from '../services/owner.js';
 import { listedProjects } from '../services/personal-space.js';
+import { offeredPhoneNames } from '../services/phone-computer.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
 import { markProviderModelTextOnly } from '../services/providers.js';
 import {
@@ -297,6 +298,8 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         return teamId === null ? [] : connectorToolDefsForTeam(db, teamId);
       },
       ownComputer: (threadId) => ownComputerOffered(db, threadId),
+      phoneComputer: (threadId) =>
+        offeredPhoneNames({ db, machineHub: machine.machineHub }, threadId),
       providersFor: (threadId) => {
         const teamId = threadTeam(threadId);
         const providers =
@@ -578,6 +581,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             vmComputer: teamHasVmComputer(db, threadRow.teamId),
             vmBrowser: teamHasVmBrowser(db, threadRow.teamId),
             ownComputer: ownComputerOffered(db, row.buildId),
+            phoneComputer: offeredPhoneNames({ db, machineHub: machine.machineHub }, row.buildId),
           }),
           ...connectorToolDefsForTeam(db, threadRow.teamId),
         ],

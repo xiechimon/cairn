@@ -188,6 +188,27 @@ export const vmDownloadSchema = z
   .strict();
 export type VmDownload = z.infer<typeof vmDownloadSchema>;
 
+export const MACHINE_PHONE_PLATFORMS = ['android', 'ios'] as const;
+export type MachinePhonePlatform = (typeof MACHINE_PHONE_PLATFORMS)[number];
+
+export const MACHINE_PHONE_LINK_STATES = [
+  'seen',
+  'unauthorized',
+  'ready',
+  'locked',
+  'offline',
+  'signing_expired',
+] as const;
+export type MachinePhoneLinkState = (typeof MACHINE_PHONE_LINK_STATES)[number];
+
+export const machinePhoneReportSchema = z.object({
+  deviceId: z.string().min(1).max(256),
+  platform: z.enum(MACHINE_PHONE_PLATFORMS),
+  name: z.string().min(1).max(200),
+  link: z.enum(MACHINE_PHONE_LINK_STATES),
+});
+export type MachinePhoneReport = z.infer<typeof machinePhoneReportSchema>;
+
 export const machineCapabilitiesSchema = z.object({
   osPlatform: machineOsPlatformSchema.optional(),
   osDistribution: z
@@ -228,6 +249,8 @@ export const machineCapabilitiesSchema = z.object({
   agentReach: agentReachReportSchema.optional(),
   scrapling: z.object({ version: z.string().min(1).max(32) }).optional(),
   hostPermissions: hostPermissionsSchema.optional(),
+  phoneHost: z.literal(true).optional(),
+  phones: z.array(machinePhoneReportSchema).optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -256,6 +279,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const scrapling = machineCapabilitiesSchema.shape.scrapling.safeParse(rec.scrapling);
   const hostPermissions = hostPermissionsSchema.safeParse(rec.hostPermissions);
   const vmDownload = vmDownloadSchema.safeParse(rec.vmDownload);
+  const phones = z.array(machinePhoneReportSchema).max(32).safeParse(rec.phones);
   const computerName = machineCapabilitiesSchema.shape.computerName.safeParse(rec.computerName);
   const reportedHostname = machineCapabilitiesSchema.shape.hostname.safeParse(rec.hostname);
   return {
@@ -294,6 +318,8 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
       : {}),
     ...(rec.secretGateway === true ? { secretGateway: true as const } : {}),
     ...(rec.mcpConnectors === true ? { mcpConnectors: true as const } : {}),
+    ...(rec.phoneHost === true ? { phoneHost: true as const } : {}),
+    ...(phones.success && phones.data !== undefined ? { phones: phones.data } : {}),
   };
 }
 

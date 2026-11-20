@@ -13,6 +13,7 @@ export * from './machine-api.js';
 export * from './machine-wire.js';
 export * from './mcp.js';
 export * from './own-computer.js';
+export * from './phone-computer.js';
 export * from './rest.js';
 export * from './search.js';
 export * from './sse.js';
