@@ -3,7 +3,6 @@ import type { ToolCallRecord } from '@cairn/shared';
 import {
   claudeRateLimitReportSchema,
   computerCallIdSchema,
-  ENGINE_PTY_LOG_FILE_NAME,
   enrollDisplayName,
   MACHINE_ENROLL_TTL_MS,
   machineActivityBodySchema,
@@ -58,7 +57,6 @@ import { receiveRepoArchive, receiveRepoArchiveFailure } from './services/machin
 import {
   createUploadUrls,
   getStepSession,
-  receiveEnginePtyLogUpload,
   receivePlanUpload,
   receiveSessionUpload,
   receiveUpload,
@@ -714,16 +712,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         () => c.req.text(),
         (_row, body) => {
           receiveSessionUpload(deps, upload, body);
-          return completeUpload();
-        },
-      );
-    }
-    if (upload.name === ENGINE_PTY_LOG_FILE_NAME) {
-      return executeMachineCommand(
-        c,
-        async () => Buffer.from(await c.req.arrayBuffer()),
-        (_row, body) => {
-          receiveEnginePtyLogUpload(deps, upload, body);
           return completeUpload();
         },
       );

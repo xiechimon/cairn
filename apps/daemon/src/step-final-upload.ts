@@ -1,5 +1,4 @@
 import {
-  ENGINE_PTY_LOG_FILE_NAME,
   type MachineDoneBody,
   PLAN_FILE_NAME,
   SESSION_FILE_NAME,
@@ -18,16 +17,12 @@ function finalUploadFiles(
   messages: TranscriptUpload['messages'],
   planContent: string | null,
   sessionContent: string | null,
-  enginePtyLog: Buffer | null,
 ): { name: string; size?: number }[] {
   const files: { name: string; size?: number }[] = [
     { name: 'transcript.json', size: JSON.stringify(messages).length },
   ];
   if (planContent !== null) files.push({ name: PLAN_FILE_NAME, size: planContent.length });
   if (sessionContent !== null) files.push({ name: SESSION_FILE_NAME, size: sessionContent.length });
-  if (enginePtyLog !== null) {
-    files.push({ name: ENGINE_PTY_LOG_FILE_NAME, size: enginePtyLog.length });
-  }
   return files;
 }
 
@@ -38,10 +33,9 @@ export async function putFinalArtifacts(
   messages: TranscriptUpload['messages'],
   planContent: string | null,
   sessionFile: string | undefined,
-  enginePtyLog: Buffer | null = null,
 ): Promise<void> {
   const sessionContent = readSessionJsonlForUpload(sessionFile, (msg) => logger.step(msg));
-  const files = finalUploadFiles(messages, planContent, sessionContent, enginePtyLog);
+  const files = finalUploadFiles(messages, planContent, sessionContent);
   for (let attempt = 1; ; attempt++) {
     try {
       const { uploads } = await client.uploadUrls(stepId, files);
@@ -62,16 +56,6 @@ export async function putFinalArtifacts(
             } catch (err) {
               logger.step(
                 `session upload failed: ${err instanceof Error ? err.message : String(err)}`,
-              );
-            }
-          }
-        } else if (upload.name === ENGINE_PTY_LOG_FILE_NAME) {
-          if (enginePtyLog !== null) {
-            try {
-              await client.putUpload(upload.url, upload.headers, enginePtyLog, 'text/plain');
-            } catch (err) {
-              logger.step(
-                `engine pty log upload failed: ${err instanceof Error ? err.message : String(err)}`,
               );
             }
           }

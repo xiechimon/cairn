@@ -1,13 +1,4 @@
-import {
-  Archive,
-  CircleStop,
-  ClipboardList,
-  Hand,
-  Pencil,
-  Route,
-  ScrollText,
-  Undo2,
-} from 'lucide-react';
+import { Archive, CircleStop, ClipboardList, Pencil, Route, ScrollText, Undo2 } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
@@ -29,7 +20,6 @@ interface MoreMenuProps {
   onRename?: () => void;
   onViewPlan?: () => void;
   onViewRaw?: () => void;
-  takeOver?: { label: string; onClick: () => void };
   moveSub?: ReactNode;
 }
 
@@ -50,7 +40,6 @@ export function MoreMenu({
   onRename,
   onViewPlan,
   onViewRaw,
-  takeOver,
   moveSub,
 }: MoreMenuProps) {
   const { t } = useI18n();
@@ -103,19 +92,6 @@ export function MoreMenu({
             action: 'view-raw',
             disabled: false,
             onClick: onViewRaw,
-          },
-        ]
-      : []),
-    ...(takeOver !== undefined
-      ? [
-          {
-            key: 'take-over',
-            shortcut: 'T',
-            label: takeOver.label,
-            Icon: Hand,
-            action: 'take-over',
-            disabled: false,
-            onClick: takeOver.onClick,
           },
         ]
       : []),

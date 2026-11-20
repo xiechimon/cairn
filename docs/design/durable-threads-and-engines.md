@@ -42,12 +42,11 @@ An engine plans for itself. When the plan includes an action that cannot be undo
 
 ## The engine view
 
-Owner decisions on 2026-11-12 and 2026-11-13. When a thread has dispatched work to an engine, the run has no card of its own: its events are the thread's own conversation, Raw output and takeover are items of the thread's `…` menu; the engine, time and cost sit in the thread's usage popover, filled from the build's steps on a live thread.
+Owner decisions on 2026-11-12 and 2026-11-13. When a thread has dispatched work to an engine, the run has no card of its own: its events are the thread's own conversation, Raw output is an item of the thread's `…` menu; the engine, time and cost sit in the thread's usage popover, filled from the build's steps on a live thread.
 
 - Default view: the engine's structured event stream rendered with cairn's own conversation components (reply text, the plan checklist, read, edit and run rows, the running row). It is the same family as the thread itself and works on the phone.
-- Nothing is lost silently. An event type the adapter does not know renders as a generic row that names the type and opens its raw content. An engine that waits for input the adapter cannot map shows that it is waiting and offers takeover. Every unknown type is counted and reported, and each adapter is tested by replaying recorded streams per engine version.
+- Nothing is lost silently. An event type the adapter does not know renders as a generic row that names the type and opens its raw content. Every unknown type is counted and reported, and each adapter is tested by replaying recorded streams per engine version.
 - A read-only raw output view (the engine's plain text log) is always available from the thread's menu.
-- A real terminal (a pseudo-terminal streamed to a maintained terminal component in the browser) is built later, for takeover and for engines in an interactive screen. It replaces the raw output view when it exists. It crosses the machine and command boundary, so it is owner-routed and needs its own design.
 - A thread's header carries the title and one status line only. Code changes, documents and pull requests are results: a compact card in the conversation that opens the result, never a control in the header. Most tasks have no code changes.
 
 ## Commands and working habits belong to cairn
@@ -104,7 +103,7 @@ Decided on 2026-11-12: proposed by Claude at ian's delegation and confirmed by i
 - **Phases stay on the task.** A task's phase still changes only through the server's transition table; the thread is the session that does the work. The plan, build, review and verify steps become dispatches inside the thread. The confirm phase appears only in plan-first mode or when the plan contains an action that cannot be undone. The merge gate applies only when the output is code.
 - **Billing of a thread's own turns.** They use the Coordinator's connection until a separate `thread` route is set, and the cost shows in the thread. This answers the billing half of the third open question above.
 - **Cutover.** A Claude Code step that is running at the switch runs to its end. This answers the migration question above.
-- **The engine view.** It is read-only first. Takeover is built last, and once it exists it may spend ian's own subscription quota.
+- **The engine view.** It is read-only: conversation transcript plus the raw output view. The PTY/takeover channel behind `CAIRN_ENGINE_PTY` was removed (2026-11-20, runtime-unify).
 
 ## Order of work
 

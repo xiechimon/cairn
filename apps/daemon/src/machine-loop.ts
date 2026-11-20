@@ -57,10 +57,7 @@ import { createComputerScreenProvider } from './computer/screen-provider.js';
 import { VmDesktops } from './computer/vm-desktop.js';
 import { VmRuntime } from './computer/vm-runtime.js';
 import type { DaemonConfig } from './config.js';
-import { createClaudePtyBackend } from './engine/claude-tui.js';
-import { enginePtyOf } from './engine/registry.js';
-import { OutboundEngineScreens } from './engine/screen-channel.js';
-import { createEngineScreenProvider } from './engine/screen-provider.js';
+import { FolderPins } from './folder-pins.js';
 import { createHostPermissionsProbe, type HostPermissionsProbe } from './host-permissions.js';
 import { createImsgBridge } from './imsg-bridge.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
@@ -365,11 +362,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(scraper !== undefined ? { scrapling: scraper } : {}),
       ...(hostPermissions !== undefined ? { hostPermissions } : {}),
-      ...(enginePtyEnabled ? { enginePty: true as const } : {}),
     };
   };
 
-  const enginePtyEnabled = capEnv.CAIRN_ENGINE_PTY === '1';
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
   let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
   let devinBackend: AgentBackend | null = null;
@@ -485,25 +480,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       claudeAnnounced = true;
     }
     if (claudeBackend === null) {
-      const pipe = createClaudeCodeBackend({
+      claudeBackend = createClaudeCodeBackend({
         skills: { skillsDir: config.skillsDir, cwd: config.home },
         onSkillsLog: (msg) => logger.skills(msg),
-        ...(claudeBin !== null ? { executablePath: claudeBin.path } : {}),
         ...(confine !== null ? { confine } : {}),
         teamSkillsCacheDir: paths.teamSkillsCacheDir,
-        ...(claudeBin !== null ? { executableVersion: claudeBin.version } : {}),
       });
-      claudeBackend = enginePtyEnabled
-        ? createClaudePtyBackend(pipe, {
-            skills: { skillsDir: config.skillsDir, cwd: config.home },
-            onSkillsLog: (msg) => logger.skills(msg),
-            ...(claudeBin !== null ? { executablePath: claudeBin.path } : {}),
-            teamSkillsCacheDir: paths.teamSkillsCacheDir,
-            ...(claudeBin !== null ? { executableVersion: claudeBin.version } : {}),
-            runtimeDir: paths.agentRuntimeDir,
-            log: (msg) => logger.machine(msg),
-          })
-        : pipe;
     }
     return claudeBackend;
   };
@@ -708,15 +690,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   });
   await backfillRepositoryCaches(config.workspacesDir, (message) => logger.workspace(message));
   const sessionHandles = new Map<string, AgentSessionHandle>();
-  const engineScreens = new OutboundEngineScreens({
-    serverUrl: config.serverUrl,
-    getToken: () => inMemoryToken,
-    provider: createEngineScreenProvider({
-      handleForStep: (stepId) => sessionHandles.get(stepId),
-      ptyForHandle: (handle) => enginePtyOf(handle),
-    }),
-    log: (msg) => logger.machine(msg),
-  });
   const steerAcks = new Map<string, Set<Promise<void>>>();
   const deliveredSteerSends = new Map<string, number>();
   const stepImageSupport = new Map<string, boolean | null>();
@@ -1061,7 +1034,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             }
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
             if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
-            if (ev.type === 'engine.screen') void engineScreens.dispatch(ev.channel);
             if (ev.type === 'im.attach' || ev.type === 'im.detach' || ev.type === 'im.send') {
               imsgBridge.handle(ev);
             }
@@ -1289,7 +1261,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     claimCtrl.abort();
     imsgBridge.stop();
     void screens.close();
-    void engineScreens.close();
     caffeinate?.kill();
     await Promise.race([
       availability?.settled(),

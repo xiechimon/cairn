@@ -32,7 +32,6 @@ import {
 } from './computer.js';
 import { computerPresenceListSchema } from './computer-presence.js';
 import { computerScreenRequestSchema } from './computer-screen.js';
-import { engineScreenRequestSchema } from './engine-screen.js';
 import { machineJsonSchema } from './executor.js';
 
 export const machineEnrollBodySchema = z.object({
@@ -310,7 +309,6 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('repo.archive'), archive: machineRepoArchiveCommandSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
-  z.object({ type: z.literal('engine.screen'), channel: engineScreenRequestSchema }),
   z.object({ type: z.literal('im.attach'), connId: z.string().min(1).max(128) }),
   z.object({ type: z.literal('im.detach'), connId: z.string().min(1).max(128) }),
   z.object({

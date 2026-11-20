@@ -22,9 +22,8 @@ export function engineRunStage(script: EngineScript): EngineRunStage {
     const { t } = useI18n();
     const [shown, setShown] = useState(start);
     const [answers, setAnswers] = useState<EngineAnswers>({});
-    const [takenOver, setTakenOver] = useState(false);
     const [playing, setPlaying] = useState(false);
-    const run = engineRunAt(script, shown, answers, takenOver);
+    const run = engineRunAt(script, shown, answers);
     const advancing = run.state === 'running';
     useEffect(() => {
       if (!playing || !advancing) return;
@@ -39,8 +38,6 @@ export function engineRunStage(script: EngineScript): EngineRunStage {
           setAnswers((current) => ({ ...current, [eventId]: answer }));
           setShown((count) => count + 1);
         },
-        takeOver: () => setTakenOver(true),
-        handBack: () => setTakenOver(false),
       },
       controls: !PLAYER_SHOWN ? undefined : (
         <div data-testid="engine-player" className="mt-5 flex flex-wrap items-center gap-2">
@@ -67,7 +64,6 @@ export function engineRunStage(script: EngineScript): EngineRunStage {
             onClick={() => {
               setShown(1);
               setAnswers({});
-              setTakenOver(false);
               setPlaying(false);
             }}
           >

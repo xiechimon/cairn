@@ -35,13 +35,8 @@ import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { MACHINES_HREF } from '../resources/hrefs.js';
 import { useOpenDesignAttachment } from './design/design-route.js';
-import {
-  type EngineRunView,
-  engineCanTakeOver,
-  engineTranscript,
-  engineUsageSummary,
-} from './engine-run.js';
-import { EngineQuestion, EngineRawView, TakeOverDialog } from './engine-run-view.js';
+import { type EngineRunView, engineTranscript, engineUsageSummary } from './engine-run.js';
+import { EngineQuestion, EngineRawView } from './engine-run-view.js';
 import { OpenDesignPageContext } from './file-pane.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
@@ -67,7 +62,6 @@ import {
   type ThreadUsageView,
   threadUsageShown,
 } from './thread-usage-ring.js';
-import { useEngineScreen } from './use-engine-screen.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
 import { useThreadUsage } from './use-thread-usage.js';
@@ -453,7 +447,7 @@ function ThreadBody({
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
       {view === 'raw' && engine !== undefined ? (
-        <EngineRawView run={engine.run} screen={engine.screen} />
+        <EngineRawView run={engine.run} />
       ) : (
         <ReportThreadContext.Provider value={reportThread}>
           <TranscriptColumn
@@ -723,65 +717,13 @@ function ReadyThread({
   const openPlan =
     chat.planDoc !== undefined || updates !== null ? () => setPlanOpen(true) : undefined;
   const usage = useThreadUsage(todo);
-  const [takingOver, setTakingOver] = useState(false);
   const { live, teamId } = useLiveData();
-  const screen = useEngineScreen(
-    teamId,
-    live && engine !== undefined ? (engine.run.stepId ?? null) : null,
-    live &&
-      engine !== undefined &&
-      (view === 'raw' || takingOver || engine.run.state === 'taken_over'),
-  );
-  const engineView =
-    engine === undefined
-      ? undefined
-      : {
-          ...engine,
-          run: {
-            ...engine.run,
-            state: screen.held ? ('taken_over' as const) : engine.run.state,
-            rawOutput:
-              (screen.status === 'live' || screen.status === 'ended') && screen.text !== ''
-                ? screen.text
-                : engine.run.rawOutput,
-          },
-          screen: {
-            status: screen.status,
-            held: screen.held,
-            text: screen.text,
-            send: screen.send,
-          },
-          actions:
-            engine.run.stepId !== undefined && live && engineCanTakeOver(engine.run.state)
-              ? {
-                  answer: () => {},
-                  takeOver: () => {
-                    screen.takeOver();
-                    onView('raw');
-                  },
-                  handBack: screen.handBack,
-                }
-              : engine.actions,
-        };
-  const engineActions = engineView?.actions;
   const actions = useThreadActions({
     todo,
     chat,
     onGone: onClose,
     onViewPlan: openPlan,
-    engine:
-      engineView === undefined
-        ? undefined
-        : {
-            onViewRaw: () => onView('raw'),
-            ...(engineActions === undefined
-              ? {}
-              : engineView.run.state === 'taken_over'
-                ? { takeOver: { label: t('交还'), onClick: engineActions.handBack } }
-                : engineCanTakeOver(engineView.run.state)
-                  ? { takeOver: { label: t('接管'), onClick: () => setTakingOver(true) } }
-                  : {}),
-          },
+    engine: engine === undefined ? undefined : { onViewRaw: () => onView('raw') },
   });
   const prs = usePrs(teamId, todo.id, live);
   const prRows = prs.data ?? [];
@@ -829,7 +771,7 @@ function ReadyThread({
         origin={origin}
         onJumpToOrigin={jumpToOrigin}
         onClose={onClose}
-        engine={engineView}
+        engine={engine}
         pr={
           prs.status === 'error' || (prs.status === 'success' && prRows.length > 0) ? (
             <ThreadPrPanel
@@ -853,25 +795,20 @@ function ReadyThread({
           ) : null
         }
         usage={
-          engineView !== undefined ||
+          engine !== undefined ||
           (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||
           contextPercentOf(todo.context) !== null
             ? {
                 summary:
-                  engineView === undefined
+                  engine === undefined
                     ? usage.summary
-                    : engineUsageSummary(usage.summary, engineView.run),
+                    : engineUsageSummary(usage.summary, engine.run),
                 state: usage.state,
                 onRetry: usage.retry,
                 context: todo.context,
               }
             : null
         }
-      />
-      <TakeOverDialog
-        open={takingOver}
-        onClose={() => setTakingOver(false)}
-        onConfirm={() => engineActions?.takeOver()}
       />
       <DialogShell
         open={planOpen}

@@ -35,7 +35,7 @@ import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import { setCoordinatorInServer, setCoordinatorWake } from './services/coordinator-context.js';
 import { runDataMigrationOnce } from './services/data-migrations.js';
-import { engineScreensOf } from './services/engine-screen.js';
+
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { drainEffects, effectRegistry, reconcileEffects } from './services/external-effects.js';
 import { killInFlightPick } from './services/fs-pick.js';
@@ -367,8 +367,6 @@ void reconcileEffects(db, effectRegistry)
     logger.warn({ err: error }, 'external effects could not be reconciled');
   });
 computerScreens.attach(server);
-const engineScreens = engineScreensOf({ db, machineHub, secretBox, hub, attachmentsDir });
-engineScreens.attach(server);
 
 if (config.authToken !== null) {
   void tailscale.reapply().catch((error: unknown) => {
@@ -397,7 +395,6 @@ async function shutdown(): Promise<void> {
   ]);
   killInFlightPick();
   computerScreens.close();
-  engineScreens.close();
   await im.shutdown().catch(() => {});
   await mail.shutdown().catch(() => {});
   setImRuntime(null);

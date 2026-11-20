@@ -35,7 +35,6 @@ export function engineRunAt(
   script: EngineScript,
   shown: number,
   answers: EngineAnswers = {},
-  takenOver = false,
 ): EngineRun {
   const steps = engineScriptSteps(script, answers);
   const visible = steps.slice(0, Math.max(1, shown));
@@ -47,19 +46,17 @@ export function engineRunAt(
   });
   const last = events.at(-1);
   const asked = last?.kind === 'question' && last.answer === null;
-  const state: EngineRunState = takenOver
-    ? 'taken_over'
-    : ended
-      ? steps === script.steps
-        ? script.outcome
-        : 'finished'
-      : asked
-        ? 'waiting'
-        : 'running';
+  const state: EngineRunState = ended
+    ? steps === script.steps
+      ? script.outcome
+      : 'finished'
+    : asked
+      ? 'waiting'
+      : 'running';
   if (state === 'running' && last?.kind === 'run')
     events[events.length - 1] = { ...last, exit: null, output: [], seconds: 0 };
   const planDone = visible.at(-1)?.planDone ?? 0;
-  const active = state === 'running' || state === 'waiting' || state === 'taken_over';
+  const active = state === 'running' || state === 'waiting';
   return {
     engine: script.engine,
     state,

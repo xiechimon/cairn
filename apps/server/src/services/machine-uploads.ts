@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  ENGINE_PTY_LOG_MAX_BYTES,
   REPO_ARCHIVE_FAILED_FILE_NAME,
   REPO_ARCHIVE_FILE_NAME,
   SESSION_JSONL_MAX_BYTES,
@@ -158,33 +157,6 @@ export function readStepSession(attachmentsDir: string, stepId: string): string 
   const dest = stepSessionPath(attachmentsDir, stepId);
   if (!existsSync(dest)) return null;
   return readFileSync(dest, 'utf8');
-}
-
-export function stepEnginePtyLogPath(attachmentsDir: string, stepId: string): string {
-  return join(attachmentsDir, 'step-sessions', `${stepId}.engine-pty.log`);
-}
-
-export function receiveEnginePtyLogUpload(
-  deps: MachineDeps,
-  upload: PendingUpload,
-  content: Buffer,
-): void {
-  ownedStep(deps, upload.machineId, upload.stepId);
-  if (content.length > ENGINE_PTY_LOG_MAX_BYTES) {
-    throw new HttpError(
-      413,
-      `engine pty log ${content.length}B over ${ENGINE_PTY_LOG_MAX_BYTES}B cap`,
-    );
-  }
-  const dest = stepEnginePtyLogPath(deps.attachmentsDir, upload.stepId);
-  mkdirSync(join(deps.attachmentsDir, 'step-sessions'), { recursive: true });
-  writeFileSync(dest, content);
-}
-
-export function readStepEnginePtyLog(attachmentsDir: string, stepId: string): Buffer | null {
-  const dest = stepEnginePtyLogPath(attachmentsDir, stepId);
-  if (!existsSync(dest)) return null;
-  return readFileSync(dest);
 }
 
 export function getStepSession(

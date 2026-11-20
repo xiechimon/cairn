@@ -64,10 +64,10 @@ test('a running run shows its plan and steps, with its time so far in the usage 
   await expect(usage).not.toContainText('模型档位');
   await expect(usage).not.toContainText('要改一个文件并跑测试');
   await page.keyboard.press('Escape');
-  await expect(await menuItem(page, '接管')).toBeVisible();
+  await expect(await menuItem(page, '原始输出')).toBeVisible();
 });
 
-test('a finished run keeps time and cost in the usage popover and offers no takeover', async ({ page }) => {
+test('a finished run keeps time and cost in the usage popover', async ({ page }) => {
   await open(page, 'finished');
   await expect.poll(() => planStates(page)).toEqual(['done', 'done', 'done', 'done']);
   const settledOrder = await transcript(page).evaluate((root) => {
@@ -96,7 +96,6 @@ test('a failed run stays folded and opens the failed command with its output on 
   await expect(failed).toContainText('pnpm test:upload');
   await expect(page.getByTestId('tool-output')).toContainText('Tests  1 failed | 30 passed (31)');
   await expect(await menuItem(page, '原始输出')).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: '接管' })).toHaveCount(0);
 });
 
 test('the raw output fills the panel at its end and back returns to the conversation', async ({
@@ -181,24 +180,6 @@ test('refusing the question ends the run without the refused command', async ({ 
   await expect(transcript(page)).toContainText('不跑完整上传测试');
   await expect(transcript(page)).not.toContainText('pnpm test:upload');
   expect(await planStates(page)).toEqual(['done', 'done', 'todo', 'todo']);
-});
-
-test('takeover from the menu asks first, marks the run as taken over and hands back', async ({
-  page,
-}) => {
-  await open(page, 'waiting');
-  await (await menuItem(page, '接管')).click();
-  const dialog = page.getByRole('dialog', { name: '接管这次运行' });
-  await expect(dialog).toContainText('终端还没有接入');
-  await dialog.getByRole('button', { name: '取消' }).click();
-  await expect(tail(page)).toHaveAttribute('data-state', 'waiting');
-  await (await menuItem(page, '接管')).click();
-  await dialog.getByTestId('engine-take-over-confirm').click();
-  await expect(tail(page)).toHaveAttribute('data-state', 'taken_over');
-  await expect(page.getByTestId('engine-question').getByRole('button')).toHaveCount(0);
-  await (await menuItem(page, '交还')).click();
-  await expect(tail(page)).toHaveAttribute('data-state', 'waiting');
-  await expect(page.getByTestId('engine-question').getByRole('button')).toHaveCount(2);
 });
 
 test('the fixture driver steps, plays on a timer and restarts', async ({ page }) => {

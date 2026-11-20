@@ -56,16 +56,6 @@ export default defineConfig(({ mode }) => ({
         ws: true,
         changeOrigin: false,
       },
-      '/api/engine-screen': {
-        target: `http://127.0.0.1:${process.env.CAIRN_DEV_SERVER_PORT ?? 8787}`,
-        ws: true,
-        changeOrigin: false,
-      },
-      '/api/machine/engine-screen': {
-        target: `http://127.0.0.1:${process.env.CAIRN_DEV_SERVER_PORT ?? 8787}`,
-        ws: true,
-        changeOrigin: false,
-      },
       '/api': {
         target: `http://127.0.0.1:${process.env.CAIRN_DEV_SERVER_PORT ?? 8787}`,
         changeOrigin: true,

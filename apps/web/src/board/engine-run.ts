@@ -4,13 +4,7 @@ import { formatWorkDuration } from '../detail/work-trace.js';
 import type { DiffFile, TodoRecord, TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { ThreadUsageSummary } from './thread-usage-model.js';
 
-export type EngineRunState =
-  | 'running'
-  | 'waiting'
-  | 'finished'
-  | 'failed'
-  | 'stopped'
-  | 'taken_over';
+export type EngineRunState = 'running' | 'waiting' | 'finished' | 'failed' | 'stopped';
 export type EngineAnswer = 'allowed' | 'refused';
 
 export interface EnginePlanStep {
@@ -33,13 +27,6 @@ export type EngineEvent =
   | { kind: 'question'; id: string; text: string; answer: EngineAnswer | null }
   | { kind: 'unknown'; id: string; type: string; payload: string };
 
-export interface EngineScreenView {
-  status: 'off' | 'connecting' | 'live' | 'ended' | 'failed';
-  held: boolean;
-  text: string;
-  send(bytes: string): void;
-}
-
 export interface EngineRun {
   engine: string;
   state: EngineRunState;
@@ -53,14 +40,11 @@ export interface EngineRun {
 
 export interface EngineRunActions {
   answer: (eventId: string, answer: EngineAnswer) => void;
-  takeOver: () => void;
-  handBack: () => void;
 }
 
 export interface EngineRunView {
   run: EngineRun;
   actions?: EngineRunActions;
-  screen?: EngineScreenView;
   controls?: ReactNode;
   phase?: TodoRecord['phase'];
   eventsInTranscript?: boolean;
@@ -86,10 +70,6 @@ export function engineUsageSummary(
       run.elapsedSeconds === null ? summary.duration : formatWorkDuration(run.elapsedSeconds),
     cost: engineCost(run.costUsd) ?? summary.cost,
   };
-}
-
-export function engineCanTakeOver(state: EngineRunState): boolean {
-  return state === 'running' || state === 'waiting';
 }
 
 const settled = { error: false, running: false, unfinished: false } as const;

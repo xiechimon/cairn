@@ -51,7 +51,6 @@ const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }>
 
 export interface EngineMenu {
   onViewRaw: () => void;
-  takeOver?: { label: string; onClick: () => void };
 }
 
 export interface ThreadActions {
@@ -270,17 +269,6 @@ export function useThreadActions({
                 setMenuOpen(false);
                 engine.onViewRaw();
               },
-              ...(engine.takeOver !== undefined
-                ? {
-                    takeOver: {
-                      label: engine.takeOver.label,
-                      onClick: () => {
-                        setMenuOpen(false);
-                        engine.takeOver?.onClick();
-                      },
-                    },
-                  }
-                : {}),
             }
           : {})}
         moveSub={<MoveToProjectSub todo={todo} />}

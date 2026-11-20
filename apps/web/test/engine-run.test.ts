@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { engineCanTakeOver, engineUsageSummary } from '../src/board/engine-run.js';
+import { engineUsageSummary } from '../src/board/engine-run.js';
 import { earlierStepCount } from '../src/detail/work-trace.js';
 import {
   ENGINE_SCRIPTS,
@@ -34,12 +34,6 @@ describe('engine run view model', () => {
     });
     expect(usage(10, 0.004).cost).toBe('$0.0040');
     expect(usage(null, null)).toMatchObject({ duration: '', cost: '—' });
-  });
-
-  it('offers takeover only while the engine is still working', () => {
-    expect(
-      (['running', 'waiting', 'finished', 'failed', 'taken_over'] as const).map(engineCanTakeOver),
-    ).toEqual([true, true, false, false, false]);
   });
 
   it('folds earlier steps only when more than one would hide', () => {
@@ -85,18 +79,20 @@ describe('fixture engine run at a step', () => {
     expect(planOf(7, answers)).toEqual(['done', 'done', 'todo', 'todo']);
   });
 
-  it('keeps the events while taken over and never drops an unknown one', () => {
-    const run = engineRunAt(script, 6, {}, true);
-    expect(run.state).toBe('taken_over');
+  it('never drops an unknown event', () => {
+    const run = engineRunAt(script, 6);
     expect(run.events).toHaveLength(6);
     expect(run.events[4]).toMatchObject({ kind: 'unknown', type: 'context_compaction' });
     expect(run.rawOutput.split('\n').at(-1)).toContain('(y/n)');
   });
 
   it('maps the run state onto the thread phase the head shows', () => {
-    expect(
-      (['running', 'waiting', 'taken_over', 'finished', 'failed'] as const).map(enginePhase),
-    ).toEqual(['building', 'needs_input', 'needs_input', 'done', 'failed']);
+    expect((['running', 'waiting', 'finished', 'failed'] as const).map(enginePhase)).toEqual([
+      'building',
+      'needs_input',
+      'done',
+      'failed',
+    ]);
   });
 
   it('clamps a step outside the script', () => {

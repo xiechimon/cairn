@@ -126,22 +126,22 @@ Reach:
 
 ### engine-view
 
-**Engine run in a task thread** (partial, centrality 1). A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with time and cost in the usage popover and a raw output view and takeover in the thread menu. Live scrollback streams over the paired engine-screen channel when the machine advertises enginePty (CAIRN_ENGINE_PTY=1 daemon flag), rendered by the in-repo VT grid; keystrokes reach PTY stdin only while the owner's takeover lease holds; fallback to the synthesized transcript view otherwise.
+**Engine run in a task thread** (partial, centrality 1). A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with time and cost in the usage popover and a raw output view in the thread menu, synthesized from the transcript.
 
-States: Running with the plan checklist, trace rows and the typing bubble; waiting on a question with allow once, refuse and take over; finished with time and cost; failed with the failed command open; taken over with live terminal input and a hand back control; scrollback reconnect resyncing via fromSeq; an unknown event as a row that opens its raw payload; a long step list that folds its earlier steps; no tail when the thread carries no run.
+States: Running with the plan checklist, trace rows and the typing bubble; waiting on a question with allow once and refuse; finished with time and cost; failed with the failed command open; an unknown event as a row that opens its raw payload; a long step list that folds its earlier steps; no tail when the thread carries no run.
 
 Reach:
 
 1. `open /app/todo/<id of a thread listed by the todos API>`
 2. `click label:更多操作…`
-3. `click label:接管`
+3. `click label:原始输出`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `engine-question`, `engine-raw`, `engine-raw-copy`, `engine-raw-view`, `engine-take-over-confirm`
+- Test ids in its code: `engine-question`, `engine-raw`, `engine-raw-copy`, `engine-raw-view`
 - Research: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md)
 - Frontend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
-- Backend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/side-panels-backend-gaps.md](../../../docs/design/side-panels-backend-gaps.md), [docs/design/enginerun-takeover-protocol.md](../../../docs/design/enginerun-takeover-protocol.md)
+- Backend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/side-panels-backend-gaps.md](../../../docs/design/side-panels-backend-gaps.md)
 - Evidence: `apps/web/e2e/chief-home-engine-run.spec.ts`, `apps/web/test/engine-run.test.ts`
 
 ### harness-dispatch

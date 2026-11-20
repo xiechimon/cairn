@@ -37,7 +37,6 @@ export interface StepDeliveryInput {
   refreshGitToken: (() => Promise<string>) | null;
   transcript: TranscriptBuffer;
   session: { sessionId: string | null; sessionFile: string | undefined };
-  enginePtyLog?: Buffer | null;
   usage: AgentTokenUsage;
   lastError: string | null;
   stopped: boolean;
@@ -153,15 +152,7 @@ export async function deliverStepOutcome(input: StepDeliveryInput): Promise<void
     sessionFile: sessionFileForUpload ?? null,
   });
   try {
-    await putFinalArtifacts(
-      client,
-      logger,
-      stepId,
-      messages,
-      planContent,
-      sessionFileForUpload,
-      input.enginePtyLog ?? null,
-    );
+    await putFinalArtifacts(client, logger, stepId, messages, planContent, sessionFileForUpload);
   } catch (err) {
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(input.creds);
