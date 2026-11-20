@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, renameSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { BRAND } from '@cairn/shared';
 
 export type RuntimeId = 'claude' | 'pi' | 'devin' | 'gemini' | 'antigravity';
 
@@ -47,9 +48,11 @@ export function migrateRuntimeHomes(cairnHome: string, realHome = homedir()): st
       move(join(legacyHomes, entry), runtimeHome(cairnHome, entry), `agent-homes/${entry}`);
     }
   } catch {}
-  const legacyTools = join(realHome, '.local', 'share', 'cairn');
-  for (const name of ['devin', 'antigravity']) {
-    move(join(legacyTools, name), toolInstallRoot(cairnHome, name), `tools/${name}`);
+  if (resolve(cairnHome) === resolve(join(realHome, BRAND.homeDirName))) {
+    const legacyTools = join(realHome, '.local', 'share', 'cairn');
+    for (const name of ['devin', 'antigravity']) {
+      move(join(legacyTools, name), toolInstallRoot(cairnHome, name), `tools/${name}`);
+    }
   }
   move(
     join(toolInstallRoot(cairnHome, 'devin'), 'home'),

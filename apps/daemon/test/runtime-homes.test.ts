@@ -23,8 +23,8 @@ function tmp(): string {
 
 describe('migrateRuntimeHomes', () => {
   test('moves every legacy layout into homes/ and tools/', () => {
-    const cairn = join(tmp(), 'cairn');
     const real = join(tmp(), 'real');
+    const cairn = join(real, '.cairn');
     for (const dir of [
       join(cairn, 'claude'),
       join(cairn, 'agent-runtime'),
@@ -71,8 +71,8 @@ describe('migrateRuntimeHomes', () => {
   });
 
   test('never moves a symlinked legacy path', () => {
-    const cairn = join(tmp(), 'cairn');
     const real = join(tmp(), 'real');
+    const cairn = join(real, '.cairn');
     const elsewhere = join(real, 'elsewhere');
     mkdirSync(elsewhere, { recursive: true });
     writeFileSync(join(elsewhere, 'token'), 'secret\n');
@@ -87,6 +87,19 @@ describe('migrateRuntimeHomes', () => {
     expect(lstatSync(join(cairn, 'claude')).isSymbolicLink()).toBe(true);
     expect(lstatSync(join(real, '.local', 'share', 'cairn', 'devin')).isSymbolicLink()).toBe(true);
     expect(existsSync(claudeConfigHome(cairn))).toBe(false);
+    expect(existsSync(toolInstallRoot(cairn, 'devin'))).toBe(false);
+  });
+
+  test('a non-canonical cairn home never touches the real ~/.local/share/cairn', () => {
+    const real = join(tmp(), 'real');
+    const cairn = join(tmp(), 'cairn');
+    const legacy = join(real, '.local', 'share', 'cairn', 'devin');
+    mkdirSync(legacy, { recursive: true });
+
+    const moved = migrateRuntimeHomes(cairn, real);
+
+    expect(moved).toEqual([]);
+    expect(existsSync(legacy)).toBe(true);
     expect(existsSync(toolInstallRoot(cairn, 'devin'))).toBe(false);
   });
 });
