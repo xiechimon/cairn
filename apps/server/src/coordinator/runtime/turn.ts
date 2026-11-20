@@ -271,11 +271,12 @@ export async function runCoordinatorTurn(
       await stopping;
       return done({ status: 'stopped' });
     }
-    const previousInitial = (await api.inputs?.list(threadId))?.find(
+    const previousInitial = (await api.inputs?.list(threadId))?.findLast(
       (input) =>
         input.stepId === stepId &&
         input.kind === 'initial' &&
-        input.conversationId === conversationKey,
+        input.conversationId === conversationKey &&
+        input.state === 'consumed',
     );
     deps.setupPhase?.('input list');
     const prior =
@@ -295,6 +296,7 @@ export async function runCoordinatorTurn(
       conversationKey,
       storedInstruction ?? '',
       prior?.entry === undefined ? undefined : String(prior.entry),
+      previousInitial !== undefined && (prior === undefined || prior.status === 'unanswered'),
     );
     deps.setupPhase?.('input prepare');
     const submission = await root.submit(

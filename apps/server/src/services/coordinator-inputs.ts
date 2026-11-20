@@ -26,6 +26,28 @@ export function coordinatorInputs(db: Db, threadId: string): CoordinatorInput[] 
     .all();
 }
 
+export function inputRequestId(input: Pick<CoordinatorInput, 'id' | 'attempt'>): string {
+  return input.attempt <= 1 ? input.id : `${input.id}#${input.attempt}`;
+}
+
+function parseInputRequestId(requestId: string): { id: string; attempt: number } {
+  const hash = requestId.lastIndexOf('#');
+  if (hash === -1) return { id: requestId, attempt: 1 };
+  const attempt = Number(requestId.slice(hash + 1));
+  return Number.isSafeInteger(attempt) && attempt >= 1
+    ? { id: requestId.slice(0, hash), attempt }
+    : { id: requestId, attempt: 1 };
+}
+
+export function inputForRequestId(
+  db: Db,
+  requestId: string,
+): { batch: CoordinatorInput | undefined; stale: boolean } {
+  const ref = parseInputRequestId(requestId);
+  const batch = db.select().from(coordinatorInput).where(eq(coordinatorInput.id, ref.id)).get();
+  return { batch, stale: batch !== undefined && batch.attempt !== ref.attempt };
+}
+
 export function queueCoordinatorInput(
   db: Db,
   target: StepRow,
@@ -91,6 +113,7 @@ export function prepareCoordinatorInput(
   conversationId: string,
   content: string,
   existingEntryId?: string,
+  renew = false,
 ): CoordinatorInput {
   const prior = db
     .select()
@@ -103,11 +126,8 @@ export function prepareCoordinatorInput(
       ),
     )
     .get();
-  if (prior !== undefined) {
-    if (prior.kind !== 'initial' || prior.conversationId !== conversationId)
-      throw new HttpError(409, 'Coordinator input identity changed');
-    if (prior.state === 'pending') return prior;
-  }
+  if (prior !== undefined && (prior.state === 'pending' || (prior.state === 'consumed' && !renew)))
+    return { ...prior, id: inputRequestId(prior) };
   const row = db.select().from(step).where(eq(step.id, stepId)).get();
   if (row?.kind !== 'chief' || row.machineId !== null || row.status !== 'claimed')
     throw new HttpError(409, 'Coordinator input has no native claimed step');
@@ -127,6 +147,32 @@ export function prepareCoordinatorInput(
             (entry?.conversationId === conversationId && entry.entryId === existingEntryId)
           );
         });
+  if (prior !== undefined) {
+    if (prior.state === 'pending') return { ...prior, id: inputRequestId(prior) };
+    const renewed: CoordinatorInput = {
+      ...prior,
+      attempt: prior.attempt + 1,
+      ownerMessageIds: frozen,
+      content,
+      state: 'pending',
+      entryId: null,
+      successorStepId: null,
+      createdAt: nowMs(),
+    };
+    db.update(coordinatorInput)
+      .set({
+        attempt: renewed.attempt,
+        ownerMessageIds: renewed.ownerMessageIds,
+        content: renewed.content,
+        state: renewed.state,
+        entryId: renewed.entryId,
+        successorStepId: renewed.successorStepId,
+        createdAt: renewed.createdAt,
+      })
+      .where(eq(coordinatorInput.id, prior.id))
+      .run();
+    return { ...renewed, id: inputRequestId(renewed) };
+  }
   const input: CoordinatorInput = {
     id:
       db.select().from(coordinatorInput).where(eq(coordinatorInput.id, stepId)).get() === undefined
@@ -139,27 +185,13 @@ export function prepareCoordinatorInput(
     content,
     conversationId,
     state: 'pending',
+    attempt: 1,
     entryId: null,
     successorStepId: null,
     createdAt: nowMs(),
   };
-  if (prior === undefined) {
-    db.insert(coordinatorInput).values(input).run();
-  } else {
-    db.update(coordinatorInput)
-      .set({
-        id: input.id,
-        ownerMessageIds: input.ownerMessageIds,
-        content: input.content,
-        state: 'pending',
-        entryId: null,
-        successorStepId: null,
-        createdAt: input.createdAt,
-      })
-      .where(eq(coordinatorInput.id, prior.id))
-      .run();
-  }
-  return input;
+  db.insert(coordinatorInput).values(input).run();
+  return { ...input, id: inputRequestId(input) };
 }
 
 export function pullCoordinatorInput(
@@ -187,7 +219,7 @@ export function pullCoordinatorInput(
   if (bound === undefined) throw new HttpError(409, 'Coordinator input conversation is missing');
   requireCoordinatorConversation(db, target.buildId, bound);
   for (const id of admittedRequestIds) {
-    const admitted = db.select().from(coordinatorInput).where(eq(coordinatorInput.id, id)).get();
+    const admitted = inputForRequestId(db, id).batch;
     if (
       admitted?.stepId !== stepId ||
       admitted.conversationId !== bound ||
@@ -233,8 +265,8 @@ export function consumeCoordinatorInput(
   placedAt?: number,
 ): { placed: ChiefMessageRow[]; retired: StepRow | undefined } {
   const unchanged = { placed: [], retired: undefined };
-  const batch = db.select().from(coordinatorInput).where(eq(coordinatorInput.id, requestId)).get();
-  if (batch === undefined) return unchanged;
+  const { batch, stale } = inputForRequestId(db, requestId);
+  if (batch === undefined || stale) return unchanged;
   if (
     !Number.isSafeInteger(Number(entryId)) ||
     Number(entryId) < 1 ||
@@ -296,8 +328,8 @@ export function releaseCoordinatorInput(
   requestId: string,
   conversationId: string | null,
 ): void {
-  const batch = db.select().from(coordinatorInput).where(eq(coordinatorInput.id, requestId)).get();
-  if (batch === undefined || batch.state !== 'pending') return;
+  const { batch, stale } = inputForRequestId(db, requestId);
+  if (batch === undefined || stale || batch.state !== 'pending') return;
   if (batch.conversationId !== conversationId)
     throw new HttpError(409, 'Coordinator input release has the wrong conversation');
   if (conversationId !== null) requireCoordinatorConversation(db, batch.threadId, conversationId);
@@ -362,8 +394,9 @@ export function releaseCoordinatorInput(
 }
 
 export function coordinatorInputIsLive(db: Db, requestId: string): boolean | undefined {
-  const batch = db.select().from(coordinatorInput).where(eq(coordinatorInput.id, requestId)).get();
+  const { batch, stale } = inputForRequestId(db, requestId);
   if (batch === undefined) return undefined;
+  if (stale) return false;
   const target = db.select().from(step).where(eq(step.id, batch.stepId)).get();
   return (
     batch.state !== 'released' &&

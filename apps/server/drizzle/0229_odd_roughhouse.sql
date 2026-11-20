@@ -1,0 +1,1 @@
+ALTER TABLE `coordinator_input` ADD `attempt` integer DEFAULT 1 NOT NULL;

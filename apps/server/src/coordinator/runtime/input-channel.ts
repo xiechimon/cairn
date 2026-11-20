@@ -40,6 +40,7 @@ export interface InputChannel {
     conversationId: string,
     content: string,
     existingEntryId?: string,
+    renew?: boolean,
   ): Promise<NativeInput>;
   consume(
     requestId: string,

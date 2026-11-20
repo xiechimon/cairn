@@ -258,6 +258,7 @@ export function createInputReceipts(
             conversationKey,
             content,
             record.entry === undefined ? 'unplaced' : String(record.entry),
+            record.status === 'unanswered',
           );
           submissions.set(record.id, record);
           pending.push({ kind: 'receipt', record });

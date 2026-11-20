@@ -1,7 +1,8 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { coordinatorInput, coordinatorRun } from '../db/schema.js';
+import { coordinatorRun } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
+import { inputForRequestId } from './coordinator-inputs.js';
 
 export function coordinatorRuns(db: Db, threadId: string) {
   return db.select().from(coordinatorRun).where(eq(coordinatorRun.threadId, threadId)).all();
@@ -17,7 +18,8 @@ export function bindCoordinatorRun(
   if (requestIds.length === 0) throw new HttpError(409, 'Coordinator run has no input authority');
   const producers = new Set<string>();
   for (const id of requestIds) {
-    const input = db.select().from(coordinatorInput).where(eq(coordinatorInput.id, id)).get();
+    const { batch: input, stale } = inputForRequestId(db, id);
+    if (stale) continue;
     if (
       input?.threadId !== threadId ||
       input.conversationId !== conversationId ||
@@ -26,6 +28,7 @@ export function bindCoordinatorRun(
       throw new HttpError(409, 'Coordinator run input authority is incomplete');
     producers.add(input.stepId);
   }
+  if (producers.size === 0) return;
   const stepId = [...producers][0];
   if (producers.size !== 1 || stepId === undefined)
     throw new HttpError(409, 'Coordinator run crosses producer boundaries');

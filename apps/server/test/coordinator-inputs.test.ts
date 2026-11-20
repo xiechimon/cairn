@@ -71,9 +71,22 @@ test('initial input freezes owner identity and content before later steers', () 
 test('a consumed input does not replay: a re-claimed step prepares a new requestId', () => {
   const first = prepareCoordinatorInput(H.s.db, parentId, 'conversation-1', 'Start.');
   consumeCoordinatorInput(H.s.db, first.id, 'conversation-1', '5');
-  const second = prepareCoordinatorInput(H.s.db, parentId, 'conversation-1', 'Start.');
-  expect(second.id).not.toBe(first.id);
-  expect(second).toMatchObject({ state: 'pending', stepId: parentId, kind: 'initial' });
+  const resumed = prepareCoordinatorInput(H.s.db, parentId, 'conversation-1', 'Start.');
+  expect(resumed.id).toBe(first.id);
+  const retried = prepareCoordinatorInput(
+    H.s.db,
+    parentId,
+    'conversation-1',
+    'Start.',
+    undefined,
+    true,
+  );
+  expect(retried.id).not.toBe(first.id);
+  expect(retried).toMatchObject({ state: 'pending', stepId: parentId, kind: 'initial' });
+  consumeCoordinatorInput(H.s.db, first.id, 'conversation-1', '6');
+  expect(batch(first.id)?.state).toBe('pending');
+  consumeCoordinatorInput(H.s.db, retried.id, 'conversation-1', '7');
+  expect(batch(first.id)).toMatchObject({ state: 'consumed', entryId: '7' });
 });
 
 test('queue and repeated pull retain the same frozen batch without early attribution', () => {

@@ -1155,6 +1155,7 @@ export const coordinatorInput = sqliteTable(
     content: text('content').notNull(),
     conversationId: text('conversationId'),
     state: text('state').$type<'pending' | 'consumed' | 'released'>().notNull().default('pending'),
+    attempt: integer('attempt').notNull().default(1),
     entryId: text('entryId'),
     successorStepId: text('successorStepId'),
     createdAt: epochMs('createdAt').notNull(),
