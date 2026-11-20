@@ -140,6 +140,35 @@ jobs:
         working-directory: apps/desktop
         run: pnpm smoke
 
+      - name: Download the previous release for the migration smoke
+        if: matrix.arch == 'arm64'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prev_tag=$(gh release list --limit 30 --json tagName,isDraft \
+            -q '[.[] | select(.tagName | startswith("desktop-v")) | select(.isDraft | not)][0].tagName')
+          echo "previous release: $prev_tag"
+          gh release download "$prev_tag" -p 'Cairn-*-arm64.zip' --dir "$RUNNER_TEMP/prev" --clobber
+          mkdir -p "$RUNNER_TEMP/prev-app"
+          ditto -x -k "$RUNNER_TEMP"/prev/Cairn-*-arm64.zip "$RUNNER_TEMP/prev-app"
+
+      - name: Run the post-install smoke on the packaged arm64 app
+        if: matrix.arch == 'arm64'
+        run: |
+          node scripts/smoke/post-install.mjs \
+            --app "$RUNNER_TEMP/unzipped/Cairn.app" \
+            --prev-app "$RUNNER_TEMP/prev-app/Cairn.app" \
+            --evidence "$RUNNER_TEMP/smoke-evidence"
+
+      - name: Upload post-install smoke evidence
+        if: failure() && matrix.arch == 'arm64'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: smoke-evidence-${{ matrix.arch }}
+          path: ${{ runner.temp }}/smoke-evidence
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Keep the packaged files for the publish job
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

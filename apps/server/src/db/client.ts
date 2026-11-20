@@ -18,20 +18,38 @@ function resolveMigrationsFolder(): string {
 
 export const MIGRATIONS_FOLDER = resolveMigrationsFolder();
 
-export function migrateDatabase(db: Db, sqlite: Database.Database): void {
+interface FkViolation {
+  table: string;
+  rowid: number | bigint | null;
+  parent: string;
+}
+
+function foreignKeyViolations(sqlite: Database.Database): Set<string> {
+  const rows = sqlite.prepare('SELECT * FROM pragma_foreign_key_check').all() as FkViolation[];
+  return new Set(rows.map((row) => `${row.table}|${row.rowid}|${row.parent}`));
+}
+
+export function migrateDatabase(
+  db: Db,
+  sqlite: Database.Database,
+  migrationsFolder = MIGRATIONS_FOLDER,
+): void {
   const foreignKeysOn = sqlite.pragma('foreign_keys', { simple: true }) === 1;
   if (foreignKeysOn) sqlite.pragma('foreign_keys = OFF');
+  const before = foreignKeyViolations(sqlite);
   try {
-    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    migrate(db, { migrationsFolder });
   } finally {
     if (foreignKeysOn) sqlite.pragma('foreign_keys = ON');
   }
-  const violations = sqlite.pragma('foreign_key_check') as unknown[];
-  if (violations.length > 0)
+  const added = [...foreignKeyViolations(sqlite)].filter((key) => !before.has(key));
+  if (added.length > 0) {
+    const names = [...new Set(added.map((key) => key.split('|')[0]))];
     throw new Error(
-      `foreign_key_check after migrations reported ${violations.length} violation(s)`,
+      `foreign key violations introduced by migrations (${added.length} rows in ${names.join(', ')})`,
     );
-  foldMemoryIndexes(db);
+  }
+  if (migrationsFolder === MIGRATIONS_FOLDER) foldMemoryIndexes(db);
 }
 
 export interface OpenedDb {

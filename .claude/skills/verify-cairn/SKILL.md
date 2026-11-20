@@ -15,6 +15,8 @@ Control Glass journeys (new task, dispatch, review diff, request changes, merge)
 
 Change history: one file per ticket under `changelog/` (`<date>-<ticket>.md`, convention in `changelog/README.md`). Record a new entry by creating a new file; never edit old entries or this file for it.
 
+Shipped-app regressions: [post-install-regressions.md](post-install-regressions.md) lists every behavior that regressed in a released desktop build and the check guarding it in `scripts/smoke/post-install.mjs` (run by `desktop-release` before publish). A verified fix that later regresses gets a row and a check there.
+
 ## Evidence limits checklist
 
 Apply this checklist before reporting verification or handing off a delivery. For each acceptance claim, record the command, tested commit, app surface (fixture or live), provider mode (stub, real, or not exercised), artifact path, result and remaining limits. Mark an unavailable check as unverified rather than widening a narrower result.
