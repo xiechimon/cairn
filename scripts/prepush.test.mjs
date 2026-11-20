@@ -899,7 +899,11 @@ test('the temp-dir ratchet is a required gate and CI vitest runs sit under the s
   for (const run of vitestRuns) assert.match(run, /node scripts\/test-temp-run\.mjs -- pnpm test /);
 });
 
-const prepushEnv = (overrides = {}) => ({ ...scrubGateEnv(), ...overrides });
+const prepushEnv = (overrides = {}) => ({
+  ...scrubGateEnv(),
+  CAIRN_CPU_SATURATION_PERCENT: '0',
+  ...overrides,
+});
 
 test('CLI skips real document changes and rejects a missing base', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-'));

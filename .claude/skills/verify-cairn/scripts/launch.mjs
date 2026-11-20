@@ -18,6 +18,8 @@ const HOME_DIR = join(RUN_DIR, 'home');
 const SKILLS_DIR = join(HOME_DIR, 'skills');
 const rawIdleMs = Number(process.env.VERIFY_IDLE_TIMEOUT_MS ?? '1200000');
 const IDLE_TIMEOUT_MS = Number.isFinite(rawIdleMs) && rawIdleMs >= 0 ? rawIdleMs : 1_200_000;
+const rawMaxAgeMs = Number(process.env.VERIFY_MAX_AGE_MS ?? '2700000');
+const MAX_AGE_MS = Number.isFinite(rawMaxAgeMs) && rawMaxAgeMs >= 0 ? rawMaxAgeMs : 2_700_000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -179,6 +181,19 @@ async function main() {
   console.log(`  运行态          ${RUN_DIR}`);
   console.log(`  supervisor     pid ${process.pid}: the stack lives exactly as long as this process and its parent chain`);
   console.log('next:node scripts/doctor.mjs 体检 → node scripts/drive.mjs <probe>; stop with vp.mjs cleanup');
+  console.log(
+    `  lifetime       idle ${IDLE_TIMEOUT_MS / 60_000} min, max ${MAX_AGE_MS / 60_000} min (VERIFY_IDLE_TIMEOUT_MS, VERIFY_MAX_AGE_MS; 0 disables)`,
+  );
+
+  if (MAX_AGE_MS > 0) {
+    const maxAge = setTimeout(() => {
+      console.error(
+        `栈已活 ${Math.round(MAX_AGE_MS / 60_000)} 分钟，到 VERIFY_MAX_AGE_MS 上限，自动停栈把 live-stack slot 让出来（仍在用就重开一次）`,
+      );
+      void shutdown();
+    }, MAX_AGE_MS);
+    maxAge.unref();
+  }
 
   if (IDLE_TIMEOUT_MS > 0) {
     let lastActive = Date.now();

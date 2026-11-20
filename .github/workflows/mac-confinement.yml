@@ -23,6 +23,11 @@ concurrency:
   group: mac-confinement-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  # Every machine this repo is built on is one lane's machine; a GitHub runner is one job's
+  # machine. The explicit flag keeps the bypass visible in the runner log instead of implicit.
+  CAIRN_HEAVY_GATE_BYPASS: '1'
+
 jobs:
   probe:
     runs-on: macos-latest

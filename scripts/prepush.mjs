@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { mergeBase } from './diff-base.mjs';
+import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 import { OWNED_PROCESS_CLI } from './owned-process.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
@@ -341,6 +342,8 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
             args[0]?.slice(2) ?? 'local',
             process.env.PREPUSH_FORCE_FULL === 'true',
           );
+  const lease = await acquireSlot({ label: 'prepush' });
+  if (lease !== null) Object.assign(process.env, leaseEnv(lease));
   runPlan(plan, { cwd: root, env: process.env });
   console.log(`[prepush] PASS (${plan.length} checks)`);
 }

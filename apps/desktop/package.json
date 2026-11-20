@@ -19,9 +19,9 @@
     "stage-runner": "node scripts/stage-runner.mjs",
     "stage-agent-desktop": "node scripts/stage-agent-desktop.mjs",
     "build": "node build.mjs",
-    "start": "node build.mjs && electron .",
-    "dist:mac": "node build.mjs && electron-builder --mac",
-    "dist:linux": "node build.mjs && electron-builder --linux --publish never",
+    "start": "node scripts/pack.mjs --start",
+    "dist:mac": "node scripts/pack.mjs --mac",
+    "dist:linux": "node scripts/pack.mjs --linux --publish never",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke-mac.mjs release/mac-arm64/Cairn.app release/smoke.png release/tray.png",
     "smoke:linux": "node scripts/smoke-linux.mjs"
