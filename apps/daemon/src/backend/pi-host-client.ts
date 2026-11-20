@@ -150,7 +150,6 @@ class PiHostSession implements AgentSessionHandle {
       sessionDir: this.privateDirectory,
       ...(backend.skills !== undefined ? { skills: backend.skills } : {}),
       ...(backend.machineName !== undefined ? { machineName: backend.machineName } : {}),
-      ...(backend.folderRoots !== undefined ? { folderRoots: [...backend.folderRoots()] } : {}),
       resumeFile: args.resumeFile,
       session: serializableSession(opts),
     });

@@ -303,7 +303,7 @@ describe('request_cloak_license is offered with a VM computer or a browser-usabl
     expect(teamHasVmComputer(s.db, s.team.id)).toBe(true);
   });
 
-  test('a VM machine without the computer capability or with the desktop grant off has no VM computer', () => {
+  test('a VM machine without the computer capability has no VM computer', () => {
     const { s } = boot();
     s.db
       .insert(machineTable)
@@ -318,24 +318,6 @@ describe('request_cloak_license is offered with a VM computer or a browser-usabl
       .run();
     expect(teamHasVmComputer(s.db, s.team.id)).toBe(false);
     addVmMachine(s, 'vm');
-    expect(teamHasVmComputer(s.db, s.team.id)).toBe(true);
-    s.db
-      .update(machineTable)
-      .set({ desktopOverride: false })
-      .where(eq(machineTable.id, 'mac-vm'))
-      .run();
-    expect(teamHasVmComputer(s.db, s.team.id)).toBe(false);
-    s.db
-      .update(machineTable)
-      .set({ desktopOverride: null })
-      .where(eq(machineTable.id, 'mac-vm'))
-      .run();
-    expect(teamHasVmComputer(s.db, s.team.id)).toBe(true);
-    s.db
-      .update(machineTable)
-      .set({ desktopOverride: true })
-      .where(eq(machineTable.id, 'mac-vm'))
-      .run();
     expect(teamHasVmComputer(s.db, s.team.id)).toBe(true);
   });
 
@@ -355,7 +337,7 @@ describe('request_cloak_license is offered with a VM computer or a browser-usabl
     );
   });
 
-  test('the license tool is offered for a browser-usable VM even with the desktop grant off', () => {
+  test('the license tool alone is offered for a browser-usable VM', () => {
     expect(coordinatorToolDefs({ vmBrowser: true }).map((def) => def.name)).toContain(
       REQUEST_CLOAK_LICENSE_TOOL,
     );
@@ -368,24 +350,6 @@ describe('request_cloak_license is offered with a VM computer or a browser-usabl
     addVmMachine(s, 'host');
     expect(teamHasVmBrowser(s.db, s.team.id)).toBe(false);
     addVmMachine(s, 'vm');
-    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(true);
-    s.db
-      .update(machineTable)
-      .set({ desktopOverride: false })
-      .where(eq(machineTable.id, 'mac-vm'))
-      .run();
-    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(true);
-    s.db
-      .update(machineTable)
-      .set({ browserOverride: false })
-      .where(eq(machineTable.id, 'mac-vm'))
-      .run();
-    expect(teamHasVmBrowser(s.db, s.team.id)).toBe(false);
-    s.db
-      .update(machineTable)
-      .set({ browserOverride: null })
-      .where(eq(machineTable.id, 'mac-vm'))
-      .run();
     expect(teamHasVmBrowser(s.db, s.team.id)).toBe(true);
     s.db
       .update(machineTable)

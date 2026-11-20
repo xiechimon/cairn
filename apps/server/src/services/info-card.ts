@@ -31,9 +31,7 @@ export function infoComputerHosts(db: Pick<Db, 'select'>, teamId: string) {
         row.online &&
         row.capabilities?.computerKind === 'vm' &&
         row.capabilities.computer === true &&
-        row.capabilities.browser === true &&
-        row.desktopOverride !== false &&
-        row.browserOverride !== false,
+        row.capabilities.browser === true,
     );
 }
 

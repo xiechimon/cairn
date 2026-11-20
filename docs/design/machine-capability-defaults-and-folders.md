@@ -1,6 +1,6 @@
 # Machine capability defaults and folder grants
 
-Status: implemented. Browser and desktop grants ship as nullable machine overrides that default on when the matching capability is reported; the G2 folder slice ships as `machine.folderGrants`; the owner-Mac path ships behind `ownComputerEnabled` plus per-call approval stamps. This pass (seq 18) finishes the default-on contract: the VM-computer offer and the Runner-claimed chief tool surface now read the same grant as dispatch, the daemon refuses orb calls the server did not stamp, and the settings machine row exposes the two grants. Baseline `f5f30e7f` on `origin/main`.
+Status: superseded by the owner on 2026-11-20. Browser and desktop control are always on where a machine reports the capability, the agent may use any path on the machine, and the own-Mac action log lives only in the daemon log; the grant columns, folder grants and their settings rows were removed. The dangerous-command gate in `apps/daemon/src/backend/command-gate.ts` still applies. What follows is the historical design.
 
 ## Problem
 

@@ -94,7 +94,6 @@ async function open(page: Page, world: World, path = '/app') {
               scopeKey: 'chief:u1',
               state: 'stopped',
               controlHolder: 'none',
-              browserEnabled: true,
               handoffReason: null,
               kind: 'vm',
               download: { state: 'absent', doneBytes: 0, totalBytes: 1_481_435_942 },

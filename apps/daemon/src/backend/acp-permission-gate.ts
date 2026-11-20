@@ -1,11 +1,6 @@
 import type { RequestPermissionRequest } from '@agentclientprotocol/sdk';
 import type { SessionOpts } from '@cairn/shared';
-import {
-  decideBashCommand,
-  decideToolCall,
-  type FolderGateContext,
-  type PermissionRule,
-} from './command-gate.js';
+import { decideBashCommand, decideToolCall, type PermissionRule } from './command-gate.js';
 
 export type AcpTurnPolicy = 'relay-only' | 'read-only' | 'normal';
 
@@ -14,7 +9,6 @@ export type AcpToolCall = RequestPermissionRequest['toolCall'];
 export interface AcpNormalGate {
   mode: 'deny' | 'allow-once' | 'gate';
   rules?: readonly PermissionRule[];
-  folders?: () => FolderGateContext | undefined;
 }
 
 export interface AcpGateDecision {
@@ -203,7 +197,6 @@ export function decideAcpPermission(input: {
   if (!KNOWN_KINDS.has(kind)) {
     return { allow: false, reason: `Cairn permission gate rejected ${label}: unknown tool kind` };
   }
-  const folders = input.normal.folders?.();
   if (kind === 'execute') {
     const command = commandOf(toolCall);
     if (command === null) {
@@ -212,7 +205,7 @@ export function decideAcpPermission(input: {
         reason: `Cairn permission gate rejected ${label}: no command text to check`,
       };
     }
-    const decision = decideBashCommand(command, input.normal.rules, folders);
+    const decision = decideBashCommand(command, input.normal.rules);
     return decision.action === 'allow'
       ? { allow: true, reason: 'command gate allows' }
       : {
@@ -223,7 +216,7 @@ export function decideAcpPermission(input: {
   const tool = FILE_KIND_TOOL[kind];
   if (tool !== undefined) {
     for (const path of pathsOf(toolCall)) {
-      const decision = decideToolCall(tool, { path }, input.normal.rules, folders);
+      const decision = decideToolCall(tool, { path }, input.normal.rules);
       if (decision !== undefined && decision.action !== 'allow') {
         return {
           allow: false,

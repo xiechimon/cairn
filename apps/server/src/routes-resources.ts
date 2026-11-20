@@ -14,7 +14,6 @@ import {
   createSkillBodySchema,
   githubReposResponseSchema,
   importSkillBodySchema,
-  type MachineFolderGrants,
   type MachineRunningThread,
   machineStrain,
   PHASE_VALUES,
@@ -122,7 +121,6 @@ import { adoptGithubProfile } from './services/github-profile.js';
 import { mintGithubWebhook, revokeGithubWebhook } from './services/github-webhook.js';
 import { isOwner } from './services/instance-owner.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
-import { applyFolderPinOps } from './services/machine-folders.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
 import { machineRunningCount, toMachineRecord } from './services/machines.js';
 import {
@@ -158,7 +156,6 @@ import {
   startMcpConnectorAuthorize,
   startOAuthAuthorize,
 } from './services/oauth.js';
-import { listOwnComputerActivity } from './services/own-computer.js';
 import {
   listUpstreamModels,
   ProviderTestLimiter,
@@ -317,15 +314,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     if (!row) throw notFound(`machine ${id}`);
     requireTeam(ctx, row.teamId);
     const body = parseWith(patchMachineBodySchema, await jsonBody(c), 'body');
-    if (body.browserOverride !== undefined || body.desktopOverride !== undefined) {
-      if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
-      if (
-        (body.browserOverride === true && row.capabilities?.browser !== true) ||
-        (body.desktopOverride === true && row.capabilities?.computer !== true)
-      ) {
-        throw new HttpError(409, 'machine does not report the requested capability');
-      }
-    }
     if (body.isDefault === true) {
       if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
       if (row.tokenHash === null) throw new HttpError(409, 'machine is not enrolled');
@@ -336,19 +324,8 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         'runtimes follow what the Runner detects; there is no runtime switch to change',
       );
     }
-    let folderGrantsPatch: { folderGrants: MachineFolderGrants } | undefined;
-    if (body.folderPins !== undefined) {
-      if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
-      folderGrantsPatch = { folderGrants: applyFolderPinOps(row.folderGrants, body.folderPins) };
-    }
-    const patch = {
-      ...(body.name !== undefined ? { name: body.name } : {}),
-      ...(body.browserOverride !== undefined ? { browserOverride: body.browserOverride } : {}),
-      ...(body.desktopOverride !== undefined ? { desktopOverride: body.desktopOverride } : {}),
-      ...(folderGrantsPatch !== undefined ? folderGrantsPatch : {}),
-    };
-    if (Object.keys(patch).length > 0) {
-      ctx.db.update(machine).set(patch).where(eq(machine.id, id)).run();
+    if (body.name !== undefined) {
+      ctx.db.update(machine).set({ name: body.name }).where(eq(machine.id, id)).run();
     }
     if (body.isDefault === true) {
       ctx.db.update(team).set({ defaultMachineId: id }).where(eq(team.id, row.teamId)).run();
@@ -358,19 +335,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     if (!updated) throw notFound(`machine ${id}`);
     return c.json(toMachineRecord(updated, machineRunningCount(ctx.db, id)));
   });
-
-  const ownedMachine = (c: Context) => {
-    const id = c.req.param('id') ?? '';
-    const row = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
-    if (!row) throw notFound(`machine ${id}`);
-    requireTeam(ctx, row.teamId);
-    if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
-    return row;
-  };
-
-  app.get('/api/machines/:id/own-computer/activity', (c) =>
-    c.json({ activity: listOwnComputerActivity(ctx.db, ownedMachine(c)) }),
-  );
 
   app.delete('/api/machines/:id', (c) => {
     const id = c.req.param('id');

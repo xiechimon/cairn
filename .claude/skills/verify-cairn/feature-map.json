@@ -1008,8 +1008,8 @@
     {
       "id": "agent-computer",
       "name": "The agent's computer",
-      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.",
-      "states": "No computer; one machine card per computer with an activity line (in use by a task or the Coordinator, idle with the last user, none) and no line when offline; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; CloakBrowser license card waiting, rejected key reason, saved, not saved, owner-only refusal; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; own-Mac switch on the machine row in Settings, Computers: off with the warning on the switch hover; state folds into the row's meta line — finish setup in the Cairn app, installing, verifying read as plain meta text; install failed, not installed, Accessibility missing and Screen Recording missing expand an inline drawer (open by default) with the reason and their actions; ready stays collapsed behind a grant-count meta segment, expanding to standing grants with revoke; own-Mac approval card in the Coordinator conversation (allow once, allow in this conversation or always allow this command, deny); browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere; per-machine browser and desktop grant rows behind a computer-control meta segment on the machine row — default-on, explicit off counted in the segment, explicit on, and unsupported with the disabled switch explaining why. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
+      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser and desktop control are always on wherever the machine reports the capability; there is no setting.",
+      "states": "No computer; one machine card per computer with an activity line (in use by a task or the Coordinator, idle with the last user, none) and no line when offline; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; CloakBrowser license card waiting, rejected key reason, saved, not saved, owner-only refusal; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; own-Mac switch on the machine row in Settings, Computers: off with the warning on the switch hover; state folds into the row's meta line — finish setup in the Cairn app, installing, verifying read as plain meta text; install failed, not installed, Accessibility missing and Screen Recording missing expand an inline drawer (open by default) with the reason and their actions; ready adds nothing to the row (no action log in the product); own-Mac approval card in the Coordinator conversation (allow once, allow in this conversation or always allow this command, deny); browser unsupported (no capabilities.browser) and offline machine. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
       "centrality": 1,
       "status": "partial",
       "code": {
@@ -1022,8 +1022,7 @@
           "apps/web/src/chief/package-install-card.tsx",
           "apps/web/src/board/computer-actions-menu.tsx",
           "apps/web/src/board/machine-capabilities.ts",
-          "apps/web/src/resources/own-computer-panel.tsx",
-          "apps/web/src/resources/computer-grants-panel.tsx"
+          "apps/web/src/resources/own-computer-panel.tsx"
         ],
         "server": [
           "apps/server/src/routes-computers.ts",
@@ -1044,12 +1043,10 @@
       "routes": {
         "server": [
           "/api/computers",
-          "/api/computers/:id",
           "/api/teams/:teamId/computers/**",
           "/api/teams/:id/cloak-license",
           "/api/computers/package-install",
-          "/api/computers/:id/actions",
-          "/api/machines/:id/own-computer/activity"
+          "/api/computers/:id/actions"
         ]
       },
       "reach": [
@@ -1074,7 +1071,7 @@
       "evidence": [
         "apps/web/e2e/machines-computer-card.spec.ts",
         "apps/web/e2e/machines-own-computer.spec.ts",
-        "apps/web/e2e/machines-computer-grants.spec.ts",
+        "apps/server/test/computer-control-open-migration.test.ts",
         "apps/server/test/own-computer.test.ts",
         "apps/server/test/cloak-license.test.ts",
         "apps/server/test/chief-claim-computer-tools.test.ts",

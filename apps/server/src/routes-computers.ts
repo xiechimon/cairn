@@ -1,19 +1,9 @@
-import {
-  computerEnsureBodySchema,
-  computerManageParamsSchema,
-  computerPatchBodySchema,
-  packageInstallDecisionBodySchema,
-} from '@cairn/shared';
+import { computerManageParamsSchema, packageInstallDecisionBodySchema } from '@cairn/shared';
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
+import { HttpError, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
-import {
-  ensureComputerBrowserEnabled,
-  ensureCoordinatorComputer,
-  listComputers,
-  setComputerBrowserEnabled,
-} from './services/computer-feed.js';
+import { ensureCoordinatorComputer, listComputers } from './services/computer-feed.js';
 import { decidePackageInstall, manageComputer } from './services/machine-computer.js';
 
 export function registerComputerRoutes(app: Hono, ctx: AppContext): void {
@@ -47,39 +37,5 @@ export function registerComputerRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/computers', (c) => {
     ensureCoordinatorComputer(ctx.db, ctx.team.id, ctx.user.id);
     return c.json({ computers: listComputers(ctx.db, ctx.team.id, ctx.user.id) });
-  });
-
-  app.post('/api/computers', async (c) => {
-    requireOwnerSession(c);
-    const body = parseWith(computerEnsureBodySchema, await c.req.json(), 'body');
-    const result = ensureComputerBrowserEnabled(
-      ctx.db,
-      ctx.team.id,
-      ctx.user.id,
-      body.machineId,
-      body.browserEnabled,
-    );
-    if (!result.ok) {
-      if (result.reason === 'machine_mismatch') {
-        throw conflict('browser preference belongs to another machine for this Coordinator');
-      }
-      throw notFound(`machine ${body.machineId}`);
-    }
-    return c.json({ computer: result.computer });
-  });
-
-  app.patch('/api/computers/:id', async (c) => {
-    requireOwnerSession(c);
-    const id = c.req.param('id');
-    const body = parseWith(computerPatchBodySchema, await c.req.json(), 'body');
-    const computer = setComputerBrowserEnabled(
-      ctx.db,
-      ctx.team.id,
-      ctx.user.id,
-      id,
-      body.browserEnabled,
-    );
-    if (!computer) throw notFound(`computer ${id}`);
-    return c.json({ computer });
   });
 }

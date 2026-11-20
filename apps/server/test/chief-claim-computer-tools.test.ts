@@ -94,7 +94,7 @@ async function toolNames(s: TestServer): Promise<string[]> {
   return (claimed?.remoteTools ?? []).map((tool) => tool.name);
 }
 
-function addVm(s: TestServer, opts: { kind?: 'vm' | 'host'; desktopOff?: boolean } = {}) {
+function addVm(s: TestServer, opts: { kind?: 'vm' | 'host' } = {}) {
   const id = insertMachine(s, {
     name: `computer-${opts.kind ?? 'vm'}`,
     capabilities: {
@@ -105,35 +105,15 @@ function addVm(s: TestServer, opts: { kind?: 'vm' | 'host'; desktopOff?: boolean
       computerKind: opts.kind ?? 'vm',
     },
   });
-  if (opts.desktopOff === true) {
-    s.db.update(machineTable).set({ desktopOverride: false }).where(eq(machineTable.id, id)).run();
-  }
   return id;
 }
 
-describe('a Runner-claimed chief turn offers the computer tools the grants allow', () => {
+describe('a Runner-claimed chief turn offers the computer tools the machine reports', () => {
   test('a capable VM machine puts the desktop and VM tools on the claim payload', async () => {
     const s = boot();
     addVm(s);
     const names = await toolNames(s);
     for (const name of [...DESKTOP_TOOLS, ...VM_TOOLS]) expect(names).toContain(name);
-  });
-
-  test('the desktop grant being off withholds the desktop and VM tools', async () => {
-    const s = boot();
-    addVm(s, { desktopOff: true });
-    const names = await toolNames(s);
-    for (const name of [...DESKTOP_TOOLS, ...VM_TOOLS]) expect(names).not.toContain(name);
-    expect(names).toContain('browser_navigate');
-    expect(names).toContain('request_cloak_license');
-  });
-
-  test('the license card is withheld when the browser grant is also off', async () => {
-    const s = boot();
-    const id = addVm(s, { desktopOff: true });
-    s.db.update(machineTable).set({ browserOverride: false }).where(eq(machineTable.id, id)).run();
-    const names = await toolNames(s);
-    expect(names).not.toContain('request_cloak_license');
   });
 
   test('a host-kind computer offers the desktop tools but not the VM tools', async () => {

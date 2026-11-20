@@ -1,6 +1,3 @@
-import { realpathSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { basename, dirname, isAbsolute, join, normalize, resolve, sep } from 'node:path';
 import { matchPermissionRule, type PermissionAction, type PermissionRule } from '@cairn/shared';
 import {
   isToolCallEventType,
@@ -18,128 +15,6 @@ export type { PermissionRule };
 export interface GateDecision {
   action: PermissionAction;
   ruleId?: string;
-}
-
-export interface FolderGateContext {
-  cwd: string;
-  roots: readonly string[];
-  readRoots?: readonly string[];
-}
-
-const FOLDER_DENY: GateDecision = { action: 'reject', ruleId: 'folder-grant' };
-const FOLDER_FILE_TOOLS = new Set(['read', 'edit', 'write', 'grep', 'find', 'ls']);
-const FOLDER_DEV_PATHS = new Set(['/dev/null', '/dev/stdin', '/dev/stdout', '/dev/stderr']);
-const REDIRECT_PATH_OPS = new Set(['>', '<', '>>', '>|', '<>', '&>', '&>>', '>>|']);
-
-export interface FolderRoots {
-  cwd: string;
-  home: string;
-  inside(path: string): boolean;
-}
-
-export function prepareFolderRoots(ctx: FolderGateContext): FolderRoots {
-  const canonical: string[] = [];
-  for (const path of [ctx.cwd, ...ctx.roots]) {
-    try {
-      canonical.push(realpathSync(path));
-    } catch {
-      canonical.push(normalize(path));
-    }
-  }
-  return {
-    cwd: ctx.cwd,
-    home: homedir(),
-    inside(path) {
-      return canonical.some((root) => {
-        if (path === root) return true;
-        const prefix = root.endsWith(sep) ? root : `${root}${sep}`;
-        return path.startsWith(prefix);
-      });
-    },
-  };
-}
-
-function resolveExistingPath(path: string): string | null {
-  let cursor = path;
-  const rest: string[] = [];
-  for (let index = 0; index < 128; index += 1) {
-    try {
-      return join(realpathSync(cursor), ...rest);
-    } catch {
-      const parent = dirname(cursor);
-      if (parent === cursor) return null;
-      rest.unshift(basename(cursor));
-      cursor = parent;
-    }
-  }
-  return null;
-}
-
-function expandFolderHome(token: string, home: string): string | null {
-  if (token === '~') return home;
-  if (token.startsWith('~/') || token.startsWith('~\\')) return join(home, token.slice(2));
-  if (token.startsWith('~')) return null;
-  return token;
-}
-
-function stripOuterQuotes(token: string): string {
-  if (token.length >= 2) {
-    const first = token[0] ?? '';
-    if ((first === '"' || first === "'") && token[token.length - 1] === first) {
-      return token.slice(1, -1);
-    }
-  }
-  return token;
-}
-
-function hasTraversalSegment(path: string): boolean {
-  return path.split(/[\\/]+/).some((segment) => segment === '..');
-}
-
-export function folderTokenBlocked(raw: string, roots: FolderRoots): boolean {
-  let token = stripOuterQuotes(raw);
-  if (token === '' || FOLDER_DEV_PATHS.has(token)) return false;
-  if (token.startsWith('-')) {
-    const eq = token.indexOf('=');
-    if (eq === -1) return false;
-    token = token.slice(eq + 1);
-    if (token === '') return false;
-  } else if (isAssignment(token)) {
-    const eq = token.indexOf('=');
-    token = token.slice(eq + 1);
-    if (token === '') return false;
-  }
-  if (/[$`]/.test(token)) return /[/\\]/.test(token) || token.includes('..');
-  const expanded = expandFolderHome(token, roots.home);
-  if (expanded === null) return true;
-  const absolute = isAbsolute(expanded);
-  const explicit =
-    absolute ||
-    expanded === '.' ||
-    expanded === '..' ||
-    expanded.startsWith('./') ||
-    expanded.startsWith('.\\') ||
-    hasTraversalSegment(expanded);
-  const lex = absolute ? normalize(expanded) : resolve(roots.cwd, expanded);
-  const real = resolveExistingPath(lex);
-  if (real === null) return explicit;
-  return !roots.inside(real);
-}
-
-function folderArgDecision(
-  segments: readonly BashSegment[],
-  redirects: readonly string[],
-  roots: FolderRoots,
-): GateDecision | undefined {
-  for (const segment of segments) {
-    for (const arg of segment.args) {
-      if (folderTokenBlocked(arg, roots)) return FOLDER_DENY;
-    }
-  }
-  for (const target of redirects) {
-    if (folderTokenBlocked(target, roots)) return FOLDER_DENY;
-  }
-  return undefined;
 }
 
 export interface BashGatePattern {
@@ -717,7 +592,6 @@ const WRAPPERS: Readonly<Record<string, WrapperSpec>> = {
 interface CollectedCommands {
   segments: BashSegment[];
   scripts: string[];
-  redirects: string[];
   unresolved: boolean;
 }
 
@@ -1288,7 +1162,6 @@ function absorbNested(
   const innerCollected = collectCommands(nested);
   collected.segments.push(...innerCollected.segments);
   collected.scripts.push(...innerCollected.scripts);
-  collected.redirects.push(...innerCollected.redirects);
   collected.unresolved ||= innerCollected.unresolved;
   return index;
 }
@@ -1297,7 +1170,6 @@ function collectCommands(entries: readonly ShellParseEntry[]): CollectedCommands
   const collected: CollectedCommands = {
     segments: [],
     scripts: [],
-    redirects: [],
     unresolved: false,
   };
   let index = 0;
@@ -1344,8 +1216,6 @@ function collectCommands(entries: readonly ShellParseEntry[]): CollectedCommands
         if (shellInput) {
           if (op === '<<<' && targetWord) collected.scripts.push(targetWord);
           else collected.unresolved = true;
-        } else if (REDIRECT_PATH_OPS.has(op) && targetWord !== undefined) {
-          collected.redirects.push(targetWord);
         }
         continue;
       }
@@ -1410,7 +1280,6 @@ function classifyCommand(
   command: string,
   depth: number,
   seen: Set<string>,
-  folders?: FolderRoots,
 ): GateDecision | undefined {
   if (depth > MAX_COMMAND_DEPTH) return UNRESOLVED_COMMAND;
   if (seen.has(command)) return undefined;
@@ -1437,16 +1306,12 @@ function classifyCommand(
   const collected = collectCommands(entries);
   const direct = segmentDecision(collected.segments);
   if (direct) return direct;
-  if (folders !== undefined) {
-    const blocked = folderArgDecision(collected.segments, collected.redirects, folders);
-    if (blocked !== undefined) return blocked;
-  }
   for (const script of collected.scripts) {
-    const nested = classifyCommand(script, depth + 1, seen, folders);
+    const nested = classifyCommand(script, depth + 1, seen);
     if (nested && nested.action !== 'allow') return nested;
   }
   for (const body of executableSubstitutionBodies(normalized)) {
-    const nested = classifyCommand(body, depth + 1, seen, folders);
+    const nested = classifyCommand(body, depth + 1, seen);
     if (nested && nested.action !== 'allow') return nested;
   }
   if (collected.unresolved) return UNRESOLVED_COMMAND;
@@ -1456,7 +1321,6 @@ function classifyCommand(
 export function decideBashCommand(
   command: string,
   customRules?: readonly PermissionRule[],
-  folders?: FolderGateContext,
 ): GateDecision {
   const stripped = stripQuotedSpans(command);
   if (customRules !== undefined) {
@@ -1466,8 +1330,7 @@ export function decideBashCommand(
       matchPermissionRule(customRules, 'Bash', params);
     if (hit !== undefined) return { action: hit.action, ruleId: hit.id };
   }
-  const roots = folders === undefined ? undefined : prepareFolderRoots(folders);
-  return classifyCommand(command, 0, new Set(), roots) ?? { action: 'allow' };
+  return classifyCommand(command, 0, new Set()) ?? { action: 'allow' };
 }
 
 export function phoneControlRefusal(command: string): string | undefined {
@@ -1497,7 +1360,6 @@ export function decideToolCall(
   toolName: string,
   params: Readonly<Record<string, unknown>>,
   customRules?: readonly PermissionRule[],
-  folders?: FolderGateContext,
 ): GateDecision | undefined {
   if (customRules !== undefined && customRules.length > 0) {
     const slots: Record<string, string> = Object.create(null);
@@ -1506,16 +1368,6 @@ export function decideToolCall(
     }
     const hit = matchPermissionRule(customRules, toolName, slots);
     if (hit !== undefined) return { action: hit.action, ruleId: hit.id };
-  }
-  if (folders !== undefined && FOLDER_FILE_TOOLS.has(toolName)) {
-    const path = params.path;
-    const roots = prepareFolderRoots({
-      cwd: folders.cwd,
-      roots: toolName === 'read' ? [...folders.roots, ...(folders.readRoots ?? [])] : folders.roots,
-    });
-    if (typeof path === 'string' && folderTokenBlocked(path, roots)) {
-      return FOLDER_DENY;
-    }
   }
   return undefined;
 }
@@ -1532,21 +1384,19 @@ export function formatToolRefusal(toolName: string, decision: GateDecision): str
 export function gateToolCallHandler(opts: {
   rules?: readonly PermissionRule[];
   log?: (msg: string) => void;
-  folders?: FolderGateContext;
 }): (event: ToolCallEvent) => Promise<ToolCallEventResult | undefined> {
   const rules = opts.rules;
   const log = opts.log;
-  const folders = opts.folders;
   return async (event) => {
     if (isToolCallEventType('bash', event)) {
-      const decision = decideBashCommand(event.input.command, rules, folders);
+      const decision = decideBashCommand(event.input.command, rules);
       if (decision.action !== 'allow') {
         log?.(`${decision.action}: rule=${decision.ruleId} command=${event.input.command}`);
         return { block: true, reason: formatGateRefusal(event.input.command, decision) };
       }
       return undefined;
     }
-    const hit = decideToolCall(event.toolName, event.input, rules, folders);
+    const hit = decideToolCall(event.toolName, event.input, rules);
     if (hit !== undefined && hit.action !== 'allow') {
       log?.(`${hit.action}: rule=${hit.ruleId} tool=${event.toolName}`);
       return { block: true, reason: formatToolRefusal(event.toolName, hit) };

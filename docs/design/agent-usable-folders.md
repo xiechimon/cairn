@@ -1,6 +1,6 @@
 # Agent-writable folders per machine
 
-Status: proposal for the owner's review. Nothing here is built. Baseline `e541ed535` on `origin/main`. Companion to `docs/design/machine-capability-defaults-and-folders.md`, which proposes additive `folderGrants`; this page is the write-boundary variant the owner asked for: a per-machine declaration of the directories the agent may write — scope `~/work` — with everything else refused, and unset meaning today's behavior.
+Status: superseded by the owner on 2026-11-20. Browser and desktop control are always on where a machine reports the capability, the agent may use any path on the machine, and the own-Mac action log lives only in the daemon log; the grant columns, folder grants and their settings rows were removed. The dangerous-command gate in `apps/daemon/src/backend/command-gate.ts` still applies. What follows is the historical design.
 
 ## Problem
 

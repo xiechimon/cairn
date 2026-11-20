@@ -61,7 +61,6 @@ import { createClaudePtyBackend } from './engine/claude-tui.js';
 import { enginePtyOf } from './engine/registry.js';
 import { OutboundEngineScreens } from './engine/screen-channel.js';
 import { createEngineScreenProvider } from './engine/screen-provider.js';
-import { FolderPins } from './folder-pins.js';
 import { createHostPermissionsProbe, type HostPermissionsProbe } from './host-permissions.js';
 import { createImsgBridge } from './imsg-bridge.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
@@ -449,7 +448,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       }
       if (geminiBackend === null)
         geminiBackend = createGeminiBackend({
-          gate: { folderRoots: () => folderPins.roots(), log: (msg) => logger.gate(msg) },
+          gate: { log: (msg) => logger.gate(msg) },
           skills: { skillsDir: config.skillsDir, cwd: config.home },
           onSkillsLog: (msg) => logger.skills(msg),
           ...(confine !== null ? { confine } : {}),
@@ -463,7 +462,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           agentDir: paths.agentRuntimeDir,
           sessionDir: paths.chatSessionsDir,
           skills: { skillsDir: config.skillsDir, cwd: config.home },
-          folderRoots: () => folderPins.roots(),
           resolveSessionFile: (sid) => resolveSessionFile(paths, sid),
           onSession: (sid, file) => {
             if (file) recordSession(paths, sid, file);
@@ -579,7 +577,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     log: (msg) => logger.machine(msg),
   });
 
-  const folderPins = new FolderPins(config.workspacesDir);
   let networkFailures = 0;
   let connectionId: string | null = null;
   const presenceReporter = new ComputerPresenceReporter({
@@ -589,15 +586,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       cliVersion: DAEMON_VERSION,
       claudeCode: claudeReport(),
       capabilities: capabilitiesReport(),
-      folders: {
-        workspacesDir: folderPins.workspacesRoot(),
-        pins: folderPins.report(),
-      },
     }),
     timeoutMs: opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS,
     send: async (body, signal) => {
       const response = await client.presence(body, signal);
-      folderPins.setPins(response.folderPins ?? []);
       phones.setConsented(response.phones ?? []);
       if (
         response.installDevin === true &&

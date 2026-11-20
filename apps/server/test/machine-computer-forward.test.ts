@@ -16,7 +16,6 @@ import {
   step as stepTable,
 } from '../src/db/schema.js';
 import {
-  COMPUTER_BROWSER_DISABLED,
   COMPUTER_BROWSER_UNAVAILABLE,
   COMPUTER_BUSY,
   COMPUTER_EXECUTION_LEASE_MS,
@@ -192,17 +191,11 @@ test('every dispatched Orb tool has a server grant regression case', () => {
 });
 
 describe('Coordinator desktop tools', () => {
-  test('teamOffersDesktop follows the computer capability and the desktop grant', () => {
+  test('teamOffersDesktop follows the computer capability', () => {
     const { s, deps } = boot();
     expect(teamOffersDesktop(deps.db, s.team.id)).toBe(false);
     addMachine(s, 'omarchy', { computer: true });
     expect(teamOffersDesktop(deps.db, s.team.id)).toBe(true);
-    s.db
-      .update(machineTable)
-      .set({ desktopOverride: false })
-      .where(eq(machineTable.id, 'omarchy'))
-      .run();
-    expect(teamOffersDesktop(deps.db, s.team.id)).toBe(false);
   });
 
   test('computer_observe reaches the scope computer and its screenshot comes back as an image', async () => {
@@ -315,59 +308,48 @@ describe('forwardComputerCall target and presence', () => {
     'browser_navigate',
     'browser_snapshot',
     'browser_act',
-  ] as ComputerTool[])('grant gates %s before dispatch and survives presence', async (name) => {
-    const { s, deps, chiefId } = boot();
-    addMachine(s, 'omarchy', { computer: true, browser: true });
-    s.db
-      .insert(computerTable)
-      .values({
-        id: 'grant-computer',
-        teamId: s.team.id,
-        scopeKey: `chief:${chiefId}`,
-        machineId: 'omarchy',
-        providerRef: 'grant',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
-    const calls = connect(s, 'omarchy');
-    const browser = name.startsWith('browser_');
-    const column = browser ? 'browserOverride' : 'desktopOverride';
-    s.db
-      .update(machineTable)
-      .set({ [column]: false })
-      .where(eq(machineTable.id, 'omarchy'))
-      .run();
-    markPresence(deps, 'omarchy', {
-      capabilities: { mcpServers: [], skills: [], computer: true, browser: true },
-    });
-    const body = { computer: true as const, name, toolCallId: 'grant', params: {} };
-    const blocked = forwardComputerCall(deps, 'sidecar', 'step-a', body);
-    void blocked.catch(() => {});
-    expect(calls).toEqual([]);
-    await expect(blocked).rejects.toMatchObject({ status: 403 });
-    s.db
-      .update(machineTable)
-      .set({ [column]: null, capabilities: { mcpServers: [], skills: [] } })
-      .where(eq(machineTable.id, 'omarchy'))
-      .run();
-    await expect(forwardComputerCall(deps, 'sidecar', 'step-a', body)).rejects.toMatchObject({
-      status: 403,
-    });
-    expect(calls).toEqual([]);
-    markPresence(deps, 'omarchy', {
-      capabilities: { mcpServers: [], skills: [], computer: true, browser: true },
-    });
-    const result = forwardComputerCall(deps, 'sidecar', 'step-a', body);
-    expect(calls).toHaveLength(1);
-    receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1, 'granted')]);
-    expect((await result).text).toBe('granted');
-    markPresence(deps, 'omarchy', { capabilities: { mcpServers: [], skills: [] } });
-    expect(
-      s.db.select().from(machineTable).where(eq(machineTable.id, 'omarchy')).get()?.capabilities
-        ?.browser,
-    ).toBeUndefined();
-  });
+  ] as ComputerTool[])(
+    'capability gates %s before dispatch and survives presence',
+    async (name) => {
+      const { s, deps, chiefId } = boot();
+      addMachine(s, 'omarchy', { computer: true, browser: true });
+      s.db
+        .insert(computerTable)
+        .values({
+          id: 'grant-computer',
+          teamId: s.team.id,
+          scopeKey: `chief:${chiefId}`,
+          machineId: 'omarchy',
+          providerRef: 'grant',
+          createdAt: 1,
+          updatedAt: 1,
+        })
+        .run();
+      const calls = connect(s, 'omarchy');
+      const body = { computer: true as const, name, toolCallId: 'grant', params: {} };
+      s.db
+        .update(machineTable)
+        .set({ capabilities: { mcpServers: [], skills: [] } })
+        .where(eq(machineTable.id, 'omarchy'))
+        .run();
+      await expect(forwardComputerCall(deps, 'sidecar', 'step-a', body)).rejects.toMatchObject({
+        status: 403,
+      });
+      expect(calls).toEqual([]);
+      markPresence(deps, 'omarchy', {
+        capabilities: { mcpServers: [], skills: [], computer: true, browser: true },
+      });
+      const result = forwardComputerCall(deps, 'sidecar', 'step-a', body);
+      expect(calls).toHaveLength(1);
+      receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1, 'granted')]);
+      expect((await result).text).toBe('granted');
+      markPresence(deps, 'omarchy', { capabilities: { mcpServers: [], skills: [] } });
+      expect(
+        s.db.select().from(machineTable).where(eq(machineTable.id, 'omarchy')).get()?.capabilities
+          ?.browser,
+      ).toBeUndefined();
+    },
+  );
 
   test.each([
     ['shell', 'desktop'],
@@ -397,34 +379,13 @@ describe('forwardComputerCall target and presence', () => {
     await pending;
   });
 
-  test('browser tools refuse before creating a starting computer when browser is off', async () => {
-    const { s, deps } = boot();
-    addMachine(s, 'omarchy', { computer: true });
-    s.db
-      .update(machineTable)
-      .set({ browserOverride: false })
-      .where(eq(machineTable.id, 'omarchy'))
-      .run();
-    connect(s, 'omarchy');
-    await expect(
-      forwardComputerCall(deps, 'sidecar', 'step-a', {
-        computer: true,
-        name: 'browser_navigate',
-        toolCallId: 'browser-1',
-        params: { url: 'https://example.com' },
-      }),
-    ).rejects.toMatchObject({ status: 403, message: COMPUTER_BROWSER_DISABLED });
-    expect(s.db.select().from(computerTable).all()).toEqual([]);
-    expect(s.db.select().from(computerCallTable).all()).toEqual([]);
-  });
-
   test('a new computer skips a newer ineligible machine and uses an eligible one', async () => {
     const { s, deps } = boot();
     addMachine(s, 'older', { computer: true, browser: true }, 1);
     addMachine(s, 'newer', { computer: true, browser: true }, 5);
     s.db
       .update(machineTable)
-      .set({ browserOverride: false, desktopOverride: false })
+      .set({ capabilities: { mcpServers: [], skills: [], computer: true } })
       .where(eq(machineTable.id, 'newer'))
       .run();
     const olderCalls = connect(s, 'older');
@@ -456,7 +417,6 @@ describe('forwardComputerCall target and presence', () => {
         machineId: 'omarchy',
         providerRef: computerMachineName(`chief:${chiefId}`),
         state: 'stopped',
-        browserEnabled: true,
         createdAt: now,
         updatedAt: now,
       })
@@ -901,11 +861,6 @@ describe('leases', () => {
 
   test('while ian holds control every bot call is refused except read-only safe tools', async () => {
     const { s, deps, calls } = await twoSteps();
-    s.db
-      .update(machineTable)
-      .set({ desktopOverride: true })
-      .where(eq(machineTable.id, 'omarchy'))
-      .run();
     s.db
       .update(computerTable)
       .set({ executionStepId: null, executionLeaseExpiresAt: null, controlHolder: 'user' })

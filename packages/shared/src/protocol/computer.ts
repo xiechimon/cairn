@@ -245,7 +245,6 @@ export const computerRecordSchema = z.object({
   scopeKey: z.string(),
   state: z.enum(COMPUTER_STATES),
   controlHolder: z.enum(COMPUTER_CONTROL_HOLDERS),
-  browserEnabled: z.boolean(),
   handoffReason: z.enum(['login', 'model']).nullable(),
   kind: z.enum(['host', 'vm']),
   download: vmDownloadSchema.nullable(),
@@ -253,17 +252,6 @@ export const computerRecordSchema = z.object({
   activity: computerActivitySchema.nullable(),
 });
 export type ComputerRecord = z.infer<typeof computerRecordSchema>;
-
-export const computerPatchBodySchema = z.object({
-  browserEnabled: z.boolean(),
-});
-export type ComputerPatchBody = z.infer<typeof computerPatchBodySchema>;
-
-export const computerEnsureBodySchema = z.object({
-  machineId: z.string().min(1).max(128),
-  browserEnabled: z.boolean(),
-});
-export type ComputerEnsureBody = z.infer<typeof computerEnsureBodySchema>;
 
 export const COMPUTER_BROWSER_TOOLS = [
   'browser_navigate',

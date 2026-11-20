@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
-import { computer, machine, pairedDevice, team } from '../src/db/schema.js';
+import { machine, pairedDevice, team } from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
 import { issueBrowserSession } from '../src/services/browser-session.js';
 import { bootServer, type TestServer } from './helpers.js';
@@ -49,28 +49,6 @@ function call(
   return s.app.request(path, { method, headers, body: JSON.stringify(body) });
 }
 
-test('owner patches nullable grants; absent capability rejects atomically and unknown machines are 404', async () => {
-  boot();
-  const path = '/api/machines/grant-machine';
-  expect((await call(path, { browserOverride: false, desktopOverride: false })).status).toBe(200);
-  expect(s.db.select().from(machine).where(eq(machine.id, 'grant-machine')).get()).toMatchObject({
-    browserOverride: false,
-    desktopOverride: false,
-  });
-  expect(
-    await (await call(path, { browserOverride: null, desktopOverride: null })).json(),
-  ).toMatchObject({ browserOverride: null, desktopOverride: null });
-  s.db.update(machine).set({ capabilities: null }).where(eq(machine.id, 'grant-machine')).run();
-  expect((await call(path, { browserOverride: true, desktopOverride: false })).status).toBe(409);
-  expect(
-    s.db.select().from(machine).where(eq(machine.id, 'grant-machine')).get()?.desktopOverride,
-  ).toBeNull();
-  expect((await call('/api/machines/missing', { browserOverride: false })).status).toBe(404);
-  s.db.insert(team).values({ id: 'foreign', name: 'Foreign', createdAt: 1 }).run();
-  s.db.insert(machine).values({ id: 'foreign', teamId: 'foreign', name: 'foreign' }).run();
-  expect((await call('/api/machines/foreign', { desktopOverride: false })).status).toBe(404);
-});
-
 test('only the owner moves the default Runner, and only to an enrolled machine', async () => {
   boot();
   s.db
@@ -85,97 +63,4 @@ test('only the owner moves the default Runner, and only to an enrolled machine',
   expect(defaultOf()).toBeNull();
   expect((await call('/api/machines/enrolled', { isDefault: true })).status).toBe(200);
   expect(defaultOf()).toBe('enrolled');
-});
-
-test.each(['device', 'agent'] as const)(
-  '%s cannot change machine or mirrored computer grants',
-  async (kind) => {
-    boot();
-    expect(
-      (
-        await call(
-          '/api/machines/grant-machine',
-          { browserOverride: false, desktopOverride: false },
-          kind,
-        )
-      ).status,
-    ).toBe(kind === 'device' ? 403 : 401);
-    expect(
-      (
-        await call(
-          '/api/computers',
-          { machineId: 'grant-machine', browserEnabled: true },
-          kind,
-          'POST',
-        )
-      ).status,
-    ).toBe(kind === 'device' ? 403 : 401);
-    expect((await call('/api/computers/missing', { browserEnabled: true }, kind)).status).toBe(
-      kind === 'device' ? 403 : 401,
-    );
-    expect(
-      s.db.select().from(machine).where(eq(machine.id, 'grant-machine')).get()?.browserOverride,
-    ).toBeNull();
-    expect(s.db.select().from(computer).all()).toEqual([]);
-  },
-);
-
-test('grant patches work on an auth-off server without a session cookie', async () => {
-  s = bootServer({ githubFetch: async () => new Response('[]') });
-  s.db
-    .insert(machine)
-    .values({
-      id: 'grant-machine',
-      name: 'orb',
-      teamId: s.team.id,
-      tokenHash: 'synthetic',
-      capabilities: { mcpServers: [], skills: [], computer: true, browser: true },
-    })
-    .run();
-  const call = (path: string, body: unknown) =>
-    s.app.request(path, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
-      body: JSON.stringify(body),
-    });
-  expect(
-    (
-      await s.app.request('/api/computers', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
-        body: JSON.stringify({ machineId: 'grant-machine', browserEnabled: true }),
-      })
-    ).status,
-  ).toBe(200);
-  expect(
-    (
-      await call('/api/machines/grant-machine', {
-        browserOverride: false,
-        desktopOverride: false,
-      })
-    ).status,
-  ).toBe(200);
-  expect((await call('/api/machines/grant-machine', { isDefault: true })).status).toBe(200);
-});
-
-test('compatibility writes mirror the machine grant and cannot undo explicit off', async () => {
-  boot();
-  const response = await call(
-    '/api/computers',
-    { machineId: 'grant-machine', browserEnabled: true },
-    'owner',
-    'POST',
-  );
-  const body = (await response.json()) as { computer: { id: string } };
-  expect(response.status).toBe(200);
-  expect(
-    s.db.select().from(machine).where(eq(machine.id, 'grant-machine')).get()?.browserOverride,
-  ).toBe(true);
-  await call('/api/machines/grant-machine', { browserOverride: false });
-  expect((await call(`/api/computers/${body.computer.id}`, { browserEnabled: true })).status).toBe(
-    409,
-  );
-  expect(
-    s.db.select().from(machine).where(eq(machine.id, 'grant-machine')).get()?.browserOverride,
-  ).toBe(false);
 });

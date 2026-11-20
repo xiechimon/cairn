@@ -60,7 +60,6 @@ import type {
   NotificationRecord,
   NotificationsResponse,
   OAuthAuthorizeResponse,
-  OwnComputerActivity,
   PackageInstallDecisionBody,
   PairedDevice,
   PairingCodeResponse,
@@ -464,20 +463,6 @@ export function useComputers(
       (await api.get<{ computers: ComputerRecord[] }>('/api/computers')).computers,
     enabled: enabled && teamId !== undefined && !auth.gateOpen,
     ...(refetchIntervalMs !== undefined ? { refetchInterval: refetchIntervalMs } : {}),
-  });
-}
-
-export function useOwnComputerActivity(machineId: string | undefined, enabled: boolean) {
-  return useQuery({
-    queryKey: ['own-computer-activity', machineId],
-    queryFn: async () =>
-      (
-        await api.get<{ activity: OwnComputerActivity[] }>(
-          `/api/machines/${encodeURIComponent(machineId ?? '')}/own-computer/activity`,
-        )
-      ).activity,
-    enabled: enabled && machineId !== undefined,
-    refetchInterval: 10_000,
   });
 }
 
@@ -1242,8 +1227,7 @@ export function useApiMutations(teamId: string | undefined) {
         qc.setQueryData<MachineRecord[]>(['machines', teamId], (rows) =>
           (rows ?? []).map((m) => {
             if (m.id !== input.id) return m;
-            const { folderPins: _folderPins, ...rest } = input.body;
-            return { ...m, ...rest };
+            return { ...m, ...input.body };
           }),
         );
         return { previous };

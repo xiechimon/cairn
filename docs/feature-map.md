@@ -201,7 +201,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### agent-computer
 
-**The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.
+**The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser and desktop control are always on wherever the machine reports the capability; there is no setting.
 
 - Research: [docs/research/coordinator-computer.md](research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](research/user-computer-model-2026-11-08.md) (not on main), [docs/research/resident-cloakbrowser-2026-11-16.md](research/resident-cloakbrowser-2026-11-16.md)
 - Frontend design: **gap**: the screen view and control handover have no design

@@ -1625,6 +1625,13 @@
       "when": 1795186113711,
       "tag": "0236_chubby_boom_boom",
       "breakpoints": true
+    },
+    {
+      "idx": 237,
+      "version": "6",
+      "when": 1795190273882,
+      "tag": "0237_computer_control_open",
+      "breakpoints": true
     }
   ]
 }

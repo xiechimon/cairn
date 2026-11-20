@@ -113,7 +113,6 @@ function boot(authToken: string | null = null) {
       scopeKey: `chief:${chiefId}`,
       machineId: 'omarchy',
       providerRef: 'vault',
-      browserEnabled: true,
       createdAt: 1,
       updatedAt: 1,
     })

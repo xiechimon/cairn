@@ -9,12 +9,10 @@ import {
   type DailyUsage,
   type GithubRepoSummary,
   type MachineExecutor,
-  type MachineFolderGrants,
   type MachineHardware,
   type MachineOsPlatform,
   type MemoryRecord,
   type ModelSource,
-  type OwnComputerActivity,
   type OwnComputerTool,
   type PermissionState,
   PHASE_VALUES,
@@ -336,15 +334,7 @@ export interface MachineRow {
   } | null;
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
-  ownComputerFixture?: OwnComputerFixture;
   phonesFixture?: PhonesFixture;
-  browserOverride?: boolean | null;
-  desktopOverride?: boolean | null;
-  folderGrants?: MachineFolderGrants | null;
-}
-
-export interface OwnComputerFixture {
-  activity?: OwnComputerActivity[];
 }
 
 export interface PhonesFixture {

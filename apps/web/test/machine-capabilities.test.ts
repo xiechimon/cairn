@@ -17,7 +17,6 @@ const computer = (online = true, state: 'running' | 'stopped' | 'failed' = 'runn
   scopeKey: 'chief:1',
   state,
   controlHolder: 'none' as const,
-  browserEnabled: false,
   handoffReason: null,
   kind: 'host' as const,
   download: null,

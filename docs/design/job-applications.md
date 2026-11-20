@@ -25,7 +25,7 @@ Browser tools that do exist:
 | Piece | Behavior |
 |---|---|
 | Tools | `browser_navigate`, `browser_snapshot`, `browser_act` in `packages/shared/src/protocol/computer.ts` and `computer-tools.ts`. Acts: click, fill, type, press, hover, select, check, uncheck, scrollintoview. No submit class. |
-| Gate | `apps/server/src/services/machine-computer.ts` returns 403 when `computer.browserEnabled` is false or the machine capability `browser` is not true. `browserEnabled` defaults false (`apps/server/src/db/schema.ts`). |
+| Gate | `apps/server/src/services/machine-computer.ts` returns 403 when the machine capability `browser` is not true; there is no owner browser switch (removed 2026-11-20). |
 | Who may call | `apps/server/src/services/machine-relay.ts` allows these tools only on a claimed chief step. |
 | Where it runs | `apps/daemon/src/computer/browser.ts` runs `agent-browser` with `--session` and `--headed` inside the orb image (`computer.kind` defaults to `orb`; capability comes from `computerImageOffersBrowser` in `apps/daemon/src/orb/computer.ts`). This is not the owner's daily browser. |
 | Profile block | `apps/daemon/src/computer/guard.ts` refuses shell that mentions `.browser-profiles` or `--user-data-dir`. The agent cannot point a shell at a Chrome profile. Nothing attaches to one either. |
@@ -34,7 +34,7 @@ Browser tools that do exist:
 | Confirm-once | Not built. The class is described in `docs/design/ai-native-actions.md`. `ask_user` stores a question on `chiefMessage` (`apps/server/src/services/chief-questions.ts`) and pushes; that is a question, not a matched submit. |
 | Profile store | None. Attachments are message files, not a resume record. |
 
-The computers-panel item that would turn the orb browser on by default is a different switch. This design does not flip `browserEnabled`.
+The orb browser is on wherever the machine reports it; this design adds no switch.
 
 ## Recommendation
 
@@ -104,7 +104,7 @@ A second `job_submit` for a hash already `submitted` or `blocked` with unknown d
 | User takeover (`computer-control.ts`) | lease | lease | While the user holds it, snapshot may run; `job_navigate`, `job_upload_resume`, `job_submit`, and fills refuse with the existing 409. |
 | Cap read | `job_cap` | nothing until a delivered or unknown submit | Clock skew does not reset the counter early: the key is the UTC day stored on the row, not the model's idea of today. |
 
-`browserEnabled` is not this gate. A host attach has its own owner switch, default off, even if the orb browser is later on by default.
+The orb browser capability is not this gate. A host attach has its own owner switch, default off.
 
 ## Page text is data
 

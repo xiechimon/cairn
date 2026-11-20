@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import type { RemoteToolDef } from './chief-tools.js';
 
 export const OWN_COMPUTER_TOOL_NAMES = [
@@ -172,23 +171,6 @@ export function ownComputerHardlineRefusal(command: string): string | null {
     ? null
     : `This command was not run because ${hit.reason}. The agent never runs it on the user's Mac; if the user really wants it, they run it themselves in Terminal.`;
 }
-
-export const ownComputerActivitySchema = z.object({
-  callId: z.string(),
-  tool: z.enum(OWN_COMPUTER_TOOL_NAMES),
-  summary: z.string(),
-  state: z.string(),
-  exitCode: z.number().int().nullable(),
-  error: z.string().nullable(),
-  threadId: z.string().nullable(),
-  threadTitle: z.string().nullable(),
-  createdAt: z.number().int(),
-});
-export type OwnComputerActivity = z.infer<typeof ownComputerActivitySchema>;
-
-export const ownComputerActivityResponseSchema = z.object({
-  activity: z.array(ownComputerActivitySchema),
-});
 
 export function ownComputerCallSummary(tool: string, params: Record<string, unknown>): string {
   if (tool === 'user_computer_shell')

@@ -7,7 +7,6 @@ import {
   OWN_COMPUTER_NO_ACCESSIBILITY,
   OWN_COMPUTER_NO_MAC,
   OWN_COMPUTER_NOT_OWNER,
-  ownComputerActivityResponseSchema,
 } from '@cairn/shared';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
@@ -16,11 +15,9 @@ import {
   chiefThread as chiefThreadTable,
   computerCall as computerCallTable,
   machine as machineTable,
-  pairedDevice,
   step as stepTable,
   user as userTable,
 } from '../src/db/schema.js';
-import { issueBrowserSession } from '../src/services/browser-session.js';
 import {
   dropComputerWaiters,
   forwardComputerCall,
@@ -259,48 +256,5 @@ describe('only the Mac that runs this Cairn is used', () => {
     addStep(w.s, 'step-mail', { prompt: '[wake:wake] provenance=mail:evt-1\nnew mail' });
     await expect(forward(w, shell('ls'), 'step-mail')).rejects.toThrow(/mail turn/);
     noDispatch(w);
-  });
-});
-
-describe('the activity log', () => {
-  function get(w: World, kind: 'owner' | 'device') {
-    return w.s.app.request('/api/machines/users-mac/own-computer/activity', {
-      headers: {
-        'sec-fetch-site': 'same-origin',
-        cookie: `cairn_auth=${issueBrowserSession(w.s.db, kind, kind === 'device' ? 'paired' : null).token}`,
-      },
-    });
-  }
-
-  test('lists every Mac call newest first with its conversation, for the owner only', async () => {
-    const w = world(READY, 'own-computer-activity');
-    w.s.db
-      .insert(pairedDevice)
-      .values({
-        id: 'paired',
-        teamId: w.s.team.id,
-        name: 'phone',
-        tokenHash: 'synthetic',
-        masked: 'phone',
-        createdAt: 1,
-      })
-      .run();
-    await settled(w, forward(w, shell('xcodebuild -scheme Cairn')));
-    const act = forward(w, {
-      computer: true,
-      name: 'user_computer_act',
-      toolCallId: 'tc-act',
-      params: { app: 'Notes', actions: [{ kind: 'click', element: 3 }, { kind: 'type' }] },
-    });
-    await until(() => w.pushed.length === 2);
-    await settled(w, act);
-    expect((await get(w, 'device')).status).toBe(403);
-    const response = await get(w, 'owner');
-    expect(response.status).toBe(200);
-    const { activity } = ownComputerActivityResponseSchema.parse(await response.json());
-    expect(activity.map(({ tool, summary, threadId }) => ({ tool, summary, threadId }))).toEqual([
-      { tool: 'user_computer_act', summary: 'Notes: click, type', threadId: THREAD },
-      { tool: 'user_computer_shell', summary: 'xcodebuild -scheme Cairn', threadId: THREAD },
-    ]);
   });
 });

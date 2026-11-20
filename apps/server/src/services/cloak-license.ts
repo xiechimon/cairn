@@ -14,27 +14,21 @@ import { createSecret, type SecretDeps, updateSecret } from './secrets.js';
 
 export function teamHasVmComputer(db: Db, teamId: string): boolean {
   return db
-    .select({ capabilities: machine.capabilities, desktopOverride: machine.desktopOverride })
+    .select({ capabilities: machine.capabilities })
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .all()
-    .some(
-      (row) =>
-        row.desktopOverride !== false &&
-        row.capabilities?.computer === true &&
-        row.capabilities.computerKind === 'vm',
-    );
+    .some((row) => row.capabilities?.computer === true && row.capabilities.computerKind === 'vm');
 }
 
 export function teamHasVmBrowser(db: Db, teamId: string): boolean {
   return db
-    .select({ capabilities: machine.capabilities, browserOverride: machine.browserOverride })
+    .select({ capabilities: machine.capabilities })
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .all()
     .some(
       (row) =>
-        row.browserOverride !== false &&
         row.capabilities?.computer === true &&
         row.capabilities.computerKind === 'vm' &&
         row.capabilities.browser === true,

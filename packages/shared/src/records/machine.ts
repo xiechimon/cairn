@@ -24,26 +24,6 @@ export const machineQueuedThreadSchema = z.object({
 });
 export type MachineQueuedThread = z.infer<typeof machineQueuedThreadSchema>;
 
-export const MACHINE_FOLDER_PATH_MAX = 4096;
-export const MACHINE_FOLDER_PINS_LIMIT = 64;
-
-export const machineFolderPinStatusSchema = z.enum(['pending', 'confirmed', 'rejected', 'absent']);
-export type MachineFolderPinStatus = z.infer<typeof machineFolderPinStatusSchema>;
-
-export const machineFolderPinSchema = z.object({
-  path: z.string().min(1).max(MACHINE_FOLDER_PATH_MAX),
-  status: machineFolderPinStatusSchema,
-  enabled: z.boolean(),
-});
-export type MachineFolderPin = z.infer<typeof machineFolderPinSchema>;
-
-export const machineFolderGrantsSchema = z.object({
-  workspacesDir: z.string().min(1).max(MACHINE_FOLDER_PATH_MAX).optional(),
-  bindsGrants: z.literal(true).optional(),
-  pins: z.array(machineFolderPinSchema).max(MACHINE_FOLDER_PINS_LIMIT),
-});
-export type MachineFolderGrants = z.infer<typeof machineFolderGrantsSchema>;
-
 export const machineRecordSchema = z.object({
   id: recordId,
   name: z.string(),
@@ -59,10 +39,7 @@ export const machineRecordSchema = z.object({
   queued: z.array(machineQueuedThreadSchema).optional(),
   strain: z.array(machineStrainReasonSchema).optional(),
   capabilities: machineCapabilitiesSchema.nullish(),
-  browserOverride: z.boolean().nullable().optional(),
-  desktopOverride: z.boolean().nullable().optional(),
   claudeLogin: claudeLoginSchema.optional(),
-  folderGrants: machineFolderGrantsSchema.nullish(),
 });
 export type MachineRecord = z.infer<typeof machineRecordSchema>;
 
@@ -74,12 +51,6 @@ export function isRegisteredMachine(row: {
   return row.kind !== 'local' || row.online || row.lastSeenAt != null;
 }
 
-export const machineFolderPinOpSchema = z.object({
-  path: z.string().min(1).max(MACHINE_FOLDER_PATH_MAX),
-  op: z.enum(['pin', 'enable', 'disable', 'remove']),
-});
-export type MachineFolderPinOp = z.infer<typeof machineFolderPinOpSchema>;
-
 export const patchMachineBodySchema = z.object({
   name: z
     .string()
@@ -88,10 +59,7 @@ export const patchMachineBodySchema = z.object({
     .max(64)
     .regex(/^\P{C}+$/u)
     .optional(),
-  browserOverride: z.boolean().nullable().optional(),
-  desktopOverride: z.boolean().nullable().optional(),
   enabledRuntimes: z.array(z.enum(MACHINE_RUNTIMES)).optional(),
   isDefault: z.literal(true).optional(),
-  folderPins: z.array(machineFolderPinOpSchema).min(1).max(MACHINE_FOLDER_PINS_LIMIT).optional(),
 });
 export type PatchMachineBody = z.infer<typeof patchMachineBodySchema>;

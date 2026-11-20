@@ -1,5 +1,4 @@
 import { chiefIdFormat } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   build as buildTable,
@@ -211,7 +210,6 @@ describe('computer feed routes', () => {
           scopeKey: `chief:${chiefIdFormat(s.user.id, s.team.id)}`,
           state: 'running',
           controlHolder: 'none',
-          browserEnabled: false,
           handoffReason: null,
           kind: 'host',
           download: null,
@@ -251,29 +249,18 @@ describe('computer feed routes', () => {
     expect(again.computers.map((row) => row.id)).toEqual([first.computers[0]?.id]);
   });
 
-  test('no Coordinator computer appears without an online computer machine or with the desktop turned off', async () => {
+  test('no Coordinator computer appears without an online computer machine', async () => {
     const s = boot();
     s.db
       .insert(machineTable)
-      .values([
-        {
-          id: 'offline',
-          teamId: s.team.id,
-          name: 'offline',
-          online: false,
-          lastSeenAt: 3,
-          capabilities: { mcpServers: [], skills: [], computer: true },
-        },
-        {
-          id: 'off',
-          teamId: s.team.id,
-          name: 'off',
-          online: true,
-          lastSeenAt: 2,
-          desktopOverride: false,
-          capabilities: { mcpServers: [], skills: [], computer: true },
-        },
-      ])
+      .values({
+        id: 'offline',
+        teamId: s.team.id,
+        name: 'offline',
+        online: false,
+        lastSeenAt: 3,
+        capabilities: { mcpServers: [], skills: [], computer: true },
+      })
       .run();
     expect(await (await req(s.app, 'GET', '/api/computers')).json()).toEqual({ computers: [] });
   });
@@ -289,145 +276,6 @@ describe('computer feed routes', () => {
     const res = await req(s.app, 'GET', '/api/computers');
     const body = (await res.json()) as { computers: { handoffReason: string | null }[] };
     expect(body.computers[0]?.handoffReason).toBe('login');
-  });
-
-  test('PATCH enables and disables browser tools on the owned computer', async () => {
-    const s = boot();
-    s.db
-      .insert(machineTable)
-      .values({
-        id: 'm1',
-        teamId: s.team.id,
-        name: 'name-m1',
-        online: true,
-        lastSeenAt: 1,
-        capabilities: { mcpServers: [], skills: [], browser: true },
-      })
-      .run();
-    addComputer(s, s.team.id, 'c1', 'm1');
-    const on = await req(s.app, 'PATCH', '/api/computers/c1', { browserEnabled: true });
-    expect(on.status).toBe(200);
-    expect(await on.json()).toMatchObject({
-      computer: { id: 'c1', browserEnabled: true },
-    });
-    const listed = await req(s.app, 'GET', '/api/computers');
-    expect(await listed.json()).toMatchObject({
-      computers: [{ id: 'c1', browserEnabled: true }],
-    });
-    const off = await req(s.app, 'PATCH', '/api/computers/c1', { browserEnabled: false });
-    expect(await off.json()).toMatchObject({
-      computer: { id: 'c1', browserEnabled: false },
-    });
-    expect(
-      (await req(s.app, 'PATCH', '/api/computers/missing', { browserEnabled: true })).status,
-    ).toBe(404);
-  });
-
-  test('a saved browser preference stays visible after the capability disappears', async () => {
-    const s = boot();
-    s.db
-      .insert(machineTable)
-      .values({
-        id: 'm1',
-        teamId: s.team.id,
-        name: 'name-m1',
-        online: true,
-        lastSeenAt: 1,
-        capabilities: { mcpServers: [], skills: [], browser: true },
-      })
-      .run();
-    addComputer(s, s.team.id, 'c1', 'm1');
-    expect((await req(s.app, 'PATCH', '/api/computers/c1', { browserEnabled: true })).status).toBe(
-      200,
-    );
-    s.db
-      .update(machineTable)
-      .set({ capabilities: { mcpServers: [], skills: [] } })
-      .where(eq(machineTable.id, 'm1'))
-      .run();
-    const listed = await req(s.app, 'GET', '/api/computers');
-    expect(await listed.json()).toMatchObject({
-      computers: [{ id: 'c1', browserEnabled: true }],
-    });
-    expect(s.db.select().from(machineTable).where(eq(machineTable.id, 'm1')).get()).toMatchObject({
-      browserOverride: true,
-    });
-  });
-
-  test('POST ensures a stopped private computer and sets browserEnabled before any tool call', async () => {
-    const s = boot();
-    s.db
-      .insert(machineTable)
-      .values({
-        id: 'm1',
-        teamId: s.team.id,
-        name: 'omarchy',
-        online: false,
-        lastSeenAt: 1,
-        capabilities: { mcpServers: [], skills: [], computer: true, browser: true },
-      })
-      .run();
-    s.db
-      .insert(machineTable)
-      .values({
-        id: 'm2',
-        teamId: s.team.id,
-        name: 'other',
-        online: true,
-        lastSeenAt: 1,
-        capabilities: { mcpServers: [], skills: [], computer: true, browser: true },
-      })
-      .run();
-    const created = await req(s.app, 'POST', '/api/computers', {
-      machineId: 'm1',
-      browserEnabled: true,
-    });
-    expect(created.status).toBe(200);
-    expect(await created.json()).toMatchObject({
-      computer: {
-        state: 'stopped',
-        browserEnabled: true,
-        machine: { id: 'm1', online: false },
-      },
-    });
-    expect(
-      (await req(s.app, 'POST', '/api/computers', { machineId: 'm2', browserEnabled: true }))
-        .status,
-    ).toBe(409);
-    const again = await req(s.app, 'POST', '/api/computers', {
-      machineId: 'm1',
-      browserEnabled: false,
-    });
-    expect(await again.json()).toMatchObject({
-      computer: { browserEnabled: false, state: 'stopped' },
-    });
-    expect(
-      (await req(s.app, 'POST', '/api/computers', { machineId: 'missing', browserEnabled: true }))
-        .status,
-    ).toBe(404);
-  });
-
-  test('POST and PATCH refuse enabling without explicit browser capability', async () => {
-    const s = boot();
-    s.db
-      .insert(machineTable)
-      .values({
-        id: 'm1',
-        teamId: s.team.id,
-        name: 'old-orb',
-        online: true,
-        lastSeenAt: 1,
-        capabilities: { mcpServers: [], skills: [], computer: true },
-      })
-      .run();
-    expect(
-      (await req(s.app, 'POST', '/api/computers', { machineId: 'm1', browserEnabled: true }))
-        .status,
-    ).toBe(404);
-    addComputer(s, s.team.id, 'c1', 'm1');
-    expect((await req(s.app, 'PATCH', '/api/computers/c1', { browserEnabled: true })).status).toBe(
-      404,
-    );
   });
 
   test('another team computer is never listed', async () => {

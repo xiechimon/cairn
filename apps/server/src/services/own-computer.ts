@@ -2,21 +2,16 @@ import {
   OWN_COMPUTER_NO_ACCESSIBILITY,
   OWN_COMPUTER_NO_MAC,
   OWN_COMPUTER_NOT_OWNER,
-  OWN_COMPUTER_TOOL_NAMES,
-  type OwnComputerActivity,
   type OwnComputerTool,
-  ownComputerCallSummary,
 } from '@cairn/shared';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chiefThread, computerCall, machine, step } from '../db/schema.js';
+import { chiefThread, machine } from '../db/schema.js';
 import { isOwner } from './instance-owner.js';
 import type { MachineDeps } from './machine-deps.js';
 
 type ThreadRow = typeof chiefThread.$inferSelect;
 type MachineRow = typeof machine.$inferSelect;
-
-const ACTIVITY_LIMIT = 200;
 
 function servesTool(row: MachineRow, tool: OwnComputerTool): boolean {
   if (row.kind !== 'local') return false;
@@ -64,36 +59,4 @@ export function ownComputerTarget(
   )
     return { kind: 'refused', text: OWN_COMPUTER_NO_ACCESSIBILITY(host.name) };
   return { kind: 'ready', machineId: host.id };
-}
-
-export function listOwnComputerActivity(db: Db, machineRow: MachineRow): OwnComputerActivity[] {
-  return db
-    .select({
-      call: computerCall,
-      threadId: chiefThread.id,
-      threadTitle: chiefThread.title,
-    })
-    .from(computerCall)
-    .leftJoin(step, eq(step.id, computerCall.stepId))
-    .leftJoin(chiefThread, eq(chiefThread.id, step.buildId))
-    .where(
-      and(
-        eq(computerCall.machineId, machineRow.id),
-        inArray(computerCall.tool, [...OWN_COMPUTER_TOOL_NAMES]),
-      ),
-    )
-    .orderBy(desc(computerCall.createdAt), sql`computer_call.rowid desc`)
-    .limit(ACTIVITY_LIMIT)
-    .all()
-    .map(({ call, threadId, threadTitle }) => ({
-      callId: call.id,
-      tool: call.tool as OwnComputerTool,
-      summary: ownComputerCallSummary(call.tool, call.params),
-      state: call.state,
-      exitCode: call.exitCode,
-      error: call.errorMessage,
-      threadId,
-      threadTitle,
-      createdAt: call.createdAt,
-    }));
 }

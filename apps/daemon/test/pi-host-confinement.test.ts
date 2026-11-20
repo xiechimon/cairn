@@ -103,6 +103,9 @@ describe.runIf(process.platform === 'darwin')('pi session confinement on macOS',
     writeFileSync(join(runnerHome, 'machine.json'), SENTINEL);
     const escapeFile = join(root, 'escape');
     const probe = join(worktree, 'probe.sh');
+    const homeNote = join(home, 'projects', 'notes.txt');
+    mkdirSync(join(home, 'projects'), { recursive: true });
+    writeFileSync(homeNote, 'notes outside the worktree');
     const script: Scripted[] = [
       { name: 'read', args: { path: token } },
       { name: 'edit', args: { path: token, edits: [{ oldText: 'PI-HOST', newText: 'changed' }] } },
@@ -113,6 +116,7 @@ describe.runIf(process.platform === 'darwin')('pi session confinement on macOS',
       },
       { name: 'bash', args: { command: `echo escaped > '${escapeFile}'` } },
       { name: 'write', args: { path: join(worktree, 'inside.txt'), content: 'allowed' } },
+      { name: 'read', args: { path: homeNote } },
     ];
     const model = scriptedModel(script);
     servers.push(model.server);
@@ -158,9 +162,9 @@ describe.runIf(process.platform === 'darwin')('pi session confinement on macOS',
       .filter((message) => message.role === 'tool')
       .map((message) => JSON.stringify(message.content));
     expect(results).toHaveLength(script.length);
-    for (const denied of results.slice(0, -1))
-      expect(denied).toMatch(/not permitted|folder-grant/i);
-    expect(results.at(-1)).not.toMatch(/not permitted|folder-grant/i);
+    for (const denied of results.slice(0, -2)) expect(denied).toMatch(/not permitted/i);
+    expect(results.at(-2)).not.toMatch(/not permitted|folder-grant/i);
+    expect(results.at(-1)).toContain('notes outside the worktree');
     for (const body of model.bodies) expect(body).not.toContain(SENTINEL);
     expect(existsSync(escapeFile)).toBe(false);
     expect(readFileSync(token, 'utf8')).toBe(SENTINEL);

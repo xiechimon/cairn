@@ -20,7 +20,6 @@ test('each own-Mac state folds into the meta line with no switch and only its ow
       ['own-computer-guide', 'own-computer-recheck'],
     ],
     ['no-screen-mac', 'no-screen-recording', /屏幕录制/, true, ['own-computer-guide']],
-    ['macbook-pro', 'ready', /4 条操作记录/, false, []],
   ];
   for (const [machine, state, segment, drawerOpen, actions] of cases) {
     const item = itemOf(page, machine);
@@ -32,20 +31,16 @@ test('each own-Mac state folds into the meta line with no switch and only its ow
   await expect(settings(page).getByRole('switch', { name: /使用这台 Mac/ })).toHaveCount(0);
 });
 
-test('the ready Mac lists every logged call behind the meta line, failures marked', async ({
+test('a ready Mac row carries no action log, computer-control switches or folder list', async ({
   page,
 }) => {
   await page.goto(STATES);
   const item = itemOf(page, 'macbook-pro');
-  await item.getByTestId('own-computer-meta').click();
-  await expect(item.getByTestId('own-computer-status')).toContainText('危险命令');
-  const rows = item.getByTestId('own-computer-activity-row');
-  await expect(rows).toHaveCount(4);
-  await expect(rows.nth(0)).toContainText('xcodebuild -scheme Cairn');
-  await expect(rows.nth(0)).toContainText('运行命令 · 验收桌面版的托盘菜单');
-  await expect(rows.nth(1)).toContainText('Cairn: click, type');
-  await expect(rows.nth(2)).toContainText('没有成功');
-  await expect(rows.nth(0)).not.toContainText('没有成功');
-  await item.getByTestId('own-computer-meta').click();
+  await expect(item).toHaveAttribute('data-oc-state', 'ready');
+  await expect(item.getByTestId('machine-item-status')).toHaveText('在线');
+  await expect(item.getByTestId('own-computer-meta')).toHaveCount(0);
   await expect(item.getByTestId('own-computer-drawer')).toHaveCount(0);
+  await expect(item).not.toContainText(/操作记录|电脑控制|文件夹/);
+  await expect(item.getByRole('switch')).toHaveCount(0);
+  await expect(item.getByRole('textbox')).toHaveCount(0);
 });

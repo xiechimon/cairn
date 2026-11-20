@@ -122,11 +122,9 @@ export const COMPUTER_USER_CONTROL =
   'the owner is using this computer right now; wait a few seconds and retry the same call';
 export const COMPUTER_INTERRUPTED = 'interrupted, may have partially run; it was not retried';
 export const COMPUTER_CANCELLED = 'cancelled because the Coordinator turn was stopped';
-export const COMPUTER_BROWSER_DISABLED =
-  'browser tools are off for this computer; enable 浏览器 in the Computers panel';
 export const COMPUTER_NO_CLOAK_LICENSE = `No CloakBrowser license; set team secret ${CLOAK_LICENSE_SECRET}`;
 export const COMPUTER_BROWSER_UNAVAILABLE =
-  'this machine no longer reports browser capability; turn off 浏览器 or rebuild the computer image';
+  'this machine no longer reports browser capability; rebuild the computer image';
 
 const SHELL_TOOLS: ReadonlySet<ComputerTool> = new Set(['shell', 'user_computer_shell']);
 const SCREEN_TOOLS: ReadonlySet<ComputerTool> = new Set([
@@ -637,9 +635,9 @@ export function stopStepComputer(
 
 function machineAcceptsTool(row: typeof machine.$inferSelect, tool: ComputerTool): boolean {
   if (isComputerBrowserTool(tool)) {
-    return row.browserOverride !== false && row.capabilities?.browser === true;
+    return row.capabilities?.browser === true;
   }
-  return row.desktopOverride !== false && row.capabilities?.computer === true;
+  return row.capabilities?.computer === true;
 }
 
 export function teamOffersDesktop(db: Db, teamId: string): boolean {
@@ -654,11 +652,10 @@ export function teamOffersDesktop(db: Db, teamId: string): boolean {
 function assertMachineGrant(db: Db, machineId: string, tool: ComputerTool): void {
   const host = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (isComputerBrowserTool(tool)) {
-    if (host?.browserOverride === false) throw new HttpError(403, COMPUTER_BROWSER_DISABLED);
     if (host?.capabilities?.browser !== true)
       throw new HttpError(403, COMPUTER_BROWSER_UNAVAILABLE);
-  } else if (host?.desktopOverride === false || host?.capabilities?.computer !== true) {
-    throw new HttpError(403, 'Orb desktop tools are off or unavailable for this machine');
+  } else if (host?.capabilities?.computer !== true) {
+    throw new HttpError(403, 'Orb desktop tools are unavailable for this machine');
   }
 }
 

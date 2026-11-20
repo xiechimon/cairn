@@ -696,8 +696,6 @@ function ownMac(
   };
 }
 
-const MINUTE = 60_000;
-
 export const ownComputerStates: FixtureSet = {
   ...resourcesDefault,
   resources: {
@@ -728,117 +726,7 @@ export const ownComputerStates: FixtureSet = {
           },
         },
       ),
-      ownMac('oc-ready', 'macbook-pro', {
-        ownComputerFixture: {
-          activity: [
-            {
-              callId: 'a'.repeat(64),
-              tool: 'user_computer_shell',
-              summary: 'xcodebuild -scheme Cairn -configuration Debug build',
-              state: 'done',
-              exitCode: 0,
-              error: null,
-              threadId: 'chief-thread-1',
-              threadTitle: '验收桌面版的托盘菜单',
-              createdAt: Date.now() - 4 * MINUTE,
-            },
-            {
-              callId: 'b'.repeat(64),
-              tool: 'user_computer_act',
-              summary: 'Cairn: click, type',
-              state: 'done',
-              exitCode: null,
-              error: null,
-              threadId: 'chief-thread-1',
-              threadTitle: '验收桌面版的托盘菜单',
-              createdAt: Date.now() - 6 * MINUTE,
-            },
-            {
-              callId: 'c'.repeat(64),
-              tool: 'user_computer_shell',
-              summary: 'pnpm test --filter @cairn/desktop',
-              state: 'done',
-              exitCode: 1,
-              error: null,
-              threadId: null,
-              threadTitle: null,
-              createdAt: Date.now() - 2 * 60 * MINUTE,
-            },
-            {
-              callId: 'd'.repeat(64),
-              tool: 'user_computer_observe',
-              summary: 'Finder',
-              state: 'done',
-              exitCode: null,
-              error: null,
-              threadId: 'chief-thread-2',
-              threadTitle: '整理下载文件夹',
-              createdAt: Date.now() - 26 * 60 * MINUTE,
-            },
-          ],
-        },
-      }),
-    ],
-  },
-};
-
-export const folderGrantsStates: FixtureSet = {
-  ...resourcesDefault,
-  resources: {
-    ...RESOURCES,
-    machines: [
-      ownMac('fg-bound', 'folders-mac', {
-        folderGrants: {
-          workspacesDir: '/Users/ian/cairn/workspaces',
-          bindsGrants: true,
-          pins: [
-            { path: '/Users/ian/Code', status: 'confirmed', enabled: true },
-            { path: '/Users/ian/Documents', status: 'confirmed', enabled: false },
-            { path: '/opt/shared', status: 'pending', enabled: false },
-            { path: '/etc/secret', status: 'rejected', enabled: false },
-            { path: '/Users/ian/gone', status: 'absent', enabled: false },
-          ],
-        },
-      }),
-      ownMac('fg-unbound', 'plain-mac', {
-        folderGrants: {
-          workspacesDir: '/srv/agent/workspaces',
-          pins: [
-            { path: '/srv/data', status: 'confirmed', enabled: false },
-            { path: '/var/tmp/staging', status: 'pending', enabled: false },
-          ],
-        },
-      }),
-      ownMac('fg-none', 'bare-mac', {}),
-    ],
-  },
-};
-
-export const computerGrantsStates: FixtureSet = {
-  ...resourcesDefault,
-  resources: {
-    ...RESOURCES,
-    machines: [
-      ownMac('cg-default', 'capable-mac', {}, { computer: true, browser: true }),
-      ownMac(
-        'cg-browser-off',
-        'no-browser-mac',
-        { browserOverride: false },
-        { computer: true, browser: true },
-      ),
-      ownMac(
-        'cg-desktop-off',
-        'no-desktop-mac',
-        { desktopOverride: false },
-        { computer: true, browser: true },
-      ),
-      ownMac(
-        'cg-explicit-on',
-        'pinned-mac',
-        { browserOverride: true, desktopOverride: true },
-        { computer: true, browser: true },
-      ),
-      ownMac('cg-plain', 'plain-mac', {}),
+      ownMac('oc-ready', 'macbook-pro', {}, { computer: true, browser: true }),
     ],
   },
 };
@@ -911,6 +799,7 @@ export const resourcesMailError: FixtureSet = {
   },
 };
 
+const MINUTE = 60_000;
 const PHONE_NOW = Date.now();
 
 function phoneRow(

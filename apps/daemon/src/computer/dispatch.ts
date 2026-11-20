@@ -8,6 +8,7 @@ import {
   INSTALL_PACKAGES_TIMEOUT_MS,
   installPackagesParamsSchema,
   isPhoneTool,
+  OWN_COMPUTER_TOOL_NAMES,
   ownComputerHardlineRefusal,
   PACKAGES_INSTALLED_PREFIX,
 } from '@cairn/shared';
@@ -40,6 +41,8 @@ import {
   ComputerRefusal,
   type ScopedComputerProviders,
 } from './provider.js';
+
+const OWN_MAC_TOOLS: ReadonlySet<string> = new Set(OWN_COMPUTER_TOOL_NAMES);
 
 export const NO_COMPUTER_PROVIDER_MESSAGE = 'This machine has no computer provider';
 export const NO_COMPUTER_SCOPE_MESSAGE = 'The call names no computer';
@@ -750,6 +753,8 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     async dispatch(call) {
       if (closing || inFlight.has(call.callId) || finishedUnsafe.has(call.callId)) return;
       if (!COMPUTER_REPLAY_SAFE_TOOLS.has(call.tool)) remember(call.callId);
+      if (OWN_MAC_TOOLS.has(call.tool))
+        options.logger?.machine(`own mac ${call.tool} ${call.callId.slice(0, 8)}`);
       const controller = new AbortController();
       const settled = handle(call, controller)
         .catch((error: unknown) => {

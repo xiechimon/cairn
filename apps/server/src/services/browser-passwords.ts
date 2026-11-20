@@ -103,11 +103,7 @@ export function validateBrowserPasswordApproval(
     .from(machine)
     .where(and(eq(machine.teamId, teamId), eq(machine.id, binding.machineId)))
     .get();
-  if (
-    row.policyRevision !== binding.revision ||
-    host?.capabilities?.browserSecretFill !== true ||
-    host.browserOverride === false
-  )
+  if (row.policyRevision !== binding.revision || host?.capabilities?.browserSecretFill !== true)
     throw new HttpError(409, 'The password or browser machine changed; ask for approval again.');
 }
 

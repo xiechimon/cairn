@@ -9,7 +9,6 @@ const computer = (patch: Record<string, unknown> = {}) => ({
   scopeKey: 'private:u1',
   state: 'running',
   controlHolder: 'none',
-  browserEnabled: false,
   handoffReason: null,
   kind: 'host',
   machine: { id: 'm1', name: 'omarchy', online: true },
@@ -33,13 +32,6 @@ async function open(
   await mockLive(page, { threads: [], messages: HISTORY, machines }, (path, route, json) => {
     if (path === '/api/computers' && route.request().method() === 'GET') {
       return json({ computers: feed.computers });
-    }
-    if (path === '/api/computers/comp-1' && route.request().method() === 'PATCH') {
-      const body = route.request().postDataJSON() as { browserEnabled?: boolean };
-      const current = (feed.computers[0] ?? computer()) as Record<string, unknown>;
-      const updated = { ...current, browserEnabled: body.browserEnabled === true };
-      feed.computers = [updated];
-      return json({ computer: updated });
     }
     if (path === '/api/teams/t1/computers/comp-1/screen') {
       return json({ error: 'the computer is not connected' }, 409);

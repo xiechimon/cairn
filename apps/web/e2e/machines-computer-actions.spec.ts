@@ -12,7 +12,6 @@ const computer = (kind: 'host' | 'vm', download: Download = null) => ({
   scopeKey: 'chief:u1',
   state: 'running',
   controlHolder: 'none',
-  browserEnabled: true,
   handoffReason: null,
   kind,
   download,
