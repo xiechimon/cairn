@@ -46,6 +46,7 @@ import type { CommentActions } from './design-comment-list.js';
 import { ExportMenu } from './design-export.js';
 import { bakeMarkPng, MarkError, markTarget } from './design-markup.js';
 import { type DesignTarget, pickPage } from './design-route.js';
+import { SharePopover } from './design-share.js';
 import { VersionsMenu, versionLabel } from './design-versions.js';
 import { designSrcdoc } from './srcdoc.js';
 
@@ -134,6 +135,7 @@ export function DesignPane({
       pages={pages}
       readOnly={todoQ.data?.archivedAt != null}
       sendComments={sendComments}
+      shareOrigin={pagesQ.data?.shareOrigin ?? null}
     />
   );
   return (
@@ -170,12 +172,14 @@ function DesignPage({
   pages,
   readOnly,
   sendComments,
+  shareOrigin,
 }: {
   todoId: string;
   page: DesignPageRecord;
   pages: readonly DesignPageRecord[];
   readOnly: boolean;
   sendComments: SendDesignComments | undefined;
+  shareOrigin: string | null;
 }) {
   const { t } = useI18n();
   const { live } = useLiveData();
@@ -195,10 +199,8 @@ function DesignPage({
     [htmlQ.data],
   );
   const frameRef = useRef<HTMLIFrameElement | null>(null);
-  const { restore, createComment, patchComment, deleteComment, saveMark } = useDesignMutations(
-    todoId,
-    page.fileName,
-  );
+  const { restore, createComment, patchComment, deleteComment, saveMark, createShare, stopShare } =
+    useDesignMutations(todoId, page.fileName);
   const [commenting, setCommenting] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const stopCommenting = useCallback(() => setCommenting(false), []);
@@ -465,6 +467,20 @@ function DesignPage({
           previewing={!source && srcdoc !== null}
           printHref={`${pageHref}?print=1`}
         />
+        {live && (
+          <SharePopover
+            fileName={page.fileName}
+            html={htmlQ.data}
+            shareOrigin={shareOrigin}
+            shareToken={page.shareToken}
+            readOnly={readOnly}
+            control={{
+              busy: createShare.isPending || stopShare.isPending,
+              create: (onError) => createShare.mutate(undefined, { onError }),
+              stop: (onError) => stopShare.mutate(undefined, { onError }),
+            }}
+          />
+        )}
         <DropdownMenu>
           <IconTooltip
             label={t('更多')}

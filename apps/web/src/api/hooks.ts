@@ -31,6 +31,7 @@ import type {
   DesignCommentPatch,
   DesignCommentRecord,
   DesignPageRecord,
+  DesignShareRecord,
   DesignVersionRecord,
   DiffFileContent,
   DocumentDiffFile,
@@ -1937,6 +1938,7 @@ export function useDesignMutations(todoId: string, fileName: string) {
   ) => {
     if (context?.previous !== undefined) qc.setQueryData(commentsKey, context.previous);
   };
+  const sharePath = `${designPath(todoId)}/${encodeURIComponent(fileName)}/share`;
   const commentPath = (commentId: string) =>
     `${designPath(todoId)}/comments/${encodeURIComponent(commentId)}`;
   return {
@@ -1971,6 +1973,14 @@ export function useDesignMutations(todoId: string, fileName: string) {
           ),
         ),
       onError: rollback,
+      onSettled: refresh,
+    }),
+    createShare: useMutation({
+      mutationFn: () => api.post<DesignShareRecord>(sharePath),
+      onSettled: refresh,
+    }),
+    stopShare: useMutation({
+      mutationFn: () => api.del<void>(sharePath),
       onSettled: refresh,
     }),
     saveMark: useMutation({

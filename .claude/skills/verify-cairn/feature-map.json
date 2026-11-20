@@ -2111,6 +2111,7 @@
           "apps/web/src/board/design/design-composer.tsx",
           "apps/web/src/board/design/design-export.tsx",
           "apps/web/src/board/design/design-markup.tsx",
+          "apps/web/src/board/design/design-share.tsx",
           "apps/web/src/board/design/srcdoc.ts"
         ],
         "server": [

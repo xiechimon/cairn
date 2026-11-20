@@ -64,7 +64,7 @@ function lostComment(): Comment {
   };
 }
 
-async function openDesign(page: Page, seeded: Comment[] = []) {
+async function openDesign(page: Page, seeded: Comment[] = [], shareOrigin: string | null = null) {
   const state = {
     versions: [version(1), version(2)],
     restored: [] as string[],
@@ -72,6 +72,8 @@ async function openDesign(page: Page, seeded: Comment[] = []) {
     sends: [] as { content: string; designCommentIds?: string[] }[],
     writes: [] as string[],
     marks: [] as Buffer[],
+    shareToken: null as string | null,
+    shareCalls: [] as string[],
   };
   const mock = { threads: [THREAD], messages: [] as unknown[], todos: [PAGE_TASK] };
   await mockLive(page, mock, (path, route, json) => {
@@ -97,6 +99,15 @@ async function openDesign(page: Page, seeded: Comment[] = []) {
       state.comments = [...state.comments, row];
       state.writes.push(`create ${row.id}`);
       return json(row, 201);
+    }
+    if (path === `${base}/pricing.html/share`) {
+      state.shareCalls.push(method);
+      if (method === 'DELETE') {
+        state.shareToken = null;
+        return json({ ok: true });
+      }
+      state.shareToken = 'tok-abc';
+      return json({ token: 'tok-abc', path: '/s/tok-abc', createdAt: Date.now() }, 201);
     }
     if (path === `${base}/marks` && method === 'POST') {
       const { pngBase64 } = route.request().postDataJSON() as { pngBase64: string };
@@ -147,10 +158,10 @@ async function openDesign(page: Page, seeded: Comment[] = []) {
             current,
             versionCount: state.versions.length,
             openComments: state.comments.filter((c) => c.status === 'open').length,
-            shareToken: null,
+            shareToken: state.shareToken,
           },
         ],
-        shareOrigin: null,
+        shareOrigin,
       });
     }
     if (path === `${base}/pricing.html/versions`) return json(state.versions);
@@ -429,4 +440,33 @@ test('export: the page as HTML without bridges, a ZIP with handoff and manifest,
   const pdf = page.getByTestId('design-export-pdf');
   await expect(pdf).toHaveAttribute('href', '/api/design/versions/ver-2/page?print=1');
   await expect(pdf).toHaveAttribute('target', '_blank');
+});
+
+test('share without a relay downloads the page and points at remote access', async ({ page }) => {
+  const state = await openDesign(page);
+  await expect(page.frameLocator('[data-testid="design-frame"]').getByRole('heading')).toBeVisible();
+  const [file] = await Promise.all([page.waitForEvent('download'), page.getByTestId('design-share').click()]);
+  expect(file.suggestedFilename()).toBe('pricing.html');
+  const popover = page.getByTestId('design-share-popover');
+  await expect(popover.getByTestId('design-share-no-relay')).toContainText('生成链接需要先配置中继（远程访问）');
+  await expect(popover.getByTestId('design-share-create')).toHaveCount(0);
+  expect(state.shareCalls).toEqual([]);
+  await popover.getByTestId('design-share-relay-settings').click();
+  await expect(page).toHaveURL(/\/app\/settings\/remote/);
+});
+
+test('share with a relay creates a link, copies it and stops sharing', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const state = await openDesign(page, [], 'https://relay.example');
+  await expect(page.frameLocator('[data-testid="design-frame"]').getByRole('heading')).toBeVisible();
+  await page.getByTestId('design-share').click();
+  const popover = page.getByTestId('design-share-popover');
+  await expect(popover.getByTestId('design-share-off')).toBeVisible();
+  await popover.getByTestId('design-share-create').click();
+  await expect(popover.getByTestId('design-share-url')).toHaveText('https://relay.example/s/tok-abc');
+  await popover.getByTestId('design-share-copy').click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('https://relay.example/s/tok-abc');
+  await popover.getByTestId('design-share-stop').click();
+  await expect(popover.getByTestId('design-share-off')).toBeVisible();
+  expect(state.shareCalls).toEqual(['POST', 'DELETE']);
 });

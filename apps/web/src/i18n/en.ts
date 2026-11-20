@@ -2898,4 +2898,17 @@ export const EN: Record<string, string> = {
   'PNG 截图': 'PNG screenshot',
   '打印成 PDF': 'Print to PDF',
   页面截图没拍下来: 'Could not capture the page',
+  分享: 'Share',
+  '已下载 {name}，可以直接发给别人打开。': 'Downloaded {name}; send it to anyone to open.',
+  '生成链接需要先配置中继（远程访问）': 'A link needs a relay first (Remote access)',
+  去设置远程访问: 'Set up remote access',
+  '拿到链接的人都能看这个页面的当前版本。':
+    'Anyone with the link can view the current version of this page.',
+  没复制上: 'Could not copy',
+  没能停止分享: 'Could not stop sharing',
+  停止分享: 'Stop sharing',
+  '生成一个公开链接，拿到链接的人都能看这个页面的当前版本。':
+    'Create a public link; anyone with it can view the current version of this page.',
+  链接没生成: 'Link not created',
+  生成链接: 'Create link',
 };
