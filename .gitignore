@@ -83,6 +83,10 @@ credentials.enc
 !.claude/skills/verify-merge-gate/
 !.claude/skills/retro-cairn/
 !.claude/skills/options-prototype-cairn/
+!.claude/skills/cairn-motion/
+!.claude/skills/cairn-polish/
+!.claude/skills/cairn-type/
+!.claude/skills/cairn-motion-audit/
 !.claude/settings.json
 !.claude/hooks/
 !.claude/workflows/

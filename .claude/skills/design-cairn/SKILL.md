@@ -1,6 +1,6 @@
 ---
 name: design-cairn
-description: Use when a task or brief touches apps/web/src (new screen, UI fix, copy, layout, state handling). Carries the cairn UI brief template (references, component x state list, compare-to-reference acceptance), the draft-first rule for the five main surfaces and the seed-missing-states rule. Use together with the global design skill.
+description: Use when a task or brief touches apps/web/src (new screen, UI fix, copy, layout, state handling). Carries the cairn UI brief template (references, component x state list, compare-to-reference acceptance), the draft-first rule for the five main surfaces, the seed-missing-states rule and the routing table to the domain skills (cairn-motion, cairn-polish, cairn-type, cairn-motion-audit).
 ---
 
 # design-cairn: UI work in cairn
@@ -13,6 +13,17 @@ Read `apps/web/DESIGN.md` first — the token frontmatter, the rule index (one l
 | Settings | Amp and t3code |
 | Thread progress, review and diff | t3code and Amp |
 | First run and connection state | Amp |
+
+## Skill routing
+
+Every `apps/web/src` change loads this skill first (AGENTS.md), then the domain skill for its task type:
+
+| Task type | Skill to load |
+|---|---|
+| Motion, animation, transitions, enter/exit, press feedback, loading or status motion | `cairn-motion` |
+| Surfaces, shadows, borders, radii, icons, optical alignment, spacing polish | `cairn-polish` |
+| Type, fonts, sizes, wrapping, truncation, tabular figures | `cairn-type` |
+| Reviewing or auditing motion (only when someone asks) | `cairn-motion-audit` |
 
 ## Order of work
 
@@ -57,8 +68,13 @@ Acceptance (done means all of these):
 2. Compare to reference: for each state with a reference shot, one row "reference | ours" and one sentence on the difference. State what is still worse than the reference.
 3. The DESIGN.md rule ids listed above checked; `M` rules measured, not eyeballed.
 4. Self-review at 1440 and 390, light and dark, by the building session against the reference shots (visual review stays with Claude; no second reviewer is needed).
-5. Real stack shot for the main state (live, not `?scenario=`).
+5. Interface review of the diff (adapted from Jakub Krehel's `interface-review`): read the whole diff; expand each changed file one hop to the surfaces it renders in, five consumers at most; read the removed lines for regressions; hold the change to its stated intent — a state left unbuilt is a finding; classify each finding `Introduced` / `Regression` / `Pre-existing`, keyed to its rule id, with at most three pre-existing findings as courtesy.
+6. Real stack shot for the main state (live, not `?scenario=`).
 ```
+
+## Long content
+
+The `long content` cell of the state list is filled from the extreme-data catalog vendored at `upstream/break-ui/CATALOG.md` — Emil Kowalski's `break-ui` at `emilkowalski/skills@64eb3deb9a5fbfa041faf783e0bc3fd635872e9c` (MIT, `upstream/break-ui/LICENSE`, upstream `SKILL.md` kept as `README.md`). Read it and pick the rows that apply to the data the component renders: long hyphenated and CJK names, unbreakable emails and URLs, emoji and ZWJ sequences, huge or locale-formatted numbers, `0`/`1`/missing, every status enum at once, edge dates, broken images. Use `example.com` / `.test` domains so no fixture points at a real inbox.
 
 ## Seed missing states
 
