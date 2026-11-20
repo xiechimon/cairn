@@ -14,7 +14,7 @@ export const isInFlightPhase = (phase: string): boolean => IN_FLIGHT_PHASES.has(
 
 export const PHASE_UI: Record<Phase, PhaseUi> = {
   todo: { chip: '待开始', tone: 'idle', action: '开始', placeholder: null },
-  queued: { chip: '排队中', tone: 'idle', action: null, placeholder: null },
+  queued: { chip: '运行中', tone: 'idle', action: null, placeholder: null },
   planning: {
     chip: '规划中',
     tone: 'plan',
