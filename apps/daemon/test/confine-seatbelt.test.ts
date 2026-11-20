@@ -1,7 +1,8 @@
-import { spawnSync } from 'node:child_process';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
+import { setTimeout as waitTimeout } from 'node:timers/promises';
 import { describe, expect, test } from 'vitest';
 import {
   runSeatbeltProbe,
@@ -89,6 +90,17 @@ describe('seatbelt profile', () => {
     );
     expect(index('(allow file-read* file-write*')).toBeLessThan(index('/repo.git/config'));
     expect(lines).toContain('(deny network-outbound (remote ip "localhost:8123"))');
+  });
+
+  test('limits signals and process inspection to processes inside the same sandbox', () => {
+    const lines = seatbeltProfile(layout().policy).split('\n');
+    const index = (line: string) => lines.indexOf(line);
+    for (const operation of ['signal', 'process-info*']) {
+      expect(index(`(deny ${operation})`), operation).toBeGreaterThan(-1);
+      expect(index(`(deny ${operation})`), operation).toBeLessThan(
+        index(`(allow ${operation} (target same-sandbox))`),
+      );
+    }
   });
 
   test('rejects a cache that overlaps a denied root and unsafe paths', () => {
@@ -179,6 +191,58 @@ describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
     );
     expect(open.status).toBe(0);
   }, 20000);
+
+  const outsideSentinel = 'outside-process-secret';
+
+  function outsideProcess(): ChildProcess {
+    return spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], {
+      env: { ...process.env, CAIRN_PROBE_SENTINEL: outsideSentinel },
+      stdio: 'ignore',
+    });
+  }
+
+  function inspectAndSignal(pid: number): string {
+    return `ps -E -ww -o command= -p ${pid}; kill -0 ${pid} && echo signal-delivered`;
+  }
+
+  test('without confinement a session can signal and read the environment of another process', () => {
+    const fixture = layout();
+    const outside = outsideProcess();
+    try {
+      const result = runConfined(null, inspectAndSignal(outside.pid as number), fixture.worktree);
+      expect(result.stdout).toContain(outsideSentinel);
+      expect(result.stdout).toContain('signal-delivered');
+    } finally {
+      outside.kill('SIGKILL');
+    }
+  });
+
+  test('a confined session cannot signal or inspect processes outside its sandbox but manages its own', async () => {
+    const fixture = layout();
+    const outside = outsideProcess();
+    try {
+      const pid = outside.pid as number;
+      const probe = runConfined(
+        fixture.policy,
+        `${inspectAndSignal(pid)}; kill -TERM ${pid}`,
+        fixture.worktree,
+      );
+      expect(probe.stdout).not.toContain(outsideSentinel);
+      expect(probe.stdout).not.toContain('signal-delivered');
+      await waitTimeout(500);
+      expect(outside.exitCode).toBeNull();
+      expect(outside.signalCode).toBeNull();
+      const own = runConfined(
+        fixture.policy,
+        'CAIRN_PROBE_SENTINEL=own-child sleep 30 & child=$!; ps -E -ww -o command= -p $child; kill -0 $child && kill -TERM $child && wait $child; echo own-done',
+        fixture.worktree,
+      );
+      expect(own.stdout).toContain('own-child');
+      expect(own.stdout).toContain('own-done');
+    } finally {
+      outside.kill('SIGKILL');
+    }
+  });
 
   test('without confinement a session reads the owner token and edits the database', () => {
     const fixture = layout();
