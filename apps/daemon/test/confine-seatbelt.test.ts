@@ -101,9 +101,7 @@ describe('seatbelt profile', () => {
         index(`(allow ${operation} (target same-sandbox))`),
       );
     }
-    expect(lines).toContain(
-      '(deny sysctl-read (sysctl-name "kern.procargs") (sysctl-name "kern.procargs2"))',
-    );
+    expect(lines).toContain('(deny sysctl-read (sysctl-name-prefix "kern.procargs"))');
   });
 
   test('rejects a cache that overlaps a denied root and unsafe paths', () => {

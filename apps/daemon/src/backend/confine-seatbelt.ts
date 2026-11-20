@@ -29,7 +29,7 @@ const OUTSIDE_PROCESS_DENIALS = [
   '(allow signal (target same-sandbox))',
   '(deny process-info*)',
   '(allow process-info* (target same-sandbox))',
-  '(deny sysctl-read (sysctl-name "kern.procargs") (sysctl-name "kern.procargs2"))',
+  '(deny sysctl-read (sysctl-name-prefix "kern.procargs"))',
 ];
 
 export interface SeatbeltPolicy {
