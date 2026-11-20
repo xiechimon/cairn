@@ -87,8 +87,6 @@ export const serverConfigSchema = z.object({
   host: z.string().min(1),
   tsnet: tsnetSettingsSchema,
   mcpConfigPath: z.string(),
-  issueIntake: z.boolean(),
-  scheduling: z.boolean(),
   coordinatorInServer: z.boolean(),
   trajectoryOutcomeBackfill: z.boolean(),
   trajectoryReflectCurate: z.boolean(),
@@ -303,8 +301,6 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     mcpConfigPath: resolve(
       process.env[ENV_VARS.mcpConfig] || join(homedir(), CLAUDE_CONFIG_FILE_NAME),
     ),
-    issueIntake: envFlag(ENV_VARS.issueIntake),
-    scheduling: envFlag(ENV_VARS.scheduling),
     coordinatorInServer: envFlagDefaultOn(ENV_VARS.coordinatorInServer),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
     trajectoryReflectCurate: envFlag(ENV_VARS.trajectoryReflectCurate),

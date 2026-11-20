@@ -12,10 +12,8 @@ import {
   project as projectTable,
   step as stepTable,
   todo as todoTable,
-  tokenUsage,
 } from '../src/db/schema.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
-import { autonomySpentToday } from '../src/services/autonomy-gates.js';
 import {
   applyBuildStepAction,
   applyStepFailure,
@@ -795,7 +793,7 @@ describe('needs you (#1800)', () => {
     expect(buildCount(w)).toBe(2);
   });
 
-  test('an automatic retry is recorded as a retry and its spend counts toward the autonomy budget', async () => {
+  test('an automatic retry is recorded as a retry', async () => {
     const w = openWorld();
     const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
     if (step === undefined) throw new Error('missing step');
@@ -812,11 +810,6 @@ describe('needs you (#1800)', () => {
       .where(eq(buildTable.id, retryBuildId ?? ''))
       .get();
     expect(retryBuild?.triggerSource).toBe('retry');
-    w.s.db
-      .insert(tokenUsage)
-      .values({ buildId: retryBuildId ?? '', model: 'm', costTotal: 1.5 })
-      .run();
-    expect(autonomySpentToday(w.s.db, w.projectId, nowMs())).toBe(1.5);
   });
 
   test('a Coordinator message on a failed thread restarts it as a Coordinator build', async () => {

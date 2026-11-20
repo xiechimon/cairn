@@ -478,7 +478,7 @@ export function ProjectSettingsPage() {
           </Section>
         )}
         {live && wireProject?.repoKind === 'github' && id !== undefined && teamId !== undefined && (
-          <Section title={t('后台自动任务')}>
+          <Section>
             <ProjectAutonomyCard projectId={id} teamId={teamId} />
           </Section>
         )}

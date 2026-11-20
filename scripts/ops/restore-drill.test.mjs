@@ -619,7 +619,6 @@ exec ${sqlite} "$@"
       ]);
       for (const reason of Object.values(report.allowlist.machine.columns))
         assert.match(reason, /heartbeat/i);
-      assert.deepEqual(Object.keys(report.allowlist.autonomy_state.columns), ['lastEvaluatedAt']);
       if (process.env.CAIRN_RESTORE_DRILL_EVIDENCE && !renamed)
         copyFileSync(
           f.report,
@@ -627,7 +626,7 @@ exec ${sqlite} "$@"
         );
     });
 
-test('heartbeat comparator accepts only named columns and keeps all other machine and autonomy fields strict', () => {
+test('heartbeat comparator accepts only named columns and keeps all other machine fields strict', () => {
   const r = spawnSync(
     'python3',
     [
@@ -640,7 +639,6 @@ drill = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(drill)
 for table, allowed, strict in [
     ('machine', ['lastSeenAt', 'capabilities'], ['id', 'teamId', 'name', 'online', 'tokenHash', 'apiKeyId', 'latestCliVersion', 'kind', 'enabledRuntimes', 'claudeCodeReport', 'claudeRateLimits', 'maxConcurrent', 'maxConcurrentOverridden']),
-    ('autonomy_state', ['lastEvaluatedAt'], ['projectId', 'kind', 'lastStartedAt', 'baselineSha', 'lastBlockedReason']),
 ]:
     fields = allowed + strict
     for field in fields:

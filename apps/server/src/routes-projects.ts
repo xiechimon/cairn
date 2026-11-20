@@ -11,7 +11,6 @@ import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { actionJournal, actionProposal, build, project, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
-import { nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import {
   githubAppOf,
@@ -24,7 +23,7 @@ import {
 } from './routes-helpers.js';
 import { answerProposal } from './services/action-proposals.js';
 import { executeAction, undoJournalEntry } from './services/action-registry.js';
-import { patchAutonomy, readAutonomy } from './services/autonomy-gates.js';
+import { patchAutonomy, readAutonomy } from './services/autonomy.js';
 import { toBuildRecord } from './services/builds.js';
 import { listDir } from './services/fs-list.js';
 import { pickFolder } from './services/fs-pick.js';
@@ -33,7 +32,6 @@ import { importGithubIssue } from './services/github-issues.js';
 import { isOwner } from './services/instance-owner.js';
 import { listedProjects } from './services/personal-space.js';
 import { createProject, updateProject } from './services/projects.js';
-import { latestScheduleReport } from './services/scheduling/store.js';
 import { listTodos } from './services/todos.js';
 
 export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
@@ -135,18 +133,13 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/projects/:id/autonomy', (c) => {
     const row = requireProject(ctx, c.req.param('id'));
-    return c.json(readAutonomy(ctx.db, row.id, nowMs()));
+    return c.json(readAutonomy(ctx.db, row.id));
   });
 
   app.patch('/api/projects/:id/autonomy', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
     const body = parseWith(patchAutonomyBodySchema, await jsonBody(c), 'body');
-    return c.json(patchAutonomy(ctx.db, row.id, body, nowMs()));
-  });
-
-  app.get('/api/projects/:id/schedule', (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    return c.json({ report: latestScheduleReport(ctx.db, row.id) });
+    return c.json(patchAutonomy(ctx.db, row.id, body));
   });
 
   for (const [action, id] of [

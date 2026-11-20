@@ -336,7 +336,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   {
     method: 'POST',
     path: '/api/webhook/github/{token}',
-    note: 'seq-32：GitHub issues webhook——labeled ready-for-agent 进 importGithubIssue，202 一律，未知 token 401',
+    note: 'seq-32：GitHub webhook——只做投递去重，事件不消费；202 一律，未知 token 401',
   },
 ];
 

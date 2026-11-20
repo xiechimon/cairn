@@ -57,7 +57,7 @@ Existing rows migrate to `retryAttempt = 0` — one full budget each.
 | Retry launches | A system row `Automatic retry k/3` lands in the build thread so the transcript shows the gap |
 | Build reused for the retry | `retryAttempt` increments on that row; a new build carries `parent.retryAttempt + 1` |
 
-Out of scope, already bounded elsewhere: in-step retries (daemon `step-pass-retry.ts` network delays, `planModelFallback`'s tried-list, the single zero-usage requeue, `CI_FIX_ROUNDS_MAX`), quota/capacity `waiting_quota` holds (step 4), `schedule.retryNotBefore` (schedule firing), and issue-intake's in-memory orchestrate retries.
+Out of scope, already bounded elsewhere: in-step retries (daemon `step-pass-retry.ts` network delays, `planModelFallback`'s tried-list, the single zero-usage requeue, `CI_FIX_ROUNDS_MAX`), quota/capacity `waiting_quota` holds (step 4), `schedule.retryNotBefore` (schedule firing).
 
 ## Tests — one per path
 

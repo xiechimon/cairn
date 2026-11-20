@@ -28,7 +28,7 @@ import {
   SEND_CHOICE,
   settlePendingProposal,
 } from './action-proposals.js';
-import { actionTierOf } from './autonomy-gates.js';
+import { actionTierOf } from './autonomy.js';
 import { isOwner } from './instance-owner.js';
 import { isPersonalSpace } from './personal-space.js';
 import { deleteProject } from './projects.js';

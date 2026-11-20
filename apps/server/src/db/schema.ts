@@ -2,8 +2,6 @@ import type {
   ActionTier,
   ActiveRun,
   AntigravitySubscriptionModel,
-  AutonomyGateReason,
-  AutonomyKind,
   AutonomyPauseMarker,
   AutonomyPauseSource,
   BlockerHandoffRecord,
@@ -58,7 +56,6 @@ import type {
   RouteOverride,
   RouteUse,
   ScheduleKind,
-  ScheduleReport,
   ScheduleTriggerSpec,
   SecretDelivery,
   SkillInjectionRecord,
@@ -1466,26 +1463,6 @@ export const gateState = sqliteTable('gate_state', {
   evaluatedAt: epochMs('evaluatedAt').notNull(),
 });
 
-export const autonomyState = sqliteTable(
-  'autonomy_state',
-  {
-    projectId: text('projectId')
-      .notNull()
-      .references(() => project.id, { onDelete: 'cascade' }),
-    kind: text('kind').$type<AutonomyKind>().notNull(),
-    lastStartedAt: epochMs('lastStartedAt'),
-    baselineSha: text('baselineSha'),
-    lastBlockedReason: text('lastBlockedReason').$type<AutonomyGateReason | null>(),
-    lastEvaluatedAt: epochMs('lastEvaluatedAt'),
-  },
-  (t) => [primaryKey({ columns: [t.projectId, t.kind] })],
-);
-
-export const memberActivity = sqliteTable('member_activity', {
-  scope: text('scope').primaryKey(),
-  at: epochMs('at').notNull(),
-});
-
 export const buildFeedback = sqliteTable(
   'build_feedback',
   {
@@ -1512,25 +1489,6 @@ export const buildOutcomeBackfill = sqliteTable('build_outcome_backfill', {
   mergeCommit: text('mergeCommit').notNull(),
   checkedAt: epochMs('checkedAt').notNull(),
 });
-
-export const scheduleReport = sqliteTable(
-  'schedule_report',
-  {
-    id: text('id').primaryKey(),
-    projectId: text('projectId')
-      .notNull()
-      .references(() => project.id, { onDelete: 'cascade' }),
-    generatedAt: epochMs('generatedAt').notNull(),
-    mainSha: text('mainSha').notNull(),
-    groups: json<ScheduleReport['groups']>('groups').notNull(),
-    items: json<ScheduleReport['items']>('items').notNull(),
-    unparsedDeps: json<ScheduleReport['unparsedDeps']>('unparsedDeps').notNull(),
-    decidedAt: epochMs('decidedAt'),
-    decidedBy: text('decidedBy'),
-    appliedAt: epochMs('appliedAt'),
-  },
-  (t) => [index('schedule_report_project_idx').on(t.projectId, t.generatedAt)],
-);
 
 export const claudeSubscription = sqliteTable(
   'claude_subscription',

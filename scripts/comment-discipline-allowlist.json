@@ -145,11 +145,6 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/server/src/services/issue-intake.ts",
-    "line": "// #1459：webhook 的 `cairn` 触发按同一 D5 判据核打标人（事件的 sender）、",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/server/src/services/machines.ts",
     "line": "  // env CAIRN_DAEMON_MAX_CONCURRENT 覆盖 DB 的 server 落点；缺省（老",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"

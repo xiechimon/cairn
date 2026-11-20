@@ -1639,6 +1639,13 @@
       "when": 1795194082830,
       "tag": "0238_funny_retro_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 239,
+      "version": "6",
+      "when": 1795195797962,
+      "tag": "0239_glamorous_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }

@@ -57,8 +57,6 @@ import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
 import {
   createScheduler,
-  issueIntakeRunOf,
-  schedulingRunOf,
   trajectoryExportRunOf,
   trajectoryOutcomeRunOf,
   trajectoryReflectCurateRunOf,
@@ -291,7 +289,6 @@ const scheduler = createScheduler(
   },
   { attachmentsDir, logger },
   { githubFetch, logger },
-  issueIntakeRunOf(config, { githubFetch, logger }),
   trajectoryOutcomeRunOf(config, { logger }),
   trajectoryExportRunOf(config, { logger }),
   trajectoryReflectCurateRunOf(config, {
@@ -303,7 +300,6 @@ const scheduler = createScheduler(
       apiKey: process.env.CAIRN_REFLECTOR_API_KEY ?? '',
     },
   }),
-  schedulingRunOf(config, { githubFetch, logger }),
 );
 if (config.coordinatorInServer) {
   warnTeamsWithoutCoordinatorRule(db, logger);

@@ -960,9 +960,7 @@ describe('send and submit action classes', () => {
       actionTier: 'full',
     });
     expect(patched.status).toBe(200);
-    expect(
-      ((await patched.json()) as { settings: { actionTier: string } }).settings.actionTier,
-    ).toBe('full');
+    expect(((await patched.json()) as { actionTier: string }).actionTier).toBe('full');
     expect(call(s, sendMessage, sendInput)).toMatchObject({ status: 'executed' });
     expect(s.db.select().from(actionProposal).all()).toEqual([]);
     s.dispose();

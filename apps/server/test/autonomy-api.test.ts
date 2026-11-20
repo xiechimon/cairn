@@ -1,10 +1,5 @@
-import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
-import {
-  actionTierOf,
-  countsAsMemberWrite,
-  lastMemberWriteAt,
-} from '../src/services/autonomy-gates.js';
+import { actionTierOf } from '../src/services/autonomy.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
@@ -21,41 +16,11 @@ async function boot(): Promise<{ s: TestServer; projectId: string }> {
 }
 
 describe('GET / PATCH /api/projects/{id}/autonomy', () => {
-  test('a new project follows the team tier and reads an empty history', async () => {
+  test('a new project follows the team tier', async () => {
     const { s, projectId } = await boot();
     const res = await req(s.app, 'GET', `/api/projects/${projectId}/autonomy`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      settings: DEFAULT_AUTONOMY_SETTINGS,
-      actionTierOverride: null,
-      spentTodayUsd: 0,
-      kinds: [
-        {
-          kind: 'issue-intake',
-          lastStartedAt: null,
-          lastBlockedReason: null,
-          lastEvaluatedAt: null,
-        },
-        { kind: 'scheduling', lastStartedAt: null, lastBlockedReason: null, lastEvaluatedAt: null },
-      ],
-    });
-  });
-
-  test('PATCH merges the given keys; missing keys stay', async () => {
-    const { s, projectId } = await boot();
-    const res = await req(s.app, 'PATCH', `/api/projects/${projectId}/autonomy`, {
-      enabled: false,
-      dailyBudgetUsd: 2.5,
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { settings: unknown };
-    expect(body.settings).toEqual({
-      ...DEFAULT_AUTONOMY_SETTINGS,
-      enabled: false,
-      dailyBudgetUsd: 2.5,
-    });
-    const again = await req(s.app, 'GET', `/api/projects/${projectId}/autonomy`);
-    expect(((await again.json()) as { settings: unknown }).settings).toEqual(body.settings);
+    expect(await res.json()).toEqual({ actionTier: 'full', actionTierOverride: null });
   });
 
   test('PATCH actionTier pins an explicit tier over the team default', async () => {
@@ -65,27 +30,21 @@ describe('GET / PATCH /api/projects/{id}/autonomy', () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      settings: { actionTier: string };
+      actionTier: string;
       actionTierOverride: string | null;
     };
-    expect(body.settings.actionTier).toBe('guarded');
+    expect(body.actionTier).toBe('guarded');
     expect(body.actionTierOverride).toBe('guarded');
     const again = await req(s.app, 'GET', `/api/projects/${projectId}/autonomy`);
-    const persisted = (await again.json()) as {
-      settings: { actionTier: string };
-      actionTierOverride: string | null;
-    };
-    expect(persisted.settings.actionTier).toBe('guarded');
-    expect(persisted.actionTierOverride).toBe('guarded');
+    expect(await again.json()).toEqual({ actionTier: 'guarded', actionTierOverride: 'guarded' });
   });
 
   test.each([
     ['unknown key', { surprise: 1 }],
-    ['negative minutes', { quietMinutes: -1 }],
-    ['fractional minutes', { cooldownMinutes: 1.5 }],
-    ['negative budget', { dailyBudgetUsd: -0.01 }],
-    ['wrong type', { enabled: 'yes' }],
+    ['retired gate key', { quietMinutes: 30 }],
+    ['retired gate flag', { enabled: false }],
     ['unknown tier', { actionTier: 'bold' }],
+    ['wrong type', { actionTier: 1 }],
   ])('PATCH rejects %s with 400', async (_name, body) => {
     const { s, projectId } = await boot();
     const res = await req(s.app, 'PATCH', `/api/projects/${projectId}/autonomy`, body);
@@ -144,10 +103,10 @@ describe('action-tier resolution: project explicit → team → full', () => {
     expect(actionTierOf(s.db, s.team.id, projectId)).toBe('guarded');
     const res = await req(s.app, 'GET', `/api/projects/${projectId}/autonomy`);
     const body = (await res.json()) as {
-      settings: { actionTier: string };
+      actionTier: string;
       actionTierOverride: string | null;
     };
-    expect(body.settings.actionTier).toBe('guarded');
+    expect(body.actionTier).toBe('guarded');
     expect(body.actionTierOverride).toBeNull();
   });
 
@@ -192,58 +151,13 @@ describe('action-tier resolution: project explicit → team → full', () => {
     });
     expect(unpinned.status).toBe(200);
     const body = (await unpinned.json()) as {
-      settings: { actionTier: string };
+      actionTier: string;
       actionTierOverride: string | null;
     };
     expect(body.actionTierOverride).toBeNull();
-    expect(body.settings.actionTier).toBe('full');
+    expect(body.actionTier).toBe('full');
     expect(actionTierOf(s.db, s.team.id, projectId)).toBe('full');
     await patchTeam(s, 'guarded');
     expect(actionTierOf(s.db, s.team.id, projectId)).toBe('guarded');
-  });
-
-  test('patching other autonomy keys keeps the follow-global state', async () => {
-    const { s, projectId } = await boot();
-    const res = await req(s.app, 'PATCH', `/api/projects/${projectId}/autonomy`, {
-      quietMinutes: 30,
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { actionTierOverride: string | null };
-    expect(body.actionTierOverride).toBeNull();
-    await patchTeam(s, 'guarded');
-    expect(actionTierOf(s.db, s.team.id, projectId)).toBe('guarded');
-  });
-});
-
-describe('member_activity: only a member’s successful writes count', () => {
-  test('a successful POST is recorded; a GET and a failed write are not', async () => {
-    const s = bootServer();
-    servers.push(s);
-    expect(lastMemberWriteAt(s.db)).toBeNull();
-    await req(s.app, 'GET', '/api/projects');
-    expect(lastMemberWriteAt(s.db)).toBeNull();
-    expect((await req(s.app, 'POST', '/api/projects', {})).status).toBe(400);
-    expect(lastMemberWriteAt(s.db)).toBeNull();
-    const before = Date.now();
-    expect((await req(s.app, 'POST', '/api/projects', { name: 'x' })).status).toBe(201);
-    expect(lastMemberWriteAt(s.db)).toBeGreaterThanOrEqual(before);
-  });
-
-  test.each([
-    ['POST', '/api/projects', 201, true],
-    ['PATCH', '/api/todos/t1', 200, true],
-    ['DELETE', '/api/projects/p1', 204, true],
-    ['GET', '/api/projects', 200, false],
-    ['HEAD', '/api/projects', 200, false],
-    ['POST', '/api/projects', 409, false],
-    ['POST', '/api/mcp', 200, false],
-    ['POST', '/api/machine/claim', 200, false],
-    ['POST', '/api/webhook/github/tok', 202, false],
-    ['POST', '/api/webhook/schedule/tok', 202, false],
-    ['GET', '/api/oauth/callback', 302, false],
-    ['POST', '/api/machinefoo', 200, true],
-    ['POST', '/git/team/repo', 200, false],
-  ] as const)('%s %s (%i) → %s', (method, path, status, counts) => {
-    expect(countsAsMemberWrite(method, path, status)).toBe(counts);
   });
 });

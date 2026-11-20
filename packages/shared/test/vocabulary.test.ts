@@ -456,8 +456,6 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       customModelReasoning,
       piCacheRetention,
       hookTimeoutMs,
-      issueIntake,
-      scheduling,
       coordinatorInServer,
       confinementPlatform,
       confineDeniedRoots,
@@ -492,8 +490,6 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(customModelReasoning).toBe('CAIRN_CUSTOM_MODEL_REASONING');
     expect(piCacheRetention).toBe('CAIRN_PI_CACHE_RETENTION');
     expect(hookTimeoutMs).toBe('CAIRN_HOOK_TIMEOUT_MS');
-    expect(issueIntake).toBe('CAIRN_ISSUE_INTAKE');
-    expect(scheduling).toBe('CAIRN_SCHEDULING');
     expect(coordinatorInServer).toBe('CAIRN_COORDINATOR_IN_SERVER');
     expect(confinementPlatform).toBe('CAIRN_CONFINEMENT_PLATFORM');
     expect(confineDeniedRoots).toBe('CAIRN_CONFINE_DENIED_ROOTS');
@@ -525,10 +521,10 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
   });
 });
 
-describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; +devin_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message; 5346 −chief_report −retro_proposal; seq-13 +computer_browser_lease; 5349 −chief_summary; 5348 −harness_* −thread_*; seq-11 +external_effect +im_seen_inbound +im_turn_origin; +phone)', () => {
+describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; +devin_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message; 5346 −chief_report −retro_proposal; seq-13 +computer_browser_lease; 5349 −chief_summary; 5348 −harness_* −thread_*; seq-11 +external_effect +im_seen_inbound +im_turn_origin; +phone; −autonomy_state −member_activity −schedule_report)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
     expect(INTERNAL_ONLY_TABLES).toContain('autonomy_pause');
-    expect(DB_TABLES).toHaveLength(93);
+    expect(DB_TABLES).toHaveLength(90);
     for (const table of [
       'action_journal',
       'action_proposal',
@@ -567,8 +563,6 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(INTERNAL_ONLY_TABLES).toContain('claude_subscription');
     expect(DB_TABLES).toContain('autonomous_merge_admission');
     expect(INTERNAL_ONLY_TABLES).toContain('autonomous_merge_admission');
-    expect(DB_TABLES).toContain('autonomy_state');
-    expect(DB_TABLES).toContain('member_activity');
     expect(DB_TABLES).toContain('build_feedback');
     expect(DB_TABLES).toContain('build_outcome_backfill');
     expect(DB_TABLES).toContain('github_label');
@@ -579,8 +573,9 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(DB_TABLES).toContain('stop_pending');
     expect(DB_TABLES).toContain('github_connection');
     expect(DB_TABLES).toContain('schedule');
-    expect(DB_TABLES).toContain('schedule_report');
-    expect(INTERNAL_ONLY_TABLES).toContain('schedule_report');
+    expect(DB_TABLES).not.toContain('schedule_report');
+    expect(DB_TABLES).not.toContain('autonomy_state');
+    expect(DB_TABLES).not.toContain('member_activity');
     expect(DB_TABLES).not.toContain('feishu_binding');
     expect(DB_TABLES).not.toContain('harness_eval_attempts');
     expect(DB_TABLES).not.toContain('harness_profile');

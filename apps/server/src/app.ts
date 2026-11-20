@@ -6,12 +6,10 @@ import { compress } from 'hono/compress';
 import type { Logger } from 'pino';
 import type { AppContext } from './context.js';
 import { HttpError } from './lib/errors.js';
-import { nowMs } from './lib/ids.js';
 import { registerTokenAuth } from './lib/token-auth.js';
 import { registerRoutes } from './routes.js';
 import { registerMachineRoutes } from './routes-machine.js';
 import { registerRemoteRoutes } from './routes-remote.js';
-import { countsAsMemberWrite, recordMemberWrite } from './services/autonomy-gates.js';
 import { redeemStreamTicket, resolveBrowserSession } from './services/browser-session.js';
 import { NotFoundError } from './services/builds.js';
 import {
@@ -89,16 +87,6 @@ function registerStaticSpa(app: Hono, webDir: string): void {
   });
 }
 
-function registerMemberActivity(app: Hono, ctx: AppContext): void {
-  app.use('/api/*', async (c, next) => {
-    await next();
-    if (!countsAsMemberWrite(c.req.method, c.req.path, c.res.status)) return;
-    try {
-      recordMemberWrite(ctx.db, nowMs());
-    } catch {}
-  });
-}
-
 export function createApp(ctx: AppContext, logger?: Logger): Hono {
   const app = new Hono();
   registerTokenAuth(app, ctx.authToken, {
@@ -117,7 +105,6 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
       return session;
     },
   });
-  registerMemberActivity(app, ctx);
   app.use('/api/*', compress());
   registerRoutes(app, ctx);
   registerMachineRoutes(app, ctx);

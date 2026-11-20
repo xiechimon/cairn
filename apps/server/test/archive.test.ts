@@ -31,10 +31,8 @@ import {
   sweepZombieQueuedTodos,
 } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
-import { projectAtInFlightCap } from '../src/services/issue-intake.js';
 import { claimStep, fetchStop, finishStep } from '../src/services/machines.js';
 import { deleteProject } from '../src/services/projects.js';
-import { inFlightIssues } from '../src/services/scheduling/sweep.js';
 import { deleteTodo, getTodo } from '../src/services/todos.js';
 import { bootServer, insertMachine, req, seedSessionRoute } from './helpers.js';
 
@@ -487,35 +485,6 @@ test('archive removes running tasks from phase-filtered lists', async () => {
   expect(await (await req(s.app, 'GET', '/api/todos')).json()).toHaveLength(1);
   await action(s, 'archive');
   expect(await (await req(s.app, 'GET', '/api/todos')).json()).toEqual([]);
-});
-
-test('archived issue tasks release intake capacity but remain in scheduling in-flight issues', async () => {
-  const { s, now } = world('building', 'done');
-  s.db
-    .update(todo)
-    .set({ sourceKind: 'github-issue', sourceRef: 'github:owner/repo#1' })
-    .where(eq(todo.id, 'todo-archive'))
-    .run();
-  for (const number of [2, 3]) {
-    s.db
-      .insert(todo)
-      .values({
-        id: `archived-${number}`,
-        teamId: s.team.id,
-        projectId: 'project-archive',
-        title: 'Archived issue',
-        phase: 'building',
-        phaseAt: now,
-        archivedAt: now,
-        seqNum: number,
-        sourceKind: 'github-issue',
-        sourceRef: `github:owner/repo#${number}`,
-      })
-      .run();
-  }
-  await action(s, 'archive');
-  expect(projectAtInFlightCap(s.db, 'project-archive')).toBe(false);
-  expect(inFlightIssues(s.db, 'project-archive')).toEqual(new Map([[1, 'github:owner/repo#1']]));
 });
 
 test.each(['building', 'review'] as const)(

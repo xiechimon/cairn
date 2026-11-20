@@ -70,19 +70,12 @@ function claimedSourceRefs(db: Db, teamId: string, refs: string[]): Set<string> 
 
 export type ImportGithubIssueDeps = GithubIssueFaceDeps & Omit<TodoDeps, 'box'>;
 
-const importsInFlight = new Map<string, string>();
-
-export function importsInFlightFor(projectId: string): number {
-  let n = 0;
-  for (const p of importsInFlight.values()) if (p === projectId) n += 1;
-  return n;
-}
+const importsInFlight = new Set<string>();
 
 export async function importGithubIssue(
   deps: ImportGithubIssueDeps,
   row: ProjectRow,
   issueNumber: number,
-  opts: { createdBy?: string; requiredLabel?: string } = {},
 ): Promise<TodoRecord> {
   const { owner, repo } = requireGithubRepo(row);
   const fetchImpl = deps.githubFetch ?? fetch;
@@ -94,16 +87,10 @@ export async function importGithubIssue(
   if (importsInFlight.has(claim)) {
     throw new HttpError(409, `issue ${ref} is being imported`);
   }
-  importsInFlight.set(claim, row.id);
+  importsInFlight.add(claim);
   try {
     const token = await requireToken(deps, row.teamId, { owner, repo });
     const detail = await githubRepoIssue(fetchImpl, token, owner, repo, issueNumber);
-    if (
-      opts.requiredLabel !== undefined &&
-      !detail.labels.some((label) => label.name === opts.requiredLabel)
-    ) {
-      throw new HttpError(422, `issue ${ref} does not carry ${opts.requiredLabel}`);
-    }
     const repoLabels = await githubRepoLabels(fetchImpl, token, owner, repo);
     syncGithubLabels(deps.db, row.id, [...repoLabels, ...detail.labels]);
     const names = [...new Set(detail.labels.map((l) => l.name))];
@@ -118,7 +105,7 @@ export async function importGithubIssue(
       spec: `${names.some((name) => name.toLowerCase() === 'correction') ? `${CORRECTION_PROMPT}\n\n` : ''}${neutralizeIssueAttachmentTokens(detail.body ?? '')}`,
       githubLabelIds,
       correctionRequired: names.some((name) => name.toLowerCase() === 'correction'),
-      createdBy: opts.createdBy ?? deps.user.id,
+      createdBy: deps.user.id,
       ownerId: deps.user.id,
       sourceKind: 'github-issue',
       sourceRef: ref,

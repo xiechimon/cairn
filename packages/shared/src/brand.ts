@@ -67,8 +67,6 @@ export const ENV_VARS = {
   customModelReasoning: 'CAIRN_CUSTOM_MODEL_REASONING',
   piCacheRetention: 'CAIRN_PI_CACHE_RETENTION',
   hookTimeoutMs: 'CAIRN_HOOK_TIMEOUT_MS',
-  issueIntake: 'CAIRN_ISSUE_INTAKE',
-  scheduling: 'CAIRN_SCHEDULING',
   coordinatorInServer: 'CAIRN_COORDINATOR_IN_SERVER',
   confinementPlatform: 'CAIRN_CONFINEMENT_PLATFORM',
   confineDeniedRoots: 'CAIRN_CONFINE_DENIED_ROOTS',

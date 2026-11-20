@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { githubOpenIssuesDetail, githubPullPanel, githubUserLogin } from '../src/lib/github.js';
+import { githubPullPanel, githubUserLogin } from '../src/lib/github.js';
 import { githubApiBaseUrl, isGithubApiUrl } from '../src/lib/github-api-base.js';
 
 afterEach(() => vi.unstubAllEnvs());
@@ -44,15 +44,5 @@ test('pagination allows only URLs under the configured API base', () => {
     'http://evil.test/api/v3/',
   ]) {
     expect(isGithubApiUrl(url)).toBe(false);
-  }
-});
-
-test('issue pagination returns emulator next links and rejects foreign links', async () => {
-  vi.stubEnv('CAIRN_GITHUB_API_BASE_URL', 'http://127.0.0.1:4001');
-  for (const origin of ['http://127.0.0.1:4001', 'https://api.github.com']) {
-    const next = `${origin}/repos/octo/demo/issues?page=2`;
-    const fetcher = async () => new Response('[]', { headers: { link: `<${next}>; rel="next"` } });
-    const page = await githubOpenIssuesDetail(fetcher, 'local-token', 'octo', 'demo');
-    expect(page).toMatchObject({ data: { next: origin.startsWith('http:') ? next : null } });
   }
 });

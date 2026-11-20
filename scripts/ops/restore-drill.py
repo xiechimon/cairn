@@ -24,9 +24,6 @@ HEARTBEAT_ALLOWLIST = {
         'lastSeenAt': 'Daemon heartbeat refreshes the last-seen timestamp.',
         'capabilities': 'Daemon heartbeat refreshes the reported capabilities snapshot.',
     }},
-    'autonomy_state': {'columns': {
-        'lastEvaluatedAt': 'Scheduler evaluation heartbeat refreshes this timestamp even when the verdict is unchanged.',
-    }},
 }
 
 

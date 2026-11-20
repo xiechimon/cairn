@@ -44,7 +44,6 @@ describe('pick 2: RingSpinner is the loading.dev Ring', () => {
       'chief/package-install-card.tsx',
       'components/ui/toaster.tsx',
       'overlay/token-gate.tsx',
-      'pages/project-autonomy-card.tsx',
       'pages/project-settings-page.tsx',
       'resources/antigravity-subscriptions.tsx',
       'resources/devin-subscriptions.tsx',

@@ -403,29 +403,8 @@ export const TEAM_AUTONOMY: TeamAutonomy = {
 };
 
 export const AUTONOMY: AutonomyRecord = {
-  settings: {
-    enabled: true,
-    quietMinutes: 10,
-    cooldownMinutes: 15,
-    dailyBudgetUsd: 10,
-    actionTier: 'guarded',
-  },
+  actionTier: 'guarded',
   actionTierOverride: null,
-  spentTodayUsd: 3.42,
-  kinds: [
-    {
-      kind: 'issue-intake',
-      lastStartedAt: NOW - HOUR,
-      lastBlockedReason: null,
-      lastEvaluatedAt: NOW - 5 * MIN,
-    },
-    {
-      kind: 'scheduling',
-      lastStartedAt: null,
-      lastBlockedReason: 'member-active',
-      lastEvaluatedAt: NOW - 9 * MIN,
-    },
-  ],
 };
 
 export const ISSUE_ECHO: GithubIssueEcho = {

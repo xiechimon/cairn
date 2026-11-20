@@ -27,7 +27,7 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
     expect(names).not.toContain('harness_profile');
     expect(names).toContain('github_connection');
     expect(names).toContain('schedule');
-    expect(names).toContain('schedule_report');
+    expect(names).not.toContain('schedule_report');
     expect(names).not.toContain('shell_command');
     expect(names).toContain('gate_verdict');
   });

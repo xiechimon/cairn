@@ -51,11 +51,6 @@ import { drainEffects, effectRegistry, reconcileEffects } from './external-effec
 import { projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
-import {
-  createIssueIntake,
-  ISSUE_INTAKE_INTERVAL_MS,
-  type IssueIntakeLogger,
-} from './issue-intake.js';
 import { sweepStaleMachines } from './machines.js';
 import { purgeExpiredMemoryVersions } from './memory.js';
 import { sweepAbandonedMemoryEditSteps } from './memory-edit-turns.js';
@@ -87,7 +82,6 @@ import {
   WORKER_SCHEDULE_RUN_LIMIT,
   workerScheduleRunHistory,
 } from './schedules.js';
-import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
 import { createTaskIssueSync } from './task-issue-sync.js';
 import { insertMessageRow } from './transcript.js';
 import { sweepUnplaceableSteps } from './unplaceable-steps.js';
@@ -101,37 +95,6 @@ export interface SchedulerOptions {
 export interface CiPollRun {
   githubFetch: FetchLike;
   logger: CiPollLogger;
-}
-
-export interface IssueIntakeRun {
-  githubFetch: FetchLike;
-  logger: IssueIntakeLogger;
-}
-
-export function issueIntakeRunOf(
-  config: { issueIntake: boolean },
-  run: IssueIntakeRun,
-): IssueIntakeRun | null {
-  run.logger.info(
-    { issueIntake: config.issueIntake },
-    config.issueIntake
-      ? `github issue intake on (${ENV_VARS.issueIntake})`
-      : `github issue intake off (set ${ENV_VARS.issueIntake}=1 to enable)`,
-  );
-  return config.issueIntake ? run : null;
-}
-
-export function schedulingRunOf(
-  config: { scheduling: boolean },
-  run: SchedulingRun,
-): SchedulingRun | null {
-  run.logger?.info(
-    { scheduling: config.scheduling },
-    config.scheduling
-      ? `weekly schedule report on (${ENV_VARS.scheduling})`
-      : `weekly schedule report off (set ${ENV_VARS.scheduling}=1 to enable)`,
-  );
-  return config.scheduling ? run : null;
 }
 
 export interface AttachmentGcRun {
@@ -225,11 +188,9 @@ export function createScheduler(
   opts: SchedulerOptions,
   gc?: AttachmentGcRun | null,
   ci?: CiPollRun | null,
-  intake?: IssueIntakeRun | null,
   outcome?: TrajectoryOutcomeRun | null,
   exportRun?: TrajectoryExportRun | null,
   reflectCurate?: TrajectoryReflectCurateRun | null,
-  scheduling?: SchedulingRun | null,
 ): Scheduler {
   const lastDigestRun = new Map<string, number>();
   let digestSweeping = false;
@@ -246,18 +207,6 @@ export function createScheduler(
       : null;
   const prWatch = ci ? createPrWatch(deps, ci) : null;
   const taskIssueSync = ci ? createTaskIssueSync(deps, ci) : null;
-  const correctionIntake = intake
-    ? createIssueIntake(deps, { ...intake, label: 'correction' })
-    : null;
-  const issueIntake =
-    intake !== undefined && intake !== null ? createIssueIntake(deps, intake) : null;
-  const schedulingSweep =
-    scheduling !== undefined && scheduling !== null
-      ? createScheduling(deps, {
-          githubFetch: scheduling.githubFetch,
-          logger: scheduling.logger,
-        })
-      : null;
   let prSweep: Promise<void> | null = null;
   let prSweepAt = Number.NEGATIVE_INFINITY;
   function watchPrs() {
@@ -739,11 +688,6 @@ export function createScheduler(
         await watchPrs();
         await taskIssueSync?.sweep();
       },
-      intake: async () => {
-        await issueIntake?.sweep();
-        await correctionIntake?.sweep();
-      },
-      scheduling: () => schedulingSweep?.sweep(),
       outcome: () => {
         if (outcome === undefined || outcome === null || deps.reposDir === undefined) return;
         if (outcomeSweeping) return;
@@ -824,10 +768,6 @@ export function createScheduler(
       );
       if (ciPoller !== null) ensureDue('poll:ci', 'ci', CI_POLL_INTERVAL_MS);
       if (prWatch !== null) ensureDue('poll:pr-watch', 'pr-watch', PR_WATCH_INTERVAL_MS);
-      if (issueIntake !== null) ensureDue('poll:intake', 'intake', ISSUE_INTAKE_INTERVAL_MS);
-      if (schedulingSweep !== null) {
-        ensureDue('poll:scheduling', 'scheduling', SCHEDULE_INTERVAL_MS);
-      }
       if (outcome !== undefined && outcome !== null && deps.reposDir !== undefined) {
         ensureDue('poll:outcome', 'outcome', OUTCOME_BACKFILL_INTERVAL_MS);
       }

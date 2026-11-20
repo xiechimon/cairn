@@ -23,7 +23,7 @@ import { loopbackOwnerOriginOf } from './lib/loopback-owner.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { isOpenRemotePath, pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
-import { patchTeamAutonomy, readTeamAutonomy } from './services/autonomy-gates.js';
+import { patchTeamAutonomy, readTeamAutonomy } from './services/autonomy.js';
 import { readBackupHealth } from './services/backup-status.js';
 import {
   AUTH_COOKIE,

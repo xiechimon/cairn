@@ -116,7 +116,6 @@ export type ChiefDigestContent = z.infer<typeof chiefDigestContentSchema>;
 
 export const CHIEF_REPORT_KIND = 'chief_daily_report';
 export const CHIEF_REPORT_ROW_ID_PREFIX = 'chief-report-';
-export const INTAKE_SOURCE_KIND = 'intake';
 
 const chiefReportTodoRefSchema = z.object({
   id: z.string(),

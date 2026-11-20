@@ -713,7 +713,7 @@ prune_snapshots() {
 }
 
 UNTRACKED_TABLES=" __drizzle_migrations deploy_lease "
-HEARTBEAT_COLUMNS=" machine.lastSeenAt machine.capabilities autonomy_state.lastEvaluatedAt "
+HEARTBEAT_COLUMNS=" machine.lastSeenAt machine.capabilities "
 
 user_tables() {
   local names
