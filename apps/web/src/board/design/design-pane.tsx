@@ -43,6 +43,7 @@ import {
   type MarkInput,
 } from './design-canvas.js';
 import type { CommentActions } from './design-comment-list.js';
+import { ExportMenu } from './design-export.js';
 import { bakeMarkPng, MarkError, markTarget } from './design-markup.js';
 import { type DesignTarget, pickPage } from './design-route.js';
 import { VersionsMenu, versionLabel } from './design-versions.js';
@@ -430,19 +431,6 @@ function DesignPage({
             {t('标注')}
           </Button>
         )}
-        <VersionsMenu
-          fileName={page.fileName}
-          versions={versions}
-          currentId={page.current.id}
-          shownId={shown.id}
-          onPick={(version) =>
-            setPicked(
-              version.id === page.current.id
-                ? null
-                : { id: version.id, currentSeq: page.current.seq },
-            )
-          }
-        />
         {live && (
           <Button
             variant="ghost"
@@ -457,6 +445,26 @@ function DesignPage({
             <span className="tabular-nums">{activeComments}</span>
           </Button>
         )}
+        <VersionsMenu
+          fileName={page.fileName}
+          versions={versions}
+          currentId={page.current.id}
+          shownId={shown.id}
+          onPick={(version) =>
+            setPicked(
+              version.id === page.current.id
+                ? null
+                : { id: version.id, currentSeq: page.current.seq },
+            )
+          }
+        />
+        <ExportMenu
+          fileName={page.fileName}
+          html={htmlQ.data}
+          frameRef={frameRef}
+          previewing={!source && srcdoc !== null}
+          printHref={`${pageHref}?print=1`}
+        />
         <DropdownMenu>
           <IconTooltip
             label={t('更多')}

@@ -395,3 +395,38 @@ test('mark-up: draw a box, a stroke and text, undo and redo, then save a PNG mar
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('design-mark-bar')).toBeHidden();
 });
+
+test('export: the page as HTML without bridges, a ZIP with handoff and manifest, a PNG snapshot and a print link', async ({
+  page,
+}) => {
+  await openDesign(page);
+  await expect(page.frameLocator('[data-testid="design-frame"]').getByRole('heading')).toBeVisible();
+  const download = async (item: string) => {
+    await page.getByTestId('design-export').click();
+    const [file] = await Promise.all([page.waitForEvent('download'), page.getByTestId(item).click()]);
+    const path = await file.path();
+    return { name: file.suggestedFilename(), bytes: (await import('node:fs')).readFileSync(path) };
+  };
+
+  const html = await download('design-export-html');
+  expect(html.name).toBe('pricing.html');
+  expect(html.bytes.toString('utf8')).toBe(HTML['ver-2']);
+
+  const zip = await download('design-export-zip');
+  expect(zip.name).toBe('pricing.zip');
+  expect(zip.bytes.subarray(0, 4).toString('hex')).toBe('504b0304');
+  const listing = zip.bytes.toString('utf8');
+  for (const entry of ['pricing/index.html', 'pricing/DESIGN-HANDOFF.md', 'pricing/DESIGN-MANIFEST.json'])
+    expect(listing).toContain(entry);
+  expect(listing).toContain(HTML['ver-2']);
+  expect(listing).not.toContain('od:comment');
+
+  const png = await download('design-export-png');
+  expect(png.name).toBe('pricing.png');
+  expect(png.bytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+
+  await page.getByTestId('design-export').click();
+  const pdf = page.getByTestId('design-export-pdf');
+  await expect(pdf).toHaveAttribute('href', '/api/design/versions/ver-2/page?print=1');
+  await expect(pdf).toHaveAttribute('target', '_blank');
+});

@@ -2892,4 +2892,10 @@ export const EN: Record<string, string> = {
   '标注图超过 5 MB，没保存': 'The mark-up image is over 5 MB and was not saved',
   标注没保存上: 'Mark-up not saved',
   '标注图 {n}': 'Mark-up image {n}',
+  导出: 'Export',
+  'HTML 文件': 'HTML file',
+  'ZIP（含交接说明）': 'ZIP (with handoff notes)',
+  'PNG 截图': 'PNG screenshot',
+  '打印成 PDF': 'Print to PDF',
+  页面截图没拍下来: 'Could not capture the page',
 };
