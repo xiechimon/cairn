@@ -133,16 +133,14 @@ describe('antigravity managed binary resolution', () => {
 
   test('a cached install is dropped once its binary disappears from disk', async () => {
     const dir = tempDir('ag-stale-');
-    const home = join(dir, 'home');
-    const binDir = join(home, '.local', 'bin');
-    mkdirSync(binDir, { recursive: true });
-    const agy = join(binDir, 'agy');
-    writeFileSync(agy, '#!/bin/sh\nexit 0\n');
-    chmodSync(agy, 0o755);
+    const root = join(dir, 'managed');
+    const src = join(dir, 'antigravity-acp');
+    writeFileSync(src, '#!/bin/sh\nexit 0\n');
+    writeManagedInstall(root, src);
+    const bin = join(root, 'versions', '1.5.10', 'bin', 'antigravity-acp');
 
     const managed = createAntigravityManaged({
-      home,
-      pathEnv: '',
+      root,
       platform: 'darwin',
       arch: 'arm64',
       fetchImpl: async () => new Response('{}', { status: 500 }),
@@ -156,8 +154,8 @@ describe('antigravity managed binary resolution', () => {
       }),
     });
 
-    expect((await managed.probe())?.binPath).toBe(agy);
-    rmSync(agy, { force: true });
+    expect((await managed.probe())?.binPath).toBe(bin);
+    rmSync(bin, { force: true });
     expect(managed.current()).toBeNull();
   });
 
