@@ -140,6 +140,7 @@ interface SettingsRowProps {
   hint?: ReactNode;
   info?: string;
   labelTestId?: string;
+  icon?: ReactNode;
   className?: string;
   labelClassName?: string;
   hintClassName?: string;
@@ -168,6 +169,7 @@ export function SettingsRow({
   hint,
   info,
   labelTestId,
+  icon,
   className,
   labelClassName,
   hintClassName,
@@ -184,6 +186,30 @@ export function SettingsRow({
   useEffect(() => {
     if (matched) rowRef.current?.scrollIntoView({ block: 'nearest' });
   }, [matched]);
+  const labelColumn = (
+    <span
+      className={cn(
+        'flex min-w-0 flex-col',
+        withHint && (icon == null ? 'max-w-3/5 flex-auto' : 'flex-auto'),
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span
+          id={labelId}
+          data-testid={labelTestId}
+          className={cn(
+            'text-ui text-foreground',
+            matched && 'underline decoration-(--card-button) decoration-wavy underline-offset-4',
+            labelClassName,
+          )}
+        >
+          {label}
+        </span>
+        {info !== undefined && <InfoTip info={info} />}
+      </span>
+      {withHint && <span className={cn(SETTINGS_HINT_CLS, hintClassName)}>{hint}</span>}
+    </span>
+  );
   return (
     <div
       ref={rowRef}
@@ -197,23 +223,16 @@ export function SettingsRow({
         className,
       )}
     >
-      <span className={cn('flex min-w-0 flex-col', withHint && 'max-w-3/5 flex-auto')}>
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span
-            id={labelId}
-            data-testid={labelTestId}
-            className={cn(
-              'text-ui text-foreground',
-              matched && 'underline decoration-(--card-button) decoration-wavy underline-offset-4',
-              labelClassName,
-            )}
-          >
-            {label}
-          </span>
-          {info !== undefined && <InfoTip info={info} />}
+      {icon == null ? (
+        labelColumn
+      ) : (
+        <span
+          className={cn('flex min-w-0 items-center gap-2.5', withHint && 'max-w-3/5 flex-auto')}
+        >
+          {icon}
+          {labelColumn}
         </span>
-        {withHint && <span className={cn(SETTINGS_HINT_CLS, hintClassName)}>{hint}</span>}
-      </span>
+      )}
       <SettingsRowLabelContext.Provider value={labelId}>
         <span
           className={cn(

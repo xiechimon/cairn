@@ -47,8 +47,21 @@ export const EN: Record<string, string> = {
     'This device is no longer signed in, so nothing was checked and the subscription status is unchanged. Pair it again, or verify on the computer running Cairn.',
   '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。':
     'Could not reach the server, so nothing was checked and the subscription status is unchanged. The server may be restarting; try again shortly.',
-  '验证太频繁，这次没有运行。请 10 秒后重试。':
-    'Checked too often, so this check did not run. Try again in 10 seconds.',
+  '验证太频繁，这次没有运行。': 'Checked too often, so this check did not run.',
+  结果: 'Result',
+  用时: 'Took',
+  '拖动调整顺序：{name}': 'Drag to reorder {name}',
+  可拖动排序: 'sortable',
+  '已拿起 {name}，在第 {n} 位': 'Picked up {name} at position {n}',
+  '{name} 移到第 {n} 位': '{name} moved to position {n}',
+  '{name} 放在第 {n} 位': '{name} dropped at position {n}',
+  '{name} 放回原位': '{name} returned to where it was',
+  '按空格键拿起，用上下方向键移动，再按空格键放下，按 Esc 取消。':
+    'Press Space to pick up, move with the Up and Down arrow keys, press Space again to drop, or Escape to cancel.',
+  '顺序没能保存，已恢复原来的顺序。': 'The order was not saved; the previous order is back.',
+  '近 24 小时': 'Last 24 hours',
+  '{vendor} 不报告剩余额度': '{vendor} does not report remaining quota',
+  验证命令: 'Command',
   '服务器没能运行这次验证，订阅状态没有改变。请重试。':
     'The server could not run this check. The subscription status is unchanged. Try again.',
   验证失败: 'Verification failed',

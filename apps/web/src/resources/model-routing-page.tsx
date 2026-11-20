@@ -1,5 +1,6 @@
-import type { TeamRoutingSettings } from '@cairn/shared';
+import type { RouteUse, TeamRoutingSettings } from '@cairn/shared';
 import { Plus } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
 import {
   toAntigravityAccount,
@@ -21,7 +22,9 @@ import { useRoutingSettings } from '../api/routing-settings.js';
 import { PROVIDERS } from '../components/accounts/account-parts.js';
 import { AntigravityMark, ClaudeMark, DevinMark } from '../components/brand-marks.js';
 import { QueryBoundary } from '../components/query-state.js';
+import { RouteUseGlyph } from '../components/route-use-glyph.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
+import { ProjectGlyph } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -34,6 +37,8 @@ import { ProvidersSection } from './providers-page.js';
 import { ModelRulesSection } from './routing-settings-page.js';
 
 const EMPTY_SETTINGS: TeamRoutingSettings = { rules: [], policies: [] };
+
+const GRAPH_LEAD_USES: readonly RouteUse[] = ['coordinator', 'session', 'review', 'compaction'];
 
 const SUBSCRIPTION_MARKS = {
   'claude-code': ClaudeMark,
@@ -84,13 +89,32 @@ function RoutingContent() {
   const options = toModelOptions(
     live ? (sourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
-  const projectChoices = (projectsQ.data ?? []).flatMap((project) => {
+  const projects = projectsQ.data ?? [];
+  const projectChoices = projects.flatMap((project) => {
     const choice = project.modelOverrides?.coordinator;
     return choice == null
       ? []
       : [{ id: `${project.id}:coordinator`, name: `${project.name} · Coordinator`, choice }];
   });
-  const groups = ruleGraphGroups(settings, targets, options, t, projectChoices);
+  const leads = new Map<string, ReactNode>([
+    ...GRAPH_LEAD_USES.map((use) => [use, <RouteUseGlyph key={use} use={use} />] as const),
+    ...projects.map(
+      (project) =>
+        [
+          `project:${project.id}:coordinator`,
+          <ProjectGlyph
+            key={project.id}
+            icon={project.icon}
+            name={project.name}
+            className="size-4"
+          />,
+        ] as const,
+    ),
+  ]);
+  const groups = ruleGraphGroups(settings, targets, options, t, projectChoices).map((group) => ({
+    ...group,
+    nodes: group.nodes.map((node) => ({ ...node, lead: leads.get(node.id) })),
+  }));
 
   return (
     <PageShell

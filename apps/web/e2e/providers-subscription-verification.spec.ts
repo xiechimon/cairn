@@ -225,7 +225,7 @@ const HEALTHY: ClaudeSubscriptionListEntry = {
 };
 
 const NOT_RUN: { mode: Verify; reason: string; shot: string }[] = [
-  { mode: 'rate-limited', reason: '验证太频繁，这次没有运行。请 10 秒后重试。', shot: 'not-run-rate-limited' },
+  { mode: 'rate-limited', reason: '验证太频繁，这次没有运行。', shot: 'not-run-rate-limited' },
   {
     mode: 'reset',
     reason: '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。',

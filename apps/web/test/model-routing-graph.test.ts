@@ -87,15 +87,38 @@ describe('routing targets and the rule graph', () => {
       ],
       policies: [],
     };
-    const [agents, claude] = ruleGraphGroups(settings, targets, options, t);
+    const groups = ruleGraphGroups(settings, targets, options, t);
     expect(
-      agents?.nodes.map((node) => [node.id, node.target ?? null, node.broken, node.tag]),
+      groups[0]?.nodes.map((node) => [node.id, node.target ?? null, node.broken, node.tag]),
     ).toEqual([
       ['coordinator', 'subscription:main', false, 'claude-opus-5-5'],
       ['review', 'provider:rec-codex', false, 'GPT-6.1 Sol'],
       ['compaction', null, true, 'glm-5.3'],
     ]);
-    expect(claude?.nodes).toEqual([
+    expect(groups.map((group) => group.label)).toEqual(['Coordinator 和其他 Agent']);
+  });
+
+  test('the all-Claude-models node is drawn only while a project runs on Claude Code', () => {
+    const settings: TeamRoutingSettings = {
+      rules: [rule('coordinator', 'claude-code', 'claude-opus-5-5')],
+      policies: [],
+    };
+    const elsewhere = ruleGraphGroups(settings, targets, options, t, [
+      {
+        id: 'p1:coordinator',
+        name: 'web · Coordinator',
+        choice: { provider: 'openai-codex', modelId: 'gpt-6.1-sol', thinkingLevel: null },
+      },
+    ]);
+    expect(elsewhere.some((group) => group.label === 'Claude Code')).toBe(false);
+    const onClaude = ruleGraphGroups(settings, targets, options, t, [
+      {
+        id: 'p1:coordinator',
+        name: 'web · Coordinator',
+        choice: { provider: 'claude-code', modelId: 'claude-opus-5-5', thinkingLevel: null },
+      },
+    ]);
+    expect(onClaude.find((group) => group.label === 'Claude Code')?.nodes).toEqual([
       { id: 'claude-models', name: '所有 Claude 模型', target: 'subscription:main' },
     ]);
   });
@@ -166,21 +189,28 @@ describe('devin subscription targets', () => {
     ]);
   });
 
-  test('a devin rule wires to the live devin subscription and the devin group is drawn', () => {
+  test('a devin rule wires to the live devin subscription; the devin group waits for a project on Devin', () => {
     const settings: TeamRoutingSettings = {
       rules: [rule('session', 'devin', 'devin-swe-2')],
       policies: [],
     };
     const groups = ruleGraphGroups(settings, targets, [], t);
     const agents = groups.find((group) => group.label === 'Coordinator 和其他 Agent');
-    const devin = groups.find((group) => group.label === 'Devin');
     expect(
       agents?.nodes.map((node) => [node.id, node.target ?? null, node.broken, node.tag]),
     ).toEqual([['session', 'subscription:d-main', false, 'devin-swe-2']]);
-    expect(devin?.nodes).toEqual([
+    expect(groups.some((group) => group.label === 'Devin')).toBe(false);
+    const withProject = ruleGraphGroups(settings, targets, [], t, [
+      {
+        id: 'p1:coordinator',
+        name: 'web · Coordinator',
+        choice: { provider: 'devin', modelId: 'devin-swe-2', thinkingLevel: null },
+      },
+    ]);
+    expect(withProject.find((group) => group.label === 'Devin')?.nodes).toEqual([
       { id: 'devin-models', name: '所有 Devin 模型', target: 'subscription:d-main' },
     ]);
-    expect(groups.some((group) => group.label === 'Claude Code')).toBe(false);
+    expect(withProject.some((group) => group.label === 'Claude Code')).toBe(false);
   });
 });
 
@@ -226,7 +256,13 @@ describe('antigravity subscription targets', () => {
       rules: [rule('coordinator', 'antigravity', 'gemini-4-carbon')],
       policies: [],
     };
-    const groups = ruleGraphGroups(settings, targets, [], t);
+    const groups = ruleGraphGroups(settings, targets, [], t, [
+      {
+        id: 'p1:coordinator',
+        name: 'web · Coordinator',
+        choice: { provider: 'antigravity', modelId: 'gemini-4-carbon', thinkingLevel: null },
+      },
+    ]);
     const agents = groups.find((group) => group.label === 'Coordinator 和其他 Agent');
     const antigravity = groups.find((group) => group.label === 'Antigravity');
     expect(

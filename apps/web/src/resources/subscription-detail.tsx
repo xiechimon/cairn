@@ -31,6 +31,7 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { ACCENT_INK } from '../phase.js';
 import {
+  type CheckFact,
   CheckResultPopover,
   CommitInput,
   FAILURE_SENTENCE,
@@ -126,7 +127,7 @@ const NOT_RUN_COPY: Record<VerifyNotRun, string> = {
   'signed-out':
     '这台设备的登录已失效，这次没有验证，订阅状态没有改变。请重新配对或在运行 Cairn 的电脑上验证。',
   network: '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。',
-  'rate-limited': '验证太频繁，这次没有运行。请 10 秒后重试。',
+  'rate-limited': '验证太频繁，这次没有运行。',
   error: '服务器没能运行这次验证，订阅状态没有改变。请重试。',
 };
 
@@ -289,7 +290,29 @@ function QuotaHead({ account, now }: { account: SubscriptionAccount; now: number
   const { t } = useI18n();
   const clock = useClock();
   const ordered = quotaWindows(account.windows);
-  if (ordered.length === 0) return null;
+  if (ordered.length === 0) {
+    return (
+      <span
+        data-testid="subscription-usage"
+        className="ml-auto flex w-60 flex-col gap-1 max-sm:ml-0 max-sm:w-full"
+      >
+        <span className="flex justify-between text-meta text-content-tertiary">
+          {t('近 24 小时')}
+          <span className="font-medium text-foreground tabular-nums">
+            {t('{n} 次运行', { n: account.stepsLast24h ?? 0 })}
+          </span>
+        </span>
+        {account.vendor !== 'claude' && (
+          <span
+            data-testid="subscription-usage-note"
+            className="text-caption text-content-tertiary"
+          >
+            {t('{vendor} 不报告剩余额度', { vendor: VENDORS[account.vendor].short })}
+          </span>
+        )}
+      </span>
+    );
+  }
   return (
     <span data-testid="subscription-quota" className="ml-auto flex gap-4 max-sm:ml-0 max-sm:w-full">
       {ordered.map((window) => {
@@ -341,7 +364,7 @@ function verifyDetail(
   at: number,
   now: number,
   t: TFunc,
-): string {
+): CheckFact[] {
   const check = verification.phase === 'not-run' ? undefined : verification.check;
   const outcome =
     verification.phase === 'passed'
@@ -349,12 +372,14 @@ function verifyDetail(
       : verification.phase === 'not-run'
         ? t('没有运行')
         : t('没通过 · {reason}', { reason: t(FAILED_LABEL[verification.reason]) });
-  const timing = [
-    outcome,
-    ...(check === undefined ? [] : [t('{s} 秒', { s: (check.durationMs / 1000).toFixed(1) })]),
-    relativeTime(check?.at ?? at, now, t),
-  ].join(' · ');
-  return check === undefined ? timing : `${check.command}\n${timing}`;
+  return [
+    { label: t('结果'), value: outcome },
+    ...(check === undefined
+      ? []
+      : [{ label: t('用时'), value: t('{s} 秒', { s: (check.durationMs / 1000).toFixed(1) }) }]),
+    { label: t('时间'), value: relativeTime(check?.at ?? at, now, t) },
+    ...(check === undefined ? [] : [{ label: t('验证命令'), value: check.command, code: true }]),
+  ];
 }
 
 function VerifyResultPopover({

@@ -132,6 +132,11 @@ export function FrequentModelsCard({
     <SettingsSection
       testId="frequent-models"
       title={t('常用模型')}
+      {...(models.length > 0
+        ? {
+            info: t('Coordinator 派活时按任务难度从这里挑一个。'),
+          }
+        : {})}
       action={
         <FilterPicker
           options={addable.map((o) => ({
@@ -193,14 +198,6 @@ export function FrequentModelsCard({
           ))
         )}
       </SettingsCard>
-      {models.length > 0 && (
-        <p
-          data-testid="frequent-models-footer"
-          className="m-0 px-1 text-meta text-pretty text-content-tertiary"
-        >
-          {t('Coordinator 派活时按任务难度从这里挑一个。')}
-        </p>
-      )}
     </SettingsSection>
   );
 }

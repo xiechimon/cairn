@@ -32,6 +32,7 @@ export * from './model-routing.js';
 export * from './orb-services.js';
 export * from './phase.js';
 export * from './protocol/index.js';
+export * from './provider-order.js';
 export * from './records/index.js';
 export * from './remote-access.js';
 export * from './reply-quote.js';

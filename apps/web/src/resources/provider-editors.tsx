@@ -195,6 +195,12 @@ export function failureOf(check: ModelCheck | undefined): ProviderFailure | 'una
   return null;
 }
 
+export interface CheckFact {
+  label: string;
+  value: string;
+  code?: boolean;
+}
+
 export function CheckResultPopover({
   anchor,
   open,
@@ -211,7 +217,7 @@ export function CheckResultPopover({
   onClose: () => void;
   tone: Extract<ProviderTone, 'ok' | 'fail' | 'off'> | 'checking';
   sentence: ReactNode;
-  detail: string | null;
+  detail: readonly CheckFact[] | null;
   testId: string;
   detailTestId?: string;
   phase?: string;
@@ -254,13 +260,32 @@ export function CheckResultPopover({
             )}
             <span>{sentence}</span>
           </span>
-          {detail !== null && (
-            <pre
+          {detail !== null && detail.length > 0 && (
+            <dl
               data-testid={detailTestId}
-              className="m-0 rounded-md bg-secondary px-2.5 py-2 font-mono text-caption whitespace-pre-wrap text-content-secondary tabular-nums [overflow-wrap:anywhere]"
+              className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 border-t border-border pt-2.5 text-meta"
             >
-              {detail}
-            </pre>
+              {detail.map((fact) => (
+                <div key={`${fact.label}/${fact.value}`} className="contents">
+                  <dt
+                    className={cn(
+                      'text-content-tertiary',
+                      fact.code === true && 'font-mono text-caption leading-5',
+                    )}
+                  >
+                    {fact.label}
+                  </dt>
+                  <dd
+                    className={cn(
+                      'm-0 text-foreground tabular-nums [overflow-wrap:anywhere]',
+                      fact.code === true && 'font-mono text-caption leading-5',
+                    )}
+                  >
+                    {fact.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           )}
         </div>
       </PopoverContent>
@@ -391,18 +416,16 @@ export function ModelTestReport({
               n: done.length,
             });
   const now = Date.now();
-  const detail = done
-    .map(({ id, check }) => {
-      const failure = failureOf(check);
-      const outcome =
-        failure === null
-          ? `${t('通过')} · ${check.phase === 'done' ? (check.result.latencyMs ?? 0) : 0} ms`
-          : failure === 'unavailable'
-            ? t('没测完')
-            : t('没通过 · {reason}', { reason: t(failureShort[failure]) });
-      return `${id} · ${outcome} · ${relativeTime(check.at, now, t)}`;
-    })
-    .join('\n');
+  const detail = done.map(({ id, check }): CheckFact => {
+    const failure = failureOf(check);
+    const outcome =
+      failure === null
+        ? `${t('通过')} · ${check.phase === 'done' ? (check.result.latencyMs ?? 0) : 0} ms`
+        : failure === 'unavailable'
+          ? t('没测完')
+          : t('没通过 · {reason}', { reason: t(failureShort[failure]) });
+    return { label: id, value: `${outcome} · ${relativeTime(check.at, now, t)}`, code: true };
+  });
   return (
     <CheckResultPopover
       anchor={report.anchor}

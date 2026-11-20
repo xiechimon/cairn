@@ -1277,6 +1277,7 @@
         ],
         "server": [
           "/api/teams/:id/providers**",
+          "/api/teams/:id/provider-order",
           "/api/teams/:id/claude-subscriptions**",
           "/api/teams/:id/devin-subscriptions**",
           "/api/teams/:id/antigravity-subscriptions**",
@@ -1305,6 +1306,7 @@
         "docs/spec/11-model-service-and-machine-localization.md"
       ],
       "backendDesign": [
+        "docs/design/provider-order.md",
         "docs/spec/11-model-service-and-machine-localization.md",
         "docs/research/r16-model-catalog-liveness.md",
         "docs/design/devin-subscription-source.md",

@@ -1,5 +1,25 @@
+import {
+  type Announcements,
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { cn } from 'cn';
-import type { ComponentType, ReactNode, SVGProps } from 'react';
+import { GripVertical } from 'lucide-react';
+import type { ComponentType, CSSProperties, ReactNode, SVGProps } from 'react';
+import { useI18n } from '../../i18n/provider.js';
+import { IconTooltip } from '../icon-tooltip.js';
 import { SettingsPanel, SettingsSection } from '../settings-list.js';
 import { Button } from '../ui/button.js';
 
@@ -38,22 +58,39 @@ export function ProviderInstanceRow({
   item,
   selected,
   onSelect,
+  handle,
+  rowRef,
+  style,
+  dragging = false,
 }: {
   item: ProviderItem;
   selected: boolean;
   onSelect: () => void;
+  handle?: ReactNode;
+  rowRef?: (node: HTMLElement | null) => void;
+  style?: CSSProperties;
+  dragging?: boolean;
 }) {
   return (
     <div
+      ref={rowRef}
+      style={style}
       data-testid="provider-instance"
       data-instance-id={item.id}
       data-tone={item.tone}
+      data-dragging={dragging ? 'true' : undefined}
       aria-current={selected ? 'true' : undefined}
       className={cn(
-        'flex items-start gap-3 px-3.5 py-3',
-        selected ? 'bg-(--sidebar-active)' : 'hover:bg-menu-hover',
+        'relative flex items-start gap-3 px-3.5 py-3',
+        handle !== undefined && 'pl-1.5',
+        dragging
+          ? 'z-10 bg-popover shadow-(--shadow-popover)'
+          : selected
+            ? 'bg-(--sidebar-active)'
+            : 'bg-card hover:bg-menu-hover',
       )}
     >
+      {handle}
       <Button
         variant="ghost"
         onClick={onSelect}
@@ -87,10 +124,128 @@ export function ProviderInstanceRow({
   );
 }
 
+function SortableRow({
+  item,
+  selected,
+  onSelect,
+}: {
+  item: ProviderItem;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { t } = useI18n();
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+  const label = t('拖动调整顺序：{name}', { name: item.name });
+  return (
+    <ProviderInstanceRow
+      item={item}
+      selected={selected}
+      onSelect={onSelect}
+      rowRef={setNodeRef}
+      dragging={isDragging}
+      style={{
+        transform:
+          transform === null ? undefined : `translate3d(0, ${Math.round(transform.y)}px, 0)`,
+        transition,
+      }}
+      handle={
+        <IconTooltip
+          label={label}
+          trigger={
+            <Button
+              ref={setActivatorNodeRef}
+              variant="ghost"
+              size="icon-xs"
+              data-testid="provider-drag-handle"
+              {...attributes}
+              {...listeners}
+              aria-roledescription={t('可拖动排序')}
+              className="-my-0.5 w-5 flex-none cursor-grab touch-none text-content-tertiary hover:text-foreground active:cursor-grabbing"
+            />
+          }
+        >
+          <GripVertical aria-hidden className="size-4" />
+        </IconTooltip>
+      }
+    />
+  );
+}
+
+function SortableRows({
+  items,
+  selectedId,
+  onSelect,
+  onReorder,
+}: {
+  items: ProviderItem[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onReorder: (ids: string[]) => void;
+}) {
+  const { t } = useI18n();
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const ids = items.map((item) => item.id);
+  const nameOf = (id: string | number) => items.find((item) => item.id === id)?.name ?? String(id);
+  const positionOf = (id: string | number) => ids.indexOf(String(id)) + 1;
+  const announcements: Announcements = {
+    onDragStart: ({ active }) =>
+      t('已拿起 {name}，在第 {n} 位', { name: nameOf(active.id), n: positionOf(active.id) }),
+    onDragOver: ({ active, over }) =>
+      over === null
+        ? undefined
+        : t('{name} 移到第 {n} 位', { name: nameOf(active.id), n: positionOf(over.id) }),
+    onDragEnd: ({ active, over }) =>
+      over === null
+        ? t('{name} 放回原位', { name: nameOf(active.id) })
+        : t('{name} 放在第 {n} 位', { name: nameOf(active.id), n: positionOf(over.id) }),
+    onDragCancel: ({ active }) => t('{name} 放回原位', { name: nameOf(active.id) }),
+  };
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (over === null || active.id === over.id) return;
+    onReorder(arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id))));
+  };
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={onDragEnd}
+      accessibility={{
+        announcements,
+        screenReaderInstructions: {
+          draggable: t('按空格键拿起，用上下方向键移动，再按空格键放下，按 Esc 取消。'),
+        },
+      }}
+    >
+      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+        {items.map((item) => (
+          <SortableRow
+            key={item.id}
+            item={item}
+            selected={item.id === selectedId}
+            onSelect={() => onSelect(item.id)}
+          />
+        ))}
+      </SortableContext>
+    </DndContext>
+  );
+}
+
 export function ProviderPanel({
   items,
   selectedId,
   onSelect,
+  onReorder,
   header,
   empty,
   children,
@@ -98,6 +253,7 @@ export function ProviderPanel({
   items: ProviderItem[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onReorder?: (ids: string[]) => void;
   header?: ReactNode;
   empty?: ReactNode;
   children: ReactNode;
@@ -115,14 +271,23 @@ export function ProviderPanel({
           data-testid="provider-list"
           className="flex flex-col divide-y divide-border border-b border-border @3xl:border-r @3xl:border-b-0"
         >
-          {items.map((item) => (
-            <ProviderInstanceRow
-              key={item.id}
-              item={item}
-              selected={item.id === selectedId}
-              onSelect={() => onSelect(item.id)}
+          {onReorder === undefined ? (
+            items.map((item) => (
+              <ProviderInstanceRow
+                key={item.id}
+                item={item}
+                selected={item.id === selectedId}
+                onSelect={() => onSelect(item.id)}
+              />
+            ))
+          ) : (
+            <SortableRows
+              items={items}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              onReorder={onReorder}
             />
-          ))}
+          )}
         </div>
         <div data-testid="provider-editor" className="flex min-w-0 flex-col gap-6 p-4">
           {children}

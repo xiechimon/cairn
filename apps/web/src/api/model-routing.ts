@@ -160,28 +160,25 @@ export function ruleGraphGroups(
   const groups: RoutingSourceGroup[] = [];
   if (agents.length > 0) groups.push({ label: t('Coordinator 和其他 Agent'), nodes: agents });
   if (projects.length > 0) groups.push({ label: t('项目单独设置'), nodes: projects });
-  const claude = targetOfRule(CLAUDE_CODE_TARGET, targets);
-  if (claude !== undefined) {
-    groups.push({
+  const projectRuntimes = new Set(projectChoices.map(({ choice }) => choice.provider));
+  for (const { runtime, label, id, name } of [
+    {
+      runtime: CLAUDE_CODE_TARGET,
       label: 'Claude Code',
-      nodes: [{ id: 'claude-models', name: t('所有 Claude 模型'), target: claude.id }],
-    });
-  }
-  const devin = targetOfRule(DEVIN_TARGET, targets);
-  if (devin !== undefined) {
-    groups.push({
-      label: 'Devin',
-      nodes: [{ id: 'devin-models', name: t('所有 Devin 模型'), target: devin.id }],
-    });
-  }
-  const antigravity = targetOfRule(ANTIGRAVITY_TARGET, targets);
-  if (antigravity !== undefined) {
-    groups.push({
+      id: 'claude-models',
+      name: t('所有 Claude 模型'),
+    },
+    { runtime: DEVIN_TARGET, label: 'Devin', id: 'devin-models', name: t('所有 Devin 模型') },
+    {
+      runtime: ANTIGRAVITY_TARGET,
       label: 'Antigravity',
-      nodes: [
-        { id: 'antigravity-models', name: t('所有 Antigravity 模型'), target: antigravity.id },
-      ],
-    });
+      id: 'antigravity-models',
+      name: t('所有 Antigravity 模型'),
+    },
+  ]) {
+    if (!projectRuntimes.has(runtime)) continue;
+    const target = targetOfRule(runtime, targets);
+    if (target !== undefined) groups.push({ label, nodes: [{ id, name, target: target.id }] });
   }
   return groups;
 }

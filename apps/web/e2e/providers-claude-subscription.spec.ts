@@ -135,7 +135,7 @@ test('a Claude subscription picks Opus 5.5 from upstream and a failed model test
   await expect(chip('claude-sonnet-5-5')).toHaveAttribute('data-check', 'failed');
   const report = page.getByTestId('model-test-result');
   await expect(report).toContainText('1/2 个模型没连上：这个订阅的登录已失效。先移除它，再在终端运行 claude setup-token');
-  await expect(page.getByTestId('model-test-detail')).toContainText('claude-sonnet-5-5 · 没通过 · 登录失效');
+  await expect(page.getByTestId('model-test-detail').locator('dt:text-is("claude-sonnet-5-5") + dd')).toContainText('没通过 · 登录失效');
   await expect(report).not.toContainText('key 无效');
   await expect(detail).not.toContainText('登录失效');
 });

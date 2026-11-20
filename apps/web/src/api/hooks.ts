@@ -155,6 +155,7 @@ export type StepRow = StepJournalRow;
 export interface ProvidersEnvelope {
   presets: ProviderPreset[];
   providers: ProviderRecord[];
+  order?: string[] | null;
   canTestConnection?: boolean;
 }
 
@@ -542,6 +543,29 @@ export const useProviders = (teamId: string | undefined, enabled: boolean) =>
     queryFn: () => api.get<ProvidersEnvelope>(`/api/teams/${teamId}/providers`),
     enabled: enabled && teamId !== undefined,
   });
+
+export function useSaveProviderOrder(teamId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (order: string[]) =>
+      api.put<{ order: string[] }>(`/api/teams/${teamId}/provider-order`, { order }),
+    onMutate: async (order) => {
+      await qc.cancelQueries({ queryKey: ['providers', teamId] });
+      const previous = qc.getQueryData<ProvidersEnvelope>(['providers', teamId]);
+      qc.setQueryData<ProvidersEnvelope>(['providers', teamId], (envelope) =>
+        envelope === undefined ? envelope : { ...envelope, order },
+      );
+      return { previous };
+    },
+    onError: (_error, _order, context) => {
+      qc.setQueryData(['providers', teamId], context?.previous);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['providers', teamId] });
+      void qc.invalidateQueries({ queryKey: ['model-sources', teamId] });
+    },
+  });
+}
 
 export const useMemories = (teamId: string | undefined, enabled: boolean) =>
   useQuery({

@@ -21,6 +21,7 @@ import {
   patchMcpConnectorBodySchema,
   patchProviderBodySchema,
   patchScheduleBodySchema,
+  providerOrderBodySchema,
   redactSecrets,
   renameAntigravitySubscriptionSchema,
   renameClaudeSubscriptionSchema,
@@ -167,6 +168,7 @@ import {
   getModelSources,
   getProvidersEnvelope,
   updateProvider,
+  writeProviderOrder,
 } from './services/providers.js';
 import { seedClaudeCodeRules } from './services/routing-rules.js';
 import { runScheduleNow } from './services/schedule-run.js';
@@ -716,6 +718,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       ...getProvidersEnvelope(keysvc, teamId),
       canTestConnection: pairedDeviceIdOf(c) === null && isOwner(ctx.db, ctx.user.id),
     });
+  });
+
+  app.put('/api/teams/:id/provider-order', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(providerOrderBodySchema, await jsonBody(c), 'body');
+    return c.json({ order: writeProviderOrder(ctx.db, teamId, body.order) });
   });
 
   app.get('/api/teams/:id/model-sources', (c) => {

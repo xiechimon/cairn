@@ -21,7 +21,9 @@ import { FilterPicker } from '../components/filter-picker.js';
 import { InfoTip } from '../components/info-tip.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import { QueryBoundary } from '../components/query-state.js';
+import { RouteUseGlyph } from '../components/route-use-glyph.js';
 import { SettingsCard, SettingsRow } from '../components/settings-list.js';
+import { ProjectGlyph } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
@@ -32,6 +34,8 @@ import { RuleIssueNotices } from './rule-issue-notices.js';
 import { ThinkingLevelSelect } from './thinking-level-select.js';
 
 const AGENT_USES: readonly RouteUse[] = ['coordinator'];
+
+const PROJECT_GLYPHS_SHOWN = 3;
 
 const STORED_ONLY_USES: readonly RouteUse[] = ['compaction'];
 
@@ -229,6 +233,7 @@ export function RuleRow({
       <SettingsRow
         label={label}
         hint={hint}
+        icon={<RouteUseGlyph use={use} className="size-5" />}
         className="flex-wrap gap-y-2 py-2.5 max-sm:[&>span:first-child]:max-w-none"
         hintClassName="text-pretty break-keep"
       >
@@ -283,6 +288,11 @@ function ProjectOverrides({ options }: { options: ModelOption[] }) {
         onClick={() => setOpen((v) => !v)}
         className="h-auto min-h-6 w-fit gap-1 px-1 font-normal text-meta text-content-secondary no-underline hover:text-foreground hover:no-underline pointer-coarse:min-h-11"
       >
+        <span className="flex flex-none items-center gap-1">
+          {projects.slice(0, PROJECT_GLYPHS_SHOWN).map((p) => (
+            <ProjectGlyph key={p.id} icon={p.icon} name={p.name} className="size-4" />
+          ))}
+        </span>
         {t('{count} 个项目单独设置了模型', { count: projects.length })}
         <ChevronRight
           aria-hidden
@@ -297,7 +307,12 @@ function ProjectOverrides({ options }: { options: ModelOption[] }) {
             const choice = p.modelOverrides?.coordinator;
             if (choice == null) return null;
             return (
-              <SettingsRow key={p.id} label={p.name} hint={`Coordinator · ${nameOf(choice)}`}>
+              <SettingsRow
+                key={p.id}
+                label={p.name}
+                hint={`Coordinator · ${nameOf(choice)}`}
+                icon={<ProjectGlyph icon={p.icon} name={p.name} />}
+              >
                 <Link
                   to={`/app/project/${p.id}/settings`}
                   className="text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current"

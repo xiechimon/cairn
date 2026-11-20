@@ -110,8 +110,8 @@ test('test all pops its result up from the button, never reflows the editor, and
   await expect(report(page)).toBeVisible();
   await expect(report(page)).toHaveAttribute('data-phase', 'failed');
   await expect(report(page)).toContainText('1/2 个模型没连上：上游没有这个模型。');
-  await expect(page.getByTestId('model-test-detail')).toContainText('small-model · 通过 · 412 ms');
-  await expect(page.getByTestId('model-test-detail')).toContainText('large-model · 没通过 · 模型不存在');
+  await expect(page.getByTestId('model-test-detail').locator('dt:text-is("small-model") + dd')).toContainText('通过 · 412 ms');
+  await expect(page.getByTestId('model-test-detail').locator('dt:text-is("large-model") + dd')).toContainText('没通过 · 模型不存在');
   await expect(report(page)).not.toContainText('HTTP 404');
   await expect(report(page)).not.toContainText('not supported by any configured account');
   expect(await top()).toBe(before);
@@ -175,7 +175,7 @@ test('a transport error reads as not finished', async ({ page }) => {
   await page.goto('/app/resources/providers');
   await editor(page).getByRole('button', { name: '测试 small-model' }).click();
   await expect(report(page)).toContainText('small-model 没连上：测试没能跑完，请重试。');
-  await expect(page.getByTestId('model-test-detail')).toContainText('small-model · 没测完');
+  await expect(page.getByTestId('model-test-detail').locator('dt:text-is("small-model") + dd')).toContainText('没测完');
 });
 
 test('an empty provider offers the upstream list; a failed list falls back to adding by ID', async ({

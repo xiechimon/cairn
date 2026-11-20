@@ -56,9 +56,11 @@ const ROW_FILL =
 export function ProjectGlyph({
   icon,
   name,
+  className = 'size-5',
 }: {
   icon?: ProjectIcon | null | undefined;
   name?: string;
+  className?: string;
 }) {
   const resolved = projectIconOrAuto(icon, name);
   const auto = icon == null && resolved !== 'box';
@@ -68,7 +70,7 @@ export function ProjectGlyph({
       data-slot="project-glyph"
       data-project-icon={auto || icon != null ? resolved : undefined}
       data-project-icon-auto={auto || undefined}
-      className="size-5 flex-none text-sidebar-ink"
+      className={cn('flex-none text-sidebar-ink', className)}
       strokeWidth={1.75}
     />
   );

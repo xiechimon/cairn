@@ -1,8 +1,9 @@
-import type {
-  ModelSource,
-  ModelSourceModel,
-  ProviderRecord,
-  ProviderTestResult,
+import {
+  type ModelSource,
+  type ModelSourceModel,
+  orderByKeys,
+  type ProviderRecord,
+  type ProviderTestResult,
 } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cpu } from 'lucide-react';
@@ -42,7 +43,12 @@ import {
   useRenameDevinSubscription,
   useUpdateDevinSubscriptionModels,
 } from '../api/devin-subscriptions.js';
-import { useApiMutations, useModelSources, useProviders } from '../api/hooks.js';
+import {
+  useApiMutations,
+  useModelSources,
+  useProviders,
+  useSaveProviderOrder,
+} from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useClock, VENDORS } from '../components/accounts/account-parts.js';
@@ -224,6 +230,8 @@ export function ProvidersSection() {
   const [pickingSubscription, setPickingSubscription] = useState<SubscriptionAccount | null>(null);
   const upstreamCatalogRef = useRef<ReadonlyMap<string, SubscriptionModel>>(new Map());
   const [connectError, setConnectError] = useState<string | null>(null);
+  const saveOrder = useSaveProviderOrder(teamId);
+  const [fixtureOrder, setFixtureOrder] = useState<string[] | null>(null);
 
   const sources = live
     ? (sourcesQ.data?.sources ?? [])
@@ -431,7 +439,17 @@ export function ProvidersSection() {
     t,
     clock,
   };
-  const entries = [
+  const order = live ? (providersQ.data?.order ?? null) : fixtureOrder;
+  const reorder = (ids: string[]) => {
+    if (!live) {
+      setFixtureOrder(ids);
+      return;
+    }
+    saveOrder.mutate(ids, {
+      onError: (error) => toastError(t('顺序没能保存，已恢复原来的顺序。'), error),
+    });
+  };
+  const defaultEntries = [
     ...subscriptionEntries(subscriptions, {
       ...subscriptionDeps,
       models: claudeModels,
@@ -446,6 +464,7 @@ export function ProvidersSection() {
     }),
     ...teamEntries(providers, deadModelIds(sources), actionsFor, t),
   ];
+  const entries = orderByKeys(defaultEntries, (entry) => [entry.item.id], order);
   const partialFailure =
     subscriptionsQ.isError || devinSubscriptionsQ.isError || antigravitySubscriptionsQ.isError
       ? 'subscriptions'
@@ -486,6 +505,7 @@ export function ProvidersSection() {
           items={entries.map((e) => e.item)}
           selectedId={selected?.item.id ?? null}
           onSelect={(id) => setParams({ item: id })}
+          onReorder={reorder}
           empty={
             <QueryBoundary
               query={

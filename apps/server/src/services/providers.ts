@@ -7,6 +7,7 @@ import {
   DEFAULT_DEVIN_MODELS,
   type ModelSourceModel,
   type ModelSourcesEnvelope,
+  orderByKeys,
   PROVIDER_OAUTH_PRESET_IDS,
   PROVIDER_PRESET_IDS,
   PROVIDER_XAI_PRESET,
@@ -25,9 +26,12 @@ import {
 } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
 import {
+  antigravitySubscription,
   build,
   chiefThread,
   chiefTurnUsage,
+  claudeSubscription,
+  devinSubscription,
   machine,
   project,
   provider,
@@ -35,6 +39,7 @@ import {
   step,
   stepRoute,
   stepUsage,
+  team,
   teamTopModels,
   todo,
   tokenUsage,
@@ -132,8 +137,12 @@ export function listProviders(deps: ProviderDeps, teamId: string): ProviderRecor
 export function getProvidersEnvelope(
   deps: ProviderDeps,
   teamId: string,
-): { presets: ProviderPreset[]; providers: ProviderRecord[] } {
-  return { presets: providerPresets(), providers: listProviders(deps, teamId) };
+): { presets: ProviderPreset[]; providers: ProviderRecord[]; order: string[] | null } {
+  return {
+    presets: providerPresets(),
+    providers: listProviders(deps, teamId),
+    order: readProviderOrder(deps.db, teamId),
+  };
 }
 
 export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
@@ -263,36 +272,97 @@ export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnve
   }));
 }
 
+export function readProviderOrder(db: Db, teamId: string): string[] | null {
+  const stored = db
+    .select({ order: team.providerOrder })
+    .from(team)
+    .where(eq(team.id, teamId))
+    .get()?.order;
+  return Array.isArray(stored) && stored.every((key) => typeof key === 'string') ? stored : null;
+}
+
+export function writeProviderOrder(db: Db, teamId: string, order: string[]): string[] {
+  db.update(team).set({ providerOrder: order }).where(eq(team.id, teamId)).run();
+  return order;
+}
+
+function subscriptionKeys(db: Db, teamId: string) {
+  const keysOf = (rows: { id: string }[]) => rows.map((row) => `subscription:${row.id}`);
+  return {
+    'claude-code': keysOf(
+      db
+        .select({ id: claudeSubscription.id })
+        .from(claudeSubscription)
+        .where(eq(claudeSubscription.teamId, teamId))
+        .all(),
+    ),
+    devin: keysOf(
+      db
+        .select({ id: devinSubscription.id })
+        .from(devinSubscription)
+        .where(eq(devinSubscription.teamId, teamId))
+        .all(),
+    ),
+    antigravity: keysOf(
+      db
+        .select({ id: antigravitySubscription.id })
+        .from(antigravitySubscription)
+        .where(eq(antigravitySubscription.teamId, teamId))
+        .all(),
+    ),
+  } satisfies Partial<Record<ModelSourcesEnvelope['sources'][number]['runtime'], string[]>>;
+}
+
+type ModelSource = ModelSourcesEnvelope['sources'][number];
+
 export function getModelSources(deps: ProviderDeps, teamId: string): ModelSourcesEnvelope {
-  const piSources: ModelSourcesEnvelope['sources'] = listProviders(deps, teamId).map((p) => {
+  const piSources = listProviders(deps, teamId).map((p): { key: string; source: ModelSource } => {
     const stored = p.models.filter((m) => m.id !== '');
     const models =
       stored.length > 0
         ? stored.map((m) => ({ id: m.id, name: m.name !== '' ? m.name : m.id }))
         : [...builtinModelIds(p.providerId)].map((id) => ({ id, name: id }));
     return {
-      runtime: 'pi' as const,
-      provider: p.providerId,
-      providerLabel: p.label,
-      installed: true,
-      hostname: hostname(),
-      models: models.map((m) => ({
-        ...m,
-        liveness: getModelLiveness(teamId, p.providerId, m.id),
-        ...asTask(piThinking(p.providerId, m.id)),
-        ...asInServer(inServerThinking(p, m.id)),
-      })),
+      key: `provider:${p.id}`,
+      source: {
+        runtime: 'pi' as const,
+        provider: p.providerId,
+        providerLabel: p.label,
+        installed: true,
+        hostname: hostname(),
+        models: models.map((m) => ({
+          ...m,
+          liveness: getModelLiveness(teamId, p.providerId, m.id),
+          ...asTask(piThinking(p.providerId, m.id)),
+          ...asInServer(inServerThinking(p, m.id)),
+        })),
+      },
     };
   });
+  const subscriptions = subscriptionKeys(deps.db, teamId);
+  const providerKeys = new Map(piSources.map(({ key, source }) => [source, key]));
+  const keysOf = (source: ModelSource): readonly string[] => {
+    const key = providerKeys.get(source);
+    if (key !== undefined) return [key];
+    return source.runtime === 'claude-code' ||
+      source.runtime === 'devin' ||
+      source.runtime === 'antigravity'
+      ? subscriptions[source.runtime]
+      : [];
+  };
   return {
-    sources: [
-      ...(piSources.length > 0
-        ? piSources
-        : [{ runtime: 'pi' as const, installed: true, hostname: hostname(), models: [] }]),
-      ...listClaudeCodeSources(deps.db, teamId),
-      ...listDevinSources(deps.db, teamId),
-      ...listAntigravitySources(deps.db, teamId),
-    ],
+    sources: orderByKeys(
+      [
+        ...(piSources.length > 0
+          ? piSources.map(({ source }) => source)
+          : [{ runtime: 'pi' as const, installed: true, hostname: hostname(), models: [] }]),
+        ...listClaudeCodeSources(deps.db, teamId),
+        ...listDevinSources(deps.db, teamId),
+        ...listAntigravitySources(deps.db, teamId),
+      ],
+      keysOf,
+      readProviderOrder(deps.db, teamId),
+    ),
   };
 }
 

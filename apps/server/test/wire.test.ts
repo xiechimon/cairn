@@ -187,6 +187,7 @@ const INFERRED_ROUTES = [
   'POST /api/builds/{id}/stop',
   'POST /api/builds/{id}/tasks/{taskId}/stop',
   'GET /api/teams/{id}/model-sources',
+  'PUT /api/teams/{id}/provider-order',
   'PATCH /api/machines/{id}',
   'GET /api/github/repos',
   'POST /api/teams/{id}/github/oauth/authorize',

@@ -23,9 +23,11 @@ test('fixture: the routing page holds the provider list above the rule graph', a
   await expect(detail.getByRole('progressbar')).toHaveCount(2);
 
   const graph = page.getByTestId('routing-section');
-  await expect(graph.locator('[data-routing-source]')).toHaveCount(5);
+  await expect(graph.locator('[data-routing-source]')).toHaveCount(3);
+  await expect(graph.locator('[data-routing-source="claude-models"]')).toHaveCount(0);
+  await expect(graph.locator('[data-routing-source="coordinator"] [data-route-glyph="coordinator"]')).toBeVisible();
   await expect(graph.locator('[data-routing-target]')).toHaveCount(7);
-  await expect(graph.locator('path[data-wire]')).toHaveCount(5);
+  await expect(graph.locator('path[data-wire]')).toHaveCount(3);
   await expect(graph.locator('path[data-wire][data-broken]')).toHaveCount(0);
   await expect(graph.locator('[data-routing-source="citation_check"]')).toHaveCount(0);
   await expect(graph.locator('[data-routing-source="coordinator"]')).not.toHaveAttribute('data-broken', '');

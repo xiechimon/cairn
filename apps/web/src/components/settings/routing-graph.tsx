@@ -1,6 +1,13 @@
 import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
-import { type ComponentType, type SVGProps, useLayoutEffect, useRef, useState } from 'react';
+import {
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { IconTooltip } from '../icon-tooltip.js';
 
@@ -10,6 +17,7 @@ export interface RoutingSource {
   tag?: string;
   target?: string;
   broken?: boolean;
+  lead?: ReactNode;
 }
 
 export interface RoutingSourceGroup {
@@ -164,8 +172,10 @@ export function RoutingGraph({
                       node.broken === true ? 'text-destructive' : 'text-foreground',
                     )}
                   >
-                    {node.broken === true && (
+                    {node.broken === true ? (
                       <TriangleAlert aria-hidden className="size-4 flex-none" />
+                    ) : (
+                      node.lead
                     )}
                     <span className="min-w-0 truncate">{node.name}</span>
                     {node.broken === true ? (
