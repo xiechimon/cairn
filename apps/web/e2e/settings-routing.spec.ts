@@ -42,6 +42,25 @@ test('model selector lists the frequently used models in place of the task row, 
   await expect(settings.locator('[data-testid^="work-policy-"]')).toHaveCount(0);
 });
 
+test('V6: the two add actions on the Model page are the same outline tier, and a set Coordinator row carries no subtitle', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/routing?scenario=model-routing');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings.getByTestId('routing-add-provider')).toHaveAttribute(
+    'data-variant',
+    'outline',
+  );
+  await expect(settings.getByTestId('frequent-models-add')).toHaveAttribute(
+    'data-variant',
+    'outline',
+  );
+  await expect(settings.locator('[data-variant="default"]')).toHaveCount(0);
+  const coordinator = settings.getByTestId('routing-rule-coordinator');
+  await expect(coordinator).toBeVisible();
+  await expect(coordinator).not.toContainText('和你对话');
+});
+
 test('the model menu groups by runtime and greys nothing, not for the Coordinator and not for a runtime no Runner has turned on', async ({
   page,
 }) => {

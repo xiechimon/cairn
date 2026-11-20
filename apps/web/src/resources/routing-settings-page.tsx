@@ -42,7 +42,6 @@ const AGENT_USES: readonly RouteUse[] = ['coordinator'];
 const STORED_ONLY_USES: readonly RouteUse[] = ['compaction'];
 
 const USE_HINTS: Partial<Record<RouteUse, string>> = {
-  coordinator: '和你对话、派活',
   compaction: '上下文快满时压缩对话',
 };
 
@@ -438,8 +437,8 @@ export function ModelRulesSection() {
                   ) : (
                     t('先给 Coordinator 选模型，它才能回答你的消息。')
                   )
-                ) : (
-                  t(USE_HINTS[use] ?? '')
+                ) : USE_HINTS[use] === undefined ? undefined : (
+                  t(USE_HINTS[use])
                 )
               }
               rule={ruleOf(use)}

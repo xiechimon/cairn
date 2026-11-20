@@ -108,6 +108,7 @@ function RoutingContent() {
       fixture={fixture}
       actions={
         <Button
+          variant="outline"
           size="sm"
           className="pointer-coarse:h-11"
           onClick={() =>

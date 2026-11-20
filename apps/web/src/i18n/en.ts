@@ -1880,7 +1880,6 @@ export const EN: Record<string, string> = {
   模型路由没能加载: 'Model routing did not load',
   '{count} 个项目单独设置了模型': '{count#1 project sets|# projects set} their own models',
   项目单独设置: 'Set per project',
-  '和你对话、派活': 'Talks with you and hands out work',
   常用模型: 'Frequently used models',
   '任务默认用 Coordinator 的模型。在这里加几个常用模型，Coordinator 派活时会按任务难度从中挑一个。':
     'Tasks use the Coordinator model by default. Add a few frequently used models here and the Coordinator picks one per task, by how hard it is.',
