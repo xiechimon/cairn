@@ -108,7 +108,7 @@ test('credential initialization failure removes a token already written to the p
         },
         () => undefined,
       ),
-  ).toThrow('symlink');
+  ).toThrow(/symlink|ELOOP|symbolic link/i);
   expect(existsSync(dir)).toBe(false);
   expect(readFileSync(target, 'utf8')).toBe('preserved');
 });

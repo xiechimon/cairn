@@ -459,6 +459,8 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       coordinatorInServer,
       confinementPlatform,
       confineDeniedRoots,
+      claudeBin,
+      agentImportHome,
       trajectoryOutcomeBackfill,
       trajectoryReflectCurate,
       trajectoryReflectOpenGuardIssues,
@@ -493,6 +495,8 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(coordinatorInServer).toBe('CAIRN_COORDINATOR_IN_SERVER');
     expect(confinementPlatform).toBe('CAIRN_CONFINEMENT_PLATFORM');
     expect(confineDeniedRoots).toBe('CAIRN_CONFINE_DENIED_ROOTS');
+    expect(claudeBin).toBe('CAIRN_CLAUDE_BIN');
+    expect(agentImportHome).toBe('CAIRN_AGENT_IMPORT_HOME');
     expect(trajectoryOutcomeBackfill).toBe('CAIRN_TRAJ_OUTCOME_BACKFILL');
     expect(trajectoryReflectCurate).toBe('CAIRN_TRAJ_REFLECT_CURATE');
     expect(trajectoryReflectOpenGuardIssues).toBe('CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES');

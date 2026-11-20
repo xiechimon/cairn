@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
+import { claudeConfigHome } from '../../apps/daemon/src/runtime-homes.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import {
   build as buildTable,
@@ -96,7 +97,7 @@ beforeAll(async () => {
   const userHome = makeTestTempDir('cairn-it-switch-user-');
   const configDir = join(userHome, '.claude');
   home = makeTestTempDir('cairn-it-switch-home-');
-  const transcripts = join(home, 'claude', 'projects', PROJECT_DIR_NAME);
+  const transcripts = join(claudeConfigHome(home), 'projects', PROJECT_DIR_NAME);
   mkdirSync(configDir, { recursive: true });
   writeFileSync(
     join(configDir, 'settings.json'),
@@ -108,7 +109,7 @@ beforeAll(async () => {
       },
     })}\n`,
   );
-  runLog = join(makeTestTempDir('cairn-it-switch-log-'), 'runs.log');
+  runLog = join(claudeConfigHome(home), 'fake-runs.log');
   for (const [key, value] of Object.entries({
     HOME: userHome,
     CLAUDE_CONFIG_DIR: configDir,

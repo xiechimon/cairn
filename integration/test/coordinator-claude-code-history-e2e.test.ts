@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
+import { claudeConfigHome } from '../../apps/daemon/src/runtime-homes.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import {
   chiefMessage,
@@ -37,8 +38,9 @@ let claudeLog = '';
 const saved: Record<string, string | undefined> = {};
 
 beforeAll(async () => {
-  claudeLog = join(makeTestTempDir('cairn-it-coord-hist-log-'), 'claude.log');
   setCoordinatorInServer(true);
+  home = makeTestTempDir('cairn-it-coord-cc-home-');
+  claudeLog = join(claudeConfigHome(home), 'fake-prompt.log');
   const userHome = makeTestTempDir('cairn-it-coord-cc-user-');
   mkdirSync(join(userHome, '.claude'), { recursive: true });
   writeFileSync(
@@ -56,7 +58,6 @@ beforeAll(async () => {
   }
   stub = await startStubLlm([{ content: 'unused' }]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = makeTestTempDir('cairn-it-coord-cc-home-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,
