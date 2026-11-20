@@ -565,15 +565,7 @@ export const EN: Record<string, string> = {
   // #1250（ADR 0018 层 1）verify 步状态与 fan-out 面。
   验证通过: 'Verification passed',
   验证未通过: 'Verification failed',
-  // #731 `/` slash completion vocabulary (zh keys, en values).
   命令: 'Commands',
-  '没有匹配"/{query}"的命令': 'No commands match "/{query}"',
-  清空输入: 'Clear the input',
-  已清空: 'Cleared',
-  停止当前运行: 'Stop the current run',
-  查看命令说明: 'Show command help',
-  命令说明: 'Command help',
-  '团队技能来自技能页面（共 {count} 个）': 'Team skills come from the Skills page ({count} total)',
   '停止排队？': 'Stop queueing?',
   '任务回到排队前的状态。': 'The task goes back to where it was before it was queued.',
   '丢弃本轮修改——方案和代码回到上一个版本':

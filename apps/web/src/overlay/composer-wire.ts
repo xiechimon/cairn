@@ -8,8 +8,6 @@ import type {
   SetStateAction,
 } from 'react';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { useI18n } from '../i18n/provider.js';
 import {
   createPastedNameCounter,
   filesFromClipboardData,
@@ -42,16 +40,6 @@ import {
 } from './mention-token.js';
 import { applyOrderedListBackspace, applyOrderedListEnter } from './ordered-list.js';
 import { usePendingAttachments } from './pending-attachments.js';
-import {
-  type BuiltinSlashName,
-  buildSlashSections,
-  insertSlashText,
-  isMessageStart,
-  resolveSlashAccept,
-  SLASH_COMPLETION_SPEC,
-  type SlashRow,
-  type SlashSection,
-} from './slash-commands.js';
 
 export interface ComposerWireOptions {
   editable?: boolean;
@@ -64,8 +52,8 @@ export interface ComposerWireOptions {
   onAttachment?: (files: File[]) => string[] | Promise<string[]>;
   mentionGroups?: MentionGroups;
   mentionFiles?: FileMentionEntry[];
-  slash?: {
-    stopAvailable: boolean;
+  stop?: {
+    available: boolean;
     onStop?: () => void;
   };
   growCap?: number;
@@ -103,20 +91,6 @@ export interface ComposerWire {
   inlineListboxId: string;
   inlineListboxRef: RefObject<HTMLDivElement | null>;
   acceptInlineRow: (row: InlineCompletionRow) => void;
-  slashOpen: boolean;
-  slashQuery: string;
-  slashCaret: number | null;
-  slashSections: SlashSection[];
-  slashRows: SlashRow[];
-  slashHighlight: number | null;
-  setSlashHighlight: (index: number | null) => void;
-  slashListboxId: string;
-  slashListboxRef: RefObject<HTMLDivElement | null>;
-  acceptSlashRow: (row: SlashRow, via: 'enter' | 'tab') => void;
-  helpOpen: boolean;
-  closeHelp: () => void;
-  helpRows: SlashRow[];
-  helpSkillCount: number;
   mentionRegistry: MentionRegistry;
 }
 
@@ -136,12 +110,11 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     onAttachment,
     mentionGroups,
     mentionFiles,
-    slash: slashOptions,
+    stop: stopOptions,
     growCap,
     active = true,
     onPickProject,
   } = options;
-  const { t } = useI18n();
 
   const [internalDraft, setInternalDraft] = useState('');
   const controlled = draftProp !== undefined && onDraftChange !== undefined;
@@ -203,15 +176,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const fileCount = mentionFiles?.length ?? 0;
   const inlineOpen = inlineRange !== null && entityCount + fileCount > 0;
 
-  const [slashRange, setSlashRange] = useState<CompletionRange | null>(null);
-  const slashRangeRef = useRef<CompletionRange | null>(null);
-  const dismissedSlashRef = useRef<CompletionRange | null>(null);
-  const [slashHighlight, setSlashHighlight] = useState<number | null>(null);
-  const [helpOpen, setHelpOpen] = useState(false);
-  const slashListboxId = useId();
-  const slashListboxRef = useRef<HTMLDivElement | null>(null);
-  const slashEnabled = editable && slashOptions !== undefined;
-
   const pastedNameCounterRef = useRef<PastedNameCounter | null>(null);
   if (pastedNameCounterRef.current === null)
     pastedNameCounterRef.current = createPastedNameCounter();
@@ -227,9 +191,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
         if (sameRange(dismissed, next)) return;
         dismissedRangeRef.current = null;
       }
-      slashRangeRef.current = null;
-      setSlashRange(null);
-      setSlashHighlight(null);
     }
     inlineRangeRef.current = next;
     setInlineRange(next);
@@ -240,52 +201,16 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     applyRange(null);
   }, [applyRange]);
 
-  const applySlashRange = useCallback((next: CompletionRange | null) => {
-    const prev = slashRangeRef.current;
-    if (prev === next) return;
-    if (prev !== null && next !== null && sameRange(prev, next)) return;
-    if (next !== null) {
-      const dismissed = dismissedSlashRef.current;
-      if (dismissed !== null) {
-        if (sameRange(dismissed, next)) return;
-        dismissedSlashRef.current = null;
-      }
-      inlineRangeRef.current = null;
-      setInlineRange(null);
-      setInlineHighlight(null);
-    }
-    slashRangeRef.current = next;
-    setSlashRange(next);
-    setSlashHighlight(null);
-  }, []);
-
-  const closeSlash = useCallback(() => {
-    applySlashRange(null);
-  }, [applySlashRange]);
-
-  const closeHelp = useCallback(() => {
-    setHelpOpen(false);
-  }, []);
-
   const reevaluate = useCallback(() => {
     if (!editable) return;
     const ta = textareaRef.current;
     if (ta == null) return;
     const caret = ta.selectionStart ?? ta.value.length;
-    if (slashEnabled) {
-      const slash = detectCompletionToken(ta.value, caret, SLASH_COMPLETION_SPEC);
-      if (slash !== null) {
-        applySlashRange(slash);
-        return;
-      }
-      applySlashRange(null);
-    }
     applyRange(detectCompletionToken(ta.value, caret, MENTION_COMPLETION_SPEC));
-  }, [editable, slashEnabled, applySlashRange, applyRange]);
+  }, [editable, applyRange]);
 
   const reevaluateFromChange = useCallback(() => {
     dismissedRangeRef.current = null;
-    dismissedSlashRef.current = null;
     reevaluate();
   }, [reevaluate]);
 
@@ -293,36 +218,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     if (inlineRange === null || mentionGroups == null) return [];
     return buildInlineRows(inlineRange.query, mentionGroups, mentionFiles);
   }, [inlineRange, mentionGroups, mentionFiles]);
-
-  const slashSections: SlashSection[] = useMemo(() => {
-    if (slashRange === null || !slashEnabled) return [];
-    return buildSlashSections({
-      query: slashRange.query,
-      available: {
-        stop: slashOptions?.stopAvailable === true,
-      },
-      skills: (mentionGroups?.skill ?? []).map((s) => ({
-        id: s.id,
-        name: s.label,
-        ...(s.subtitle != null ? { description: s.subtitle } : {}),
-      })),
-    });
-  }, [slashRange, slashEnabled, slashOptions, mentionGroups]);
-  const slashRows = useMemo(() => slashSections.flatMap((s) => s.rows), [slashSections]);
-  const slashOpen = slashRange !== null && slashEnabled;
-  const slashQuery = slashRange?.query ?? '';
-  const helpSkillCount = mentionGroups?.skill.length ?? 0;
-  const helpRows = useMemo(
-    () =>
-      buildSlashSections({
-        query: '',
-        available: {
-          stop: slashOptions?.stopAvailable === true,
-        },
-        skills: [],
-      }).flatMap((s) => s.rows),
-    [slashOptions],
-  );
 
   const escapeAt = useRef<number | null>(null);
   const sending = useRef(false);
@@ -463,7 +358,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     const start = range !== null ? range.start : (ta.selectionStart ?? ta.value.length);
     const replaceEnd = range !== null ? range.end : undefined;
     closeInline();
-    closeSlash();
     pendingInsertRef.current = null;
     setDraft((current) => {
       const result = produce(current, start, replaceEnd);
@@ -525,67 +419,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const insertFile = (path: string) => {
     insertFileAt(path, inlineOpen ? inlineRangeRef.current : null);
   };
-  const runBuiltin = (name: BuiltinSlashName) => {
-    closeSlash();
-    switch (name) {
-      case 'clear':
-        writeFull('');
-        toast.success(t('已清空'));
-        break;
-      case 'attach':
-        openFilePicker();
-        break;
-      case 'stop':
-        slashOptions?.onStop?.();
-        break;
-      case 'help':
-        setHelpOpen(true);
-        break;
-    }
-  };
-
-  const insertSlashLiteral = (name: string) => {
-    const range = slashRangeRef.current;
-    if (range === null) return;
-    closeSlash();
-    pendingInsertRef.current = null;
-    setDraft((current) => {
-      const start = Math.max(0, Math.min(range.start, current.length));
-      const end = Math.max(start, Math.min(range.end, current.length));
-      const inserted = insertSlashText(current, { start, end, query: range.query }, name);
-      pendingInsertRef.current = { value: inserted.value, caret: inserted.caret };
-      return inserted.value;
-    });
-  };
-
-  const acceptSlashRow = (row: SlashRow, via: 'enter' | 'tab') => {
-    const range = slashRangeRef.current;
-    if (range === null) return;
-    const ta = textareaRef.current;
-    const value = ta?.value ?? '';
-    const action = resolveSlashAccept({
-      name: row.name,
-      kind: row.kind,
-      atStart: isMessageStart(value, range.start),
-      via,
-    });
-    if (action === 'run' && row.builtin !== undefined) {
-      setDraft((current) => {
-        const start = Math.max(0, Math.min(range.start, current.length));
-        const end = Math.max(start, Math.min(range.end, current.length));
-        return current.slice(0, start) + current.slice(end).replace(/^ /, '');
-      });
-      runBuiltin(row.builtin);
-      return;
-    }
-    if (action === 'insert-token' && row.skillId !== undefined) {
-      const skill = mentionGroups?.skill.find((s) => s.id === row.skillId);
-      insertTokensAt([{ kind: 'skill', id: row.skillId, label: skill?.label ?? row.name }], range);
-      return;
-    }
-    insertSlashLiteral(row.name);
-  };
-
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     const next = event.target.value;
     setDraft(next);
@@ -595,29 +428,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     const isComposing = event.nativeEvent.isComposing;
-    if (slashOpen) {
-      const slashIntent = completionKeyIntent(
-        { key: event.key, shiftKey: event.shiftKey, isComposing },
-        { open: true, highlight: slashHighlight, matchCount: slashRows.length },
-      );
-      if (slashIntent.kind !== 'ignore') event.preventDefault();
-      if (slashIntent.kind === 'dismiss') {
-        dismissedSlashRef.current = slashRangeRef.current;
-        closeSlash();
-        return;
-      }
-      if (slashIntent.kind === 'navigate') {
-        setSlashHighlight(slashIntent.index);
-        return;
-      }
-      if (slashIntent.kind === 'accept') {
-        const picked = slashRows[slashIntent.index];
-        if (picked != null) {
-          acceptSlashRow(picked, event.key === 'Tab' ? 'tab' : 'enter');
-        }
-        return;
-      }
-    }
     const intent = completionKeyIntent(
       { key: event.key, shiftKey: event.shiftKey, isComposing },
       { open: inlineOpen, highlight: inlineHighlight, matchCount: inlineRows.length },
@@ -640,7 +450,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     if (
       event.key === 'Escape' &&
       (isComposing || event.repeat) &&
-      (slashOptions?.stopAvailable || escapeAt.current !== null)
+      (stopOptions?.available || escapeAt.current !== null)
     ) {
       if (!isComposing) event.preventDefault();
       event.stopPropagation();
@@ -656,11 +466,11 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
         submit(onStopAndSend);
         return;
       }
-      if (slashOptions?.stopAvailable && slashOptions.onStop !== undefined) {
+      if (stopOptions?.available && stopOptions.onStop !== undefined) {
         event.preventDefault();
         event.stopPropagation();
         escapeAt.current = now;
-        slashOptions.onStop();
+        stopOptions.onStop();
         return;
       }
     } else if (event.key !== 'Escape') {
@@ -712,7 +522,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   };
 
   useEffect(() => {
-    if (!inlineOpen && !slashOpen) return;
+    if (!inlineOpen) return;
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
       if (target == null) return;
@@ -720,14 +530,11 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       if (ta?.contains(target)) return;
       const box = inlineListboxRef.current;
       if (box?.contains(target)) return;
-      const slashBox = slashListboxRef.current;
-      if (slashBox?.contains(target)) return;
       closeInline();
-      closeSlash();
     };
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [inlineOpen, slashOpen, closeInline, closeSlash]);
+  }, [inlineOpen, closeInline]);
 
   return {
     draft,
@@ -740,10 +547,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     handleKeyDown,
     handleCaretMoved: reevaluate,
     handleCompositionEnd: reevaluate,
-    handleBlur: () => {
-      closeInline();
-      closeSlash();
-    },
+    handleBlur: closeInline,
     textareaRef,
     fileInputRef,
     openFilePicker,
@@ -765,19 +569,5 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     inlineListboxRef,
     acceptInlineRow,
     mentionRegistry: registry,
-    slashOpen,
-    slashQuery,
-    slashCaret: slashRange?.start ?? null,
-    slashSections,
-    slashRows,
-    slashHighlight,
-    setSlashHighlight,
-    slashListboxId,
-    slashListboxRef,
-    acceptSlashRow,
-    helpOpen,
-    closeHelp,
-    helpRows,
-    helpSkillCount,
   };
 }

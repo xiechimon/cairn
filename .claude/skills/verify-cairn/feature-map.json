@@ -1927,14 +1927,14 @@
     {
       "id": "composer",
       "name": "Composer",
-      "summary": "The message composer: mentions, slash commands, named prompts and drafts that survive closing the app.",
-      "states": "Empty with a placeholder, a draft restored after reload, slash menu and mention suggestions open, and a send error.",
+      "summary": "The message composer: mentions, named prompts and drafts that survive closing the app. A leading / is plain text; there is no slash-command menu.",
+      "states": "Empty with a placeholder, a draft restored after reload, mention suggestions open, and a send error.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/chief/composer-surface.tsx",
-          "apps/web/src/overlay/slash-menu.tsx",
+          "apps/web/src/overlay/mention-inline.tsx",
           "apps/web/src/overlay/draft-sync.ts"
         ],
         "server": [
@@ -1950,7 +1950,7 @@
       "reach": [
         "open /app",
         "click testid:chief-composer-block",
-        "type / to open slash commands or @ to mention"
+        "type @ to mention"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/mentions.md",
@@ -1968,7 +1968,6 @@
         "gap": "no design for server drafts  and named prompts"
       },
       "evidence": [
-        "apps/web/e2e/composer-slash.spec.ts",
         "apps/web/e2e/chief-draft-persist.spec.ts",
         "apps/server/test/composer-drafts.test.ts"
       ],

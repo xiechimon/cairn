@@ -845,8 +845,8 @@ export function ChiefConversation({
               }
               onAttachment={onAttachment}
               mentionGroups={mentionGroups}
-              slash={{
-                stopAvailable: canStop,
+              stop={{
+                available: canStop,
                 onStop: () => stopTurnRef.current?.(),
               }}
               active={!answerActive}

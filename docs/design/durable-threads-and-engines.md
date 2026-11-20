@@ -51,7 +51,7 @@ Owner decisions on 2026-11-12 and 2026-11-13. When a thread has dispatched work 
 
 ## Commands and working habits belong to cairn
 
-Owner question on 2026-11-12: pi has no `/loop`, `/goal`, todo list and similar commands that other harnesses ship. The answer is that cairn does not wait for the harness to grow them and does not borrow an engine's. The runtime already extends pi through extensions (`apps/server/src/coordinator/runtime/server-runtime.ts` installs the Coordinator tools, volatile context, compaction and telemetry), and the web already has a slash menu (`apps/web/src/overlay/slash-menu.tsx`). Each habit is built once at that layer, so it behaves the same whichever engine does the work, survives a restart, and shows in the interface.
+Owner question on 2026-11-12: pi has no `/loop`, `/goal`, todo list and similar commands that other harnesses ship. The answer is that cairn does not wait for the harness to grow them and does not borrow an engine's. The runtime already extends pi through extensions (`apps/server/src/coordinator/runtime/server-runtime.ts` installs the Coordinator tools, volatile context, compaction and telemetry) (the web composer has no slash-command menu; the owner removed it on 2026-11-21). Each habit is built once at that layer, so it behaves the same whichever engine does the work, survives a restart, and shows in the interface.
 
 | Habit | What it is in cairn | Built on |
 |---|---|---|
@@ -64,7 +64,7 @@ Owner question on 2026-11-12: pi has no `/loop`, `/goal`, todo list and similar 
 
 Rules:
 
-- Each habit is one action in the registry proposed in `docs/design/ai-native-actions.md`, so the slash menu, the thread's tools and the CLI are generated from the same definition. A command the owner can type is a tool the agent can call.
+- Each habit is one action in the registry proposed in `docs/design/ai-native-actions.md`, so the thread's tools and the CLI are generated from the same definition. A command the owner can type is a tool the agent can call.
 - State lives on the thread, not in the engine's session. An engine may have its own todo or loop; the thread does not depend on it, and the adapter maps the engine's plan events onto the thread's checklist where they exist.
 - A new habit needs its states and failure behavior written down first (what happens when the wake fails, the cap is reached, the goal cannot be checked), because it is persisted state.
 

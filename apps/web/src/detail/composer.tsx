@@ -34,7 +34,6 @@ import { useFileDrop } from '../overlay/file-drop.js';
 import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.js';
-import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 
 const COMPOSER_FIELD =
   'composer relative flex flex-col rounded-(--radius-composer) border-0 data-drop-target:ring-2 data-drop-target:ring-(--focus-ring)';
@@ -117,19 +116,6 @@ export function Composer({
     inlineListboxRef,
     acceptInlineRow,
     mentionRegistry,
-    slashOpen,
-    slashQuery,
-    slashCaret,
-    slashSections,
-    slashHighlight,
-    setSlashHighlight,
-    slashListboxId,
-    slashListboxRef,
-    acceptSlashRow,
-    helpOpen,
-    closeHelp,
-    helpRows,
-    helpSkillCount,
   } = useComposerWire({
     editable,
     draft: draftProp,
@@ -140,8 +126,8 @@ export function Composer({
     onAttachment,
     mentionGroups,
     mentionFiles,
-    slash: {
-      stopAvailable: streaming && onStop !== undefined,
+    stop: {
+      available: streaming && onStop !== undefined,
       ...(onStop !== undefined ? { onStop } : {}),
     },
     growCap: 384,
@@ -284,20 +270,6 @@ export function Composer({
                 listboxRef={inlineListboxRef}
                 listboxId={inlineListboxId}
               />
-              <SlashMenu
-                open={slashOpen}
-                sections={slashSections.map((s) => ({
-                  title: s.section === 'builtin' ? t('命令') : t('技能'),
-                  rows: s.rows,
-                }))}
-                caret={slashCaret}
-                query={slashQuery}
-                highlight={slashHighlight}
-                onHover={setSlashHighlight}
-                onPick={(row) => acceptSlashRow(row, 'enter')}
-                listboxRef={slashListboxRef}
-                listboxId={slashListboxId}
-              />
             </div>
           ) : (
             <div
@@ -378,12 +350,6 @@ export function Composer({
           {meter != null && <span className="ml-auto flex">{meter}</span>}
         </div>
       )}
-      <SlashHelp
-        open={helpOpen}
-        onClose={closeHelp}
-        commands={helpRows}
-        skillCount={helpSkillCount}
-      />
     </div>
   );
 }

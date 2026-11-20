@@ -3,40 +3,13 @@ import { useId, useRef, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Kbd } from '../components/ui/kbd.js';
-import { useI18n } from '../i18n/provider.js';
 import { EllipsisVertical, Search, Settings } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import { MoreMenu } from '../overlay/more-menu.js';
 import { type SearchContext, SearchPanel, useSearchState } from '../overlay/search-panel.js';
-import { BUILTIN_SLASH_COMMANDS, type SlashRow } from '../overlay/slash-commands.js';
-import { SlashMenu } from '../overlay/slash-menu.js';
 import { BOARD_FIXTURE, CARD_FACES, MENTION_GROUPS } from './product-fixtures.js';
 import { Cell, Section, Specimen } from './specimen.js';
-
-const SLASH_SECTIONS: { title: string; rows: SlashRow[] }[] = [
-  {
-    title: '命令',
-    rows: BUILTIN_SLASH_COMMANDS.slice(0, 4).map((c) => ({
-      name: c.name,
-      kind: c.kind,
-      builtin: c.name,
-      descKey: c.descKey,
-    })),
-  },
-  {
-    title: '技能',
-    rows: [
-      {
-        name: 'frontend-design',
-        kind: 'insert',
-        skillId: 'frontend-design',
-        description: 'Distinctive UI direction',
-      },
-      { name: 'verify', kind: 'insert', skillId: 'verify', description: 'Prove a change works' },
-    ],
-  },
-];
 
 const INLINE_ROWS = [
   ...MENTION_GROUPS.agent.map((e) => ({ kind: 'agent' as const, ...e })),
@@ -120,53 +93,17 @@ function SearchSpecimen() {
 }
 
 function PickersSpecimen() {
-  const { t } = useI18n();
-  const [slashHi, setSlashHi] = useState<number | null>(0);
   const [inlineHi, setInlineHi] = useState<number | null>(0);
   const [picked, setPicked] = useState<string | null>(null);
-  const slashRef = useRef<HTMLDivElement>(null);
   const inlineRef = useRef<HTMLDivElement>(null);
-  const slashId = useId();
   const inlineId = useId();
   return (
     <Specimen
-      id="slash-menu-and-mentions"
-      title="Slash menu and mentions"
-      note={picked ?? 'SlashMenu and MentionInline as they float over the composer'}
+      id="mentions"
+      title="Mentions"
+      note={picked ?? 'MentionInline as it floats over the composer'}
       stage="canvas"
     >
-      <Cell label="SlashMenu">
-        <div className="relative mt-80 h-10 w-80 rounded-(--radius-composer) bg-card px-3 py-2.5 text-ui shadow-(--shadow-composer)">
-          /
-          <SlashMenu
-            open
-            sections={SLASH_SECTIONS.map((section) => ({ ...section, title: t(section.title) }))}
-            caret={0}
-            query=""
-            highlight={slashHi}
-            onHover={setSlashHi}
-            onPick={(row) => setPicked(`Slash: /${row.name}`)}
-            listboxRef={slashRef}
-            listboxId={slashId}
-          />
-        </div>
-      </Cell>
-      <Cell label="SlashMenu, no match">
-        <div className="relative mt-80 h-10 w-64 rounded-(--radius-composer) bg-card px-3 py-2.5 text-ui shadow-(--shadow-composer)">
-          /zzz
-          <SlashMenu
-            open
-            sections={[]}
-            caret={0}
-            query="zzz"
-            highlight={null}
-            onHover={() => {}}
-            onPick={() => {}}
-            listboxRef={slashRef}
-            listboxId={`${slashId}-empty`}
-          />
-        </div>
-      </Cell>
       <Cell label="MentionInline">
         <div className="relative mt-80 h-10 w-80 rounded-(--radius-composer) bg-card px-3 py-2.5 text-ui shadow-(--shadow-composer)">
           @

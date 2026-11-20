@@ -55,6 +55,20 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
       .toBeGreaterThan((viewport?.height ?? 0) - 40);
   });
 
+  test('a leading slash is plain text: no command menu opens and /clear is sent as typed', async ({
+    page,
+  }) => {
+    const sent = await mockLive(page, { threads: [], messages: [] });
+    await page.goto('/app');
+    const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await input.click();
+    await page.keyboard.type('/clear');
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+    await expect(input).not.toHaveAttribute('aria-expanded');
+    await input.press('Enter');
+    await expect.poll(() => sent).toEqual(['/clear']);
+  });
+
   test('the first send from home never brings the loading skeleton back, even when the messages arrive late', async ({
     page,
   }) => {

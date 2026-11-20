@@ -496,7 +496,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### composer
 
-**Composer** (shipped). The message composer: mentions, slash commands, named prompts and drafts that survive closing the app.
+**Composer** (shipped). The message composer: mentions, named prompts and drafts that survive closing the app. A leading / is plain text; there is no slash-command menu.
 
 - Research: **gap**: no note comparing composers in claude.ai, Amp and t3code
 - Frontend design: [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/references/coordinator-chat](design/references/coordinator-chat)

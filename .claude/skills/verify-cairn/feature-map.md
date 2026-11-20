@@ -750,15 +750,15 @@ Reach:
 
 ### composer
 
-**Composer** (shipped, centrality 3). The message composer: mentions, slash commands, named prompts and drafts that survive closing the app.
+**Composer** (shipped, centrality 3). The message composer: mentions, named prompts and drafts that survive closing the app. A leading / is plain text; there is no slash-command menu.
 
-States: Empty with a placeholder, a draft restored after reload, slash menu and mention suggestions open, and a send error.
+States: Empty with a placeholder, a draft restored after reload, mention suggestions open, and a send error.
 
 Reach:
 
 1. `open /app`
 2. `click testid:chief-composer-block`
-3. `type / to open slash commands or @ to mention`
+3. `type @ to mention`
 
 - Web routes: none
 - Keyboard shortcuts in its code: `A`
@@ -767,7 +767,7 @@ Reach:
 - Research: **gap**: no note comparing composers in claude.ai, Amp and t3code
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat)
 - Backend design: **gap**: no design for server drafts  and named prompts
-- Evidence: `apps/web/e2e/composer-slash.spec.ts`, `apps/web/e2e/chief-draft-persist.spec.ts`, `apps/server/test/composer-drafts.test.ts`
+- Evidence: `apps/web/e2e/chief-draft-persist.spec.ts`, `apps/server/test/composer-drafts.test.ts`
 
 ### coordinator-mcp
 
