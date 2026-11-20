@@ -19,14 +19,12 @@ import {
 import { useLiveData } from '../../api/provider.js';
 import { EmptyState } from '../../components/empty-state.js';
 import { IconTooltip } from '../../components/icon-tooltip.js';
+import { KeyedMenuContent, KeyedMenuItem, KeyedMenuRadioItem } from '../../components/menu-keys.js';
 import { SegmentedTabs } from '../../components/segmented.js';
 import { Button } from '../../components/ui/button.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu.js';
 import { Skeleton } from '../../components/ui/skeleton.js';
@@ -325,22 +323,22 @@ function DesignPage({
               <span className="truncate">{page.fileName}</span>
               <ChevronDown aria-hidden className="size-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
+            <KeyedMenuContent align="start" className="w-56">
               <DropdownMenuRadioGroup
                 value={page.fileName}
                 onValueChange={(v) => openPage(String(v))}
               >
                 {pages.map((item) => (
-                  <DropdownMenuRadioItem
+                  <KeyedMenuRadioItem
                     key={item.fileName}
                     value={item.fileName}
                     data-testid="design-page-option"
                   >
                     {item.fileName}
-                  </DropdownMenuRadioItem>
+                  </KeyedMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
+            </KeyedMenuContent>
           </DropdownMenu>
         ) : (
           <span
@@ -501,33 +499,40 @@ function DesignPage({
           >
             <Ellipsis aria-hidden className="size-4" />
           </IconTooltip>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem
+          <KeyedMenuContent align="end" className="w-48">
+            <KeyedMenuItem
+              shortcut="B"
               data-testid="design-open-browser"
               render={<a href={pageHref} target="_blank" rel="noopener noreferrer" />}
             >
               <Globe aria-hidden />
               {t('在浏览器打开')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
+              shortcut="D"
               data-testid="design-download"
               render={<a href={deliverableHref(shown.attachmentId)} download={page.fileName} />}
             >
               <Download aria-hidden />
               {t('下载')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
+              shortcut="R"
               className="min-[641px]:hidden"
               onClick={() => setReloads((n) => n + 1)}
             >
               <RotateCw aria-hidden />
               {t('重新加载')}
-            </DropdownMenuItem>
-            <DropdownMenuItem className="min-[641px]:hidden" onClick={() => setSource((v) => !v)}>
+            </KeyedMenuItem>
+            <KeyedMenuItem
+              shortcut="S"
+              className="min-[641px]:hidden"
+              onClick={() => setSource((v) => !v)}
+            >
               <Code aria-hidden />
               {source ? t('看预览') : t('看源码')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+            </KeyedMenuItem>
+          </KeyedMenuContent>
         </DropdownMenu>
       </div>
       {viewingOld && (

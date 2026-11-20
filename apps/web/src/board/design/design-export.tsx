@@ -1,12 +1,8 @@
 import { FileArchive, FileCode, FileImage, Printer } from 'lucide-react';
 import type { RefObject } from 'react';
+import { KeyedMenuContent, KeyedMenuItem } from '../../components/menu-keys.js';
 import { Button } from '../../components/ui/button.js';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu.js';
+import { DropdownMenu, DropdownMenuTrigger } from '../../components/ui/dropdown-menu.js';
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
 import {
@@ -99,37 +95,41 @@ export function ExportMenu({
       >
         {t('导出')}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem
+      <KeyedMenuContent align="end" className="w-56">
+        <KeyedMenuItem
+          shortcut="H"
           data-testid="design-export-html"
           onClick={() => html !== undefined && downloadPageHtml(html, fileName)}
         >
           <FileCode aria-hidden />
           {t('HTML 文件')}
-        </DropdownMenuItem>
-        <DropdownMenuItem
+        </KeyedMenuItem>
+        <KeyedMenuItem
+          shortcut="Z"
           data-testid="design-export-zip"
           onClick={() => html !== undefined && downloadPageZip(html, fileName)}
         >
           <FileArchive aria-hidden />
           {t('ZIP（含交接说明）')}
-        </DropdownMenuItem>
-        <DropdownMenuItem
+        </KeyedMenuItem>
+        <KeyedMenuItem
+          shortcut="P"
           data-testid="design-export-png"
           disabled={!previewing}
           onClick={() => void exportPng()}
         >
           <FileImage aria-hidden />
           {t('PNG 截图')}
-        </DropdownMenuItem>
-        <DropdownMenuItem
+        </KeyedMenuItem>
+        <KeyedMenuItem
+          shortcut="F"
           data-testid="design-export-pdf"
           render={<a href={printHref} target="_blank" rel="noopener noreferrer" />}
         >
           <Printer aria-hidden />
           {t('打印成 PDF')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+        </KeyedMenuItem>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }

@@ -1,10 +1,9 @@
 import type { DesignVersionRecord } from '@cairn/shared';
+import { KeyedMenuContent, KeyedMenuItem } from '../../components/menu-keys.js';
 import { Button } from '../../components/ui/button.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuGroup,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu.js';
@@ -48,11 +47,11 @@ export function VersionsMenu({
       >
         {t('版本')}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72">
+      <KeyedMenuContent align="end" className="w-72">
         <DropdownMenuGroup>
           <DropdownMenuLabel>{t('{name} · 版本', { name: fileName })}</DropdownMenuLabel>
           {ordered.map((version) => (
-            <DropdownMenuItem
+            <KeyedMenuItem
               key={version.id}
               data-testid="design-version-item"
               data-seq={version.seq}
@@ -72,10 +71,10 @@ export function VersionsMenu({
                   {relativeTime(version.createdAt, now, t)}
                 </span>
               </span>
-            </DropdownMenuItem>
+            </KeyedMenuItem>
           ))}
         </DropdownMenuGroup>
-      </DropdownMenuContent>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 }
