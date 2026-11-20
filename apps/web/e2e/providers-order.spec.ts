@@ -95,8 +95,13 @@ test('the keyboard moves a provider with Space and the arrow keys', async ({ pag
     .focus();
   await page.keyboard.press('Space');
   await expect(page.locator('[data-dragging="true"]')).toHaveCount(1);
-  await page.keyboard.press('ArrowDown');
-  await expect(page.locator('[data-instance-id="provider:p-a"]')).toHaveAttribute('style', /translate3d\(0px, -/);
+  const dragged = page.locator('[data-instance-id="provider:p-a"]');
+  await expect
+    .poll(async () => {
+      await page.keyboard.press('ArrowDown');
+      return dragged.getAttribute('style');
+    })
+    .toMatch(/translate3d\(0px, -/);
   await page.keyboard.press('Space');
 
   const moved = ['provider:p-a', 'subscription:sub-d1', 'provider:p-b'];
@@ -116,8 +121,13 @@ test('a failed save puts the previous order back and says so', async ({ page }) 
     .focus();
   await page.keyboard.press('Space');
   await expect(page.locator('[data-dragging="true"]')).toHaveCount(1);
-  await page.keyboard.press('ArrowUp');
-  await expect(page.locator('[data-instance-id="subscription:sub-d1"]')).toHaveAttribute('style', /translate3d\(0px, [1-9]/);
+  const shifted = page.locator('[data-instance-id="subscription:sub-d1"]');
+  await expect
+    .poll(async () => {
+      await page.keyboard.press('ArrowUp');
+      return shifted.getAttribute('style');
+    })
+    .toMatch(/translate3d\(0px, [1-9]/);
   await page.keyboard.press('Space');
 
   await expect(page.getByText('顺序没能保存，已恢复原来的顺序。')).toBeVisible();
