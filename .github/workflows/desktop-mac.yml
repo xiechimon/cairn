@@ -71,6 +71,10 @@ jobs:
         working-directory: apps/desktop
         run: node scripts/check-signature.mjs "$SIGNING_CERT" release/mac-arm64/Cairn.app
 
+      - name: Check that the packaged Runner resolves the Claude Code binary
+        working-directory: apps/desktop
+        run: node scripts/check-runner-claude.mjs release/mac-arm64/Cairn.app/Contents/Resources/runner darwin arm64
+
       - name: Launch the packaged app and check the owner sign-in
         working-directory: apps/desktop
         run: pnpm smoke

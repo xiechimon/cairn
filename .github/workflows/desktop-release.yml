@@ -111,6 +111,12 @@ jobs:
           node scripts/check-signature.mjs signing/cairn-mac-self-signed.crt \
             "$RUNNER_TEMP/unzipped/Cairn.app"
 
+      - name: Check that the update zip's Runner resolves the Claude Code binary for its arch
+        working-directory: apps/desktop
+        run: |
+          node scripts/check-runner-claude.mjs \
+            "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/runner" darwin "$ARCH"
+
       - name: Launch the arm64 app before publishing it
         if: matrix.arch == 'arm64'
         working-directory: apps/desktop
