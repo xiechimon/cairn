@@ -326,17 +326,23 @@ function toolSearchTool(deferred: readonly RemoteToolDef[]): ToolRegistration {
         agent.model === undefined
           ? undefined
           : api.models.getModel(agent.model.provider, agent.model.modelId);
-      const named = deferred.filter((def) => new RegExp(`\\b${def.name}\\b`).test(query));
-      const found = await native.execute(
-        { query, ...(limit === undefined ? {} : { limit }) },
-        api,
-        context,
-      );
-      const ranked = (found.details as { loaded?: string[] } | undefined)?.loaded ?? [];
-      const names = [...new Set([...named.map((def) => def.name), ...ranked])].slice(
-        0,
-        Math.max(limit ?? 8, named.length),
-      );
+      const named = deferred
+        .filter((def) => new RegExp(`\\b${def.name}\\b`).test(query))
+        .map((def) => def.name);
+      const names =
+        named.length > 0
+          ? named
+          : (
+              (
+                (
+                  await native.execute(
+                    { query, ...(limit === undefined ? {} : { limit }) },
+                    api,
+                    context,
+                  )
+                ).details as { loaded?: string[] } | undefined
+              )?.loaded ?? []
+            ).slice(0, limit ?? 8);
       if (model !== undefined && deferToolsOf(model) === 'native') {
         const offered = new Set(agent.tools.map((tool) => tool.name));
         const load = names.filter((name) => !offered.has(name));
@@ -359,12 +365,16 @@ function toolSearchTool(deferred: readonly RemoteToolDef[]): ToolRegistration {
       const text =
         defs.length === 0
           ? 'No matching tools found.'
-          : `Call these with ${CALL_TOOL_TOOL} {name, arguments}; they are not in your tool list.\n\n${defs
-              .map(
-                (def) =>
-                  `## ${def.name}\n${def.description}\nParameters: ${JSON.stringify(def.parameters ?? EMPTY_PARAMETERS)}`,
-              )
-              .join('\n\n')}`;
+          : named.length === 0
+            ? `Matching tools; search again with the names you need to load them:\n${defs
+                .map((def) => `- ${def.name}: ${firstSentence(def.description)}`)
+                .join('\n')}`
+            : `Call these with ${CALL_TOOL_TOOL} {name, arguments}; they are not in your tool list.\n\n${defs
+                .map(
+                  (def) =>
+                    `## ${def.name}\n${def.description}\nParameters: ${JSON.stringify(def.parameters ?? EMPTY_PARAMETERS)}`,
+                )
+                .join('\n\n')}`;
       return { output: [{ type: 'text', text }], details: { loaded: [] } };
     },
   });
