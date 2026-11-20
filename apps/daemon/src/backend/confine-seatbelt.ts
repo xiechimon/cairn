@@ -53,6 +53,10 @@ function subpaths(paths: string[]): string {
   return paths.map((path) => `(subpath ${quoted(path)})`).join(' ');
 }
 
+function regexEscaped(path: string): string {
+  return path.replace(/[\\^$.|?*+()[\]{}]/g, '\\$&');
+}
+
 export function seatbeltProfile(policy: SeatbeltPolicy): string {
   const home = canonical(policy.home, true);
   const deniedRoots = policy.deniedRoots.map((path) => canonical(path));
@@ -112,8 +116,22 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
     ),
   ];
   const protectedGit = policy.gitDirectories.flatMap((directory) =>
-    ['config', 'config.worktree', 'hooks'].map((name) => canonical(join(directory, name))),
+    [
+      'config',
+      'config.worktree',
+      'hooks',
+      'commondir',
+      'gitdir',
+      'rebase-merge',
+      'rebase-apply',
+      'sequencer',
+    ].map((name) => canonical(join(directory, name))),
   );
+  const protectedGitPatterns = policy.gitDirectories.map((directory) => {
+    const resolved = canonical(directory);
+    if (/["\n\r\0]/.test(resolved)) throw new Error('Unsafe seatbelt path');
+    return `(regex #"^${regexEscaped(resolved)}/(worktrees|modules)/(.*/)?(commondir|gitdir|config(\\..*)?|hooks.*|rebase-merge.*|rebase-apply.*|sequencer.*)$")`;
+  });
   const workspaceGit = canonical(join(policy.workspace, '.git'));
   const lines = [
     '(version 1)',
@@ -128,7 +146,7 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
         ]
       : []),
     ...(readable.length > 0 ? [`(allow file-read* ${subpaths(readable)})`] : []),
-    `(deny file-write* ${subpaths(protectedGit)} (literal ${quoted(workspaceGit)}))`,
+    `(deny file-write* ${subpaths(protectedGit)} (literal ${quoted(workspaceGit)})${protectedGitPatterns.length > 0 ? ` ${protectedGitPatterns.join(' ')}` : ''})`,
     ...LAUNCH_SERVICE_DENIALS,
   ];
   if (policy.serverPort !== undefined) {

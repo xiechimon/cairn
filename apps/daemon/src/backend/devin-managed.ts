@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -17,10 +18,10 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import { ensurePrivateDir } from '../private-fs.js';
+import { contains } from './confine.js';
 
 const exec = promisify(execFile);
 
-const REGISTRY_URL = 'https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json';
 const MANIFEST_URL = 'https://static.devin.ai/cli/current/manifest.json';
 const ARCHIVE_HOST = 'static.devin.ai';
 const LOCK_STALE_MS = 15 * 60_000;
@@ -37,27 +38,6 @@ const manifestSchema = z.object({
     }),
   ),
 });
-
-const registryAgentSchema = z.object({
-  id: z.string(),
-  version: z.string(),
-  distribution: z
-    .object({
-      binary: z
-        .record(
-          z.string(),
-          z.object({
-            archive: z.string().url(),
-            cmd: z.string(),
-            args: z.array(z.string()).optional(),
-          }),
-        )
-        .nullish(),
-    })
-    .optional(),
-});
-
-const registrySchema = z.object({ agents: z.array(registryAgentSchema) });
 
 const installMarkerSchema = z.object({
   version: z.string(),
@@ -88,7 +68,6 @@ export interface DevinManagedOptions {
   platform?: string;
   arch?: string;
   fetchImpl?: typeof fetch;
-  registryUrl?: string;
   manifestUrl?: string;
   archiveHost?: string;
   log?: (message: string) => void;
@@ -143,7 +122,6 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
   const fetchImpl = options.fetchImpl ?? fetch;
-  const registryUrl = options.registryUrl ?? REGISTRY_URL;
   const manifestUrl = options.manifestUrl ?? MANIFEST_URL;
   const archiveHost = options.archiveHost ?? ARCHIVE_HOST;
   const log = options.log ?? (() => {});
@@ -156,7 +134,8 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
     if (marker === null) return null;
     const binPath = join(versionDir, marker.binRelPath);
     try {
-      if (!existsSync(binPath) || sha256File(binPath) !== marker.binSha256) return null;
+      if (!contains(realpathSync(versionDir), realpathSync(binPath))) return null;
+      if (sha256File(binPath) !== marker.binSha256) return null;
     } catch {
       return null;
     }
@@ -252,51 +231,6 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
     };
   }
 
-  async function registrySpec(): Promise<InstallSpec | null> {
-    if (key === null) return null;
-    const body = await fetchCachedJson(registryUrl, 'registry-cache.json');
-    if (body === null) return null;
-    const parsed = registrySchema.safeParse(parseJson(body));
-    if (!parsed.success) {
-      log('devin registry did not match the expected shape');
-      return null;
-    }
-    const agent = parsed.data.agents.find((entry) => entry.id === 'devin');
-    const binary = agent?.distribution?.binary?.[key];
-    if (agent === undefined || binary === undefined) {
-      log(`devin registry has no binary entry for ${key}`);
-      return null;
-    }
-    const binRelPath = binary.cmd.replace(/^\.[/\\]/, '').replaceAll('\\', '/');
-    if (
-      unsafeVersion(agent.version) ||
-      binRelPath.split('/').includes('..') ||
-      binRelPath.startsWith('/')
-    ) {
-      log(`devin registry entry has an unsafe version or cmd: ${agent.version} ${binary.cmd}`);
-      return null;
-    }
-    if (!trustedArchive(binary.archive, archiveHost)) {
-      log(`devin registry archive url is untrusted: ${binary.archive}`);
-      return null;
-    }
-    return {
-      version: agent.version,
-      archive: binary.archive,
-      binRelPath,
-      args: binary.args ?? ['acp'],
-    };
-  }
-
-  async function resolveSpecs(): Promise<InstallSpec[]> {
-    const specs: InstallSpec[] = [];
-    const manifest = await manifestSpec();
-    if (manifest !== null) specs.push(manifest);
-    const registry = await registrySpec();
-    if (registry !== null && registry.version !== manifest?.version) specs.push(registry);
-    return specs;
-  }
-
   async function install(spec: InstallSpec): Promise<DevinInstall | null> {
     const versionDir = join(root, 'versions', spec.version);
     const existing = installFor(versionDir);
@@ -329,6 +263,8 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
         if (!existsSync(binPath)) throw new Error('devin archive has no binary');
       }
       if (!lstatSync(binPath).isFile()) throw new Error('devin archive binary is not a file');
+      if (!contains(realpathSync(staging), realpathSync(binPath)))
+        throw new Error('devin archive binary escapes the archive');
       const marker: InstallMarker = {
         version: spec.version,
         url: spec.archive,
@@ -338,7 +274,10 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
         args: spec.args,
         installedAt: Date.now(),
       };
-      writeFileSync(join(staging, '.install-complete'), JSON.stringify(marker));
+      const markerPath = join(staging, '.install-complete');
+      const markerStaging = join(staging, '.install-complete.pending');
+      writeFileSync(markerStaging, JSON.stringify(marker), { flag: 'wx' });
+      renameSync(markerStaging, markerPath);
       rmSync(versionDir, { recursive: true, force: true });
       mkdirSync(join(root, 'versions'), { recursive: true });
       renameSync(staging, versionDir);
@@ -372,19 +311,14 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
 
   async function ensure(): Promise<DevinInstall | null> {
     if (key === null) return null;
-    const specs = await resolveSpecs();
-    if (specs.length === 0) return current();
-    for (const spec of specs) {
-      const done = await withLock(() => install(spec));
-      if (done !== null) {
-        writeFileSync(join(root, 'current.json'), JSON.stringify({ version: spec.version }));
-        return done;
-      }
+    const spec = await manifestSpec();
+    if (spec === null) return current();
+    const done = await withLock(() => install(spec));
+    if (done !== null) {
+      writeFileSync(join(root, 'current.json'), JSON.stringify({ version: spec.version }));
+      return done;
     }
-    const head = specs[0];
-    return (
-      (head === undefined ? null : installFor(join(root, 'versions', head.version))) ?? current()
-    );
+    return installFor(join(root, 'versions', spec.version)) ?? current();
   }
 
   return {

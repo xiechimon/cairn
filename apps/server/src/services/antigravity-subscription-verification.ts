@@ -4,7 +4,11 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { AntigravitySubscriptionVerifyResult } from '@cairn/shared';
-import { verifiedManagedBin, verifiedManagedBins } from '@cairn/shared/managed-bin';
+import {
+  unsafeManagedVersion,
+  verifiedManagedBin,
+  verifiedManagedBins,
+} from '@cairn/shared/managed-bin';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MANAGED_ROOT = join(homedir(), '.cairn', 'tools', 'antigravity');
@@ -50,7 +54,9 @@ function managedMarkerCommand(): { command: string; args: string[] } | null {
     const current = JSON.parse(readFileSync(join(MANAGED_ROOT, 'current.json'), 'utf8')) as {
       version?: unknown;
     };
-    if (typeof current.version === 'string') currentVersion = current.version;
+    if (typeof current.version === 'string' && !unsafeManagedVersion(current.version)) {
+      currentVersion = current.version;
+    }
   } catch {}
   const candidates = [
     ...(currentVersion === null

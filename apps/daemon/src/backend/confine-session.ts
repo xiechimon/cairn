@@ -47,11 +47,12 @@ function systemTempDirectory(): string | null {
   }
 }
 
-function gitDirectoriesOf(workspace: string, deniedRoots: readonly string[]): string[] {
+function gitDirectoriesOf(workspace: string): string[] {
   const dotGit = join(workspace, '.git');
   const stat = lstatSync(dotGit, { throwIfNoEntry: false });
   if (stat === undefined || stat.isSymbolicLink()) return [];
   if (stat.isDirectory()) return [realpathSync(dotGit)];
+  if (!stat.isFile()) return [];
   const text = readGitPointer(dotGit);
   if (text === null) return [];
   try {
@@ -62,9 +63,7 @@ function gitDirectoriesOf(workspace: string, deniedRoots: readonly string[]): st
     if (back === null || realpathSync(resolve(gitdir, back)) !== realpathSync(dotGit)) {
       return [];
     }
-    const resolved = realpathSync(common);
-    if (deniedRoots.some((root) => contains(root, resolved))) return [];
-    return [resolved];
+    return [realpathSync(common)];
   } catch {
     return [];
   }
@@ -151,7 +150,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const state = ownState(harness, home, env)
       .filter((path) => !isStateFile(home, path) || existsSync(path))
       .map((path) => {
-        if (!isStateFile(home, path)) mkdirSync(path, { recursive: true });
+        if (!isStateFile(home, path)) mkdirSync(path, { recursive: true, mode: 0o700 });
         return realpathSync(path);
       });
     const handoff = options.handoffDirectories.map((path) => {
@@ -160,7 +159,10 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     });
     const explicitState = [...handoff, ...extraState.map((path) => realpathSync(path))];
     const temp = realpathSync(env.TMPDIR ?? tmpdir());
-    const deniedRoots = [options.daemonHome, ...options.extraDeniedRoots]
+    const daemonHome = existsSync(options.daemonHome)
+      ? realpathSync(options.daemonHome)
+      : options.daemonHome;
+    const deniedRoots = [daemonHome, ...options.extraDeniedRoots]
       .filter((path) => existsSync(path))
       .map((path) => realpathSync(path));
     const systemTemp =
@@ -181,10 +183,10 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     if (harnessTemp !== null) mkdirSync(harnessTemp, { recursive: true, mode: 0o700 });
     const policy: SeatbeltPolicy = {
       home,
-      daemonHome: options.daemonHome,
+      daemonHome,
       deniedRoots,
       workspace,
-      gitDirectories: gitDirectoriesOf(workspace, deniedRoots),
+      gitDirectories: gitDirectoriesOf(workspace),
       taskTemp: temp,
       state: [...state, ...explicitState],
       caches: [

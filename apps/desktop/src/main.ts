@@ -152,7 +152,7 @@ function migrateRunnerHome(): void {
     const to = join(target, entry);
     try {
       if (existsSync(to) || lstatSync(join(legacy, entry)).isSymbolicLink()) continue;
-      mkdirSync(target, { recursive: true });
+      mkdirSync(target, { recursive: true, mode: 0o700 });
       renameSync(join(legacy, entry), to);
     } catch (error) {
       console.warn(`runner-home migration skipped ${entry}:`, error);

@@ -121,6 +121,16 @@ describe('seatbelt profile', () => {
     writeFileSync(state, '{}');
     expect(() => seatbeltProfile({ ...policy, state: [state] })).not.toThrow();
   });
+
+  test('denies writes to git redirect metadata in the exposed git dir', () => {
+    const { policy } = layout();
+    const git = policy.gitDirectories[0] as string;
+    const profile = seatbeltProfile(policy);
+    for (const name of ['commondir', 'gitdir', 'rebase-merge', 'rebase-apply', 'sequencer']) {
+      expect(profile, name).toContain(`(subpath "${join(git, name)}")`);
+    }
+    expect(profile).toContain(`${git.replace(/[\\^$.|?*+()[\]{}]/g, '\\$&')}/(worktrees|modules)`);
+  });
 });
 
 describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {

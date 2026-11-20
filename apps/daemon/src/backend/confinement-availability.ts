@@ -101,9 +101,12 @@ export class ConfinementAvailability {
   }
 
   private owner(): string {
-    return (
-      this.options.owner ?? readFileSync('/proc/self/cgroup', 'utf8').trim().split('/').at(-1) ?? ''
-    );
+    if (this.options.owner !== undefined) return this.options.owner;
+    try {
+      return readFileSync('/proc/self/cgroup', 'utf8').trim().split('/').at(-1) ?? '';
+    } catch {
+      return '';
+    }
   }
 
   invalidate(): void {

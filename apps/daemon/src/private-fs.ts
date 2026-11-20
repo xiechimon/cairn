@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, lstatSync, mkdirSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  closeSync,
+  constants,
+  fchmodSync,
+  mkdirSync,
+  openSync,
+  writeSync,
+} from 'node:fs';
 
 const PRIVATE_DIR_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
@@ -9,12 +17,15 @@ export function ensurePrivateDir(dir: string): void {
 }
 
 export function writePrivateFile(path: string, contents: string): void {
-  if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
-    throw new Error(`refusing to write through symlink: ${path}`);
+  const fd = openSync(
+    path,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW,
+    PRIVATE_FILE_MODE,
+  );
+  try {
+    writeSync(fd, contents);
+    fchmodSync(fd, PRIVATE_FILE_MODE);
+  } finally {
+    closeSync(fd);
   }
-  writeFileSync(path, contents, { mode: PRIVATE_FILE_MODE });
-  if (lstatSync(path).isSymbolicLink()) {
-    throw new Error(`refusing to chmod through symlink: ${path}`);
-  }
-  chmodSync(path, PRIVATE_FILE_MODE);
 }

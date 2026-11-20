@@ -2,10 +2,12 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -16,6 +18,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { BRAND } from '@cairn/shared';
 import { z } from 'zod';
+import { contains } from './confine.js';
 
 const exec = promisify(execFile);
 
@@ -131,6 +134,7 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
     if (marker === null) return null;
     const binPath = join(versionDir, marker.binRelPath);
     try {
+      if (!contains(realpathSync(versionDir), realpathSync(binPath))) return null;
       const bytes = readFileSync(binPath);
       if (createHash('sha256').update(bytes).digest('hex') !== marker.binSha256) return null;
     } catch {
@@ -227,8 +231,12 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
         writeFileSync(tarballPath, bytes);
         await exec('tar', ['-xzf', tarballPath, '-C', staging, 'package/bundle/gemini.js']);
         const bundle = join(staging, 'package', 'bundle', 'gemini.js');
-        if (!existsSync(bundle)) {
+        if (!existsSync(bundle) || !lstatSync(bundle).isFile()) {
           log('gemini tarball has no bundle/gemini.js');
+          return null;
+        }
+        if (!contains(realpathSync(staging), realpathSync(bundle))) {
+          log('gemini tarball bundle escapes the archive');
           return null;
         }
         const binSha256 = createHash('sha256').update(readFileSync(bundle)).digest('hex');

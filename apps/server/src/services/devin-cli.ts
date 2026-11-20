@@ -1,11 +1,16 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { DevinSubscriptionVerifyResult } from '@cairn/shared';
+import {
+  unsafeManagedVersion,
+  verifiedManagedBin,
+  verifiedManagedBins,
+} from '@cairn/shared/managed-bin';
 
 export const DEFAULT_DEVIN_TIMEOUT_MS = 30_000;
 
-const MANAGED_INSTALL_ROOT = join(homedir(), '.local', 'share', 'cairn', 'devin');
+const MANAGED_INSTALL_ROOT = join(homedir(), '.cairn', 'tools', 'devin');
 const FORWARDED_ENV = [
   'HTTPS_PROXY',
   'HTTP_PROXY',
@@ -30,38 +35,37 @@ export function childEnv(home: string, token: string): NodeJS.ProcessEnv {
   return env;
 }
 
+function managedVersions(): string[] {
+  const versions: string[] = [];
+  try {
+    for (const entry of readdirSync(join(MANAGED_INSTALL_ROOT, 'versions'), {
+      withFileTypes: true,
+    })) {
+      if (entry.isDirectory()) versions.push(entry.name);
+    }
+  } catch {}
+  return versions;
+}
+
 function managedBin(): { command: string; args: string[] } | null {
-  const versionDirs: string[] = [];
+  let currentVersion: string | null = null;
   try {
     const current = JSON.parse(
       readFileSync(join(MANAGED_INSTALL_ROOT, 'current.json'), 'utf8'),
     ) as { version?: unknown };
-    if (typeof current.version === 'string') {
-      versionDirs.push(join(MANAGED_INSTALL_ROOT, 'versions', current.version));
+    if (typeof current.version === 'string' && !unsafeManagedVersion(current.version)) {
+      currentVersion = current.version;
     }
   } catch {}
-  try {
-    for (const entry of readdirSync(join(MANAGED_INSTALL_ROOT, 'versions')).sort().reverse()) {
-      versionDirs.push(join(MANAGED_INSTALL_ROOT, 'versions', entry));
-    }
-  } catch {}
-  for (const dir of versionDirs) {
-    try {
-      const marker = JSON.parse(readFileSync(join(dir, '.install-complete'), 'utf8')) as {
-        binRelPath?: unknown;
-        args?: unknown;
-      };
-      if (typeof marker.binRelPath !== 'string') continue;
-      const binPath = join(dir, marker.binRelPath);
-      if (!existsSync(binPath)) continue;
-      const args =
-        Array.isArray(marker.args) && marker.args.every((arg) => typeof arg === 'string')
-          ? marker.args
-          : ['acp'];
-      return { command: binPath, args };
-    } catch {}
-  }
-  return null;
+  const candidates = [
+    ...(currentVersion === null
+      ? []
+      : [verifiedManagedBin(join(MANAGED_INSTALL_ROOT, 'versions', currentVersion))]),
+    ...verifiedManagedBins(join(MANAGED_INSTALL_ROOT, 'versions'), managedVersions()),
+  ];
+  const found = candidates.find((bin) => bin !== null);
+  if (found === undefined || found === null) return null;
+  return { command: found.command, args: found.args.length > 0 ? found.args : ['acp'] };
 }
 
 export function devinBin(args: string[]): { command: string; args: string[] } {

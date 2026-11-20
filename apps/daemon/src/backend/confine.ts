@@ -1,6 +1,6 @@
 import { type ChildProcessWithoutNullStreams, execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import { promisify } from 'node:util';
@@ -131,11 +131,29 @@ export function confinementArgs(
   for (const path of deniedFiles.filter((path) => !policy.state.includes(path))) {
     args.push('--ro-bind', '/dev/null', path);
   }
-  for (const directory of policy.gitDirectories) {
-    for (const name of ['config', 'config.worktree', 'hooks']) {
+  const maskGitDirectory = (directory: string) => {
+    for (const name of ['config', 'config.worktree', 'commondir', 'gitdir']) {
       const path = canonical(join(directory, name));
-      if (name === 'hooks' && !existsSync(path)) args.push('--tmpfs', path, '--remount-ro', path);
-      else args.push('--ro-bind', existsSync(path) ? path : '/dev/null', path);
+      args.push('--ro-bind', existsSync(path) ? path : '/dev/null', path);
+    }
+    for (const name of ['hooks', 'rebase-merge', 'rebase-apply', 'sequencer']) {
+      const path = canonical(join(directory, name));
+      if (existsSync(path)) args.push('--ro-bind', path, path);
+      else args.push('--tmpfs', path, '--remount-ro', path);
+    }
+  };
+  for (const directory of policy.gitDirectories) {
+    maskGitDirectory(directory);
+    const nested = [join(directory, 'modules'), join(directory, 'worktrees')];
+    while (nested.length > 0) {
+      const parent = nested.pop();
+      if (parent === undefined || !existsSync(parent)) continue;
+      for (const entry of readdirSync(parent, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const path = join(parent, entry.name);
+        maskGitDirectory(path);
+        if (contains(join(directory, 'modules'), path)) nested.push(path);
+      }
     }
   }
   args.push('--remount-ro', home);

@@ -1,5 +1,13 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { type ConfinementPolicy, confinementArgs } from '../src/backend/confine.js';
@@ -7,7 +15,7 @@ import { testTempDir } from './test-temp-dir.js';
 
 const linuxProbes = process.platform === 'linux' && process.env.CAIRN_CONFINE_LINUX_PROBES === '1';
 function fixture(): ConfinementPolicy {
-  const root = testTempDir('confine-');
+  const root = realpathSync(testTempDir('confine-'));
   const home = join(root, 'home');
   const daemonHome = join(home, '.cairn');
   const policy: ConfinementPolicy = {
@@ -82,6 +90,41 @@ test('rejects a writable cache overlapping a denied credential tree', () => {
   expect(() => confinementArgs(policy, 'linux')).toThrow('overlap');
 });
 
+test('masks git redirect metadata inside exposed git dirs', () => {
+  const policy = fixture();
+  const git = policy.gitDirectories[0] as string;
+  const admin = join(git, 'worktrees', 'wt1');
+  mkdirSync(admin, { recursive: true });
+  writeFileSync(join(admin, 'commondir'), 'x');
+  const sub = join(git, 'modules', 'sub');
+  mkdirSync(join(sub, 'hooks'), { recursive: true });
+  writeFileSync(join(sub, 'config'), 'x');
+  const args = confinementArgs(policy, 'linux');
+  const masked = (path: string) =>
+    args.some(
+      (arg, index) =>
+        arg === path &&
+        (args[index - 1] === '--ro-bind' ||
+          args[index - 1] === '--tmpfs' ||
+          args[index - 2] === '--ro-bind' ||
+          args[index - 2] === '--tmpfs'),
+    );
+  for (const path of [
+    join(git, 'commondir'),
+    join(git, 'gitdir'),
+    join(git, 'rebase-merge'),
+    join(git, 'sequencer'),
+    join(admin, 'commondir'),
+    join(admin, 'gitdir'),
+    join(admin, 'config.worktree'),
+    join(sub, 'config'),
+    join(sub, 'hooks'),
+    join(sub, 'rebase-merge'),
+  ]) {
+    expect(masked(path), path).toBe(true);
+  }
+});
+
 test('rejects symlink mount sources before spawning', () => {
   const policy = fixture();
   symlinkSync(policy.workspace, join(policy.home, 'alias'));
@@ -91,7 +134,7 @@ test('rejects symlink mount sources before spawning', () => {
 
 test('refuses rebinding the whole daemon home or an ancestor of secrets', () => {
   const policy = fixture();
-  for (const workspace of ['/run', policy.daemonHome, policy.home, '/']) {
+  for (const workspace of ['/run', policy.daemonHome, policy.home, '/'].filter(existsSync)) {
     for (const grant of [
       { workspace },
       { taskTemp: workspace },

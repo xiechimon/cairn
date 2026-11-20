@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
 import { cleanupTestTempDirs, makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -8,7 +8,11 @@ import {
   createAntigravitySubscriptionSchema,
   DEFAULT_ANTIGRAVITY_MODELS,
 } from '../src/index.js';
-import { verifiedManagedBin, verifiedManagedBins } from '../src/node/managed-bin.js';
+import {
+  unsafeManagedVersion,
+  verifiedManagedBin,
+  verifiedManagedBins,
+} from '../src/node/managed-bin.js';
 
 const tmp = makeTestTempDir('managed-bin-');
 afterAll(() => cleanupTestTempDirs());
@@ -55,6 +59,35 @@ describe('antigravity local helpers and schemas', () => {
     expect(verifiedManagedBins(join(root, 'versions'), ['0.5.0', '2.0.0', '1.0.0'])).toEqual([
       { command: join(root, 'versions', '1.0.0', 'bin', 'tool'), args: ['acp'] },
     ]);
+  });
+
+  test('verifiedManagedBin rejects a binary that escapes through a symlinked directory', () => {
+    const root = join(tmp, 'tools', 'escape');
+    const outside = join(tmp, 'outside');
+    mkdirSync(outside, { recursive: true });
+    const bin = 'outside-bytes';
+    writeFileSync(join(outside, 'tool'), bin);
+    const dir = join(root, 'versions', '1.0.0');
+    mkdirSync(dir, { recursive: true });
+    symlinkSync(outside, join(dir, 'bin'));
+    writeFileSync(
+      join(dir, '.install-complete'),
+      JSON.stringify({
+        binRelPath: 'bin/tool',
+        binSha256: createHash('sha256').update(bin).digest('hex'),
+        args: ['acp'],
+      }),
+    );
+    expect(verifiedManagedBin(dir)).toBeNull();
+  });
+
+  test('unsafeManagedVersion marks traversal and hidden versions', () => {
+    for (const bad of ['', '..', '../x', 'a/b', 'a\\b', '.hidden']) {
+      expect(unsafeManagedVersion(bad), bad).toBe(true);
+    }
+    for (const good of ['1.0.0', '2024.1-beta', 'x']) {
+      expect(unsafeManagedVersion(good), good).toBe(false);
+    }
   });
 
   test('createAntigravitySubscriptionSchema accepts host-login (null/omitted token) and validates token when set', () => {

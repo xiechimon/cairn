@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -28,29 +28,6 @@ const manifest = (url: string, sha256: string, version = '3000.0.2') =>
     },
   });
 
-const registry = (archive: string, version = '3000.0.1') =>
-  JSON.stringify({
-    version: 1,
-    agents: [
-      {
-        id: 'codex',
-        name: 'Codex',
-        version: '0.0.1',
-        distribution: { npm: { package: '@zed/codex-acp' } },
-      },
-      {
-        id: 'devin',
-        name: 'Devin',
-        version,
-        distribution: {
-          binary: {
-            'darwin-aarch64': { archive, cmd: './bin/devin', args: ['acp'] },
-          },
-        },
-      },
-    ],
-  });
-
 afterEach(() => {
   for (const dir of roots.splice(0)) releaseTestTempDir(dir);
 });
@@ -73,7 +50,6 @@ describe('devin managed install', () => {
         requests.push(url);
         if (url.includes('manifest.json'))
           return new Response(manifest('https://x/devin.tgz', sha));
-        if (url.includes('registry.json')) return new Response(registry('https://x/devin.tgz'));
         return new Response(bytes);
       },
     });
@@ -110,10 +86,10 @@ describe('devin managed install', () => {
     expect(managed.current()).toBeNull();
   });
 
-  test('falls back to the registry spec when the manifest is unavailable', async () => {
+  test('ignores the registry when the manifest is unavailable', async () => {
     const { dir, tarball } = workspace();
-    const { readFileSync } = await import('node:fs');
     const bytes = new Uint8Array(readFileSync(tarball));
+    const fetched: string[] = [];
     const managed = createDevinManaged({
       archiveHost: 'x',
       root: join(dir, 'install'),
@@ -121,19 +97,18 @@ describe('devin managed install', () => {
       arch: 'arm64',
       fetchImpl: async (input) => {
         const url = String(input);
+        fetched.push(url);
         if (url.includes('manifest.json')) throw new Error('manifest down');
-        if (url.includes('registry.json')) return new Response(registry('https://x/devin.tgz'));
         return new Response(bytes);
       },
     });
-    const install = await managed.ensure();
-    expect(install?.version).toBe('3000.0.1');
+    expect(await managed.ensure()).toBeNull();
+    expect(fetched.some((url) => url.includes('registry.json'))).toBe(false);
   });
 
-  test('falls back to the registry spec when the manifest archive 403s', async () => {
+  test('returns nothing when the manifest archive 403s', async () => {
     const { dir, tarball } = workspace();
     const { createHash } = await import('node:crypto');
-    const { readFileSync } = await import('node:fs');
     const bytes = new Uint8Array(readFileSync(tarball));
     const managed = createDevinManaged({
       archiveHost: 'x',
@@ -146,18 +121,18 @@ describe('devin managed install', () => {
           return new Response(
             manifest('https://x/dead.tgz', createHash('sha256').update(bytes).digest('hex')),
           );
-        if (url.includes('registry.json')) return new Response(registry('https://x/devin.tgz'));
         if (url.includes('dead.tgz')) return new Response('denied', { status: 403 });
         return new Response(bytes);
       },
     });
-    const install = await managed.ensure();
-    expect(install?.version).toBe('3000.0.1');
+    expect(await managed.ensure()).toBeNull();
   });
 
-  test('downloads the registry entry, verifies and installs into a private root', async () => {
+  test('downloads the manifest entry, verifies and installs into a private root', async () => {
     const { dir, tarball } = workspace();
-    const bytes = new Uint8Array(await import('node:fs').then((fs) => fs.readFileSync(tarball)));
+    const { createHash } = await import('node:crypto');
+    const bytes = new Uint8Array(readFileSync(tarball));
+    const sha = createHash('sha256').update(bytes).digest('hex');
     const requests: string[] = [];
     const managed = createDevinManaged({
       archiveHost: 'x',
@@ -167,8 +142,8 @@ describe('devin managed install', () => {
       fetchImpl: async (input) => {
         const url = String(input);
         requests.push(url);
-        if (url.includes('manifest.json')) throw new Error('manifest down');
-        if (url.includes('registry.json')) return new Response(registry('https://x/devin.tgz'));
+        if (url.includes('manifest.json'))
+          return new Response(manifest('https://x/devin.tgz', sha, '3000.0.1'));
         return new Response(bytes);
       },
     });
@@ -178,13 +153,14 @@ describe('devin managed install', () => {
     expect(install?.args).toEqual(['acp']);
     expect(install?.binPath.endsWith(join('bin', 'devin'))).toBe(true);
     expect(managed.current()?.binPath).toBe(install?.binPath);
-    expect(requests).toHaveLength(3);
+    expect(requests).toHaveLength(2);
   });
 
   test('reuses a verified install without re-downloading', async () => {
     const { dir, tarball } = workspace();
-    const { readFileSync } = await import('node:fs');
+    const { createHash } = await import('node:crypto');
     const bytes = new Uint8Array(readFileSync(tarball));
+    const sha = createHash('sha256').update(bytes).digest('hex');
     let downloads = 0;
     const managed = createDevinManaged({
       archiveHost: 'x',
@@ -193,8 +169,8 @@ describe('devin managed install', () => {
       arch: 'arm64',
       fetchImpl: async (input) => {
         const url = String(input);
-        if (url.includes('manifest.json')) throw new Error('manifest down');
-        if (url.includes('registry.json')) return new Response(registry('https://x/devin.tgz'));
+        if (url.includes('manifest.json'))
+          return new Response(manifest('https://x/devin.tgz', sha));
         downloads += 1;
         return new Response(bytes);
       },
@@ -204,10 +180,11 @@ describe('devin managed install', () => {
     expect(downloads).toBe(1);
   });
 
-  test('falls back to the cached install when the registry is unreachable', async () => {
+  test('falls back to the cached install when the manifest is unreachable', async () => {
     const { dir, tarball } = workspace();
-    const { readFileSync } = await import('node:fs');
+    const { createHash } = await import('node:crypto');
     const bytes = new Uint8Array(readFileSync(tarball));
+    const sha = createHash('sha256').update(bytes).digest('hex');
     let online = true;
     const managed = createDevinManaged({
       archiveHost: 'x',
@@ -217,8 +194,8 @@ describe('devin managed install', () => {
       fetchImpl: async (input) => {
         if (!online) throw new Error('offline');
         const url = String(input);
-        if (url.includes('manifest.json')) throw new Error('manifest down');
-        if (url.includes('registry.json')) return new Response(registry('https://x/devin.tgz'));
+        if (url.includes('manifest.json'))
+          return new Response(manifest('https://x/devin.tgz', sha));
         return new Response(bytes);
       },
     });
@@ -230,8 +207,10 @@ describe('devin managed install', () => {
 
   test('rejects a tampered cached binary instead of running it', async () => {
     const { dir, tarball } = workspace();
-    const { readFileSync, writeFileSync: write } = await import('node:fs');
+    const { createHash } = await import('node:crypto');
+    const { writeFileSync: write } = await import('node:fs');
     const bytes = new Uint8Array(readFileSync(tarball));
+    const sha = createHash('sha256').update(bytes).digest('hex');
     const managed = createDevinManaged({
       archiveHost: 'x',
       root: join(dir, 'install'),
@@ -239,8 +218,8 @@ describe('devin managed install', () => {
       arch: 'arm64',
       fetchImpl: async (input) => {
         const url = String(input);
-        if (url.includes('manifest.json')) throw new Error('manifest down');
-        if (url.includes('registry.json')) return new Response(registry('https://x/devin.tgz'));
+        if (url.includes('manifest.json'))
+          return new Response(manifest('https://x/devin.tgz', sha));
         return new Response(bytes);
       },
     });
@@ -251,9 +230,68 @@ describe('devin managed install', () => {
     expect(await managed.ensure()).not.toBeNull();
   });
 
-  test('rejects manifest and registry archives hosted off the trusted host', async () => {
+  test('rejects an archive whose binary escapes through a symlinked directory', async () => {
+    const dir = makeTestTempDir('cairn-devin-managed-');
+    roots.push(dir);
+    const { createHash } = await import('node:crypto');
+    const outside = join(dir, 'outside');
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, 'devin'), '#!/bin/sh\necho outside\n');
+    const pkg = join(dir, 'pkg-escape');
+    mkdirSync(pkg);
+    symlinkSync(outside, join(pkg, 'bin'));
+    const tarball = join(dir, 'escape.tar.gz');
+    execFileSync('tar', ['-czf', tarball, '-C', pkg, '.']);
+    const bytes = new Uint8Array(readFileSync(tarball));
+    const sha = createHash('sha256').update(bytes).digest('hex');
+    const managed = createDevinManaged({
+      archiveHost: 'x',
+      root: join(dir, 'install'),
+      platform: 'darwin',
+      arch: 'arm64',
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url.includes('manifest.json'))
+          return new Response(manifest('https://x/devin.tgz', sha));
+        return new Response(bytes);
+      },
+    });
+    expect(await managed.ensure()).toBeNull();
+  });
+
+  test('an archive member cannot clobber an outside file through .install-complete', async () => {
+    const dir = makeTestTempDir('cairn-devin-managed-');
+    roots.push(dir);
+    const { createHash } = await import('node:crypto');
+    const bin = join(dir, 'pkg-clobber', 'bin');
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'devin'), '#!/bin/sh\necho devin\n', { mode: 0o755 });
+    const victim = join(dir, 'victim');
+    writeFileSync(victim, 'precious');
+    symlinkSync(victim, join(dir, 'pkg-clobber', '.install-complete'));
+    const tarball = join(dir, 'clobber.tar.gz');
+    execFileSync('tar', ['-czf', tarball, '-C', join(dir, 'pkg-clobber'), '.']);
+    const bytes = new Uint8Array(readFileSync(tarball));
+    const sha = createHash('sha256').update(bytes).digest('hex');
+    const managed = createDevinManaged({
+      archiveHost: 'x',
+      root: join(dir, 'install'),
+      platform: 'darwin',
+      arch: 'arm64',
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url.includes('manifest.json'))
+          return new Response(manifest('https://x/devin.tgz', sha));
+        return new Response(bytes);
+      },
+    });
+    const install = await managed.ensure();
+    expect(install).not.toBeNull();
+    expect(readFileSync(victim, 'utf8')).toBe('precious');
+  });
+
+  test('rejects a manifest archive hosted off the trusted host', async () => {
     const { dir, tarball } = workspace();
-    const { readFileSync } = await import('node:fs');
     const { createHash } = await import('node:crypto');
     const bytes = new Uint8Array(readFileSync(tarball));
     const sha = createHash('sha256').update(bytes).digest('hex');
@@ -268,8 +306,6 @@ describe('devin managed install', () => {
         fetched.push(url);
         if (url.includes('manifest.json'))
           return new Response(manifest('https://evil.example/devin.tgz', sha));
-        if (url.includes('registry.json'))
-          return new Response(registry('https://evil.example/devin.tgz'));
         return new Response(bytes);
       },
     });
@@ -279,7 +315,6 @@ describe('devin managed install', () => {
 
   test('rejects an http archive url even on the trusted host', async () => {
     const { dir, tarball } = workspace();
-    const { readFileSync } = await import('node:fs');
     const { createHash } = await import('node:crypto');
     const bytes = new Uint8Array(readFileSync(tarball));
     const sha = createHash('sha256').update(bytes).digest('hex');
@@ -291,7 +326,6 @@ describe('devin managed install', () => {
       fetchImpl: async (input) => {
         const url = String(input);
         if (url.includes('manifest.json')) return new Response(manifest('http://x/devin.tgz', sha));
-        if (url.includes('registry.json')) return new Response(registry('http://x/devin.tgz'));
         return new Response(bytes);
       },
     });

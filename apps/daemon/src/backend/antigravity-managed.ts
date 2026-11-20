@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -34,6 +35,7 @@ import {
 } from '@cairn/shared';
 import { z } from 'zod';
 import { DAEMON_VERSION } from '../version.js';
+import { contains } from './confine.js';
 
 const exec = promisify(execFile);
 
@@ -136,6 +138,36 @@ function trustedArchive(url: string, host: string): boolean {
   } catch {
     return false;
   }
+}
+
+const PROBE_ENV_KEYS = [
+  'PATH',
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'TMPDIR',
+  'TERM',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
+  'SSL_CERT_FILE',
+  'NODE_EXTRA_CA_CERTS',
+];
+
+function probeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = {};
+  for (const key of PROBE_ENV_KEYS) {
+    const value = env[key];
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
 }
 
 function platformKey(platform: string, arch: string): string | null {
@@ -308,7 +340,7 @@ export function createAntigravityManaged(
   options: AntigravityManagedOptions = {},
 ): AntigravityManaged {
   const root = options.root ?? antigravityInstallRoot(join(homedir(), BRAND.homeDirName));
-  const env = options.env ?? process.env;
+  const env = probeEnv(options.env ?? process.env);
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -332,7 +364,8 @@ export function createAntigravityManaged(
     if (marker === null) return null;
     const binPath = join(versionDir, marker.binRelPath);
     try {
-      if (!existsSync(binPath) || sha256File(binPath) !== marker.binSha256) return null;
+      if (!contains(realpathSync(versionDir), realpathSync(binPath))) return null;
+      if (sha256File(binPath) !== marker.binSha256) return null;
     } catch {
       return null;
     }
@@ -493,6 +526,8 @@ export function createAntigravityManaged(
         if (!existsSync(binPath)) throw new Error('antigravity archive has no binary');
       }
       if (!lstatSync(binPath).isFile()) throw new Error('antigravity archive binary is not a file');
+      if (!contains(realpathSync(staging), realpathSync(binPath)))
+        throw new Error('antigravity archive binary escapes the archive');
       const marker: InstallMarker = {
         version: agent.version,
         url: binary.archive,
@@ -502,7 +537,10 @@ export function createAntigravityManaged(
         args: binary.args ?? ['acp'],
         installedAt: Date.now(),
       };
-      writeFileSync(join(staging, '.install-complete'), JSON.stringify(marker));
+      const markerPath = join(staging, '.install-complete');
+      const markerStaging = join(staging, '.install-complete.pending');
+      writeFileSync(markerStaging, JSON.stringify(marker), { flag: 'wx' });
+      renameSync(markerStaging, markerPath);
       rmSync(versionDir, { recursive: true, force: true });
       mkdirSync(join(root, 'versions'), { recursive: true });
       renameSync(staging, versionDir);

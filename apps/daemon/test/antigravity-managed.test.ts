@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEFAULT_ANTIGRAVITY_MODELS } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -356,5 +356,53 @@ describe('antigravity managed binary resolution', () => {
       expect(await managed.ensure(), entry.name).toBeNull();
       expect(downloaded, entry.name).toEqual([]);
     }
+  });
+
+  test('rejects an archive whose binary escapes through a symlinked directory', async () => {
+    const dir = tempDir('ag-escape-');
+    const outside = join(dir, 'outside');
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, 'antigravity-acp'), '#!/bin/sh\nexit 0\n');
+    const src = join(dir, 'src');
+    mkdirSync(src);
+    symlinkSync(outside, join(src, 'bin'));
+    const archivePath = join(dir, 'ag.tar.gz');
+    execFileSync('tar', ['-czf', archivePath, '-C', src, '.']);
+    const archiveBytes = readFileSync(archivePath);
+    const archiveSha256 = createHash('sha256').update(archiveBytes).digest('hex');
+    const managed = createAntigravityManaged({
+      root: join(dir, 'managed'),
+      platform: 'darwin',
+      arch: 'arm64',
+      registryUrl: 'https://example.invalid/registry.json',
+      archiveHost: 'example.invalid',
+      fetchImpl: async (url) => {
+        if (String(url).endsWith('registry.json')) {
+          return new Response(
+            JSON.stringify({
+              agents: [
+                {
+                  id: 'antigravity-acp',
+                  version: '1.5.10',
+                  distribution: {
+                    binary: {
+                      'darwin-aarch64': {
+                        archive: 'https://example.invalid/ag.tar.gz',
+                        cmd: './bin/antigravity-acp',
+                        args: ['acp'],
+                        sha256: archiveSha256,
+                      },
+                    },
+                  },
+                },
+              ],
+            }),
+            { status: 200 },
+          );
+        }
+        return new Response(archiveBytes, { status: 200 });
+      },
+    });
+    expect(await managed.ensure()).toBeNull();
   });
 });

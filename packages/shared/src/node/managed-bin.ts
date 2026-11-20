@@ -1,11 +1,20 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { isAbsolute, join, relative, sep } from 'node:path';
 import { compareVersions } from '../antigravity-local.js';
+
+function insidePath(parent: string, child: string): boolean {
+  const rel = relative(parent, child);
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+}
 
 export interface VerifiedManagedBin {
   command: string;
   args: string[];
+}
+
+export function unsafeManagedVersion(version: string): boolean {
+  return version === '' || /[/\\]/.test(version) || version.startsWith('.');
 }
 
 export function verifiedManagedBin(versionDir: string): VerifiedManagedBin | null {
@@ -21,6 +30,7 @@ export function verifiedManagedBin(versionDir: string): VerifiedManagedBin | nul
     }
     if (typeof marker.binSha256 !== 'string') return null;
     const command = join(versionDir, marker.binRelPath);
+    if (!insidePath(realpathSync(versionDir), realpathSync(command))) return null;
     const digest = createHash('sha256').update(readFileSync(command)).digest('hex');
     if (digest !== marker.binSha256.toLowerCase()) return null;
     const args =
