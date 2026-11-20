@@ -10,7 +10,6 @@ import {
 import { cn } from 'cn';
 import { Download, Play, Server, X } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
-import { isPermissionRefusal } from '../api/account-verification.js';
 import { relativeTime } from '../board/rel-time.js';
 import { AnthropicMark } from '../components/brand-marks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
@@ -160,8 +159,7 @@ export interface ProviderEditActions {
 export type ModelCheck =
   | { phase: 'running' }
   | { phase: 'done'; result: ProviderTestResult; at: number }
-  | { phase: 'unavailable'; at: number }
-  | { phase: 'refused'; at: number };
+  | { phase: 'unavailable'; at: number };
 
 export const FAILURE_SHORT: Record<ProviderFailure, string> = {
   auth: 'key 无效',
@@ -188,9 +186,6 @@ export const FAILURE_SENTENCE: Record<ProviderFailure, string> = {
 const TEST_CONCURRENCY = 3;
 
 const UNFINISHED_SENTENCE = '测试没能跑完，请重试';
-
-export const REFUSED_TEST_COPY =
-  '这台设备是配对设备，没有权限测试模型，结果没有改变。请在运行 Cairn 的电脑上打开这一页再测试。';
 
 export function failureOf(check: ModelCheck | undefined): ProviderFailure | 'unavailable' | null {
   if (check?.phase === 'unavailable') return 'unavailable';
@@ -305,8 +300,8 @@ export function useModelTests(
         const model = id;
         const outcome: ModelCheck = await test(model).then(
           (result) => ({ phase: 'done', result, at: Date.now() }),
-          (error: unknown) => ({
-            phase: isPermissionRefusal(error) ? 'refused' : 'unavailable',
+          () => ({
+            phase: 'unavailable',
             at: Date.now(),
           }),
         );
@@ -367,7 +362,6 @@ export function ModelTestReport({
     return check === undefined || check.phase === 'running' ? [] : [{ id, check }];
   });
   if (done.length === 0) return null;
-  const refused = done.some(({ check }) => check.phase === 'refused');
   const failures = done.flatMap(({ id, check }) => {
     const failure = failureOf(check);
     return failure === null ? [] : [{ id, failure }];
@@ -379,9 +373,8 @@ export function ModelTestReport({
     );
   const kinds = new Set(failures.map(({ failure }) => failure));
   const [first] = failures;
-  const sentence = refused
-    ? t(REFUSED_TEST_COPY)
-    : first === undefined
+  const sentence =
+    first === undefined
       ? done.length === 1
         ? t('{id} 回复了，能用。', { id: done[0]?.id ?? '' })
         : t('{n} 个模型都回复了，能用。', { n: done.length })
@@ -402,13 +395,11 @@ export function ModelTestReport({
     .map(({ id, check }) => {
       const failure = failureOf(check);
       const outcome =
-        check.phase === 'refused'
-          ? t('没有运行')
-          : failure === null
-            ? `${t('通过')} · ${check.phase === 'done' ? (check.result.latencyMs ?? 0) : 0} ms`
-            : failure === 'unavailable'
-              ? t('没测完')
-              : t('没通过 · {reason}', { reason: t(failureShort[failure]) });
+        failure === null
+          ? `${t('通过')} · ${check.phase === 'done' ? (check.result.latencyMs ?? 0) : 0} ms`
+          : failure === 'unavailable'
+            ? t('没测完')
+            : t('没通过 · {reason}', { reason: t(failureShort[failure]) });
       return `${id} · ${outcome} · ${relativeTime(check.at, now, t)}`;
     })
     .join('\n');
@@ -417,8 +408,8 @@ export function ModelTestReport({
       anchor={report.anchor}
       open={report.open}
       onClose={onClose}
-      tone={refused ? 'off' : first === undefined ? 'ok' : 'fail'}
-      phase={refused ? 'not-run' : first === undefined ? 'passed' : 'failed'}
+      tone={first === undefined ? 'ok' : 'fail'}
+      phase={first === undefined ? 'passed' : 'failed'}
       sentence={withCodeSpans(sentence)}
       detail={detail}
       testId="model-test-result"
@@ -455,13 +446,7 @@ export function ModelChip({
       data-model-id={id}
       data-liveness={dead ? 'dead' : 'alive'}
       data-check={
-        check === undefined
-          ? 'none'
-          : running || check.phase === 'refused'
-            ? check.phase
-            : failure === null
-              ? 'ok'
-              : 'failed'
+        check === undefined ? 'none' : running ? check.phase : failure === null ? 'ok' : 'failed'
       }
       className="inline-flex min-h-7 max-w-full items-center gap-1.5 rounded-md bg-secondary py-0.5 pr-0.5 pl-2.5 text-ui text-foreground ring-1 ring-border pointer-coarse:min-h-9"
     >

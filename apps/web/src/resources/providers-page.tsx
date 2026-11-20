@@ -173,7 +173,6 @@ function subscriptionEntries(
           key={account.id}
           account={account}
           models={shown}
-          fallback={picked.length === 0}
           now={deps.now}
           view={view}
           verification={verification}

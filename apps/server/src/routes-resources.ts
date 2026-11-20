@@ -568,7 +568,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/claude-subscriptions/:cid/upstream-models', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    requireOwnerSession(c);
     return c.json(
       await claudeSubscriptionUpstreamModels(claudeUpstreamSvc(), teamId, c.req.param('cid')),
     );
@@ -577,7 +576,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/claude-subscriptions/:cid/test', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    requireOwnerSession(c);
     const body = parseWith(claudeSubscriptionTestSchema, await jsonBody(c), 'body');
     return c.json(
       await testClaudeSubscriptionModel(
@@ -606,7 +604,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/claude-subscriptions/:cid/verify', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    requireOwnerSession(c);
     const subscriptionId = c.req.param('cid');
     const started = performance.now();
     const result = await verifySubscriptionConnection(keysvc, teamId, subscriptionId);
@@ -672,14 +669,12 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/devin-subscriptions/:cid/verify', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    requireOwnerSession(c);
     return c.json(await verifyDevinSubscriptionConnection(keysvc, teamId, c.req.param('cid')));
   });
 
   app.post('/api/teams/:id/devin-subscriptions/:cid/upstream-models', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    requireOwnerSession(c);
     return c.json(await devinSubscriptionUpstreamModels(keysvc, teamId, c.req.param('cid')));
   });
 
@@ -739,7 +734,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/antigravity-subscriptions/:cid/verify', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    requireOwnerSession(c);
     return c.json(
       await verifyAntigravitySubscriptionConnection(keysvc, teamId, c.req.param('cid')),
     );
@@ -748,7 +742,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/antigravity-subscriptions/:cid/upstream-models', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    requireOwnerSession(c);
     return c.json(await antigravitySubscriptionUpstreamModels(keysvc, teamId, c.req.param('cid')));
   });
 

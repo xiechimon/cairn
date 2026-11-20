@@ -11,7 +11,7 @@ export const VERIFY_FAILURES = [
 ] as const;
 export type VerifyFailure = (typeof VERIFY_FAILURES)[number];
 
-export type VerifyNotRun = 'forbidden' | 'signed-out' | 'network' | 'rate-limited' | 'error';
+export type VerifyNotRun = 'signed-out' | 'network' | 'rate-limited' | 'error';
 
 export type Verification =
   | { phase: 'verifying' }
@@ -24,11 +24,8 @@ export type VerifyOutcome = Exclude<Verification, { phase: 'verifying' }>;
 export const VERIFY_TIMEOUT_MS = 45_000;
 
 const GATEWAY_STATUSES: readonly number[] = [502, 503, 504];
-export const isPermissionRefusal = (error: unknown): boolean =>
-  error instanceof ApiError && error.status === 403;
 
 function requestFailure(error: unknown): VerifyOutcome {
-  if (isPermissionRefusal(error)) return { phase: 'not-run', cause: 'forbidden' };
   if (!(error instanceof ApiError)) return { phase: 'not-run', cause: 'network' };
   if (error.status === 401) return { phase: 'not-run', cause: 'signed-out' };
   if (error.status === 429) return { phase: 'not-run', cause: 'rate-limited' };

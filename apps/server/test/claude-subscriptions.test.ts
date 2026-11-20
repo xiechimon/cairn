@@ -754,8 +754,12 @@ describe('switching the enabled Claude subscription', () => {
   });
 });
 
-test('a paired device cannot run subscription checks, and nothing is stored or run', async () => {
+test('a paired device runs subscription checks, and the check bookkeeping is stored', async () => {
   const s = bootServer({ authToken: 'owner-secret-0123456789abcdef' });
+  const dir = makeTestTempDir('paired-subscription-checks-');
+  fixtureDirs.push(dir);
+  vi.stubEnv('CLAUDE_BIN', join(dir, 'missing'));
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
   s.db
     .insert(pairedDevice)
     .values({
@@ -782,12 +786,14 @@ test('a paired device cannot run subscription checks, and nothing is stored or r
       headers: { cookie, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
       body: JSON.stringify({ model: 'claude-haiku-5-5' }),
     });
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: 'only the owner token can do this' });
+    expect(response.status).not.toBe(403);
+    expect((await response.json()) as { error?: string }).not.toEqual({
+      error: 'only the owner token can do this',
+    });
   }
   expect(
     s.db.select().from(claudeSubscription).where(eq(claudeSubscription.id, id)).get()?.lastCheck,
-  ).toBeNull();
+  ).not.toBeNull();
   s.dispose();
 });
 

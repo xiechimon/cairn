@@ -42,8 +42,6 @@ export const EN: Record<string, string> = {
   '服务器上找不到 codex 命令': 'The codex command was not found on the server.',
   '服务器上找不到可执行的 agent': 'No runnable agent was found on the server.',
   '验证没有通过，请重试': 'Verification did not pass. Try again.',
-  '这台设备是配对设备，没有权限运行验证，订阅状态没有改变。请在运行 Cairn 的电脑上打开这一页再验证。':
-    'This is a paired device, so it cannot run the check. The subscription status is unchanged. Open this page on the computer running Cairn to verify.',
   '这台设备的登录已失效，这次没有验证，订阅状态没有改变。请重新配对或在运行 Cairn 的电脑上验证。':
     'This device is no longer signed in, so nothing was checked and the subscription status is unchanged. Pair it again, or verify on the computer running Cairn.',
   '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。':
@@ -52,10 +50,6 @@ export const EN: Record<string, string> = {
     'Checked too often, so this check did not run. Try again in 10 seconds.',
   '服务器没能运行这次验证，订阅状态没有改变。请重试。':
     'The server could not run this check. The subscription status is unchanged. Try again.',
-  '这台设备是配对设备，没有权限测试模型，结果没有改变。请在运行 Cairn 的电脑上打开这一页再测试。':
-    'This is a paired device, so it cannot test models. Nothing changed. Open this page on the computer running Cairn to test.',
-  '这台设备是配对设备，没有权限获取上游模型。请在运行 Cairn 的电脑上打开这一页再选择。':
-    'This is a paired device, so it cannot fetch the upstream models. Open this page on the computer running Cairn to choose.',
   验证失败: 'Verification failed',
   '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
     'This subscription has expired. Remove it, then run `claude setup-token` in a terminal and add the new token.',
@@ -2800,8 +2794,6 @@ export const EN: Record<string, string> = {
   '{s} 秒': '{s}s',
   '每个模型测试会发一次很短的请求，算在订阅额度里。':
     'Each model test sends one short request, counted against the subscription quota.',
-  '还没勾选模型，订阅按执行机上报的名单兜底。':
-    'No models picked yet; the subscription uses the list the Runners report.',
   '还没勾选模型。从上游拉一份清单来勾选。':
     'No models picked yet. Pull a list from upstream to pick from.',
 };

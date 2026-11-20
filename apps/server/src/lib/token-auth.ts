@@ -12,6 +12,11 @@ const STREAM_PATH_PATTERNS = [
 ];
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const PAIRED_DIAGNOSTIC_PATTERNS = [
+  /^\/api\/teams\/[^/]+\/claude-subscriptions\/[^/]+\/(?:upstream-models|test|verify)$/,
+  /^\/api\/teams\/[^/]+\/devin-subscriptions\/[^/]+\/(?:upstream-models|verify)$/,
+  /^\/api\/teams\/[^/]+\/antigravity-subscriptions\/[^/]+\/(?:upstream-models|verify)$/,
+];
 const OWNER_ONLY_PATTERNS = [
   /^\/api\/computers(?:\/[^/]+)?$/,
   /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|devin-subscriptions|antigravity-subscriptions|mcp-connectors)(?:\/|$)/,
@@ -29,6 +34,11 @@ export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
   )
     return true;
   if (READ_METHODS.has(method.toUpperCase())) return false;
+  if (
+    method.toUpperCase() === 'POST' &&
+    PAIRED_DIAGNOSTIC_PATTERNS.some((pattern) => pattern.test(pathname))
+  )
+    return false;
   return OWNER_ONLY_PATTERNS.some((pattern) => pattern.test(pathname));
 }
 

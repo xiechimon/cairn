@@ -30,7 +30,6 @@ type Verify =
   | 'unavailable'
   | 'quota'
   | 'rate-limited'
-  | 'forbidden'
   | 'reset'
   | 'restart'
   | 'slow';
@@ -85,8 +84,6 @@ async function open(page: Page, verify: { current: Verify }, subscriptions?: Cla
           return json({ ok: false, reason: 'quota' });
         case 'rate-limited':
           return json({ error: 'wait' }, 429);
-        case 'forbidden':
-          return json({ error: 'only the owner token can do this' }, 403);
         case 'reset':
           return route.abort('connectionreset');
         case 'restart':
@@ -96,15 +93,6 @@ async function open(page: Page, verify: { current: Verify }, subscriptions?: Cla
             setTimeout(() => resolve(json({ ok: true, check: passedCheck() })), 2_500),
           );
       }
-    }
-    if (path === '/api/teams/t1/claude-subscriptions/s1/test' && verify.current === 'forbidden') {
-      return json({ error: 'only the owner token can do this' }, 403);
-    }
-    if (
-      path === '/api/teams/t1/claude-subscriptions/s1/upstream-models' &&
-      verify.current === 'forbidden'
-    ) {
-      return json({ error: 'only the owner token can do this' }, 403);
     }
     return undefined;
   });
@@ -235,11 +223,6 @@ const HEALTHY: ClaudeSubscriptionListEntry = {
 };
 
 const NOT_RUN: { mode: Verify; reason: string; shot: string }[] = [
-  {
-    mode: 'forbidden',
-    reason: '这台设备是配对设备，没有权限运行验证，订阅状态没有改变。请在运行 Cairn 的电脑上打开这一页再验证。',
-    shot: 'not-run-paired-device',
-  },
   { mode: 'rate-limited', reason: '验证太频繁，这次没有运行。请 10 秒后重试。', shot: 'not-run-rate-limited' },
   {
     mode: 'reset',
@@ -274,28 +257,6 @@ for (const notRun of NOT_RUN) {
     await expect(result(page)).toHaveCount(0);
   });
 }
-
-test('a paired device testing models or opening upstream is told why, not that the models failed', async ({
-  page,
-}) => {
-  await open(page, { current: 'forbidden' }, [HEALTHY]);
-  await page.getByTestId('subscription-test-all').click();
-  await expect(page.getByTestId('model-test-result')).toHaveAttribute('data-phase', 'not-run');
-  await expect(page.getByTestId('model-test-result')).toContainText(
-    '这台设备是配对设备，没有权限测试模型',
-  );
-  await expect(page.getByTestId('model-test-result')).not.toContainText('没连上');
-  await expect(page.getByTestId('subscription-models-summary')).not.toContainText('失败');
-  await expect(detail(page)).not.toContainText('没有权限');
-  await expect(page.locator('[data-testid="subscription-model"][data-check="failed"]')).toHaveCount(0);
-  await shot(page, 'model-test-paired-device');
-  await page.keyboard.press('Escape');
-
-  await page.getByTestId('subscription-pick-upstream').click();
-  await expect(page.getByTestId('upstream-error')).toContainText(
-    '这台设备是配对设备，没有权限获取上游模型',
-  );
-});
 
 test('a stored last check is not shown until the user runs one', async ({ page }) => {
   const mode = { current: 'ok' as Verify };

@@ -126,7 +126,6 @@ function SubscriptionPanelSpecimen() {
         <SubscriptionDetail
           account={current.account}
           models={SPECIMEN_SUBSCRIPTION_MODELS}
-          fallback
           now={NOW}
           view={current.view}
           verification={current.verification}
@@ -151,7 +150,6 @@ function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
       <SubscriptionDetail
         account={account}
         models={SPECIMEN_SUBSCRIPTION_MODELS}
-        fallback
         now={NOW}
         view={view}
         verification={undefined}

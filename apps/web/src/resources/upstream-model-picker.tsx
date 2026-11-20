@@ -2,7 +2,6 @@ import type { ProviderFailure, UpstreamModelsResult } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleAlert, RotateCw, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { isPermissionRefusal } from '../api/account-verification.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -32,7 +31,7 @@ type Load =
     }
   | {
       phase: 'failed';
-      failure: ProviderFailure | 'unavailable' | 'refused';
+      failure: ProviderFailure | 'unavailable';
       httpStatus: number | null;
     };
 
@@ -42,7 +41,7 @@ export const COST_TIER_LABEL: Record<string, string> = {
   'High cost': '高价',
 };
 
-const LIST_FAILURE: Record<ProviderFailure | 'unavailable' | 'refused', string> = {
+const LIST_FAILURE: Record<ProviderFailure | 'unavailable', string> = {
   auth: '上游拒绝了 API key。检查 key 后重试。',
   'not-found': '上游没有提供模型清单。',
   'rate-limit': '上游限流了，稍后重试。',
@@ -52,7 +51,6 @@ const LIST_FAILURE: Record<ProviderFailure | 'unavailable' | 'refused', string> 
   network: '连不上上游。检查地址后重试。',
   'no-model': '上游没有提供模型清单。',
   unavailable: '没能获取上游模型，请重试。',
-  refused: '这台设备是配对设备，没有权限获取上游模型。请在运行 Cairn 的电脑上打开这一页再选择。',
 };
 
 const FALLBACK_REASON: Record<ProviderFailure, string> = {
@@ -112,11 +110,11 @@ export function UpstreamModelPicker({
               : { phase: 'failed', failure: result.failure, httpStatus: result.httpStatus },
         );
       },
-      (error: unknown) => {
+      () => {
         if (!live) return;
         setState({
           phase: 'failed',
-          failure: isPermissionRefusal(error) ? 'refused' : 'unavailable',
+          failure: 'unavailable',
           httpStatus: null,
         });
       },

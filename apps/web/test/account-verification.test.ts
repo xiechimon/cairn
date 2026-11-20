@@ -21,11 +21,11 @@ describe('runVerification', () => {
     });
   });
 
-  it('a 403 refusal is not a verification result', async () => {
+  it('a residual 403 is still not a verification result', async () => {
     const outcome = await runVerification(() =>
       Promise.reject(new ApiError(403, 'only the owner token can do this')),
     );
-    expect(outcome).toEqual({ phase: 'not-run', cause: 'forbidden' });
+    expect(outcome).toEqual({ phase: 'not-run', cause: 'error' });
   });
 
   it('a 401 means this device is signed out, not that the check failed', async () => {

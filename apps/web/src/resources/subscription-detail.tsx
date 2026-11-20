@@ -123,8 +123,6 @@ const FAILED_LABEL: Record<VerifyFailure, string> = {
 };
 
 const NOT_RUN_COPY: Record<VerifyNotRun, string> = {
-  forbidden:
-    '这台设备是配对设备，没有权限运行验证，订阅状态没有改变。请在运行 Cairn 的电脑上打开这一页再验证。',
   'signed-out':
     '这台设备的登录已失效，这次没有验证，订阅状态没有改变。请重新配对或在运行 Cairn 的电脑上验证。',
   network: '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。',
@@ -454,7 +452,6 @@ function tierMeta(model: SubscriptionModel, t: TFunc) {
 export function SubscriptionDetail({
   account,
   models,
-  fallback,
   now,
   view,
   verification,
@@ -462,7 +459,6 @@ export function SubscriptionDetail({
 }: {
   account: SubscriptionAccount;
   models: readonly SubscriptionModel[];
-  fallback: boolean;
   now: number;
   view: SubscriptionStatusView;
   verification: Verification | undefined;
@@ -640,11 +636,6 @@ export function SubscriptionDetail({
               />
             ))}
           </div>
-        )}
-        {fallback && models.length > 0 && actions.onPickUpstream !== undefined && (
-          <p className="m-0 text-meta text-content-tertiary">
-            {t('还没勾选模型，订阅按执行机上报的名单兜底。')}
-          </p>
         )}
         <ModelTestReport
           report={tests.report}
