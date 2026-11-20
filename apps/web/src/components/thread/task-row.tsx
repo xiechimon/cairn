@@ -20,7 +20,7 @@ export interface TaskRowProps {
   stamp?: string;
   date?: string;
   waiting: boolean;
-  place?: string;
+  place?: { name: string; shown: boolean };
   muted?: boolean;
   prLink?: { number: number; url: string };
   check?: { label: string; onCheck: () => void; checked?: boolean } | 'none';
@@ -65,7 +65,8 @@ export function TaskRow({
 }: TaskRowProps) {
   const descriptionId = useId();
   const checkable = check !== undefined && check !== 'none';
-  const status = `${word} · ${what}${waiting && where !== null ? ` → ${where}` : ''}${age === '' ? '' : ` · ${age}`}`;
+  const status = `${place === undefined ? '' : `${place.name} · `}${word} · ${what}${waiting && where !== null ? ` → ${where}` : ''}${age === '' ? '' : ` · ${age}`}`;
+  const placeLine = place?.shown === true ? place.name : undefined;
   const dated = date !== undefined && date !== '';
   const stamped = !dated && stamp !== undefined && stamp !== '';
   const row = (
@@ -129,10 +130,10 @@ export function TaskRow({
               </span>
             )}
           </span>
-          {(waiting || place !== undefined) && (
+          {(waiting || placeLine !== undefined) && (
             <span className="min-w-0 truncate text-meta leading-4.5 text-content-tertiary">
-              {place !== undefined && <span data-slot="task-row-place">{place}</span>}
-              {place !== undefined && waiting && <span aria-hidden="true">{' · '}</span>}
+              {placeLine !== undefined && <span data-slot="task-row-place">{placeLine}</span>}
+              {placeLine !== undefined && waiting && <span aria-hidden="true">{' · '}</span>}
               {waiting && <span data-slot="task-row-what">{what}</span>}
             </span>
           )}
@@ -158,7 +159,7 @@ export function TaskRow({
       {row}
       {below}
       <span id={descriptionId} data-slot="task-row-description" className="sr-only">
-        {`${word} · ${what}`}
+        {`${place === undefined ? '' : `${place.name} · `}${word} · ${what}`}
         {waiting && where !== null && <span data-slot="task-row-where">{` → ${where}`}</span>}
         {age !== '' && ` · ${age}`}
       </span>

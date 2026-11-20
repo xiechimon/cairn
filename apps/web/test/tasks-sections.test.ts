@@ -11,6 +11,7 @@ import {
   type TaskEntry,
   type TaskSection,
   taskRowCopy,
+  titlesNeedingProject,
 } from '../src/board/tasks-sections.js';
 import { threadCopy } from '../src/board/thread-copy.js';
 import type { TodoRecord } from '../src/fixtures/records.js';
@@ -355,5 +356,17 @@ describe('a question row opens the question in the Coordinator thread that asked
       kind: 'focus',
       at: 0,
     });
+  });
+});
+
+describe('C10 the all-projects view names a project only where it tells two tasks apart', () => {
+  test('a title one project owns needs no project; a title two projects share does', () => {
+    const rows = [
+      entry(1, 'queued', 'working', { title: 'Fix the login loop', projectId: 'pay' }),
+      entry(2, 'queued', 'working', { title: 'Update the README', projectId: 'web' }),
+      entry(3, 'todo', 'up_next', { title: 'Update the README', projectId: 'docs' }),
+      entry(4, 'todo', 'up_next', { title: 'Fix the login loop', projectId: 'pay' }),
+    ];
+    expect([...titlesNeedingProject(rows)]).toEqual(['Update the README']);
   });
 });

@@ -135,6 +135,18 @@ export function taskRowCopy(
   }
 }
 
+export function titlesNeedingProject(entries: readonly TaskEntry[]): ReadonlySet<string> {
+  const projectsOf = new Map<string, Set<string | null>>();
+  for (const { todo } of entries) {
+    const projects = projectsOf.get(todo.title) ?? new Set<string | null>();
+    projects.add(todo.projectId ?? null);
+    projectsOf.set(todo.title, projects);
+  }
+  return new Set(
+    [...projectsOf].filter(([, projects]) => projects.size > 1).map(([title]) => title),
+  );
+}
+
 export function glyphOf(entry: TaskEntry): GlyphKind {
   switch (entry.section) {
     case 'ready_for_review':

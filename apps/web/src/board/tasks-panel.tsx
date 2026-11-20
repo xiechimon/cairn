@@ -42,6 +42,7 @@ import {
   type TaskRowCopy,
   type TaskSection,
   taskRowCopy,
+  titlesNeedingProject,
 } from './tasks-sections.js';
 import { usePrefetchThread } from './thread-link.js';
 import { canMarkDone, useMarkDone } from './use-mark-done.js';
@@ -67,14 +68,11 @@ function TasksSkeleton() {
         <Skeleton className={`h-3 w-14 ${SKELETON_BAR}`} />
       </div>
       {[0.6, 0.45, 0.7].map((width) => (
-        <div key={width} className="flex h-14 items-start gap-4 px-2.5 py-2">
+        <div key={width} className="flex h-11.5 items-center gap-4 px-2.5">
           <span className="flex size-7 flex-none items-center justify-center">
             <Skeleton className={`size-4 rounded-full ${SKELETON_BAR}`} />
           </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-2.5 pt-1.5">
-            <Skeleton className={`h-3 ${SKELETON_BAR}`} style={{ width: `${width * 100}%` }} />
-            <Skeleton className={`h-2.5 w-1/3 ${SKELETON_BAR}`} />
-          </span>
+          <Skeleton className={`h-3 ${SKELETON_BAR}`} style={{ width: `${width * 100}%` }} />
         </div>
       ))}
     </div>
@@ -221,7 +219,7 @@ function PanelTaskRow({
   onToggle: () => void;
   entry: TaskEntry;
   lookup: (id: string) => TaskEntry['todo'] | undefined;
-  place: string | undefined;
+  place: { name: string; shown: boolean } | undefined;
   prs: readonly PrPanelRow[];
   prsArrived: ReadonlySet<string>;
   prsPending: boolean;
@@ -362,8 +360,13 @@ export function TasksPanel({
     (pr) => projectId === null || pr.projectId === projectId,
   );
   const projects = useProjects(teamId, connected && projectId === null).data;
+  const ambiguous = titlesNeedingProject(entries);
   const placeOf = (entry: TaskEntry) =>
     projectId === null ? projects?.find((p) => p.id === entry.todo.projectId)?.name : undefined;
+  const rowPlace = (entry: TaskEntry) => {
+    const name = placeOf(entry);
+    return name === undefined ? undefined : { name, shown: ambiguous.has(entry.todo.title) };
+  };
   const prsArrived = useArrivals(
     prs.map((pr) => pr.buildId),
     prsQuery.data !== undefined,
@@ -379,7 +382,7 @@ export function TasksPanel({
       key={entry.todo.id}
       entry={entry}
       lookup={(id) => listed.get(id)}
-      place={placeOf(entry)}
+      place={rowPlace(entry)}
       prs={prsOf.get(entry.todo.id) ?? []}
       prsArrived={prsArrived}
       prsPending={connected && prsQuery.isPending}
