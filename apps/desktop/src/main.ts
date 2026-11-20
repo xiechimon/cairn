@@ -23,6 +23,7 @@ import {
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   globalShortcut,
   type IpcMainEvent,
@@ -51,6 +52,7 @@ import {
   stopAntigravityLogin,
 } from './antigravity-auth.js';
 import { appMenuTemplate } from './app-menu.js';
+import { installContextMenu } from './context-menu.js';
 import {
   devinCancelLogin,
   devinImportKey,
@@ -279,6 +281,7 @@ function openWindow(origin: string): BrowserWindow {
   window.webContents.setUserAgent(
     `${window.webContents.getUserAgent()} ${DESKTOP_SHELL_USER_AGENT}`,
   );
+  installContextMenu(window.webContents, { clipboard, Menu });
   window.once('ready-to-show', () => window.show());
   window.on('close', (event) => {
     if (quitting) return;
