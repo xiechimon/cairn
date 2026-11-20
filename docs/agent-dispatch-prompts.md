@@ -43,7 +43,7 @@ Look up GitHub names, PRs and CI status only with the authenticated `gh api` (`g
 
 ## Image assets
 
-Images for the site, README, demo site, phone UI, icons and avatars, and doc illustrations are generated with codex first, not hand-drawn as SVG or canvas code. Image generation goes to codex whatever the task's implementer is. Show each generated image to ian first; it goes into the repo and gets pushed only after he approves.
+Images for the site, README, demo site, phone UI, icons and avatars, and doc illustrations are generated with codex first, not hand-drawn as SVG or canvas code. Image generation goes to codex whatever the task's implementer is. Show each generated image to the owner first; it goes into the repo and gets pushed only after approval.
 
 ## Evidence limits checklist
 
@@ -55,14 +55,6 @@ Apply this checklist before reporting verification or handing off a delivery. Fo
 - Mechanism claims require compiled or runtime evidence of the claimed effect, such as compiled CSS, observed animation state, actual wire payloads, runtime logs or schema snapshots. Source, configuration and installed dependencies alone do not establish that the mechanism took effect. Record the artifact and the assertion it supports.
 - Separate automated checks from review: no check judges evidence sufficiency, live-app origin or real-provider execution, so state them yourself and label stub-only runs as such.
 
-## Codex
-
-Implement the task below and verify it according to the repository rules. Apply every item in the [Evidence limits checklist](#evidence-limits-checklist) and report the supported claims and unverified limits. Do not write comments; express intent through naming and code structure; exceptions follow the repository comment discipline. Write all repository content in English: comments, docs, test titles, commit messages and PR bodies. When you make a mistake during the task and fix it, and the same kind of mistake could recur, add a safeguard in the code (type, lint rule, test or CI check) at the highest feasible level, use the real mistake as its negative control, and name the mistake in the PR body. Do not write files under `docs/lessons/`.
-
-## Grok
-
-Implement the task below and verify it according to the repository rules. Apply every item in the [Evidence limits checklist](#evidence-limits-checklist) and report the supported claims and unverified limits. Do not write comments; express intent through naming and code structure; exceptions follow the repository comment discipline. Write all repository content in English: comments, docs, test titles, commit messages and PR bodies. When you make a mistake during the task and fix it, and the same kind of mistake could recur, add a safeguard in the code (type, lint rule, test or CI check) at the highest feasible level, use the real mistake as its negative control, and name the mistake in the PR body. Do not write files under `docs/lessons/`.
-
-## pi
+## Worker prompt (Codex, Grok, pi)
 
 Implement the task below and verify it according to the repository rules. Apply every item in the [Evidence limits checklist](#evidence-limits-checklist) and report the supported claims and unverified limits. Do not write comments; express intent through naming and code structure; exceptions follow the repository comment discipline. Write all repository content in English: comments, docs, test titles, commit messages and PR bodies. When you make a mistake during the task and fix it, and the same kind of mistake could recur, add a safeguard in the code (type, lint rule, test or CI check) at the highest feasible level, use the real mistake as its negative control, and name the mistake in the PR body. Do not write files under `docs/lessons/`.

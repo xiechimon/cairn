@@ -11,8 +11,8 @@ pull request only when someone asks for one.
 When you do:
 
 1. Branch from the latest `origin/main` and run the same checks as Ship step 4.
-2. Push the branch without force and open the PR with `gh pr create`. On a host
-   with the App key, prefix it with `~/.cairn/tools/app-token/as-bot.sh`.
+2. Push the branch without force and open the PR with `gh pr create`, using the
+   ordinary `gh` login (`docs/ops/agent-bot-identity.md`).
 3. Write a short description: what changed, why, and how you verified it (the
    commands you ran and their results). Name anything you did not verify.
    `.github/PULL_REQUEST_TEMPLATE.md` is an optional outline.

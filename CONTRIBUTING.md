@@ -44,6 +44,8 @@ pnpm dev          # web on :5173, server on :8787, daemon, all with hot reload
 
 ## Pull requests
 
+Pull requests are the flow for external contributors. Maintainers and agents working in this repository land directly on `main` through the `queue/main` ref per `AGENTS.md`; they do not open pull requests.
+
 Describe what changed, why, and how you verified it; the [pull request template](./.github/PULL_REQUEST_TEMPLATE.md) is an optional outline. When the change finishes a ticket, put `Closes #N` on its own line, or `Part of #N` for one segment.
 
 Commit messages follow `area(issue): summary`, for example `server(1570): skip already-pushed traces`.

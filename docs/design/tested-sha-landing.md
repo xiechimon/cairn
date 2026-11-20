@@ -25,12 +25,10 @@ head). Rejected candidates never move `main`; the lane rebases and re-queues.
 
 - a `ci` workflow run for `S` exists with conclusion `success` (in-progress,
   queued and cancelled runs are not evidence);
-- inside that run, jobs `check`, `pack-smoke` and `e2e-gate` all succeeded —
-  the three names `deploy-watch.sh` used as its green predicate. The watcher
-  was torn down on 2026-11-18 (`docs/ops/self-deploy.md`) and
+- inside that run, jobs `check`, `pack-smoke` and `e2e-gate` all succeeded.
   `desktop-release` publishes on app-source pushes without gating, so these
-  three jobs are no longer enforced anywhere — the queue gate is the first
-  place they must be green, not a second one;
+  three jobs are enforced nowhere else — the queue gate is the first place
+  they must be green;
 - `S` still equals `queue/main` head (a lane may have stacked a newer candidate;
   promoting `S` then is still correct — `main` fast-forwards to `S` and the
   newer candidate waits for its own green run);
@@ -70,14 +68,10 @@ any future green-checking watcher or ruleset would consume.
 
 Problem: stacked candidates cancelled each other's `ci` run, so only the chain
 head was ever tested; a red head blocked every lane and only its owner could
-remove it, by hand, once with the wrong commit dropped. The first week of the
-pilot added a second problem: sessions that did not know the owner of the red
-candidate deleted `queue/main` and pushed onto the empty ref, which skipped the
-rerun and the one-candidate rule (2026-11-19 15:14 and 15:43 UTC, a Claude Code
-session on the Mac following the old "delete your own dead candidate" step).
-The same hour showed that `promote` never saw the red runs: it picked the
-first run for the head SHA, which was the `queue-guard` run (green), so it
-waited on `check` forever and the rerun and drop never ran.
+remove it, by hand. The pilot also hit sessions that did not know the owner of
+the red candidate deleting `queue/main` and pushing onto the empty ref, which
+skipped the rerun and the one-candidate rule, and a `promote` run that picked
+the `queue-guard` run for the head SHA and waited on `check` forever.
 
 - `ci` no longer cancels queue runs: queue pushes use the per-SHA group like
   `main`, so a refused stacked push cannot cancel the running candidate.
@@ -137,7 +131,7 @@ Repository ruleset on `main`: required status checks `check`, `pack-smoke`,
 accepted while pushing an untested SHA is rejected by GitHub itself — the SHA
 carries its own authorization, no bypass list or bot identity is needed. Verify
 on flip day that GitHub evaluates the pushed head's existing checks this way;
-if it only governs PR merges, fall back to "restrict pushes + ian on bypass"
+if it only governs PR merges, fall back to "restrict pushes + owner on bypass"
 which keeps lanes honest via AGENTS.md but is toothless by itself.
 
 ## Rollout
@@ -153,12 +147,6 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
    promote predicate, so lanes do not need a local watcher. It pushes with
    the `cairn-release` app token — GITHUB_TOKEN pushes cannot carry commits
    that touch `.github/workflows` and would not re-trigger `desktop-release`.
-   Verified live on the first two workflow_run events: both fired on queue
-   completions and failed in setup because `actions/setup-node` auto-enables
-   `package-manager-cache` for pnpm, which the job does not install — fixed
-   by disabling the cache (`a9e6004c3`). The trigger wiring, the
-   `desktop-release` environment secrets and the app-token checkout all
-   worked on the first attempt.
    Remaining optional work: batching policy and prepush slimming.
 
 ## Tests
