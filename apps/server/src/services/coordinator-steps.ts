@@ -199,7 +199,7 @@ function turnStateSection(deps: MachineDeps, threadRow: ThreadRow, at: number): 
   return [
     TURN_STATE_OPEN,
     nowNote(at),
-    coordinatorTurnState(deps, threadRow.teamId),
+    coordinatorTurnState(deps, threadRow.teamId, threadRow.projectId),
     '</turn_state>',
   ].join('\n');
 }

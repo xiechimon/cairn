@@ -7,6 +7,7 @@ import {
   chiefThread,
   machine as machineTable,
   project as projectTable,
+  provider as providerTable,
   step as stepTable,
 } from '../src/db/schema.js';
 import {
@@ -258,5 +259,78 @@ describe('chief envelope; PATCH /chief is gone', () => {
       .where(eq(projectTable.id, H.projectId))
       .run();
     expect(composeChiefSystemPrompt(promptDeps(), H.teamId)).toBe(before);
+  });
+
+  test('the project Coordinator model choice reaches the turn state, the envelope and the channel gate', () => {
+    H.s.db
+      .insert(providerTable)
+      .values({
+        id: 'prov-workbuddy',
+        teamId: H.teamId,
+        kind: 'custom',
+        providerId: 'workbuddy',
+        label: 'WorkBuddy',
+        baseUrl: 'http://127.0.0.1:9/v1',
+        api: 'openai-completions',
+        authHeader: true,
+        compat: {},
+        models: [{ id: 'deepseek-v4.1-flash', name: 'DeepSeek' }],
+        apiKeyCipher: H.s.secretBox.seal('sk-project-choice'),
+        createdBy: H.userId,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    H.s.db
+      .update(projectTable)
+      .set({
+        modelOverrides: {
+          coordinator: {
+            provider: 'workbuddy',
+            modelId: 'deepseek-v4.1-flash',
+            thinkingLevel: null,
+          },
+        },
+      })
+      .where(eq(projectTable.id, H.projectId))
+      .run();
+
+    expect(coordinatorTurnState(promptDeps(), H.teamId)).toContain(
+      'Your model: stub-gw/stub-model',
+    );
+    expect(coordinatorTurnState(promptDeps(), H.teamId, H.projectId)).toContain(
+      'Your model: workbuddy/deepseek-v4.1-flash',
+    );
+
+    const envelopeDeps = {
+      db: H.s.db,
+      hub: H.s.hub,
+      machineHub: H.s.machineHub,
+      user: H.s.user,
+    };
+    expect(getChiefEnvelope(envelopeDeps, H.teamId).agentActor?.modelId).toBe('stub-model');
+
+    const now = Date.now();
+    H.s.db
+      .insert(chiefThread)
+      .values({
+        id: 'chief-project-thread',
+        chiefId: H.chiefId,
+        userId: H.userId,
+        teamId: H.teamId,
+        projectId: H.projectId,
+        title: 'demo 项目频道',
+        createdAt: now,
+        updatedAt: now,
+        sessionRuntime: 'pi',
+        sessionId: '',
+        sessionOpenedAt: now,
+        toolDefHashes: {},
+        toolResultHashes: {},
+      })
+      .run();
+    expect(
+      getChiefEnvelope(envelopeDeps, H.teamId, 'chief-project-thread').agentActor?.modelId,
+    ).toBe('deepseek-v4.1-flash');
   });
 });

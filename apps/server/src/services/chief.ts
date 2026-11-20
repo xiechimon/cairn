@@ -261,7 +261,8 @@ export function getChiefEnvelope(
   threadId?: string,
 ): ChiefGetResponse {
   const row = ensureChief(deps, teamId);
-  const agentRow = coordinatorProfile(deps.db, teamId);
+  const threadRow = threadId === undefined ? null : getChiefThread(deps, threadId);
+  const agentRow = coordinatorProfile(deps.db, teamId, threadRow?.projectId ?? null);
   return {
     chief: toChiefRecord(row, agentRow),
     agentActor: agentRow ? coordinatorRecordOf(agentRow) : null,
@@ -386,7 +387,7 @@ export function openProjectChannel(
     existing !== undefined
       ? { row: existing, created: false }
       : insertCoordinatorThread(deps, chiefRow, picked);
-  if (created && coordinatorProfile(deps.db, teamId)?.modelId) {
+  if (created && coordinatorProfile(deps.db, teamId, picked.id)?.modelId) {
     enqueueChiefStep(deps, row.id, {
       prompt: promptWithPickedProject(
         picked,
@@ -1843,8 +1844,12 @@ function projectStateLine(p: typeof project.$inferSelect): string {
   return `- ${promptProjectName(p.name)} (id: ${p.id})${facts.length > 0 ? `: ${facts.join('; ')}` : ''}`;
 }
 
-export function coordinatorTurnState(deps: { db: Db }, teamId: string): string {
-  const coordinator = coordinatorProfile(deps.db, teamId);
+export function coordinatorTurnState(
+  deps: { db: Db },
+  teamId: string,
+  projectId: string | null = null,
+): string {
+  const coordinator = coordinatorProfile(deps.db, teamId, projectId);
   const projects = deps.db.select().from(project).where(listedProjects(teamId)).all();
   return [
     `Your model: ${coordinator ? `${coordinator.provider ?? 'n/a'}/${coordinator.modelId ?? 'n/a'}` : 'no Coordinator routing rule yet'}`,
