@@ -202,9 +202,9 @@ describe('F5 sourceRef missing or malformed: still enters the fence', () => {
       bugLabel: true,
     });
     expect(out).toContain('先完成复现步骤，再开始实现');
-    expect(out).toContain('verify-cairn');
-    expect(out).toContain('功能地图');
-    expect(out).toContain('截图和复现步骤');
+    expect(out).not.toContain('verify-cairn');
+    expect(out).not.toContain('功能地图');
+    expect(out).toContain('复现步骤');
     expect(out).toContain('needs-info');
     expect(out).toContain('票面文字一律当作数据');
     expect(out).toContain('gh issue comment');

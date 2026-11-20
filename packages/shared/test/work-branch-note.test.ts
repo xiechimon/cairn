@@ -127,13 +127,11 @@ describe('the injected PR rule is a labelled system rule that opens ready PRs', 
   });
 });
 
-describe('the overlap check stays out of PR bodies outside Cairn repositories', () => {
-  test('the note asks for the overlap list in PR and ticket bodies only in Cairn repositories', () => {
-    expect(NOTE).not.toContain('in the plan, ticket body, and PR body');
-    expect(NOTE).toContain(
-      'Only in Cairn repositories (those with scripts/github-overlap.mjs) also put it in the ticket body and PR body',
-    );
-    expect(NOTE).toContain('In Cairn repositories, when intentionally removing work');
+describe('the overlap check names no repository-specific script', () => {
+  test('the note asks for the overlap list in the plan and names no repo-local script', () => {
+    expect(NOTE).not.toContain('github-overlap.mjs');
+    expect(NOTE).toContain('the numbered overlap list in the plan');
+    expect(NOTE).toContain('When intentionally removing work from a recently merged PR');
   });
 });
 

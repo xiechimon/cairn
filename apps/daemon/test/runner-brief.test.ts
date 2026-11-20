@@ -372,7 +372,7 @@ test('generated worker brief requests light and dark screenshots through attach_
   });
   await run({ claimed: claimedStep({ repoBound: false }), backend });
   expect(brief).toContain('UI tasks');
-  expect(brief).toContain('light and dark screenshots');
+  expect(brief).toContain('screenshots');
   expect(brief).toContain('attach_file');
 });
 

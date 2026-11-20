@@ -19,7 +19,6 @@ import {
   parseReviewPromptMeta,
   parseVerifyPromptMeta,
   type ReviewGate,
-  WORKER_DECISION_BOUNDARY,
 } from '@cairn/shared';
 
 export function buildTaskPrompt(claimed: ClaimedStep): string {
@@ -138,18 +137,16 @@ export function composeWorkerSystemPrompt(
   opts?: {
     taskMeta?: { currentTitle: string; meta?: TaskMetaForm };
     attachments?: boolean;
-    decisionBoundary?: boolean;
     project?: { name: string; instructions?: string | undefined };
   },
 ): string | undefined {
   const parts: string[] = [];
   if (opts?.attachments) {
     parts.push(
-      'For UI tasks, attach light and dark screenshots with `attach_file {path, caption?}` before your final reply. Attach other deliverable files the same way. Attachment tokens are appended to your assistant output automatically.',
+      'For UI tasks, attach screenshots with `attach_file {path, caption?}` before your final reply. Attach other deliverable files the same way. Attachment tokens are appended to your assistant output automatically.',
     );
   }
   if (description) parts.push(description);
-  if (opts?.decisionBoundary) parts.push(WORKER_DECISION_BOUNDARY);
   if (opts?.project?.instructions) {
     parts.push(`## 项目说明（${opts.project.name}）\n${opts.project.instructions}`);
   }

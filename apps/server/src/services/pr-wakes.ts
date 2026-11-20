@@ -221,11 +221,11 @@ async function deliverReviewCap(
 
 function buildQueueWaitPrompt(args: { prNumber: number; prUrl: string | null; unmet: string }) {
   return [
-    `${QUEUE_WAIT_PROMPT_HEAD} PR #${args.prNumber}${args.prUrl ? `（${args.prUrl}）` : ''} 的检查已全部通过超过 ${QUEUE_WAIT_MS / 60_000} 分钟，但还没进合并队列。Mergify 列出的未满足的入队条件：`,
+    `${QUEUE_WAIT_PROMPT_HEAD} PR #${args.prNumber}${args.prUrl ? `（${args.prUrl}）` : ''} 的检查已全部通过超过 ${QUEUE_WAIT_MS / 60_000} 分钟，但还没进合并队列。未满足的入队条件：`,
     '',
     neutralizeIssueAttachmentTokens(args.unmet),
     '',
-    '修复你能修复的条件后推送一次；不要发任何 Mergify 命令。修不了的条件（例如需要协调者或 ian 决定的标签）在回复里说明原因。',
+    '修复你能修复的条件后推送一次；修不了的条件（例如需要协调者或仓库负责人决定的标签）在回复里说明原因。',
   ].join('\n');
 }
 

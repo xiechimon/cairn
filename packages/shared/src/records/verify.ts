@@ -146,7 +146,7 @@ export function buildVerifyStepPrompt(args: {
     changesSection,
     ...(args.changes === undefined
       ? [
-          `Inspect the added lines of the delivery diff under apps/web/src/ for transition, animation, @keyframes, motion, a drag or hover handler (onDrag, onPointerMove, onMouseEnter, onMouseDown, draggable), hover:, scroll-behavior: smooth, and a scripted .style.transform / .style.scrollBehavior assignment; a change to ${MOTION_TOKEN_PATHS.join(', ')} also counts. If any trigger matches, include a real ${recordingFormats} recording (at most ${RECORDING_MAX_BYTES / (1024 * 1024)} MiB) under ${evidenceDirectory} in the verdict evidence list and ${recordingPublication}. ${attachments ? `Record only under ${evidenceDirectory}, convert the recording to .gif and upload it before finishing.` : 'Record navigation with node .claude/skills/verify-cairn/scripts/vp.mjs capture <route> --video --wait <ms>; record the affected interactions with Playwright recordVideo when navigation alone is insufficient.'}`,
+          `Inspect the added lines of the delivery diff under apps/web/src/ for transition, animation, @keyframes, motion, a drag or hover handler (onDrag, onPointerMove, onMouseEnter, onMouseDown, draggable), hover:, scroll-behavior: smooth, and a scripted .style.transform / .style.scrollBehavior assignment; a change to ${MOTION_TOKEN_PATHS.join(', ')} also counts. If any trigger matches, include a real ${recordingFormats} recording (at most ${RECORDING_MAX_BYTES / (1024 * 1024)} MiB) under ${evidenceDirectory} in the verdict evidence list and ${recordingPublication}. ${attachments ? `Record only under ${evidenceDirectory}, convert the recording to .gif and upload it before finishing.` : 'Record navigation and the affected interactions with a real browser recorder (for example Playwright recordVideo or a --video flag), then convert the recording to the required format.'}`,
         ]
       : []),
     ...(recordingRequirements(
@@ -157,7 +157,7 @@ export function buildVerifyStepPrompt(args: {
       })),
     ).required
       ? [
-          `Animated or interactive UI changed. Include a real ${recordingFormats} recording (at most ${RECORDING_MAX_BYTES / (1024 * 1024)} MiB) under ${evidenceDirectory} in the verdict evidence list and ${recordingPublication}. ${attachments ? `Record only under ${evidenceDirectory}, convert the recording to .gif and upload it before finishing.` : 'Use node .claude/skills/verify-cairn/scripts/vp.mjs capture <route> --video --wait <ms> to record the live route; drive the affected interactions in a recording-enabled Playwright context when navigation alone does not demonstrate them.'}`,
+          `Animated or interactive UI changed. Include a real ${recordingFormats} recording (at most ${RECORDING_MAX_BYTES / (1024 * 1024)} MiB) under ${evidenceDirectory} in the verdict evidence list and ${recordingPublication}. ${attachments ? `Record only under ${evidenceDirectory}, convert the recording to .gif and upload it before finishing.` : 'Record the live route and drive the affected interactions in a recording-enabled browser context (for example Playwright recordVideo or a --video flag), then convert the recording to the required format.'}`,
         ]
       : []),
   ];

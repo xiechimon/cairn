@@ -76,10 +76,13 @@ describe('Coordinator tools that write todo text take no task text', () => {
   });
 
   it('the tool schema and description state the messageIds rule', () => {
-    const tool = CHIEF_REMOTE_TOOLS.find((entry) => entry.name === 'create_todo');
-    expect(tool?.description).toContain(
-      'pass them when the turn carries more than one owner message',
-    );
+    const tool = CHIEF_REMOTE_TOOLS.find((entry) => entry.name === 'create_todo')!;
+    const messageIds = (
+      tool.parameters as {
+        properties: { messageIds: { description: string } };
+      }
+    ).properties.messageIds;
+    expect(messageIds.description).toContain('when the turn carries more than one owner message');
     expect(
       coordinatorCreateTodoParamsSchema.safeParse({
         projectId: 'p',

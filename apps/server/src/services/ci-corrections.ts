@@ -89,8 +89,7 @@ export async function drainCiCorrections(deps: BuildDeps, githubFetch: FetchLike
         ticketDedupeMarker(key),
         `待归因事件：build ${event.buildId}，PR #${event.prNumber} 经过 ci-fix 且最终转绿。`,
         `检查类别：${category}。检查名是初步归类，根因需结合修复 diff 与日志确认。`,
-        '按纠错阶梯取最高可行防护级（结构 > 类型 > lint / 测试 / CI 检查），防护落在代码里，不写 docs/lessons；新闸必须拿真实失误做负对照，旧错变红、修复后变绿。',
-        '涉及 AGENTS.md 或闸的保护路径时，合并留人。',
+        '为该检查类别补上能挡住它的最底层防护（代码结构、类型、lint、测试或 CI 检查），防护落在代码里；新防护要拿这次真实失误做负对照：旧错变红、修复后变绿。',
       ].join('\n\n');
       await githubCreateIssue(githubFetch, token, ref.owner, ref.repo, {
         title: `纠错待归因：ci-fix ${category}`,
