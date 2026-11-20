@@ -1793,11 +1793,6 @@ export const EN: Record<string, string> = {
   '额度用完了，到点自动开始': 'Quota is used up; this starts on its own when it resets',
   等这台电脑空出来: 'Waiting for this computer to free up',
   '等额度 · {at}': 'Quota · {at}',
-  负载正常: 'load normal',
-  负载偏高: 'load high',
-  负载满了: 'load full',
-  '内存 {memory}%': 'memory {memory}%',
-  磁盘快满了: 'disk almost full',
   '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB':
     '{free} GB memory free; 5-minute load {load} on {cores#1 core|# cores}; {disk} GB disk free',
   '还有 {n} 个，在 Cairn 里看': '{n} more, see them in Cairn',

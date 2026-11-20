@@ -123,7 +123,7 @@ test('a running task on a computer leaves the 进行中 group, and a long list e
   expect(rows.at(-1)?.note).toEqual({ key: '还有 {n} 个，在 Cairn 里看', vars: { n: 2 } });
 });
 
-test('an idle computer shows only when strained, with its strain in the header', () => {
+test('an idle computer shows only when strained, with a pressure percent and level in the header', () => {
   const hardware = { cpuCores: 10, memoryTotalMb: 16_384, memoryAvailableMb: 1_024, loadAvg1: 2, loadAvg5: 7, diskFreeMb: 2_048 };
   const groups = trayGroups(
     { questions: [], entries: [] },
@@ -132,12 +132,40 @@ test('an idle computer shows only when strained, with its strain in the header',
   );
   expect(groups).toHaveLength(1);
   expect(groups[0]?.rows).toEqual([]);
-  expect(groups[0]?.meta?.warn).toBe(true);
-  expect(groups[0]?.meta?.parts).toEqual([
-    { key: '内存 {memory}%', vars: { memory: 94 } },
-    { key: '负载偏高' },
-    { key: '磁盘快满了' },
-  ]);
+  const meta = groups[0]?.meta;
+  expect(meta?.warn).toBe(true);
+  expect(meta?.percent).toBe(94);
+  expect(meta?.level).toBe('full');
+  expect(meta?.tip).toEqual({
+    key: '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB',
+    vars: { free: '1.0', load: '7.0', cores: 10, disk: 2 },
+  });
+  expect(meta && Object.keys(meta).sort()).toEqual(['level', 'percent', 'tip', 'warn']);
+});
+
+test('the header percent is the machine pressure: the worse of memory and per-core load, capped', () => {
+  const hardware = (over: Record<string, number>) => ({
+    cpuCores: 8,
+    memoryTotalMb: 16_384,
+    memoryAvailableMb: 9_830,
+    loadAvg1: 1,
+    loadAvg5: 1,
+    diskFreeMb: 500_000,
+    ...over,
+  });
+  const metaOf = (hw: Record<string, number>, strain: TrayMachine['strain'] = []) =>
+    trayGroups({ questions: [], entries: [] }, [
+      machine({
+        strain,
+        running: [thread('t', 0)],
+        capabilities: { hardware: hardware(hw) } as TrayMachine['capabilities'],
+      }),
+    ])[0]?.meta;
+  expect(metaOf({ memoryAvailableMb: 9_830, loadAvg5: 1 })).toMatchObject({ percent: 40, level: 'normal' });
+  expect(metaOf({ memoryAvailableMb: 9_830, loadAvg5: 6 })).toMatchObject({ percent: 75, level: 'high' });
+  expect(metaOf({ memoryAvailableMb: 12_288, loadAvg5: 45 })).toMatchObject({ percent: 100, level: 'full' });
+  expect(metaOf({ memoryAvailableMb: 1_024 }, ['memory'])).toMatchObject({ percent: 94, level: 'full' });
+  expect(metaOf({ memoryAvailableMb: 14_746 }, ['disk'])).toMatchObject({ percent: 13, level: 'full' });
 });
 
 test('usage is hidden before anything ran today and reports the tightest Claude window', () => {

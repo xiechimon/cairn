@@ -39,11 +39,13 @@ export interface TrayRow {
   tip?: TrayText;
 }
 
+export type TrayMetaLevel = 'normal' | 'high' | 'full';
+
 export interface TrayGroup {
   key: string;
   label: string;
   literal?: boolean;
-  meta?: { parts: TrayText[]; warn: boolean; tip: TrayText };
+  meta?: { percent: number; level: TrayMetaLevel; warn: boolean; tip: TrayText };
   rows: TrayRow[];
 }
 
@@ -121,29 +123,20 @@ function queuedRow(thread: MachineQueuedThread): TrayRow {
   };
 }
 
-function loadText(ratio: number): TrayText {
-  if (ratio >= 1) return { key: '负载满了' };
-  if (ratio >= 0.6) return { key: '负载偏高' };
-  return { key: '负载正常' };
-}
-
 function machineMeta(machine: TrayMachine): TrayGroup['meta'] {
   const hardware = machine.capabilities?.hardware;
   if (hardware == null) return undefined;
   const strain = machine.strain ?? [];
   const load = hardware.loadAvg5 ?? hardware.loadAvg1;
   const total = hardware.memoryTotalMb;
-  const memory =
-    total !== undefined && total > 0
-      ? Math.round((1 - hardware.memoryAvailableMb / total) * 100)
-      : null;
-  const parts: TrayText[] = [
-    ...(memory === null ? [] : [{ key: '内存 {memory}%', vars: { memory } }]),
-    loadText(load / hardware.cpuCores),
-    ...(strain.includes('disk') ? [{ key: '磁盘快满了' }] : []),
-  ];
+  const memory = total !== undefined && total > 0 ? 1 - hardware.memoryAvailableMb / total : null;
+  const loadRatio = load / hardware.cpuCores;
+  const pressure = Math.min(1, Math.max(memory ?? 0, loadRatio));
+  const level: TrayMetaLevel =
+    strain.length > 0 || loadRatio >= 1 ? 'full' : pressure >= 0.6 ? 'high' : 'normal';
   return {
-    parts,
+    percent: Math.round(pressure * 100),
+    level,
     warn: strain.length > 0,
     tip: {
       key: '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB',

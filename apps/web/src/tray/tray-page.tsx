@@ -31,6 +31,7 @@ import {
   trayGroups,
   trayUsage,
 } from './tray-groups.js';
+import { TrayHeadMeta } from './tray-meta.js';
 
 const ON_MAC = typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh');
 
@@ -221,13 +222,7 @@ export function TrayPage() {
                 {group.literal ? group.label : t(group.label)}
               </span>
               {group.meta !== undefined && (
-                <span
-                  data-testid="tray-machine-meta"
-                  title={say(group.meta.tip)}
-                  className={cn('tray-head-meta', group.meta.warn && 'tray-warn')}
-                >
-                  {group.meta.parts.map(say).join(' · ')}
-                </span>
+                <TrayHeadMeta meta={group.meta} tip={say(group.meta.tip)} />
               )}
             </h2>
             {group.rows.map((row) => (
