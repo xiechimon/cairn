@@ -35,7 +35,7 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | V9 | Icons are lucide from the project icon set; never invent an icon name. | G `pnpm typecheck` |
 | V10 | Pages compose existing pieces before building their own. | G `ui-page-style-gate`, `ui-drift-gate` |
 | V11 | A project carries no colour: its chosen icon or a name-derived neutral glyph; only a person's `SeededAvatar` may be a tinted letter. | M; G `test/anti-slop-foundations.test.ts`, `test/avatar-tint.test.ts`, `e2e/avatar-initial.spec.ts` |
-| V12 | At most 2 non-neutral hue families per screen beyond the V5 roles (decoded avatars, provider marks, user content and the V11 tint excluded). | M |
+| V12 | At most 2 non-neutral hue families per screen beyond the V5 roles (decoded avatars, provider marks, user content and the V11 tint excluded). Syntax highlighting in code views is exempt: its muted `--code-token-*` palette is mixed from Cairn tokens toward the foreground. | M |
 | V13 | Type budget: sizes from the token steps, at most 6 per screen; at most 3 font weights; at most 9 size and weight pairs. | M |
 | V14 | Icon uniformity: lucide stroke 1.75, sizes 16, 20 or 22px by role. | M; G `test/icon-stroke.test.ts` |
 | V15 | Badge budget: at most 3 tinted short-text elements per screen (keycaps excluded); the task glyph tile and chip are not counted. | M |
@@ -44,7 +44,7 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | V18 | Like rows fold: three or more sibling rows with the same status sit under one section heading. | M |
 | V19 | A placeholder is not content: no text node consists only of `—`, `·` or `-`. | M; G `e2e/design-rules-measure.spec.ts` |
 | V20 | An object list is rows in one card, not a grid of identical cards; the results panel's preview row is the exception. | M; G `e2e/design-rules-measure.spec.ts`: no grid or stack of three or more outlined 12px-corner cards outside the results panel |
-| V21 | No hover shadows or elevation; a hover background covers the whole row or control. | G `ui-drift-gate` G8 |
+| V21 | No hover shadows or elevation; a hover background covers the whole row or control. Exception: the file lightbox's adjacent-file peeks lift on hover to say they page (owner decision, 2026-11-21; allowlisted in G8). | G `ui-drift-gate` G8 |
 | V22 | Sentence case and normal tracking: no uppercase labels; `letter-spacing` normal on every text node. | M; G `test/unslop-signs.test.ts` |
 | V23 | No weight of 800 or more and no italic in chrome; emphasis is weight or ink step. | M; G `test/unslop-signs.test.ts` |
 | V25 | Text keeps the platform's default font smoothing: no `-webkit-font-smoothing` or `antialiased` utilities. | G `test/font-smoothing.test.ts` |

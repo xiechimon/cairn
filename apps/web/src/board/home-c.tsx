@@ -32,6 +32,7 @@ import {
 import { useDesignComposer } from './design/design-composer.js';
 import type { DesignTarget } from './design/design-route.js';
 import { useDesignSplit } from './design/design-split.js';
+import { FILE_NAME_PARAM, FILE_PARAM } from './file-pane.js';
 import { HomeSpiral, type SpiralProject } from './home-spiral.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
@@ -216,6 +217,8 @@ export function HomeC({
     params.delete(THREAD_PARAM);
     params.delete(VIEW_PARAM);
     params.delete(TASKS_TAB_PARAM);
+    params.delete(FILE_PARAM);
+    params.delete(FILE_NAME_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state });

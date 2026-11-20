@@ -21,7 +21,7 @@
       "file": "apps/web/src/board/file-lightbox.tsx",
       "anchor": "inset-0 top-0 left-0 flex h-dvh w-full max-w-none",
       "kind": "deviation",
-      "reason": "File lightbox: the dimmed scrim is the dialog popup itself and covers the whole window edge to edge, as in the Claude desktop lightbox, so clicks around the media close it. Rounded corners on a full-window box would leave slivers of the page showing, so the box stays square; the document sheet inside keeps --radius-card."
+      "reason": "File lightbox: the dimmed scrim is the dialog popup itself and covers the whole window edge to edge, as in the Claude desktop lightbox, so clicks around the media close it. Rounded corners on a full-window box would leave slivers of the page showing, so the box stays square; the media and peeks inside keep --radius-card."
     },
     {
       "file": "apps/web/src/board/app-sidebar.tsx",

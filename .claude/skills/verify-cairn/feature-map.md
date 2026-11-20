@@ -730,9 +730,9 @@ Reach:
 
 ### attachments
 
-**Attachments** (shipped, centrality 3). Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens in a full-window lightbox with a pager across the message's files.
+**Attachments** (shipped, centrality 3). Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens by kind: images and video in a full-window lightbox with a zoned top bar, a filmstrip of the message's media and peeks of the adjacent files; documents (Markdown with a preview/source switch, code with muted highlighting, text, PDF, office) in a right side panel inside the Coordinator layout, one at a time.
 
-States: Composer tile uploading (grey pulse), ready, failed (removable) and the drop-target outline; sent attachment card with type glyph, first-line preview or video frame; file lightbox for text with line numbers, an empty file, an image, a video, an office document, an unsupported type, loading, a load error and the pager; agent attachments in the thread transcript.
+States: Composer tile uploading (grey pulse), ready, failed (removable) and the drop-target outline; sent attachment card with type glyph, first-line preview or video frame; lightbox for an image, a video, the filmstrip and a hovered peek; document side panel for text and code with line numbers, Markdown preview and source, PDF, an office document, an unsupported type, loading and a load error; agent attachments in the thread transcript.
 
 Reach:
 
@@ -741,7 +741,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `attachment-pending`, `attachment-tile-preview`, `attachment-tile-video`, `chief-sent-attachment`, `chief-sent-attachments`, `composer-attachments`, `file-lightbox`, `file-lightbox-close`, `file-lightbox-next`, `file-lightbox-position`, `file-lightbox-prev`, `file-preview-body`, `file-preview-copy`, `file-preview-download`, `file-preview-name`, `file-preview-pdf`, `file-preview-source-toggle`
+- Test ids in its code: `attachment-pending`, `attachment-tile-preview`, `attachment-tile-video`, `chief-sent-attachment`, `chief-sent-attachments`, `composer-attachments`, `file-lightbox`, `file-lightbox-close`, `file-lightbox-filmstrip`, `file-lightbox-head`, `file-lightbox-next`, `file-lightbox-peek-*`, `file-lightbox-position`, `file-lightbox-prev`, `file-lightbox-thumb`, `file-panel`, `file-preview-body`, `file-preview-copy`, `file-preview-download`, `file-preview-meta`, `file-preview-name`, `file-preview-pdf`, `file-preview-source-toggle`
 - Verify recipes: [.claude/skills/verify-cairn/features/attachments.md](features/attachments.md)
 - Research: [docs/research/file-preview-reference-2026-11-11.md](../../../docs/research/file-preview-reference-2026-11-11.md)
 - Frontend design: [docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg](../../../docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg), [docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg](../../../docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg), [docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg](../../../docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg)

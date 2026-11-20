@@ -1,6 +1,7 @@
 import { isDesignPageName } from '@cairn/shared';
 import { createContext } from 'react';
 import { attachmentIdFromKey } from '../detail/attachment-chip.js';
+import { type FileViewerKind, kindFor } from '../vendor-open-design/viewers/file-kind.js';
 
 export const FILE_PARAM = 'file';
 export const FILE_NAME_PARAM = 'fileName';
@@ -15,6 +16,19 @@ export type OpenFile = (target: FileTarget, set?: readonly FileTarget[]) => void
 export const OpenFileContext = createContext<OpenFile | undefined>(undefined);
 
 export const FileSetContext = createContext<readonly FileTarget[]>([]);
+
+export interface OpenDocument {
+  target: FileTarget;
+  close: () => void;
+}
+
+export const OpenDocumentContext = createContext<OpenDocument | null>(null);
+
+const LIGHTBOX_KINDS: ReadonlySet<FileViewerKind> = new Set(['image', 'svg', 'video']);
+
+export function opensInLightbox(target: FileTarget): boolean {
+  return LIGHTBOX_KINDS.has(kindFor(target.key));
+}
 
 const ATTACHMENT_REF =
   /!?\[([^\]]*)\]\(attachment:([A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.[a-z0-9]{1,8})\)/g;

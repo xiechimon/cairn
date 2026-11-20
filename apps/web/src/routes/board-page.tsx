@@ -23,6 +23,7 @@ import { BackupBanner } from '../board/backup-banner.js';
 import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
 import { designTargetOf } from '../board/design/design-route.js';
 import { DevinLoginBanner, useDevinLoginWarnings } from '../board/devin-login-banner.js';
+import { FileDocPanel } from '../board/file-doc-panel.js';
 import { setupShown } from '../board/first-run-checklist-model.js';
 import {
   FirstRunFrame,
@@ -321,6 +322,7 @@ export function BoardPage() {
           )}
         </div>
         {threadId !== null && design === null && !dockThread && sideChat(false)}
+        {threadId === null && design === null && <FileDocPanel />}
       </div>
       <SearchPanel
         open={search.open}

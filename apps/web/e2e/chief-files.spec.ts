@@ -21,7 +21,7 @@ async function dropFiles(page: Page, selector: string, files: { name: string; ty
   );
 }
 
-test('a sent attachment is a 122px card with its type icon that opens the lightbox', async ({
+test('a sent attachment is a 122px card with its type icon that opens the document panel', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -43,7 +43,7 @@ test('a sent attachment is a 122px card with its type icon that opens the lightb
   expect(Math.abs((bubbleBox?.x ?? 0) + (bubbleBox?.width ?? 0) - (cardBox?.x ?? 0) - 122)).toBeLessThan(1);
 
   await card.getByRole('button', { name: 'test.txt', exact: true }).click();
-  const panel = page.getByTestId('file-lightbox');
+  const panel = page.getByTestId('file-panel');
   await expect(panel).toBeVisible();
   await expect(page).toHaveURL(/file=team-files/);
   await expect(page).not.toHaveURL(/pane=/);
@@ -51,6 +51,9 @@ test('a sent attachment is a 122px card with its type icon that opens the lightb
   const lines = panel.getByTestId('file-preview-text').locator('[data-slot="file-line"]');
   await expect(lines).toHaveCount(1);
   await expect(panel.getByTestId('file-preview-text')).toContainText('1');
+  await expect(panel.getByTestId('file-preview-meta')).toHaveText('TXT');
+  await expect(page.getByTestId('file-lightbox')).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-input')).toBeVisible();
   await expect(page.getByTestId('tasks-toggle')).toHaveAttribute('aria-pressed', 'false');
 
   await page.goBack();
@@ -58,7 +61,7 @@ test('a sent attachment is a 122px card with its type icon that opens the lightb
   await expect(page).not.toHaveURL(/file=/);
 });
 
-test('the lightbox deep-links, copies the text, downloads with the name and closes', async ({
+test('the document panel deep-links, copies the text, downloads with the name and closes', async ({
   page,
   context,
 }) => {
@@ -66,7 +69,7 @@ test('the lightbox deep-links, copies the text, downloads with the name and clos
   await page.goto(
     '/app?scenario=chief-files-long&file=team-files/att-verify-log.log&fileName=verify-3877.log',
   );
-  const panel = page.getByTestId('file-lightbox');
+  const panel = page.getByTestId('file-panel');
   await expect(panel).toBeVisible();
   const viewer = panel.getByTestId('file-preview-text');
   await expect(viewer.locator('[data-slot="file-line"]')).toHaveCount(240);
@@ -101,7 +104,8 @@ test('a Markdown file renders as a document, the toggle shows the source and cop
   await page.goto(
     '/app?scenario=chief-files-markdown&file=team-files/att-release-notes.md&fileName=release-notes.md',
   );
-  const panel = page.getByTestId('file-lightbox');
+  const panel = page.getByTestId('file-panel');
+  await expect(panel.getByTestId('file-preview-meta')).toHaveCount(0);
   const rendered = panel.getByTestId('file-preview-markdown');
   await expect(rendered.getByRole('heading', { name: '发布检查清单', level: 1 })).toBeVisible();
   await expect(rendered.getByRole('heading', { name: '必做', level: 2 })).toBeVisible();
@@ -122,21 +126,20 @@ test('a Markdown file renders as a document, the toggle shows the source and cop
   expect(copied).toContain('# 发布检查清单');
   expect(copied).toContain('- 跑完 `pnpm prepush`');
 
-  const toggle = panel.getByTestId('file-preview-source-toggle');
-  await toggle.click();
+  await panel.getByTestId('file-preview-source-toggle').click();
   await expect(rendered).toHaveCount(0);
   await expect(panel.getByTestId('file-preview-text')).toContainText('# 发布检查清单');
   await expect(panel.getByRole('link', { name: '下载' })).toHaveAttribute(
     'download',
     'release-notes.md',
   );
-  await toggle.click();
+  await panel.getByTestId('file-preview-mode-preview').click();
   await expect(panel.getByTestId('file-preview-markdown')).toBeVisible();
 });
 
 test('a plain text file keeps the line view and has no source toggle', async ({ page }) => {
   await page.goto(TEXT_DEEP_LINK);
-  const panel = page.getByTestId('file-lightbox');
+  const panel = page.getByTestId('file-panel');
   await expect(panel.getByTestId('file-preview-text')).toBeVisible();
   await expect(panel.getByTestId('file-preview-markdown')).toHaveCount(0);
   await expect(panel.getByTestId('file-preview-source-toggle')).toHaveCount(0);
@@ -173,12 +176,12 @@ test('a text file that fails to load shows the error state with retry', async ({
   await page.goto(
     '/app?scenario=chief-files&file=team-files/att-missing.txt&fileName=missing.txt',
   );
-  const panel = page.getByTestId('file-lightbox');
+  const panel = page.getByTestId('file-panel');
   await expect(panel.getByTestId('query-error')).toContainText('文件没能加载');
   await expect(panel.getByRole('button', { name: '重试' })).toBeVisible();
 });
 
-test('the lightbox floats over the conversation, pages across the message files and closes three ways', async ({
+test('images and video page in the lightbox, documents open in the side panel', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -212,17 +215,17 @@ test('the lightbox floats over the conversation, pages across the message files 
   await expect(page.getByTestId('side-panel-resize')).toHaveCount(0);
   await expect.poll(async () => (await lightbox.boundingBox())?.width).toBe(1440);
   await expect.poll(async () => (await lightbox.boundingBox())?.height).toBe(900);
+  await expect(lightbox.getByTestId('file-lightbox-thumb')).toHaveCount(2);
   const position = lightbox.getByTestId('file-lightbox-position');
-  await expect(position).toHaveText('第 1 个，共 3 个');
+  await expect(position).toHaveText('1 / 2');
   await expect(lightbox.getByTestId('file-lightbox-prev')).toBeDisabled();
-  await page.keyboard.press('ArrowRight');
-  await expect(position).toHaveText('第 2 个，共 3 个');
+  await expect(lightbox.getByTestId('file-lightbox-peek-previous')).toHaveCount(0);
+  await lightbox.getByTestId('file-lightbox-peek-next').click();
+  await expect(position).toHaveText('2 / 2');
   await expect(lightbox.getByTestId('file-preview-name')).toHaveText('clip.mp4');
-  await lightbox.getByTestId('file-lightbox-next').click();
-  await expect(position).toHaveText('第 3 个，共 3 个');
-  await expect(lightbox.getByTestId('file-preview-document')).toContainText('先做桌面端');
+  await expect(lightbox.getByTestId('file-lightbox-next')).toBeDisabled();
   await page.keyboard.press('ArrowLeft');
-  await expect(position).toHaveText('第 2 个，共 3 个');
+  await expect(position).toHaveText('1 / 2');
 
   await page.keyboard.press('Escape');
   await expect(lightbox).toHaveCount(0);
@@ -234,8 +237,13 @@ test('the lightbox floats over the conversation, pages across the message files 
   await expect(lightbox).toHaveCount(0);
 
   await tiles.nth(2).getByRole('button', { name: 'plan.docx', exact: true }).click();
-  await lightbox.getByTestId('file-lightbox-close').click();
   await expect(lightbox).toHaveCount(0);
+  const panel = page.getByTestId('file-panel');
+  await expect(panel.getByTestId('file-preview-document')).toContainText('先做桌面端');
+  await expect(page.getByTestId('chief-composer-input')).toBeVisible();
+  await panel.getByRole('button', { name: '关闭' }).click();
+  await expect(panel).toHaveCount(0);
+  await expect(page).not.toHaveURL(/file=/);
 });
 
 test('composer tiles: 122px, remove tooltip names the file, keyboard removal returns focus', async ({
@@ -336,12 +344,12 @@ test('a failed drop upload leaves an error tile and a toast, and keeps the draft
   await expect(input).toHaveValue('这段话要留着');
 });
 
-test('the lightbox fills the phone screen', async ({
+test('the document panel fills the phone screen', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(TEXT_DEEP_LINK);
-  const panel = page.getByTestId('file-lightbox');
+  const panel = page.getByTestId('file-panel');
   await expect(panel).toBeVisible();
   await expect.poll(async () => Math.round((await panel.boundingBox())?.width ?? 0)).toBe(390);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
@@ -356,7 +364,7 @@ test('a live file downloads through the endpoint that names the file', async ({ 
       : undefined,
   );
   await page.goto('/app?file=team-files/att-notes.log&fileName=notes.log');
-  const panel = page.getByTestId('file-lightbox');
+  const panel = page.getByTestId('file-panel');
   await expect(panel.getByTestId('file-preview-text').locator('[data-slot="file-line"]')).toHaveCount(2);
   const download = panel.getByRole('link', { name: '下载' });
   await expect(download).toHaveAttribute('href', '/api/attachments/att-notes?download=1');
@@ -380,7 +388,8 @@ test('an office file shows its extracted text, and one the server cannot read of
         : undefined,
   );
   await page.goto('/app?file=team-files/att-plan.docx&fileName=计划.docx');
-  const panel = page.getByTestId('file-lightbox');
+  const panel = page.getByTestId('file-panel');
+  await expect(panel.getByTestId('file-preview-meta')).toContainText('Word');
   const document = panel.getByTestId('file-preview-document');
   await expect(document.getByRole('heading', { name: '第一阶段计划', level: 2 })).toBeVisible();
   await expect(document.getByRole('heading', { name: '目标', level: 3 })).toBeVisible();

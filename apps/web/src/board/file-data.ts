@@ -3,8 +3,13 @@ import { useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { attachmentIdFromKey } from '../detail/attachment-chip.js';
 import { resolveScenario } from '../fixtures/scenario.js';
+import { humanSize } from '../vendor-open-design/viewers/binary-viewer.js';
 import type { DocumentPreview } from '../vendor-open-design/viewers/document-preview-viewer.js';
-import { type FileViewerKind, kindFor } from '../vendor-open-design/viewers/file-kind.js';
+import {
+  type FileViewerKind,
+  fileExtOf,
+  kindFor,
+} from '../vendor-open-design/viewers/file-kind.js';
 import { attachmentUrl } from './file-pane.js';
 
 const DOCUMENT_UNAVAILABLE_STATUSES = new Set([413, 415, 422]);
@@ -12,6 +17,27 @@ const DOCUMENT_UNAVAILABLE_STATUSES = new Set([413, 415, 422]);
 const TILE_PREVIEW_LINES = 8;
 
 export class DocumentPreviewUnavailable extends Error {}
+
+const TYPE_NAMES: Record<string, string> = {
+  js: 'JavaScript',
+  mjs: 'JavaScript',
+  cjs: 'JavaScript',
+  jsx: 'JavaScript',
+  ts: 'TypeScript',
+  tsx: 'TypeScript',
+  py: 'Python',
+  docx: 'Word',
+  xlsx: 'Excel',
+  pptx: 'PowerPoint',
+};
+
+export function fileMetaLabel(key: string, size: number | undefined): string {
+  const ext = fileExtOf(key);
+  const type = TYPE_NAMES[ext] ?? ext.toUpperCase();
+  return [type, size === undefined ? '' : humanSize(size)]
+    .filter((part) => part !== '')
+    .join(' · ');
+}
 
 async function fetchAttachmentText(url: string): Promise<string> {
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -82,7 +108,7 @@ export function useAttachmentFiles(
   const sizeQ = useQuery({
     queryKey: ['attachment-size', key],
     queryFn: () => fetchAttachmentSize(url),
-    enabled: size && live && (kind === 'document' || kind === 'binary'),
+    enabled: size && live,
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });

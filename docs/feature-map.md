@@ -488,7 +488,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### attachments
 
-**Attachments** (shipped). Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens in a full-window lightbox with a pager across the message's files.
+**Attachments** (shipped). Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens by kind: images and video in a full-window lightbox with a zoned top bar, a filmstrip of the message's media and peeks of the adjacent files; documents (Markdown with a preview/source switch, code with muted highlighting, text, PDF, office) in a right side panel inside the Coordinator layout, one at a time.
 
 - Research: [docs/research/file-preview-reference-2026-11-11.md](research/file-preview-reference-2026-11-11.md)
 - Frontend design: [docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg](design/references/coordinator-chat/claude-duet-composer-attachment.jpg), [docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg](design/references/coordinator-chat/claude-duet-file-preview-panel.jpg), [docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg](design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg)

@@ -547,7 +547,11 @@ export const EN: Record<string, string> = {
   上一个: 'Previous',
   下一个: 'Next',
   切换文件: 'Switch file',
-  '第 {n} 个，共 {total} 个': '{n} of {total}',
+  '上一个：{name}': 'Previous: {name}',
+  '下一个：{name}': 'Next: {name}',
+  显示方式: 'View as',
+  预览: 'Preview',
+  源码: 'Source',
   '只显示前 {n} 行，下载查看完整文件': 'Showing lines 1 to {n}. Download for the full file',
   '此任务为只读，请在实时工作区中打开后继续。':
     'This task is read only. Open it in the live workspace to continue.',

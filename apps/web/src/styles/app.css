@@ -1396,6 +1396,10 @@ body:has([data-testid="chief-body"]),
   left: 90px;
 }
 
+:root[data-shell="mac-desktop"] .file-lightbox-head {
+  padding-left: 82px;
+}
+
 .desktop-drag-strip {
   position: fixed;
   inset: 0 0 auto;
