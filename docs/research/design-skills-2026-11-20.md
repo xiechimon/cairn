@@ -27,7 +27,7 @@ Sources and pins:
 4. **The site does not fully follow its author's own skill.** loading.dev presses to `0.97` and opens popups from `0.95`; Jakub's `better-motion` says `0.96`, and `0.96`/`0.97` for dropdowns. The skill also says a deliberate project convention is a preference, not a finding. So the values are a codified default, and a project's own consistent choice outranks them. That is exactly the stance Cairn needs. (verified values; reading of intent derived)
 5. **Cairn already contradicts both authors in places ian decided on purpose.** A pressed Cairn button never moves (`DESIGN.md` Motion, line 382) where both skills scale it; Cairn uses no springs (line 384); Cairn's `--ease-standard` is the Material curve `cubic-bezier(0.4, 0, 0.2, 1)`, which Emil's `animate` names as the familiar curve not to invent. A skill loaded without an override layer would push agents to undo owner decisions. (verified)
 6. **ian's idea works with a change: on-demand skills, not the upstream sets.** Claude Code and Devin both load `.claude/skills/*` on description match, but description matching is probabilistic, and 35 extra descriptions cost listing budget on every turn. The reliable shape is two or three Cairn wrapper skills (motion, polish, typography) that `design-cairn` names per task type, each carrying a pinned copy of one upstream skill plus a short "Cairn overrides" table, and a test that holds the routing and the pins. (derived, sections 4 and 5)
-7. **Adopt Jakub's domain skills as the base, take Emil's as a reading source, and import no spinners.** Jakub's structure (one owner per rule, calibration lines, a "Before you finish" detection table) composes with Cairn's rule ids; Emil's skills open with a fixed persona reply and "default to flagging", which fights an autonomous pipeline. loading.dev's bouncing dots and dot spinners are not for Cairn: the working mark is the spiral, and ian rejected dot working indicators on 2026-11-17. Take loading.dev's engineering pattern (one motion registry, a test over every animated component) instead. (derived)
+7. **Adopt Jakub's domain skills as the base, take Emil's as a reading source, and import no spinners.** Jakub's structure (one owner per rule, calibration lines, a "Before you finish" detection table) composes with Cairn's rule ids; Emil's skills open with a fixed persona reply and "default to flagging", which fights an autonomous pipeline. loading.dev's bouncing dots and dot spinners are not for Cairn: the working mark is the spiral, and ian rejected dot working indicators on 2026-11-17. Take loading.dev's engineering pattern (one motion registry, a test over every animated component) instead. (derived; re-assessed on merit in section 7, which supersedes this point)
 
 ## 1. The two skill repositories
 
@@ -276,7 +276,9 @@ How to prove it (before/after, per `visual-change-needs-recording`):
 - Turn the new values into an `M` check in `design-rules-measure.spec.ts` (open each overlay, assert origin is not `center` for anchored popups, enter scale ≥ 0.96, ⌘K has no enter transition), with a negative control.
 - Show ian the side-by-side recording; he decides whether to continue to the next surface.
 
-### 5.4 Do not adopt
+### 5.4 Do not adopt (superseded by section 7)
+
+This list judged items against earlier owner decisions. ian asked for a re-assessment on merit; section 7 replaces it.
 
 - Any loading.dev spinner, bouncing dots included, or any dot-based working indicator (owner rejection 2026-11-17; the spiral is the working mark).
 - Press scale, springs with bounce, staggered entrances on chat or board items: each reverses an owner decision. Ask ian before any of them.
@@ -299,3 +301,52 @@ Worth copying from loading.dev's engineering rather than its visuals: one motion
 | Claude Code skills docs | Loading, frontmatter, listing budget, compaction | code.claude.com/docs/en/skills.md |
 | Devin CLI skills docs | Discovery paths, triggers | docs.devin.ai/cli/extensibility/skills/overview.md |
 | Cairn | `DESIGN.md` Motion, `DESIGN-RULES.md`, `design-cairn`, `shadcn.css` motion tokens, `design-rules-measure.spec.ts`, `audit-2026-11-20.md` | `origin/main` `4ced3778e` |
+
+## 7. Re-assessment on merit (ian, 2026-11-20)
+
+ian asked that nothing be rejected only because it conflicts with an earlier owner decision. Each item below is judged on what it would improve in Cairn, its cost and risk, and quality. Where the answer depends on how it feels, it is marked **taste** and the proposal is a side-by-side for ian, not a decision.
+
+New facts read for this section (verified, at `origin/main` of this change):
+
+- Cairn already ships solid typing dots: `TypingDots` in `apps/web/src/components/chat/live-row.tsx` (lines 55-86), three 6px dots, `typing-hop` 1.2s `ease-in-out`, 0.15s apart, a 3px hop with opacity 0.45 to 1, resting for 60% of each cycle (`apps/web/src/styles/app.css` lines 492-511). The 2026-11-17 rejection was of Bayer dot-ink texture, not of solid dots.
+- Inline busy states use lucide `LoaderCircle` with `animate-spin` (8 sites, e.g. `apps/web/src/chief/approval-card.tsx` line 173); the brand working mark is the spiral (2.4s linear).
+- The no-move press came from issue #3152 (commit `85c0ac960`): the old press was `active:translate-y-px` and about 33 call sites cancelled it. The problem it fixed was a 1px downward shift of the label, not scale as such.
+- Cairn has no motion library (`apps/web/package.json` lists `tw-animate-css` only). A JS spring would need `motion`, a new dependency and a lockfile change, which is ian's call. CSS `linear()` can draw a spring curve without a library.
+- loading.dev's bouncing dots run a 1s cycle (0.5s each way, `alternate`), travel one full dot height (`translateY(28%)` to `translateY(-72%)`), are evenly staggered across the cycle, and never rest (`L/src/bouncing-dots.tsx` lines 7-31).
+
+### 7.1 Items
+
+| Item | What it would improve in Cairn | Cost and risk | Recommendation |
+|---|---|---|---|
+| loading.dev bouncing dots | Cairn's typing pill already uses three solid dots, but they hop 3px and rest 60% of the cycle, so the pill reads as idle between hops. loading.dev's dots never stop and travel a full dot height with even spacing, which reads as "working" at a glance | A faster, larger bounce in a chat pill can feel nervous next to calm text; the CSS is ~20 lines | **Adapt, taste**: retune `typing-hop` toward loading.dev's motion (period, travel, even stagger, no rest) inside the existing `TypingDots`; side-by-side of today vs retuned at 1x |
+| Other loading.dev spinners (Arc, Ring, Classic) for inline busy glyphs | Replaces the stock lucide `LoaderCircle` in buttons and cards with a drawn, size-relative spinner that inherits `currentColor` and ships reduced-motion CSS | Two loop languages (spiral for agent work, a small spinner for "this button is busy"); either copy one spinner (MIT, notice kept) or add `loading-dev` as a dependency (lockfile) | **Adapt, taste**: copy one or two spinners' CSS into a Cairn `BusyGlyph`, no new dependency; side-by-side `LoaderCircle` vs Arc vs Ring at 16 and 20px. Skip the whole library |
+| Press scale | Physical acknowledgement in the frame of the click, the effect ian sees on loading.dev buttons. Scale from the centre does not move the label down, which was the actual #3152 complaint | A scaled button shrinks its edges by 0.5-3px, so a click that starts at the very edge can release outside it; text can soften for a frame during scale; on dense rows and icon buttons the movement is noise | **Adapt, taste**: scale only standalone labelled buttons (filled and outline `Button`), keep the instant tint, never rows, menu items, sidebar or toolbar icon buttons; disabled never scales. Side-by-side today vs scale |
+| Press value 0.96 vs 0.97 | Either reads as a press; one value project-wide is what matters (Jakub `better-motion` line 16) | None beyond the item above | **Adapt**: 0.97. Cairn buttons are small (28-32px tall) and dense, and 0.97 is also what loading.dev itself ships; 0.96 is the stronger value for larger components. Shown in the same side-by-side |
+| Springs | The few moves that imitate an object (segmented-control pill, side panel slide, jump-to-latest button) settle more naturally and can be reversed mid-way | `motion` would be a new dependency for three surfaces; a CSS `linear()` spring has no velocity hand-off on interruption | **Adapt**: no library; a no-bounce spring curve as a CSS `linear()` token (or Jakub's `cubic-bezier(0.2, 0, 0, 1)`) on those three surfaces only |
+| Bounce 0 vs 0.2 | Bounce adds play; Jakub never bounces, Emil allows 0.1-0.3 for playful and drag-to-dismiss | Overshoot on work chrome (menus, panels, toggles) reads as toy-like and slows the settle | **Bounce 0 for chrome (adopt Jakub). Taste** for one rare celebratory moment (a task's done check or first-run completion): side-by-side 0 vs 0.15 |
+| Easing curves | Cairn's `--ease-standard` is Material `cubic-bezier(0.4, 0, 0.2, 1)`, which starts slowly; overlays use the default `ease`. A strong ease-out (Emil `cubic-bezier(0.23, 1, 0.32, 1)`, or Cairn's own `--ease-out-expo` `cubic-bezier(0.16, 1, 0.3, 1)`) moves at once, so the same 150-200ms feels faster | Retuning curves touches every overlay; `--ease-out-expo` is pinned by `e2e/color-freeze.spec.ts`, so a new token or a pin update is needed | **Adopt** a strong ease-out for every enter and exit (overlays, panels), keep a gentle curve for colour and hover. **Taste** only on which strong curve: side-by-side Emil's vs `--ease-out-expo` on the ⌘K and menu pilot |
+| Staggered entrance on chat messages | Would give each new message a little choreography | Messages arrive every turn: high frequency, the case both authors say not to animate; streaming text already moves; it competes with C18 (start of reply in view) and C23 (what is shown stays put); Claude.ai, the reference, does not stagger | **Skip** for messages and lists, on merit |
+| Staggered entrance on rare moments | First run, an empty state, a finished setup step: 100ms stagger, 12px, 4px blur (Jakub) gives these moments a crafted arrival | Low; reduced motion falls back to a cross-fade | **Adapt, taste**: first-run page only as a trial; side-by-side today vs staggered |
+| Emil's motion skills (`remove-animations`, `find-animation-opportunities`, `improve-animations`) | Cairn added many Growth animations on 2026-11-19; a read-only audit that both prunes over-animation and finds missing motion, with plans another lane can execute, fits the dispatch model | Persona opener and "default to flagging" stall autonomous lanes; values conflict with the Cairn table | **Adapt**: one user-invoked `cairn-motion-audit` built from these three, with the persona line removed, findings keyed to Cairn rule ids and values from the Cairn tokens |
+| `review-animations` | A strict motion review before landing a motion change | Same persona and flag-everything stance | **Adapt** into the audit above (diff scope), not a second skill |
+| `choreograph`, `animation-performance` | Direct guidance for the Growth rows (lead, follow, overlap) and frame budget | None as reference | **Adopt** as reference files of `cairn-motion` |
+| `emil-design-eng` | Strong reasons, but 684 lines overlapping everything above | Context cost; duplicates `better-motion` | **Skip** as a skill; already mined |
+| `gestures`, `apple-design`, `mobile-native`, `animate-expo` | Touch and sheet interactions | Cairn is Mac first with pointer input; no iOS | **Skip** now; revisit `gestures` if drag-to-reorder or sheets arrive |
+| `variant` / `prototype` | Several variants behind a picker | `options-prototype-cairn` already does this, grayscale and structurally different, wired into the owner's pick | **Skip**; borrow one thing: a "promote the picked variant" step |
+| `state-machine` | Every state of one component on a page with a switcher | Cairn has fixture scenarios and `/design.html`; a second throwaway route would duplicate them | **Skip** the skill; P3 already requires the states |
+| `break` / `break-ui` | Worst-case data catalog (long names, unbreakable emails, CJK and emoji, huge counts, empty) | Low | **Adapt**: add the catalog as the "long content" checklist in `design-cairn`'s state list |
+| `interface-review` | Change-scoped UI review (introduced / regression / pre-existing) that Cairn's general review lacks | A review lane per UI change | **Adapt** as a step of the design review, with Cairn rule ids |
+| `afk`, `upskill`, `learn-taste` | Unattended work, session mining, corrections into rules | Cairn has lanes and `retro-cairn`, which already turns corrections into checks | **Skip**; `learn-taste`'s "a check beats a sentence" is already Cairn practice |
+
+### 7.2 Side-by-sides for ian
+
+Taste calls, each shown as a real-speed recording plus a 0.1x frame strip on one prototype page with an A/B switch, built from the real components:
+
+1. Typing dots: today vs retuned toward loading.dev.
+2. Inline busy glyph: `LoaderCircle` vs loading.dev Arc vs Ring, at 16 and 20px, in a real button.
+3. Press: today's tint vs tint plus `scale(0.97)` on standalone buttons.
+4. Overlay curve: today vs Emil's strong ease-out vs `--ease-out-expo`, on ⌘K and a menu.
+5. Celebration bounce: done check with bounce 0 vs 0.15.
+6. First-run entrance: today vs 100ms stagger.
+
+Decided on merit without a side-by-side: bounce 0 for all chrome, no stagger on messages, no motion library, the motion audit and reference adoptions, and the process-skill skips.
