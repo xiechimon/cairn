@@ -892,11 +892,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         testId={testId}
         stamp={<MessageStamp createdAt={item.createdAt} />}
         note={withNote ? fallbackNote : undefined}
-        onReply={
-          onReply !== undefined && item.id != null
-            ? () => onReply({ sourceMessageId: item.id ?? '', quote })
-            : undefined
-        }
         onCopy={() => onCopy(quote)}
       />
     ) : null;

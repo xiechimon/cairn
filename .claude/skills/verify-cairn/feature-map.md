@@ -57,7 +57,7 @@ Reach:
 3. `type a request and press Enter`
 
 - Web routes: `/app`
-- Keyboard shortcuts in its code: `A`, `C`, `D`, `R`
+- Keyboard shortcuts in its code: `A`, `D`, `R`
 - Test ids in its code: `*`, `approval-card-context`, `approval-card-note`, `approval-card-problem`, `approval-card-quote`, `approval-card-title`, `approval-detail-label`, `approval-details`, `approval-details-toggle`, `approval-field-more`, `approval-field-value`, `approval-history-text`, `approval-history-toggle`, `chief-body`, `chief-bubble`, `chief-channel-mirror`, `chief-cloak-license`, `chief-cloak-license-get`, `chief-cloak-license-input`, `chief-cloak-license-problem`, `chief-cloak-license-save`, `chief-cloak-license-saved`, `chief-composer-block`, `chief-composer-input`, `chief-composer-placeholder`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-package-install`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-queue`, `chief-queue-cancel-edit`, `chief-queue-more`, `chief-queue-wait-card`, `chief-queued-message`, `chief-queued-message-text`, `chief-queued-remove`, `chief-queued-steer`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-sentence`, `chief-runner-offline`, `chief-send-queue`, `chief-send-steer`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-steer-withdraw`, `chief-stopped`, `chief-stream`, `chief-takeover`, `chief-takeover-failed`, `chief-takeover-handback`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-time-left`, `chief-task-created`, `chief-task-ref`, `chief-task-ref-hover`, `chief-task-refs`, `chief-task-started`, `chief-task-started-said`, `chief-time-divider`, `chief-turn-error`, `chief-turn-error-card`, `chief-turn-error-detail`, `chief-turn-error-raw`, `chief-turn-retry`, `chief-virtual-rows`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `context-panel`, `context-panel-*`, `context-panel-reading`, `home-c`, `home-c-error`, `home-c-pane-buttons`, `memory-edit-card`, `memory-edit-composer`, `memory-edit-content`, `memory-edit-input`, `memory-edit-send`, `memory-edit-stop`, `memory-edit-title`, `memory-list`, `memory-usage`, `panel-error`, `project-instructions-input`, `queue-blocked-fix`, `reply-quote`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`, `tasks-badge`, `tasks-toggle`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
@@ -320,14 +320,14 @@ Reach:
 
 ### selection-reply
 
-**Reply quote** (shipped, centrality 1). Press Reply in a Coordinator message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Selecting text shows no reply bar.
+**Reply quote** (shipped, centrality 1). Press Reply in your own message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Coordinator messages have no reply arrow (owner decision, 2026-11-21); selecting text shows no reply bar.
 
 States: Quote staged above the composer, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, light and dark, 1440 and 390 wide.
 
 Reach:
 
 1. `open /app`
-2. `hover testid:chief-reply-bubble`
+2. `hover testid:chief-bubble`
 3. `click testid:chief-msg-reply`
 
 - Web routes: `/app`

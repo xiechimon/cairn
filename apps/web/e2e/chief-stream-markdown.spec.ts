@@ -235,7 +235,9 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
 
     const final = msgs.nth(1);
     const finalFoot = final.getByTestId('chief-msg-foot');
-    await expect(finalFoot.getByTestId('chief-msg-more')).toBeVisible();
+    await expect(finalFoot.getByTestId('chief-msg-copy')).toBeVisible();
+    await expect(finalFoot.getByTestId('chief-msg-reply')).toHaveCount(0);
+    await expect(finalFoot.getByTestId('chief-msg-more')).toHaveCount(0);
     await expect(finalFoot).not.toContainText('完成');
 
     const typing = msgs.nth(2);
@@ -275,7 +277,10 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(stream.locator('a[data-slot="task-mention"]')).toHaveClass(/mention-chip--todo/);
     await expect(stream).not.toContainText('r5-scribe');
 
-    await expect(stream.getByTestId('chief-msg-tools').getByRole('button')).toHaveCount(1);
+    const tools = stream.getByTestId('chief-msg-tools');
+    await expect(tools.getByRole('button')).toHaveCount(2);
+    await expect(tools.getByTestId('chief-msg-copy')).toHaveCount(1);
+    await expect(tools.getByTestId('chief-msg-more')).toHaveCount(1);
   });
 
   test('F-R15: a Coordinator reply carries no identity row (D122)', async ({ page }) => {
@@ -377,8 +382,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     const tools = firstUser.getByTestId('chief-msg-tools');
     await firstUser.getByTestId('chief-bubble').hover();
     await expect(tools.getByTestId('chief-msg-reply')).toBeVisible();
-    await tools.getByRole('button', { name: '更多' }).click();
-    await page.getByRole('menuitem', { name: '复制' }).click();
+    await tools.getByTestId('chief-msg-copy').click();
     const clip = await page.evaluate(() => navigator.clipboard.readText());
 
     expect(clip).toBe(MD_USER);

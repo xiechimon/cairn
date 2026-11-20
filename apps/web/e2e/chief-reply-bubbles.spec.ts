@@ -84,21 +84,3 @@ test('headings, inline styles, quote and a task list with the dashed-circle and 
   await expect(message).not.toContainText('**');
   await expect(message).not.toContainText('~~');
 });
-
-test('reply quotes the hovered bubble and the Replying to bar darkens only that bubble', async ({
-  page,
-}) => {
-  await page.goto(ROUTE);
-  const message = reply(page);
-  const quote = message.getByTestId('chief-reply-bubble').filter({ hasText: '这是一段引用' });
-  await quote.hover();
-  const tools = quote.locator('xpath=..').getByTestId('chief-msg-block-tools');
-  await tools.getByTestId('chief-msg-reply').click();
-  const bar = page.getByTestId('composer-reply-quote');
-  await expect(bar).toContainText('无序列表一');
-  await bar.hover();
-  await expect(quote).toHaveAttribute('data-reply-highlight', '');
-  await expect(
-    message.getByTestId('chief-reply-bubble').filter({ hasText: '一级标题' }),
-  ).not.toHaveAttribute('data-reply-highlight', '');
-});

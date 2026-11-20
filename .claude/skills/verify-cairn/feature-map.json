@@ -149,7 +149,7 @@
     {
       "id": "selection-reply",
       "name": "Reply quote",
-      "summary": "Press Reply in a Coordinator message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Selecting text shows no reply bar.",
+      "summary": "Press Reply in your own message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Coordinator messages have no reply arrow (owner decision, 2026-11-21); selecting text shows no reply bar.",
       "states": "Quote staged above the composer, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, light and dark, 1440 and 390 wide.",
       "centrality": 1,
       "status": "shipped",
@@ -169,7 +169,7 @@
       },
       "reach": [
         "open /app",
-        "hover testid:chief-reply-bubble",
+        "hover testid:chief-bubble",
         "click testid:chief-msg-reply"
       ],
       "research": [

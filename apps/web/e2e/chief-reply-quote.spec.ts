@@ -4,6 +4,8 @@ import { evidenceShot } from './evidence';
 
 const LAST_REPLY = '这条和 #9 是同一处，已经补给它了。';
 const LAST_WIRE = `<!-- reply source=m6 -->\n> ${LAST_REPLY}`;
+const OWN = '顺便把空列的提示也改一下';
+const OWN_WIRE = `<!-- reply source=m4 -->\n> ${OWN}`;
 
 async function openChat(page: Page) {
   const state = { threads: [THREAD], messages: [...HISTORY] };
@@ -15,30 +17,42 @@ async function openChat(page: Page) {
 }
 
 async function replyTo(page: Page, sourceId: string) {
-  const source = page.locator(`[data-reply-source="${sourceId}"]`);
-  const bubble = source.locator('[data-slot="reply-bubble"]').first();
+  const bubble = page.locator(`[data-reply-source="${sourceId}"]`);
   await bubble.hover();
-  await source.locator('[data-placement="right"] [data-testid="chief-msg-reply"]').first().click();
+  await bubble
+    .locator('xpath=..')
+    .locator('[data-placement="left"] [data-testid="chief-msg-reply"]')
+    .click();
 }
 
-test.describe('reply to a Coordinator message from its toolbar', () => {
+test('a Coordinator message offers copy but no reply arrow and no more menu', async ({ page }) => {
+  await openChat(page);
+  const source = page.locator('[data-reply-source="m6"]');
+  await source.locator('[data-slot="reply-bubble"]').first().hover();
+  const tools = source.locator('[data-placement="right"]').first();
+  await expect(tools.getByTestId('chief-msg-copy')).toBeVisible();
+  await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
+  await expect(tools.getByTestId('chief-msg-more')).toHaveCount(0);
+});
+
+test.describe('reply to your own message from its toolbar', () => {
   test('Reply stages the quote in the composer and the sent message carries it with its source', async ({
     page,
   }) => {
     const { sent, stream } = await openChat(page);
-    await replyTo(page, 'm6');
+    await replyTo(page, 'm4');
     const staged = page.getByTestId('composer-reply-quote');
-    await expect(staged).toContainText('已经补给它了');
+    await expect(staged).toContainText('空列的提示');
     const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
     await expect(input).toBeFocused();
     await input.fill('补完记得跑一下拖拽的 e2e');
     await evidenceShot(page, 'replying-with-quote.png');
     await input.press('Enter');
 
-    await expect.poll(() => sent.at(-1)).toBe(`${LAST_WIRE}\n\n补完记得跑一下拖拽的 e2e`);
+    await expect.poll(() => sent.at(-1)).toBe(`${OWN_WIRE}\n\n补完记得跑一下拖拽的 e2e`);
     await expect(staged).toHaveCount(0);
     const bubble = stream.getByTestId('chief-bubble').last();
-    await expect(bubble.getByTestId('reply-quote')).toHaveText(LAST_REPLY);
+    await expect(bubble.getByTestId('reply-quote')).toHaveText(OWN);
     await expect(bubble).toContainText('补完记得跑一下拖拽的 e2e');
     await expect(bubble).not.toContainText('<!--');
     await evidenceShot(page, 'sent-with-quote.png');
@@ -49,14 +63,14 @@ test.describe('reply to a Coordinator message from its toolbar', () => {
   }) => {
     await openChat(page);
     const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
-    await replyTo(page, 'm6');
+    await replyTo(page, 'm4');
     const bar = page.getByTestId('composer-reply-bar');
     await expect(bar).toBeVisible();
     await expect(bar).toHaveCSS('height', '28px');
     await expect(page.getByTestId('chief-composer-placeholder')).toHaveText('回复这条消息');
     const inCard = await bar.evaluate((el) => el.closest('.chief-composer') !== null);
     expect(inCard).toBe(true);
-    const source = page.locator('[data-reply-source="m6"]');
+    const source = page.locator('[data-reply-source="m4"]');
     await expect(source).not.toHaveAttribute('data-reply-highlight', '');
     await bar.hover();
     await expect(source).toHaveAttribute('data-reply-highlight', '');
@@ -70,20 +84,20 @@ test.describe('reply to a Coordinator message from its toolbar', () => {
 
   test('removing the quote while hovering it clears the mark on its source', async ({ page }) => {
     await openChat(page);
-    await replyTo(page, 'm6');
-    const source = page.locator('[data-reply-source="m6"]');
+    await replyTo(page, 'm4');
+    const source = page.locator('[data-reply-source="m4"]');
     await page.getByTestId('composer-reply-bar').hover();
     await expect(source).toHaveAttribute('data-reply-highlight', '');
     await page.getByTestId('composer-reply-quote-remove').click();
     await expect(page.getByTestId('composer-reply-bar')).toHaveCount(0);
     await expect(page.locator('[data-reply-highlight]')).toHaveCount(0);
-    await replyTo(page, 'm3');
+    await replyTo(page, 'm1');
     await expect(page.locator('[data-reply-highlight]')).toHaveCount(0);
   });
 
   test('a removed quote is not sent', async ({ page }) => {
     const { sent } = await openChat(page);
-    await replyTo(page, 'm3');
+    await replyTo(page, 'm1');
     await page.getByTestId('composer-reply-quote-remove').click();
     await expect(page.getByTestId('composer-reply-quote')).toHaveCount(0);
     const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
@@ -160,7 +174,7 @@ test.describe('a staged or queued quote keeps its source', () => {
       else await expect(answerComposer).toHaveCount(0);
     };
     await expectOneAnswerPath('answer composer');
-    await replyTo(page, 'm6');
+    await replyTo(page, 'm4');
     await expectOneAnswerPath('question chips');
     await input.fill('先别合');
     await expectOneAnswerPath('question chips');
@@ -170,11 +184,11 @@ test.describe('a staged or queued quote keeps its source', () => {
     await expectOneAnswerPath('question chips');
     await page.getByTestId('composer-reply-quote-remove').click();
     await expectOneAnswerPath('answer composer');
-    await replyTo(page, 'm6');
+    await replyTo(page, 'm4');
     await expectOneAnswerPath('question chips');
     await input.fill('补充一句');
     await input.press('Enter');
-    await expect.poll(() => sent.at(-1)).toBe(`${LAST_WIRE}\n\n补充一句`);
+    await expect.poll(() => sent.at(-1)).toBe(`${OWN_WIRE}\n\n补充一句`);
     expect(answered).toEqual([]);
   });
 });
