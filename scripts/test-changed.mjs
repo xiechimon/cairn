@@ -16,7 +16,27 @@ const MIN_IDENTIFIER_LENGTH = 5;
 const MAX_REFERENCING_TESTS = 40;
 const MAX_STEM_MATCHES = 8;
 const IDENTIFIER_TOKEN = /[A-Za-z_$][\w$]{4,}/g;
-const CONTRACT_TESTS = ['packages/shared/test/snapshot.test.ts', 'apps/server/test/wire.test.ts'];
+const CONTRACT_TESTS = [
+  'packages/shared/test/snapshot.test.ts',
+  'apps/server/test/wire.test.ts',
+  'packages/shared/test/vocabulary.test.ts',
+  'apps/server/test/machine-wire.test.ts',
+];
+const AUDIT_TESTS = [
+  [
+    /^apps\/web\/(?!test\/|e2e\/)/,
+    [
+      'apps/web/test/anti-slop-foundations.test.ts',
+      'apps/web/test/brand-assets.test.ts',
+      'apps/web/test/color-token-duplicates.test.ts',
+      'apps/web/test/gallery-coverage.test.ts',
+      'apps/web/test/i18n-coverage.test.ts',
+      'apps/web/test/unslop-signs.test.ts',
+    ],
+  ],
+  [/^scripts\/brand\//, ['apps/web/test/brand-assets.test.ts']],
+  [/\.test\.[cm]?[jt]sx?$|^scripts\//, ['packages/shared/test/test-tmp-ratchet.test.ts']],
+];
 
 export function declaredIdentifiers(content, changedLines = null) {
   const lines = content.split('\n');
@@ -54,6 +74,8 @@ export function selectTestsWithReport(changed, tests, migrationTests = [], refer
   const stemOverflow = new Set();
   const referenceScores = new Map();
   for (const file of changed) {
+    for (const [pattern, audit] of AUDIT_TESTS)
+      if (pattern.test(file)) for (const test of audit) if (known.has(test)) picked.add(test);
     if (SCHEMA_CHANGE.test(file))
       for (const migration of migrationTests) if (known.has(migration)) picked.add(migration);
     if (TEST_FILE.test(file)) {

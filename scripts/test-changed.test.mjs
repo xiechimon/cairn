@@ -15,6 +15,8 @@ const tests = [
   'apps/web/test/fleet-status.test.ts',
   'packages/shared/test/snapshot.test.ts',
   'apps/server/test/wire.test.ts',
+  'apps/server/test/machine-wire.test.ts',
+  'packages/shared/test/vocabulary.test.ts',
 ];
 
 test('a changed test file is selected', () => {
@@ -29,30 +31,69 @@ test('a changed source file selects same-package tests whose name contains its b
   ]);
   assert.deepEqual(selectTests(['apps/server/src/services/machine-computer.ts'], tests), [
     'apps/server/test/machine-computer.test.ts',
+    'apps/server/test/machine-wire.test.ts',
     'apps/server/test/wire.test.ts',
     'packages/shared/test/snapshot.test.ts',
+    'packages/shared/test/vocabulary.test.ts',
   ]);
 });
 
 test('a shared protocol change runs the contract tests but does not fan out to every importer', () => {
   assert.deepEqual(selectTests(['packages/shared/src/protocol/computer.ts'], tests), [
+    'apps/server/test/machine-wire.test.ts',
     'apps/server/test/wire.test.ts',
     'packages/shared/test/snapshot.test.ts',
+    'packages/shared/test/vocabulary.test.ts',
   ]);
 });
 
 test('a server source change runs the route and schema contract tests', () => {
   assert.deepEqual(selectTests(['apps/server/src/routes-computers.ts'], tests), [
+    'apps/server/test/machine-wire.test.ts',
     'apps/server/test/wire.test.ts',
     'packages/shared/test/snapshot.test.ts',
+    'packages/shared/test/vocabulary.test.ts',
   ]);
 });
 
-test('docs, styles and other packages select nothing', () => {
-  assert.deepEqual(
-    selectTests(['docs/design/mac-vm-computer.md', 'apps/web/src/styles/app.css'], tests),
-    [],
+const auditTests = [
+  'apps/web/test/anti-slop-foundations.test.ts',
+  'apps/web/test/brand-assets.test.ts',
+  'apps/web/test/color-token-duplicates.test.ts',
+  'apps/web/test/gallery-coverage.test.ts',
+  'apps/web/test/i18n-coverage.test.ts',
+  'apps/web/test/unslop-signs.test.ts',
+  'packages/shared/test/vocabulary.test.ts',
+  'packages/shared/test/test-tmp-ratchet.test.ts',
+];
+
+test('tree-scanning audit tests run when the scanned trees change', () => {
+  for (const change of [
+    'apps/web/src/i18n/en.js',
+    'apps/web/src/styles/app.css',
+    'apps/web/index.html',
+  ])
+    for (const audit of auditTests.filter((file) => file.startsWith('apps/web/')))
+      assert.ok(selectTests([change], auditTests).includes(audit), `${change}: ${audit}`);
+  assert.ok(
+    selectTests(['scripts/brand/logo.mjs'], auditTests).includes(
+      'apps/web/test/brand-assets.test.ts',
+    ),
   );
+  for (const change of ['apps/server/test/x.test.ts', 'scripts/release.mjs'])
+    assert.ok(
+      selectTests([change], auditTests).includes('packages/shared/test/test-tmp-ratchet.test.ts'),
+      change,
+    );
+  assert.ok(
+    !selectTests(['apps/web/e2e/overlay-focus.spec.ts'], auditTests).includes(
+      'apps/web/test/i18n-coverage.test.ts',
+    ),
+  );
+});
+
+test('docs and other packages select nothing', () => {
+  assert.deepEqual(selectTests(['docs/design/mac-vm-computer.md'], tests), []);
 });
 
 test('a deleted test file is not selected', () => {
