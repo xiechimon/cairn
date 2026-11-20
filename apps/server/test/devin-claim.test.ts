@@ -314,7 +314,7 @@ describe('claimStep and the Devin subscription', () => {
 });
 
 describe('model sources', () => {
-  test('an online devin-capable Runner contributes a static devin source; offline or incapable ones do not', async () => {
+  test('a devin-capable Runner contributes a static devin source online or offline; incapable ones do not', async () => {
     const { s } = await world();
     const online = insertMachine(s, {
       name: 'devin-online',
@@ -326,18 +326,49 @@ describe('model sources', () => {
     });
     s.db.update(machineTable).set({ online: false }).where(eq(machineTable.id, offline)).run();
     insertMachine(s, { name: 'no-devin' });
-    const sources = listDevinSources(s.db, s.team.id);
-    expect(sources).toEqual([
+    const statics = [
+      { id: 'swe-2-high', name: 'SWE-2', slot: 'builtin' },
+      { id: 'swe-2-flash-medium', name: 'SWE-2 Flash', slot: 'builtin' },
+      { id: 'adaptive', name: 'Adaptive', slot: 'builtin' },
+    ];
+    expect(listDevinSources(s.db, s.team.id)).toEqual([
+      {
+        runtime: 'devin',
+        installed: true,
+        hostname: 'devin-offline',
+        machineId: offline,
+        models: statics,
+      },
       {
         runtime: 'devin',
         installed: true,
         hostname: 'devin-online',
         machineId: online,
-        models: [
-          { id: 'swe-2-high', name: 'SWE-2', slot: 'builtin' },
-          { id: 'swe-2-flash-medium', name: 'SWE-2 Flash', slot: 'builtin' },
-          { id: 'adaptive', name: 'Adaptive', slot: 'builtin' },
-        ],
+        models: statics,
+      },
+    ]);
+  });
+
+  test('the enabled subscription selection reaches an offline devin-capable Runner', async () => {
+    const { s } = await world();
+    const subscriptionId = insertDevinSubscription(s);
+    s.db
+      .update(devinSubscriptionTable)
+      .set({ models: [{ id: 'swe-3', name: 'SWE-3 picked' }] })
+      .where(eq(devinSubscriptionTable.id, subscriptionId))
+      .run();
+    const machineId = insertMachine(s, {
+      name: 'devin-asleep',
+      capabilities: DEVIN_CAPABILITIES,
+    });
+    s.db.update(machineTable).set({ online: false }).where(eq(machineTable.id, machineId)).run();
+    expect(listDevinSources(s.db, s.team.id)).toEqual([
+      {
+        runtime: 'devin',
+        installed: true,
+        hostname: 'devin-asleep',
+        machineId,
+        models: [{ id: 'swe-3', name: 'SWE-3 picked' }],
       },
     ]);
   });

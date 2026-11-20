@@ -222,3 +222,56 @@ test('adding, tuning and removing a frequently used model saves the whole list',
   await expect.poll(() => puts.at(-1)).toEqual([]);
   await expect(card.getByTestId('frequent-models-empty')).toBeVisible();
 });
+
+test('a stored Devin model shows available and the picker offers the Devin group', async ({
+  page,
+}) => {
+  const puts: unknown[] = [];
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    const method = route.request().method();
+    if (path === '/api/teams/t1/top-models' && method === 'GET') {
+      return json({
+        models: [{ provider: 'devin', modelId: 'swe-2-high', thinkingLevel: null }],
+      });
+    }
+    if (path === '/api/teams/t1/top-models' && method === 'PUT') {
+      const body = route.request().postDataJSON() as { models: unknown[] };
+      puts.push(body.models);
+      return json({ models: body.models });
+    }
+    if (path === '/api/teams/t1/machines') return json([]);
+    if (path === '/api/teams/t1/model-sources')
+      return json({
+        sources: [
+          {
+            runtime: 'devin',
+            installed: true,
+            hostname: 'exec-mac',
+            machineId: 'm1',
+            models: [
+              { id: 'swe-2-high', name: 'SWE-2' },
+              { id: 'swe-2-flash-medium', name: 'SWE-2 Flash' },
+            ],
+          },
+        ],
+      });
+    return undefined;
+  });
+  await page.goto('/app/settings/routing');
+  const card = page.getByRole('dialog', { name: '设置' }).getByTestId('frequent-models');
+  const row = card.getByTestId('frequent-model-row');
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText('SWE-2');
+  await expect(row).not.toHaveAttribute('data-unavailable', '');
+  await expect(row.locator('.frequent-model-level')).toHaveCount(0);
+  await card.getByTestId('frequent-models-add').click();
+  const menu = page.locator('[data-slot="select-content"][aria-label="添加模型"]');
+  await expect(menu.getByText('Devin', { exact: true })).toBeVisible();
+  await menu.locator('.frequent-models-add-row', { hasText: 'SWE-2 Flash' }).click();
+  await expect
+    .poll(() => puts.at(-1))
+    .toEqual([
+      { provider: 'devin', modelId: 'swe-2-high', thinkingLevel: null },
+      { provider: 'devin', modelId: 'swe-2-flash-medium', thinkingLevel: null },
+    ]);
+});

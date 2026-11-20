@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   antigravitySubscription,
   build as buildTable,
+  machine as machineTable,
   step as stepTable,
 } from '../src/db/schema.js';
 import { getModelSources } from '../src/services/providers.js';
@@ -445,6 +446,32 @@ describe('antigravity upstream models', () => {
         { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', slot: 'builtin' },
         { id: 'gemini-4-argon', name: 'Gemini 4 Argon', slot: 'builtin' },
       ],
+    });
+  });
+
+  test('an offline antigravity-capable Runner still contributes its model source', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const machineId = insertMachine(s, {
+      name: 'agy-asleep',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+        },
+      },
+    });
+    s.db.update(machineTable).set({ online: false }).where(eq(machineTable.id, machineId)).run();
+    const sources = getModelSources({ db: s.db, box: s.secretBox }, s.team.id).sources;
+    expect(sources).toContainEqual({
+      runtime: 'antigravity',
+      installed: true,
+      hostname: 'agy-asleep',
+      machineId,
+      models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', slot: 'builtin' }],
     });
   });
 });

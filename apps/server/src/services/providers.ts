@@ -151,7 +151,7 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
     .where(eq(machine.teamId, teamId))
     .orderBy(asc(machine.name))
     .all()
-    .filter((row) => row.online && row.capabilities?.devin?.installed === true);
+    .filter((row) => row.capabilities?.devin?.installed === true);
   const seen = new Set<string>();
   const merged = [
     ...enabledDevinSubscriptionModels({ db }, teamId),
@@ -178,7 +178,7 @@ export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnve
     .where(eq(machine.teamId, teamId))
     .orderBy(asc(machine.name))
     .all()
-    .filter((row) => row.online && row.capabilities?.antigravity?.installed === true);
+    .filter((row) => row.capabilities?.antigravity?.installed === true);
   const seen = new Set<string>();
   const merged = [
     ...enabledAntigravitySubscriptionModels({ db }, teamId),
