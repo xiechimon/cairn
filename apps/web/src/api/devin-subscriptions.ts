@@ -8,7 +8,12 @@ import type {
 import { devinKeyFromToml } from '@cairn/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
+import {
+  runVerification,
+  type Verification,
+  type VerifyOutcome,
+  verificationOf,
+} from './account-verification.js';
 import type { SubscriptionAccount, SubscriptionModel } from './claude-accounts.js';
 import { api } from './client.js';
 
@@ -33,6 +38,7 @@ export function toDevinAccount(wire: DevinSubscriptionListEntry, now: number): S
     windows: [],
     lastUsedAt: wire.lastUsedAt ?? null,
     stepsLast24h: typeof wire.stepsLast24h === 'number' ? wire.stepsLast24h : null,
+    lastCheck: wire.lastCheck ?? null,
     models: Array.isArray(wire.models) ? wire.models : [],
   };
 }
@@ -114,6 +120,7 @@ export function useUpdateDevinSubscriptionModels(teamId: string | undefined) {
 }
 
 export function useDevinSubscriptionVerification(teamId: string | undefined) {
+  const client = useQueryClient();
   const [states, setStates] = useState<Record<string, Verification>>({});
   const inFlight = useRef(new Set<string>());
   const verify = async (id: string): Promise<VerifyOutcome | null> => {
@@ -130,9 +137,10 @@ export function useDevinSubscriptionVerification(teamId: string | undefined) {
       const { [id]: _settled, ...rest } = current;
       return {
         ...rest,
-        [id]: outcome.ok ? { phase: 'passed' } : { phase: 'failed', reason: outcome.reason },
+        [id]: verificationOf(outcome),
       };
     });
+    void client.invalidateQueries({ queryKey: ['devin-subscriptions', teamId] });
     return outcome;
   };
   return { states, verify };

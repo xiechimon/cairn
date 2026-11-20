@@ -51,7 +51,6 @@ export const EN: Record<string, string> = {
   '这个订阅已过期。先移除它，再重新添加新的 token。':
     'This subscription has expired. Remove it, then add a new token.',
   使用: 'Usage',
-  '24 小时步骤': 'Steps in 24 hours',
   '无法取消归档任务。': 'Could not unarchive the task.',
   '无法归档任务。': 'Could not archive the task.',
   'Claude 订阅': 'Claude subscription',
@@ -1852,7 +1851,6 @@ export const EN: Record<string, string> = {
   状态未知: 'Unknown',
   评审: 'Review',
   账户: 'Accounts',
-  还没有额度读数: 'No quota reading yet',
   这台执行机还没有上报模型服务状态: 'This Runner has not reported its providers yet',
   重命名: 'Rename',
   重命名分组: 'Rename group',
@@ -1888,12 +1886,6 @@ export const EN: Record<string, string> = {
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
   '先给 Coordinator 选模型，它才能回答你的消息。':
     'Pick a model for the Coordinator so it can answer your messages.',
-  '查看验证结果：{status}': 'Show verification result: {status}',
-  正在用这个订阅发一次模型请求: 'Sending one model request with this subscription',
-  正在检查这个订阅的登录: 'Checking this subscription’s sign-in',
-  '正在用这个凭据登录 Devin': 'Signing in to Devin with these credentials',
-  '正在检查 Antigravity 是否接受这个凭据': 'Checking whether Antigravity accepts these credentials',
-  '这个订阅刚完成了一次模型请求。': 'This subscription just completed a model request.',
   '这个订阅的登录有效。': 'This subscription’s sign-in is valid.',
   'Devin 接受了这个凭据。': 'Devin accepted these credentials.',
   'Antigravity 接受了这个凭据。': 'Antigravity accepted these credentials.',
@@ -2551,8 +2543,6 @@ export const EN: Record<string, string> = {
   从上游选择: 'Choose from upstream',
   全部测试: 'Test all',
   '还没选模型。从上游拉一份清单来勾选。': 'No models yet. Fetch the upstream list and pick some.',
-  '还没勾选模型，订阅按执行机上报的名单兜底。':
-    'No models picked yet. The subscription falls back to the list machines report.',
   低价: 'Low cost',
   中价: 'Med cost',
   高价: 'High cost',
@@ -2770,4 +2760,27 @@ export const EN: Record<string, string> = {
     'Create one under Settings → API Keys in the Composio dashboard; it starts with ak_.',
   '打开 Composio 控制台': 'Open the Composio dashboard',
   '自定义 MCP 服务器': 'Custom MCP server',
+  'Claude 回复了这次模型请求，订阅能用。':
+    'Claude answered the model request; the subscription works.',
+  登录失效: 'Sign-in expired',
+  验证超时: 'Check timed out',
+  没法验证: 'Cannot check',
+  连接中断: 'Connection dropped',
+  验证太频繁: 'Checked too often',
+  执行机未登录: 'Runner not signed in',
+  未验证: 'Not checked',
+  '{window} 剩 {left}%': '{window} {left}% left',
+  '用这个订阅跑过一次任务后，这里显示 5 小时和每周额度':
+    'After a task runs on this subscription, the 5-hour and weekly quota show here',
+  '剩 {left}%': '{left}% left',
+  通过: 'Passed',
+  '没通过 · {reason}': 'Failed · {reason}',
+  '{s} 秒': '{s}s',
+  重新验证: 'Check again',
+  '每个模型测试会发一次很短的请求，算在订阅额度里。':
+    'Each model test sends one short request, counted against the subscription quota.',
+  '还没勾选模型，订阅按执行机上报的名单兜底。':
+    'No models picked yet; the subscription uses the list the Runners report.',
+  '还没勾选模型。从上游拉一份清单来勾选。':
+    'No models picked yet. Pull a list from upstream to pick from.',
 };

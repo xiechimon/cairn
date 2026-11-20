@@ -13,9 +13,11 @@ import { antigravitySubscription, build, chiefThread, machine, step, todo } from
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
+  ANTIGRAVITY_MODELS_URL,
   verifyAntigravityHostLogin,
   verifyAntigravitySubscription,
 } from './antigravity-subscription-verification.js';
+import { timedCheck } from './subscription-check.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
 
 export type AntigravityAccountStepsPage = {
@@ -322,6 +324,7 @@ export function listAntigravitySubscriptions(
       ...toRecord(row),
       lastUsedAt: stats?.lastUsedAt ?? null,
       stepsLast24h: stats?.stepsLast24h ?? null,
+      lastCheck: row.lastCheck,
     };
   });
 }
@@ -344,6 +347,7 @@ export function createAntigravitySubscription(
     expiresAt: body.expiresAt ?? null,
     enabledAt: null,
     models: [],
+    lastCheck: null,
     createdAt: now,
   };
   return deps.db.transaction((tx) => {
@@ -379,7 +383,18 @@ export async function verifyAntigravitySubscriptionConnection(
   if (!row) throw notFound('Antigravity subscription connection');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false };
   claimRateWindow(verificationWindows, deps.db, row.id, 'verification attempts');
-  return verifyRowCredentials(deps, teamId, row);
+  const result = await timedCheck(() => verifyRowCredentials(deps, teamId, row), {
+    check: 'sign-in',
+    command:
+      row.tokenCipher === null ? 'agy acp · Runner sign-in' : `GET ${ANTIGRAVITY_MODELS_URL}`,
+    model: null,
+  });
+  deps.db
+    .update(antigravitySubscription)
+    .set({ lastCheck: result.check })
+    .where(eq(antigravitySubscription.id, row.id))
+    .run();
+  return result;
 }
 
 export async function antigravitySubscriptionUpstreamModels(

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { subscriptionCheckSchema } from './subscription-check.js';
 
 export const ANTIGRAVITY_TOKEN_REGEX = /^[A-Za-z0-9._~$+/=-]{16,4096}$/;
 
@@ -50,6 +51,7 @@ export type PatchAntigravitySubscription = z.infer<typeof renameAntigravitySubsc
 export const antigravitySubscriptionVerifyResultSchema = z.object({
   ok: z.boolean(),
   reason: z.enum(['auth', 'timeout', 'unavailable', 'failed', 'missing_local_login']).optional(),
+  check: subscriptionCheckSchema.optional(),
 });
 
 export type AntigravitySubscriptionVerifyResult = z.infer<

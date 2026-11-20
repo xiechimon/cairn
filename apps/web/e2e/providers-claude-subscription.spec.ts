@@ -60,9 +60,11 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
   const detail = page.getByTestId('subscription-detail');
   const feedback = page.getByTestId('subscription-verify-feedback');
   await expect(feedback).toHaveAttribute('data-phase', 'passed');
-  await expect(feedback).toHaveText(locale === 'zh' ? '这个订阅刚完成了一次模型请求。' : 'This subscription just completed a model request.');
-  await page.keyboard.press('Escape');
-  await expect(feedback).toHaveCount(0);
+  await expect(feedback).toContainText(
+    locale === 'zh'
+      ? 'Claude 回复了这次模型请求，订阅能用。'
+      : 'Claude answered the model request; the subscription works.',
+  );
   await expect(detail.getByLabel(locale === 'zh' ? '名称' : 'Name')).toBeVisible();
 
   const remove = locale === 'zh' ? '移除' : 'Remove';

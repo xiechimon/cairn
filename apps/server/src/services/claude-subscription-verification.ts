@@ -48,10 +48,25 @@ function classify(failure: ExecFileException, output: ExecOutput): ClaudeSubscri
   return { ok: false, reason: 'failed' };
 }
 
+const CHECK_ARGS = [
+  '-p',
+  'Reply with OK',
+  '--output-format',
+  'json',
+  '--no-session-persistence',
+  '--tools',
+  '',
+];
+
+export function claudeCheckCommand(model: string | null): string {
+  return `claude -p "Reply with OK"${model === null ? '' : ` --model ${model}`}`;
+}
+
 function runClaude(
   token: string,
   home: string,
   timeoutMs: number,
+  model: string | null,
 ): Promise<ClaudeSubscriptionVerifyResult> {
   const explicit = process.env.CLAUDE_BIN || process.env.CAIRN_CLAUDE_BIN;
   const command =
@@ -75,7 +90,7 @@ function runClaude(
   return new Promise((resolve) => {
     const child = execFile(
       command,
-      ['-p', 'Reply with OK', '--output-format', 'json', '--no-session-persistence', '--tools', ''],
+      [...CHECK_ARGS, ...(model === null ? [] : ['--model', model])],
       {
         cwd: home,
         env: childEnv(home, token),
@@ -94,11 +109,16 @@ function runClaude(
 
 export async function verifyClaudeSubscription(
   token: string,
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; model?: string } = {},
 ): Promise<ClaudeSubscriptionVerifyResult> {
   const home = await mkdtemp(join(tmpdir(), 'cairn-claude-verify-'));
   try {
-    return await runClaude(token, home, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    return await runClaude(
+      token,
+      home,
+      options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      options.model ?? null,
+    );
   } finally {
     await rm(home, { recursive: true, force: true });
   }

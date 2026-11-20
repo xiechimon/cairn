@@ -32,7 +32,7 @@ const picked = () => [UPSTREAM[0], UPSTREAM[2]];
 
 const detail = (page: Page) => page.getByTestId('subscription-detail');
 const pickedChip = (page: Page, id: string) =>
-  detail(page).locator(`[data-testid="subscription-picked-model"][data-model-id="${id}"]`);
+  detail(page).locator(`[data-testid="subscription-model"][data-model-id="${id}"]`);
 
 const mount = (
   page: Page,
@@ -85,7 +85,7 @@ test('removing a chip persists the shortened model list', async ({ page }) => {
   const patches: object[] = [];
   await mount(page, subscription(picked()), UPSTREAM, patches);
   await page.goto('/app/resources/providers');
-  await pickedChip(page, 'gemini-4-carbon').getByTestId('subscription-model-remove').click();
+  await pickedChip(page, 'gemini-4-carbon').getByRole('button', { name: '移除 gemini-4-carbon' }).click();
   await expect
     .poll(() => patches)
     .toEqual([{ models: [expect.objectContaining({ id: 'claude-sonnet-4-6' })] }]);

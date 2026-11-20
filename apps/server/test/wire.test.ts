@@ -35,6 +35,8 @@ const INFERRED_ROUTES = [
   'PATCH /api/teams/{id}/claude-subscriptions/{cid}',
   'POST /api/teams/{id}/claude-subscriptions/{cid}/enable',
   'POST /api/teams/{id}/claude-subscriptions/{cid}/disable',
+  'POST /api/teams/{id}/claude-subscriptions/{cid}/upstream-models',
+  'POST /api/teams/{id}/claude-subscriptions/{cid}/test',
   'GET /api/teams/{id}/devin-subscriptions',
   'DELETE /api/teams/{id}/devin-subscriptions/{cid}',
   'POST /api/teams/{id}/devin-subscriptions',

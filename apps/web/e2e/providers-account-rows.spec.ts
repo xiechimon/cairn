@@ -3,7 +3,7 @@ import type { ClaudeSubscriptionListEntry } from '@cairn/shared';
 import { mockLive } from './chief-home-mock';
 
 const URL = '/app/settings/routing?scenario=model-routing';
-const STATUS_WORDS = ['可用', '验证中', '验证失败', '冷却', '额度用尽', '已过期'];
+const STATUS_WORDS = ['可用', '未验证', '验证中', '验证失败', '登录失效', '冷却', '额度用尽', '已过期'];
 
 for (const width of [1440, 375]) {
   test(`subscription rows at ${width}px: kind, one status, no placeholder dashes`, async ({
@@ -34,7 +34,6 @@ test('the Personal detail reads status, last use, steps and each quota window in
   const detail = page.getByTestId('subscription-detail');
   await expect(detail.getByTestId('subscription-status')).toHaveText('可用');
   await expect(detail).toContainText('最近使用');
-  await expect(detail).toContainText('24 小时步骤');
   await expect(detail.getByTestId('subscription-model')).toHaveCount(4);
   await expect(detail.getByTestId('subscription-model').first()).toContainText('claude-opus-4-5');
   await expect(detail.getByRole('progressbar')).toHaveCount(2);
@@ -50,9 +49,9 @@ test('the Devin subscription lists its catalog models and shows no quota section
   await expect(row).toContainText('订阅 · 5 个模型 · 可用');
   await row.click();
   const detail = page.getByTestId('subscription-detail');
-  await expect(detail.getByTestId('subscription-picked-model')).toHaveCount(5);
-  await expect(detail.getByTestId('subscription-picked-model').first()).toContainText('SWE-2');
-  await expect(detail.getByTestId('subscription-picked-model').first()).toContainText('swe-2-high');
+  await expect(detail.getByTestId('subscription-model')).toHaveCount(5);
+  await expect(detail.getByTestId('subscription-model').first()).toContainText('SWE-2');
+  await expect(detail.getByTestId('subscription-model').first()).toContainText('swe-2-high');
   await expect(detail).not.toContainText('额度');
   await expect(detail).not.toContainText('—');
 });
@@ -71,7 +70,7 @@ test('subscriptions whose Runner reports nothing: Claude reads 0 models and warn
   await expect(devin).toContainText('订阅 · 5 个模型 · 可用');
   await expect(devin).toHaveAttribute('data-tone', 'ok');
   await devin.click();
-  await expect(detail.getByTestId('subscription-picked-model')).toHaveCount(5);
+  await expect(detail.getByTestId('subscription-model')).toHaveCount(5);
 });
 
 test('an account nobody has used says so once, and still has a quota line of its own', async ({
@@ -95,11 +94,13 @@ test('an account nobody has used says so once, and still has a quota line of its
   await page.goto('/app/settings/routing');
   const row = page.getByTestId('provider-instance');
   await expect(row).toHaveCount(1);
-  await expect(row).toContainText('订阅 · 0 个模型 · 可用');
+  await expect(row).toContainText('订阅 · 0 个模型 · 未验证');
   await expect(row).not.toContainText('最近使用');
   const detail = page.getByTestId('subscription-detail');
   await expect(detail.getByText('还没用过')).toHaveCount(1);
-  await expect(detail).toContainText('还没有执行机上报 Claude Code 模型');
-  await expect(detail).toContainText('还没有额度读数');
+  await expect(detail).toContainText('还没勾选模型。从上游拉一份清单来勾选。');
+  await expect(detail.getByTestId('subscription-status')).toHaveText('未验证');
+  await expect(detail.getByTestId('subscription-verify-feedback')).toHaveCount(0);
+  await expect(detail).toContainText('用这个订阅跑过一次任务后，这里显示 5 小时和每周额度');
   await expect(detail).not.toContainText('—');
 });

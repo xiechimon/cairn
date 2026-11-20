@@ -95,17 +95,20 @@ describe('Devin subscription connections', () => {
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
     const runs = fakeDevin();
-    expect(await (await req(s.app, 'POST', `${path}/${id}/verify`)).json()).toEqual({
+    expect(await (await req(s.app, 'POST', `${path}/${id}/verify`)).json()).toMatchObject({
       ok: true,
     });
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
     fakeDevin({ authenticate: 'reject' });
     const rejected = await req(s.app, 'POST', `${path}/${id}/verify`);
-    expect(await rejected.json()).toEqual({ ok: false, reason: 'auth' });
+    expect(await rejected.json()).toMatchObject({ ok: false, reason: 'auth' });
     clock.mockReturnValue(Date.now() + 10_000);
     vi.stubEnv('DEVIN_BIN', join(fixtureDirs[fixtureDirs.length - 1] ?? '/nonexistent', 'missing'));
     const failed = await req(s.app, 'POST', `${path}/${id}/verify`);
-    expect(await failed.json()).toEqual({ ok: false, reason: 'unavailable' });
+    expect(await failed.json()).toMatchObject({ ok: false, reason: 'unavailable' });
+    const [listed] = (await (await req(s.app, 'GET', path)).json()) as { lastCheck: unknown }[];
+    expect(listed?.lastCheck).toMatchObject({ ok: false, reason: 'unavailable', check: 'sign-in' });
+    expect(JSON.stringify(listed)).not.toContain(TOKEN);
     expect(logs.join('')).not.toContain(TOKEN);
     expect(
       (await req(s.app, 'POST', `/api/teams/other/devin-subscriptions/${id}/verify`)).status,
@@ -119,7 +122,7 @@ describe('Devin subscription connections', () => {
     const created = await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN });
     const { id } = (await created.json()) as { id: string };
     fakeDevin({ authenticate: 'absent' });
-    expect(await (await req(s.app, 'POST', `${path}/${id}/verify`)).json()).toEqual({
+    expect(await (await req(s.app, 'POST', `${path}/${id}/verify`)).json()).toMatchObject({
       ok: true,
     });
   });

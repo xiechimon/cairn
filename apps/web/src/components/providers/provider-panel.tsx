@@ -14,6 +14,7 @@ export interface ProviderItem {
   version?: string | null;
   status: string;
   tone: ProviderTone;
+  aside?: ReactNode;
 }
 
 const MONO_MARK_CLS = '[&_path]:fill-current';
@@ -81,6 +82,7 @@ export function ProviderInstanceRow({
           </span>
         </span>
       </Button>
+      {item.aside}
     </div>
   );
 }
@@ -135,20 +137,23 @@ export function ProviderEditorHead({
   name,
   kind,
   version,
+  aside,
 }: {
   Mark: ProviderMark;
   name: string;
   kind: string;
   version?: string | null;
+  aside?: ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <ProviderMarkTile Mark={Mark} />
       <div className="flex min-w-0 flex-auto flex-col">
         <h2 className="m-0 truncate text-card-title font-medium text-foreground">{name}</h2>
         <span className="text-meta text-content-tertiary">{kind}</span>
       </div>
       {version != null && <code className="text-meta text-content-tertiary">v{version}</code>}
+      {aside}
     </div>
   );
 }

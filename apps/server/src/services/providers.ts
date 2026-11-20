@@ -34,6 +34,7 @@ import {
 import { conflict, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { enabledAntigravitySubscriptionModels } from './antigravity-subscriptions.js';
+import { enabledClaudeSubscriptionModels } from './claude-subscriptions.js';
 import { enabledDevinSubscriptionModels } from './devin-subscriptions.js';
 import { getModelLiveness } from './model-liveness.js';
 
@@ -122,6 +123,8 @@ export function getProvidersEnvelope(
 }
 
 export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
+  const picked = enabledClaudeSubscriptionModels({ db }, teamId);
+  const pickedIds = picked === null ? null : new Set(picked.map((model) => model.id));
   return db
     .select()
     .from(machine)
@@ -137,7 +140,10 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
           installed: report.installed,
           hostname: report.hostname,
           machineId: row.id,
-          models: report.models,
+          models:
+            pickedIds === null
+              ? report.models
+              : report.models.filter((model) => pickedIds.has(model.id)),
           ...(report.bin !== undefined ? { bin: report.bin } : {}),
         },
       ];

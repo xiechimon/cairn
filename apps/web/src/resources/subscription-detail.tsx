@@ -1,3 +1,4 @@
+import type { ProviderTestResult, SubscriptionCheck } from '@cairn/shared';
 import {
   MODEL_SOURCE_RUNTIME_LABELS,
   type ModelSource,
@@ -5,8 +6,8 @@ import {
   type ModelSourceRuntime,
 } from '@cairn/shared';
 import { cn } from 'cn';
-import { Download, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Download, Play } from 'lucide-react';
+import { useRef, useState } from 'react';
 import type { AccountStatus, Verification, VerifyFailure } from '../api/account-verification.js';
 import type {
   AccountVendor,
@@ -23,25 +24,20 @@ import {
   TONE_DOT,
 } from '../components/providers/provider-panel.js';
 import { isLowQuota } from '../components/settings/quota-row.js';
-import {
-  SETTINGS_ROW_CLS,
-  SettingsCard,
-  SettingsDangerZone,
-  SettingsRow,
-  SettingsSection,
-} from '../components/settings-list.js';
+import { SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverTrigger,
-} from '../components/ui/popover.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { ACCENT_INK } from '../phase.js';
-import { CommitInput } from './provider-editors.js';
+import {
+  CommitInput,
+  FAILURE_SENTENCE,
+  Field,
+  failureOf,
+  type ModelCheck,
+  ModelChip,
+} from './provider-editors.js';
 import { COST_TIER_LABEL } from './upstream-model-picker.js';
 
 const WINDOW_LABELS: Record<string, string> = {
@@ -94,20 +90,23 @@ function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
   };
 }
 
-const VERIFYING_COPY: Record<AccountVendor, string> = {
-  claude: '正在用这个订阅发一次模型请求',
-  codex: '正在检查这个订阅的登录',
-  grok: '正在检查这个订阅的登录',
-  devin: '正在用这个凭据登录 Devin',
-  antigravity: '正在检查 Antigravity 是否接受这个凭据',
-};
-
 const PASSED_COPY: Record<AccountVendor, string> = {
-  claude: '这个订阅刚完成了一次模型请求。',
+  claude: 'Claude 回复了这次模型请求，订阅能用。',
   codex: '这个订阅的登录有效。',
   grok: '这个订阅的登录有效。',
   devin: 'Devin 接受了这个凭据。',
   antigravity: 'Antigravity 接受了这个凭据。',
+};
+
+const FAILED_LABEL: Record<VerifyFailure, string> = {
+  auth: '登录失效',
+  timeout: '验证超时',
+  unavailable: '没法验证',
+  quota: '额度用尽',
+  failed: '验证失败',
+  network: '连接中断',
+  'rate-limited': '验证太频繁',
+  missing_local_login: '执行机未登录',
 };
 
 const STATUS_CLS = 'flex items-center gap-1.5 text-meta text-content-secondary';
@@ -137,10 +136,18 @@ export function subscriptionStatusView(
   clock: (ts: number, now: number) => string,
 ): SubscriptionStatusView {
   if (status.kind === 'verifying') return { tone: 'off', label: t('验证中…'), reason: null };
-  if (status.kind === 'verify-failed') return { tone: 'fail', label: t('验证失败'), reason: null };
+  if (status.kind === 'unverified') return { tone: 'off', label: t('未验证'), reason: null };
+  if (status.kind === 'verified') {
+    return {
+      tone: 'ok',
+      label: t('可用'),
+      reason: null,
+    };
+  }
+  if (status.kind === 'verify-failed') {
+    return { tone: 'fail', label: t(FAILED_LABEL[status.reason]), reason: null };
+  }
   switch (status.state) {
-    case 'ok':
-      return { tone: 'ok', label: t('可用'), reason: null };
     case 'cooling':
       return {
         tone: 'off',
@@ -226,58 +233,179 @@ export function subscriptionSummary(
   ].join(' · ');
 }
 
-function QuotaRows({ windows, now }: { windows: QuotaWindow[]; now: number }) {
+function quotaWindows(windows: readonly QuotaWindow[]): QuotaWindow[] {
+  return WINDOW_ORDER.flatMap((name) => windows.filter((w) => w.name === name));
+}
+
+export function QuotaMiniBars({ windows }: { windows: readonly QuotaWindow[] }) {
+  const { t } = useI18n();
+  const ordered = quotaWindows(windows);
+  if (ordered.length === 0) return null;
+  const summary = ordered
+    .map((w) =>
+      t('{window} 剩 {left}%', {
+        window: t(WINDOW_LABELS[w.name] ?? w.name),
+        left: leftPercent(w),
+      }),
+    )
+    .join(' · ');
+  return (
+    <span
+      data-testid="subscription-quota-mini"
+      role="img"
+      aria-label={summary}
+      title={summary}
+      className="mt-1.5 flex w-9 flex-none flex-col gap-1"
+    >
+      {ordered.map((window) => {
+        const left = leftPercent(window);
+        return (
+          <span key={window.name} className="block h-1 overflow-hidden rounded-full bg-secondary">
+            <i
+              className={cn(
+                'block h-full rounded-full',
+                isLowQuota(left) ? 'bg-(--card-button)' : 'bg-running',
+              )}
+              style={{ width: `${left}%` }}
+            />
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function QuotaHead({ account, now }: { account: SubscriptionAccount; now: number }) {
   const { t } = useI18n();
   const clock = useClock();
-  const ordered = WINDOW_ORDER.flatMap((name) => windows.filter((w) => w.name === name));
+  const ordered = quotaWindows(account.windows);
   if (ordered.length === 0) {
+    if (account.vendor !== 'claude') return null;
     return (
-      <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
-        {t('还没有额度读数')}
-      </div>
+      <span
+        data-testid="subscription-quota"
+        className="ml-auto max-w-64 text-right text-meta text-content-tertiary max-sm:ml-0 max-sm:w-full max-sm:text-left"
+      >
+        {t('用这个订阅跑过一次任务后，这里显示 5 小时和每周额度')}
+      </span>
     );
   }
-  return ordered.map((window) => {
-    const left = leftPercent(window);
-    const label = t(WINDOW_LABELS[window.name] ?? window.name);
-    return (
-      <SettingsRow
-        key={window.name}
-        label={label}
-        hint={
-          window.resetsAt === null
-            ? undefined
-            : t('{time} 重置', { time: clock(window.resetsAt, now) })
-        }
-        className="gap-3"
+  return (
+    <span data-testid="subscription-quota" className="ml-auto flex gap-4 max-sm:ml-0 max-sm:w-full">
+      {ordered.map((window) => {
+        const left = leftPercent(window);
+        const label = t(WINDOW_LABELS[window.name] ?? window.name);
+        return (
+          <span key={window.name} className="flex w-28 flex-col gap-1 max-sm:flex-auto">
+            <span className="flex justify-between text-meta text-content-tertiary">
+              {label}
+              <span
+                className={cn(
+                  'font-medium text-foreground tabular-nums',
+                  isLowQuota(left) && ACCENT_INK,
+                )}
+              >
+                {t('剩 {left}%', { left })}
+              </span>
+            </span>
+            <span
+              role="progressbar"
+              aria-label={t('{window} 剩余', { window: label })}
+              aria-valuenow={left}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="block h-1 overflow-hidden rounded-full bg-secondary"
+            >
+              <i
+                className={cn(
+                  'block h-full rounded-full',
+                  isLowQuota(left) ? 'bg-(--card-button)' : 'bg-running',
+                )}
+                style={{ width: `${left}%` }}
+              />
+            </span>
+            {window.resetsAt !== null && (
+              <span className="text-caption text-content-tertiary">
+                {t('{time} 重置', { time: clock(window.resetsAt, now) })}
+              </span>
+            )}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function checkLines(check: SubscriptionCheck, now: number, t: TFunc): string {
+  const seconds = (check.durationMs / 1000).toFixed(1);
+  return [
+    check.command,
+    `${
+      check.ok
+        ? t('通过')
+        : t('没通过 · {reason}', {
+            reason: t(FAILED_LABEL[(check.reason ?? 'failed') as VerifyFailure] ?? '验证失败'),
+          })
+    } · ${t('{s} 秒', { s: seconds })} · ${relativeTime(check.at, now, t)}`,
+  ].join('\n');
+}
+
+function VerifyResult({
+  account,
+  verification,
+  now,
+}: {
+  account: SubscriptionAccount;
+  verification: Verification | undefined;
+  now: number;
+}) {
+  const { t } = useI18n();
+  if (verification?.phase === 'verifying') return null;
+  const check = verification === undefined ? account.lastCheck : (verification.check ?? null);
+  const failure: VerifyFailure | null =
+    verification?.phase === 'failed'
+      ? verification.reason
+      : verification === undefined && check !== null && !check.ok
+        ? Object.keys(failureCopy(account.vendor)).includes(check.reason ?? '')
+          ? (check.reason as VerifyFailure)
+          : 'failed'
+        : null;
+  if (verification === undefined && check === null) return null;
+  return (
+    <div
+      role="status"
+      data-testid="subscription-verify-feedback"
+      data-phase={failure === null ? 'passed' : 'failed'}
+      className="-mt-2 flex flex-col gap-1.5 rounded-lg px-3 py-2.5 ring-1 ring-border"
+    >
+      <span
+        className={cn(
+          'flex items-start gap-1.5 text-ui font-medium',
+          failure === null ? 'text-foreground' : 'text-destructive',
+        )}
       >
         <span
-          role="progressbar"
-          aria-label={t('{window} 剩余', { window: label })}
-          aria-valuenow={left}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          className="h-2 w-28 flex-none overflow-hidden rounded-full bg-secondary @xl:w-40"
-        >
-          <i
-            className={cn(
-              'block h-full rounded-full',
-              isLowQuota(left) ? 'bg-(--card-button)' : 'bg-running',
-            )}
-            style={{ width: `${left}%` }}
-          />
-        </span>
-        <span
-          className={cn(
-            'w-10 flex-none text-right text-meta text-content-secondary tabular-nums',
-            isLowQuota(left) && ACCENT_INK,
+          aria-hidden
+          className={cn(STATUS_DOT_CLS, 'mt-2', failure === null ? 'bg-running' : 'bg-destructive')}
+        />
+        <span>
+          {withCodeSpans(
+            failure === null
+              ? t(PASSED_COPY[account.vendor])
+              : t(failureCopy(account.vendor)[failure]),
           )}
-        >
-          {left}%
         </span>
-      </SettingsRow>
-    );
-  });
+      </span>
+      {check !== null && (
+        <pre
+          data-testid="subscription-verify-detail"
+          className="m-0 rounded-md bg-secondary px-2.5 py-2 font-mono text-caption whitespace-pre-wrap text-content-secondary [overflow-wrap:anywhere]"
+        >
+          {checkLines(check, now, t)}
+        </pre>
+      )}
+    </div>
+  );
 }
 
 export interface SubscriptionActions {
@@ -286,48 +414,13 @@ export interface SubscriptionActions {
   onRemove: () => void;
   onPickUpstream?: () => void;
   onRemoveModel?: (id: string) => void;
+  onTestModel?: (id: string) => Promise<ProviderTestResult>;
   modelsBusy?: boolean;
 }
 
-function SubscriptionModelChip({ model }: { model: ModelSourceModel }) {
-  const { t } = useI18n();
-  const dead = model.liveness === 'dead';
-  return (
-    <span
-      data-testid="subscription-model"
-      data-model-id={model.id}
-      data-liveness={dead ? 'dead' : 'alive'}
-      className="inline-flex min-h-7 max-w-full items-center gap-1.5 rounded-md bg-secondary px-2.5 py-0.5 text-ui text-foreground ring-1 ring-border pointer-coarse:min-h-9"
-    >
-      <span
-        className={cn(
-          'min-w-0 [overflow-wrap:anywhere]',
-          dead && 'text-content-tertiary line-through',
-        )}
-      >
-        {model.name}
-      </span>
-      {model.name !== model.id && (
-        <code className="flex-none truncate font-mono text-caption text-content-tertiary">
-          {model.id}
-        </code>
-      )}
-      {dead && <span className="flex-none text-meta text-content-tertiary">{t('已下架')}</span>}
-    </span>
-  );
-}
+const TEST_CONCURRENCY = 2;
 
-function PickedModelChip({
-  model,
-  busy,
-  onRemove,
-}: {
-  model: SubscriptionModel;
-  busy: boolean;
-  onRemove?: () => void;
-}) {
-  const { t } = useI18n();
-  const dead = model.liveness === 'dead';
+function tierMeta(model: SubscriptionModel, t: TFunc) {
   const tier =
     model.costTier === undefined ? undefined : (COST_TIER_LABEL[model.costTier] ?? model.costTier);
   const context =
@@ -336,286 +429,258 @@ function PickedModelChip({
       : model.contextTokens >= 1_000_000
         ? `${Number((model.contextTokens / 1_000_000).toFixed(1))}M`
         : `${Math.round(model.contextTokens / 1000)}K`;
+  const parts = [
+    model.name === model.id ? null : model.name,
+    tier === undefined ? null : t(tier),
+    context ?? null,
+  ].filter((v) => v !== null);
+  if (parts.length === 0) return undefined;
   return (
     <span
-      data-testid="subscription-picked-model"
-      data-model-id={model.id}
       title={model.costSummary}
-      className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-md bg-secondary pl-2.5 pr-1 text-ui text-foreground ring-1 ring-border"
+      className="flex-none text-caption text-content-tertiary tabular-nums"
     >
-      <span className={cn('truncate', dead && 'text-content-tertiary line-through')}>
-        {model.name}
-      </span>
-      {model.name !== model.id && (
-        <code className="truncate font-mono text-caption text-content-tertiary">{model.id}</code>
-      )}
-      {model.costTier === 'Free' && (
-        <span
-          data-testid="subscription-model-free"
-          className="flex-none rounded border border-border px-1 text-caption text-content-tertiary"
-        >
-          Free
-        </span>
-      )}
-      {tier !== undefined && model.costTier !== 'Free' && (
-        <span className="flex-none text-caption text-content-tertiary">{t(tier)}</span>
-      )}
-      {context !== undefined && (
-        <span className="flex-none text-caption text-content-tertiary tabular-nums">{context}</span>
-      )}
-      {dead && <span className="flex-none text-caption text-content-tertiary">{t('已下架')}</span>}
-      {onRemove !== undefined && (
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label={t('移除模型')}
-          data-testid="subscription-model-remove"
-          disabled={busy}
-          className="size-5 text-content-tertiary"
-          onClick={onRemove}
-        >
-          <X />
-        </Button>
-      )}
+      {parts.join(' · ')}
     </span>
-  );
-}
-
-function VerifyFeedback({
-  vendor,
-  verification,
-}: {
-  vendor: AccountVendor;
-  verification: Verification;
-}) {
-  const { t } = useI18n();
-  return (
-    <PopoverDescription
-      role="status"
-      className="flex items-start gap-2 text-meta text-content-secondary"
-    >
-      {verification.phase === 'verifying' && (
-        <Spinner aria-hidden className="mt-0.5 size-4 flex-none text-content-tertiary" />
-      )}
-      <span>
-        {withCodeSpans(
-          verification.phase === 'verifying'
-            ? t(VERIFYING_COPY[vendor])
-            : verification.phase === 'passed'
-              ? t(PASSED_COPY[vendor])
-              : t(failureCopy(vendor)[verification.reason]),
-        )}
-      </span>
-    </PopoverDescription>
   );
 }
 
 export function SubscriptionDetail({
   account,
   models,
-  picked,
+  fallback,
   now,
   view,
   verification,
   actions,
 }: {
   account: SubscriptionAccount;
-  models: readonly ModelSourceModel[];
-  picked?: readonly SubscriptionModel[];
+  models: readonly SubscriptionModel[];
+  fallback: boolean;
   now: number;
   view: SubscriptionStatusView;
   verification: Verification | undefined;
   actions: SubscriptionActions;
 }) {
   const { t } = useI18n();
-  const verifyRef = useRef<HTMLButtonElement>(null);
-  const [feedbackOpen, setFeedbackOpen] = useState(verification?.phase === 'verifying');
-  useEffect(() => {
-    if (verification?.phase === 'verifying') setFeedbackOpen(true);
-  }, [verification]);
-  const neverUsed = account.lastUsedAt === null && account.stepsLast24h === null;
+  const [checks, setChecks] = useState<Record<string, ModelCheck>>({});
+  const generation = useRef(0);
+  const [checkedAccount, setCheckedAccount] = useState(account.id);
+  if (checkedAccount !== account.id) {
+    generation.current += 1;
+    setCheckedAccount(account.id);
+    setChecks({});
+  }
+  const test = actions.onTestModel;
+  const runTests = async (ids: readonly string[]) => {
+    if (test === undefined || ids.length === 0) return;
+    const started = generation.current;
+    setChecks((prev) => ({
+      ...prev,
+      ...Object.fromEntries(ids.map((id) => [id, { phase: 'running' }])),
+    }));
+    const queue = [...ids];
+    const worker = async () => {
+      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+        const model = id;
+        const outcome: ModelCheck = await test(model).then(
+          (result) => ({ phase: 'done', result }),
+          () => ({ phase: 'unavailable' }),
+        );
+        if (generation.current === started) setChecks((prev) => ({ ...prev, [model]: outcome }));
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(TEST_CONCURRENCY, ids.length) }, worker));
+  };
+  const ids = models.map((model) => model.id);
+  const running = ids.filter((id) => checks[id]?.phase === 'running').length;
+  const tested = ids.filter((id) => checks[id] !== undefined && checks[id].phase !== 'running');
+  const failed = ids.filter((id) => failureOf(checks[id]) !== null);
+  const summary =
+    running > 0
+      ? t('测试中 {done}/{n}', { done: ids.length - running, n: ids.length })
+      : tested.length > 0
+        ? failed.length > 0
+          ? t('{ok} 个可用 · {failed} 个失败', {
+              ok: tested.length - failed.length,
+              failed: failed.length,
+            })
+          : t('{ok} 个可用', { ok: tested.length })
+        : t('{n} 个', { n: ids.length });
   const runtime = SUBSCRIPTION_RUNTIME[account.vendor];
   const runtimeLabel =
     runtime === undefined ? VENDORS[account.vendor].label : MODEL_SOURCE_RUNTIME_LABELS[runtime];
+  const verifying = verification?.phase === 'verifying';
   return (
-    <>
+    <div
+      data-testid="subscription-detail"
+      data-account-id={account.id}
+      data-tone={view.tone}
+      className="@container flex flex-col gap-6"
+    >
       <ProviderEditorHead
         Mark={VENDORS[account.vendor].Mark}
         name={account.label}
-        kind={[t('订阅'), ...(account.plan === null ? [] : [account.plan])].join(' · ')}
+        kind={[
+          t('订阅'),
+          ...(account.plan === null ? [] : [account.plan]),
+          account.lastUsedAt === null
+            ? t('还没用过')
+            : t('最近使用 {ago}', { ago: relativeTime(account.lastUsedAt, now, t) }),
+        ].join(' · ')}
+        aside={<QuotaHead account={account} now={now} />}
       />
-      <div
-        data-testid="subscription-detail"
-        data-account-id={account.id}
-        data-tone={view.tone}
-        className="flex flex-col gap-6"
-      >
-        <SettingsCard>
-          <SettingsRow label={t('状态')}>
-            <Popover open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-              {verification?.phase === 'failed' ? (
-                <PopoverTrigger
-                  data-testid="subscription-status"
-                  aria-label={t('查看验证结果：{status}', { status: view.label })}
-                  className={cn(STATUS_CLS, 'rounded-sm hover:text-foreground')}
-                >
-                  <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
-                  {view.label}
-                </PopoverTrigger>
-              ) : (
-                <span data-testid="subscription-status" className={STATUS_CLS}>
-                  <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
-                  {view.label}
-                </span>
-              )}
-              {actions.onVerify !== undefined && (
-                <Button
-                  ref={verifyRef}
-                  variant="outline"
-                  size="sm"
-                  data-testid="subscription-verify"
-                  disabled={verification?.phase === 'verifying'}
-                  onClick={actions.onVerify}
-                >
-                  {view.tone === 'fail' ? t('重试') : t('验证')}
-                </Button>
-              )}
-              {verification !== undefined && (
-                <PopoverContent
-                  anchor={verifyRef}
-                  align="end"
-                  sideOffset={8}
-                  initialFocus={false}
-                  finalFocus={verifyRef}
-                  data-testid="subscription-verify-feedback"
-                  data-phase={verification.phase}
-                  className="p-3"
-                >
-                  <VerifyFeedback vendor={account.vendor} verification={verification} />
-                </PopoverContent>
-              )}
-            </Popover>
-          </SettingsRow>
-          {view.reason !== null && (
-            <div
-              data-testid="subscription-reason"
-              className={cn(SETTINGS_ROW_CLS, 'min-h-0 py-2 text-meta text-content-tertiary')}
-            >
-              <span>{withCodeSpans(view.reason)}</span>
-            </div>
-          )}
-          {actions.onRename !== undefined && (
-            <SettingsRow label={t('名称')} className="flex-wrap gap-y-2 py-2.5">
-              <CommitInput
-                key={`label:${account.label}`}
-                label={t('名称')}
-                value={account.label}
-                onCommit={actions.onRename}
-              />
-            </SettingsRow>
-          )}
-          {neverUsed ? (
-            <SettingsRow label={t('使用')}>
-              <span className="text-meta text-content-tertiary">{t('还没用过')}</span>
-            </SettingsRow>
+      <div className="grid grid-cols-1 gap-3 @sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <Field label={t('名称')}>
+          {actions.onRename === undefined ? (
+            <span className="flex h-8 items-center truncate text-ui text-foreground">
+              {account.label}
+            </span>
           ) : (
-            <>
-              {account.lastUsedAt !== null && (
-                <SettingsRow label={t('最近使用')}>
-                  <span className="text-meta text-content-secondary">
-                    {relativeTime(account.lastUsedAt, now, t)}
-                  </span>
-                </SettingsRow>
-              )}
-              {account.stepsLast24h !== null && (
-                <SettingsRow label={t('24 小时步骤')}>
-                  <span className="text-meta text-content-secondary tabular-nums">
-                    {account.stepsLast24h}
-                  </span>
-                </SettingsRow>
-              )}
-            </>
+            <CommitInput
+              key={`label:${account.label}`}
+              label={t('名称')}
+              value={account.label}
+              className="sm:w-full"
+              onCommit={actions.onRename}
+            />
           )}
-        </SettingsCard>
-        {picked === undefined ? (
-          <SettingsSection title={t('模型')}>
-            <SettingsCard>
-              {models.length === 0 ? (
-                <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
-                  {t('还没有执行机上报 {runtime} 模型', { runtime: runtimeLabel })}
-                </div>
+        </Field>
+        <Field label={t('状态')}>
+          <span className="flex h-8 items-center gap-2">
+            <span data-testid="subscription-status" className={STATUS_CLS}>
+              {verifying ? (
+                <Spinner aria-hidden className="size-3.5 flex-none text-content-tertiary" />
               ) : (
-                <div
-                  data-testid="subscription-models"
-                  className={cn(SETTINGS_ROW_CLS, 'flex-wrap justify-start gap-1.5 py-2.5')}
-                >
-                  {models.map((model) => (
-                    <SubscriptionModelChip key={model.id} model={model} />
-                  ))}
-                </div>
+                <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
               )}
-            </SettingsCard>
-          </SettingsSection>
-        ) : (
-          <section data-testid="subscription-models" className="flex min-w-0 flex-col gap-2.5">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-              <h3 className="m-0 text-ui font-semibold text-foreground">{t('模型')}</h3>
-              <span
-                data-testid="subscription-models-summary"
-                className="text-meta text-content-tertiary"
+              {view.label}
+            </span>
+            {actions.onVerify !== undefined && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="subscription-verify"
+                disabled={verifying}
+                onClick={actions.onVerify}
               >
-                {t('{n} 个', { n: picked.length })}
-              </span>
-              {actions.onPickUpstream !== undefined && (
-                <span className="ml-auto flex items-center gap-2 max-sm:w-full max-sm:justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-testid="subscription-pick-upstream"
-                    onClick={actions.onPickUpstream}
-                  >
-                    <Download aria-hidden />
-                    {t('从上游选择')}
-                  </Button>
-                </span>
-              )}
-            </div>
-            {picked.length === 0 ? (
-              <p className="m-0 py-1 text-ui text-content-secondary">
-                {t('还没勾选模型，订阅按执行机上报的名单兜底。')}
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {picked.map((model) => (
-                  <PickedModelChip
-                    key={model.id}
-                    model={model}
-                    busy={actions.modelsBusy ?? false}
-                    {...(actions.onRemoveModel === undefined
-                      ? {}
-                      : { onRemove: () => actions.onRemoveModel?.(model.id) })}
-                  />
-                ))}
-              </div>
+                {view.tone === 'fail' ? t('重新验证') : t('验证')}
+              </Button>
             )}
-          </section>
-        )}
-        {account.vendor !== 'devin' && account.vendor !== 'antigravity' && (
-          <SettingsSection title={t('额度')}>
-            <SettingsCard>
-              <QuotaRows windows={account.windows} now={now} />
-            </SettingsCard>
-          </SettingsSection>
-        )}
-        <SettingsSection title={t('管理')}>
-          <SettingsDangerZone
-            label={t('移除订阅')}
-            description={t('移除后，后续步骤不再使用这个订阅。')}
-            actionLabel={t('移除')}
-            onAction={actions.onRemove}
-          />
-        </SettingsSection>
+          </span>
+        </Field>
       </div>
-    </>
+      {view.reason !== null && (
+        <p data-testid="subscription-reason" className="-mt-3 m-0 text-meta text-content-tertiary">
+          {withCodeSpans(view.reason)}
+        </p>
+      )}
+      <VerifyResult account={account} verification={verification} now={now} />
+      <section data-testid="subscription-models" className="flex min-w-0 flex-col gap-2.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+          <h3 className="m-0 text-ui font-semibold text-foreground">{t('模型')}</h3>
+          <span
+            data-testid="subscription-models-summary"
+            className="text-meta text-content-tertiary"
+          >
+            {summary}
+          </span>
+          <span className="ml-auto flex items-center gap-2 max-sm:w-full max-sm:justify-end">
+            {actions.onPickUpstream !== undefined && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="subscription-pick-upstream"
+                onClick={actions.onPickUpstream}
+              >
+                <Download aria-hidden />
+                {t('从上游选择')}
+              </Button>
+            )}
+            {test !== undefined && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="subscription-test-all"
+                className="min-w-24"
+                disabled={running > 0 || ids.length === 0}
+                onClick={() => void runTests(ids)}
+              >
+                {running > 0 ? <Spinner aria-hidden /> : <Play aria-hidden />}
+                {running > 0 ? t('测试中') : t('全部测试')}
+              </Button>
+            )}
+          </span>
+        </div>
+        {models.length === 0 ? (
+          <p className="m-0 py-1 text-ui text-content-secondary">
+            {actions.onPickUpstream === undefined
+              ? t('还没有执行机上报 {runtime} 模型', { runtime: runtimeLabel })
+              : t('还没勾选模型。从上游拉一份清单来勾选。')}
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {models.map((model) => (
+              <ModelChip
+                key={model.id}
+                id={model.id}
+                testId="subscription-model"
+                dead={model.liveness === 'dead'}
+                check={checks[model.id]}
+                busy={actions.modelsBusy ?? false}
+                meta={tierMeta(model, t)}
+                {...(test === undefined ? {} : { onTest: () => void runTests([model.id]) })}
+                {...(actions.onRemoveModel === undefined
+                  ? {}
+                  : {
+                      onRemove: () => {
+                        actions.onRemoveModel?.(model.id);
+                        setChecks(({ [model.id]: _, ...rest }) => rest);
+                      },
+                    })}
+              />
+            ))}
+          </div>
+        )}
+        {fallback && models.length > 0 && actions.onPickUpstream !== undefined && (
+          <p className="m-0 text-meta text-content-tertiary">
+            {t('还没勾选模型，订阅按执行机上报的名单兜底。')}
+          </p>
+        )}
+        {failed.length > 0 && (
+          <ul
+            data-testid="subscription-model-failures"
+            className="m-0 flex list-none flex-col gap-1 p-0"
+          >
+            {failed.map((id) => {
+              const failure = failureOf(checks[id]);
+              return (
+                <li key={id} className="flex flex-wrap items-baseline gap-x-2 text-meta">
+                  <code className="text-destructive">{id}</code>
+                  <span className="text-content-secondary">
+                    {failure === 'unavailable' || failure === null
+                      ? t('测试没能跑完，请重试。')
+                      : t(FAILURE_SENTENCE[failure])}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {test !== undefined && (
+          <p className="m-0 text-meta text-content-tertiary">
+            {t('每个模型测试会发一次很短的请求，算在订阅额度里。')}
+          </p>
+        )}
+      </section>
+      <SettingsSection title={t('管理')}>
+        <SettingsDangerZone
+          label={t('移除订阅')}
+          description={t('移除后，后续步骤不再使用这个订阅。')}
+          actionLabel={t('移除')}
+          onAction={actions.onRemove}
+        />
+      </SettingsSection>
+    </div>
   );
 }

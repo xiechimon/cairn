@@ -82,19 +82,33 @@ describe('Claude subscription connections', () => {
     const fetchStub = vi.fn();
     vi.stubGlobal('fetch', fetchStub);
     script('exit 0');
-    expect(await (await req(s.app, 'POST', `${path}/${id}/verify`)).json()).toEqual({ ok: true });
+    const listed = async () =>
+      ((await (await req(s.app, 'GET', path)).json()) as { lastCheck: unknown }[])[0]?.lastCheck;
+    expect(await listed()).toBeNull();
+    expect(await (await req(s.app, 'POST', `${path}/${id}/verify`)).json()).toMatchObject({
+      ok: true,
+      check: {
+        ok: true,
+        reason: null,
+        check: 'model-request',
+        command: 'claude -p "Reply with OK"',
+      },
+    });
+    expect(await listed()).toMatchObject({ ok: true, durationMs: expect.any(Number) });
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
     script(`echo "401 ${TOKEN} private-upstream-response" >&2\nexit 1`);
     const rejected = await req(s.app, 'POST', `${path}/${id}/verify`);
-    expect(await rejected.json()).toEqual({ ok: false, reason: 'auth' });
+    expect(await rejected.json()).toMatchObject({ ok: false, reason: 'auth' });
+    expect(await listed()).toMatchObject({ ok: false, reason: 'auth' });
     clock.mockReturnValue(Date.now() + 10_000);
     script(`echo "You've hit your weekly limit private-quota-response ${TOKEN}" >&2\nexit 1`);
     const exhausted = await req(s.app, 'POST', `${path}/${id}/verify`);
-    expect(await exhausted.json()).toEqual({ ok: false, reason: 'quota' });
+    expect(await exhausted.json()).toMatchObject({ ok: false, reason: 'quota' });
     clock.mockReturnValue(Date.now() + 10_000);
     vi.stubEnv('CLAUDE_BIN', join(dir, 'missing'));
     const failed = await req(s.app, 'POST', `${path}/${id}/verify`);
-    expect(await failed.json()).toEqual({ ok: false, reason: 'unavailable' });
+    expect(await failed.json()).toMatchObject({ ok: false, reason: 'unavailable' });
+    expect(JSON.stringify(await listed())).not.toContain(TOKEN);
     expect(logs.join('')).not.toContain(TOKEN);
     expect(logs.join('')).not.toContain('private-upstream-response');
     expect(logs.join('')).not.toContain('private-quota-response');
@@ -119,6 +133,93 @@ describe('Claude subscription connections', () => {
     );
     expect(readFileSync(runs, 'utf8').trim().split('\n')).toHaveLength(3);
     expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  test('a model test runs claude with that model, refuses flag-shaped ids and leaves the last check alone', async () => {
+    const s = bootServer();
+    const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+    const { id } = (await (
+      await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN })
+    ).json()) as { id: string };
+    const dir = makeTestTempDir('claude-subscriptions-');
+    fixtureDirs.push(dir);
+    const args = join(dir, 'args');
+    const binary = join(dir, 'claude');
+    writeFileSync(binary, `#!/bin/sh\necho "$@" >> "${args}"\nexit 0\n`, { mode: 0o755 });
+    vi.stubEnv('CLAUDE_BIN', binary);
+    const tested = await req(s.app, 'POST', `${path}/${id}/test`, { model: 'claude-opus-5-5' });
+    expect(await tested.json()).toMatchObject({ status: 'ok', latencyMs: expect.any(Number) });
+    expect(readFileSync(args, 'utf8')).toContain('--model claude-opus-5-5');
+    expect(
+      (await req(s.app, 'POST', `${path}/${id}/test`, { model: 'claude-opus-5-5' })).status,
+    ).toBe(429);
+    expect(
+      (await req(s.app, 'POST', `${path}/${id}/test`, { model: 'claude-sonnet-5-5' })).status,
+    ).toBe(200);
+    expect(
+      (await req(s.app, 'POST', `${path}/${id}/test`, { model: '--dangerously-skip-permissions' }))
+        .status,
+    ).toBe(400);
+    expect((await req(s.app, 'POST', `${path}/${id}/test`, { model: 'made-up-1' })).status).toBe(
+      400,
+    );
+    expect(
+      (
+        await req(s.app, 'PATCH', `${path}/${id}`, {
+          models: [{ id: 'claude-opus-5-5', name: `x ${TOKEN}` }],
+        })
+      ).status,
+    ).toBe(400);
+    const list = (await (await req(s.app, 'GET', path)).json()) as { lastCheck: unknown }[];
+    expect(list[0]?.lastCheck).toBeNull();
+  });
+
+  test('picked models are stored on the subscription and narrow the Claude Code model source', async () => {
+    const s = bootServer();
+    const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+    const { id } = (await (
+      await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN })
+    ).json()) as { id: string };
+    insertMachine(s, {
+      claudeCodeReport: {
+        installed: true,
+        hostname: 'mac',
+        models: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'].map((model) => ({
+          id: model,
+          name: model,
+          slot: 'builtin',
+        })),
+      },
+    });
+    const claudeModels = async () =>
+      (
+        (await (await req(s.app, 'GET', `/api/teams/${s.team.id}/model-sources`)).json()) as {
+          sources: { runtime: string; models: { id: string }[] }[];
+        }
+      ).sources
+        .filter((source) => source.runtime === 'claude-code')
+        .flatMap((source) => source.models.map((model) => model.id));
+    expect(await claudeModels()).toEqual([
+      'claude-opus-5-5',
+      'claude-sonnet-5-5',
+      'claude-haiku-5-5',
+    ]);
+    const picked = [
+      { id: 'claude-opus-5-5', name: 'claude-opus-5-5' },
+      { id: 'claude-haiku-5-5', name: 'claude-haiku-5-5' },
+      { id: 'claude-opus-5-5', name: 'duplicate' },
+    ];
+    const patched = await req(s.app, 'PATCH', `${path}/${id}`, { models: picked });
+    expect(
+      ((await patched.json()) as { models: { id: string }[] }).models.map((m) => m.id),
+    ).toEqual(['claude-opus-5-5', 'claude-haiku-5-5']);
+    expect(await claudeModels()).toEqual(['claude-opus-5-5', 'claude-haiku-5-5']);
+    const upstream = await req(s.app, 'POST', `${path}/${id}/upstream-models`);
+    expect(
+      ((await upstream.json()) as { models: { id: string }[] }).models.map((m) => m.id),
+    ).toEqual(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']);
+    await req(s.app, 'PATCH', `${path}/${id}`, { models: null });
+    expect(await claudeModels()).toHaveLength(3);
   });
 
   test('invalid input and foreign connection ids reveal no credentials', async () => {
@@ -246,7 +347,7 @@ test('verification limits concurrent and repeated calls per connection for ten s
   writeFileSync(fail, '');
   const failed = await req(s.app, 'POST', `${path}/${ids[0]}/verify`);
   expect(failed.status).toBe(200);
-  expect(await failed.json()).toEqual({ ok: false, reason: 'auth' });
+  expect(await failed.json()).toMatchObject({ ok: false, reason: 'auth' });
   expect((await req(s.app, 'POST', `${path}/${ids[0]}/verify`)).status).toBe(429);
   expect((await req(s.app, 'POST', `${path}/missing/verify`)).status).toBe(404);
   expect(

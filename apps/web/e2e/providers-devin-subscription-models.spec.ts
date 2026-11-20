@@ -50,7 +50,7 @@ const picked = () => [
 
 const detail = (page: Page) => page.getByTestId('subscription-detail');
 const pickedChip = (page: Page, id: string) =>
-  detail(page).locator(`[data-testid="subscription-picked-model"][data-model-id="${id}"]`);
+  detail(page).locator(`[data-testid="subscription-model"][data-model-id="${id}"]`);
 
 const mount = (
   page: Page,
@@ -105,8 +105,7 @@ test('removing a chip persists the shortened model list', async ({ page }) => {
   const patches: object[] = [];
   await mount(page, subscription(picked()), UPSTREAM, patches);
   await page.goto('/app/resources/providers');
-  await pickedChip(page, 'swe-2-flash-medium')
-    .getByTestId('subscription-model-remove')
+  await pickedChip(page, 'swe-2-flash-medium').getByRole('button', { name: '移除 swe-2-flash-medium' })
     .click();
   await expect
     .poll(() => patches)

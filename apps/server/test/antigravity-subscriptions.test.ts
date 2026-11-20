@@ -124,7 +124,7 @@ describe('antigravity subscriptions REST & model sources', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
     );
     expect(okVerify.status).toBe(200);
-    expect(await okVerify.json()).toEqual({ ok: true });
+    expect(await okVerify.json()).toMatchObject({ ok: true });
 
     const createdSecond = await req(
       s.app,
@@ -258,7 +258,7 @@ describe('antigravity token verification via Google API', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
+    expect(await res.json()).toMatchObject({ ok: true });
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models');
@@ -282,7 +282,7 @@ describe('antigravity token verification via Google API', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: false, reason: 'auth' });
+    expect(await res.json()).toMatchObject({ ok: false, reason: 'auth' });
   });
 
   test('treats a network failure as unavailable', async () => {
@@ -305,7 +305,7 @@ describe('antigravity token verification via Google API', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: false, reason: 'unavailable' });
+    expect(await res.json()).toMatchObject({ ok: false, reason: 'unavailable' });
   });
 });
 
