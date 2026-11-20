@@ -320,7 +320,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### selection-reply
 
-**Reply quote** (shipped). Press Reply in your own message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Coordinator messages have no reply arrow (owner decision, 2026-11-21); selecting text shows no reply bar.
+**Reply quote** (shipped). Press Reply in your own message's hover tools to quote it above the composer. Coordinator messages have no reply arrow (owner decision, 2026-11-21); instead, select text in a Coordinator message to get a pill with Ask in side chat and Quote (R); Quote opens a one-input box where Enter stages the quote above the composer and Cmd+Enter sends it at once; Ask in side chat opens the related task thread with the selection quoted in its composer. The sent message carries the quote and its source message id.
 
 - Research: [docs/research/selection-reply-2026-11-08.md](research/selection-reply-2026-11-08.md)
 - Frontend design: [docs/design/selection-reply-2026-11-08.md](design/selection-reply-2026-11-08.md)

@@ -149,14 +149,17 @@
     {
       "id": "selection-reply",
       "name": "Reply quote",
-      "summary": "Press Reply in your own message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Coordinator messages have no reply arrow (owner decision, 2026-11-21); selecting text shows no reply bar.",
-      "states": "Quote staged above the composer, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, light and dark, 1440 and 390 wide.",
+      "summary": "Press Reply in your own message's hover tools to quote it above the composer. Coordinator messages have no reply arrow (owner decision, 2026-11-21); instead, select text in a Coordinator message to get a pill with Ask in side chat and Quote (R); Quote opens a one-input box where Enter stages the quote above the composer and Cmd+Enter sends it at once; Ask in side chat opens the related task thread with the selection quoted in its composer. The sent message carries the quote and its source message id.",
+      "states": "Selection pill with and without a related task, quote box with its key hint, quote staged above the composer from your own message or a selection, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, side chat composer seeded with the quote, light and dark, 1440 and 390 wide.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/chief/reply-quote-block.tsx",
-          "apps/web/src/chief/reply-source-highlight.ts"
+          "apps/web/src/chief/reply-source-highlight.ts",
+          "apps/web/src/chief/selection-reply.tsx",
+          "apps/web/src/chief/selection-reply-model.ts",
+          "apps/web/src/board/side-chat-seed.ts"
         ],
         "other": [
           "packages/shared/src/reply-quote.ts"
@@ -169,8 +172,8 @@
       },
       "reach": [
         "open /app",
-        "hover testid:chief-bubble",
-        "click testid:chief-msg-reply"
+        "hover testid:chief-reply",
+        "click testid:selection-quote"
       ],
       "research": [
         "docs/research/selection-reply-2026-11-08.md"
@@ -183,6 +186,7 @@
       ],
       "evidence": [
         "apps/web/e2e/chief-reply-quote.spec.ts",
+        "apps/web/e2e/chief-selection-quote.spec.ts",
         "packages/shared/test/reply-quote.test.ts"
       ]
     },
