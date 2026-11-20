@@ -314,6 +314,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
   return (
     <DialogShell
       title={t('添加执行机')}
+      info={t('让另一台电脑帮你跑任务')}
       open={open}
       onClose={onClose}
       size="l"

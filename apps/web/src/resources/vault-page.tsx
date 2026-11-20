@@ -8,6 +8,7 @@ import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON, TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
 import { relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
+import { InfoTip } from '../components/info-tip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SETTINGS_ROW_CLS } from '../components/settings-list.js';
@@ -123,7 +124,14 @@ export function VaultPage() {
     >
       <div className="flex min-w-0 flex-col gap-8 pb-16">
         <section className="flex min-w-0 flex-col">
-          <h3 className="m-0 mt-4 text-ui font-semibold text-foreground">{t('网站登录')}</h3>
+          <div className="mt-4 flex items-center gap-1.5">
+            <h3 className="m-0 text-ui font-semibold text-foreground">{t('网站登录')}</h3>
+            <InfoTip
+              info={t(
+                '浏览器代填用的网站登录保存在这里。Coordinator 只在你批准的网站上填入用户名和密码，这两个值不会出现在页面或对话里。',
+              )}
+            />
+          </div>
           <QueryBoundary
             query={live ? secretsQ : undefined}
             isEmpty={pairs.length === 0}
@@ -234,7 +242,8 @@ export function VaultPage() {
         <section className="flex min-w-0 flex-col">
           <h3 className="m-0 text-ui font-semibold text-foreground">{t('网站授权')}</h3>
           <p className="m-0 mt-1 text-meta text-pretty text-content-tertiary">
-            {t('批准过的网站在这台执行机上直接代填')}
+            {t('批准过的网站在这台执行机上直接代填')}{' '}
+            <InfoTip info={t('Coordinator 第一次在某个网站代填时会请求批准；撤销后重新请求。')} />
           </p>
           <QueryBoundary
             query={live ? grantsQ : undefined}

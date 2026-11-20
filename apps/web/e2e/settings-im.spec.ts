@@ -49,6 +49,11 @@ test('IM: a connected Telegram bot is one row, and deleting it asks first', asyn
   await expect(row).not.toContainText('contacts');
   await expect(settings.getByTestId('im-platform-slack')).toBeVisible();
   await expect(settings.getByTestId('im-platform-wechat')).toBeVisible();
+  const why = 'Connect a Telegram bot, WeChat or Slack and talk to the Coordinator from your phone.';
+  await expect(page.getByText(why)).toHaveCount(0);
+  await settings.getByRole('button', { name: why }).focus();
+  await expect(page.getByText(why)).toBeVisible();
+  await page.keyboard.press('Escape');
 
   await row.getByRole('button', { name: '@cairn_home_bot menu' }).click();
   await page.getByTestId('im-delete-conn-tg').click();

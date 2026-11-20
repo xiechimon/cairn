@@ -13,6 +13,7 @@ export function ChiefMemoryDialog({ open, onClose }: { open: boolean; onClose: (
       open={open}
       onClose={onClose}
       title={t('记忆')}
+      info={t('Coordinator 的长期记忆')}
       initialFocus={contentRef}
       width="var(--settings-w)"
       className="h-(--settings-h) [&_[data-testid=dialog-body]]:pb-0"

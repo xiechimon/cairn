@@ -109,7 +109,11 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
             onCheckedChange={(enabled) => save({ enabled })}
           />
         </SettingsRow>
-        <SettingsRow label={t('对外动作')} hint={t('比如发送、发布')}>
+        <SettingsRow
+          label={t('对外动作')}
+          hint={t('比如发送、发布')}
+          info={t('发送、发布等对外动作，会先问过再跑，或完全交给它。')}
+        >
           <Select
             value={data.actionTierOverride ?? 'follow'}
             disabled={mutations.patchAutonomy.isPending}

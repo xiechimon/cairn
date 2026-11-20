@@ -3,6 +3,7 @@ import { cn } from 'cn';
 import { type ReactNode, useCallback, useEffect, useId, useRef } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { X } from '../../icons/index.js';
+import { InfoTip } from '../info-tip.js';
 import { Button } from './button.js';
 import {
   Dialog,
@@ -71,6 +72,7 @@ export const PICKER_ROW_SELECTED =
 interface DialogShellProps {
   title?: string;
   subtitle?: ReactNode;
+  info?: string;
   headerCenter?: ReactNode;
   headerAction?: ReactNode;
   open?: boolean;
@@ -120,6 +122,7 @@ function useReturnFocus(open: boolean) {
 export function DialogShell({
   title,
   subtitle,
+  info,
   headerCenter,
   headerAction,
   open = true,
@@ -229,7 +232,12 @@ export function DialogShell({
             <div className="flex min-w-0 flex-1 justify-center">{headerCenter}</div>
           ) : (
             <div className="min-w-0 flex-1">
-              {title != null && <DialogTitle className={DIALOG_TITLE_CLS}>{title}</DialogTitle>}
+              {title != null && (
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <DialogTitle className={DIALOG_TITLE_CLS}>{title}</DialogTitle>
+                  {info !== undefined && <InfoTip info={info} />}
+                </div>
+              )}
               {subtitle != null && (
                 <DialogDescription className={DIALOG_SUBTITLE_CLS}>{subtitle}</DialogDescription>
               )}

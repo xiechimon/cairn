@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import type { ComponentProps, ReactNode } from 'react';
 import { createContext, useContext, useEffect, useId, useRef } from 'react';
 import { FORM_CONTROL_CLS } from './form-layout.js';
+import { InfoTip } from './info-tip.js';
 import { Button } from './ui/button.js';
 import { Card } from './ui/card.js';
 import { DIALOG_PRIMARY_BUTTON } from './ui/dialog-shell.js';
@@ -137,6 +138,7 @@ export function SettingsPanel({
 interface SettingsRowProps {
   label: string;
   hint?: ReactNode;
+  info?: string;
   labelTestId?: string;
   className?: string;
   labelClassName?: string;
@@ -164,6 +166,7 @@ export function SettingsSelectTrigger({
 export function SettingsRow({
   label,
   hint,
+  info,
   labelTestId,
   className,
   labelClassName,
@@ -195,16 +198,19 @@ export function SettingsRow({
       )}
     >
       <span className={cn('flex min-w-0 flex-col', withHint && 'max-w-3/5 flex-auto')}>
-        <span
-          id={labelId}
-          data-testid={labelTestId}
-          className={cn(
-            'text-ui text-foreground',
-            matched && 'underline decoration-(--card-button) decoration-wavy underline-offset-4',
-            labelClassName,
-          )}
-        >
-          {label}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span
+            id={labelId}
+            data-testid={labelTestId}
+            className={cn(
+              'text-ui text-foreground',
+              matched && 'underline decoration-(--card-button) decoration-wavy underline-offset-4',
+              labelClassName,
+            )}
+          >
+            {label}
+          </span>
+          {info !== undefined && <InfoTip info={info} />}
         </span>
         {withHint && <span className={cn(SETTINGS_HINT_CLS, hintClassName)}>{hint}</span>}
       </span>
@@ -227,6 +233,7 @@ export function SettingsRow({
 export function SettingsSection({
   title,
   description,
+  info,
   action,
   className,
   testId,
@@ -234,6 +241,7 @@ export function SettingsSection({
 }: {
   title: string;
   description?: ReactNode;
+  info?: string;
   action?: ReactNode;
   className?: string;
   testId?: string;
@@ -248,7 +256,10 @@ export function SettingsSection({
     >
       <div className={cn('flex min-h-7 items-center justify-between gap-3', !flat && 'px-1')}>
         <div className="flex min-w-0 flex-col">
-          <h2 className="m-0 truncate text-card-title font-semibold text-foreground">{title}</h2>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h2 className="m-0 truncate text-card-title font-semibold text-foreground">{title}</h2>
+            {info !== undefined && <InfoTip info={info} />}
+          </div>
           {description != null && (
             <p className="m-0 text-meta text-balance text-content-tertiary">{description}</p>
           )}

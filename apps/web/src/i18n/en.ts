@@ -2813,4 +2813,48 @@ export const EN: Record<string, string> = {
   '需要你操作手机 {name}': 'The phone {name} is waiting for you',
   '在手机上完成后点“交还”，Coordinator 继续。':
     'Finish on the phone, then tap "hand back" and the Coordinator continues.',
+  '登录信息在执行机的 OS 钥匙串里': "The sign-in lives in the Runner's OS keychain",
+  'Token 加密保存': 'The token is stored encrypted',
+  '不用再配 API key，Token 加密保存': 'No API key needed; the token is stored encrypted',
+  '会从中取出 windsurf_api_key，Token 加密保存':
+    'Cairn picks out windsurf_api_key; the token is stored encrypted',
+  本任务的执行机与执行要求: 'Per-task Runner and capability requirements',
+  'Coordinator 的长期记忆': "The Coordinator's long-term memory",
+  '发送、发布等对外动作，会先问过再跑，或完全交给它。':
+    'Send, publish and other external actions ask first, or run entirely on their own.',
+  '转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位。':
+    'After conversion the GitHub repo becomes the single source of truth and the local path becomes an execution accelerator.',
+  '关掉后 Coordinator 不会在这台执行机上用对应能力；随时能开回来':
+    'When off, the Coordinator will not use that capability on this Runner; you can turn it back on anytime',
+  '经 Composio 接入的应用都用它授权': 'Apps connected through Composio authorize with it',
+  'Slack、Google 日历、Todoist 等上千个应用，经你自己的 Composio 账号交给 Coordinator。':
+    'Slack, Google Calendar, Todoist and thousands more, handed to the Coordinator through your own Composio account.',
+  'key 加密存储，经 Composio 接入的应用都用它授权':
+    'The key is stored encrypted, and apps connected through Composio authorize with it',
+  '新邮件会唤醒 Coordinator，回信前先问你。':
+    'New mail wakes the Coordinator, and it asks you before replying.',
+  '填好服务器即可连接，新邮件会唤醒 Coordinator，回信前先问你。':
+    'Fill in the servers to connect. New mail wakes the Coordinator, and it asks you before replying.',
+  '新邮件到达时，Coordinator 会收到通知。': 'The Coordinator is notified when new mail arrives.',
+  'Coordinator 回信前总会先给你看一张确认卡。':
+    'The Coordinator always shows you a confirmation card before replying.',
+  让另一台电脑帮你跑任务: 'Let another computer run tasks for you',
+  '任何支持远程 MCP 的服务器都可以加进来。': 'Add any server that speaks remote MCP.',
+  '因为团队有 Anthropic API key': 'Because the team has an Anthropic API key',
+  '因为这是最早添加、Coordinator 能直接用的服务商':
+    'Because it is the earliest added provider the Coordinator can use',
+  'Coordinator 要有模型才能回答你的消息': 'The Coordinator needs a model to answer your messages',
+  '任务在执行机上运行时会拿到这些密钥和环境变量。也可以让 Coordinator 添加机密，值不会进入对话。':
+    'Tasks get these secrets and environment variables when they run on a Runner. The Coordinator can also add secrets without the value entering the conversation.',
+  '浏览器代填用的网站登录保存在这里。Coordinator 只在你批准的网站上填入用户名和密码，这两个值不会出现在页面或对话里。':
+    'Site logins for browser fill live here. The Coordinator fills the username and password only on sites you approved, and neither value ever appears on a page or in a conversation.',
+  'Coordinator 第一次在某个网站代填时会请求批准；撤销后重新请求。':
+    'The Coordinator asks for approval the first time it fills on a site; revoking makes it ask again.',
+  系统通知的提示音: 'The sound system notifications play',
+  锁屏也能收到: 'Arrives even on the lock screen',
+  '按钮和回复都支持。': 'Buttons and replies are supported.',
+  '在私聊里和 Coordinator 对话。': 'Talk to the Coordinator in DMs.',
+  '在平时的聊天里和 Coordinator 对话。': 'Talk to the Coordinator in your usual chat.',
+  '连接 Telegram 机器人、微信或 Slack 后，就能直接用手机和 Coordinator 对话。':
+    'Connect a Telegram bot, WeChat or Slack and talk to the Coordinator from your phone.',
 };

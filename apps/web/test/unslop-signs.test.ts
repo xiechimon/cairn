@@ -180,6 +180,33 @@ const labelLiterals = (text: string, constants: Map<string, string> = copyConsta
   ...[...text.matchAll(LABEL_CONSTANT)].flatMap((m) => constants.get(`${m[1]}.${m[2]}`) ?? []),
 ];
 
+const INFO_PROP = /\binfo(?:=\{|:\s*)$/;
+const INFO_CONSTANT = /\binfo:\s*'((?:\\.|[^'\\])*)'/g;
+
+function tooltipOnlyStrings(texts: string[], en: Record<string, string>): Set<string> {
+  const visible = new Set<string>();
+  const tooltip = new Set<string>();
+  for (const text of texts) {
+    for (const m of text.matchAll(T_LITERAL)) {
+      const before = text.slice(Math.max(0, m.index - 12), m.index);
+      (INFO_PROP.test(before) ? tooltip : visible).add(m[2] ?? '');
+    }
+    for (const m of text.matchAll(INFO_CONSTANT)) tooltip.add(m[1] ?? '');
+  }
+  const only = [...tooltip].filter((key) => !visible.has(key));
+  return new Set([...only, ...only.flatMap((key) => en[key] ?? [])]);
+}
+
+function justificationOffenders(texts: string[], en: Record<string, string>): string[] {
+  const tooltipOnly = tooltipOnlyStrings(texts, en);
+  const strings = new Set([
+    ...Object.keys(en),
+    ...Object.values(en),
+    ...texts.flatMap((text) => [...text.matchAll(T_LITERAL)].map((m) => m[2] ?? '')),
+  ]);
+  return [...strings].filter((text) => JUSTIFICATION.test(text) && !tooltipOnly.has(text));
+}
+
 const uiStrings = [
   ...new Set([
     ...Object.keys(EN),
@@ -271,6 +298,26 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     expect(labelLiterals(snippet, copyConstantsIn(snippet)).some(endsLikeASentenceLabel)).toBe(expected);
   });
 
+  test.each([
+    [`<SettingsRow label={t('提醒')} hint={t('因为团队有 key')} />`, ['因为团队有 key']],
+    [`<SettingsSection title={t('提醒')} description={t('Because the team has a key')} />`, ['Because the team has a key']],
+    [`<SettingsRow label={t('提醒')} info={t('因为团队有 key')} />`, []],
+    [`<InfoTip info={t('因为团队有 key')} />`, []],
+    [`const COPY = {\n  info: '因为团队有 key',\n};`, []],
+    [`<InfoTip info={t('因为团队有 key')} />\n<p>{t('因为团队有 key')}</p>`, ['因为团队有 key']],
+  ])('justification outside the info tooltip is rejected: %s', (snippet, expected) => {
+    expect(justificationOffenders([snippet], {})).toEqual(expected);
+  });
+
+  test('a tooltip-only key keeps its translation exempt, a visible key does not', () => {
+    const en = { 因为团队有key: 'Because the team has a key' };
+    expect(justificationOffenders([`<InfoTip info={t('因为团队有key')} />`], en)).toEqual([]);
+    expect(justificationOffenders([`<p>{t('因为团队有key')}</p>`], en)).toEqual([
+      '因为团队有key',
+      'Because the team has a key',
+    ]);
+  });
+
   test('plain copy passes', () => {
     expect(copySignsIn('Queued: no machine meets the capability requirements')).toEqual([]);
     expect(copySignsIn('⌘K 搜索 · ✕ 已挡下')).toEqual([]);
@@ -315,11 +362,20 @@ describe('unslop signs: the source carries none outside the named exceptions', (
     expect(offenders).toEqual([]);
   });
 
-  test('T4 UI copy has no exclamation, emoji, hype word or justification', () => {
+  test('T4 UI copy has no exclamation, emoji or hype word', () => {
     const offenders = uiStrings
-      .map((text) => ({ text, signs: copySignsIn(text) }))
+      .map((text) => ({ text, signs: copySignsIn(text).filter((sign) => sign !== 'justification') }))
       .filter(({ signs }) => signs.length > 0)
       .map(({ text, signs }) => `${signs.join(',')}: ${text}`);
     expect(offenders).toEqual([]);
+  });
+
+  test('T4 justification appears only inside an info tooltip', () => {
+    expect(
+      justificationOffenders(
+        sourceFiles.map(({ text }) => text),
+        EN,
+      ),
+    ).toEqual([]);
   });
 });

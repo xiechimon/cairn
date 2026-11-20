@@ -8,6 +8,7 @@ import { useLiveData } from '../api/provider.js';
 import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
 import { relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
+import { InfoTip } from '../components/info-tip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SETTINGS_ROW_CLS } from '../components/settings-list.js';
@@ -143,7 +144,12 @@ export function SecretsPage() {
       fixture={fixture}
     >
       <p className="m-0 mt-2 text-ui text-content-secondary">
-        {t('项目里的同名条目优先于团队条目')}
+        {t('项目里的同名条目优先于团队条目')}{' '}
+        <InfoTip
+          info={t(
+            '任务在执行机上运行时会拿到这些密钥和环境变量。也可以让 Coordinator 添加机密，值不会进入对话。',
+          )}
+        />
       </p>
       <QueryBoundary
         query={live ? secretsQ : undefined}

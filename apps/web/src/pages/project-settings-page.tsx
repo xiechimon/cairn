@@ -21,6 +21,7 @@ import { useMediaQuery } from '../board/use-narrow.js';
 import { MemoryPanel } from '../chief/memory-panel.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
+import { InfoTip } from '../components/info-tip.js';
 import {
   SettingsNav,
   type SettingsNavGroup,
@@ -403,7 +404,12 @@ export function ProjectSettingsPage() {
               <SettingsCard>
                 <div className="flex flex-col gap-3 py-3">
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-ui text-foreground">{t('转换为 GitHub 形态')}</span>
+                    <span className="flex items-center gap-1.5 text-ui text-foreground">
+                      {t('转换为 GitHub 形态')}
+                      <InfoTip
+                        info={t('转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位。')}
+                      />
+                    </span>
                     <span className={SETTINGS_HINT_CLS}>
                       {t('转换后以 GitHub 仓为准；有构建在跑时不能转换')}
                     </span>

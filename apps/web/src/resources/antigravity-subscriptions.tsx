@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CreateAntigravitySubscription } from '../api/antigravity-subscriptions.js';
 import { extractAntigravityToken } from '../api/antigravity-subscriptions.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
+import { InfoTip } from '../components/info-tip.js';
 import { withCodeSpans } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -189,7 +190,8 @@ export function AddAntigravitySubscriptionDialog({
           <p className="m-0 text-meta text-content-tertiary">
             {withCodeSpans(
               t('默认使用执行机已登录的 Antigravity，也可以展开下方粘贴 `GEMINI_API_KEY`。'),
-            )}
+            )}{' '}
+            <InfoTip info={t('登录信息在执行机的 OS 钥匙串里')} />
           </p>
         )}
         <FormField label={t('名称')} htmlFor="antigravity-subscription-label">
@@ -214,7 +216,8 @@ export function AddAntigravitySubscriptionDialog({
         ) : (
           <>
             <p className="m-0 text-meta text-content-tertiary">
-              {withCodeSpans(t('粘贴 `GEMINI_API_KEY` 或 `.env` 片段。保存后无法再查看。'))}
+              {withCodeSpans(t('粘贴 `GEMINI_API_KEY` 或 `.env` 片段。保存后无法再查看。'))}{' '}
+              <InfoTip info={t('Token 加密保存')} />
             </p>
             <FormField label="GEMINI_API_KEY" htmlFor="antigravity-subscription-token">
               <Input

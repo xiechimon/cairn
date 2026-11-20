@@ -137,6 +137,7 @@ function AddMailboxDialog({
   return (
     <DialogShell
       title={t(form.title)}
+      info={t('新邮件到达时，Coordinator 会收到通知。')}
       stacked={stacked}
       onClose={onClose}
       footer={
@@ -360,15 +361,21 @@ function describeAccount(
   return `${wake} · ${last}`;
 }
 
-const PROVIDER_CARD: Record<MailProvider, { name: string; description: string }> = {
-  qq: { name: 'QQ 邮箱', description: '用授权码连接' },
+const PROVIDER_CARD: Record<MailProvider, { name: string; description: string; info: string }> = {
+  qq: {
+    name: 'QQ 邮箱',
+    description: '用授权码连接',
+    info: '新邮件会唤醒 Coordinator，回信前先问你。',
+  },
   gmail: {
     name: 'Gmail',
     description: '用应用专用密码连接',
+    info: '新邮件会唤醒 Coordinator，回信前先问你。',
   },
   other: {
     name: '其他邮箱',
     description: 'Outlook、163 等支持 IMAP 的邮箱',
+    info: '填好服务器即可连接，新邮件会唤醒 Coordinator，回信前先问你。',
   },
 };
 
@@ -391,6 +398,7 @@ export interface MailProviderCard {
   provider: MailProvider;
   name: string;
   description: string;
+  info: string;
   connected: boolean;
   needsAttention: boolean;
   open: () => void;
@@ -429,6 +437,7 @@ function ManageMailboxDialog({
     <DialogShell
       title={t(PROVIDER_CARD[provider].name)}
       subtitle={t('回信前先问你')}
+      info={t('Coordinator 回信前总会先给你看一张确认卡。')}
       onClose={onClose}
       footer={
         <Button className={DIALOG_PRIMARY_BUTTON} onClick={onAdd} data-testid="mail-add">

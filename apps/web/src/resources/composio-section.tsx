@@ -204,6 +204,7 @@ export function useComposioRows({
     testId: 'mcp-composio',
     icon: <ComposioMark />,
     name: 'Composio',
+    info: t('经 Composio 接入的应用都用它授权'),
     description: t('key 已保存'),
     action: (
       <Button
@@ -222,6 +223,7 @@ export function useComposioRows({
     testId: 'composio-setup-card',
     icon: <ComposioMark />,
     name: t('更多应用'),
+    info: t('Slack、Google 日历、Todoist 等上千个应用，经你自己的 Composio 账号交给 Coordinator。'),
     description: t('用你自己的 Composio 账号接入，需另注册'),
     action: (
       <Button
@@ -313,6 +315,13 @@ function ComposioKeyDialog({
   return (
     <DialogShell
       title={configured ? 'Composio' : t('用 Composio 接入更多应用')}
+      info={
+        configured
+          ? t('key 加密存储，经 Composio 接入的应用都用它授权')
+          : t(
+              'Slack、Google 日历、Todoist 等上千个应用，经你自己的 Composio 账号交给 Coordinator。',
+            )
+      }
       subtitle={
         configured
           ? t('key 已保存，不会再显示。')

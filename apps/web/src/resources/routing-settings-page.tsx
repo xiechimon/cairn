@@ -18,6 +18,7 @@ import { ROUTE_USE_LABELS } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { FilterPicker } from '../components/filter-picker.js';
+import { InfoTip } from '../components/info-tip.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SettingsCard, SettingsRow } from '../components/settings-list.js';
@@ -60,11 +61,20 @@ function CoordinatorDefaultHint({
     model: row?.modelName ?? coordinatorDefault.modelId ?? '',
     provider: row?.providerLabel ?? coordinatorDefault.provider ?? '',
   };
-  const text =
-    coordinatorDefault.reason === 'none' || vars.model === ''
-      ? t('当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则')
-      : t('当前默认：{model} · {provider}', vars);
-  return <span data-testid="routing-coordinator-default">{text}</span>;
+  const known = coordinatorDefault.reason !== 'none' && vars.model !== '';
+  return (
+    <span data-testid="routing-coordinator-default">
+      {known
+        ? t('当前默认：{model} · {provider}', vars)
+        : t('当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则')}
+      {known && coordinatorDefault.reason === 'anthropic-key' && (
+        <InfoTip className="ml-1.5" info={t('因为团队有 Anthropic API key')} />
+      )}
+      {known && coordinatorDefault.reason === 'provider' && (
+        <InfoTip className="ml-1.5" info={t('因为这是最早添加、Coordinator 能直接用的服务商')} />
+      )}
+    </span>
+  );
 }
 
 type RuleModel = Pick<RoutingRuleRecord, 'provider' | 'modelId'>;
@@ -396,7 +406,13 @@ export function ModelRulesSection() {
                       options={options}
                     />
                   ) : (
-                    t('先给 Coordinator 选模型')
+                    <>
+                      {t('先给 Coordinator 选模型')}
+                      <InfoTip
+                        className="ml-1.5"
+                        info={t('Coordinator 要有模型才能回答你的消息')}
+                      />
+                    </>
                   )
                 ) : USE_HINTS[use] === undefined ? undefined : (
                   t(USE_HINTS[use])

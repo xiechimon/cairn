@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CreateDevinSubscription } from '../api/devin-subscriptions.js';
 import { extractDevinToken } from '../api/devin-subscriptions.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
+import { InfoTip } from '../components/info-tip.js';
 import { withCodeSpans } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -218,7 +219,8 @@ export function AddDevinSubscriptionDialog({
                 t(
                   '在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴。保存后无法再查看。',
                 ),
-              )}
+              )}{' '}
+              <InfoTip info={t('会从中取出 windsurf_api_key，Token 加密保存')} />
             </p>
             <FormField label="Token" htmlFor="devin-subscription-token">
               <Input

@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import { Plus } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
+import { InfoTip } from '../components/info-tip.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
@@ -140,6 +141,7 @@ export interface IntegrationItem {
   icon: ReactNode;
   name: string;
   kind?: string;
+  info?: string;
   description: ReactNode;
   status?: ReactNode;
   action?: ReactNode;
@@ -150,6 +152,7 @@ export function IntegrationRow({
   icon,
   name,
   kind,
+  info,
   description,
   status,
   action,
@@ -165,6 +168,7 @@ export function IntegrationRow({
         <RowLine>
           <RowTitle className="font-medium">{name}</RowTitle>
           {kind !== undefined && <RowMeta>{kind}</RowMeta>}
+          {info !== undefined && <InfoTip info={info} />}
         </RowLine>
         <span className="line-clamp-2 text-meta text-content-tertiary">{description}</span>
       </RowText>

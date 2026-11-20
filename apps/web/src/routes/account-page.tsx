@@ -199,7 +199,7 @@ export function AccountPage() {
             />
           </SettingsRow>
           {desktopSoundPickable && (
-            <SettingsRow label={t('提醒声音')}>
+            <SettingsRow label={t('提醒声音')} info={t('系统通知的提示音')}>
               <Select
                 value={notifySound}
                 onValueChange={(next) => {
@@ -239,6 +239,7 @@ export function AccountPage() {
           {devicePushLive && (
             <SettingsRow
               label={t('在这台设备上接收推送')}
+              info={t('锁屏也能收到')}
               hint={
                 devicePushFailed
                   ? t('浏览器已拒绝通知权限，需到站点设置重新允许')

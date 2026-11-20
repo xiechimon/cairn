@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import { type ReactNode, useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { InfoTip } from '../components/info-tip.js';
 import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -91,6 +92,9 @@ export function useComputerGrantsRow(machine: MachineRow): {
           )}
         />
       </Button>
+      {open && (
+        <InfoTip info={t('关掉后 Coordinator 不会在这台执行机上用对应能力；随时能开回来')} />
+      )}
     </>
   );
 

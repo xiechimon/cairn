@@ -41,20 +41,26 @@ const STATUS_LABEL: Record<ImConnectionStatus, string> = {
 
 const PLATFORM_ORDER: readonly ImPlatform[] = ['telegram', 'slack', 'wechat'];
 
-const PLATFORM_COPY: Record<ImPlatform, { name: string; description: string; connect: string }> = {
+const PLATFORM_COPY: Record<
+  ImPlatform,
+  { name: string; description: string; info: string; connect: string }
+> = {
   telegram: {
     name: 'Telegram 机器人',
     description: '官方 Bot API',
+    info: '按钮和回复都支持。',
     connect: '连接 Telegram',
   },
   slack: {
     name: 'Slack',
     description: 'Socket Mode 直连',
+    info: '在私聊里和 Coordinator 对话。',
     connect: '连接 Slack',
   },
   wechat: {
     name: '微信',
     description: '扫码登录',
+    info: '在平时的聊天里和 Coordinator 对话。',
     connect: '连接 WeChat',
   },
 };
@@ -427,6 +433,7 @@ export function ImConnectionsPage() {
           testId={`im-platform-${platform}`}
           icon={platformIcon(platform)}
           name={t(copy.name)}
+          info={t(copy.info)}
           description={t(copy.description)}
           {...(live
             ? {
@@ -457,7 +464,12 @@ export function ImConnectionsPage() {
 
   return (
     <PageShell route={IM_ROUTE} fixture={fixture} selected="none" title="IM">
-      <SettingsSection className="mt-6" title={t('聊天应用')} testId="im-platforms">
+      <SettingsSection
+        className="mt-6"
+        title={t('聊天应用')}
+        info={t('连接 Telegram 机器人、微信或 Slack 后，就能直接用手机和 Coordinator 对话。')}
+        testId="im-platforms"
+      >
         <SettingsCard>{PLATFORM_ORDER.flatMap(platformRows)}</SettingsCard>
       </SettingsSection>
       {connecting && (

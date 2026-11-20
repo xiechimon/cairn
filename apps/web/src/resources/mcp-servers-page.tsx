@@ -277,6 +277,7 @@ export function McpServersPage() {
         testId: `mail-card-${card.provider}`,
         icon: <MailIcon />,
         name: t(card.name),
+        info: t(card.info),
         description: t(card.description),
         action: connectButton(t(card.name), card.open),
       }),
