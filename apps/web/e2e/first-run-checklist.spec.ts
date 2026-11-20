@@ -114,9 +114,8 @@ test('a machine coming back online clears the chip', async ({ page }) => {
   await expect(chip(page)).toHaveCount(0);
 });
 
-test('in the desktop app its own offline machine reconnects instead of asking for cairn start', async ({
-  page,
-}) => {
+async function openDesktop(page: Page, world: World) {
+  await page.clock.install();
   await page.addInitScript(() => {
     const calls: string[] = [];
     Object.assign(window, {
@@ -124,12 +123,46 @@ test('in the desktop app its own offline machine reconnects instead of asking fo
       cairnDesktop: { localRunner: { reconnect: async () => void calls.push('reconnect') } },
     });
   });
-  await open(page, {
+  const machinesRead = page.waitForResponse((res) => res.url().endsWith('/api/teams/t1/machines'));
+  await open(page, world);
+  await machinesRead;
+  await expect(page.getByTestId('chief-composer-input')).toBeVisible();
+  await page.clock.runFor(1_000);
+}
+
+const OWN_OFFLINE = { id: 'm1', name: 'xmonsMac', online: false, kind: 'local' as const, lastSeenAt: 1 };
+
+test('opening the desktop app shows no Runner hint while its own Runner is still starting', async ({
+  page,
+}) => {
+  const world: World = {
     ...fresh(),
     providers: [{ id: 'p1', name: 'gw' }],
     bound: true,
-    machines: [{ id: 'm1', name: 'xmonsMac', online: false, kind: 'local', lastSeenAt: 1 }],
+    machines: [OWN_OFFLINE],
+  };
+  await openDesktop(page, world);
+  await expect(chip(page)).toHaveCount(0);
+  await expect(hint(page)).toHaveCount(0);
+  world.machines = [{ ...OWN_OFFLINE, online: true }];
+  await page.evaluate(() => {
+    for (const es of window.__es) es.emit({ type: 'machine_presence', machineId: 'm1', online: true });
   });
+  await page.clock.runFor(30_000);
+  await expect(chip(page)).toHaveCount(0);
+});
+
+test('in the desktop app its own offline machine reconnects instead of asking for cairn start', async ({
+  page,
+}) => {
+  await openDesktop(page, {
+    ...fresh(),
+    providers: [{ id: 'p1', name: 'gw' }],
+    bound: true,
+    machines: [OWN_OFFLINE],
+  });
+  await expect(chip(page)).toHaveCount(0);
+  await page.clock.runFor(15_000);
   await expect(chip(page)).toHaveText('xmonsMac 离线');
   await expect(hint(page)).toHaveText('Cairn 会在这台电脑唤醒后自动重连');
   await expect(hint(page).locator('code')).toHaveCount(0);
