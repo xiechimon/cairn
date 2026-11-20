@@ -917,22 +917,28 @@ describe('#2006 a work-branch push already contained in the remote branch is not
     expect(lines[0]).toContain(merged.slice(0, 7));
   }, 30_000);
 
-  test('failure mode 2: remote branch advanced by a commit that does not contain local HEAD -> non-fast-forward still throws', async () => {
-    const { upstream, dir } = pushFixture();
+  test('failure mode 2: remote branch advanced by a commit that does not contain local HEAD -> local work is replayed on top and pushed', async () => {
+    const { remote, upstream, dir } = pushFixture();
     commitFile(dir, 'work.txt', 'work\n');
     gitOk(upstream, ['checkout', '-B', 'work', 'origin/main']);
-    commitFile(upstream, 'foreign.txt', 'foreign\n');
+    const foreign = commitFile(upstream, 'foreign.txt', 'foreign\n');
     gitOk(upstream, ['push', 'origin', 'work']);
     commitFile(dir, 'later.txt', 'later\n');
     const lines: string[] = [];
 
-    const err = await gitPrim
-      .push(dir, 'work', null, (a, b) => lines.push(`${a} ${b}`))
-      .catch((error: unknown) => error);
+    await expect(
+      gitPrim.push(dir, 'work', null, (a, b) => lines.push(`${a} ${b}`)),
+    ).resolves.toBeUndefined();
 
-    expect(err).toBeInstanceOf(Error);
-    expect(String(err)).toContain('git push failed');
-    expect(String(err)).toMatch(/non-fast-forward|fetch first/);
+    const remoteTip = gitOk(remote, ['rev-parse', 'refs/heads/work']);
+    expect(remoteTip).toBe(gitOk(dir, ['rev-parse', 'work']));
+    expect(gitOk(dir, ['merge-base', '--is-ancestor', foreign, remoteTip])).toBe('');
+    expect(gitOk(remote, ['rev-parse', '--verify', 'refs/heads/work:work.txt'])).toMatch(
+      /^[0-9a-f]+$/,
+    );
+    expect(gitOk(remote, ['rev-parse', '--verify', 'refs/heads/work:later.txt'])).toMatch(
+      /^[0-9a-f]+$/,
+    );
     expect(lines).toEqual([]);
   }, 30_000);
 
@@ -957,9 +963,66 @@ describe('#2006 a work-branch push already contained in the remote branch is not
   }, 30_000);
 });
 
+describe('#5378 a retried step that rewrote its branch still pushes without force', () => {
+  test('a rewrite that is patch-identical to the published tip settles back onto it', async () => {
+    const { remote, dir } = pushFixture();
+    const published = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'work']);
+    gitOk(dir, ['fetch', 'origin']);
+    gitOk(dir, ['rebase', 'origin/main']);
+    expect(gitOk(dir, ['rev-parse', 'work'])).not.toBe(published);
+
+    await expect(gitPrim.push(dir, 'work', null)).resolves.toBeUndefined();
+
+    expect(gitOk(dir, ['rev-parse', 'work'])).toBe(published);
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(published);
+  }, 30_000);
+
+  test('new work on top of the rewrite lands on top of the published tip', async () => {
+    const { remote, dir } = pushFixture();
+    const published = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'work']);
+    gitOk(dir, ['fetch', 'origin']);
+    gitOk(dir, ['rebase', 'origin/main']);
+    commitFile(dir, 'retry.txt', 'retry work\n');
+
+    await expect(gitPrim.push(dir, 'work', null)).resolves.toBeUndefined();
+
+    const remoteTip = gitOk(remote, ['rev-parse', 'refs/heads/work']);
+    expect(remoteTip).toBe(gitOk(dir, ['rev-parse', 'work']));
+    expect(gitOk(dir, ['merge-base', '--is-ancestor', published, remoteTip])).toBe('');
+    expect(gitOk(remote, ['rev-parse', '--verify', 'refs/heads/work:work.txt'])).toMatch(
+      /^[0-9a-f]+$/,
+    );
+    expect(gitOk(remote, ['rev-parse', '--verify', 'refs/heads/work:retry.txt'])).toMatch(
+      /^[0-9a-f]+$/,
+    );
+  }, 30_000);
+
+  test('work that collides with the published content still fails and the worktree rewinds', async () => {
+    const { remote, dir } = pushFixture();
+    commitFile(dir, 'shared.txt', 'published version\n');
+    const published = gitOk(dir, ['rev-parse', 'work']);
+    gitOk(dir, ['push', 'origin', 'work']);
+    gitOk(dir, ['fetch', 'origin']);
+    gitOk(dir, ['reset', '--hard', 'origin/main']);
+    commitFile(dir, 'shared.txt', 'conflicting retry version\n');
+    const retryHead = gitOk(dir, ['rev-parse', 'work']);
+
+    const err = await gitPrim.push(dir, 'work', null).catch((error: unknown) => error);
+
+    expect(err).toBeInstanceOf(Error);
+    expect(String(err)).toContain('git push failed');
+    expect(String(err)).toMatch(/non-fast-forward|fetch first/);
+    expect(gitOk(dir, ['rev-parse', 'work'])).toBe(retryHead);
+    expect(gitOk(dir, ['status', '--porcelain'])).toBe('');
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(published);
+  }, 30_000);
+});
+
 describe('#2047 containment binds to the attempted branch and fetched destination', () => {
   for (const mapping of ['missing', 'main-only']) {
-    test(`a ${mapping} fetch mapping cannot certify a divergent tip through stale tracking state`, async () => {
+    test(`a ${mapping} fetch mapping reconciles against the fetched tip and pushes, never the stale tracking ref`, async () => {
       const { remote, dir } = pushFixture();
       const local = commitFile(dir, 'work.txt', 'work\n');
       gitOk(dir, ['push', 'origin', 'work']);
@@ -973,10 +1036,14 @@ describe('#2047 containment binds to the attempted branch and fetched destinatio
 
       await expect(
         gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
-      ).rejects.toThrow(/non-fast-forward|fetch first/);
+      ).resolves.toBeUndefined();
 
       expect(notices).toEqual([]);
-      expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
+      const remoteTip = gitOk(remote, ['rev-parse', 'refs/heads/work']);
+      expect(gitOk(dir, ['merge-base', '--is-ancestor', foreign, remoteTip])).toBe('');
+      expect(gitOk(remote, ['rev-parse', '--verify', 'refs/heads/work:work.txt'])).toMatch(
+        /^[0-9a-f]+$/,
+      );
       expect(gitOk(dir, ['for-each-ref', '--format=%(refname)', 'refs/cairn/push-check/'])).toBe(
         '',
       );
@@ -1101,7 +1168,7 @@ test('#2047 branch-gated pre-push checks still receive the named branch ref', as
   await expect(gitPrim.push(dir, 'work', null)).rejects.toMatchObject({ name: 'GitPushHookError' });
 }, 30_000);
 
-test('#2047 a chained URL rewrite cannot redirect the containment proof to a decoy repository', async () => {
+test('#2047 a chained URL rewrite neither redirects the push to a decoy nor fakes containment', async () => {
   const { remote, dir } = pushFixture();
   const local = commitFile(dir, 'work.txt', 'work\n');
   gitOk(dir, ['push', 'origin', 'work']);
@@ -1117,10 +1184,14 @@ test('#2047 a chained URL rewrite cannot redirect the containment proof to a dec
 
   await expect(
     gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
-  ).rejects.toThrow(/non-fast-forward|fetch first/);
+  ).resolves.toBeUndefined();
 
+  const landed = gitOk(remote, ['rev-parse', 'refs/heads/work']);
+  expect(landed).not.toBe(foreign);
+  gitOk(remote, ['merge-base', '--is-ancestor', foreign, landed]);
+  expect(gitOk(remote, ['show', 'refs/heads/work:work.txt'])).toBe('work');
+  expect(gitOk(decoy, ['rev-parse', 'refs/heads/work'])).toBe(local);
   expect(notices).toEqual([]);
-  expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
 }, 30_000);
 
 test('#2047 an ordinary URL alias still certifies the actual containing tip', async () => {
@@ -1181,7 +1252,7 @@ describe('#2047 configured push mappings cannot change the requested destination
     expect(gitOk(remote, ['rev-parse', 'refs/heads/release'])).toBe(foreign);
   }, 30_000);
 
-  test('a writable mapped branch cannot hide rejection from the requested divergent branch', async () => {
+  test('a writable mapped branch cannot hide the reconcile or take the push', async () => {
     const { remote, dir } = pushFixture();
     const seed = gitOk(dir, ['rev-parse', 'HEAD']);
     const local = commitFile(dir, 'work.txt', 'work\n');
@@ -1194,10 +1265,11 @@ describe('#2047 configured push mappings cannot change the requested destination
 
     await expect(
       gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
-    ).rejects.toThrow(/non-fast-forward|fetch first/);
+    ).resolves.toBeUndefined();
 
     expect(notices).toEqual([]);
-    expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
+    const remoteTip = gitOk(remote, ['rev-parse', 'refs/heads/work']);
+    expect(gitOk(dir, ['merge-base', '--is-ancestor', foreign, remoteTip])).toBe('');
     expect(gitOk(remote, ['rev-parse', 'refs/heads/release'])).toBe(seed);
   }, 30_000);
 });

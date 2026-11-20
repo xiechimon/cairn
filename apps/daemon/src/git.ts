@@ -359,6 +359,74 @@ export async function landGitSquash(input: {
   });
 }
 
+async function rebaseCommitterEnv(
+  dir: string,
+  branch: string,
+  identity: CommitIdentity | null | undefined,
+): Promise<NodeJS.ProcessEnv> {
+  let chosen = identity ?? null;
+  if (chosen === null) {
+    const meta = await runGit(['show', '-s', '--format=%cn%x00%ce', `refs/heads/${branch}`], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    const [name, email] = meta.stdout.split('\0');
+    if (meta.code === 0 && name !== undefined && email !== undefined) {
+      chosen = { name: name.trim(), email: email.trim() };
+    }
+  }
+  return chosen === null ? {} : commitEnv(chosen);
+}
+
+async function rebaseBranchOntoPublishedTip(
+  dir: string,
+  branch: string,
+  remoteTip: string,
+  env: NodeJS.ProcessEnv,
+): Promise<{ head: string } | { error: string }> {
+  const current = await runGit(['branch', '--show-current'], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  const checkedOut = current.stdout.trim();
+  if (current.code !== 0 || checkedOut !== branch) {
+    return {
+      error: `the checked-out branch is ${checkedOut === '' ? 'a detached commit' : checkedOut}, not ${branch}`,
+    };
+  }
+  const branchRef = `refs/heads/${branch}`;
+  let cut: string | null = null;
+  for (const candidate of ['refs/remotes/origin/HEAD', remoteTip]) {
+    const probe = await runGit(['merge-base', '--end-of-options', branchRef, candidate], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    const sha = probe.stdout.trim();
+    if (probe.code === 0 && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sha)) {
+      cut = sha;
+      break;
+    }
+  }
+  if (cut === null) return { error: `${branch} and the published tip share no history` };
+  const rebase = await runGit(
+    ['rebase', '--rebase-merges', '--autostash', '--onto', remoteTip, cut, branch],
+    { cwd: dir, env, timeoutMs: CHECKOUT_TIMEOUT_MS },
+  );
+  if (rebase.code !== 0) {
+    await runGit(['rebase', '--abort'], { cwd: dir, env, timeoutMs: META_TIMEOUT_MS });
+    return { error: outputTail(rebase) };
+  }
+  const head = await runGit(['rev-parse', '--verify', '--end-of-options', branchRef], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  const headSha = head.stdout.trim();
+  if (head.code !== 0 || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(headSha)) {
+    return { error: 'the rebased branch tip could not be read back' };
+  }
+  return { head: headSha };
+}
+
 export const gitPrim = {
   async clone(url: string, dir: string, cred: BoundGitCredentials | null): Promise<void> {
     await runGitOk(['clone', '--end-of-options', url, dir], {
@@ -720,6 +788,7 @@ export const gitPrim = {
     branch: string,
     cred: BoundGitCredentials | null,
     onAlreadyContained?: (local: string, remote: string) => void,
+    identity?: CommitIdentity | null,
   ): Promise<void> {
     const env = cred ? gitCredentialEnv(cred) : machineGitEnv();
     const branchRef = `refs/heads/${branch}`;
@@ -753,21 +822,19 @@ export const gitPrim = {
     });
     const traceDir = mkdtempSync(join(tmpdir(), 'cairn-push-'));
     const traceFile = join(traceDir, 'trace.jsonl');
-    try {
-      const result = await runGit(
-        ['push', '--end-of-options', 'origin', `${branchRef}:${branchRef}`],
-        {
-          cwd: dir,
-          env: { ...env, GIT_TRACE2_EVENT: traceFile },
-          timeoutMs: NET_TIMEOUT_MS,
-        },
+    const attemptPush = () =>
+      runGit(['push', '--end-of-options', 'origin', `${branchRef}:${branchRef}`], {
+        cwd: dir,
+        env: { ...env, GIT_TRACE2_EVENT: traceFile },
+        timeoutMs: NET_TIMEOUT_MS,
+      });
+    const attemptOutput = (r: GitRunResult) =>
+      [r.stdout.trim(), r.stderr.trim()].filter(Boolean).join('\n');
+    const attemptFailure = (r: GitRunResult) =>
+      new Error(
+        `git push failed (${r.code ?? `signal ${r.signal ?? 'unknown'}`}): ${attemptOutput(r)}`,
       );
-      if (result.code === 0) return;
-      const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n');
-      const pushFailure = new Error(
-        `git push failed (${result.code ?? `signal ${result.signal ?? 'unknown'}`}): ${output}`,
-      );
-      let hookRejected = false;
+    const traceShowsHookRejection = (): boolean => {
       const hooks = new Set<number>();
       for (const line of readFileSync(traceFile, 'utf8').split('\n')) {
         if (line === '') continue;
@@ -795,12 +862,18 @@ export const gitPrim = {
           event.code !== undefined &&
           event.code !== 0
         ) {
-          hookRejected = true;
-          break;
+          return true;
         }
       }
-      const rejection = hookRejected ? new GitPushHookError(output) : pushFailure;
-      if (hookRejected || !isPushRejectedNoFastForward(output)) throw rejection;
+      return false;
+    };
+    try {
+      const result = await attemptPush();
+      if (result.code === 0) return;
+      const output = attemptOutput(result);
+      if (traceShowsHookRejection()) throw new GitPushHookError(output);
+      const rejection = attemptFailure(result);
+      if (!isPushRejectedNoFastForward(output)) throw rejection;
       if (
         local === null ||
         (await branchHead()) !== local ||
@@ -846,21 +919,37 @@ export const gitPrim = {
           timeoutMs: META_TIMEOUT_MS,
         });
         remote = tip.code === 0 ? tip.stdout.trim() : '';
-        if (
-          !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(remote) ||
-          (
-            await runGit(['merge-base', '--is-ancestor', '--end-of-options', local, remote], {
-              cwd: dir,
-              timeoutMs: META_TIMEOUT_MS,
-            })
-          ).code !== 0
-        )
-          throw rejection;
       } finally {
         await runGitOk(['update-ref', '-d', proofRef], { cwd: dir, timeoutMs: META_TIMEOUT_MS });
       }
+      if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(remote)) throw rejection;
       if ((await branchHead()) !== local || (await remoteAddress()) !== fetchUrl) throw rejection;
-      onAlreadyContained?.(local, remote);
+      if (
+        (
+          await runGit(['merge-base', '--is-ancestor', '--end-of-options', local, remote], {
+            cwd: dir,
+            timeoutMs: META_TIMEOUT_MS,
+          })
+        ).code === 0
+      ) {
+        onAlreadyContained?.(local, remote);
+        return;
+      }
+      const synced = await rebaseBranchOntoPublishedTip(dir, branch, remote, {
+        ...env,
+        ...(await rebaseCommitterEnv(dir, branch, identity)),
+      });
+      if ('error' in synced) {
+        throw new Error(
+          `${rejection.message}\nrebasing ${branch} on top of the published tip also failed: ${synced.error}`,
+        );
+      }
+      const retry = await attemptPush();
+      if (retry.code !== 0) {
+        if (traceShowsHookRejection()) throw new GitPushHookError(attemptOutput(retry));
+        throw attemptFailure(retry);
+      }
+      if (synced.head === remote) onAlreadyContained?.(synced.head, remote);
     } finally {
       rmSync(traceDir, { recursive: true, force: true });
     }

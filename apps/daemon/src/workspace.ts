@@ -457,10 +457,15 @@ export class WorkspaceManager implements WorktreeOps {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
     await attributeStepCommits({ ...publication, dir: cwd, branch, credential: credentials });
     await withGitNetRetries(() =>
-      gitPrim.push(cwd, branch, credentials, (local, remote) =>
-        this.logger.workspace(
-          `push of ${branch} already contained in origin/${branch} (local ${local.slice(0, 7)}, remote ${remote.slice(0, 7)}); nothing to push`,
-        ),
+      gitPrim.push(
+        cwd,
+        branch,
+        credentials,
+        (local, remote) =>
+          this.logger.workspace(
+            `push of ${branch} already contained in origin/${branch} (local ${local.slice(0, 7)}, remote ${remote.slice(0, 7)}); nothing to push`,
+          ),
+        publication.identity,
       ),
     );
   }

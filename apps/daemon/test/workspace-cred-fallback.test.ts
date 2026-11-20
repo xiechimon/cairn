@@ -215,7 +215,7 @@ describe('#2006 closing push of a work branch the remote already contains', () =
     expect(lines[0]).toContain('origin/work');
   }, 30_000);
 
-  test('failure mode 2: the remote work branch moves to a tip that does not contain the local commit -> closing push still fails', async () => {
+  test('failure mode 2: the remote work branch is replaced by an unrelated tip -> closing push replays the local commit on top of it', async () => {
     const { cwd } = await branchAlreadyUpdated();
     await runGit(['checkout', '--orphan', 'publish'], { cwd });
     await runGit(['rm', '-rf', '.'], { cwd });
@@ -232,10 +232,16 @@ describe('#2006 closing push of a work branch the remote already contains', () =
     expect(head).not.toBeNull();
     expect(remoteTip).not.toBe(head);
 
-    await expect(ws.push(cwd, 'work', null, NO_PUBLICATION)).rejects.toThrow(
-      /non-fast-forward|fetch first/,
-    );
+    await expect(ws.push(cwd, 'work', null, NO_PUBLICATION)).resolves.toBeUndefined();
 
+    const landed = (
+      await runGit(['rev-parse', 'refs/heads/work'], { cwd: originDir })
+    ).stdout.trim();
+    expect(landed).not.toBe(remoteTip);
+    await runGitOk(['merge-base', '--is-ancestor', remoteTip, landed], { cwd: originDir });
+    expect(
+      (await runGit(['show', 'refs/heads/work:work.txt'], { cwd: originDir })).stdout.trim(),
+    ).toBe('work');
     expect(logger.lines.filter((l) => l.includes('already contained'))).toEqual([]);
   }, 30_000);
 });
