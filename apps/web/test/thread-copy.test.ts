@@ -31,6 +31,10 @@ describe('threadCopy', () => {
     expect(threadCopy(todo({})).reason).toBe('正在动手。');
   });
 
+  it('a queued task waiting for a Runner says it is queued, not running', () => {
+    expect(threadCopy(todo({ phase: 'queued', section: 'working' })).state).toBe('排队中');
+  });
+
   it('a finished thread uses one done word and ignores the verify bit', () => {
     expect(threadCopy(todo({ phase: 'done' }))).toEqual(DONE);
     expect(threadCopy(todo({ phase: 'done', verified: true }))).toEqual(DONE);

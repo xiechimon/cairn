@@ -1692,7 +1692,7 @@ export const EN: Record<string, string> = {
   '等 {machine} 上线': 'waiting for {machine} to come online',
   等执行机上线: 'waiting for a Runner to come online',
   '缺 {missing}': 'missing {missing}',
-  排队中: 'queued',
+  排队中: 'Queued',
   '已交给 Coordinator 安排': 'Handed to the Coordinator',
   'Coordinator 正在安排这个任务...': 'The Coordinator is arranging this task...',
   'Coordinator 没有派发这个任务，原因见上面的回复。点「开始」再试一次。':
