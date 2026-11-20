@@ -120,7 +120,7 @@ test('logged-in Mac creates a host-keyring subscription with no token and shows 
   const row = page.locator('[data-instance-id="subscription:ag-sub-1"]');
   await expect(row).toContainText('Antigravity 订阅');
   const detail = page.getByTestId('subscription-detail');
-  await expect(detail.getByLabel('名称')).toBeVisible();
+  await expect(detail.getByTestId('provider-rename')).toHaveText('Antigravity 订阅');
   await expect(detail).not.toContainText('还没勾选模型');
   await expect(detail.getByTestId('subscription-pick-upstream')).toBeVisible();
   await expect(row).toContainText('2 个模型');

@@ -154,6 +154,7 @@ test('live: rename, verify and remove hit the agreed routes', async ({
   const detail = page.getByTestId('subscription-detail');
   await expect(detail.getByRole('progressbar')).toHaveCount(2);
   await expect(detail.getByRole('progressbar').nth(1)).toHaveAttribute('aria-valuenow', '10');
+  await detail.getByTestId('provider-rename').click();
   await detail.getByLabel('名称', { exact: true }).fill('Main');
   await detail.getByLabel('名称', { exact: true }).press('Enter');
   await expect.poll(() => calls).toContain('PATCH s1 Main');
@@ -168,7 +169,7 @@ test('live: rename, verify and remove hit the agreed routes', async ({
 
   await page.locator('[data-instance-id="subscription:s2"]').click();
   await expect(detail).toHaveAttribute('data-account-id', 's2');
-  await expect(detail.getByLabel('名称', { exact: true })).toHaveValue('Legacy');
+  await expect(detail.getByTestId('provider-rename')).toHaveText('Legacy');
   await detail.getByRole('button', { name: '移除', exact: true }).click();
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toContainText('Legacy');
