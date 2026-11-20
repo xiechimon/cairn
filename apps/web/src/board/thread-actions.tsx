@@ -10,7 +10,7 @@ import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
-import { Spinner } from '../components/ui/spinner.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { toastError } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
@@ -170,7 +170,7 @@ export function useThreadActions({
           disabled={pending}
           className="h-7.5 border-border px-3 text-ui font-medium text-foreground"
         >
-          {pending && <Spinner data-icon="inline-start" />}
+          {pending && <RingSpinner data-icon="inline-start" />}
           {t(ACTION_COPY.unarchive.primary)}
         </Button>
       </div>
@@ -193,7 +193,7 @@ export function useThreadActions({
               />
             }
           >
-            {(pending || orchestrating) && <Spinner data-icon="inline-start" />}
+            {(pending || orchestrating) && <RingSpinner data-icon="inline-start" />}
             {orchestrating ? t('编排中') : t(ACTION_COPY[kind].primary)}
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={6}>

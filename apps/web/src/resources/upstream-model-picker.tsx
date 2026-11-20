@@ -7,8 +7,8 @@ import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { Skeleton } from '../components/ui/skeleton.js';
-import { Spinner } from '../components/ui/spinner.js';
 import { useI18n } from '../i18n/provider.js';
 
 export interface UpstreamOption {
@@ -253,7 +253,7 @@ export function UpstreamModelPicker({
           aria-busy="true"
         >
           <span className="flex items-center gap-2 text-meta text-content-tertiary">
-            <Spinner />
+            <RingSpinner className="size-4" />
             {t('正在获取上游模型')}
           </span>
           {Array.from({ length: 12 }, (_, index) => (

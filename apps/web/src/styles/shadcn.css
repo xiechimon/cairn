@@ -61,8 +61,34 @@
 :root {
   --dur-fast: 150ms;
   --dur-overlay: 200ms;
+  --dur-enter: 400ms;
+  --dur-spring: 600ms;
+  --dur-spin: 800ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-check-spring: linear(
+    0,
+    0.122,
+    0.337,
+    0.537,
+    0.692,
+    0.801,
+    0.874,
+    0.922,
+    0.952,
+    0.971,
+    0.983,
+    0.99,
+    0.994,
+    0.996,
+    0.998,
+    0.999,
+    0.9993,
+    0.9996,
+    0.9999,
+    1
+  );
 
   --z-docked: 10;
   --z-floating: 15;

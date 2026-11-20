@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { computerScreenWsUrl, openComputerScreen } from '../api/computer-screen.js';
 import { Button } from '../components/ui/button.js';
-import { Spinner } from '../components/ui/spinner.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { useI18n } from '../i18n/provider.js';
 import type { ScreenPointerProps } from './screen-hover-control.js';
 
@@ -166,7 +166,7 @@ export function MachineScreenSurface({
           data-testid="machine-screen-starting"
           className="absolute inset-0 z-1 grid place-items-center bg-(--surface-1)"
         >
-          <Spinner aria-label={t('正在启动')} className="size-5 text-content-tertiary" />
+          <RingSpinner aria-label={t('正在启动')} className="size-5 text-content-tertiary" />
         </div>
       )}
       {power === 'asleep' && (

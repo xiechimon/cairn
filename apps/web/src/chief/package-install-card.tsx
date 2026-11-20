@@ -1,9 +1,10 @@
-import { Ban, CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react';
+import { Ban, CircleAlert, CircleCheck } from 'lucide-react';
 import { useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ApprovalCard, ApprovalHistoryLine } from './approval-card.js';
@@ -67,7 +68,7 @@ export function PackageInstallCard({ item }: { item: PackageInstallItem }) {
     outcome === 'approved'
       ? {
           status: t('正在安装'),
-          icon: <LoaderCircle strokeWidth={1.75} className={`${HISTORY_ICON_CLS} animate-spin`} />,
+          icon: <RingSpinner className={HISTORY_ICON_CLS} />,
         }
       : outcome === 'installed'
         ? {

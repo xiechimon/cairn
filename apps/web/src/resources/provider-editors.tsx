@@ -26,7 +26,7 @@ import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dia
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent } from '../components/ui/popover.js';
-import { Spinner } from '../components/ui/spinner.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { useI18n } from '../i18n/provider.js';
 import { presetMarkOf } from './provider-preset-icon.js';
 import { UpstreamModelPicker } from './upstream-model-picker.js';
@@ -245,7 +245,7 @@ export function CheckResultPopover({
             )}
           >
             {tone === 'checking' ? (
-              <Spinner aria-hidden className="mt-0.5 size-4 flex-none text-content-tertiary" />
+              <RingSpinner aria-hidden className="mt-0.5 size-4 flex-none text-content-tertiary" />
             ) : (
               <span
                 aria-hidden

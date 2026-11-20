@@ -1,7 +1,7 @@
 import type { RoutingRuleRecord } from '@cairn/shared';
 import { cn } from 'cn';
 import { Check, KeyRound } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type CSSProperties, type ReactNode, useState } from 'react';
 import {
   useApiMutations,
   useChief,
@@ -21,7 +21,7 @@ import { SegmentedRadio } from '../components/segmented.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
-import { Spinner } from '../components/ui/spinner.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
@@ -370,7 +370,7 @@ function ConfirmBody({ setup }: { setup: Setup }) {
           disabled={pick == null || patchRule.isPending}
           onClick={() => void confirm()}
         >
-          {patchRule.isPending && <Spinner className="size-5" />}
+          {patchRule.isPending && <RingSpinner data-icon="inline-start" />}
           {patchRule.isPending ? t('保存中…') : t('确认并开始对话')}
         </Button>
       </div>
@@ -487,24 +487,32 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
           </div>
         </div>
         <div className="relative flex flex-col lg:flex-1 lg:justify-center">
-          <h1 className="m-0 mt-8 voice-greeting text-greeting text-balance lg:mt-0">
+          <h1
+            className="m-0 mt-8 voice-greeting text-greeting text-balance lg:mt-0 first-run-enter"
+            style={{ '--enter-delay': '0ms' } as CSSProperties}
+          >
             {t('欢迎使用 Cairn')}
           </h1>
-          <Rail open={open} />
-          <Segments open={open} />
-          <InkSpiral
-            hangs={NO_HANGS}
-            drawn={open === 'models' ? 1 / 3 : 2 / 3}
-            size={150}
-            className="mt-6 self-end max-lg:hidden [@media(max-height:700px)]:hidden"
-          />
+          <div className="first-run-enter" style={{ '--enter-delay': '100ms' } as CSSProperties}>
+            <Rail open={open} />
+          </div>
+          <div className="first-run-enter" style={{ '--enter-delay': '200ms' } as CSSProperties}>
+            <Segments open={open} />
+          </div>
+          <div
+            className="mt-6 self-end first-run-enter max-lg:hidden [@media(max-height:700px)]:hidden"
+            style={{ '--enter-delay': '200ms' } as CSSProperties}
+          >
+            <InkSpiral hangs={NO_HANGS} drawn={open === 'models' ? 1 / 3 : 2 / 3} size={150} />
+          </div>
         </div>
       </aside>
       <div className="flex flex-1 flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] lg:items-center lg:overflow-y-auto lg:px-16 lg:pt-28 lg:pb-15">
         <section
           key={open}
           aria-label={open === 'models' ? t('接入模型') : t('确认设置')}
-          className="w-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 lg:my-auto lg:max-w-130"
+          className="w-full first-run-enter lg:my-auto lg:max-w-130"
+          style={{ '--enter-delay': '200ms' } as CSSProperties}
         >
           <h2 className="m-0 voice-response text-page lg:sr-only">
             {open === 'models' ? t('接入模型') : t('确认设置')}

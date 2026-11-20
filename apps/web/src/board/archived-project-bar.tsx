@@ -1,7 +1,7 @@
 import { cn } from 'cn';
 import { Archive } from 'lucide-react';
 import { Button } from '../components/ui/button.js';
-import { Spinner } from '../components/ui/spinner.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { useI18n } from '../i18n/provider.js';
 
 export interface ArchivedProjectState {
@@ -39,7 +39,7 @@ export function ArchivedProjectBar({
         disabled={state.pending}
         className="h-7.5 border-border px-3 text-ui font-medium text-foreground"
       >
-        {state.pending && <Spinner data-icon="inline-start" />}
+        {state.pending && <RingSpinner data-icon="inline-start" />}
         {t('取消归档')}
       </Button>
     </div>

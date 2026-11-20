@@ -16,6 +16,7 @@ import {
   InputGroupInput,
 } from '../components/ui/input-group.js';
 import { Kbd, KbdGroup } from '../components/ui/kbd.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import {
   Select,
   SelectContent,
@@ -23,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select.js';
-import { Spinner } from '../components/ui/spinner.js';
 import { StatusChip, type StatusTone } from '../components/ui/status-chip.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -148,7 +148,7 @@ export function ButtonSection() {
               window.setTimeout(() => setBusy(false), 1400);
             }}
           >
-            {busy && <Spinner data-icon="inline-start" />}
+            {busy && <RingSpinner data-icon="inline-start" />}
             {busy ? 'Starting…' : 'Start task'}
           </Button>
         </Cell>

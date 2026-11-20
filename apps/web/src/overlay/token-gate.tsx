@@ -12,7 +12,7 @@ import {
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { Input } from '../components/ui/input.js';
-import { Spinner } from '../components/ui/spinner.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -152,7 +152,7 @@ export function TokenGate() {
             >
               {probing ? (
                 <>
-                  <Spinner className="size-3.5" />
+                  <RingSpinner data-icon="inline-start" />
                   {t('正在配对…')}
                 </>
               ) : (

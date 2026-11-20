@@ -5,7 +5,7 @@ import { useApiMutations, useProviders } from '../api/hooks.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { Checkbox } from '../components/ui/checkbox.js';
-import { Spinner } from '../components/ui/spinner.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
@@ -192,7 +192,7 @@ export function LocalProviderImportCard({
           disabled={importing || chosen.length === 0}
           onClick={() => void importChosen()}
         >
-          {importing && <Spinner className="size-4" />}
+          {importing && <RingSpinner data-icon="inline-start" />}
           {importLabel}
         </Button>
       </div>

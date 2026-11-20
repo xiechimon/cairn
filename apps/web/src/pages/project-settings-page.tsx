@@ -36,7 +36,7 @@ import {
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
-import { Spinner } from '../components/ui/spinner.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { ModelOption, ProjectContent } from '../fixtures/records.js';
@@ -457,7 +457,7 @@ export function ProjectSettingsPage() {
                         );
                       }}
                     >
-                      {mutations.patchProject.isPending && <Spinner data-icon="inline-start" />}
+                      {mutations.patchProject.isPending && <RingSpinner data-icon="inline-start" />}
                       {t('转换')}
                     </Button>
                     {convError !== null && (

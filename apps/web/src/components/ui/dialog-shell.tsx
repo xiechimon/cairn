@@ -21,7 +21,7 @@ const VIEWPORT_MECHANISM_CLS =
   'fixed inset-0 pointer-events-none [&>*]:pointer-events-auto data-[ending-style]:[transition:opacity_0s_linear_var(--dur-fast)] data-[ending-style]:opacity-0';
 
 export const VIEWPORT_POP_ANIM =
-  'duration-100 ease-out group-data-open/dlgvp:animate-in group-data-open/dlgvp:fade-in-0 group-data-open/dlgvp:zoom-in-98';
+  'duration-100 ease-(--ease-out-expo) group-data-open/dlgvp:animate-in group-data-open/dlgvp:fade-in-0 group-data-open/dlgvp:zoom-in-98';
 
 export const DIALOG_FACE =
   'rounded-(--edge-radius) bg-dialog-surface shadow-(--dialog-shadow) ring-0';

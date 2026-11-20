@@ -1,14 +1,14 @@
 {
   "frozenFrom": {
-    "sha": "39bdfc9fe15e8461b8a95eb88981da992e1497e3",
-    "date": "2026-11-19"
+    "sha": "6d6cd20916d750cd413b1e2a35bcbd8b2eddbf6e",
+    "date": "2026-11-20"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
     "INVENTORY.md": {
       "kind": "adapter",
       "reason": "Documentation, not a component: the reuse inventory this directory ships (new-track list, old-track frozen list, which-piece-to-use rules), moved here from apps/web/COMPONENTS.md so it sits next to the code it lists. Registered so the gate sees the file; its content is prose, and the machine-readable markers it carries are checked by test/ui-reuse-inventory.test.ts.",
-      "hash": "102f39ed66e64bf53d888e39f710b89928cbea0a65965f198a630118c15ade72"
+      "hash": "2891475d4fa815e83c8c8b5461425a64150b9f56f088e64e4a4bffd993831d00"
     },
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
@@ -76,7 +76,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (docs/design/surfaces/chrome.md dialogs) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog / overlay/route-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes, and bare forwards initialFocus. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces. stacked forces the registry overlay for a regular face opened over another dialog, as AlertDialogShell does, so the dialog underneath is dimmed.",
-      "hash": "17b616b895e92aea7abf4a006a0fb1c6f2a6e3a216ceae5344a716e6b8734136"
+      "hash": "f3dbee543248d626705fad75d1a34ecb85fbdea4e704e4847334db9a3ba2e1ac"
     },
     "dialog.tsx": {
       "kind": "registry",
@@ -88,8 +88,8 @@
       "kind": "registry",
       "upstreamItem": "dropdown-menu",
       "status": "deviated",
-      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #454 anchor prop exposed for call-site positioning (project-new-page, 1 consumer). Icon seam retired to lucide per the components.json iconLibrary contract (#982); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu: popup and items take the shared menu classes from menu.ts (--radius-popover, --menu-pad padding, --shadow-popover; items h-8 with --radius-menu-item pills, text-ui, 15px ink-3 icons, menu-hover focus fill), danger-soft destructive fill; caption labels and shortcut hints.",
-      "hash": "572cc9028018e6a600bfccb93dce5dc642512d7d10340dabea115fd4d5e4f5f2"
+      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #454 anchor prop exposed for call-site positioning (project-new-page, 1 consumer). Icon seam retired to lucide per the components.json iconLibrary contract (#982); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form); the owner motion pick then retimed the open animation to --ease-out-expo at duration-100 on Content and SubContent, close still instant via motion.css [data-closed]. Paper menu: popup and items take the shared menu classes from menu.ts (--radius-popover, --menu-pad padding, --shadow-popover; items h-8 with --radius-menu-item pills, text-ui, 15px ink-3 icons, menu-hover focus fill), danger-soft destructive fill; caption labels and shortcut hints.",
+      "hash": "f1537a876863cba8fcaa333945f0a16683dec05982b28082f5a892a56d53a0d0"
     },
     "empty.tsx": {
       "kind": "registry",
@@ -157,6 +157,11 @@
       "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu face: popup consumes --radius-popover (10px) + --shadow-popover (light 1px ring + soft pool, dark inset highlight); text-sm -> text-ui (docs/design/surfaces/foundation.md type scale). Portal keepMounted exposed on PopoverContent so the Tasks panel PR hover cards are pre-rendered and open instantly (1 consumer, owner 2026-11-13). Positioner anchor exposed on PopoverContent so the phone schedule editor covers the whole schedule list instead of its row (1 consumer, 2026-11-15).",
       "hash": "5cb475ad76d7cfa53819af51ebeb560588d6d43117dc9404f7e73e13d7585e12"
     },
+    "ring-spinner.tsx": {
+      "kind": "adapter",
+      "reason": "loading.dev Ring (jakubkrehel/loading@da6f2e6, MIT — attribution in spinner.NOTICE.md) as the shared busy indicator, adopted over the registry spinner item per the owner motion pick: 20% opacity track + 16/62.8 arc, round cap, 800ms linear turn via .spin-ring (--dur-spin), static under reduced motion. Keeps data-slot=\"spinner\" so Button context sizing applies (16px at sm, 20px at default; explicit size-* elsewhere). spinner.tsx itself stays pristine upstream; all busy call sites import this adapter.",
+      "hash": "e83a834c5691f32006e2821ce066b613ae4877dbd618a4bb1582816f5e124bd6"
+    },
     "seeded-avatar.tsx": {
       "kind": "adapter",
       "reason": "XMON-14/#387/#1429, owner 2026-11-12: default avatar is a tinted initial seeded by name (lib/avatar-tint, no busy variant) + picture and fallback-image semantics composed on the registry avatar item; Root is a fixed-size box per the #983 verdict (#1003) — the upstream after: hairline ring needs a real containing block, geometry rides the Root via consumer className.",
@@ -179,6 +184,11 @@
       "upstreamItem": "skeleton",
       "status": "pristine",
       "hash": "30c21a8f3384ce62406b84c6e244bcc36738428b38d03a005fd28fdaa418e299"
+    },
+    "spinner.NOTICE.md": {
+      "kind": "adapter",
+      "reason": "Documentation, not a component: the MIT attribution (Copyright (c) 2026 Jakub Krehel, jakubkrehel/loading@da6f2e6) for the Ring vendored in ring-spinner.tsx — kept out of source per the no-comments rule, mirroring how INVENTORY.md registers prose files.",
+      "hash": "de9a2c3e932da94db3091bf9e8a7485a7ddffa29c7ec96c52a4189f9123290d9"
     },
     "spinner.tsx": {
       "kind": "registry",
@@ -212,8 +222,8 @@
     },
     "toaster.tsx": {
       "kind": "adapter",
-      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer.",
-      "hash": "19027b9f5c82de70da0aa91a7110a23498dd66ee0c37e7f92a2ee5e5a04dc045"
+      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer. Motion pick: the dormant loading icon is the shared RingSpinner (ring-spinner.tsx), not a lucide loader.",
+      "hash": "812519c34365f8ad0a11a6df8799e8c5d3da624985db3752bebaea48536b576b"
     },
     "tooltip.tsx": {
       "kind": "registry",

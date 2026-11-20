@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react';
 import { Button } from '../../components/ui/button.js';
-import { Spinner } from '../../components/ui/spinner.js';
+import { RingSpinner } from '../../components/ui/ring-spinner.js';
 
 export interface PlanApprovalProps {
   approved: boolean;
@@ -17,7 +17,7 @@ export function PlanApproval({ approved, approvedText, onApprove, onEdit }: Plan
         data-approved=""
         className="m-0 flex items-center gap-2 text-ui text-content-tertiary"
       >
-        <Spinner className="size-5" />
+        <RingSpinner className="size-5" />
         {approvedText}
       </p>
     );

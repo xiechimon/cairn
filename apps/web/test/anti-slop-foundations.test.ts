@@ -89,7 +89,12 @@ describe('V3 no blurred surfaces', () => {
     expect(offenders(/backdrop-blur|backdrop-filter:\s*blur|filter:\s*blur\(/).sort()).toEqual([
       'components/ui/alert-dialog.tsx',
       'components/ui/dialog.tsx',
+      'styles/app.css',
     ]);
+  });
+
+  test('the only blur left in styles is the first-run entrance unblur', () => {
+    expect(appCss.match(/filter:\s*blur\([^)]*\)/g) ?? []).toEqual(['filter: blur(4px)']);
   });
 
   test('the pristine dialog overlays keep their upstream blur class but render none', () => {

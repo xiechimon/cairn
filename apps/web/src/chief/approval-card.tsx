@@ -1,8 +1,9 @@
 import { cn } from 'cn';
-import { Box, CircleAlert, LoaderCircle, Mail, Send } from 'lucide-react';
+import { Box, CircleAlert, Mail, Send } from 'lucide-react';
 import { type ComponentType, Fragment, type ReactNode, type SVGProps, useState } from 'react';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { useI18n } from '../i18n/provider.js';
 import { Monitor, Terminal } from '../icons/index.js';
 import type { ApprovalCardModel, ApprovalField, ApprovalKind } from './approval-card-model.js';
@@ -170,7 +171,7 @@ export function ApprovalCard({
                   data-testid={action.testId}
                   onClick={busy === null ? action.onClick : undefined}
                 >
-                  {busy === action.testId && <LoaderCircle aria-hidden className="animate-spin" />}
+                  {busy === action.testId && <RingSpinner data-icon="inline-start" />}
                   {action.label}
                 </Button>
               ))

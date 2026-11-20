@@ -67,7 +67,7 @@ function TaskIcon({ state, grow = false }: { state: TaskState; grow?: boolean })
         className={`absolute inset-0 rounded-full border-[1.5px] border-(--border) border-t-(--text-secondary) ${TASK_FADE} ${state === 'doing' ? 'animate-spin opacity-100 motion-reduce:animate-none' : 'opacity-0'}`}
       />
       <span
-        className={`absolute inset-0 flex items-center justify-center rounded-full bg-(--text-tertiary) text-(--card) ${TASK_FADE} ${state === 'done' ? 'scale-100 opacity-100' : 'scale-50 opacity-0'} ${grow ? 'grow-check' : ''}`}
+        className={`absolute inset-0 flex items-center justify-center rounded-full bg-(--text-tertiary) text-(--card) check-scale ${state === 'done' ? 'scale-100 opacity-100' : 'scale-50 opacity-0'} ${grow ? 'grow-check' : ''}`}
       >
         <Check width={10} height={10} />
       </span>

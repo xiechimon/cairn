@@ -35,7 +35,7 @@ checkbox.tsx             # checkbox (registry-same-source + a one-piece zero-ski
 collapsible.tsx          # Base UI Collapsible (Root/Trigger/Content, registry-same-source): the registryDependency of trace.tsx; reach for Trace first when the disclosure is an activity line
 dialog-shell.tsx         # shared dialog base (e2e vehicle = role=dialog accessible name + dialog-head/-body/-foot testids, spec/22 §5.5)
 dialog.tsx
-dropdown-menu.tsx        # in-repo semantic mapping: z goes through the single --z-dialog ladder (#733), Content exposes anchor (#454); motion = upstream defaults (#991 Q9)
+dropdown-menu.tsx        # in-repo semantic mapping: z goes through the single --z-dialog ladder (#733), Content exposes anchor (#454); open motion retimed to --ease-out-expo at 100ms (owner motion pick), close stays instant via motion.css [data-closed]
 empty.tsx
 field.tsx                # form row composition (FieldGroup/Field/FieldLabel/FieldContent/FieldError…): all form layouts use it, do not hand-arrange with div + space-y
 input.tsx
@@ -46,11 +46,12 @@ marker.tsx               # shadcn Marker family (Marker/Icon/Content, separator/
 message-scroller.tsx     # shadcn MessageScroller family (Provider/Root/Viewport/Content/Item/Button + useMessageScroller hooks): the single implementation of the chat-stream scroll container (autoScroll bottom-follow + jump-to-latest + messageId pass-through); do not hand-write overflow-y-auto conversation columns anymore
 message.tsx              # shadcn Message family (Message/Avatar/Content/Header/Footer/Group): the chat-stream message row skeleton (avatar column + content column); row skinning belongs to bubble/marker
 popover.tsx              # in-repo semantic mapping: z goes through the single --z-dialog ladder (#733); motion = upstream defaults (#991 Q9)
+ring-spinner.tsx         # loading.dev Ring spinner (20% track + 16/62.8 arc, round cap, 800ms linear via .spin-ring; MIT attribution in spinner.NOTICE.md): a busy button puts it before its label with data-icon="inline-start" and stays disabled — the Button context sizes it (16px at sm, 20px at default); first page loads use skeleton.tsx instead
 seeded-avatar.tsx        # avatar adapter layer (src picture > tinted initial seeded by name > fallback image when there is no name; a broken picture falls back to the initial; Root is a fixed-size box, geometry via consumer className size-N, #983/#1003); always use it for avatars
 select.tsx               # single-select dropdown (registry-same-source compound family: Select/SelectTrigger/SelectValue/SelectContent/SelectItem, #1010 re-sourced, the XMON-75 hand-written form retired; the clear tier = a SelectItem with value=null, geometry/anchoring left to Base UI Positioner defaults); **do not use the native `<select>` anymore** — it pops the system menu, and sitting next to homemade popups that is two popup systems
 separator.tsx            # semantic divider (registryDependency of field.tsx): replaces <hr> and border-t divs
 skeleton.tsx             # first-load placeholder drawn in the card shape while data has not arrived; use it instead of a spinner or empty copy (no existing primitive covers this)
-spinner.tsx              # registry spinner (lucide Loader2, spins): a busy button puts it before its label with data-icon="inline-start" and stays disabled; first page loads use skeleton.tsx instead
+spinner.tsx              # upstream registry spinner (pristine, not used in product code — busy indicators use ring-spinner.tsx)
 status-chip.tsx          # the five-state task-status chip (idle/plan/confirm/done/failed, skin = --chip-* token pairs); lands on badge.tsx, the state vehicle is data-tone; replaces the old-track ui/chip.tsx (canonical table spec/22 §5.2, #942)
 switch.tsx
 tabs.tsx                 # default/line tiers ride the upstream native data-[variant] mechanism + zero-chrome TabsIndicator pass-through (#644, keep-or-go belongs to #1009); the segmented/bare hand-written tiers are retired (#991), the segmented control skin = the SEG_* recipes in pages/parts.ts

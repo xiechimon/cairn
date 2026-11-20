@@ -582,6 +582,55 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   }
 }
 
+@media (prefers-reduced-motion: no-preference) and (pointer: fine) {
+  [data-slot="button"]:is(
+    [data-variant="default"],
+    [data-variant="secondary"],
+    [data-variant="outline"],
+    [data-variant="destructive"]
+  ):not(
+    [data-size^="icon"],
+    [role="option"],
+    [role="menuitem"],
+    [role="switch"],
+    [role="tab"],
+    [data-row-kind],
+    :disabled,
+    [aria-disabled="true"],
+    :where(.tray-pop *)
+  ) {
+    transition:
+      color var(--dur-fast) var(--ease-standard),
+      background-color var(--dur-fast) var(--ease-standard),
+      border-color var(--dur-fast) var(--ease-standard),
+      outline-color var(--dur-fast) var(--ease-standard),
+      text-decoration-color var(--dur-fast) var(--ease-standard),
+      fill var(--dur-fast) var(--ease-standard),
+      stroke var(--dur-fast) var(--ease-standard),
+      scale var(--dur-fast) var(--ease-out-strong);
+  }
+
+  [data-slot="button"]:is(
+    [data-variant="default"],
+    [data-variant="secondary"],
+    [data-variant="outline"],
+    [data-variant="destructive"]
+  ):not(
+    [data-size^="icon"],
+    [role="option"],
+    [role="menuitem"],
+    [role="switch"],
+    [role="tab"],
+    [data-row-kind],
+    :disabled,
+    [aria-disabled="true"],
+    :where(.tray-pop *)
+  ):active {
+    transition-duration: 0s, 0s, 0s, 0s, 0s, 0s, 0s, var(--dur-fast);
+    scale: 0.97;
+  }
+}
+
 [data-slot="task-ref-guide"] {
   transition: color var(--dur-fast) var(--ease-standard);
 }
@@ -665,6 +714,42 @@ html:has([data-slot="demo-banner"]) .app-drawer {
     background-position: 0 55%;
     background-size: 100% 1px;
     animation: grow-strike-sweep 360ms var(--ease-standard) 420ms both;
+  }
+}
+
+@keyframes spin-ring-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility spin-ring {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: spin-ring-rotate var(--dur-spin) linear infinite;
+  }
+}
+
+@utility check-scale {
+  transition:
+    opacity var(--dur-fast) var(--ease-standard),
+    scale var(--dur-spring) var(--ease-check-spring);
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+@keyframes first-run-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+}
+
+@utility first-run-enter {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: first-run-enter var(--dur-enter) var(--ease-out-strong) both;
+    animation-delay: var(--enter-delay, 0ms);
   }
 }
 

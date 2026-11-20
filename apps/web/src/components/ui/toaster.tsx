@@ -1,10 +1,11 @@
 'use client';
 
-import { Info, LoaderCircle, OctagonX, TriangleAlert, X } from 'lucide-react';
+import { Info, OctagonX, TriangleAlert, X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { Toaster as Sonner, type ToasterProps, toast } from 'sonner';
 import { useI18n } from '../../i18n/provider.js';
+import { RingSpinner } from './ring-spinner.js';
 
 export function toastError(title: string, error: unknown): void {
   const reason = error instanceof Error && error.message !== '' ? error.message : null;
@@ -47,7 +48,7 @@ function Toaster({ ...props }: ToasterProps) {
         info: <Info className="size-5 text-content-secondary" />,
         warning: <TriangleAlert className="size-5 text-(--badge-attention)" />,
         error: <OctagonX className="size-5 text-destructive" />,
-        loading: <LoaderCircle className="size-5 animate-spin motion-reduce:animate-none" />,
+        loading: <RingSpinner className="size-5" />,
         close: <X className="size-4" />,
       }}
       style={

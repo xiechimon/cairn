@@ -20,6 +20,7 @@ import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import {
   Select,
   SelectContent,
@@ -27,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select.js';
-import { Spinner } from '../components/ui/spinner.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -155,7 +155,7 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
             disabled={mutations.patchAutonomy.isPending || invalid || !dirty}
             onClick={() => save(parsed, () => setDraft({}))}
           >
-            {mutations.patchAutonomy.isPending && <Spinner data-icon="inline-start" />}
+            {mutations.patchAutonomy.isPending && <RingSpinner data-icon="inline-start" />}
             {t('保存')}
           </Button>
         </div>
