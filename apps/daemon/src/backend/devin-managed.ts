@@ -242,6 +242,15 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
       return null;
     }
     const binRelPath = binary.cmd.replace(/^\.[/\\]/, '').replaceAll('\\', '/');
+    if (
+      /[/\\]/.test(agent.version) ||
+      agent.version === '..' ||
+      binRelPath.split('/').includes('..') ||
+      binRelPath.startsWith('/')
+    ) {
+      log(`devin registry entry has an unsafe version or cmd: ${agent.version} ${binary.cmd}`);
+      return null;
+    }
     return {
       version: agent.version,
       archive: binary.archive,

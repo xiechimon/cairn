@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -114,6 +114,7 @@ describe('gemini managed install', () => {
         version: '0.70.0',
         url: 'https://example.invalid/g.tgz',
         binRelPath: 'bundle/gemini.js',
+        binSha256: createHash('sha256').update('// bundle\n').digest('hex'),
         args: ['--acp'],
         installedAt: Date.now(),
       }),
@@ -122,5 +123,55 @@ describe('gemini managed install', () => {
     const current = managed.current();
     expect(current?.version).toBe('0.70.0');
     expect(current?.args[0]).toBe(join(versionDir, 'bundle', 'gemini.js'));
+  });
+
+  test('a tampered bundle fails the marker checksum and is not launched', async () => {
+    const dir = tempDir('gm-tamper-');
+    const tarball = makeTarball(dir);
+    const managed = createGeminiManaged({ root: join(dir, 'tools'), fetchImpl: fetchFor(tarball) });
+    await managed.ensure();
+    const bundle = join(dir, 'tools', 'versions', '0.70.0', 'bundle', 'gemini.js');
+    writeFileSync(bundle, '// tampered\n');
+    expect(managed.current()).toBeNull();
+  });
+
+  test('a registry version containing a path does not write outside tools/', async () => {
+    const dir = tempDir('gm-escape-');
+    const managed = createGeminiManaged({
+      root: join(dir, 'tools'),
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            agents: [
+              {
+                id: 'gemini',
+                version: '0.70.0',
+                distribution: {
+                  npx: { package: '@google/gemini-cli@../../escaped', args: ['--acp'] },
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+    });
+    expect(await managed.ensure()).toBeNull();
+    expect(existsSync(join(dir, 'escaped'))).toBe(false);
+    expect(existsSync(join(dir, 'tools', 'versions'))).toBe(false);
+  });
+
+  test('a live install lock makes ensure() defer to the holder', async () => {
+    const dir = tempDir('gm-lock-');
+    mkdirSync(`${join(dir, 'tools')}.lock`, { recursive: true });
+    let fetched = 0;
+    const managed = createGeminiManaged({
+      root: join(dir, 'tools'),
+      fetchImpl: async (url) => {
+        fetched += 1;
+        return fetchFor(makeTarball(dir))(url);
+      },
+    });
+    expect(await managed.ensure()).toBeNull();
+    expect(fetched).toBeLessThanOrEqual(2);
   });
 });

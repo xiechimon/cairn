@@ -51,6 +51,7 @@ const installMarkerSchema = z.object({
   url: z.string(),
   tarballSha1: z.string().optional(),
   binRelPath: z.string(),
+  binSha256: z.string(),
   args: z.array(z.string()).default(['--acp']),
   installedAt: z.number(),
 });
@@ -89,7 +90,9 @@ function markerOf(versionDir: string): InstallMarker | null {
 function parseNpmPackage(spec: string): { name: string; version: string } | null {
   const at = spec.lastIndexOf('@');
   if (at <= 0) return null;
-  return { name: spec.slice(0, at), version: spec.slice(at + 1) };
+  const version = spec.slice(at + 1);
+  if (version === '' || /[/\\]/.test(version) || version === '..') return null;
+  return { name: spec.slice(0, at), version };
 }
 
 function verifyTarball(bytes: Buffer, dist: { shasum?: string; integrity?: string }): boolean {
@@ -121,7 +124,8 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
     if (marker === null) return null;
     const binPath = join(versionDir, marker.binRelPath);
     try {
-      if (!existsSync(binPath) || !statSync(binPath).isFile()) return null;
+      const bytes = readFileSync(binPath);
+      if (createHash('sha256').update(bytes).digest('hex') !== marker.binSha256) return null;
     } catch {
       return null;
     }
@@ -176,6 +180,8 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
       log(`gemini registry package spec is unparseable: ${pkg}`);
       return null;
     }
+    const existing = current();
+    if (existing !== null && existing.version === parsed.version) return existing;
     const meta = npmDistSchema.safeParse(
       await fetchJson(`${npmRegistryUrl}/${parsed.name.replace('/', '%2f')}/${parsed.version}`),
     );
@@ -184,8 +190,9 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
       return null;
     }
     const lock = `${root}.lock`;
+    mkdirSync(root, { recursive: true });
     try {
-      mkdirSync(lock, { recursive: true });
+      mkdirSync(lock);
     } catch {
       try {
         if (Date.now() - statSync(lock).mtimeMs < LOCK_STALE_MS) return current();
@@ -210,12 +217,13 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
       try {
         const tarballPath = join(staging, 'pkg.tgz');
         writeFileSync(tarballPath, bytes);
-        await exec('tar', ['-xzf', tarballPath, '-C', staging]);
+        await exec('tar', ['-xzf', tarballPath, '-C', staging, 'package/bundle/gemini.js']);
         const bundle = join(staging, 'package', 'bundle', 'gemini.js');
         if (!existsSync(bundle)) {
           log('gemini tarball has no bundle/gemini.js');
           return null;
         }
+        const binSha256 = createHash('sha256').update(readFileSync(bundle)).digest('hex');
         const versionDir = join(root, 'versions', parsed.version);
         rmSync(versionDir, { recursive: true, force: true });
         mkdirSync(join(versionDir, 'bundle'), { recursive: true });
@@ -225,6 +233,7 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
           url: meta.data.dist.tarball,
           ...(meta.data.dist.shasum !== undefined ? { tarballSha1: meta.data.dist.shasum } : {}),
           binRelPath: 'bundle/gemini.js',
+          binSha256,
           args: npmArgs,
           installedAt: Date.now(),
         };
@@ -253,8 +262,6 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
   return {
     current,
     ensure: () => {
-      const existing = current();
-      if (existing !== null) return Promise.resolve(existing);
       pending ??= install().finally(() => {
         pending = null;
       });

@@ -413,6 +413,18 @@ export function createAntigravityManaged(
       log(`antigravity registry has no binary entry for ${key}`);
       return null;
     }
+    const binRelCandidate = binary.cmd.replace(/^\.[/\\]/, '').replaceAll('\\', '/');
+    if (
+      /[/\\]/.test(agent.version) ||
+      agent.version === '..' ||
+      binRelCandidate.split('/').includes('..') ||
+      binRelCandidate.startsWith('/')
+    ) {
+      log(
+        `antigravity registry entry has an unsafe version or cmd: ${agent.version} ${binary.cmd}`,
+      );
+      return null;
+    }
     const versionDir = join(root, 'versions', agent.version);
     const existing = managedInstallFromDir(versionDir);
     if (existing !== null) return existing;

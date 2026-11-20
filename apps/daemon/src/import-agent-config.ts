@@ -1,4 +1,12 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { parseClaudeMcpEntries } from '@cairn/shared';
@@ -7,7 +15,8 @@ import { z } from 'zod';
 import { claudeConfigHome } from './runtime-homes.js';
 
 const IMPORT_VERSION = 1;
-const SECRET_KEY = /key|token|secret|password|passwd|auth|credential/i;
+const SECRET_KEY =
+  /key|token|secret|pass|pwd|auth|credential|cookie|session|dsn|pem|bearer|private/i;
 
 const markerSchema = z.object({
   version: z.number(),
@@ -61,6 +70,7 @@ function readJsonObject(path: string): Record<string, unknown> | null {
 function writeJson(path: string, value: unknown): void {
   mkdirSync(join(path, '..'), { recursive: true });
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+  chmodSync(path, 0o600);
 }
 
 const codexMcpServerSchema = z.object({
@@ -87,7 +97,7 @@ export function importAgentConfig(
 
   const report: AgentConfigImportReport = { copied: [], skipped: [], failed: [] };
   const claudeHome = claudeConfigHome(cairnHome);
-  mkdirSync(claudeHome, { recursive: true });
+  mkdirSync(claudeHome, { recursive: true, mode: 0o700 });
 
   const userSkills = join(realHome, '.claude', 'skills');
   const managedSkills = join(claudeHome, 'skills');
