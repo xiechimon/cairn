@@ -214,9 +214,9 @@ export function CheckResultPopover({
   anchor: Element | null;
   open: boolean;
   onClose: () => void;
-  tone: Extract<ProviderTone, 'ok' | 'fail' | 'off'>;
+  tone: Extract<ProviderTone, 'ok' | 'fail' | 'off'> | 'checking';
   sentence: ReactNode;
-  detail: string;
+  detail: string | null;
   testId: string;
   detailTestId?: string;
   phase?: string;
@@ -237,7 +237,9 @@ export function CheckResultPopover({
         finalFocus={false}
         collisionPadding={12}
         data-testid={testId}
-        data-phase={phase ?? (tone === 'ok' ? 'passed' : 'failed')}
+        data-phase={
+          phase ?? (tone === 'checking' ? 'checking' : tone === 'ok' ? 'passed' : 'failed')
+        }
         className="w-96 max-w-[calc(100vw-24px)] gap-2 p-3"
       >
         <div role="status" className="flex flex-col gap-2">
@@ -247,18 +249,24 @@ export function CheckResultPopover({
               tone === 'fail' ? 'text-destructive' : 'text-foreground',
             )}
           >
-            <span
-              aria-hidden
-              className={cn('mt-2 size-1.5 flex-none rounded-full', TONE_DOT[tone])}
-            />
+            {tone === 'checking' ? (
+              <Spinner aria-hidden className="mt-0.5 size-4 flex-none text-content-tertiary" />
+            ) : (
+              <span
+                aria-hidden
+                className={cn('mt-2 size-1.5 flex-none rounded-full', TONE_DOT[tone])}
+              />
+            )}
             <span>{sentence}</span>
           </span>
-          <pre
-            data-testid={detailTestId}
-            className="m-0 rounded-md bg-secondary px-2.5 py-2 font-mono text-caption whitespace-pre-wrap text-content-secondary tabular-nums [overflow-wrap:anywhere]"
-          >
-            {detail}
-          </pre>
+          {detail !== null && (
+            <pre
+              data-testid={detailTestId}
+              className="m-0 rounded-md bg-secondary px-2.5 py-2 font-mono text-caption whitespace-pre-wrap text-content-secondary tabular-nums [overflow-wrap:anywhere]"
+            >
+              {detail}
+            </pre>
+          )}
         </div>
       </PopoverContent>
     </Popover>
@@ -286,7 +294,7 @@ export function useModelTests(
   const run = async (ids: readonly string[], anchor: Element | null) => {
     if (test === undefined || ids.length === 0) return;
     const started = generation.current;
-    setReport(null);
+    setReport({ ids, anchor, open: true });
     setChecks((prev) => ({
       ...prev,
       ...Object.fromEntries(ids.map((id) => [id, { phase: 'running' }])),
@@ -306,7 +314,9 @@ export function useModelTests(
       }
     };
     await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
-    if (generation.current === started) setReport({ ids, anchor, open: true });
+    if (generation.current === started) {
+      setReport((prev) => (prev?.ids === ids ? { ...prev, open: true } : prev));
+    }
   };
   const drop = (id: string) => {
     setChecks(({ [id]: _, ...rest }) => rest);
@@ -331,6 +341,27 @@ export function ModelTestReport({
 }) {
   const { t } = useI18n();
   if (report === null) return null;
+  const pending = report.ids.filter((id) => checks[id]?.phase === 'running').length;
+  if (pending > 0) {
+    return (
+      <CheckResultPopover
+        anchor={report.anchor}
+        open={report.open}
+        onClose={onClose}
+        tone="checking"
+        sentence={
+          report.ids.length === 1
+            ? t('正在测试 {id}…', { id: report.ids[0] ?? '' })
+            : t('正在测试 {done}/{n} 个模型…', {
+                done: report.ids.length - pending,
+                n: report.ids.length,
+              })
+        }
+        detail={null}
+        testId="model-test-result"
+      />
+    );
+  }
   const done = report.ids.flatMap((id) => {
     const check = checks[id];
     return check === undefined || check.phase === 'running' ? [] : [{ id, check }];
@@ -457,7 +488,7 @@ export function ModelChip({
             />
           }
         >
-          {running ? <Spinner aria-label={t('测试中')} /> : <Play aria-hidden />}
+          <Play aria-hidden />
         </IconTooltip>
       )}
       {onRemove !== undefined && (
@@ -538,12 +569,7 @@ export function TeamProviderEditor({
   };
   const ids = models.map((m) => m.id);
   const running = ids.filter((id) => checks[id]?.phase === 'running').length;
-  const summary =
-    ids.length === 0
-      ? null
-      : running > 0
-        ? t('测试中 {done}/{n}', { done: ids.length - running, n: ids.length })
-        : t('{n} 个', { n: ids.length });
+  const summary = ids.length === 0 ? null : t('{n} 个', { n: ids.length });
   return (
     <>
       <ProviderEditorHead
@@ -611,8 +637,8 @@ export function TeamProviderEditor({
                 disabled={running > 0 || ids.length === 0}
                 onClick={() => void tests.run(ids, testAllRef.current)}
               >
-                {running > 0 ? <Spinner aria-hidden /> : <Play aria-hidden />}
-                {running > 0 ? t('测试中') : t('全部测试')}
+                <Play aria-hidden />
+                {t('全部测试')}
               </Button>
             )}
           </span>

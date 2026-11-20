@@ -557,7 +557,6 @@ export const EN: Record<string, string> = {
     'That queued message was already sent; your edit was not applied',
   '丢弃本轮修改？': 'Discard this round’s changes?',
   // #1250（ADR 0018 层 1）verify 步状态与 fan-out 面。
-  验证中: 'Verifying',
   验证通过: 'Verification passed',
   验证未通过: 'Verification failed',
   // #731 `/` slash completion vocabulary (zh keys, en values).
@@ -2541,11 +2540,16 @@ export const EN: Record<string, string> = {
   上游返回的内容不像模型回复: 'The upstream reply does not look like a model reply',
   '连不上上游，检查地址': 'Cannot reach the upstream; check the address',
   没有可测的模型: 'No model to test',
-  测试中: 'Testing',
   没测完: 'Not finished',
   没有运行: 'Did not run',
+  '周 {left}%': 'wk {left}%',
+  '正在测试 {id}…': 'Testing {id}…',
+  '正在测试 {done}/{n} 个模型…': 'Testing models, {done} of {n} done…',
+  '正在让 Claude 回复一次很短的请求…': 'Asking Claude to answer one short request…',
+  '正在检查这个订阅的登录…': 'Checking this subscription’s sign-in…',
+  '正在让 Devin 检查这个凭据…': 'Asking Devin to check these credentials…',
+  '正在让 Antigravity 检查这个凭据…': 'Asking Antigravity to check these credentials…',
   '测试 {name}': 'Test {name}',
-  '测试中 {done}/{n}': 'Testing {done}/{n}',
   '{id} 回复了，能用。': '{id} answered; it works.',
   '{n} 个模型都回复了，能用。':
     '{n#1 The model answered; it works|All # models answered; they work}.',

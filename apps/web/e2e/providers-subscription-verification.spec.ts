@@ -147,6 +147,7 @@ test('a check never reflows the page: the result pops up from Verify, closes on 
   const mode = { current: 'slow' as Verify };
   await open(page, mode);
   await expect(row(page)).toContainText('订阅 · 3 个模型');
+  await expect(row(page).getByTestId('subscription-quota-mini')).toHaveText('5h 62%周 88%');
   await expectNoCheckStatus(page);
   await expect(result(page)).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -154,9 +155,14 @@ test('a check never reflows the page: the result pops up from Verify, closes on 
   await shot(page, 'idle');
 
   await verify(page).click();
+  await expect(result(page)).toHaveAttribute('data-phase', 'checking');
+  await expect(result(page)).toContainText('正在让 Claude 回复一次很短的请求…');
+  await expect(result(page).locator('[data-slot="spinner"]')).toHaveCount(1);
   await expect(verify(page)).toBeDisabled();
-  await expect(verify(page).locator('[data-slot="spinner"]')).toHaveCount(1);
+  await expect(verify(page)).toHaveText('验证');
+  await expect(verify(page).locator('[data-slot="spinner"]')).toHaveCount(0);
   expect(await top(page)).toBe(before);
+  await expectNoCheckStatus(page);
   await shot(page, 'checking');
 
   await expect(result(page)).toBeVisible();
@@ -312,6 +318,7 @@ test('a stored last check is not shown until the user runs one', async ({ page }
     },
   ]);
   await expect(row(page)).toContainText('Checked earlier');
+  await expect(row(page).getByTestId('subscription-quota-mini')).toHaveCount(0);
   await expectNoCheckStatus(page);
   await expect(result(page)).toHaveCount(0);
 });

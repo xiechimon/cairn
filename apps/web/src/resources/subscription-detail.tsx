@@ -26,7 +26,6 @@ import {
 import { isLowQuota } from '../components/settings/quota-row.js';
 import { SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import { Spinner } from '../components/ui/spinner.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { ACCENT_INK } from '../phase.js';
@@ -96,6 +95,14 @@ const PASSED_COPY: Record<AccountVendor, string> = {
   grok: '这个订阅的登录有效。',
   devin: 'Devin 接受了这个凭据。',
   antigravity: 'Antigravity 接受了这个凭据。',
+};
+
+const VERIFYING_COPY: Record<AccountVendor, string> = {
+  claude: '正在让 Claude 回复一次很短的请求…',
+  codex: '正在检查这个订阅的登录…',
+  grok: '正在检查这个订阅的登录…',
+  devin: '正在让 Devin 检查这个凭据…',
+  antigravity: '正在让 Antigravity 检查这个凭据…',
 };
 
 const MODEL_FAILURE_SHORT: Record<ProviderFailure, string> = { ...FAILURE_SHORT, auth: '登录失效' };
@@ -241,16 +248,21 @@ function quotaWindows(windows: readonly QuotaWindow[]): QuotaWindow[] {
   return WINDOW_ORDER.flatMap((name) => windows.filter((w) => w.name === name));
 }
 
-export function QuotaMiniBars({ windows }: { windows: readonly QuotaWindow[] }) {
+const QUOTA_MARKS: { name: string; label: string }[] = [
+  { name: 'five_hour', label: '5h {left}%' },
+  { name: 'seven_day', label: '周 {left}%' },
+];
+
+export function QuotaMarks({ windows }: { windows: readonly QuotaWindow[] }) {
   const { t } = useI18n();
-  const ordered = quotaWindows(windows);
-  if (ordered.length === 0) return null;
-  const summary = ordered
-    .map((w) =>
-      t('{window} 剩 {left}%', {
-        window: t(WINDOW_LABELS[w.name] ?? w.name),
-        left: leftPercent(w),
-      }),
+  const marks = QUOTA_MARKS.flatMap(({ name, label }) => {
+    const window = windows.find((w) => w.name === name);
+    return window === undefined ? [] : [{ name, label, left: leftPercent(window) }];
+  });
+  if (marks.length === 0) return null;
+  const summary = marks
+    .map(({ name, left }) =>
+      t('{window} 剩 {left}%', { window: t(WINDOW_LABELS[name] ?? name), left }),
     )
     .join(' · ');
   return (
@@ -259,22 +271,17 @@ export function QuotaMiniBars({ windows }: { windows: readonly QuotaWindow[] }) 
       role="img"
       aria-label={summary}
       title={summary}
-      className="mt-1.5 flex w-9 flex-none flex-col gap-1"
+      className="flex flex-none flex-col items-end gap-0.5 pt-0.5 text-caption text-content-tertiary tabular-nums"
     >
-      {ordered.map((window) => {
-        const left = leftPercent(window);
-        return (
-          <span key={window.name} className="block h-1 overflow-hidden rounded-full bg-secondary">
-            <i
-              className={cn(
-                'block h-full rounded-full',
-                isLowQuota(left) ? 'bg-(--card-button)' : 'bg-running',
-              )}
-              style={{ width: `${left}%` }}
-            />
-          </span>
-        );
-      })}
+      {marks.map(({ name, label, left }) => (
+        <span
+          key={name}
+          data-window={name}
+          className={cn('whitespace-nowrap', isLowQuota(left) && ACCENT_INK)}
+        >
+          {t(label, { left })}
+        </span>
+      ))}
     </span>
   );
 }
@@ -377,9 +384,22 @@ function VerifyResultPopover({
   if (seen !== verification) {
     setSeen(verification);
     setAt(Date.now());
-    setOpen(verification !== undefined && verification.phase !== 'verifying');
+    setOpen(verification !== undefined);
   }
-  if (verification === undefined || verification.phase === 'verifying') return null;
+  if (verification === undefined) return null;
+  if (verification.phase === 'verifying') {
+    return (
+      <CheckResultPopover
+        anchor={anchor}
+        open={open}
+        onClose={() => setOpen(false)}
+        tone="checking"
+        sentence={t(VERIFYING_COPY[vendor])}
+        detail={null}
+        testId="subscription-verify-feedback"
+      />
+    );
+  }
   return (
     <CheckResultPopover
       anchor={anchor}
@@ -470,10 +490,7 @@ export function SubscriptionDetail({
   }
   const ids = models.map((model) => model.id);
   const running = ids.filter((id) => checks[id]?.phase === 'running').length;
-  const summary =
-    running > 0
-      ? t('测试中 {done}/{n}', { done: ids.length - running, n: ids.length })
-      : t('{n} 个', { n: ids.length });
+  const summary = t('{n} 个', { n: ids.length });
   const runtime = SUBSCRIPTION_RUNTIME[account.vendor];
   const runtimeLabel =
     runtime === undefined ? VENDORS[account.vendor].label : MODEL_SOURCE_RUNTIME_LABELS[runtime];
@@ -527,12 +544,10 @@ export function SubscriptionDetail({
                 variant="outline"
                 size="sm"
                 data-testid="subscription-verify"
-                className="min-w-20"
                 disabled={verifying}
                 onClick={actions.onVerify}
               >
-                {verifying && <Spinner aria-hidden />}
-                {verifying ? t('验证中') : t('验证')}
+                {t('验证')}
               </Button>
             )}
           </span>
@@ -579,8 +594,8 @@ export function SubscriptionDetail({
                 disabled={running > 0 || ids.length === 0}
                 onClick={() => void tests.run(ids, testAllRef.current)}
               >
-                {running > 0 ? <Spinner aria-hidden /> : <Play aria-hidden />}
-                {running > 0 ? t('测试中') : t('全部测试')}
+                <Play aria-hidden />
+                {t('全部测试')}
               </Button>
             )}
           </span>

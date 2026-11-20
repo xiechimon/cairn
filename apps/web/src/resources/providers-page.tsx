@@ -59,7 +59,7 @@ import {
   TeamProviderEditor,
 } from './provider-editors.js';
 import {
-  QuotaMiniBars,
+  QuotaMarks,
   type SubscriptionActions,
   SubscriptionDetail,
   subscriptionModels,
@@ -161,7 +161,7 @@ function subscriptionEntries(
         Mark: VENDORS[account.vendor].Mark,
         status: subscriptionSummary(account, view, rowModels, deps.now, deps.t),
         tone: subscriptionRowTone(view, rowModels),
-        aside: <QuotaMiniBars windows={account.windows} />,
+        aside: <QuotaMarks windows={account.windows} />,
       },
       editor: (
         <SubscriptionDetail

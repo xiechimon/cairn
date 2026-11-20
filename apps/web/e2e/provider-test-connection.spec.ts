@@ -100,6 +100,10 @@ test('test all pops its result up from the button, never reflows the editor, and
   const before = await top();
   await editor(page).getByTestId('provider-test-all').click();
   await expect(chip(page, 'small-model')).toHaveAttribute('data-check', 'running');
+  await expect(report(page)).toHaveAttribute('data-phase', 'checking');
+  await expect(report(page)).toContainText('正在测试 0/2 个模型…');
+  await expect(editor(page).getByTestId('provider-models-summary')).toHaveText('2 个');
+  await expect(editor(page).getByTestId('provider-test-all')).toHaveText('全部测试');
   expect(await top()).toBe(before);
   release?.();
 
