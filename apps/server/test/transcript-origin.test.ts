@@ -75,6 +75,14 @@ test('upsertMessage persists origin and keeps it across conflict updates', () =>
   const row = s.db.select().from(message).where(eq(message.id, 'm-1')).get();
   expect(row?.origin).toBe('user');
   upsertMessage(s.svc, {
+    id: 'm-1',
+    conversationId: 'conv-1',
+    role: 'user',
+    content: 'v3',
+    createdAt: 4,
+  });
+  expect(s.db.select().from(message).where(eq(message.id, 'm-1')).get()?.origin).toBe('user');
+  upsertMessage(s.svc, {
     id: 'm-2',
     conversationId: 'conv-1',
     role: 'user',

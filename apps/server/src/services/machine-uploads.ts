@@ -119,6 +119,8 @@ export function receiveUpload(
         role: m.role,
         content: m.content,
         createdAt: m.createdAt,
+        origin:
+          m.role === 'user' && m.id === transcriptPromptRowId(body.stepId) ? 'task-prompt' : null,
       });
       continue;
     }

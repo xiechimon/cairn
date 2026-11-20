@@ -76,7 +76,7 @@ describe('chief thread reports and quiet event turns (#1784)', () => {
     const items = mapChiefStream([
       row('user-reminder', 'user', '[wake:wake] provenance=wake:w1\nCheck task progress'),
       row('wake-reply', 'assistant', 'Nothing new.'),
-      row('user-next', 'user', 'How is it going?'),
+      { ...row('user-next', 'user', 'How is it going?'), origin: 'user' },
       row('reply', 'assistant', 'Still running.'),
     ]);
     expect(items.map((item) => item.kind)).toEqual(['user', 'robot']);
@@ -115,7 +115,7 @@ describe('chief thread reports and quiet event turns (#1784)', () => {
 
   test('a user turn reply before a wake keeps its text and tool pills', () => {
     const items = mapChiefStream([
-      row('user-1', 'user', 'Check the board'),
+      { ...row('user-1', 'user', 'Check the board'), origin: 'user' },
       row('tool', 'assistant', {
         kind: 'toolcall',
         call: { id: 'call-1', name: 'todos', arguments: {}, result: [] },

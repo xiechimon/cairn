@@ -1753,6 +1753,15 @@ export function askQuestionOfContent(content: unknown): {
 
 const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
 
+function isChiefPromptEcho(m: MessageRow): boolean {
+  if (m.origin === 'user') return false;
+  return (
+    m.origin === 'task-prompt' ||
+    m.origin === 'synthetic' ||
+    m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+  );
+}
+
 function chiefUserText(raw: string): string {
   return stripTurnContext(stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, ''))).trim();
 }
@@ -1872,11 +1881,6 @@ function collectChiefStream(
   let lastAt = 0;
   const pendingById = new Map<string, ChiefStreamItem>();
   let fallback: { model: string; stepId: string } | null = null;
-  const postedTexts = new Set(
-    messages
-      .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
-      .map((m) => chiefUserText(textOfContent(m.content).trim())),
-  );
   let pendingTools: ChiefToolRow[] = [];
   let pendingCards: ChiefStreamItem[] = [];
   const flushCards = () => {
@@ -1904,12 +1908,10 @@ function collectChiefStream(
         : m.id;
       if (stepOfRow !== fallback.stepId) fallback = null;
     }
-    if (m.role === 'user' && m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) {
+    if (m.role === 'user' && isChiefPromptEcho(m)) {
       eventTurn = WAKE_MARKER_PREFIX_RE.test(textOfContent(m.content).trim());
-      if (eventTurn) {
-        pendingTools = [];
-        continue;
-      }
+      if (eventTurn) pendingTools = [];
+      continue;
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
     if (m.role === 'user' && pendingState === undefined) eventTurn = false;
@@ -2073,7 +2075,6 @@ function collectChiefStream(
     if (m.role === 'user') {
       const text = chiefUserText(rawText);
       if (text === '') continue;
-      if (m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) && postedTexts.has(text)) continue;
       pendingTools = [];
       flushCards();
       const head = orchestratePromptHeadOf(text);

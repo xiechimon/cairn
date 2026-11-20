@@ -425,6 +425,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         role: 'user',
         content: row.prompt,
         createdAt: nowMs(),
+        origin: 'task-prompt',
       });
     }
     const volatileParts = context.sections;

@@ -24,6 +24,7 @@ import {
   machineStrain,
   PROGRESS_ACTIVITY_PHASES,
   parseReportedCapabilities,
+  transcriptPromptRowId,
 } from '@cairn/shared';
 import { and, asc, eq, isNotNull, isNull, lt, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -712,6 +713,8 @@ export function reportTranscriptRow(
 ): void {
   const owned = ownedStep(deps, machineId, stepId);
   markProgress(deps, owned);
+  const origin =
+    row.role === 'user' && row.id === transcriptPromptRowId(stepId) ? 'task-prompt' : null;
   if (isChiefConversation(owned.buildId)) {
     upsertChiefRow(deps, {
       id: row.id,
@@ -719,6 +722,7 @@ export function reportTranscriptRow(
       role: row.role,
       content: row.content,
       createdAt: row.createdAt,
+      origin,
     });
     return;
   }
@@ -728,6 +732,7 @@ export function reportTranscriptRow(
     role: row.role,
     content: row.content,
     createdAt: row.createdAt,
+    origin,
   });
 }
 

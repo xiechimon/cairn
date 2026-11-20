@@ -14,6 +14,7 @@ import type {
   Phase,
   ThreadReportContent,
   TodoRecord,
+  TranscriptUserOrigin,
   UserRecord,
 } from '@cairn/shared';
 import {
@@ -708,7 +709,13 @@ function directThreadMessagesSinceLastTurn(db: Db, threadId: string): string | n
   const lastUser = db
     .select({ createdAt: chiefMessage.createdAt })
     .from(chiefMessage)
-    .where(and(eq(chiefMessage.threadId, threadId), eq(chiefMessage.role, 'user')))
+    .where(
+      and(
+        eq(chiefMessage.threadId, threadId),
+        eq(chiefMessage.role, 'user'),
+        notLike(chiefMessage.id, `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`),
+      ),
+    )
     .orderBy(desc(chiefMessage.createdAt))
     .get();
   const lines = db
@@ -829,6 +836,7 @@ export function submitChiefMessage(
     role: 'user' as const,
     content: body.content,
     projectId: picked?.id ?? null,
+    origin: 'user' as const,
     createdAt: now,
   };
   try {
@@ -843,6 +851,7 @@ export function submitChiefMessage(
           role: 'user',
           content: body.content,
           projectId: message.projectId,
+          origin: 'user',
           createdAt: now,
         })
         .run();
@@ -1316,10 +1325,10 @@ function insertThreadReport(
       );
     }
   }
-  deps.db.transaction(() => {
-    for (const report of reports) upsertChiefMessage(deps.db, report);
-  });
-  for (const report of reports) deps.convHub?.publishMessage(report.threadId, report);
+  const stored = deps.db.transaction(() =>
+    reports.map((report) => upsertChiefMessage(deps.db, report)),
+  );
+  for (const report of stored) deps.convHub?.publishMessage(report.threadId, report);
 }
 
 function isWatched(chiefs: ChiefRow[], todoId: string): boolean {
@@ -2085,6 +2094,7 @@ type ChiefMessageWrite = {
   content: unknown;
   createdAt: number;
   projectId?: string | null;
+  origin?: TranscriptUserOrigin | null;
 };
 
 function storedChiefMessage(db: Db, row: ChiefMessageWrite) {
@@ -2095,6 +2105,7 @@ function storedChiefMessage(db: Db, row: ChiefMessageWrite) {
     ...row,
     content: scrubMailFenceContent(row.content),
     projectId: row.projectId === undefined ? writingTurnProjectId(db, row) : row.projectId,
+    origin: row.origin ?? null,
   };
 }
 
@@ -2111,7 +2122,12 @@ export function upsertChiefMessage(db: Db, row: ChiefMessageWrite) {
     .values(stored)
     .onConflictDoUpdate({
       target: chiefMessage.id,
-      set: { role: stored.role, content: stored.content, createdAt: stored.createdAt },
+      set: {
+        role: stored.role,
+        content: stored.content,
+        createdAt: stored.createdAt,
+        origin: sql`coalesce(excluded.origin, ${chiefMessage.origin})`,
+      },
     })
     .run();
   db.update(chiefThread).set({ updatedAt: nowMs() }).where(eq(chiefThread.id, row.threadId)).run();

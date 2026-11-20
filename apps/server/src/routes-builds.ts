@@ -84,6 +84,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
           content: r.content,
           createdAt: r.createdAt,
           projectId: r.projectId,
+          origin: r.origin,
         })),
         chips: [],
         historyEpoch: 0,

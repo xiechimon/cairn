@@ -1222,6 +1222,7 @@ export const chiefMessage = sqliteTable('chief_message', {
   content: json<unknown>('content').notNull(),
   projectId: text('projectId'),
   delivery: text('delivery').$type<ChiefMessageDelivery>(),
+  origin: text('origin').$type<TranscriptUserOrigin>(),
   createdAt: epochMs('createdAt').notNull(),
 });
 

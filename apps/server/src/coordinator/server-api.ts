@@ -1,5 +1,9 @@
-import { coordinatorConversationKey, quickRepliesRowId } from '@cairn/shared';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import {
+  coordinatorConversationKey,
+  quickRepliesRowId,
+  TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+} from '@cairn/shared';
+import { and, eq, gt, isNull, notLike } from 'drizzle-orm';
 import {
   chiefMessage,
   coordinatorConversation,
@@ -88,6 +92,7 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         and(
           eq(chiefMessage.threadId, owned.buildId),
           eq(chiefMessage.role, 'user'),
+          notLike(chiefMessage.id, `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`),
           gt(chiefMessage.createdAt, owned.claimedAt ?? owned.createdAt),
         ),
       )

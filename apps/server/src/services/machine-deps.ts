@@ -1,6 +1,6 @@
 import type { GitIdentity, StepRecord, TranscriptUserOrigin, UserRecord } from '@cairn/shared';
 import { isChiefConversationId } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, message, step, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
@@ -115,7 +115,7 @@ export function upsertMessage(
         content: row.content,
         createdAt: row.createdAt,
         actor: null,
-        origin: row.origin ?? null,
+        origin: sql`coalesce(excluded.origin, ${message.origin})`,
       },
     })
     .run();
@@ -124,7 +124,7 @@ export function upsertMessage(
 
 export function upsertChiefRow(
   deps: { db: Db; convHub?: ConversationStreamHub },
-  row: MessageRowInput & { threadId: string },
+  row: MessageRowInput & { threadId: string; origin?: TranscriptUserOrigin | null },
 ): void {
   const stored = upsertChiefMessage(deps.db, row);
   deps.convHub?.publishMessage(row.threadId, stored);
