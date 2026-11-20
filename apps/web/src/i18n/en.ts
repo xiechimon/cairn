@@ -1237,6 +1237,8 @@ export const EN: Record<string, string> = {
   // #1285 失败行指引按分类分族
   '请将这台执行机重新上线。这一步不会改派到其他执行机。':
     'Bring this Runner back online. This step is not reassigned.',
+  '连接模型服务时超时或断开，通常是暂时的，重跑即可。':
+    'The connection to the model service timed out or dropped. This is usually temporary; run it again.',
   '模型额度已用尽，请等待额度恢复后重试。':
     'Model quota exhausted — wait for it to recover, then retry.',
   '请求被限流，请稍后重试。': 'Rate limited — retry later.',

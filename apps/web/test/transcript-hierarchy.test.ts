@@ -250,7 +250,7 @@ describe('task thread hierarchy', () => {
     const fails = items.filter((item) => item.kind === 'fail');
     expect(fails).toHaveLength(1);
     expect(fails[0]).toMatchObject({
-      body: '请将这台执行机重新上线。这一步不会改派到其他执行机。',
+      body: '连接模型服务时超时或断开，通常是暂时的，重跑即可。',
     });
   });
 

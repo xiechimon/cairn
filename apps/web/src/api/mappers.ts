@@ -1287,7 +1287,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
   switch (kind) {
     case 'network':
-      return '请将这台执行机重新上线。这一步不会改派到其他执行机。';
+      return '连接模型服务时超时或断开，通常是暂时的，重跑即可。';
     case 'quota':
       return '模型额度已用尽，请等待额度恢复后重试。';
     case 'capacity':
